@@ -364,11 +364,11 @@ export function StrategyContentOpportunitiesSection({
                 <div className="mt-4">
                   <div className="flex items-center gap-2 mb-2">
                     <Icon as={Target} size="md" className="text-accent-warning" />
-                    <span className="t-caption font-medium text-[var(--brand-text)]">Review Keyword Ideas</span>
+                    <span className="t-caption font-medium text-[var(--brand-text)]">Market Evidence To Review</span>
                     <span className="t-caption-sm text-[var(--brand-text-muted)]">({strategyData.keywordGaps.length})</span>
                   </div>
                   <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">
-                    Search terms seen in competitor or market data. These are review candidates, not automatic recommendations.
+                    Search terms seen in competitor or market data. These are evidence candidates, not selected strategy actions.
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {strategyData.keywordGaps.slice(0, expandedSections.has('competitor-gaps-all') ? undefined : 6).map((gap, i) => (

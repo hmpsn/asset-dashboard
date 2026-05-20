@@ -30,7 +30,7 @@
           "source": "ADMIN_UX_AUDIT P2-7",
           "est": "2-3h",
           "priority": "P1",
-          "notes": "Shipped in feat/admin-ux-pr4-onboarding — OnboardingChecklist modal overlay on WorkspaceHome first visit. 4 steps: Connect Webflow, Connect GSC, Run First Audit, Set Client Password. Blue progress bar, teal checkmarks, localStorage dismissal per workspace, auto-celebrate on completion. Feature #291.",
+          "notes": "Shipped in feat/admin-ux-pr4-onboarding \u2014 OnboardingChecklist modal overlay on WorkspaceHome first visit. 4 steps: Connect Webflow, Connect GSC, Run First Audit, Set Client Password. Blue progress bar, teal checkmarks, localStorage dismissal per workspace, auto-celebrate on completion. Feature #291.",
           "status": "done",
           "shippedAt": "2026-04-13"
         },
@@ -40,7 +40,7 @@
           "source": "FEATURE_VISION #14",
           "est": "8-12h",
           "priority": "P1",
-          "notes": "Register as official Webflow App → appear in Marketplace → one-click install. Zero-cost distribution channel. Depends on OAuth (#100).",
+          "notes": "Register as official Webflow App \u2192 appear in Marketplace \u2192 one-click install. Zero-cost distribution channel. Depends on OAuth (#100).",
           "status": "pending"
         },
         {
@@ -49,7 +49,7 @@
           "source": "MONETIZATION.md White-Label",
           "est": "4-6h",
           "priority": "P1",
-          "notes": "CNAME + reverse proxy. Configurable branding (logo, colors, favicon, email sender, chatbot persona). Agency resale tiers ($299-999/mo). Moved from Sprint C — fits better with distribution/growth.",
+          "notes": "CNAME + reverse proxy. Configurable branding (logo, colors, favicon, email sender, chatbot persona). Agency resale tiers ($299-999/mo). Moved from Sprint C \u2014 fits better with distribution/growth.",
           "status": "pending"
         },
         {
@@ -65,7 +65,7 @@
     },
     {
       "id": "sprint-intelligence-quality-consolidation",
-      "name": "Intelligence Quality Consolidation — Recommendations & AI Content",
+      "name": "Intelligence Quality Consolidation \u2014 Recommendations & AI Content",
       "hours": "50-82",
       "rationale": "Close the root quality gaps in platform insights and AI content generation by joining mature subsystems through the existing intelligence conventions instead of hand-rolling context, scoring, narrative, and evidence handling per feature. The target architecture is: workspace data -> intelligence slices -> shared generation context -> AI operation contract -> deterministic recommendation/story output -> tracked action/outcome -> future intelligence. The remaining keyword work extends this consolidation into a full keyword operating loop: provider source data -> shared keyword intelligence -> strategy/recommendation judgment -> rank-tracking propagation -> content/action follow-through -> outcome feedback.",
       "items": [
@@ -103,7 +103,7 @@
           "est": "5-8h",
           "priority": "P1",
           "status": "done",
-          "notes": "Completed in PR4. Added `server/signal-story-registry.ts` as the server-local boundary for signal→story projection across three surfaces: client insight narratives, deterministic briefing insight dispatch, and overlapping recommendation copy. `server/insight-narrative.ts` now consumes the registry instead of hand-writing inline narrative maps, which closed generic fallback gaps for `audit_finding`, `site_health`, and `milestone_attribution` while keeping explicit non-client exclusions for `strategy_alignment` and `keyword_cluster`. `server/briefing-templates/index.ts` now routes insight/content-gap dispatch through the shared registry boundary without replacing the existing deterministic templates. `server/recommendations.ts` now uses centralized story copy builders for content gaps, ranking opportunities, content decay, CTR underperformance, and freshness alerts so overlapping signals stop inventing separate phrasing. Added focused coverage in `tests/unit/signal-story-registry.test.ts` and updated narrative coverage tests."
+          "notes": "Completed in PR4. Added `server/signal-story-registry.ts` as the server-local boundary for signal\u2192story projection across three surfaces: client insight narratives, deterministic briefing insight dispatch, and overlapping recommendation copy. `server/insight-narrative.ts` now consumes the registry instead of hand-writing inline narrative maps, which closed generic fallback gaps for `audit_finding`, `site_health`, and `milestone_attribution` while keeping explicit non-client exclusions for `strategy_alignment` and `keyword_cluster`. `server/briefing-templates/index.ts` now routes insight/content-gap dispatch through the shared registry boundary without replacing the existing deterministic templates. `server/recommendations.ts` now uses centralized story copy builders for content gaps, ranking opportunities, content decay, CTR underperformance, and freshness alerts so overlapping signals stop inventing separate phrasing. Added focused coverage in `tests/unit/signal-story-registry.test.ts` and updated narrative coverage tests."
         },
         {
           "id": "intel-quality-outcome-learning-default-path",
@@ -201,8 +201,16 @@
           "source": "Keyword intelligence operating-loop discussion 2026-05-19",
           "est": "6-10h",
           "priority": "P1",
+          "status": "done",
+          "notes": "After source data, shared intelligence, and propagation are in place, make the keyword strategy experience visibly more useful to admins and clients. This is the PR13 quality/UX pass that turns the backend operating loop into product value.\n\nIntent:\n- Move the platform from \u201cwe generated a keyword strategy\u201d to \u201chere is the keyword operating plan, why each keyword was chosen, how it is performing, what changed, and what to do next.\u201d\n\nImplementation opportunities:\n- Add a strategy refresh summary: keywords added, removed/deprecated, reassigned to new pages, preserved because manually pinned/client-requested, and content gaps newly created or resolved.\n- Add keyword-level explainability using the shared keyword intelligence explanation primitives: source evidence, business fit, client feedback, existing page conflict/cannibalization posture, authority posture, opportunity score, and whether AI reranking or deterministic scoring influenced the choice.\n- Improve admin surfaces around page keyword maps: show why each page has its primary keyword, whether it came from GSC/provider/client request/competitor gap/source expansion, and whether the platform considers it reachable now or authority-building.\n- Improve rank-tracking and Page Intelligence handoff: show newly tracked keywords, tracking status, baseline state, and whether rank data is waiting for the next snapshot.\n- Improve client Strategy tab copy without overexposing internals: frame strategy changes as \u201cwhat changed,\u201d \u201cwhat we are watching,\u201d and \u201cwhat we recommend doing next.\u201d\n- Connect keyword choices to content actions: generate brief CTA for new content gaps, optimization CTA for existing-page keyword moves, and recommendation card refreshes for newly underperforming or newly reachable opportunities.\n- Preserve no-publishing/no-auto-action posture: this PR should explain and queue actions, not silently publish content or change live site metadata.\n\nTests:\n- Component/hook tests for refresh summary and keyword explanation rendering if UI changes land.\n- Contract tests ensuring explanation payloads remain optional/backward-compatible if exposed through existing APIs.\n- Integration tests proving a regenerated strategy can produce a coherent change set and that deprecated/reassigned keywords render safely.\n- Staging QA on at least two workspaces: an established site with rich GSC/provider data and a sparse/cold-start site.\n\nAcceptance criteria:\n- Admins can quickly answer: why this keyword, what changed, what should we track, and what action should happen next.\n- Clients see a clearer strategy story without raw-provider jargon.\n- Keyword choices are connected to content briefs/recommendations/rank tracking in the UI.\n- No client API breakage and no automatic publishing behavior is introduced.\n\nPrerequisite now satisfied by `intel-quality-keyword-strategy-refactor-signal-hygiene`: PR13 can build UX/explainability on sanitized strategy outputs, lifecycle-retired stale tracking keywords, and signal-boundary-filtered keyword insights rather than compensating for noisy backend primitives.\n\nCompleted in PR13 on 2026-05-20. Added the visible strategy quality/action-loop layer on top of the PR10-PR12 source, lifecycle, and shared keyword-intelligence work.\n\nWhat changed:\n- Added shared optional strategy UX contracts in `shared/types/keyword-strategy-ux.ts` for refresh summaries, keyword explanations, tracking/action state, and raw evidence posture.\n- Added `server/keyword-strategy-ux.ts`, a read-only assembler that derives explanations from existing strategy, page keyword, content-gap, keyword-gap, feedback, rank-tracking lifecycle, and shared keyword-intelligence evaluation data.\n- Extended admin strategy reads, strategy diff reads, and public/client strategy reads backward-compatibly with optional `strategyUx` / summary / explanation fields.\n- Upgraded admin \"What Changed\" into a refresh summary with added/retained/reassigned/retired/preserved counts and explanation previews.\n- Relabeled competitor keyword gaps as raw provider evidence so noisy provider terms are not presented as selected strategy actions.\n- Added client-safe strategy refresh and explanation affordances in the Strategy tab, keyword drawer, and page keyword map, preserving existing feedback/request flows.\n- Added small rank-tracker handoff labels for strategy/client-sourced tracked keywords.\n\nScope boundaries preserved:\n- No scoring/ranking rewrite, no automatic regeneration, no publishing/live metadata writes, no DB migration, and no local SEO implementation.\n- Optional fields are additive and absent-safe for existing callers.\n\nVerification coverage:\n- Added focused tests for refresh summary counts, keyword explanation mapping, raw evidence posture, and client-safe omission of competitor-gap evidence."
+        },
+        {
+          "id": "intel-quality-keyword-normalization-route-reliability-hardening",
+          "title": "Keyword normalization and route reliability hardening",
           "status": "pending",
-          "notes": "After source data, shared intelligence, and propagation are in place, make the keyword strategy experience visibly more useful to admins and clients. This is the PR13 quality/UX pass that turns the backend operating loop into product value.\n\nIntent:\n- Move the platform from “we generated a keyword strategy” to “here is the keyword operating plan, why each keyword was chosen, how it is performing, what changed, and what to do next.”\n\nImplementation opportunities:\n- Add a strategy refresh summary: keywords added, removed/deprecated, reassigned to new pages, preserved because manually pinned/client-requested, and content gaps newly created or resolved.\n- Add keyword-level explainability using the shared keyword intelligence explanation primitives: source evidence, business fit, client feedback, existing page conflict/cannibalization posture, authority posture, opportunity score, and whether AI reranking or deterministic scoring influenced the choice.\n- Improve admin surfaces around page keyword maps: show why each page has its primary keyword, whether it came from GSC/provider/client request/competitor gap/source expansion, and whether the platform considers it reachable now or authority-building.\n- Improve rank-tracking and Page Intelligence handoff: show newly tracked keywords, tracking status, baseline state, and whether rank data is waiting for the next snapshot.\n- Improve client Strategy tab copy without overexposing internals: frame strategy changes as “what changed,” “what we are watching,” and “what we recommend doing next.”\n- Connect keyword choices to content actions: generate brief CTA for new content gaps, optimization CTA for existing-page keyword moves, and recommendation card refreshes for newly underperforming or newly reachable opportunities.\n- Preserve no-publishing/no-auto-action posture: this PR should explain and queue actions, not silently publish content or change live site metadata.\n\nTests:\n- Component/hook tests for refresh summary and keyword explanation rendering if UI changes land.\n- Contract tests ensuring explanation payloads remain optional/backward-compatible if exposed through existing APIs.\n- Integration tests proving a regenerated strategy can produce a coherent change set and that deprecated/reassigned keywords render safely.\n- Staging QA on at least two workspaces: an established site with rich GSC/provider data and a sparse/cold-start site.\n\nAcceptance criteria:\n- Admins can quickly answer: why this keyword, what changed, what should we track, and what action should happen next.\n- Clients see a clearer strategy story without raw-provider jargon.\n- Keyword choices are connected to content briefs/recommendations/rank tracking in the UI.\n- No client API breakage and no automatic publishing behavior is introduced.\n\nPrerequisite now satisfied by `intel-quality-keyword-strategy-refactor-signal-hygiene`: PR13 can build UX/explainability on sanitized strategy outputs, lifecycle-retired stale tracking keywords, and signal-boundary-filtered keyword insights rather than compensating for noisy backend primitives."
+          "source": "PR13 review follow-up before local SEO 2026-05-20",
+          "owner": "analytics-intelligence",
+          "notes": "Add this immediately after PR13 and before the local SEO intelligence layer. PR13 review surfaced two platform-wide hardening seams that are not new PR13 bugs but are likely contributors to keyword-loop gremlins and harder-to-debug failures: (1) many keyword comparison paths still use local variants such as `toLowerCase().trim()` while the PR12 shared keyword-intelligence engine uses punctuation-stripping canonical normalization, and (2) many legacy async Express route handlers still rely on implicit promise behavior rather than explicit `try/catch next(err)` wrappers or a shared async-route helper.\n\nWhy this should happen before local SEO:\n- Local SEO will multiply keyword variants with city, neighborhood, near-me, service-area, punctuation, pluralization, and modifier patterns. If canonical keyword equality is not shared first, local SEO can reintroduce duplicate tracking rows, missed declined-keyword suppression, stale strategy terms, mismatched page-map coverage, and inconsistent feedback matching.\n- The keyword operating loop now spans provider evidence, strategy synthesis, shared keyword-intelligence filtering, rank tracking, client feedback, page intelligence, strategy UX, and future local-intent scoring. A single shared normalization contract is the simplest way to keep those surfaces from disagreeing about whether two terms are the same keyword.\n- Async route wrapper cleanup is less directly tied to keyword quality, but it improves reliability and observability when provider calls, strategy reads, public client reads, or AI/helper routes fail. This reduces confusing CI/runtime failures and makes future local SEO work safer to debug.\n\nScope for the hardening PR:\n1. Create a shared keyword normalization contract that can be imported by both server and client code. Prefer a small shared utility or shared keyword type helper that mirrors the PR12 canonical behavior: lowercase, strip punctuation to spaces, collapse whitespace, and trim. Preserve provider-specific cache keys or display strings where exact casing/punctuation is intentionally meaningful.\n2. Audit all keyword equality/dedupe/map-key paths that still use local `toLowerCase().trim()`, ad hoc `normalizeKeyword()` functions, or punctuation-insensitive matching. Prioritize high-value keyword-loop paths first: keyword strategy synthesis/enrichment/persistence, recommendations, rank tracking, page keywords, public/client feedback, content gaps, keyword gaps, topical authority coverage, Page Intelligence keyword joins, provider metric caches, and client Strategy/Rank Tracker display helpers.\n3. Migrate comparisons and map keys to the shared normalizer where semantic keyword equality is intended. Do not blindly change provider API request payloads, human-facing display text, or cache keys where exact raw keyword strings are part of the provider contract; document exceptions inline if needed.\n4. Add regression tests for canonical equality: punctuation, case, extra whitespace, `near me` phrases, service/location modifiers, declined-keyword suppression, duplicate rank-tracking prevention, strategy-vs-client feedback matching, and client/server parity. Include real observed noisy/legacy cases where useful.\n5. Add a focused async route reliability pass for touched keyword/public strategy routes and other high-value keyword-loop endpoints. Prefer a small shared wrapper if the project already has or accepts one; otherwise use explicit `try/catch next(err)` consistently. Avoid whole-repo route churn in the same PR unless the diff stays reviewable.\n6. Update docs/rules or a focused guardrail doc to explain when to use canonical keyword normalization versus raw keyword strings. Add a pr-check guard only if the pattern is mechanizable without excessive false positives.\n\nAcceptance criteria:\n- High-value keyword-loop comparisons use one shared canonical normalizer instead of local variants.\n- Client and server agree on normalized keyword keys for Strategy, Rank Tracker, feedback, and Page Keyword Map interactions.\n- Existing raw/display/provider strings remain intact where they are user-facing or provider-contract-sensitive.\n- Tests prove canonical matching for punctuation/case/spacing and prevent duplicate/stale keyword regressions.\n- High-value keyword-loop async routes fail through normal Express error handling instead of unwrapped promise paths.\n- Local SEO work can start on top of a stable keyword equality contract.\n\nNon-goals:\n- Do not rewrite keyword scoring, provider source collection, or local SEO in this PR.\n- Do not change selected strategy ranking behavior except where duplicate/equality bugs are explicitly fixed by the shared normalizer.\n- Do not migrate every async route in the repository if that would turn this into a broad route-infrastructure PR; prioritize keyword-loop and PR13-adjacent paths."
         },
         {
           "id": "intel-quality-local-seo-intelligence-layer",
@@ -211,19 +219,19 @@
           "est": "8-14h",
           "priority": "P1",
           "status": "pending",
-          "notes": "Build a local SEO intelligence layer so location-dependent businesses, such as dentists, med spas, home services, legal, and other service-area companies, are evaluated on the searches and actions that actually drive revenue rather than only national/global keyword metrics.\n\nWhy this matters:\n- Generic national SEO metrics can understate or misrepresent value for local businesses. A dental office may not need to rank nationally for `dental implants`; it needs to be visible for local-intent terms such as `dental implants austin`, `dentist near me`, `emergency dentist san antonio`, and map-pack/service-area searches that produce calls, directions, booking clicks, and form submissions.\n- The keyword operating loop now has richer provider source data and is moving toward rank-tracking reconciliation, shared keyword judgment, and explainability. Local intent should become a first-class axis in that loop rather than a one-off keyword modifier hack.\n- PR10 staging QA on Swish Dental surfaced the distinction clearly: strategy can improve source quality and topic coverage, but local service businesses still need location-aware coverage, rank posture, and conversion-action reporting.\n\nTarget architecture:\n- Add a server-local `local-seo` bounded context or equivalent domain module that can assemble a local SEO context from existing workspace identity, locations/service areas, GSC queries, page map, rank tracking, provider keyword evidence, reviews/GBP signals when available, and client/business-service metadata.\n- Model local SEO as an overlay on the keyword operating loop, not a replacement for it. The shared keyword-intelligence engine should eventually consume local intent/posture signals for business-fit scoring, opportunity classification, authority/ambition guidance, and explanation output.\n- Preserve national/global strategy paths for SaaS, ecommerce, and technology companies. Local posture should activate only when the workspace has location/service-area intent or when an admin explicitly chooses a local strategy mode.\n\nAudit first when picked up:\n1. Inventory current workspace fields for address, location pages, service areas, business category, GBP/review data, and any existing location metadata.\n2. Audit current DataForSEO/SEMRush capabilities for location-aware keyword metrics, SERP/local-pack signals, Maps/Business Listings endpoints, local rank tracking, and competitor discovery by geography.\n3. Audit Google Business Profile availability and whether we have or need OAuth/scopes for impressions, calls, direction requests, website clicks, bookings, reviews, categories, services, and posts.\n4. Trace how local keywords currently enter strategy generation, page_keywords, rank tracking, recommendations, content gaps, client Strategy tab, and reporting.\n5. Identify where location modifiers are currently treated as ordinary keywords and where that creates misleading coverage, difficulty, or opportunity scoring.\n\nCandidate data sources and signals:\n- GSC local-intent query clusters: `near me`, city, neighborhood, service-area, and location-page queries.\n- Existing location/service pages and page titles/slugs from Webflow/static crawl data.\n- Rank tracking with optional location/geography metadata once PR11 adds lifecycle fields.\n- Provider keyword evidence for local modifiers, location-specific search volume, keyword difficulty, CPC, SERP features, and competitor rankings.\n- Google Business Profile, if integrated: calls, direction requests, website clicks, bookings, profile views, search queries, reviews, categories, services, photos, and local post engagement.\n- Review posture: rating, review count, review velocity, common review themes, and competitor review gaps if available.\n- Local competitor set by geography, not just organic domain overlap.\n- Map-pack/local-pack visibility where provider support and budget make it feasible.\n\nProduct surfaces to consider:\n- Admin Strategy/Page Intelligence: local opportunity posture per service area and page, including whether a term is reachable locally, map-pack-oriented, existing-page optimization, or new-location/service-page content.\n- Rank Tracker: tracked keyword rows should eventually support location/service-area metadata, baseline local position, and local-pack/SERP feature posture.\n- Client Strategy tab: client-safe reporting that explains `where we are visible`, `where we are gaining ground`, `what local actions matter next`, and `what we are tracking`, without drowning clients in provider jargon.\n- Recommendations: local business-fit and actionability weighting so high-value local terms outrank generic national terms for local workspaces.\n- Content pipeline: CTAs for local service pages, location-page improvements, FAQ/service-area content, review-request/supporting trust content, and GBP optimization tasks.\n- Outcomes/ROI: connect local SEO actions to calls, forms, bookings, directions, and high-intent landing-page traffic where data exists.\n\nImplementation sequencing suggestion:\n1. Local SEO source + capability audit PR: document existing fields, provider capabilities, GBP availability, local keyword entry points, and reporting gaps.\n2. Local SEO context contract PR: add server-local types/helpers for service areas, local intent classification, local keyword evidence, and local posture without changing UI broadly.\n3. Rank-tracking/location metadata PR or fold into PR11 follow-up: add optional location/service-area fields and lifecycle-safe reconciliation for local tracked keywords.\n4. Shared keyword-engine integration PR: make local intent/business-fit available to deterministic scoring and explanations for strategy/recommendations.\n5. Local SEO reporting UX PR: add admin/client surfaces for local visibility, map-pack/GBP actions if data exists, and local next actions. No auto-publishing.\n\nNon-goals:\n- Do not make every workspace local by default. SaaS, national, ecommerce, and content businesses should continue using broader keyword/authority logic.\n- Do not fake map-pack rankings or GBP performance when we do not have a trustworthy source.\n- Do not conflate local SEO with only adding city modifiers. The feature should account for service areas, location pages, reviews, GBP actions, local competitors, and conversion outcomes.\n- Do not auto-publish location pages or GBP updates from this layer.\n- Do not broaden PR11–PR13 with local SEO implementation unless a tiny future-safe field is required and explicitly documented.\n\nAcceptance criteria:\n- The platform can distinguish local-intent keywords/opportunities from national/general keywords and explain why that matters for the workspace.\n- Local businesses get reporting around service-area visibility, local opportunities, tracked local terms, and next actions tied to calls/bookings/directions/forms where data exists.\n- Missing local data degrades explicitly (`local posture unknown`) rather than inventing confidence.\n- Keyword strategy, recommendations, rank tracking, and content actions can all consume the same local SEO posture instead of hand-rolling location heuristics per surface.\n- The implementation remains optional/bounded and does not degrade non-local workspace strategy quality.\n\nSequencing note: keep local SEO after the strategy refactor and PR13 UX/action-loop pass unless a tiny optional metadata field is required. The local layer should consume the cleaned keyword operating loop rather than widening the sanitizer/refactor PR."
+          "notes": "Build a local SEO intelligence layer so location-dependent businesses, such as dentists, med spas, home services, legal, and other service-area companies, are evaluated on the searches and actions that actually drive revenue rather than only national/global keyword metrics.\n\nWhy this matters:\n- Generic national SEO metrics can understate or misrepresent value for local businesses. A dental office may not need to rank nationally for `dental implants`; it needs to be visible for local-intent terms such as `dental implants austin`, `dentist near me`, `emergency dentist san antonio`, and map-pack/service-area searches that produce calls, directions, booking clicks, and form submissions.\n- The keyword operating loop now has richer provider source data and is moving toward rank-tracking reconciliation, shared keyword judgment, and explainability. Local intent should become a first-class axis in that loop rather than a one-off keyword modifier hack.\n- PR10 staging QA on Swish Dental surfaced the distinction clearly: strategy can improve source quality and topic coverage, but local service businesses still need location-aware coverage, rank posture, and conversion-action reporting.\n\nTarget architecture:\n- Add a server-local `local-seo` bounded context or equivalent domain module that can assemble a local SEO context from existing workspace identity, locations/service areas, GSC queries, page map, rank tracking, provider keyword evidence, reviews/GBP signals when available, and client/business-service metadata.\n- Model local SEO as an overlay on the keyword operating loop, not a replacement for it. The shared keyword-intelligence engine should eventually consume local intent/posture signals for business-fit scoring, opportunity classification, authority/ambition guidance, and explanation output.\n- Preserve national/global strategy paths for SaaS, ecommerce, and technology companies. Local posture should activate only when the workspace has location/service-area intent or when an admin explicitly chooses a local strategy mode.\n\nAudit first when picked up:\n1. Inventory current workspace fields for address, location pages, service areas, business category, GBP/review data, and any existing location metadata.\n2. Audit current DataForSEO/SEMRush capabilities for location-aware keyword metrics, SERP/local-pack signals, Maps/Business Listings endpoints, local rank tracking, and competitor discovery by geography.\n3. Audit Google Business Profile availability and whether we have or need OAuth/scopes for impressions, calls, direction requests, website clicks, bookings, reviews, categories, services, and posts.\n4. Trace how local keywords currently enter strategy generation, page_keywords, rank tracking, recommendations, content gaps, client Strategy tab, and reporting.\n5. Identify where location modifiers are currently treated as ordinary keywords and where that creates misleading coverage, difficulty, or opportunity scoring.\n\nCandidate data sources and signals:\n- GSC local-intent query clusters: `near me`, city, neighborhood, service-area, and location-page queries.\n- Existing location/service pages and page titles/slugs from Webflow/static crawl data.\n- Rank tracking with optional location/geography metadata once PR11 adds lifecycle fields.\n- Provider keyword evidence for local modifiers, location-specific search volume, keyword difficulty, CPC, SERP features, and competitor rankings.\n- Google Business Profile, if integrated: calls, direction requests, website clicks, bookings, profile views, search queries, reviews, categories, services, photos, and local post engagement.\n- Review posture: rating, review count, review velocity, common review themes, and competitor review gaps if available.\n- Local competitor set by geography, not just organic domain overlap.\n- Map-pack/local-pack visibility where provider support and budget make it feasible.\n\nProduct surfaces to consider:\n- Admin Strategy/Page Intelligence: local opportunity posture per service area and page, including whether a term is reachable locally, map-pack-oriented, existing-page optimization, or new-location/service-page content.\n- Rank Tracker: tracked keyword rows should eventually support location/service-area metadata, baseline local position, and local-pack/SERP feature posture.\n- Client Strategy tab: client-safe reporting that explains `where we are visible`, `where we are gaining ground`, `what local actions matter next`, and `what we are tracking`, without drowning clients in provider jargon.\n- Recommendations: local business-fit and actionability weighting so high-value local terms outrank generic national terms for local workspaces.\n- Content pipeline: CTAs for local service pages, location-page improvements, FAQ/service-area content, review-request/supporting trust content, and GBP optimization tasks.\n- Outcomes/ROI: connect local SEO actions to calls, forms, bookings, directions, and high-intent landing-page traffic where data exists.\n\nImplementation sequencing suggestion:\n1. Local SEO source + capability audit PR: document existing fields, provider capabilities, GBP availability, local keyword entry points, and reporting gaps.\n2. Local SEO context contract PR: add server-local types/helpers for service areas, local intent classification, local keyword evidence, and local posture without changing UI broadly.\n3. Rank-tracking/location metadata PR or fold into PR11 follow-up: add optional location/service-area fields and lifecycle-safe reconciliation for local tracked keywords.\n4. Shared keyword-engine integration PR: make local intent/business-fit available to deterministic scoring and explanations for strategy/recommendations.\n5. Local SEO reporting UX PR: add admin/client surfaces for local visibility, map-pack/GBP actions if data exists, and local next actions. No auto-publishing.\n\nNon-goals:\n- Do not make every workspace local by default. SaaS, national, ecommerce, and content businesses should continue using broader keyword/authority logic.\n- Do not fake map-pack rankings or GBP performance when we do not have a trustworthy source.\n- Do not conflate local SEO with only adding city modifiers. The feature should account for service areas, location pages, reviews, GBP actions, local competitors, and conversion outcomes.\n- Do not auto-publish location pages or GBP updates from this layer.\n- Do not broaden PR11\u2013PR13 with local SEO implementation unless a tiny future-safe field is required and explicitly documented.\n\nAcceptance criteria:\n- The platform can distinguish local-intent keywords/opportunities from national/general keywords and explain why that matters for the workspace.\n- Local businesses get reporting around service-area visibility, local opportunities, tracked local terms, and next actions tied to calls/bookings/directions/forms where data exists.\n- Missing local data degrades explicitly (`local posture unknown`) rather than inventing confidence.\n- Keyword strategy, recommendations, rank tracking, and content actions can all consume the same local SEO posture instead of hand-rolling location heuristics per surface.\n- The implementation remains optional/bounded and does not degrade non-local workspace strategy quality.\n\nSequencing note: keep local SEO after the strategy refactor and PR13 UX/action-loop pass unless a tiny optional metadata field is required. The local layer should consume the cleaned keyword operating loop rather than widening the sanitizer/refactor PR."
         }
       ]
     },
     {
       "id": "sprint-roadmap-closeout-residuals",
-      "name": "Roadmap Residual Closeout — Near-Finish Sprint Cleanup",
+      "name": "Roadmap Residual Closeout \u2014 Near-Finish Sprint Cleanup",
       "hours": "8-13",
-      "rationale": "Consolidate the final 1–2 items from near-finished sprints into one explicit closeout queue so shipped sprint history stays clean while remaining work is execution-ready.",
+      "rationale": "Consolidate the final 1\u20132 items from near-finished sprints into one explicit closeout queue so shipped sprint history stays clean while remaining work is execution-ready.",
       "items": [
         {
           "id": 535,
-          "title": "CMS Editor UX Redesign — Match SeoEditor simplicity",
+          "title": "CMS Editor UX Redesign \u2014 Match SeoEditor simplicity",
           "source": "PR #138 review / manual testing",
           "est": "3-5h",
           "priority": "P1",
@@ -250,30 +258,30 @@
         },
         {
           "id": 356,
-          "title": "E-E-A-T Asset Library — Personalized Trust Signal Recommendations",
+          "title": "E-E-A-T Asset Library \u2014 Personalized Trust Signal Recommendations",
           "source": "USER REQUEST",
           "est": "4-6h",
           "priority": "P2",
-          "notes": "Current E-E-A-T guidance in content briefs is generic per-pillar text ('include case studies'). Gap: no inventory of what assets a client ACTUALLY has. Build: (1) Workspace-level E-E-A-T profile in settings — admin tags existing client assets: testimonials (with quotes + attribution), case studies (with URLs + metrics), certifications/credentials, before/after galleries, team bios/expertise, awards/recognition, data/research, client logos. (2) Content briefs inject specific asset recommendations: 'Add the Dr. Smith testimonial from /reviews' or 'Include the Acme Corp case study showing 40% conversion lift'. (3) Page Intelligence flags pages missing trust signals based on page type (service pages need testimonials, product pages need reviews, etc.). (4) Schema generator uses asset library for author/credential structured data. New DB table: eeat_assets (workspace_id, type, title, url, content, metadata JSON). New UI: settings tab or workspace profile section.",
+          "notes": "Current E-E-A-T guidance in content briefs is generic per-pillar text ('include case studies'). Gap: no inventory of what assets a client ACTUALLY has. Build: (1) Workspace-level E-E-A-T profile in settings \u2014 admin tags existing client assets: testimonials (with quotes + attribution), case studies (with URLs + metrics), certifications/credentials, before/after galleries, team bios/expertise, awards/recognition, data/research, client logos. (2) Content briefs inject specific asset recommendations: 'Add the Dr. Smith testimonial from /reviews' or 'Include the Acme Corp case study showing 40% conversion lift'. (3) Page Intelligence flags pages missing trust signals based on page type (service pages need testimonials, product pages need reviews, etc.). (4) Schema generator uses asset library for author/credential structured data. New DB table: eeat_assets (workspace_id, type, title, url, content, metadata JSON). New UI: settings tab or workspace profile section.",
           "status": "pending"
         }
       ]
     },
     {
       "id": "sprint-platform-value-schema-intelligence-next",
-      "name": "Platform Value Wave — Schema Intelligence & Authority",
+      "name": "Platform Value Wave \u2014 Schema Intelligence & Authority",
       "hours": "80-140",
       "rationale": "Highest strategic SEO differentiation and trust-evidence value. Prioritizes schema intelligence upgrades that improve rich-result eligibility, E-E-A-T signaling, and entity grounding.",
       "items": [
         {
           "id": "schema-page-element-catalog-pr3",
-          "title": "Schema Page-Element Catalog PR3 — polish (codeBlocks, headings/ToC, speakable)",
-          "source": "docs/superpowers/specs/2026-04-29-page-element-catalog-design.md §5.3",
+          "title": "Schema Page-Element Catalog PR3 \u2014 polish (codeBlocks, headings/ToC, speakable)",
+          "source": "docs/superpowers/specs/2026-04-29-page-element-catalog-design.md \u00a75.3",
           "est": "2d",
           "priority": "P2",
           "sprint": "future",
           "status": "pending",
-          "notes": "Optional polish: codeBlocks → CodeRepository/SoftwareSourceCode (low ROI for agency sites); headings → WebPage.speakable cssSelector (overlaps with schema-engagement-signals; whichever ships first wins). May be skipped if cycles are short."
+          "notes": "Optional polish: codeBlocks \u2192 CodeRepository/SoftwareSourceCode (low ROI for agency sites); headings \u2192 WebPage.speakable cssSelector (overlaps with schema-engagement-signals; whichever ships first wins). May be skipped if cycles are short."
         },
         {
           "id": "schema-cleanup-dead-pageKeywordMap",
@@ -283,57 +291,57 @@
           "priority": "P2",
           "sprint": "future",
           "status": "pending",
-          "notes": "After schema-yoast-parity-fields PR1, buildSchemaContext still computes pageKeywordMap from ws?.keywordStrategy?.pageMap and returns it (server/helpers.ts:343, :410-418, :539). Both callers (server/routes/webflow-schema.ts:51, server/routes/jobs.ts:636) destructure it and pass to generateSchemaSuggestions, which immediately voids it (server/schema-suggester.ts:391). Per-page keywords are now fetched via buildWorkspaceIntelligence inside the page loop. Cleanup: drop the pageKeywordMap return field, the parameter, and the void discard. While in there, audit the other 5 voided params on generateSchemaSuggestions (gscMap, ga4Map, queryPageData, insightsMap, validationsByPageId) — likely also dead. Devin Review explicitly recommended deferring to a follow-up PR; doesn't affect correctness."
+          "notes": "After schema-yoast-parity-fields PR1, buildSchemaContext still computes pageKeywordMap from ws?.keywordStrategy?.pageMap and returns it (server/helpers.ts:343, :410-418, :539). Both callers (server/routes/webflow-schema.ts:51, server/routes/jobs.ts:636) destructure it and pass to generateSchemaSuggestions, which immediately voids it (server/schema-suggester.ts:391). Per-page keywords are now fetched via buildWorkspaceIntelligence inside the page loop. Cleanup: drop the pageKeywordMap return field, the parameter, and the void discard. While in there, audit the other 5 voided params on generateSchemaSuggestions (gscMap, ga4Map, queryPageData, insightsMap, validationsByPageId) \u2014 likely also dead. Devin Review explicitly recommended deferring to a follow-up PR; doesn't affect correctness."
         },
         {
           "id": "schema-engagement-signals",
-          "title": "Schema engagement signals — wordCount, timeRequired, speakable, educationalLevel",
+          "title": "Schema engagement signals \u2014 wordCount, timeRequired, speakable, educationalLevel",
           "source": "Strategic landscape brainstorm 2026-04-29 (post-PR1 merge)",
           "est": "2d",
           "priority": "P1",
           "sprint": "future",
           "status": "pending",
-          "notes": "Article.wordCount shipped in the Blog/Article Schema Quality Hardening pass (May 2026) using visible content extraction instead of full articleBody duplication. Remaining quick-win Tier-4 fields with data the platform already has: Article.timeRequired = wordCount/250wpm rounded; WebPage.speakable with cssSelector pointing to .lead/.intro/first-paragraph — voice-assistant rich result; Article.educationalLevel via AI classification (Beginner/Intermediate/Advanced). All wire through existing PageData typed boundary. No new admin UI required for the basics; speakable cssSelector is a per-template constant. Independent rich-result eligibility unlock for Google Article + voice-search amplification."
+          "notes": "Article.wordCount shipped in the Blog/Article Schema Quality Hardening pass (May 2026) using visible content extraction instead of full articleBody duplication. Remaining quick-win Tier-4 fields with data the platform already has: Article.timeRequired = wordCount/250wpm rounded; WebPage.speakable with cssSelector pointing to .lead/.intro/first-paragraph \u2014 voice-assistant rich result; Article.educationalLevel via AI classification (Beginner/Intermediate/Advanced). All wire through existing PageData typed boundary. No new admin UI required for the basics; speakable cssSelector is a per-template constant. Independent rich-result eligibility unlock for Google Article + voice-search amplification."
         },
         {
           "id": "schema-eeat-amplifiers",
-          "title": "Schema E-E-A-T amplifiers — publishingPrinciples, reviewedBy, copyrightHolder, isAccessibleForFree, Person.jobTitle",
+          "title": "Schema E-E-A-T amplifiers \u2014 publishingPrinciples, reviewedBy, copyrightHolder, isAccessibleForFree, Person.jobTitle",
           "source": "Strategic landscape brainstorm 2026-04-29 (post-PR1 merge)",
           "est": "1w",
           "priority": "P1",
           "sprint": "future",
           "status": "pending",
-          "notes": "Tier-3 trust signals Google increasingly weighs. Add 4 new optional Workspace fields: publishingPrinciplesUrl, actionableFeedbackPolicyUrl (both → Organization.publishingPrinciples + actionableFeedbackPolicy on every page's @graph). Article.copyrightHolder ref to Organization, copyrightYear from datePublished. Article.reviewedBy as Person from new CMS field 'fact_checker' (optional). Article.isAccessibleForFree from per-tier content gating. Person.jobTitle + worksFor on author when CMS author records have those fields (currently they're just string names). Mostly admin Settings UI work + template emission. Each field is an additive E-E-A-T signal — non-breaking, immediate ranking benefit on YMYL content."
+          "notes": "Tier-3 trust signals Google increasingly weighs. Add 4 new optional Workspace fields: publishingPrinciplesUrl, actionableFeedbackPolicyUrl (both \u2192 Organization.publishingPrinciples + actionableFeedbackPolicy on every page's @graph). Article.copyrightHolder ref to Organization, copyrightYear from datePublished. Article.reviewedBy as Person from new CMS field 'fact_checker' (optional). Article.isAccessibleForFree from per-tier content gating. Person.jobTitle + worksFor on author when CMS author records have those fields (currently they're just string names). Mostly admin Settings UI work + template emission. Each field is an additive E-E-A-T signal \u2014 non-breaking, immediate ranking benefit on YMYL content."
         },
         {
           "id": "schema-entity-grounding-wikidata",
-          "title": "Schema entity grounding — typed Thing/Place entities + Wikidata sameAs disambiguation",
+          "title": "Schema entity grounding \u2014 typed Thing/Place entities + Wikidata sameAs disambiguation",
           "source": "Strategic landscape brainstorm 2026-04-29 (post-PR1 merge)",
           "est": "2-3w",
           "priority": "P1",
           "sprint": "future",
           "status": "pending",
-          "notes": "Tier-2 / biggest competitive moat. Replace string knowsAbout (currently ['brand strategy','webflow']) with typed Thing entities linked to Wikidata Q-numbers via sameAs. Same upgrade for Article.about (typed Thing — what is this article about?), Article.mentions[] (entities referenced in body), Place entities for areaServed (Austin, TX → Wikidata Q16559), Organization.sameAs extended with Wikidata identifier. Architecture: new EntityResolutionSlice on buildWorkspaceIntelligence, populated by a Cheerio-based extractor that runs entity recognition (likely via OpenAI structured-output prompt against curated entity types) + Wikidata SPARQL lookup for top candidates, cached per-entity. Most agencies don't do this; Google's knowledge graph rewards disambiguation heavily. Architectural prerequisite met by parity-fields PR1 Pattern B starter. Can ship after schema-page-element-catalog-v1 (the catalog feeds Article.mentions extraction)."
+          "notes": "Tier-2 / biggest competitive moat. Replace string knowsAbout (currently ['brand strategy','webflow']) with typed Thing entities linked to Wikidata Q-numbers via sameAs. Same upgrade for Article.about (typed Thing \u2014 what is this article about?), Article.mentions[] (entities referenced in body), Place entities for areaServed (Austin, TX \u2192 Wikidata Q16559), Organization.sameAs extended with Wikidata identifier. Architecture: new EntityResolutionSlice on buildWorkspaceIntelligence, populated by a Cheerio-based extractor that runs entity recognition (likely via OpenAI structured-output prompt against curated entity types) + Wikidata SPARQL lookup for top candidates, cached per-entity. Most agencies don't do this; Google's knowledge graph rewards disambiguation heavily. Architectural prerequisite met by parity-fields PR1 Pattern B starter. Can ship after schema-page-element-catalog-v1 (the catalog feeds Article.mentions extraction)."
         },
         {
           "id": "schema-commerce-types",
-          "title": "Schema commerce types — Service.offers (PriceSpecification), Product, Course, Event",
+          "title": "Schema commerce types \u2014 Service.offers (PriceSpecification), Product, Course, Event",
           "source": "Strategic landscape brainstorm 2026-04-29 (post-PR1 merge)",
           "est": "1-2w per type, parallelizable",
           "priority": "P2",
           "sprint": "future",
           "status": "pending",
-          "notes": "Tier-5 monetization opportunity for agencies with productized services / paid content. Service.offers with Offer { price, priceCurrency, availability } — Google's 'service prices' SERP feature. Product schema for templates/digital products. Course for educational content/training. Event for webinars/launches with eventStatus + eventAttendanceMode (Online/Offline/Mixed). Each is independent rich-result eligibility unlock. Workspace.contentPricing already exists (used for content-purchase tiers); Service.offers can reuse the pricing infra. Per-type effort similar to parity-fields PR1's per-template additions; parallelizable across template files. Default-off; admin opts in per-workspace. Most useful for agencies with packaged services (web-design + brand audit + content retainer); skip for service-only sites without published prices."
+          "notes": "Tier-5 monetization opportunity for agencies with productized services / paid content. Service.offers with Offer { price, priceCurrency, availability } \u2014 Google's 'service prices' SERP feature. Product schema for templates/digital products. Course for educational content/training. Event for webinars/launches with eventStatus + eventAttendanceMode (Online/Offline/Mixed). Each is independent rich-result eligibility unlock. Workspace.contentPricing already exists (used for content-purchase tiers); Service.offers can reuse the pricing infra. Per-type effort similar to parity-fields PR1's per-template additions; parallelizable across template files. Default-off; admin opts in per-workspace. Most useful for agencies with packaged services (web-design + brand audit + content retainer); skip for service-only sites without published prices."
         },
         {
           "id": "schema-trust-authority-graph",
-          "title": "Schema trust/authority — Organization.award, member, hasCredential, numberOfEmployees",
+          "title": "Schema trust/authority \u2014 Organization.award, member, hasCredential, numberOfEmployees",
           "source": "Strategic landscape brainstorm 2026-04-29 (post-PR1 merge)",
           "est": "2-3d",
           "priority": "P2",
           "sprint": "future",
           "status": "pending",
-          "notes": "Tier-6 reputation graph fields. New Workspace.organizationAwards (string[] of Award names → Award entity[]), Workspace.organizationMemberships (industry orgs → ProgramMembership/Organization references), Workspace.organizationCredentials (certifications → EducationalOccupationalCredential), Workspace.numberOfEmployees (QuantitativeValue { minValue, maxValue, unitText: 'employee' }). Each emitted on Organization sibling node in homepage + local-business templates. Pure admin Settings UI + template extension; no AI/intelligence dependencies. Agency credibility in SERP, especially for B2B competitive queries."
+          "notes": "Tier-6 reputation graph fields. New Workspace.organizationAwards (string[] of Award names \u2192 Award entity[]), Workspace.organizationMemberships (industry orgs \u2192 ProgramMembership/Organization references), Workspace.organizationCredentials (certifications \u2192 EducationalOccupationalCredential), Workspace.numberOfEmployees (QuantitativeValue { minValue, maxValue, unitText: 'employee' }). Each emitted on Organization sibling node in homepage + local-business templates. Pure admin Settings UI + template extension; no AI/intelligence dependencies. Agency credibility in SERP, especially for B2B competitive queries."
         },
         {
           "id": "schema-intelligence-layer-v2",
@@ -343,13 +351,13 @@
           "priority": "P1",
           "sprint": "I",
           "status": "pending",
-          "notes": "Follow-up to lean-schema-rewrite. Re-injects the platform's intelligence layer surgically into schema generation: (1) Healthcare type escalation — workspace businessContext → Dentist/Physician/Optician/Chiropractor/MedicalClinic/etc. when address+phone+hours are present, falls back to LocalBusiness otherwise. (2) FAQ enrichment from GSC question queries — extractFaqOpportunities (already exists in analytics-intelligence.ts) feeds FAQPage when ≥3 question queries match a page. (3) E-E-A-T author injection from content brief — extractEeatFromBrief (already exists) populates Article.author with Person.knowsAbout, sameAs from the brief's expert profile. (4) Service serviceType from voice profile + business profile. Reuses existing intelligence wiring; the lean rewrite kept the data flow intact, this task adds surgical injection points to the templates."
+          "notes": "Follow-up to lean-schema-rewrite. Re-injects the platform's intelligence layer surgically into schema generation: (1) Healthcare type escalation \u2014 workspace businessContext \u2192 Dentist/Physician/Optician/Chiropractor/MedicalClinic/etc. when address+phone+hours are present, falls back to LocalBusiness otherwise. (2) FAQ enrichment from GSC question queries \u2014 extractFaqOpportunities (already exists in analytics-intelligence.ts) feeds FAQPage when \u22653 question queries match a page. (3) E-E-A-T author injection from content brief \u2014 extractEeatFromBrief (already exists) populates Article.author with Person.knowsAbout, sameAs from the brief's expert profile. (4) Service serviceType from voice profile + business profile. Reuses existing intelligence wiring; the lean rewrite kept the data flow intact, this task adds surgical injection points to the templates."
         }
       ]
     },
     {
       "id": "sprint-platform-value-team-collaboration-controls",
-      "name": "Platform Value Wave — Team, Permissions, and Collaboration Controls",
+      "name": "Platform Value Wave \u2014 Team, Permissions, and Collaboration Controls",
       "hours": "20-28",
       "rationale": "Unlocks multi-user adoption and safer account expansion by closing core team-management, role-gating, and collaboration workflow gaps.",
       "items": [
@@ -402,14 +410,14 @@
     },
     {
       "id": "sprint-platform-value-experience-adoption",
-      "name": "Platform Value Wave — UX Adoption & Onboarding Momentum",
+      "name": "Platform Value Wave \u2014 UX Adoption & Onboarding Momentum",
       "hours": "34-48",
       "rationale": "Improves activation and stickiness through customizable workspace surfaces, guided education, accessibility UX uplift, and onboarding automation.",
       "items": [
         {
           "id": 540,
-          "title": "Widget System — Customizable Workspace Home dashboard",
-          "source": "UI_UX_AUDIT §Long-Term",
+          "title": "Widget System \u2014 Customizable Workspace Home dashboard",
+          "source": "UI_UX_AUDIT \u00a7Long-Term",
           "est": "6-8h",
           "priority": "P2",
           "notes": "Let users pin/unpin modules on Workspace Home, rearrange widget order, choose sizes (compact/full/wide). Save per-workspace layouts to localStorage or workspace config.",
@@ -417,8 +425,8 @@
         },
         {
           "id": 541,
-          "title": "AI Insights Feed — TikTok-style vertical feed of actionable insights",
-          "source": "UI_UX_AUDIT §Long-Term",
+          "title": "AI Insights Feed \u2014 TikTok-style vertical feed of actionable insights",
+          "source": "UI_UX_AUDIT \u00a7Long-Term",
           "est": "4-6h",
           "priority": "P3",
           "notes": "Swipeable insight cards: 'LCP improved 23%', '3 pages need schema', 'Competitor published 5 articles'. Auto-generated from anomaly detection + audit + strategy data.\n[Audit 2026-04-22 partial] Filterable insight feed UI shipped (src/components/insights/InsightFeed + InsightFeedItem + filter chips); swipeable vertical-feed presentation not built.",
@@ -426,8 +434,8 @@
         },
         {
           "id": 542,
-          "title": "Command Palette 2.0 — Action palette with natural language",
-          "source": "UI_UX_AUDIT §Long-Term",
+          "title": "Command Palette 2.0 \u2014 Action palette with natural language",
+          "source": "UI_UX_AUDIT \u00a7Long-Term",
           "est": "4-6h",
           "priority": "P3",
           "notes": "Expand from navigation to actions: 'Generate schema for [page]', 'Create brief for [keyword]', 'Run audit'. Natural language: 'Show thin content pages'.\n[Audit 2026-04-22 partial] CommandPalette.tsx scaffolds an \"action\" item type alongside nav/workspace/recent, but no natural-language action handlers are wired (no LLM call, no parameterised \"Generate schema for [page]\").",
@@ -435,8 +443,8 @@
         },
         {
           "id": 514,
-          "title": "Client Education Hub — Embedded SEO education throughout",
-          "source": "UI_UX_AUDIT §Long-Term",
+          "title": "Client Education Hub \u2014 Embedded SEO education throughout",
+          "source": "UI_UX_AUDIT \u00a7Long-Term",
           "est": "3-4h",
           "priority": "P3",
           "notes": "Contextual tooltips with 'Why this matters'. 'Learn more' links to SeoGlossary. Video explanations for complex features. Education tip cards in empty states.\n[Audit 2026-04-22 partial] SeoGlossary.tsx + SeoEducationTip.tsx (tab-keyed learnMore content for overview/performance/health/strategy/content/roi) ship; \"Why this matters\" framing, video embeds, and Glossary cross-links from tips are not wired.",
@@ -444,8 +452,8 @@
         },
         {
           "id": 515,
-          "title": "Performance Budget Dashboard — Visual page weight tracker",
-          "source": "UI_UX_AUDIT §Long-Term",
+          "title": "Performance Budget Dashboard \u2014 Visual page weight tracker",
+          "source": "UI_UX_AUDIT \u00a7Long-Term",
           "est": "3-4h",
           "priority": "P3",
           "notes": "Show page weight over time per workspace. Alert on regressions. Recommendations: 'Homepage grew 400KB, consider image optimization'.\n[Audit 2026-04-22 partial] PageWeight + PageSpeedPanel + server/performance-store ship point-in-time data; historical weight trend per workspace + regression alerts are not built.",
@@ -453,8 +461,8 @@
         },
         {
           "id": 516,
-          "title": "Accessibility Improvements — WCAG AA compliance pass",
-          "source": "UI_UX_AUDIT §10",
+          "title": "Accessibility Improvements \u2014 WCAG AA compliance pass",
+          "source": "UI_UX_AUDIT \u00a710",
           "est": "4-6h",
           "priority": "P2",
           "notes": "Add ARIA landmarks, focus management for modals, keyboard navigation for complex widgets. Skip links. Test with screen reader (NVDA/VoiceOver).\n[Audit 2026-04-22 partial] 63 aria-label usages across 20 components ship; ARIA landmark roles, skip-links, and modal focus-management are not implemented.",
@@ -466,23 +474,23 @@
           "source": "FEATURE_AUDIT",
           "est": "4-6h",
           "priority": "P3",
-          "notes": "Sidebar → bottom nav, stacked cards on small screens.",
+          "notes": "Sidebar \u2192 bottom nav, stacked cards on small screens.",
           "status": "pending"
         },
         {
           "id": 523,
-          "title": "Workspace onboarding automation — templates, batch setup, reduce repetitive per-workspace tasks",
+          "title": "Workspace onboarding automation \u2014 templates, batch setup, reduce repetitive per-workspace tasks",
           "source": "Connected Intelligence brainstorming",
           "est": "6-8h",
           "priority": "P3",
-          "notes": "Each new workspace requires: connect Webflow, connect GSC, connect GA4, run keyword analysis, run site audit, set up brand voice, configure competitors, set content pricing, enable client portal. Most steps are identical across workspaces. Add: workspace templates (clone config from existing workspace), batch analysis trigger (run audit + keyword analysis + decay analysis in one click), onboarding checklist with progress tracking, default competitor auto-discovery. Separate initiative from intelligence engine — scoped as its own spec.",
+          "notes": "Each new workspace requires: connect Webflow, connect GSC, connect GA4, run keyword analysis, run site audit, set up brand voice, configure competitors, set content pricing, enable client portal. Most steps are identical across workspaces. Add: workspace templates (clone config from existing workspace), batch analysis trigger (run audit + keyword analysis + decay analysis in one click), onboarding checklist with progress tracking, default competitor auto-discovery. Separate initiative from intelligence engine \u2014 scoped as its own spec.",
           "status": "pending"
         }
       ]
     },
     {
       "id": "sprint-platform-value-automation-ops",
-      "name": "Platform Value Wave — Operational Automation & Quality Signals",
+      "name": "Platform Value Wave \u2014 Operational Automation & Quality Signals",
       "hours": "30-45",
       "rationale": "Reduces manual operating overhead and increases signal quality with workflow automation, accessibility quality expansion, and strategy-memory follow-through.",
       "items": [
@@ -571,7 +579,7 @@
     },
     {
       "id": "sprint-platform-value-integrations-expansion",
-      "name": "Platform Value Wave — Integrations, Distribution, and Expansion Bets",
+      "name": "Platform Value Wave \u2014 Integrations, Distribution, and Expansion Bets",
       "hours": "65-95",
       "rationale": "Packages higher-latency integration and expansion work into a distinct growth track so near-term value sprints stay focused while long-horizon platform expansion remains actionable.",
       "items": [
@@ -626,7 +634,7 @@
           "source": "FEATURE_VISION #3",
           "est": "8-12h",
           "priority": "P4",
-          "notes": "Historical GSC data + Google Trends API + seasonal patterns → predict growing keywords 30-90 days out.",
+          "notes": "Historical GSC data + Google Trends API + seasonal patterns \u2192 predict growing keywords 30-90 days out.",
           "status": "pending"
         },
         {
@@ -644,7 +652,7 @@
           "source": "FEATURE_VISION #5",
           "est": "10-15h",
           "priority": "P2",
-          "notes": "Ahrefs/Moz API → backlink profile → link gaps → AI outreach templates. Elevated from P3 — backlinks are a top-3 ranking factor and this capability justifies premium pricing. Lightweight overview (#213) ships first in Sprint F; this is the full-featured follow-up.",
+          "notes": "Ahrefs/Moz API \u2192 backlink profile \u2192 link gaps \u2192 AI outreach templates. Elevated from P3 \u2014 backlinks are a top-3 ranking factor and this capability justifies premium pricing. Lightweight overview (#213) ships first in Sprint F; this is the full-featured follow-up.",
           "status": "pending"
         },
         {
@@ -683,7 +691,7 @@
       "items": [
         {
           "id": "schema-page-element-catalog-pr1",
-          "title": "Schema Page-Element Catalog PR1 — slice + 3 element types + 3 schema integrations",
+          "title": "Schema Page-Element Catalog PR1 \u2014 slice + 3 element types + 3 schema integrations",
           "source": "docs/superpowers/plans/2026-04-29-page-element-catalog-pr1.md",
           "est": "5d",
           "priority": "P1",
@@ -694,8 +702,8 @@
         },
         {
           "id": "schema-page-element-catalog-pr2",
-          "title": "Schema Page-Element Catalog PR2 — images + tables + testimonials",
-          "source": "docs/superpowers/specs/2026-04-29-page-element-catalog-design.md §5.2 + §6",
+          "title": "Schema Page-Element Catalog PR2 \u2014 images + tables + testimonials",
+          "source": "docs/superpowers/specs/2026-04-29-page-element-catalog-design.md \u00a75.2 + \u00a76",
           "est": "4d",
           "priority": "P1",
           "sprint": "J",
@@ -704,14 +712,14 @@
         },
         {
           "id": "schema-entity-graph-workstream-c",
-          "title": "Schema Workstream C — Entity Graph Hub Dispatch",
+          "title": "Schema Workstream C \u2014 Entity Graph Hub Dispatch",
           "source": "claude/schema-v2-brainstorm branch",
           "est": "1d",
           "priority": "P0",
           "sprint": "J",
           "status": "done",
           "shippedAt": "2026-04-30",
-          "notes": "Workstream C shipped: hub pages now emit semantically correct schema types with cross-page @id references via assembleSiteContext + SiteContext plumbing into generateLeanSchema. BlogIndex → Blog with blogPost[] (@id refs, sorted newest-first, capped at 10, numberOfItems = true count). ServiceIndex → Service + hasOfferCatalog: { @type: OfferCatalog, hasPart[] }. CaseStudyIndex → CollectionPage + mainEntity: { @type: ItemList, itemListElement[] (positional ListItems) }. All three fall back to CollectionPage when siteContext is absent. Non-hub pages (BlogPosting, Service, AboutPage, etc.) unchanged. 18 integration tests in tests/integration/schema-entity-graph.test.ts."
+          "notes": "Workstream C shipped: hub pages now emit semantically correct schema types with cross-page @id references via assembleSiteContext + SiteContext plumbing into generateLeanSchema. BlogIndex \u2192 Blog with blogPost[] (@id refs, sorted newest-first, capped at 10, numberOfItems = true count). ServiceIndex \u2192 Service + hasOfferCatalog: { @type: OfferCatalog, hasPart[] }. CaseStudyIndex \u2192 CollectionPage + mainEntity: { @type: ItemList, itemListElement[] (positional ListItems) }. All three fall back to CollectionPage when siteContext is absent. Non-hub pages (BlogPosting, Service, AboutPage, etc.) unchanged. 18 integration tests in tests/integration/schema-entity-graph.test.ts."
         },
         {
           "id": "schema-semantic-extraction",
@@ -722,12 +730,12 @@
           "sprint": "J",
           "status": "done",
           "shippedAt": "2026-05-01",
-          "notes": "AI-powered universal page content extraction layer for schema generation. extractSemanticData() (Haiku 4.5 tool_use) extracts phone, address, hours, staff, services, aggregateRating, sameAs, faq, primaryImage per page — stored on PageElementCatalog.semantics. applyPostEnrichment() appends FAQPage/AggregateRating/sameAs/VideoObject nodes to generated schema using extracted semantics with rollback-on-new-errors safety. generateSchemaForUnknownType() generates WebPage-classified pages with non-empty semantics via second Haiku call + static SCHEMA_TYPE_REFERENCE. Validator extended with DEDICATED_VALIDATOR_TYPES guard, unverified-type warnings for unknown Schema.org types, addressCountry in ContactPage. GSC URL Inspection integration: inspectUrlForRichResults() calls GSC API 3 minutes after publish, stores google_validation_status on schema_publish_history. schema.org pre-publish validator: validateWithSchemaOrg() fires at generation time (fire-and-forget, logs only). Migrations 081 (google_validation_status on schema_publish_history) + 082 (schema_org_validation_status on schema_snapshots). WS_EVENTS.SCHEMA_GOOGLE_VALIDATION added. 9 new/modified test files; 5805 tests passing."
+          "notes": "AI-powered universal page content extraction layer for schema generation. extractSemanticData() (Haiku 4.5 tool_use) extracts phone, address, hours, staff, services, aggregateRating, sameAs, faq, primaryImage per page \u2014 stored on PageElementCatalog.semantics. applyPostEnrichment() appends FAQPage/AggregateRating/sameAs/VideoObject nodes to generated schema using extracted semantics with rollback-on-new-errors safety. generateSchemaForUnknownType() generates WebPage-classified pages with non-empty semantics via second Haiku call + static SCHEMA_TYPE_REFERENCE. Validator extended with DEDICATED_VALIDATOR_TYPES guard, unverified-type warnings for unknown Schema.org types, addressCountry in ContactPage. GSC URL Inspection integration: inspectUrlForRichResults() calls GSC API 3 minutes after publish, stores google_validation_status on schema_publish_history. schema.org pre-publish validator: validateWithSchemaOrg() fires at generation time (fire-and-forget, logs only). Migrations 081 (google_validation_status on schema_publish_history) + 082 (schema_org_validation_status on schema_snapshots). WS_EVENTS.SCHEMA_GOOGLE_VALIDATION added. 9 new/modified test files; 5805 tests passing."
         },
         {
           "id": "schema-context-builder-pattern-b-migration",
           "title": "Migrate buildSchemaContext direct reads to intelligence slices",
-          "source": "docs/superpowers/specs/2026-04-29-schema-yoast-parity-fields-design.md §6",
+          "source": "docs/superpowers/specs/2026-04-29-schema-yoast-parity-fields-design.md \u00a76",
           "est": "2-3h cumulative across opportunistic PRs",
           "priority": "P1",
           "sprint": "I",
@@ -767,7 +775,7 @@
         },
         {
           "id": "schema-pillar-2-1-searchaction-correctness",
-          "title": "Schema Pillar 2.1 — Stop emitting SearchAction on sites without search",
+          "title": "Schema Pillar 2.1 \u2014 Stop emitting SearchAction on sites without search",
           "source": "docs/superpowers/plans/2026-04-29-schema-pillar-2-data-wiring.md (post-merge correction)",
           "est": "1h",
           "priority": "P0",
@@ -778,7 +786,7 @@
         },
         {
           "id": "schema-pillar-1-validator-bar",
-          "title": "Schema Pillar 1 — Raise the Validator Bar",
+          "title": "Schema Pillar 1 \u2014 Raise the Validator Bar",
           "source": "docs/superpowers/plans/2026-04-29-schema-pillar-1-validator-bar.md",
           "est": "1d",
           "priority": "P0",
@@ -789,7 +797,7 @@
         },
         {
           "id": "schema-yoast-parity-fields-pr1",
-          "title": "Schema Yoast-Parity Fields PR1 — validator API + 6 fields + slice-migration starter",
+          "title": "Schema Yoast-Parity Fields PR1 \u2014 validator API + 6 fields + slice-migration starter",
           "source": "docs/superpowers/plans/2026-04-29-schema-yoast-parity-fields-pr1.md",
           "est": "2d",
           "priority": "P0",
@@ -800,23 +808,23 @@
         },
         {
           "id": "schema-yoast-parity-fields-pr2",
-          "title": "Schema Yoast-Parity Fields PR2 — admin discoverability surfaces",
+          "title": "Schema Yoast-Parity Fields PR2 \u2014 admin discoverability surfaces",
           "source": "docs/superpowers/plans/2026-04-29-schema-yoast-parity-fields-pr2.md",
           "est": "1.5d",
           "priority": "P0",
           "sprint": "I",
           "status": "done",
           "shippedAt": "2026-04-29",
-          "notes": "Admin discoverability layer atop PR1's typed validationFindings. SchemaCompletenessWidget on the Schema page aggregates findings across all pages with progress bar + missing-field deep-link buttons. BusinessProfileTab gains a 'Schema impact' read-only mirror SectionCard listing 5 schema-impacting fields with ✓/✗ status + deep-links (cross-tab via Link with ?tab=...&focus=..., in-tab via scroll-to-element). FeaturesTab gains Logo URL microcopy + new 'Site capabilities' SectionCard with the siteHasSearch checkbox (toggling on activates PR1's gated WebSite.potentialAction emission). SchemaPageCard now groups findings by field with click-to-expand collapsible rows when a single field has 2+ findings on a page. SchemaSuggester header gains 'X fixes available' annotation. New shared useDeepLinkFocus hook + data-schema-deeplink attribute convention establishes the field-level deep-link two-halves contract. New fieldTargets.ts module is the single source of truth mapping ValidationFinding.field → Settings deep-link. Frontend-only; no backend changes. 8 new component tests (3 hook + 5 widget). Plan: docs/superpowers/plans/2026-04-29-schema-yoast-parity-fields-pr2.md."
+          "notes": "Admin discoverability layer atop PR1's typed validationFindings. SchemaCompletenessWidget on the Schema page aggregates findings across all pages with progress bar + missing-field deep-link buttons. BusinessProfileTab gains a 'Schema impact' read-only mirror SectionCard listing 5 schema-impacting fields with \u2713/\u2717 status + deep-links (cross-tab via Link with ?tab=...&focus=..., in-tab via scroll-to-element). FeaturesTab gains Logo URL microcopy + new 'Site capabilities' SectionCard with the siteHasSearch checkbox (toggling on activates PR1's gated WebSite.potentialAction emission). SchemaPageCard now groups findings by field with click-to-expand collapsible rows when a single field has 2+ findings on a page. SchemaSuggester header gains 'X fixes available' annotation. New shared useDeepLinkFocus hook + data-schema-deeplink attribute convention establishes the field-level deep-link two-halves contract. New fieldTargets.ts module is the single source of truth mapping ValidationFinding.field \u2192 Settings deep-link. Frontend-only; no backend changes. 8 new component tests (3 hook + 5 widget). Plan: docs/superpowers/plans/2026-04-29-schema-yoast-parity-fields-pr2.md."
         },
         {
           "id": "schema-pillar-3-gates",
-          "title": "Schema Pillar 3 — Compile-time + CI Gates",
+          "title": "Schema Pillar 3 \u2014 Compile-time + CI Gates",
           "source": "docs/superpowers/plans/2026-04-29-schema-pillar-3-gates.md",
           "est": "1d",
           "priority": "P2",
           "status": "deferred",
-          "notes": "DEFERRED. Pillar 3 is regression-prevention hardening (schema-dts compile-time types + schemarama CI corpus + pr-check rule for cross-ref helper imports). It does not change schema output — it locks the bar Pillars 1 + 2 set. Decision (2026-04-29): defer until after schema-yoast-parity-fields ships, because the field expansion will reshape templates and Pillar 3's typed signatures would have to be rewritten. Reactivate after intelligence layer settles. Plan file remains committed for reference."
+          "notes": "DEFERRED. Pillar 3 is regression-prevention hardening (schema-dts compile-time types + schemarama CI corpus + pr-check rule for cross-ref helper imports). It does not change schema output \u2014 it locks the bar Pillars 1 + 2 set. Decision (2026-04-29): defer until after schema-yoast-parity-fields ships, because the field expansion will reshape templates and Pillar 3's typed signatures would have to be rewritten. Reactivate after intelligence layer settles. Plan file remains committed for reference."
         }
       ]
     },
@@ -825,8 +833,8 @@
       "items": [
         {
           "id": "client-inbox-phase31-schema-admin-consolidation",
-          "title": "InboxTab Phase 3.1 — Schema admin consolidation (retire standalone client schema route)",
-          "source": "Session 2026-05-11 — Phase 3 planning",
+          "title": "InboxTab Phase 3.1 \u2014 Schema admin consolidation (retire standalone client schema route)",
+          "source": "Session 2026-05-11 \u2014 Phase 3 planning",
           "est": "3-4h",
           "priority": "P2",
           "status": "done",
@@ -836,8 +844,8 @@
         },
         {
           "id": "client-inbox-phase32-wins-enrichment",
-          "title": "InboxTab Phase 3.2 — Wins enrichment (more signal types in WinsSurface)",
-          "source": "Session 2026-05-11 — Phase 3 planning",
+          "title": "InboxTab Phase 3.2 \u2014 Wins enrichment (more signal types in WinsSurface)",
+          "source": "Session 2026-05-11 \u2014 Phase 3 planning",
           "est": "3-5h",
           "priority": "P2",
           "status": "pending",
@@ -846,8 +854,8 @@
         },
         {
           "id": "client-inbox-phase33-per-item-exclusion",
-          "title": "InboxTab Phase 3.3 — Per-item exclusion in approval batches",
-          "source": "Session 2026-05-11 — Phase 3 planning",
+          "title": "InboxTab Phase 3.3 \u2014 Per-item exclusion in approval batches",
+          "source": "Session 2026-05-11 \u2014 Phase 3 planning",
           "est": "4-6h",
           "priority": "P2",
           "status": "pending",
@@ -856,8 +864,8 @@
         },
         {
           "id": "client-inbox-phase34-client-signals-resolution",
-          "title": "InboxTab Phase 3.4 — Client signals resolution (loop engagement → insight engine)",
-          "source": "Session 2026-05-11 — Phase 3 planning",
+          "title": "InboxTab Phase 3.4 \u2014 Client signals resolution (loop engagement \u2192 insight engine)",
+          "source": "Session 2026-05-11 \u2014 Phase 3 planning",
           "est": "4-6h",
           "priority": "P2",
           "status": "done",
@@ -866,18 +874,18 @@
           "notes": "Shipped 2026-05-18. Added client-action feedback loop helper (`server/domains/inbox/client-action-feedback-loop.ts`) wired into public approval, admin completion, and playbook auto-completion paths. Insight resolution now prefers explicit payload origin IDs (`payload.metadata.origin.insightIds`) and only uses page/keyword fallback when exactly one unresolved insight matches (conservative ambiguity guard). Outcome linkage now records/updates tracked action lifecycle rows (`sourceType='client_action'`) and upgrades pre-action `content_decay` tracked rows via `trackingSourceId` metadata to `platform_executed` with related action linkage."
         }
       ],
-      "name": "Client Inbox IA — Phase 3 Deferred (3.1–3.4)"
+      "name": "Client Inbox IA \u2014 Phase 3 Deferred (3.1\u20133.4)"
     },
     {
       "id": "sprint-polish-quick-wins",
-      "name": "✅ SHIPPED — Polish & Quick Wins",
+      "name": "\u2705 SHIPPED \u2014 Polish & Quick Wins",
       "hours": "14-20",
-      "rationale": "P1 items and fast visual wins — closes open UX gaps and knocks out the QA backlog before hardening begins.",
+      "rationale": "P1 items and fast visual wins \u2014 closes open UX gaps and knocks out the QA backlog before hardening begins.",
       "items": [
         {
           "id": 503,
-          "title": "Unified Notification Hub — Merge NotificationBell + TaskPanel",
-          "source": "UI_UX_AUDIT §7",
+          "title": "Unified Notification Hub \u2014 Merge NotificationBell + TaskPanel",
+          "source": "UI_UX_AUDIT \u00a77",
           "est": "3-4h",
           "priority": "P1",
           "notes": "Shipped 2026-05-18: merged NotificationBell + TaskPanel into a unified Notification Hub with categorized sections (Actions Needed, Alerts, System Events), background task progress/cancel/dismiss controls in-drawer, and removed standalone floating TaskPanel mount from App.",
@@ -886,8 +894,8 @@
         },
         {
           "id": 624,
-          "title": "Stripe payment modal — visual QA in test mode (light + dark)",
-          "source": "Phase 5 Phase 2 follow-up — PR #314",
+          "title": "Stripe payment modal \u2014 visual QA in test mode (light + dark)",
+          "source": "Phase 5 Phase 2 follow-up \u2014 PR #314",
           "est": "10-15m",
           "priority": "P1",
           "notes": "Superseded 2026-05-04 by platform-consolidation-billing-checkout-only. The inline Stripe Elements payment modal and StripePaymentForm were removed; client purchases now redirect to hosted Stripe Checkout, so there is no in-app Elements modal to visually QA.",
@@ -895,18 +903,18 @@
         },
         {
           "id": 625,
-          "title": "Mobile breakpoint visual smoke — Phase 5 token migration",
-          "source": "Phase 5 Phase 2 follow-up — staging smoke gap",
+          "title": "Mobile breakpoint visual smoke \u2014 Phase 5 token migration",
+          "source": "Phase 5 Phase 2 follow-up \u2014 staging smoke gap",
           "est": "15-20m",
           "priority": "P1",
-          "notes": "Phase 2 codemod batches touched ~225 components but the original staging smoke test on 2026-04-25 only exercised desktop breakpoints — the resize_window MCP call didn't take effect on the Chrome instance. Tailwind responsive utilities are unchanged at the codemod level (only color tokens swapped, not breakpoint prefixes), but token swaps at breakpoint-conditional className boundaries could have edge cases. Test at 375 (mobile), 640 (sm), 768 (md), 1024 (lg) breakpoints across: WorkspaceOverview (admin home), ClientDashboard (overview/strategy/content tabs), SeoAudit (audit results table), Settings (Workspace + Client tabs). Look for: stacked vs grid layouts, button sizes, table overflow, sidebar collapse. Risk if skipped: medium — a regression at one breakpoint is invisible on desktop testing.\n[Shipped 2026-05-15] Added repeatable Playwright harness `tests/playwright/visual/wave5-mobile-smoke.spec.ts` to verify those exact routes and breakpoints against staging. First run caught 375px horizontal overflow on client overview/strategy/content routes; fixed via responsive header wrapping + root x-overflow containment in `ClientHeader` and `ClientDashboard`.",
+          "notes": "Phase 2 codemod batches touched ~225 components but the original staging smoke test on 2026-04-25 only exercised desktop breakpoints \u2014 the resize_window MCP call didn't take effect on the Chrome instance. Tailwind responsive utilities are unchanged at the codemod level (only color tokens swapped, not breakpoint prefixes), but token swaps at breakpoint-conditional className boundaries could have edge cases. Test at 375 (mobile), 640 (sm), 768 (md), 1024 (lg) breakpoints across: WorkspaceOverview (admin home), ClientDashboard (overview/strategy/content tabs), SeoAudit (audit results table), Settings (Workspace + Client tabs). Look for: stacked vs grid layouts, button sizes, table overflow, sidebar collapse. Risk if skipped: medium \u2014 a regression at one breakpoint is invisible on desktop testing.\n[Shipped 2026-05-15] Added repeatable Playwright harness `tests/playwright/visual/wave5-mobile-smoke.spec.ts` to verify those exact routes and breakpoints against staging. First run caught 375px horizontal overflow on client overview/strategy/content routes; fixed via responsive header wrapping + root x-overflow containment in `ClientHeader` and `ClientDashboard`.",
           "status": "done",
           "shippedAt": "2026-05-15"
         },
         {
           "id": 626,
           "title": "Harden flaky brand-engine + brand-identity integration tests",
-          "source": "CI flakiness — recurring on staging push runs",
+          "source": "CI flakiness \u2014 recurring on staging push runs",
           "est": "1-2h",
           "priority": "P1",
           "status": "done",
@@ -923,8 +931,8 @@
         },
         {
           "id": 517,
-          "title": "Form Validation Standardization — React Hook Form + Zod",
-          "source": "UI_UX_AUDIT §9",
+          "title": "Form Validation Standardization \u2014 React Hook Form + Zod",
+          "source": "UI_UX_AUDIT \u00a79",
           "est": "3-4h",
           "priority": "P2",
           "notes": "Shipped 2026-05-11: added React Hook Form + @hookform/resolvers as the standard client form stack; extended shared FormField/FormInput/FormSelect/FormTextarea primitives with error-authoritative valid/success state, emerald valid borders, aria-invalid, aria-describedby, alert/status messages; migrated LoginScreen and EmailCaptureGate from basic/manual validation to Zod-backed forms with inline field errors, disabled-invalid submits, loading states, and trimmed submit values. Focused tests cover primitive valid/error precedence, client email validation/submission, and admin login behavior. Remaining form migrations should be tracked as specific follow-up component items rather than this broad standardization item.",
@@ -933,8 +941,8 @@
         },
         {
           "id": 518,
-          "title": "Loading State Consistency — Unified skeleton system",
-          "source": "UI_UX_AUDIT §3",
+          "title": "Loading State Consistency \u2014 Unified skeleton system",
+          "source": "UI_UX_AUDIT \u00a73",
           "est": "2-3h",
           "priority": "P2",
           "notes": "Standardize loading patterns: route-level (keep ChunkFallback), data fetching (skeleton screens), actions (button loading + optimistic UI), background jobs (progress panel).\n[Audit 2026-04-22 partial] Skeleton primitive widely adopted (169 usages across 34 files including Roadmap, ClientDashboard, AdminInbox, brand/*, client/*); no formal standardization rule, lint, or codified loading-pattern doc.\nShipped / re-audited 2026-05-06: loading-state standardization now exists through shared Skeleton, LoadingState, SectionCardSkeleton, and ProgressIndicator primitives; route-level ChunkFallback remains in App.tsx, background jobs use TaskPanel/useBackgroundTasks, and docs/rules/ui-ux-consistency.md codifies contextual loading and skeleton usage. Remaining future polish can be tracked as specific component migrations rather than this broad standardization item.",
@@ -943,16 +951,16 @@
         },
         {
           "id": 627,
-          "title": "Blog/content editor improvements — TipTap rich text, auto-save, reading time, AI Fix This flow",
+          "title": "Blog/content editor improvements \u2014 TipTap rich text, auto-save, reading time, AI Fix This flow",
           "source": "docs/superpowers/plans/2026-04-28-blog-editor-improvements.md",
           "est": "8-10h",
           "priority": "P1",
           "status": "done",
-          "notes": "Shipped — Phase 1: replaced all PostEditor/SectionEditor/PostReviewCard textareas with TipTap v3 rich text editor (bold/italic/H2/H3/links via BubbleMenu). New useAutoSave hook (debounced 2s, stale-closure-safe). Reading time added to PostPreview. Phase 2: AI 'Fix This' button on failed ReviewChecklist items. POST /api/content-posts/:wsId/:postId/ai-fix with 6 issue-key strategies (factual_accuracy, brand_voice, internal_links, no_hallucinations, meta_optimized, word_count_target). FixDiffModal shows two-column before/after diff. AiFixResult + IssueKey shared types. POST_UPDATED broadcast added to PATCH handler. 6 unit tests (useAutoSave) + 6 integration tests (ai-fix endpoint)."
+          "notes": "Shipped \u2014 Phase 1: replaced all PostEditor/SectionEditor/PostReviewCard textareas with TipTap v3 rich text editor (bold/italic/H2/H3/links via BubbleMenu). New useAutoSave hook (debounced 2s, stale-closure-safe). Reading time added to PostPreview. Phase 2: AI 'Fix This' button on failed ReviewChecklist items. POST /api/content-posts/:wsId/:postId/ai-fix with 6 issue-key strategies (factual_accuracy, brand_voice, internal_links, no_hallucinations, meta_optimized, word_count_target). FixDiffModal shows two-column before/after diff. AiFixResult + IssueKey shared types. POST_UPDATED broadcast added to PATCH handler. 6 unit tests (useAutoSave) + 6 integration tests (ai-fix endpoint)."
         },
         {
           "id": 628,
-          "title": "CI runtime optimization — path-filtered jobs, concurrency cancellation, and Playwright cache",
+          "title": "CI runtime optimization \u2014 path-filtered jobs, concurrency cancellation, and Playwright cache",
           "source": "PR CI optimization follow-up (May 2026)",
           "est": "1-2h",
           "priority": "P1",
@@ -965,7 +973,7 @@
     },
     {
       "id": "sprint-seo-intelligence-depth",
-      "name": "✅ SHIPPED — SEO Intelligence Depth",
+      "name": "\u2705 SHIPPED \u2014 SEO Intelligence Depth",
       "hours": "19-24",
       "rationale": "Deepen the data layer: competitor monitoring, difficulty calibration, URL-level keyword intel, score history, anti-hallucination, and E-E-A-T signals.",
       "items": [
@@ -975,7 +983,7 @@
           "source": "USER REQUEST",
           "est": "4h",
           "priority": "P2",
-          "notes": "Future — Scheduled job to periodically fetch new competitor keywords and alert when competitors gain new rankings.\nShipped / verified 2026-05-06: startCompetitorMonitoringCron() is started from server/startup.ts; server/intelligence-crons.ts snapshots configured competitor domains, diffs against previous snapshots, writes competitor_alert rows, and upserts competitor_alert insights.",
+          "notes": "Future \u2014 Scheduled job to periodically fetch new competitor keywords and alert when competitors gain new rankings.\nShipped / verified 2026-05-06: startCompetitorMonitoringCron() is started from server/startup.ts; server/intelligence-crons.ts snapshots configured competitor domains, diffs against previous snapshots, writes competitor_alert rows, and upserts competitor_alert insights.",
           "status": "done",
           "shippedAt": "2026-05-06"
         },
@@ -985,7 +993,7 @@
           "source": "USER REQUEST",
           "est": "3h",
           "priority": "P2",
-          "notes": "Future — Contextualize keyword difficulty (KD) by site's domain authority/rating. A KD of 40% means different things for a DR-20 site vs a DR-60 site.\nShipped 2026-04-23 under Recommendation Intelligence Tier 1 item #615. adjustKdImpactScore() adjusts recommendation impact by site strength vs keyword difficulty, with unit coverage in tests/unit/recommendations-authority-kd.test.ts. This roadmap duplicate is now closed.",
+          "notes": "Future \u2014 Contextualize keyword difficulty (KD) by site's domain authority/rating. A KD of 40% means different things for a DR-20 site vs a DR-60 site.\nShipped 2026-04-23 under Recommendation Intelligence Tier 1 item #615. adjustKdImpactScore() adjusts recommendation impact by site strength vs keyword difficulty, with unit coverage in tests/unit/recommendations-authority-kd.test.ts. This roadmap duplicate is now closed.",
           "status": "done",
           "shippedAt": "2026-04-23"
         },
@@ -1001,7 +1009,7 @@
         },
         {
           "id": 351,
-          "title": "Page Intelligence — Optimization Score History & Trending",
+          "title": "Page Intelligence \u2014 Optimization Score History & Trending",
           "source": "USER REQUEST",
           "est": "3-4h",
           "priority": "P2",
@@ -1011,7 +1019,7 @@
         },
         {
           "id": 355,
-          "title": "AI Research Mode — Anti-Hallucination Prompt Blocks",
+          "title": "AI Research Mode \u2014 Anti-Hallucination Prompt Blocks",
           "source": "USER REQUEST (Reddit find: Anthropic docs anti-hallucination techniques)",
           "est": "2-3h",
           "priority": "P2",
@@ -1021,7 +1029,7 @@
         },
         {
           "id": 629,
-          "title": "Content Review Evidence Panel — Show SERP provenance for factual claims",
+          "title": "Content Review Evidence Panel \u2014 Show SERP provenance for factual claims",
           "source": "USER REQUEST",
           "est": "2-3h",
           "priority": "P2",
@@ -1054,7 +1062,7 @@
     },
     {
       "id": "sprint-platform-health-wave6-deferred-polish",
-      "name": "✅ SHIPPED — Platform Health Wave 6 — Deferred Platform Polish",
+      "name": "\u2705 SHIPPED \u2014 Platform Health Wave 6 \u2014 Deferred Platform Polish",
       "hours": "16-28",
       "rationale": "Park useful but less urgent platform-health work behind the first five waves so it stays visible without competing with higher-confidence unlocks.",
       "items": [
@@ -1083,7 +1091,7 @@
           "est": "2-4h",
           "priority": "P2",
           "status": "done",
-          "notes": "Shipped 2026-05-15: implemented styleguide drift architecture guardrails with a canonical lockdown contract (`docs/rules/styleguide-lockdown-contract.md`), new pr-check enforcement rules (style exception metadata contract, raw `<button>` drift detector, raw CTA literal detector), warning→error ratchet promotions for zero-backlog style rules, and a machine-readable style drift report/baseline regression gate (`scripts/report-style-drift.ts`, `verify:style-drift`, `report:style-drift`).\nWave follow-up 2026-05-15: completed a parallel admin action-button primitive sweep across SEO Editor action rows (`SeoEditorHeaderActions`, `ApprovalPanel`, `SeoEditorTableControls`, `BulkOperations`), SettingsPanel top-level controls, WorkspaceHome action links/status cards, and SchemaSuggester top controls. Style drift metrics improved from `raw_button_unallowlisted_count: 891 -> 855` and `non_primitive_action_count: 876 -> 840`; admin raw-button count now `717` (down from `753`).\nWave 3b follow-up 2026-05-15: migrated admin settings/audit controls in `ConnectionsTab`, `FeaturesTab`, `ClientDashboardTab`, and SEO Audit share actions to `Button`/`IconButton`. Style drift metrics improved further to `raw_button_unallowlisted_count: 808` and `non_primitive_action_count: 793`; admin raw-button count now `670`.\nWave 4 follow-up 2026-05-17: established canonical styleguide parity rule registry artifacts (`docs/rules/styleguide-rule-registry.md`, `data/styleguide-rule-registry.json`) with rule-level enforcement tiers (`error|warn|manual`), ownership, metric keys, and promotion prerequisites to guide future ratchet waves from advisory to blocking checks.\nWave 5 follow-up 2026-05-17: added three non-blocking parity detectors in `pr-check` (`styleguide-css-must-import-public-tokens`, `styleguide-typography-extra-class-drift`, `global-token-declaration-outside-canonical-token-files`) with fixture coverage in `tests/pr-check.test.ts` so token/typography drift surfaces as advisory before promotion.\nWave 8 follow-up 2026-05-18: promoted five zero-backlog parity rules to blocking errors (`hardcoded card radius outside ui primitives`, `badge-like-span-outside-primitives`, `styleguide-css-must-import-public-tokens`, `styleguide-typography-extra-class-drift`, `global-token-declaration-outside-canonical-token-files`), added warn-tier detectors (`src-index-css-no-token-declarations`, `badge-color-prop-deprecation`, `interactive-div-role-button`, `primitive-override-drift-on-form-controls`), and migrated the final four live badge-like spans to `Badge` primitives in client surfaces.\nWave 10 follow-up 2026-05-17: removed structural class overrides from shared form primitive callsites across client/admin/editor surfaces, tightened `primitive-override-drift-on-form-controls` to structural drift only, promoted that rule from warn to error with docs/registry sync, and reached zero backlog (`raw form control advisory: admin=0, client=0, total=0`).\nWave 12 follow-up 2026-05-17: added three warn-tier styleguide parity heuristics in `pr-check` (`duplicate-heading-signal`, `nested-card-density-signal`, `blue-action-semantic-drift`), added fixture coverage for trigger + hatch behavior in `tests/pr-check.test.ts`, and expanded `scripts/report-style-drift.ts` with file-level advisory breakdowns for duplicate headings, nested SectionCard density, and blue action-semantic drift so cleanup can be targeted by ownership slice without blocking CI.\nWave 13 follow-up 2026-05-17: resolved all active advisory hits for the three Wave 12 heuristics by (a) converting remaining blue-styled action controls to teal semantics in asset audit/cards and SERP evidence links, and (b) marking intentional duplicated heading patterns in feature-flagged or dynamic-title surfaces with explicit `duplicate-heading-ok` hatches. Current style drift report is zero across duplicate-heading, nested-card-density, and blue-action-semantic advisories.\nWave 15 follow-up 2026-05-17: promoted `src-index-css-no-token-declarations` from warn to error after sustained zero-hit verification and added `status-semantic-mapping-drift` as a new warn-tier detector with fixture coverage and `report-style-drift` file-level advisory breakdowns to drive centralized StatusBadge/status-registry cleanup.\nWave 16 follow-up 2026-05-17: completed the remaining status-semantic migration sweep (requests, workspace-home, batch generation, redirect manager), added a canonical `request` StatusBadge domain, drove `status_semantic_mapping_drift_count` to zero, and promoted `status-semantic-mapping-drift` from warn to error with docs/registry synchronization.\nWave 17 pre-plan audit 2026-05-17: ran parallel read-only audits across static styleguide/docs, client surfaces, admin/editor/settings/schema surfaces, and enforcement plumbing; registered newly discovered parity directives as planned warn/manual contracts in the canonical registry; and published an execution matrix in  to drive the next detector + cleanup ratchet batches.\nWave 17b follow-up 2026-05-17: added automated staging merge integrity guardrails for stacked PR flows (`scripts/report-staging-merge-integrity.ts`) with CI + nightly wiring and explicit historical exception tracking in `data/staging-merge-integrity-exceptions.json` so non-staging merges that fail to land in `staging` are surfaced immediately.\nWave 18 follow-up 2026-05-17: began typography hierarchy ratchet by promoting `muted-text-two-tier-only` from planned to active advisory, adding warn-tier detection + hatch support in `pr-check`, and extending `report-style-drift` with per-file muted-tier counts (`mutedTextTierViolationCount`) to drive targeted cleanup waves.\nWave 19 follow-up 2026-05-17: activated three additional Wave 17 planned styleguide parity directives as warn-tier advisories — `focus-visible-ring-contract`, `raw-z-index-inline-literal`, and `stat-primitive-bypass-signal` — with `pr-check` detectors, hatch support, fixture coverage in `tests/pr-check.test.ts`, and new `report-style-drift` file-level metrics to route cleanup by ownership slice.",
+          "notes": "Shipped 2026-05-15: implemented styleguide drift architecture guardrails with a canonical lockdown contract (`docs/rules/styleguide-lockdown-contract.md`), new pr-check enforcement rules (style exception metadata contract, raw `<button>` drift detector, raw CTA literal detector), warning\u2192error ratchet promotions for zero-backlog style rules, and a machine-readable style drift report/baseline regression gate (`scripts/report-style-drift.ts`, `verify:style-drift`, `report:style-drift`).\nWave follow-up 2026-05-15: completed a parallel admin action-button primitive sweep across SEO Editor action rows (`SeoEditorHeaderActions`, `ApprovalPanel`, `SeoEditorTableControls`, `BulkOperations`), SettingsPanel top-level controls, WorkspaceHome action links/status cards, and SchemaSuggester top controls. Style drift metrics improved from `raw_button_unallowlisted_count: 891 -> 855` and `non_primitive_action_count: 876 -> 840`; admin raw-button count now `717` (down from `753`).\nWave 3b follow-up 2026-05-15: migrated admin settings/audit controls in `ConnectionsTab`, `FeaturesTab`, `ClientDashboardTab`, and SEO Audit share actions to `Button`/`IconButton`. Style drift metrics improved further to `raw_button_unallowlisted_count: 808` and `non_primitive_action_count: 793`; admin raw-button count now `670`.\nWave 4 follow-up 2026-05-17: established canonical styleguide parity rule registry artifacts (`docs/rules/styleguide-rule-registry.md`, `data/styleguide-rule-registry.json`) with rule-level enforcement tiers (`error|warn|manual`), ownership, metric keys, and promotion prerequisites to guide future ratchet waves from advisory to blocking checks.\nWave 5 follow-up 2026-05-17: added three non-blocking parity detectors in `pr-check` (`styleguide-css-must-import-public-tokens`, `styleguide-typography-extra-class-drift`, `global-token-declaration-outside-canonical-token-files`) with fixture coverage in `tests/pr-check.test.ts` so token/typography drift surfaces as advisory before promotion.\nWave 8 follow-up 2026-05-18: promoted five zero-backlog parity rules to blocking errors (`hardcoded card radius outside ui primitives`, `badge-like-span-outside-primitives`, `styleguide-css-must-import-public-tokens`, `styleguide-typography-extra-class-drift`, `global-token-declaration-outside-canonical-token-files`), added warn-tier detectors (`src-index-css-no-token-declarations`, `badge-color-prop-deprecation`, `interactive-div-role-button`, `primitive-override-drift-on-form-controls`), and migrated the final four live badge-like spans to `Badge` primitives in client surfaces.\nWave 10 follow-up 2026-05-17: removed structural class overrides from shared form primitive callsites across client/admin/editor surfaces, tightened `primitive-override-drift-on-form-controls` to structural drift only, promoted that rule from warn to error with docs/registry sync, and reached zero backlog (`raw form control advisory: admin=0, client=0, total=0`).\nWave 12 follow-up 2026-05-17: added three warn-tier styleguide parity heuristics in `pr-check` (`duplicate-heading-signal`, `nested-card-density-signal`, `blue-action-semantic-drift`), added fixture coverage for trigger + hatch behavior in `tests/pr-check.test.ts`, and expanded `scripts/report-style-drift.ts` with file-level advisory breakdowns for duplicate headings, nested SectionCard density, and blue action-semantic drift so cleanup can be targeted by ownership slice without blocking CI.\nWave 13 follow-up 2026-05-17: resolved all active advisory hits for the three Wave 12 heuristics by (a) converting remaining blue-styled action controls to teal semantics in asset audit/cards and SERP evidence links, and (b) marking intentional duplicated heading patterns in feature-flagged or dynamic-title surfaces with explicit `duplicate-heading-ok` hatches. Current style drift report is zero across duplicate-heading, nested-card-density, and blue-action-semantic advisories.\nWave 15 follow-up 2026-05-17: promoted `src-index-css-no-token-declarations` from warn to error after sustained zero-hit verification and added `status-semantic-mapping-drift` as a new warn-tier detector with fixture coverage and `report-style-drift` file-level advisory breakdowns to drive centralized StatusBadge/status-registry cleanup.\nWave 16 follow-up 2026-05-17: completed the remaining status-semantic migration sweep (requests, workspace-home, batch generation, redirect manager), added a canonical `request` StatusBadge domain, drove `status_semantic_mapping_drift_count` to zero, and promoted `status-semantic-mapping-drift` from warn to error with docs/registry synchronization.\nWave 17 pre-plan audit 2026-05-17: ran parallel read-only audits across static styleguide/docs, client surfaces, admin/editor/settings/schema surfaces, and enforcement plumbing; registered newly discovered parity directives as planned warn/manual contracts in the canonical registry; and published an execution matrix in  to drive the next detector + cleanup ratchet batches.\nWave 17b follow-up 2026-05-17: added automated staging merge integrity guardrails for stacked PR flows (`scripts/report-staging-merge-integrity.ts`) with CI + nightly wiring and explicit historical exception tracking in `data/staging-merge-integrity-exceptions.json` so non-staging merges that fail to land in `staging` are surfaced immediately.\nWave 18 follow-up 2026-05-17: began typography hierarchy ratchet by promoting `muted-text-two-tier-only` from planned to active advisory, adding warn-tier detection + hatch support in `pr-check`, and extending `report-style-drift` with per-file muted-tier counts (`mutedTextTierViolationCount`) to drive targeted cleanup waves.\nWave 19 follow-up 2026-05-17: activated three additional Wave 17 planned styleguide parity directives as warn-tier advisories \u2014 `focus-visible-ring-contract`, `raw-z-index-inline-literal`, and `stat-primitive-bypass-signal` \u2014 with `pr-check` detectors, hatch support, fixture coverage in `tests/pr-check.test.ts`, and new `report-style-drift` file-level metrics to route cleanup by ownership slice.",
           "shippedAt": "2026-05-15"
         },
         {
@@ -1187,7 +1195,7 @@
     },
     {
       "id": "sprint-platform-health-wave5-product-lifecycle-discipline",
-      "name": "✅ SHIPPED — Platform Health Wave 5 — Product & Lifecycle Discipline",
+      "name": "\u2705 SHIPPED \u2014 Platform Health Wave 5 \u2014 Product & Lifecycle Discipline",
       "hours": "14-24",
       "rationale": "Keep the platform understandable as it grows by managing product surface area, feature flags, deprecations, performance budgets, local onboarding, ADRs, and platform-health cadence.",
       "items": [
@@ -1276,7 +1284,7 @@
     },
     {
       "id": "sprint-platform-health-wave4-runtime-operability",
-      "name": "✅ SHIPPED — Platform Health Wave 4 — Runtime & Operational Confidence",
+      "name": "\u2705 SHIPPED \u2014 Platform Health Wave 4 \u2014 Runtime & Operational Confidence",
       "hours": "18-30",
       "rationale": "Improve runtime confidence: know when integrations fail, evaluate AI quality, recover data safely, observe operations, and protect tenant boundaries.",
       "items": [
@@ -1344,7 +1352,7 @@
     },
     {
       "id": "sprint-platform-health-wave3-silent-failure-rails",
-      "name": "✅ SHIPPED — Platform Health Wave 3 — Silent-Failure Reduction Rails",
+      "name": "\u2705 SHIPPED \u2014 Platform Health Wave 3 \u2014 Silent-Failure Reduction Rails",
       "hours": "18-30",
       "rationale": "Reduce correct-looking but miswired code by centralizing serializers, events, AI operation contracts, external fetch behavior, and workspace mutation lifecycle rails.",
       "items": [
@@ -1433,7 +1441,7 @@
     },
     {
       "id": "sprint-platform-health-wave2b-critical-test-coverage",
-      "name": "✅ SHIPPED — Platform Health Wave 2b — Critical Test Coverage Hardening",
+      "name": "\u2705 SHIPPED \u2014 Platform Health Wave 2b \u2014 Critical Test Coverage Hardening",
       "hours": "70-120",
       "rationale": "Raise confidence in the highest-risk product domains before chasing global 80-90% coverage. Current baseline from 2026-05-13 coverage run: 32.31% lines, 30.66% statements, 24.64% branches, 24.30% functions. The first goal is critical-domain behavior coverage, not vanity global line coverage.",
       "items": [
@@ -1502,7 +1510,7 @@
     },
     {
       "id": "sprint-platform-health-wave2-shipping-confidence",
-      "name": "✅ SHIPPED — Platform Health Wave 2 — Shipping Confidence Spine",
+      "name": "\u2705 SHIPPED \u2014 Platform Health Wave 2 \u2014 Shipping Confidence Spine",
       "hours": "12-20",
       "rationale": "Turn the operating model into repeatable confidence checks: domain smoke tests, integration maps, feature-class completion gates, and high-value API contract tests.",
       "items": [
@@ -1561,7 +1569,7 @@
     },
     {
       "id": "sprint-platform-health-wave1-operating-model",
-      "name": "✅ SHIPPED — Platform Health Wave 1 — Operating Model",
+      "name": "\u2705 SHIPPED \u2014 Platform Health Wave 1 \u2014 Operating Model",
       "hours": "8-12",
       "rationale": "Create the operating model for future platform work: domains, file placement, feature templates, and PR readiness checks before deeper refactors begin.",
       "items": [
@@ -1610,80 +1618,80 @@
     },
     {
       "id": "sprint-may-2026",
-      "name": "✅ SHIPPED — May 2026",
-      "rationale": "Client Inbox IA Redesign (Phase 1 + Phase 2) — feedback retirement, shared type contracts, admin send convention standardization, 3-section inbox layout, wins surface, and prevention rules.",
+      "name": "\u2705 SHIPPED \u2014 May 2026",
+      "rationale": "Client Inbox IA Redesign (Phase 1 + Phase 2) \u2014 feedback retirement, shared type contracts, admin send convention standardization, 3-section inbox layout, wins surface, and prevention rules.",
       "items": [
         {
           "id": "may-2026-feedback-retirement",
           "name": "Feedback Module Retirement",
           "status": "done",
-          "notes": "Shipped — PR #658 (feat/feedback-retirement). Removed FeedbackWidget from InboxTab and all import chains; retired /api/feedback routes; pr-check rule prevents reintroduction."
+          "notes": "Shipped \u2014 PR #658 (feat/feedback-retirement). Removed FeedbackWidget from InboxTab and all import chains; retired /api/feedback routes; pr-check rule prevents reintroduction."
         },
         {
           "id": "may-2026-keyword-strategy-deprecation",
           "name": "keyword_strategy Action Type Deprecation",
           "status": "done",
-          "notes": "Shipped — PR #659 (feat/keyword-strategy-deprecation). Existing keyword_strategy client_actions archived; new creation blocked via pr-check rule."
+          "notes": "Shipped \u2014 PR #659 (feat/keyword-strategy-deprecation). Existing keyword_strategy client_actions archived; new creation blocked via pr-check rule."
         },
         {
           "id": "may-2026-shared-contracts",
-          "name": "Client Inbox IA — Shared Type Contracts",
+          "name": "Client Inbox IA \u2014 Shared Type Contracts",
           "status": "done",
-          "notes": "Shipped — PR #660 (feat/shared-contracts). InboxFilter type, ClientAction/ClientActionSourceType/ClientActionTier types, CLIENT_INBOX_ALIASES in routes.ts, shared-contracts test."
+          "notes": "Shipped \u2014 PR #660 (feat/shared-contracts). InboxFilter type, ClientAction/ClientActionSourceType/ClientActionTier types, CLIENT_INBOX_ALIASES in routes.ts, shared-contracts test."
         },
         {
           "id": "may-2026-admin-send-convention",
           "name": "Admin Send Convention Standardization",
           "status": "done",
-          "notes": "Shipped — PR #661 (feat/admin-send-convention). 'Send for Review' and 'Flag for Client' labels replaced with canonical 'Send' pattern; pr-check rule enforces no recurrence; ui-vocabulary.md updated."
+          "notes": "Shipped \u2014 PR #661 (feat/admin-send-convention). 'Send for Review' and 'Flag for Client' labels replaced with canonical 'Send' pattern; pr-check rule enforces no recurrence; ui-vocabulary.md updated."
         },
         {
           "id": "may-2026-inbox-ia-restructure",
-          "name": "Client Inbox IA Redesign — 3-Section Layout",
+          "name": "Client Inbox IA Redesign \u2014 3-Section Layout",
           "status": "done",
-          "notes": "Shipped — PR #662 (feat/inbox-ia-restructure). InboxTab 3-section layout (Decisions/Reviews/Conversations) behind new-inbox-ia flag; SchemaReviewModal; ClientActionDetailModal; LEGACY_FILTER_MAP backward-compat."
+          "notes": "Shipped \u2014 PR #662 (feat/inbox-ia-restructure). InboxTab 3-section layout (Decisions/Reviews/Conversations) behind new-inbox-ia flag; SchemaReviewModal; ClientActionDetailModal; LEGACY_FILTER_MAP backward-compat."
         },
         {
           "id": "may-2026-client-wins-surface",
           "name": "Client Wins Surface",
           "status": "done",
-          "notes": "Shipped — PR #663 (feat/client-wins-surface). WinsSurface in InsightsBriefingPage behind client-wins-surface flag; GET /api/public/outcomes/:wsId/wins endpoint; mutual-exclusivity with PredictionShowcaseCard enforced by pr-check."
+          "notes": "Shipped \u2014 PR #663 (feat/client-wins-surface). WinsSurface in InsightsBriefingPage behind client-wins-surface flag; GET /api/public/outcomes/:wsId/wins endpoint; mutual-exclusivity with PredictionShowcaseCard enforced by pr-check."
         },
         {
           "id": "may-2026-ia-prevention-rules",
           "name": "IA Redesign Prevention Rules",
           "status": "done",
-          "notes": "Shipped — PR #664 (feat/ia-prevention-rules). 5 new pr-check rules: feedback-module-reintroduction, keyword-strategy-action-type, send-for-review-anti-pattern, prediction-showcase-ungated, inbox-action-queue-strip. docs/rules/inbox-section-routing.md added."
+          "notes": "Shipped \u2014 PR #664 (feat/ia-prevention-rules). 5 new pr-check rules: feedback-module-reintroduction, keyword-strategy-action-type, send-for-review-anti-pattern, prediction-showcase-ungated, inbox-action-queue-strip. docs/rules/inbox-section-routing.md added."
         },
         {
           "id": "may-2026-action-queue-strip-phase2b",
-          "name": "ActionQueueStrip Phase 2B — Final InboxFilter Values",
+          "name": "ActionQueueStrip Phase 2B \u2014 Final InboxFilter Values",
           "status": "done",
-          "notes": "Shipped — PR #665 (feat/action-queue-strip-final-values). Chip section values updated from intermediate names (seo-changes/content/needs-action) to final InboxFilter values (decisions/reviews). LEGACY_FILTER_MAP trimmed to 5 URL alias entries."
+          "notes": "Shipped \u2014 PR #665 (feat/action-queue-strip-final-values). Chip section values updated from intermediate names (seo-changes/content/needs-action) to final InboxFilter values (decisions/reviews). LEGACY_FILTER_MAP trimmed to 5 URL alias entries."
         },
         {
           "id": "client-inbox-phase35-action-playbooks-resolution",
-          "title": "InboxTab Phase 3.5 — Action playbooks resolution (approval → implementation)",
+          "title": "InboxTab Phase 3.5 \u2014 Action playbooks resolution (approval \u2192 implementation)",
           "source": "docs/superpowers/plans/2026-05-11-action-playbooks-resolution.md",
           "est": "4-6h",
           "priority": "P1",
           "status": "done",
           "createdAt": "2026-05-11",
           "shippedAt": "2026-05-11",
-          "notes": "Shipped. Closes the approval dead-end: client approves a client_action → (1) admin team email notification via action_approved event, (2) content_decay auto-creates content brief via ACTION_PLAYBOOK_EXECUTE background job and transitions to completed, (3) other types (aeo_change, internal_link, keyword_strategy, redirect_proposal) surface in admin UI with amber 'Awaiting implementation' badge and teal 'Mark complete' button."
+          "notes": "Shipped. Closes the approval dead-end: client approves a client_action \u2192 (1) admin team email notification via action_approved event, (2) content_decay auto-creates content brief via ACTION_PLAYBOOK_EXECUTE background job and transitions to completed, (3) other types (aeo_change, internal_link, keyword_strategy, redirect_proposal) surface in admin UI with amber 'Awaiting implementation' badge and teal 'Mark complete' button."
         }
       ],
       "shippedAt": "2026-05-11"
     },
     {
       "id": "sprint-hardening",
-      "name": "✅ SHIPPED — Hardening Pass",
+      "name": "\u2705 SHIPPED \u2014 Hardening Pass",
       "hours": "28-42",
       "rationale": "Data normalization, validation coverage, test gaps, and small code-quality fixes that reduce future bug surface.",
       "items": [
         {
           "id": "content-post-stat-provenance",
-          "title": "Content Post — Statistics Provenance Check",
+          "title": "Content Post \u2014 Statistics Provenance Check",
           "est": "1-2d",
           "priority": "P1",
           "sprint": "H",
@@ -1719,7 +1727,7 @@
         },
         {
           "id": 630,
-          "title": "Canonical Page Address Contract — platform-wide slug/path hardening follow-up",
+          "title": "Canonical Page Address Contract \u2014 platform-wide slug/path hardening follow-up",
           "source": "PageSpeed single-page bug + nested Webflow page audit 2026-05-12",
           "est": "3-5h",
           "priority": "P1",
@@ -1728,7 +1736,7 @@
         },
         {
           "id": 587,
-          "title": "Shared WebSocket event bus — eliminate per-hook WS connections",
+          "title": "Shared WebSocket event bus \u2014 eliminate per-hook WS connections",
           "source": "Platform Health Sprint PR1 Devin review (2026-04-14)",
           "est": "2-3h",
           "priority": "P2",
@@ -1743,7 +1751,7 @@
           "est": "0.5h",
           "priority": "P2",
           "status": "done",
-          "notes": "Completed 2026-05-08 in `codex/page-rewrite-chat-decomp-phase3`. `PageRewriteChat` now surfaces a toast (`Section not found — content inserted at end`) when AI section targets do not match any `data-section` heading, replacing the prior silent append behavior. Original flag was deferred from PR #159."
+          "notes": "Completed 2026-05-08 in `codex/page-rewrite-chat-decomp-phase3`. `PageRewriteChat` now surfaces a toast (`Section not found \u2014 content inserted at end`) when AI section targets do not match any `data-section` heading, replacing the prior silent append behavior. Original flag was deferred from PR #159."
         },
         {
           "id": 578,
@@ -1767,7 +1775,7 @@
         {
           "id": 599,
           "title": "Per-feature usage budgets (split strategy_generations pool)",
-          "source": "PR #255 code review — Devin comment on shared billing pool",
+          "source": "PR #255 code review \u2014 Devin comment on shared billing pool",
           "est": "4-6h",
           "priority": "P2",
           "notes": "Shipped / verified 2026-05-08 on `codex/hardening-per-feature-usage-budgets`. Split the former shared `strategy_generations` pool by moving Webflow alt-text generation to `alt_text_generations` and workspace context generation jobs (brand voice / knowledge base / personas) to `workspace_context_generations`, while retaining `strategy_generations` for keyword strategy generation. Updated `server/usage-tracking.ts` union + per-tier limits + usage summary output, rewired affected increment/check/decrement call sites, and expanded unit/integration coverage (`tests/unit/usage-tracking.test.ts`, `tests/integration/tier-gate-enforcement.test.ts`) to pin the new feature budgets in free/growth/premium tiers.",
@@ -1826,11 +1834,11 @@
         },
         {
           "id": 583,
-          "title": "Verify client_signal → 'internal' category mapping in email-throttle",
+          "title": "Verify client_signal \u2192 'internal' category mapping in email-throttle",
           "source": "PR #162 typecheck cleanup",
           "est": "0.5h",
           "priority": "P3",
-          "notes": "server/email-throttle.ts has a guessed mapping of the client_signal insight category to 'internal' throttle bucket. Needs human review — confirm this matches intent or adjust. Low risk because it only affects email throttle grouping, not correctness. Flagged during the typecheck cleanup.\nVerified 2026-05-06: server/email-throttle.ts maps client_signal to the internal bucket alongside request_new/content_request/payment_received, which matches intent because client signals notify the agency/admin inbox and should not count toward client email caps.",
+          "notes": "server/email-throttle.ts has a guessed mapping of the client_signal insight category to 'internal' throttle bucket. Needs human review \u2014 confirm this matches intent or adjust. Low risk because it only affects email throttle grouping, not correctness. Flagged during the typecheck cleanup.\nVerified 2026-05-06: server/email-throttle.ts maps client_signal to the internal bucket alongside request_new/content_request/payment_received, which matches intent because client signals notify the agency/admin inbox and should not count toward client email caps.",
           "status": "done",
           "shippedAt": "2026-05-06"
         },
@@ -1847,7 +1855,7 @@
         {
           "id": "competitor-snapshot-store-refactor",
           "title": "Refactor detectCompetitorAlerts: separate computation from DB persistence",
-          "source": "TECH DEBT — scaled code review on PR #267 (feat/seo-tier2-capabilities)",
+          "source": "TECH DEBT \u2014 scaled code review on PR #267 (feat/seo-tier2-capabilities)",
           "est": "1-2h",
           "priority": "P3",
           "notes": "Shipped / verified 2026-05-08. detectCompetitorAlerts() in server/competitor-snapshot-store.ts is now pure (no DB writes), with inserts moved into saveCompetitorAlerts(alerts). Intelligence cron wiring now calls detect + save in sequence. Added/updated tests pinning the two-step contract: no persisted alerts until saveCompetitorAlerts is called, then expected unlinked-alert/list/link behavior.",
@@ -1857,17 +1865,17 @@
         {
           "id": "analytics-intelligence-phase-reorder",
           "title": "Move Phase 5 (emerging_keyword) and Phase 6 (freshness_alert) to after Phase 4 in analytics-intelligence.ts",
-          "source": "TECH DEBT — scaled code review on PR #267",
+          "source": "TECH DEBT \u2014 scaled code review on PR #267",
           "est": "0.5h",
           "priority": "P3",
-          "notes": "Phase 5 (line ~1309) and Phase 6 (line ~1349) are currently inserted between Phase 3B and Phase 3C, contradicting the new rule 8.3 in docs/rules/analytics-insights.md (phases must be appended after the last existing phase). Pure code motion — no logic change, no dependency conflicts. Deferred from PR #267 to avoid mixing functional bug fixes with pure reorder churn.\nShipped / verified 2026-05-06: server/analytics-intelligence.ts now orders Phase 3A, Phase 3B, Phase 3C, Phase 4, then Phase 5 emerging_keyword and Phase 6 freshness_alert. The deferred pure code-motion item is complete.",
+          "notes": "Phase 5 (line ~1309) and Phase 6 (line ~1349) are currently inserted between Phase 3B and Phase 3C, contradicting the new rule 8.3 in docs/rules/analytics-insights.md (phases must be appended after the last existing phase). Pure code motion \u2014 no logic change, no dependency conflicts. Deferred from PR #267 to avoid mixing functional bug fixes with pure reorder churn.\nShipped / verified 2026-05-06: server/analytics-intelligence.ts now orders Phase 3A, Phase 3B, Phase 3C, Phase 4, then Phase 5 emerging_keyword and Phase 6 freshness_alert. The deferred pure code-motion item is complete.",
           "status": "done",
           "shippedAt": "2026-05-06"
         },
         {
           "id": "freshness-detection-direct-test",
           "title": "Add direct unit test for Phase 6 content freshness detection logic",
-          "source": "TECH DEBT — scaled code review on PR #267",
+          "source": "TECH DEBT \u2014 scaled code review on PR #267",
           "est": "0.5h",
           "priority": "P3",
           "notes": "Shipped / verified 2026-05-08. Extracted Phase 6 freshness detection into pure helper `computeFreshnessAlerts()` in server/analytics-intelligence.ts and added direct unit coverage in tests/unit/analytics-intelligence.test.ts. Tests now pin: 90-day+100-impression inclusion threshold, exactly-180-day warning boundary, >180-day critical severity, stale low-impression exclusion, invalid/missing analysis date exclusion, insightType literal, and data payload mapping.",
@@ -1877,7 +1885,7 @@
         {
           "id": "insight-cards-empty-state-parity",
           "title": "Unify empty-state behavior for new Tier 2 InsightCards (grid gap fix)",
-          "source": "UX — scaled code review on PR #267",
+          "source": "UX \u2014 scaled code review on PR #267",
           "est": "0.5h",
           "priority": "P3",
           "notes": "Shipped / verified 2026-05-08. Removed growth/premium null-return short-circuits in CompetitorAlertCard, EmergingKeywordCard, and FreshnessAlertCard so all Tier 2 cards stay mounted and render lightweight empty states when data is absent. Added component coverage in tests/component/InsightCards.test.tsx to assert all three card titles and empty-state copy render for growth tier without tier-2 insights.",
@@ -1886,8 +1894,8 @@
         },
         {
           "id": 430,
-          "title": "Content Briefs — template cross-reference",
-          "source": "TOOL_AUDIT §2d",
+          "title": "Content Briefs \u2014 template cross-reference",
+          "source": "TOOL_AUDIT \u00a72d",
           "est": "2h",
           "priority": "P3",
           "notes": "Shipped / verified 2026-05-08 on codex/hardening-content-briefs-template-crossref. Added `GET /api/content-briefs/:workspaceId/template-crossref?keyword=...` to resolve matrix-cell keyword matches (custom keyword precedence over target keyword), return matched template metadata, and provide sorted template sections. Brief generation now auto-injects matched template sections/style/title/meta patterns, locks keyword source to `template`, and falls back page type from the matched template when incoming page type is absent/invalid. Admin Brief Generator now shows a matched-template callout and auto-prefills page type from the crossref. Added integration coverage for missing keyword 400, no-match null response, and custom-keyword precedence + section ordering behavior.",
@@ -1896,8 +1904,8 @@
         },
         {
           "id": 431,
-          "title": "Workspace Home — content velocity metric",
-          "source": "TOOL_AUDIT §4c",
+          "title": "Workspace Home \u2014 content velocity metric",
+          "source": "TOOL_AUDIT \u00a74c",
           "est": "2h",
           "priority": "P3",
           "notes": "Shipped / verified 2026-05-08 on codex/hardening-normalize-content-gaps. Added workspace-home `contentVelocity` payload from `getContentVelocityTrend()` in server/content-posts-db.ts and surfaced a new hero StatCard on Workspace Home showing trailing 3-month avg posts/month, month-over-month trend %, and current-month published count. Hardening included zero-fill month buckets, null trend for zero/insufficient baseline windows, and test-order-independent velocity unit coverage.",
@@ -1907,7 +1915,7 @@
         {
           "id": "pr398-dedup-types",
           "title": "BriefDetail dedup + type consolidation (Unit A + B)",
-          "source": "PR #398 — content brief pipeline refactor",
+          "source": "PR #398 \u2014 content brief pipeline refactor",
           "est": "3-4h",
           "priority": "P1",
           "status": "done",
@@ -1916,18 +1924,18 @@
         },
         {
           "id": "pr398-bug-fixes",
-          "title": "Content pipeline bug fixes — 7 server-side fixes (Unit C)",
-          "source": "PR #398 — content brief pipeline refactor",
+          "title": "Content pipeline bug fixes \u2014 7 server-side fixes (Unit C)",
+          "source": "PR #398 \u2014 content brief pipeline refactor",
           "est": "2-3h",
           "priority": "P1",
           "status": "done",
-          "notes": "Bug 2: Clear clientFeedback on resubmit. Bug 3: Upgrade endpoint try/catch for InvalidTransitionError. Bug 4: send-to-client initialStatus changed to brief_generated. Bug 5: Client can view post in changes_requested status. Bug 6: postId only exposed when serviceType=full_post. Bug 7: Double skeleton save prevention. Bug 8: State machine — removed post_review from changes_requested transitions, Re-queue for Revision button.",
+          "notes": "Bug 2: Clear clientFeedback on resubmit. Bug 3: Upgrade endpoint try/catch for InvalidTransitionError. Bug 4: send-to-client initialStatus changed to brief_generated. Bug 5: Client can view post in changes_requested status. Bug 6: postId only exposed when serviceType=full_post. Bug 7: Double skeleton save prevention. Bug 8: State machine \u2014 removed post_review from changes_requested transitions, Re-queue for Revision button.",
           "shippedAt": "2026-05-01"
         },
         {
           "id": "pr398-email-notifications",
           "title": "Email notification for changes_requested (Unit D)",
-          "source": "PR #398 — content brief pipeline refactor",
+          "source": "PR #398 \u2014 content brief pipeline refactor",
           "est": "1h",
           "priority": "P2",
           "status": "done",
@@ -1939,7 +1947,7 @@
     },
     {
       "id": "sprint-platform-consolidation",
-      "name": "✅ SHIPPED — Platform Consolidation",
+      "name": "\u2705 SHIPPED \u2014 Platform Consolidation",
       "hours": "70-108",
       "rationale": "Verified against origin/staging eb0a5832 on 2026-05-04. Phase 0 baseline confirms rapid product expansion left uneven background-generation coverage, duplicate implementations, partially completed migrations, and large feature modules that now slow safe iteration.",
       "items": [
@@ -2281,7 +2289,7 @@
           "priority": "P3",
           "status": "done",
           "createdAt": "2026-05-08",
-          "notes": "Completed 2026-05-08 on `codex/page-rewrite-chat-decomp-phase3`. Extracted editor action workflow from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/pageRewriteChatActions.ts` (`execFormatCommand`, `clearFormattingSelection`, `wrapSelectionHeading`, `applyRewriteToSection`) and rewired root toolbar/apply handlers to consume the module while preserving behavior. Bug sniffing hardening included: missing section targets now surface an explicit toast (`Section not found — content inserted at end`) instead of silently appending. Added source-contract guardrails (`tests/contract/page-rewrite-chat-phase3-actions-extraction.test.ts`) and behavior coverage (`tests/unit/page-rewrite-chat-actions.test.ts`) to lock ownership and section-apply fallback behavior."
+          "notes": "Completed 2026-05-08 on `codex/page-rewrite-chat-decomp-phase3`. Extracted editor action workflow from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/pageRewriteChatActions.ts` (`execFormatCommand`, `clearFormattingSelection`, `wrapSelectionHeading`, `applyRewriteToSection`) and rewired root toolbar/apply handlers to consume the module while preserving behavior. Bug sniffing hardening included: missing section targets now surface an explicit toast (`Section not found \u2014 content inserted at end`) instead of silently appending. Added source-contract guardrails (`tests/contract/page-rewrite-chat-phase3-actions-extraction.test.ts`) and behavior coverage (`tests/unit/page-rewrite-chat-actions.test.ts`) to lock ownership and section-apply fallback behavior."
         },
         {
           "id": "platform-consolidation-page-rewrite-chat-decomp-phase4",
@@ -2378,9 +2386,9 @@
     },
     {
       "id": "sprint-send-to-client",
-      "name": "✅ SHIPPED — Send to Client Expansion",
+      "name": "\u2705 SHIPPED \u2014 Send to Client Expansion",
       "hours": "9-14",
-      "rationale": "Unified delivery story — every major analysis surface (AEO, Internal Links, Keywords, Redirects, Content Decay, Page Rewriter) gains a client-send action in one sprint.",
+      "rationale": "Unified delivery story \u2014 every major analysis surface (AEO, Internal Links, Keywords, Redirects, Content Decay, Page Rewriter) gains a client-send action in one sprint.",
       "items": [
         {
           "id": 609,
@@ -2388,7 +2396,7 @@
           "source": "Send to Client consistency initiative",
           "est": "2-3h",
           "priority": "P2",
-          "notes": "Add per-page Send to Client button to AEO Review change cards. Each recommended change (rewrite_intro, add_faq, add_section, etc.) should be sendable to the client approval queue with current→suggested diff as the approval payload.\nShipped / verified 2026-05-06: AeoReview sends page-level client actions with sourceType 'aeo_change', sourceId `aeo:${page.pageUrl}`, client-ready change filtering, and payload.page for client review.",
+          "notes": "Add per-page Send to Client button to AEO Review change cards. Each recommended change (rewrite_intro, add_faq, add_section, etc.) should be sendable to the client approval queue with current\u2192suggested diff as the approval payload.\nShipped / verified 2026-05-06: AeoReview sends page-level client actions with sourceType 'aeo_change', sourceId `aeo:${page.pageUrl}`, client-ready change filtering, and payload.page for client review.",
           "status": "done",
           "shippedAt": "2026-05-06"
         },
@@ -2418,7 +2426,7 @@
           "source": "Send to Client consistency initiative",
           "est": "1-2h",
           "priority": "P2",
-          "notes": "Add Send to Client for proposed redirects (broken links, chain fixes). Client reviews source→target mappings before agency publishes them to Webflow.\nShipped / verified 2026-05-06: RedirectManager sends accepted redirect proposals to the client action queue with sourceType 'redirect_proposal' and source/target rule payloads.",
+          "notes": "Add Send to Client for proposed redirects (broken links, chain fixes). Client reviews source\u2192target mappings before agency publishes them to Webflow.\nShipped / verified 2026-05-06: RedirectManager sends accepted redirect proposals to the client action queue with sourceType 'redirect_proposal' and source/target rule payloads.",
           "status": "done",
           "shippedAt": "2026-05-06"
         },
@@ -2437,7 +2445,7 @@
     },
     {
       "id": "sprint-deep-bug-remediation",
-      "name": "✅ SHIPPED — Deep Bug Remediation",
+      "name": "\u2705 SHIPPED \u2014 Deep Bug Remediation",
       "hours": "24-40",
       "rationale": "Follow-up queue from docs/superpowers/audits/2026-05-04-deep-bug-audit.md. Focuses on systemic correctness issues found after PR #440: workspace/resource scoping, test isolation, path identity joins, client contract drift, content invalidation, and AI provenance.",
       "items": [
@@ -2516,7 +2524,7 @@
     },
     {
       "id": "sprint-seo-tier2-capabilities",
-      "name": "✅ SHIPPED — SEO Tier 2 Capabilities",
+      "name": "\u2705 SHIPPED \u2014 SEO Tier 2 Capabilities",
       "hours": null,
       "shippedAt": "2026-04-23",
       "items": [
@@ -2526,7 +2534,7 @@
           "source": "SEO Tier 2 Capabilities plan",
           "est": "2-3h",
           "priority": "P1",
-          "notes": "Shipped 2026-04-23. computeOpportunityScore() exported from server/routes/keyword-strategy.ts. Scores content gaps 0–100 by composing volume (45% weight, capped at 10K/mo), ease-of-ranking via 1−KD/100 (45% weight), and a GSC impressions additive bonus (up to 5% of the raw score, capped at 2K impressions). A trend multiplier (×1.3 rising / ×0.7 declining / ×1.0 stable) is applied last. Results sorted descending in both admin ContentGaps.tsx and client StrategyTab.tsx with blue score badges.",
+          "notes": "Shipped 2026-04-23. computeOpportunityScore() exported from server/routes/keyword-strategy.ts. Scores content gaps 0\u2013100 by composing volume (45% weight, capped at 10K/mo), ease-of-ranking via 1\u2212KD/100 (45% weight), and a GSC impressions additive bonus (up to 5% of the raw score, capped at 2K impressions). A trend multiplier (\u00d71.3 rising / \u00d70.7 declining / \u00d71.0 stable) is applied last. Results sorted descending in both admin ContentGaps.tsx and client StrategyTab.tsx with blue score badges.",
           "status": "done",
           "shippedAt": "2026-04-23"
         },
@@ -2536,7 +2544,7 @@
           "source": "SEO Tier 2 Capabilities plan",
           "est": "2-3h",
           "priority": "P1",
-          "notes": "Shipped 2026-04-23. Phase 5 in server/analytics-intelligence.ts. isKeywordEmerging() exported to detect trend-rising keywords (≥20% volume gain + positive second-half slope). Emits emerging_keyword InsightType. Wired into insight narrative, admin chat context, and InsightCards.tsx rendering with sparkline and percentage-change badge.",
+          "notes": "Shipped 2026-04-23. Phase 5 in server/analytics-intelligence.ts. isKeywordEmerging() exported to detect trend-rising keywords (\u226520% volume gain + positive second-half slope). Emits emerging_keyword InsightType. Wired into insight narrative, admin chat context, and InsightCards.tsx rendering with sparkline and percentage-change badge.",
           "status": "done",
           "shippedAt": "2026-04-23"
         },
@@ -2556,7 +2564,7 @@
           "source": "SEO Tier 2 Capabilities plan",
           "est": "2-3h",
           "priority": "P1",
-          "notes": "Shipped 2026-04-23. Phase 6 in server/analytics-intelligence.ts. Flags pages with analysisGeneratedAt > 90 days old AND ≥100 impressions as freshness_alert (critical at 180d, warning at 90-180d). Auto-generates content_refresh recommendations. Wired into narrative, admin chat context, InsightCards.tsx with age badge and refresh CTA.",
+          "notes": "Shipped 2026-04-23. Phase 6 in server/analytics-intelligence.ts. Flags pages with analysisGeneratedAt > 90 days old AND \u2265100 impressions as freshness_alert (critical at 180d, warning at 90-180d). Auto-generates content_refresh recommendations. Wired into narrative, admin chat context, InsightCards.tsx with age badge and refresh CTA.",
           "status": "done",
           "shippedAt": "2026-04-23"
         }
@@ -2564,11 +2572,11 @@
     },
     {
       "id": "sprint-rec-intelligence-tier1",
-      "name": "✅ SHIPPED — Recommendation Intelligence Tier 1",
+      "name": "\u2705 SHIPPED \u2014 Recommendation Intelligence Tier 1",
       "items": [
         {
           "id": 613,
-          "title": "CTR gap → title/meta recommendations (Item 1)",
+          "title": "CTR gap \u2192 title/meta recommendations (Item 1)",
           "source": "SEO Recommendation Intelligence plan",
           "est": "1-2h",
           "priority": "P1",
@@ -2592,7 +2600,7 @@
           "source": "SEO Recommendation Intelligence plan",
           "est": "1-2h",
           "priority": "P1",
-          "notes": "Shipped 2026-04-23. New adjustKdImpactScore() helper: KD 30+ above domain strength → 40% penalty, KD 15-30 above → 20% penalty, KD 20+ below → 20% boost (capped 100). Domain strength derived from SEMRush/DataForSEO organic keyword count. KD context appended to estimatedGain text. Tested in tests/unit/recommendations-authority-kd.test.ts.",
+          "notes": "Shipped 2026-04-23. New adjustKdImpactScore() helper: KD 30+ above domain strength \u2192 40% penalty, KD 15-30 above \u2192 20% penalty, KD 20+ below \u2192 20% boost (capped 100). Domain strength derived from SEMRush/DataForSEO organic keyword count. KD context appended to estimatedGain text. Tested in tests/unit/recommendations-authority-kd.test.ts.",
           "status": "done",
           "shippedAt": "2026-04-23"
         },
@@ -2608,11 +2616,11 @@
         },
         {
           "id": 617,
-          "title": "Diagnostic remediation → auto-created recommendations (Item 6)",
+          "title": "Diagnostic remediation \u2192 auto-created recommendations (Item 6)",
           "source": "SEO Recommendation Intelligence plan",
           "est": "1-2h",
           "priority": "P1",
-          "notes": "Shipped 2026-04-23. Completed diagnostic reports with P0/P1 actions auto-generate fix_now recommendations (technical or content type based on action.owner). Up to 3 reports × 5 actions per run. Source keyed as diagnostic:{reportId}:{actionTitle} for merge stability. Tested in tests/integration/recommendations-diagnostic.test.ts (port 13337).",
+          "notes": "Shipped 2026-04-23. Completed diagnostic reports with P0/P1 actions auto-generate fix_now recommendations (technical or content type based on action.owner). Up to 3 reports \u00d7 5 actions per run. Source keyed as diagnostic:{reportId}:{actionTitle} for merge stability. Tested in tests/integration/recommendations-diagnostic.test.ts (port 13337).",
           "status": "done",
           "shippedAt": "2026-04-23"
         }
@@ -2621,14 +2629,14 @@
     },
     {
       "id": "sprint-broadcast-invalidation-audit",
-      "name": "✅ SHIPPED — Broadcast Invalidation Audit (do next)",
+      "name": "\u2705 SHIPPED \u2014 Broadcast Invalidation Audit (do next)",
       "hours": "3-6",
-      "rationale": "Recurring UX symptom: components show stale/empty data on first mount and 'fix themselves' on hard refresh. Root cause pattern — long staleTime React Query hooks without a useWorkspaceEvents broadcast subscription (violates Data Flow Rule #2). PageIntelligence is the confirmed instance; likely a platform-wide class of bug.",
+      "rationale": "Recurring UX symptom: components show stale/empty data on first mount and 'fix themselves' on hard refresh. Root cause pattern \u2014 long staleTime React Query hooks without a useWorkspaceEvents broadcast subscription (violates Data Flow Rule #2). PageIntelligence is the confirmed instance; likely a platform-wide class of bug.",
       "items": [
         {
           "id": 596,
           "title": "Fix PageIntelligence missing broadcast invalidation",
-          "source": "User report 2026-04-21 — 'page intelligence doesn't display data at first, but then on refresh it does'",
+          "source": "User report 2026-04-21 \u2014 'page intelligence doesn't display data at first, but then on refresh it does'",
           "est": "30m-1h",
           "priority": "P0",
           "notes": "Shipped 2026-04-21 alongside Devin-flag fixes for PR #249. Added useWorkspaceEvents subscription to src/components/PageIntelligence.tsx that invalidates queryKeys.admin.keywordStrategy on STRATEGY_UPDATED broadcasts. Resolves staleTime 10min cache-miss UX where users saw empty data until hard refresh. #597 (platform-wide audit) still pending.",
@@ -2641,7 +2649,7 @@
           "source": "Post-PageIntelligence diagnosis 2026-04-21",
           "est": "2-4h",
           "priority": "P0",
-          "notes": "Shipped 2026-04-21. Centralized 7 workspace-scoped events in src/hooks/useWsInvalidation.ts (STRATEGY_UPDATED, BRANDSCRIPT_UPDATED, DISCOVERY_UPDATED, VOICE_PROFILE_UPDATED, BRAND_IDENTITY_UPDATED, BLUEPRINT_UPDATED, BLUEPRINT_GENERATED — total centralized now 43). Removed redundant inline useWorkspaceEvents subscriptions from 10 component files (PageIntelligence, SeoEditor, KeywordStrategy, VoiceTab, IdentityTab, BrandscriptTab, DiscoveryTab, PageStrategyTab, BlueprintDetail, BlueprintVersionHistory). Added two-layer regression guardrail: pr-check rule (self-syncing allowlist parsed from useWsInvalidation.ts, escape hatch `// ws-invalidation-ok`) catches reintroduced inline handlers; contract test (tests/contract/ws-invalidation-coverage.test.ts) catches new WS_EVENTS entries added without either centralization or an explicit LOCAL_ONLY_EVENTS rationale. Blueprint queries rely on React Query prefix invalidation (['admin-blueprint', wsId] / ['admin-blueprint-versions', wsId]).",
+          "notes": "Shipped 2026-04-21. Centralized 7 workspace-scoped events in src/hooks/useWsInvalidation.ts (STRATEGY_UPDATED, BRANDSCRIPT_UPDATED, DISCOVERY_UPDATED, VOICE_PROFILE_UPDATED, BRAND_IDENTITY_UPDATED, BLUEPRINT_UPDATED, BLUEPRINT_GENERATED \u2014 total centralized now 43). Removed redundant inline useWorkspaceEvents subscriptions from 10 component files (PageIntelligence, SeoEditor, KeywordStrategy, VoiceTab, IdentityTab, BrandscriptTab, DiscoveryTab, PageStrategyTab, BlueprintDetail, BlueprintVersionHistory). Added two-layer regression guardrail: pr-check rule (self-syncing allowlist parsed from useWsInvalidation.ts, escape hatch `// ws-invalidation-ok`) catches reintroduced inline handlers; contract test (tests/contract/ws-invalidation-coverage.test.ts) catches new WS_EVENTS entries added without either centralization or an explicit LOCAL_ONLY_EVENTS rationale. Blueprint queries rely on React Query prefix invalidation (['admin-blueprint', wsId] / ['admin-blueprint-versions', wsId]).",
           "status": "done",
           "shippedAt": "2026-04-21"
         }

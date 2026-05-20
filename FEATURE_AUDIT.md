@@ -6280,3 +6280,16 @@ Bug hardening included:
 **Mutual:** Creates a cleaner foundation for the upcoming strategy explainability/action-loop UX pass: the UI can explain selected keywords and retired tracking state without first compensating for noisy backend primitives.
 
 **Files:** `server/keyword-strategy-context.ts`; `server/keyword-strategy-sanitizer.ts`; `server/keyword-strategy-generation.ts`; `server/keyword-strategy-ai-synthesis.ts`; `server/insight-feedback.ts`; `server/routes/keyword-strategy.ts`; `tests/unit/keyword-strategy-sanitizer.test.ts`; `tests/unit/insight-feedback.test.ts`; `tests/unit/rank-tracking-reconciliation.test.ts`; `docs/superpowers/audits/2026-05-20-keyword-strategy-refactor-signal-hygiene.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 443. Keyword Strategy Quality, Explainability + Action Loop UX
+**What it does:** Adds the PR13 visible explanation layer for the keyword operating loop. A new shared optional contract (`shared/types/keyword-strategy-ux.ts`) and server-local read-only assembler (`server/keyword-strategy-ux.ts`) derive refresh summaries, keyword explanations, tracking/action state, and raw-evidence posture from existing strategy, page-keyword, content-gap, keyword-gap, feedback, rank-tracking lifecycle, and shared keyword-intelligence data. Admin strategy diff now shows a richer “What Changed” summary with added/retained/reassigned/retired/preserved counts and explanation previews. Competitor keyword gaps are explicitly labeled as raw provider evidence rather than selected actions. Client Strategy surfaces now get client-safe refresh summary and explanation affordances in the keyword drawer and page keyword map, with existing feedback/request flows preserved.
+
+**Agency value:** Makes strategy QA and client conversations easier because admins can quickly answer what changed, why a keyword exists, what is being tracked, what was retired, and what safe action comes next.
+
+**Client value:** Turns keyword strategy from a static generated artifact into a clearer operating plan: what changed, what we are watching, and what we recommend reviewing next, without exposing raw provider jargon or noisy terms as recommendations.
+
+**Mutual:** Preserves the no-publishing/no-live-site-write posture while connecting cleaner strategy primitives to safe next actions like generate brief, review page, track keyword, or keep watching.
+
+**Files:** `shared/types/keyword-strategy-ux.ts`; `server/keyword-strategy-ux.ts`; `server/routes/keyword-strategy.ts`; `server/routes/public-content.ts`; `src/api/seo.ts`; `src/components/strategy/StrategyDiff.tsx`; `src/components/strategy/KeywordGaps.tsx`; `src/components/client/StrategyTab.tsx`; `src/components/client/types.ts`; `src/components/client/strategy/StrategyRefreshSummarySection.tsx`; `src/components/client/strategy/StrategyKeywordDrawer.tsx`; `src/components/client/strategy/StrategyPageKeywordMapSection.tsx`; `src/components/client/PageKeywordMapContent.tsx`; `src/components/client/strategy/StrategyContentOpportunitiesSection.tsx`; `src/components/RankTracker.tsx`; `tests/unit/keyword-strategy-ux.test.ts`; `docs/superpowers/audits/2026-05-20-pr13-keyword-strategy-quality-ux.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.

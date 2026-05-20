@@ -18,6 +18,7 @@ import { StrategyKeywordsSection } from './strategy/StrategyKeywordsSection';
 import { StrategyNextStepsSection } from './strategy/StrategyNextStepsSection';
 import { StrategyPageKeywordMapSection } from './strategy/StrategyPageKeywordMapSection';
 import { StrategyPageImprovementsSection } from './strategy/StrategyPageImprovementsSection';
+import { StrategyRefreshSummarySection } from './strategy/StrategyRefreshSummarySection';
 import { StrategySnapshotSection } from './strategy/StrategySnapshotSection';
 import { useStrategyBusinessPriorities } from './strategy/useStrategyBusinessPriorities';
 import { useStrategyKeywordFeedback } from './strategy/useStrategyKeywordFeedback';
@@ -27,6 +28,7 @@ import {
   type PriorityKeywordStatus,
   type StrategyKeywordRole,
   type StrategyKeywordTableRow,
+  normalizeKeyword,
 } from './strategy/strategyKeywordDisplay';
 
 export interface PricingModalState {
@@ -69,8 +71,6 @@ const getFocusable = (root: HTMLElement): HTMLElement[] =>
   Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
     el => !el.hasAttribute('disabled') && el.tabIndex !== -1,
   );
-
-const normalizeKeyword = (keyword: string) => keyword.toLowerCase().trim();
 
 const STRATEGY_TAB_SECTION_MAP = {
   'content-gaps': 'new-content',
@@ -384,6 +384,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const siteMetricMap = new Map((strategyData.siteKeywordMetrics || []).map(metric => [normalizeKeyword(metric.keyword), metric]));
   const contentGapMap = new Map((strategyData.contentGaps || []).map(gap => [normalizeKeyword(gap.targetKeyword), gap]));
   const keywordGapMap = new Map((strategyData.keywordGaps || []).map(gap => [normalizeKeyword(gap.keyword), gap]));
+  const explanationMap = new Map((strategyData.strategyUx?.explanations || []).map(explanation => [explanation.normalizedKeyword, explanation]));
 
   const findKeywordPage = (normalized: string) => {
     let secondaryMatch: (typeof strategyData.pageMap)[number] | undefined;
@@ -546,6 +547,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
 
   const buildKeywordRow = (item: PriorityKeywordItem): StrategyKeywordTableRow => {
     const page = findKeywordPage(item.normalized);
+    const explanation = explanationMap.get(item.normalized);
     const siteMetric = siteMetricMap.get(item.normalized);
     const contentGap = contentGapMap.get(item.normalized);
     const keywordGap = keywordGapMap.get(item.normalized);
@@ -609,6 +611,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       rationale: contentGap?.rationale,
       trendDirection: contentGap?.trendDirection,
       enrichmentStatus,
+      explanation,
     };
   };
 
@@ -669,6 +672,10 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         quickWinScore={quickWinScore}
         coverageScore={coverageScore}
       />
+
+      {strategyData.strategyUx?.refreshSummary && (
+        <StrategyRefreshSummarySection summary={strategyData.strategyUx.refreshSummary} />
+      )}
 
       <StrategyNextStepsSection
         contentGapsFound={contentGapsFound}
@@ -778,6 +785,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       <StrategyPageKeywordMapSection
         effectiveTier={effectiveTier}
         pageMap={strategyData.pageMap}
+        strategyUx={strategyData.strategyUx}
         expandedSections={expandedSections}
         toggleSection={toggleSection}
         workspaceId={workspaceId}

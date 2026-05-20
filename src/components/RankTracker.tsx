@@ -4,7 +4,7 @@ import {
   Target, ArrowUp, ArrowDown, LineChart, ChevronDown,
 } from 'lucide-react';
 import { get, post, patch, del } from '../api/client';
-import { EmptyState, SectionCard, Icon, Button, IconButton, PageHeader, FormInput } from './ui';
+import { Badge, EmptyState, SectionCard, Icon, Button, IconButton, PageHeader, FormInput } from './ui';
 import { WS_EVENTS } from '../lib/wsEvents';
 import { cn } from '../lib/utils';
 import { chartGridColor, chartAxisColor, CHART_SERIES_COLORS } from './ui/constants';
@@ -392,7 +392,16 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
                       className={cn('flex-shrink-0', rank.pinned ? 'text-amber-400' : 'text-[var(--brand-border-hover)] hover:text-[var(--brand-text)]')}
                     />
                     <Icon as={ChevronDown} size="sm" className={cn('text-[var(--brand-text-dim)] flex-shrink-0 transition-transform', isExpanded && 'rotate-180')} />
-                    <span className="text-xs text-[var(--brand-text-bright)] truncate">{rank.query}</span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-xs text-[var(--brand-text-bright)] truncate">{rank.query}</span>
+                        {rank.source?.startsWith('strategy_') && <Badge tone="teal" size="sm" label="Strategy" />}
+                        {rank.source === 'client_requested' && <Badge tone="blue" size="sm" label="Client" />}
+                      </div>
+                      {rank.pagePath && (
+                        <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{rank.pageTitle || rank.pagePath}</div>
+                      )}
+                    </div>
                   </div>
                   <div className="text-right">
                     <span className={cn('text-sm font-bold', rank.position <= 3 ? 'text-emerald-400' : rank.position <= 10 ? 'text-teal-400' : rank.position <= 20 ? 'text-amber-400' : 'text-[var(--brand-text)]')}>

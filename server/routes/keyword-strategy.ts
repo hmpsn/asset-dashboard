@@ -9,7 +9,7 @@ import { Router } from 'express';
 const router = Router();
 
 import { addActivity } from '../activity-log.js';
-import { addTrackedKeyword, addTrackedKeywords } from '../rank-tracking.js';
+import { addTrackedKeyword, addTrackedKeywords, getTrackedKeywords } from '../rank-tracking.js';
 import { trackedKeywordSourceForFeedback } from '../keyword-feedback-tracking.js';
 import { buildWorkspaceIntelligence, invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { debouncedStrategyInvalidate, debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
@@ -42,6 +42,11 @@ import {
   type AdminBulkKeywordFeedbackBody,
   type AdminKeywordFeedbackBody,
 } from '../schemas/keyword-feedback.js';
+import {
+  attachKeywordStrategyUxToDiff,
+  buildKeywordStrategyRefreshSummary,
+  buildKeywordStrategyUxPayload,
+} from '../keyword-strategy-ux.js';
 export { buildStrategyIntelligenceBlock, computeOpportunityScore, shouldFetchCompetitorData } from '../keyword-strategy-generation.js';
 
 const log = createLogger('keyword-strategy');
@@ -67,6 +72,7 @@ function serializeKeywordStrategy(
   keywordGaps: KeywordGapItem[],
   topicClusters: TopicCluster[],
   cannibalization: CannibalizationItem[],
+  strategyUx?: Awaited<ReturnType<typeof buildKeywordStrategyUxPayload>>,
 ) {
   // Strip any stale table-backed fields left in the blob in favor of
   // the table-backed sources —
@@ -98,6 +104,7 @@ function serializeKeywordStrategy(
     keywordGaps,
     topicClusters,
     cannibalization,
+    strategyUx,
   };
 }
 
@@ -199,93 +206,145 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
 // so Page Intelligence must be able to surface those rows without requiring a
 // full strategy generation run. Short-circuits to null only when both sources
 // are empty.
-router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  const ws = getWorkspace(req.params.workspaceId);
-  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const strategy = ws.keywordStrategy;
-  const pageMap = listPageKeywords(ws.id);
-  const contentGapsFromTable = listContentGaps(ws.id);
-  const contentGaps = contentGapsFromTable.length > 0 ? contentGapsFromTable : (strategy?.contentGaps || []);
-  const quickWinsFromTable = listQuickWins(ws.id);
-  const quickWins = quickWinsFromTable.length > 0 ? quickWinsFromTable : (strategy?.quickWins || []);
-  const keywordGapsFromTable = listKeywordGaps(ws.id);
-  const keywordGaps = keywordGapsFromTable.length > 0 ? keywordGapsFromTable : (strategy?.keywordGaps || []);
-  const topicClustersFromTable = listTopicClusters(ws.id);
-  const topicClusters = topicClustersFromTable.length > 0 ? topicClustersFromTable : (strategy?.topicClusters || []);
-  const cannibalizationFromTable = listCannibalizationIssues(ws.id);
-  const cannibalization = cannibalizationFromTable.length > 0 ? cannibalizationFromTable : (strategy?.cannibalization || []);
-  if (!strategy && pageMap.length === 0 && contentGaps.length === 0 && quickWins.length === 0 && keywordGaps.length === 0 && topicClusters.length === 0 && cannibalization.length === 0) return res.json(null);
-  if (!strategy) {
-    return res.json({
-      siteKeywords: [],
-      opportunities: [],
+router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res, next) => {
+  try {
+    const ws = getWorkspace(req.params.workspaceId);
+    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+    const strategy = ws.keywordStrategy;
+    const pageMap = listPageKeywords(ws.id);
+    const contentGapsFromTable = listContentGaps(ws.id);
+    const contentGaps = contentGapsFromTable.length > 0 ? contentGapsFromTable : (strategy?.contentGaps || []);
+    const quickWinsFromTable = listQuickWins(ws.id);
+    const quickWins = quickWinsFromTable.length > 0 ? quickWinsFromTable : (strategy?.quickWins || []);
+    const keywordGapsFromTable = listKeywordGaps(ws.id);
+    const keywordGaps = keywordGapsFromTable.length > 0 ? keywordGapsFromTable : (strategy?.keywordGaps || []);
+    const topicClustersFromTable = listTopicClusters(ws.id);
+    const topicClusters = topicClustersFromTable.length > 0 ? topicClustersFromTable : (strategy?.topicClusters || []);
+    const cannibalizationFromTable = listCannibalizationIssues(ws.id);
+    const cannibalization = cannibalizationFromTable.length > 0 ? cannibalizationFromTable : (strategy?.cannibalization || []);
+    if (!strategy && pageMap.length === 0 && contentGaps.length === 0 && quickWins.length === 0 && keywordGaps.length === 0 && topicClusters.length === 0 && cannibalization.length === 0) return res.json(null);
+    if (!strategy) {
+      return res.json({
+        siteKeywords: [],
+        opportunities: [],
+        pageMap,
+        contentGaps,
+        quickWins,
+        keywordGaps,
+        topicClusters,
+        cannibalization,
+        strategyUx: await buildKeywordStrategyUxPayload({
+          workspaceId: ws.id,
+          workspaceName: ws.name,
+          strategy: null,
+          pageMap,
+          contentGaps,
+          keywordGaps,
+          surface: 'admin',
+        }),
+        generatedAt: null,
+      });
+    }
+    const strategyUx = await buildKeywordStrategyUxPayload({
+      workspaceId: ws.id,
+      workspaceName: ws.name,
+      strategy,
       pageMap,
       contentGaps,
-      quickWins,
       keywordGaps,
-      topicClusters,
-      cannibalization,
-      generatedAt: null,
+      surface: 'admin',
     });
+    res.json(serializeKeywordStrategy(strategy, pageMap, contentGaps, quickWins, keywordGaps, topicClusters, cannibalization, strategyUx));
+  } catch (err) {
+    next(err);
   }
-  res.json(serializeKeywordStrategy(strategy, pageMap, contentGaps, quickWins, keywordGaps, topicClusters, cannibalization));
 });
 
 // Get strategy diff (compare current vs previous)
-router.get('/api/webflow/keyword-strategy/:workspaceId/diff', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  const ws = getWorkspace(req.params.workspaceId);
-  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+router.get('/api/webflow/keyword-strategy/:workspaceId/diff', requireWorkspaceAccess('workspaceId'), async (req, res, next) => {
+  try {
+    const ws = getWorkspace(req.params.workspaceId);
+    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
-  const current = ws.keywordStrategy;
-  if (!current) return res.json(null);
+    const current = ws.keywordStrategy;
+    if (!current) return res.json(null);
 
-  const prev = db.prepare('SELECT strategy_json, page_map_json, generated_at FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC LIMIT 1').get(ws.id) as { strategy_json: string; page_map_json: string; generated_at: string } | undefined;
-  if (!prev) return res.json(null);
+    const prev = db.prepare('SELECT strategy_json, page_map_json, generated_at FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC LIMIT 1').get(ws.id) as { strategy_json: string; page_map_json: string; generated_at: string } | undefined;
+    if (!prev) return res.json(null);
 
-  type PrevStrategyShape = {
-    siteKeywords?: string[];
-    contentGaps?: { targetKeyword: string }[];
-  };
-  const prevStrategy = parseJsonFallback<PrevStrategyShape>(prev.strategy_json, {});
-  const prevPageMap = parseJsonFallback<Array<{ pagePath: string; primaryKeyword: string }>>(prev.page_map_json, []);
-  const currentPageMap = listPageKeywords(ws.id);
+    type PrevStrategyShape = {
+      siteKeywords?: string[];
+      contentGaps?: { targetKeyword: string }[];
+    };
+    const prevStrategy = parseJsonFallback<PrevStrategyShape>(prev.strategy_json, {});
+    const prevPageMap = parseJsonFallback<Array<{ pagePath: string; primaryKeyword: string }>>(prev.page_map_json, []);
+    const currentPageMap = listPageKeywords(ws.id);
+    const trackedKeywords = getTrackedKeywords(ws.id, { includeInactive: true });
 
-  // Compute diffs
-  const prevSiteKws = new Set<string>(prevStrategy.siteKeywords || []);
-  const currSiteKws = new Set<string>(current.siteKeywords || []);
-  const newKeywords = [...currSiteKws].filter((k: string) => !prevSiteKws.has(k));
-  const lostKeywords = [...prevSiteKws].filter((k: string) => !currSiteKws.has(k));
+    // Compute diffs
+    const prevSiteKws = new Set<string>(prevStrategy.siteKeywords || []);
+    const currSiteKws = new Set<string>(current.siteKeywords || []);
+    const newKeywords = [...currSiteKws].filter((k: string) => !prevSiteKws.has(k));
+    const lostKeywords = [...prevSiteKws].filter((k: string) => !currSiteKws.has(k));
 
-  // Previous gaps come from the history snapshot (which now bakes in the
-  // table state at save-time, see keyword-strategy-persistence.ts).
-  // Current gaps come from the live content_gaps table — the blob no longer
-  // carries them after #365 normalization.
-  const currentContentGaps = listContentGaps(ws.id);
-  const prevGapKws = new Set<string>((prevStrategy.contentGaps || []).map((g: { targetKeyword: string }) => g.targetKeyword));
-  const currGapKws = new Set<string>(currentContentGaps.map((g) => g.targetKeyword));
-  const newGaps = [...currGapKws].filter((k: string) => !prevGapKws.has(k));
-  const resolvedGaps = [...prevGapKws].filter((k: string) => !currGapKws.has(k));
+    // Previous gaps come from the history snapshot (which now bakes in the
+    // table state at save-time, see keyword-strategy-persistence.ts).
+    // Current gaps come from the live content_gaps table - the blob no longer
+    // carries them after #365 normalization.
+    const currentContentGaps = listContentGaps(ws.id);
+    const prevGapKws = new Set<string>((prevStrategy.contentGaps || []).map((g: { targetKeyword: string }) => g.targetKeyword));
+    const currGapKws = new Set<string>(currentContentGaps.map((g) => g.targetKeyword));
+    const newGaps = [...currGapKws].filter((k: string) => !prevGapKws.has(k));
+    const resolvedGaps = [...prevGapKws].filter((k: string) => !currGapKws.has(k));
 
-  // Page map changes
-  const prevPageKws = new Map(prevPageMap.map((p: { pagePath: string; primaryKeyword: string }) => [p.pagePath, p.primaryKeyword]));
-  const currPageKws = new Map(currentPageMap.map((p: { pagePath: string; primaryKeyword: string }) => [p.pagePath, p.primaryKeyword]));
-  const keywordChanges: { pagePath: string; oldKeyword: string; newKeyword: string }[] = [];
-  for (const [path, kw] of currPageKws) {
-    const old = prevPageKws.get(path);
-    if (old && old !== kw) keywordChanges.push({ pagePath: path, oldKeyword: old, newKeyword: kw });
+    // Page map changes
+    const prevPageKws = new Map(prevPageMap.map((p: { pagePath: string; primaryKeyword: string }) => [p.pagePath, p.primaryKeyword]));
+    const currPageKws = new Map(currentPageMap.map((p: { pagePath: string; primaryKeyword: string }) => [p.pagePath, p.primaryKeyword]));
+    const keywordChanges: { pagePath: string; oldKeyword: string; newKeyword: string }[] = [];
+    for (const [path, kw] of currPageKws) {
+      const old = prevPageKws.get(path);
+      if (old && old !== kw) keywordChanges.push({ pagePath: path, oldKeyword: old, newKeyword: kw });
+    }
+
+    const diff = {
+      previousGeneratedAt: prev.generated_at,
+      currentGeneratedAt: current.generatedAt,
+      newKeywords,
+      lostKeywords,
+      newGaps,
+      resolvedGaps,
+      keywordChanges,
+      prevSiteKeywordCount: prevSiteKws.size,
+      currSiteKeywordCount: currSiteKws.size,
+    };
+    const summary = buildKeywordStrategyRefreshSummary({
+      previousGeneratedAt: prev.generated_at,
+      currentGeneratedAt: current.generatedAt,
+      previousSiteKeywords: prevStrategy.siteKeywords ?? [],
+      currentSiteKeywords: current.siteKeywords ?? [],
+      previousContentGapKeywords: prevStrategy.contentGaps?.map(gap => gap.targetKeyword) ?? [],
+      currentContentGapKeywords: currentContentGaps.map(gap => gap.targetKeyword),
+      previousPageMap: prevPageMap,
+      currentPageMap,
+      trackedKeywords,
+    });
+    const keywordGapsFromTable = listKeywordGaps(ws.id);
+    const keywordGaps = keywordGapsFromTable.length > 0 ? keywordGapsFromTable : (current.keywordGaps || []);
+    const strategyUx = await buildKeywordStrategyUxPayload({
+      workspaceId: ws.id,
+      workspaceName: ws.name,
+      strategy: current,
+      pageMap: currentPageMap,
+      contentGaps: currentContentGaps,
+      keywordGaps,
+      surface: 'admin',
+      summary,
+      trackedKeywords,
+    });
+    res.json(attachKeywordStrategyUxToDiff(diff, strategyUx));
+  } catch (err) {
+    next(err);
   }
-
-  res.json({
-    previousGeneratedAt: prev.generated_at,
-    currentGeneratedAt: current.generatedAt,
-    newKeywords,
-    lostKeywords,
-    newGaps,
-    resolvedGaps,
-    keywordChanges,
-    prevSiteKeywordCount: prevSiteKws.size,
-    currSiteKeywordCount: currSiteKws.size,
-  });
 });
 
 // Update keyword strategy (manual edits)
