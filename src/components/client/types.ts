@@ -19,6 +19,10 @@ export type {
   ApprovalItem, ApprovalBatch,
 } from '../../../shared/types/approvals.ts';
 
+export type {
+  LatestRank, RankHistoryEntry,
+} from '../../../shared/types/rank-tracking.ts';
+
 // ── Client-specific types (not shared with server) ──────────────
 
 import type { EventDisplayConfig, EventGroup } from '../../../shared/types/workspace.ts';
@@ -53,8 +57,6 @@ export interface ActivityLogItem {
   createdAt: string;
 }
 
-export interface RankHistoryEntry { date: string; positions: Record<string, number> }
-export interface LatestRank { query: string; position: number; clicks: number; impressions: number; ctr: number; change?: number }
 export interface AnnotationItem { id: string; date: string; label: string; description?: string; color?: string; createdAt: string }
 export interface AnomalyItem { id: string; workspaceId?: string; workspaceName?: string; type: string; severity: string; title: string; description: string; metric: string; currentValue: number; previousValue: number; changePct: number; aiSummary?: string; detectedAt: string; dismissedAt?: string; acknowledgedAt?: string; source: string }
 

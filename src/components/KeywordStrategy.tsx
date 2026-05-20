@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import type { MetricsSource } from '../../shared/types/keywords.js';
 import {
   Loader2, Target, ChevronDown, ChevronRight, RefreshCw,
@@ -23,7 +23,10 @@ import { IntelligenceSignals } from './strategy/IntelligenceSignals';
 import { keywords, rankTracking } from '../api/seo';
 import { workspaces } from '../api';
 import { queryKeys } from '../lib/queryKeys';
+import { WS_EVENTS } from '../lib/wsEvents';
+import { keywordTrackingKey } from '../lib/keywordTracking';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
+import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
 
 /** Minimum monthly search volume to display a strategy card. Cards below this are noise. */
@@ -101,11 +104,20 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     ?? DEFAULT_SEO_DATA_PROVIDER;
 
   // Seed trackedKeywords from server on mount so buttons reflect actual state
-  useEffect(() => {
+  const loadTrackedKeywords = useCallback(() => {
     rankTracking.keywords(workspaceId)
-      .then(kws => setTrackedKeywords(new Set((kws || []).map(k => k.query))))
+      .then(kws => setTrackedKeywords(new Set((kws || []).map(k => keywordTrackingKey(k.query)))))
       .catch(() => {});
   }, [workspaceId]);
+
+  useEffect(() => {
+    loadTrackedKeywords();
+  }, [loadTrackedKeywords]);
+
+  useWorkspaceEvents(workspaceId, {
+    // ws-invalidation-ok: this component keeps a local Set for tracking badges outside React Query.
+    [WS_EVENTS.RANK_TRACKING_UPDATED]: loadTrackedKeywords,
+  });
 
   // Load provider status + workspace preference
   useEffect(() => {
@@ -209,10 +221,11 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   };
 
   const trackKeyword = async (kw: string) => {
-    if (trackedKeywords.has(kw)) return;
+    const key = keywordTrackingKey(kw);
+    if (!key || trackedKeywords.has(key)) return;
     try {
       await rankTracking.addKeyword(workspaceId, { query: kw });
-      setTrackedKeywords(prev => new Set(prev).add(kw));
+      setTrackedKeywords(prev => new Set(prev).add(key));
     } catch {
       // silently ignore duplicates — server deduplicates
     }
@@ -707,7 +720,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             <div className="flex flex-wrap gap-1.5">
               {strategy.siteKeywords.map((kw: string, i: number) => {
                 const metrics = strategy.siteKeywordMetrics?.find((m: { keyword: string; volume: number; difficulty: number }) => m.keyword.toLowerCase() === kw.toLowerCase());
-                const tracked = trackedKeywords.has(kw);
+                const tracked = trackedKeywords.has(keywordTrackingKey(kw));
                 return (
                   <div key={i} className="inline-flex items-center gap-1.5 t-caption-sm text-accent-brand">
                     <Badge label={kw} tone="teal" />

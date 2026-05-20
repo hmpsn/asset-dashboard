@@ -13,9 +13,14 @@ describe('keyword strategy follow-ons split', () => {
     expect(generationSrc).not.toContain("from './llms-txt-generator.js'");
     expect(generationSrc).not.toContain("from './recommendations.js'");
 
-    expect(followOnsSrc).toContain("import { addTrackedKeyword } from './rank-tracking.js'");
+    expect(followOnsSrc).toContain("from './rank-tracking-reconciliation.js'");
     expect(followOnsSrc).toContain("import { queueLlmsTxtRegeneration } from './llms-txt-generator.js'");
     expect(followOnsSrc).toContain("import { generateRecommendations } from './recommendations.js'");
+    expect(followOnsSrc).toContain('reconcileStrategyRankTracking({');
+    expect(followOnsSrc).toContain('const structuralChanged = summary.added + summary.reassigned + summary.deprecated + summary.replaced');
+    expect(followOnsSrc).toContain('const touched = structuralChanged + summary.retained');
+    expect(followOnsSrc).toContain('if (touched > 0)');
+    expect(followOnsSrc).toContain('WS_EVENTS.RANK_TRACKING_UPDATED');
     expect(followOnsSrc).toContain("queueLlmsTxtRegeneration(workspaceId, 'keyword_strategy_updated')");
     expect(followOnsSrc).toContain('generateRecommendations(workspaceId)');
   });

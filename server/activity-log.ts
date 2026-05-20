@@ -46,6 +46,7 @@ export type ActivityType =
   | 'schema_plan_sent'
   | 'redirects_scanned'
   | 'strategy_generated'
+  | 'rank_tracking_updated'
   | 'rank_snapshot'
   | 'chat_session'
   | 'payment_received'

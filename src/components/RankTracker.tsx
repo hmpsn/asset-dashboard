@@ -5,8 +5,11 @@ import {
 } from 'lucide-react';
 import { get, post, patch, del } from '../api/client';
 import { EmptyState, SectionCard, Icon, Button, IconButton, PageHeader, FormInput } from './ui';
+import { WS_EVENTS } from '../lib/wsEvents';
 import { cn } from '../lib/utils';
 import { chartGridColor, chartAxisColor, CHART_SERIES_COLORS } from './ui/constants';
+import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
+import type { LatestRank, TrackedKeyword } from '../../shared/types/rank-tracking';
 
 // ── Trend colors (blue/teal/green family per design system — no violet/indigo) ──
 // chart-hex-ok — multi-keyword trend chart needs 7+ visually distinct cool-hue steps
@@ -147,23 +150,6 @@ function TrendsChart({ data, keywords }: { data: HistoryPoint[]; keywords: strin
 
 type HistoryPoint = { date: string; positions: Record<string, number> };
 
-interface TrackedKeyword {
-  query: string;
-  pinned: boolean;
-  addedAt: string;
-}
-
-interface LatestRank {
-  query: string;
-  position: number;
-  previousPosition: number | null;
-  clicks: number;
-  impressions: number;
-  ctr: number;
-  change: number | null;
-  pinned: boolean;
-}
-
 interface Props {
   workspaceId: string;
   hasGsc?: boolean;
@@ -187,7 +173,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
   const [trendsLoading, setTrendsLoading] = useState(false);
   const expandedQueryRef = useRef<string | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const [kw, ranks] = await Promise.all([
         get<TrackedKeyword[]>(`/api/rank-tracking/${workspaceId}/keywords`),
@@ -200,9 +186,15 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
       setError('Failed to load rank data');
     }
     setLoading(false);
-  };
+  }, [workspaceId]);
 
-  useEffect(() => { load(); }, [workspaceId]);
+  useEffect(() => { load(); }, [load]);
+  useWorkspaceEvents(workspaceId, {
+    // ws-invalidation-ok: RankTracker owns local table/chart state in addition to centralized query invalidation.
+    [WS_EVENTS.RANK_TRACKING_UPDATED]: () => { void load(); },
+    // ws-invalidation-ok: strategy refresh can change tracked keyword lifecycle metadata displayed in local state.
+    [WS_EVENTS.STRATEGY_UPDATED]: () => { void load(); },
+  });
 
   const addKeyword = async () => {
     if (!newKeyword.trim()) return;

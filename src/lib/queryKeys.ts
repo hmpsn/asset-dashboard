@@ -76,6 +76,9 @@ export const queryKeys = {
     seoSuggestions: (wsId: string) => ['seo-suggestions', wsId] as const,
     rewritePages: (wsId: string) => ['admin-rewrite-pages', wsId] as const,
     keywordStrategy: (wsId: string) => ['keyword-strategy', wsId] as const,
+    rankTrackingKeywords: (wsId: string) => ['admin-rank-tracking-keywords', wsId] as const,
+    rankTrackingLatest: (wsId: string) => ['admin-rank-tracking-latest', wsId] as const,
+    rankTrackingHistory: (wsId: string) => ['admin-rank-tracking-history', wsId] as const,
     anomalyAlerts: (wsId: string) => ['anomaly-alerts', wsId] as const,
     competitorIntel: (wsId: string, competitorKey: string) =>
       ['admin-competitive-intel', wsId, competitorKey] as const,

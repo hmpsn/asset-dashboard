@@ -1,10 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **443 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **444 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
 ---
+
+### 444. Keyword Strategy Rank-Tracking Reconciliation
+
+**What it does:** Turns keyword strategy refreshes into a real rank-tracking lifecycle event. Strategy generation now reconciles tracked keywords after persistence: newly selected site/page keywords are added with source/page/strategy/baseline metadata, retained keywords are refreshed, page reassignments are detected, removed strategy-owned keywords are marked deprecated, and replaced page keywords keep `replacedBy` metadata instead of silently lingering as active strategy terms. Manual, client-requested, recommendation/content-gap, unknown, and pinned keywords are preserved so regeneration does not clobber human-selected tracking. Rank-tracking mutations now broadcast a dedicated event and refresh relevant admin/client caches.
+
+**Agency value:** Strategists can trust that regeneration updates the tracking plan instead of leaving stale strategy keywords mixed with live terms. The platform can now answer why a keyword is tracked, which page/strategy selected it, and whether it was retained, replaced, or preserved manually.
+
+**Client value:** Sets up clearer reporting around what the team is watching after a strategy refresh. Clients should see tracked keywords reflect the latest strategy without losing manually requested or pinned terms.
+
+**Mutual:** Completes the propagation layer needed before the shared keyword-intelligence and explainability PRs. The keyword operating loop now has source-data expansion plus lifecycle reconciliation, giving future UX a reliable change set to explain.
 
 ### 443. Keyword Source Data Expansion
 

@@ -1,7 +1,12 @@
-import { addTrackedKeyword } from './rank-tracking.js';
+import { addActivity } from './activity-log.js';
+import { broadcastToWorkspace } from './broadcast.js';
+import { invalidateSubCachePrefix } from './bridge-infrastructure.js';
+import { reconcileStrategyRankTracking, summarizeStrategyRankTrackingChangeSet } from './rank-tracking-reconciliation.js';
 import { queueLlmsTxtRegeneration } from './llms-txt-generator.js';
 import { generateRecommendations } from './recommendations.js';
 import { createLogger } from './logger.js';
+import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { WS_EVENTS } from './ws-events.js';
 import type { PageKeywordMap, KeywordStrategy } from '../shared/types/workspace.js';
 
 const log = createLogger('keyword-strategy:follow-ons');
@@ -14,7 +19,7 @@ const recsInFlight = new Set<string>();
 export interface SeedKeywordStrategyTrackedKeywordsOptions {
   workspaceId: string;
   workspaceName: string;
-  keywordStrategy: Pick<KeywordStrategy, 'siteKeywords'>;
+  keywordStrategy: Pick<KeywordStrategy, 'siteKeywords' | 'siteKeywordMetrics' | 'generatedAt'>;
   pageMap: PageKeywordMap[];
 }
 
@@ -22,30 +27,39 @@ export interface QueueKeywordStrategyPostUpdateFollowOnsOptions {
   workspaceId: string;
 }
 
-export function collectKeywordStrategySeedKeywords(
-  keywordStrategy: Pick<KeywordStrategy, 'siteKeywords'>,
-  pageMap: PageKeywordMap[],
-): string[] {
-  const seedKeywords = new Set<string>();
-  for (const kw of keywordStrategy.siteKeywords || []) {
-    const normalized = kw.toLowerCase().trim();
-    if (normalized) seedKeywords.add(normalized); // skip empty strings
-  }
-  for (const pm of pageMap) {
-    if (pm.primaryKeyword) seedKeywords.add(pm.primaryKeyword.toLowerCase().trim());
-  }
-  return [...seedKeywords];
-}
-
 export function seedKeywordStrategyTrackedKeywords(options: SeedKeywordStrategyTrackedKeywordsOptions): void {
   const { workspaceId, workspaceName, keywordStrategy, pageMap } = options;
 
   try {
-    const seedKeywords = collectKeywordStrategySeedKeywords(keywordStrategy, pageMap);
-    for (const kw of seedKeywords) addTrackedKeyword(workspaceId, kw);
-    log.info(`Auto-seeded ${seedKeywords.length} keywords into rank tracking for ${workspaceName}`);
+    const changeSet = reconcileStrategyRankTracking({
+      workspaceId,
+      keywordStrategy,
+      pageMap,
+      generatedAt: keywordStrategy.generatedAt,
+    });
+    const summary = summarizeStrategyRankTrackingChangeSet(changeSet);
+    const structuralChanged = summary.added + summary.reassigned + summary.deprecated + summary.replaced;
+    const touched = structuralChanged + summary.retained;
+    log.info({ workspaceId, summary }, `Reconciled strategy rank tracking for ${workspaceName}`);
+    if (touched > 0) {
+      if (structuralChanged > 0) {
+        addActivity(
+          workspaceId,
+          'rank_tracking_updated',
+          'Rank tracking updated from keyword strategy',
+          `${summary.added} added, ${summary.reassigned} reassigned, ${summary.deprecated + summary.replaced} retired`,
+          summary,
+        );
+      }
+      broadcastToWorkspace(workspaceId, WS_EVENTS.RANK_TRACKING_UPDATED, {
+        source: 'keyword_strategy',
+        ...summary,
+      });
+      invalidateIntelligenceCache(workspaceId);
+      invalidateSubCachePrefix(workspaceId, 'slice:seoContext');
+    }
   } catch (seedErr) {
-    log.warn({ err: seedErr }, 'Failed to auto-seed rank tracking keywords');
+    log.warn({ err: seedErr }, 'Failed to reconcile strategy rank tracking keywords');
   }
 }
 

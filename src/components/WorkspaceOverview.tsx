@@ -378,6 +378,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                 schema_published: Shield,
                 redirects_scanned: AlertTriangle,
                 strategy_generated: BarChart3,
+                rank_tracking_updated: Search,
                 rank_snapshot: Search,
               };
               const EntryIcon = iconMap[entry.type] || Activity;

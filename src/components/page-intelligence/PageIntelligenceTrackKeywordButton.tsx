@@ -1,5 +1,6 @@
 import { Check, Plus } from 'lucide-react';
 import { Button } from '../ui';
+import { keywordTrackingKey } from '../../lib/keywordTracking';
 
 interface Props {
   keyword: string;
@@ -12,7 +13,7 @@ export function PageIntelligenceTrackKeywordButton({
   trackedKeywords,
   onTrackKeyword,
 }: Props) {
-  const isTracked = trackedKeywords.has(keyword);
+  const isTracked = trackedKeywords.has(keywordTrackingKey(keyword));
 
   return (
     <Button

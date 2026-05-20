@@ -219,6 +219,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       'audit-detail': queryKeys.client.auditDetail(workspaceId),
       annotations: queryKeys.client.annotations(workspaceId),
       anomalies: queryKeys.client.anomalies(workspaceId),
+      'rank-history': queryKeys.client.rankHistory(workspaceId),
+      'latest-ranks': queryKeys.client.latestRanks(workspaceId),
       strategy: queryKeys.client.strategy(workspaceId),
       'page-keywords': queryKeys.client.pageKeywords(workspaceId),
       pricing: queryKeys.client.pricing(workspaceId),
@@ -423,6 +425,11 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     [WS_EVENTS.STRATEGY_UPDATED]: () => {
       refetchClient('strategy', '');
       refetchClient('page-keywords', '');
+    },
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.RANK_TRACKING_UPDATED]: () => {
+      refetchClient('rank-history', '');
+      refetchClient('latest-ranks', '');
     },
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.OUTCOME_SCORED]: () => {

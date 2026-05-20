@@ -18,6 +18,7 @@ import {
 import { summarizeScoreTrend } from './pageIntelligenceData';
 import type { ContentScore, KeywordData, KeywordEditDraft, SeoCopy } from './pageIntelligenceTypes';
 import { PageIntelligencePageDetails } from './PageIntelligencePageDetails';
+import { keywordTrackingKey } from '../../lib/keywordTracking';
 
 interface Props {
   page: UnifiedPage;
@@ -75,6 +76,9 @@ export function PageIntelligencePageRow({
   onViewFullAnalysis,
 }: Props) {
   const strategy = page.strategy;
+  const primaryKeywordTracked = strategy?.primaryKeyword
+    ? trackedKeywords.has(keywordTrackingKey(strategy.primaryKeyword))
+    : false;
   const displayScore = analysis?.optimizationScore ?? strategy?.optimizationScore;
   const scoreTrend = summarizeScoreTrend(strategy?.optimizationScoreHistory);
   const trendIcon = scoreTrend?.direction === 'up'
@@ -123,16 +127,16 @@ export function PageIntelligencePageRow({
             <span className="inline-flex items-center gap-1 t-caption-sm text-accent-brand bg-teal-500/10 px-1.5 py-0.5 rounded max-w-[200px]">
               <span className="truncate">{strategy.primaryKeyword}</span>
               <IconButton
-                icon={trackedKeywords.has(strategy.primaryKeyword) ? Check : Plus}
-                label={trackedKeywords.has(strategy.primaryKeyword) ? 'Tracking' : 'Track in Rank Tracker'}
-                title={trackedKeywords.has(strategy.primaryKeyword) ? 'Tracking' : 'Track in Rank Tracker'}
+                icon={primaryKeywordTracked ? Check : Plus}
+                label={primaryKeywordTracked ? 'Tracking' : 'Track in Rank Tracker'}
+                title={primaryKeywordTracked ? 'Tracking' : 'Track in Rank Tracker'}
                 size="sm"
                 variant="ghost"
                 onClick={event => {
                   event.stopPropagation();
                   onTrackKeyword(strategy.primaryKeyword);
                 }}
-                className={`!h-auto !w-auto !p-0 flex-shrink-0 transition-colors ${trackedKeywords.has(strategy.primaryKeyword) ? 'text-accent-success' : 'text-accent-brand hover:text-accent-brand'}`}
+                className={`!h-auto !w-auto !p-0 flex-shrink-0 transition-colors ${primaryKeywordTracked ? 'text-accent-success' : 'text-accent-brand hover:text-accent-brand'}`}
               />
             </span>
           )}
