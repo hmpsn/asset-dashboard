@@ -24,11 +24,16 @@ import type {
 import type { ClientSignalsSlice, LearningsSlice, SeoContextSlice } from '../shared/types/intelligence.ts';
 import type { PageKeywordMap } from '../shared/types/workspace.ts';
 import { sanitizeQueryForPrompt } from './helpers.js';
+import {
+  evaluateKeywordCandidate,
+  normalizeKeyword,
+  opportunityScore,
+  shouldIncludeKeywordCandidate,
+} from './keyword-intelligence/index.js';
 
 const log = createLogger('keyword-recommendations');
 
 const recommendationSlices = ['seoContext', 'learnings', 'clientSignals'] as const;
-const STOP_WORDS = new Set(['a', 'an', 'and', 'for', 'in', 'near', 'of', 'on', 'or', 'the', 'to', 'with']);
 
 type ConflictSeverity = CannibalizationConflict['severity'];
 
@@ -54,63 +59,7 @@ interface CandidateScoringContext {
   backlinkProfile: SeoContextSlice['backlinkProfile'];
   excludedConflictIdentifiers: string[];
   workspaceId: string;
-}
-
-function normalizeKeyword(keyword: string): string {
-  return keyword.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
-}
-
-function keywordTokens(keyword: string): string[] {
-  return normalizeKeyword(keyword)
-    .split(' ')
-    .map(token => token.trim())
-    .filter(token => token.length >= 2 && !STOP_WORDS.has(token));
-}
-
-function wordOverlapRatio(a: string, b: string): number {
-  const aTokens = new Set(keywordTokens(a));
-  const bTokens = new Set(keywordTokens(b));
-  if (aTokens.size === 0 || bTokens.size === 0) return 0;
-  let intersection = 0;
-  for (const token of aTokens) {
-    if (bTokens.has(token)) intersection++;
-  }
-  const union = new Set([...aTokens, ...bTokens]).size;
-  return union > 0 ? intersection / union : 0;
-}
-
-function isNearDuplicateKeyword(a: string, b: string): boolean {
-  const normalizedA = normalizeKeyword(a);
-  const normalizedB = normalizeKeyword(b);
-  if (!normalizedA || !normalizedB) return false;
-  if (normalizedA === normalizedB) return true;
-
-  const aTokens = keywordTokens(a);
-  const bTokens = keywordTokens(b);
-  if (aTokens.length === 0 || bTokens.length === 0) return false;
-
-  const shorter = aTokens.length <= bTokens.length ? aTokens : bTokens;
-  const longer = aTokens.length <= bTokens.length ? bTokens : aTokens;
-  const matches = shorter.filter(token => longer.includes(token)).length;
-  return matches / shorter.length >= 0.8;
-}
-
-function findKeywordMatches(keyword: string, phrases: string[], maxMatches: number = 2): string[] {
-  const matches: string[] = [];
-  for (const phrase of phrases) {
-    if (!phrase) continue;
-    if (isNearDuplicateKeyword(keyword, phrase) || wordOverlapRatio(keyword, phrase) >= 0.6) {
-      matches.push(phrase);
-    }
-    if (matches.length >= maxMatches) break;
-  }
-  return matches;
-}
-
-function describeMatches(label: string, matches: string[]): string {
-  if (matches.length === 0) return '';
-  if (matches.length === 1) return `${label}: ${matches[0]}`;
-  return `${label}: ${matches[0]} + ${matches.length - 1} more`;
+  businessTerms: string[];
 }
 
 function getStrongestConflictSeverity(conflicts: CannibalizationConflict[]): ConflictSeverity | null {
@@ -127,26 +76,6 @@ function buildConflictReason(conflicts: CannibalizationConflict[]): string | nul
     return `Competes with an existing page target (${strongest.conflictsWith.identifier})`;
   }
   return strongest.reason;
-}
-
-function inferBroadMismatchPenalty(seedKeyword: string, candidateKeyword: string): number {
-  const seedTokens = keywordTokens(seedKeyword);
-  const candidateTokens = keywordTokens(candidateKeyword);
-  if (seedTokens.length < 2 || candidateTokens.length === 0) return 0;
-
-  const overlap = wordOverlapRatio(seedKeyword, candidateKeyword);
-  const candidateShorter = candidateTokens.length + 1 < seedTokens.length;
-  const missingSeedSpecificity = candidateShorter && overlap >= 0.34;
-  if (missingSeedSpecificity) return 12;
-  if (candidateTokens.length <= 2 && overlap < 0.34) return 10;
-  return 0;
-}
-
-function inferAuthorityMismatchPenalty(candidate: KeywordCandidate, backlinkProfile: SeoContextSlice['backlinkProfile']): number {
-  if (!backlinkProfile) return 0;
-  if (backlinkProfile.referringDomains < 15 && candidate.difficulty >= 75) return 12;
-  if (backlinkProfile.referringDomains < 40 && candidate.difficulty >= 85) return 8;
-  return 0;
 }
 
 function shouldUseSmartRanking(
@@ -171,6 +100,7 @@ function shouldUseSmartRanking(
 
 function buildScoringContext(
   workspaceId: string,
+  workspaceName: string | undefined,
   seedKeyword: string,
   seoContext: SeoContextSlice | undefined,
   learnings: LearningsSlice | undefined,
@@ -191,6 +121,15 @@ function buildScoringContext(
     learnings: learnings ?? undefined,
     backlinkProfile: seoContext?.backlinkProfile,
     excludedConflictIdentifiers,
+    businessTerms: [
+      workspaceName ?? '',
+      seoContext?.businessContext ?? '',
+      seoContext?.knowledgeBase ?? '',
+      seoContext?.brandVoice ?? '',
+      ...(seoContext?.personas ?? []).map(persona => `${persona.name} ${persona.painPoints?.join(' ') ?? ''} ${persona.goals?.join(' ') ?? ''}`),
+      ...(clientSignals?.businessPriorities ?? []),
+      ...(clientSignals?.recentChatTopics ?? []),
+    ],
   };
 }
 
@@ -221,54 +160,29 @@ function scoreKeywordCandidate(candidate: KeywordCandidate, ctx: CandidateScorin
   const penaltyReasons: string[] = [];
   const fitSignals: string[] = [];
 
-  const requestedMatches = findKeywordMatches(candidate.keyword, ctx.requestedKeywords);
-  const approvedMatches = findKeywordMatches(candidate.keyword, ctx.approvedKeywords);
-  const declinedMatches = findKeywordMatches(candidate.keyword, ctx.declinedKeywords);
-  const priorityMatches = findKeywordMatches(candidate.keyword, ctx.businessPriorities);
-  const contentGapMatches = findKeywordMatches(candidate.keyword, ctx.contentGapTopics, 1);
-  const recentChatMatches = findKeywordMatches(candidate.keyword, ctx.recentChatTopics, 1);
-  const seedOverlap = wordOverlapRatio(ctx.seedKeyword, candidate.keyword);
-
-  if (candidate.source === 'pattern') {
-    score += 4;
-    fitSignals.push('seed-keyword');
-    reasons.push('Keeps the original target keyword in the option set');
-  }
-
-  if (candidate.source === 'gsc') {
-    score += 8;
-    fitSignals.push('gsc-proven');
-    reasons.push('Already earns impressions in Search Console, so demand is proven');
-  }
-
-  if (requestedMatches.length > 0) {
-    score += 18;
-    fitSignals.push('client-requested');
-    reasons.push(`Client explicitly requested a similar keyword (${describeMatches('matches', requestedMatches)})`);
-  }
-
-  if (approvedMatches.length > 0) {
-    score += 12;
-    fitSignals.push('client-approved');
-    reasons.push(`Aligns with previously approved keyword feedback (${describeMatches('approved', approvedMatches)})`);
-  }
-
-  if (priorityMatches.length > 0) {
-    score += 10;
-    fitSignals.push('business-priority');
-    reasons.push(`Tracks with current business priorities (${describeMatches('priority', priorityMatches)})`);
-  }
-
-  if (contentGapMatches.length > 0) {
-    score += 8;
-    fitSignals.push('content-gap-demand');
-    reasons.push(`Matches a client-voted content need (${contentGapMatches[0]})`);
-  }
-
-  if (recentChatMatches.length > 0) {
-    score += 6;
-    fitSignals.push('recent-client-interest');
-    reasons.push(`Connects to a recent client conversation topic (${recentChatMatches[0]})`);
+  const sharedEvaluation = evaluateKeywordCandidate(candidate, {
+    workspaceId: ctx.workspaceId,
+    seedKeyword: ctx.seedKeyword,
+    pageMap: ctx.pageMap,
+    declinedKeywords: ctx.declinedKeywords,
+    requestedKeywords: ctx.requestedKeywords,
+    approvedKeywords: ctx.approvedKeywords,
+    businessPriorities: ctx.businessPriorities,
+    businessTerms: ctx.businessTerms,
+    contentGapTopics: ctx.contentGapTopics,
+    recentChatTopics: ctx.recentChatTopics,
+    rejectionReasons: ctx.rejectionReasons,
+    backlinkProfile: ctx.backlinkProfile,
+    strictBusinessFit: true,
+  });
+  score += sharedEvaluation.scoreDelta;
+  fitSignals.push(...sharedEvaluation.fitSignals);
+  for (const reason of sharedEvaluation.reasons) {
+    if (reason.weight < 0) {
+      penaltyReasons.push(reason.message);
+    } else {
+      reasons.push(reason.message);
+    }
   }
 
   const outcomeAdjustment = buildOutcomeAdjustment({
@@ -287,11 +201,6 @@ function scoreKeywordCandidate(candidate: KeywordCandidate, ctx: CandidateScorin
     }
   }
 
-  if (declinedMatches.length > 0) {
-    score -= 40;
-    penaltyReasons.push(`Similar to a previously declined keyword (${describeMatches('declined', declinedMatches)})`);
-  }
-
   const conflictCandidates = checkKeywordCannibalization(ctx.workspaceId, candidate.keyword)
     .filter(conflict => !ctx.excludedConflictIdentifiers.includes(conflict.conflictsWith.identifier));
   const conflictSeverity = getStrongestConflictSeverity(conflictCandidates);
@@ -307,48 +216,10 @@ function scoreKeywordCandidate(candidate: KeywordCandidate, ctx: CandidateScorin
     penaltyReasons.push(conflictReason ?? 'Low cannibalization risk');
   }
 
-  const pageMapMatches = ctx.pageMap.filter(page =>
-    isNearDuplicateKeyword(page.primaryKeyword, candidate.keyword)
-    || page.secondaryKeywords.some(secondary => isNearDuplicateKeyword(secondary, candidate.keyword)),
-  );
-  if (pageMapMatches.length > 0) {
-    score -= 20;
-    penaltyReasons.push(`Already mapped to an existing strategy page (${pageMapMatches[0].pagePath})`);
-  }
-
-  const broadMismatchPenalty = inferBroadMismatchPenalty(ctx.seedKeyword, candidate.keyword);
-  if (broadMismatchPenalty > 0 && requestedMatches.length === 0 && priorityMatches.length === 0) {
-    score -= broadMismatchPenalty;
-    penaltyReasons.push('Broader or less specific than the original seed topic');
-  }
-
-  if (seedOverlap < 0.34 && requestedMatches.length === 0 && priorityMatches.length === 0 && contentGapMatches.length === 0) {
-    score -= 10;
-    penaltyReasons.push('Weak topical overlap with the original seed keyword');
-  }
-
-  if (candidate.source === 'semrush_related' && candidate.volume < 25) {
-    score -= 6;
-    penaltyReasons.push('Very low provider volume for a related-keyword suggestion');
-  }
-
-  if (ctx.rejectionReasons.length > 0 && declinedMatches.length === 0 && candidate.source === 'semrush_related') {
-    const genericRejectionPatterns = ['irrelevant', 'too broad', 'not a fit'];
-    if (ctx.rejectionReasons.some(reason => genericRejectionPatterns.some(pattern => reason.toLowerCase().includes(pattern)))) {
-      score -= 4;
-      penaltyReasons.push('Workspace feedback patterns favor more specific, business-fit terms');
-    }
-  }
-
-  const authorityMismatchPenalty = inferAuthorityMismatchPenalty(candidate, ctx.backlinkProfile);
-  const authorityAssessment = assessAuthorityFromBacklinks(candidate.difficulty, ctx.backlinkProfile);
-  if (authorityMismatchPenalty > 0) {
-    score -= authorityMismatchPenalty;
-    penaltyReasons.push(authorityAssessment.note);
-  }
+  const authorityAssessment = candidate.authorityAssessment ?? assessAuthorityFromBacklinks(candidate.difficulty, ctx.backlinkProfile);
 
   const uniqueReasons = [...new Set([...reasons, ...penaltyReasons])].slice(0, 5);
-  if (declinedMatches.length > 0 && requestedMatches.length === 0 && approvedMatches.length === 0) {
+  if (sharedEvaluation.suppressed) {
     return null;
   }
 
@@ -408,31 +279,7 @@ function formatCandidateForAi(candidate: ScoredCandidate): string {
   return `- "${candidate.keyword}" (vol: ${candidate.volume}, KD: ${candidate.difficulty}, CPC: $${candidate.cpc.toFixed(2)}, score: ${candidate._score}, signals: ${signals}, notes: ${reasons})`;
 }
 
-// ── Opportunity scoring ────────────────────────────────────────────────────
-
-/**
- * Score a keyword on a 0–110 scale based on volume, difficulty, and commercial intent.
- * Base score is 0–100 (55% volume + 45% difficulty inversion); CPC adds up to 10 bonus points.
- * Higher volume + lower difficulty + higher CPC = higher score.
- * @internal exported for unit testing
- */
-export function opportunityScore(volume: number, difficulty: number, cpc: number = 0): number {
-  if (volume <= 0) return 0;
-  const volScore = Math.min(100, (Math.log10(volume) / 5) * 100);
-  const diffScore = 100 - difficulty;
-  const cpcBonus = Math.min(10, cpc * 2);
-  return Math.round(volScore * 0.55 + diffScore * 0.45 + cpcBonus);
-}
-
-/**
- * Returns true if a keyword candidate should be included in scoring.
- * Seed keywords (source === 'pattern') are always kept; related keywords require
- * at least 10 monthly searches to avoid noise.
- * @internal exported for unit testing
- */
-export function shouldIncludeKeywordCandidate(source: string, volume: number): boolean {
-  return source === 'pattern' || source === 'gsc' || volume >= 10;
-}
+export { opportunityScore, shouldIncludeKeywordCandidate } from './keyword-intelligence/index.js';
 
 // ── Core recommendation function ───────────────────────────────────────────
 
@@ -506,6 +353,7 @@ export async function getKeywordRecommendations(
   const clientSignals = recommendationContext?.intelligence.clientSignals;
   const scoringContext = buildScoringContext(
     workspaceId,
+    ws?.name,
     seedKeyword,
     seoContext,
     learnings,

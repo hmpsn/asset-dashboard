@@ -1,11 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **444 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **445 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
 ---
 
+### 445. Shared Keyword Intelligence Engine
+
+**What it does:** Adds a server-local shared keyword-intelligence module that both keyword recommendations and strategy generation can consume for deterministic keyword judgment. The engine centralizes keyword normalization, near-duplicate matching, candidate inclusion thresholds, opportunity scoring, declined/requested/approved feedback handling, page-map conflict detection, business-fit posture, authority mismatch reasoning, and explicit low-actionability/noise suppression. Keyword recommendations now evaluate candidates through this shared rule layer, and keyword strategy generation now applies the same shared eligibility gate before provider/discovery/related candidates enter the AI keyword pool. Staging-observed noisy terms such as `paper tiger` and `typing tiger` are now regression fixtures for hmpsn studio-like business context.
+
+**Agency value:** Gives strategists one consistent substrate for deciding whether a keyword is worth considering, regardless of whether it appears in recommendations or full strategy generation. This reduces the “same term, different judgment” problem and stops obvious provider-noise terms earlier in the operating loop.
+
+**Client value:** Clients should see fewer irrelevant or low-actionability keyword ideas survive into strategy and recommendation surfaces, while their requested/approved keywords remain protected from overly aggressive filtering.
+
+**Mutual:** Completes the rule-sharing layer needed before PR13's explainability/action-loop UX. The platform can now explain and test keyword suppression/down-ranking with typed reasons instead of relying on scattered local heuristics.
+
+---
 ### 444. Keyword Strategy Rank-Tracking Reconciliation
 
 **What it does:** Turns keyword strategy refreshes into a real rank-tracking lifecycle event. Strategy generation now reconciles tracked keywords after persistence: newly selected site/page keywords are added with source/page/strategy/baseline metadata, retained keywords are refreshed, page reassignments are detected, removed strategy-owned keywords are marked deprecated, and replaced page keywords keep `replacedBy` metadata instead of silently lingering as active strategy terms. Manual, client-requested, recommendation/content-gap, unknown, and pinned keywords are preserved so regeneration does not clobber human-selected tracking. Rank-tracking mutations now broadcast a dedicated event and refresh relevant admin/client caches.
