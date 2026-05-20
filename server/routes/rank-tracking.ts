@@ -19,6 +19,7 @@ import { getSearchOverview } from '../search-console.js';
 import { getWorkspace } from '../workspaces.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
+import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 
 const router = Router();
 
@@ -30,7 +31,11 @@ function parseHistoryLimit(rawLimit: unknown): number | null {
 }
 
 function normalizeKeywordQuery(query: string): string {
-  return query.toLowerCase().trim();
+  return keywordComparisonKey(query);
+}
+
+function sameKeyword(a: string, b: string): boolean {
+  return normalizeKeywordQuery(a) === normalizeKeywordQuery(b);
 }
 
 // --- Rank Tracking ---
@@ -45,8 +50,8 @@ router.post('/api/rank-tracking/:workspaceId/keywords', requireWorkspaceAccess('
   if (typeof query !== 'string') return res.status(400).json({ error: 'query required' });
   const normalizedQuery = normalizeKeywordQuery(query);
   if (!normalizedQuery) return res.status(400).json({ error: 'query required' });
-  const wasTracked = getTrackedKeywords(req.params.workspaceId).some(keyword => keyword.query === normalizedQuery);
-  const keywords = addTrackedKeyword(req.params.workspaceId, normalizedQuery, {
+  const wasTracked = getTrackedKeywords(req.params.workspaceId).some(keyword => sameKeyword(keyword.query, query));
+  const keywords = addTrackedKeyword(req.params.workspaceId, query.trim(), {
     pinned: Boolean(pinned),
     source: TRACKED_KEYWORD_SOURCE.MANUAL,
   });
@@ -61,7 +66,7 @@ router.post('/api/rank-tracking/:workspaceId/keywords', requireWorkspaceAccess('
 router.delete('/api/rank-tracking/:workspaceId/keywords/:query', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const query = decodeURIComponent(req.params.query);
   const normalizedQuery = normalizeKeywordQuery(query);
-  const wasTracked = getTrackedKeywords(req.params.workspaceId).some(keyword => keyword.query === normalizedQuery);
+  const wasTracked = getTrackedKeywords(req.params.workspaceId).some(keyword => sameKeyword(keyword.query, query));
   const keywords = removeTrackedKeyword(req.params.workspaceId, query);
   if (wasTracked) {
     addActivity(req.params.workspaceId, 'rank_tracking_updated', 'Tracked keyword removed', `"${normalizedQuery}" removed from rank tracking`);
@@ -74,7 +79,7 @@ router.delete('/api/rank-tracking/:workspaceId/keywords/:query', requireWorkspac
 router.patch('/api/rank-tracking/:workspaceId/keywords/:query/pin', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const query = decodeURIComponent(req.params.query);
   const normalizedQuery = normalizeKeywordQuery(query);
-  const wasTracked = getTrackedKeywords(req.params.workspaceId).some(keyword => keyword.query === normalizedQuery);
+  const wasTracked = getTrackedKeywords(req.params.workspaceId).some(keyword => sameKeyword(keyword.query, query));
   const keywords = togglePinKeyword(req.params.workspaceId, query);
   if (wasTracked) {
     addActivity(req.params.workspaceId, 'rank_tracking_updated', 'Tracked keyword pin updated', `"${normalizedQuery}" pin status changed`);
@@ -84,7 +89,7 @@ router.patch('/api/rank-tracking/:workspaceId/keywords/:query/pin', requireWorks
 });
 
 // Capture a rank snapshot from current GSC data
-router.post('/api/rank-tracking/:workspaceId/snapshot', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+router.post('/api/rank-tracking/:workspaceId/snapshot', requireWorkspaceAccess('workspaceId'), async (req, res, next) => {
   try {
     const ws = getWorkspace(req.params.workspaceId);
     if (!ws?.gscPropertyUrl) return res.status(400).json({ error: 'No GSC property linked' });
@@ -99,7 +104,7 @@ router.post('/api/rank-tracking/:workspaceId/snapshot', requireWorkspaceAccess('
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.RANK_TRACKING_UPDATED, { action: 'snapshot', count: queries.length, date });
     res.json({ date, count: queries.length });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to capture snapshot' });
+    next(err);
   }
 });
 

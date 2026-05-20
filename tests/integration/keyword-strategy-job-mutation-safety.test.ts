@@ -446,7 +446,7 @@ describe('keyword strategy job mutation safety', () => {
     expect(activityTitles(workspace.workspaceId, 'strategy_generated')).toContain('Keyword strategy generated');
     expect(getTrackedKeywords(workspace.workspaceId).map(keyword => keyword.query)).toEqual([
       'local seo',
-      'seo agency',
+      'SEO Agency',
     ]);
     expect(getUsageCount(workspace.workspaceId, 'strategy_generations')).toBe(1);
     expect(getActionBySource('strategy', workspace.workspaceId)).not.toBeNull();

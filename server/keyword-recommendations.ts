@@ -421,7 +421,7 @@ export async function getKeywordRecommendations(
 
       for (const row of relevantQueries) {
         const sanitizedQuery = sanitizeQueryForPrompt(row.query);
-        if (!candidates.some(candidate => candidate.keyword.toLowerCase() === sanitizedQuery.toLowerCase())) {
+        if (!candidates.some(candidate => normalizeKeyword(candidate.keyword) === normalizeKeyword(sanitizedQuery))) {
           candidates.push({
             keyword: sanitizedQuery,
             volume: Math.max(1, Math.round(row.impressions / 3)),
@@ -453,11 +453,12 @@ export async function getKeywordRecommendations(
         ? `${recommendationContext.promptContext}\n\nOUTCOME LEARNING STATUS:\n${outcomeLearningStatusNote}`
         : recommendationContext.promptContext;
       const aiRanked = await aiRankKeywords(scored, aiContext, workspaceId);
-      const candidateMap = new Map(scored.map(candidate => [candidate.keyword.toLowerCase(), candidate])); // map-dup-ok — candidates are deduped by normalized keyword earlier in this function
+      const candidateMap = new Map(scored.map(candidate => [normalizeKeyword(candidate.keyword), candidate])); // map-dup-ok — candidates are deduped by normalized keyword earlier in this function
       const reordered = aiRanked
-        .map(candidate => candidateMap.get(candidate.keyword.toLowerCase()))
+        .map(candidate => candidateMap.get(normalizeKeyword(candidate.keyword)))
         .filter((candidate): candidate is ScoredCandidate => !!candidate);
-      const remaining = scored.filter(candidate => !reordered.some(item => item.keyword.toLowerCase() === candidate.keyword.toLowerCase()));
+      const reorderedKeys = new Set(reordered.map(candidate => normalizeKeyword(candidate.keyword)));
+      const remaining = scored.filter(candidate => !reorderedKeys.has(normalizeKeyword(candidate.keyword)));
       const finalScored = [...reordered, ...remaining].slice(0, maxCandidates);
       for (const candidate of finalScored) candidate.isRecommended = false;
       if (finalScored[0]) finalScored[0].isRecommended = true;
@@ -523,14 +524,15 @@ Return a JSON array of the keywords in ranked order (best first). Only return th
   const ranked = parseAIJson<string[]>(result.text);
   if (!Array.isArray(ranked)) throw new Error('AI did not return an array');
 
-  const candidateMap = new Map(candidates.map(candidate => [candidate.keyword.toLowerCase(), candidate])); // map-dup-ok — ranked input is already deduped before AI reordering
+  const candidateMap = new Map(candidates.map(candidate => [normalizeKeyword(candidate.keyword), candidate])); // map-dup-ok — ranked input is already deduped before AI reordering
   const reordered: KeywordCandidate[] = [];
 
   for (const keyword of ranked) {
-    const match = candidateMap.get(keyword.toLowerCase());
+    const normalizedKeyword = normalizeKeyword(keyword);
+    const match = candidateMap.get(normalizedKeyword);
     if (match) {
       reordered.push(stripScore(match));
-      candidateMap.delete(keyword.toLowerCase());
+      candidateMap.delete(normalizedKeyword);
     }
   }
 

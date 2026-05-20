@@ -96,6 +96,7 @@ describe('normalizeKeywordForComparison', () => {
   it('normalizes case, punctuation, whitespace, and local-ish phrases without stripping meaning', () => {
     expect(normalizeKeywordForComparison('  Cosmetic-Dentistry!! Near   Me ')).toBe('cosmetic dentistry near me');
     expect(normalizeKeywordForComparison('Dentist, Austin TX')).toBe('dentist austin tx');
+    expect(normalizeKeywordForComparison('Emergency Dentist - Near-Me')).toBe('emergency dentist near me');
   });
 });
 
@@ -226,7 +227,7 @@ describe('applyKeywordCommandCenterAction', () => {
     expect(feedbackRows()).toEqual([]);
     const tracked = getTrackedKeywords(workspaceId, { includeInactive: true });
     expect(tracked.filter(keyword => keywordComparisonKey(keyword.query) === 'paper tiger')).toEqual([
-      expect.objectContaining({ query: 'paper tiger', status: TRACKED_KEYWORD_STATUS.ACTIVE }),
+      expect.objectContaining({ query: 'paper-tiger', status: TRACKED_KEYWORD_STATUS.ACTIVE }),
     ]);
   });
 
@@ -236,7 +237,7 @@ describe('applyKeywordCommandCenterAction', () => {
       keyword: 'Porcelain Veneers Cost',
     });
     expect(getTrackedKeywords(workspaceId)).toEqual(expect.arrayContaining([
-      expect.objectContaining({ query: 'porcelain veneers cost', status: TRACKED_KEYWORD_STATUS.ACTIVE }),
+      expect.objectContaining({ query: 'Porcelain Veneers Cost', status: TRACKED_KEYWORD_STATUS.ACTIVE }),
     ]));
 
     applyKeywordCommandCenterAction(workspaceId, {
@@ -248,7 +249,7 @@ describe('applyKeywordCommandCenterAction', () => {
       expect.objectContaining({ query: 'porcelain veneers cost' }),
     ]));
     expect(getTrackedKeywords(workspaceId, { includeInactive: true })).toEqual(expect.arrayContaining([
-      expect.objectContaining({ query: 'porcelain veneers cost', status: TRACKED_KEYWORD_STATUS.PAUSED }),
+      expect.objectContaining({ query: 'Porcelain Veneers Cost', status: TRACKED_KEYWORD_STATUS.PAUSED }),
     ]));
 
     applyKeywordCommandCenterAction(workspaceId, {
@@ -256,8 +257,29 @@ describe('applyKeywordCommandCenterAction', () => {
       keyword: 'porcelain veneers cost',
     });
     expect(getTrackedKeywords(workspaceId)).toEqual(expect.arrayContaining([
-      expect.objectContaining({ query: 'porcelain veneers cost', status: TRACKED_KEYWORD_STATUS.ACTIVE }),
+      expect.objectContaining({ query: 'Porcelain Veneers Cost', status: TRACKED_KEYWORD_STATUS.ACTIVE }),
     ]));
+  });
+
+  it('matches lifecycle actions across canonical keyword variants', () => {
+    applyKeywordCommandCenterAction(workspaceId, {
+      action: KEYWORD_COMMAND_CENTER_ACTIONS.TRACK,
+      keyword: 'Emergency Dentist - Near-Me',
+    });
+
+    applyKeywordCommandCenterAction(workspaceId, {
+      action: KEYWORD_COMMAND_CENTER_ACTIONS.PAUSE_TRACKING,
+      keyword: 'emergency dentist near me',
+      force: true,
+    });
+
+    const inactive = getTrackedKeywords(workspaceId, { includeInactive: true });
+    expect(inactive.filter(keyword => keywordComparisonKey(keyword.query) === 'emergency dentist near me')).toEqual([
+      expect.objectContaining({
+        query: 'Emergency Dentist - Near-Me',
+        status: TRACKED_KEYWORD_STATUS.PAUSED,
+      }),
+    ]);
   });
 
   it('does not report pause or retire success when the keyword is not tracked', () => {

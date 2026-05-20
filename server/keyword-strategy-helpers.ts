@@ -1,6 +1,7 @@
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import type { KeywordSourceEvidence } from '../shared/types/keywords.js';
 import type { Workspace } from '../shared/types/workspace.js';
+import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 
 export interface KeywordPoolCandidate {
   volume: number;
@@ -24,7 +25,7 @@ export function upsertKeywordPoolCandidate(
   keyword: string,
   candidate: KeywordPoolCandidate,
 ): boolean {
-  const normalized = keyword.toLowerCase().trim();
+  const normalized = keywordComparisonKey(keyword);
   if (!normalized) return false;
 
   const existing = pool.get(normalized);

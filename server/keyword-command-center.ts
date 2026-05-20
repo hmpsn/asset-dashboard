@@ -584,7 +584,7 @@ function upsertTrackedKeywordByKey(
       next.push({
         ...existing,
         ...definedOptions,
-        query: normalized,
+        query: existing.query,
         pinned: equivalents.some(entry => entry.pinned) || Boolean(options.pinned),
         addedAt: existing.addedAt || now,
         status: nextStatus,
@@ -596,7 +596,7 @@ function upsertTrackedKeywordByKey(
     }
 
     next.push({
-      query: normalized,
+      query: keyword.trim(),
       pinned: Boolean(options.pinned),
       addedAt: now,
       source: options.source ?? TRACKED_KEYWORD_SOURCE.MANUAL,
@@ -641,6 +641,7 @@ export function applyKeywordCommandCenterAction(
   if (!workspace) throw new Error('Workspace not found');
   const keyword = keywordComparisonKey(request.keyword);
   if (!keyword) throw new Error('keyword required');
+  const displayKeyword = request.keyword.trim();
 
   const existing = findTracked(workspace.id, keyword);
   const protectedCheck = canModifyProtected(existing, request.force);
@@ -652,7 +653,7 @@ export function applyKeywordCommandCenterAction(
     switch (request.action) {
       case KEYWORD_COMMAND_CENTER_ACTIONS.ADD_TO_STRATEGY:
         upsertFeedback(workspace.id, keyword, 'approved', request.reason ?? 'Added to strategy from Keyword Command Center');
-        trackedKeywords = upsertTrackedKeywordByKey(workspace.id, keyword, {
+        trackedKeywords = upsertTrackedKeywordByKey(workspace.id, displayKeyword, {
           source: TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD,
           status: TRACKED_KEYWORD_STATUS.ACTIVE,
           pagePath: request.pagePath,
@@ -662,7 +663,7 @@ export function applyKeywordCommandCenterAction(
       case KEYWORD_COMMAND_CENTER_ACTIONS.PROMOTE_EVIDENCE:
       case KEYWORD_COMMAND_CENTER_ACTIONS.TRACK:
         deleteFeedbackByKeywordKey(workspace.id, keyword);
-        trackedKeywords = upsertTrackedKeywordByKey(workspace.id, keyword, {
+        trackedKeywords = upsertTrackedKeywordByKey(workspace.id, displayKeyword, {
           source: request.action === KEYWORD_COMMAND_CENTER_ACTIONS.PROMOTE_EVIDENCE
             ? TRACKED_KEYWORD_SOURCE.RECOMMENDATION
             : TRACKED_KEYWORD_SOURCE.MANUAL,
@@ -693,7 +694,7 @@ export function applyKeywordCommandCenterAction(
         break;
       case KEYWORD_COMMAND_CENTER_ACTIONS.RESTORE:
         deleteFeedbackByKeywordKey(workspace.id, keyword);
-        trackedKeywords = upsertTrackedKeywordByKey(workspace.id, keyword, {
+        trackedKeywords = upsertTrackedKeywordByKey(workspace.id, displayKeyword, {
           source: existing?.source ?? TRACKED_KEYWORD_SOURCE.MANUAL,
           status: TRACKED_KEYWORD_STATUS.ACTIVE,
           deprecatedAt: undefined,

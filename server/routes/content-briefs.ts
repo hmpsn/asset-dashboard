@@ -45,6 +45,7 @@ import { listMatrices } from '../content-matrices.js';
 import { getTemplate } from '../content-templates.js';
 import { BRIEF_PAGE_TYPES } from '../../shared/types/content.js';
 import type { BriefPageType, BriefTemplateCrossrefMatch } from '../../shared/types/content.js';
+import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 
 const router = Router();
 const log = createLogger('content-briefs');
@@ -93,7 +94,7 @@ function notifyContentUpdated(workspaceId: string, payload: Record<string, unkno
 }
 
 function normalizeKeyword(value: string): string {
-  return value.trim().toLowerCase();
+  return keywordComparisonKey(value);
 }
 
 function toBriefPageType(value: string): BriefPageType | null {
@@ -558,10 +559,10 @@ router.post('/api/content-briefs/:workspaceId/validate-keywords', requireWorkspa
 
   try {
     const metrics = await bulkProvider.getKeywordMetrics(keywords.slice(0, 50), req.params.workspaceId);
-    const metricsMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m])); // map-dup-ok
+    const metricsMap = new Map(metrics.map(m => [normalizeKeyword(m.keyword), m])); // map-dup-ok
 
     const results = keywords.slice(0, 50).map((kw: string) => {
-      const m = metricsMap.get(kw.toLowerCase());
+      const m = metricsMap.get(normalizeKeyword(kw));
       if (!m) {
         return { keyword: kw, valid: true, source: bulkProvider.name, metrics: null };
       }

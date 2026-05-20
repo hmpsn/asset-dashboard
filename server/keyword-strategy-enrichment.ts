@@ -16,6 +16,7 @@ import {
 import { computeOpportunityScore, isSuspiciousPlannerGroupedVolume } from './keyword-strategy-helpers.js';
 import { matchesQuestionKeyword } from './strategy-filters.js';
 import { METRICS_SOURCE } from '../shared/types/keywords.js';
+import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 
 const log = createLogger('keyword-strategy:enrichment');
 const URL_LEVEL_KEYWORD_PAGE_LIMIT = 12;
@@ -73,11 +74,7 @@ export interface EnrichKeywordStrategyResult {
 }
 
 function normalizeTopicKeyword(value: string | undefined): string {
-  return (value ?? '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-    .replace(/\s+/g, ' ');
+  return keywordComparisonKey(value);
 }
 
 function hasMultiWordTopicSignal(keyword: string): boolean {
@@ -241,9 +238,9 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
         try { return new URL(r.page).pathname === pm.pagePath; } catch { return false; }
       });
       if (matchingRows.length > 0) {
-        const primaryKeyword = pm.primaryKeyword.trim().toLowerCase();
+        const primaryKeyword = keywordComparisonKey(pm.primaryKeyword);
         if (primaryKeyword) {
-          const kwMatch = matchingRows.find(r => r.query.toLowerCase().includes(primaryKeyword));
+          const kwMatch = matchingRows.find(r => keywordComparisonKey(r.query).includes(primaryKeyword));
           if (kwMatch) {
             pm.currentPosition = kwMatch.position;
           }
@@ -272,12 +269,12 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
   // Enrich pageMap with SEO provider volume/difficulty data
   if (domainKeywords.length > 0) {
     // Build lookup: keyword → metrics
-    const kwLookup = new Map(domainKeywords.map(k => [k.keyword.toLowerCase(), k])); // map-dup-ok
+    const kwLookup = new Map(domainKeywords.map(k => [keywordComparisonKey(k.keyword), k])); // map-dup-ok
     for (const pm of strategy.pageMap ?? []) {
       if (pm.metricsSource === METRICS_SOURCE.URL_LEVEL) continue;
       // Skip pages with no primary keyword (declined filter may have cleared it, or AI omitted it)
       if (!pm.primaryKeyword) continue;
-      const match = kwLookup.get(pm.primaryKeyword.toLowerCase());
+      const match = kwLookup.get(keywordComparisonKey(pm.primaryKeyword));
       if (match) {
         pm.volume = match.volume;
         pm.difficulty = match.difficulty;
@@ -298,8 +295,8 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
       } else {
         // Try word-overlap match (requires >=80% word overlap and at least 2 words)
         const partial = domainKeywords.find(k => {
-          const kwWords = new Set(k.keyword.toLowerCase().split(/\s+/));
-          const pmWords = pm.primaryKeyword.toLowerCase().split(/\s+/);
+          const kwWords = new Set(keywordComparisonKey(k.keyword).split(/\s+/));
+          const pmWords = keywordComparisonKey(pm.primaryKeyword).split(/\s+/);
           const overlap = pmWords.filter((w: string) => kwWords.has(w)).length;
           return overlap / pmWords.length >= 0.8 && pmWords.length >= 2;
         });
@@ -314,7 +311,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
       if (pm.secondaryKeywords?.length) {
         pm.secondaryMetrics = pm.secondaryKeywords
           .map((sk: string) => {
-            const m = kwLookup.get(sk.toLowerCase());
+            const m = kwLookup.get(keywordComparisonKey(sk));
             return m ? { keyword: sk, volume: m.volume, difficulty: m.difficulty } : null;
           })
           .filter(Boolean) as { keyword: string; volume: number; difficulty: number }[];
@@ -332,17 +329,24 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
     const lookupCandidates = pagesNeedingVolume
       .filter((pm: { primaryKeyword: string }) => pm.primaryKeyword.split(/\s+/).length <= 5)
       .map((pm: { primaryKeyword: string }) => pm.primaryKeyword);
-    // Deduplicate
-    const uniqueNeeds = [...new Set(lookupCandidates.map((k: string) => k.toLowerCase()))];
+    // Deduplicate semantically, but preserve the first raw representative for provider requests.
+    const uniqueNeedsByKey = new Map<string, string>();
+    for (const keyword of lookupCandidates) {
+      const key = keywordComparisonKey(keyword);
+      if (key && !uniqueNeedsByKey.has(key)) {
+        uniqueNeedsByKey.set(key, keyword);
+      }
+    }
+    const uniqueNeeds = [...uniqueNeedsByKey.values()];
     log.info(`Enrichment: ${strategy.pageMap?.length ?? 0} pages total, ${pagesNeedingVolume.length} need volume, ${uniqueNeeds.length} unique keywords to look up (capped at 30)`);
     const needsVolume = uniqueNeeds.slice(0, 30);
     if (needsVolume.length > 0) {
       try {
         const metrics = await provider.getKeywordMetrics(needsVolume as string[], workspaceId);
-        const metricMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m])); // map-dup-ok
+        const metricMap = new Map(metrics.map(m => [keywordComparisonKey(m.keyword), m])); // map-dup-ok
         for (const pm of strategy.pageMap ?? []) {
           if (!pm.volume) {
-            const m = metricMap.get(pm.primaryKeyword.toLowerCase());
+            const m = metricMap.get(keywordComparisonKey(pm.primaryKeyword));
             if (m && !isSuspiciousPlannerGroupedVolume(m.keyword, m.volume)) {
               pm.volume = m.volume;
               pm.difficulty = m.difficulty;
@@ -363,11 +367,11 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
     // competitor gaps, competitor keywords, GSC, related keywords), then domain organic
     // data, then bulk API fetch as last resort. The keyword pool is the richest source
     // because it aggregates all data gathered during this strategy run.
-    const domainKwLookup = new Map(domainKeywords.map(k => [k.keyword.toLowerCase(), k])); // map-dup-ok
+    const domainKwLookup = new Map(domainKeywords.map(k => [keywordComparisonKey(k.keyword), k])); // map-dup-ok
     const missingCgKws: string[] = [];
     let poolEnriched = 0;
     for (const cg of strategy.contentGaps) {
-      const kwLower = cg.targetKeyword.toLowerCase();
+      const kwLower = keywordComparisonKey(cg.targetKeyword);
       // Priority 1: keyword pool (competitor gaps, competitor keywords, related keywords).
       // SKIP GSC-sourced entries — their "volume" is actually GSC impressions, not real
       // search volume. Using impressions would severely undervalue high-volume keywords
@@ -392,10 +396,10 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
     if (missingCgKws.length > 0 && provider && seoDataMode !== 'none') {
       try {
         const cgMetrics = await provider.getKeywordMetrics(missingCgKws.slice(0, 30), workspaceId);
-        const cgMap = new Map(cgMetrics.map(m => [m.keyword.toLowerCase(), m])); // map-dup-ok
+        const cgMap = new Map(cgMetrics.map(m => [keywordComparisonKey(m.keyword), m])); // map-dup-ok
         for (const cg of strategy.contentGaps) {
           if (cg.volume == null) {
-            const m = cgMap.get(cg.targetKeyword.toLowerCase());
+            const m = cgMap.get(keywordComparisonKey(cg.targetKeyword));
             if (m && !isSuspiciousPlannerGroupedVolume(m.keyword, m.volume)) {
               cg.volume = m.volume;
               cg.difficulty = m.difficulty;
@@ -410,7 +414,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
     if (gscData.length > 0) {
       const gscByQuery = new Map<string, { impressions: number }>();
       for (const row of gscData) {
-        const q = row.query.toLowerCase();
+        const q = keywordComparisonKey(row.query);
         const existing = gscByQuery.get(q);
         if (existing) {
           existing.impressions += row.impressions;
@@ -419,12 +423,12 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
         }
       }
       for (const cg of strategy.contentGaps) {
-        const exact = gscByQuery.get(cg.targetKeyword.toLowerCase());
+        const exact = gscByQuery.get(keywordComparisonKey(cg.targetKeyword));
         if (exact) {
           cg.impressions = exact.impressions;
         } else {
           // Word-level match: sum impressions from queries where all target words appear
-          const targetWords = cg.targetKeyword.toLowerCase().split(/\s+/);
+          const targetWords = keywordComparisonKey(cg.targetKeyword).split(/\s+/);
           if (targetWords.length >= 2) {
             let totalImpr = 0;
             for (const [q, data] of gscByQuery) {
@@ -441,9 +445,9 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
 
   // Enrich content gaps with trend direction + SERP features from domain data
   if (strategy.contentGaps?.length && domainKeywords.length > 0) {
-    const domainLookup = new Map(domainKeywords.map(k => [k.keyword.toLowerCase(), k])); // map-dup-ok
+    const domainLookup = new Map(domainKeywords.map(k => [keywordComparisonKey(k.keyword), k])); // map-dup-ok
     for (const cg of strategy.contentGaps) {
-      const match = domainLookup.get(cg.targetKeyword.toLowerCase());
+      const match = domainLookup.get(keywordComparisonKey(cg.targetKeyword));
       if (match) {
         cg.trendDirection = trendDirection(match.trend);
         const serp = hasSerpOpportunity(match.serpFeatures);
@@ -517,7 +521,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
   {
     const kwPages = new Map<string, Array<{ path: string; source: 'keyword_map' | 'gsc' }>>();
     for (const pm of strategy.pageMap ?? []) {
-      const kw = pm.primaryKeyword.trim().toLowerCase();
+      const kw = keywordComparisonKey(pm.primaryKeyword);
       if (!kw) continue;
       if (!kwPages.has(kw)) kwPages.set(kw, []);
       kwPages.get(kw)!.push({ path: pm.pagePath, source: 'keyword_map' });
@@ -526,7 +530,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
     if (gscData.length > 0) {
       const gscByQuery = new Map<string, Array<{ page: string; position: number; impressions: number; clicks: number }>>();
       for (const r of gscData) {
-        const q = r.query.toLowerCase();
+        const q = keywordComparisonKey(r.query);
         if (!gscByQuery.has(q)) gscByQuery.set(q, []);
         try {
           gscByQuery.get(q)!.push({ page: new URL(r.page).pathname, position: r.position, impressions: r.impressions, clicks: r.clicks });
@@ -626,7 +630,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
   if (keywordPool.size >= 10) {
     try {
       sendProgress('enrichment', 'Building topical authority clusters...', 0.92);
-      const ownedRankingKws = new Set(domainKeywords.map(k => k.keyword.toLowerCase()));
+      const ownedRankingKws = new Set(domainKeywords.map(k => keywordComparisonKey(k.keyword)));
 
       // Top keywords by volume for AI clustering
       const poolForClustering = [...keywordPool.entries()]
@@ -668,7 +672,7 @@ Rules:
           if (!cluster.topic || !Array.isArray(cluster.keywords) || cluster.keywords.length < 3) continue;
 
           const normalizedKws = cluster.keywords
-            .map((k: string) => k.toLowerCase().trim())
+            .map((k: string) => keywordComparisonKey(k))
             .filter((k: string) => keywordPool.has(k));
           if (normalizedKws.length < 3) continue;
 
@@ -680,7 +684,7 @@ Rules:
 
           let avgPos: number | undefined;
           if (owned.length > 0) {
-            const positions = owned.map((k: string) => domainKeywords.find(d => d.keyword.toLowerCase() === k)?.position).filter(Boolean) as number[];
+            const positions = owned.map((k: string) => domainKeywords.find(d => keywordComparisonKey(d.keyword) === k)?.position).filter(Boolean) as number[];
             if (positions.length > 0) avgPos = Math.round(positions.reduce((s, p) => s + p, 0) / positions.length);
           }
 
@@ -689,7 +693,7 @@ Rules:
           if (competitorKeywords.length > 0) {
             const compCoverage = new Map<string, number>();
             for (const ck of competitorKeywords) {
-              if (normalizedKws.includes(ck.keyword.toLowerCase())) {
+              if (normalizedKws.includes(keywordComparisonKey(ck.keyword))) {
                 compCoverage.set(ck.domain, (compCoverage.get(ck.domain) || 0) + 1);
               }
             }
@@ -725,11 +729,11 @@ Rules:
   // Enrich siteKeywords with volume/difficulty
   let siteKeywordMetrics: KeywordStrategySiteKeywordMetric[] = [];
   if (provider && seoDataMode !== 'none' && strategy.siteKeywords?.length) {
-    const kwLookup = new Map(domainKeywords.map(k => [k.keyword.toLowerCase(), k])); // map-dup-ok
+    const kwLookup = new Map(domainKeywords.map(k => [keywordComparisonKey(k.keyword), k])); // map-dup-ok
     const found: typeof siteKeywordMetrics = [];
     const missing: string[] = [];
     for (const kw of strategy.siteKeywords) {
-      const m = kwLookup.get(kw.toLowerCase());
+      const m = kwLookup.get(keywordComparisonKey(kw));
       if (m) {
         found.push({ keyword: kw, volume: m.volume, difficulty: m.difficulty });
       } else {

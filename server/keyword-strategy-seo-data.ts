@@ -8,6 +8,7 @@ import { listProviders } from './seo-data-provider.js';
 import type { DomainKeyword, KeywordGapEntry, RelatedKeyword, SeoDataProvider } from './seo-data-provider.js';
 import type { KeywordSourceEvidence } from '../shared/types/keywords.js';
 import type { SeoDataStatus, Workspace } from '../shared/types/workspace.js';
+import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -204,7 +205,7 @@ export async function fetchAndCacheKeywordStrategySeoData({
         seoContext += `\n\nCOMPETITOR KEYWORDS (what your competitors rank for — these are proven industry terms):\n`;
         const seen = new Set<string>();
         const deduped = competitorKeywords
-          .filter(k => { const lc = k.keyword.toLowerCase(); if (seen.has(lc)) return false; seen.add(lc); return true; })
+          .filter(k => { const lc = keywordComparisonKey(k.keyword); if (seen.has(lc)) return false; seen.add(lc); return true; })
           .sort((a, b) => b.volume - a.volume);
         seoContext += deduped.slice(0, 50).map(k =>
           `- "${k.keyword}" (vol: ${k.volume}/mo, KD: ${k.difficulty}%) — ${k.domain} ranks #${k.position}`
@@ -274,7 +275,7 @@ export async function fetchAndCacheKeywordStrategySeoData({
       })));
       const seenDiscovery = new Set<string>();
       for (const keyword of batches.flat()) {
-        const normalized = keyword.keyword.toLowerCase().trim();
+        const normalized = keywordComparisonKey(keyword.keyword);
         if (!normalized || seenDiscovery.has(normalized)) continue;
         seenDiscovery.add(normalized);
         discoveryKeywords.push(keyword);

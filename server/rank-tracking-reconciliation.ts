@@ -9,6 +9,7 @@ import {
   TRACKED_KEYWORD_STATUS,
   type TrackedKeyword,
 } from '../shared/types/rank-tracking.js';
+import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 import type { KeywordStrategy, PageKeywordMap } from '../shared/types/workspace.js';
 
 export interface StrategyRankTrackingTarget {
@@ -43,7 +44,7 @@ export interface ReconcileStrategyRankTrackingOptions {
 }
 
 function normalizeQuery(query: string | undefined): string {
-  return (query ?? '').toLowerCase().trim();
+  return keywordComparisonKey(query);
 }
 
 function isStrategyOwned(keyword: TrackedKeyword): boolean {
@@ -70,7 +71,7 @@ function buildTargets(
     }
     const metrics = keywordStrategy.siteKeywordMetrics?.find(metric => normalizeQuery(metric.keyword) === query);
     targets.set(query, {
-      query,
+      query: keyword.trim(),
       source: TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD,
       volume: metrics?.volume,
       difficulty: metrics?.difficulty,
@@ -84,7 +85,7 @@ function buildTargets(
       continue;
     }
     targets.set(query, {
-      query,
+      query: page.primaryKeyword.trim(),
       source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
       pagePath: page.pagePath,
       pageTitle: page.pageTitle,
@@ -112,7 +113,7 @@ function mergeTarget(
   const isSiteKeyword = target.source === TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD;
   return {
     ...existing,
-    query: target.query,
+    query: existing.query,
     pinned: existing.pinned,
     source: shouldAdoptStrategySource ? target.source : existingSource,
     status: TRACKED_KEYWORD_STATUS.ACTIVE,

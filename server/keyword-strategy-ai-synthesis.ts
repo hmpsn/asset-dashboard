@@ -355,7 +355,7 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
       return true;
     };
     const isEligibleGeneratedKeyword = (keyword: string): boolean => {
-      const normalizedKeyword = keyword.toLowerCase().trim();
+      const normalizedKeyword = normalizeKeyword(keyword);
       const poolMatch = keywordPool.get(normalizedKeyword);
       return isEligibleStrategyPoolKeyword({
         keyword,
@@ -405,35 +405,35 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
     }
     // Add GSC queries to the pool (these are proven search terms)
     for (const r of gscData) {
-      const q = r.query.toLowerCase();
+      const q = normalizeKeyword(r.query);
       if (q.length > 3 && q.split(' ').length >= 2) {
         upsertKeywordPoolCandidate(keywordPool, q, { volume: r.impressions, difficulty: 0, source: 'gsc' });
       }
     }
     // Add competitor keywords to the pool — these are proven industry terms with real volume
     for (const ck of competitorKeywordData) {
-      const kw = ck.keyword.toLowerCase();
+      const kw = normalizeKeyword(ck.keyword);
       if (ck.volume > 0 && isEligibleStrategyPoolKeyword({ keyword: kw, volume: ck.volume, difficulty: ck.difficulty, source: `competitor:${ck.domain}` })) {
         upsertKeywordPoolCandidate(keywordPool, kw, { volume: ck.volume, difficulty: ck.difficulty, source: `competitor:${ck.domain}` });
       }
     }
     // Add keyword gaps to the pool — highest priority since competitors rank and you don't
     for (const gap of keywordGaps) {
-      const kw = gap.keyword.toLowerCase();
+      const kw = normalizeKeyword(gap.keyword);
       if (gap.volume > 0 && isEligibleStrategyPoolKeyword({ keyword: kw, volume: gap.volume, difficulty: gap.difficulty, source: `gap:${gap.competitorDomain}` })) {
         upsertKeywordPoolCandidate(keywordPool, kw, { volume: gap.volume, difficulty: gap.difficulty, source: `gap:${gap.competitorDomain}` });
       }
     }
     // Add provider discovery keywords to the pool for sparse/low-footprint sites.
     for (const dk of discoveryKeywords) {
-      const kw = dk.keyword.toLowerCase();
+      const kw = normalizeKeyword(dk.keyword);
       if (isStrategyQualityDiscoveryKeyword(dk) && isEligibleStrategyPoolKeyword(dk)) {
         upsertKeywordPoolCandidate(keywordPool, kw, { volume: dk.volume, difficulty: dk.difficulty, source: `discovery:${dk.sourceKind}` });
       }
     }
     // Add related keywords to the pool
     for (const rk of relatedKws) {
-      const kw = rk.keyword.toLowerCase();
+      const kw = normalizeKeyword(rk.keyword);
       if (rk.volume > 0 && isEligibleStrategyPoolKeyword({ keyword: kw, volume: rk.volume, difficulty: rk.difficulty, cpc: rk.cpc, source: 'related' })) {
         upsertKeywordPoolCandidate(keywordPool, kw, { volume: rk.volume, difficulty: rk.difficulty, source: 'related' });
       }
@@ -442,7 +442,7 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
     const clientTracked = getTrackedKeywords(ws.id);
     let clientKeywordsAdded = 0;
     for (const tk of clientTracked) {
-      const kw = tk.query.toLowerCase().trim();
+      const kw = normalizeKeyword(tk.query);
       if (kw.length > 1) {
         const added = upsertKeywordPoolCandidate(keywordPool, kw, { volume: 0, difficulty: 0, source: 'client' });
         if (!added) continue;
@@ -459,7 +459,7 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
     // Filter branded competitor keywords from the pool BEFORE feeding to AI
     const brandedRemoved = filterBrandedKeywords(keywordPool, competitorDomains);
     // Hard filter: remove declined keywords before the AI sees the pool (prompt instruction is soft)
-    const declinedSet = new Set(declinedKeywords.map(k => k.toLowerCase()));
+    const declinedSet = new Set(declinedKeywords.map(k => normalizeKeyword(k)).filter(Boolean));
     const declinedPoolRemoved = filterDeclinedFromPool(keywordPool, declinedKeywords);
     if (declinedPoolRemoved > 0) log.info(`Removed ${declinedPoolRemoved} declined keywords from keyword pool`);
     log.info(`Keyword pool: ${keywordPool.size} unique terms (${semrushDomainData.length} domain + ${competitorKeywordData.length} competitor + ${keywordGaps.length} gaps + ${discoveryKeywords.length} discovery + ${clientKeywordsAdded} client + GSC)${brandedRemoved > 0 ? ` — removed ${brandedRemoved} branded competitor keywords` : ''}`);
@@ -618,7 +618,7 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
             }
           }
           // Pre-enrich from pool — if the keyword is in our pool, apply the data now
-          const poolMatch = keywordPool.get(pm.primaryKeyword?.toLowerCase());
+          const poolMatch = keywordPool.get(normalizeKeyword(pm.primaryKeyword ?? ''));
           if (poolMatch && poolMatch.source !== 'gsc') {
             pm.volume = poolMatch.volume;
             pm.difficulty = poolMatch.difficulty;
@@ -681,18 +681,18 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
     // --- Post-AI keyword validation via SEO provider bulk lookup ---
     // Optimization: check domain organic data + existing page_keywords before calling API
     if (provider && seoDataMode !== 'none') {
-      const domainKwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k])); // map-dup-ok
+      const domainKwLookup = new Map(semrushDomainData.map(k => [normalizeKeyword(k.keyword), k])); // map-dup-ok
       const existingPkLookup = new Map(
         listPageKeywords(ws.id)
           .filter(pk => pk.volume && pk.volume > 0 && !isSuspiciousPlannerGroupedVolume(pk.primaryKeyword, pk.volume))
-          .map(pk => [pk.primaryKeyword.toLowerCase(), pk])
+          .map(pk => [normalizeKeyword(pk.primaryKeyword), pk])
       );
 
       // First pass: enrich from already-fetched data (no API calls)
       const needsApiLookup: string[] = [];
       let preEnriched = 0;
       for (const pm of allPageMappings) {
-        const kwLower = pm.primaryKeyword?.toLowerCase();
+        const kwLower = normalizeKeyword(pm.primaryKeyword ?? '');
         if (!kwLower) continue;
         // Check domain organic data (already fetched this run)
         const domainHit = domainKwLookup.get(kwLower);
@@ -719,14 +719,21 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
       // Second pass: fetch remaining from provider API
       if (needsApiLookup.length > 0) {
         try {
-          const uniqueNeeds = [...new Set(needsApiLookup.map(k => k.toLowerCase()))];
+          const uniqueNeedsByKey = new Map<string, string>();
+          for (const keyword of needsApiLookup) {
+            const key = normalizeKeyword(keyword);
+            if (key && !uniqueNeedsByKey.has(key)) {
+              uniqueNeedsByKey.set(key, keyword);
+            }
+          }
+          const uniqueNeeds = [...uniqueNeedsByKey.values()];
           const metrics = await provider.getKeywordMetrics(uniqueNeeds.slice(0, 100), ws.id);
-          const metricMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m])); // map-dup-ok
+          const metricMap = new Map(metrics.map(m => [normalizeKeyword(m.keyword), m])); // map-dup-ok
 
           let unvalidated = 0;
           for (const pm of allPageMappings) {
             if (pm.validated != null) continue; // already handled
-            const m = metricMap.get(pm.primaryKeyword.toLowerCase());
+            const m = metricMap.get(normalizeKeyword(pm.primaryKeyword));
             if (m && m.volume > 0 && !isSuspiciousPlannerGroupedVolume(m.keyword, m.volume)) {
               pm.validated = true;
               pm.volume = m.volume;
@@ -751,7 +758,7 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
     // Detect keyword conflicts from batch results (batches don't know about each other)
     const kwCount = new Map<string, string[]>();
     for (const pm of allPageMappings) {
-      const kw = pm.primaryKeyword.toLowerCase();
+      const kw = normalizeKeyword(pm.primaryKeyword);
       if (!kw) continue;
       if (!kwCount.has(kw)) kwCount.set(kw, []);
       kwCount.get(kw)!.push(pm.pagePath);
@@ -1057,7 +1064,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
     if (declinedKeywords.length > 0 && masterData.siteKeywords?.length) {
       const before = masterData.siteKeywords.length;
       masterData.siteKeywords = masterData.siteKeywords.filter(
-        (kw: string) => !declinedSet.has(kw.toLowerCase())
+        (kw: string) => !declinedSet.has(normalizeKeyword(kw))
       );
       const declinedSiteKwsRemoved = before - masterData.siteKeywords.length;
       if (declinedSiteKwsRemoved > 0) {
@@ -1086,7 +1093,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
     if (declinedKeywords.length > 0 && cleanContentGaps.length > 0) {
       finalContentGaps = cleanContentGaps.filter(
         (cg: { targetKeyword?: string }) =>
-          !cg.targetKeyword || !declinedSet.has(cg.targetKeyword.toLowerCase())
+          !cg.targetKeyword || !declinedSet.has(normalizeKeyword(cg.targetKeyword))
       );
       const declinedGapsRemoved = cleanContentGaps.length - finalContentGaps.length;
       if (declinedGapsRemoved > 0) {
@@ -1115,12 +1122,12 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
     // Post-generation: hard filter declined keywords from pageMap assignments
     if (declinedKeywords.length > 0 && strategy.pageMap?.length) {
       for (const pm of strategy.pageMap) {
-        if (pm.primaryKeyword && declinedSet.has(pm.primaryKeyword.toLowerCase())) {
+        if (pm.primaryKeyword && declinedSet.has(normalizeKeyword(pm.primaryKeyword))) {
           pm.primaryKeyword = '';
         }
         if (pm.secondaryKeywords?.length) {
           pm.secondaryKeywords = pm.secondaryKeywords.filter(
-            (k: string) => !declinedSet.has(k.toLowerCase())
+            (k: string) => !declinedSet.has(normalizeKeyword(k))
           );
         }
       }

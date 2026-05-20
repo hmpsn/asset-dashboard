@@ -2,6 +2,7 @@ import { createLogger } from './logger.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
 import { getWorkspace } from './workspaces.js';
 import type { PageKeywordMap } from '../shared/types/workspace.js';
+import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 
 const log = createLogger('provider-keyword-metrics');
 
@@ -33,7 +34,7 @@ export async function getProviderMetricsForKeywords(
   try {
     const metrics = await provider.getKeywordMetrics(cleanKeywords, workspaceId);
     for (const metric of metrics) {
-      results.set(metric.keyword.toLowerCase(), { difficulty: metric.difficulty, volume: metric.volume });
+      results.set(keywordComparisonKey(metric.keyword), { difficulty: metric.difficulty, volume: metric.volume });
     }
   } catch (err) {
     log.warn({ err, workspaceId, context }, 'keyword provider metrics lookup failed');
@@ -51,7 +52,7 @@ export async function getProviderMetricsForKeyword(
   if (!trimmedKeyword) return null;
 
   const metrics = await getProviderMetricsForKeywords(workspaceId, [trimmedKeyword], context);
-  return metrics.get(trimmedKeyword.toLowerCase()) ?? null;
+  return metrics.get(keywordComparisonKey(trimmedKeyword)) ?? null;
 }
 
 export function resolvePersistedKeywordMetrics(
@@ -66,8 +67,8 @@ export function resolvePersistedKeywordMetrics(
     };
   }
 
-  const normalizedExistingKeyword = existing?.primaryKeyword?.trim().toLowerCase();
-  const normalizedResolvedKeyword = resolvedPrimaryKeyword.trim().toLowerCase();
+  const normalizedExistingKeyword = keywordComparisonKey(existing?.primaryKeyword);
+  const normalizedResolvedKeyword = keywordComparisonKey(resolvedPrimaryKeyword);
   const isSamePersistedKeyword = !!normalizedExistingKeyword && normalizedExistingKeyword === normalizedResolvedKeyword;
   const hasPersistedMetrics = existing?.keywordDifficulty != null || existing?.monthlyVolume != null;
 

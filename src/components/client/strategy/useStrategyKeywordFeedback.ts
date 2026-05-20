@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { keywordFeedback as kwFeedbackApi } from '../../../api';
+import { keywordComparisonKey } from '../../../../shared/keyword-normalization';
 
 export type KeywordFeedbackStatus = 'approved' | 'declined' | 'requested';
 
@@ -33,7 +34,7 @@ export function useStrategyKeywordFeedback({ workspaceId, setToast }: UseStrateg
     kwFeedbackApi.get(workspaceId)
       .then((items) => {
         const map = new Map<string, KeywordFeedbackStatus>();
-        for (const item of items as KeywordFeedback[]) map.set(item.keyword, item.status);
+        for (const item of items as KeywordFeedback[]) map.set(keywordComparisonKey(item.keyword), item.status);
         setKeywordFeedback(map);
       })
       .catch(() => { setFeedbackLoadError(true); });
@@ -49,10 +50,10 @@ export function useStrategyKeywordFeedback({ workspaceId, setToast }: UseStrateg
     options?: FeedbackMutationOptions,
   ) => {
     if (!workspaceId) return;
-    const kw = keyword.toLowerCase().trim();
+    const kw = keywordComparisonKey(keyword);
     setFeedbackLoading(prev => new Set(prev).add(kw));
     try {
-      await kwFeedbackApi.submit(workspaceId, { keyword: kw, status, source, reason });
+      await kwFeedbackApi.submit(workspaceId, { keyword: keyword.trim(), status, source, reason });
       setKeywordFeedback(prev => {
         const next = new Map(prev);
         next.set(kw, status);
@@ -71,7 +72,7 @@ export function useStrategyKeywordFeedback({ workspaceId, setToast }: UseStrateg
 
   const removeFeedback = useCallback(async (keyword: string, options?: FeedbackMutationOptions) => {
     if (!workspaceId) return;
-    const kw = keyword.toLowerCase().trim();
+    const kw = keywordComparisonKey(keyword);
     setFeedbackLoading(prev => new Set(prev).add(kw));
     try {
       await kwFeedbackApi.remove(workspaceId, kw);
@@ -93,12 +94,12 @@ export function useStrategyKeywordFeedback({ workspaceId, setToast }: UseStrateg
   }, [workspaceId, setToast]);
 
   const getFeedbackStatus = useCallback(
-    (keyword: string) => keywordFeedback.get(keyword.toLowerCase().trim()),
+    (keyword: string) => keywordFeedback.get(keywordComparisonKey(keyword)),
     [keywordFeedback],
   );
 
   const isLoadingFeedback = useCallback(
-    (keyword: string) => feedbackLoading.has(keyword.toLowerCase().trim()),
+    (keyword: string) => feedbackLoading.has(keywordComparisonKey(keyword)),
     [feedbackLoading],
   );
 

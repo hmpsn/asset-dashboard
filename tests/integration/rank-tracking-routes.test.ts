@@ -15,6 +15,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 
 const ctx = createTestContext(13213);
 const { api, postJson, patchJson, del } = ctx;
@@ -82,6 +83,22 @@ describe('Rank Tracking — keywords CRUD', () => {
       `/api/rank-tracking/${testWsId}/keywords/${encodeURIComponent('seo audit tool')}`,
     );
     expect(res.status).toBe(200);
+  });
+
+  it('POST dedupes canonical keyword variants', async () => {
+    const first = await postJson(`/api/rank-tracking/${testWsId}/keywords`, {
+      query: 'Emergency Dentist - Near-Me',
+    });
+    expect(first.status).toBe(200);
+
+    const second = await postJson(`/api/rank-tracking/${testWsId}/keywords`, {
+      query: ' emergency dentist near me ',
+    });
+    expect(second.status).toBe(200);
+    const body = await second.json();
+    const matches = body.filter((k: { query: string }) => keywordComparisonKey(k.query) === 'emergency dentist near me');
+    expect(matches).toHaveLength(1);
+    expect(matches[0].query).toBe('Emergency Dentist - Near-Me');
   });
 });
 

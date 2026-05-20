@@ -10,6 +10,7 @@ import {
   type TrackedKeywordSource,
   type TrackedKeywordStatus,
 } from '../shared/types/rank-tracking.js';
+import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 
 export interface RankSnapshot {
   date: string; // YYYY-MM-DD
@@ -116,7 +117,7 @@ const trackedKeywordSchema = z.object({
 });
 
 function normalizeQuery(query: string): string {
-  return query.toLowerCase().trim();
+  return keywordComparisonKey(query);
 }
 
 function normalizeTrackedKeywords(keywords: Array<Partial<TrackedKeyword> & { query: string }>): TrackedKeyword[] {
@@ -124,12 +125,13 @@ function normalizeTrackedKeywords(keywords: Array<Partial<TrackedKeyword> & { qu
   const normalized: TrackedKeyword[] = [];
   const now = new Date().toISOString();
   for (const keyword of keywords) {
-    const query = normalizeQuery(keyword.query);
-    if (!query || seen.has(query)) continue;
-    seen.add(query);
+    const displayQuery = keyword.query.trim();
+    const queryKey = normalizeQuery(displayQuery);
+    if (!displayQuery || !queryKey || seen.has(queryKey)) continue;
+    seen.add(queryKey);
     normalized.push({
       ...keyword,
-      query,
+      query: displayQuery,
       pinned: Boolean(keyword.pinned),
       addedAt: keyword.addedAt || now,
       source: keyword.source ?? TRACKED_KEYWORD_SOURCE.UNKNOWN,
@@ -189,7 +191,7 @@ function addTrackedKeywordToConfig(
 ): boolean {
   const normalizedQuery = normalizeQuery(query);
   if (!normalizedQuery) return false;
-  const existing = config.trackedKeywords.find(k => k.query === normalizedQuery);
+  const existing = config.trackedKeywords.find(k => normalizeQuery(k.query) === normalizedQuery);
   if (existing) {
     const nextStatus = options.status ?? TRACKED_KEYWORD_STATUS.ACTIVE;
     const existingSource = existing.source ?? TRACKED_KEYWORD_SOURCE.UNKNOWN;
@@ -213,7 +215,7 @@ function addTrackedKeywordToConfig(
     return true;
   }
   config.trackedKeywords.push({
-    query: normalizedQuery,
+    query: query.trim(),
     pinned: Boolean(options.pinned),
     addedAt: new Date().toISOString(),
     source: options.source ?? TRACKED_KEYWORD_SOURCE.MANUAL,
@@ -265,7 +267,7 @@ export function addTrackedKeywords(
 export function removeTrackedKeyword(workspaceId: string, query: string): TrackedKeyword[] {
   const normalizedQuery = normalizeQuery(query);
   const config = readConfig(workspaceId);
-  config.trackedKeywords = config.trackedKeywords.filter(k => k.query !== normalizedQuery);
+  config.trackedKeywords = config.trackedKeywords.filter(k => normalizeQuery(k.query) !== normalizedQuery);
   writeConfig(workspaceId, config);
   return getTrackedKeywords(workspaceId);
 }
@@ -273,7 +275,7 @@ export function removeTrackedKeyword(workspaceId: string, query: string): Tracke
 export function togglePinKeyword(workspaceId: string, query: string): TrackedKeyword[] {
   const normalizedQuery = normalizeQuery(query);
   const config = readConfig(workspaceId);
-  const kw = config.trackedKeywords.find(k => k.query === normalizedQuery);
+  const kw = config.trackedKeywords.find(k => normalizeQuery(k.query) === normalizedQuery);
   if (kw) kw.pinned = !kw.pinned;
   writeConfig(workspaceId, config);
   return getTrackedKeywords(workspaceId);
@@ -307,7 +309,7 @@ export function getRankHistory(
         .filter(query => query.lookup && query.output)
     : config.trackedKeywords
       .filter(k => (k.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE)
-      .map(k => ({ lookup: k.query, output: k.query }));
+      .map(k => ({ lookup: normalizeQuery(k.query), output: k.query }));
 
   return recent.map(snap => {
     const positions: Record<string, number> = {};
@@ -332,7 +334,7 @@ function buildLatestRanks(workspaceId: string, options: { includeUntracked?: boo
   const trackedEntries = new Map(
     config.trackedKeywords
       .filter(k => (k.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE)
-      .map(k => [k.query, k]),
+      .map(k => [normalizeQuery(k.query), k]),
   );
 
   // If a workspace only has retired lifecycle rows, do not fall back to all

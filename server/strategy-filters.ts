@@ -4,6 +4,8 @@
  * implementations directly — prevents the "testing a local copy" trap.
  */
 
+import { keywordComparisonKey } from '../shared/keyword-normalization.js';
+
 /**
  * Removes declined keywords from the keyword pool Map in-place.
  * Returns the count of removed entries.
@@ -13,10 +15,10 @@ export function filterDeclinedFromPool(
   declinedKeywords: string[]
 ): number {
   if (declinedKeywords.length === 0) return 0;
-  const declinedSet = new Set(declinedKeywords.map(k => k.toLowerCase()));
+  const declinedSet = new Set(declinedKeywords.map(k => keywordComparisonKey(k)).filter(Boolean));
   let removed = 0;
   for (const [kw] of keywordPool) {
-    if (declinedSet.has(kw)) {
+    if (declinedSet.has(keywordComparisonKey(kw))) {
       keywordPool.delete(kw);
       removed++;
     }

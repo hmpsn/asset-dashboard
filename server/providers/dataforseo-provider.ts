@@ -8,6 +8,7 @@ import path from 'path';
 import { getUploadRoot, getDataDir } from '../data-dir.js';
 import { createLogger } from '../logger.js';
 import { getCachedMetricsBatch, cacheMetricsBatch } from '../keyword-metrics-cache.js';
+import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 import { KEYWORD_GAP_COMPETITOR_KEYWORD_LIMIT, MAX_COMPETITORS } from '../constants.js';
 import { recordExternalApiTelemetry, recordOperationTrace } from '../platform-observability.js';
 import { KEYWORD_SOURCE_KIND, type KeywordSourceEvidence, type KeywordSourceKind } from '../../shared/types/keywords.js';
@@ -507,7 +508,7 @@ export class DataForSeoProvider implements SeoDataProvider {
     }
     const stillUncached: string[] = [];
     for (const kw of uncached) {
-      const hit = globalHits.get(kw.toLowerCase());
+      const hit = globalHits.get(keywordComparisonKey(kw));
       if (hit) {
         results.push(hit);
         logCreditUsage({ credits: 0, endpoint: 'search_volume', query: kw, rowsReturned: 1, workspaceId, cached: true });

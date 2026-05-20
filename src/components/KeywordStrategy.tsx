@@ -719,7 +719,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           >
             <div className="flex flex-wrap gap-1.5">
               {strategy.siteKeywords.map((kw: string, i: number) => {
-                const metrics = strategy.siteKeywordMetrics?.find((m: { keyword: string; volume: number; difficulty: number }) => m.keyword.toLowerCase() === kw.toLowerCase());
+                const metrics = strategy.siteKeywordMetrics?.find((m: { keyword: string; volume: number; difficulty: number }) => keywordTrackingKey(m.keyword) === keywordTrackingKey(kw));
                 const tracked = trackedKeywords.has(keywordTrackingKey(kw));
                 return (
                   <div key={i} className="inline-flex items-center gap-1.5 t-caption-sm text-accent-brand">

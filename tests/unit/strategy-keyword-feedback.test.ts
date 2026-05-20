@@ -4,8 +4,8 @@
  *
  * The hook owns the per-workspace map of keyword → feedback status, the
  * loading set, and the toasts/error handling around the keyword-feedback API.
- * The keys are normalized via `.toLowerCase().trim()` so this suite verifies
- * that normalization + the optimistic-update + the API failure paths.
+ * The local state keys are canonicalized while API submissions preserve display
+ * keyword text, so this suite verifies both halves of that contract.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
@@ -72,19 +72,19 @@ describe('useStrategyKeywordFeedback — submitFeedback', () => {
     mockedApi.get.mockResolvedValue([]);
   });
 
-  it('normalizes keys to lowercase + trim before sending and storing', async () => {
+  it('preserves display keyword text for submissions while storing canonical local keys', async () => {
     mockedApi.submit.mockResolvedValueOnce({});
     const { result } = renderHook(() =>
       useStrategyKeywordFeedback({ workspaceId: 'ws-1' }),
     );
     await act(async () => {
-      await result.current.submitFeedback('  Pizza Delivery  ', 'approved', 'manual');
+      await result.current.submitFeedback('  Pizza Delivery - Near-Me  ', 'approved', 'manual');
     });
     expect(mockedApi.submit).toHaveBeenCalledWith(
       'ws-1',
-      expect.objectContaining({ keyword: 'pizza delivery', status: 'approved', source: 'manual' }),
+      expect.objectContaining({ keyword: 'Pizza Delivery - Near-Me', status: 'approved', source: 'manual' }),
     );
-    expect(result.current.keywordFeedback.get('pizza delivery')).toBe('approved');
+    expect(result.current.keywordFeedback.get('pizza delivery near me')).toBe('approved');
   });
 
   it('updates state optimistically once the API resolves', async () => {

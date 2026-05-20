@@ -13,6 +13,7 @@ import { normalizePath } from './helpers.js';
 import { createLogger } from './logger.js';
 import { parseJsonSafeArray, parseJsonFallback } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 
 const log = createLogger('page-keywords');
 const SCORE_HISTORY_PER_PAGE_LIMIT = 25;
@@ -342,7 +343,7 @@ function maybeRecordScoreSnapshot(workspaceId: string, entry: PageKeywordMap): v
 }
 
 function normalizedKeyword(value: string | undefined | null): string {
-  return (value ?? '').trim().toLowerCase();
+  return keywordComparisonKey(value);
 }
 
 function clearScoreHistoryIfPrimaryKeywordChanged(workspaceId: string, entry: PageKeywordMap): void {

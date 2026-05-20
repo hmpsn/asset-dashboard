@@ -24,6 +24,7 @@ import type {
   SerpOpportunityData,
   FreshnessAlertData,
 } from '../shared/types/analytics.js';
+import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 import type { GA4LandingPage } from './google-analytics.js';
 import { getAllGscPages, getQueryPageData } from './search-console.js';
 import type { CustomDateRange } from './google-analytics.js';
@@ -1441,7 +1442,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
         // A keyword can rank on multiple pages; keep the BEST (lowest) position so
         // currentPosition reflects our strongest ranking, not an arbitrary last-seen page.
         const gscLookup = normQueryPageData.reduce<Map<string, number>>((map, r) => {
-          const key = r.query.toLowerCase();
+          const key = keywordComparisonKey(r.query);
           const existing = map.get(key);
           if (existing === undefined || r.position < existing) map.set(key, r.position);
           return map;
@@ -1450,7 +1451,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
           kw => kw.volume >= 100 && isKeywordEmerging({ trend: kw.trend }),
         );
         for (const kw of emerging.slice(0, 10)) {
-          const currentPosition = gscLookup.get(kw.keyword.toLowerCase());
+          const currentPosition = gscLookup.get(keywordComparisonKey(kw.keyword));
           enrichAndUpsert({
             insightType: 'emerging_keyword',
             pageId: `emerging_keyword::${kw.keyword}`, // unique per keyword so each gets its own DB row

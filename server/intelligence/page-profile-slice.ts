@@ -10,6 +10,7 @@ import type { SeoChangeEvent } from '../seo-change-tracker.js';
 import type { RankEntry } from '../rank-tracking.js';
 import type { ContentBrief, GeneratedPost } from '../../shared/types/content.js';
 import type { DecayAnalysis } from '../content-decay.js';
+import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 import { createLogger } from '../logger.js';
 import { matchPageIdentity, matchPagePath, toAuditFindingPageId } from '../helpers.js';
 
@@ -36,9 +37,9 @@ export async function assemblePageProfile(
   try {
     const { getLatestRanks } = await import('../rank-tracking.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
     const latest = getLatestRanks(workspaceId);
-    const primaryKw = pageKw?.primaryKeyword?.toLowerCase();
+    const primaryKw = keywordComparisonKey(pageKw?.primaryKeyword);
     const pageRank: RankEntry | undefined = primaryKw
-      ? latest.find(k => k.query.toLowerCase() === primaryKw)
+      ? latest.find(k => keywordComparisonKey(k.query) === primaryKw)
       : undefined;
     if (pageRank) {
       current = pageRank.position ?? current;
@@ -228,9 +229,9 @@ export async function assemblePageProfile(
     const { listBriefs } = await import('../content-brief.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
     const briefs: ContentBrief[] = listBriefs(workspaceId);
     // ContentBrief matches pages via targetKeyword, not URL
-    const primaryKw = pageKw?.primaryKeyword?.toLowerCase();
-    const hasBrief = primaryKw ? briefs.some(b => b.targetKeyword?.toLowerCase() === primaryKw) : false;
-    const matchingBrief = primaryKw ? briefs.find(b => b.targetKeyword?.toLowerCase() === primaryKw) : undefined;
+    const primaryKw = keywordComparisonKey(pageKw?.primaryKeyword);
+    const hasBrief = primaryKw ? briefs.some(b => keywordComparisonKey(b.targetKeyword) === primaryKw) : false;
+    const matchingBrief = primaryKw ? briefs.find(b => keywordComparisonKey(b.targetKeyword) === primaryKw) : undefined;
 
     let hasPost = false;
     let isPublished = false;
@@ -271,9 +272,9 @@ export async function assemblePageProfile(
       const { listContentGaps } = await import('../content-gaps.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
       const allGaps = listContentGaps(workspaceId);
       if (allGaps.length > 0) {
-        const primaryKwLower = pageKw?.primaryKeyword?.toLowerCase();
-        const matched = primaryKwLower
-          ? allGaps.filter(g => g.targetKeyword?.toLowerCase() === primaryKwLower)
+        const primaryKwKey = keywordComparisonKey(pageKw?.primaryKeyword);
+        const matched = primaryKwKey
+          ? allGaps.filter(g => keywordComparisonKey(g.targetKeyword) === primaryKwKey)
           : [];
         const source = matched.length > 0 ? matched : allGaps;
         contentGaps = source.slice(0, 5).map(g => g.topic).filter(Boolean);

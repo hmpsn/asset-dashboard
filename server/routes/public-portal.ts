@@ -52,6 +52,7 @@ import {
 import { isProgrammingError } from '../errors.js';
 import { normalizeSocialProfiles } from '../social-profiles.js';
 import { toPublicWorkspaceView } from '../serializers/client-safe.js';
+import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 
 const log = createLogger('public-portal');
 
@@ -369,7 +370,8 @@ router.post('/api/public/keyword-feedback/:workspaceId', requireClientStrategyMu
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const { keyword, status, reason, source } = req.body as KeywordFeedbackBody;
-  const kw = keyword.toLowerCase().trim();
+  const kw = keywordComparisonKey(keyword);
+  const displayKeyword = keyword.trim();
   const declinedBy = typeof res.locals.clientEmail === 'string' ? res.locals.clientEmail : 'client';
 
   db.prepare(`
@@ -383,8 +385,8 @@ router.post('/api/public/keyword-feedback/:workspaceId', requireClientStrategyMu
   `).run(ws.id, kw, status, reason || null, source, declinedBy);
 
   if (status === 'approved') {
-    addTrackedKeyword(ws.id, kw, { source: trackedKeywordSourceForFeedback(source) });
-    broadcastToWorkspace(ws.id, WS_EVENTS.RANK_TRACKING_UPDATED, { keyword: kw, action: 'feedback_approved', source: 'client_feedback' });
+    addTrackedKeyword(ws.id, displayKeyword, { source: trackedKeywordSourceForFeedback(source) });
+    broadcastToWorkspace(ws.id, WS_EVENTS.RANK_TRACKING_UPDATED, { keyword: displayKeyword, action: 'feedback_approved', source: 'client_feedback' });
   }
 
   log.info(`Client keyword feedback: "${kw}" → ${status} for workspace ${ws.id}`);
@@ -415,11 +417,11 @@ router.post('/api/public/keyword-feedback/:workspaceId/bulk', requireClientStrat
   const approvedKeywordEntries: Parameters<typeof addTrackedKeywords>[1] = [];
   const insert = db.transaction((items: KeywordFeedbackBody[]) => {
     for (const item of items) {
-      const kw = item.keyword.toLowerCase().trim();
+      const kw = keywordComparisonKey(item.keyword);
       stmt.run(ws.id, kw, item.status, item.reason || null, item.source, declinedBy);
       if (item.status === 'approved') {
         approvedKeywordEntries.push({
-          query: kw,
+          query: item.keyword.trim(),
           options: { source: trackedKeywordSourceForFeedback(item.source) },
         });
       }
@@ -464,7 +466,7 @@ router.delete('/api/public/keyword-feedback/:workspaceId', (req, res) => {
       : typeof req.body?.keyword === 'string'
         ? req.body.keyword
         : '';
-  const keyword = rawKeyword.toLowerCase().trim();
+  const keyword = keywordComparisonKey(rawKeyword);
   if (!keyword) return res.status(400).json({ error: 'keyword required' });
 
   const removeFeedback = db.transaction(() => {
@@ -638,7 +640,7 @@ router.post('/api/public/content-gap-vote/:workspaceId', requireClientStrategyMu
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
   const { keyword, vote } = req.body as ContentGapVoteBody;
-  const kw = keyword.toLowerCase().trim();
+  const kw = keywordComparisonKey(keyword);
 
   // The two write paths below (DELETE for "clear" + INSERT/UPDATE for
   // "set") are mutually exclusive — only one runs per request — but the

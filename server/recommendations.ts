@@ -48,6 +48,7 @@ import type { RecPriority, RecType, RecStatus, Recommendation, RecommendationSet
 import type { ConversionAttributionData, CtrOpportunityData } from '../shared/types/analytics.js';
 import type { LearningsSlice } from '../shared/types/intelligence.js';
 import type { ActionType } from '../shared/types/outcome-tracking.js';
+import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('recommendations');
@@ -871,7 +872,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   // ── 2. Strategy-based recommendations ──
   // Load declined keywords so we can skip suggestions the client has rejected (2C)
   const declinedKeywords = new Set(
-    getDeclinedKeywords(workspaceId).map(k => k.toLowerCase())
+    getDeclinedKeywords(workspaceId).map(k => keywordComparisonKey(k)).filter(Boolean)
   );
 
   if (strategy) {
@@ -881,7 +882,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     if (quickWins.length > 0) {
       for (const qw of quickWins) {
         // 2C: skip if the current keyword was declined
-        if (qw.currentKeyword && declinedKeywords.has(qw.currentKeyword.toLowerCase())) continue;
+        if (qw.currentKeyword && declinedKeywords.has(keywordComparisonKey(qw.currentKeyword))) continue;
 
         const t = getTrafficForSlug(traffic, qw.pagePath.replace(/^\//, ''));
         // 2E: demote zero-traffic quick wins — fixing meta on unvisited pages is not a "quick win"
@@ -929,7 +930,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     if (strategyContentGaps.length > 0) {
       for (const cg of strategyContentGaps) {
         // 2C: skip if the target keyword was declined by the client
-        if (cg.targetKeyword && declinedKeywords.has(cg.targetKeyword.toLowerCase())) continue;
+        if (cg.targetKeyword && declinedKeywords.has(keywordComparisonKey(cg.targetKeyword))) continue;
 
         let baseScore = cg.priority === 'high' ? 65 : cg.priority === 'medium' ? 45 : 25;
         // Apply authority-adjusted KD filtering
@@ -997,7 +998,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     if (pageKeywords.length > 0) {
       for (const pm of pageKeywords) {
         // 2C: skip if the primary keyword was declined
-        if (pm.primaryKeyword && declinedKeywords.has(pm.primaryKeyword.toLowerCase())) continue;
+        if (pm.primaryKeyword && declinedKeywords.has(keywordComparisonKey(pm.primaryKeyword))) continue;
 
         if (pm.currentPosition && pm.currentPosition > 3 && pm.currentPosition <= 20 && pm.impressions && pm.impressions > 100) {
           // Page ranking 4-20 with decent impressions — opportunity to push up

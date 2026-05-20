@@ -37,6 +37,20 @@ function pageKeyword(overrides: Partial<PageKeywordMap>): PageKeywordMap {
 }
 
 describe('reconcileStrategyRankTracking', () => {
+  it('dedupes tracked keywords with canonical punctuation and spacing variants', () => {
+    addTrackedKeyword(workspaceId, 'Emergency Dentist - Near-Me');
+    addTrackedKeyword(workspaceId, ' emergency dentist near me ');
+
+    const tracked = getTrackedKeywords(workspaceId, { includeInactive: true });
+
+    expect(tracked).toEqual([
+      expect.objectContaining({
+        query: 'Emergency Dentist - Near-Me',
+        status: TRACKED_KEYWORD_STATUS.ACTIVE,
+      }),
+    ]);
+  });
+
   it('adds strategy site and page keywords with lifecycle metadata', () => {
     const generatedAt = '2026-05-19T10:00:00.000Z';
     addTrackedKeyword(workspaceId, 'already tracked');
@@ -93,6 +107,44 @@ describe('reconcileStrategyRankTracking', () => {
         baselineImpressions: 450,
       }),
     ]));
+  });
+
+  it('matches strategy targets and latest ranks across canonical keyword variants', () => {
+    const generatedAt = '2026-05-20T11:00:00.000Z';
+    addTrackedKeyword(workspaceId, 'Emergency Dentist - Near-Me', {
+      source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
+      pagePath: '/services/emergency-dentist',
+    });
+    storeRankSnapshot(workspaceId, '2026-05-20', [
+      { query: 'emergency dentist near me', position: 3, clicks: 7, impressions: 180, ctr: 0.038 },
+    ]);
+
+    const changeSet = reconcileStrategyRankTracking({
+      workspaceId,
+      generatedAt,
+      keywordStrategy: {
+        siteKeywords: [],
+        generatedAt,
+      },
+      pageMap: [
+        pageKeyword({
+          pagePath: '/services/emergency-dentist',
+          pageTitle: 'Emergency Dentist',
+          primaryKeyword: 'Emergency Dentist Near Me',
+        }),
+      ],
+    });
+
+    expect(changeSet.retained.map(keyword => keyword.query)).toEqual(['Emergency Dentist - Near-Me']);
+    expect(changeSet.added).toEqual([]);
+    expect(getTrackedKeywords(workspaceId)).toEqual([
+      expect.objectContaining({
+        query: 'Emergency Dentist - Near-Me',
+        baselinePosition: 3,
+        baselineClicks: 7,
+        baselineImpressions: 180,
+      }),
+    ]);
   });
 
   it('retains, reassigns, replaces, deprecates, and manually preserves tracked keywords', () => {
@@ -251,7 +303,7 @@ describe('reconcileStrategyRankTracking', () => {
 
     expect(getTrackedKeywords(workspaceId)).toEqual([
       expect.objectContaining({
-        query: 'legacy keyword',
+        query: 'Legacy Keyword',
         pinned: false,
         source: TRACKED_KEYWORD_SOURCE.UNKNOWN,
         status: TRACKED_KEYWORD_STATUS.ACTIVE,
@@ -273,7 +325,7 @@ describe('reconcileStrategyRankTracking', () => {
 
     expect(getLatestRanks(workspaceId)).toEqual([
       expect.objectContaining({
-        query: 'legacy keyword',
+        query: 'Legacy Keyword',
         position: 6,
         change: 2,
         pinned: true,
@@ -310,7 +362,7 @@ describe('reconcileStrategyRankTracking', () => {
 
     expect(getTrackedKeywords(workspaceId, { includeInactive: true })).toEqual([
       expect.objectContaining({
-        query: 'legacy manual keyword',
+        query: 'Legacy Manual Keyword',
         source: TRACKED_KEYWORD_SOURCE.UNKNOWN,
         status: TRACKED_KEYWORD_STATUS.ACTIVE,
       }),
@@ -326,11 +378,11 @@ describe('reconcileStrategyRankTracking', () => {
       pageMap: [],
     });
 
-    expect(changeSet.manuallyPreserved.map(k => k.query)).toContain('legacy manual keyword');
-    expect(changeSet.deprecated.map(k => k.query)).not.toContain('legacy manual keyword');
+    expect(changeSet.manuallyPreserved.map(k => k.query)).toContain('Legacy Manual Keyword');
+    expect(changeSet.deprecated.map(k => k.query)).not.toContain('Legacy Manual Keyword');
     expect(getTrackedKeywords(workspaceId)).toEqual([
       expect.objectContaining({
-        query: 'legacy manual keyword',
+        query: 'Legacy Manual Keyword',
         source: TRACKED_KEYWORD_SOURCE.UNKNOWN,
         status: TRACKED_KEYWORD_STATUS.ACTIVE,
       }),
