@@ -6306,3 +6306,16 @@ Bug hardening included:
 **Mutual:** Clarifies product boundaries: Rank Tracker is measurement-only, Strategy is generation/explanation, Page Intelligence is page-first, and the Command Center owns keyword lifecycle. Raw provider evidence remains auditable but is not presented as a selected strategy action.
 
 **Files:** `shared/keyword-normalization.ts`; `shared/types/keyword-command-center.ts`; `server/keyword-command-center.ts`; `server/routes/keyword-command-center.ts`; `server/app.ts`; `src/api/keywordCommandCenter.ts`; `src/hooks/admin/useKeywordCommandCenter.ts`; `src/components/KeywordCommandCenter.tsx`; `src/routes.ts`; `src/App.tsx`; `src/components/layout/Sidebar.tsx`; `src/components/layout/Breadcrumbs.tsx`; `src/components/CommandPalette.tsx`; `tests/unit/keyword-command-center.test.ts`; `tests/integration/keyword-command-center-routes.test.ts`; `tests/component/KeywordCommandCenter.test.tsx`; `docs/rules/keyword-command-center.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 445. Local SEO Foundation Audit + Workspace Posture Contract
+**What it does:** Establishes the implementation baseline for the next local SEO workstream without changing production behavior. The PR14 audit (`docs/superpowers/audits/2026-05-20-local-seo-foundation-source-market-audit.md`) verifies the current Strategy, Keywords, Rank Tracker, Page Intelligence, Client Strategy, schema, business profile, provider, and intelligence prompt paths before local-pack visibility implementation begins. A new rule doc (`docs/rules/local-seo-visibility.md`) defines the local SEO boundary: local visibility is market-specific evidence, not a replacement for Rank Tracker, Keyword Command Center, Strategy, or Schema. The audit also defines the future workspace posture contract (`local`, `non_local`, `hybrid`, `unknown`), local market identity shape, conservative business-match confidence, provider/cost guardrails, and DataForSEO local-source candidates.
+
+**Agency value:** Prevents the next local SEO feature from becoming another scattered keyword surface. Admins get a decision-ready blueprint for measuring local-pack visibility safely, with explicit cost caps, match-confidence language, and clear boundaries between global rank measurement and local visibility evidence.
+
+**Client value:** Sets up local-business reporting that can eventually answer the questions clients actually care about — where they are visible locally, whether map/local-pack visibility exists in the right market, and what safe action comes next — without making unverified rank or GBP claims.
+
+**Mutual:** Keeps local SEO optional and posture-aware so dentists, clinics, attorneys, restaurants, and service-area businesses get local visibility intelligence while SaaS/global workspaces avoid noisy local modules. The audit also keeps GBP health, reviews/reputation, geo-grid tracking, and local recommendations as separate roadmap items instead of overloading v1.
+
+**Files:** `docs/superpowers/audits/2026-05-20-local-seo-foundation-source-market-audit.md`; `docs/rules/local-seo-visibility.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
