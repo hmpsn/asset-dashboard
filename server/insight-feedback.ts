@@ -9,8 +9,10 @@ import { createLogger } from './logger.js';
 import { getInsights } from './analytics-insights-store.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
+import { isStrategyPoolEligibleKeyword } from './keyword-intelligence/index.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import type { StrategySignal, PipelineSignal } from '../shared/types/insights.js';
+import type { KeywordEvaluationContext } from './keyword-intelligence/index.js';
 
 const log = createLogger('insight-feedback');
 
@@ -50,7 +52,23 @@ export function runFeedbackLoops(workspaceId: string): void {
 
 // ── Strategy signals ──────────────────────────────────────────────
 
-export function buildStrategySignals(insights: AnalyticsInsight[]): StrategySignal[] {
+export interface BuildStrategySignalsOptions {
+  keywordEvaluationContext?: KeywordEvaluationContext;
+}
+
+function isKeywordSignalEligible(
+  keyword: string | undefined,
+  options: BuildStrategySignalsOptions,
+  source: string,
+  volume = 0,
+  difficulty = 0,
+): boolean {
+  if (!keyword?.trim()) return false;
+  if (!options.keywordEvaluationContext) return true;
+  return !isStrategyPoolEligibleKeyword({ keyword, volume, difficulty, source }, options.keywordEvaluationContext).suppressed;
+}
+
+export function buildStrategySignals(insights: AnalyticsInsight[], options: BuildStrategySignalsOptions = {}): StrategySignal[] {
   const signals: StrategySignal[] = [];
 
   for (const insight of insights) {
@@ -58,10 +76,11 @@ export function buildStrategySignals(insights: AnalyticsInsight[]): StrategySign
     if (insight.insightType === 'ranking_mover' && insight.data) {
       const data = insight.data as Record<string, unknown>;
       const posChange = (data.previousPosition as number ?? 0) - (data.currentPosition as number ?? 0);
-      if (posChange > 3) {
+      const keyword = (data.query as string) ?? 'unknown';
+      if (posChange > 3 && isKeywordSignalEligible(keyword, options, 'insight:ranking_mover')) {
         signals.push({
           type: 'momentum',
-          keyword: (data.query as string) ?? 'unknown',
+          keyword,
           pageUrl: insight.pageId ?? undefined,
           pageTitle: insight.pageTitle ?? undefined,
           detail: `Gained ${posChange} positions — consider adding to strategy`,
@@ -72,7 +91,7 @@ export function buildStrategySignals(insights: AnalyticsInsight[]): StrategySign
     }
 
     // Strategy misalignment
-    if (insight.strategyAlignment === 'misaligned') {
+    if (insight.strategyAlignment === 'misaligned' && isKeywordSignalEligible(insight.strategyKeyword ?? undefined, options, 'insight:misalignment')) {
       signals.push({
         type: 'misalignment',
         keyword: insight.strategyKeyword ?? 'unknown',
@@ -89,12 +108,16 @@ export function buildStrategySignals(insights: AnalyticsInsight[]): StrategySign
       const data = insight.data as Record<string, unknown>;
       const ourPosition = data.ourPosition as number | null | undefined;
       const competitorPosition = data.competitorPosition as number | undefined;
+      const keyword = (data.keyword as string) ?? 'unknown';
+      if (!isKeywordSignalEligible(keyword, options, `insight_gap:${data.competitorDomain ?? 'unknown'}`, data.volume as number | undefined, data.difficulty as number | undefined)) {
+        continue;
+      }
       const detail = ourPosition != null
         ? `Competitor ranking position ${competitorPosition ?? '?'} for "${data.keyword}" — you rank #${ourPosition}, consider optimizing`
         : `Competitors ranking for "${data.keyword}" — no content targeting this`;
       signals.push({
         type: 'content_gap',
-        keyword: (data.keyword as string) ?? 'unknown',
+        keyword,
         detail,
         insightId: insight.id,
         impactScore: insight.impactScore ?? 0,

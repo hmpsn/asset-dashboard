@@ -10,16 +10,17 @@
  *
  * Port: 13320
  */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, getWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
-import { upsertPageKeyword } from '../../server/page-keywords.js';
+import { listPageKeywords, upsertPageKeyword } from '../../server/page-keywords.js';
 import { listQuickWins, replaceAllQuickWins } from '../../server/quick-wins.js';
 import { listKeywordGaps, replaceAllKeywordGaps } from '../../server/keyword-gaps.js';
 import { listTopicClusters, replaceAllTopicClusters } from '../../server/topic-clusters.js';
 import { listCannibalizationIssues, replaceAllCannibalizationIssues } from '../../server/cannibalization-issues.js';
 import { persistKeywordStrategy } from '../../server/keyword-strategy-persistence.js';
+import { setBroadcast } from '../../server/broadcast.js';
 import type { ContentGap, PageKeywordMap } from '../../shared/types/workspace.js';
 
 const PORT = 13320;
@@ -29,6 +30,7 @@ let partialWsId = '';   // has page_keywords, no ws.keywordStrategy
 let emptyWsId = '';     // no page_keywords, no ws.keywordStrategy
 
 beforeAll(async () => {
+  setBroadcast(vi.fn(), vi.fn());
   await ctx.startServer();
 
   partialWsId = createWorkspace('Partial Strategy (page_keywords only)').id;
@@ -641,5 +643,173 @@ describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', 
       expect.objectContaining({ pagePath: '/baseline', action: 'Keep baseline' }),
     ]);
     expect(getWorkspace(wsId)?.keywordStrategy?.siteKeywords).toEqual(['baseline']);
+  });
+
+  it('incremental persistence clears analyzed page rows removed by final strategy sanitation', () => {
+    const wsId = freshShellWorkspace('Persist incremental sanitized removal');
+    upsertPageKeyword(wsId, {
+      pagePath: '/stale-noisy',
+      pageTitle: 'Stale Noisy',
+      primaryKeyword: 'paper tiger',
+      secondaryKeywords: [],
+      analysisGeneratedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    const ws = getWorkspace(wsId);
+    expect(ws).toBeTruthy();
+    persistKeywordStrategy({
+      ws: ws!,
+      strategy: {
+        siteKeywords: ['seo services'],
+        opportunities: [],
+        pageMap: [
+          {
+            pagePath: '/services/seo',
+            pageTitle: 'SEO Services',
+            primaryKeyword: 'seo services',
+            secondaryKeywords: ['seo agency'],
+          },
+        ],
+        quickWins: [],
+        contentGaps: [],
+      },
+      strategyMode: 'incremental',
+      pagesToAnalyze: [{
+        path: '/stale-noisy',
+        title: 'Stale Noisy',
+        seoTitle: 'Stale Noisy',
+        seoDesc: '',
+        contentSnippet: '',
+      }],
+      removedPagePaths: ['/stale-noisy'],
+      siteKeywordMetrics: [],
+      keywordGaps: [],
+      competitorKeywordData: [],
+      topicClusters: [],
+      cannibalization: [],
+      questionKeywords: [],
+      businessContext: '',
+      seoDataMode: 'quick',
+      seoDataStatus: { mode: 'quick', provider: 'dataforseo', status: 'degraded', reasons: ['test'] },
+      searchData: {
+        deviceBreakdown: [],
+        countryBreakdown: [],
+        periodComparison: null,
+        organicLandingPages: [],
+        organicOverview: null,
+      },
+    });
+
+    const pagePaths = listPageKeywords(wsId).map(page => page.pagePath);
+    expect(pagePaths).toContain('/services/seo');
+    expect(pagePaths).not.toContain('/stale-noisy');
+  });
+
+  it('incremental persistence clears sanitized preserved page rows when explicitly reported by generation', () => {
+    const wsId = freshShellWorkspace('Persist incremental sanitized preserved removal');
+    upsertPageKeyword(wsId, {
+      pagePath: '/preserved-noisy',
+      pageTitle: 'Preserved Noisy',
+      primaryKeyword: 'typing tiger',
+      secondaryKeywords: [],
+      analysisGeneratedAt: new Date().toISOString(),
+    });
+
+    const ws = getWorkspace(wsId);
+    expect(ws).toBeTruthy();
+    persistKeywordStrategy({
+      ws: ws!,
+      strategy: {
+        siteKeywords: ['seo services'],
+        opportunities: [],
+        pageMap: [
+          {
+            pagePath: '/services/seo',
+            pageTitle: 'SEO Services',
+            primaryKeyword: 'seo services',
+            secondaryKeywords: ['seo agency'],
+          },
+        ],
+        quickWins: [],
+        contentGaps: [],
+      },
+      strategyMode: 'incremental',
+      pagesToAnalyze: [],
+      removedPagePaths: ['/preserved-noisy'],
+      siteKeywordMetrics: [],
+      keywordGaps: [],
+      competitorKeywordData: [],
+      topicClusters: [],
+      cannibalization: [],
+      questionKeywords: [],
+      businessContext: '',
+      seoDataMode: 'quick',
+      seoDataStatus: { mode: 'quick', provider: 'dataforseo', status: 'degraded', reasons: ['test'] },
+      searchData: {
+        deviceBreakdown: [],
+        countryBreakdown: [],
+        periodComparison: null,
+        organicLandingPages: [],
+        organicOverview: null,
+      },
+    });
+
+    const pagePaths = listPageKeywords(wsId).map(page => page.pagePath);
+    expect(pagePaths).toContain('/services/seo');
+    expect(pagePaths).not.toContain('/preserved-noisy');
+  });
+
+  it('incremental persistence updates sanitized preserved page rows when explicitly reported by generation', () => {
+    const wsId = freshShellWorkspace('Persist incremental sanitized preserved update');
+    upsertPageKeyword(wsId, {
+      pagePath: '/preserved-repaired',
+      pageTitle: 'Preserved Repaired',
+      primaryKeyword: 'paper tiger',
+      secondaryKeywords: ['seo services'],
+      analysisGeneratedAt: new Date().toISOString(),
+    });
+
+    const ws = getWorkspace(wsId);
+    expect(ws).toBeTruthy();
+    persistKeywordStrategy({
+      ws: ws!,
+      strategy: {
+        siteKeywords: ['seo services'],
+        opportunities: [],
+        pageMap: [
+          {
+            pagePath: '/preserved-repaired',
+            pageTitle: 'Preserved Repaired',
+            primaryKeyword: 'seo services',
+            secondaryKeywords: [],
+          },
+        ],
+        quickWins: [],
+        contentGaps: [],
+      },
+      strategyMode: 'incremental',
+      pagesToAnalyze: [],
+      extraPagePaths: ['/preserved-repaired'],
+      siteKeywordMetrics: [],
+      keywordGaps: [],
+      competitorKeywordData: [],
+      topicClusters: [],
+      cannibalization: [],
+      questionKeywords: [],
+      businessContext: '',
+      seoDataMode: 'quick',
+      seoDataStatus: { mode: 'quick', provider: 'dataforseo', status: 'degraded', reasons: ['test'] },
+      searchData: {
+        deviceBreakdown: [],
+        countryBreakdown: [],
+        periodComparison: null,
+        organicLandingPages: [],
+        organicOverview: null,
+      },
+    });
+
+    const repaired = listPageKeywords(wsId).find(page => page.pagePath === '/preserved-repaired');
+    expect(repaired?.primaryKeyword).toBe('seo services');
+    expect(repaired?.secondaryKeywords).toEqual([]);
   });
 });
