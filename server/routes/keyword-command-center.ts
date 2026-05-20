@@ -42,7 +42,7 @@ router.get('/api/webflow/keyword-command-center/:workspaceId', requireWorkspaceA
   }
 });
 
-router.post('/api/webflow/keyword-command-center/:workspaceId/actions', requireWorkspaceAccess('workspaceId'), validate(actionSchema), (req, res) => {
+router.post('/api/webflow/keyword-command-center/:workspaceId/actions', requireWorkspaceAccess('workspaceId'), validate(actionSchema), (req, res, next) => {
   try {
     const result = applyKeywordCommandCenterAction(req.params.workspaceId, req.body);
     res.json(result);
@@ -51,7 +51,7 @@ router.post('/api/webflow/keyword-command-center/:workspaceId/actions', requireW
     if (message === 'Workspace not found') return res.status(404).json({ error: message });
     if (message === 'keyword required') return res.status(400).json({ error: message });
     if (message.includes('requires explicit confirmation')) return res.status(409).json({ error: message });
-    res.status(500).json({ error: message });
+    next(err);
   }
 });
 

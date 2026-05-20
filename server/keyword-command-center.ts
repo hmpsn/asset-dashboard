@@ -16,6 +16,7 @@ import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { buildKeywordStrategyUxPayload } from './keyword-strategy-ux.js';
 import { WS_EVENTS } from './ws-events.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
+import type { KeywordGapItem } from '../shared/types/workspace.js';
 import {
   KEYWORD_COMMAND_CENTER_ACTIONS,
   KEYWORD_COMMAND_CENTER_FILTERS,
@@ -147,6 +148,14 @@ function sourceFromExplanation(explanation: KeywordStrategyExplanation): Keyword
   return { kind: 'strategy', label: 'Strategy keyword', detail: explanation.surfaceLabel };
 }
 
+function sourceFromKeywordGap(gap: KeywordGapItem): KeywordCommandCenterSourceLabel {
+  return {
+    kind: 'raw_evidence',
+    label: 'Raw provider evidence',
+    detail: `${gap.competitorDomain} ranks #${gap.competitorPosition}`,
+  };
+}
+
 function isInactiveTracking(keyword: TrackedKeyword): boolean {
   return (keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) !== TRACKED_KEYWORD_STATUS.ACTIVE;
 }
@@ -236,8 +245,7 @@ function buildNextActions(row: DraftRow, status: KeywordCommandCenterStatus, isP
       detail: 'Hide this keyword from active tracking while preserving rank history.',
       tone: 'amber',
       keyword,
-      disabled: isProtected,
-      disabledReason: isProtected ? `${protection} is protected from one-click pause.` : undefined,
+      disabledReason: isProtected ? `${protection} requires confirmation before pausing.` : undefined,
     });
   }
 
@@ -269,8 +277,7 @@ function buildNextActions(row: DraftRow, status: KeywordCommandCenterStatus, isP
     detail: 'Suppress this keyword from future strategy and recommendation consideration.',
     tone: 'red',
     keyword,
-    disabled: isProtected,
-    disabledReason: isProtected ? `${protection} is protected from one-click decline.` : undefined,
+    disabledReason: isProtected ? `${protection} requires confirmation before decline.` : undefined,
   });
 
   if (row.tracking) {
@@ -280,8 +287,7 @@ function buildNextActions(row: DraftRow, status: KeywordCommandCenterStatus, isP
       detail: 'Remove from active strategy-owned tracking without deleting rank history.',
       tone: 'red',
       keyword,
-      disabled: isProtected,
-      disabledReason: isProtected ? `${protection} is protected from one-click retirement.` : undefined,
+      disabledReason: isProtected ? `${protection} requires confirmation before retirement.` : undefined,
     });
   }
   return actions;
@@ -376,6 +382,17 @@ export async function buildKeywordCommandCenter(workspaceId: string): Promise<Ke
     mergeMetrics(row, {
       volume: explanation.role === 'content_gap' ? contentGaps.find(gap => keywordComparisonKey(gap.targetKeyword) === explanation.normalizedKeyword)?.volume : undefined,
       difficulty: explanation.role === 'content_gap' ? contentGaps.find(gap => keywordComparisonKey(gap.targetKeyword) === explanation.normalizedKeyword)?.difficulty : undefined,
+    });
+  }
+
+  for (const gap of keywordGaps) {
+    const row = ensureRow(rows, gap.keyword);
+    if (!row) continue;
+    row.rawEvidenceOnly = row.rawEvidenceOnly ?? !row.explanation;
+    addSource(row, sourceFromKeywordGap(gap));
+    mergeMetrics(row, {
+      volume: gap.volume,
+      difficulty: gap.difficulty,
     });
   }
 

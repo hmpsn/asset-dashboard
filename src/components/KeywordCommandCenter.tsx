@@ -21,6 +21,7 @@ import {
   Badge,
   Button,
   ClickableRow,
+  ConfirmDialog,
   EmptyState,
   FormInput,
   Icon,
@@ -102,6 +103,14 @@ function isServerAction(type: KeywordCommandCenterNextAction['type']): type is K
   return Object.values(KEYWORD_COMMAND_CENTER_ACTIONS).includes(type as KeywordCommandCenterActionType);
 }
 
+function requiresProtectedConfirmation(row: KeywordCommandCenterRow, action: KeywordCommandCenterNextAction): boolean {
+  return row.isProtected && (
+    action.type === KEYWORD_COMMAND_CENTER_ACTIONS.PAUSE_TRACKING
+    || action.type === KEYWORD_COMMAND_CENTER_ACTIONS.RETIRE
+    || action.type === KEYWORD_COMMAND_CENTER_ACTIONS.DECLINE
+  );
+}
+
 function SummaryMetric({
   label,
   value,
@@ -168,7 +177,7 @@ function KeywordRow({
         {row.metrics.currentPosition ? `#${row.metrics.currentPosition.toFixed(1)}` : row.metrics.difficulty != null ? `${row.metrics.difficulty}/100` : '—'}
       </p>
       <p className="t-caption text-[var(--brand-text-muted)] truncate">
-        {row.assignment?.pageTitle || row.assignment?.pagePath || row.explanation?.nextAction.label || 'No assignment yet'}
+        {row.assignment?.pageTitle || row.assignment?.pagePath || row.explanation?.nextAction?.label || 'No assignment yet'}
       </p>
       <div className="flex items-center justify-end gap-1">
         {row.nextActions.slice(0, 2).map(action => (
@@ -330,6 +339,10 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
   const [filter, setFilter] = useState<KeywordCommandCenterFilter>(KEYWORD_COMMAND_CENTER_FILTERS.ALL);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [pendingProtectedAction, setPendingProtectedAction] = useState<{
+    row: KeywordCommandCenterRow;
+    action: KeywordCommandCenterNextAction;
+  } | null>(null);
 
   const rows = data?.rows ?? [];
   const filteredRows = useMemo(() => {
@@ -355,6 +368,16 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
     }
     return filteredRows[0] ?? null;
   }, [filteredRows, rows, selectedKey]);
+
+  const runServerAction = (row: KeywordCommandCenterRow, action: KeywordCommandCenterNextAction, force = false) => {
+    if (!isServerAction(action.type)) return;
+    actionMutation.mutate({
+      action: action.type,
+      keyword: row.keyword,
+      pagePath: action.pagePath,
+      force: force || undefined,
+    });
+  };
 
   const handleAction = (row: KeywordCommandCenterRow | null, action: KeywordCommandCenterNextAction) => {
     if (!row) return;
@@ -388,11 +411,11 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
       return;
     }
     if (!isServerAction(action.type)) return;
-    actionMutation.mutate({
-      action: action.type,
-      keyword: row.keyword,
-      pagePath: action.pagePath,
-    });
+    if (requiresProtectedConfirmation(row, action)) {
+      setPendingProtectedAction({ row, action });
+      return;
+    }
+    runServerAction(row, action);
   };
 
   if (isLoading) {
@@ -529,6 +552,23 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
           onAction={(action) => handleAction(selectedRow, action)}
         />
       </div>
+
+      <ConfirmDialog
+        open={!!pendingProtectedAction}
+        title="Confirm protected keyword action"
+        message={
+          pendingProtectedAction
+            ? `${pendingProtectedAction.row.protectionReason ?? 'This keyword'} is protected. Confirm "${pendingProtectedAction.action.label}" for "${pendingProtectedAction.row.keyword}"? Rank history will be preserved.`
+            : ''
+        }
+        confirmLabel={pendingProtectedAction?.action.label ?? 'Confirm'}
+        variant={pendingProtectedAction?.action.tone === 'red' ? 'destructive' : 'default'}
+        onConfirm={() => {
+          if (pendingProtectedAction) runServerAction(pendingProtectedAction.row, pendingProtectedAction.action, true);
+          setPendingProtectedAction(null);
+        }}
+        onCancel={() => setPendingProtectedAction(null)}
+      />
     </div>
   );
 }

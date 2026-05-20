@@ -166,6 +166,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceSignals(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.aiSuggestedBriefs(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(workspaceId) });
     },
     [WS_EVENTS.SCHEMA_CMS_MAPPING_UPDATED]: (data: unknown) => {
       const siteId = typeof data === 'object' && data !== null && 'siteId' in data

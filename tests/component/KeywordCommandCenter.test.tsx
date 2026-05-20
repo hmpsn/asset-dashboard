@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { KeywordCommandCenter } from '../../src/components/KeywordCommandCenter';
 import {
   KEYWORD_COMMAND_CENTER_STATUS,
@@ -96,6 +97,14 @@ const payload: KeywordCommandCenterResponse = {
   generatedAt: '2026-05-20T10:00:00.000Z',
 };
 
+function renderCommandCenter() {
+  return render(
+    <MemoryRouter>
+      <KeywordCommandCenter workspaceId="ws-1" />
+    </MemoryRouter>,
+  );
+}
+
 describe('KeywordCommandCenter', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -114,7 +123,7 @@ describe('KeywordCommandCenter', () => {
   });
 
   it('renders lifecycle summaries and raw evidence as evidence, not selected strategy action', () => {
-    render(<KeywordCommandCenter workspaceId="ws-1" />);
+    renderCommandCenter();
 
     expect(screen.getByText('Keywords')).toBeInTheDocument();
     expect(screen.getByText('Keyword Universe')).toBeInTheDocument();
@@ -124,7 +133,7 @@ describe('KeywordCommandCenter', () => {
   });
 
   it('filters and searches the keyword universe together', () => {
-    render(<KeywordCommandCenter workspaceId="ws-1" />);
+    renderCommandCenter();
 
     fireEvent.click(screen.getByRole('button', { name: /^raw evidence\s*1$/i }));
     expect(screen.getAllByText('best teeth whitening strips').length).toBeGreaterThan(0);
@@ -135,7 +144,7 @@ describe('KeywordCommandCenter', () => {
   });
 
   it('opens drawer actions without publishing or live metadata writes', () => {
-    render(<KeywordCommandCenter workspaceId="ws-1" />);
+    renderCommandCenter();
 
     fireEvent.click(screen.getByText('best teeth whitening strips'));
     const drawer = screen.getByText('Safe Next Actions').closest('div')!.parentElement!;
@@ -147,5 +156,47 @@ describe('KeywordCommandCenter', () => {
       pagePath: undefined,
     });
     expect(screen.getByText(/They do not publish content or write live metadata/i)).toBeInTheDocument();
+  });
+
+  it('requires explicit confirmation before forcing protected keyword actions', async () => {
+    const hooks = await import('../../src/hooks/admin/useKeywordCommandCenter');
+    vi.mocked(hooks.useKeywordCommandCenter).mockReturnValue({
+      data: {
+        ...payload,
+        rows: [{
+          keyword: 'manual keyword',
+          normalizedKeyword: 'manual keyword',
+          lifecycleStatus: KEYWORD_COMMAND_CENTER_STATUS.TRACKED,
+          statusLabel: 'Tracked',
+          sourceLabels: [{ kind: 'manual', label: 'Rank tracking', detail: 'manual' }],
+          metrics: {},
+          tracking: { status: TRACKED_KEYWORD_STATUS.ACTIVE, source: 'manual', pinned: false },
+          nextActions: [
+            { type: 'pause_tracking', label: 'Pause tracking', detail: 'Pause this keyword.', tone: 'amber', keyword: 'manual keyword', disabledReason: 'Manual keyword requires confirmation before pausing.' },
+          ],
+          isProtected: true,
+          protectionReason: 'Manual keyword',
+        }],
+        counts: { total: 1, inStrategy: 0, tracked: 1, needsReview: 0, evidence: 0, retired: 0, declined: 0 },
+        filters: [{ id: 'all', label: 'All', count: 1 }],
+      },
+      isLoading: false,
+      error: null,
+    } as ReturnType<typeof hooks.useKeywordCommandCenter>);
+
+    renderCommandCenter();
+
+    const actionSection = screen.getByText('Safe Next Actions').closest('div')!.parentElement!;
+    fireEvent.click(within(actionSection).getByRole('button', { name: /pause tracking/i }));
+    expect(screen.getByText('Confirm protected keyword action')).toBeInTheDocument();
+    const dialog = screen.getByText('Confirm protected keyword action').closest('div')!;
+    fireEvent.click(within(dialog).getByRole('button', { name: /pause tracking/i }));
+
+    expect(mutateMock).toHaveBeenCalledWith({
+      action: 'pause_tracking',
+      keyword: 'manual keyword',
+      pagePath: undefined,
+      force: true,
+    });
   });
 });

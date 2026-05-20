@@ -144,6 +144,26 @@ describe('buildKeywordCommandCenter', () => {
     expect(payload!.counts.tracked).toBeGreaterThan(0);
     expect(payload!.filters.some(filter => filter.id === 'raw_evidence' && filter.count > 0)).toBe(true);
   });
+
+  it('reports uncapped raw provider evidence totals and preserves provider metrics', async () => {
+    replaceAllKeywordGaps(workspaceId, Array.from({ length: 30 }, (_, index) => ({
+      keyword: `provider evidence ${index}`,
+      volume: 1_000 + index,
+      difficulty: 20 + index,
+      competitorPosition: 3 + index,
+      competitorDomain: 'competitor.example',
+    })));
+
+    const payload = await buildKeywordCommandCenter(workspaceId);
+
+    expect(payload?.rawEvidenceTotal).toBe(30);
+    expect(payload?.rawEvidenceReturned).toBe(30);
+    const lastGap = payload!.rows.find(row => row.normalizedKeyword === 'provider evidence 29');
+    expect(lastGap).toEqual(expect.objectContaining({
+      lifecycleStatus: KEYWORD_COMMAND_CENTER_STATUS.RAW_EVIDENCE,
+      metrics: expect.objectContaining({ volume: 1029, difficulty: 49 }),
+    }));
+  });
 });
 
 describe('applyKeywordCommandCenterAction', () => {
