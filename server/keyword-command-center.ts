@@ -6,10 +6,10 @@ import { listContentGaps } from './content-gaps.js';
 import { listKeywordGaps } from './keyword-gaps.js';
 import { listPageKeywords } from './page-keywords.js';
 import {
-  addTrackedKeyword,
   getLatestSnapshotRanks,
   getTrackedKeywords,
   updateTrackedKeywords,
+  type AddTrackedKeywordOptions,
 } from './rank-tracking.js';
 import { getWorkspace } from './workspaces.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
@@ -95,9 +95,18 @@ function mergeMetrics(row: DraftRow, metrics: KeywordCommandCenterMetrics): void
   };
 }
 
+function readFeedbackRows(workspaceId: string): FeedbackRow[] {
+  return stmts().feedback.all(workspaceId) as FeedbackRow[];
+}
+
 function readFeedback(workspaceId: string): Map<string, FeedbackRow> {
-  const rows = stmts().feedback.all(workspaceId) as FeedbackRow[];
-  return new Map(rows.map(row => [keywordComparisonKey(row.keyword), row]));
+  const feedback = new Map<string, FeedbackRow>();
+  for (const row of readFeedbackRows(workspaceId)) {
+    const key = keywordComparisonKey(row.keyword);
+    if (!key || feedback.has(key)) continue;
+    feedback.set(key, row);
+  }
+  return feedback;
 }
 
 function feedbackState(row: FeedbackRow): KeywordCommandCenterFeedbackState | undefined {
@@ -133,7 +142,7 @@ function sourceFromExplanation(explanation: KeywordStrategyExplanation): Keyword
     return { kind: 'content_gap', label: 'Content opportunity', detail: explanation.nextAction.detail };
   }
   if (explanation.role === 'competitor_gap') {
-    return { kind: 'raw_evidence', label: 'Raw provider evidence', detail: explanation.sourceEvidence[0] };
+    return { kind: 'raw_evidence', label: 'Raw provider evidence', detail: explanation.sourceEvidence[0] ?? 'Provider keyword gap' };
   }
   return { kind: 'strategy', label: 'Strategy keyword', detail: explanation.surfaceLabel };
 }
@@ -153,10 +162,16 @@ function protectedReason(keyword: TrackedKeyword | undefined): string | undefine
 function lifecycleStatus(row: DraftRow): KeywordCommandCenterStatus {
   if (row.feedback?.status === 'declined') return KEYWORD_COMMAND_CENTER_STATUS.DECLINED;
   if (row.tracking && isInactiveTracking(row.tracking)) return KEYWORD_COMMAND_CENTER_STATUS.RETIRED;
+  if (row.feedback?.status === 'approved') return KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY;
   if (row.feedback?.status === 'requested') return KEYWORD_COMMAND_CENTER_STATUS.NEEDS_REVIEW;
   if (row.explanation?.rawEvidenceOnly || row.rawEvidenceOnly) return KEYWORD_COMMAND_CENTER_STATUS.RAW_EVIDENCE;
   if (row.explanation && row.explanation.role !== 'competitor_gap') return KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY;
-  if ((row.tracking?.status ?? 'not_tracked') === TRACKED_KEYWORD_STATUS.ACTIVE) return KEYWORD_COMMAND_CENTER_STATUS.TRACKED;
+  if (row.tracking?.source === TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY || row.tracking?.source === TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD) {
+    return KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY;
+  }
+  if (row.tracking && (row.tracking.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE) {
+    return KEYWORD_COMMAND_CENTER_STATUS.TRACKED;
+  }
   if (row.rank) return KEYWORD_COMMAND_CENTER_STATUS.NEEDS_REVIEW;
   return KEYWORD_COMMAND_CENTER_STATUS.RAW_EVIDENCE;
 }
@@ -186,6 +201,16 @@ function buildNextActions(row: DraftRow, status: KeywordCommandCenterStatus, isP
     return actions;
   }
 
+  if (row.feedback?.status === 'requested' || status === KEYWORD_COMMAND_CENTER_STATUS.NEEDS_REVIEW) {
+    actions.push({
+      type: KEYWORD_COMMAND_CENTER_ACTIONS.ADD_TO_STRATEGY,
+      label: 'Add to strategy',
+      detail: 'Approve this keyword into the strategy operating loop without publishing anything.',
+      tone: 'teal',
+      keyword,
+    });
+  }
+
   if (!row.tracking || (row.tracking.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) !== TRACKED_KEYWORD_STATUS.ACTIVE) {
     actions.push({
       type: row.rawEvidenceOnly || row.explanation?.rawEvidenceOnly
@@ -211,6 +236,8 @@ function buildNextActions(row: DraftRow, status: KeywordCommandCenterStatus, isP
       detail: 'Hide this keyword from active tracking while preserving rank history.',
       tone: 'amber',
       keyword,
+      disabled: isProtected,
+      disabledReason: isProtected ? `${protection} is protected from one-click pause.` : undefined,
     });
   }
 
@@ -480,14 +507,99 @@ function findTracked(workspaceId: string, keyword: string): TrackedKeyword | und
   return getTrackedKeywords(workspaceId, { includeInactive: true }).find(entry => keywordComparisonKey(entry.query) === normalized);
 }
 
+function deleteFeedbackByKeywordKey(workspaceId: string, keyword: string): number {
+  const normalized = keywordComparisonKey(keyword);
+  if (!normalized) return 0;
+  let changes = 0;
+  for (const row of readFeedbackRows(workspaceId)) {
+    if (keywordComparisonKey(row.keyword) !== normalized) continue;
+    changes += stmts().deleteFeedback.run(workspaceId, row.keyword).changes;
+  }
+  return changes;
+}
+
 function upsertFeedback(workspaceId: string, keyword: string, status: 'approved' | 'declined' | 'requested', reason?: string): void {
+  const normalized = keywordComparisonKey(keyword);
+  deleteFeedbackByKeywordKey(workspaceId, normalized);
   stmts().upsertFeedback.run({
     workspace_id: workspaceId,
-    keyword,
+    keyword: normalized,
     status,
     reason: reason ?? null,
     source: 'command_center',
     declined_by: status === 'declined' ? 'admin' : null,
+  });
+}
+
+function trackedSourceForMerge(existing: TrackedKeyword, options: AddTrackedKeywordOptions, preferSource: boolean): TrackedKeyword['source'] {
+  const existingSource = existing.source ?? TRACKED_KEYWORD_SOURCE.UNKNOWN;
+  const existingStatus = existing.status ?? TRACKED_KEYWORD_STATUS.ACTIVE;
+  const nextStatus = options.status ?? existingStatus;
+  if (protectedReason(existing) && !preferSource) return existingSource;
+  if (preferSource && options.source && !protectedReason(existing)) return options.source;
+  if (existingStatus !== TRACKED_KEYWORD_STATUS.ACTIVE && nextStatus === TRACKED_KEYWORD_STATUS.ACTIVE) {
+    return options.source ?? existingSource;
+  }
+  if (existingSource === TRACKED_KEYWORD_SOURCE.UNKNOWN) return options.source ?? existingSource;
+  return existingSource;
+}
+
+function upsertTrackedKeywordByKey(
+  workspaceId: string,
+  keyword: string,
+  options: AddTrackedKeywordOptions,
+  opts: { preferSource?: boolean } = {},
+): TrackedKeyword[] {
+  const normalized = keywordComparisonKey(keyword);
+  if (!normalized) return getTrackedKeywords(workspaceId, { includeInactive: true });
+
+  return updateTrackedKeywords(workspaceId, keywords => {
+    const equivalents = keywords.filter(entry => keywordComparisonKey(entry.query) === normalized);
+    const existing = equivalents[0];
+    const now = new Date().toISOString();
+    const next = keywords.filter(entry => keywordComparisonKey(entry.query) !== normalized);
+
+    if (existing) {
+      const nextStatus = options.status ?? existing.status ?? TRACKED_KEYWORD_STATUS.ACTIVE;
+      const definedOptions = Object.fromEntries(
+        Object.entries(options).filter(([, value]) => value !== undefined),
+      ) as AddTrackedKeywordOptions;
+      next.push({
+        ...existing,
+        ...definedOptions,
+        query: normalized,
+        pinned: equivalents.some(entry => entry.pinned) || Boolean(options.pinned),
+        addedAt: existing.addedAt || now,
+        status: nextStatus,
+        source: trackedSourceForMerge(existing, options, Boolean(opts.preferSource)),
+        replacedBy: nextStatus === TRACKED_KEYWORD_STATUS.ACTIVE ? undefined : definedOptions.replacedBy ?? existing.replacedBy,
+        deprecatedAt: nextStatus === TRACKED_KEYWORD_STATUS.ACTIVE ? undefined : definedOptions.deprecatedAt ?? existing.deprecatedAt,
+      });
+      return next;
+    }
+
+    next.push({
+      query: normalized,
+      pinned: Boolean(options.pinned),
+      addedAt: now,
+      source: options.source ?? TRACKED_KEYWORD_SOURCE.MANUAL,
+      status: options.status ?? TRACKED_KEYWORD_STATUS.ACTIVE,
+      pagePath: options.pagePath,
+      pageTitle: options.pageTitle,
+      strategyGeneratedAt: options.strategyGeneratedAt,
+      lastStrategySeenAt: options.lastStrategySeenAt,
+      intent: options.intent,
+      volume: options.volume,
+      difficulty: options.difficulty,
+      cpc: options.cpc,
+      authorityPosture: options.authorityPosture,
+      baselinePosition: options.baselinePosition,
+      baselineClicks: options.baselineClicks,
+      baselineImpressions: options.baselineImpressions,
+      replacedBy: options.replacedBy,
+      deprecatedAt: options.deprecatedAt,
+    });
+    return next;
   });
 }
 
@@ -522,10 +634,18 @@ export function applyKeywordCommandCenterAction(
   const run = db.transaction(() => {
     switch (request.action) {
       case KEYWORD_COMMAND_CENTER_ACTIONS.ADD_TO_STRATEGY:
+        upsertFeedback(workspace.id, keyword, 'approved', request.reason ?? 'Added to strategy from Keyword Command Center');
+        trackedKeywords = upsertTrackedKeywordByKey(workspace.id, keyword, {
+          source: TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD,
+          status: TRACKED_KEYWORD_STATUS.ACTIVE,
+          pagePath: request.pagePath,
+        }, { preferSource: true });
+        message = `"${keyword}" was added to the strategy operating loop.`;
+        break;
       case KEYWORD_COMMAND_CENTER_ACTIONS.PROMOTE_EVIDENCE:
       case KEYWORD_COMMAND_CENTER_ACTIONS.TRACK:
-        stmts().deleteFeedback.run(workspace.id, keyword);
-        trackedKeywords = addTrackedKeyword(workspace.id, keyword, {
+        deleteFeedbackByKeywordKey(workspace.id, keyword);
+        trackedKeywords = upsertTrackedKeywordByKey(workspace.id, keyword, {
           source: request.action === KEYWORD_COMMAND_CENTER_ACTIONS.PROMOTE_EVIDENCE
             ? TRACKED_KEYWORD_SOURCE.RECOMMENDATION
             : TRACKED_KEYWORD_SOURCE.MANUAL,
@@ -535,6 +655,7 @@ export function applyKeywordCommandCenterAction(
         message = `"${keyword}" is now active in keyword tracking.`;
         break;
       case KEYWORD_COMMAND_CENTER_ACTIONS.PAUSE_TRACKING:
+        if (!protectedCheck.ok) throw new Error(protectedCheck.reason);
         trackedKeywords = retireTrackedKeyword(workspace.id, keyword, TRACKED_KEYWORD_STATUS.PAUSED);
         message = `"${keyword}" was paused from active tracking.`;
         break;
@@ -552,8 +673,8 @@ export function applyKeywordCommandCenterAction(
         message = `"${keyword}" was declined for future strategy consideration.`;
         break;
       case KEYWORD_COMMAND_CENTER_ACTIONS.RESTORE:
-        stmts().deleteFeedback.run(workspace.id, keyword);
-        trackedKeywords = addTrackedKeyword(workspace.id, keyword, {
+        deleteFeedbackByKeywordKey(workspace.id, keyword);
+        trackedKeywords = upsertTrackedKeywordByKey(workspace.id, keyword, {
           source: existing?.source ?? TRACKED_KEYWORD_SOURCE.MANUAL,
           status: TRACKED_KEYWORD_STATUS.ACTIVE,
           deprecatedAt: undefined,
@@ -567,7 +688,11 @@ export function applyKeywordCommandCenterAction(
 
   invalidateIntelligenceCache(workspace.id);
   const payload = { keyword, action: request.action, source: 'keyword_command_center', updatedAt: now };
-  if (request.action === KEYWORD_COMMAND_CENTER_ACTIONS.DECLINE || request.action === KEYWORD_COMMAND_CENTER_ACTIONS.RESTORE) {
+  if (
+    request.action === KEYWORD_COMMAND_CENTER_ACTIONS.ADD_TO_STRATEGY
+    || request.action === KEYWORD_COMMAND_CENTER_ACTIONS.DECLINE
+    || request.action === KEYWORD_COMMAND_CENTER_ACTIONS.RESTORE
+  ) {
     broadcastToWorkspace(workspace.id, WS_EVENTS.STRATEGY_UPDATED, payload);
     broadcastToWorkspace(workspace.id, WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED, {
       workspaceId: workspace.id,

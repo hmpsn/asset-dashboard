@@ -10,7 +10,7 @@ import { replaceAllKeywordGaps } from '../../server/keyword-gaps.js';
 import { upsertPageKeyword } from '../../server/page-keywords.js';
 import { addTrackedKeyword, getTrackedKeywords, storeRankSnapshot } from '../../server/rank-tracking.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
-import { normalizeKeywordForComparison } from '../../shared/keyword-normalization.js';
+import { keywordComparisonKey, normalizeKeywordForComparison } from '../../shared/keyword-normalization.js';
 import {
   KEYWORD_COMMAND_CENTER_ACTIONS,
   KEYWORD_COMMAND_CENTER_STATUS,
@@ -44,6 +44,10 @@ function seedFeedback(keyword: string, status: 'approved' | 'declined' | 'reques
       declined_by = excluded.declined_by,
       updated_at = datetime('now')
   `).run(workspaceId, keyword, status, reason ?? null, 'test', status === 'declined' ? 'admin' : null);
+}
+
+function feedbackRows() {
+  return db.prepare('SELECT keyword, status FROM keyword_feedback WHERE workspace_id = ?').all(workspaceId) as Array<{ keyword: string; status: string }>;
 }
 
 function seedStrategy() {
@@ -143,6 +147,46 @@ describe('buildKeywordCommandCenter', () => {
 });
 
 describe('applyKeywordCommandCenterAction', () => {
+  it('adds requested keywords to strategy using canonical keyword equality', async () => {
+    seedFeedback('Requested-Keyword', 'requested', 'Client asked about this.');
+
+    applyKeywordCommandCenterAction(workspaceId, {
+      action: KEYWORD_COMMAND_CENTER_ACTIONS.ADD_TO_STRATEGY,
+      keyword: 'requested keyword',
+    });
+
+    const payload = await buildKeywordCommandCenter(workspaceId);
+    const row = payload!.rows.find(item => item.normalizedKeyword === 'requested keyword');
+    expect(row).toEqual(expect.objectContaining({
+      lifecycleStatus: KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY,
+      feedback: expect.objectContaining({ status: 'approved' }),
+      tracking: expect.objectContaining({
+        status: TRACKED_KEYWORD_STATUS.ACTIVE,
+        source: TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD,
+      }),
+    }));
+    expect(feedbackRows().map(row => keywordComparisonKey(row.keyword))).toEqual(['requested keyword']);
+  });
+
+  it('restores equivalent punctuated keywords without leaving declined feedback or duplicate tracked rows', () => {
+    seedFeedback('paper-tiger', 'declined', 'Not a fit.');
+    addTrackedKeyword(workspaceId, 'paper-tiger', {
+      source: TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD,
+      status: TRACKED_KEYWORD_STATUS.DEPRECATED,
+    });
+
+    applyKeywordCommandCenterAction(workspaceId, {
+      action: KEYWORD_COMMAND_CENTER_ACTIONS.RESTORE,
+      keyword: 'paper tiger',
+    });
+
+    expect(feedbackRows()).toEqual([]);
+    const tracked = getTrackedKeywords(workspaceId, { includeInactive: true });
+    expect(tracked.filter(keyword => keywordComparisonKey(keyword.query) === 'paper tiger')).toEqual([
+      expect.objectContaining({ query: 'paper tiger', status: TRACKED_KEYWORD_STATUS.ACTIVE }),
+    ]);
+  });
+
   it('tracks and restores keywords without losing rank-tracking metadata', () => {
     applyKeywordCommandCenterAction(workspaceId, {
       action: KEYWORD_COMMAND_CENTER_ACTIONS.TRACK,
@@ -155,6 +199,7 @@ describe('applyKeywordCommandCenterAction', () => {
     applyKeywordCommandCenterAction(workspaceId, {
       action: KEYWORD_COMMAND_CENTER_ACTIONS.PAUSE_TRACKING,
       keyword: 'porcelain veneers cost',
+      force: true,
     });
     expect(getTrackedKeywords(workspaceId)).not.toEqual(expect.arrayContaining([
       expect.objectContaining({ query: 'porcelain veneers cost' }),
@@ -179,6 +224,10 @@ describe('applyKeywordCommandCenterAction', () => {
 
     expect(() => applyKeywordCommandCenterAction(workspaceId, {
       action: KEYWORD_COMMAND_CENTER_ACTIONS.RETIRE,
+      keyword: 'manual keyword',
+    })).toThrow(/explicit confirmation/);
+    expect(() => applyKeywordCommandCenterAction(workspaceId, {
+      action: KEYWORD_COMMAND_CENTER_ACTIONS.PAUSE_TRACKING,
       keyword: 'manual keyword',
     })).toThrow(/explicit confirmation/);
     expect(() => applyKeywordCommandCenterAction(workspaceId, {

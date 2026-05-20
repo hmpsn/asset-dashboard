@@ -79,8 +79,7 @@ function compactNumber(value: number | undefined): string {
 
 function percent(value: number | undefined): string {
   if (value == null) return '—';
-  const normalized = value > 1 ? value : value * 100;
-  return `${normalized.toFixed(1)}%`;
+  return `${(value * 100).toFixed(1)}%`;
 }
 
 function matchesFilter(row: KeywordCommandCenterRow, filter: KeywordCommandCenterFilter): boolean {
@@ -343,6 +342,11 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
       return matchesSearch && matchesFilter(row, filter);
     });
   }, [filter, rows, searchTerm]);
+  const actionErrorMessage = actionMutation.error instanceof Error
+    ? actionMutation.error.message
+    : actionMutation.error
+      ? 'Keyword action failed. Try again or refresh the page.'
+      : null;
 
   const selectedRow = useMemo(() => {
     if (selectedKey) {
@@ -432,6 +436,15 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
         <SummaryMetric label="Retired" value={data?.counts.retired ?? 0} icon={Archive} tone="zinc" />
       </div>
 
+      {actionErrorMessage && (
+        <div
+          role="alert"
+          className="rounded-[var(--radius-xl)] border border-red-500/25 bg-red-500/8 px-4 py-3 text-red-400 t-caption"
+        >
+          {actionErrorMessage}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_390px] gap-4 items-start">
         <SectionCard
           title="Keyword Universe"
@@ -468,33 +481,37 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
             })}
           </div>
 
-          <div className="hidden md:grid grid-cols-[minmax(220px,1.5fr)_120px_100px_100px_minmax(180px,1fr)_130px] gap-3 px-4 py-2 border-b border-[var(--brand-border)] bg-[var(--surface-3)]/30">
-            <p className="t-label text-[var(--brand-text-muted)]">Keyword</p>
-            <p className="t-label text-[var(--brand-text-muted)]">Status</p>
-            <p className="t-label text-[var(--brand-text-muted)]">Demand</p>
-            <p className="t-label text-[var(--brand-text-muted)]">Rank/KD</p>
-            <p className="t-label text-[var(--brand-text-muted)]">Assignment</p>
-            <p className="t-label text-[var(--brand-text-muted)] text-right">Next</p>
-          </div>
+          <div className="overflow-x-auto">
+            <div className="min-w-[860px]">
+              <div className="hidden md:grid grid-cols-[minmax(220px,1.5fr)_120px_100px_100px_minmax(180px,1fr)_130px] gap-3 px-4 py-2 border-b border-[var(--brand-border)] bg-[var(--surface-3)]/30">
+                <p className="t-label text-[var(--brand-text-muted)]">Keyword</p>
+                <p className="t-label text-[var(--brand-text-muted)]">Status</p>
+                <p className="t-label text-[var(--brand-text-muted)]">Demand</p>
+                <p className="t-label text-[var(--brand-text-muted)]">Rank/KD</p>
+                <p className="t-label text-[var(--brand-text-muted)]">Assignment</p>
+                <p className="t-label text-[var(--brand-text-muted)] text-right">Next</p>
+              </div>
 
-          {filteredRows.length === 0 ? (
-            <EmptyState
-              icon={Search}
-              title="No keywords match this view"
-              description="Try a different filter or search term. Raw provider evidence is capped so the operating list stays useful."
-            />
-          ) : (
-            <div className="max-h-[680px] overflow-y-auto">
-              {filteredRows.map(row => (
-                <KeywordRow
-                  key={row.normalizedKeyword}
-                  row={row}
-                  active={selectedRow?.normalizedKeyword === row.normalizedKeyword}
-                  onSelect={() => setSelectedKey(row.normalizedKeyword)}
+              {filteredRows.length === 0 ? (
+                <EmptyState
+                  icon={Search}
+                  title="No keywords match this view"
+                  description="Try a different filter or search term. Raw provider evidence is capped so the operating list stays useful."
                 />
-              ))}
+              ) : (
+                <div className="max-h-[680px] overflow-y-auto">
+                  {filteredRows.map(row => (
+                    <KeywordRow
+                      key={row.normalizedKeyword}
+                      row={row}
+                      active={selectedRow?.normalizedKeyword === row.normalizedKeyword}
+                      onSelect={() => setSelectedKey(row.normalizedKeyword)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
-          )}
+          </div>
 
           {data && data.rawEvidenceTotal > data.rawEvidenceReturned && (
             <div className="px-4 py-3 border-t border-[var(--brand-border)] bg-[var(--surface-3)]/20">

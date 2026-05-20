@@ -32,7 +32,7 @@ describe('Keyword Command Center routes', () => {
     expect(body.rawEvidenceTotal).toEqual(expect.any(Number));
   });
 
-  it('POST track activates a keyword and protected retire requires explicit confirmation', async () => {
+  it('POST track activates a keyword and protected lifecycle actions require explicit confirmation', async () => {
     const track = await postJson(`/api/webflow/keyword-command-center/${workspaceId}/actions`, {
       action: 'track',
       keyword: 'Route Test Keyword',
@@ -42,6 +42,15 @@ describe('Keyword Command Center routes', () => {
       ok: true,
       keyword: 'route test keyword',
     }));
+
+    const pause = await postJson(`/api/webflow/keyword-command-center/${workspaceId}/actions`, {
+      action: 'pause_tracking',
+      keyword: 'Route Test Keyword',
+    });
+    expect(pause.status).toBe(409);
+    await expect(pause.json()).resolves.toEqual({
+      error: 'Manual keyword requires explicit confirmation before this action.',
+    });
 
     const retire = await postJson(`/api/webflow/keyword-command-center/${workspaceId}/actions`, {
       action: 'retire',
