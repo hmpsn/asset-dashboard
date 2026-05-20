@@ -111,6 +111,12 @@ describe('buildStrategySignals', () => {
       data: { keyword: 'paper tiger', competitorDomain: 'rival.com', competitorPosition: 2, ourPosition: null, volume: 9000, difficulty: 12 },
       impactScore: 95,
     });
+    const staleProviderNoise = makeInsight({
+      id: 'gap_domain_extension_noise',
+      insightType: 'competitor_gap',
+      data: { keyword: 'list of all domain name extensions', competitorDomain: 'rival.com', competitorPosition: 4, ourPosition: null, volume: 3600, difficulty: 30 },
+      impactScore: 90,
+    });
     const useful = makeInsight({
       id: 'gap_useful',
       insightType: 'competitor_gap',
@@ -118,7 +124,7 @@ describe('buildStrategySignals', () => {
       impactScore: 80,
     });
 
-    const signals = buildStrategySignals([noisy, useful], {
+    const signals = buildStrategySignals([noisy, staleProviderNoise, useful], {
       keywordEvaluationContext: {
         workspaceId: 'ws_test',
         businessTerms: ['SEO analytics platform for agencies', 'keyword intelligence'],

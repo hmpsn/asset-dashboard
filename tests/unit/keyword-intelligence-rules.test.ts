@@ -87,7 +87,7 @@ describe('keyword intelligence shared rules', () => {
       strictBusinessFit: true,
     };
 
-    for (const keyword of ['paper tiger', 'typing tiger']) {
+    for (const keyword of ['paper tiger', 'typing tiger', 'all domain name extensions list', 'list of all domain name extensions']) {
       const result = evaluateKeywordCandidate(
         { keyword, volume: 12000, difficulty: 20, cpc: 0.5, source: 'keyword_ideas' },
         context,
