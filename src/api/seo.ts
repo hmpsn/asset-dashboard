@@ -1,6 +1,6 @@
 // ── SEO API (audit, schema, keywords, webflow, etc.) ──────────────
 import { ApiError, get, post, put, patch, del, getSafe, getOptional } from './client';
-import type { LatestRank, RankHistoryEntry } from '../components/client/types';
+import type { LatestRank, RankHistoryEntry, TrackedKeyword } from '../../shared/types/rank-tracking';
 import { readNdjsonStream } from './streamUtils';
 export {
   schema,
@@ -119,7 +119,7 @@ export const keywords = {
 // ── Rank tracking ───────────────────────────────────────────────
 export const rankTracking = {
   keywords: (wsId: string) =>
-    get<Array<{ query: string; pinned?: boolean; addedAt?: string }>>(`/api/rank-tracking/${wsId}/keywords`),
+    get<TrackedKeyword[]>(`/api/rank-tracking/${wsId}/keywords`),
 
   latest: (wsId: string) =>
     getSafe<LatestRank[]>(`/api/rank-tracking/${wsId}/latest`, []),

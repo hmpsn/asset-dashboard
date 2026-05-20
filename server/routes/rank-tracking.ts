@@ -4,9 +4,8 @@
 import { Router } from 'express';
 
 import { requireWorkspaceAccess } from '../auth.js';
-const router = Router();
-
 import { addActivity } from '../activity-log.js';
+import { broadcastToWorkspace } from '../broadcast.js';
 import {
   getTrackedKeywords,
   addTrackedKeyword,
@@ -18,12 +17,20 @@ import {
 } from '../rank-tracking.js';
 import { getSearchOverview } from '../search-console.js';
 import { getWorkspace } from '../workspaces.js';
+import { WS_EVENTS } from '../ws-events.js';
+import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
+
+const router = Router();
 
 function parseHistoryLimit(rawLimit: unknown): number | null {
   if (rawLimit == null) return 90;
   const limit = Number(rawLimit);
   if (!Number.isInteger(limit) || limit <= 0) return null;
   return limit;
+}
+
+function normalizeKeywordQuery(query: string): string {
+  return query.toLowerCase().trim();
 }
 
 // --- Rank Tracking ---
@@ -35,18 +42,45 @@ router.get('/api/rank-tracking/:workspaceId/keywords', requireWorkspaceAccess('w
 // Add a tracked keyword
 router.post('/api/rank-tracking/:workspaceId/keywords', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const { query, pinned } = req.body;
-  if (!query) return res.status(400).json({ error: 'query required' });
-  res.json(addTrackedKeyword(req.params.workspaceId, query, pinned));
+  if (typeof query !== 'string') return res.status(400).json({ error: 'query required' });
+  const normalizedQuery = normalizeKeywordQuery(query);
+  if (!normalizedQuery) return res.status(400).json({ error: 'query required' });
+  const wasTracked = getTrackedKeywords(req.params.workspaceId).some(keyword => keyword.query === normalizedQuery);
+  const keywords = addTrackedKeyword(req.params.workspaceId, normalizedQuery, {
+    pinned: Boolean(pinned),
+    source: TRACKED_KEYWORD_SOURCE.MANUAL,
+  });
+  if (!wasTracked) {
+    addActivity(req.params.workspaceId, 'rank_tracking_updated', 'Tracked keyword added', `"${normalizedQuery}" added to rank tracking`);
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.RANK_TRACKING_UPDATED, { keyword: normalizedQuery, action: 'added', source: 'manual' });
+  }
+  res.json(keywords);
 });
 
 // Remove a tracked keyword
 router.delete('/api/rank-tracking/:workspaceId/keywords/:query', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  res.json(removeTrackedKeyword(req.params.workspaceId, decodeURIComponent(req.params.query)));
+  const query = decodeURIComponent(req.params.query);
+  const normalizedQuery = normalizeKeywordQuery(query);
+  const wasTracked = getTrackedKeywords(req.params.workspaceId).some(keyword => keyword.query === normalizedQuery);
+  const keywords = removeTrackedKeyword(req.params.workspaceId, query);
+  if (wasTracked) {
+    addActivity(req.params.workspaceId, 'rank_tracking_updated', 'Tracked keyword removed', `"${normalizedQuery}" removed from rank tracking`);
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.RANK_TRACKING_UPDATED, { keyword: normalizedQuery, action: 'removed', source: 'manual' });
+  }
+  res.json(keywords);
 });
 
 // Toggle pin on a tracked keyword
 router.patch('/api/rank-tracking/:workspaceId/keywords/:query/pin', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  res.json(togglePinKeyword(req.params.workspaceId, decodeURIComponent(req.params.query)));
+  const query = decodeURIComponent(req.params.query);
+  const normalizedQuery = normalizeKeywordQuery(query);
+  const wasTracked = getTrackedKeywords(req.params.workspaceId).some(keyword => keyword.query === normalizedQuery);
+  const keywords = togglePinKeyword(req.params.workspaceId, query);
+  if (wasTracked) {
+    addActivity(req.params.workspaceId, 'rank_tracking_updated', 'Tracked keyword pin updated', `"${normalizedQuery}" pin status changed`);
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.RANK_TRACKING_UPDATED, { keyword: normalizedQuery, action: 'pin_toggled', source: 'manual' });
+  }
+  res.json(keywords);
 });
 
 // Capture a rank snapshot from current GSC data
@@ -62,6 +96,7 @@ router.post('/api/rank-tracking/:workspaceId/snapshot', requireWorkspaceAccess('
     }));
     storeRankSnapshot(req.params.workspaceId, date, queries);
     addActivity(req.params.workspaceId, 'rank_snapshot', 'Rank snapshot captured', `${queries.length} keyword positions recorded for ${date}`);
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.RANK_TRACKING_UPDATED, { action: 'snapshot', count: queries.length, date });
     res.json({ date, count: queries.length });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to capture snapshot' });

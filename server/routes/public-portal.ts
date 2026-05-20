@@ -31,7 +31,8 @@ import { debouncedStrategyInvalidate, invalidateSubCachePrefix } from '../bridge
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { getBookingUrl } from '../studio-config.js';
 import { listBlueprints } from '../page-strategy.js';
-import { addTrackedKeyword } from '../rank-tracking.js';
+import { addTrackedKeyword, addTrackedKeywords } from '../rank-tracking.js';
+import { trackedKeywordSourceForFeedback } from '../keyword-feedback-tracking.js';
 import { listContentGaps } from '../content-gaps.js';
 import { getSection, getSectionsForEntry, getEntryCopyStatus, updateSectionStatus, addClientSuggestion } from '../copy-review.js';
 import {
@@ -371,7 +372,10 @@ router.post('/api/public/keyword-feedback/:workspaceId', requireClientStrategyMu
       updated_at = datetime('now')
   `).run(ws.id, kw, status, reason || null, source, declinedBy);
 
-  if (status === 'approved') addTrackedKeyword(ws.id, kw);
+  if (status === 'approved') {
+    addTrackedKeyword(ws.id, kw, { source: trackedKeywordSourceForFeedback(source) });
+    broadcastToWorkspace(ws.id, WS_EVENTS.RANK_TRACKING_UPDATED, { keyword: kw, action: 'feedback_approved', source: 'client_feedback' });
+  }
 
   log.info(`Client keyword feedback: "${kw}" → ${status} for workspace ${ws.id}`);
   broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { keyword: kw, status, source });
@@ -398,16 +402,32 @@ router.post('/api/public/keyword-feedback/:workspaceId/bulk', requireClientStrat
       updated_at = datetime('now')
   `);
 
+  const approvedKeywordEntries: Parameters<typeof addTrackedKeywords>[1] = [];
   const insert = db.transaction((items: KeywordFeedbackBody[]) => {
     for (const item of items) {
       const kw = item.keyword.toLowerCase().trim();
       stmt.run(ws.id, kw, item.status, item.reason || null, item.source, declinedBy);
-      if (item.status === 'approved') addTrackedKeyword(ws.id, kw);
+      if (item.status === 'approved') {
+        approvedKeywordEntries.push({
+          query: kw,
+          options: { source: trackedKeywordSourceForFeedback(item.source) },
+        });
+      }
     }
+    if (approvedKeywordEntries.length > 0) addTrackedKeywords(ws.id, approvedKeywordEntries);
   });
   insert(keywords);
+  const approvedKeywords = approvedKeywordEntries.map(entry => entry.query);
   log.info(`Client bulk keyword feedback: ${keywords.length} keywords for workspace ${ws.id}`);
   broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { updated: keywords.length });
+  if (approvedKeywords.length > 0) {
+    broadcastToWorkspace(ws.id, WS_EVENTS.RANK_TRACKING_UPDATED, {
+      action: 'feedback_bulk_approved',
+      source: 'client_feedback',
+      keywords: approvedKeywords,
+      count: approvedKeywords.length,
+    });
+  }
   // client-visibility-ok: this activity is for internal audit history, not client timeline display.
   addActivity(wsId, 'client_keyword_feedback', `Client gave bulk keyword feedback (${keywords.length} keywords)`, 'Via client portal');
   res.json({ updated: keywords.length });

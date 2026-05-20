@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { trackedKeywords as trackedKwApi } from '../../../api';
+import { useWorkspaceEvents } from '../../../hooks/useWorkspaceEvents';
+import { WS_EVENTS } from '../../../lib/wsEvents';
+import type { TrackedKeyword } from '../../../../shared/types/rank-tracking';
 
-export interface StrategyTrackedKeyword {
-  query: string;
-  pinned: boolean;
-  addedAt: string;
-}
+export type StrategyTrackedKeyword = TrackedKeyword;
 
 interface UseStrategyTrackedKeywordsOptions {
   workspaceId?: string;
@@ -32,6 +31,13 @@ export function useStrategyTrackedKeywords({ workspaceId }: UseStrategyTrackedKe
   }, [workspaceId]);
 
   useEffect(() => { loadTrackedKeywords(); }, [loadTrackedKeywords]);
+
+  useWorkspaceEvents(workspaceId, {
+    // ws-invalidation-ok: Strategy tab owns local tracked-keyword state, not React Query state.
+    [WS_EVENTS.RANK_TRACKING_UPDATED]: loadTrackedKeywords,
+    // ws-invalidation-ok: strategy refresh can reconcile tracked keyword lifecycle/source metadata.
+    [WS_EVENTS.STRATEGY_UPDATED]: loadTrackedKeywords,
+  });
 
   const addTrackedKeyword = useCallback(async (keyword: string): Promise<StrategyTrackedKeyword[]> => {
     if (!workspaceId) return trackedKeywords;

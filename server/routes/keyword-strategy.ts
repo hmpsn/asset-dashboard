@@ -8,7 +8,9 @@ import { Router } from 'express';
 
 const router = Router();
 
-import { addTrackedKeyword } from '../rank-tracking.js';
+import { addActivity } from '../activity-log.js';
+import { addTrackedKeyword, addTrackedKeywords } from '../rank-tracking.js';
+import { trackedKeywordSourceForFeedback } from '../keyword-feedback-tracking.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { debouncedStrategyInvalidate, debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { updateWorkspace, getWorkspace } from '../workspaces.js';
@@ -477,7 +479,7 @@ router.get('/api/webflow/keyword-feedback/:workspaceId', requireWorkspaceAccess(
 });
 
 // Admin or client: submit feedback on a keyword
-// activity-ok: keyword approve/decline is transient feedback state, not a workspace activity event
+// activity-ok: keyword approve/decline is transient feedback state; approved tracking writes are logged separately.
 router.post('/api/webflow/keyword-feedback/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(adminKeywordFeedbackSchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -494,7 +496,16 @@ router.post('/api/webflow/keyword-feedback/:workspaceId', requireWorkspaceAccess
       updated_at = datetime('now')
   `).run(ws.id, kw, status, reason || null, source, declinedBy || null);
 
-  if (status === 'approved') addTrackedKeyword(ws.id, kw);
+  if (status === 'approved') {
+    const trackingSource = trackedKeywordSourceForFeedback(source);
+    addTrackedKeyword(ws.id, kw, { source: trackingSource });
+    addActivity(ws.id, 'rank_tracking_updated', 'Tracked keyword approved', `"${kw}" added to rank tracking from keyword approval`, {
+      keyword: kw,
+      source: trackingSource,
+      action: 'feedback_approved',
+    });
+    broadcastToWorkspace(ws.id, WS_EVENTS.RANK_TRACKING_UPDATED, { keyword: kw, action: 'feedback_approved', source: 'admin_feedback' });
+  }
 
   log.info(`Keyword feedback: "${kw}" → ${status} for workspace ${ws.id}${reason ? ` (reason: ${reason})` : ''}`);
   broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { keyword: kw, status, source });
@@ -502,7 +513,7 @@ router.post('/api/webflow/keyword-feedback/:workspaceId', requireWorkspaceAccess
 });
 
 // Bulk feedback (approve/decline multiple keywords at once)
-// activity-ok: keyword approve/decline is transient feedback state, not a workspace activity event
+// activity-ok: keyword approve/decline is transient feedback state; approved tracking writes are logged separately.
 router.post('/api/webflow/keyword-feedback/:workspaceId/bulk', requireWorkspaceAccess('workspaceId'), validate(adminBulkKeywordFeedbackSchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -518,19 +529,38 @@ router.post('/api/webflow/keyword-feedback/:workspaceId/bulk', requireWorkspaceA
       updated_at = datetime('now')
   `);
 
+  const approvedKeywordEntries: Parameters<typeof addTrackedKeywords>[1] = [];
   const insert = db.transaction((items: AdminBulkKeywordFeedbackBody['keywords']) => {
     for (const item of items) {
-      stmt.run(ws.id, item.keyword.toLowerCase().trim(), item.status, item.reason || null, item.source, declinedBy || null);
+      const kw = item.keyword.toLowerCase().trim();
+      stmt.run(ws.id, kw, item.status, item.reason || null, item.source, declinedBy || null);
+      if (item.status === 'approved') {
+        approvedKeywordEntries.push({
+          query: kw,
+          options: { source: trackedKeywordSourceForFeedback(item.source) },
+        });
+      }
     }
+    if (approvedKeywordEntries.length > 0) addTrackedKeywords(ws.id, approvedKeywordEntries);
   });
   insert(keywords);
-
-  for (const item of keywords) {
-    if (item.status === 'approved') addTrackedKeyword(ws.id, item.keyword.toLowerCase().trim());
-  }
+  const approvedKeywords = approvedKeywordEntries.map(entry => entry.query);
 
   log.info(`Bulk keyword feedback: ${keywords.length} keywords for workspace ${ws.id}`);
   broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { updated: keywords.length });
+  if (approvedKeywords.length > 0) {
+    addActivity(ws.id, 'rank_tracking_updated', 'Tracked keywords approved', `${approvedKeywords.length} approved keywords added to rank tracking`, {
+      keywords: approvedKeywords,
+      count: approvedKeywords.length,
+      action: 'feedback_bulk_approved',
+    });
+    broadcastToWorkspace(ws.id, WS_EVENTS.RANK_TRACKING_UPDATED, {
+      action: 'feedback_bulk_approved',
+      source: 'admin_feedback',
+      keywords: approvedKeywords,
+      count: approvedKeywords.length,
+    });
+  }
   res.json({ updated: keywords.length });
 });
 

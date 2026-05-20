@@ -28,6 +28,7 @@ import { getClientActor, requireClientPortalAuth } from '../middleware.js';
 import { getPageTrend, getQueryPageData } from '../search-console.js';
 import { getWorkspace } from '../workspaces.js';
 import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword } from '../rank-tracking.js';
+import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
 import { handleContentPerformance } from './content-requests.js';
 import { isProgrammingError } from '../errors.js';
 import { getConfiguredProvider } from '../seo-data-provider.js';
@@ -557,12 +558,14 @@ router.post('/api/public/tracked-keywords/:workspaceId', validate(addTrackedKeyw
   const actor = getClientActor(req, ws.id);
   const existingKeywords = getTrackedKeywords(ws.id);
   const alreadyTracked = existingKeywords.some(k => k.query === keyword);
-  const keywords = alreadyTracked ? existingKeywords : addTrackedKeyword(ws.id, keyword);
+  const keywords = alreadyTracked ? existingKeywords : addTrackedKeyword(ws.id, keyword, {
+    source: TRACKED_KEYWORD_SOURCE.CLIENT_REQUESTED,
+  });
   res.json({ keywords });
 
   if (!alreadyTracked) {
     recordTrackedKeywordActivity(ws.id, 'client_keyword_tracked', `"${keyword}" added to strategy keywords`, actor ?? undefined);
-    broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { keyword });
+    broadcastToWorkspace(ws.id, WS_EVENTS.RANK_TRACKING_UPDATED, { keyword });
 
     // Fire-and-forget: pre-warm the DataForSEO cache for this keyword so the next
     // strategy GET has volume/difficulty data available immediately.
@@ -591,7 +594,7 @@ router.delete('/api/public/tracked-keywords/:workspaceId', validate(removeTracke
   if (wasTracked) {
     const actor = getClientActor(req, ws.id);
     recordTrackedKeywordActivity(ws.id, 'client_keyword_removed', `"${keyword}" removed from strategy keywords`, actor ?? undefined);
-    broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { keyword, removed: true });
+    broadcastToWorkspace(ws.id, WS_EVENTS.RANK_TRACKING_UPDATED, { keyword, removed: true });
   }
 });
 
