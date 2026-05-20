@@ -741,3 +741,192 @@ describe('DataForSeoProvider — init() capability probe', () => {
     expect(isCapabilityDisabled('dataforseo', 'backlinks')).toBe(false);
   });
 });
+
+describe('DataForSeoProvider — local visibility', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const market = {
+    id: 'market-austin',
+    workspaceId: 'ws-local-provider',
+    label: 'Austin, TX',
+    city: 'Austin',
+    stateOrRegion: 'TX',
+    country: 'US',
+    providerLocationCode: 1026201,
+    providerLocationName: 'Austin,Texas,United States',
+    source: 'admin_override' as const,
+    status: 'active' as const,
+    createdAt: '2026-05-20T00:00:00.000Z',
+    updatedAt: '2026-05-20T00:00:00.000Z',
+  };
+
+  it('uses Google organic SERP local-pack payload guardrails', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(dfsTaskResponse([{ items: [] }])),
+    } as Response);
+
+    await provider.getLocalVisibility({
+      keyword: 'austin dentist',
+      market,
+      device: 'desktop',
+      languageCode: 'en',
+      maxResults: 10,
+    }, 'ws-local-provider');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(String(url)).toContain('serp/google/organic/live/advanced');
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body[0]).toEqual(expect.objectContaining({
+      keyword: 'austin dentist',
+      location_code: 1026201,
+      language_code: 'en',
+      device: 'desktop',
+    }));
+    expect(body[0]).not.toHaveProperty('location_name');
+    expect(body[0].depth).toBeGreaterThanOrEqual(10);
+  });
+
+  it('uses coordinates when no provider location code or name is available', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(dfsTaskResponse([{ items: [] }])),
+    } as Response);
+
+    await provider.getLocalVisibility({
+      keyword: 'austin dentist',
+      market: {
+        ...market,
+        providerLocationCode: undefined,
+        providerLocationName: undefined,
+        latitude: 30.2672,
+        longitude: -97.7431,
+      },
+      device: 'desktop',
+      languageCode: 'en',
+      maxResults: 10,
+    }, 'ws-local-provider');
+
+    const [, init] = fetchSpy.mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body[0]).toEqual(expect.objectContaining({
+      location_coordinate: '30.2672,-97.7431,10z',
+    }));
+    expect(body[0]).not.toHaveProperty('location_code');
+    expect(body[0]).not.toHaveProperty('location_name');
+  });
+
+  it('separates local visibility cache keys by provider location identity', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(dfsTaskResponse([{ items: [] }])),
+    } as Response);
+
+    await provider.getLocalVisibility({
+      keyword: 'austin dentist',
+      market: {
+        ...market,
+        id: 'market-austin-name-a',
+        providerLocationCode: undefined,
+        providerLocationName: 'Austin,Texas,United States',
+      },
+      device: 'desktop',
+      languageCode: 'en',
+      maxResults: 10,
+    }, 'ws-local-provider');
+    await provider.getLocalVisibility({
+      keyword: 'austin dentist',
+      market: {
+        ...market,
+        id: 'market-austin-name-b',
+        providerLocationCode: undefined,
+        providerLocationName: 'Austin,Texas',
+      },
+      device: 'desktop',
+      languageCode: 'en',
+      maxResults: 10,
+    }, 'ws-local-provider');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('normalizes nested local pack items into provider results', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    mockFetchOnce(dfsTaskResponse([{
+      items: [{
+        type: 'local_pack',
+        items: [
+          { title: 'Local Dental', rank_group: 1, domain: 'local-dental.example.com', phone: '(512) 555-0123', description: '123 Congress Ave, Austin, TX', cid: 'abc' },
+          { title: 'Other Dentist', rank_group: 2, url: 'https://other.example.com' },
+        ],
+      }],
+    }]));
+
+    const result = await provider.getLocalVisibility({
+      keyword: 'austin dentist',
+      market,
+      device: 'mobile',
+      languageCode: 'en',
+      maxResults: 10,
+    }, 'ws-local-provider');
+
+    expect(result.localPackPresent).toBe(true);
+    expect(result.sourceEndpoint).toBe('google_organic_serp');
+    expect(result.results).toEqual([
+      expect.objectContaining({ title: 'Local Dental', rank: 1, domain: 'local-dental.example.com', address: '123 Congress Ave, Austin, TX', cid: 'abc' }),
+      expect.objectContaining({ title: 'Other Dentist', rank: 2, domain: 'other.example.com' }),
+    ]);
+  });
+
+  it('normalizes multiple top-level local pack items into provider results', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    mockFetchOnce(dfsTaskResponse([{
+      items: [
+        { type: 'local_pack', title: 'Competitor Dental', rank_group: 1, domain: 'competitor.example.com' },
+        { type: 'local_pack', title: 'Local Dental', rank_group: 2, domain: 'local-dental.example.com' },
+      ],
+    }]));
+
+    const result = await provider.getLocalVisibility({
+      keyword: 'austin dentist',
+      market,
+      device: 'desktop',
+      languageCode: 'en',
+      maxResults: 10,
+    }, 'ws-local-provider');
+
+    expect(result.localPackPresent).toBe(true);
+    expect(result.results).toEqual([
+      expect.objectContaining({ title: 'Competitor Dental', rank: 1, domain: 'competitor.example.com' }),
+      expect.objectContaining({ title: 'Local Dental', rank: 2, domain: 'local-dental.example.com' }),
+    ]);
+  });
+
+  it('degrades provider failures into a typed provider_failed result', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    vi.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('network down'));
+
+    const result = await provider.getLocalVisibility({
+      keyword: 'austin dentist',
+      market,
+      device: 'desktop',
+      languageCode: 'en',
+      maxResults: 10,
+    }, 'ws-local-provider');
+
+    expect(result.status).toBe('provider_failed');
+    expect(result.localPackPresent).toBe(false);
+    expect(result.results).toEqual([]);
+    expect(result.degradedReason).toContain('Network error');
+  });
+});

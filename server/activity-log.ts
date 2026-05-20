@@ -120,6 +120,7 @@ export type ActivityType =
   | 'copy_sent_to_client'
   | 'copy_pattern_removed'
   | 'diagnostic_completed'
+  | 'local_seo_updated'
   | 'portal_session'
   | 'action_backlog_alert'
   | 'post_approved'

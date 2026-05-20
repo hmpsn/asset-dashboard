@@ -17,6 +17,7 @@ export const BACKGROUND_JOB_TYPES = {
   SEO_BULK_REWRITE: 'seo-bulk-rewrite',
   SEO_BULK_ACCEPT_FIXES: 'seo-bulk-accept-fixes',
   ACTION_PLAYBOOK_EXECUTE: 'action-playbook-execute',
+  LOCAL_SEO_REFRESH: 'local-seo-refresh',
 } as const;
 
 export type BackgroundJobType = typeof BACKGROUND_JOB_TYPES[keyof typeof BACKGROUND_JOB_TYPES];
@@ -141,6 +142,12 @@ export const BACKGROUND_JOB_METADATA: { [K in BackgroundJobType]: BackgroundJobT
     description: 'Executes an automated implementation playbook after client approval.',
     cancellable: false,
     resultBehavior: 'domain-store',
+  },
+  [BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH]: {
+    label: 'Local SEO Refresh',
+    description: 'Refreshes local pack visibility for selected markets and keywords.',
+    cancellable: false,
+    resultBehavior: 'domain-store-and-result',
   },
 };
 

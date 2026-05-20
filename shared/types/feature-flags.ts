@@ -73,6 +73,9 @@ export const FEATURE_FLAGS = {
 
   // Client IA Redesign Phase 1 (PRs 1.2 + 1.3)
   'new-inbox-ia': false,
+
+  // Local SEO Visibility
+  'local-seo-visibility': false,
 } as const;
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;
@@ -114,6 +117,7 @@ export const FEATURE_FLAG_GROUP_LABELS = [
   'Platform Intelligence Enhancements',
   'Client Insights Briefing',
   'Client IA Redesign',
+  'Local SEO',
   'Schema AI',
 ] as const;
 
@@ -136,6 +140,7 @@ const LEGACY_ROADMAP = {
   deepDiagnostics: 'legacy-deep-diagnostics',
   schema: 'legacy-schema-ai',
   inboxIa: 'legacy-client-inbox-ia',
+  localSeo: 'intel-quality-local-pack-visibility-foundation',
   platformIntelligenceEnhancements: 'legacy-platform-intelligence-enhancements',
 } as const;
 
@@ -646,6 +651,19 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: REVIEWED_AT,
     },
   },
+  'local-seo-visibility': {
+    label: 'Local SEO visibility',
+    group: 'Local SEO',
+    lifecycle: {
+      owner: 'seo-health',
+      createdAt: '2026-05-15',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Remove once local SEO reporting is validated and the admin visibility foundation no longer needs a kill-switch.',
+      linkedRoadmapItemId: LEGACY_ROADMAP.localSeo,
+      staleAuditCadence: 'monthly',
+      lastReviewedAt: REVIEWED_AT,
+    },
+  },
   'schema-ai-element-classifier': {
     label: 'Schema AI — page-element role classifier',
     group: 'Schema AI',
@@ -728,6 +746,10 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   {
     label: 'Client IA Redesign',
     keys: ['new-inbox-ia'],
+  },
+  {
+    label: 'Local SEO',
+    keys: ['local-seo-visibility'],
   },
   {
     label: 'Schema AI',

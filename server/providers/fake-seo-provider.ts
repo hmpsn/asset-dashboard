@@ -10,6 +10,12 @@ import type {
   RelatedKeyword,
   SeoDataProvider,
 } from '../seo-data-provider.js';
+import {
+  LOCAL_VISIBILITY_SOURCE_ENDPOINT,
+  LOCAL_VISIBILITY_STATUS,
+  type LocalVisibilityProviderRequest,
+  type LocalVisibilityProviderResult,
+} from '../../shared/types/local-seo.js';
 
 function keywordMetric(keyword: string): KeywordMetrics {
   return {
@@ -131,5 +137,27 @@ export class FakeSeoProvider implements SeoDataProvider {
       firstSeen: '2025-01-01T00:00:00.000Z',
       lastSeen: '2026-05-01T00:00:00.000Z',
     }));
+  }
+
+  async getLocalVisibility(request: LocalVisibilityProviderRequest): Promise<LocalVisibilityProviderResult> {
+    const domain = 'example.com';
+    return {
+      keyword: request.keyword,
+      marketId: request.market.id,
+      provider: 'fake-seo-provider',
+      sourceEndpoint: LOCAL_VISIBILITY_SOURCE_ENDPOINT.GOOGLE_ORGANIC_SERP,
+      capturedAt: new Date().toISOString(),
+      localPackPresent: true,
+      status: LOCAL_VISIBILITY_STATUS.SUCCESS,
+      results: [
+        {
+          title: `Synthetic ${request.market.city} Business`,
+          rank: 1,
+          domain,
+          url: `https://${domain}/local`,
+          address: `${request.market.city}, ${request.market.stateOrRegion ?? request.market.country}`,
+        },
+      ],
+    };
   }
 }
