@@ -1,4 +1,5 @@
 import type { KeywordSourceEvidence } from '../../shared/types/keywords.js';
+import { normalizeKeywordForComparison } from '../../shared/keyword-normalization.js';
 import { assessAuthorityFromBacklinks } from '../authority-context.js';
 import type { KeywordBusinessContext, KeywordDecisionReason, KeywordEvaluationContext, KeywordEvaluationResult } from './types.js';
 
@@ -14,7 +15,7 @@ const LOW_ACTIONABILITY_PHRASES = [
 ];
 
 export function normalizeKeyword(keyword: string): string {
-  return keyword.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  return normalizeKeywordForComparison(keyword);
 }
 
 export function keywordTokens(keyword: string): string[] {

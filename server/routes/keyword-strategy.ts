@@ -26,6 +26,7 @@ import db from '../db/index.js';
 import { parseJsonFallback } from '../db/json-validation.js';
 import { getInsights } from '../analytics-insights-store.js';
 import type { KeywordStrategy, ContentGap, QuickWin, KeywordGapItem, TopicCluster, CannibalizationItem } from '../../shared/types/workspace.js';
+import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 import { buildStrategySignals } from '../insight-feedback.js';
 import { buildStrategyKeywordEvaluationContext } from '../keyword-strategy-context.js';
 import { getDeclinedKeywords, getRequestedKeywords } from '../keyword-feedback.js';
@@ -555,7 +556,8 @@ router.post('/api/webflow/keyword-feedback/:workspaceId', requireWorkspaceAccess
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const { keyword, status, reason, source, declinedBy } = req.body as AdminKeywordFeedbackBody;
-  const kw = keyword.toLowerCase().trim();
+  const kw = keywordComparisonKey(keyword);
+  const displayKeyword = keyword.trim();
 
   db.prepare(`
     INSERT INTO keyword_feedback (workspace_id, keyword, status, reason, source, declined_by)
@@ -569,13 +571,13 @@ router.post('/api/webflow/keyword-feedback/:workspaceId', requireWorkspaceAccess
 
   if (status === 'approved') {
     const trackingSource = trackedKeywordSourceForFeedback(source);
-    addTrackedKeyword(ws.id, kw, { source: trackingSource });
-    addActivity(ws.id, 'rank_tracking_updated', 'Tracked keyword approved', `"${kw}" added to rank tracking from keyword approval`, {
-      keyword: kw,
+    addTrackedKeyword(ws.id, displayKeyword, { source: trackingSource });
+    addActivity(ws.id, 'rank_tracking_updated', 'Tracked keyword approved', `"${displayKeyword}" added to rank tracking from keyword approval`, {
+      keyword: displayKeyword,
       source: trackingSource,
       action: 'feedback_approved',
     });
-    broadcastToWorkspace(ws.id, WS_EVENTS.RANK_TRACKING_UPDATED, { keyword: kw, action: 'feedback_approved', source: 'admin_feedback' });
+    broadcastToWorkspace(ws.id, WS_EVENTS.RANK_TRACKING_UPDATED, { keyword: displayKeyword, action: 'feedback_approved', source: 'admin_feedback' });
   }
 
   log.info(`Keyword feedback: "${kw}" → ${status} for workspace ${ws.id}${reason ? ` (reason: ${reason})` : ''}`);
@@ -603,11 +605,11 @@ router.post('/api/webflow/keyword-feedback/:workspaceId/bulk', requireWorkspaceA
   const approvedKeywordEntries: Parameters<typeof addTrackedKeywords>[1] = [];
   const insert = db.transaction((items: AdminBulkKeywordFeedbackBody['keywords']) => {
     for (const item of items) {
-      const kw = item.keyword.toLowerCase().trim();
+      const kw = keywordComparisonKey(item.keyword);
       stmt.run(ws.id, kw, item.status, item.reason || null, item.source, declinedBy || null);
       if (item.status === 'approved') {
         approvedKeywordEntries.push({
-          query: kw,
+          query: item.keyword.trim(),
           options: { source: trackedKeywordSourceForFeedback(item.source) },
         });
       }
@@ -641,7 +643,7 @@ router.post('/api/webflow/keyword-feedback/:workspaceId/bulk', requireWorkspaceA
 router.delete('/api/webflow/keyword-feedback/:workspaceId/:keyword', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const kw = decodeURIComponent(req.params.keyword).toLowerCase().trim();
+  const kw = keywordComparisonKey(decodeURIComponent(req.params.keyword));
   const removeFeedback = db.transaction(() => {
     const existing = db.prepare('SELECT keyword, status, source FROM keyword_feedback WHERE workspace_id = ? AND keyword = ?').get(ws.id, kw) as { keyword: string; status: string; source: string | null } | undefined; // txn-ok: read-before-delete and delete are enclosed by removeFeedback transaction
     db.prepare('DELETE FROM keyword_feedback WHERE workspace_id = ? AND keyword = ?').run(ws.id, kw);

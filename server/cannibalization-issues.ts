@@ -10,6 +10,7 @@ import type { CannibalizationItem } from '../shared/types/workspace.js';
 import { createLogger } from './logger.js';
 import { parseJsonFallback, parseJsonSafeArray } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 
 const log = createLogger('cannibalization-issues');
 
@@ -130,7 +131,7 @@ function modelToParams(workspaceId: string, issue: CannibalizationItem) {
 function dedupeByKeyword(issues: CannibalizationItem[]): CannibalizationItem[] {
   const byKeyword = new Map<string, CannibalizationItem>();
   for (const issue of issues) {
-    byKeyword.set(issue.keyword.toLowerCase(), issue);
+    byKeyword.set(keywordComparisonKey(issue.keyword), issue);
   }
   return [...byKeyword.values()];
 }

@@ -1,9 +1,9 @@
 /**
- * Canonical keyword comparison for command-center and keyword-lifecycle joins.
+ * Canonical semantic keyword comparison for the keyword operating loop.
  *
- * This intentionally stays conservative: it normalizes casing, punctuation,
- * and whitespace without stemming or stripping local modifiers. Broader
- * semantic normalization belongs in the follow-up hardening item.
+ * Use this for equality, dedupe, feedback joins, strategy/tracking joins, and
+ * lifecycle checks. Do not use it for provider request payloads, display text,
+ * or provider/cache keys where exact raw keyword text is contract-sensitive.
  */
 export function normalizeKeywordForComparison(keyword: string | null | undefined): string {
   return String(keyword ?? '')

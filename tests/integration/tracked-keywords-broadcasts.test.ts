@@ -121,22 +121,22 @@ describe('public tracked keyword workflow broadcasts', () => {
 
     expect(getTrackedKeywords(wsId)).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        query: 'feedback approved keyword',
+        query: 'Feedback Approved Keyword',
         source: TRACKED_KEYWORD_SOURCE.CONTENT_GAP,
       }),
     ]));
     expect(rankTrackingBroadcasts()).toEqual([
       {
-        workspaceId: wsId,
-        event: WS_EVENTS.RANK_TRACKING_UPDATED,
-        payload: {
-          keyword: 'feedback approved keyword',
+          workspaceId: wsId,
+          event: WS_EVENTS.RANK_TRACKING_UPDATED,
+          payload: {
+          keyword: 'Feedback Approved Keyword',
           action: 'feedback_approved',
           source: 'admin_feedback',
         },
       },
     ]);
-    expect(countActivities('rank_tracking_updated', 'feedback approved keyword')).toBe(1);
+    expect(countActivities('rank_tracking_updated', 'Feedback Approved Keyword')).toBe(1);
   });
 
   it('broadcasts and records activity once for a newly tracked keyword', async () => {

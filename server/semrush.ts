@@ -3,6 +3,7 @@ import path from 'path';
 
 import { getUploadRoot, getDataDir } from './data-dir.js';
 import { getCachedMetricsBatch, cacheMetrics } from './keyword-metrics-cache.js';
+import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 import { createLogger } from './logger.js';
 import { isProgrammingError } from './errors.js';
 import { normalizeProviderDate } from './seo-data-provider.js';
@@ -307,7 +308,7 @@ export async function getKeywordOverview(
 
   // L2: Check per-workspace file cache for anything not in L1
   for (const kw of keywords) {
-    const globalHit = globalHits.get(kw.toLowerCase());
+    const globalHit = globalHits.get(keywordComparisonKey(kw));
     if (globalHit) {
       results.push(globalHit as KeywordMetrics);
       logCreditUsage({ credits: 0, endpoint: 'keyword_overview', query: kw, rowsReturned: 1, workspaceId, cached: true });

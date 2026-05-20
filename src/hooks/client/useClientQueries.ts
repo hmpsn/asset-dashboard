@@ -10,6 +10,7 @@ import type {
   AnnotationItem, AnomalyItem, ContentPlanReviewCell, ApprovalPageKeyword,
 } from '../../components/client/types';
 import type { PricingData } from '../usePayments';
+import { keywordComparisonKey } from '../../../shared/keyword-normalization';
 
 // ── Activity ──────────────────────────────────────────────────────
 export function useClientActivity(wsId: string, enabled: boolean) {
@@ -172,7 +173,7 @@ export interface ContentPlanResult {
   reviewCells: ContentPlanReviewCell[];
 }
 
-function processContentPlan(plans: ContentPlanMatrix[]): ContentPlanResult {
+export function processContentPlan(plans: ContentPlanMatrix[]): ContentPlanResult {
   if (!Array.isArray(plans) || plans.length === 0) {
     return { summary: null, keywords: new Map(), reviewCells: [] };
   }
@@ -187,7 +188,8 @@ function processContentPlan(plans: ContentPlanMatrix[]): ContentPlanResult {
   };
   const keywords = new Map<string, string>();
   for (const c of allCells) {
-    if (c.targetKeyword) keywords.set(c.targetKeyword.toLowerCase(), c.status);
+    const keywordKey = keywordComparisonKey(c.targetKeyword);
+    if (keywordKey) keywords.set(keywordKey, c.status);
   }
   const reviewCells: ContentPlanReviewCell[] = [];
   for (const plan of plans) {

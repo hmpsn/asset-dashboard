@@ -273,10 +273,10 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                                   </span>
                                 )}
                                 {/* Inline feedback badge */}
-                                {keywordFeedback?.get(page.primaryKeyword.toLowerCase().trim()) === 'approved' && (
+                                {keywordFeedback?.get(normalizeKeyword(page.primaryKeyword)) === 'approved' && (
                                   <Badge label="Relevant" tone="emerald" variant="outline" icon={ThumbsUp} />
                                 )}
-                                {keywordFeedback?.get(page.primaryKeyword.toLowerCase().trim()) === 'declined' && (
+                                {keywordFeedback?.get(normalizeKeyword(page.primaryKeyword)) === 'declined' && (
                                   <Badge label="Not relevant" tone="red" variant="outline" icon={Ban} />
                                 )}
                               </span>
@@ -365,7 +365,7 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                             {/* Keyword feedback controls */}
                             {page.primaryKeyword && onApproveKeyword && onDeclineKeyword && (() => {
                               const kw = page.primaryKeyword!;
-                              const fbStatus = keywordFeedback?.get(kw.toLowerCase().trim());
+                              const fbStatus = keywordFeedback?.get(normalizeKeyword(kw));
                               const loading = isLoadingFeedback?.(kw) ?? false;
                               if (fbStatus === 'declined') return (
                                 <div className="flex items-center gap-2 mt-2 px-2 py-1.5 rounded-[var(--radius-md)] bg-red-500/5 border border-red-500/20">

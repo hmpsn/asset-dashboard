@@ -26,6 +26,7 @@ import { listKeywordGaps } from './keyword-gaps.js';
 import { listTopicClusters } from './topic-clusters.js';
 import { listCannibalizationIssues } from './cannibalization-issues.js';
 import { normalizePath } from './helpers.js';
+import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 
 // Re-exported for backward compatibility with existing callers.
 export { buildStrategyIntelligenceBlock, computeOpportunityScore, shouldFetchCompetitorData } from './keyword-strategy-helpers.js';
@@ -401,8 +402,8 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
     if (!strategy.pageMap?.length) {
       throw new KeywordStrategyGenerationError(500, { error: 'Strategy generation produced no valid page keyword assignments after enrichment' });
     }
-    const finalSiteKeywordSet = new Set((strategy.siteKeywords ?? []).map(keyword => keyword.toLowerCase().trim()));
-    siteKeywordMetrics = siteKeywordMetrics.filter(metric => finalSiteKeywordSet.has(metric.keyword.toLowerCase().trim()));
+    const finalSiteKeywordSet = new Set((strategy.siteKeywords ?? []).map(keyword => keywordComparisonKey(keyword)));
+    siteKeywordMetrics = siteKeywordMetrics.filter(metric => finalSiteKeywordSet.has(keywordComparisonKey(metric.keyword)));
     ({ topicClusters, cannibalization } = sanitizeKeywordStrategyDerivedArtifacts({
       topicClusters,
       cannibalization,

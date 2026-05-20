@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { post, getSafe } from '../api/client';
 import type { WorkspaceInfo, ClientContentRequest } from '../components/client/types';
 import { STUDIO_NAME } from '../constants';
+import { keywordComparisonKey } from '../../shared/keyword-normalization';
 
 export interface PricingModalData {
   serviceType: 'brief_only' | 'full_post';
@@ -88,7 +89,7 @@ export function usePayments(
       } else if (pricingModal.source === 'strategy') {
         setRequestingTopic(pricingModal.targetKeyword);
         await post(`/api/public/content-request/${workspaceId}`, { topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, intent: pricingModal.intent, priority: pricingModal.priority, rationale: pricingModal.rationale, serviceType: pricingModal.serviceType, pageType: pricingModal.pageType || 'blog', targetPageId: pricingModal.targetPageId, targetPageSlug: pricingModal.targetPageSlug });
-        setRequestedTopics(prev => new Set(prev).add(pricingModal.targetKeyword));
+        setRequestedTopics(prev => new Set(prev).add(keywordComparisonKey(pricingModal.targetKeyword)));
         getSafe<ClientContentRequest[]>(`/api/public/content-requests/${workspaceId}`, []).then((reqs) => {
           if (Array.isArray(reqs) && reqs.length > 0) setContentRequests(reqs);
         }).catch((err) => { console.error('usePayments operation failed:', err); });
@@ -98,7 +99,7 @@ export function usePayments(
       } else {
         const created = await post<ClientContentRequest>(`/api/public/content-request/${workspaceId}/submit`, { topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, notes: pricingModal.notes || undefined, serviceType: pricingModal.serviceType, pageType: pricingModal.pageType || 'blog', targetPageId: pricingModal.targetPageId, targetPageSlug: pricingModal.targetPageSlug });
         setContentRequests(prev => [created, ...prev]);
-        setRequestedTopics(prev => new Set(prev).add(created.targetKeyword));
+        setRequestedTopics(prev => new Set(prev).add(keywordComparisonKey(created.targetKeyword)));
         setToast({ message: `Topic submitted! ${STUDIO_NAME} will review it.`, type: 'success' });
       }
     } catch (err) {

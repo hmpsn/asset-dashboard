@@ -14,6 +14,17 @@ describe('filterDeclinedFromPool', () => {
     expect(pool.has('seo agency')).toBe(true);
   });
 
+  it('removes canonical punctuation and spacing variants', () => {
+    const pool = new Map<string, unknown>([
+      ['emergency dentist near me', {}],
+      ['cosmetic dentist', {}],
+    ]);
+    const removed = filterDeclinedFromPool(pool, ['Emergency Dentist - Near-Me']);
+    expect(removed).toBe(1);
+    expect(pool.has('emergency dentist near me')).toBe(false);
+    expect(pool.has('cosmetic dentist')).toBe(true);
+  });
+
   it('returns 0 when no matches', () => {
     const pool = new Map<string, unknown>([['seo', {}]]);
     const removed = filterDeclinedFromPool(pool, ['ppc']);

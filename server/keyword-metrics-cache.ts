@@ -9,6 +9,7 @@
 import db from './db/index.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
+import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 
 const log = createLogger('keyword-metrics-cache');
 
@@ -96,7 +97,7 @@ export function getCachedMetrics(
   database = 'us',
   maxAgeHours = 720 // 30 days
 ): CachedKeywordMetrics | null {
-  const row = getOneStmt().get(keyword.toLowerCase(), database) as MetricRow | undefined;
+  const row = getOneStmt().get(keywordComparisonKey(keyword), database) as MetricRow | undefined;
   if (!row) return null;
   if (isStale(row.cached_at, maxAgeHours)) return null;
   return rowToMetrics(row);
@@ -104,7 +105,7 @@ export function getCachedMetrics(
 
 /**
  * Look up multiple keywords in the global cache.
- * Returns a Map of keyword (lowercased) → metrics for found/fresh entries.
+ * Returns a Map of keyword comparison key → metrics for found/fresh entries.
  */
 export function getCachedMetricsBatch(
   keywords: string[],
@@ -117,9 +118,10 @@ export function getCachedMetricsBatch(
   // Use individual lookups (SQLite prepared statements are fast, avoids dynamic IN clause)
   const stmt = getOneStmt();
   for (const kw of keywords) {
-    const row = stmt.get(kw.toLowerCase(), database) as MetricRow | undefined;
+    const key = keywordComparisonKey(kw);
+    const row = stmt.get(key, database) as MetricRow | undefined;
     if (row && !isStale(row.cached_at, maxAgeHours)) {
-      result.set(kw.toLowerCase(), rowToMetrics(row));
+      result.set(key, rowToMetrics(row));
     }
   }
   return result;
@@ -133,7 +135,7 @@ export function cacheMetrics(
   database = 'us'
 ): void {
   upsertStmt().run({
-    keyword: metrics.keyword.toLowerCase(),
+    keyword: keywordComparisonKey(metrics.keyword),
     database_region: database,
     volume: metrics.volume,
     difficulty: metrics.difficulty,
@@ -158,7 +160,7 @@ export function cacheMetricsBatch(
     const now = new Date().toISOString();
     for (const m of items) {
       stmt.run({
-        keyword: m.keyword.toLowerCase(),
+        keyword: keywordComparisonKey(m.keyword),
         database_region: database,
         volume: m.volume,
         difficulty: m.difficulty,

@@ -9,6 +9,7 @@ import type { KeywordGapItem } from '../shared/types/workspace.js';
 import { createLogger } from './logger.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 
 const log = createLogger('keyword-gaps');
 
@@ -73,7 +74,7 @@ function modelToParams(workspaceId: string, gap: KeywordGapItem) {
 function dedupeByKeyword(gaps: KeywordGapItem[]): KeywordGapItem[] {
   const byKeyword = new Map<string, KeywordGapItem>();
   for (const gap of gaps) {
-    byKeyword.set(gap.keyword.toLowerCase(), gap);
+    byKeyword.set(keywordComparisonKey(gap.keyword), gap);
   }
   return [...byKeyword.values()];
 }

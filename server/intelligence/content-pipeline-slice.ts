@@ -14,6 +14,7 @@ import db from '../db/index.js';
 import { createStmtCache } from '../db/stmt-cache.js';
 import { parseJsonSafe } from '../db/json-validation.js';
 import { z } from '../middleware/validate.js';
+import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 
 const log = createLogger('workspace-intelligence/content-pipeline');
 
@@ -63,9 +64,9 @@ export async function assembleContentPipeline(workspaceId: string): Promise<Cont
     ) ?? [];
     const { listBriefs } = await import('../content-brief.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
     const briefs = listBriefs(workspaceId);
-    const briefKeywords = new Set(briefs.map(b => b.targetKeyword?.trim().toLowerCase()));
+    const briefKeywords = new Set(briefs.map(b => keywordComparisonKey(b.targetKeyword)));
     coverageGaps = strategyKeywords
-      .filter(kw => !briefKeywords.has(kw.trim().toLowerCase()))
+      .filter(kw => !briefKeywords.has(keywordComparisonKey(kw)))
       .slice(0, 10);
   } catch (err) {
     log.debug({ err, workspaceId }, 'assembleContentPipeline: coverage gaps optional, degrading gracefully');

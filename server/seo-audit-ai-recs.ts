@@ -11,6 +11,7 @@ import { findPageMapEntryByIdentity, sanitizeForPromptInjection, stripCodeFences
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { z } from './middleware/validate.js';
 import type { PageSeoResult } from './audit-page.js';
+import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 
 const log = createLogger('seo-audit-ai-recs');
 
@@ -111,10 +112,10 @@ export async function generateAiRecommendations(opts: AiRecsOpts): Promise<void>
           const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext', 'learnings', 'pageProfile'] }); // bip-ok: slices is a superset
 
           // Build cannibalization context block if this page's primary keyword is flagged
-          const pageKeyword = seoCtx?.pageKeywords?.primaryKeyword?.toLowerCase().trim();
+          const pageKeyword = keywordComparisonKey(seoCtx?.pageKeywords?.primaryKeyword);
           const cannibalizationWarnings = wsIntel.contentPipeline?.cannibalizationWarnings ?? [];
           const cannibalizationMatch = pageKeyword
-            ? cannibalizationWarnings.find(w => w.keyword.toLowerCase().trim() === pageKeyword)
+            ? cannibalizationWarnings.find(w => keywordComparisonKey(w.keyword) === pageKeyword)
             : undefined;
           // Filter sibling pages: exclude this page's own path (pagePath is a pathname like /about,
           // matching the format stored in cannibalizationWarnings[].pages) and exclude matrix cell

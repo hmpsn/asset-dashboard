@@ -65,6 +65,7 @@ import {
   type ClientContentRequest,
 } from './client/types';
 import type { AnalyticsDateRange } from '../../shared/types/analytics-contract.js';
+import { keywordComparisonKey } from '../../shared/keyword-normalization';
 
 const HealthTab = lazyWithRetry(() => import('./client/HealthTab').then(m => ({ default: m.HealthTab })));
 const InsightsEngine = lazyWithRetry(() => import('./client/InsightsEngine').then(m => ({ default: m.InsightsEngine })));
@@ -134,7 +135,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   const contentRequests = useMemo(() => contentReqQ.data ?? [], [contentReqQ.data]);
   const requestedTopics = useMemo(() => {
     if (contentRequests.length === 0) return requestedTopicsSeed;
-    return new Set(contentRequests.map(r => r.targetKeyword));
+    return new Set(contentRequests.map(r => keywordComparisonKey(r.targetKeyword)).filter(Boolean));
   }, [contentRequests, requestedTopicsSeed]);
 
   const sectionErrors = useMemo(() => {

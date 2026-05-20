@@ -22,6 +22,7 @@ import { buildStaticPathSet, discoverCmsUrls, getSiteSubdomain, toCmsPageId } fr
 import { getWorkspacePages } from './workspace-data.js';
 import { getWorkspace } from './workspaces.js';
 import { pageAnalysisAiResultSchema } from './schemas/page-analysis.js';
+import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 import {
   buildWorkspaceIntelligence,
   formatForPrompt,
@@ -81,10 +82,10 @@ export async function prefetchSemrushForTopPages(
 
     const keywords = withKeywords.map(pk => pk.primaryKeyword!);
     const metrics = await provider.getKeywordMetrics(keywords, workspaceId).catch(() => []);
-    const metricsMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m])); // map-dup-ok
+    const metricsMap = new Map(metrics.map(m => [keywordComparisonKey(m.keyword), m])); // map-dup-ok
 
     for (const pk of withKeywords) {
-      const m = metricsMap.get(pk.primaryKeyword!.toLowerCase());
+      const m = metricsMap.get(keywordComparisonKey(pk.primaryKeyword));
       if (!m) continue;
       const providerLabel = getProviderDisplayName(provider.name);
       let block = `\n\nREAL KEYWORD DATA (from ${providerLabel} — use these exact values, do NOT estimate):\n`;

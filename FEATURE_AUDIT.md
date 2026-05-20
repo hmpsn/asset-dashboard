@@ -6319,3 +6319,16 @@ Bug hardening included:
 **Mutual:** Keeps local SEO optional and posture-aware so dentists, clinics, attorneys, restaurants, and service-area businesses get local visibility intelligence while SaaS/global workspaces avoid noisy local modules. The audit also keeps GBP health, reviews/reputation, geo-grid tracking, and local recommendations as separate roadmap items instead of overloading v1.
 
 **Files:** `docs/superpowers/audits/2026-05-20-local-seo-foundation-source-market-audit.md`; `docs/rules/local-seo-visibility.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 446. Keyword Normalization + Route Reliability Hardening
+**What it does:** Stabilizes keyword equality across the high-value keyword operating loop before local SEO provider work begins. The shared keyword comparison helper is now the canonical semantic key for Strategy, Rank Tracker, rank-tracking reconciliation, Page Keywords, Keyword Command Center, keyword recommendations, strategy enrichment/synthesis, content-pipeline coverage gaps, client Strategy feedback, keyword gaps, cannibalization issues, and provider metric joins. Raw display strings and provider request payloads remain untouched where exact wording is meaningful.
+
+**Agency value:** Reduces duplicate/stale keyword gremlins caused by punctuation, casing, spacing, and near-me/local modifier variants. Admins can trust that tracking, feedback, strategy, and Command Center lifecycle actions agree on whether two strings are the same keyword.
+
+**Client value:** Client requests and declines are more reliably honored across Strategy and future local SEO surfaces, so irrelevant or retired keywords are less likely to reappear because of small wording differences.
+
+**Mutual:** Gives the upcoming local-pack visibility work a safer foundation. Local SEO will multiply city, neighborhood, and near-me variants; this PR keeps those variants from fracturing strategy, tracking, feedback, and reporting joins.
+
+**Files:** `shared/keyword-normalization.ts`; `server/keyword-intelligence/rules.ts`; `server/rank-tracking.ts`; `server/rank-tracking-reconciliation.ts`; `server/page-keywords.ts`; `server/keyword-strategy-helpers.ts`; `server/keyword-strategy-ai-synthesis.ts`; `server/keyword-strategy-enrichment.ts`; `server/keyword-strategy-generation.ts`; `server/keyword-strategy-seo-data.ts`; `server/keyword-recommendations.ts`; `server/keyword-gaps.ts`; `server/cannibalization-issues.ts`; `server/provider-keyword-metrics.ts`; `server/routes/keyword-strategy.ts`; `server/routes/rank-tracking.ts`; `server/routes/public-portal.ts`; `server/routes/content-briefs.ts`; `src/lib/keywordTracking.ts`; `src/components/KeywordStrategy.tsx`; `src/components/client/PageKeywordMapContent.tsx`; `src/components/client/strategy/strategyKeywordDisplay.ts`; `src/components/client/strategy/useStrategyKeywordFeedback.ts`; `tests/unit/keyword-command-center.test.ts`; `tests/unit/rank-tracking-reconciliation.test.ts`; `tests/integration/rank-tracking-routes.test.ts`; `docs/rules/keyword-normalization-route-hardening.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.

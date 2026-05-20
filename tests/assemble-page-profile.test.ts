@@ -471,6 +471,28 @@ describe('assemblePageProfile', () => {
     expect(result.pageProfile!.rankHistory.current).toBe(12);
   });
 
+  it('matches rank tracking with canonical keyword variants while preserving rank data', async () => {
+    const pageKeywords = await import('../server/page-keywords.js');
+    vi.mocked(pageKeywords.getPageKeyword).mockReturnValueOnce({
+      pagePath: '/about',
+      primaryKeyword: 'Emergency Dentist - Near-Me',
+      searchIntent: 'transactional',
+    } as ReturnType<typeof pageKeywords.getPageKeyword>);
+    const rankTracking = await import('../server/rank-tracking.js');
+    vi.mocked(rankTracking.getLatestRanks).mockReturnValueOnce([
+      { query: 'emergency dentist near me', position: 4, clicks: 8, impressions: 220, ctr: 0.036, change: -2 },
+    ]);
+
+    const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
+    const result = await buildWorkspaceIntelligence('ws-1', {
+      slices: ['pageProfile'],
+      pagePath: '/about',
+    });
+
+    expect(result.pageProfile!.rankHistory.current).toBe(4);
+    expect(result.pageProfile!.rankHistory.trend).toBe('up');
+  });
+
   it('falls back to strategy gaps matching page keyword when pageKw has no contentGaps', async () => {
     // Override pageKw to have no contentGaps — tests the fallback path
     const pageKeywords = await import('../server/page-keywords.js');
@@ -502,6 +524,36 @@ describe('assemblePageProfile', () => {
     // Non-matching gap topics must not appear
     expect(gaps).not.toContain('Pricing Guide');
     expect(gaps).not.toContain('Contact Methods');
+  });
+
+  it('matches briefs and strategy gaps with canonical keyword variants', async () => {
+    const pageKeywords = await import('../server/page-keywords.js');
+    vi.mocked(pageKeywords.getPageKeyword).mockReturnValueOnce({
+      pagePath: '/about',
+      primaryKeyword: 'Emergency Dentist - Near-Me',
+      searchIntent: 'transactional',
+      currentPosition: 12,
+      previousPosition: 15,
+    } as ReturnType<typeof pageKeywords.getPageKeyword>);
+    const contentBriefs = await import('../server/content-brief.js');
+    vi.mocked(contentBriefs.listBriefs).mockReturnValueOnce([
+      { id: 'brief_1', workspaceId: 'ws-1', targetKeyword: 'emergency dentist near me', status: 'draft' },
+    ] as ReturnType<typeof contentBriefs.listBriefs>);
+    const contentGaps = await import('../server/content-gaps.js');
+    vi.mocked(contentGaps.listContentGaps).mockReturnValueOnce([
+      { topic: 'Emergency Dental Services', targetKeyword: 'emergency dentist near me', intent: 'commercial', priority: 'high', rationale: 'service fit' },
+      { topic: 'Pricing Guide', targetKeyword: 'pricing', intent: 'commercial', priority: 'medium', rationale: 'conversion page' },
+    ]);
+
+    const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
+    const result = await buildWorkspaceIntelligence('ws-1', {
+      slices: ['pageProfile'],
+      pagePath: '/about',
+    });
+
+    expect(result.pageProfile!.contentStatus).toBe('has_brief');
+    expect(result.pageProfile!.contentGaps).toContain('Emergency Dental Services');
+    expect(result.pageProfile!.contentGaps).not.toContain('Pricing Guide');
   });
 
   it('fallback: returns all strategy gaps (capped at 5) when no keyword matches and pageKw has no gaps', async () => {
