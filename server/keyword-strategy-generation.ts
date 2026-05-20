@@ -19,15 +19,13 @@ import {
 import { enrichKeywordStrategy } from './keyword-strategy-enrichment.js';
 import { persistKeywordStrategy } from './keyword-strategy-persistence.js';
 import { sanitizeKeywordStrategyDerivedArtifacts, sanitizeKeywordStrategyKeywordGaps, sanitizeKeywordStrategyOutput } from './keyword-strategy-sanitizer.js';
-import { queueKeywordStrategyPostUpdateFollowOns, seedKeywordStrategyTrackedKeywords } from './keyword-strategy-follow-ons.js';
+import { queueKeywordStrategyPostUpdateFollowOns, seedKeywordStrategyTrackedKeywords, workspaceHasStrategyOwnedRankTracking } from './keyword-strategy-follow-ons.js';
 import { listContentGaps } from './content-gaps.js';
 import { listQuickWins } from './quick-wins.js';
 import { listKeywordGaps } from './keyword-gaps.js';
 import { listTopicClusters } from './topic-clusters.js';
 import { listCannibalizationIssues } from './cannibalization-issues.js';
 import { normalizePath } from './helpers.js';
-import { getTrackedKeywords } from './rank-tracking.js';
-import { TRACKED_KEYWORD_SOURCE } from '../shared/types/rank-tracking.js';
 
 // Re-exported for backward compatibility with existing callers.
 export { buildStrategyIntelligenceBlock, computeOpportunityScore, shouldFetchCompetitorData } from './keyword-strategy-helpers.js';
@@ -241,9 +239,7 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       const noOpStrategy = (synthesis.strategy ?? { pageMap: [] }) as StrategyOutput;
       const preservedContentGaps = listContentGaps(ws.id);
       const preservedQuickWins = listQuickWins(ws.id);
-      const strategyOwnedTrackedKeywords = getTrackedKeywords(ws.id, { includeInactive: true })
-        .filter(keyword => keyword.source === TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY || keyword.source === TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD);
-      const shouldCleanPageAssignments = strategyOwnedTrackedKeywords.length > 0;
+      const shouldCleanPageAssignments = workspaceHasStrategyOwnedRankTracking(ws.id);
       const noOpSanitizer = shouldCleanPageAssignments
         ? sanitizeKeywordStrategyOutput({
           workspaceId: ws.id,

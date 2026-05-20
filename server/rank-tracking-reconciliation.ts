@@ -1,5 +1,6 @@
 import {
   getLatestSnapshotRanks,
+  getTrackedKeywords,
   updateTrackedKeywords,
   type RankEntry,
 } from './rank-tracking.js';
@@ -48,6 +49,10 @@ function normalizeQuery(query: string | undefined): string {
 function isStrategyOwned(keyword: TrackedKeyword): boolean {
   return keyword.source === TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY
     || keyword.source === TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD;
+}
+
+export function hasStrategyOwnedTrackedKeywords(workspaceId: string): boolean {
+  return getTrackedKeywords(workspaceId, { includeInactive: true }).some(isStrategyOwned);
 }
 
 function buildTargets(

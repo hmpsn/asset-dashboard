@@ -1,7 +1,7 @@
 import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { invalidateSubCachePrefix } from './bridge-infrastructure.js';
-import { reconcileStrategyRankTracking, summarizeStrategyRankTrackingChangeSet } from './rank-tracking-reconciliation.js';
+import { hasStrategyOwnedTrackedKeywords, reconcileStrategyRankTracking, summarizeStrategyRankTrackingChangeSet } from './rank-tracking-reconciliation.js';
 import { queueLlmsTxtRegeneration } from './llms-txt-generator.js';
 import { generateRecommendations } from './recommendations.js';
 import { createLogger } from './logger.js';
@@ -25,6 +25,10 @@ export interface SeedKeywordStrategyTrackedKeywordsOptions {
 
 export interface QueueKeywordStrategyPostUpdateFollowOnsOptions {
   workspaceId: string;
+}
+
+export function workspaceHasStrategyOwnedRankTracking(workspaceId: string): boolean {
+  return hasStrategyOwnedTrackedKeywords(workspaceId);
 }
 
 export function seedKeywordStrategyTrackedKeywords(options: SeedKeywordStrategyTrackedKeywordsOptions): void {
