@@ -26,6 +26,8 @@ import { listKeywordGaps } from './keyword-gaps.js';
 import { listTopicClusters } from './topic-clusters.js';
 import { listCannibalizationIssues } from './cannibalization-issues.js';
 import { normalizePath } from './helpers.js';
+import { getTrackedKeywords } from './rank-tracking.js';
+import { TRACKED_KEYWORD_SOURCE } from '../shared/types/rank-tracking.js';
 
 // Re-exported for backward compatibility with existing callers.
 export { buildStrategyIntelligenceBlock, computeOpportunityScore, shouldFetchCompetitorData } from './keyword-strategy-helpers.js';
@@ -239,21 +241,31 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       const noOpStrategy = (synthesis.strategy ?? { pageMap: [] }) as StrategyOutput;
       const preservedContentGaps = listContentGaps(ws.id);
       const preservedQuickWins = listQuickWins(ws.id);
-      const shouldCleanPageAssignments = Boolean(ws.keywordStrategy);
-      const noOpSanitizer = sanitizeKeywordStrategyOutput({
-        workspaceId: ws.id,
-        strategy: {
-          ...noOpStrategy,
-          // Without an existing strategy blob, fresh page_keywords rows may be legacy/manual
-          // state rather than strategy output. Avoid rewriting them on a no-op refresh.
-          pageMap: shouldCleanPageAssignments ? noOpStrategy.pageMap : [],
-          contentGaps: preservedContentGaps,
-          quickWins: preservedQuickWins,
-        },
-        keywordPool: synthesis.keywordPool,
-        evaluationContext: synthesis.keywordEvaluationContext,
-        stage: 'post-enrichment',
-      });
+      const strategyOwnedTrackedKeywords = getTrackedKeywords(ws.id, { includeInactive: true })
+        .filter(keyword => keyword.source === TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY || keyword.source === TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD);
+      const shouldCleanPageAssignments = strategyOwnedTrackedKeywords.length > 0;
+      const noOpSanitizer = shouldCleanPageAssignments
+        ? sanitizeKeywordStrategyOutput({
+          workspaceId: ws.id,
+          strategy: {
+            ...noOpStrategy,
+            contentGaps: preservedContentGaps,
+            quickWins: preservedQuickWins,
+          },
+          keywordPool: synthesis.keywordPool,
+          evaluationContext: synthesis.keywordEvaluationContext,
+          stage: 'post-enrichment',
+        })
+        : {
+          strategy: {
+            ...noOpStrategy,
+            contentGaps: preservedContentGaps,
+            quickWins: preservedQuickWins,
+          },
+          removed: { pageMappings: [], siteKeywords: [], contentGaps: [], quickWins: [], secondaryKeywords: [] },
+          repaired: [],
+          updatedPagePaths: [],
+        };
       const noOpRemovedPagePaths = noOpSanitizer.removed.pageMappings.map(page => page.pagePath);
       const noOpUpdatedPagePaths = noOpSanitizer.updatedPagePaths;
       const existingKeywordGaps = listKeywordGaps(ws.id);
