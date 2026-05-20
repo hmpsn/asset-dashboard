@@ -9,6 +9,8 @@ const LOW_ACTIONABILITY_PHRASES = [
   'typing tiger',
   'tiger typing',
   'tiger type',
+  'all domain name extensions list',
+  'list of all domain name extensions',
 ];
 
 export function normalizeKeyword(keyword: string): string {
