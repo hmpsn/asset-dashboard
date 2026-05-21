@@ -1397,7 +1397,21 @@ function sourceKeysForRows(input: {
 
   switch (input.filter) {
     case KEYWORD_COMMAND_CENTER_FILTERS.ALL:
-      return null;
+      addStrategyKeys(keys, input.strategy);
+      addPageKeys(keys, input.pageMap);
+      for (const gap of input.contentGaps) add(gap.targetKeyword);
+      for (const gap of input.keywordGaps) add(gap.keyword);
+      for (const keyword of input.trackedKeywords) add(keyword.query);
+      for (const row of input.feedback.values()) add(row.keyword);
+      for (const key of input.localVisibility.keys()) keys.add(key);
+      for (const rank of input.latestRanks
+        .filter(rank => {
+          const key = keywordComparisonKey(rank.query);
+          return key && !keys.has(key) && !rawEvidenceKeys.has(key);
+        })
+        .sort((a, b) => (b.impressions ?? 0) - (a.impressions ?? 0))
+        .slice(0, RANK_EVIDENCE_ROW_LIMIT)) add(rank.query);
+      return keys;
     case KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY:
       addStrategyKeys(keys, input.strategy);
       addPageKeys(keys, input.pageMap);
