@@ -7,7 +7,7 @@ export function useLocalSeo(workspaceId: string, options: { includeSnapshots?: b
   const includeSnapshots = options.includeSnapshots === true;
   return useQuery({
     queryKey: [...queryKeys.admin.localSeo(workspaceId), includeSnapshots ? 'with-snapshots' : 'summary'] as const,
-    queryFn: () => localSeo.get(workspaceId, { includeSnapshots }),
+    queryFn: () => includeSnapshots ? localSeo.getWithSnapshots(workspaceId) : localSeo.getSummary(workspaceId),
     enabled: !!workspaceId,
     staleTime: 2 * 60 * 1000,
   });

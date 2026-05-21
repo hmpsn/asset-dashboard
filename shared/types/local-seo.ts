@@ -428,6 +428,7 @@ export interface LocalSeoReadResponse {
   settings: LocalSeoWorkspaceSettings;
   markets: LocalSeoMarket[];
   suggestedMarkets: LocalSeoMarket[];
+  /** Empty on summary-only reads. Request snapshot-inclusive reads only when rendering keyword-level local annotations. */
   latestSnapshots: LocalVisibilitySnapshot[];
   report: LocalSeoReportSummary;
   caps: {

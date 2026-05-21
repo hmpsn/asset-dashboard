@@ -16,6 +16,12 @@ export const localSeo = {
     return get<LocalSeoReadResponse>(`/api/local-seo/${workspaceId}${query ? `?${query}` : ''}`);
   },
 
+  getSummary: (workspaceId: string) =>
+    localSeo.get(workspaceId, { includeSnapshots: false }),
+
+  getWithSnapshots: (workspaceId: string) =>
+    localSeo.get(workspaceId, { includeSnapshots: true }),
+
   update: (workspaceId: string, body: LocalSeoMarketUpdateRequest) =>
     put<LocalSeoReadResponse>(`/api/local-seo/${workspaceId}`, body),
 
