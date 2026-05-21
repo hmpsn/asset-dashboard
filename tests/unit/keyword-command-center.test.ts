@@ -10,11 +10,17 @@ import { replaceAllKeywordGaps } from '../../server/keyword-gaps.js';
 import { upsertPageKeyword } from '../../server/page-keywords.js';
 import { addTrackedKeyword, getTrackedKeywords, storeRankSnapshot } from '../../server/rank-tracking.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
+import { createJob, clearCompletedJobs } from '../../server/jobs.js';
+import { updateLocalSeoConfiguration, runLocalSeoRefreshJob } from '../../server/local-seo.js';
+import { FakeSeoProvider } from '../../server/providers/fake-seo-provider.js';
+import { _resetRegistryForTest, registerProvider } from '../../server/seo-data-provider.js';
 import { keywordComparisonKey, normalizeKeywordForComparison } from '../../shared/keyword-normalization.js';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import {
   KEYWORD_COMMAND_CENTER_ACTIONS,
   KEYWORD_COMMAND_CENTER_STATUS,
 } from '../../shared/types/keyword-command-center.js';
+import { LOCAL_SEO_MARKET_STATUS, LOCAL_SEO_POSTURE, LOCAL_SEO_VISIBILITY_POSTURE } from '../../shared/types/local-seo.js';
 import {
   TRACKED_KEYWORD_SOURCE,
   TRACKED_KEYWORD_STATUS,
@@ -25,10 +31,59 @@ let workspaceId = '';
 
 beforeEach(() => {
   setBroadcast(vi.fn(), vi.fn());
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS local_seo_workspace_settings (
+      workspace_id TEXT PRIMARY KEY,
+      posture TEXT NOT NULL DEFAULT 'unknown',
+      posture_source TEXT NOT NULL DEFAULT 'unknown',
+      suggested_posture TEXT,
+      suggestion_reasons TEXT NOT NULL DEFAULT '[]',
+      updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS local_seo_markets (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
+      label TEXT NOT NULL,
+      city TEXT NOT NULL,
+      state_or_region TEXT,
+      country TEXT NOT NULL,
+      latitude REAL,
+      longitude REAL,
+      provider_location_code INTEGER,
+      provider_location_name TEXT,
+      source TEXT NOT NULL DEFAULT 'unknown',
+      status TEXT NOT NULL DEFAULT 'needs_review',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS local_visibility_snapshots (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
+      keyword TEXT NOT NULL,
+      normalized_keyword TEXT NOT NULL,
+      market_id TEXT NOT NULL,
+      market_label TEXT NOT NULL,
+      captured_at TEXT NOT NULL,
+      local_pack_present INTEGER NOT NULL DEFAULT 0,
+      business_found INTEGER NOT NULL DEFAULT 0,
+      business_match_confidence TEXT NOT NULL DEFAULT 'unknown',
+      business_match_reason TEXT,
+      local_rank INTEGER,
+      top_competitors TEXT NOT NULL DEFAULT '[]',
+      source_endpoint TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      device TEXT NOT NULL DEFAULT 'desktop',
+      language_code TEXT NOT NULL DEFAULT 'en',
+      status TEXT NOT NULL DEFAULT 'success',
+      degraded_reason TEXT
+    );
+  `);
   workspaceId = createWorkspace(`Keyword Command Center ${Date.now()}`).id;
 });
 
 afterEach(() => {
+  _resetRegistryForTest();
+  if (workspaceId) clearCompletedJobs({ workspaceId });
   if (workspaceId) deleteWorkspace(workspaceId);
   workspaceId = '';
 });
@@ -116,7 +171,7 @@ describe('buildKeywordCommandCenter', () => {
     seedFeedback('requested keyword', 'requested', 'Client asked about this.');
     seedFeedback('declined keyword', 'declined', 'Too broad.');
 
-    const payload = await buildKeywordCommandCenter(workspaceId);
+    const payload = await buildKeywordCommandCenter(workspaceId, { includeLocalSeo: true });
 
     expect(payload).not.toBeNull();
     const byKeyword = new Map(payload!.rows.map(row => [row.normalizedKeyword, row]));
@@ -187,6 +242,104 @@ describe('buildKeywordCommandCenter', () => {
       rawEvidenceOnly: true,
       tracking: expect.objectContaining({ status: TRACKED_KEYWORD_STATUS.ACTIVE }),
     }));
+  });
+
+  it('annotates keyword rows with local visibility evidence when snapshots exist', async () => {
+    updateWorkspace(workspaceId, {
+      name: 'Synthetic Austin Business',
+      liveDomain: 'https://example.com',
+      seoDataProvider: 'dataforseo',
+      businessProfile: {
+        phone: '(512) 555-0123',
+        address: {
+          street: '123 Congress Ave',
+          city: 'Austin',
+          state: 'TX',
+          country: 'US',
+        },
+      },
+    });
+    updateLocalSeoConfiguration(workspaceId, {
+      posture: LOCAL_SEO_POSTURE.LOCAL,
+      markets: [
+        {
+          label: 'Austin, TX',
+          city: 'Austin',
+          stateOrRegion: 'TX',
+          country: 'US',
+          providerLocationCode: 1026201,
+          status: LOCAL_SEO_MARKET_STATUS.ACTIVE,
+        },
+        {
+          label: 'Round Rock, TX',
+          city: 'Round Rock',
+          stateOrRegion: 'TX',
+          country: 'US',
+          providerLocationCode: 1026339,
+          status: LOCAL_SEO_MARKET_STATUS.ACTIVE,
+        },
+      ],
+    }, true);
+    addTrackedKeyword(workspaceId, 'Austin dentist', { source: TRACKED_KEYWORD_SOURCE.MANUAL });
+    registerProvider('dataforseo', new FakeSeoProvider());
+
+    const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, {
+      workspaceId,
+      message: 'Testing local command center annotation...',
+    });
+    await runLocalSeoRefreshJob(job.id, workspaceId, { keywords: ['Austin dentist'] });
+
+    const payload = await buildKeywordCommandCenter(workspaceId, { includeLocalSeo: true });
+    const row = payload!.rows.find(item => item.normalizedKeyword === 'austin dentist');
+
+    expect(row?.localSeo).toEqual(expect.objectContaining({
+      posture: LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE,
+      marketLabel: '2 markets',
+      marketCount: 2,
+      localPackPresent: true,
+    }));
+    expect(row?.localSeo?.markets.map(market => market.marketLabel)).toEqual(['Austin, TX', 'Round Rock, TX']);
+  });
+
+  it('does not expose local visibility annotations when the local SEO feature is disabled', async () => {
+    updateWorkspace(workspaceId, {
+      name: 'Synthetic Austin Business',
+      liveDomain: 'https://example.com',
+      seoDataProvider: 'dataforseo',
+      businessProfile: {
+        phone: '(512) 555-0123',
+        address: {
+          street: '123 Congress Ave',
+          city: 'Austin',
+          state: 'TX',
+          country: 'US',
+        },
+      },
+    });
+    updateLocalSeoConfiguration(workspaceId, {
+      posture: LOCAL_SEO_POSTURE.LOCAL,
+      markets: [{
+        label: 'Austin, TX',
+        city: 'Austin',
+        stateOrRegion: 'TX',
+        country: 'US',
+        providerLocationCode: 1026201,
+        status: LOCAL_SEO_MARKET_STATUS.ACTIVE,
+      }],
+    }, true);
+    addTrackedKeyword(workspaceId, 'Austin dentist', { source: TRACKED_KEYWORD_SOURCE.MANUAL });
+    registerProvider('dataforseo', new FakeSeoProvider());
+
+    const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, {
+      workspaceId,
+      message: 'Testing disabled local command center annotation...',
+    });
+    await runLocalSeoRefreshJob(job.id, workspaceId, { keywords: ['Austin dentist'] });
+
+    const payload = await buildKeywordCommandCenter(workspaceId);
+    const row = payload!.rows.find(item => item.normalizedKeyword === 'austin dentist');
+
+    expect(row?.localSeo).toBeUndefined();
   });
 });
 

@@ -44,6 +44,7 @@ import {
 import { TRACKED_KEYWORD_STATUS } from '../../shared/types/rank-tracking';
 import { keywordComparisonKey } from '../../shared/keyword-normalization';
 import { useKeywordCommandCenter, useKeywordCommandCenterAction } from '../hooks/admin/useKeywordCommandCenter';
+import { LocalSeoVisibilityBadge, LocalSeoVisibilityPanel } from './local-seo/LocalSeoVisibilityPanel';
 
 interface KeywordCommandCenterProps {
   workspaceId: string;
@@ -166,6 +167,7 @@ function KeywordRow({
         <div className="flex items-center gap-2 min-w-0">
           <p className="t-caption font-semibold text-[var(--brand-text-bright)] truncate">{row.keyword}</p>
           {row.isProtected && <Badge label="Protected" tone="amber" variant="soft" shape="pill" />}
+          <LocalSeoVisibilityBadge visibility={row.localSeo} subtle />
         </div>
         <p className="t-caption-sm text-[var(--brand-text-muted)] truncate">
           {primarySource ? `${primarySource.label}${primarySource.detail ? ` · ${primarySource.detail}` : ''}` : 'Keyword universe'}
@@ -302,6 +304,24 @@ function KeywordDrawer({
             <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-3)]/40 p-3">
               <Badge label={row.feedback.status} tone={row.feedback.status === 'declined' ? 'red' : row.feedback.status === 'requested' ? 'amber' : 'emerald'} variant="outline" />
               {row.feedback.reason && <p className="t-caption-sm text-[var(--brand-text)] mt-2">{row.feedback.reason}</p>}
+            </div>
+          </div>
+        )}
+
+        {row.localSeo && (
+          <div>
+            <p className="t-label text-[var(--brand-text-muted)] mb-2">Local Visibility</p>
+            <div className="rounded-[var(--radius-lg)] border border-blue-500/20 bg-blue-500/8 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="t-caption font-medium text-[var(--brand-text-bright)]">{row.localSeo.marketLabel}</p>
+                  <p className="t-caption-sm text-[var(--brand-text-muted)]">{row.localSeo.detail}</p>
+                </div>
+                <LocalSeoVisibilityBadge visibility={row.localSeo} />
+              </div>
+              <p className="t-caption-sm text-[var(--brand-text-muted)] mt-2">
+                Local SEO is market-specific local-pack visibility. Rank Tracker remains Search Console measurement.
+              </p>
             </div>
           </div>
         )}
@@ -459,6 +479,11 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
         <SummaryMetric label="Retired" value={data?.counts.retired ?? 0} icon={Archive} tone="zinc" />
       </div>
 
+      <LocalSeoVisibilityPanel
+        workspaceId={workspaceId}
+        onOpenKeywords={() => document.getElementById('keyword-universe')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+      />
+
       {actionErrorMessage && (
         <div
           role="alert"
@@ -470,6 +495,7 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_390px] gap-4 items-start">
         <SectionCard
+          id="keyword-universe"
           title="Keyword Universe"
           titleExtra={<Badge label={`${filteredRows.length} visible`} tone="blue" variant="soft" shape="pill" />}
           action={

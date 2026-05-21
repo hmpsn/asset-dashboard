@@ -67,7 +67,10 @@ router.get('/api/local-seo/:workspaceId', requireWorkspaceAccess('workspaceId'),
 
 router.put('/api/local-seo/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(updateSchema), (req, res, next) => {
   try {
-    const payload = updateLocalSeoConfiguration(req.params.workspaceId, req.body, isFeatureEnabled('local-seo-visibility'));
+    if (!isFeatureEnabled('local-seo-visibility')) {
+      return res.status(403).json({ error: 'Local SEO visibility is not enabled for this environment' });
+    }
+    const payload = updateLocalSeoConfiguration(req.params.workspaceId, req.body, true);
     if (!payload) return res.status(404).json({ error: 'Workspace not found' });
     res.json(payload);
   } catch (err) {

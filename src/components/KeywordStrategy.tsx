@@ -20,6 +20,7 @@ import { TopicClusters } from './strategy/TopicClusters';
 import { CannibalizationAlert } from './strategy/CannibalizationAlert';
 import { StrategyDiff } from './strategy/StrategyDiff';
 import { IntelligenceSignals } from './strategy/IntelligenceSignals';
+import { LocalSeoVisibilityPanel } from './local-seo/LocalSeoVisibilityPanel';
 import { keywords, rankTracking } from '../api/seo';
 import { workspaces } from '../api';
 import { queryKeys } from '../lib/queryKeys';
@@ -350,6 +351,8 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       {!isRealStrategy && !generating && (
         <AIContextIndicator workspaceId={workspaceId} feature="strategy" />
       )}
+
+      <LocalSeoVisibilityPanel workspaceId={workspaceId} compact />
 
       {/* Settings Panel */}
       {/* pr-check-disable-next-line -- brand asymmetric signature on KeywordStrategy settings panel; intentional non-SectionCard chrome (collapsible, button-as-first-child) */}

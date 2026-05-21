@@ -1,6 +1,8 @@
 import { Loader2, Sparkles } from 'lucide-react';
 import type { UnifiedPage } from '../../../shared/types/page-join';
+import type { LocalSeoKeywordVisibilitySummary } from '../../../shared/types/local-seo';
 import { Button } from '../ui';
+import { LocalSeoVisibilityBadge } from '../local-seo/LocalSeoVisibilityPanel';
 import type { ContentScore, KeywordData, KeywordEditDraft, SeoCopy } from './pageIntelligenceTypes';
 import { PageIntelligenceAnalysisSection } from './PageIntelligenceAnalysisSection';
 import { PageIntelligencePageActions } from './PageIntelligencePageActions';
@@ -19,6 +21,7 @@ interface Props {
   generatingCopy: string | null;
   copiedField: string | null;
   trackedKeywords: Set<string>;
+  localSeoVisibility?: LocalSeoKeywordVisibilitySummary;
   onTrackKeyword: (keyword: string) => void;
   onStartEdit: (page: UnifiedPage) => void;
   onEditDraftChange: (draft: KeywordEditDraft) => void;
@@ -45,6 +48,7 @@ export function PageIntelligencePageDetails({
   generatingCopy,
   copiedField,
   trackedKeywords,
+  localSeoVisibility,
   onTrackKeyword,
   onStartEdit,
   onEditDraftChange,
@@ -82,6 +86,18 @@ export function PageIntelligencePageDetails({
         onGenerateSeoCopy={onGenerateSeoCopy}
         onCopyText={onCopyText}
       />
+
+      {localSeoVisibility && (
+        <div className="rounded-[var(--radius-lg)] border border-blue-500/20 bg-blue-500/8 px-3 py-2">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="t-caption font-semibold text-[var(--brand-text-bright)]">Local visibility in {localSeoVisibility.marketLabel}</p>
+              <p className="t-caption-sm text-[var(--brand-text-muted)]">{localSeoVisibility.detail}</p>
+            </div>
+            <LocalSeoVisibilityBadge visibility={localSeoVisibility} />
+          </div>
+        </div>
+      )}
 
       {!sp && !analysis && !isAnalyzing && (
         <div className="text-center py-4">

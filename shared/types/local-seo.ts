@@ -67,6 +67,17 @@ export const LOCAL_VISIBILITY_STATUS = {
 
 export type LocalVisibilityStatus = typeof LOCAL_VISIBILITY_STATUS[keyof typeof LOCAL_VISIBILITY_STATUS];
 
+export const LOCAL_SEO_VISIBILITY_POSTURE = {
+  VISIBLE: 'visible',
+  POSSIBLE_MATCH: 'possible_match',
+  NOT_VISIBLE: 'not_visible',
+  LOCAL_PACK_PRESENT: 'local_pack_present',
+  PROVIDER_DEGRADED: 'provider_degraded',
+} as const;
+
+export type LocalSeoVisibilityPosture =
+  typeof LOCAL_SEO_VISIBILITY_POSTURE[keyof typeof LOCAL_SEO_VISIBILITY_POSTURE];
+
 export interface LocalSeoMarket {
   id: string;
   workspaceId: string;
@@ -145,12 +156,240 @@ export interface LocalVisibilitySnapshot {
   degradedReason?: string;
 }
 
+export interface LocalSeoKeywordVisibility {
+  keyword: string;
+  normalizedKeyword: string;
+  marketId: string;
+  marketLabel: string;
+  capturedAt: string;
+  posture: LocalSeoVisibilityPosture;
+  label: string;
+  detail: string;
+  localPackPresent: boolean;
+  businessFound: boolean;
+  businessMatchConfidence: LocalBusinessMatchConfidence;
+  localRank?: number;
+  sourceEndpoint: LocalVisibilitySourceEndpoint;
+  provider: string;
+  degradedReason?: string;
+}
+
+export interface LocalSeoKeywordVisibilitySummary extends LocalSeoKeywordVisibility {
+  marketCount: number;
+  markets: LocalSeoKeywordVisibility[];
+  visibleMarketCount: number;
+  possibleMatchMarketCount: number;
+  localPackOnlyMarketCount: number;
+  notVisibleMarketCount: number;
+  degradedMarketCount: number;
+}
+
+export function localSeoKeywordVisibilityFromSnapshot(snapshot: LocalVisibilitySnapshot): LocalSeoKeywordVisibility {
+  if (snapshot.status === LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED || snapshot.status === LOCAL_VISIBILITY_STATUS.DEGRADED) {
+    return {
+      keyword: snapshot.keyword,
+      normalizedKeyword: snapshot.normalizedKeyword,
+      marketId: snapshot.marketId,
+      marketLabel: snapshot.marketLabel,
+      capturedAt: snapshot.capturedAt,
+      posture: LOCAL_SEO_VISIBILITY_POSTURE.PROVIDER_DEGRADED,
+      label: 'Provider degraded',
+      detail: snapshot.degradedReason ?? 'Local visibility data could not be refreshed cleanly.',
+      localPackPresent: snapshot.localPackPresent,
+      businessFound: snapshot.businessFound,
+      businessMatchConfidence: snapshot.businessMatchConfidence,
+      localRank: snapshot.localRank,
+      sourceEndpoint: snapshot.sourceEndpoint,
+      provider: snapshot.provider,
+      degradedReason: snapshot.degradedReason,
+    };
+  }
+
+  if (snapshot.businessFound && snapshot.businessMatchConfidence === LOCAL_BUSINESS_MATCH_CONFIDENCE.VERIFIED) {
+    return {
+      keyword: snapshot.keyword,
+      normalizedKeyword: snapshot.normalizedKeyword,
+      marketId: snapshot.marketId,
+      marketLabel: snapshot.marketLabel,
+      capturedAt: snapshot.capturedAt,
+      posture: LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE,
+      label: snapshot.localRank ? `Visible #${snapshot.localRank}` : 'Visible locally',
+      detail: snapshot.businessMatchReason ?? 'Business appears in local results with verified match evidence.',
+      localPackPresent: snapshot.localPackPresent,
+      businessFound: snapshot.businessFound,
+      businessMatchConfidence: snapshot.businessMatchConfidence,
+      localRank: snapshot.localRank,
+      sourceEndpoint: snapshot.sourceEndpoint,
+      provider: snapshot.provider,
+    };
+  }
+
+  if (
+    snapshot.businessFound
+    && (
+      snapshot.businessMatchConfidence === LOCAL_BUSINESS_MATCH_CONFIDENCE.STRONG_MATCH
+      || snapshot.businessMatchConfidence === LOCAL_BUSINESS_MATCH_CONFIDENCE.POSSIBLE_MATCH
+    )
+  ) {
+    return {
+      keyword: snapshot.keyword,
+      normalizedKeyword: snapshot.normalizedKeyword,
+      marketId: snapshot.marketId,
+      marketLabel: snapshot.marketLabel,
+      capturedAt: snapshot.capturedAt,
+      posture: LOCAL_SEO_VISIBILITY_POSTURE.POSSIBLE_MATCH,
+      label: snapshot.localRank ? `Possible match #${snapshot.localRank}` : 'Possible match',
+      detail: snapshot.businessMatchReason ?? 'Possible business match; review before treating this as verified local visibility.',
+      localPackPresent: snapshot.localPackPresent,
+      businessFound: snapshot.businessFound,
+      businessMatchConfidence: snapshot.businessMatchConfidence,
+      localRank: snapshot.localRank,
+      sourceEndpoint: snapshot.sourceEndpoint,
+      provider: snapshot.provider,
+    };
+  }
+
+  if (snapshot.localPackPresent) {
+    return {
+      keyword: snapshot.keyword,
+      normalizedKeyword: snapshot.normalizedKeyword,
+      marketId: snapshot.marketId,
+      marketLabel: snapshot.marketLabel,
+      capturedAt: snapshot.capturedAt,
+      posture: LOCAL_SEO_VISIBILITY_POSTURE.LOCAL_PACK_PRESENT,
+      label: 'Local pack present',
+      detail: snapshot.businessMatchReason ?? 'A local pack appeared, but this business was not confidently matched.',
+      localPackPresent: snapshot.localPackPresent,
+      businessFound: snapshot.businessFound,
+      businessMatchConfidence: snapshot.businessMatchConfidence,
+      localRank: snapshot.localRank,
+      sourceEndpoint: snapshot.sourceEndpoint,
+      provider: snapshot.provider,
+    };
+  }
+
+  return {
+    keyword: snapshot.keyword,
+    normalizedKeyword: snapshot.normalizedKeyword,
+    marketId: snapshot.marketId,
+    marketLabel: snapshot.marketLabel,
+    capturedAt: snapshot.capturedAt,
+    posture: LOCAL_SEO_VISIBILITY_POSTURE.NOT_VISIBLE,
+    label: 'Not found locally',
+    detail: snapshot.businessMatchReason ?? 'No likely business match found in local results for this market.',
+    localPackPresent: snapshot.localPackPresent,
+    businessFound: snapshot.businessFound,
+    businessMatchConfidence: snapshot.businessMatchConfidence,
+    localRank: snapshot.localRank,
+    sourceEndpoint: snapshot.sourceEndpoint,
+    provider: snapshot.provider,
+  };
+}
+
+export function summarizeLocalSeoKeywordVisibility(
+  items: LocalSeoKeywordVisibility[],
+): LocalSeoKeywordVisibilitySummary | undefined {
+  if (items.length === 0) return undefined;
+  const sorted = [...items].sort((a, b) => a.marketLabel.localeCompare(b.marketLabel));
+  const visibleMarketCount = sorted.filter(item => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE).length;
+  const possibleMatchMarketCount = sorted.filter(item => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.POSSIBLE_MATCH).length;
+  const localPackOnlyMarketCount = sorted.filter(item => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.LOCAL_PACK_PRESENT).length;
+  const notVisibleMarketCount = sorted.filter(item => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.NOT_VISIBLE).length;
+  const degradedMarketCount = sorted.filter(item => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.PROVIDER_DEGRADED).length;
+  const primary = sorted.find(item => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE)
+    ?? sorted.find(item => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.POSSIBLE_MATCH)
+    ?? sorted.find(item => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.LOCAL_PACK_PRESENT)
+    ?? sorted.find(item => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.NOT_VISIBLE)
+    ?? sorted[0];
+
+  if (sorted.length === 1) {
+    return {
+      ...primary,
+      marketCount: 1,
+      markets: sorted,
+      visibleMarketCount,
+      possibleMatchMarketCount,
+      localPackOnlyMarketCount,
+      notVisibleMarketCount,
+      degradedMarketCount,
+    };
+  }
+
+  const marketCount = sorted.length;
+  const posture = visibleMarketCount > 0
+    ? LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE
+    : possibleMatchMarketCount > 0
+      ? LOCAL_SEO_VISIBILITY_POSTURE.POSSIBLE_MATCH
+      : localPackOnlyMarketCount > 0
+        ? LOCAL_SEO_VISIBILITY_POSTURE.LOCAL_PACK_PRESENT
+        : degradedMarketCount === marketCount
+          ? LOCAL_SEO_VISIBILITY_POSTURE.PROVIDER_DEGRADED
+          : LOCAL_SEO_VISIBILITY_POSTURE.NOT_VISIBLE;
+  const label = posture === LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE
+    ? `Visible in ${visibleMarketCount}/${marketCount} markets`
+    : posture === LOCAL_SEO_VISIBILITY_POSTURE.POSSIBLE_MATCH
+      ? `Possible in ${possibleMatchMarketCount}/${marketCount} markets`
+      : posture === LOCAL_SEO_VISIBILITY_POSTURE.LOCAL_PACK_PRESENT
+        ? `Local pack in ${localPackOnlyMarketCount}/${marketCount} markets`
+        : posture === LOCAL_SEO_VISIBILITY_POSTURE.PROVIDER_DEGRADED
+          ? `Provider degraded in ${marketCount} markets`
+          : `Not found in ${notVisibleMarketCount}/${marketCount} markets`;
+  const detail = sorted
+    .slice(0, 3)
+    .map(item => `${item.marketLabel}: ${item.label}`)
+    .join(' · ');
+
+  return {
+    ...primary,
+    marketLabel: `${marketCount} markets`,
+    posture,
+    label,
+    detail: sorted.length > 3 ? `${detail} · +${sorted.length - 3} more` : detail,
+    localPackPresent: sorted.some(item => item.localPackPresent),
+    businessFound: sorted.some(item => item.businessFound),
+    localRank: primary.localRank,
+    marketCount,
+    markets: sorted,
+    visibleMarketCount,
+    possibleMatchMarketCount,
+    localPackOnlyMarketCount,
+    notVisibleMarketCount,
+    degradedMarketCount,
+  };
+}
+
+export function localSeoKeywordVisibilitySummaryFromSnapshots(
+  snapshots: LocalVisibilitySnapshot[],
+): LocalSeoKeywordVisibilitySummary | undefined {
+  return summarizeLocalSeoKeywordVisibility(snapshots.map(localSeoKeywordVisibilityFromSnapshot));
+}
+
+export interface LocalSeoReportSummary {
+  workspacePosture: LocalSeoPosture;
+  suggestedPosture?: LocalSeoPosture;
+  activeMarketCount: number;
+  configuredMarketCount: number;
+  suggestedMarketCount: number;
+  latestSnapshotCount: number;
+  checkedKeywordCount: number;
+  visibleCount: number;
+  possibleMatchCount: number;
+  notVisibleCount: number;
+  localPackPresentCount: number;
+  degradedCount: number;
+  lastCapturedAt?: string;
+  setupState: 'feature_disabled' | 'non_local' | 'needs_market' | 'ready_no_data' | 'has_data';
+  setupLabel: string;
+  setupDetail: string;
+}
+
 export interface LocalSeoReadResponse {
   featureEnabled: boolean;
   settings: LocalSeoWorkspaceSettings;
   markets: LocalSeoMarket[];
   suggestedMarkets: LocalSeoMarket[];
   latestSnapshots: LocalVisibilitySnapshot[];
+  report: LocalSeoReportSummary;
   caps: {
     maxMarkets: number;
     maxKeywordsPerRefresh: number;

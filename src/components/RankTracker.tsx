@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Loader2, TrendingUp, Minus, Plus, Trash2, Pin, RefreshCw,
-  Target, ArrowUp, ArrowDown, LineChart, ChevronDown,
+  Target, ArrowUp, ArrowDown, LineChart, ChevronDown, MapPin,
 } from 'lucide-react';
 import { get, post, patch, del } from '../api/client';
 import { Badge, EmptyState, SectionCard, Icon, Button, IconButton, PageHeader, FormInput } from './ui';
+import { FeatureFlag } from './ui/FeatureFlag';
 import { WS_EVENTS } from '../lib/wsEvents';
 import { cn } from '../lib/utils';
 import { chartGridColor, chartAxisColor, CHART_SERIES_COLORS } from './ui/constants';
@@ -327,6 +328,22 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
           Connect Google Search Console in Workspace Settings to enable rank tracking snapshots.
         </div>
       )}
+
+      <FeatureFlag flag="local-seo-visibility">
+        <SectionCard variant="subtle">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-[var(--radius-lg)] border border-blue-500/20 bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+              <Icon as={MapPin} size="md" className="text-blue-400" />
+            </div>
+            <div>
+              <p className="t-caption font-semibold text-[var(--brand-text-bright)]">Rank Tracker is Search Console measurement</p>
+              <p className="t-caption-sm text-[var(--brand-text-muted)]">
+                Local SEO visibility is measured separately by market and local-pack evidence. Use Keywords for local visibility posture; use this page for GSC query positions, clicks, and impressions.
+              </p>
+            </div>
+          </div>
+        </SectionCard>
+      </FeatureFlag>
 
       {error && <p className="text-xs text-red-400">{error}</p>}
 
