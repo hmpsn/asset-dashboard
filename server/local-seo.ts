@@ -372,7 +372,12 @@ function disabledSettings(workspace: Workspace): LocalSeoWorkspaceSettings {
   };
 }
 
-function hasProviderLocationIdentity(market: Pick<LocalSeoMarket, 'providerLocationCode' | 'providerLocationName' | 'latitude' | 'longitude'>): boolean {
+function hasProviderLocationIdentity(market: {
+  providerLocationCode?: number | null;
+  providerLocationName?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}): boolean {
   return Boolean(
     market.providerLocationCode
     || market.providerLocationName?.trim()
@@ -408,11 +413,17 @@ export function updateLocalSeoConfiguration(workspaceId: string, request: LocalS
           if (!existing) throw new Error('Local SEO market not found');
           const existingMarket = rowToMarket(existing);
           const nextStatus = market.status ?? existingMarket.status;
+          const nextProviderIdentity = {
+            providerLocationCode: market.providerLocationCode !== undefined ? market.providerLocationCode : existingMarket.providerLocationCode,
+            providerLocationName: market.providerLocationName !== undefined ? market.providerLocationName : existingMarket.providerLocationName,
+            latitude: market.latitude !== undefined ? market.latitude : existingMarket.latitude,
+            longitude: market.longitude !== undefined ? market.longitude : existingMarket.longitude,
+          };
           if (nextStatus === LOCAL_SEO_MARKET_STATUS.ACTIVE && !hasProviderLocationIdentity({
-            providerLocationCode: market.providerLocationCode ?? existingMarket.providerLocationCode,
-            providerLocationName: market.providerLocationName ?? existingMarket.providerLocationName,
-            latitude: market.latitude ?? existingMarket.latitude,
-            longitude: market.longitude ?? existingMarket.longitude,
+            providerLocationCode: nextProviderIdentity.providerLocationCode,
+            providerLocationName: nextProviderIdentity.providerLocationName,
+            latitude: nextProviderIdentity.latitude,
+            longitude: nextProviderIdentity.longitude,
           })) {
             throw new Error('Active local SEO markets require a provider location code, provider location name, or coordinates');
           }
@@ -438,10 +449,10 @@ export function updateLocalSeoConfiguration(workspaceId: string, request: LocalS
           city: market.city.trim(),
           state_or_region: market.stateOrRegion !== undefined ? market.stateOrRegion.trim() || null : existingMarket?.stateOrRegion ?? null,
           country: market.country.trim(),
-          latitude: market.latitude ?? existingMarket?.latitude ?? null,
-          longitude: market.longitude ?? existingMarket?.longitude ?? null,
-          provider_location_code: market.providerLocationCode ?? existingMarket?.providerLocationCode ?? null,
-          provider_location_name: market.providerLocationName !== undefined ? market.providerLocationName.trim() || null : existingMarket?.providerLocationName ?? null,
+          latitude: market.latitude !== undefined ? market.latitude : existingMarket?.latitude ?? null,
+          longitude: market.longitude !== undefined ? market.longitude : existingMarket?.longitude ?? null,
+          provider_location_code: market.providerLocationCode !== undefined ? market.providerLocationCode : existingMarket?.providerLocationCode ?? null,
+          provider_location_name: market.providerLocationName !== undefined ? market.providerLocationName?.trim() || null : existingMarket?.providerLocationName ?? null,
           source: LOCAL_SEO_MARKET_SOURCE.ADMIN_OVERRIDE,
           status: market.status ?? existingMarket?.status ?? LOCAL_SEO_MARKET_STATUS.ACTIVE,
           created_at: existing?.created_at ?? now,

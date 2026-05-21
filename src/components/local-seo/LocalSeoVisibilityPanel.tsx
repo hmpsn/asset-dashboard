@@ -1,8 +1,10 @@
-import { AlertTriangle, CheckCircle2, Globe2, MapPin, RefreshCw, Search, XCircle } from 'lucide-react';
+import { useState } from 'react';
+import { AlertTriangle, CheckCircle2, Globe2, MapPin, RefreshCw, Search, Settings2, XCircle } from 'lucide-react';
 import type { LocalSeoKeywordVisibility, LocalSeoReadResponse, LocalSeoVisibilityPosture, LocalVisibilitySnapshot } from '../../../shared/types/local-seo';
 import { LOCAL_SEO_VISIBILITY_POSTURE, localSeoKeywordVisibilityFromSnapshot } from '../../../shared/types/local-seo';
 import { useLocalSeo, useLocalSeoRefresh } from '../../hooks/admin';
 import { Badge, Button, EmptyState, Icon, SectionCard, StatCard, cn } from '../ui';
+import { LocalSeoMarketSetupDrawer } from './LocalSeoMarketSetupDrawer';
 
 interface LocalSeoVisibilityPanelProps {
   workspaceId: string;
@@ -96,6 +98,7 @@ function latestVisibility(data: LocalSeoReadResponse): LocalSeoKeywordVisibility
 }
 
 export function LocalSeoVisibilityPanel({ workspaceId, compact = false, onOpenKeywords }: LocalSeoVisibilityPanelProps) {
+  const [setupOpen, setSetupOpen] = useState(false);
   const { data, isLoading, error } = useLocalSeo(workspaceId);
   const refresh = useLocalSeoRefresh(workspaceId);
 
@@ -115,6 +118,8 @@ export function LocalSeoVisibilityPanel({ workspaceId, compact = false, onOpenKe
   const report = data.report;
   const snapshots = latestVisibility(data);
   const canRefresh = report.activeMarketCount > 0 && report.workspacePosture !== 'non_local';
+  const setupLabel = report.setupState === 'needs_market' ? 'Configure market' : data.markets.length > 0 ? 'Edit markets' : 'Configure market';
+  const setupVariant = report.setupState === 'needs_market' ? 'primary' : 'ghost';
   const setupTone = report.setupState === 'has_data'
     ? 'emerald'
     : report.setupState === 'ready_no_data'
@@ -134,6 +139,14 @@ export function LocalSeoVisibilityPanel({ workspaceId, compact = false, onOpenKe
       }
       action={
         <div className="flex items-center gap-2">
+          <Button
+            variant={setupVariant}
+            size="sm"
+            icon={Settings2}
+            onClick={() => setSetupOpen(true)}
+          >
+            {setupLabel}
+          </Button>
           {onOpenKeywords && (
             <Button variant="ghost" size="sm" icon={Search} onClick={onOpenKeywords}>
               Keywords
@@ -216,6 +229,12 @@ export function LocalSeoVisibilityPanel({ workspaceId, compact = false, onOpenKe
           </div>
         )}
       </div>
+      <LocalSeoMarketSetupDrawer
+        workspaceId={workspaceId}
+        data={data}
+        open={setupOpen}
+        onClose={() => setSetupOpen(false)}
+      />
     </SectionCard>
   );
 }

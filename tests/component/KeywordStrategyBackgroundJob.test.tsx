@@ -37,6 +37,12 @@ vi.mock('../../src/hooks/admin', () => ({
     isPending: false,
     error: null,
   }),
+  useLocalSeoUpdate: () => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+    error: null,
+  }),
 }));
 
 vi.mock('../../src/hooks/useBackgroundTasks', () => ({
