@@ -4,12 +4,15 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { KeywordCommandCenter } from '../../src/components/KeywordCommandCenter';
 import {
+  KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE,
+  KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY,
   KEYWORD_COMMAND_CENTER_STATUS,
   type KeywordCommandCenterResponse,
 } from '../../shared/types/keyword-command-center';
 import { TRACKED_KEYWORD_STATUS } from '../../shared/types/rank-tracking';
 
 const mutateMock = vi.fn();
+const localRefreshMutateMock = vi.fn();
 const navigateMock = vi.fn();
 
 vi.mock('react-router-dom', async () => {
@@ -23,6 +26,71 @@ vi.mock('react-router-dom', async () => {
 vi.mock('../../src/hooks/admin/useKeywordCommandCenter', () => ({
   useKeywordCommandCenter: vi.fn(),
   useKeywordCommandCenterAction: vi.fn(),
+}));
+
+vi.mock('../../src/hooks/admin/useLocalSeo', () => ({
+  useLocalSeoRefresh: () => ({
+    mutate: localRefreshMutateMock,
+    isPending: false,
+    error: null,
+  }),
+}));
+
+vi.mock('../../src/hooks/admin', () => ({
+  useLocalSeo: () => ({
+    data: {
+      featureEnabled: true,
+      settings: {
+        workspaceId: 'ws-1',
+        posture: 'local',
+        postureSource: 'admin_override',
+        suggestionReasons: [],
+        updatedAt: '2026-05-20T12:00:00.000Z',
+      },
+      markets: [{
+        id: 'market-austin',
+        workspaceId: 'ws-1',
+        label: 'Austin, TX',
+        city: 'Austin',
+        stateOrRegion: 'TX',
+        country: 'US',
+        source: 'admin_override',
+        status: 'active',
+        createdAt: '2026-05-20T12:00:00.000Z',
+        updatedAt: '2026-05-20T12:00:00.000Z',
+      }],
+      suggestedMarkets: [],
+      latestSnapshots: [],
+      report: {
+        workspacePosture: 'local',
+        activeMarketCount: 1,
+        configuredMarketCount: 1,
+        suggestedMarketCount: 0,
+        latestSnapshotCount: 1,
+        checkedKeywordCount: 1,
+        visibleCount: 1,
+        possibleMatchCount: 0,
+        notVisibleCount: 0,
+        localPackPresentCount: 1,
+        degradedCount: 0,
+        lastCapturedAt: '2026-05-20T12:00:00.000Z',
+        setupState: 'has_data',
+        setupLabel: 'Local visibility ready',
+        setupDetail: 'Local visibility has recent market-specific evidence.',
+      },
+      caps: { maxMarkets: 3, maxKeywordsPerRefresh: 50 },
+    },
+    isLoading: false,
+    error: null,
+  }),
+  useLocalSeoRefresh: () => ({
+    mutate: localRefreshMutateMock,
+    mutateAsync: vi.fn(),
+    isPending: false,
+    error: null,
+  }),
+  useLocalSeoUpdate: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
+  useLocalSeoLocationLookup: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
 }));
 
 const payload: KeywordCommandCenterResponse = {
@@ -51,8 +119,29 @@ const payload: KeywordCommandCenterResponse = {
         localRank: 2,
         sourceEndpoint: 'google_organic_serp',
         provider: 'fake-seo-provider',
+        topCompetitors: [{ title: 'Austin Smile Studio', rank: 1, domain: 'competitor.example' }],
+        marketCount: 1,
+        markets: [],
+        visibleMarketCount: 1,
+        possibleMatchMarketCount: 0,
+        localPackOnlyMarketCount: 0,
+        notVisibleMarketCount: 0,
+        degradedMarketCount: 0,
+      },
+      localSeoState: {
+        lifecycle: KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.SELECTED,
+        lifecycleLabel: 'Selected · checked',
+        priority: KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY.DEFEND,
+        priorityLabel: 'Defend',
+        detail: 'Business appears in local results with verified match evidence.',
+        checked: true,
+        marketLabel: 'Austin, TX',
+        sourceLabels: ['Page assignment'],
+        localPackPresent: true,
+        businessMatchConfidence: 'verified',
       },
       nextActions: [
+        { type: 'check_local_visibility', label: 'Refresh local', detail: 'Refresh local visibility.', tone: 'teal', keyword: 'cosmetic dentistry' },
         { type: 'view_rankings', label: 'View rankings', detail: 'Open Rank Tracker.', tone: 'blue', keyword: 'cosmetic dentistry', targetTab: 'seo-ranks' },
         { type: 'review_page', label: 'Review page', detail: 'Open Page Intelligence.', tone: 'teal', keyword: 'cosmetic dentistry', pagePath: '/services/cosmetic-dentistry', targetTab: 'page-intelligence' },
       ],
@@ -75,6 +164,30 @@ const payload: KeywordCommandCenterResponse = {
       rawEvidenceOnly: true,
     },
     {
+      keyword: 'cosmetic dentistry austin',
+      normalizedKeyword: 'cosmetic dentistry austin',
+      lifecycleStatus: KEYWORD_COMMAND_CENTER_STATUS.NEEDS_REVIEW,
+      statusLabel: 'Needs Review',
+      sourceLabels: [{ kind: 'local_candidate', label: 'Local candidate', detail: 'Cosmetic Dentistry' }],
+      metrics: {},
+      assignment: { pagePath: '/services/cosmetic-dentistry', pageTitle: 'Cosmetic Dentistry', role: 'page_keyword' },
+      tracking: { status: 'not_tracked' },
+      localSeoState: {
+        lifecycle: KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CANDIDATE,
+        lifecycleLabel: 'Local candidate',
+        priority: KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY.INVESTIGATE,
+        priorityLabel: 'Ready to check',
+        detail: 'Cosmetic Dentistry',
+        checked: false,
+        sourceLabels: ['Local candidate'],
+      },
+      nextActions: [
+        { type: 'check_local_visibility', label: 'Check locally', detail: 'Check local visibility.', tone: 'teal', keyword: 'cosmetic dentistry austin' },
+        { type: 'track', label: 'Track keyword', detail: 'Track this keyword.', tone: 'teal', keyword: 'cosmetic dentistry austin' },
+      ],
+      isProtected: false,
+    },
+    {
       keyword: 'old strategy keyword',
       normalizedKeyword: 'old strategy keyword',
       lifecycleStatus: KEYWORD_COMMAND_CENTER_STATUS.RETIRED,
@@ -89,22 +202,31 @@ const payload: KeywordCommandCenterResponse = {
     },
   ],
   counts: {
-    total: 3,
+    total: 4,
     inStrategy: 1,
     tracked: 1,
-    needsReview: 0,
+    needsReview: 1,
     evidence: 1,
+    local: 2,
+    localCandidates: 1,
     retired: 1,
     declined: 0,
   },
   filters: [
-    { id: 'all', label: 'All', count: 3 },
+    { id: 'all', label: 'All', count: 4 },
     { id: 'in_strategy', label: 'In Strategy', count: 1 },
     { id: 'tracked', label: 'Tracked', count: 1 },
-    { id: 'needs_review', label: 'Needs Review', count: 0 },
+    { id: 'needs_review', label: 'Needs Review', count: 1 },
     { id: 'content', label: 'Content', count: 0 },
     { id: 'page_assigned', label: 'Page Assigned', count: 1 },
     { id: 'raw_evidence', label: 'Raw Evidence', count: 1 },
+    { id: 'local', label: 'Local', count: 2 },
+    { id: 'local_candidates', label: 'Local Candidates', count: 1 },
+    { id: 'visible_locally', label: 'Visible Locally', count: 1 },
+    { id: 'possible_match', label: 'Possible Match', count: 0 },
+    { id: 'not_visible', label: 'Not Visible', count: 0 },
+    { id: 'not_checked', label: 'Not Checked', count: 1 },
+    { id: 'provider_degraded', label: 'Provider Degraded', count: 0 },
     { id: 'requested', label: 'Requested', count: 0 },
     { id: 'declined', label: 'Declined', count: 0 },
     { id: 'retired', label: 'Retired', count: 1 },
@@ -166,6 +288,21 @@ describe('KeywordCommandCenter', () => {
     expect(screen.getByText('No keywords match this view')).toBeInTheDocument();
   });
 
+  it('filters local candidates and starts keyword-specific local refreshes', () => {
+    renderCommandCenter();
+
+    fireEvent.click(screen.getByRole('button', { name: /^local candidates\s*1$/i }));
+    expect(screen.getAllByText('cosmetic dentistry austin').length).toBeGreaterThan(0);
+    expect(screen.queryByText('best teeth whitening strips')).not.toBeInTheDocument();
+
+    const drawer = screen.getByText('Safe Next Actions').closest('div')!.parentElement!;
+    fireEvent.click(within(drawer).getByRole('button', { name: /check locally/i }));
+
+    expect(localRefreshMutateMock).toHaveBeenCalledWith({
+      keywords: ['cosmetic dentistry austin'],
+    });
+  });
+
   it('opens drawer actions without publishing or live metadata writes', () => {
     renderCommandCenter();
 
@@ -200,7 +337,7 @@ describe('KeywordCommandCenter', () => {
           isProtected: true,
           protectionReason: 'Manual keyword',
         }],
-        counts: { total: 1, inStrategy: 0, tracked: 1, needsReview: 0, evidence: 0, retired: 0, declined: 0 },
+        counts: { total: 1, inStrategy: 0, tracked: 1, needsReview: 0, evidence: 0, local: 0, localCandidates: 0, retired: 0, declined: 0 },
         filters: [{ id: 'all', label: 'All', count: 1 }],
       },
       isLoading: false,

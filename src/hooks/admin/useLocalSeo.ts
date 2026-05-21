@@ -18,6 +18,9 @@ export function useLocalSeoRefresh(workspaceId: string) {
     mutationFn: (body: LocalSeoRefreshRequest = {}) => localSeo.refresh(workspaceId, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.localSeo(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
     },
   });
 }

@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { AlertTriangle, CheckCircle2, Globe2, MapPin, RefreshCw, Search, Settings2, XCircle } from 'lucide-react';
-import type { LocalSeoKeywordVisibility, LocalSeoReadResponse, LocalSeoVisibilityPosture, LocalVisibilitySnapshot } from '../../../shared/types/local-seo';
-import { LOCAL_SEO_VISIBILITY_POSTURE, localSeoKeywordVisibilityFromSnapshot } from '../../../shared/types/local-seo';
+import type { LocalSeoKeywordVisibility, LocalSeoVisibilityPosture } from '../../../shared/types/local-seo';
+import { LOCAL_SEO_VISIBILITY_POSTURE } from '../../../shared/types/local-seo';
 import { useLocalSeo, useLocalSeoRefresh } from '../../hooks/admin';
-import { Badge, Button, EmptyState, Icon, SectionCard, StatCard, cn } from '../ui';
+import { Badge, Button, Icon, SectionCard, StatCard, cn } from '../ui';
 import { LocalSeoMarketSetupDrawer } from './LocalSeoMarketSetupDrawer';
 
 interface LocalSeoVisibilityPanelProps {
@@ -47,56 +47,6 @@ export function LocalSeoVisibilityBadge({ visibility, subtle = false }: { visibi
   );
 }
 
-function SnapshotList({ snapshots }: { snapshots: LocalSeoKeywordVisibility[] }) {
-  if (snapshots.length === 0) {
-    return (
-      <EmptyState
-        icon={Search}
-        title="No local visibility snapshots yet"
-        description="Run a refresh after markets are configured to see market-specific local-pack evidence."
-      />
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      {snapshots.slice(0, 6).map(snapshot => (
-        <div
-          key={`${snapshot.marketId}-${snapshot.normalizedKeyword}`}
-          className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-3)]/35 px-3 py-2"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="t-caption font-semibold text-[var(--brand-text-bright)] truncate">{snapshot.keyword}</p>
-              <p className="t-caption-sm text-[var(--brand-text-muted)] truncate">
-                {snapshot.marketLabel} · {snapshot.sourceEndpoint.replace(/_/g, ' ')}
-              </p>
-            </div>
-            <LocalSeoVisibilityBadge visibility={snapshot} />
-          </div>
-          <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">{snapshot.detail}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-export function localSeoVisibilityFromSnapshot(snapshot: LocalVisibilitySnapshot): LocalSeoKeywordVisibility {
-  return localSeoKeywordVisibilityFromSnapshot(snapshot);
-}
-
-function latestVisibility(data: LocalSeoReadResponse): LocalSeoKeywordVisibility[] {
-  const seen = new Set<string>();
-  const rows: LocalSeoKeywordVisibility[] = [];
-  for (const snapshot of data.latestSnapshots) {
-    const key = `${snapshot.marketId}:${snapshot.normalizedKeyword}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    rows.push(localSeoVisibilityFromSnapshot(snapshot));
-  }
-  return rows;
-}
-
 export function LocalSeoVisibilityPanel({ workspaceId, compact = false, onOpenKeywords }: LocalSeoVisibilityPanelProps) {
   const [setupOpen, setSetupOpen] = useState(false);
   const { data, isLoading, error } = useLocalSeo(workspaceId);
@@ -116,7 +66,6 @@ export function LocalSeoVisibilityPanel({ workspaceId, compact = false, onOpenKe
   if (!data?.featureEnabled) return null;
 
   const report = data.report;
-  const snapshots = latestVisibility(data);
   const canRefresh = report.activeMarketCount > 0 && report.workspacePosture !== 'non_local';
   const setupLabel = report.setupState === 'needs_market' ? 'Configure market' : data.markets.length > 0 ? 'Edit markets' : 'Configure market';
   const setupVariant = report.setupState === 'needs_market' ? 'primary' : 'ghost';
@@ -149,7 +98,7 @@ export function LocalSeoVisibilityPanel({ workspaceId, compact = false, onOpenKe
           </Button>
           {onOpenKeywords && (
             <Button variant="ghost" size="sm" icon={Search} onClick={onOpenKeywords}>
-              Keywords
+              View local keywords
             </Button>
           )}
           <Button
@@ -225,7 +174,18 @@ export function LocalSeoVisibilityPanel({ workspaceId, compact = false, onOpenKe
                 )}
               </div>
             </div>
-            <SnapshotList snapshots={snapshots} />
+            <div className="rounded-[var(--radius-lg)] border border-blue-500/20 bg-blue-500/8 p-3">
+              <p className="t-label text-blue-400 mb-2">Keyword visibility lives in Keywords</p>
+              <p className="t-caption-sm text-[var(--brand-text-muted)]">
+                This panel summarizes market-specific local-pack evidence. Use the Keyword Command Center to filter local candidates,
+                visible keywords, possible matches, and not-visible opportunities in the main keyword universe.
+              </p>
+              {onOpenKeywords && (
+                <Button variant="secondary" size="sm" icon={Search} className="mt-3" onClick={onOpenKeywords}>
+                  View local keywords
+                </Button>
+              )}
+            </div>
           </div>
         )}
       </div>

@@ -1,10 +1,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { evaluateLocalBusinessMatch, getLocalSeoReadModel, runLocalSeoRefreshJob, updateLocalSeoConfiguration } from '../../server/local-seo.js';
+import db from '../../server/db/index.js';
+import {
+  buildLocalSeoKeywordCandidates,
+  createLocalSeoRefreshPlan,
+  evaluateLocalBusinessMatch,
+  getLocalSeoReadModel,
+  runLocalSeoRefreshJob,
+  updateLocalSeoConfiguration,
+} from '../../server/local-seo.js';
 import { setBroadcast } from '../../server/broadcast.js';
 import { clearCompletedJobs, createJob, getJob } from '../../server/jobs.js';
 import { FakeSeoProvider } from '../../server/providers/fake-seo-provider.js';
 import { _resetRegistryForTest, registerProvider } from '../../server/seo-data-provider.js';
 import { addTrackedKeyword } from '../../server/rank-tracking.js';
+import { upsertPageKeyword } from '../../server/page-keywords.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import {
@@ -218,6 +227,104 @@ describe('local SEO visibility posture classification', () => {
 });
 
 describe('local SEO provider selection', () => {
+  it('builds richer local candidates from page keywords and market modifiers while suppressing declined noise', () => {
+    setBroadcast(vi.fn(), vi.fn());
+    const ws = createWorkspace('Local SEO Candidate Test');
+    cleanupWorkspaceIds.add(ws.id);
+    updateWorkspace(ws.id, {
+      name: 'Swish Dental',
+      liveDomain: 'https://swish.example.com',
+      businessProfile: {
+        address: {
+          street: '123 Congress Ave',
+          city: 'Austin',
+          state: 'TX',
+          country: 'US',
+        },
+      },
+      keywordStrategy: {
+        siteKeywords: ['cosmetic dentist'],
+        opportunities: [],
+        businessContext: 'Dental office offering cosmetic dentistry, veneers, whitening, and implants.',
+        generatedAt: '2026-05-20T10:00:00.000Z',
+      },
+    });
+    updateLocalSeoConfiguration(ws.id, {
+      posture: LOCAL_SEO_POSTURE.LOCAL,
+      markets: [{
+        label: 'Austin, TX',
+        city: 'Austin',
+        stateOrRegion: 'TX',
+        country: 'US',
+        providerLocationCode: 1026201,
+        status: LOCAL_SEO_MARKET_STATUS.ACTIVE,
+      }],
+    }, true);
+    upsertPageKeyword(ws.id, {
+      pagePath: '/services/cosmetic-dentistry',
+      pageTitle: 'Cosmetic Dentistry',
+      primaryKeyword: 'cosmetic dentistry',
+      secondaryKeywords: ['veneers dentist', 'paper tiger'],
+      searchIntent: 'commercial',
+    });
+    db.prepare(`
+      INSERT INTO keyword_feedback (workspace_id, keyword, status, reason, source, declined_by)
+      VALUES (?, ?, 'declined', 'Noisy local variant', 'test', 'admin')
+    `).run(ws.id, 'veneers dentist austin');
+
+    const candidates = buildLocalSeoKeywordCandidates(ws.id);
+    const keys = candidates.map(candidate => candidate.normalizedKeyword);
+
+    expect(keys).toContain('cosmetic dentistry austin');
+    expect(keys).toContain('cosmetic dentistry near me');
+    expect(keys).not.toContain('veneers dentist austin');
+    expect(keys).not.toContain('paper tiger austin');
+    expect(candidates.find(candidate => candidate.normalizedKeyword === 'cosmetic dentistry austin')).toEqual(expect.objectContaining({
+      source: 'local_variant',
+      selected: false,
+    }));
+  });
+
+  it('keeps explicit single-keyword refresh plans scoped to the requested keyword', () => {
+    setBroadcast(vi.fn(), vi.fn());
+    const ws = createWorkspace('Local SEO Explicit Refresh Test');
+    cleanupWorkspaceIds.add(ws.id);
+    updateWorkspace(ws.id, {
+      name: 'Swish Dental',
+      businessProfile: {
+        address: {
+          street: '123 Congress Ave',
+          city: 'Austin',
+          state: 'TX',
+          country: 'US',
+        },
+      },
+    });
+    updateLocalSeoConfiguration(ws.id, {
+      posture: LOCAL_SEO_POSTURE.LOCAL,
+      markets: [{
+        label: 'Austin, TX',
+        city: 'Austin',
+        stateOrRegion: 'TX',
+        country: 'US',
+        providerLocationCode: 1026201,
+        status: LOCAL_SEO_MARKET_STATUS.ACTIVE,
+      }],
+    }, true);
+    addTrackedKeyword(ws.id, 'Austin Dentist', { source: TRACKED_KEYWORD_SOURCE.MANUAL });
+    upsertPageKeyword(ws.id, {
+      pagePath: '/services/cosmetic-dentistry',
+      pageTitle: 'Cosmetic Dentistry',
+      primaryKeyword: 'cosmetic dentistry',
+      secondaryKeywords: ['veneers dentist'],
+      searchIntent: 'commercial',
+    });
+
+    const plan = createLocalSeoRefreshPlan(ws.id, { keywords: ['cosmetic dentistry austin'] });
+
+    expect(plan?.keywords).toEqual(['cosmetic dentistry austin']);
+  });
+
   it('does not fall back to DataForSEO when the workspace selected SEMRush for local visibility', async () => {
     setBroadcast(vi.fn(), vi.fn());
     const ws = createWorkspace('Local SEO Provider Strictness Test');

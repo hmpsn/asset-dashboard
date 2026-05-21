@@ -2,12 +2,15 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowUpRight,
+  AlertTriangle,
   Archive,
   CheckCircle2,
   Eye,
   FileText,
   Gauge,
   History,
+  MapPin,
+  RefreshCw,
   Search,
   ShieldCheck,
   SlidersHorizontal,
@@ -34,6 +37,8 @@ import {
 import {
   KEYWORD_COMMAND_CENTER_ACTIONS,
   KEYWORD_COMMAND_CENTER_FILTERS,
+  KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE,
+  KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY,
   KEYWORD_COMMAND_CENTER_STATUS,
   type KeywordCommandCenterActionType,
   type KeywordCommandCenterFilter,
@@ -41,9 +46,11 @@ import {
   type KeywordCommandCenterRow,
   type KeywordCommandCenterStatus,
 } from '../../shared/types/keyword-command-center';
+import { LOCAL_SEO_VISIBILITY_POSTURE } from '../../shared/types/local-seo';
 import { TRACKED_KEYWORD_STATUS } from '../../shared/types/rank-tracking';
 import { keywordComparisonKey } from '../../shared/keyword-normalization';
 import { useKeywordCommandCenter, useKeywordCommandCenterAction } from '../hooks/admin/useKeywordCommandCenter';
+import { useLocalSeoRefresh } from '../hooks/admin/useLocalSeo';
 import { LocalSeoVisibilityBadge, LocalSeoVisibilityPanel } from './local-seo/LocalSeoVisibilityPanel';
 
 interface KeywordCommandCenterProps {
@@ -67,6 +74,13 @@ const FILTER_ICONS: Record<KeywordCommandCenterFilter, typeof Search> = {
   [KEYWORD_COMMAND_CENTER_FILTERS.CONTENT]: FileText,
   [KEYWORD_COMMAND_CENTER_FILTERS.PAGE_ASSIGNED]: Gauge,
   [KEYWORD_COMMAND_CENTER_FILTERS.RAW_EVIDENCE]: Sparkles,
+  [KEYWORD_COMMAND_CENTER_FILTERS.LOCAL]: MapPin,
+  [KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES]: MapPin,
+  [KEYWORD_COMMAND_CENTER_FILTERS.VISIBLE_LOCALLY]: CheckCircle2,
+  [KEYWORD_COMMAND_CENTER_FILTERS.POSSIBLE_MATCH]: Eye,
+  [KEYWORD_COMMAND_CENTER_FILTERS.NOT_VISIBLE]: XCircle,
+  [KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED]: RefreshCw,
+  [KEYWORD_COMMAND_CENTER_FILTERS.PROVIDER_DEGRADED]: AlertTriangle,
   [KEYWORD_COMMAND_CENTER_FILTERS.REQUESTED]: ShieldCheck,
   [KEYWORD_COMMAND_CENTER_FILTERS.DECLINED]: XCircle,
   [KEYWORD_COMMAND_CENTER_FILTERS.RETIRED]: Archive,
@@ -84,10 +98,49 @@ function percent(value: number | undefined): string {
   return `${(value * 100).toFixed(1)}%`;
 }
 
+function localPriorityTone(priority: NonNullable<KeywordCommandCenterRow['localSeoState']>['priority']): 'teal' | 'blue' | 'emerald' | 'amber' | 'red' | 'zinc' {
+  if (priority === KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY.HIGH_OPPORTUNITY) return 'teal';
+  if (priority === KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY.DEFEND) return 'emerald';
+  if (priority === KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY.INVESTIGATE || priority === KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY.NEEDS_SETUP) return 'amber';
+  return 'zinc';
+}
+
+function localLifecycleTone(lifecycle: NonNullable<KeywordCommandCenterRow['localSeoState']>['lifecycle']): 'teal' | 'blue' | 'amber' | 'zinc' {
+  if (lifecycle === KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.SELECTED) return 'teal';
+  if (lifecycle === KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CHECKED) return 'blue';
+  if (lifecycle === KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CANDIDATE || lifecycle === KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.NOT_CHECKED) return 'amber';
+  return 'zinc';
+}
+
+function LocalSeoStateBadge({ row }: { row: KeywordCommandCenterRow }) {
+  if (!row.localSeoState) return <span className="t-caption-sm text-[var(--brand-text-muted)]">—</span>;
+  if (row.localSeo) return <LocalSeoVisibilityBadge visibility={row.localSeo} subtle />;
+  return (
+    <Badge
+      label={row.localSeoState.lifecycleLabel}
+      tone={localLifecycleTone(row.localSeoState.lifecycle)}
+      variant="soft"
+      shape="pill"
+    />
+  );
+}
+
 function matchesFilter(row: KeywordCommandCenterRow, filter: KeywordCommandCenterFilter): boolean {
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.ALL) return true;
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.CONTENT) return row.assignment?.role === 'content_gap';
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.PAGE_ASSIGNED) return row.assignment?.role === 'page_keyword';
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.LOCAL) return Boolean(row.localSeoState);
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES) {
+    return row.localSeoState?.lifecycle === KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CANDIDATE;
+  }
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.VISIBLE_LOCALLY) return row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE;
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.POSSIBLE_MATCH) return row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.POSSIBLE_MATCH;
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.NOT_VISIBLE) {
+    return row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.NOT_VISIBLE
+      || row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.LOCAL_PACK_PRESENT;
+  }
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED) return Boolean(row.localSeoState && !row.localSeoState.checked);
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.PROVIDER_DEGRADED) return row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.PROVIDER_DEGRADED;
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.REQUESTED) return row.feedback?.status === 'requested';
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.TRACKED) return row.tracking.status === TRACKED_KEYWORD_STATUS.ACTIVE;
   return row.lifecycleStatus === filter;
@@ -159,7 +212,7 @@ function KeywordRow({
       active={active}
       onClick={onSelect}
       className={cn(
-        'grid grid-cols-[minmax(220px,1.5fr)_120px_100px_100px_minmax(180px,1fr)_130px] gap-3 items-center px-4 py-3 border-b border-[var(--brand-border)] last:border-b-0',
+        'grid grid-cols-[minmax(220px,1.5fr)_120px_150px_100px_100px_minmax(180px,1fr)_130px] gap-3 items-center px-4 py-3 border-b border-[var(--brand-border)] last:border-b-0',
         'hover:bg-teal-500/5',
       )}
     >
@@ -174,6 +227,9 @@ function KeywordRow({
         </p>
       </div>
       <Badge label={row.statusLabel} tone={STATUS_TONE[row.lifecycleStatus]} variant="outline" shape="pill" />
+      <div className="min-w-0">
+        <LocalSeoStateBadge row={row} />
+      </div>
       <p className="t-caption text-blue-400 tabular-nums">{compactNumber(row.metrics.volume ?? row.metrics.impressions)}</p>
       <p className="t-caption text-[var(--brand-text)] tabular-nums">
         {row.metrics.currentPosition ? `#${row.metrics.currentPosition.toFixed(1)}` : row.metrics.difficulty != null ? `${row.metrics.difficulty}/100` : '—'}
@@ -250,7 +306,7 @@ function KeywordDrawer({
               <Badge
                 key={`${source.kind}-${source.label}-${source.detail ?? ''}`}
                 label={source.detail ? `${source.label}: ${source.detail}` : source.label}
-                tone={source.kind === 'raw_evidence' ? 'zinc' : source.kind === 'rank_data' ? 'blue' : 'teal'}
+                tone={source.kind === 'raw_evidence' ? 'zinc' : source.kind === 'rank_data' || source.kind === 'local_visibility' ? 'blue' : source.kind === 'local_candidate' ? 'amber' : 'teal'}
                 variant="outline"
               />
             ))}
@@ -308,17 +364,56 @@ function KeywordDrawer({
           </div>
         )}
 
-        {row.localSeo && (
+        {row.localSeoState && (
           <div>
             <p className="t-label text-[var(--brand-text-muted)] mb-2">Local Visibility</p>
             <div className="rounded-[var(--radius-lg)] border border-blue-500/20 bg-blue-500/8 p-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="t-caption font-medium text-[var(--brand-text-bright)]">{row.localSeo.marketLabel}</p>
-                  <p className="t-caption-sm text-[var(--brand-text-muted)]">{row.localSeo.detail}</p>
+                  <p className="t-caption font-medium text-[var(--brand-text-bright)]">
+                    {row.localSeoState.marketLabel ?? row.localSeoState.lifecycleLabel}
+                  </p>
+                  <p className="t-caption-sm text-[var(--brand-text-muted)]">{row.localSeoState.detail}</p>
                 </div>
-                <LocalSeoVisibilityBadge visibility={row.localSeo} />
+                <div className="flex flex-wrap justify-end gap-1.5">
+                  <Badge label={row.localSeoState.priorityLabel} tone={localPriorityTone(row.localSeoState.priority)} variant="outline" shape="pill" />
+                  {row.localSeo ? (
+                    <LocalSeoVisibilityBadge visibility={row.localSeo} />
+                  ) : (
+                    <Badge label={row.localSeoState.lifecycleLabel} tone={localLifecycleTone(row.localSeoState.lifecycle)} variant="soft" shape="pill" />
+                  )}
+                </div>
               </div>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {row.localSeoState.sourceLabels.map(source => (
+                  <Badge key={source} label={source} tone="blue" variant="soft" />
+                ))}
+                {row.localSeoState.localPackPresent != null && (
+                  <Badge
+                    label={row.localSeoState.localPackPresent ? 'Local pack present' : 'No local pack'}
+                    tone={row.localSeoState.localPackPresent ? 'blue' : 'zinc'}
+                    variant="outline"
+                  />
+                )}
+                {row.localSeoState.businessMatchConfidence && (
+                  <Badge label={row.localSeoState.businessMatchConfidence.replace(/_/g, ' ')} tone="amber" variant="outline" />
+                )}
+              </div>
+              {row.localSeo?.topCompetitors && row.localSeo.topCompetitors.length > 0 && (
+                <div className="mt-3 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-3)]/40 p-3">
+                  <p className="t-caption-sm font-semibold text-[var(--brand-text-bright)] mb-2">Top local result evidence</p>
+                  <div className="space-y-1.5">
+                    {row.localSeo.topCompetitors.slice(0, 3).map(result => (
+                      <div key={`${result.rank ?? 'rank'}-${result.title}`} className="flex items-center justify-between gap-3">
+                        <p className="t-caption-sm text-[var(--brand-text)] truncate">
+                          {result.rank ? `#${result.rank} ` : ''}{result.title}
+                        </p>
+                        {result.domain && <span className="t-caption-sm text-blue-400 truncate">{result.domain}</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <p className="t-caption-sm text-[var(--brand-text-muted)] mt-2">
                 Local SEO is market-specific local-pack visibility. Rank Tracker remains Search Console measurement.
               </p>
@@ -356,6 +451,7 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
   const navigate = useNavigate();
   const { data, isLoading, error } = useKeywordCommandCenter(workspaceId);
   const actionMutation = useKeywordCommandCenterAction(workspaceId);
+  const localRefresh = useLocalSeoRefresh(workspaceId);
   const [filter, setFilter] = useState<KeywordCommandCenterFilter>(KEYWORD_COMMAND_CENTER_FILTERS.ALL);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -379,7 +475,11 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
     ? actionMutation.error.message
     : actionMutation.error
       ? 'Keyword action failed. Try again or refresh the page.'
-      : null;
+      : localRefresh.error instanceof Error
+        ? localRefresh.error.message
+        : localRefresh.error
+          ? 'Local visibility refresh could not start. Try again or refresh the page.'
+          : null;
 
   const selectedRow = useMemo(() => {
     if (selectedKey) {
@@ -430,6 +530,10 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
       });
       return;
     }
+    if (action.type === 'check_local_visibility') {
+      localRefresh.mutate({ keywords: [row.keyword] });
+      return;
+    }
     if (!isServerAction(action.type)) return;
     if (requiresProtectedConfirmation(row, action)) {
       setPendingProtectedAction({ row, action });
@@ -474,14 +578,17 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <SummaryMetric label="In Strategy" value={data?.counts.inStrategy ?? 0} icon={Target} tone="teal" />
         <SummaryMetric label="Tracked" value={data?.counts.tracked ?? 0} icon={TrendingUp} tone="blue" />
+        <SummaryMetric label="Local" value={data?.counts.local ?? 0} icon={MapPin} tone="blue" />
         <SummaryMetric label="Needs Review" value={data?.counts.needsReview ?? 0} icon={Eye} tone="amber" />
-        <SummaryMetric label="Evidence" value={data?.counts.evidence ?? 0} icon={Sparkles} tone="zinc" />
         <SummaryMetric label="Retired" value={data?.counts.retired ?? 0} icon={Archive} tone="zinc" />
       </div>
 
       <LocalSeoVisibilityPanel
         workspaceId={workspaceId}
-        onOpenKeywords={() => document.getElementById('keyword-universe')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+        onOpenKeywords={() => {
+          setFilter(KEYWORD_COMMAND_CENTER_FILTERS.LOCAL);
+          document.getElementById('keyword-universe')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }}
       />
 
       {actionErrorMessage && (
@@ -531,10 +638,11 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
           </div>
 
           <div className="overflow-x-auto">
-            <div className="min-w-[860px]">
-              <div className="hidden md:grid grid-cols-[minmax(220px,1.5fr)_120px_100px_100px_minmax(180px,1fr)_130px] gap-3 px-4 py-2 border-b border-[var(--brand-border)] bg-[var(--surface-3)]/30">
+            <div className="min-w-[1020px]">
+              <div className="hidden md:grid grid-cols-[minmax(220px,1.5fr)_120px_150px_100px_100px_minmax(180px,1fr)_130px] gap-3 px-4 py-2 border-b border-[var(--brand-border)] bg-[var(--surface-3)]/30">
                 <p className="t-label text-[var(--brand-text-muted)]">Keyword</p>
                 <p className="t-label text-[var(--brand-text-muted)]">Status</p>
+                <p className="t-label text-[var(--brand-text-muted)]">Local</p>
                 <p className="t-label text-[var(--brand-text-muted)]">Demand</p>
                 <p className="t-label text-[var(--brand-text-muted)]">Rank/KD</p>
                 <p className="t-label text-[var(--brand-text-muted)]">Assignment</p>
@@ -574,7 +682,7 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
         <KeywordDrawer
           row={selectedRow}
           workspaceId={workspaceId}
-          loadingAction={actionMutation.isPending ? actionMutation.variables?.action : undefined}
+          loadingAction={localRefresh.isPending ? 'check_local_visibility' : actionMutation.isPending ? actionMutation.variables?.action : undefined}
           onAction={(action) => handleAction(selectedRow, action)}
         />
       </div>
