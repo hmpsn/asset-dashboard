@@ -75,7 +75,7 @@ export const BACKGROUND_JOB_METADATA: { [K in BackgroundJobType]: BackgroundJobT
     label: 'Keyword Strategy',
     description: 'Builds a workspace keyword strategy.',
     cancellable: false,
-    resultBehavior: 'domain-store-and-result',
+    resultBehavior: 'domain-store',
   },
   [BACKGROUND_JOB_TYPES.SCHEMA_GENERATOR]: {
     label: 'Schema Generator',

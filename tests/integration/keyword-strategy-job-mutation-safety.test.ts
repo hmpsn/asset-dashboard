@@ -417,15 +417,14 @@ describe('keyword strategy job mutation safety', () => {
       type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
       status: 'done',
       result: expect.objectContaining({
-        siteKeywords: ['Local SEO', 'SEO Agency'],
-        pageMap: [
-          expect.objectContaining({
-            pagePath: '/services/local-seo',
-            primaryKeyword: 'local seo',
-          }),
-        ],
+        persisted: true,
+        pageCount: 1,
+        siteKeywordCount: 2,
+        contentGapCount: 0,
+        quickWinCount: 0,
       }),
     });
+    expect((job.result as { pageMap?: unknown }).pageMap).toBeUndefined();
 
     const storedWorkspace = getWorkspace(workspace.workspaceId);
     expect(storedWorkspace?.keywordStrategy).toMatchObject({
@@ -551,13 +550,9 @@ describe('keyword strategy job mutation safety', () => {
       type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
       status: 'done',
       result: expect.objectContaining({
-        siteKeywords: ['local seo'],
-        pageMap: [
-          expect.objectContaining({
-            pagePath: '/services/local-seo',
-            primaryKeyword: 'local seo',
-          }),
-        ],
+        persisted: true,
+        pageCount: 1,
+        siteKeywordCount: 1,
       }),
     });
 
@@ -627,7 +622,9 @@ describe('keyword strategy job mutation safety', () => {
       type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
       status: 'done',
       result: expect.objectContaining({
-        siteKeywords: ['local seo'],
+        persisted: true,
+        pageCount: 1,
+        siteKeywordCount: 1,
       }),
     });
 
@@ -680,7 +677,9 @@ describe('keyword strategy job mutation safety', () => {
       type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
       status: 'done',
       result: expect.objectContaining({
-        siteKeywords: ['local seo'],
+        persisted: true,
+        pageCount: 1,
+        siteKeywordCount: 1,
       }),
     });
 
