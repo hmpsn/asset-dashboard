@@ -32,6 +32,42 @@ describe('Keyword Command Center routes', () => {
     expect(body.rawEvidenceTotal).toEqual(expect.any(Number));
   });
 
+  it('GET summary, rows, and detail expose split read models', async () => {
+    await postJson(`/api/webflow/keyword-command-center/${workspaceId}/actions`, {
+      action: 'track',
+      keyword: 'Split Route Keyword',
+    });
+
+    const summary = await api(`/api/webflow/keyword-command-center/${workspaceId}/summary`);
+    expect(summary.status).toBe(200);
+    const summaryBody = await summary.json();
+    expect(summaryBody).toEqual(expect.objectContaining({
+      counts: expect.objectContaining({ total: expect.any(Number) }),
+      filters: expect.any(Array),
+      summarizedAt: expect.any(String),
+    }));
+    expect(summaryBody.rows).toBeUndefined();
+
+    const rows = await api(`/api/webflow/keyword-command-center/${workspaceId}/rows?search=split&page=1&pageSize=2`);
+    expect(rows.status).toBe(200);
+    const rowsBody = await rows.json();
+    expect(rowsBody.pageInfo).toEqual(expect.objectContaining({
+      page: 1,
+      pageSize: 2,
+      totalRows: expect.any(Number),
+    }));
+    expect(rowsBody.rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({ normalizedKeyword: 'split route keyword' }),
+    ]));
+    expect(rowsBody.rows[0].explanation).toBeUndefined();
+
+    const detail = await api(`/api/webflow/keyword-command-center/${workspaceId}/detail?keyword=${encodeURIComponent('Split Route Keyword')}`);
+    expect(detail.status).toBe(200);
+    await expect(detail.json()).resolves.toEqual(expect.objectContaining({
+      row: expect.objectContaining({ normalizedKeyword: 'split route keyword' }),
+    }));
+  });
+
   it('POST track activates a keyword and protected lifecycle actions require explicit confirmation', async () => {
     const track = await postJson(`/api/webflow/keyword-command-center/${workspaceId}/actions`, {
       action: 'track',

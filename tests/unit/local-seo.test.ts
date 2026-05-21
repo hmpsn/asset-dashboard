@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import db from '../../server/db/index.js';
 import {
   buildLocalSeoKeywordCandidates,
+  buildLocalSeoKeywordVisibilitySummaryByKey,
   createLocalSeoRefreshPlan,
   evaluateLocalBusinessMatch,
   getLocalSeoReadModel,
@@ -471,5 +472,60 @@ describe('local SEO provider selection', () => {
     expect(readModel?.latestSnapshots).toHaveLength(2);
     expect(readModel?.report.checkedKeywordCount).toBe(2);
     expect(readModel?.report.activeMarketCount).toBe(2);
+  });
+
+  it('keeps summary visibility aligned with detail granularity across device and language snapshots', async () => {
+    const ws = createWorkspace('Local SEO Device Summary');
+    updateLocalSeoConfiguration(ws.id, {
+      posture: LOCAL_SEO_POSTURE.LOCAL,
+      markets: [{
+        label: 'Austin, TX',
+        city: 'Austin',
+        stateOrRegion: 'TX',
+        country: 'US',
+        providerLocationCode: 1026201,
+        status: LOCAL_SEO_MARKET_STATUS.ACTIVE,
+      }],
+    }, true);
+    const market = db.prepare('SELECT id FROM local_seo_markets WHERE workspace_id = ? LIMIT 1').get(ws.id) as { id: string };
+    const insert = db.prepare(`
+      INSERT INTO local_visibility_snapshots (
+        id, workspace_id, keyword, normalized_keyword, market_id, market_label, captured_at,
+        local_pack_present, business_found, business_match_confidence, business_match_reason,
+        local_rank, top_competitors, source_endpoint, provider, device, language_code, status, degraded_reason
+      ) VALUES (
+        @id, @workspace_id, @keyword, @normalized_keyword, @market_id, @market_label, @captured_at,
+        @local_pack_present, @business_found, @business_match_confidence, @business_match_reason,
+        @local_rank, @top_competitors, @source_endpoint, @provider, @device, @language_code, @status, @degraded_reason
+      )
+    `);
+    const base = {
+      workspace_id: ws.id,
+      keyword: 'Austin Dentist',
+      normalized_keyword: 'austin dentist',
+      market_id: market.id,
+      market_label: 'Austin, TX',
+      local_pack_present: 1,
+      business_found: 0,
+      business_match_confidence: LOCAL_BUSINESS_MATCH_CONFIDENCE.NOT_FOUND,
+      business_match_reason: null,
+      local_rank: null,
+      top_competitors: '[]',
+      source_endpoint: 'google_organic_serp',
+      provider: 'fake-seo-provider',
+      status: LOCAL_VISIBILITY_STATUS.SUCCESS,
+      degraded_reason: null,
+    };
+    insert.run({ ...base, id: 'desktop-en', captured_at: '2026-05-20T10:00:00.000Z', device: 'desktop', language_code: 'en' });
+    insert.run({ ...base, id: 'mobile-en', captured_at: '2026-05-20T10:05:00.000Z', device: 'mobile', language_code: 'en' });
+
+    const summary = buildLocalSeoKeywordVisibilitySummaryByKey(ws.id).get('austin dentist');
+    const readModel = getLocalSeoReadModel(ws.id, true, { includeSnapshots: false });
+
+    expect(summary?.marketCount).toBe(2);
+    expect(readModel?.report.latestSnapshotCount).toBe(2);
+    expect(readModel?.report.checkedKeywordCount).toBe(1);
+
+    deleteWorkspace(ws.id);
   });
 });

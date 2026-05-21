@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowUpRight,
@@ -46,10 +46,12 @@ import {
   type KeywordCommandCenterRow,
   type KeywordCommandCenterStatus,
 } from '../../shared/types/keyword-command-center';
-import { LOCAL_SEO_VISIBILITY_POSTURE } from '../../shared/types/local-seo';
-import { TRACKED_KEYWORD_STATUS } from '../../shared/types/rank-tracking';
-import { keywordComparisonKey } from '../../shared/keyword-normalization';
-import { useKeywordCommandCenter, useKeywordCommandCenterAction } from '../hooks/admin/useKeywordCommandCenter';
+import {
+  useKeywordCommandCenterAction,
+  useKeywordCommandCenterDetail,
+  useKeywordCommandCenterRows,
+  useKeywordCommandCenterSummary,
+} from '../hooks/admin/useKeywordCommandCenter';
 import { useLocalSeoRefresh } from '../hooks/admin/useLocalSeo';
 import { LocalSeoVisibilityBadge, LocalSeoVisibilityPanel } from './local-seo/LocalSeoVisibilityPanel';
 
@@ -123,27 +125,6 @@ function LocalSeoStateBadge({ row }: { row: KeywordCommandCenterRow }) {
       shape="pill"
     />
   );
-}
-
-function matchesFilter(row: KeywordCommandCenterRow, filter: KeywordCommandCenterFilter): boolean {
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.ALL) return true;
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.CONTENT) return row.assignment?.role === 'content_gap';
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.PAGE_ASSIGNED) return row.assignment?.role === 'page_keyword';
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.LOCAL) return Boolean(row.localSeoState);
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES) {
-    return row.localSeoState?.lifecycle === KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CANDIDATE;
-  }
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.VISIBLE_LOCALLY) return row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE;
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.POSSIBLE_MATCH) return row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.POSSIBLE_MATCH;
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.NOT_VISIBLE) {
-    return row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.NOT_VISIBLE
-      || row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.LOCAL_PACK_PRESENT;
-  }
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED) return Boolean(row.localSeoState && !row.localSeoState.checked);
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.PROVIDER_DEGRADED) return row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.PROVIDER_DEGRADED;
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.REQUESTED) return row.feedback?.status === 'requested';
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.TRACKED) return row.tracking.status === TRACKED_KEYWORD_STATUS.ACTIVE;
-  return row.lifecycleStatus === filter;
 }
 
 function actionVariant(action: KeywordCommandCenterNextAction): 'primary' | 'secondary' | 'ghost' | 'danger' | 'link' {
@@ -249,15 +230,24 @@ function KeywordRow({
 function KeywordDrawer({
   row,
   workspaceId,
+  isLoading,
   loadingAction,
   onAction,
 }: {
   row: KeywordCommandCenterRow | null;
   workspaceId: string;
+  isLoading?: boolean;
   loadingAction?: string;
   onAction: (action: KeywordCommandCenterNextAction) => void;
 }) {
   const navigate = useNavigate();
+  if (isLoading) {
+    return (
+      <SectionCard title="Keyword Detail" variant="subtle" className="sticky top-4">
+        <TableSkeleton rows={5} columns={1} />
+      </SectionCard>
+    );
+  }
   if (!row) {
     return (
       <SectionCard title="Keyword Detail" variant="subtle">
@@ -449,28 +439,39 @@ function KeywordDrawer({
 
 export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps) {
   const navigate = useNavigate();
-  const { data, isLoading, error } = useKeywordCommandCenter(workspaceId);
   const actionMutation = useKeywordCommandCenterAction(workspaceId);
   const localRefresh = useLocalSeoRefresh(workspaceId);
   const [filter, setFilter] = useState<KeywordCommandCenterFilter>(KEYWORD_COMMAND_CENTER_FILTERS.ALL);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [pendingProtectedAction, setPendingProtectedAction] = useState<{
     row: KeywordCommandCenterRow;
     action: KeywordCommandCenterNextAction;
   } | null>(null);
 
-  const rows = data?.rows ?? [];
-  const filteredRows = useMemo(() => {
-    const query = keywordComparisonKey(searchTerm);
-    return rows.filter(row => {
-      const matchesSearch = !query
-        || row.normalizedKeyword.includes(query)
-        || row.assignment?.pagePath?.toLowerCase().includes(query)
-        || row.assignment?.pageTitle?.toLowerCase().includes(query);
-      return matchesSearch && matchesFilter(row, filter);
-    });
-  }, [filter, rows, searchTerm]);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => window.clearTimeout(timeout);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setPage(1);
+    setSelectedKey(null);
+  }, [debouncedSearchTerm, filter]);
+
+  const rowsQuery = useMemo(() => ({
+    filter,
+    search: debouncedSearchTerm.trim() || undefined,
+    page,
+    pageSize: 50,
+  }), [debouncedSearchTerm, filter, page]);
+
+  const summary = useKeywordCommandCenterSummary(workspaceId);
+  const rowsResult = useKeywordCommandCenterRows(workspaceId, rowsQuery);
+  const detail = useKeywordCommandCenterDetail(workspaceId, selectedKey);
+  const rows = rowsResult.data?.rows ?? [];
   const actionErrorMessage = actionMutation.error instanceof Error
     ? actionMutation.error.message
     : actionMutation.error
@@ -481,13 +482,11 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
           ? 'Local visibility refresh could not start. Try again or refresh the page.'
           : null;
 
-  const selectedRow = useMemo(() => {
-    if (selectedKey) {
-      const selected = rows.find(row => row.normalizedKeyword === selectedKey);
-      if (selected) return selected;
-    }
-    return filteredRows[0] ?? null;
-  }, [filteredRows, rows, selectedKey]);
+  const selectedPreviewRow = useMemo(() => {
+    if (!selectedKey) return null;
+    return rows.find(row => row.normalizedKeyword === selectedKey) ?? null;
+  }, [rows, selectedKey]);
+  const selectedRow = detail.data?.row ?? selectedPreviewRow;
 
   const runServerAction = (row: KeywordCommandCenterRow, action: KeywordCommandCenterNextAction, force = false) => {
     if (!isServerAction(action.type)) return;
@@ -542,7 +541,7 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
     runServerAction(row, action);
   };
 
-  if (isLoading) {
+  if (summary.isLoading || rowsResult.isLoading) {
     return (
       <div className="space-y-5">
         <PageHeader title="Keywords" subtitle="Building the keyword operating layer..." />
@@ -553,12 +552,13 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
     );
   }
 
-  if (error) {
+  const loadError = summary.error ?? rowsResult.error;
+  if (loadError) {
     return (
       <EmptyState
         icon={Search}
         title="Keyword Command Center could not load"
-        description={error instanceof Error ? error.message : 'Try refreshing the page. Your keyword data was not changed.'}
+        description={loadError instanceof Error ? loadError.message : 'Try refreshing the page. Your keyword data was not changed.'}
       />
     );
   }
@@ -576,19 +576,20 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <SummaryMetric label="In Strategy" value={data?.counts.inStrategy ?? 0} icon={Target} tone="teal" />
-        <SummaryMetric label="Tracked" value={data?.counts.tracked ?? 0} icon={TrendingUp} tone="blue" />
-        <SummaryMetric label="Local" value={data?.counts.local ?? 0} icon={MapPin} tone="blue" />
-        <SummaryMetric label="Needs Review" value={data?.counts.needsReview ?? 0} icon={Eye} tone="amber" />
-        <SummaryMetric label="Retired" value={data?.counts.retired ?? 0} icon={Archive} tone="zinc" />
+        <SummaryMetric label="In Strategy" value={summary.data?.counts.inStrategy ?? 0} icon={Target} tone="teal" />
+        <SummaryMetric label="Tracked" value={summary.data?.counts.tracked ?? 0} icon={TrendingUp} tone="blue" />
+        <SummaryMetric label="Local" value={summary.data?.counts.local ?? 0} icon={MapPin} tone="blue" />
+        <SummaryMetric label="Needs Review" value={summary.data?.counts.needsReview ?? 0} icon={Eye} tone="amber" />
+        <SummaryMetric label="Retired" value={summary.data?.counts.retired ?? 0} icon={Archive} tone="zinc" />
       </div>
 
       <LocalSeoVisibilityPanel
-        workspaceId={workspaceId}
-        onOpenKeywords={() => {
-          setFilter(KEYWORD_COMMAND_CENTER_FILTERS.LOCAL);
-          document.getElementById('keyword-universe')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }}
+          workspaceId={workspaceId}
+          onOpenKeywords={() => {
+            setFilter(KEYWORD_COMMAND_CENTER_FILTERS.LOCAL);
+            setPage(1);
+            document.getElementById('keyword-universe')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }}
       />
 
       {actionErrorMessage && (
@@ -604,7 +605,7 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
         <SectionCard
           id="keyword-universe"
           title="Keyword Universe"
-          titleExtra={<Badge label={`${filteredRows.length} visible`} tone="blue" variant="soft" shape="pill" />}
+          titleExtra={<Badge label={`${rowsResult.data?.pageInfo.totalRows ?? rows.length} visible`} tone="blue" variant="soft" shape="pill" />}
           action={
             <div className="w-[260px]">
               <FormInput
@@ -619,7 +620,7 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
           variant="subtle"
         >
           <div className="px-3 py-3 border-b border-[var(--brand-border)] flex flex-wrap gap-2">
-            {(data?.filters ?? []).map(item => {
+            {(summary.data?.filters ?? []).map(item => {
               const IconComponent = FILTER_ICONS[item.id];
               return (
                 <Button
@@ -649,7 +650,7 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
                 <p className="t-label text-[var(--brand-text-muted)] text-right">Next</p>
               </div>
 
-              {filteredRows.length === 0 ? (
+              {rows.length === 0 ? (
                 <EmptyState
                   icon={Search}
                   title="No keywords match this view"
@@ -657,7 +658,7 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
                 />
               ) : (
                 <div className="max-h-[680px] overflow-y-auto">
-                  {filteredRows.map(row => (
+                  {rows.map(row => (
                     <KeywordRow
                       key={row.normalizedKeyword}
                       row={row}
@@ -670,11 +671,37 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
             </div>
           </div>
 
-          {data && data.rawEvidenceTotal > data.rawEvidenceReturned && (
+          {summary.data && summary.data.rawEvidenceTotal > summary.data.rawEvidenceReturned && (
             <div className="px-4 py-3 border-t border-[var(--brand-border)] bg-[var(--surface-3)]/20">
               <p className="t-caption-sm text-[var(--brand-text-muted)]">
-                Showing {data.rawEvidenceReturned} of {data.rawEvidenceTotal} raw-evidence-only terms. Selected strategy, feedback, and tracked terms are never capped.
+                Showing {summary.data.rawEvidenceReturned} of {summary.data.rawEvidenceTotal} raw-evidence-only terms. Selected strategy, feedback, and tracked terms are never capped.
               </p>
+            </div>
+          )}
+
+          {rowsResult.data && rowsResult.data.pageInfo.totalPages > 1 && (
+            <div className="px-4 py-3 border-t border-[var(--brand-border)] bg-[var(--surface-3)]/20 flex items-center justify-between gap-3">
+              <p className="t-caption-sm text-[var(--brand-text-muted)]">
+                Page {rowsResult.data.pageInfo.page} of {rowsResult.data.pageInfo.totalPages}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={!rowsResult.data.pageInfo.hasPreviousPage || rowsResult.isFetching}
+                  onClick={() => setPage(current => Math.max(1, current - 1))}
+                >
+                  Previous
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={!rowsResult.data.pageInfo.hasNextPage || rowsResult.isFetching}
+                  onClick={() => setPage(current => current + 1)}
+                >
+                  Next
+                </Button>
+              </div>
             </div>
           )}
         </SectionCard>
@@ -682,6 +709,7 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
         <KeywordDrawer
           row={selectedRow}
           workspaceId={workspaceId}
+          isLoading={detail.isFetching && !!selectedKey && !detail.data}
           loadingAction={localRefresh.isPending ? 'check_local_visibility' : actionMutation.isPending ? actionMutation.variables?.action : undefined}
           onAction={(action) => handleAction(selectedRow, action)}
         />

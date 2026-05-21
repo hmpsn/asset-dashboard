@@ -207,6 +207,45 @@ export interface KeywordCommandCenterResponse {
   generatedAt?: string | null;
 }
 
+export type KeywordCommandCenterSort = 'priority' | 'keyword' | 'demand' | 'rank';
+
+export interface KeywordCommandCenterSummaryResponse {
+  counts: KeywordCommandCenterCounts;
+  filters: KeywordCommandCenterFilterMeta[];
+  rawEvidenceTotal: number;
+  rawEvidenceReturned: number;
+  generatedAt?: string | null;
+  summarizedAt: string;
+}
+
+export interface KeywordCommandCenterRowsQuery {
+  filter?: KeywordCommandCenterFilter;
+  search?: string;
+  sort?: KeywordCommandCenterSort;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface KeywordCommandCenterPageInfo {
+  page: number;
+  pageSize: number;
+  totalRows: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
+export interface KeywordCommandCenterRowsResponse {
+  rows: KeywordCommandCenterRow[];
+  pageInfo: KeywordCommandCenterPageInfo;
+  generatedAt?: string | null;
+}
+
+export interface KeywordCommandCenterDetailResponse {
+  row: KeywordCommandCenterRow;
+  generatedAt?: string | null;
+}
+
 export interface KeywordCommandCenterActionRequest {
   action: KeywordCommandCenterActionType;
   keyword: string;
