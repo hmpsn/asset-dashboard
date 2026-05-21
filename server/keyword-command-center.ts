@@ -568,9 +568,7 @@ function filterCount(rows: KeywordCommandCenterRow[], filter: KeywordCommandCent
 }
 
 export function filterNeedsLocalCandidates(filter: KeywordCommandCenterFilter | undefined): boolean {
-  return filter === KEYWORD_COMMAND_CENTER_FILTERS.LOCAL
-    || filter === KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES
-    || filter === KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED;
+  return filter === KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES;
 }
 
 function buildCounts(rows: KeywordCommandCenterRow[]): KeywordCommandCenterCounts {

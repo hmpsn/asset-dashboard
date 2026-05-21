@@ -162,9 +162,9 @@ describe('normalizeKeywordForComparison', () => {
 
 describe('buildKeywordCommandCenter', () => {
   it('only opts into expensive local candidates for local candidate filters', () => {
-    expect(filterNeedsLocalCandidates(KEYWORD_COMMAND_CENTER_FILTERS.LOCAL)).toBe(true);
+    expect(filterNeedsLocalCandidates(KEYWORD_COMMAND_CENTER_FILTERS.LOCAL)).toBe(false);
     expect(filterNeedsLocalCandidates(KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES)).toBe(true);
-    expect(filterNeedsLocalCandidates(KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED)).toBe(true);
+    expect(filterNeedsLocalCandidates(KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED)).toBe(false);
     expect(filterNeedsLocalCandidates(KEYWORD_COMMAND_CENTER_FILTERS.ALL)).toBe(false);
     expect(filterNeedsLocalCandidates(KEYWORD_COMMAND_CENTER_FILTERS.VISIBLE_LOCALLY)).toBe(false);
     expect(filterNeedsLocalCandidates(KEYWORD_COMMAND_CENTER_FILTERS.POSSIBLE_MATCH)).toBe(false);
@@ -498,6 +498,18 @@ describe('buildKeywordCommandCenter', () => {
       pageSize: 100,
     }, { includeLocalSeo: true });
     expect(defaultRows?.rows.some(row => row.normalizedKeyword === 'cosmetic dentistry austin')).toBe(false);
+
+    const aggregateLocalRows = await buildKeywordCommandCenterRows(workspaceId, {
+      filter: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL,
+      pageSize: 100,
+    }, { includeLocalSeo: true });
+    expect(aggregateLocalRows?.rows.some(row => row.normalizedKeyword === 'cosmetic dentistry austin')).toBe(false);
+
+    const notCheckedRows = await buildKeywordCommandCenterRows(workspaceId, {
+      filter: KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED,
+      pageSize: 100,
+    }, { includeLocalSeo: true });
+    expect(notCheckedRows?.rows.some(row => row.normalizedKeyword === 'cosmetic dentistry austin')).toBe(false);
 
     const localCandidateRows = await buildKeywordCommandCenterRows(workspaceId, {
       filter: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES,
