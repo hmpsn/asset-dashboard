@@ -1080,6 +1080,37 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
     expect(rows!.pageInfo.totalRows).toBe(summary!.counts.total);
   });
 
+  it('in_strategy badge count matches rows totalRows', async () => {
+    // Regression: previously summary did not include tracked-with-strategy-source
+    // or approved feedback in inStrategyKeys, so the badge under-counted vs rows
+    // (observed on Swish: badge 224 / table 227).
+    seedStrategy();
+    // Tracked keyword promoted from strategy that isn't already in strategy.siteKeywords
+    // — this is the case that caused the drift on Swish.
+    addTrackedKeyword(workspaceId, 'orthodontics austin', { source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY });
+    addTrackedKeyword(workspaceId, 'family dentist', { source: TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD });
+    // Approved feedback keyword — also counts as in_strategy via rows path.
+    seedFeedback('teeth whitening near me', 'approved');
+    // Declined/requested feedback keywords — must NOT count even if they overlap a page.
+    seedFeedback('zoom whitening', 'declined');
+    seedFeedback('client interested keyword', 'requested');
+
+    const summary = await buildKeywordCommandCenterSummary(workspaceId);
+    const rows = await buildKeywordCommandCenterRows(workspaceId, {
+      filter: KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY,
+      pageSize: 500,
+    });
+    expect(rows!.pageInfo.totalRows).toBe(summary!.counts.inStrategy);
+    // Sanity: the tracked-strategy keywords actually appear in the rows
+    const keywords = new Set(rows!.rows.map(r => r.normalizedKeyword));
+    expect(keywords.has('orthodontics austin')).toBe(true);
+    expect(keywords.has('family dentist')).toBe(true);
+    expect(keywords.has('teeth whitening near me')).toBe(true);
+    // Declined/requested do NOT appear under in_strategy
+    expect(keywords.has('zoom whitening')).toBe(false);
+    expect(keywords.has('client interested keyword')).toBe(false);
+  });
+
   it('localCandidates summary count is intentionally 0 (computed off the hot path; follow-up cache)', async () => {
     // PR #876 introduced a generator-backed count here, but on rich workspaces
     // (Swish: 235 tracked + 50 pages + variants) that took ~35s because every
