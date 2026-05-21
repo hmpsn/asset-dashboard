@@ -75,6 +75,18 @@ describe('Local SEO routes', () => {
     }));
   });
 
+  it('GET can return summary-only local SEO data without snapshot payloads', async () => {
+    const res = await api(`/api/local-seo/${workspaceId}?includeSnapshots=false`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.featureEnabled).toBe(true);
+    expect(body.report).toEqual(expect.objectContaining({
+      activeMarketCount: expect.any(Number),
+      checkedKeywordCount: expect.any(Number),
+    }));
+    expect(body.latestSnapshots).toEqual([]);
+  });
+
   it('PUT stores admin posture and explicit markets', async () => {
     const res = await api(`/api/local-seo/${workspaceId}`, {
       method: 'PUT',

@@ -9,8 +9,18 @@ import type {
 } from '../../shared/types/local-seo';
 
 export const localSeo = {
-  get: (workspaceId: string) =>
-    get<LocalSeoReadResponse>(`/api/local-seo/${workspaceId}`),
+  get: (workspaceId: string, options: { includeSnapshots?: boolean } = {}) => {
+    const params = new URLSearchParams();
+    if (options.includeSnapshots === false) params.set('includeSnapshots', 'false');
+    const query = params.toString();
+    return get<LocalSeoReadResponse>(`/api/local-seo/${workspaceId}${query ? `?${query}` : ''}`);
+  },
+
+  getSummary: (workspaceId: string) =>
+    localSeo.get(workspaceId, { includeSnapshots: false }),
+
+  getWithSnapshots: (workspaceId: string) =>
+    localSeo.get(workspaceId, { includeSnapshots: true }),
 
   update: (workspaceId: string, body: LocalSeoMarketUpdateRequest) =>
     put<LocalSeoReadResponse>(`/api/local-seo/${workspaceId}`, body),
