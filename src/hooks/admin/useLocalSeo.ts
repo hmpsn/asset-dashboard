@@ -3,10 +3,11 @@ import { localSeo } from '../../api/localSeo';
 import { queryKeys } from '../../lib/queryKeys';
 import type { LocalSeoLocationLookupRequest, LocalSeoMarketUpdateRequest, LocalSeoRefreshRequest } from '../../../shared/types/local-seo';
 
-export function useLocalSeo(workspaceId: string) {
+export function useLocalSeo(workspaceId: string, options: { includeSnapshots?: boolean } = {}) {
+  const includeSnapshots = options.includeSnapshots === true;
   return useQuery({
-    queryKey: queryKeys.admin.localSeo(workspaceId),
-    queryFn: () => localSeo.get(workspaceId),
+    queryKey: [...queryKeys.admin.localSeo(workspaceId), includeSnapshots ? 'with-snapshots' : 'summary'] as const,
+    queryFn: () => localSeo.get(workspaceId, { includeSnapshots }),
     enabled: !!workspaceId,
     staleTime: 2 * 60 * 1000,
   });

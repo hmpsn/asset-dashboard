@@ -70,7 +70,9 @@ const locationLookupQuerySchema = z.object({
 }).strict();
 
 router.get('/api/local-seo/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  const payload = getLocalSeoReadModel(req.params.workspaceId, isFeatureEnabled('local-seo-visibility'));
+  const payload = getLocalSeoReadModel(req.params.workspaceId, isFeatureEnabled('local-seo-visibility'), {
+    includeSnapshots: req.query.includeSnapshots !== 'false',
+  });
   if (!payload) return res.status(404).json({ error: 'Workspace not found' });
   res.json(payload);
 });

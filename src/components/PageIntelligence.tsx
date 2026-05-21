@@ -36,7 +36,7 @@ interface Props {
 export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   const navigate = useNavigate();
   const { data: keywordData } = useKeywordStrategy(workspaceId);
-  const { data: localSeoData } = useLocalSeo(workspaceId);
+  const { data: localSeoData } = useLocalSeo(workspaceId, { includeSnapshots: true });
   const strategy = keywordData?.strategy || null;
   const localSeoByKeyword = useMemo(() => {
     const grouped = new Map<string, LocalVisibilitySnapshot[]>();

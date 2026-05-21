@@ -340,7 +340,11 @@ function buildSuggestedMarkets(workspace: Workspace): LocalSeoMarket[] {
   }];
 }
 
-export function getLocalSeoReadModel(workspaceId: string, featureEnabled: boolean): LocalSeoReadResponse | null {
+export function getLocalSeoReadModel(
+  workspaceId: string,
+  featureEnabled: boolean,
+  options: { includeSnapshots?: boolean } = {},
+): LocalSeoReadResponse | null {
   const workspace = getWorkspace(workspaceId);
   if (!workspace) return null;
   if (!featureEnabled) {
@@ -368,12 +372,13 @@ export function getLocalSeoReadModel(workspaceId: string, featureEnabled: boolea
   const markets = listLocalSeoMarkets(workspace.id);
   const suggestedMarkets = buildSuggestedMarkets(workspace);
   const latestSnapshots = listLatestLocalVisibilitySnapshots(workspace.id);
+  const responseSnapshots = options.includeSnapshots === false ? [] : latestSnapshots;
   return {
     featureEnabled,
     settings,
     markets,
     suggestedMarkets,
-    latestSnapshots,
+    latestSnapshots: responseSnapshots,
     report: buildLocalSeoReportSummary({
       featureEnabled,
       settings,
