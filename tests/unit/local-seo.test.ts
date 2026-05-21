@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { evaluateLocalBusinessMatch, runLocalSeoRefreshJob, updateLocalSeoConfiguration } from '../../server/local-seo.js';
+import { evaluateLocalBusinessMatch, getLocalSeoReadModel, runLocalSeoRefreshJob, updateLocalSeoConfiguration } from '../../server/local-seo.js';
 import { setBroadcast } from '../../server/broadcast.js';
 import { clearCompletedJobs, createJob, getJob } from '../../server/jobs.js';
 import { FakeSeoProvider } from '../../server/providers/fake-seo-provider.js';
@@ -7,7 +7,16 @@ import { _resetRegistryForTest, registerProvider } from '../../server/seo-data-p
 import { addTrackedKeyword } from '../../server/rank-tracking.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
-import { LOCAL_SEO_MARKET_STATUS, LOCAL_SEO_POSTURE } from '../../shared/types/local-seo.js';
+import {
+  LOCAL_BUSINESS_MATCH_CONFIDENCE,
+  LOCAL_SEO_MARKET_STATUS,
+  LOCAL_SEO_POSTURE,
+  LOCAL_SEO_VISIBILITY_POSTURE,
+  LOCAL_VISIBILITY_STATUS,
+  localSeoKeywordVisibilityFromSnapshot,
+  localSeoKeywordVisibilitySummaryFromSnapshots,
+} from '../../shared/types/local-seo.js';
+import type { LocalVisibilitySnapshot } from '../../shared/types/local-seo.js';
 import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
 import type { Workspace } from '../../shared/types/workspace.js';
 
@@ -101,6 +110,95 @@ describe('local SEO business match confidence', () => {
   });
 });
 
+describe('local SEO visibility posture classification', () => {
+  const baseSnapshot: LocalVisibilitySnapshot = {
+    id: 'snap-1',
+    workspaceId: 'ws-local-match',
+    keyword: 'Austin dentist',
+    normalizedKeyword: 'austin dentist',
+    marketId: 'market-austin',
+    marketLabel: 'Austin, TX',
+    capturedAt: '2026-05-20T12:00:00.000Z',
+    localPackPresent: true,
+    businessFound: false,
+    businessMatchConfidence: LOCAL_BUSINESS_MATCH_CONFIDENCE.NOT_FOUND,
+    topCompetitors: [],
+    sourceEndpoint: 'google_organic_serp',
+    provider: 'dataforseo',
+    device: 'desktop',
+    languageCode: 'en',
+    status: LOCAL_VISIBILITY_STATUS.SUCCESS,
+  };
+
+  it('classifies verified, possible, local-pack-only, and degraded local evidence consistently', () => {
+    expect(localSeoKeywordVisibilityFromSnapshot({
+      ...baseSnapshot,
+      businessFound: true,
+      businessMatchConfidence: LOCAL_BUSINESS_MATCH_CONFIDENCE.VERIFIED,
+      localRank: 2,
+    })).toEqual(expect.objectContaining({
+      posture: LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE,
+      label: 'Visible #2',
+    }));
+
+    expect(localSeoKeywordVisibilityFromSnapshot({
+      ...baseSnapshot,
+      businessFound: true,
+      businessMatchConfidence: LOCAL_BUSINESS_MATCH_CONFIDENCE.POSSIBLE_MATCH,
+      localRank: 3,
+    })).toEqual(expect.objectContaining({
+      posture: LOCAL_SEO_VISIBILITY_POSTURE.POSSIBLE_MATCH,
+      label: 'Possible match #3',
+    }));
+
+    expect(localSeoKeywordVisibilityFromSnapshot(baseSnapshot)).toEqual(expect.objectContaining({
+      posture: LOCAL_SEO_VISIBILITY_POSTURE.LOCAL_PACK_PRESENT,
+      label: 'Local pack present',
+    }));
+
+    expect(localSeoKeywordVisibilityFromSnapshot({
+      ...baseSnapshot,
+      status: LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED,
+      localPackPresent: false,
+      degradedReason: 'Provider credits exhausted',
+    })).toEqual(expect.objectContaining({
+      posture: LOCAL_SEO_VISIBILITY_POSTURE.PROVIDER_DEGRADED,
+      label: 'Provider degraded',
+    }));
+  });
+
+  it('summarizes conflicting market snapshots without dropping market-specific evidence', () => {
+    const summary = localSeoKeywordVisibilitySummaryFromSnapshots([
+      {
+        ...baseSnapshot,
+        marketId: 'market-austin',
+        marketLabel: 'Austin, TX',
+        businessFound: true,
+        businessMatchConfidence: LOCAL_BUSINESS_MATCH_CONFIDENCE.VERIFIED,
+        localRank: 2,
+      },
+      {
+        ...baseSnapshot,
+        id: 'snap-2',
+        marketId: 'market-round-rock',
+        marketLabel: 'Round Rock, TX',
+        localPackPresent: false,
+        businessFound: false,
+        businessMatchConfidence: LOCAL_BUSINESS_MATCH_CONFIDENCE.NOT_FOUND,
+      },
+    ]);
+
+    expect(summary).toEqual(expect.objectContaining({
+      posture: LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE,
+      label: 'Visible in 1/2 markets',
+      marketCount: 2,
+      visibleMarketCount: 1,
+      notVisibleMarketCount: 1,
+    }));
+    expect(summary?.markets.map(item => item.marketLabel)).toEqual(['Austin, TX', 'Round Rock, TX']);
+  });
+});
+
 describe('local SEO provider selection', () => {
   it('does not fall back to DataForSEO when the workspace selected SEMRush for local visibility', async () => {
     setBroadcast(vi.fn(), vi.fn());
@@ -143,5 +241,60 @@ describe('local SEO provider selection', () => {
       status: 'error',
       error: 'No configured local visibility provider',
     }));
+  });
+
+  it('counts local visibility per market and keyword instead of collapsing multi-market evidence', async () => {
+    setBroadcast(vi.fn(), vi.fn());
+    const ws = createWorkspace('Local SEO Multi Market Test');
+    cleanupWorkspaceIds.add(ws.id);
+    updateWorkspace(ws.id, {
+      name: 'Local Dental',
+      liveDomain: 'https://local-dental.example.com',
+      seoDataProvider: 'dataforseo',
+      businessProfile: {
+        phone: '(512) 555-0123',
+        address: {
+          street: '123 Congress Ave',
+          city: 'Austin',
+          state: 'TX',
+          country: 'US',
+        },
+      },
+    });
+    updateLocalSeoConfiguration(ws.id, {
+      posture: LOCAL_SEO_POSTURE.LOCAL,
+      markets: [
+        {
+          label: 'Austin, TX',
+          city: 'Austin',
+          stateOrRegion: 'TX',
+          country: 'US',
+          providerLocationCode: 1026201,
+          status: LOCAL_SEO_MARKET_STATUS.ACTIVE,
+        },
+        {
+          label: 'Round Rock, TX',
+          city: 'Round Rock',
+          stateOrRegion: 'TX',
+          country: 'US',
+          providerLocationCode: 1026339,
+          status: LOCAL_SEO_MARKET_STATUS.ACTIVE,
+        },
+      ],
+    }, true);
+    addTrackedKeyword(ws.id, 'Austin Dentist', { source: TRACKED_KEYWORD_SOURCE.MANUAL });
+    registerProvider('dataforseo', new FakeSeoProvider());
+
+    const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, {
+      workspaceId: ws.id,
+      message: 'Testing multi-market local visibility...',
+    });
+    await runLocalSeoRefreshJob(job.id, ws.id, { keywords: ['Austin Dentist'] });
+
+    const readModel = getLocalSeoReadModel(ws.id, true);
+
+    expect(readModel?.latestSnapshots).toHaveLength(2);
+    expect(readModel?.report.checkedKeywordCount).toBe(2);
+    expect(readModel?.report.activeMarketCount).toBe(2);
   });
 });

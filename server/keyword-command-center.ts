@@ -4,6 +4,7 @@ import { broadcastToWorkspace } from './broadcast.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { listContentGaps } from './content-gaps.js';
 import { listKeywordGaps } from './keyword-gaps.js';
+import { buildLocalSeoKeywordVisibilityByKey } from './local-seo.js';
 import { listPageKeywords } from './page-keywords.js';
 import {
   getLatestSnapshotRanks,
@@ -349,7 +350,10 @@ function buildFilters(rows: KeywordCommandCenterRow[]): KeywordCommandCenterFilt
   return filters.map(filter => ({ ...filter, count: filterCount(rows, filter.id) }));
 }
 
-export async function buildKeywordCommandCenter(workspaceId: string): Promise<KeywordCommandCenterResponse | null> {
+export async function buildKeywordCommandCenter(
+  workspaceId: string,
+  options: { includeLocalSeo?: boolean } = {},
+): Promise<KeywordCommandCenterResponse | null> {
   const workspace = getWorkspace(workspaceId);
   if (!workspace) return null;
 
@@ -360,6 +364,9 @@ export async function buildKeywordCommandCenter(workspaceId: string): Promise<Ke
   const trackedKeywords = getTrackedKeywords(workspace.id, { includeInactive: true });
   const latestRanks = getLatestSnapshotRanks(workspace.id);
   const feedback = readFeedback(workspace.id);
+  const localVisibilityByKeyword = options.includeLocalSeo
+    ? buildLocalSeoKeywordVisibilityByKey(workspace.id)
+    : new Map();
   const rows = new Map<string, DraftRow>();
 
   const strategyUx = await buildKeywordStrategyUxPayload({
@@ -495,6 +502,7 @@ export async function buildKeywordCommandCenter(workspaceId: string): Promise<Ke
           deprecatedAt: row.tracking.deprecatedAt,
         } : { status: 'not_tracked' },
         explanation: row.explanation,
+        localSeo: localVisibilityByKeyword.get(row.normalizedKeyword),
         nextActions: buildNextActions(row, status, isProtected, protection),
         isProtected,
         protectionReason: protection,

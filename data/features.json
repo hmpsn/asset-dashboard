@@ -53,9 +53,9 @@
     {
       "id": 6,
       "title": "Keyword Strategy Engine",
-      "oneLiner": "AI-driven keyword mapping with SEMRush/DataForSEO data, content gaps, quick wins, lifecycle tracking, and a command-center surface for keyword evidence/actions",
+      "oneLiner": "AI-driven keyword mapping with SEMRush/DataForSEO data, content gaps, quick wins, lifecycle tracking, local visibility reporting, and a command-center surface for keyword evidence/actions",
       "category": "content",
-      "painPoints": ["keyword-strategy", "competitive-intel", "workflow-clarity"],
+      "painPoints": ["keyword-strategy", "competitive-intel", "workflow-clarity", "local-seo"],
       "tier": "growth",
       "impact": "high",
       "clientFacing": true

@@ -28,6 +28,15 @@ vi.mock('../../src/hooks/admin', () => ({
     data: mocks.keywordStrategyData,
     isLoading: false,
   }),
+  useLocalSeo: () => ({
+    data: { featureEnabled: false },
+    isLoading: false,
+  }),
+  useLocalSeoRefresh: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+    error: null,
+  }),
 }));
 
 vi.mock('../../src/hooks/useBackgroundTasks', () => ({

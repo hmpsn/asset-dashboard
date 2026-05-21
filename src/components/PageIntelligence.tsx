@@ -5,6 +5,7 @@ import { adminPath } from '../routes';
 import { TabBar } from './ui';
 import { ErrorBoundary } from './ErrorBoundary';
 import { useKeywordStrategy, usePageJoin } from '../hooks/admin';
+import { useLocalSeo } from '../hooks/admin/useLocalSeo';
 import type { UnifiedPage } from '../../shared/types/page-join';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import type { FixContext } from '../App';
@@ -13,6 +14,9 @@ import { buildEffectiveAnalyses, buildFilteredPages, buildFixQueue } from './pag
 import type { KeywordData, SortBy } from './page-intelligence/pageIntelligenceTypes';
 import { PageIntelligencePageList } from './page-intelligence/PageIntelligencePageList';
 import { PageIntelligencePagesHeader } from './page-intelligence/PageIntelligencePagesHeader';
+import { LocalSeoVisibilityPanel } from './local-seo/LocalSeoVisibilityPanel';
+import { localSeoKeywordVisibilitySummaryFromSnapshots } from '../../shared/types/local-seo';
+import type { LocalVisibilitySnapshot } from '../../shared/types/local-seo';
 import { usePageIntelligenceAnalysis } from './page-intelligence/usePageIntelligenceAnalysis';
 import { usePageIntelligenceKeywordEditing } from './page-intelligence/usePageIntelligenceKeywordEditing';
 import { usePageIntelligenceKeywordTracking } from './page-intelligence/usePageIntelligenceKeywordTracking';
@@ -32,7 +36,24 @@ interface Props {
 export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   const navigate = useNavigate();
   const { data: keywordData } = useKeywordStrategy(workspaceId);
+  const { data: localSeoData } = useLocalSeo(workspaceId);
   const strategy = keywordData?.strategy || null;
+  const localSeoByKeyword = useMemo(() => {
+    const grouped = new Map<string, LocalVisibilitySnapshot[]>();
+    const map = new Map<string, NonNullable<ReturnType<typeof localSeoKeywordVisibilitySummaryFromSnapshots>>>();
+    if (!localSeoData?.featureEnabled) return map;
+    for (const snapshot of localSeoData.latestSnapshots) {
+      if (!snapshot.normalizedKeyword) continue;
+      const current = grouped.get(snapshot.normalizedKeyword) ?? [];
+      current.push(snapshot);
+      grouped.set(snapshot.normalizedKeyword, current);
+    }
+    for (const [keyword, snapshots] of grouped) {
+      const summary = localSeoKeywordVisibilitySummaryFromSnapshots(snapshots);
+      if (summary) map.set(keyword, summary);
+    }
+    return map;
+  }, [localSeoData]);
 
   // Tab state
   const [activeTab, setActiveTab] = useState<'pages' | 'architecture' | 'guide'>('pages');
@@ -236,6 +257,8 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
         onSortChange={handleSortChange}
       />
 
+      <LocalSeoVisibilityPanel workspaceId={workspaceId} compact />
+
       <PageIntelligencePageList
         pages={filtered}
         search={search}
@@ -250,6 +273,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
         generatingCopy={generatingCopy}
         copiedField={copiedField}
         trackedKeywords={trackedKeywords}
+        localSeoByKeyword={localSeoByKeyword}
         onToggleExpanded={pageId => setExpanded(prev => prev === pageId ? null : pageId)}
         onTrackKeyword={trackKeyword}
         onStartEdit={startEdit}

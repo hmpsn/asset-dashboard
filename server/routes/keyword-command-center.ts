@@ -12,6 +12,7 @@ import {
   applyKeywordCommandCenterAction,
   buildKeywordCommandCenter,
 } from '../keyword-command-center.js';
+import { isFeatureEnabled } from '../feature-flags.js';
 import { KEYWORD_COMMAND_CENTER_ACTIONS } from '../../shared/types/keyword-command-center.js';
 
 const router = Router();
@@ -34,7 +35,9 @@ const actionSchema = z.object({
 
 router.get('/api/webflow/keyword-command-center/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res, next) => {
   try {
-    const payload = await buildKeywordCommandCenter(req.params.workspaceId);
+    const payload = await buildKeywordCommandCenter(req.params.workspaceId, {
+      includeLocalSeo: isFeatureEnabled('local-seo-visibility'),
+    });
     if (!payload) return res.status(404).json({ error: 'Workspace not found' });
     res.json(payload);
   } catch (err) {

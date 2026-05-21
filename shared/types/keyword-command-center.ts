@@ -4,6 +4,7 @@ import type {
   TrackedKeywordStatus,
 } from './rank-tracking.ts';
 import type { KeywordStrategyExplanation } from './keyword-strategy-ux.ts';
+import type { LocalSeoKeywordVisibilitySummary } from './local-seo.ts';
 
 export const KEYWORD_COMMAND_CENTER_STATUS = {
   IN_STRATEGY: 'in_strategy',
@@ -124,6 +125,7 @@ export interface KeywordCommandCenterRow {
   feedback?: KeywordCommandCenterFeedbackState;
   tracking: KeywordCommandCenterTrackingState;
   explanation?: KeywordStrategyExplanation;
+  localSeo?: LocalSeoKeywordVisibilitySummary;
   nextActions: KeywordCommandCenterNextAction[];
   isProtected: boolean;
   protectionReason?: string;

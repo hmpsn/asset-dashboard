@@ -57,6 +57,18 @@ Never say "verified local rank" unless the source and match confidence support i
 
 If local visibility feeds prompts, recommendations, or strategy scoring, add a `localSeo` intelligence slice rather than direct reads from callers. Missing local visibility should degrade to `local posture unknown`, not fabricated confidence.
 
+## Reporting Surfaces
+
+Local SEO reporting should annotate the existing keyword operating loop instead of creating a second lifecycle manager.
+
+- **Keyword Command Center:** primary admin surface for keyword-level local visibility, local evidence posture, and safe actions.
+- **Keyword Strategy:** may show market visibility summaries, but must not imply local visibility changes the selected strategy unless a later scoring PR explicitly does that work.
+- **Page Intelligence:** may annotate local-intent page keywords with local visibility evidence when stored snapshots exist.
+- **Rank Tracker:** should explain that GSC query measurement and local pack visibility are separate evidence layers.
+- **Client Portal:** should stay unchanged until admin staging QA proves local data quality and copy clarity.
+
+Reporting copy must distinguish "raw local evidence" from "recommended action". Do not call raw provider evidence a selected strategy action.
+
 ## Deferred Work
 
 Google Business Profile health, Google reviews/reputation, geo-grid tracking, and local SEO recommendation automation are separate follow-up roadmap items. Do not fold them into the first local-pack visibility foundation unless a later plan explicitly expands scope.

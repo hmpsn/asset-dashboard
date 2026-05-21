@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { KeywordCommandCenter } from '../../src/components/KeywordCommandCenter';
 import {
@@ -35,6 +36,22 @@ const payload: KeywordCommandCenterResponse = {
       metrics: { volume: 700, difficulty: 29, currentPosition: 6, impressions: 500, ctr: 0.024 },
       assignment: { pagePath: '/services/cosmetic-dentistry', pageTitle: 'Cosmetic Dentistry', role: 'page_keyword' },
       tracking: { status: TRACKED_KEYWORD_STATUS.ACTIVE, source: 'strategy_primary', pinned: false },
+      localSeo: {
+        keyword: 'cosmetic dentistry',
+        normalizedKeyword: 'cosmetic dentistry',
+        marketId: 'market-austin',
+        marketLabel: 'Austin, TX',
+        capturedAt: '2026-05-20T11:00:00.000Z',
+        posture: 'visible',
+        label: 'Visible #2',
+        detail: 'Business appears in local results with verified match evidence.',
+        localPackPresent: true,
+        businessFound: true,
+        businessMatchConfidence: 'verified',
+        localRank: 2,
+        sourceEndpoint: 'google_organic_serp',
+        provider: 'fake-seo-provider',
+      },
       nextActions: [
         { type: 'view_rankings', label: 'View rankings', detail: 'Open Rank Tracker.', tone: 'blue', keyword: 'cosmetic dentistry', targetTab: 'seo-ranks' },
         { type: 'review_page', label: 'Review page', detail: 'Open Page Intelligence.', tone: 'teal', keyword: 'cosmetic dentistry', pagePath: '/services/cosmetic-dentistry', targetTab: 'page-intelligence' },
@@ -98,10 +115,15 @@ const payload: KeywordCommandCenterResponse = {
 };
 
 function renderCommandCenter() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
   return render(
-    <MemoryRouter>
-      <KeywordCommandCenter workspaceId="ws-1" />
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <KeywordCommandCenter workspaceId="ws-1" />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
@@ -130,6 +152,7 @@ describe('KeywordCommandCenter', () => {
     expect(screen.getAllByText('In Strategy').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Raw Evidence').length).toBeGreaterThan(0);
     expect(screen.getByText('Raw provider evidence · competitor.example')).toBeInTheDocument();
+    expect(screen.getAllByText('Visible #2').length).toBeGreaterThan(0);
   });
 
   it('filters and searches the keyword universe together', () => {

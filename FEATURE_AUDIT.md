@@ -6352,3 +6352,21 @@ Admin APIs now support local SEO setup and refresh: `GET /api/local-seo/:workspa
 **Boundaries:** No reporting UI, no client payloads, no GBP health, no Google reviews, no geo-grid tracking, no synchronous strategy-generation provider fanout, no automatic publishing, and no live metadata/schema writes. PR17 should surface this evidence in admin reporting, Keyword Command Center, Strategy, and Page Intelligence behind the feature flag.
 
 **Files:** `shared/types/local-seo.ts`; `shared/types/feature-flags.ts`; `shared/types/background-jobs.ts`; `shared/types/index.ts`; `server/db/migrations/096-local-seo-visibility.sql`; `server/seo-data-provider.ts`; `server/providers/dataforseo-provider.ts`; `server/providers/fake-seo-provider.ts`; `server/local-seo.ts`; `server/routes/local-seo.ts`; `server/app.ts`; `server/ws-events.ts`; `server/activity-log.ts`; `src/lib/wsEvents.ts`; `src/lib/queryKeys.ts`; `src/hooks/useWsInvalidation.ts`; `scripts/platform-domain-event-definitions.ts`; `tests/contract/background-job-coverage-contract.test.ts`; `tests/unit/dataforseo-provider.test.ts`; `tests/unit/local-seo.test.ts`; `tests/integration/local-seo-routes.test.ts`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+## Local SEO Reporting + Strategy Integration (PR17)
+
+**Status:** Shipped to staging branch workstream on 2026-05-20
+**Owner:** `seo-health`
+**Roadmap:** `intel-quality-local-seo-reporting-strategy-integration`
+
+**What it does:** Adds the admin reporting layer on top of the local-pack visibility foundation without changing strategy scoring, publishing content, writing live SEO metadata, or mixing local visibility into GSC Rank Tracker. `GET /api/local-seo/:workspaceId` now returns an optional report summary with workspace posture, setup state, active market count, checked keyword count, visible/possible/not-found counts, and latest capture time.
+
+The new `LocalSeoVisibilityPanel` surfaces local-market setup and snapshot evidence behind the `local-seo-visibility` feature flag. Keyword Strategy shows a compact visibility summary, Keyword Command Center annotates rows and drawer details with local visibility posture, and Page Intelligence annotates local-intent page keywords when stored snapshots exist. Rank Tracker now includes handoff copy that explains it measures Search Console query performance while local SEO measures market-specific local-pack visibility.
+
+**Agency value:** Gives admins a clear local SEO operating view for dentists, clinics, attorneys, home services, and other market-specific businesses. They can see whether a keyword was checked locally, whether the business was visible or only a possible match, and which surface should handle the next step.
+
+**Client value:** Client-facing local SEO remains deferred until staging data quality is validated, but this PR creates the safe language and evidence model needed to eventually report local visibility without overclaiming "verified rank" or GBP ownership.
+
+**Boundaries:** Admin-first and feature-flagged. No client payload changes, no automatic strategy regeneration, no local provider calls in render paths, no GBP health/reviews, no geo-grid tracking, no publishing, and no live metadata/schema writes.
+
+**Files:** `shared/types/local-seo.ts`; `shared/types/keyword-command-center.ts`; `server/local-seo.ts`; `server/keyword-command-center.ts`; `src/api/localSeo.ts`; `src/hooks/admin/useLocalSeo.ts`; `src/hooks/admin/index.ts`; `src/components/local-seo/LocalSeoVisibilityPanel.tsx`; `src/components/KeywordCommandCenter.tsx`; `src/components/KeywordStrategy.tsx`; `src/components/PageIntelligence.tsx`; `src/components/RankTracker.tsx`; `src/components/ui/SectionCard.tsx`; `src/components/page-intelligence/PageIntelligencePageDetails.tsx`; `src/components/page-intelligence/PageIntelligencePageList.tsx`; `src/components/page-intelligence/PageIntelligencePageRow.tsx`; `tests/unit/local-seo.test.ts`; `tests/integration/local-seo-routes.test.ts`; `tests/unit/keyword-command-center.test.ts`; `tests/integration/keyword-command-center-routes.test.ts`; `tests/component/KeywordCommandCenter.test.tsx`; `docs/rules/local-seo-visibility.md`; `FEATURE_AUDIT.md`; `data/roadmap.json`; `data/features.json`.

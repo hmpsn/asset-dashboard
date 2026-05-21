@@ -15,6 +15,11 @@ let otherWorkspaceId = '';
 
 beforeAll(async () => {
   await ctx.startServer();
+  await api('/api/admin/feature-flags/local-seo-visibility', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: true }),
+  });
   const ws = createWorkspace('Local SEO Route Test Dental');
   workspaceId = ws.id;
   otherWorkspaceId = createWorkspace('Other Local SEO Route Test Dental').id;
@@ -37,6 +42,11 @@ beforeAll(async () => {
 afterAll(async () => {
   deleteWorkspace(workspaceId);
   deleteWorkspace(otherWorkspaceId);
+  await api('/api/admin/feature-flags/local-seo-visibility', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: null }),
+  });
   await ctx.stopServer();
 });
 
@@ -53,6 +63,11 @@ describe('Local SEO routes', () => {
     ]));
     expect(body.caps).toEqual({ maxMarkets: 3, maxKeywordsPerRefresh: 25 });
     expect(body.latestSnapshots).toEqual([]);
+    expect(body.report).toEqual(expect.objectContaining({
+      workspacePosture: 'unknown',
+      setupState: 'needs_market',
+      checkedKeywordCount: 0,
+    }));
   });
 
   it('PUT stores admin posture and explicit markets', async () => {
@@ -78,6 +93,48 @@ describe('Local SEO routes', () => {
     expect(body.markets).toEqual(expect.arrayContaining([
       expect.objectContaining({ label: 'Austin, TX', status: 'active', providerLocationCode: 1026201 }),
     ]));
+    expect(body.report).toEqual(expect.objectContaining({
+      workspacePosture: 'local',
+      activeMarketCount: 1,
+      setupState: 'ready_no_data',
+    }));
+  });
+
+  it('redacts local SEO state and rejects writes while the feature flag is disabled', async () => {
+    await api('/api/admin/feature-flags/local-seo-visibility', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: false }),
+    });
+    try {
+      const read = await api(`/api/local-seo/${workspaceId}`);
+      expect(read.status).toBe(200);
+      const readBody = await read.json();
+      expect(readBody).toEqual(expect.objectContaining({
+        featureEnabled: false,
+        markets: [],
+        suggestedMarkets: [],
+        latestSnapshots: [],
+      }));
+      expect(readBody.report).toEqual(expect.objectContaining({
+        setupState: 'feature_disabled',
+        activeMarketCount: 0,
+        checkedKeywordCount: 0,
+      }));
+
+      const write = await api(`/api/local-seo/${workspaceId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ posture: 'local' }),
+      });
+      expect(write.status).toBe(403);
+    } finally {
+      await api('/api/admin/feature-flags/local-seo-visibility', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: true }),
+      });
+    }
   });
 
   it('PUT preserves existing market provider identity and status when fields are omitted', async () => {

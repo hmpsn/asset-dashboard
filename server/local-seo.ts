@@ -22,13 +22,19 @@ import {
   LOCAL_SEO_MARKET_STATUS,
   LOCAL_SEO_POSTURE,
   LOCAL_SEO_POSTURE_SOURCE,
+  LOCAL_SEO_VISIBILITY_POSTURE,
   LOCAL_VISIBILITY_STATUS,
+  localSeoKeywordVisibilityFromSnapshot,
+  summarizeLocalSeoKeywordVisibility,
   type LocalBusinessMatchConfidence,
+  type LocalSeoKeywordVisibility,
+  type LocalSeoKeywordVisibilitySummary,
   type LocalSeoDevice,
   type LocalSeoMarket,
   type LocalSeoMarketStatus,
   type LocalSeoMarketUpdateRequest,
   type LocalSeoPosture,
+  type LocalSeoReportSummary,
   type LocalSeoReadResponse,
   type LocalSeoRefreshRequest,
   type LocalSeoRefreshResult,
@@ -311,16 +317,58 @@ function buildSuggestedMarkets(workspace: Workspace): LocalSeoMarket[] {
 export function getLocalSeoReadModel(workspaceId: string, featureEnabled: boolean): LocalSeoReadResponse | null {
   const workspace = getWorkspace(workspaceId);
   if (!workspace) return null;
+  if (!featureEnabled) {
+    const settings = disabledSettings(workspace);
+    return {
+      featureEnabled: false,
+      settings,
+      markets: [],
+      suggestedMarkets: [],
+      latestSnapshots: [],
+      report: buildLocalSeoReportSummary({
+        featureEnabled: false,
+        settings,
+        markets: [],
+        suggestedMarkets: [],
+        latestSnapshots: [],
+      }),
+      caps: {
+        maxMarkets: LOCAL_SEO_MAX_MARKETS,
+        maxKeywordsPerRefresh: LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH,
+      },
+    };
+  }
+  const settings = readSettings(workspace);
+  const markets = listLocalSeoMarkets(workspace.id);
+  const suggestedMarkets = buildSuggestedMarkets(workspace);
+  const latestSnapshots = listLatestLocalVisibilitySnapshots(workspace.id);
   return {
     featureEnabled,
-    settings: readSettings(workspace),
-    markets: listLocalSeoMarkets(workspace.id),
-    suggestedMarkets: buildSuggestedMarkets(workspace),
-    latestSnapshots: listLatestLocalVisibilitySnapshots(workspace.id),
+    settings,
+    markets,
+    suggestedMarkets,
+    latestSnapshots,
+    report: buildLocalSeoReportSummary({
+      featureEnabled,
+      settings,
+      markets,
+      suggestedMarkets,
+      latestSnapshots,
+    }),
     caps: {
       maxMarkets: LOCAL_SEO_MAX_MARKETS,
       maxKeywordsPerRefresh: LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH,
     },
+  };
+}
+
+function disabledSettings(workspace: Workspace): LocalSeoWorkspaceSettings {
+  return {
+    workspaceId: workspace.id,
+    posture: LOCAL_SEO_POSTURE.UNKNOWN,
+    postureSource: LOCAL_SEO_POSTURE_SOURCE.UNKNOWN,
+    suggestionReasons: [],
+    updatedAt: new Date().toISOString(),
   };
 }
 
@@ -420,6 +468,102 @@ export function listLatestLocalVisibilitySnapshots(workspaceId: string): LocalVi
     snapshots.push(rowToSnapshot(row));
   }
   return snapshots;
+}
+
+export function buildLocalSeoKeywordVisibilityByKey(workspaceId: string): Map<string, LocalSeoKeywordVisibilitySummary> {
+  const grouped = new Map<string, LocalSeoKeywordVisibility[]>();
+  for (const snapshot of listLatestLocalVisibilitySnapshots(workspaceId)) {
+    if (!snapshot.normalizedKeyword) continue;
+    const current = grouped.get(snapshot.normalizedKeyword) ?? [];
+    current.push(localSeoKeywordVisibilityFromSnapshot(snapshot));
+    grouped.set(snapshot.normalizedKeyword, current);
+  }
+  const summaries = new Map<string, LocalSeoKeywordVisibilitySummary>();
+  for (const [key, visibility] of grouped) {
+    const summary = summarizeLocalSeoKeywordVisibility(visibility);
+    if (summary) summaries.set(key, summary);
+  }
+  return summaries;
+}
+
+function buildLocalSeoReportSummary(input: {
+  featureEnabled: boolean;
+  settings: LocalSeoWorkspaceSettings;
+  markets: LocalSeoMarket[];
+  suggestedMarkets: LocalSeoMarket[];
+  latestSnapshots: LocalVisibilitySnapshot[];
+}): LocalSeoReportSummary {
+  const activeMarketCount = input.markets.filter(market => market.status === LOCAL_SEO_MARKET_STATUS.ACTIVE).length;
+  const latestByMarketKeyword = buildMarketKeywordVisibilityFromSnapshots(input.latestSnapshots);
+  const visibility = [...latestByMarketKeyword.values()];
+  const visibleCount = visibility.filter(item => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE).length;
+  const possibleMatchCount = visibility.filter(item => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.POSSIBLE_MATCH).length;
+  const notVisibleCount = visibility.filter(item => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.NOT_VISIBLE || item.posture === LOCAL_SEO_VISIBILITY_POSTURE.LOCAL_PACK_PRESENT).length;
+  const degradedCount = visibility.filter(item => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.PROVIDER_DEGRADED).length;
+  const lastCapturedAt = input.latestSnapshots
+    .map(snapshot => snapshot.capturedAt)
+    .sort()
+    .at(-1);
+
+  let setupState: LocalSeoReportSummary['setupState'] = 'has_data';
+  let setupLabel = 'Local visibility reporting is active';
+  let setupDetail = 'Market-specific local-pack visibility is available for reviewed local-intent keywords.';
+  if (!input.featureEnabled) {
+    setupState = 'feature_disabled';
+    setupLabel = 'Local SEO visibility is not enabled';
+    setupDetail = 'The reporting layer is dark-launched behind the local SEO visibility feature flag.';
+  } else if (input.settings.posture === LOCAL_SEO_POSTURE.NON_LOCAL) {
+    setupState = 'non_local';
+    setupLabel = 'Workspace marked non-local';
+    setupDetail = 'Local-pack visibility is hidden because this workspace is not currently managed as a local SEO account.';
+  } else if (activeMarketCount === 0) {
+    setupState = 'needs_market';
+    setupLabel = 'Market setup needed';
+    setupDetail = 'Configure at least one reviewed local market before refreshing local visibility.';
+  } else if (input.latestSnapshots.length === 0) {
+    setupState = 'ready_no_data';
+    setupLabel = 'Ready for first refresh';
+    setupDetail = 'Markets are configured. Run a local visibility refresh to collect local-pack evidence.';
+  }
+
+  return {
+    workspacePosture: input.settings.posture,
+    suggestedPosture: input.settings.suggestedPosture,
+    activeMarketCount,
+    configuredMarketCount: input.markets.length,
+    suggestedMarketCount: input.suggestedMarkets.length,
+    latestSnapshotCount: input.latestSnapshots.length,
+    checkedKeywordCount: latestByMarketKeyword.size,
+    visibleCount,
+    possibleMatchCount,
+    notVisibleCount,
+    localPackPresentCount: visibility.filter(item => item.localPackPresent).length,
+    degradedCount,
+    lastCapturedAt,
+    setupState,
+    setupLabel,
+    setupDetail,
+  };
+}
+
+function buildMarketKeywordVisibilityFromSnapshots(snapshots: LocalVisibilitySnapshot[]): Map<string, LocalSeoKeywordVisibility> {
+  return buildLocalSeoVisibilityMap(
+    snapshots,
+    snapshot => `${snapshot.marketId}:${snapshot.normalizedKeyword}`,
+  );
+}
+
+function buildLocalSeoVisibilityMap(
+  snapshots: LocalVisibilitySnapshot[],
+  keyForSnapshot: (snapshot: LocalVisibilitySnapshot) => string,
+): Map<string, LocalSeoKeywordVisibility> {
+  const map = new Map<string, LocalSeoKeywordVisibility>();
+  for (const snapshot of snapshots) {
+    const key = keyForSnapshot(snapshot);
+    if (!snapshot.normalizedKeyword || map.has(key)) continue;
+    map.set(key, localSeoKeywordVisibilityFromSnapshot(snapshot));
+  }
+  return map;
 }
 
 function cleanDomain(value: string | undefined): string | undefined {

@@ -9,6 +9,10 @@ vi.mock('../../src/api/client', () => ({
   del: vi.fn().mockResolvedValue({}),
 }));
 
+vi.mock('../../src/hooks/useFeatureFlag', () => ({
+  useFeatureFlag: vi.fn().mockReturnValue(false),
+}));
+
 import { RankTracker } from '../../src/components/RankTracker';
 
 describe('RankTracker — GSC Capture Snapshot button', () => {

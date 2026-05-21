@@ -248,9 +248,9 @@
           "source": "PR14 local SEO foundation audit 2026-05-20",
           "est": "5-8h",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "owner": "seo-health",
-          "notes": "Build admin-first local SEO reporting on top of the PR15 visibility foundation. Add local visibility posture to Keyword Command Center, Strategy, and Page Intelligence where keyword/page intent is local; add Rank Tracker handoff copy that distinguishes GSC measurement from local-pack visibility. Keep copy conservative (`visible in local results`, `possible match`) and avoid `verified local rank` unless match confidence supports it. Add client-facing local summaries only after staging data proves reliable and understandable. No publishing, live metadata writes, or automatic strategy regeneration."
+          "notes": "Completed in PR17 on 2026-05-20. Added the admin-first reporting and strategy integration layer on top of the PR16 local-pack visibility foundation.\n\nWhat changed:\n- Extended `GET /api/local-seo/:workspaceId` with an optional report summary that captures workspace posture, setup state, active market count, checked keyword count, visible/possible/not-found counts, and latest capture time.\n- Added a feature-flagged `LocalSeoVisibilityPanel` for admin reporting, with conservative setup, summary, market, and keyword snapshot copy.\n- Annotated Keyword Command Center rows and drawer details with local visibility posture when stored snapshots exist, while keeping the Command Center as the keyword lifecycle owner.\n- Added compact local visibility summaries to Keyword Strategy and Page Intelligence and local-intent keyword annotations to Page Intelligence page rows/details.\n- Added Rank Tracker handoff copy clarifying that Rank Tracker measures GSC query performance while Local SEO measures market-specific map/local-pack visibility.\n\nScope boundaries preserved: no client-facing local SEO payloads, no strategy scoring/ranking changes, no automatic strategy regeneration, no provider calls in render paths, no GBP health/reviews, no geo-grid tracking, no publishing, and no live metadata/schema writes. Client-facing local summaries remain deferred until admin staging QA proves data quality and copy clarity."
         },
         {
           "id": "intel-quality-google-business-profile-health",

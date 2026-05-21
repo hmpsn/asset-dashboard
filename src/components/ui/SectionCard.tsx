@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 interface SectionCardProps {
+  id?: string;
   title?: string;
   titleIcon?: ReactNode;
   /**
@@ -38,7 +39,7 @@ interface SectionCardProps {
   variant?: 'default' | 'subtle';
 }
 
-export function SectionCard({ title, titleIcon, titleExtra, action, children, className, noPadding, interactive, staggerIndex, variant = 'default' }: SectionCardProps) {
+export function SectionCard({ id, title, titleIcon, titleExtra, action, children, className, noPadding, interactive, staggerIndex, variant = 'default' }: SectionCardProps) {
   const hasHeader = title || action || titleExtra;
 
   const staggerStyle = staggerIndex !== undefined
@@ -56,6 +57,7 @@ export function SectionCard({ title, titleIcon, titleExtra, action, children, cl
 
   return (
     <div
+      id={id}
       className={`${containerClasses} ${interactiveClasses} ${className ?? ''}`}
       style={containerStyle}
     >
