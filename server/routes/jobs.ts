@@ -105,6 +105,33 @@ const keywordStrategyStepLabels: Record<string, string> = {
   complete: 'Complete',
 };
 
+function keywordStrategyJobResultSummary(
+  strategy: {
+    generatedAt?: unknown;
+    pageMap?: unknown;
+    siteKeywords?: unknown;
+    contentGaps?: unknown;
+    quickWins?: unknown;
+  },
+  options: { upToDate?: boolean; freshPageCount?: number } = {},
+): Record<string, unknown> {
+  const pageMap = strategy.pageMap;
+  const siteKeywords = strategy.siteKeywords;
+  const contentGaps = strategy.contentGaps;
+  const quickWins = strategy.quickWins;
+
+  return {
+    persisted: true,
+    upToDate: Boolean(options.upToDate),
+    freshPageCount: options.freshPageCount,
+    generatedAt: typeof strategy.generatedAt === 'string' ? strategy.generatedAt : undefined,
+    pageCount: Array.isArray(pageMap) ? pageMap.length : 0,
+    siteKeywordCount: Array.isArray(siteKeywords) ? siteKeywords.length : 0,
+    contentGapCount: Array.isArray(contentGaps) ? contentGaps.length : 0,
+    quickWinCount: Array.isArray(quickWins) ? quickWins.length : 0,
+  };
+}
+
 // --- Background Job Endpoints ---
 router.get('/api/jobs', (_req, res) => {
   const wsId = _req.query.workspaceId as string | undefined;
@@ -729,7 +756,9 @@ router.post('/api/jobs', async (req, res) => {
               const pageCount = Array.isArray(pageMap) ? pageMap.length : 0;
               updateJob(job.id, {
                 status: 'done',
-                result: stratResult,
+                result: keywordStrategyJobResultSummary(stratResult, {
+                  freshPageCount: generationResult.freshPageCount,
+                }),
                 progress: 100,
                 total: 100,
                 message: `Strategy complete — ${pageCount} pages mapped`,

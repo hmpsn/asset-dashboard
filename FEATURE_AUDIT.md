@@ -6380,6 +6380,8 @@ The new `LocalSeoVisibilityPanel` surfaces local-market setup and snapshot evide
 
 The local refresh source set is now built from strategy terms, active tracked terms, page-assigned keywords, service page titles, content gaps, configured market city/state, and safe city/near-me variants. Candidates are deduped through the shared keyword normalizer, screened with shared keyword-intelligence rules, and exclude declined, retired, weak-fit, and known noisy terms. Refreshes remain background-job based and bounded, with a 50-keyword prioritized cap.
 
+Staging QA also exposed a stability risk at keyword-strategy completion: the background job was storing and broadcasting the full generated strategy object even though the strategy is already persisted in the domain store. Keyword strategy jobs now return a compact completion summary only, reducing SQLite/job-cache/WebSocket payload pressure during heavy generation runs.
+
 **Agency value:** Gives admins one place to understand and act on local keyword opportunities: what is visible locally, what is a possible match, what is not visible, what has not been checked, and which local candidates should be tracked, promoted, declined, or reviewed. This makes local SEO feel like part of the keyword operating loop rather than a separate report to hunt through.
 
 **Client value:** Client-facing local SEO remains deferred, but the admin evidence model now supports safer future reporting because local candidates are not presented as selected strategy terms until promoted and local visibility copy stays conservative.
