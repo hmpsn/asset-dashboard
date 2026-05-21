@@ -6,6 +6,7 @@ import { listContentGaps } from './content-gaps.js';
 import { listKeywordGaps } from './keyword-gaps.js';
 import {
   buildLocalSeoKeywordCandidates,
+  buildLocalSeoKeywordVisibilityForKeyword,
   buildLocalSeoKeywordVisibilitySummaryByKey,
   buildLocalSeoKeywordVisibilityByKey,
   listLocalSeoMarkets,
@@ -24,7 +25,7 @@ import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { buildKeywordStrategyUxPayload } from './keyword-strategy-ux.js';
 import { WS_EVENTS } from './ws-events.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
-import type { KeywordGapItem } from '../shared/types/workspace.js';
+import type { ContentGap, KeywordGapItem, KeywordStrategy, PageKeywordMap, Workspace } from '../shared/types/workspace.js';
 import {
   KEYWORD_COMMAND_CENTER_ACTIONS,
   KEYWORD_COMMAND_CENTER_FILTERS,
@@ -107,6 +108,32 @@ interface DraftRow {
   localCandidate?: LocalSeoKeywordCandidate;
   rank?: LatestRank;
   rawEvidenceOnly?: boolean;
+}
+
+interface CommandCenterSourceBundle {
+  workspaceId: string;
+  workspaceName?: string;
+  strategy?: KeywordStrategy | null;
+  pageMap: PageKeywordMap[];
+  contentGaps: ContentGap[];
+  keywordGaps: KeywordGapItem[];
+  trackedKeywords: TrackedKeyword[];
+  latestRanks: LatestRank[];
+  feedback: Map<string, FeedbackRow>;
+  localCandidates?: LocalSeoKeywordCandidate[];
+  includeStrategyUx?: boolean;
+  includeWorkspaceIntelligence?: boolean;
+}
+
+interface RowFinalizeContext {
+  localVisibilityByKeyword: Map<string, LocalSeoKeywordVisibilitySummary>;
+  activeLocalMarketCount: number;
+}
+
+interface FinalizedRows {
+  rows: KeywordCommandCenterRow[];
+  rawEvidenceTotal: number;
+  rawEvidenceReturned: number;
 }
 
 function addSource(row: DraftRow, source: KeywordCommandCenterSourceLabel): void {
@@ -650,6 +677,254 @@ function buildFilterFacetsFromCounts(counts: SkinnyFilterCounts): KeywordCommand
   ];
 }
 
+async function populateDraftRows(rows: Map<string, DraftRow>, bundle: CommandCenterSourceBundle): Promise<void> {
+  const strategy = bundle.strategy;
+
+  for (const metric of strategy?.siteKeywordMetrics ?? []) {
+    const row = ensureRow(rows, metric.keyword);
+    if (!row) continue;
+    setAssignment(row, { role: 'site_keyword' });
+    addSource(row, { kind: 'strategy', label: 'Strategy keyword', detail: 'Site keyword' });
+    mergeMetrics(row, { volume: metric.volume, difficulty: metric.difficulty });
+  }
+
+  for (const keyword of strategy?.siteKeywords ?? []) {
+    const row = ensureRow(rows, keyword);
+    if (!row) continue;
+    setAssignment(row, { role: 'site_keyword' });
+    addSource(row, { kind: 'strategy', label: 'Strategy keyword', detail: 'Site keyword' });
+  }
+
+  for (const page of bundle.pageMap) {
+    const pageKeywords = [page.primaryKeyword, ...(page.secondaryKeywords ?? [])].filter(Boolean);
+    for (const keyword of pageKeywords) {
+      const row = ensureRow(rows, keyword);
+      if (!row) continue;
+      setAssignment(row, {
+        pagePath: page.pagePath,
+        pageTitle: page.pageTitle,
+        role: 'page_keyword',
+      });
+      addSource(row, { kind: 'page_assignment', label: 'Page assignment', detail: page.pageTitle ?? page.pagePath });
+      mergeMetrics(row, {
+        volume: page.volume,
+        difficulty: page.difficulty,
+      });
+    }
+  }
+
+  for (const gap of bundle.contentGaps) {
+    const row = ensureRow(rows, gap.targetKeyword);
+    if (!row) continue;
+    setAssignment(row, {
+      pageTitle: gap.topic,
+      role: 'content_gap',
+    });
+    addSource(row, { kind: 'content_gap', label: 'Content opportunity', detail: gap.topic });
+    mergeMetrics(row, {
+      volume: gap.volume,
+      difficulty: gap.difficulty,
+    });
+  }
+
+  const strategyUx = bundle.includeStrategyUx === false
+    ? null
+    : await buildKeywordStrategyUxPayload({
+      workspaceId: bundle.workspaceId,
+      workspaceName: bundle.workspaceName,
+      strategy: strategy ?? null,
+      pageMap: bundle.pageMap,
+      contentGaps: bundle.contentGaps,
+      keywordGaps: bundle.keywordGaps,
+      surface: 'admin',
+      trackedKeywords: bundle.trackedKeywords,
+      includeWorkspaceIntelligence: bundle.includeWorkspaceIntelligence,
+    });
+
+  for (const explanation of strategyUx?.explanations ?? []) {
+    const row = ensureRow(rows, explanation.keyword);
+    if (!row) continue;
+    row.explanation = explanation;
+    row.rawEvidenceOnly = Boolean(explanation.rawEvidenceOnly);
+    addSource(row, sourceFromExplanation(explanation));
+    mergeMetrics(row, {
+      volume: explanation.role === 'content_gap'
+        ? bundle.contentGaps.find(gap => keywordComparisonKey(gap.targetKeyword) === explanation.normalizedKeyword)?.volume
+        : undefined,
+      difficulty: explanation.role === 'content_gap'
+        ? bundle.contentGaps.find(gap => keywordComparisonKey(gap.targetKeyword) === explanation.normalizedKeyword)?.difficulty
+        : undefined,
+    });
+  }
+
+  for (const gap of bundle.keywordGaps) {
+    const row = ensureRow(rows, gap.keyword);
+    if (!row) continue;
+    row.rawEvidenceOnly = row.rawEvidenceOnly ?? !row.explanation;
+    addSource(row, sourceFromKeywordGap(gap));
+    mergeMetrics(row, {
+      volume: gap.volume,
+      difficulty: gap.difficulty,
+    });
+  }
+
+  for (const keyword of bundle.trackedKeywords) {
+    const row = ensureRow(rows, keyword.query);
+    if (!row) continue;
+    row.tracking = keyword;
+    addSource(row, {
+      kind: keyword.source === TRACKED_KEYWORD_SOURCE.MANUAL ? 'manual' : 'tracking',
+      label: 'Rank tracking',
+      detail: keyword.source?.replace(/_/g, ' '),
+    });
+    mergeMetrics(row, {
+      volume: keyword.volume,
+      difficulty: keyword.difficulty,
+      cpc: keyword.cpc,
+      currentPosition: keyword.baselinePosition,
+      clicks: keyword.baselineClicks,
+      impressions: keyword.baselineImpressions,
+    });
+  }
+
+  for (const [normalized, row] of bundle.feedback) {
+    const draft = ensureRow(rows, row.keyword);
+    if (!draft) continue;
+    draft.feedback = feedbackState(row);
+    addSource(draft, {
+      kind: row.status === 'requested' ? 'client_request' : 'feedback',
+      label: row.status === 'requested' ? 'Requested keyword' : 'Keyword feedback',
+      detail: row.status,
+    });
+    if (draft.normalizedKeyword !== normalized) rows.set(normalized, draft);
+  }
+
+  const rankedUntracked = bundle.latestRanks
+    .filter(rank => !rows.has(keywordComparisonKey(rank.query)))
+    .sort((a, b) => (b.impressions ?? 0) - (a.impressions ?? 0))
+    .slice(0, RANK_EVIDENCE_ROW_LIMIT);
+  for (const rank of rankedUntracked) {
+    const row = ensureRow(rows, rank.query);
+    if (!row) continue;
+    row.rank = rank;
+    addSource(row, { kind: 'rank_data', label: 'Search Console evidence', detail: 'Ranking query not currently selected' });
+    mergeMetrics(row, {
+      currentPosition: rank.position,
+      clicks: rank.clicks,
+      impressions: rank.impressions,
+      ctr: rank.ctr,
+    });
+  }
+
+  for (const rank of bundle.latestRanks) {
+    const row = rows.get(keywordComparisonKey(rank.query));
+    if (!row) continue;
+    row.rank = rank;
+    mergeMetrics(row, {
+      currentPosition: rank.position,
+      clicks: rank.clicks,
+      impressions: rank.impressions,
+      ctr: rank.ctr,
+    });
+  }
+
+  for (const candidate of bundle.localCandidates ?? []) {
+    const row = ensureRow(rows, candidate.keyword);
+    if (!row) continue;
+    row.localCandidate = candidate;
+    addSource(row, {
+      kind: 'local_candidate',
+      label: candidate.sourceLabel,
+      detail: candidate.detail,
+    });
+    mergeMetrics(row, {
+      volume: candidate.volume,
+      difficulty: candidate.difficulty,
+    });
+  }
+}
+
+function finalizeDraftRow(row: DraftRow, context: RowFinalizeContext): KeywordCommandCenterRow {
+  const status = lifecycleStatus(row);
+  const protection = protectedReason(row.tracking);
+  const explanationRole = row.explanation?.role;
+  const isProtected = Boolean(protection);
+  const localSeo = context.localVisibilityByKeyword.get(row.normalizedKeyword);
+  const localSeoState = buildLocalSeoState(row, status, localSeo, context.activeLocalMarketCount);
+  return {
+    keyword: row.keyword,
+    normalizedKeyword: row.normalizedKeyword,
+    lifecycleStatus: status,
+    statusLabel: statusLabel(status),
+    sourceLabels: row.sourceLabels,
+    metrics: row.metrics,
+    assignment: row.explanation ? {
+      pagePath: row.explanation.pagePath,
+      pageTitle: row.explanation.pageTitle,
+      role: explanationRole === 'competitor_gap' ? 'raw_evidence' : explanationRole,
+    } : row.assignment ?? (row.localCandidate?.pagePath || row.localCandidate?.pageTitle ? {
+      pagePath: row.localCandidate.pagePath,
+      pageTitle: row.localCandidate.pageTitle,
+      role: row.localCandidate.source === 'content_gap' ? 'content_gap' : 'page_keyword',
+    } : undefined),
+    feedback: row.feedback,
+    tracking: row.tracking ? {
+      status: row.tracking.status ?? TRACKED_KEYWORD_STATUS.ACTIVE,
+      source: row.tracking.source,
+      pinned: row.tracking.pinned,
+      addedAt: row.tracking.addedAt,
+      pagePath: row.tracking.pagePath,
+      pageTitle: row.tracking.pageTitle,
+      replacedBy: row.tracking.replacedBy,
+      deprecatedAt: row.tracking.deprecatedAt,
+    } : { status: 'not_tracked' },
+    explanation: row.explanation,
+    localSeo,
+    localSeoState,
+    nextActions: buildNextActions(row, status, isProtected, protection, localSeoState),
+    isProtected,
+    protectionReason: protection,
+    rawEvidenceOnly: row.rawEvidenceOnly,
+  };
+}
+
+function finalizeDraftRows(rows: Map<string, DraftRow>, context: RowFinalizeContext): FinalizedRows {
+  const rawEvidenceRows = [...rows.values()].filter(row => row.rawEvidenceOnly && !row.tracking && !row.feedback && !row.localCandidate);
+  const allowedRawEvidence = new Set(
+    rawEvidenceRows
+      .sort((a, b) => (b.metrics.volume ?? 0) - (a.metrics.volume ?? 0))
+      .slice(0, RAW_EVIDENCE_ROW_LIMIT)
+      .map(row => row.normalizedKeyword),
+  );
+
+  const finalRows = [...rows.values()]
+    .filter(row => !row.rawEvidenceOnly || row.tracking || row.feedback || row.localCandidate || allowedRawEvidence.has(row.normalizedKeyword))
+    .map(row => finalizeDraftRow(row, context))
+    .sort(sortRows);
+
+  return {
+    rows: finalRows,
+    rawEvidenceTotal: rawEvidenceRows.length,
+    rawEvidenceReturned: allowedRawEvidence.size,
+  };
+}
+
+function ensureLocalVisibilityRows(
+  rows: Map<string, DraftRow>,
+  localVisibilityByKeyword: Map<string, LocalSeoKeywordVisibilitySummary>,
+): void {
+  for (const [normalizedKeyword, visibility] of localVisibilityByKeyword) {
+    const row = ensureRow(rows, visibility.keyword);
+    if (!row) continue;
+    if (row.normalizedKeyword !== normalizedKeyword) rows.set(normalizedKeyword, row);
+    addSource(row, {
+      kind: 'local_visibility',
+      label: 'Local visibility',
+      detail: visibility.label,
+    });
+  }
+}
+
 async function buildKeywordCommandCenterModel(
   workspaceId: string,
   options: {
@@ -691,228 +966,34 @@ async function buildKeywordCommandCenterModel(
     : 0;
   mark('localSeoMs');
   const rows = new Map<string, DraftRow>();
-
-  for (const metric of strategy?.siteKeywordMetrics ?? []) {
-    const row = ensureRow(rows, metric.keyword);
-    if (!row) continue;
-    setAssignment(row, { role: 'site_keyword' });
-    addSource(row, { kind: 'strategy', label: 'Strategy keyword', detail: 'Site keyword' });
-    mergeMetrics(row, { volume: metric.volume, difficulty: metric.difficulty });
-  }
-
-  for (const keyword of strategy?.siteKeywords ?? []) {
-    const row = ensureRow(rows, keyword);
-    if (!row) continue;
-    setAssignment(row, { role: 'site_keyword' });
-    addSource(row, { kind: 'strategy', label: 'Strategy keyword', detail: 'Site keyword' });
-  }
-
-  for (const page of pageMap) {
-    const pageKeywords = [page.primaryKeyword, ...(page.secondaryKeywords ?? [])].filter(Boolean);
-    for (const keyword of pageKeywords) {
-      const row = ensureRow(rows, keyword);
-      if (!row) continue;
-      setAssignment(row, {
-        pagePath: page.pagePath,
-        pageTitle: page.pageTitle,
-        role: 'page_keyword',
-      });
-      addSource(row, { kind: 'page_assignment', label: 'Page assignment', detail: page.pageTitle ?? page.pagePath });
-      mergeMetrics(row, {
-        volume: page.volume,
-        difficulty: page.difficulty,
-      });
-    }
-  }
-
-  for (const gap of contentGaps) {
-    const row = ensureRow(rows, gap.targetKeyword);
-    if (!row) continue;
-    setAssignment(row, {
-      pageTitle: gap.topic,
-      role: 'content_gap',
-    });
-    addSource(row, { kind: 'content_gap', label: 'Content opportunity', detail: gap.topic });
-    mergeMetrics(row, {
-      volume: gap.volume,
-      difficulty: gap.difficulty,
-    });
-  }
-
-  const strategyUx = options.includeStrategyUx === false
-    ? null
-    : await buildKeywordStrategyUxPayload({
-      workspaceId: workspace.id,
-      workspaceName: workspace.name,
-      strategy: strategy ?? null,
-      pageMap,
-      contentGaps,
-      keywordGaps,
-      surface: 'admin',
-      trackedKeywords,
-    });
+  await populateDraftRows(rows, {
+    workspaceId: workspace.id,
+    workspaceName: workspace.name,
+    strategy,
+    pageMap,
+    contentGaps,
+    keywordGaps,
+    trackedKeywords,
+    latestRanks,
+    feedback,
+    localCandidates,
+    includeStrategyUx: options.includeStrategyUx,
+  });
+  ensureLocalVisibilityRows(rows, localVisibilityByKeyword);
   mark('strategyUxMs');
-
-  for (const explanation of strategyUx?.explanations ?? []) {
-    const row = ensureRow(rows, explanation.keyword);
-    if (!row) continue;
-    row.explanation = explanation;
-    row.rawEvidenceOnly = Boolean(explanation.rawEvidenceOnly);
-    addSource(row, sourceFromExplanation(explanation));
-    mergeMetrics(row, {
-      volume: explanation.role === 'content_gap' ? contentGaps.find(gap => keywordComparisonKey(gap.targetKeyword) === explanation.normalizedKeyword)?.volume : undefined,
-      difficulty: explanation.role === 'content_gap' ? contentGaps.find(gap => keywordComparisonKey(gap.targetKeyword) === explanation.normalizedKeyword)?.difficulty : undefined,
-    });
-  }
-
-  for (const gap of keywordGaps) {
-    const row = ensureRow(rows, gap.keyword);
-    if (!row) continue;
-    row.rawEvidenceOnly = row.rawEvidenceOnly ?? !row.explanation;
-    addSource(row, sourceFromKeywordGap(gap));
-    mergeMetrics(row, {
-      volume: gap.volume,
-      difficulty: gap.difficulty,
-    });
-  }
-
-  for (const keyword of trackedKeywords) {
-    const row = ensureRow(rows, keyword.query);
-    if (!row) continue;
-    row.tracking = keyword;
-    addSource(row, {
-      kind: keyword.source === TRACKED_KEYWORD_SOURCE.MANUAL ? 'manual' : 'tracking',
-      label: 'Rank tracking',
-      detail: keyword.source?.replace(/_/g, ' '),
-    });
-    mergeMetrics(row, {
-      volume: keyword.volume,
-      difficulty: keyword.difficulty,
-      cpc: keyword.cpc,
-      currentPosition: keyword.baselinePosition,
-      clicks: keyword.baselineClicks,
-      impressions: keyword.baselineImpressions,
-    });
-  }
-
-  for (const [normalized, row] of feedback) {
-    const draft = ensureRow(rows, row.keyword);
-    if (!draft) continue;
-    draft.feedback = feedbackState(row);
-    addSource(draft, {
-      kind: row.status === 'requested' ? 'client_request' : 'feedback',
-      label: row.status === 'requested' ? 'Requested keyword' : 'Keyword feedback',
-      detail: row.status,
-    });
-    if (draft.normalizedKeyword !== normalized) rows.set(normalized, draft);
-  }
-
-  const rankedUntracked = latestRanks
-    .filter(rank => !rows.has(keywordComparisonKey(rank.query)))
-    .sort((a, b) => (b.impressions ?? 0) - (a.impressions ?? 0))
-    .slice(0, RANK_EVIDENCE_ROW_LIMIT);
-  for (const rank of rankedUntracked) {
-    const row = ensureRow(rows, rank.query);
-    if (!row) continue;
-    row.rank = rank;
-    addSource(row, { kind: 'rank_data', label: 'Search Console evidence', detail: 'Ranking query not currently selected' });
-    mergeMetrics(row, {
-      currentPosition: rank.position,
-      clicks: rank.clicks,
-      impressions: rank.impressions,
-      ctr: rank.ctr,
-    });
-  }
-
-  for (const rank of latestRanks) {
-    const row = rows.get(keywordComparisonKey(rank.query));
-    if (!row) continue;
-    row.rank = rank;
-    mergeMetrics(row, {
-      currentPosition: rank.position,
-      clicks: rank.clicks,
-      impressions: rank.impressions,
-      ctr: rank.ctr,
-    });
-  }
-
-  for (const candidate of localCandidates) {
-    const row = ensureRow(rows, candidate.keyword);
-    if (!row) continue;
-    row.localCandidate = candidate;
-    addSource(row, {
-      kind: 'local_candidate',
-      label: candidate.sourceLabel,
-      detail: candidate.detail,
-    });
-    mergeMetrics(row, {
-      volume: candidate.volume,
-      difficulty: candidate.difficulty,
-    });
-  }
-
-  const rawEvidenceRows = [...rows.values()].filter(row => row.rawEvidenceOnly && !row.tracking && !row.feedback && !row.localCandidate);
-  const allowedRawEvidence = new Set(
-    rawEvidenceRows
-      .sort((a, b) => (b.metrics.volume ?? 0) - (a.metrics.volume ?? 0))
-      .slice(0, RAW_EVIDENCE_ROW_LIMIT)
-      .map(row => row.normalizedKeyword),
-  );
-
-  const finalRows = [...rows.values()]
-    .filter(row => !row.rawEvidenceOnly || row.tracking || row.feedback || row.localCandidate || allowedRawEvidence.has(row.normalizedKeyword))
-    .map((row): KeywordCommandCenterRow => {
-      const status = lifecycleStatus(row);
-      const protection = protectedReason(row.tracking);
-      const explanationRole = row.explanation?.role;
-      const isProtected = Boolean(protection);
-      const localSeo = localVisibilityByKeyword.get(row.normalizedKeyword);
-      const localSeoState = buildLocalSeoState(row, status, localSeo, activeLocalMarketCount);
-      return {
-        keyword: row.keyword,
-        normalizedKeyword: row.normalizedKeyword,
-        lifecycleStatus: status,
-        statusLabel: statusLabel(status),
-        sourceLabels: row.sourceLabels,
-        metrics: row.metrics,
-        assignment: row.explanation ? {
-          pagePath: row.explanation.pagePath,
-          pageTitle: row.explanation.pageTitle,
-          role: explanationRole === 'competitor_gap' ? 'raw_evidence' : explanationRole,
-        } : row.assignment ?? (row.localCandidate?.pagePath || row.localCandidate?.pageTitle ? {
-          pagePath: row.localCandidate.pagePath,
-          pageTitle: row.localCandidate.pageTitle,
-          role: row.localCandidate.source === 'content_gap' ? 'content_gap' : 'page_keyword',
-        } : undefined),
-        feedback: row.feedback,
-        tracking: row.tracking ? {
-          status: row.tracking.status ?? TRACKED_KEYWORD_STATUS.ACTIVE,
-          source: row.tracking.source,
-          pinned: row.tracking.pinned,
-          addedAt: row.tracking.addedAt,
-          pagePath: row.tracking.pagePath,
-          pageTitle: row.tracking.pageTitle,
-          replacedBy: row.tracking.replacedBy,
-          deprecatedAt: row.tracking.deprecatedAt,
-        } : { status: 'not_tracked' },
-        explanation: row.explanation,
-        localSeo,
-        localSeoState,
-        nextActions: buildNextActions(row, status, isProtected, protection, localSeoState),
-        isProtected,
-        protectionReason: protection,
-        rawEvidenceOnly: row.rawEvidenceOnly,
-      };
-    })
-    .sort(sortRows);
+  const finalized = finalizeDraftRows(rows, {
+    localVisibilityByKeyword,
+    activeLocalMarketCount,
+  });
+  const finalRows = finalized.rows;
   mark('rowIndexMs');
 
   log.info({
     workspaceId,
     mode: options.timingLabel ?? 'full',
     rowCount: finalRows.length,
-    rawEvidenceTotal: rawEvidenceRows.length,
-    rawEvidenceReturned: allowedRawEvidence.size,
+    rawEvidenceTotal: finalized.rawEvidenceTotal,
+    rawEvidenceReturned: finalized.rawEvidenceReturned,
     ...marks,
     ...heap,
     totalMs: Date.now() - startedAt,
@@ -923,23 +1004,10 @@ async function buildKeywordCommandCenterModel(
     rows: finalRows,
     counts: buildCounts(finalRows),
     filters: buildFilters(finalRows),
-    rawEvidenceTotal: rawEvidenceRows.length,
-    rawEvidenceReturned: [...allowedRawEvidence].length,
+    rawEvidenceTotal: finalized.rawEvidenceTotal,
+    rawEvidenceReturned: finalized.rawEvidenceReturned,
     generatedAt: strategy?.generatedAt ?? null,
   };
-}
-
-export async function buildKeywordCommandCenter(
-  workspaceId: string,
-  options: { includeLocalSeo?: boolean } = {},
-): Promise<KeywordCommandCenterResponse | null> {
-  return buildKeywordCommandCenterModel(workspaceId, {
-    includeLocalSeo: options.includeLocalSeo,
-    includeLocalSeoDetails: true,
-    includeLocalCandidates: true,
-    includeStrategyUx: true,
-    timingLabel: 'legacy-full',
-  });
 }
 
 export async function buildKeywordCommandCenterSummary(
@@ -1071,20 +1139,387 @@ export async function buildKeywordCommandCenterSummary(
   };
 }
 
-export async function buildKeywordCommandCenterRows(
+function trackedKeywordMatchesFilter(keyword: TrackedKeyword, filter: KeywordCommandCenterFilter): boolean {
+  const status = keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE;
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.TRACKED) return status === TRACKED_KEYWORD_STATUS.ACTIVE;
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.RETIRED) return status !== TRACKED_KEYWORD_STATUS.ACTIVE;
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY) {
+    return status === TRACKED_KEYWORD_STATUS.ACTIVE && (
+      keyword.source === TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY
+      || keyword.source === TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD
+    );
+  }
+  return true;
+}
+
+function addStrategyKeys(target: Set<string>, strategy: KeywordStrategy | null | undefined): void {
+  for (const metric of strategy?.siteKeywordMetrics ?? []) {
+    const key = keywordComparisonKey(metric.keyword);
+    if (key) target.add(key);
+  }
+  for (const keyword of strategy?.siteKeywords ?? []) {
+    const key = keywordComparisonKey(keyword);
+    if (key) target.add(key);
+  }
+}
+
+function addPageKeys(target: Set<string>, pageMap: PageKeywordMap[]): void {
+  for (const page of pageMap) {
+    for (const keyword of [page.primaryKeyword, ...(page.secondaryKeywords ?? [])]) {
+      const key = keywordComparisonKey(keyword);
+      if (key) target.add(key);
+    }
+  }
+}
+
+function filterStrategyForKeys(strategy: KeywordStrategy | null | undefined, keys: Set<string> | null): KeywordStrategy | null | undefined {
+  if (!strategy || !keys) return strategy;
+  return {
+    ...strategy,
+    siteKeywords: (strategy.siteKeywords ?? []).filter(keyword => keys.has(keywordComparisonKey(keyword))),
+    siteKeywordMetrics: (strategy.siteKeywordMetrics ?? []).filter(metric => keys.has(keywordComparisonKey(metric.keyword))),
+  };
+}
+
+function pageMatchesKeys(page: PageKeywordMap, keys: Set<string> | null): boolean {
+  if (!keys) return true;
+  return keys.has(keywordComparisonKey(page.primaryKeyword))
+    || (page.secondaryKeywords ?? []).some(keyword => keys.has(keywordComparisonKey(keyword)));
+}
+
+function filterMapByKeys<T>(map: Map<string, T>, keys: Set<string> | null): Map<string, T> {
+  if (!keys) return map;
+  return new Map([...map.entries()].filter(([key]) => keys.has(key)));
+}
+
+function localVisibilityByFilter(
   workspaceId: string,
-  query: KeywordCommandCenterRowsQuery = {},
-  options: { includeLocalSeo?: boolean } = {},
+  filter: KeywordCommandCenterFilter,
+  includeLocalSeo: boolean | undefined,
+): Map<string, LocalSeoKeywordVisibilitySummary> {
+  if (!includeLocalSeo) return new Map();
+  const visibility = buildLocalSeoKeywordVisibilitySummaryByKey(workspaceId);
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.ALL) return visibility;
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.VISIBLE_LOCALLY) {
+    return new Map([...visibility.entries()].filter(([, item]) => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE));
+  }
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.POSSIBLE_MATCH) {
+    return new Map([...visibility.entries()].filter(([, item]) => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.POSSIBLE_MATCH));
+  }
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.NOT_VISIBLE) {
+    return new Map([...visibility.entries()].filter(([, item]) =>
+      item.posture === LOCAL_SEO_VISIBILITY_POSTURE.NOT_VISIBLE
+      || item.posture === LOCAL_SEO_VISIBILITY_POSTURE.LOCAL_PACK_PRESENT,
+    ));
+  }
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.PROVIDER_DEGRADED) {
+    return new Map([...visibility.entries()].filter(([, item]) => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.PROVIDER_DEGRADED));
+  }
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.LOCAL) return visibility;
+  return new Map();
+}
+
+interface RowCandidateKey {
+  key: string;
+  keyword: string;
+  sourcePriority: number;
+  demand: number;
+  rank?: number;
+  searchText?: string;
+}
+
+function addCandidateKey(
+  candidates: Map<string, RowCandidateKey>,
+  keyword: string | undefined | null,
+  sourcePriority: number,
+  demand = 0,
+  rank?: number,
+  searchText?: string,
+): void {
+  const key = keywordComparisonKey(keyword ?? '');
+  if (!key) return;
+  const displayKeyword = keyword?.trim() || key;
+  const existing = candidates.get(key);
+  if (
+    !existing
+    || sourcePriority < existing.sourcePriority
+    || (sourcePriority === existing.sourcePriority && demand > existing.demand)
+  ) {
+    candidates.set(key, { key, keyword: displayKeyword, sourcePriority, demand, rank, searchText });
+  } else if (searchText) {
+    existing.searchText = [...new Set([...(existing.searchText?.split(' ') ?? []), ...searchText.split(' ')].filter(Boolean))].join(' ');
+  }
+}
+
+function addCandidateKeysFromBundle(
+  candidates: Map<string, RowCandidateKey>,
+  bundle: CommandCenterSourceBundle,
+  localVisibility: Map<string, LocalSeoKeywordVisibilitySummary>,
+): void {
+  for (const metric of bundle.strategy?.siteKeywordMetrics ?? []) {
+    addCandidateKey(candidates, metric.keyword, 0, metric.volume ?? 0);
+  }
+  for (const keyword of bundle.strategy?.siteKeywords ?? []) {
+    addCandidateKey(candidates, keyword, 0);
+  }
+  for (const page of bundle.pageMap) {
+    const pageSearchText = `${page.pageTitle ?? ''} ${page.pagePath ?? ''}`.toLowerCase();
+    addCandidateKey(candidates, page.primaryKeyword, 0, page.volume ?? 0, undefined, pageSearchText);
+    for (const secondary of page.secondaryKeywords ?? []) addCandidateKey(candidates, secondary, 1, page.volume ?? 0, undefined, pageSearchText);
+  }
+  for (const gap of bundle.contentGaps) {
+    addCandidateKey(candidates, gap.targetKeyword, 1, gap.volume ?? 0);
+  }
+  for (const keyword of bundle.trackedKeywords) {
+    addCandidateKey(candidates, keyword.query, keyword.status === TRACKED_KEYWORD_STATUS.ACTIVE ? 1 : 5, keyword.volume ?? keyword.baselineImpressions ?? 0);
+  }
+  for (const row of bundle.feedback.values()) {
+    addCandidateKey(candidates, row.keyword, row.status === 'requested' ? 2 : row.status === 'declined' ? 6 : 1);
+  }
+  for (const rank of bundle.latestRanks) {
+    addCandidateKey(candidates, rank.query, 2, rank.impressions ?? 0, rank.position);
+  }
+  for (const gap of bundle.keywordGaps) {
+    addCandidateKey(candidates, gap.keyword, 4, gap.volume ?? 0);
+  }
+  for (const visibility of localVisibility.values()) {
+    addCandidateKey(candidates, visibility.keyword, 2);
+  }
+}
+
+function candidateSortForQuery(sort: KeywordCommandCenterSort | undefined): (a: RowCandidateKey, b: RowCandidateKey) => number {
+  if (sort === 'keyword') return (a, b) => a.keyword.localeCompare(b.keyword);
+  if (sort === 'demand') {
+    return (a, b) => {
+      if (a.demand !== b.demand) return b.demand - a.demand;
+      if (a.sourcePriority !== b.sourcePriority) return a.sourcePriority - b.sourcePriority;
+      return a.keyword.localeCompare(b.keyword);
+    };
+  }
+  if (sort === 'rank') {
+    return (a, b) => {
+      const aRank = a.rank ?? Number.POSITIVE_INFINITY;
+      const bRank = b.rank ?? Number.POSITIVE_INFINITY;
+      if (aRank !== bRank) return aRank - bRank;
+      if (a.sourcePriority !== b.sourcePriority) return a.sourcePriority - b.sourcePriority;
+      return a.keyword.localeCompare(b.keyword);
+    };
+  }
+  return (a, b) => {
+    if (a.sourcePriority !== b.sourcePriority) return a.sourcePriority - b.sourcePriority;
+    if (a.demand !== b.demand) return b.demand - a.demand;
+    return a.keyword.localeCompare(b.keyword);
+  };
+}
+
+function rowCandidateKeysForQuery(
+  bundle: CommandCenterSourceBundle,
+  localVisibility: Map<string, LocalSeoKeywordVisibilitySummary>,
+  query: KeywordCommandCenterRowsQuery,
+): { keys: Set<string>; page: number; pageSize: number; totalRows: number; totalPages: number } {
+  const candidates = new Map<string, RowCandidateKey>();
+  addCandidateKeysFromBundle(candidates, bundle, localVisibility);
+  const rawSearch = query.search?.trim().toLowerCase();
+  const normalizedSearch = keywordComparisonKey(query.search ?? '');
+  const filtered = [...candidates.values()]
+    .filter(candidate =>
+      !rawSearch
+      || candidate.keyword.toLowerCase().includes(rawSearch)
+      || (normalizedSearch ? candidate.key.includes(normalizedSearch) : false)
+      || candidate.searchText?.includes(rawSearch)
+    )
+    .sort(candidateSortForQuery(query.sort));
+  const pageSize = Math.min(Math.max(query.pageSize ?? DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE);
+  const requestedPage = Math.max(query.page ?? 1, 1);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const page = Math.min(requestedPage, totalPages);
+  const start = (page - 1) * pageSize;
+  return {
+    keys: new Set(filtered.slice(start, start + pageSize).map(candidate => candidate.key)),
+    page,
+    pageSize,
+    totalRows: filtered.length,
+    totalPages,
+  };
+}
+
+function sourceKeysForRows(input: {
+  filter: KeywordCommandCenterFilter;
+  strategy: KeywordStrategy | null | undefined;
+  pageMap: PageKeywordMap[];
+  contentGaps: ContentGap[];
+  keywordGaps: KeywordGapItem[];
+  trackedKeywords: TrackedKeyword[];
+  latestRanks: LatestRank[];
+  feedback: Map<string, FeedbackRow>;
+  localVisibility: Map<string, LocalSeoKeywordVisibilitySummary>;
+}): Set<string> | null {
+  const keys = new Set<string>();
+  const add = (keyword: string | undefined | null) => {
+    const key = keywordComparisonKey(keyword ?? '');
+    if (key) keys.add(key);
+  };
+  const pageKeys = new Set<string>();
+  addPageKeys(pageKeys, input.pageMap);
+  const selectedOrTrackedOrFeedbackKeys = new Set<string>();
+  addStrategyKeys(selectedOrTrackedOrFeedbackKeys, input.strategy);
+  addPageKeys(selectedOrTrackedOrFeedbackKeys, input.pageMap);
+  for (const gap of input.contentGaps) {
+    const key = keywordComparisonKey(gap.targetKeyword);
+    if (key) selectedOrTrackedOrFeedbackKeys.add(key);
+  }
+  for (const keyword of input.trackedKeywords) {
+    const key = keywordComparisonKey(keyword.query);
+    if (key) selectedOrTrackedOrFeedbackKeys.add(key);
+  }
+  for (const key of input.feedback.keys()) selectedOrTrackedOrFeedbackKeys.add(key);
+  const rawEvidenceKeys = new Set(input.keywordGaps.map(gap => keywordComparisonKey(gap.keyword)).filter(Boolean));
+  const declinedKeys = new Set(
+    [...input.feedback.values()]
+      .filter(row => row.status === 'declined')
+      .map(row => keywordComparisonKey(row.keyword))
+      .filter(Boolean),
+  );
+  const nonStrategyFeedbackKeys = new Set(
+    [...input.feedback.values()]
+      .filter(row => row.status === 'declined' || row.status === 'requested')
+      .map(row => keywordComparisonKey(row.keyword))
+      .filter(Boolean),
+  );
+
+  switch (input.filter) {
+    case KEYWORD_COMMAND_CENTER_FILTERS.ALL:
+      return null;
+    case KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY:
+      addStrategyKeys(keys, input.strategy);
+      addPageKeys(keys, input.pageMap);
+      for (const gap of input.contentGaps) add(gap.targetKeyword);
+      for (const keyword of input.trackedKeywords.filter(entry => trackedKeywordMatchesFilter(entry, input.filter))) add(keyword.query);
+      for (const row of input.feedback.values()) if (row.status === 'approved') add(row.keyword);
+      for (const key of nonStrategyFeedbackKeys) keys.delete(key);
+      return keys;
+    case KEYWORD_COMMAND_CENTER_FILTERS.TRACKED:
+      for (const keyword of input.trackedKeywords.filter(entry => trackedKeywordMatchesFilter(entry, input.filter))) add(keyword.query);
+      return keys;
+    case KEYWORD_COMMAND_CENTER_FILTERS.RETIRED:
+      for (const keyword of input.trackedKeywords.filter(entry => trackedKeywordMatchesFilter(entry, input.filter))) add(keyword.query);
+      for (const key of declinedKeys) keys.delete(key);
+      return keys;
+    case KEYWORD_COMMAND_CENTER_FILTERS.NEEDS_REVIEW:
+      for (const row of input.feedback.values()) if (row.status === 'requested') add(row.keyword);
+      for (const rank of input.latestRanks
+        .filter(rank => {
+          const key = keywordComparisonKey(rank.query);
+          return key && !selectedOrTrackedOrFeedbackKeys.has(key) && !rawEvidenceKeys.has(key);
+        })
+        .sort((a, b) => (b.impressions ?? 0) - (a.impressions ?? 0))
+        .slice(0, RANK_EVIDENCE_ROW_LIMIT)) add(rank.query);
+      return keys;
+    case KEYWORD_COMMAND_CENTER_FILTERS.CONTENT:
+      for (const gap of input.contentGaps) {
+        const key = keywordComparisonKey(gap.targetKeyword);
+        if (key && !pageKeys.has(key)) keys.add(key);
+      }
+      return keys;
+    case KEYWORD_COMMAND_CENTER_FILTERS.PAGE_ASSIGNED:
+      addPageKeys(keys, input.pageMap);
+      return keys;
+    case KEYWORD_COMMAND_CENTER_FILTERS.RAW_EVIDENCE:
+      for (const gap of input.keywordGaps) {
+        const key = keywordComparisonKey(gap.keyword);
+        if (key && !selectedOrTrackedOrFeedbackKeys.has(key)) keys.add(key);
+      }
+      return keys;
+    case KEYWORD_COMMAND_CENTER_FILTERS.REQUESTED:
+      for (const row of input.feedback.values()) if (row.status === 'requested') add(row.keyword);
+      return keys;
+    case KEYWORD_COMMAND_CENTER_FILTERS.DECLINED:
+      for (const row of input.feedback.values()) if (row.status === 'declined') add(row.keyword);
+      return keys;
+    case KEYWORD_COMMAND_CENTER_FILTERS.LOCAL:
+    case KEYWORD_COMMAND_CENTER_FILTERS.VISIBLE_LOCALLY:
+    case KEYWORD_COMMAND_CENTER_FILTERS.POSSIBLE_MATCH:
+    case KEYWORD_COMMAND_CENTER_FILTERS.NOT_VISIBLE:
+    case KEYWORD_COMMAND_CENTER_FILTERS.PROVIDER_DEGRADED:
+      for (const key of input.localVisibility.keys()) keys.add(key);
+      return keys;
+    case KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED:
+      return keys;
+    case KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES:
+      return null;
+  }
+}
+
+function buildFilteredBundle(input: {
+  workspace: Workspace;
+  filter: KeywordCommandCenterFilter;
+  localVisibility: Map<string, LocalSeoKeywordVisibilitySummary>;
+}): CommandCenterSourceBundle & { keys: Set<string> | null } {
+  const strategy = input.workspace.keywordStrategy;
+  const pageMap = listPageKeywords(input.workspace.id);
+  const contentGaps = listContentGaps(input.workspace.id);
+  const keywordGaps = listKeywordGaps(input.workspace.id);
+  const trackedKeywords = getTrackedKeywords(input.workspace.id, { includeInactive: true });
+  const latestRanks = getLatestSnapshotRanks(input.workspace.id);
+  const feedback = readFeedback(input.workspace.id);
+  const keys = sourceKeysForRows({
+    filter: input.filter,
+    strategy,
+    pageMap,
+    contentGaps,
+    keywordGaps,
+    trackedKeywords,
+    latestRanks,
+    feedback,
+    localVisibility: input.localVisibility,
+  });
+
+  return {
+    keys,
+    workspaceId: input.workspace.id,
+    workspaceName: input.workspace.name,
+    strategy: filterStrategyForKeys(strategy, keys),
+    pageMap: pageMap.filter(page => pageMatchesKeys(page, keys)),
+    contentGaps: keys ? contentGaps.filter(gap => keys.has(keywordComparisonKey(gap.targetKeyword))) : contentGaps,
+    keywordGaps: keys ? keywordGaps.filter(gap => keys.has(keywordComparisonKey(gap.keyword))) : keywordGaps,
+    trackedKeywords: keys ? trackedKeywords.filter(keyword => keys.has(keywordComparisonKey(keyword.query))) : trackedKeywords,
+    latestRanks: keys ? latestRanks.filter(rank => keys.has(keywordComparisonKey(rank.query))) : latestRanks,
+    feedback: filterMapByKeys(feedback, keys),
+    includeStrategyUx: false,
+  };
+}
+
+function filterBundleToKeys(
+  bundle: CommandCenterSourceBundle & { keys: Set<string> | null },
+  keys: Set<string>,
+): CommandCenterSourceBundle & { keys: Set<string> } {
+  return {
+    ...bundle,
+    keys,
+    strategy: filterStrategyForKeys(bundle.strategy, keys),
+    pageMap: bundle.pageMap.filter(page => pageMatchesKeys(page, keys)),
+    contentGaps: bundle.contentGaps.filter(gap => keys.has(keywordComparisonKey(gap.targetKeyword))),
+    keywordGaps: bundle.keywordGaps.filter(gap => keys.has(keywordComparisonKey(gap.keyword))),
+    trackedKeywords: bundle.trackedKeywords.filter(keyword => keys.has(keywordComparisonKey(keyword.query))),
+    latestRanks: bundle.latestRanks.filter(rank => keys.has(keywordComparisonKey(rank.query))),
+    feedback: filterMapByKeys(bundle.feedback, keys),
+  };
+}
+
+async function buildKeywordCommandCenterRowsViaModel(
+  workspaceId: string,
+  query: KeywordCommandCenterRowsQuery,
+  options: { includeLocalSeo?: boolean },
 ): Promise<KeywordCommandCenterRowsResponse | null> {
-  const filter = query.filter ?? KEYWORD_COMMAND_CENTER_FILTERS.ALL;
   const payload = await buildKeywordCommandCenterModel(workspaceId, {
     includeLocalSeo: options.includeLocalSeo,
     includeLocalSeoDetails: false,
-    includeLocalCandidates: filterNeedsLocalCandidates(filter),
+    includeLocalCandidates: true,
     includeStrategyUx: false,
-    timingLabel: 'rows',
+    timingLabel: 'rows-local-candidate',
   });
   if (!payload) return null;
+  const filter = query.filter ?? KEYWORD_COMMAND_CENTER_FILTERS.ALL;
   const filtered = payload.rows
     .filter(row => matchesFilter(row, filter))
     .filter(row => matchesSearch(row, query.search))
@@ -1104,26 +1539,155 @@ export async function buildKeywordCommandCenterRows(
   };
 }
 
+async function buildKeywordCommandCenterRowsSkinny(
+  workspaceId: string,
+  query: KeywordCommandCenterRowsQuery,
+  options: { includeLocalSeo?: boolean },
+): Promise<KeywordCommandCenterRowsResponse | null> {
+  const startedAt = Date.now();
+  const workspace = getWorkspace(workspaceId);
+  if (!workspace) return null;
+  const filter = query.filter ?? KEYWORD_COMMAND_CENTER_FILTERS.ALL;
+  const localVisibilityByKeyword = localVisibilityByFilter(workspace.id, filter, options.includeLocalSeo);
+  const activeLocalMarketCount = options.includeLocalSeo
+    ? listLocalSeoMarkets(workspace.id).filter(market => market.status === LOCAL_SEO_MARKET_STATUS.ACTIVE).length
+    : 0;
+  const bundle = buildFilteredBundle({ workspace, filter, localVisibility: localVisibilityByKeyword });
+  const pageSelection = rowCandidateKeysForQuery(bundle, localVisibilityByKeyword, query);
+  const pagedBundle = filterBundleToKeys(bundle, pageSelection.keys);
+  const pagedLocalVisibility = filterMapByKeys(localVisibilityByKeyword, pageSelection.keys);
+  const rows = new Map<string, DraftRow>();
+  await populateDraftRows(rows, pagedBundle);
+  ensureLocalVisibilityRows(rows, pagedLocalVisibility);
+  const finalized = finalizeDraftRows(rows, {
+    localVisibilityByKeyword: pagedLocalVisibility,
+    activeLocalMarketCount,
+  });
+  const filtered = finalized.rows
+    .sort(sortRowsForQuery(query.sort));
+
+  log.info({
+    workspaceId,
+    mode: 'rows-skinny',
+    filter,
+    sourceKeys: bundle.keys?.size ?? null,
+    pagedKeys: pageSelection.keys.size,
+    rowCount: filtered.length,
+    totalRows: pageSelection.totalRows,
+    totalMs: Date.now() - startedAt,
+    finalHeapMb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+  }, 'keyword command center rows built');
+
+  return {
+    rows: filtered.map(stripRowForList),
+    pageInfo: {
+      page: pageSelection.page,
+      pageSize: pageSelection.pageSize,
+      totalRows: pageSelection.totalRows,
+      totalPages: pageSelection.totalPages,
+      hasNextPage: pageSelection.page < pageSelection.totalPages,
+      hasPreviousPage: pageSelection.page > 1,
+    },
+    generatedAt: workspace.keywordStrategy?.generatedAt ?? null,
+  };
+}
+
+function filterStrategyForSingleKeyword(strategy: KeywordStrategy | null | undefined, normalized: string): KeywordStrategy | null | undefined {
+  if (!strategy) return strategy;
+  return {
+    ...strategy,
+    siteKeywords: (strategy.siteKeywords ?? []).filter(keyword => keywordComparisonKey(keyword) === normalized),
+    siteKeywordMetrics: (strategy.siteKeywordMetrics ?? []).filter(metric => keywordComparisonKey(metric.keyword) === normalized),
+  };
+}
+
+function pageMatchesKeyword(page: PageKeywordMap, normalized: string): boolean {
+  return keywordComparisonKey(page.primaryKeyword) === normalized
+    || (page.secondaryKeywords ?? []).some(keyword => keywordComparisonKey(keyword) === normalized);
+}
+
+export async function buildKeywordCommandCenterRows(
+  workspaceId: string,
+  query: KeywordCommandCenterRowsQuery = {},
+  options: { includeLocalSeo?: boolean } = {},
+): Promise<KeywordCommandCenterRowsResponse | null> {
+  const filter = query.filter ?? KEYWORD_COMMAND_CENTER_FILTERS.ALL;
+  if (filterNeedsLocalCandidates(filter)) {
+    return buildKeywordCommandCenterRowsViaModel(workspaceId, query, options);
+  }
+  return buildKeywordCommandCenterRowsSkinny(workspaceId, query, options);
+}
+
 export async function buildKeywordCommandCenterDetail(
   workspaceId: string,
   keyword: string,
   options: { includeLocalSeo?: boolean } = {},
 ): Promise<KeywordCommandCenterDetailResponse | null> {
+  const startedAt = Date.now();
   const normalized = keywordComparisonKey(keyword);
   if (!normalized) return null;
-  const payload = await buildKeywordCommandCenterModel(workspaceId, {
-    includeLocalSeo: options.includeLocalSeo,
-    includeLocalSeoDetails: true,
-    includeLocalCandidates: true,
+  const workspace = getWorkspace(workspaceId);
+  if (!workspace) return null;
+  const pageMap = listPageKeywords(workspace.id).filter(page => pageMatchesKeyword(page, normalized));
+  const contentGaps = listContentGaps(workspace.id).filter(gap => keywordComparisonKey(gap.targetKeyword) === normalized);
+  const keywordGaps = listKeywordGaps(workspace.id).filter(gap => keywordComparisonKey(gap.keyword) === normalized);
+  const trackedKeywords = getTrackedKeywords(workspace.id, { includeInactive: true }).filter(entry => keywordComparisonKey(entry.query) === normalized);
+  const latestRanks = getLatestSnapshotRanks(workspace.id).filter(rank => keywordComparisonKey(rank.query) === normalized);
+  const feedback = filterMapByKeys(readFeedback(workspace.id), new Set([normalized]));
+  const strategy = filterStrategyForSingleKeyword(workspace.keywordStrategy, normalized);
+  const localVisibility = options.includeLocalSeo
+    ? buildLocalSeoKeywordVisibilityForKeyword(workspace.id, normalized)
+    : undefined;
+  const localVisibilityByKeyword = localVisibility
+    ? new Map([[normalized, localVisibility]])
+    : new Map<string, LocalSeoKeywordVisibilitySummary>();
+  const activeLocalMarketCount = options.includeLocalSeo
+    ? listLocalSeoMarkets(workspace.id).filter(market => market.status === LOCAL_SEO_MARKET_STATUS.ACTIVE).length
+    : 0;
+  const hasStrategyKeyword = Boolean((strategy?.siteKeywords?.length ?? 0) > 0 || (strategy?.siteKeywordMetrics?.length ?? 0) > 0);
+  const hasLocalVisibility = localVisibilityByKeyword.has(normalized);
+  const hasBaseSource = hasStrategyKeyword
+    || pageMap.length > 0
+    || contentGaps.length > 0
+    || keywordGaps.length > 0
+    || trackedKeywords.length > 0
+    || latestRanks.length > 0
+    || feedback.size > 0
+    || hasLocalVisibility;
+  if (
+    !hasBaseSource
+  ) {
+    return null;
+  }
+  const rows = new Map<string, DraftRow>();
+  await populateDraftRows(rows, {
+    workspaceId: workspace.id,
+    workspaceName: workspace.name,
+    strategy,
+    pageMap,
+    contentGaps,
+    keywordGaps,
+    trackedKeywords,
+    latestRanks,
+    feedback,
     includeStrategyUx: true,
-    timingLabel: 'detail',
+    includeWorkspaceIntelligence: false,
   });
-  if (!payload) return null;
-  const row = payload.rows.find(item => item.normalizedKeyword === normalized);
+  ensureLocalVisibilityRows(rows, localVisibilityByKeyword);
+  const row = rows.get(normalized)
+    ? finalizeDraftRow(rows.get(normalized)!, { localVisibilityByKeyword, activeLocalMarketCount })
+    : null;
   if (!row) return null;
+  log.info({
+    workspaceId,
+    mode: 'detail-skinny',
+    keyword: normalized,
+    totalMs: Date.now() - startedAt,
+    finalHeapMb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+  }, 'keyword command center detail built');
   return {
     row,
-    generatedAt: payload.generatedAt,
+    generatedAt: workspace.keywordStrategy?.generatedAt ?? null,
   };
 }
 

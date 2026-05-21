@@ -26,7 +26,6 @@ vi.mock('react-router-dom', async () => {
 });
 
 vi.mock('../../src/hooks/admin/useKeywordCommandCenter', () => ({
-  useKeywordCommandCenter: vi.fn(),
   useKeywordCommandCenterSummary: vi.fn(),
   useKeywordCommandCenterRows: vi.fn(),
   useKeywordCommandCenterDetail: vi.fn(),
@@ -291,11 +290,6 @@ describe('KeywordCommandCenter', () => {
     navigateMock.mockReset();
     vi.useFakeTimers();
     const hooks = await import('../../src/hooks/admin/useKeywordCommandCenter');
-    vi.mocked(hooks.useKeywordCommandCenter).mockReturnValue({
-      data: payload,
-      isLoading: false,
-      error: null,
-    } as ReturnType<typeof hooks.useKeywordCommandCenter>);
     vi.mocked(hooks.useKeywordCommandCenterSummary).mockReturnValue({
       data: {
         counts: payload.counts,

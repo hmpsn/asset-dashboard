@@ -3,15 +3,6 @@ import { keywordCommandCenter } from '../../api/keywordCommandCenter';
 import { queryKeys } from '../../lib/queryKeys';
 import type { KeywordCommandCenterActionRequest, KeywordCommandCenterRowsQuery } from '../../../shared/types/keyword-command-center';
 
-export function useKeywordCommandCenter(workspaceId: string) {
-  return useQuery({
-    queryKey: queryKeys.admin.keywordCommandCenter(workspaceId),
-    queryFn: () => keywordCommandCenter.get(workspaceId),
-    enabled: !!workspaceId,
-    staleTime: 5 * 60 * 1000,
-  });
-}
-
 export function useKeywordCommandCenterSummary(workspaceId: string) {
   return useQuery({
     queryKey: queryKeys.admin.keywordCommandCenterSummary(workspaceId),

@@ -29,6 +29,7 @@ import {
   LOCAL_VISIBILITY_SOURCE_ENDPOINT,
   LOCAL_VISIBILITY_STATUS,
   localSeoKeywordVisibilityFromSnapshot,
+  localSeoKeywordVisibilitySummaryFromSnapshots,
   summarizeLocalSeoKeywordVisibility,
   type LocalBusinessMatchConfidence,
   type LocalSeoKeywordVisibility,
@@ -203,6 +204,12 @@ const stmts = createStmtCache(() => ({
     WHERE workspace_id = ?
     ORDER BY captured_at DESC
     LIMIT 500
+  `),
+  latestSnapshotsByKeyword: db.prepare(`
+    SELECT * FROM local_visibility_snapshots
+    WHERE workspace_id = ? AND normalized_keyword = ?
+    ORDER BY captured_at DESC
+    LIMIT 50
   `),
   latestSnapshotSummary: db.prepare(`
     SELECT
@@ -582,6 +589,10 @@ export function updateLocalSeoConfiguration(workspaceId: string, request: LocalS
 
 export function listLatestLocalVisibilitySnapshots(workspaceId: string): LocalVisibilitySnapshot[] {
   const rows = stmts().latestSnapshots.all(workspaceId) as SnapshotRow[];
+  return latestSnapshotsFromRows(rows);
+}
+
+function latestSnapshotsFromRows(rows: SnapshotRow[]): LocalVisibilitySnapshot[] {
   const seen = new Set<string>();
   const snapshots: LocalVisibilitySnapshot[] = [];
   for (const row of rows) {
@@ -591,6 +602,11 @@ export function listLatestLocalVisibilitySnapshots(workspaceId: string): LocalVi
     snapshots.push(rowToSnapshot(row));
   }
   return snapshots;
+}
+
+function listLatestLocalVisibilitySnapshotsForKeyword(workspaceId: string, normalizedKeyword: string): LocalVisibilitySnapshot[] {
+  const rows = stmts().latestSnapshotsByKeyword.all(workspaceId, normalizedKeyword) as SnapshotRow[];
+  return latestSnapshotsFromRows(rows);
 }
 
 function listLatestLocalVisibilitySnapshotSummaryRows(workspaceId: string): SnapshotSummaryRow[] {
@@ -710,6 +726,15 @@ export function buildLocalSeoKeywordVisibilityByKey(workspaceId: string): Map<st
     if (summary) summaries.set(key, summary);
   }
   return summaries;
+}
+
+export function buildLocalSeoKeywordVisibilityForKeyword(
+  workspaceId: string,
+  normalizedKeyword: string,
+): LocalSeoKeywordVisibilitySummary | undefined {
+  return localSeoKeywordVisibilitySummaryFromSnapshots(
+    listLatestLocalVisibilitySnapshotsForKeyword(workspaceId, normalizedKeyword),
+  );
 }
 
 function buildLocalSeoReportSummary(input: {

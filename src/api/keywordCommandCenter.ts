@@ -5,14 +5,10 @@ import type {
   KeywordCommandCenterDetailResponse,
   KeywordCommandCenterRowsQuery,
   KeywordCommandCenterRowsResponse,
-  KeywordCommandCenterResponse,
   KeywordCommandCenterSummaryResponse,
 } from '../../shared/types/keyword-command-center';
 
 export const keywordCommandCenter = {
-  get: (wsId: string) =>
-    get<KeywordCommandCenterResponse>(`/api/webflow/keyword-command-center/${wsId}`),
-
   summary: (wsId: string) =>
     get<KeywordCommandCenterSummaryResponse>(`/api/webflow/keyword-command-center/${wsId}/summary`),
 
