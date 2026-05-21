@@ -301,6 +301,53 @@ describe('buildKeywordCommandCenter', () => {
     expect(row?.localSeo?.markets.map(market => market.marketLabel)).toEqual(['Austin, TX', 'Round Rock, TX']);
   });
 
+  it('adds local candidate rows and local filters without presenting them as selected strategy actions', async () => {
+    seedStrategy();
+    updateWorkspace(workspaceId, {
+      name: 'Swish Dental',
+      liveDomain: 'https://swish.example.com',
+      businessProfile: {
+        address: {
+          street: '123 Congress Ave',
+          city: 'Austin',
+          state: 'TX',
+          country: 'US',
+        },
+      },
+    });
+    updateLocalSeoConfiguration(workspaceId, {
+      posture: LOCAL_SEO_POSTURE.LOCAL,
+      markets: [{
+        label: 'Austin, TX',
+        city: 'Austin',
+        stateOrRegion: 'TX',
+        country: 'US',
+        providerLocationCode: 1026201,
+        status: LOCAL_SEO_MARKET_STATUS.ACTIVE,
+      }],
+    }, true);
+
+    const payload = await buildKeywordCommandCenter(workspaceId, { includeLocalSeo: true });
+    const candidate = payload!.rows.find(row => row.normalizedKeyword === 'cosmetic dentistry austin');
+
+    expect(candidate).toEqual(expect.objectContaining({
+      lifecycleStatus: KEYWORD_COMMAND_CENTER_STATUS.NEEDS_REVIEW,
+      localSeoState: expect.objectContaining({
+        lifecycle: 'candidate',
+        checked: false,
+      }),
+      tracking: expect.objectContaining({ status: 'not_tracked' }),
+    }));
+    expect(candidate?.sourceLabels).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'local_candidate' }),
+    ]));
+    expect(payload!.filters).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'local', count: expect.any(Number) }),
+      expect.objectContaining({ id: 'local_candidates', count: expect.any(Number) }),
+      expect.objectContaining({ id: 'not_checked', count: expect.any(Number) }),
+    ]));
+  });
+
   it('does not expose local visibility annotations when the local SEO feature is disabled', async () => {
     updateWorkspace(workspaceId, {
       name: 'Synthetic Austin Business',

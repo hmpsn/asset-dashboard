@@ -204,6 +204,7 @@ export interface LocalSeoKeywordVisibility {
   localRank?: number;
   sourceEndpoint: LocalVisibilitySourceEndpoint;
   provider: string;
+  topCompetitors?: LocalVisibilityBusinessResult[];
   degradedReason?: string;
 }
 
@@ -234,6 +235,7 @@ export function localSeoKeywordVisibilityFromSnapshot(snapshot: LocalVisibilityS
       localRank: snapshot.localRank,
       sourceEndpoint: snapshot.sourceEndpoint,
       provider: snapshot.provider,
+      topCompetitors: snapshot.topCompetitors,
       degradedReason: snapshot.degradedReason,
     };
   }
@@ -254,6 +256,7 @@ export function localSeoKeywordVisibilityFromSnapshot(snapshot: LocalVisibilityS
       localRank: snapshot.localRank,
       sourceEndpoint: snapshot.sourceEndpoint,
       provider: snapshot.provider,
+      topCompetitors: snapshot.topCompetitors,
     };
   }
 
@@ -279,6 +282,7 @@ export function localSeoKeywordVisibilityFromSnapshot(snapshot: LocalVisibilityS
       localRank: snapshot.localRank,
       sourceEndpoint: snapshot.sourceEndpoint,
       provider: snapshot.provider,
+      topCompetitors: snapshot.topCompetitors,
     };
   }
 
@@ -298,6 +302,7 @@ export function localSeoKeywordVisibilityFromSnapshot(snapshot: LocalVisibilityS
       localRank: snapshot.localRank,
       sourceEndpoint: snapshot.sourceEndpoint,
       provider: snapshot.provider,
+      topCompetitors: snapshot.topCompetitors,
     };
   }
 
@@ -316,6 +321,7 @@ export function localSeoKeywordVisibilityFromSnapshot(snapshot: LocalVisibilityS
     localRank: snapshot.localRank,
     sourceEndpoint: snapshot.sourceEndpoint,
     provider: snapshot.provider,
+    topCompetitors: snapshot.topCompetitors,
   };
 }
 
@@ -388,6 +394,7 @@ export function summarizeLocalSeoKeywordVisibility(
     localPackOnlyMarketCount,
     notVisibleMarketCount,
     degradedMarketCount,
+    topCompetitors: primary.topCompetitors,
   };
 }
 

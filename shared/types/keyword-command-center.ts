@@ -26,6 +26,13 @@ export const KEYWORD_COMMAND_CENTER_FILTERS = {
   CONTENT: 'content',
   PAGE_ASSIGNED: 'page_assigned',
   RAW_EVIDENCE: 'raw_evidence',
+  LOCAL: 'local',
+  LOCAL_CANDIDATES: 'local_candidates',
+  VISIBLE_LOCALLY: 'visible_locally',
+  POSSIBLE_MATCH: 'possible_match',
+  NOT_VISIBLE: 'not_visible',
+  NOT_CHECKED: 'not_checked',
+  PROVIDER_DEGRADED: 'provider_degraded',
   REQUESTED: 'requested',
   DECLINED: 'declined',
   RETIRED: 'retired',
@@ -47,11 +54,34 @@ export const KEYWORD_COMMAND_CENTER_ACTIONS = {
 export type KeywordCommandCenterActionType =
   typeof KEYWORD_COMMAND_CENTER_ACTIONS[keyof typeof KEYWORD_COMMAND_CENTER_ACTIONS];
 
+export const KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE = {
+  SELECTED: 'selected',
+  CANDIDATE: 'candidate',
+  CHECKED: 'checked',
+  RAW_EVIDENCE: 'raw_evidence',
+  NOT_CHECKED: 'not_checked',
+} as const;
+
+export type KeywordCommandCenterLocalLifecycle =
+  typeof KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE[keyof typeof KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE];
+
+export const KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY = {
+  HIGH_OPPORTUNITY: 'high_opportunity',
+  DEFEND: 'defend',
+  INVESTIGATE: 'investigate',
+  LOW_PRIORITY: 'low_priority',
+  NEEDS_SETUP: 'needs_setup',
+} as const;
+
+export type KeywordCommandCenterLocalPriority =
+  typeof KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY[keyof typeof KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY];
+
 export type KeywordCommandCenterNextActionType =
   | KeywordCommandCenterActionType
   | 'generate_brief'
   | 'review_page'
-  | 'view_rankings';
+  | 'view_rankings'
+  | 'check_local_visibility';
 
 export interface KeywordCommandCenterSourceLabel {
   kind:
@@ -63,7 +93,9 @@ export interface KeywordCommandCenterSourceLabel {
     | 'feedback'
     | 'client_request'
     | 'manual'
-    | 'rank_data';
+    | 'rank_data'
+    | 'local_candidate'
+    | 'local_visibility';
   label: string;
   detail?: string;
 }
@@ -114,6 +146,21 @@ export interface KeywordCommandCenterNextAction {
   disabledReason?: string;
 }
 
+
+export interface KeywordCommandCenterLocalSeoState {
+  lifecycle: KeywordCommandCenterLocalLifecycle;
+  lifecycleLabel: string;
+  priority: KeywordCommandCenterLocalPriority;
+  priorityLabel: string;
+  detail: string;
+  checked: boolean;
+  marketLabel?: string;
+  sourceLabels: string[];
+  localPackPresent?: boolean;
+  businessMatchConfidence?: LocalSeoKeywordVisibilitySummary['businessMatchConfidence'];
+  visibility?: LocalSeoKeywordVisibilitySummary;
+}
+
 export interface KeywordCommandCenterRow {
   keyword: string;
   normalizedKeyword: string;
@@ -126,6 +173,7 @@ export interface KeywordCommandCenterRow {
   tracking: KeywordCommandCenterTrackingState;
   explanation?: KeywordStrategyExplanation;
   localSeo?: LocalSeoKeywordVisibilitySummary;
+  localSeoState?: KeywordCommandCenterLocalSeoState;
   nextActions: KeywordCommandCenterNextAction[];
   isProtected: boolean;
   protectionReason?: string;
@@ -138,6 +186,8 @@ export interface KeywordCommandCenterCounts {
   tracked: number;
   needsReview: number;
   evidence: number;
+  local: number;
+  localCandidates: number;
   retired: number;
   declined: number;
 }

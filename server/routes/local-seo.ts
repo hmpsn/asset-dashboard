@@ -12,6 +12,7 @@ import { createJob, hasActiveJob } from '../jobs.js';
 import {
   createLocalSeoRefreshPlan,
   getLocalSeoReadModel,
+  LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH,
   resolveLocalSeoProviderLocation,
   runLocalSeoRefreshJob,
   updateLocalSeoConfiguration,
@@ -57,7 +58,7 @@ const updateSchema = z.object({
 
 const refreshSchema = z.object({
   marketIds: z.array(z.string().min(1)).max(3).optional(),
-  keywords: z.array(z.string().min(1).max(200)).max(25).optional(),
+  keywords: z.array(z.string().min(1).max(200)).max(LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH).optional(),
   device: z.enum([LOCAL_SEO_DEVICE.DESKTOP, LOCAL_SEO_DEVICE.MOBILE]).optional(),
   languageCode: z.string().min(2).max(8).optional(),
 }).strict();

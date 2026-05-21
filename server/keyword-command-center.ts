@@ -4,7 +4,12 @@ import { broadcastToWorkspace } from './broadcast.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { listContentGaps } from './content-gaps.js';
 import { listKeywordGaps } from './keyword-gaps.js';
-import { buildLocalSeoKeywordVisibilityByKey } from './local-seo.js';
+import {
+  buildLocalSeoKeywordCandidates,
+  buildLocalSeoKeywordVisibilityByKey,
+  listLocalSeoMarkets,
+  type LocalSeoKeywordCandidate,
+} from './local-seo.js';
 import { listPageKeywords } from './page-keywords.js';
 import {
   getLatestSnapshotRanks,
@@ -21,6 +26,8 @@ import type { KeywordGapItem } from '../shared/types/workspace.js';
 import {
   KEYWORD_COMMAND_CENTER_ACTIONS,
   KEYWORD_COMMAND_CENTER_FILTERS,
+  KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE,
+  KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY,
   KEYWORD_COMMAND_CENTER_STATUS,
   type KeywordCommandCenterActionRequest,
   type KeywordCommandCenterActionResult,
@@ -28,6 +35,7 @@ import {
   type KeywordCommandCenterFeedbackState,
   type KeywordCommandCenterFilter,
   type KeywordCommandCenterFilterMeta,
+  type KeywordCommandCenterLocalSeoState,
   type KeywordCommandCenterMetrics,
   type KeywordCommandCenterNextAction,
   type KeywordCommandCenterResponse,
@@ -35,6 +43,7 @@ import {
   type KeywordCommandCenterSourceLabel,
   type KeywordCommandCenterStatus,
 } from '../shared/types/keyword-command-center.js';
+import { LOCAL_SEO_MARKET_STATUS, LOCAL_SEO_VISIBILITY_POSTURE, type LocalSeoKeywordVisibilitySummary } from '../shared/types/local-seo.js';
 import {
   TRACKED_KEYWORD_SOURCE,
   TRACKED_KEYWORD_STATUS,
@@ -45,6 +54,7 @@ import type { KeywordStrategyExplanation } from '../shared/types/keyword-strateg
 
 const RAW_EVIDENCE_ROW_LIMIT = 75;
 const RANK_EVIDENCE_ROW_LIMIT = 50;
+const LOCAL_CANDIDATE_ROW_LIMIT = 75;
 
 const stmts = createStmtCache(() => ({
   feedback: db.prepare<[workspaceId: string]>(
@@ -81,6 +91,7 @@ interface DraftRow {
   feedback?: KeywordCommandCenterFeedbackState;
   tracking?: TrackedKeyword;
   explanation?: KeywordStrategyExplanation;
+  localCandidate?: LocalSeoKeywordCandidate;
   rank?: LatestRank;
   rawEvidenceOnly?: boolean;
 }
@@ -183,6 +194,7 @@ function lifecycleStatus(row: DraftRow): KeywordCommandCenterStatus {
   }
   if (row.explanation?.rawEvidenceOnly || row.rawEvidenceOnly) return KEYWORD_COMMAND_CENTER_STATUS.RAW_EVIDENCE;
   if (row.rank) return KEYWORD_COMMAND_CENTER_STATUS.NEEDS_REVIEW;
+  if (row.localCandidate) return KEYWORD_COMMAND_CENTER_STATUS.NEEDS_REVIEW;
   return KEYWORD_COMMAND_CENTER_STATUS.RAW_EVIDENCE;
 }
 
@@ -197,7 +209,88 @@ function statusLabel(status: KeywordCommandCenterStatus): string {
   }
 }
 
-function buildNextActions(row: DraftRow, status: KeywordCommandCenterStatus, isProtected: boolean, protection?: string): KeywordCommandCenterNextAction[] {
+function localPriority(
+  visibility: LocalSeoKeywordVisibilitySummary | undefined,
+  activeMarketCount: number,
+): Pick<KeywordCommandCenterLocalSeoState, 'priority' | 'priorityLabel'> {
+  if (activeMarketCount === 0) {
+    return { priority: KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY.NEEDS_SETUP, priorityLabel: 'Needs setup' };
+  }
+  if (!visibility) {
+    return { priority: KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY.INVESTIGATE, priorityLabel: 'Ready to check' };
+  }
+  if (visibility.posture === LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE) {
+    return { priority: KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY.DEFEND, priorityLabel: 'Defend' };
+  }
+  if (visibility.posture === LOCAL_SEO_VISIBILITY_POSTURE.POSSIBLE_MATCH || visibility.posture === LOCAL_SEO_VISIBILITY_POSTURE.PROVIDER_DEGRADED) {
+    return { priority: KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY.INVESTIGATE, priorityLabel: 'Investigate' };
+  }
+  if (visibility.posture === LOCAL_SEO_VISIBILITY_POSTURE.LOCAL_PACK_PRESENT) {
+    return { priority: KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY.HIGH_OPPORTUNITY, priorityLabel: 'High opportunity' };
+  }
+  if (visibility.posture === LOCAL_SEO_VISIBILITY_POSTURE.NOT_VISIBLE && visibility.localPackPresent) {
+    return { priority: KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY.HIGH_OPPORTUNITY, priorityLabel: 'High opportunity' };
+  }
+  return { priority: KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY.LOW_PRIORITY, priorityLabel: 'Low priority' };
+}
+
+function buildLocalSeoState(
+  row: DraftRow,
+  status: KeywordCommandCenterStatus,
+  visibility: LocalSeoKeywordVisibilitySummary | undefined,
+  activeMarketCount: number,
+): KeywordCommandCenterLocalSeoState | undefined {
+  if (!row.localCandidate && !visibility) return undefined;
+  const selected = status === KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY
+    || status === KEYWORD_COMMAND_CENTER_STATUS.TRACKED
+    || row.localCandidate?.selected === true;
+  const checked = Boolean(visibility);
+  const lifecycle = selected
+    ? KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.SELECTED
+    : checked
+      ? KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CHECKED
+      : row.rawEvidenceOnly
+        ? KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.RAW_EVIDENCE
+        : row.localCandidate
+          ? KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CANDIDATE
+          : KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.NOT_CHECKED;
+  const { priority, priorityLabel } = localPriority(visibility, activeMarketCount);
+  const lifecycleLabel = lifecycle === KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.SELECTED
+    ? checked ? 'Selected · checked' : 'Selected · not checked'
+    : lifecycle === KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CHECKED
+      ? 'Checked locally'
+      : lifecycle === KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.RAW_EVIDENCE
+        ? 'Raw local evidence'
+        : lifecycle === KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CANDIDATE
+          ? 'Local candidate'
+          : 'Not checked';
+  const detail = activeMarketCount === 0
+    ? 'Configure a local market before checking this keyword.'
+    : visibility?.detail
+      ?? row.localCandidate?.detail
+      ?? 'Candidate is ready for local-pack visibility checking.';
+  return {
+    lifecycle,
+    lifecycleLabel,
+    priority,
+    priorityLabel,
+    detail,
+    checked,
+    marketLabel: visibility?.marketLabel,
+    sourceLabels: row.localCandidate ? [row.localCandidate.sourceLabel] : ['Stored local visibility'],
+    localPackPresent: visibility?.localPackPresent,
+    businessMatchConfidence: visibility?.businessMatchConfidence,
+    visibility,
+  };
+}
+
+function buildNextActions(
+  row: DraftRow,
+  status: KeywordCommandCenterStatus,
+  isProtected: boolean,
+  protection?: string,
+  localSeoState?: KeywordCommandCenterLocalSeoState,
+): KeywordCommandCenterNextAction[] {
   const keyword = row.keyword;
   const actions: KeywordCommandCenterNextAction[] = [];
   if (status === KEYWORD_COMMAND_CENTER_STATUS.DECLINED || status === KEYWORD_COMMAND_CENTER_STATUS.RETIRED) {
@@ -209,6 +302,20 @@ function buildNextActions(row: DraftRow, status: KeywordCommandCenterStatus, isP
       keyword,
     });
     return actions;
+  }
+
+  if (localSeoState) {
+    actions.push({
+      type: 'check_local_visibility',
+      label: localSeoState.checked ? 'Refresh local' : 'Check locally',
+      detail: 'Run a local-pack visibility refresh for this keyword through the background job system.',
+      tone: 'teal',
+      keyword,
+      disabled: localSeoState.priority === KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY.NEEDS_SETUP,
+      disabledReason: localSeoState.priority === KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY.NEEDS_SETUP
+        ? 'Configure a local market before checking local visibility.'
+        : undefined,
+    });
   }
 
   if (row.feedback?.status === 'requested' || status === KEYWORD_COMMAND_CENTER_STATUS.NEEDS_REVIEW) {
@@ -315,6 +422,26 @@ function filterCount(rows: KeywordCommandCenterRow[], filter: KeywordCommandCent
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.ALL) return rows.length;
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.CONTENT) return rows.filter(row => row.assignment?.role === 'content_gap').length;
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.PAGE_ASSIGNED) return rows.filter(row => row.assignment?.role === 'page_keyword').length;
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.LOCAL) return rows.filter(row => row.localSeoState).length;
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES) {
+    return rows.filter(row => row.localSeoState?.lifecycle === KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CANDIDATE).length;
+  }
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.VISIBLE_LOCALLY) {
+    return rows.filter(row => row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE).length;
+  }
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.POSSIBLE_MATCH) {
+    return rows.filter(row => row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.POSSIBLE_MATCH).length;
+  }
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.NOT_VISIBLE) {
+    return rows.filter(row =>
+      row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.NOT_VISIBLE
+      || row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.LOCAL_PACK_PRESENT,
+    ).length;
+  }
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED) return rows.filter(row => row.localSeoState && !row.localSeoState.checked).length;
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.PROVIDER_DEGRADED) {
+    return rows.filter(row => row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.PROVIDER_DEGRADED).length;
+  }
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.REQUESTED) return rows.filter(row => row.feedback?.status === 'requested').length;
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.TRACKED) {
     return rows.filter(row => row.tracking.status === TRACKED_KEYWORD_STATUS.ACTIVE).length;
@@ -329,6 +456,8 @@ function buildCounts(rows: KeywordCommandCenterRow[]): KeywordCommandCenterCount
     tracked: rows.filter(row => row.tracking.status === TRACKED_KEYWORD_STATUS.ACTIVE).length,
     needsReview: rows.filter(row => row.lifecycleStatus === KEYWORD_COMMAND_CENTER_STATUS.NEEDS_REVIEW).length,
     evidence: rows.filter(row => row.lifecycleStatus === KEYWORD_COMMAND_CENTER_STATUS.RAW_EVIDENCE).length,
+    local: rows.filter(row => row.localSeoState).length,
+    localCandidates: rows.filter(row => row.localSeoState?.lifecycle === KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CANDIDATE).length,
     retired: rows.filter(row => row.lifecycleStatus === KEYWORD_COMMAND_CENTER_STATUS.RETIRED).length,
     declined: rows.filter(row => row.lifecycleStatus === KEYWORD_COMMAND_CENTER_STATUS.DECLINED).length,
   };
@@ -343,6 +472,13 @@ function buildFilters(rows: KeywordCommandCenterRow[]): KeywordCommandCenterFilt
     { id: KEYWORD_COMMAND_CENTER_FILTERS.CONTENT, label: 'Content' },
     { id: KEYWORD_COMMAND_CENTER_FILTERS.PAGE_ASSIGNED, label: 'Page Assigned' },
     { id: KEYWORD_COMMAND_CENTER_FILTERS.RAW_EVIDENCE, label: 'Raw Evidence' },
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL, label: 'Local' },
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES, label: 'Local Candidates' },
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.VISIBLE_LOCALLY, label: 'Visible Locally' },
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.POSSIBLE_MATCH, label: 'Possible Match' },
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.NOT_VISIBLE, label: 'Not Visible' },
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED, label: 'Not Checked' },
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.PROVIDER_DEGRADED, label: 'Provider Degraded' },
     { id: KEYWORD_COMMAND_CENTER_FILTERS.REQUESTED, label: 'Requested' },
     { id: KEYWORD_COMMAND_CENTER_FILTERS.DECLINED, label: 'Declined' },
     { id: KEYWORD_COMMAND_CENTER_FILTERS.RETIRED, label: 'Retired' },
@@ -367,6 +503,12 @@ export async function buildKeywordCommandCenter(
   const localVisibilityByKeyword = options.includeLocalSeo
     ? buildLocalSeoKeywordVisibilityByKey(workspace.id)
     : new Map();
+  const localCandidates = options.includeLocalSeo
+    ? buildLocalSeoKeywordCandidates(workspace.id).slice(0, LOCAL_CANDIDATE_ROW_LIMIT)
+    : [];
+  const activeLocalMarketCount = options.includeLocalSeo
+    ? listLocalSeoMarkets(workspace.id).filter(market => market.status === LOCAL_SEO_MARKET_STATUS.ACTIVE).length
+    : 0;
   const rows = new Map<string, DraftRow>();
 
   const strategyUx = await buildKeywordStrategyUxPayload({
@@ -463,7 +605,22 @@ export async function buildKeywordCommandCenter(
     });
   }
 
-  const rawEvidenceRows = [...rows.values()].filter(row => row.rawEvidenceOnly && !row.tracking && !row.feedback);
+  for (const candidate of localCandidates) {
+    const row = ensureRow(rows, candidate.keyword);
+    if (!row) continue;
+    row.localCandidate = candidate;
+    addSource(row, {
+      kind: 'local_candidate',
+      label: candidate.sourceLabel,
+      detail: candidate.detail,
+    });
+    mergeMetrics(row, {
+      volume: candidate.volume,
+      difficulty: candidate.difficulty,
+    });
+  }
+
+  const rawEvidenceRows = [...rows.values()].filter(row => row.rawEvidenceOnly && !row.tracking && !row.feedback && !row.localCandidate);
   const allowedRawEvidence = new Set(
     rawEvidenceRows
       .sort((a, b) => (b.metrics.volume ?? 0) - (a.metrics.volume ?? 0))
@@ -472,12 +629,14 @@ export async function buildKeywordCommandCenter(
   );
 
   const finalRows = [...rows.values()]
-    .filter(row => !row.rawEvidenceOnly || row.tracking || row.feedback || allowedRawEvidence.has(row.normalizedKeyword))
+    .filter(row => !row.rawEvidenceOnly || row.tracking || row.feedback || row.localCandidate || allowedRawEvidence.has(row.normalizedKeyword))
     .map((row): KeywordCommandCenterRow => {
       const status = lifecycleStatus(row);
       const protection = protectedReason(row.tracking);
       const explanationRole = row.explanation?.role;
       const isProtected = Boolean(protection);
+      const localSeo = localVisibilityByKeyword.get(row.normalizedKeyword);
+      const localSeoState = buildLocalSeoState(row, status, localSeo, activeLocalMarketCount);
       return {
         keyword: row.keyword,
         normalizedKeyword: row.normalizedKeyword,
@@ -489,6 +648,10 @@ export async function buildKeywordCommandCenter(
           pagePath: row.explanation.pagePath,
           pageTitle: row.explanation.pageTitle,
           role: explanationRole === 'competitor_gap' ? 'raw_evidence' : explanationRole,
+        } : row.localCandidate?.pagePath || row.localCandidate?.pageTitle ? {
+          pagePath: row.localCandidate.pagePath,
+          pageTitle: row.localCandidate.pageTitle,
+          role: row.localCandidate.source === 'content_gap' ? 'content_gap' : 'page_keyword',
         } : undefined,
         feedback: row.feedback,
         tracking: row.tracking ? {
@@ -502,8 +665,9 @@ export async function buildKeywordCommandCenter(
           deprecatedAt: row.tracking.deprecatedAt,
         } : { status: 'not_tracked' },
         explanation: row.explanation,
-        localSeo: localVisibilityByKeyword.get(row.normalizedKeyword),
-        nextActions: buildNextActions(row, status, isProtected, protection),
+        localSeo,
+        localSeoState,
+        nextActions: buildNextActions(row, status, isProtected, protection, localSeoState),
         isProtected,
         protectionReason: protection,
         rawEvidenceOnly: row.rawEvidenceOnly,

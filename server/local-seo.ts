@@ -7,8 +7,10 @@ import { parseJsonSafeArray } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
+import { listContentGaps } from './content-gaps.js';
 import { updateJob, getJob } from './jobs.js';
-import { getDeclinedKeywords } from './keyword-feedback.js';
+import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js';
+import { isStrategyPoolEligibleKeyword, isNearDuplicateKeyword } from './keyword-intelligence/rules.js';
 import { listPageKeywords } from './page-keywords.js';
 import { getTrackedKeywords } from './rank-tracking.js';
 import { DEFAULT_SEO_DATA_PROVIDER, getProvider, isCapabilityDisabled, type ProviderName, type SeoDataProvider } from './seo-data-provider.js';
@@ -52,9 +54,24 @@ import type { Workspace } from '../shared/types/workspace.js';
 const log = createLogger('local-seo');
 
 export const LOCAL_SEO_MAX_MARKETS = 3;
-export const LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH = 25;
+export const LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH = 50;
 const LOCAL_SEO_MAX_RESULTS = 10;
 const DEFAULT_LANGUAGE_CODE = 'en';
+
+export interface LocalSeoKeywordCandidate {
+  keyword: string;
+  normalizedKeyword: string;
+  source: 'explicit' | 'strategy' | 'tracking' | 'page_assignment' | 'content_gap' | 'local_variant';
+  sourceLabel: string;
+  detail?: string;
+  pagePath?: string;
+  pageTitle?: string;
+  volume?: number;
+  difficulty?: number;
+  selected: boolean;
+  score: number;
+  reasons: string[];
+}
 
 const localResultSchema = z.object({
   title: z.string(),
@@ -731,35 +748,270 @@ function hasLocalIntent(keyword: string, workspace: Workspace): boolean {
   return false;
 }
 
-export function selectLocalIntentKeywords(workspaceId: string, explicitKeywords: string[] = []): string[] {
+function cleanKeywordDisplay(keyword: string | undefined): string | undefined {
+  const cleaned = keyword?.replace(/\s+/g, ' ').trim();
+  if (!cleaned || cleaned.length < 3 || cleaned.length > 90) return undefined;
+  return cleaned;
+}
+
+function titleLooksLikeServiceKeyword(title: string | undefined): boolean {
+  const cleaned = cleanKeywordDisplay(title);
+  if (!cleaned) return false;
+  const tokens = cleaned.split(/\s+/);
+  if (tokens.length > 6) return false;
+  return /dent|dental|implant|invisalign|veneer|whiten|emergency|orthodont|clinic|law|attorney|restaurant|contractor|plumb|roof|med spa|service/i.test(cleaned);
+}
+
+function hasMarketModifier(keyword: string, markets: LocalSeoMarket[]): boolean {
+  const normalized = normalizeText(keyword);
+  if (/\bnear me\b|\blocal\b/.test(normalized)) return true;
+  return markets.some(market => {
+    const city = normalizeText(market.city);
+    const state = normalizeText(market.stateOrRegion);
+    return Boolean((city && normalized.includes(city)) || (state && normalized.includes(state)));
+  });
+}
+
+function localVariantKeywords(baseKeyword: string, markets: LocalSeoMarket[]): string[] {
+  const base = cleanKeywordDisplay(baseKeyword);
+  if (!base) return [];
+  const variants = new Set<string>();
+  for (const market of markets) {
+    const city = cleanKeywordDisplay(market.city);
+    const state = cleanKeywordDisplay(market.stateOrRegion);
+    if (city && !normalizeText(base).includes(normalizeText(city))) {
+      variants.add(`${base} ${city}`);
+      if (state && state.length <= 3) variants.add(`${base} ${city} ${state}`);
+    }
+  }
+  if (!/\bnear me\b/i.test(base)) variants.add(`${base} near me`);
+  return [...variants];
+}
+
+function candidateSourceScore(source: LocalSeoKeywordCandidate['source']): number {
+  switch (source) {
+    case 'explicit': return 120;
+    case 'strategy': return 95;
+    case 'tracking': return 90;
+    case 'page_assignment': return 85;
+    case 'content_gap': return 72;
+    case 'local_variant': return 62;
+  }
+}
+
+function buildCandidateContext(workspace: Workspace) {
+  const contentGaps = listContentGaps(workspace.id);
+  const pageMap = listPageKeywords(workspace.id);
+  const declinedKeywords = getDeclinedKeywords(workspace.id);
+  const requestedKeywords = getRequestedKeywords(workspace.id);
+  const strategy = workspace.keywordStrategy;
+  const businessTerms = [
+    workspace.name,
+    strategy?.businessContext,
+    workspace.intelligenceProfile?.industry,
+    ...(workspace.businessPriorities ?? []),
+    ...(strategy?.siteKeywords ?? []),
+    ...pageMap.flatMap(page => [page.pageTitle, page.primaryKeyword, ...(page.secondaryKeywords ?? [])]),
+    ...contentGaps.flatMap(gap => [gap.topic, gap.targetKeyword]),
+  ].filter((value): value is string => Boolean(value?.trim()));
+
+  return {
+    contentGaps,
+    pageMap,
+    declinedKeywords,
+    requestedKeywords,
+    evaluationContext: {
+      workspaceId: workspace.id,
+      pageMap,
+      declinedKeywords,
+      requestedKeywords,
+      businessTerms,
+      businessPhrases: [strategy?.businessContext ?? '', workspace.name].filter(Boolean),
+      businessPriorities: workspace.businessPriorities ?? [],
+      contentGapTopics: contentGaps.map(gap => `${gap.topic} ${gap.targetKeyword}`),
+      strictBusinessFit: true,
+    },
+  };
+}
+
+export function buildLocalSeoKeywordCandidates(workspaceId: string, explicitKeywords: string[] = []): LocalSeoKeywordCandidate[] {
   const workspace = getWorkspace(workspaceId);
   if (!workspace) return [];
-  const declined = new Set(getDeclinedKeywords(workspaceId).map(keywordComparisonKey));
-  const seen = new Set<string>();
-  const selected: string[] = [];
-  const add = (keyword: string | undefined, force = false) => {
-    const display = keyword?.trim();
+  const markets = activeMarkets(workspaceId);
+  const { contentGaps, pageMap, declinedKeywords, evaluationContext } = buildCandidateContext(workspace);
+  const declined = new Set(declinedKeywords.map(keywordComparisonKey));
+  const trackedKeywords = getTrackedKeywords(workspaceId, { includeInactive: true });
+  const inactiveTracked = new Set(
+    trackedKeywords
+      .filter(tracked => (tracked.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) !== TRACKED_KEYWORD_STATUS.ACTIVE)
+      .map(tracked => keywordComparisonKey(tracked.query)),
+  );
+  const candidates = new Map<string, LocalSeoKeywordCandidate>();
+
+  const add = (
+    keyword: string | undefined,
+    source: LocalSeoKeywordCandidate['source'],
+    options: {
+      force?: boolean;
+      selected?: boolean;
+      sourceLabel?: string;
+      detail?: string;
+      pagePath?: string;
+      pageTitle?: string;
+      volume?: number;
+      difficulty?: number;
+      scoreBoost?: number;
+    } = {},
+  ) => {
+    const display = cleanKeywordDisplay(keyword);
     if (!display) return;
     const key = keywordComparisonKey(display);
-    if (!key || seen.has(key) || declined.has(key)) return;
-    if (!force && !hasLocalIntent(display, workspace)) return;
-    seen.add(key);
-    selected.push(display);
+    if (!key || declined.has(key) || inactiveTracked.has(key)) return;
+    if (!options.force && !hasLocalIntent(display, workspace) && !hasMarketModifier(display, markets)) return;
+    const evaluationSource = source === 'local_variant' ? 'local_generated' : source === 'tracking' ? 'gsc' : 'client';
+    const evaluation = isStrategyPoolEligibleKeyword({
+      keyword: display,
+      volume: options.volume ?? 0,
+      difficulty: options.difficulty ?? 0,
+      source: evaluationSource,
+    }, evaluationContext);
+    if (evaluation.suppressed) return;
+    const localIntentScore = hasMarketModifier(display, markets) ? 12 : hasLocalIntent(display, workspace) ? 8 : 0;
+    const score = candidateSourceScore(source) + localIntentScore + evaluation.scoreDelta + (options.scoreBoost ?? 0);
+    const existing = candidates.get(key);
+    const next: LocalSeoKeywordCandidate = {
+      keyword: display,
+      normalizedKeyword: key,
+      source,
+      sourceLabel: options.sourceLabel ?? source.replace(/_/g, ' '),
+      detail: options.detail,
+      pagePath: options.pagePath,
+      pageTitle: options.pageTitle,
+      volume: options.volume,
+      difficulty: options.difficulty,
+      selected: options.selected ?? (source === 'strategy' || source === 'tracking' || source === 'page_assignment'),
+      score,
+      reasons: evaluation.reasons.map(reason => reason.message).slice(0, 4),
+    };
+    if (!existing || next.score > existing.score || (next.selected && !existing.selected)) candidates.set(key, next);
   };
 
-  for (const keyword of explicitKeywords) add(keyword, true);
-  for (const tracked of getTrackedKeywords(workspaceId)) {
-    if ((tracked.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) !== TRACKED_KEYWORD_STATUS.ACTIVE) continue;
-    add(tracked.query);
+  for (const keyword of explicitKeywords) add(keyword, 'explicit', { force: true, selected: true, sourceLabel: 'Selected for refresh', scoreBoost: 30 });
+  for (const keyword of workspace.keywordStrategy?.siteKeywords ?? []) {
+    add(keyword, 'strategy', { selected: true, sourceLabel: 'Strategy keyword', scoreBoost: 12 });
   }
-  for (const page of listPageKeywords(workspaceId)) {
+  for (const tracked of trackedKeywords) {
+    if ((tracked.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) !== TRACKED_KEYWORD_STATUS.ACTIVE) continue;
+    add(tracked.query, 'tracking', {
+      selected: true,
+      sourceLabel: 'Rank tracking',
+      detail: tracked.source?.replace(/_/g, ' '),
+      pagePath: tracked.pagePath,
+      pageTitle: tracked.pageTitle,
+      volume: tracked.volume,
+      difficulty: tracked.difficulty,
+      scoreBoost: tracked.pinned ? 20 : 8,
+    });
+  }
+  for (const page of pageMap) {
     const pageLooksLocal = /\/location\/|near me|appointment|austin|houston|san antonio|dallas/i.test(`${page.pagePath} ${page.pageTitle}`)
       || page.serpFeatures?.includes('local_pack');
-    add(page.primaryKeyword, pageLooksLocal);
-    for (const secondary of page.secondaryKeywords ?? []) add(secondary, pageLooksLocal);
+    add(page.primaryKeyword, 'page_assignment', {
+      force: pageLooksLocal,
+      selected: true,
+      sourceLabel: 'Page assignment',
+      detail: page.pageTitle ?? page.pagePath,
+      pagePath: page.pagePath,
+      pageTitle: page.pageTitle,
+      volume: page.volume,
+      difficulty: page.difficulty,
+      scoreBoost: 10,
+    });
+    for (const secondary of page.secondaryKeywords ?? []) {
+      add(secondary, 'page_assignment', {
+        force: pageLooksLocal,
+        selected: true,
+        sourceLabel: 'Page assignment',
+        detail: page.pageTitle ?? page.pagePath,
+        pagePath: page.pagePath,
+        pageTitle: page.pageTitle,
+        scoreBoost: 4,
+      });
+    }
+    if (titleLooksLikeServiceKeyword(page.pageTitle)) {
+      add(page.pageTitle, 'page_assignment', {
+        force: pageLooksLocal,
+        selected: true,
+        sourceLabel: 'Service page',
+        detail: page.pagePath,
+        pagePath: page.pagePath,
+        pageTitle: page.pageTitle,
+      });
+    }
+    for (const base of [page.primaryKeyword, page.pageTitle, ...(page.secondaryKeywords ?? [])]) {
+      if (!base || !titleLooksLikeServiceKeyword(base) || isNearDuplicateKeyword(base, workspace.name)) continue;
+      for (const variant of localVariantKeywords(base, markets)) {
+        add(variant, 'local_variant', {
+          sourceLabel: 'Local candidate',
+          detail: page.pageTitle ?? page.pagePath,
+          pagePath: page.pagePath,
+          pageTitle: page.pageTitle,
+        });
+      }
+    }
+  }
+  for (const gap of contentGaps) {
+    const localGap = gap.suggestedPageType === 'location'
+      || gap.serpFeatures?.includes('local_pack')
+      || hasLocalIntent(`${gap.topic} ${gap.targetKeyword}`, workspace);
+    add(gap.targetKeyword, 'content_gap', {
+      force: localGap,
+      selected: false,
+      sourceLabel: 'Content opportunity',
+      detail: gap.topic,
+      volume: gap.volume,
+      difficulty: gap.difficulty,
+      scoreBoost: gap.priority === 'high' ? 8 : 0,
+    });
+    for (const variant of localVariantKeywords(gap.targetKeyword, markets)) {
+      add(variant, 'local_variant', {
+        sourceLabel: 'Local content candidate',
+        detail: gap.topic,
+        volume: gap.volume,
+        difficulty: gap.difficulty,
+      });
+    }
   }
 
-  return selected.slice(0, LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH);
+  return [...candidates.values()]
+    .sort((a, b) => b.score - a.score || a.keyword.localeCompare(b.keyword));
+}
+
+function selectExplicitLocalSeoKeywords(workspaceId: string, explicitKeywords: string[] = []): string[] {
+  const declined = new Set(getDeclinedKeywords(workspaceId).map(keywordComparisonKey));
+  const inactiveTracked = new Set(
+    getTrackedKeywords(workspaceId, { includeInactive: true })
+      .filter(tracked => (tracked.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) !== TRACKED_KEYWORD_STATUS.ACTIVE)
+      .map(tracked => keywordComparisonKey(tracked.query)),
+  );
+  const seen = new Set<string>();
+  const selected: string[] = [];
+  for (const keyword of explicitKeywords) {
+    const display = cleanKeywordDisplay(keyword);
+    const key = display ? keywordComparisonKey(display) : '';
+    if (!display || !key || seen.has(key) || declined.has(key) || inactiveTracked.has(key)) continue;
+    seen.add(key);
+    selected.push(display);
+    if (selected.length >= LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH) break;
+  }
+  return selected;
+}
+
+export function selectLocalIntentKeywords(workspaceId: string, explicitKeywords: string[] = []): string[] {
+  if (explicitKeywords.length > 0) return selectExplicitLocalSeoKeywords(workspaceId, explicitKeywords);
+  return buildLocalSeoKeywordCandidates(workspaceId, explicitKeywords)
+    .slice(0, LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH)
+    .map(candidate => candidate.keyword);
 }
 
 export function createLocalSeoRefreshPlan(workspaceId: string, request: LocalSeoRefreshRequest = {}): { markets: LocalSeoMarket[]; keywords: string[]; device: LocalSeoDevice; languageCode: string } | null {

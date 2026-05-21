@@ -78,7 +78,7 @@ function makeReadResponse(overrides: Partial<LocalSeoReadResponse> = {}): LocalS
     },
     caps: {
       maxMarkets: 3,
-      maxKeywordsPerRefresh: 25,
+      maxKeywordsPerRefresh: 50,
     },
   };
 
@@ -137,6 +137,59 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
 
     expect(screen.getByRole('button', { name: /configure market/i })).toBeInTheDocument();
     expect(screen.getByText('Market setup needed')).toBeInTheDocument();
+  });
+
+  it('keeps keyword-level local visibility in the command center instead of rendering a mini keyword list', () => {
+    localSeoData = makeReadResponse({
+      markets: [{
+        id: 'market-austin',
+        workspaceId: 'ws-1',
+        label: 'Austin, TX',
+        city: 'Austin',
+        stateOrRegion: 'TX',
+        country: 'US',
+        source: 'admin_override',
+        status: 'active',
+        createdAt: '2026-05-20T12:00:00.000Z',
+        updatedAt: '2026-05-20T12:00:00.000Z',
+      }],
+      latestSnapshots: [{
+        id: 'snap-1',
+        workspaceId: 'ws-1',
+        keyword: 'cosmetic dentistry austin',
+        normalizedKeyword: 'cosmetic dentistry austin',
+        marketId: 'market-austin',
+        marketLabel: 'Austin, TX',
+        capturedAt: '2026-05-20T12:00:00.000Z',
+        localPackPresent: true,
+        businessFound: true,
+        businessMatchConfidence: 'verified',
+        localRank: 2,
+        topCompetitors: [],
+        sourceEndpoint: 'google_organic_serp',
+        provider: 'fake-seo-provider',
+        device: 'desktop',
+        languageCode: 'en',
+        status: 'success',
+      }],
+      report: {
+        setupState: 'has_data',
+        setupLabel: 'Local visibility ready',
+        setupDetail: 'Use Keywords to inspect local visibility by keyword.',
+        activeMarketCount: 1,
+        configuredMarketCount: 1,
+        latestSnapshotCount: 1,
+        checkedKeywordCount: 1,
+        visibleCount: 1,
+        localPackPresentCount: 1,
+      },
+    });
+
+    render(<LocalSeoVisibilityPanel workspaceId="ws-1" onOpenKeywords={vi.fn()} />);
+
+    expect(screen.getByText('Keyword visibility lives in Keywords')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /view local keywords/i })[0]).toBeInTheDocument();
+    expect(screen.queryByText('cosmetic dentistry austin')).not.toBeInTheDocument();
   });
 
   it('uses a suggested market to populate a valid active market save', async () => {

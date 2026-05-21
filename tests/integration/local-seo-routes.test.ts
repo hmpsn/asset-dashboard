@@ -66,7 +66,7 @@ describe('Local SEO routes', () => {
         providerLocationName: 'Austin,Texas,United States',
       }),
     ]));
-    expect(body.caps).toEqual({ maxMarkets: 3, maxKeywordsPerRefresh: 25 });
+    expect(body.caps).toEqual({ maxMarkets: 3, maxKeywordsPerRefresh: 50 });
     expect(body.latestSnapshots).toEqual([]);
     expect(body.report).toEqual(expect.objectContaining({
       workspacePosture: 'unknown',
@@ -258,7 +258,7 @@ describe('Local SEO routes', () => {
     expect(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH).toBe('local-seo-refresh');
     expect(body.selectedMarketCount).toBe(0);
     expect(body.selectedKeywordCount).toBeGreaterThan(0);
-    expect(body.selectedKeywordCount).toBeLessThanOrEqual(25);
+    expect(body.selectedKeywordCount).toBeLessThanOrEqual(50);
   });
 
   it('allows replacing a market while already at the active market cap', async () => {

@@ -6370,3 +6370,20 @@ The new `LocalSeoVisibilityPanel` surfaces local-market setup and snapshot evide
 **Boundaries:** Admin-first and feature-flagged. No client payload changes, no automatic strategy regeneration, no local provider calls in render paths, no GBP health/reviews, no geo-grid tracking, no publishing, and no live metadata/schema writes.
 
 **Files:** `shared/types/local-seo.ts`; `shared/types/keyword-command-center.ts`; `server/local-seo.ts`; `server/keyword-command-center.ts`; `src/api/localSeo.ts`; `src/hooks/admin/useLocalSeo.ts`; `src/hooks/admin/index.ts`; `src/components/local-seo/LocalSeoVisibilityPanel.tsx`; `src/components/local-seo/LocalSeoMarketSetupDrawer.tsx`; `src/components/KeywordCommandCenter.tsx`; `src/components/KeywordStrategy.tsx`; `src/components/PageIntelligence.tsx`; `src/components/RankTracker.tsx`; `src/components/ui/SectionCard.tsx`; `src/components/page-intelligence/PageIntelligencePageDetails.tsx`; `src/components/page-intelligence/PageIntelligencePageList.tsx`; `src/components/page-intelligence/PageIntelligencePageRow.tsx`; `tests/unit/local-seo.test.ts`; `tests/integration/local-seo-routes.test.ts`; `tests/unit/keyword-command-center.test.ts`; `tests/integration/keyword-command-center-routes.test.ts`; `tests/component/KeywordCommandCenter.test.tsx`; `tests/component/LocalSeoVisibilityPanel.test.tsx`; `docs/rules/local-seo-visibility.md`; `FEATURE_AUDIT.md`; `data/roadmap.json`; `data/features.json`.
+
+## Local Keyword Lens + Visibility Usability
+
+**Status:** Shipped 2026-05-20
+**Roadmap:** `intel-quality-local-keyword-lens-visibility-usability`
+
+**What it does:** Turns Local SEO Visibility into a keyword lens inside the Keyword Command Center instead of a separate keyword silo. The Local SEO panel now acts as a summary/control card for market setup, refresh state, and aggregate counts, while keyword-level local visibility, local candidates, local priority, local-pack posture, business-match confidence, and safe next actions live in the main Keywords surface.
+
+The local refresh source set is now built from strategy terms, active tracked terms, page-assigned keywords, service page titles, content gaps, configured market city/state, and safe city/near-me variants. Candidates are deduped through the shared keyword normalizer, screened with shared keyword-intelligence rules, and exclude declined, retired, weak-fit, and known noisy terms. Refreshes remain background-job based and bounded, with a 50-keyword prioritized cap.
+
+**Agency value:** Gives admins one place to understand and act on local keyword opportunities: what is visible locally, what is a possible match, what is not visible, what has not been checked, and which local candidates should be tracked, promoted, declined, or reviewed. This makes local SEO feel like part of the keyword operating loop rather than a separate report to hunt through.
+
+**Client value:** Client-facing local SEO remains deferred, but the admin evidence model now supports safer future reporting because local candidates are not presented as selected strategy terms until promoted and local visibility copy stays conservative.
+
+**Boundaries:** No strategy regeneration, no publishing, no live metadata/schema writes, no GBP mutation, no geo-grid tracking, and no separate local keyword manager. Rank Tracker remains Search Console measurement-only.
+
+**Files:** `shared/types/keyword-command-center.ts`; `shared/types/local-seo.ts`; `server/local-seo.ts`; `server/keyword-command-center.ts`; `src/hooks/admin/useLocalSeo.ts`; `src/components/local-seo/LocalSeoVisibilityPanel.tsx`; `src/components/KeywordCommandCenter.tsx`; `tests/unit/local-seo.test.ts`; `tests/unit/keyword-command-center.test.ts`; `tests/component/LocalSeoVisibilityPanel.test.tsx`; `tests/component/KeywordCommandCenter.test.tsx`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
