@@ -13,13 +13,18 @@ import { KEYWORD_GAP_COMPETITOR_KEYWORD_LIMIT, MAX_COMPETITORS } from '../consta
 import { recordExternalApiTelemetry, recordOperationTrace } from '../platform-observability.js';
 import { KEYWORD_SOURCE_KIND, type KeywordSourceEvidence, type KeywordSourceKind } from '../../shared/types/keywords.js';
 import {
+  LOCAL_SEO_LOCATION_LOOKUP_STATUS,
   LOCAL_SEO_DEVICE,
   LOCAL_VISIBILITY_SOURCE_ENDPOINT,
   LOCAL_VISIBILITY_STATUS,
+  type LocalSeoLocationLookupCandidate,
+  type LocalSeoLocationLookupRequest,
+  type LocalSeoLocationLookupResponse,
   type LocalVisibilityBusinessResult,
   type LocalVisibilityProviderRequest,
   type LocalVisibilityProviderResult,
 } from '../../shared/types/local-seo.js';
+import { buildDataForSeoLocationName, normalizeLocalSeoCountryName } from '../../shared/local-seo-location.js';
 import type {
   SeoDataProvider,
   KeywordMetrics,
@@ -177,6 +182,7 @@ const CACHE_TTL_DOMAIN_OVERVIEW = 168; // 7 days
 const CACHE_TTL_BACKLINKS = 168;       // 7 days
 const CACHE_TTL_COMPETITORS = 336;     // 14 days
 const CACHE_TTL_LOCAL_VISIBILITY = 168; // 7 days
+const CACHE_TTL_LOCAL_LOCATIONS = 720;  // 30 days
 
 function getCacheDir(workspaceId: string): string {
   const dir = path.join(UPLOAD_ROOT, workspaceId, '.dataforseo-cache');
@@ -249,6 +255,13 @@ interface DataForSeoResponse {
     result_count?: number;
     result?: Array<Record<string, unknown>>;
   }>;
+}
+
+interface DataForSeoLocationRow {
+  location_code?: number;
+  location_name?: string;
+  country_iso_code?: string;
+  location_type?: string;
 }
 
 async function apiCall(endpoint: string, body: unknown[], workspaceId?: string): Promise<DataForSeoResponse> {
@@ -342,6 +355,88 @@ async function apiCall(endpoint: string, body: unknown[], workspaceId?: string):
   return json;
 }
 
+async function apiGet(endpoint: string, workspaceId?: string): Promise<DataForSeoResponse> {
+  const startedAt = Date.now();
+  const operation = `dataforseo:${endpoint}`;
+  let json: DataForSeoResponse;
+  try {
+    json = await fetchProviderJson<DataForSeoResponse>({
+      url: `https://api.dataforseo.com/v3/${endpoint}`,
+      method: 'GET',
+      headers: {
+        'Authorization': authHeader(),
+        'Content-Type': 'application/json',
+      },
+      timeoutMs: 20_000,
+      redirect: 'follow',
+      logContext: { module: 'dataforseo', endpoint },
+    });
+  } catch (err) {
+    if (isExternalFetchError(err)) {
+      const durationMs = Date.now() - startedAt;
+      recordExternalApiTelemetry({
+        provider: 'dataforseo',
+        endpoint,
+        workspaceId,
+        durationMs,
+        status: 'error',
+        errorKind: err.kind,
+      });
+      recordOperationTrace({
+        source: 'integration',
+        operation,
+        status: 'error',
+        workspaceId,
+        durationMs,
+        message: `DataForSEO fetch ${err.kind}${err.status ? ` ${err.status}` : ''}`,
+      });
+      throw new Error(`DataForSEO ${endpoint} ${err.kind}${err.status ? ` ${err.status}` : ''}: ${err.responseBodySnippet || err.message}`);
+    }
+    throw err;
+  }
+
+  const task = json.tasks?.[0];
+  if (task && task.status_code !== 20000) {
+    const msg = task.status_message || 'Unknown error';
+    const durationMs = Date.now() - startedAt;
+    recordExternalApiTelemetry({
+      provider: 'dataforseo',
+      endpoint,
+      workspaceId,
+      durationMs,
+      status: 'error',
+      errorKind: 'task_error',
+    });
+    recordOperationTrace({
+      source: 'integration',
+      operation,
+      status: 'error',
+      workspaceId,
+      durationMs,
+      message: `task ${task.status_code}: ${msg}`,
+    });
+    throw new Error(`DataForSEO ${endpoint} task error ${task.status_code}: ${msg}`);
+  }
+
+  const durationMs = Date.now() - startedAt;
+  recordExternalApiTelemetry({
+    provider: 'dataforseo',
+    endpoint,
+    workspaceId,
+    durationMs,
+    status: 'success',
+  });
+  recordOperationTrace({
+    source: 'integration',
+    operation,
+    status: 'success',
+    workspaceId,
+    durationMs,
+    message: `DataForSEO ${endpoint} success`,
+  });
+  return json;
+}
+
 function getTaskResult(json: DataForSeoResponse): Record<string, unknown>[] {
   const result = json.tasks?.[0]?.result;
   if (!result || !Array.isArray(result)) return [];
@@ -355,6 +450,50 @@ function getTaskCost(json: DataForSeoResponse): number {
 function normalizeMonthlyTrend(kwInfo: Record<string, unknown> | undefined): number[] | undefined {
   const monthlies = kwInfo?.monthly_searches as Array<{ search_volume?: number }> | undefined;
   return monthlies ? monthlies.map(m => m.search_volume ?? 0) : undefined;
+}
+
+function countryIsoForLocations(country: string): string | undefined {
+  const normalized = normalizeLocalSeoCountryName(country).toLowerCase();
+  if (normalized === 'united states') return 'us';
+  if (/^[a-z]{2}$/i.test(country.trim())) return country.trim().toLowerCase();
+  return undefined;
+}
+
+function localLocationKey(value: string | undefined): string {
+  return (value ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function scoreLocalLocation(row: DataForSeoLocationRow, request: LocalSeoLocationLookupRequest): number {
+  const locationName = row.location_name ?? '';
+  if (!locationName || typeof row.location_code !== 'number') return 0;
+  const expectedName = buildDataForSeoLocationName(request);
+  const expectedKey = localLocationKey(expectedName);
+  const locationKey = localLocationKey(locationName);
+  const cityKey = localLocationKey(request.city);
+  const stateKey = localLocationKey(request.stateOrRegion);
+  const countryKey = localLocationKey(normalizeLocalSeoCountryName(request.country));
+  let score = 0;
+  if (expectedKey && locationKey === expectedKey) score += 100;
+  if (cityKey && locationKey.split(' ').includes(cityKey)) score += 35;
+  if (stateKey && locationKey.includes(stateKey)) score += 25;
+  if (countryKey && locationKey.includes(countryKey)) score += 20;
+  if (/city/i.test(row.location_type ?? '')) score += 15;
+  if (/state|region|country/i.test(row.location_type ?? '')) score -= 15;
+  if (!stateKey && /united states/i.test(normalizeLocalSeoCountryName(request.country))) score -= 20;
+  return score;
+}
+
+function normalizeLocationCandidate(row: DataForSeoLocationRow, request: LocalSeoLocationLookupRequest): LocalSeoLocationLookupCandidate | null {
+  if (typeof row.location_code !== 'number' || !row.location_name) return null;
+  const score = scoreLocalLocation(row, request);
+  if (score <= 0) return null;
+  return {
+    providerLocationCode: row.location_code,
+    providerLocationName: row.location_name,
+    countryIsoCode: row.country_iso_code,
+    locationType: row.location_type,
+    score,
+  };
 }
 
 function evidenceFromKeywordData(
@@ -912,6 +1051,58 @@ export class DataForSeoProvider implements SeoDataProvider {
     }
   }
 
+  async resolveLocalSeoLocation(request: LocalSeoLocationLookupRequest, workspaceId: string): Promise<LocalSeoLocationLookupResponse> {
+    const countryIso = countryIsoForLocations(request.country);
+    const cacheKey = ['local_locations', countryIso ?? 'all'].join('_');
+    let rows = readCache<DataForSeoLocationRow[]>(workspaceId, cacheKey, CACHE_TTL_LOCAL_LOCATIONS);
+
+    try {
+      if (!rows) {
+        const endpoint = countryIso ? `serp/google/locations/${countryIso}` : 'serp/google/locations';
+        const json = await apiGet(endpoint, workspaceId);
+        rows = getTaskResult(json) as DataForSeoLocationRow[];
+        writeCache(workspaceId, cacheKey, rows);
+        logCreditUsage({ credits: 0, endpoint: 'local_location_lookup', query: countryIso ?? 'all', rowsReturned: rows.length, workspaceId, cached: false });
+      } else {
+        logCreditUsage({ credits: 0, endpoint: 'local_location_lookup', query: countryIso ?? 'all', rowsReturned: rows.length, workspaceId, cached: true });
+      }
+
+      const candidates = rows
+        .map(row => normalizeLocationCandidate(row, request))
+        .filter((candidate): candidate is LocalSeoLocationLookupCandidate => candidate !== null)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5);
+
+      const bestCandidate = candidates[0];
+      if (!bestCandidate) {
+        return {
+          query: request,
+          status: LOCAL_SEO_LOCATION_LOOKUP_STATUS.NOT_FOUND,
+          candidates: [],
+          degradedReason: 'No matching DataForSEO location found for this market.',
+        };
+      }
+
+      const status = bestCandidate.score >= 95 || candidates.length === 1
+        ? LOCAL_SEO_LOCATION_LOOKUP_STATUS.MATCHED
+        : LOCAL_SEO_LOCATION_LOOKUP_STATUS.AMBIGUOUS;
+      return {
+        query: request,
+        status,
+        candidates,
+        bestCandidate,
+      };
+    } catch (err) {
+      log.error({ err, request }, 'DataForSEO local location lookup error');
+      return {
+        query: request,
+        status: LOCAL_SEO_LOCATION_LOOKUP_STATUS.PROVIDER_FAILED,
+        candidates: [],
+        degradedReason: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
   async getLocalVisibility(request: LocalVisibilityProviderRequest, workspaceId: string): Promise<LocalVisibilityProviderResult> {
     const keyword = request.keyword.trim();
     const market = request.market;
@@ -954,7 +1145,7 @@ export class DataForSeoProvider implements SeoDataProvider {
         : market.providerLocationName
           ? { location_name: market.providerLocationName }
           : typeof market.latitude === 'number' && typeof market.longitude === 'number'
-            ? { location_coordinate: `${market.latitude},${market.longitude},10z` }
+            ? { location_coordinate: `${market.latitude},${market.longitude},200` }
             : null;
       if (!locationSelector) {
         throw new Error('Local visibility requires a DataForSEO location code, location name, or coordinates');

@@ -59,7 +59,12 @@ describe('Local SEO routes', () => {
     expect(body.settings).toEqual(expect.objectContaining({ posture: 'unknown' }));
     expect(body.settings.suggestionReasons.length).toBeGreaterThan(0);
     expect(body.suggestedMarkets).toEqual(expect.arrayContaining([
-      expect.objectContaining({ label: 'Austin, TX', city: 'Austin', status: 'needs_review' }),
+      expect.objectContaining({
+        label: 'Austin, TX',
+        city: 'Austin',
+        status: 'needs_review',
+        providerLocationName: 'Austin,Texas,United States',
+      }),
     ]));
     expect(body.caps).toEqual({ maxMarkets: 3, maxKeywordsPerRefresh: 25 });
     expect(body.latestSnapshots).toEqual([]);
@@ -98,6 +103,17 @@ describe('Local SEO routes', () => {
       activeMarketCount: 1,
       setupState: 'ready_no_data',
     }));
+  });
+
+  it('GET location lookup validates admin-entered market fields', async () => {
+    const res = await api(`/api/local-seo/${workspaceId}/location-lookup?city=Austin&stateOrRegion=TX&country=US`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual(expect.objectContaining({
+      query: expect.objectContaining({ city: 'Austin', stateOrRegion: 'TX', country: 'US' }),
+      candidates: expect.any(Array),
+    }));
+    expect(['matched', 'ambiguous', 'not_found', 'provider_unavailable', 'provider_failed']).toContain(body.status);
   });
 
   it('redacts local SEO state and rejects writes while the feature flag is disabled', async () => {

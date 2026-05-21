@@ -760,6 +760,39 @@ describe('DataForSeoProvider — local visibility', () => {
     updatedAt: '2026-05-20T00:00:00.000Z',
   };
 
+  it('resolves local SEO market input to a DataForSEO location code', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(dfsTaskResponse([{
+        location_code: 1026201,
+        location_name: 'Austin,Texas,United States',
+        country_iso_code: 'US',
+        location_type: 'City',
+      }, {
+        location_code: 21176,
+        location_name: 'Texas,United States',
+        country_iso_code: 'US',
+        location_type: 'State',
+      }])),
+    } as Response);
+
+    const result = await provider.resolveLocalSeoLocation({
+      city: 'Austin',
+      stateOrRegion: 'TX',
+      country: 'US',
+    }, 'ws-local-provider');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(String(fetchSpy.mock.calls[0][0])).toContain('serp/google/locations/us');
+    expect(result.status).toBe('matched');
+    expect(result.bestCandidate).toEqual(expect.objectContaining({
+      providerLocationCode: 1026201,
+      providerLocationName: 'Austin,Texas,United States',
+    }));
+  });
+
   it('uses Google organic SERP local-pack payload guardrails', async () => {
     reapplyFsMocks();
     const provider = new DataForSeoProvider();
@@ -815,7 +848,7 @@ describe('DataForSeoProvider — local visibility', () => {
     const [, init] = fetchSpy.mock.calls[0];
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body[0]).toEqual(expect.objectContaining({
-      location_coordinate: '30.2672,-97.7431,10z',
+      location_coordinate: '30.2672,-97.7431,200',
     }));
     expect(body[0]).not.toHaveProperty('location_code');
     expect(body[0]).not.toHaveProperty('location_name');
@@ -855,6 +888,11 @@ describe('DataForSeoProvider — local visibility', () => {
     }, 'ws-local-provider');
 
     expect(fetchSpy).toHaveBeenCalledTimes(2);
+    const firstBody = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string);
+    expect(firstBody[0]).toEqual(expect.objectContaining({
+      location_name: 'Austin,Texas,United States',
+    }));
+    expect(firstBody[0]).not.toHaveProperty('location_code');
   });
 
   it('normalizes nested local pack items into provider results', async () => {

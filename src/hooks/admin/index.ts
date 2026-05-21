@@ -26,7 +26,7 @@ export { useActionQueue } from './useActionQueue';
 export { useClientSignals, useUpdateSignalStatus, useCreateClientSignal } from './useClientSignals';
 export { useNotifications, type NotificationItem } from './useNotifications';
 export { useAdminMeetingBrief } from './useAdminMeetingBrief';
-export { useLocalSeo, useLocalSeoRefresh, useLocalSeoUpdate } from './useLocalSeo';
+export { useLocalSeo, useLocalSeoLocationLookup, useLocalSeoRefresh, useLocalSeoUpdate } from './useLocalSeo';
 export { useBlueprints, useBlueprint, useBlueprintVersions } from './useBlueprints';
 export * from './useCopyPipeline';
 export { usePageJoin } from './usePageJoin';

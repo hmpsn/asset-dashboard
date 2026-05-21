@@ -95,6 +95,39 @@ export interface LocalSeoMarket {
   updatedAt: string;
 }
 
+export const LOCAL_SEO_LOCATION_LOOKUP_STATUS = {
+  MATCHED: 'matched',
+  AMBIGUOUS: 'ambiguous',
+  NOT_FOUND: 'not_found',
+  PROVIDER_UNAVAILABLE: 'provider_unavailable',
+  PROVIDER_FAILED: 'provider_failed',
+} as const;
+
+export type LocalSeoLocationLookupStatus =
+  typeof LOCAL_SEO_LOCATION_LOOKUP_STATUS[keyof typeof LOCAL_SEO_LOCATION_LOOKUP_STATUS];
+
+export interface LocalSeoLocationLookupRequest {
+  city: string;
+  stateOrRegion?: string;
+  country: string;
+}
+
+export interface LocalSeoLocationLookupCandidate {
+  providerLocationCode: number;
+  providerLocationName: string;
+  countryIsoCode?: string;
+  locationType?: string;
+  score: number;
+}
+
+export interface LocalSeoLocationLookupResponse {
+  query: LocalSeoLocationLookupRequest;
+  status: LocalSeoLocationLookupStatus;
+  candidates: LocalSeoLocationLookupCandidate[];
+  bestCandidate?: LocalSeoLocationLookupCandidate;
+  degradedReason?: string;
+}
+
 export interface LocalSeoWorkspaceSettings {
   workspaceId: string;
   posture: LocalSeoPosture;

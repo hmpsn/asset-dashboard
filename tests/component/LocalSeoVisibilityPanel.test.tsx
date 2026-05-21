@@ -6,6 +6,7 @@ import type { LocalSeoReadResponse } from '../../shared/types/local-seo';
 const updateMutateAsync = vi.fn();
 const refreshMutate = vi.fn();
 const refreshMutateAsync = vi.fn();
+const locationLookupMutateAsync = vi.fn();
 
 let localSeoData: LocalSeoReadResponse;
 
@@ -23,6 +24,11 @@ vi.mock('../../src/hooks/admin', () => ({
   }),
   useLocalSeoUpdate: () => ({
     mutateAsync: updateMutateAsync,
+    isPending: false,
+    error: null,
+  }),
+  useLocalSeoLocationLookup: () => ({
+    mutateAsync: locationLookupMutateAsync,
     isPending: false,
     error: null,
   }),
@@ -98,7 +104,7 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
         city: 'Austin',
         stateOrRegion: 'TX',
         country: 'US',
-        providerLocationName: 'Austin,TX,United States',
+        providerLocationName: 'Austin,Texas,United States',
         source: 'admin_override',
         status: 'active',
         createdAt: '2026-05-20T12:00:00.000Z',
@@ -106,6 +112,24 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
       }],
     });
     refreshMutateAsync.mockResolvedValue({ jobId: 'job-1', selectedKeywordCount: 5, selectedMarketCount: 1 });
+    locationLookupMutateAsync.mockResolvedValue({
+      query: { city: 'Austin', stateOrRegion: 'TX', country: 'US' },
+      status: 'matched',
+      candidates: [{
+        providerLocationCode: 1026201,
+        providerLocationName: 'Austin,Texas,United States',
+        countryIsoCode: 'US',
+        locationType: 'City',
+        score: 100,
+      }],
+      bestCandidate: {
+        providerLocationCode: 1026201,
+        providerLocationName: 'Austin,Texas,United States',
+        countryIsoCode: 'US',
+        locationType: 'City',
+        score: 100,
+      },
+    });
   });
 
   it('renders Configure market when local visibility needs setup', () => {
@@ -129,10 +153,25 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
         city: 'Austin',
         stateOrRegion: 'TX',
         country: 'US',
-        providerLocationName: 'Austin,TX,United States',
+        providerLocationCode: 1026201,
+        providerLocationName: 'Austin,Texas,United States',
         status: 'active',
       })],
     }));
+  });
+
+  it('can match a provider location code from entered city, state, and country', async () => {
+    localSeoData = makeReadResponse({ suggestedMarkets: [] });
+    render(<LocalSeoVisibilityPanel workspaceId="ws-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /configure market/i }));
+    fireEvent.click(screen.getByRole('button', { name: /add market/i }));
+    fireEvent.change(screen.getByLabelText(/market label/i), { target: { value: 'Austin, TX' } });
+    fireEvent.change(screen.getByLabelText(/^city/i), { target: { value: 'Austin' } });
+    fireEvent.change(screen.getByLabelText(/state \/ region/i), { target: { value: 'TX' } });
+    fireEvent.click(screen.getByRole('button', { name: /match location/i }));
+
+    expect(await screen.findByText(/DataForSEO #1026201/i)).toBeInTheDocument();
   });
 
   it('does not submit active markets without provider identity', async () => {
@@ -190,7 +229,7 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
           city: 'Austin',
           stateOrRegion: 'TX',
           country: 'US',
-          providerLocationName: 'Austin,TX,United States',
+          providerLocationName: 'Austin,Texas,United States',
           source: 'admin_override',
           status: 'active',
           createdAt: '2026-05-20T12:00:00.000Z',
@@ -203,7 +242,7 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
           city: 'Round Rock',
           stateOrRegion: 'TX',
           country: 'US',
-          providerLocationName: 'Round Rock,TX,United States',
+          providerLocationName: 'Round Rock,Texas,United States',
           source: 'admin_override',
           status: 'active',
           createdAt: '2026-05-20T12:00:00.000Z',
@@ -227,7 +266,7 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
     }));
   });
 
-  it('sends nulls when clearing saved numeric provider fields', async () => {
+  it('regenerates provider code while preserving cleared coordinate fields', async () => {
     localSeoData = makeReadResponse({
       settings: { posture: 'local' },
       markets: [{
@@ -238,7 +277,7 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
         stateOrRegion: 'TX',
         country: 'US',
         providerLocationCode: 1026201,
-        providerLocationName: 'Austin,TX,United States',
+        providerLocationName: 'Austin,Texas,United States',
         latitude: 30.2672,
         longitude: -97.7431,
         source: 'admin_override',
@@ -261,10 +300,10 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
       posture: 'local',
       markets: [expect.objectContaining({
         id: 'market-austin',
-        providerLocationCode: null,
+        providerLocationCode: 1026201,
         latitude: null,
         longitude: null,
-        providerLocationName: 'Austin,TX,United States',
+        providerLocationName: 'Austin,Texas,United States',
       })],
     }));
   });
