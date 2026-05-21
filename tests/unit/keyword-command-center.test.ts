@@ -1188,6 +1188,28 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
     expect(row!.metrics.difficulty).toBe(55);
   });
 
+  it('tracking.hasSignal is true when the row has GSC metrics', async () => {
+    // Regression: Swish audit found 175/235 (74%) of active-tracked rows had no
+    // rank/clicks/impressions — tracked in name only. hasSignal distinguishes
+    // active-with-data from active-but-empty so the UI can render "Awaiting data".
+    addTrackedKeyword(workspaceId, 'has signal keyword', { source: TRACKED_KEYWORD_SOURCE.MANUAL });
+    storeRankSnapshot(workspaceId, '2026-05-20', [
+      { query: 'has signal keyword', position: 8, clicks: 15, impressions: 600, ctr: 0.025 },
+    ]);
+
+    const detail = await buildKeywordCommandCenterDetail(workspaceId, 'has signal keyword');
+    expect(detail!.row.tracking.hasSignal).toBe(true);
+  });
+
+  it('tracking.hasSignal is false when active-tracked row has no rank or GSC metrics', async () => {
+    addTrackedKeyword(workspaceId, 'awaiting data keyword', { source: TRACKED_KEYWORD_SOURCE.MANUAL });
+    // No snapshot stored — keyword is tracked but no signal has materialized
+
+    const detail = await buildKeywordCommandCenterDetail(workspaceId, 'awaiting data keyword');
+    expect(detail!.row.tracking.status).toBe(TRACKED_KEYWORD_STATUS.ACTIVE);
+    expect(detail!.row.tracking.hasSignal).toBe(false);
+  });
+
   it('localCandidates summary count is intentionally 0 (computed off the hot path; follow-up cache)', async () => {
     // PR #876 introduced a generator-backed count here, but on rich workspaces
     // (Swish: 235 tracked + 50 pages + variants) that took ~35s because every

@@ -132,6 +132,17 @@ export interface KeywordCommandCenterTrackingState {
   pageTitle?: string;
   replacedBy?: string;
   deprecatedAt?: string;
+  /**
+   * True when the row has any rank/clicks/impressions data, false when the keyword
+   * is `active` (or paused) but no rank snapshot or GSC signal has materialized.
+   *
+   * `undefined` for `not_tracked` rows (signal is irrelevant when not tracking).
+   *
+   * Set in `finalizeDraftRow` based on `row.metrics.currentPosition` / `clicks` /
+   * `impressions`. Used by the UI to show an "Awaiting data" sub-state distinct
+   * from genuine active-with-signal tracking.
+   */
+  hasSignal?: boolean;
 }
 
 export interface KeywordCommandCenterNextAction {
