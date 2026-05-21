@@ -567,6 +567,12 @@ function filterCount(rows: KeywordCommandCenterRow[], filter: KeywordCommandCent
   return rows.filter(row => row.lifecycleStatus === filter).length;
 }
 
+export function filterNeedsLocalCandidates(filter: KeywordCommandCenterFilter | undefined): boolean {
+  return filter === KEYWORD_COMMAND_CENTER_FILTERS.LOCAL
+    || filter === KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES
+    || filter === KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED;
+}
+
 function buildCounts(rows: KeywordCommandCenterRow[]): KeywordCommandCenterCounts {
   return {
     total: rows.length,
@@ -604,6 +610,48 @@ function buildFilters(rows: KeywordCommandCenterRow[]): KeywordCommandCenterFilt
   return filters.map(filter => ({ ...filter, count: filterCount(rows, filter.id) }));
 }
 
+interface SkinnyFilterCounts {
+  all: number;
+  inStrategy: number;
+  tracked: number;
+  needsReview: number;
+  content: number;
+  pageAssigned: number;
+  rawEvidence: number;
+  local: number;
+  localCandidates: number;
+  visibleLocally: number;
+  possibleMatch: number;
+  notVisible: number;
+  notChecked: number;
+  providerDegraded: number;
+  requested: number;
+  declined: number;
+  retired: number;
+}
+
+function buildFilterFacetsFromCounts(counts: SkinnyFilterCounts): KeywordCommandCenterFilterMeta[] {
+  return [
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.ALL, label: 'All', count: counts.all },
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY, label: 'In Strategy', count: counts.inStrategy },
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.TRACKED, label: 'Tracked', count: counts.tracked },
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.NEEDS_REVIEW, label: 'Needs Review', count: counts.needsReview },
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.CONTENT, label: 'Content', count: counts.content },
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.PAGE_ASSIGNED, label: 'Page Assigned', count: counts.pageAssigned },
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.RAW_EVIDENCE, label: 'Raw Evidence', count: counts.rawEvidence },
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL, label: 'Local', count: counts.local },
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES, label: 'Local Candidates', count: counts.localCandidates },
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.VISIBLE_LOCALLY, label: 'Visible Locally', count: counts.visibleLocally },
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.POSSIBLE_MATCH, label: 'Possible Match', count: counts.possibleMatch },
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.NOT_VISIBLE, label: 'Not Visible', count: counts.notVisible },
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED, label: 'Not Checked', count: counts.notChecked },
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.PROVIDER_DEGRADED, label: 'Provider Degraded', count: counts.providerDegraded },
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.REQUESTED, label: 'Requested', count: counts.requested },
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.DECLINED, label: 'Declined', count: counts.declined },
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.RETIRED, label: 'Retired', count: counts.retired },
+  ];
+}
+
 async function buildKeywordCommandCenterModel(
   workspaceId: string,
   options: {
@@ -616,8 +664,10 @@ async function buildKeywordCommandCenterModel(
 ): Promise<KeywordCommandCenterResponse | null> {
   const startedAt = Date.now();
   const marks: Record<string, number> = {};
+  const heap: Record<string, number> = {};
   const mark = (stage: string) => {
     marks[stage] = Date.now() - startedAt;
+    heap[stage.replace(/Ms$/, 'HeapMb')] = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
   };
   const workspace = getWorkspace(workspaceId);
   if (!workspace) return null;
@@ -635,7 +685,7 @@ async function buildKeywordCommandCenterModel(
       ? buildLocalSeoKeywordVisibilityByKey(workspace.id)
       : buildLocalSeoKeywordVisibilitySummaryByKey(workspace.id)
     : new Map();
-  const localCandidates = options.includeLocalSeo && options.includeLocalCandidates !== false
+  const localCandidates = options.includeLocalSeo && options.includeLocalCandidates === true
     ? buildLocalSeoKeywordCandidates(workspace.id).slice(0, LOCAL_CANDIDATE_ROW_LIMIT)
     : [];
   const activeLocalMarketCount = options.includeLocalSeo
@@ -866,7 +916,9 @@ async function buildKeywordCommandCenterModel(
     rawEvidenceTotal: rawEvidenceRows.length,
     rawEvidenceReturned: allowedRawEvidence.size,
     ...marks,
+    ...heap,
     totalMs: Date.now() - startedAt,
+    finalHeapMb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
   }, 'keyword command center read model built');
 
   return {
@@ -896,20 +948,127 @@ export async function buildKeywordCommandCenterSummary(
   workspaceId: string,
   options: { includeLocalSeo?: boolean } = {},
 ): Promise<KeywordCommandCenterSummaryResponse | null> {
-  const payload = await buildKeywordCommandCenterModel(workspaceId, {
-    includeLocalSeo: options.includeLocalSeo,
-    includeLocalSeoDetails: false,
-    includeLocalCandidates: true,
-    includeStrategyUx: false,
-    timingLabel: 'summary',
-  });
-  if (!payload) return null;
+  const startedAt = Date.now();
+  const workspace = getWorkspace(workspaceId);
+  if (!workspace) return null;
+
+  const allKeys = new Set<string>();
+  const inStrategyKeys = new Set<string>();
+  const pageAssignedKeys = new Set<string>();
+  const contentKeys = new Set<string>();
+  const rawEvidenceKeys = new Set<string>();
+  const addKey = (target: Set<string>, keyword: string | undefined) => {
+    const key = keywordComparisonKey(keyword ?? '');
+    if (!key) return;
+    target.add(key);
+    allKeys.add(key);
+  };
+
+  for (const metric of workspace.keywordStrategy?.siteKeywordMetrics ?? []) addKey(inStrategyKeys, metric.keyword);
+  for (const keyword of workspace.keywordStrategy?.siteKeywords ?? []) addKey(inStrategyKeys, keyword);
+
+  for (const page of listPageKeywords(workspace.id)) {
+    addKey(pageAssignedKeys, page.primaryKeyword);
+    addKey(inStrategyKeys, page.primaryKeyword);
+    for (const secondary of page.secondaryKeywords ?? []) {
+      addKey(pageAssignedKeys, secondary);
+      addKey(inStrategyKeys, secondary);
+    }
+  }
+
+  const contentGaps = listContentGaps(workspace.id);
+  for (const gap of contentGaps) {
+    addKey(contentKeys, gap.targetKeyword);
+    addKey(inStrategyKeys, gap.targetKeyword);
+  }
+
+  const keywordGaps = listKeywordGaps(workspace.id);
+  for (const gap of keywordGaps) addKey(rawEvidenceKeys, gap.keyword);
+
+  const trackedKeywords = getTrackedKeywords(workspace.id, { includeInactive: true });
+  for (const tracked of trackedKeywords) addKey(allKeys, tracked.query);
+  const trackedKeys = new Set(trackedKeywords.map(keyword => keywordComparisonKey(keyword.query)).filter(Boolean));
+
+  const feedback = readFeedback(workspace.id);
+  for (const row of feedback.values()) addKey(allKeys, row.keyword);
+  const feedbackKeys = new Set([...feedback.keys()]);
+
+  const latestRanks = getLatestSnapshotRanks(workspace.id);
+  const rankEvidenceKeys = new Set<string>();
+  for (const rank of latestRanks
+    .filter(rank => !allKeys.has(keywordComparisonKey(rank.query)))
+    .sort((a, b) => (b.impressions ?? 0) - (a.impressions ?? 0))
+    .slice(0, RANK_EVIDENCE_ROW_LIMIT)) {
+    addKey(rankEvidenceKeys, rank.query);
+  }
+
+  const activeTracked = trackedKeywords.filter(keyword => (keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE);
+  const inactiveTracked = trackedKeywords.filter(keyword => (keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) !== TRACKED_KEYWORD_STATUS.ACTIVE);
+  const requested = [...feedback.values()].filter(row => row.status === 'requested');
+  const declined = [...feedback.values()].filter(row => row.status === 'declined');
+  const rawEvidenceOnlyKeys = new Set(
+    [...rawEvidenceKeys].filter(key =>
+      !inStrategyKeys.has(key)
+      && !trackedKeys.has(key)
+      && !feedbackKeys.has(key)
+    ),
+  );
+  const localVisibility = options.includeLocalSeo ? buildLocalSeoKeywordVisibilitySummaryByKey(workspace.id) : new Map();
+  for (const key of localVisibility.keys()) allKeys.add(key);
+  const localVisibilityValues = [...localVisibility.values()];
+
+  const counts: KeywordCommandCenterCounts = {
+    total: allKeys.size,
+    inStrategy: inStrategyKeys.size,
+    tracked: activeTracked.length,
+    needsReview: requested.length + rankEvidenceKeys.size,
+    evidence: rawEvidenceOnlyKeys.size,
+    local: localVisibility.size,
+    localCandidates: 0,
+    retired: inactiveTracked.length,
+    declined: declined.length,
+  };
+  const filterCounts: SkinnyFilterCounts = {
+    all: counts.total,
+    inStrategy: counts.inStrategy,
+    tracked: counts.tracked,
+    needsReview: counts.needsReview,
+    content: contentKeys.size,
+    pageAssigned: pageAssignedKeys.size,
+    rawEvidence: counts.evidence,
+    local: counts.local,
+    localCandidates: 0,
+    visibleLocally: localVisibilityValues.filter(item => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE).length,
+    possibleMatch: localVisibilityValues.filter(item => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.POSSIBLE_MATCH).length,
+    notVisible: localVisibilityValues.filter(item =>
+      item.posture === LOCAL_SEO_VISIBILITY_POSTURE.NOT_VISIBLE
+      || item.posture === LOCAL_SEO_VISIBILITY_POSTURE.LOCAL_PACK_PRESENT,
+    ).length,
+    notChecked: 0,
+    providerDegraded: localVisibilityValues.filter(item => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.PROVIDER_DEGRADED).length,
+    requested: requested.length,
+    declined: declined.length,
+    retired: inactiveTracked.length,
+  };
+
+  log.info({
+    workspaceId,
+    mode: 'summary-skinny',
+    totalKeys: counts.total,
+    trackedCount: trackedKeywords.length,
+    contentGapCount: contentGaps.length,
+    keywordGapCount: keywordGaps.length,
+    localVisibilityCount: localVisibility.size,
+    totalMs: Date.now() - startedAt,
+    finalHeapMb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+  }, 'keyword command center summary built');
+
   return {
-    counts: payload.counts,
-    filters: payload.filters,
-    rawEvidenceTotal: payload.rawEvidenceTotal,
-    rawEvidenceReturned: payload.rawEvidenceReturned,
-    generatedAt: payload.generatedAt,
+    counts,
+    filters: buildFilterFacetsFromCounts(filterCounts),
+    rawEvidenceTotal: rawEvidenceOnlyKeys.size,
+    rawEvidenceReturned: Math.min(counts.evidence, RAW_EVIDENCE_ROW_LIMIT),
+    generatedAt: workspace.keywordStrategy?.generatedAt ?? null,
     summarizedAt: new Date().toISOString(),
   };
 }
@@ -919,15 +1078,15 @@ export async function buildKeywordCommandCenterRows(
   query: KeywordCommandCenterRowsQuery = {},
   options: { includeLocalSeo?: boolean } = {},
 ): Promise<KeywordCommandCenterRowsResponse | null> {
+  const filter = query.filter ?? KEYWORD_COMMAND_CENTER_FILTERS.ALL;
   const payload = await buildKeywordCommandCenterModel(workspaceId, {
     includeLocalSeo: options.includeLocalSeo,
     includeLocalSeoDetails: false,
-    includeLocalCandidates: true,
+    includeLocalCandidates: filterNeedsLocalCandidates(filter),
     includeStrategyUx: false,
     timingLabel: 'rows',
   });
   if (!payload) return null;
-  const filter = query.filter ?? KEYWORD_COMMAND_CENTER_FILTERS.ALL;
   const filtered = payload.rows
     .filter(row => matchesFilter(row, filter))
     .filter(row => matchesSearch(row, query.search))

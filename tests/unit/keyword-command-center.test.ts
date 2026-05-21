@@ -7,6 +7,7 @@ import {
   buildKeywordCommandCenterDetail,
   buildKeywordCommandCenterRows,
   buildKeywordCommandCenterSummary,
+  filterNeedsLocalCandidates,
 } from '../../server/keyword-command-center.js';
 import { replaceAllContentGaps } from '../../server/content-gaps.js';
 import { replaceAllKeywordGaps } from '../../server/keyword-gaps.js';
@@ -14,13 +15,14 @@ import { upsertPageKeyword } from '../../server/page-keywords.js';
 import { addTrackedKeyword, getTrackedKeywords, storeRankSnapshot } from '../../server/rank-tracking.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { createJob, clearCompletedJobs } from '../../server/jobs.js';
-import { updateLocalSeoConfiguration, runLocalSeoRefreshJob } from '../../server/local-seo.js';
+import { buildLocalSeoKeywordCandidates, updateLocalSeoConfiguration, runLocalSeoRefreshJob } from '../../server/local-seo.js';
 import { FakeSeoProvider } from '../../server/providers/fake-seo-provider.js';
 import { _resetRegistryForTest, registerProvider } from '../../server/seo-data-provider.js';
 import { keywordComparisonKey, normalizeKeywordForComparison } from '../../shared/keyword-normalization.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import {
   KEYWORD_COMMAND_CENTER_ACTIONS,
+  KEYWORD_COMMAND_CENTER_FILTERS,
   KEYWORD_COMMAND_CENTER_STATUS,
 } from '../../shared/types/keyword-command-center.js';
 import { LOCAL_SEO_MARKET_STATUS, LOCAL_SEO_POSTURE, LOCAL_SEO_VISIBILITY_POSTURE } from '../../shared/types/local-seo.js';
@@ -159,6 +161,16 @@ describe('normalizeKeywordForComparison', () => {
 });
 
 describe('buildKeywordCommandCenter', () => {
+  it('only opts into expensive local candidates for local candidate filters', () => {
+    expect(filterNeedsLocalCandidates(KEYWORD_COMMAND_CENTER_FILTERS.LOCAL)).toBe(true);
+    expect(filterNeedsLocalCandidates(KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES)).toBe(true);
+    expect(filterNeedsLocalCandidates(KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED)).toBe(true);
+    expect(filterNeedsLocalCandidates(KEYWORD_COMMAND_CENTER_FILTERS.ALL)).toBe(false);
+    expect(filterNeedsLocalCandidates(KEYWORD_COMMAND_CENTER_FILTERS.VISIBLE_LOCALLY)).toBe(false);
+    expect(filterNeedsLocalCandidates(KEYWORD_COMMAND_CENTER_FILTERS.POSSIBLE_MATCH)).toBe(false);
+    expect(filterNeedsLocalCandidates(KEYWORD_COMMAND_CENTER_FILTERS.TRACKED)).toBe(false);
+  });
+
   it('merges strategy, tracking, feedback, raw evidence, and rank evidence into one keyword row set', async () => {
     seedStrategy();
     addTrackedKeyword(workspaceId, 'cosmetic dentistry', {
@@ -232,15 +244,34 @@ describe('buildKeywordCommandCenter', () => {
       competitorPosition: 3 + index,
       competitorDomain: 'competitor.example',
     })));
+    storeRankSnapshot(workspaceId, '2026-05-21', [
+      { query: 'untracked gsc opportunity', position: 12, clicks: 2, impressions: 240, ctr: 0.008 },
+    ]);
 
     const summary = await buildKeywordCommandCenterSummary(workspaceId);
     expect(summary).toEqual(expect.objectContaining({
-      counts: expect.objectContaining({ total: 8, evidence: 8 }),
+      counts: expect.objectContaining({
+        total: 9,
+        inStrategy: expect.any(Number),
+        tracked: expect.any(Number),
+        needsReview: 1,
+        evidence: 8,
+        local: expect.any(Number),
+        localCandidates: expect.any(Number),
+        retired: expect.any(Number),
+        declined: expect.any(Number),
+      }),
       rawEvidenceTotal: 8,
       rawEvidenceReturned: 8,
       summarizedAt: expect.any(String),
     }));
     expect(summary).not.toHaveProperty('rows');
+    expect(summary?.filters).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: KEYWORD_COMMAND_CENTER_FILTERS.ALL, count: 9 }),
+      expect.objectContaining({ id: KEYWORD_COMMAND_CENTER_FILTERS.NEEDS_REVIEW, count: 1 }),
+      expect.objectContaining({ id: KEYWORD_COMMAND_CENTER_FILTERS.RAW_EVIDENCE, count: 8 }),
+      expect.objectContaining({ id: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES, count: 0 }),
+    ]));
 
     const firstPage = await buildKeywordCommandCenterRows(workspaceId, {
       filter: 'raw_evidence',
@@ -434,6 +465,83 @@ describe('buildKeywordCommandCenter', () => {
       expect.objectContaining({ id: 'local_candidates', count: expect.any(Number) }),
       expect.objectContaining({ id: 'not_checked', count: expect.any(Number) }),
     ]));
+  });
+
+  it('keeps local candidates out of default rows and adds them only for local candidate filters', async () => {
+    seedStrategy();
+    updateWorkspace(workspaceId, {
+      name: 'Swish Dental',
+      liveDomain: 'https://swish.example.com',
+      businessProfile: {
+        address: {
+          street: '123 Congress Ave',
+          city: 'Austin',
+          state: 'TX',
+          country: 'US',
+        },
+      },
+    });
+    updateLocalSeoConfiguration(workspaceId, {
+      posture: LOCAL_SEO_POSTURE.LOCAL,
+      markets: [{
+        label: 'Austin, TX',
+        city: 'Austin',
+        stateOrRegion: 'TX',
+        country: 'US',
+        providerLocationCode: 1026201,
+        status: LOCAL_SEO_MARKET_STATUS.ACTIVE,
+      }],
+    }, true);
+
+    const defaultRows = await buildKeywordCommandCenterRows(workspaceId, {
+      filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+      pageSize: 100,
+    }, { includeLocalSeo: true });
+    expect(defaultRows?.rows.some(row => row.normalizedKeyword === 'cosmetic dentistry austin')).toBe(false);
+
+    const localCandidateRows = await buildKeywordCommandCenterRows(workspaceId, {
+      filter: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES,
+      pageSize: 100,
+    }, { includeLocalSeo: true });
+    expect(localCandidateRows?.rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        normalizedKeyword: 'cosmetic dentistry austin',
+        localSeoState: expect.objectContaining({ lifecycle: 'candidate' }),
+      }),
+    ]));
+  });
+
+  it('hard-caps local SEO candidate generation before the candidate map can grow unbounded', () => {
+    updateWorkspace(workspaceId, {
+      name: 'Swish Dental',
+      businessProfile: {
+        address: {
+          street: '123 Congress Ave',
+          city: 'Austin',
+          state: 'TX',
+          country: 'US',
+        },
+      },
+    });
+    updateLocalSeoConfiguration(workspaceId, {
+      posture: LOCAL_SEO_POSTURE.LOCAL,
+      markets: [{
+        label: 'Austin, TX',
+        city: 'Austin',
+        stateOrRegion: 'TX',
+        country: 'US',
+        providerLocationCode: 1026201,
+        status: LOCAL_SEO_MARKET_STATUS.ACTIVE,
+      }],
+    }, true);
+
+    const candidates = buildLocalSeoKeywordCandidates(
+      workspaceId,
+      Array.from({ length: 1_050 }, (_, index) => `cosmetic dentistry austin ${index}`),
+    );
+
+    expect(candidates.length).toBeLessThanOrEqual(1_000);
+    expect(candidates[0]?.score).toBeGreaterThanOrEqual(candidates.at(-1)?.score ?? 0);
   });
 
   it('does not expose local visibility annotations when the local SEO feature is disabled', async () => {
