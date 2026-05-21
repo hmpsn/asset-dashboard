@@ -40,8 +40,7 @@ export async function assembleLocalSeo(workspaceId: string): Promise<LocalSeoSli
   if (!enabled) return baseline;
 
   try {
-    // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-    const localSeoModule = await import('../local-seo.js');
+    const localSeoModule = await import('../local-seo.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
     const {
       listLocalSeoMarkets,
       buildLocalSeoKeywordCandidates,
@@ -215,12 +214,22 @@ export function selectRelevantLocalCandidates(
     c => c.keyword.toLowerCase() === target.toLowerCase(),
   );
   const targetMarketId = targetCandidate?.marketId;
+  // Score each candidate; relevant candidates (token overlap OR market match) get a
+  // large additive boost so they dominate raw-score ordering. Within each tier, score
+  // is the tiebreaker.
+  const RELEVANCE_TIER_BOOST = 1_000_000;
   const scored = slice.candidates.map(c => {
     const cTokens = c.keyword.toLowerCase().split(/\s+/);
     let overlap = 0;
     for (const t of cTokens) if (targetTokens.has(t)) overlap++;
-    const marketBonus = targetMarketId && c.marketId === targetMarketId ? 100 : 0;
-    return { candidate: c, relevance: overlap * 10 + marketBonus + c.score };
+    const marketMatch = targetMarketId && c.marketId === targetMarketId;
+    const isRelevant = overlap > 0 || marketMatch;
+    const relevance =
+      (isRelevant ? RELEVANCE_TIER_BOOST : 0)
+      + overlap * 100
+      + (marketMatch ? 50 : 0)
+      + c.score;
+    return { candidate: c, relevance };
   });
   scored.sort((a, b) => b.relevance - a.relevance);
   return scored.slice(0, limit).map(s => s.candidate);

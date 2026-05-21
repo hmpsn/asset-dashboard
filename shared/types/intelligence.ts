@@ -330,7 +330,7 @@ export interface LocalSeoSlice {
   markets: ReadonlyArray<{
     id: string;
     label: string;
-    status: 'active' | 'inactive' | 'draft' | 'needs_review';
+    status: 'active' | 'inactive' | 'needs_review';
     location: string;
     deviceMix?: ReadonlyArray<'desktop' | 'mobile'>;
   }>;

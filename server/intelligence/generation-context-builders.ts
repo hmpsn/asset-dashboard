@@ -71,10 +71,9 @@ async function buildGenerationContext(
  */
 async function hasActiveLocalMarkets(workspaceId: string): Promise<boolean> {
   try {
-    // dynamic-import-ok - lazy-load local SEO module to keep generation builders light
-    const { listLocalSeoMarkets } = await import('../local-seo.js');
+    const { listLocalSeoMarkets } = await import('../local-seo.js'); // dynamic-import-ok - lazy-load local SEO module to keep generation builders light
     return listLocalSeoMarkets(workspaceId).some(m => m.status === 'active');
-  } catch {
+  } catch { // catch-ok: gating check, missing module or DB error should fall back to "no markets" rather than fail the whole build
     return false;
   }
 }
