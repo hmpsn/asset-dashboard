@@ -253,7 +253,7 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
         aria-label="Configure local market"
         tabIndex={-1}
         // pr-check-disable-next-line -- Brand signature radius intentional for bottom-sheet drawer top corners on mobile, matching StrategyKeywordDrawer.
-        className="fixed inset-x-0 bottom-0 h-[82vh] sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:h-auto sm:w-full sm:max-w-lg bg-[var(--surface-2)] border-t border-[var(--brand-border)] sm:border-t-0 sm:border-l z-[var(--z-modal)] flex flex-col overflow-hidden duration-200 rounded-t-[var(--radius-signature-lg)] sm:rounded-none outline-none animate-in slide-in-from-right" // fixed-inset-ok -- local SEO setup uses the established mobile sheet / desktop drawer pattern.
+        className="fixed inset-x-0 bottom-0 h-[82vh] sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:h-auto sm:w-full sm:max-w-lg bg-[var(--surface-2)] border-t border-[var(--brand-border)] sm:border-t-0 sm:border-l z-[var(--z-modal-fullscreen)] flex flex-col overflow-hidden duration-200 rounded-t-[var(--radius-signature-lg)] sm:rounded-none outline-none animate-in slide-in-from-right" // fixed-inset-ok -- local SEO setup uses the established mobile sheet / desktop drawer pattern above chat widgets.
       >
         <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-[var(--brand-border)] flex-shrink-0">
           <div>
