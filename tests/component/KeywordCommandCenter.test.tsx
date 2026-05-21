@@ -349,6 +349,22 @@ describe('KeywordCommandCenter', () => {
     expect(screen.getByText('No keywords match this view')).toBeInTheDocument();
   });
 
+  it('keeps the command center shell visible and hides stale rows while a filter refetches', async () => {
+    const hooks = await import('../../src/hooks/admin/useKeywordCommandCenter');
+    vi.mocked(hooks.useKeywordCommandCenterRows).mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isFetching: true,
+      error: null,
+    } as ReturnType<typeof hooks.useKeywordCommandCenterRows>);
+
+    renderCommandCenter();
+
+    expect(screen.getByText('Keyword Universe')).toBeInTheDocument();
+    expect(screen.queryByText('cosmetic dentistry')).not.toBeInTheDocument();
+    expect(screen.queryByText('best teeth whitening strips')).not.toBeInTheDocument();
+  });
+
   it('filters local candidates and starts keyword-specific local refreshes', () => {
     renderCommandCenter();
 

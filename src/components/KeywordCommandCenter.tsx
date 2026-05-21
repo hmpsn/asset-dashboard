@@ -546,7 +546,7 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
     runServerAction(row, action);
   };
 
-  if (summary.isLoading || rowsResult.isLoading) {
+  if (summary.isLoading || (!summary.data && rowsResult.isLoading)) {
     return (
       <div className="space-y-5">
         <PageHeader title="Keywords" subtitle="Building the keyword operating layer..." />
@@ -655,7 +655,9 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
                 <p className="t-label text-[var(--brand-text-muted)] text-right">Next</p>
               </div>
 
-              {rows.length === 0 ? (
+              {rowsResult.isFetching ? (
+                <TableSkeleton rows={8} columns={6} />
+              ) : rows.length === 0 ? (
                 <EmptyState
                   icon={Search}
                   title="No keywords match this view"
