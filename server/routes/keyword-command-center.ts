@@ -11,9 +11,16 @@ import { validate, z } from '../middleware/validate.js';
 import {
   applyKeywordCommandCenterAction,
   buildKeywordCommandCenter,
+  buildKeywordCommandCenterDetail,
+  buildKeywordCommandCenterRows,
+  buildKeywordCommandCenterSummary,
 } from '../keyword-command-center.js';
 import { isFeatureEnabled } from '../feature-flags.js';
-import { KEYWORD_COMMAND_CENTER_ACTIONS } from '../../shared/types/keyword-command-center.js';
+import { getWorkspace } from '../workspaces.js';
+import {
+  KEYWORD_COMMAND_CENTER_ACTIONS,
+  KEYWORD_COMMAND_CENTER_FILTERS,
+} from '../../shared/types/keyword-command-center.js';
 
 const router = Router();
 
@@ -32,6 +39,77 @@ const actionSchema = z.object({
   reason: z.string().optional(),
   force: z.boolean().optional(),
 }).strict();
+
+const rowsQuerySchema = z.object({
+  filter: z.enum([
+    KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+    KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY,
+    KEYWORD_COMMAND_CENTER_FILTERS.TRACKED,
+    KEYWORD_COMMAND_CENTER_FILTERS.NEEDS_REVIEW,
+    KEYWORD_COMMAND_CENTER_FILTERS.CONTENT,
+    KEYWORD_COMMAND_CENTER_FILTERS.PAGE_ASSIGNED,
+    KEYWORD_COMMAND_CENTER_FILTERS.RAW_EVIDENCE,
+    KEYWORD_COMMAND_CENTER_FILTERS.LOCAL,
+    KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES,
+    KEYWORD_COMMAND_CENTER_FILTERS.VISIBLE_LOCALLY,
+    KEYWORD_COMMAND_CENTER_FILTERS.POSSIBLE_MATCH,
+    KEYWORD_COMMAND_CENTER_FILTERS.NOT_VISIBLE,
+    KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED,
+    KEYWORD_COMMAND_CENTER_FILTERS.PROVIDER_DEGRADED,
+    KEYWORD_COMMAND_CENTER_FILTERS.REQUESTED,
+    KEYWORD_COMMAND_CENTER_FILTERS.DECLINED,
+    KEYWORD_COMMAND_CENTER_FILTERS.RETIRED,
+  ]).optional(),
+  search: z.string().optional(),
+  sort: z.enum(['priority', 'keyword', 'demand', 'rank']).optional(),
+  page: z.coerce.number().int().min(1).optional(),
+  pageSize: z.coerce.number().int().min(1).max(100).optional(),
+}).strict();
+
+const detailQuerySchema = z.object({
+  keyword: z.string().min(1),
+}).strict();
+
+router.get('/api/webflow/keyword-command-center/:workspaceId/summary', requireWorkspaceAccess('workspaceId'), async (req, res, next) => {
+  try {
+    const payload = await buildKeywordCommandCenterSummary(req.params.workspaceId, {
+      includeLocalSeo: isFeatureEnabled('local-seo-visibility'),
+    });
+    if (!payload) return res.status(404).json({ error: 'Workspace not found' });
+    res.json(payload);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/api/webflow/keyword-command-center/:workspaceId/rows', requireWorkspaceAccess('workspaceId'), async (req, res, next) => {
+  try {
+    const parsed = rowsQuerySchema.safeParse(req.query);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid query' });
+    const payload = await buildKeywordCommandCenterRows(req.params.workspaceId, parsed.data, {
+      includeLocalSeo: isFeatureEnabled('local-seo-visibility'),
+    });
+    if (!payload) return res.status(404).json({ error: 'Workspace not found' });
+    res.json(payload);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/api/webflow/keyword-command-center/:workspaceId/detail', requireWorkspaceAccess('workspaceId'), async (req, res, next) => {
+  try {
+    const parsed = detailQuerySchema.safeParse(req.query);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid query' });
+    if (!getWorkspace(req.params.workspaceId)) return res.status(404).json({ error: 'Workspace not found' });
+    const payload = await buildKeywordCommandCenterDetail(req.params.workspaceId, parsed.data.keyword, {
+      includeLocalSeo: isFeatureEnabled('local-seo-visibility'),
+    });
+    if (!payload) return res.status(404).json({ error: 'Keyword not found' });
+    res.json(payload);
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.get('/api/webflow/keyword-command-center/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res, next) => {
   try {

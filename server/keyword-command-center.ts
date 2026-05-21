@@ -6,10 +6,12 @@ import { listContentGaps } from './content-gaps.js';
 import { listKeywordGaps } from './keyword-gaps.js';
 import {
   buildLocalSeoKeywordCandidates,
+  buildLocalSeoKeywordVisibilitySummaryByKey,
   buildLocalSeoKeywordVisibilityByKey,
   listLocalSeoMarkets,
   type LocalSeoKeywordCandidate,
 } from './local-seo.js';
+import { createLogger } from './logger.js';
 import { listPageKeywords } from './page-keywords.js';
 import {
   getLatestSnapshotRanks,
@@ -31,17 +33,23 @@ import {
   KEYWORD_COMMAND_CENTER_STATUS,
   type KeywordCommandCenterActionRequest,
   type KeywordCommandCenterActionResult,
+  type KeywordCommandCenterAssignment,
   type KeywordCommandCenterCounts,
+  type KeywordCommandCenterDetailResponse,
   type KeywordCommandCenterFeedbackState,
   type KeywordCommandCenterFilter,
   type KeywordCommandCenterFilterMeta,
   type KeywordCommandCenterLocalSeoState,
   type KeywordCommandCenterMetrics,
   type KeywordCommandCenterNextAction,
+  type KeywordCommandCenterRowsQuery,
+  type KeywordCommandCenterRowsResponse,
   type KeywordCommandCenterResponse,
   type KeywordCommandCenterRow,
+  type KeywordCommandCenterSort,
   type KeywordCommandCenterSourceLabel,
   type KeywordCommandCenterStatus,
+  type KeywordCommandCenterSummaryResponse,
 } from '../shared/types/keyword-command-center.js';
 import { LOCAL_SEO_MARKET_STATUS, LOCAL_SEO_VISIBILITY_POSTURE, type LocalSeoKeywordVisibilitySummary } from '../shared/types/local-seo.js';
 import {
@@ -55,6 +63,10 @@ import type { KeywordStrategyExplanation } from '../shared/types/keyword-strateg
 const RAW_EVIDENCE_ROW_LIMIT = 75;
 const RANK_EVIDENCE_ROW_LIMIT = 50;
 const LOCAL_CANDIDATE_ROW_LIMIT = 75;
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 100;
+
+const log = createLogger('keyword-command-center');
 
 const stmts = createStmtCache(() => ({
   feedback: db.prepare<[workspaceId: string]>(
@@ -88,6 +100,7 @@ interface DraftRow {
   normalizedKeyword: string;
   sourceLabels: KeywordCommandCenterSourceLabel[];
   metrics: KeywordCommandCenterMetrics;
+  assignment?: KeywordCommandCenterAssignment;
   feedback?: KeywordCommandCenterFeedbackState;
   tracking?: TrackedKeyword;
   explanation?: KeywordStrategyExplanation;
@@ -147,6 +160,20 @@ function ensureRow(rows: Map<string, DraftRow>, keyword: string): DraftRow | nul
   return row;
 }
 
+function assignmentPriority(role: KeywordCommandCenterAssignment['role'] | undefined): number {
+  if (role === 'page_keyword') return 4;
+  if (role === 'content_gap') return 3;
+  if (role === 'site_keyword') return 2;
+  if (role === 'raw_evidence') return 1;
+  return 0;
+}
+
+function setAssignment(row: DraftRow, assignment: KeywordCommandCenterAssignment): void {
+  if (assignmentPriority(assignment.role) >= assignmentPriority(row.assignment?.role)) {
+    row.assignment = assignment;
+  }
+}
+
 function sourceFromExplanation(explanation: KeywordStrategyExplanation): KeywordCommandCenterSourceLabel {
   if (explanation.role === 'page_keyword') {
     return { kind: 'page_assignment', label: 'Page assignment', detail: explanation.pageTitle ?? explanation.pagePath };
@@ -186,6 +213,7 @@ function lifecycleStatus(row: DraftRow): KeywordCommandCenterStatus {
   if (row.feedback?.status === 'approved') return KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY;
   if (row.feedback?.status === 'requested') return KEYWORD_COMMAND_CENTER_STATUS.NEEDS_REVIEW;
   if (row.explanation && row.explanation.role !== 'competitor_gap') return KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY;
+  if (row.assignment && row.assignment.role !== 'raw_evidence') return KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY;
   if (row.tracking?.source === TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY || row.tracking?.source === TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD) {
     return KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY;
   }
@@ -357,7 +385,7 @@ function buildNextActions(
     });
   }
 
-  if (row.explanation?.role === 'content_gap') {
+  if (row.explanation?.role === 'content_gap' || row.assignment?.role === 'content_gap') {
     actions.push({
       type: 'generate_brief',
       label: 'Generate brief',
@@ -367,14 +395,15 @@ function buildNextActions(
       targetTab: 'content-pipeline',
     });
   }
-  if (row.explanation?.role === 'page_keyword' && row.explanation.pagePath) {
+  const pagePath = row.explanation?.role === 'page_keyword' ? row.explanation.pagePath : row.assignment?.role === 'page_keyword' ? row.assignment.pagePath : undefined;
+  if (pagePath) {
     actions.push({
       type: 'review_page',
       label: 'Review page',
       detail: 'Open Page Intelligence for the mapped page before making changes.',
       tone: 'teal',
       keyword,
-      pagePath: row.explanation.pagePath,
+      pagePath,
       targetTab: 'page-intelligence',
     });
   }
@@ -416,6 +445,95 @@ function sortRows(a: KeywordCommandCenterRow, b: KeywordCommandCenterRow): numbe
   const bVolume = b.metrics.volume ?? b.metrics.impressions ?? 0;
   if (aVolume !== bVolume) return bVolume - aVolume;
   return a.keyword.localeCompare(b.keyword);
+}
+
+function sortRowsForQuery(sort: KeywordCommandCenterSort | undefined): (a: KeywordCommandCenterRow, b: KeywordCommandCenterRow) => number {
+  if (sort === 'keyword') return (a, b) => a.keyword.localeCompare(b.keyword);
+  if (sort === 'demand') {
+    return (a, b) => {
+      const aDemand = a.metrics.volume ?? a.metrics.impressions ?? 0;
+      const bDemand = b.metrics.volume ?? b.metrics.impressions ?? 0;
+      if (aDemand !== bDemand) return bDemand - aDemand;
+      return sortRows(a, b);
+    };
+  }
+  if (sort === 'rank') {
+    return (a, b) => {
+      const aRank = a.metrics.currentPosition ?? Number.POSITIVE_INFINITY;
+      const bRank = b.metrics.currentPosition ?? Number.POSITIVE_INFINITY;
+      if (aRank !== bRank) return aRank - bRank;
+      return sortRows(a, b);
+    };
+  }
+  return sortRows;
+}
+
+function matchesFilter(row: KeywordCommandCenterRow, filter: KeywordCommandCenterFilter): boolean {
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.ALL) return true;
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.CONTENT) return row.assignment?.role === 'content_gap';
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.PAGE_ASSIGNED) return row.assignment?.role === 'page_keyword';
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.LOCAL) return Boolean(row.localSeoState);
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES) {
+    return row.localSeoState?.lifecycle === KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CANDIDATE;
+  }
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.VISIBLE_LOCALLY) return row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE;
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.POSSIBLE_MATCH) return row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.POSSIBLE_MATCH;
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.NOT_VISIBLE) {
+    return row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.NOT_VISIBLE
+      || row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.LOCAL_PACK_PRESENT;
+  }
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED) return Boolean(row.localSeoState && !row.localSeoState.checked);
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.PROVIDER_DEGRADED) return row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.PROVIDER_DEGRADED;
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.REQUESTED) return row.feedback?.status === 'requested';
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.TRACKED) return row.tracking.status === TRACKED_KEYWORD_STATUS.ACTIVE;
+  return row.lifecycleStatus === filter;
+}
+
+function matchesSearch(row: KeywordCommandCenterRow, search: string | undefined): boolean {
+  const query = keywordComparisonKey(search ?? '');
+  if (!query) return true;
+  return row.normalizedKeyword.includes(query)
+    || row.assignment?.pagePath?.toLowerCase().includes(query) === true
+    || row.assignment?.pageTitle?.toLowerCase().includes(query) === true;
+}
+
+function stripLocalSeoVisibility<T extends LocalSeoKeywordVisibilitySummary | undefined>(visibility: T): T {
+  if (!visibility) return visibility;
+  return {
+    ...visibility,
+    topCompetitors: undefined,
+    markets: visibility.markets.map(market => ({ ...market, topCompetitors: undefined })),
+  } as T;
+}
+
+function stripRowForList(row: KeywordCommandCenterRow): KeywordCommandCenterRow {
+  const localSeo = stripLocalSeoVisibility(row.localSeo);
+  return {
+    ...row,
+    explanation: undefined,
+    localSeo,
+    localSeoState: row.localSeoState ? {
+      ...row.localSeoState,
+      visibility: stripLocalSeoVisibility(row.localSeoState.visibility),
+    } : undefined,
+  };
+}
+
+function paginateRows(rows: KeywordCommandCenterRow[], query: KeywordCommandCenterRowsQuery): KeywordCommandCenterRowsResponse['pageInfo'] & { rows: KeywordCommandCenterRow[] } {
+  const pageSize = Math.min(Math.max(Number(query.pageSize) || DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE);
+  const totalRows = rows.length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+  const page = Math.min(Math.max(Number(query.page) || 1, 1), totalPages);
+  const start = (page - 1) * pageSize;
+  return {
+    rows: rows.slice(start, start + pageSize),
+    page,
+    pageSize,
+    totalRows,
+    totalPages,
+    hasNextPage: page < totalPages,
+    hasPreviousPage: page > 1,
+  };
 }
 
 function filterCount(rows: KeywordCommandCenterRow[], filter: KeywordCommandCenterFilter): number {
@@ -486,10 +604,21 @@ function buildFilters(rows: KeywordCommandCenterRow[]): KeywordCommandCenterFilt
   return filters.map(filter => ({ ...filter, count: filterCount(rows, filter.id) }));
 }
 
-export async function buildKeywordCommandCenter(
+async function buildKeywordCommandCenterModel(
   workspaceId: string,
-  options: { includeLocalSeo?: boolean } = {},
+  options: {
+    includeLocalSeo?: boolean;
+    includeLocalSeoDetails?: boolean;
+    includeLocalCandidates?: boolean;
+    includeStrategyUx?: boolean;
+    timingLabel?: string;
+  } = {},
 ): Promise<KeywordCommandCenterResponse | null> {
+  const startedAt = Date.now();
+  const marks: Record<string, number> = {};
+  const mark = (stage: string) => {
+    marks[stage] = Date.now() - startedAt;
+  };
   const workspace = getWorkspace(workspaceId);
   if (!workspace) return null;
 
@@ -500,29 +629,83 @@ export async function buildKeywordCommandCenter(
   const trackedKeywords = getTrackedKeywords(workspace.id, { includeInactive: true });
   const latestRanks = getLatestSnapshotRanks(workspace.id);
   const feedback = readFeedback(workspace.id);
+  mark('sourceLoadingMs');
   const localVisibilityByKeyword = options.includeLocalSeo
-    ? buildLocalSeoKeywordVisibilityByKey(workspace.id)
+    ? options.includeLocalSeoDetails
+      ? buildLocalSeoKeywordVisibilityByKey(workspace.id)
+      : buildLocalSeoKeywordVisibilitySummaryByKey(workspace.id)
     : new Map();
-  const localCandidates = options.includeLocalSeo
+  const localCandidates = options.includeLocalSeo && options.includeLocalCandidates !== false
     ? buildLocalSeoKeywordCandidates(workspace.id).slice(0, LOCAL_CANDIDATE_ROW_LIMIT)
     : [];
   const activeLocalMarketCount = options.includeLocalSeo
     ? listLocalSeoMarkets(workspace.id).filter(market => market.status === LOCAL_SEO_MARKET_STATUS.ACTIVE).length
     : 0;
+  mark('localSeoMs');
   const rows = new Map<string, DraftRow>();
 
-  const strategyUx = await buildKeywordStrategyUxPayload({
-    workspaceId: workspace.id,
-    workspaceName: workspace.name,
-    strategy: strategy ?? null,
-    pageMap,
-    contentGaps,
-    keywordGaps,
-    surface: 'admin',
-    trackedKeywords,
-  });
+  for (const metric of strategy?.siteKeywordMetrics ?? []) {
+    const row = ensureRow(rows, metric.keyword);
+    if (!row) continue;
+    setAssignment(row, { role: 'site_keyword' });
+    addSource(row, { kind: 'strategy', label: 'Strategy keyword', detail: 'Site keyword' });
+    mergeMetrics(row, { volume: metric.volume, difficulty: metric.difficulty });
+  }
 
-  for (const explanation of strategyUx.explanations) {
+  for (const keyword of strategy?.siteKeywords ?? []) {
+    const row = ensureRow(rows, keyword);
+    if (!row) continue;
+    setAssignment(row, { role: 'site_keyword' });
+    addSource(row, { kind: 'strategy', label: 'Strategy keyword', detail: 'Site keyword' });
+  }
+
+  for (const page of pageMap) {
+    const pageKeywords = [page.primaryKeyword, ...(page.secondaryKeywords ?? [])].filter(Boolean);
+    for (const keyword of pageKeywords) {
+      const row = ensureRow(rows, keyword);
+      if (!row) continue;
+      setAssignment(row, {
+        pagePath: page.pagePath,
+        pageTitle: page.pageTitle,
+        role: 'page_keyword',
+      });
+      addSource(row, { kind: 'page_assignment', label: 'Page assignment', detail: page.pageTitle ?? page.pagePath });
+      mergeMetrics(row, {
+        volume: page.volume,
+        difficulty: page.difficulty,
+      });
+    }
+  }
+
+  for (const gap of contentGaps) {
+    const row = ensureRow(rows, gap.targetKeyword);
+    if (!row) continue;
+    setAssignment(row, {
+      pageTitle: gap.topic,
+      role: 'content_gap',
+    });
+    addSource(row, { kind: 'content_gap', label: 'Content opportunity', detail: gap.topic });
+    mergeMetrics(row, {
+      volume: gap.volume,
+      difficulty: gap.difficulty,
+    });
+  }
+
+  const strategyUx = options.includeStrategyUx === false
+    ? null
+    : await buildKeywordStrategyUxPayload({
+      workspaceId: workspace.id,
+      workspaceName: workspace.name,
+      strategy: strategy ?? null,
+      pageMap,
+      contentGaps,
+      keywordGaps,
+      surface: 'admin',
+      trackedKeywords,
+    });
+  mark('strategyUxMs');
+
+  for (const explanation of strategyUx?.explanations ?? []) {
     const row = ensureRow(rows, explanation.keyword);
     if (!row) continue;
     row.explanation = explanation;
@@ -648,11 +831,11 @@ export async function buildKeywordCommandCenter(
           pagePath: row.explanation.pagePath,
           pageTitle: row.explanation.pageTitle,
           role: explanationRole === 'competitor_gap' ? 'raw_evidence' : explanationRole,
-        } : row.localCandidate?.pagePath || row.localCandidate?.pageTitle ? {
+        } : row.assignment ?? (row.localCandidate?.pagePath || row.localCandidate?.pageTitle ? {
           pagePath: row.localCandidate.pagePath,
           pageTitle: row.localCandidate.pageTitle,
           role: row.localCandidate.source === 'content_gap' ? 'content_gap' : 'page_keyword',
-        } : undefined,
+        } : undefined),
         feedback: row.feedback,
         tracking: row.tracking ? {
           status: row.tracking.status ?? TRACKED_KEYWORD_STATUS.ACTIVE,
@@ -674,6 +857,17 @@ export async function buildKeywordCommandCenter(
       };
     })
     .sort(sortRows);
+  mark('rowIndexMs');
+
+  log.info({
+    workspaceId,
+    mode: options.timingLabel ?? 'full',
+    rowCount: finalRows.length,
+    rawEvidenceTotal: rawEvidenceRows.length,
+    rawEvidenceReturned: allowedRawEvidence.size,
+    ...marks,
+    totalMs: Date.now() - startedAt,
+  }, 'keyword command center read model built');
 
   return {
     rows: finalRows,
@@ -682,6 +876,97 @@ export async function buildKeywordCommandCenter(
     rawEvidenceTotal: rawEvidenceRows.length,
     rawEvidenceReturned: [...allowedRawEvidence].length,
     generatedAt: strategy?.generatedAt ?? null,
+  };
+}
+
+export async function buildKeywordCommandCenter(
+  workspaceId: string,
+  options: { includeLocalSeo?: boolean } = {},
+): Promise<KeywordCommandCenterResponse | null> {
+  return buildKeywordCommandCenterModel(workspaceId, {
+    includeLocalSeo: options.includeLocalSeo,
+    includeLocalSeoDetails: true,
+    includeLocalCandidates: true,
+    includeStrategyUx: true,
+    timingLabel: 'legacy-full',
+  });
+}
+
+export async function buildKeywordCommandCenterSummary(
+  workspaceId: string,
+  options: { includeLocalSeo?: boolean } = {},
+): Promise<KeywordCommandCenterSummaryResponse | null> {
+  const payload = await buildKeywordCommandCenterModel(workspaceId, {
+    includeLocalSeo: options.includeLocalSeo,
+    includeLocalSeoDetails: false,
+    includeLocalCandidates: true,
+    includeStrategyUx: false,
+    timingLabel: 'summary',
+  });
+  if (!payload) return null;
+  return {
+    counts: payload.counts,
+    filters: payload.filters,
+    rawEvidenceTotal: payload.rawEvidenceTotal,
+    rawEvidenceReturned: payload.rawEvidenceReturned,
+    generatedAt: payload.generatedAt,
+    summarizedAt: new Date().toISOString(),
+  };
+}
+
+export async function buildKeywordCommandCenterRows(
+  workspaceId: string,
+  query: KeywordCommandCenterRowsQuery = {},
+  options: { includeLocalSeo?: boolean } = {},
+): Promise<KeywordCommandCenterRowsResponse | null> {
+  const payload = await buildKeywordCommandCenterModel(workspaceId, {
+    includeLocalSeo: options.includeLocalSeo,
+    includeLocalSeoDetails: false,
+    includeLocalCandidates: true,
+    includeStrategyUx: false,
+    timingLabel: 'rows',
+  });
+  if (!payload) return null;
+  const filter = query.filter ?? KEYWORD_COMMAND_CENTER_FILTERS.ALL;
+  const filtered = payload.rows
+    .filter(row => matchesFilter(row, filter))
+    .filter(row => matchesSearch(row, query.search))
+    .sort(sortRowsForQuery(query.sort));
+  const page = paginateRows(filtered.map(stripRowForList), query);
+  return {
+    rows: page.rows,
+    pageInfo: {
+      page: page.page,
+      pageSize: page.pageSize,
+      totalRows: page.totalRows,
+      totalPages: page.totalPages,
+      hasNextPage: page.hasNextPage,
+      hasPreviousPage: page.hasPreviousPage,
+    },
+    generatedAt: payload.generatedAt,
+  };
+}
+
+export async function buildKeywordCommandCenterDetail(
+  workspaceId: string,
+  keyword: string,
+  options: { includeLocalSeo?: boolean } = {},
+): Promise<KeywordCommandCenterDetailResponse | null> {
+  const normalized = keywordComparisonKey(keyword);
+  if (!normalized) return null;
+  const payload = await buildKeywordCommandCenterModel(workspaceId, {
+    includeLocalSeo: options.includeLocalSeo,
+    includeLocalSeoDetails: true,
+    includeLocalCandidates: true,
+    includeStrategyUx: true,
+    timingLabel: 'detail',
+  });
+  if (!payload) return null;
+  const row = payload.rows.find(item => item.normalizedKeyword === normalized);
+  if (!row) return null;
+  return {
+    row,
+    generatedAt: payload.generatedAt,
   };
 }
 

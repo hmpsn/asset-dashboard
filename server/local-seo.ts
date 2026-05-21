@@ -26,6 +26,7 @@ import {
   LOCAL_SEO_POSTURE,
   LOCAL_SEO_POSTURE_SOURCE,
   LOCAL_SEO_VISIBILITY_POSTURE,
+  LOCAL_VISIBILITY_SOURCE_ENDPOINT,
   LOCAL_VISIBILITY_STATUS,
   localSeoKeywordVisibilityFromSnapshot,
   summarizeLocalSeoKeywordVisibility,
@@ -44,6 +45,7 @@ import {
   type LocalSeoRefreshRequest,
   type LocalSeoRefreshResult,
   type LocalSeoWorkspaceSettings,
+  type LocalVisibilitySourceEndpoint,
   type LocalVisibilityBusinessResult,
   type LocalVisibilityProviderResult,
   type LocalVisibilitySnapshot,
@@ -131,6 +133,23 @@ interface SnapshotRow {
   degraded_reason: string | null;
 }
 
+interface SnapshotSummaryRow {
+  keyword: string;
+  normalized_keyword: string;
+  market_id: string;
+  market_label: string;
+  captured_at: string;
+  local_pack_present: number;
+  business_found: number;
+  business_match_confidence: string;
+  business_match_reason: string | null;
+  local_rank: number | null;
+  source_endpoint: string;
+  provider: string;
+  status: string;
+  degraded_reason: string | null;
+}
+
 const stmts = createStmtCache(() => ({
   getSettings: db.prepare('SELECT * FROM local_seo_workspace_settings WHERE workspace_id = ?'),
   upsertSettings: db.prepare(`
@@ -184,6 +203,36 @@ const stmts = createStmtCache(() => ({
     ORDER BY captured_at DESC
     LIMIT 500
   `),
+  latestSnapshotSummary: db.prepare(`
+    SELECT
+      s.keyword,
+      s.normalized_keyword,
+      s.market_id,
+      s.market_label,
+      s.captured_at,
+      s.local_pack_present,
+      s.business_found,
+      s.business_match_confidence,
+      s.business_match_reason,
+      s.local_rank,
+      s.source_endpoint,
+      s.provider,
+      s.status,
+      s.degraded_reason
+    FROM local_visibility_snapshots s
+    JOIN (
+      SELECT market_id, normalized_keyword, device, language_code, MAX(captured_at) AS captured_at
+      FROM local_visibility_snapshots
+      WHERE workspace_id = ?
+      GROUP BY market_id, normalized_keyword, device, language_code
+    ) latest
+      ON latest.market_id = s.market_id
+      AND latest.normalized_keyword = s.normalized_keyword
+      AND latest.device = s.device
+      AND latest.language_code = s.language_code
+      AND latest.captured_at = s.captured_at
+    WHERE s.workspace_id = ?
+  `),
 }));
 
 function isLocalSeoPosture(value: string): value is LocalSeoPosture {
@@ -192,6 +241,14 @@ function isLocalSeoPosture(value: string): value is LocalSeoPosture {
 
 function isMarketStatus(value: string): value is LocalSeoMarketStatus {
   return Object.values(LOCAL_SEO_MARKET_STATUS).includes(value as LocalSeoMarketStatus);
+}
+
+function isBusinessMatchConfidence(value: string): value is LocalBusinessMatchConfidence {
+  return Object.values(LOCAL_BUSINESS_MATCH_CONFIDENCE).includes(value as LocalBusinessMatchConfidence);
+}
+
+function isLocalVisibilitySourceEndpoint(value: string): value is LocalVisibilitySourceEndpoint {
+  return Object.values(LOCAL_VISIBILITY_SOURCE_ENDPOINT).includes(value as LocalVisibilitySourceEndpoint);
 }
 
 function rowToMarket(row: MarketRow): LocalSeoMarket {
@@ -533,6 +590,109 @@ export function listLatestLocalVisibilitySnapshots(workspaceId: string): LocalVi
     snapshots.push(rowToSnapshot(row));
   }
   return snapshots;
+}
+
+function listLatestLocalVisibilitySnapshotSummaryRows(workspaceId: string): SnapshotSummaryRow[] {
+  return stmts().latestSnapshotSummary.all(workspaceId, workspaceId) as SnapshotSummaryRow[];
+}
+
+function postureFromSummaryRow(row: SnapshotSummaryRow) {
+  if (row.status === LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED || row.status === LOCAL_VISIBILITY_STATUS.DEGRADED) {
+    return LOCAL_SEO_VISIBILITY_POSTURE.PROVIDER_DEGRADED;
+  }
+  if (row.business_found === 1 && row.business_match_confidence === LOCAL_BUSINESS_MATCH_CONFIDENCE.VERIFIED) {
+    return LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE;
+  }
+  if (
+    row.business_found === 1
+    && (
+      row.business_match_confidence === LOCAL_BUSINESS_MATCH_CONFIDENCE.STRONG_MATCH
+      || row.business_match_confidence === LOCAL_BUSINESS_MATCH_CONFIDENCE.POSSIBLE_MATCH
+    )
+  ) {
+    return LOCAL_SEO_VISIBILITY_POSTURE.POSSIBLE_MATCH;
+  }
+  if (row.local_pack_present === 1) return LOCAL_SEO_VISIBILITY_POSTURE.LOCAL_PACK_PRESENT;
+  return LOCAL_SEO_VISIBILITY_POSTURE.NOT_VISIBLE;
+}
+
+function visibilityFromSummaryRow(row: SnapshotSummaryRow): LocalSeoKeywordVisibility {
+  const posture = postureFromSummaryRow(row);
+  const businessMatchConfidence = isBusinessMatchConfidence(row.business_match_confidence)
+    ? row.business_match_confidence
+    : LOCAL_BUSINESS_MATCH_CONFIDENCE.UNKNOWN;
+  const sourceEndpoint = isLocalVisibilitySourceEndpoint(row.source_endpoint)
+    ? row.source_endpoint
+    : LOCAL_VISIBILITY_SOURCE_ENDPOINT.GOOGLE_ORGANIC_SERP;
+  const base = {
+    keyword: row.keyword,
+    normalizedKeyword: row.normalized_keyword,
+    marketId: row.market_id,
+    marketLabel: row.market_label,
+    capturedAt: row.captured_at,
+    localPackPresent: row.local_pack_present === 1,
+    businessFound: row.business_found === 1,
+    businessMatchConfidence,
+    localRank: row.local_rank ?? undefined,
+    sourceEndpoint,
+    provider: row.provider,
+    degradedReason: row.degraded_reason ?? undefined,
+  };
+
+  if (posture === LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE) {
+    return {
+      ...base,
+      posture,
+      label: row.local_rank ? `Visible #${row.local_rank}` : 'Visible locally',
+      detail: row.business_match_reason ?? 'Business appears in local results with verified match evidence.',
+    };
+  }
+  if (posture === LOCAL_SEO_VISIBILITY_POSTURE.POSSIBLE_MATCH) {
+    return {
+      ...base,
+      posture,
+      label: row.local_rank ? `Possible match #${row.local_rank}` : 'Possible match',
+      detail: row.business_match_reason ?? 'Possible business match; review before treating this as verified local visibility.',
+    };
+  }
+  if (posture === LOCAL_SEO_VISIBILITY_POSTURE.PROVIDER_DEGRADED) {
+    return {
+      ...base,
+      posture,
+      label: 'Provider degraded',
+      detail: row.degraded_reason ?? 'Local visibility data could not be refreshed cleanly.',
+    };
+  }
+  if (posture === LOCAL_SEO_VISIBILITY_POSTURE.LOCAL_PACK_PRESENT) {
+    return {
+      ...base,
+      posture,
+      label: 'Local pack present',
+      detail: row.business_match_reason ?? 'A local pack appeared, but this business was not confidently matched.',
+    };
+  }
+  return {
+    ...base,
+    posture,
+    label: 'Not found locally',
+    detail: row.business_match_reason ?? 'No likely business match found in local results for this market.',
+  };
+}
+
+export function buildLocalSeoKeywordVisibilitySummaryByKey(workspaceId: string): Map<string, LocalSeoKeywordVisibilitySummary> {
+  const grouped = new Map<string, LocalSeoKeywordVisibility[]>();
+  for (const row of listLatestLocalVisibilitySnapshotSummaryRows(workspaceId)) {
+    if (!row.normalized_keyword) continue;
+    const current = grouped.get(row.normalized_keyword) ?? [];
+    current.push(visibilityFromSummaryRow(row));
+    grouped.set(row.normalized_keyword, current);
+  }
+  const summaries = new Map<string, LocalSeoKeywordVisibilitySummary>();
+  for (const [key, visibility] of grouped) {
+    const summary = summarizeLocalSeoKeywordVisibility(visibility);
+    if (summary) summaries.set(key, summary);
+  }
+  return summaries;
 }
 
 export function buildLocalSeoKeywordVisibilityByKey(workspaceId: string): Map<string, LocalSeoKeywordVisibilitySummary> {

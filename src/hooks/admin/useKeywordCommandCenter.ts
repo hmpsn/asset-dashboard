@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { keywordCommandCenter } from '../../api/keywordCommandCenter';
 import { queryKeys } from '../../lib/queryKeys';
-import type { KeywordCommandCenterActionRequest } from '../../../shared/types/keyword-command-center';
+import type { KeywordCommandCenterActionRequest, KeywordCommandCenterRowsQuery } from '../../../shared/types/keyword-command-center';
 
 export function useKeywordCommandCenter(workspaceId: string) {
   return useQuery({
@@ -9,6 +9,34 @@ export function useKeywordCommandCenter(workspaceId: string) {
     queryFn: () => keywordCommandCenter.get(workspaceId),
     enabled: !!workspaceId,
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useKeywordCommandCenterSummary(workspaceId: string) {
+  return useQuery({
+    queryKey: queryKeys.admin.keywordCommandCenterSummary(workspaceId),
+    queryFn: () => keywordCommandCenter.summary(workspaceId),
+    enabled: !!workspaceId,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useKeywordCommandCenterRows(workspaceId: string, query: KeywordCommandCenterRowsQuery) {
+  return useQuery({
+    queryKey: queryKeys.admin.keywordCommandCenterRows(workspaceId, query),
+    queryFn: () => keywordCommandCenter.rows(workspaceId, query),
+    enabled: !!workspaceId,
+    staleTime: 2 * 60 * 1000,
+    placeholderData: previous => previous,
+  });
+}
+
+export function useKeywordCommandCenterDetail(workspaceId: string, keyword: string | null) {
+  return useQuery({
+    queryKey: queryKeys.admin.keywordCommandCenterDetail(workspaceId, keyword ?? ''),
+    queryFn: () => keywordCommandCenter.detail(workspaceId, keyword ?? ''),
+    enabled: !!workspaceId && !!keyword,
+    staleTime: 2 * 60 * 1000,
   });
 }
 

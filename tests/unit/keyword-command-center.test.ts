@@ -4,6 +4,9 @@ import db from '../../server/db/index.js';
 import {
   applyKeywordCommandCenterAction,
   buildKeywordCommandCenter,
+  buildKeywordCommandCenterDetail,
+  buildKeywordCommandCenterRows,
+  buildKeywordCommandCenterSummary,
 } from '../../server/keyword-command-center.js';
 import { replaceAllContentGaps } from '../../server/content-gaps.js';
 import { replaceAllKeywordGaps } from '../../server/keyword-gaps.js';
@@ -219,6 +222,91 @@ describe('buildKeywordCommandCenter', () => {
       lifecycleStatus: KEYWORD_COMMAND_CENTER_STATUS.RAW_EVIDENCE,
       metrics: expect.objectContaining({ volume: 1029, difficulty: 49 }),
     }));
+  });
+
+  it('returns summary counts without row payloads and paginates rows server-side', async () => {
+    replaceAllKeywordGaps(workspaceId, Array.from({ length: 8 }, (_, index) => ({
+      keyword: `provider evidence ${index}`,
+      volume: 1_000 + index,
+      difficulty: 20 + index,
+      competitorPosition: 3 + index,
+      competitorDomain: 'competitor.example',
+    })));
+
+    const summary = await buildKeywordCommandCenterSummary(workspaceId);
+    expect(summary).toEqual(expect.objectContaining({
+      counts: expect.objectContaining({ total: 8, evidence: 8 }),
+      rawEvidenceTotal: 8,
+      rawEvidenceReturned: 8,
+      summarizedAt: expect.any(String),
+    }));
+    expect(summary).not.toHaveProperty('rows');
+
+    const firstPage = await buildKeywordCommandCenterRows(workspaceId, {
+      filter: 'raw_evidence',
+      page: 1,
+      pageSize: 3,
+      sort: 'demand',
+    });
+    expect(firstPage?.rows).toHaveLength(3);
+    expect(firstPage?.pageInfo).toEqual(expect.objectContaining({
+      page: 1,
+      pageSize: 3,
+      totalRows: 8,
+      totalPages: 3,
+      hasNextPage: true,
+    }));
+    expect(firstPage?.rows[0]?.explanation).toBeUndefined();
+  });
+
+  it('supports server-side search and lazy detail reads for one keyword', async () => {
+    seedStrategy();
+
+    const rows = await buildKeywordCommandCenterRows(workspaceId, {
+      search: 'cosmetic dentistry',
+      pageSize: 10,
+    });
+    expect(rows).not.toBeNull();
+    const resultRows = rows!.rows;
+    expect(resultRows.map(row => row.normalizedKeyword)).toContain('cosmetic dentistry');
+    expect(resultRows.length).toBeGreaterThan(0);
+    for (const row of resultRows) {
+      expect(row.explanation).toBeUndefined();
+    }
+
+    const detail = await buildKeywordCommandCenterDetail(workspaceId, 'Cosmetic Dentistry');
+    expect(detail?.row).toEqual(expect.objectContaining({
+      normalizedKeyword: 'cosmetic dentistry',
+      explanation: expect.objectContaining({
+        normalizedKeyword: 'cosmetic dentistry',
+      }),
+    }));
+  });
+
+  it('keeps page assignment precedence in lightweight rows when a keyword is also a content gap', async () => {
+    seedStrategy();
+    replaceAllContentGaps(workspaceId, [{
+      topic: 'Cosmetic dentistry guide',
+      targetKeyword: 'Cosmetic Dentistry',
+      intent: 'commercial',
+      priority: 'medium',
+      rationale: 'Duplicate keyword should keep page assignment precedence.',
+      volume: 450,
+      difficulty: 35,
+      opportunityScore: 55,
+    }]);
+
+    const rows = await buildKeywordCommandCenterRows(workspaceId, {
+      search: 'cosmetic dentistry',
+      pageSize: 10,
+    });
+    const row = rows?.rows.find(item => item.normalizedKeyword === 'cosmetic dentistry');
+
+    expect(row?.assignment).toEqual(expect.objectContaining({
+      role: 'page_keyword',
+      pagePath: '/services/cosmetic-dentistry',
+    }));
+    expect(row?.nextActions.map(action => action.type)).toContain('review_page');
   });
 
   it('moves promoted raw evidence into tracked lifecycle status', async () => {

@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { KeywordCommandCenter } from '../../src/components/KeywordCommandCenter';
@@ -7,7 +7,9 @@ import {
   KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE,
   KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY,
   KEYWORD_COMMAND_CENTER_STATUS,
+  type KeywordCommandCenterFilter,
   type KeywordCommandCenterResponse,
+  type KeywordCommandCenterRowsQuery,
 } from '../../shared/types/keyword-command-center';
 import { TRACKED_KEYWORD_STATUS } from '../../shared/types/rank-tracking';
 
@@ -25,6 +27,9 @@ vi.mock('react-router-dom', async () => {
 
 vi.mock('../../src/hooks/admin/useKeywordCommandCenter', () => ({
   useKeywordCommandCenter: vi.fn(),
+  useKeywordCommandCenterSummary: vi.fn(),
+  useKeywordCommandCenterRows: vi.fn(),
+  useKeywordCommandCenterDetail: vi.fn(),
   useKeywordCommandCenterAction: vi.fn(),
 }));
 
@@ -236,6 +241,37 @@ const payload: KeywordCommandCenterResponse = {
   generatedAt: '2026-05-20T10:00:00.000Z',
 };
 
+function rowMatchesFilter(row: KeywordCommandCenterResponse['rows'][number], filter: KeywordCommandCenterFilter | undefined): boolean {
+  if (!filter || filter === 'all') return true;
+  if (filter === 'raw_evidence') return row.lifecycleStatus === KEYWORD_COMMAND_CENTER_STATUS.RAW_EVIDENCE;
+  if (filter === 'local_candidates') return row.localSeoState?.lifecycle === KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CANDIDATE;
+  if (filter === 'tracked') return row.tracking.status === TRACKED_KEYWORD_STATUS.ACTIVE;
+  return row.lifecycleStatus === filter;
+}
+
+function rowsForQuery(query: KeywordCommandCenterRowsQuery) {
+  const search = query.search?.toLowerCase();
+  const rows = payload.rows.filter(row => {
+    const matchesSearch = !search
+      || row.normalizedKeyword.includes(search)
+      || row.assignment?.pageTitle?.toLowerCase().includes(search) === true
+      || row.assignment?.pagePath?.toLowerCase().includes(search) === true;
+    return matchesSearch && rowMatchesFilter(row, query.filter);
+  });
+  return {
+    rows,
+    pageInfo: {
+      page: query.page ?? 1,
+      pageSize: query.pageSize ?? 50,
+      totalRows: rows.length,
+      totalPages: 1,
+      hasNextPage: false,
+      hasPreviousPage: false,
+    },
+    generatedAt: payload.generatedAt,
+  };
+}
+
 function renderCommandCenter() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -253,17 +289,45 @@ describe('KeywordCommandCenter', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     navigateMock.mockReset();
+    vi.useFakeTimers();
     const hooks = await import('../../src/hooks/admin/useKeywordCommandCenter');
     vi.mocked(hooks.useKeywordCommandCenter).mockReturnValue({
       data: payload,
       isLoading: false,
       error: null,
     } as ReturnType<typeof hooks.useKeywordCommandCenter>);
+    vi.mocked(hooks.useKeywordCommandCenterSummary).mockReturnValue({
+      data: {
+        counts: payload.counts,
+        filters: payload.filters,
+        rawEvidenceTotal: payload.rawEvidenceTotal,
+        rawEvidenceReturned: payload.rawEvidenceReturned,
+        generatedAt: payload.generatedAt,
+        summarizedAt: '2026-05-20T10:01:00.000Z',
+      },
+      isLoading: false,
+      error: null,
+    } as ReturnType<typeof hooks.useKeywordCommandCenterSummary>);
+    vi.mocked(hooks.useKeywordCommandCenterRows).mockImplementation((_workspaceId, query) => ({
+      data: rowsForQuery(query),
+      isLoading: false,
+      isFetching: false,
+      error: null,
+    }) as ReturnType<typeof hooks.useKeywordCommandCenterRows>);
+    vi.mocked(hooks.useKeywordCommandCenterDetail).mockImplementation((_workspaceId, keyword) => ({
+      data: keyword ? { row: payload.rows.find(row => row.normalizedKeyword === keyword) ?? payload.rows[0], generatedAt: payload.generatedAt } : undefined,
+      isFetching: false,
+      error: null,
+    }) as ReturnType<typeof hooks.useKeywordCommandCenterDetail>);
     vi.mocked(hooks.useKeywordCommandCenterAction).mockReturnValue({
       mutate: mutateMock,
       isPending: false,
       variables: undefined,
     } as ReturnType<typeof hooks.useKeywordCommandCenterAction>);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('renders lifecycle summaries and raw evidence as evidence, not selected strategy action', () => {
@@ -285,6 +349,9 @@ describe('KeywordCommandCenter', () => {
     expect(screen.queryByText('cosmetic dentistry')).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Search keywords'), { target: { value: 'cosmetic' } });
+    act(() => {
+      vi.advanceTimersByTime(350);
+    });
     expect(screen.getByText('No keywords match this view')).toBeInTheDocument();
   });
 
@@ -295,6 +362,7 @@ describe('KeywordCommandCenter', () => {
     expect(screen.getAllByText('cosmetic dentistry austin').length).toBeGreaterThan(0);
     expect(screen.queryByText('best teeth whitening strips')).not.toBeInTheDocument();
 
+    fireEvent.click(screen.getByText('cosmetic dentistry austin'));
     const drawer = screen.getByText('Safe Next Actions').closest('div')!.parentElement!;
     fireEvent.click(within(drawer).getByRole('button', { name: /check locally/i }));
 
@@ -320,8 +388,7 @@ describe('KeywordCommandCenter', () => {
 
   it('requires explicit confirmation before forcing protected keyword actions', async () => {
     const hooks = await import('../../src/hooks/admin/useKeywordCommandCenter');
-    vi.mocked(hooks.useKeywordCommandCenter).mockReturnValue({
-      data: {
+    const protectedPayload: KeywordCommandCenterResponse = {
         ...payload,
         rows: [{
           keyword: 'manual keyword',
@@ -339,13 +406,38 @@ describe('KeywordCommandCenter', () => {
         }],
         counts: { total: 1, inStrategy: 0, tracked: 1, needsReview: 0, evidence: 0, local: 0, localCandidates: 0, retired: 0, declined: 0 },
         filters: [{ id: 'all', label: 'All', count: 1 }],
+    };
+    vi.mocked(hooks.useKeywordCommandCenterSummary).mockReturnValue({
+      data: {
+        counts: protectedPayload.counts,
+        filters: protectedPayload.filters,
+        rawEvidenceTotal: protectedPayload.rawEvidenceTotal,
+        rawEvidenceReturned: protectedPayload.rawEvidenceReturned,
+        generatedAt: protectedPayload.generatedAt,
+        summarizedAt: '2026-05-20T10:01:00.000Z',
       },
       isLoading: false,
       error: null,
-    } as ReturnType<typeof hooks.useKeywordCommandCenter>);
+    } as ReturnType<typeof hooks.useKeywordCommandCenterSummary>);
+    vi.mocked(hooks.useKeywordCommandCenterRows).mockReturnValue({
+      data: {
+        rows: protectedPayload.rows,
+        pageInfo: { page: 1, pageSize: 50, totalRows: 1, totalPages: 1, hasNextPage: false, hasPreviousPage: false },
+        generatedAt: protectedPayload.generatedAt,
+      },
+      isLoading: false,
+      isFetching: false,
+      error: null,
+    } as ReturnType<typeof hooks.useKeywordCommandCenterRows>);
+    vi.mocked(hooks.useKeywordCommandCenterDetail).mockReturnValue({
+      data: { row: protectedPayload.rows[0], generatedAt: protectedPayload.generatedAt },
+      isFetching: false,
+      error: null,
+    } as ReturnType<typeof hooks.useKeywordCommandCenterDetail>);
 
     renderCommandCenter();
 
+    fireEvent.click(screen.getAllByText('manual keyword')[0]);
     const actionSection = screen.getByText('Safe Next Actions').closest('div')!.parentElement!;
     fireEvent.click(within(actionSection).getByRole('button', { name: /pause tracking/i }));
     expect(screen.getByText('Confirm protected keyword action')).toBeInTheDocument();
