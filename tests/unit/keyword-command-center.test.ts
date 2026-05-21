@@ -1080,7 +1080,14 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
     expect(rows!.pageInfo.totalRows).toBe(summary!.counts.total);
   });
 
-  it('localCandidates summary count reflects actual generator output (not hardcoded 0)', async () => {
+  it('localCandidates summary count is intentionally 0 (computed off the hot path; follow-up cache)', async () => {
+    // PR #876 introduced a generator-backed count here, but on rich workspaces
+    // (Swish: 235 tracked + 50 pages + variants) that took ~35s because every
+    // candidate runs through evaluateKeywordCandidate which scans pageMap.
+    // Reverted to 0 in this PR — a cheap SQL/cache-backed count will land separately
+    // (roadmap: intel-quality-localcandidates-cheap-count). This test locks in the
+    // expectation so a future "fix" doesn't reintroduce the same hot-path regression
+    // without addressing the underlying cost first.
     updateWorkspace(workspaceId, {
       name: 'Test Local Business',
       businessProfile: {
@@ -1103,17 +1110,7 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
       searchIntent: 'commercial',
     });
 
-    // Sanity: the candidate generator should produce at least one candidate for this setup
-    const candidates = buildLocalSeoKeywordCandidates(workspaceId);
-    if (candidates.length === 0) {
-      // Local candidate generation depends on the local-seo logic; if this seed doesn't
-      // produce candidates, the test would be vacuous. Document explicitly.
-      // (Skip rather than mis-pass — the broader fix is verified by the badge-not-0 assertion below.)
-      return;
-    }
-
     const summary = await buildKeywordCommandCenterSummary(workspaceId, { includeLocalSeo: true });
-    expect(summary!.counts.localCandidates).toBe(candidates.length);
-    expect(summary!.counts.localCandidates).toBeGreaterThan(0);
+    expect(summary!.counts.localCandidates).toBe(0);
   });
 });
