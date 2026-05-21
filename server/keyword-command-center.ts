@@ -1055,9 +1055,30 @@ export async function buildKeywordCommandCenterSummary(
   for (const tracked of trackedKeywords) addKey(allKeys, tracked.query);
   const trackedKeys = new Set(trackedKeywords.map(keyword => keywordComparisonKey(keyword.query)).filter(Boolean));
 
+  // Align with sourceKeysForRows(IN_STRATEGY): tracked keywords promoted from the
+  // strategy (active + STRATEGY_PRIMARY/STRATEGY_SITE_KEYWORD source) count toward
+  // In Strategy. Without this, the summary badge under-counts vs the rows table.
+  for (const tracked of trackedKeywords) {
+    if (trackedKeywordMatchesFilter(tracked, KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY)) {
+      addKey(inStrategyKeys, tracked.query);
+    }
+  }
+
   const feedback = readFeedback(workspace.id);
   for (const row of feedback.values()) addKey(allKeys, row.keyword);
   const feedbackKeys = new Set([...feedback.keys()]);
+
+  // Align with sourceKeysForRows(IN_STRATEGY): approved feedback keywords count toward
+  // In Strategy; declined/requested feedback keys must NOT (they live under other tabs).
+  for (const row of feedback.values()) {
+    if (row.status === 'approved') addKey(inStrategyKeys, row.keyword);
+  }
+  for (const row of feedback.values()) {
+    if (row.status === 'declined' || row.status === 'requested') {
+      const key = keywordComparisonKey(row.keyword);
+      if (key) inStrategyKeys.delete(key);
+    }
+  }
 
   const latestRanks = getLatestSnapshotRanks(workspace.id);
   const rankEvidenceKeys = new Set<string>();
