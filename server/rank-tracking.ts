@@ -69,6 +69,9 @@ const stmts = createStmtCache(() => ({
   getSnapshots: db.prepare(
     `SELECT * FROM rank_snapshots WHERE workspace_id = ? ORDER BY date ASC`,
   ),
+  getRecentSnapshots: db.prepare(
+    `SELECT * FROM rank_snapshots WHERE workspace_id = ? ORDER BY date DESC LIMIT ?`,
+  ),
   upsertSnapshot: db.prepare(
     `INSERT INTO rank_snapshots (workspace_id, date, queries)
          VALUES (@workspace_id, @date, @queries)
@@ -164,6 +167,13 @@ function writeConfig(workspaceId: string, config: { trackedKeywords: TrackedKeyw
 function readSnapshots(workspaceId: string): RankSnapshot[] {
   const rows = stmts().getSnapshots.all(workspaceId) as SnapshotRow[];
   return rows.map(r => ({ date: r.date, queries: parseJsonFallback<RankSnapshot['queries']>(r.queries, []) }));
+}
+
+function readRecentSnapshots(workspaceId: string, limit: number): RankSnapshot[] {
+  const rows = stmts().getRecentSnapshots.all(workspaceId, limit) as SnapshotRow[];
+  return rows
+    .map(r => ({ date: r.date, queries: parseJsonFallback<RankSnapshot['queries']>(r.queries, []) }))
+    .reverse();
 }
 
 // --- Public API ---
@@ -325,10 +335,13 @@ export function getRankHistory(
 export type RankEntry = LatestRank;
 
 function buildLatestRanks(workspaceId: string, options: { includeUntracked?: boolean } = {}): LatestRank[] {
-  const snapshots = readSnapshots(workspaceId);
+  const snapshots = readRecentSnapshots(workspaceId, 2);
   if (snapshots.length === 0) return [];
   const latest = snapshots[snapshots.length - 1];
   const prev = snapshots.length >= 2 ? snapshots[snapshots.length - 2] : null;
+  const previousByQuery = new Map(
+    (prev?.queries ?? []).map(query => [normalizeQuery(query.query), query]),
+  );
   const config = readConfig(workspaceId);
   const hasConfiguredKeywords = config.trackedKeywords.length > 0;
   const trackedEntries = new Map(
@@ -343,7 +356,7 @@ function buildLatestRanks(workspaceId: string, options: { includeUntracked?: boo
     .filter(q => options.includeUntracked || !hasConfiguredKeywords || trackedEntries.has(normalizeQuery(q.query)))
     .map(q => {
       const normalizedQuery = normalizeQuery(q.query);
-      const prevQ = prev?.queries.find(p => normalizeQuery(p.query) === normalizedQuery);
+      const prevQ = previousByQuery.get(normalizedQuery);
       const change = prevQ ? +(prevQ.position - q.position).toFixed(1) : undefined;
       const tracked = trackedEntries.get(normalizedQuery);
       return {
