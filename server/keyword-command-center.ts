@@ -1083,6 +1083,16 @@ export async function buildKeywordCommandCenterSummary(
   for (const key of localVisibility.keys()) allKeys.add(key);
   const localVisibilityValues = [...localVisibility.values()];
 
+  let localCandidatesCount = 0;
+  if (options.includeLocalSeo) {
+    try {
+      // local-candidates-unconditional-ok: summary needs a count to render the Local Candidates badge; generator is hard-capped at LOCAL_CANDIDATE_HARD_CAP in local-seo.ts
+      localCandidatesCount = buildLocalSeoKeywordCandidates(workspace.id).length;
+    } catch (err) {
+      log.warn({ err, workspaceId }, 'localCandidates count failed; reporting 0');
+    }
+  }
+
   const counts: KeywordCommandCenterCounts = {
     total: allKeys.size,
     inStrategy: inStrategyKeys.size,
@@ -1090,7 +1100,7 @@ export async function buildKeywordCommandCenterSummary(
     needsReview: requested.length + rankEvidenceKeys.size,
     evidence: rawEvidenceOnlyKeys.size,
     local: localVisibility.size,
-    localCandidates: 0,
+    localCandidates: localCandidatesCount,
     retired: inactiveTracked.length,
     declined: declined.length,
   };
@@ -1103,7 +1113,7 @@ export async function buildKeywordCommandCenterSummary(
     pageAssigned: pageAssignedKeys.size,
     rawEvidence: counts.evidence,
     local: counts.local,
-    localCandidates: 0,
+    localCandidates: localCandidatesCount,
     visibleLocally: localVisibilityValues.filter(item => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE).length,
     possibleMatch: localVisibilityValues.filter(item => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.POSSIBLE_MATCH).length,
     notVisible: localVisibilityValues.filter(item =>
@@ -1181,10 +1191,40 @@ function filterStrategyForKeys(strategy: KeywordStrategy | null | undefined, key
   };
 }
 
-function pageMatchesKeys(page: PageKeywordMap, keys: Set<string> | null): boolean {
-  if (!keys) return true;
-  return keys.has(keywordComparisonKey(page.primaryKeyword))
-    || (page.secondaryKeywords ?? []).some(keyword => keys.has(keywordComparisonKey(keyword)));
+/**
+ * Restrict a page's primary/secondary keywords to only those in the selected key set.
+ *
+ * - If `keys` is null, returns the page unchanged.
+ * - If neither the primary nor any secondary keyword is in `keys`, returns `null`
+ *   (caller should drop the page).
+ * - Otherwise returns a trimmed copy: primary preserved if in keys (else promoted
+ *   from the first surviving secondary), secondaries filtered to in-keys entries.
+ *
+ * This is the row-creation boundary for skinny rows. populateDraftRows iterates
+ * page.primaryKeyword + page.secondaryKeywords and creates a row per entry, so any
+ * keyword left on the page object will produce a row whether or not it was selected.
+ */
+function restrictPageToKeys(page: PageKeywordMap, keys: Set<string> | null): PageKeywordMap | null {
+  if (!keys) return page;
+  const primaryKey = keywordComparisonKey(page.primaryKeyword);
+  const primaryInKeys = primaryKey ? keys.has(primaryKey) : false;
+  const secondaryFiltered = (page.secondaryKeywords ?? []).filter(keyword => {
+    const key = keywordComparisonKey(keyword);
+    return key ? keys.has(key) : false;
+  });
+  if (!primaryInKeys && secondaryFiltered.length === 0) return null;
+  if (primaryInKeys) {
+    return { ...page, secondaryKeywords: secondaryFiltered };
+  }
+  // Primary is not in keys but at least one secondary is — promote the first surviving
+  // secondary so the page still produces a row, and drop primary metadata that wouldn't
+  // belong to any selected row.
+  const [newPrimary, ...rest] = secondaryFiltered;
+  return {
+    ...page,
+    primaryKeyword: newPrimary,
+    secondaryKeywords: rest,
+  };
 }
 
 function filterMapByKeys<T>(map: Map<string, T>, keys: Set<string> | null): Map<string, T> {
@@ -1501,7 +1541,9 @@ function buildFilteredBundle(input: {
     workspaceId: input.workspace.id,
     workspaceName: input.workspace.name,
     strategy: filterStrategyForKeys(strategy, keys),
-    pageMap: pageMap.filter(page => pageMatchesKeys(page, keys)),
+    pageMap: pageMap
+      .map(page => restrictPageToKeys(page, keys))
+      .filter((page): page is PageKeywordMap => page !== null),
     contentGaps: keys ? contentGaps.filter(gap => keys.has(keywordComparisonKey(gap.targetKeyword))) : contentGaps,
     keywordGaps: keys ? keywordGaps.filter(gap => keys.has(keywordComparisonKey(gap.keyword))) : keywordGaps,
     trackedKeywords: keys ? trackedKeywords.filter(keyword => keys.has(keywordComparisonKey(keyword.query))) : trackedKeywords,
@@ -1519,7 +1561,9 @@ function filterBundleToKeys(
     ...bundle,
     keys,
     strategy: filterStrategyForKeys(bundle.strategy, keys),
-    pageMap: bundle.pageMap.filter(page => pageMatchesKeys(page, keys)),
+    pageMap: bundle.pageMap
+      .map(page => restrictPageToKeys(page, keys))
+      .filter((page): page is PageKeywordMap => page !== null),
     contentGaps: bundle.contentGaps.filter(gap => keys.has(keywordComparisonKey(gap.targetKeyword))),
     keywordGaps: bundle.keywordGaps.filter(gap => keys.has(keywordComparisonKey(gap.keyword))),
     trackedKeywords: bundle.trackedKeywords.filter(keyword => keys.has(keywordComparisonKey(keyword.query))),
@@ -1598,6 +1642,8 @@ async function buildKeywordCommandCenterRowsSkinny(
     activeLocalMarketCount,
   });
   const filtered = finalized.rows
+    .filter(row => matchesFilter(row, filter))
+    .filter(row => matchesSearch(row, query.search))
     .sort(sortRowsForQuery(query.sort));
 
   log.info({
@@ -1607,6 +1653,8 @@ async function buildKeywordCommandCenterRowsSkinny(
     sourceKeys: bundle.keys?.size ?? null,
     pagedKeys: pageSelection.keys.size,
     rowCount: filtered.length,
+    rowsBeforeFilter: finalized.rows.length,
+    rowsDropped: finalized.rows.length - filtered.length,
     totalRows: pageSelection.totalRows,
     totalMs: Date.now() - startedAt,
     finalHeapMb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
