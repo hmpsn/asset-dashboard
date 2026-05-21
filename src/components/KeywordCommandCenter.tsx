@@ -90,8 +90,6 @@ const FILTER_ICONS: Record<KeywordCommandCenterFilter, typeof Search> = {
 
 function filterCountLabel(filterId: KeywordCommandCenterFilter, count: number): string {
   if (filterId === KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES && count === 0) return '...';
-  if (filterId === KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED && count === 0) return '...';
-  if (filterId === KEYWORD_COMMAND_CENTER_FILTERS.LOCAL) return count > 0 ? `${compactNumber(count)}+` : '...';
   return compactNumber(count);
 }
 
