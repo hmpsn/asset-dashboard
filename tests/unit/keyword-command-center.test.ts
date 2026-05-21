@@ -294,6 +294,13 @@ describe('buildKeywordCommandCenter', () => {
       expect.objectContaining({ id: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES, count: 0 }),
     ]));
 
+    const allRows = await buildKeywordCommandCenterRows(workspaceId, {
+      filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+      page: 1,
+      pageSize: 100,
+    });
+    expect(allRows?.pageInfo.totalRows).toBe(summary?.counts.total);
+
     const firstPage = await buildKeywordCommandCenterRows(workspaceId, {
       filter: 'raw_evidence',
       page: 1,
@@ -309,6 +316,28 @@ describe('buildKeywordCommandCenter', () => {
       hasNextPage: true,
     }));
     expect(firstPage?.rows[0]?.explanation).toBeUndefined();
+  });
+
+  it('caps unselected rank evidence in all rows to match summary counts', async () => {
+    storeRankSnapshot(workspaceId, '2026-05-21', Array.from({ length: 120 }, (_, index) => ({
+      query: `untracked gsc query ${index}`,
+      position: index + 1,
+      clicks: 0,
+      impressions: 1_000 - index,
+      ctr: 0,
+    })));
+
+    const summary = await buildKeywordCommandCenterSummary(workspaceId);
+    const rows = await buildKeywordCommandCenterRows(workspaceId, {
+      filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+      page: 1,
+      pageSize: 100,
+    });
+
+    expect(summary?.counts.total).toBe(50);
+    expect(rows?.pageInfo.totalRows).toBe(50);
+    expect(rows?.rows).toHaveLength(50);
+    expect(rows?.rows.some(row => row.normalizedKeyword === 'untracked gsc query 119')).toBe(false);
   });
 
   it('supports server-side search and lazy detail reads for one keyword', async () => {
