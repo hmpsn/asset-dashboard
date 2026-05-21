@@ -198,6 +198,40 @@ describe('Local SEO routes', () => {
     ]));
   });
 
+  it('PUT clears provider identity fields when null is supplied explicitly', async () => {
+    const current = await (await api(`/api/local-seo/${workspaceId}`)).json();
+    const activeMarket = current.markets.find((market: { label: string }) => market.label === 'Austin Core');
+
+    const res = await api(`/api/local-seo/${workspaceId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        markets: [{
+          id: activeMarket.id,
+          label: 'Austin Core',
+          city: 'Austin',
+          stateOrRegion: 'TX',
+          country: 'US',
+          providerLocationCode: null,
+          providerLocationName: 'Austin,Texas,United States',
+          latitude: null,
+          longitude: null,
+          status: 'active',
+        }],
+      }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const updated = body.markets.find((market: { id: string }) => market.id === activeMarket.id);
+    expect(updated).toEqual(expect.objectContaining({
+      providerLocationName: 'Austin,Texas,United States',
+      status: 'active',
+    }));
+    expect(updated.providerLocationCode).toBeUndefined();
+    expect(updated.latitude).toBeUndefined();
+    expect(updated.longitude).toBeUndefined();
+  });
+
   it('POST refresh starts a capped background job from local-intent keywords', async () => {
     const res = await postJson(`/api/local-seo/${workspaceId}/refresh`, {
       marketIds: ['missing-market'],
@@ -209,6 +243,51 @@ describe('Local SEO routes', () => {
     expect(body.selectedMarketCount).toBe(0);
     expect(body.selectedKeywordCount).toBeGreaterThan(0);
     expect(body.selectedKeywordCount).toBeLessThanOrEqual(25);
+  });
+
+  it('allows replacing a market while already at the active market cap', async () => {
+    const expand = await api(`/api/local-seo/${workspaceId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        markets: [
+          { label: 'Houston', city: 'Houston', country: 'US', providerLocationName: 'Houston,Texas,United States', status: 'active' },
+          { label: 'Dallas', city: 'Dallas', country: 'US', providerLocationName: 'Dallas,Texas,United States', status: 'active' },
+        ],
+      }),
+    });
+    expect(expand.status).toBe(200);
+    const expandedBody = await expand.json();
+    const activeMarkets = expandedBody.markets.filter((market: { status: string }) => market.status === 'active');
+    expect(activeMarkets).toHaveLength(3);
+    const retiredMarket = activeMarkets.find((market: { label: string }) => market.label === 'Dallas');
+    expect(retiredMarket).toBeTruthy();
+
+    const replace = await api(`/api/local-seo/${workspaceId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        markets: [
+          {
+            id: retiredMarket.id,
+            label: retiredMarket.label,
+            city: retiredMarket.city,
+            stateOrRegion: retiredMarket.stateOrRegion,
+            country: retiredMarket.country,
+            providerLocationName: retiredMarket.providerLocationName,
+            status: 'inactive',
+          },
+          { label: 'San Antonio', city: 'San Antonio', country: 'US', providerLocationName: 'San Antonio,Texas,United States', status: 'active' },
+        ],
+      }),
+    });
+    expect(replace.status).toBe(200);
+    const replacedBody = await replace.json();
+    expect(replacedBody.markets).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: retiredMarket.id, status: 'inactive' }),
+      expect.objectContaining({ label: 'San Antonio', status: 'active' }),
+    ]));
+    expect(replacedBody.markets.filter((market: { status: string }) => market.status === 'active')).toHaveLength(3);
   });
 
   it('rejects more than three active markets across existing and newly added markets', async () => {

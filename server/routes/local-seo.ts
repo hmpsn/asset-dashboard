@@ -31,10 +31,10 @@ const marketSchema = z.object({
   city: z.string().min(1).max(120),
   stateOrRegion: z.string().max(120).optional(),
   country: z.string().min(1).max(120),
-  latitude: z.number().min(-90).max(90).optional(),
-  longitude: z.number().min(-180).max(180).optional(),
-  providerLocationCode: z.number().int().positive().optional(),
-  providerLocationName: z.string().max(200).optional(),
+  latitude: z.number().min(-90).max(90).nullable().optional(),
+  longitude: z.number().min(-180).max(180).nullable().optional(),
+  providerLocationCode: z.number().int().positive().nullable().optional(),
+  providerLocationName: z.string().max(200).nullable().optional(),
   status: z.enum([
     LOCAL_SEO_MARKET_STATUS.ACTIVE,
     LOCAL_SEO_MARKET_STATUS.INACTIVE,
@@ -49,7 +49,9 @@ const updateSchema = z.object({
     LOCAL_SEO_POSTURE.HYBRID,
     LOCAL_SEO_POSTURE.UNKNOWN,
   ]).optional(),
-  markets: z.array(marketSchema).max(3).optional(),
+  // Allow a full replacement save at the v1 cap: up to 3 active rows plus
+  // up to 3 existing rows being explicitly marked inactive in the same request.
+  markets: z.array(marketSchema).max(6).optional(),
 }).strict();
 
 const refreshSchema = z.object({

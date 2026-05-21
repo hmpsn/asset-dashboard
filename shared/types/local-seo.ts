@@ -404,10 +404,10 @@ export interface LocalSeoMarketUpdateRequest {
     city: string;
     stateOrRegion?: string;
     country: string;
-    latitude?: number;
-    longitude?: number;
-    providerLocationCode?: number;
-    providerLocationName?: string;
+    latitude?: number | null;
+    longitude?: number | null;
+    providerLocationCode?: number | null;
+    providerLocationName?: string | null;
     status?: LocalSeoMarketStatus;
   }>;
 }
