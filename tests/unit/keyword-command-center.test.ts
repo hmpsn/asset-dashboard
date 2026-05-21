@@ -1111,6 +1111,83 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
     expect(keywords.has('client interested keyword')).toBe(false);
   });
 
+  it('drops DataForSEO planner-grouped sentinel volume (1M/21) and prefers real provider data', async () => {
+    // Regression: DataForSEO Google Ads search-volume can return 1,000,000 as a
+    // planner-grouped bucket sentinel paired with difficulty=21. On Swish staging,
+    // ~12% of rows displayed "1.0M" volume because the sentinel overwrote real
+    // provider data via mergeMetrics (later sources spread over earlier ones).
+    upsertPageKeyword(workspaceId, {
+      pagePath: '/services/dentistry',
+      pageTitle: 'Cosmetic Dentistry',
+      primaryKeyword: 'cosmetic dentistry',
+      secondaryKeywords: [],
+      searchIntent: 'commercial',
+      volume: 8100, // real provider value
+      difficulty: 62,
+    });
+    addTrackedKeyword(workspaceId, 'cosmetic dentistry', {
+      source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
+      volume: 1000000, // sentinel
+      difficulty: 21,  // sentinel partner
+    });
+
+    const result = await buildKeywordCommandCenterRows(workspaceId, {
+      filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+      pageSize: 100,
+    });
+    const row = result!.rows.find(r => r.normalizedKeyword === 'cosmetic dentistry');
+    expect(row).toBeDefined();
+    expect(row!.metrics.volume).toBe(8100);
+    expect(row!.metrics.difficulty).toBe(62);
+  });
+
+  it('drops planner-bucket sentinel even when no other source provides volume', async () => {
+    // Edge case: only source is the sentinel-bearing one. Row gets undefined
+    // volume (UI renders "—") instead of misleading "1.0M".
+    addTrackedKeyword(workspaceId, 'orphan sentinel keyword', {
+      source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
+      volume: 1000000,
+      difficulty: 21,
+    });
+
+    const result = await buildKeywordCommandCenterRows(workspaceId, {
+      filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+      pageSize: 100,
+    });
+    const row = result!.rows.find(r => r.normalizedKeyword === 'orphan sentinel keyword');
+    expect(row).toBeDefined();
+    expect(row!.metrics.volume).toBeUndefined();
+    expect(row!.metrics.difficulty).toBeUndefined();
+  });
+
+  it('preserves real volumes below the planner-bucket threshold', async () => {
+    // Guardrail: real provider volumes < 1,000,000 must always survive. The
+    // sentinel detector (isSuspiciousPlannerGroupedVolume) considers ALL values
+    // >= 1M suspicious by design — that's a deliberate tradeoff since SMB
+    // workspaces (the platform's target market) basically never have real
+    // million-volume keywords. If a legitimate niche ever needs >=1M volumes,
+    // the helper's PLANNER_GROUPED_VOLUME_FLOOR must be raised in lockstep
+    // (see server/keyword-strategy-helpers.ts).
+    upsertPageKeyword(workspaceId, {
+      pagePath: '/services/x',
+      pageTitle: 'High demand service',
+      primaryKeyword: 'high demand service',
+      secondaryKeywords: [],
+      searchIntent: 'commercial',
+      volume: 950_000, // just below the floor
+      difficulty: 55,
+    });
+
+    const result = await buildKeywordCommandCenterRows(workspaceId, {
+      filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+      pageSize: 100,
+    });
+    const row = result!.rows.find(r => r.normalizedKeyword === 'high demand service');
+    expect(row).toBeDefined();
+    expect(row!.metrics.volume).toBe(950_000);
+    expect(row!.metrics.difficulty).toBe(55);
+  });
+
   it('localCandidates summary count is intentionally 0 (computed off the hot path; follow-up cache)', async () => {
     // PR #876 introduced a generator-backed count here, but on rich workspaces
     // (Swish: 235 tracked + 50 pages + variants) that took ~35s because every
