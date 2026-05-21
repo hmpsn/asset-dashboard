@@ -5,6 +5,8 @@
 import { createLogger } from './logger.js';
 import type { KeywordSourceEvidence } from '../shared/types/keywords.js';
 import type {
+  LocalSeoLocationLookupRequest,
+  LocalSeoLocationLookupResponse,
   LocalVisibilityProviderRequest,
   LocalVisibilityProviderResult,
 } from '../shared/types/local-seo.js';
@@ -129,6 +131,7 @@ export interface SeoDataProvider {
   getReferringDomains(domain: string, workspaceId: string, limit?: number, database?: string): Promise<ReferringDomain[]>;
 
   // Local SEO visibility
+  resolveLocalSeoLocation?(request: LocalSeoLocationLookupRequest, workspaceId: string): Promise<LocalSeoLocationLookupResponse>;
   getLocalVisibility?(request: LocalVisibilityProviderRequest, workspaceId: string): Promise<LocalVisibilityProviderResult>;
 }
 

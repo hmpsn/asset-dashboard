@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, ChevronDown, MapPin, Plus, RefreshCw, Sparkles, Trash2, X } from 'lucide-react';
 import type {
+  LocalSeoLocationLookupCandidate,
   LocalSeoMarket,
   LocalSeoMarketStatus,
   LocalSeoPosture,
   LocalSeoReadResponse,
 } from '../../../shared/types/local-seo';
+import { buildDataForSeoLocationName } from '../../../shared/local-seo-location';
 import {
   LOCAL_SEO_MARKET_STATUS,
   LOCAL_SEO_POSTURE,
 } from '../../../shared/types/local-seo';
-import { useLocalSeoRefresh, useLocalSeoUpdate } from '../../hooks/admin';
+import { useLocalSeoLocationLookup, useLocalSeoRefresh, useLocalSeoUpdate } from '../../hooks/admin';
 import { Badge, Button, FormField, FormInput, FormSelect, Icon, IconButton, cn } from '../ui';
 
 interface LocalSeoMarketSetupDrawerProps {
@@ -49,10 +51,7 @@ const STATUS_OPTIONS = [
 
 function providerLocationNameFor(market: Pick<LocalSeoMarket, 'city' | 'stateOrRegion' | 'country' | 'providerLocationName'>): string {
   if (market.providerLocationName?.trim()) return market.providerLocationName.trim();
-  const country = market.country.trim();
-  const state = market.stateOrRegion?.trim();
-  if (country.toUpperCase() === 'US' && state) return `${market.city},${state},United States`;
-  return [market.city, country].filter(Boolean).join(',');
+  return buildDataForSeoLocationName(market) ?? '';
 }
 
 function draftFromMarket(market: LocalSeoMarket, forceActive = false): MarketDraft {
@@ -97,6 +96,7 @@ function hasProviderIdentity(market: MarketDraft): boolean {
   return Boolean(
     market.providerLocationCode.trim()
     || market.providerLocationName.trim()
+    || buildDataForSeoLocationName(market)
     || (market.latitude.trim() && market.longitude.trim())
   );
 }
@@ -110,10 +110,13 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
   const [markets, setMarkets] = useState<MarketDraft[]>([]);
   const [removedMarkets, setRemovedMarkets] = useState<MarketDraft[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [locationCandidatesByIndex, setLocationCandidatesByIndex] = useState<Record<number, LocalSeoLocationLookupCandidate[]>>({});
+  const [lookupPendingIndex, setLookupPendingIndex] = useState<number | null>(null);
   const drawerRef = useRef<HTMLDivElement | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const update = useLocalSeoUpdate(workspaceId);
   const refresh = useLocalSeoRefresh(workspaceId);
+  const locationLookup = useLocalSeoLocationLookup(workspaceId);
 
   useEffect(() => {
     if (!open) return;
@@ -122,6 +125,8 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
     setMarkets(data.markets.map(market => draftFromMarket(market)));
     setRemovedMarkets([]);
     setError(null);
+    setLocationCandidatesByIndex({});
+    setLookupPendingIndex(null);
     const frame = window.requestAnimationFrame(() => drawerRef.current?.focus());
     return () => {
       window.cancelAnimationFrame(frame);
@@ -164,6 +169,12 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
 
   const setMarket = (index: number, patch: Partial<MarketDraft>) => {
     setMarkets(current => current.map((market, i) => i === index ? { ...market, ...patch } : market));
+    setLocationCandidatesByIndex(current => {
+      if (!(index in current)) return current;
+      const next = { ...current };
+      delete next[index];
+      return next;
+    });
   };
 
   const addSuggestedMarket = (market: LocalSeoMarket) => {
@@ -173,6 +184,58 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
       return [...withoutDuplicate, next].slice(0, data.caps.maxMarkets);
     });
     setError(null);
+  };
+
+  const applyProviderCandidate = (index: number, candidate: LocalSeoLocationLookupCandidate) => {
+    setMarket(index, {
+      providerLocationCode: String(candidate.providerLocationCode),
+      providerLocationName: candidate.providerLocationName,
+      advancedOpen: true,
+    });
+    setLocationCandidatesByIndex(current => {
+      const next = { ...current };
+      delete next[index];
+      return next;
+    });
+    setError(null);
+  };
+
+  const lookupProviderLocation = async (index: number, market: MarketDraft): Promise<MarketDraft | null> => {
+    if (!market.city.trim() || !market.country.trim()) {
+      setError(`${marketLabel(market)} needs a city and country before matching a provider location.`);
+      return null;
+    }
+    setLookupPendingIndex(index);
+    try {
+      const result = await locationLookup.mutateAsync({
+        city: market.city.trim(),
+        stateOrRegion: market.stateOrRegion.trim() || undefined,
+        country: market.country.trim(),
+      });
+      const best = result.bestCandidate;
+      if (result.status === 'matched' && best) {
+        const next = {
+          ...market,
+          providerLocationCode: String(best.providerLocationCode),
+          providerLocationName: best.providerLocationName,
+          advancedOpen: market.advancedOpen,
+        };
+        setMarket(index, next);
+        return next;
+      }
+      if (result.candidates.length > 0) {
+        setLocationCandidatesByIndex(current => ({ ...current, [index]: result.candidates }));
+        setError(`${marketLabel(market)} matched multiple provider locations. Choose the closest match before saving.`);
+        return null;
+      }
+      setError(result.degradedReason ?? `${marketLabel(market)} could not be matched to a provider location.`);
+      return null;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `${marketLabel(market)} provider location lookup failed.`);
+      return null;
+    } finally {
+      setLookupPendingIndex(null);
+    }
   };
 
   const validate = (): boolean => {
@@ -209,16 +272,32 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
   const save = async (refreshAfterSave: boolean) => {
     if (!validate()) return;
     try {
+      const resolvedMarkets: MarketDraft[] = [];
+      for (let index = 0; index < markets.length; index++) {
+        const market = markets[index];
+        if (
+          market.status === LOCAL_SEO_MARKET_STATUS.ACTIVE
+          && !market.providerLocationCode.trim()
+          && market.city.trim()
+          && market.country.trim()
+        ) {
+          const resolved = await lookupProviderLocation(index, market);
+          if (!resolved) return;
+          resolvedMarkets.push(resolved);
+        } else {
+          resolvedMarkets.push(market);
+        }
+      }
       const response = await update.mutateAsync({
         posture,
-        markets: [...markets, ...removedMarkets].map(market => ({
+        markets: [...resolvedMarkets, ...removedMarkets].map(market => ({
           id: market.id,
           label: market.label.trim(),
           city: market.city.trim(),
           stateOrRegion: market.stateOrRegion.trim() || undefined,
           country: market.country.trim(),
           providerLocationCode: parseClearableNumber(market.providerLocationCode),
-          providerLocationName: market.providerLocationName.trim() || null,
+          providerLocationName: market.providerLocationName.trim() || buildDataForSeoLocationName(market) || null,
           latitude: parseClearableNumber(market.latitude),
           longitude: parseClearableNumber(market.longitude),
           status: market.status,
@@ -238,6 +317,7 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
   };
 
   const saving = update.isPending || refresh.isPending;
+  const lookingUp = locationLookup.isPending;
 
   return (
     <>
@@ -384,6 +464,46 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
                   </FormField>
                 </div>
 
+                <div className="rounded-[var(--radius-md)] border border-blue-500/20 bg-blue-500/8 px-3 py-2 space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="t-caption font-semibold text-[var(--brand-text-bright)]">Provider location match</p>
+                      <p className="t-caption-sm text-[var(--brand-text-muted)]">
+                        {market.providerLocationCode.trim()
+                          ? `${market.providerLocationName || 'Matched location'} · DataForSEO #${market.providerLocationCode}`
+                          : 'We can match this market to a DataForSEO location code before refreshing.'}
+                      </p>
+                    </div>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      loading={lookupPendingIndex === index}
+                      disabled={saving || lookingUp || !market.city.trim() || !market.country.trim()}
+                      onClick={() => { void lookupProviderLocation(index, market); }}
+                    >
+                      Match location
+                    </Button>
+                  </div>
+                  {locationCandidatesByIndex[index]?.length > 0 && (
+                    <div className="space-y-1">
+                      {locationCandidatesByIndex[index].map(candidate => (
+                        <Button
+                          key={candidate.providerLocationCode}
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-start rounded-[var(--radius-sm)] border border-teal-500/20 bg-[var(--surface-2)]/70 px-3 py-2 text-left hover:border-teal-400/40"
+                          onClick={() => applyProviderCandidate(index, candidate)}
+                        >
+                          <span>
+                            <span className="block t-caption font-semibold text-[var(--brand-text-bright)]">{candidate.providerLocationName}</span>
+                            <span className="block t-caption-sm text-[var(--brand-text-muted)]">DataForSEO #{candidate.providerLocationCode} · {candidate.locationType ?? 'location'}</span>
+                          </span>
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <Button
                   variant="ghost"
                   size="sm"
@@ -437,7 +557,7 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
           </p>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
-            <Button variant="secondary" size="sm" loading={update.isPending && !refresh.isPending} disabled={saving} onClick={() => save(false)}>
+            <Button variant="secondary" size="sm" loading={(update.isPending && !refresh.isPending) || lookingUp} disabled={saving || lookingUp} onClick={() => save(false)}>
               Save market
             </Button>
             <Button
@@ -445,7 +565,7 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
               size="sm"
               icon={refresh.isPending ? undefined : RefreshCw}
               loading={refresh.isPending}
-              disabled={saving || !canSaveAndRefresh}
+              disabled={saving || lookingUp || !canSaveAndRefresh}
               title={!canSaveAndRefresh ? 'Choose at least one active local market before refreshing visibility.' : undefined}
               onClick={() => save(true)}
             >

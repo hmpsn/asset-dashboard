@@ -12,6 +12,7 @@ import { createJob, hasActiveJob } from '../jobs.js';
 import {
   createLocalSeoRefreshPlan,
   getLocalSeoReadModel,
+  resolveLocalSeoProviderLocation,
   runLocalSeoRefreshJob,
   updateLocalSeoConfiguration,
 } from '../local-seo.js';
@@ -61,6 +62,12 @@ const refreshSchema = z.object({
   languageCode: z.string().min(2).max(8).optional(),
 }).strict();
 
+const locationLookupQuerySchema = z.object({
+  city: z.string().min(1).max(120),
+  stateOrRegion: z.string().max(120).optional(),
+  country: z.string().min(2).max(120),
+}).strict();
+
 router.get('/api/local-seo/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const payload = getLocalSeoReadModel(req.params.workspaceId, isFeatureEnabled('local-seo-visibility'));
   if (!payload) return res.status(404).json({ error: 'Workspace not found' });
@@ -79,6 +86,23 @@ router.put('/api/local-seo/:workspaceId', requireWorkspaceAccess('workspaceId'),
     const message = err instanceof Error ? err.message : 'Local SEO configuration failed';
     if (message.includes('At most') || message.includes('Active local SEO markets require')) return res.status(400).json({ error: message });
     if (message === 'Local SEO market not found') return res.status(404).json({ error: message });
+    next(err);
+  }
+});
+
+router.get('/api/local-seo/:workspaceId/location-lookup', requireWorkspaceAccess('workspaceId'), async (req, res, next) => {
+  try {
+    if (!isFeatureEnabled('local-seo-visibility')) {
+      return res.status(403).json({ error: 'Local SEO visibility is not enabled for this environment' });
+    }
+    const parsed = locationLookupQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid local SEO location lookup request' });
+    }
+    const payload = await resolveLocalSeoProviderLocation(req.params.workspaceId, parsed.data);
+    if (!payload) return res.status(404).json({ error: 'Workspace not found' });
+    res.json(payload);
+  } catch (err) {
     next(err);
   }
 });

@@ -15,6 +15,7 @@ import { DEFAULT_SEO_DATA_PROVIDER, getProvider, isCapabilityDisabled, type Prov
 import { getWorkspace } from './workspaces.js';
 import { WS_EVENTS } from './ws-events.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
+import { buildDataForSeoLocationName } from '../shared/local-seo-location.js';
 import {
   LOCAL_BUSINESS_MATCH_CONFIDENCE,
   LOCAL_SEO_DEVICE,
@@ -30,6 +31,8 @@ import {
   type LocalSeoKeywordVisibility,
   type LocalSeoKeywordVisibilitySummary,
   type LocalSeoDevice,
+  type LocalSeoLocationLookupRequest,
+  type LocalSeoLocationLookupResponse,
   type LocalSeoMarket,
   type LocalSeoMarketStatus,
   type LocalSeoMarketUpdateRequest,
@@ -299,6 +302,11 @@ function buildSuggestedMarkets(workspace: Workspace): LocalSeoMarket[] {
   if (!address?.city || !address.country) return [];
   const now = new Date().toISOString();
   const state = address.state?.trim();
+  const providerLocationName = buildDataForSeoLocationName({
+    city: address.city,
+    stateOrRegion: state,
+    country: address.country,
+  });
   const label = [address.city, state].filter(Boolean).join(', ') || address.city;
   return [{
     id: 'business-profile-primary-market',
@@ -307,6 +315,7 @@ function buildSuggestedMarkets(workspace: Workspace): LocalSeoMarket[] {
     city: address.city,
     stateOrRegion: state,
     country: address.country,
+    providerLocationName,
     source: LOCAL_SEO_MARKET_SOURCE.BUSINESS_PROFILE,
     status: LOCAL_SEO_MARKET_STATUS.NEEDS_REVIEW,
     createdAt: now,
@@ -373,6 +382,9 @@ function disabledSettings(workspace: Workspace): LocalSeoWorkspaceSettings {
 }
 
 function hasProviderLocationIdentity(market: {
+  city?: string | null;
+  stateOrRegion?: string | null;
+  country?: string | null;
   providerLocationCode?: number | null;
   providerLocationName?: string | null;
   latitude?: number | null;
@@ -381,8 +393,18 @@ function hasProviderLocationIdentity(market: {
   return Boolean(
     market.providerLocationCode
     || market.providerLocationName?.trim()
+    || buildDataForSeoLocationName(market)
     || (typeof market.latitude === 'number' && typeof market.longitude === 'number')
   );
+}
+
+function resolveProviderLocationName(market: {
+  city?: string | null;
+  stateOrRegion?: string | null;
+  country?: string | null;
+  providerLocationName?: string | null;
+}): string | null {
+  return market.providerLocationName?.trim() || buildDataForSeoLocationName(market) || null;
 }
 
 export function updateLocalSeoConfiguration(workspaceId: string, request: LocalSeoMarketUpdateRequest, featureEnabled: boolean): LocalSeoReadResponse | null {
@@ -415,11 +437,19 @@ export function updateLocalSeoConfiguration(workspaceId: string, request: LocalS
           const nextStatus = market.status ?? existingMarket.status;
           const nextProviderIdentity = {
             providerLocationCode: market.providerLocationCode !== undefined ? market.providerLocationCode : existingMarket.providerLocationCode,
-            providerLocationName: market.providerLocationName !== undefined ? market.providerLocationName : existingMarket.providerLocationName,
+            providerLocationName: market.providerLocationName !== undefined
+              ? resolveProviderLocationName(market)
+              : existingMarket.providerLocationName,
             latitude: market.latitude !== undefined ? market.latitude : existingMarket.latitude,
             longitude: market.longitude !== undefined ? market.longitude : existingMarket.longitude,
+            city: market.city ?? existingMarket.city,
+            stateOrRegion: market.stateOrRegion !== undefined ? market.stateOrRegion : existingMarket.stateOrRegion,
+            country: market.country ?? existingMarket.country,
           };
           if (nextStatus === LOCAL_SEO_MARKET_STATUS.ACTIVE && !hasProviderLocationIdentity({
+            city: nextProviderIdentity.city,
+            stateOrRegion: nextProviderIdentity.stateOrRegion,
+            country: nextProviderIdentity.country,
             providerLocationCode: nextProviderIdentity.providerLocationCode,
             providerLocationName: nextProviderIdentity.providerLocationName,
             latitude: nextProviderIdentity.latitude,
@@ -452,7 +482,9 @@ export function updateLocalSeoConfiguration(workspaceId: string, request: LocalS
           latitude: market.latitude !== undefined ? market.latitude : existingMarket?.latitude ?? null,
           longitude: market.longitude !== undefined ? market.longitude : existingMarket?.longitude ?? null,
           provider_location_code: market.providerLocationCode !== undefined ? market.providerLocationCode : existingMarket?.providerLocationCode ?? null,
-          provider_location_name: market.providerLocationName !== undefined ? market.providerLocationName?.trim() || null : existingMarket?.providerLocationName ?? null,
+          provider_location_name: market.providerLocationName !== undefined
+            ? resolveProviderLocationName(market)
+            : existingMarket?.providerLocationName ?? resolveProviderLocationName(market),
           source: LOCAL_SEO_MARKET_SOURCE.ADMIN_OVERRIDE,
           status: market.status ?? existingMarket?.status ?? LOCAL_SEO_MARKET_STATUS.ACTIVE,
           created_at: existing?.created_at ?? now,
@@ -749,6 +781,32 @@ function resolveLocalVisibilityProvider(workspace: Workspace): SeoDataProvider |
   const provider = getProvider(providerName);
   if (!provider?.isConfigured()) return null;
   return provider.getLocalVisibility ? provider : null;
+}
+
+function resolveLocalLocationProvider(workspace: Workspace): SeoDataProvider | null {
+  const providerName = (workspace.seoDataProvider as ProviderName | undefined) ?? DEFAULT_SEO_DATA_PROVIDER;
+  if (isCapabilityDisabled(providerName, 'local_visibility')) return null;
+  const provider = getProvider(providerName);
+  if (!provider?.isConfigured()) return null;
+  return provider.resolveLocalSeoLocation ? provider : null;
+}
+
+export async function resolveLocalSeoProviderLocation(
+  workspaceId: string,
+  request: LocalSeoLocationLookupRequest,
+): Promise<LocalSeoLocationLookupResponse | null> {
+  const workspace = getWorkspace(workspaceId);
+  if (!workspace) return null;
+  const provider = resolveLocalLocationProvider(workspace);
+  if (!provider?.resolveLocalSeoLocation) {
+    return {
+      query: request,
+      status: 'provider_unavailable',
+      candidates: [],
+      degradedReason: 'No configured local location provider is available.',
+    };
+  }
+  return provider.resolveLocalSeoLocation(request, workspaceId);
 }
 
 export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, request: LocalSeoRefreshRequest = {}): Promise<void> {

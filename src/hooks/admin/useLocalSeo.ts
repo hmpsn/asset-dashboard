@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { localSeo } from '../../api/localSeo';
 import { queryKeys } from '../../lib/queryKeys';
-import type { LocalSeoMarketUpdateRequest, LocalSeoRefreshRequest } from '../../../shared/types/local-seo';
+import type { LocalSeoLocationLookupRequest, LocalSeoMarketUpdateRequest, LocalSeoRefreshRequest } from '../../../shared/types/local-seo';
 
 export function useLocalSeo(workspaceId: string) {
   return useQuery({
@@ -32,5 +32,11 @@ export function useLocalSeoUpdate(workspaceId: string) {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
     },
+  });
+}
+
+export function useLocalSeoLocationLookup(workspaceId: string) {
+  return useMutation({
+    mutationFn: (body: LocalSeoLocationLookupRequest) => localSeo.locationLookup(workspaceId, body),
   });
 }

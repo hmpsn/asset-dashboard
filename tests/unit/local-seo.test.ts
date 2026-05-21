@@ -19,6 +19,7 @@ import {
 import type { LocalVisibilitySnapshot } from '../../shared/types/local-seo.js';
 import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
 import type { Workspace } from '../../shared/types/workspace.js';
+import { buildDataForSeoLocationName } from '../../shared/local-seo-location.js';
 
 const workspace: Workspace = {
   id: 'ws-local-match',
@@ -46,6 +47,23 @@ afterEach(() => {
     deleteWorkspace(workspaceId);
   }
   cleanupWorkspaceIds.clear();
+});
+
+describe('local SEO DataForSEO location identity', () => {
+  it('formats US provider location names with full state names for DataForSEO', () => {
+    expect(buildDataForSeoLocationName({
+      city: 'Austin',
+      stateOrRegion: 'TX',
+      country: 'US',
+    })).toBe('Austin,Texas,United States');
+  });
+
+  it('does not infer an ambiguous US provider location without state evidence', () => {
+    expect(buildDataForSeoLocationName({
+      city: 'Austin',
+      country: 'US',
+    })).toBeUndefined();
+  });
 });
 
 describe('local SEO business match confidence', () => {
