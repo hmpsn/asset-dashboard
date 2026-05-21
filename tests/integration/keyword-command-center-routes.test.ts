@@ -18,18 +18,9 @@ afterAll(async () => {
 });
 
 describe('Keyword Command Center routes', () => {
-  it('GET returns read-model rows, counts, filters, and raw evidence metadata', async () => {
+  it('legacy full GET endpoint is removed so callers use split read models', async () => {
     const res = await api(`/api/webflow/keyword-command-center/${workspaceId}`);
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(Array.isArray(body.rows)).toBe(true);
-    expect(body.counts).toEqual(expect.objectContaining({ total: expect.any(Number) }));
-    expect(body.filters).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: 'all', label: 'All' }),
-      expect.objectContaining({ id: 'tracked', label: 'Tracked' }),
-      expect.objectContaining({ id: 'raw_evidence', label: 'Raw Evidence' }),
-    ]));
-    expect(body.rawEvidenceTotal).toEqual(expect.any(Number));
+    expect(res.status).toBe(404);
   });
 
   it('GET summary, rows, and detail expose split read models', async () => {
@@ -104,15 +95,13 @@ describe('Keyword Command Center routes', () => {
     });
     expect(forcedRetire.status).toBe(200);
 
-    const read = await api(`/api/webflow/keyword-command-center/${workspaceId}`);
+    const read = await api(`/api/webflow/keyword-command-center/${workspaceId}/detail?keyword=${encodeURIComponent('Route Test Keyword')}`);
     expect(read.status).toBe(200);
     const body = await read.json();
-    expect(body.rows).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        normalizedKeyword: 'route test keyword',
-        lifecycleStatus: 'retired',
-      }),
-    ]));
+    expect(body.row).toEqual(expect.objectContaining({
+      normalizedKeyword: 'route test keyword',
+      lifecycleStatus: 'retired',
+    }));
   });
 
   it('POST pause or retire returns 404 when the keyword is not tracked', async () => {

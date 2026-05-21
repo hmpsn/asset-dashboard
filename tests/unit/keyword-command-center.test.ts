@@ -3,7 +3,6 @@ import { setBroadcast } from '../../server/broadcast.js';
 import db from '../../server/db/index.js';
 import {
   applyKeywordCommandCenterAction,
-  buildKeywordCommandCenter,
   buildKeywordCommandCenterDetail,
   buildKeywordCommandCenterRows,
   buildKeywordCommandCenterSummary,
@@ -152,6 +151,19 @@ function seedStrategy() {
   ]);
 }
 
+async function readRows(
+  options: { includeLocalSeo?: boolean } = {},
+  query: Parameters<typeof buildKeywordCommandCenterRows>[1] = {},
+) {
+  const payload = await buildKeywordCommandCenterRows(workspaceId, {
+    filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+    pageSize: 500,
+    ...query,
+  }, options);
+  expect(payload).not.toBeNull();
+  return payload!;
+}
+
 describe('normalizeKeywordForComparison', () => {
   it('normalizes case, punctuation, whitespace, and local-ish phrases without stripping meaning', () => {
     expect(normalizeKeywordForComparison('  Cosmetic-Dentistry!! Near   Me ')).toBe('cosmetic dentistry near me');
@@ -186,7 +198,7 @@ describe('buildKeywordCommandCenter', () => {
     seedFeedback('requested keyword', 'requested', 'Client asked about this.');
     seedFeedback('declined keyword', 'declined', 'Too broad.');
 
-    const payload = await buildKeywordCommandCenter(workspaceId, { includeLocalSeo: true });
+    const payload = await readRows({ includeLocalSeo: true });
 
     expect(payload).not.toBeNull();
     const byKeyword = new Map(payload!.rows.map(row => [row.normalizedKeyword, row]));
@@ -212,8 +224,9 @@ describe('buildKeywordCommandCenter', () => {
     expect(byKeyword.get('emergency dentist near me')).toEqual(expect.objectContaining({
       lifecycleStatus: KEYWORD_COMMAND_CENTER_STATUS.NEEDS_REVIEW,
     }));
-    expect(payload!.counts.tracked).toBeGreaterThan(0);
-    expect(payload!.filters.some(filter => filter.id === 'raw_evidence' && filter.count > 0)).toBe(true);
+    const summary = await buildKeywordCommandCenterSummary(workspaceId, { includeLocalSeo: true });
+    expect(summary!.counts.tracked).toBeGreaterThan(0);
+    expect(summary!.filters.some(filter => filter.id === 'raw_evidence' && filter.count > 0)).toBe(true);
   });
 
   it('reports uncapped raw provider evidence totals and preserves provider metrics', async () => {
@@ -225,10 +238,11 @@ describe('buildKeywordCommandCenter', () => {
       competitorDomain: 'competitor.example',
     })));
 
-    const payload = await buildKeywordCommandCenter(workspaceId);
+    const payload = await readRows();
 
-    expect(payload?.rawEvidenceTotal).toBe(30);
-    expect(payload?.rawEvidenceReturned).toBe(30);
+    const summary = await buildKeywordCommandCenterSummary(workspaceId);
+    expect(summary?.rawEvidenceTotal).toBe(30);
+    expect(summary?.rawEvidenceReturned).toBe(30);
     const lastGap = payload!.rows.find(row => row.normalizedKeyword === 'provider evidence 29');
     expect(lastGap).toEqual(expect.objectContaining({
       lifecycleStatus: KEYWORD_COMMAND_CENTER_STATUS.RAW_EVIDENCE,
@@ -354,7 +368,7 @@ describe('buildKeywordCommandCenter', () => {
       keyword: 'promotable provider keyword',
     });
 
-    const payload = await buildKeywordCommandCenter(workspaceId);
+    const payload = await readRows();
     const row = payload!.rows.find(item => item.normalizedKeyword === 'promotable provider keyword');
     expect(row).toEqual(expect.objectContaining({
       lifecycleStatus: KEYWORD_COMMAND_CENTER_STATUS.TRACKED,
@@ -408,7 +422,7 @@ describe('buildKeywordCommandCenter', () => {
     });
     await runLocalSeoRefreshJob(job.id, workspaceId, { keywords: ['Austin dentist'] });
 
-    const payload = await buildKeywordCommandCenter(workspaceId, { includeLocalSeo: true });
+    const payload = await readRows({ includeLocalSeo: true });
     const row = payload!.rows.find(item => item.normalizedKeyword === 'austin dentist');
 
     expect(row?.localSeo).toEqual(expect.objectContaining({
@@ -446,7 +460,9 @@ describe('buildKeywordCommandCenter', () => {
       }],
     }, true);
 
-    const payload = await buildKeywordCommandCenter(workspaceId, { includeLocalSeo: true });
+    const payload = await readRows({ includeLocalSeo: true }, {
+      filter: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES,
+    });
     const candidate = payload!.rows.find(row => row.normalizedKeyword === 'cosmetic dentistry austin');
 
     expect(candidate).toEqual(expect.objectContaining({
@@ -460,11 +476,7 @@ describe('buildKeywordCommandCenter', () => {
     expect(candidate?.sourceLabels).toEqual(expect.arrayContaining([
       expect.objectContaining({ kind: 'local_candidate' }),
     ]));
-    expect(payload!.filters).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: 'local', count: expect.any(Number) }),
-      expect.objectContaining({ id: 'local_candidates', count: expect.any(Number) }),
-      expect.objectContaining({ id: 'not_checked', count: expect.any(Number) }),
-    ]));
+    expect(payload.pageInfo.totalRows).toBeGreaterThan(0);
   });
 
   it('keeps local candidates out of default rows and adds them only for local candidate filters', async () => {
@@ -591,7 +603,7 @@ describe('buildKeywordCommandCenter', () => {
     });
     await runLocalSeoRefreshJob(job.id, workspaceId, { keywords: ['Austin dentist'] });
 
-    const payload = await buildKeywordCommandCenter(workspaceId);
+    const payload = await readRows();
     const row = payload!.rows.find(item => item.normalizedKeyword === 'austin dentist');
 
     expect(row?.localSeo).toBeUndefined();
@@ -607,7 +619,7 @@ describe('applyKeywordCommandCenterAction', () => {
       keyword: 'requested keyword',
     });
 
-    const payload = await buildKeywordCommandCenter(workspaceId);
+    const payload = await readRows();
     const row = payload!.rows.find(item => item.normalizedKeyword === 'requested keyword');
     expect(row).toEqual(expect.objectContaining({
       lifecycleStatus: KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY,

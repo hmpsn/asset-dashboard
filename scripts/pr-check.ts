@@ -952,6 +952,87 @@ export const CHECKS: Check[] = [
     severity: 'error',
   },
   {
+    name: 'Keyword Command Center summary/detail must not use full model',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    displayScope: 'server/keyword-command-center.ts',
+    message: 'Summary/detail endpoints must stay skinny. Do not call buildKeywordCommandCenterModel() from buildKeywordCommandCenterSummary() or buildKeywordCommandCenterDetail().',
+    severity: 'error',
+    rationale: 'Prevents the OOM-prone full keyword universe builder from being reintroduced into lightweight Command Center endpoints.',
+    claudeMdRef: '#data-flow-rules-mandatory',
+    customCheck: (files) => {
+      const matches: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('server/keyword-command-center.ts')) continue;
+        const lines = readFileOrEmpty(file).split('\n');
+        let current: string | null = null;
+        let depth = 0;
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const fnMatch = line.match(/export\s+async\s+function\s+(buildKeywordCommandCenterSummary|buildKeywordCommandCenterDetail)\b/);
+          if (fnMatch) {
+            current = fnMatch[1];
+            depth = 0;
+          }
+          if (!current) continue;
+          if (line.includes('buildKeywordCommandCenterModel(')) {
+            matches.push({ file, line: i + 1, text: `${current} calls buildKeywordCommandCenterModel()` });
+          }
+          depth += (line.match(/\{/g) ?? []).length;
+          depth -= (line.match(/\}/g) ?? []).length;
+          if (depth <= 0 && line.trim() === '}') current = null;
+        }
+      }
+      return matches;
+    },
+  },
+  {
+    name: 'Local SEO candidates must be explicitly gated',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    displayScope: 'server/keyword-command-center.ts',
+    message: 'buildLocalSeoKeywordCandidates() is expensive and must only run in an explicit local-candidate path or with a documented hatch.',
+    severity: 'error',
+    rationale: 'Prevents local candidate generation from running on default Keyword Command Center navigation paths.',
+    claudeMdRef: '#data-flow-rules-mandatory',
+    customCheck: (files) => {
+      const matches: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('server/keyword-command-center.ts')) continue;
+        const lines = readFileOrEmpty(file).split('\n');
+        let currentFunction = '';
+        let functionDepth = 0;
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const fnMatch = line.match(/(?:export\s+)?(?:async\s+)?function\s+(\w+)\b/)
+            ?? line.match(/(?:const|let)\s+(\w+)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>\s*\{/);
+          if (!currentFunction && fnMatch) {
+            currentFunction = fnMatch[1];
+            functionDepth = 0;
+          }
+          if (
+            line.includes('buildLocalSeoKeywordCandidates(')
+            && !line.includes('import ')
+            && currentFunction !== 'buildKeywordCommandCenterModel'
+            && currentFunction !== 'buildKeywordCommandCenterRowsViaModel'
+            && !hasHatch(lines, i, 'local-candidates-unconditional-ok')
+          ) {
+            matches.push({ file, line: i + 1, text: `ungated local candidate generation in ${currentFunction || 'module scope'}` });
+          }
+          if (currentFunction) {
+            functionDepth += (line.match(/\{/g) ?? []).length;
+            functionDepth -= (line.match(/\}/g) ?? []).length;
+            if (functionDepth <= 0 && line.trim() === '}') {
+              currentFunction = '';
+              functionDepth = 0;
+            }
+          }
+        }
+      }
+      return matches;
+    },
+  },
+  {
     name: 'Bare JSON.parse on server',
     pattern: 'JSON\\.parse\\(',
     fileGlobs: ['*.ts'],

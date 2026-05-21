@@ -10,7 +10,6 @@ import { requireWorkspaceAccess } from '../auth.js';
 import { validate, z } from '../middleware/validate.js';
 import {
   applyKeywordCommandCenterAction,
-  buildKeywordCommandCenter,
   buildKeywordCommandCenterDetail,
   buildKeywordCommandCenterRows,
   buildKeywordCommandCenterSummary,
@@ -105,18 +104,6 @@ router.get('/api/webflow/keyword-command-center/:workspaceId/detail', requireWor
       includeLocalSeo: isFeatureEnabled('local-seo-visibility'),
     });
     if (!payload) return res.status(404).json({ error: 'Keyword not found' });
-    res.json(payload);
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.get('/api/webflow/keyword-command-center/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res, next) => {
-  try {
-    const payload = await buildKeywordCommandCenter(req.params.workspaceId, {
-      includeLocalSeo: isFeatureEnabled('local-seo-visibility'),
-    });
-    if (!payload) return res.status(404).json({ error: 'Workspace not found' });
     res.json(payload);
   } catch (err) {
     next(err);
