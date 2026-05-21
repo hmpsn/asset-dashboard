@@ -88,6 +88,13 @@ const FILTER_ICONS: Record<KeywordCommandCenterFilter, typeof Search> = {
   [KEYWORD_COMMAND_CENTER_FILTERS.RETIRED]: Archive,
 };
 
+function filterCountLabel(filterId: KeywordCommandCenterFilter, count: number): string {
+  if (filterId === KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES && count === 0) return '...';
+  if (filterId === KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED && count === 0) return '...';
+  if (filterId === KEYWORD_COMMAND_CENTER_FILTERS.LOCAL) return count > 0 ? `${compactNumber(count)}+` : '...';
+  return compactNumber(count);
+}
+
 function compactNumber(value: number | undefined): string {
   if (value == null) return '—';
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
@@ -632,7 +639,7 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
                   className={filter === item.id ? '' : 'text-[var(--brand-text-muted)]'}
                 >
                   {item.label}
-                  <span className="tabular-nums opacity-75">{item.count}</span>
+                  <span className="tabular-nums opacity-75">{filterCountLabel(item.id, item.count)}</span>
                 </Button>
               );
             })}

@@ -57,6 +57,7 @@ const log = createLogger('local-seo');
 
 export const LOCAL_SEO_MAX_MARKETS = 3;
 export const LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH = 50;
+const LOCAL_CANDIDATE_HARD_CAP = 1000;
 const LOCAL_SEO_MAX_RESULTS = 10;
 const DEFAULT_LANGUAGE_CODE = 'en';
 
@@ -1012,6 +1013,7 @@ export function buildLocalSeoKeywordCandidates(workspaceId: string, explicitKeyw
       .map(tracked => keywordComparisonKey(tracked.query)),
   );
   const candidates = new Map<string, LocalSeoKeywordCandidate>();
+  let candidateHardCapReached = false;
 
   const add = (
     keyword: string | undefined,
@@ -1032,6 +1034,10 @@ export function buildLocalSeoKeywordCandidates(workspaceId: string, explicitKeyw
     if (!display) return;
     const key = keywordComparisonKey(display);
     if (!key || declined.has(key) || inactiveTracked.has(key)) return;
+    if (candidates.size >= LOCAL_CANDIDATE_HARD_CAP && !candidates.has(key)) {
+      candidateHardCapReached = true;
+      return;
+    }
     if (!options.force && !hasLocalIntent(display, workspace) && !hasMarketModifier(display, markets)) return;
     const evaluationSource = source === 'local_variant' ? 'local_generated' : source === 'tracking' ? 'gsc' : 'client';
     const evaluation = isStrategyPoolEligibleKeyword({
@@ -1146,6 +1152,10 @@ export function buildLocalSeoKeywordCandidates(workspaceId: string, explicitKeyw
         difficulty: gap.difficulty,
       });
     }
+  }
+
+  if (candidateHardCapReached) {
+    log.warn({ workspaceId, cap: LOCAL_CANDIDATE_HARD_CAP }, 'local SEO candidate hard cap reached; output truncated');
   }
 
   return [...candidates.values()]
