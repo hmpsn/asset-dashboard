@@ -1083,15 +1083,15 @@ export async function buildKeywordCommandCenterSummary(
   for (const key of localVisibility.keys()) allKeys.add(key);
   const localVisibilityValues = [...localVisibility.values()];
 
-  let localCandidatesCount = 0;
-  if (options.includeLocalSeo) {
-    try {
-      // local-candidates-unconditional-ok: summary needs a count to render the Local Candidates badge; generator is hard-capped at LOCAL_CANDIDATE_HARD_CAP in local-seo.ts
-      localCandidatesCount = buildLocalSeoKeywordCandidates(workspace.id).length;
-    } catch (err) {
-      log.warn({ err, workspaceId }, 'localCandidates count failed; reporting 0');
-    }
-  }
+  // NOTE: We do NOT compute localCandidatesCount in the summary hot path.
+  // buildLocalSeoKeywordCandidates runs evaluateKeywordCandidate for every
+  // candidate, which scans pageMap × secondaries per call — observed at ~35s
+  // on rich workspaces (Swish: 235 tracked + 50 pages + variants). The previous
+  // attempt to compute this here re-introduced the OOM/timeout regression that
+  // PRs #871–#873 fixed. The badge intentionally reports 0 until a workspace-level
+  // counter or cheap SQL proxy is wired in (tracked as
+  // `intel-quality-localcandidates-cheap-count` in roadmap).
+  const localCandidatesCount = 0;
 
   const counts: KeywordCommandCenterCounts = {
     total: allKeys.size,
