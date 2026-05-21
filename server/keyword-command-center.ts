@@ -1219,6 +1219,14 @@ function localVisibilityByFilter(
   return new Map();
 }
 
+function filterUsesLocalVisibilityRows(filter: KeywordCommandCenterFilter): boolean {
+  return filter === KEYWORD_COMMAND_CENTER_FILTERS.LOCAL
+    || filter === KEYWORD_COMMAND_CENTER_FILTERS.VISIBLE_LOCALLY
+    || filter === KEYWORD_COMMAND_CENTER_FILTERS.POSSIBLE_MATCH
+    || filter === KEYWORD_COMMAND_CENTER_FILTERS.NOT_VISIBLE
+    || filter === KEYWORD_COMMAND_CENTER_FILTERS.PROVIDER_DEGRADED;
+}
+
 interface RowCandidateKey {
   key: string;
   keyword: string;
@@ -1553,7 +1561,19 @@ async function buildKeywordCommandCenterRowsSkinny(
     ? listLocalSeoMarkets(workspace.id).filter(market => market.status === LOCAL_SEO_MARKET_STATUS.ACTIVE).length
     : 0;
   const bundle = buildFilteredBundle({ workspace, filter, localVisibility: localVisibilityByKeyword });
-  const pageSelection = rowCandidateKeysForQuery(bundle, localVisibilityByKeyword, query);
+  const candidateBundle = filterUsesLocalVisibilityRows(filter)
+    ? {
+      ...bundle,
+      strategy: null,
+      pageMap: [],
+      contentGaps: [],
+      keywordGaps: [],
+      trackedKeywords: [],
+      latestRanks: [],
+      feedback: new Map<string, FeedbackRow>(),
+    }
+    : bundle;
+  const pageSelection = rowCandidateKeysForQuery(candidateBundle, localVisibilityByKeyword, query);
   const pagedBundle = filterBundleToKeys(bundle, pageSelection.keys);
   const pagedLocalVisibility = filterMapByKeys(localVisibilityByKeyword, pageSelection.keys);
   const rows = new Map<string, DraftRow>();

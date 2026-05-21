@@ -18,7 +18,6 @@ export function useKeywordCommandCenterRows(workspaceId: string, query: KeywordC
     queryFn: () => keywordCommandCenter.rows(workspaceId, query),
     enabled: !!workspaceId,
     staleTime: 2 * 60 * 1000,
-    placeholderData: previous => previous,
   });
 }
 

@@ -24,7 +24,14 @@ import {
   KEYWORD_COMMAND_CENTER_FILTERS,
   KEYWORD_COMMAND_CENTER_STATUS,
 } from '../../shared/types/keyword-command-center.js';
-import { LOCAL_SEO_MARKET_STATUS, LOCAL_SEO_POSTURE, LOCAL_SEO_VISIBILITY_POSTURE } from '../../shared/types/local-seo.js';
+import {
+  LOCAL_BUSINESS_MATCH_CONFIDENCE,
+  LOCAL_SEO_MARKET_STATUS,
+  LOCAL_SEO_POSTURE,
+  LOCAL_SEO_VISIBILITY_POSTURE,
+  LOCAL_VISIBILITY_SOURCE_ENDPOINT,
+  LOCAL_VISIBILITY_STATUS,
+} from '../../shared/types/local-seo.js';
 import {
   TRACKED_KEYWORD_SOURCE,
   TRACKED_KEYWORD_STATUS,
@@ -477,6 +484,101 @@ describe('buildKeywordCommandCenter', () => {
       expect.objectContaining({ kind: 'local_candidate' }),
     ]));
     expect(payload.pageInfo.totalRows).toBeGreaterThan(0);
+  });
+
+  it('keeps local visibility filters scoped to checked local rows even when search matches page text', async () => {
+    seedStrategy();
+    upsertPageKeyword(workspaceId, {
+      pagePath: '/services/invisalign',
+      pageTitle: 'Austin Dentist Invisalign',
+      primaryKeyword: 'what is invisalign',
+      secondaryKeywords: ['benefits of invisalign'],
+      searchIntent: 'informational',
+      volume: 450,
+      difficulty: 31,
+    });
+    updateWorkspace(workspaceId, {
+      name: 'Swish Dental',
+      liveDomain: 'https://swish.example.com',
+      businessProfile: {
+        address: {
+          street: '123 Congress Ave',
+          city: 'Austin',
+          state: 'TX',
+          country: 'US',
+        },
+      },
+    });
+    updateLocalSeoConfiguration(workspaceId, {
+      posture: LOCAL_SEO_POSTURE.LOCAL,
+      markets: [{
+        label: 'Austin, TX',
+        city: 'Austin',
+        stateOrRegion: 'TX',
+        country: 'US',
+        providerLocationCode: 1026201,
+        status: LOCAL_SEO_MARKET_STATUS.ACTIVE,
+      }],
+    }, true);
+    const market = db.prepare('SELECT id FROM local_seo_markets WHERE workspace_id = ? LIMIT 1').get(workspaceId) as { id: string };
+    const insertSnapshot = db.prepare(`
+      INSERT INTO local_visibility_snapshots (
+        id, workspace_id, keyword, normalized_keyword, market_id, market_label, captured_at,
+        local_pack_present, business_found, business_match_confidence, business_match_reason,
+        local_rank, top_competitors, source_endpoint, provider, device, language_code, status, degraded_reason
+      ) VALUES (
+        @id, @workspace_id, @keyword, @normalized_keyword, @market_id, @market_label, @captured_at,
+        @local_pack_present, @business_found, @business_match_confidence, @business_match_reason,
+        @local_rank, @top_competitors, @source_endpoint, @provider, @device, @language_code, @status, @degraded_reason
+      )
+    `);
+    const baseSnapshot = {
+      workspace_id: workspaceId,
+      market_id: market.id,
+      market_label: 'Austin, TX',
+      local_pack_present: 1,
+      business_match_reason: null,
+      top_competitors: '[]',
+      source_endpoint: LOCAL_VISIBILITY_SOURCE_ENDPOINT.GOOGLE_ORGANIC_SERP,
+      provider: 'fake-seo-provider',
+      device: 'desktop',
+      language_code: 'en',
+      status: LOCAL_VISIBILITY_STATUS.SUCCESS,
+      degraded_reason: null,
+    };
+    insertSnapshot.run({
+      ...baseSnapshot,
+      id: 'visible-austin-dentist',
+      keyword: 'Austin Dentist',
+      normalized_keyword: 'austin dentist',
+      captured_at: '2026-05-20T10:00:00.000Z',
+      business_found: 1,
+      business_match_confidence: LOCAL_BUSINESS_MATCH_CONFIDENCE.VERIFIED,
+      local_rank: 2,
+    });
+    insertSnapshot.run({
+      ...baseSnapshot,
+      id: 'possible-cosmetic-dentistry',
+      keyword: 'Cosmetic Dentistry',
+      normalized_keyword: 'cosmetic dentistry',
+      captured_at: '2026-05-20T10:01:00.000Z',
+      business_found: 1,
+      business_match_confidence: LOCAL_BUSINESS_MATCH_CONFIDENCE.POSSIBLE_MATCH,
+      local_rank: 4,
+    });
+
+    const visibleRows = await buildKeywordCommandCenterRows(workspaceId, {
+      filter: KEYWORD_COMMAND_CENTER_FILTERS.VISIBLE_LOCALLY,
+      search: 'dentist',
+      pageSize: 25,
+    }, { includeLocalSeo: true });
+
+    expect(visibleRows?.pageInfo.totalRows).toBe(1);
+    expect(visibleRows?.rows.map(row => row.normalizedKeyword)).toEqual(['austin dentist']);
+    for (const row of visibleRows?.rows ?? []) {
+      expect(row.localSeo?.posture).toBe(LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE);
+    }
+    expect(visibleRows?.rows.some(row => row.normalizedKeyword === 'what is invisalign')).toBe(false);
   });
 
   it('keeps local candidates out of default rows and adds them only for local candidate filters', async () => {
