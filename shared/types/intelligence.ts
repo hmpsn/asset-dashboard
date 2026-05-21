@@ -30,7 +30,8 @@ export type IntelligenceSlice =
   | 'clientSignals'
   | 'operational'
   | 'pageElements'
-  | 'siteInventory';
+  | 'siteInventory'
+  | 'localSeo';
 
 // ── Options ─────────────────────────────────────────────────────────────
 
@@ -77,6 +78,8 @@ export interface WorkspaceIntelligence {
   siteHealth?: SiteHealthSlice;
   clientSignals?: ClientSignalsSlice;
   operational?: OperationalSlice;
+  /** Local SEO posture, markets, full candidate list, and pre-formatted prompt block. */
+  localSeo?: LocalSeoSlice;
 }
 
 // ── Slice interfaces ────────────────────────────────────────────────────
@@ -298,6 +301,63 @@ export interface PageElementSlice {
   pagePath: string;
   /** The catalog itself. EMPTY_CATALOG-shape when extraction yielded nothing. */
   catalog: PageElementCatalog;
+}
+
+/**
+ * Local SEO posture for a workspace — markets, visibility coverage, full candidate list.
+ *
+ * Design:
+ *   - `candidates` carries the FULL candidate universe (up to LOCAL_CANDIDATE_HARD_CAP in
+ *     server/local-seo.ts — currently 1000). MCP consumers see this directly so external
+ *     agents can analyze the full set programmatically.
+ *   - `effectiveLocalSeoBlock` is the pre-formatted text block for AI prompts. It samples
+ *     internally (stratified per active market, capped at ~50 total) so prompt token
+ *     budget stays bounded even on hyper-local workspaces. Per CLAUDE.md authority-layered
+ *     fields rule, AI consumers inject this string DIRECTLY — never construct an alternate
+ *     prompt block from `candidates`.
+ *   - Specialized consumers (content generation) can call `selectRelevantLocalCandidates`
+ *     from server/intelligence/local-seo-slice.ts to filter `candidates` by target
+ *     keyword/topic before injection.
+ *
+ * Read by AdminChat, content generation, recommendation generation, and MCP tools via
+ * `buildWorkspaceIntelligence({ slices: ['localSeo'] })`. Workspaces with no active local
+ * markets receive an empty-but-valid slice — never undefined.
+ */
+export interface LocalSeoSlice {
+  /** Whether the local-seo-visibility feature flag is enabled. */
+  enabled: boolean;
+  /** Configured local markets and their status. Not capped. */
+  markets: ReadonlyArray<{
+    id: string;
+    label: string;
+    status: 'active' | 'inactive' | 'draft' | 'needs_review';
+    location: string;
+    deviceMix?: ReadonlyArray<'desktop' | 'mobile'>;
+  }>;
+  /** Aggregate visibility counts across the full candidate universe. */
+  visibility: {
+    visible: number;
+    possibleMatch: number;
+    notVisible: number;
+    notChecked: number;
+    providerDegraded: number;
+  };
+  /** Full candidate list, sorted by score desc. Capped only by LOCAL_CANDIDATE_HARD_CAP upstream. */
+  candidates: ReadonlyArray<{
+    keyword: string;
+    source: string;
+    sourceLabel: string;
+    pageTitle?: string;
+    pagePath?: string;
+    marketId?: string;
+    volume?: number;
+    difficulty?: number;
+    score: number;
+  }>;
+  /** Pre-formatted prompt block — stratified-sampled internally. Inject directly into prompts. */
+  effectiveLocalSeoBlock: string;
+  /** ISO timestamp of the latest visibility snapshot reflected here. */
+  latestSnapshotAt: string | null;
 }
 
 // ── Client Intelligence API types (Phase 4C) ────────────────────────────────
