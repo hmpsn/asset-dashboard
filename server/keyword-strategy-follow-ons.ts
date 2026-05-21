@@ -10,6 +10,7 @@ import { WS_EVENTS } from './ws-events.js';
 import type { PageKeywordMap, KeywordStrategy } from '../shared/types/workspace.js';
 
 const log = createLogger('keyword-strategy:follow-ons');
+const RECOMMENDATION_REFRESH_DELAY_MS = 30_000;
 
 // Dedup guard: prevents concurrent background recommendation runs for the same workspace
 // (e.g. rapid strategy re-generations). Final write wins via SQLite upsert; this just
@@ -73,12 +74,15 @@ export function queueKeywordStrategyPostUpdateFollowOns(options: QueueKeywordStr
   // Trigger background llms.txt regeneration after strategy update
   queueLlmsTxtRegeneration(workspaceId, 'keyword_strategy_updated');
 
-  // Refresh recommendations so quick wins / content gaps / ranking opportunities
-  // reflect the new strategy immediately, without waiting for the next manual audit.
+  // Refresh recommendations after the strategy response settles. Keeping this
+  // out of the same resource spike as provider-backed strategy generation makes
+  // staging less likely to restart under peak load; recommendations are best-effort.
   if (!recsInFlight.has(workspaceId)) {
     recsInFlight.add(workspaceId);
-    generateRecommendations(workspaceId)
-      .catch(err => log.warn({ err, workspaceId }, 'Failed to refresh recommendations after strategy update'))
-      .finally(() => recsInFlight.delete(workspaceId));
+    setTimeout(() => {
+      generateRecommendations(workspaceId)
+        .catch(err => log.warn({ err, workspaceId }, 'Failed to refresh recommendations after strategy update'))
+        .finally(() => recsInFlight.delete(workspaceId));
+    }, RECOMMENDATION_REFRESH_DELAY_MS);
   }
 }

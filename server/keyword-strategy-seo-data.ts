@@ -250,16 +250,16 @@ export async function fetchAndCacheKeywordStrategySeoData({
         ...domainKeywords.filter(k => k.keyword?.trim()).slice(0, 5).map(k => k.keyword),
         ...(ws.keywordStrategy?.siteKeywords ?? []).slice(0, 5),
       ];
-      const discoveryCalls: Array<Promise<KeywordSourceEvidence[]>> = [];
+      const discoveryCalls: Array<() => Promise<KeywordSourceEvidence[]>> = [];
       if (provider.getKeywordsForSite) {
-        discoveryCalls.push(provider.getKeywordsForSite(siteDomain, ws.id, 50));
+        discoveryCalls.push(() => provider.getKeywordsForSite!(siteDomain, ws.id, 50));
       }
       if (provider.getKeywordIdeas && discoverySeedKeywords.length > 0) {
-        discoveryCalls.push(provider.getKeywordIdeas(discoverySeedKeywords, ws.id, 50));
+        discoveryCalls.push(() => provider.getKeywordIdeas!(discoverySeedKeywords, ws.id, 50));
       }
       if (provider.getKeywordSuggestions) {
         for (const seed of discoverySeedKeywords.slice(0, 3)) {
-          discoveryCalls.push(provider.getKeywordSuggestions(seed, ws.id, 20));
+          discoveryCalls.push(() => provider.getKeywordSuggestions!(seed, ws.id, 20));
         }
       }
       // Keep Google Ads keywords_for_keywords available at the provider layer,
@@ -268,11 +268,16 @@ export async function fetchAndCacheKeywordStrategySeoData({
       // granular page-assignment candidates until PR12's shared quality engine
       // can score and explain those source differences.
 
-      const batches = await Promise.all(discoveryCalls.map(call => call.catch(err => {
-        log.warn({ err }, 'Keyword discovery source failed');
-        providerReasons.add('keyword_discovery_partial_error');
-        return [];
-      })));
+      const batches: KeywordSourceEvidence[][] = [];
+      for (const discoveryCall of discoveryCalls) {
+        try {
+          batches.push(await discoveryCall());
+        } catch (err) {
+          log.warn({ err }, 'Keyword discovery source failed');
+          providerReasons.add('keyword_discovery_partial_error');
+          batches.push([]);
+        }
+      }
       const seenDiscovery = new Set<string>();
       for (const keyword of batches.flat()) {
         const normalized = keywordComparisonKey(keyword.keyword);
