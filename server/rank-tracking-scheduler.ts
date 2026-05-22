@@ -9,7 +9,7 @@
  */
 import { createLogger } from './logger.js';
 import { listWorkspaces } from './workspaces.js';
-import { getSearchOverview, getSearchQueryObservations, type SearchQueryObservation } from './search-console.js';
+import { getSearchOverview, getSearchQueryObservations } from './search-console.js';
 import { storeRankSnapshot } from './rank-tracking.js';
 import {
   detectLostVisibility,
@@ -22,25 +22,6 @@ const log = createLogger('rank-tracking-scheduler');
 const DAILY_MS = 24 * 60 * 60 * 1000;
 
 let rankInterval: ReturnType<typeof setInterval> | null = null;
-
-function aggregateQueryObservations(rows: SearchQueryObservation[]): DiscoveredQueryObservation[] {
-  const byQuery = new Map<string, DiscoveredQueryObservation>();
-  for (const row of rows) {
-    const existing = byQuery.get(row.query);
-    if (!existing) {
-      byQuery.set(row.query, { ...row, seenDate: row.date });
-      continue;
-    }
-    existing.clicks += row.clicks;
-    existing.impressions += row.impressions;
-    existing.ctr = existing.impressions > 0
-      ? +((existing.clicks / existing.impressions) * 100).toFixed(1)
-      : 0;
-    if (row.position < existing.position) existing.position = row.position;
-    if (!existing.seenDate || row.date > existing.seenDate) existing.seenDate = row.date;
-  }
-  return [...byQuery.values()];
-}
 
 /**
  * Run a rank snapshot for each eligible workspace.
@@ -71,7 +52,26 @@ export async function runRankTrackingSnapshots(workspaceIds?: string[]): Promise
         ctr: q.ctr,
       }));
       storeRankSnapshot(ws.id, date, queries);
-      upsertDiscoveredQueries(ws.id, aggregateQueryObservations(observedQueries), date);
+
+      // Group per-date observations and upsert each date separately so the
+      // idempotency CASE (last_snapshot_date = excluded.last_snapshot_date)
+      // prevents total_impressions from accumulating overlapping 28-day windows.
+      const byDate = new Map<string, DiscoveredQueryObservation[]>();
+      for (const row of observedQueries) {
+        const group = byDate.get(row.date) ?? [];
+        group.push({
+          query: row.query,
+          position: row.position,
+          clicks: row.clicks,
+          impressions: row.impressions,
+          ctr: row.ctr,
+          seenDate: row.date,
+        });
+        if (!byDate.has(row.date)) byDate.set(row.date, group);
+      }
+      for (const [snapshotDate, dateQueries] of [...byDate.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+        upsertDiscoveredQueries(ws.id, dateQueries, snapshotDate);
+      }
       detectLostVisibility(ws.id, date);
       log.info({ workspaceId: ws.id, count: queries.length, date }, 'Rank snapshot captured');
     } catch (err) {

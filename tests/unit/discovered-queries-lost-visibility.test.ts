@@ -215,4 +215,20 @@ describe('getDiscoveredQuerySummary', () => {
       totalImpressions: 200,
     }));
   });
+
+  it('orders topLostQueries by total_impressions DESC', () => {
+    db.prepare(`
+      INSERT INTO discovered_queries
+        (workspace_id, query, first_seen, last_seen, best_position, snapshot_count, total_impressions, status)
+      VALUES
+        (?, 'low impressions query', '2026-01-01', '2026-01-01', 15.0, 3, 50, 'lost_visibility'),
+        (?, 'high impressions query', '2026-01-01', '2026-01-01', 8.0, 5, 500, 'lost_visibility')
+    `).run(workspaceId, workspaceId);
+    const summary = getDiscoveredQuerySummary(workspaceId);
+    expect(summary.topLostQueries).toHaveLength(2);
+    expect(summary.topLostQueries[0].query).toBe('high impressions query');
+    expect(summary.topLostQueries[0].totalImpressions).toBe(500);
+    expect(summary.topLostQueries[1].query).toBe('low impressions query');
+    expect(summary.topLostQueries[1].totalImpressions).toBe(50);
+  });
 });

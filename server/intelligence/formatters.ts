@@ -287,7 +287,7 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
     if (dq.lostVisibilityCount > 0) {
       const examples = dq.topLostQueries
         .slice(0, 3)
-        .map(query => `${query.query} (last rank: ${query.lastPosition.toFixed(1)})`)
+        .map(query => `${query.query} (last rank: ${query.lastPosition != null ? query.lastPosition.toFixed(1) : 'unknown'})`)
         .join(', ');
       lines.push(
         `GSC discovery: ${dq.totalDiscovered} queries tracked, `
