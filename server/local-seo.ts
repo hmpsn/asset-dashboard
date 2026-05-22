@@ -1460,6 +1460,19 @@ function selectExplicitLocalSeoKeywords(workspaceId: string, explicitKeywords: s
 
 export function selectLocalIntentKeywords(workspaceId: string, explicitKeywords: string[] = []): string[] {
   if (explicitKeywords.length > 0) return selectExplicitLocalSeoKeywords(workspaceId, explicitKeywords);
+  // Cheap default is correct here:
+  //   - `.map(candidate => candidate.keyword)` discards every evaluator-only
+  //     field (`reasons`, evaluator score delta) — this caller only needs the
+  //     keyword strings.
+  //   - The Evaluated variant would suppress some entries via noise-pattern /
+  //     authority-mismatch / business-fit matching, but the refresh job issues
+  //     one provider call per keyword and persists snapshots independently.
+  //     Extra not-visible snapshots from keywords that would have been
+  //     "suppressed" are harmless; we already cap with
+  //     LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH.
+  //   - Crucially, the cheap default stops the OOM / 35s wall-clock regression
+  //     observed on Swish-scale workspaces (PR #876) where the per-candidate
+  //     eligibility evaluator dominated runtime and memory.
   return buildLocalSeoKeywordCandidates(workspaceId, explicitKeywords)
     .slice(0, LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH)
     .map(candidate => candidate.keyword);
