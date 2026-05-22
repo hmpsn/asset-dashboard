@@ -107,6 +107,12 @@ const LOCAL_SEO_REFRESH_CONCURRENCY = 5;
  * enough to avoid hammering subscribed clients with redundant refetches.
  */
 const LOCAL_SEO_REFRESH_PROGRESS_BROADCAST_INTERVAL = 20;
+/**
+ * Backfills update existing snapshots in local DB batches rather than calling
+ * the provider. Broadcast at batch boundaries so Local SEO + KCC views refresh
+ * during large historical recalculations without producing noisy refetches.
+ */
+const LOCAL_SEO_LOCATION_BACKFILL_PROGRESS_BROADCAST_INTERVAL = 100;
 const DEFAULT_LANGUAGE_CODE = 'en';
 
 export interface LocalSeoKeywordCandidate {
@@ -2122,6 +2128,8 @@ export function countLocalVisibilitySnapshots(workspaceId: string): number {
 }
 
 export async function runLocationBackfillJob(jobId: string, workspaceId: string): Promise<void> {
+  if (getJob(jobId)?.status === 'cancelled') return;
+
   const workspace = getWorkspace(workspaceId);
   if (!workspace) {
     updateJob(jobId, { status: 'error', message: 'Workspace not found', error: 'Workspace not found' });
@@ -2152,6 +2160,7 @@ export async function runLocationBackfillJob(jobId: string, workspaceId: string)
 
   const batchSize = 100;
   let processed = 0;
+  let lastProgressBroadcastAt = 0;
 
   for (let i = 0; i < rows.length; i += batchSize) {
     if (getJob(jobId)?.status === 'cancelled') return;
@@ -2186,8 +2195,24 @@ export async function runLocationBackfillJob(jobId: string, workspaceId: string)
       total,
       message: `Recalculating match data... (${processed}/${total})`,
     });
+
+    if (
+      getJob(jobId)?.status !== 'cancelled'
+      && processed < total
+      && processed - lastProgressBroadcastAt >= LOCAL_SEO_LOCATION_BACKFILL_PROGRESS_BROADCAST_INTERVAL
+    ) {
+      lastProgressBroadcastAt = processed;
+      broadcastToWorkspace(workspaceId, WS_EVENTS.LOCAL_SEO_UPDATED, {
+        workspaceId,
+        action: 'backfill_progress',
+        processed,
+        total,
+        updatedAt: new Date().toISOString(),
+      });
+    }
   }
 
+  if (getJob(jobId)?.status === 'cancelled') return;
   broadcastToWorkspace(workspaceId, WS_EVENTS.LOCAL_SEO_UPDATED, {
     workspaceId,
     action: 'backfill_completed',

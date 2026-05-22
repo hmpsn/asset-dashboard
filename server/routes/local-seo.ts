@@ -17,17 +17,16 @@ import {
   updateClientLocation,
 } from '../client-locations.js';
 import { isFeatureEnabled } from '../feature-flags.js';
-import { cancelJob, createJob, hasActiveJob } from '../jobs.js';
-import { createLogger } from '../logger.js';
+import { createJob, hasActiveJob } from '../jobs.js';
 import {
   countLocalVisibilitySnapshots,
   createLocalSeoRefreshPlan,
   getLocalSeoReadModel,
   resolveLocalSeoProviderLocation,
-  runLocationBackfillJob,
   runLocalSeoRefreshJob,
   updateLocalSeoConfiguration,
 } from '../local-seo.js';
+import { enqueueLocationBackfill } from '../local-seo-location-backfill-queue.js';
 import { validate, z } from '../middleware/validate.js';
 import { getWorkspace } from '../workspaces.js';
 import { WS_EVENTS } from '../ws-events.js';
@@ -41,7 +40,6 @@ import {
 } from '../../shared/types/local-seo.js';
 
 const router = Router();
-const log = createLogger('routes/local-seo');
 
 const marketSchema = z.object({
   id: z.string().min(1).optional(),
@@ -123,23 +121,6 @@ const updateLocationSchema = z.object({
   status: z.enum(['needs_review', 'confirmed']).optional(),
   gbpPlaceId: z.string().max(200).optional().or(z.literal('')),
 }).strict();
-
-function restartLocationBackfill(workspaceId: string): string {
-  const active = hasActiveJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_LOCATION_BACKFILL, workspaceId);
-  if (active) cancelJob(active.id);
-  const total = countLocalVisibilitySnapshots(workspaceId);
-  const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_LOCATION_BACKFILL, {
-    workspaceId,
-    total,
-    message: 'Preparing local match history recalculation...',
-  });
-  setImmediate(() => {
-    void runLocationBackfillJob(job.id, workspaceId).catch(err => {
-      log.error({ err, workspaceId, jobId: job.id }, 'runLocationBackfillJob failed');
-    });
-  });
-  return job.id;
-}
 
 function ensureLocalSeoLocationsAvailable(workspaceId: string): { ok: true } | { ok: false; status: number; error: string } {
   if (!isFeatureEnabled('local-seo-visibility')) {
@@ -242,7 +223,7 @@ router.post('/api/local-seo/:workspaceId/locations', requireWorkspaceAccess('wor
   if (!available.ok) return res.status(available.status).json({ error: available.error });
   const location = createClientLocation(workspaceId, req.body);
   recordLocationMutation(workspaceId, 'location_created', location.name);
-  const jobId = restartLocationBackfill(workspaceId);
+  const jobId = enqueueLocationBackfill(workspaceId);
   res.status(201).json({ location, jobId });
 });
 
@@ -253,7 +234,7 @@ router.put('/api/local-seo/:workspaceId/locations/:locationId', requireWorkspace
   const location = updateClientLocation(locationId, workspaceId, req.body);
   if (!location) return res.status(404).json({ error: 'Location not found' });
   recordLocationMutation(workspaceId, 'location_updated', location.name);
-  const jobId = restartLocationBackfill(workspaceId);
+  const jobId = enqueueLocationBackfill(workspaceId);
   res.json({ location, jobId });
 });
 
@@ -277,7 +258,7 @@ router.delete('/api/local-seo/:workspaceId/locations/:locationId', requireWorksp
   const deleted = deleteClientLocation(locationId, workspaceId);
   if (!deleted) return res.status(404).json({ error: 'Location not found' });
   recordLocationMutation(workspaceId, 'location_deleted', existing.name);
-  const jobId = restartLocationBackfill(workspaceId);
+  const jobId = enqueueLocationBackfill(workspaceId);
   res.json({ deleted: true, jobId });
 });
 
