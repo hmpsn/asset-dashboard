@@ -35,7 +35,7 @@ export class SemrushProvider implements SeoDataProvider {
     return isSemrushConfigured();
   }
 
-  async getKeywordMetrics(keywords: string[], workspaceId: string, database = 'us'): Promise<KeywordMetrics[]> {
+  async getKeywordMetrics(keywords: string[], workspaceId: string, database = 'us', _locationCode?: number): Promise<KeywordMetrics[]> {
     return getKeywordOverview(keywords, workspaceId, database);
   }
 

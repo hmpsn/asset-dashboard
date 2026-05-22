@@ -97,6 +97,7 @@ vi.mock('../../src/hooks/admin', () => ({
   }),
   useLocalSeoUpdate: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
   useLocalSeoLocationLookup: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
+  useSetPrimaryMarket: () => ({ mutate: vi.fn(), isPending: false, error: null }),
 }));
 
 const payload: KeywordCommandCenterResponse = {

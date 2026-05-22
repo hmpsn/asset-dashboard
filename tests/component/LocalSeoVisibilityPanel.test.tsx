@@ -34,6 +34,11 @@ vi.mock('../../src/hooks/admin', () => ({
     isPending: false,
     error: null,
   }),
+  useSetPrimaryMarket: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+    error: null,
+  }),
   useLocalSeoLocations: () => ({
     data: [],
     isLoading: false,

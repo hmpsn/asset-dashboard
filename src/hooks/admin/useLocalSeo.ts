@@ -39,6 +39,12 @@ export function useLocalSeoUpdate(workspaceId: string) {
   });
 }
 
+export function useSetPrimaryMarket(workspaceId: string) {
+  return useMutation({
+    mutationFn: (marketId: string) => localSeo.setPrimaryMarket(workspaceId, marketId),
+  });
+}
+
 export function useLocalSeoLocationLookup(workspaceId: string) {
   return useMutation({
     mutationFn: (body: LocalSeoLocationLookupRequest) => localSeo.locationLookup(workspaceId, body),

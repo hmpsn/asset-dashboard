@@ -2,6 +2,7 @@ import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { isProgrammingError } from './errors.js';
 import { normalizePath } from './helpers.js';
+import { resolveWorkspaceLocationCode } from './local-seo.js';
 import { trendDirection, hasSerpOpportunity } from './seo-provider-signals.js';
 import type { SeoDataProvider, DomainKeyword } from './seo-data-provider.js';
 import type { CompetitorKeywordData, QuestionKeywordGroup, KeywordStrategySeoDataMode } from './keyword-strategy-seo-data.js';
@@ -342,7 +343,8 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
     const needsVolume = uniqueNeeds.slice(0, 30);
     if (needsVolume.length > 0) {
       try {
-        const metrics = await provider.getKeywordMetrics(needsVolume as string[], workspaceId);
+        const locationCode = resolveWorkspaceLocationCode(workspaceId) ?? undefined;
+        const metrics = await provider.getKeywordMetrics(needsVolume as string[], workspaceId, undefined, locationCode);
         const metricMap = new Map(metrics.map(m => [keywordComparisonKey(m.keyword), m])); // map-dup-ok
         for (const pm of strategy.pageMap ?? []) {
           if (!pm.volume) {
@@ -395,7 +397,8 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
     log.info(`Content gap enrichment: ${poolEnriched} from keyword pool, ${strategy.contentGaps.length - poolEnriched - missingCgKws.length} from domain data, ${missingCgKws.length} need API lookup`);
     if (missingCgKws.length > 0 && provider && seoDataMode !== 'none') {
       try {
-        const cgMetrics = await provider.getKeywordMetrics(missingCgKws.slice(0, 30), workspaceId);
+        const locationCode = resolveWorkspaceLocationCode(workspaceId) ?? undefined;
+        const cgMetrics = await provider.getKeywordMetrics(missingCgKws.slice(0, 30), workspaceId, undefined, locationCode);
         const cgMap = new Map(cgMetrics.map(m => [keywordComparisonKey(m.keyword), m])); // map-dup-ok
         for (const cg of strategy.contentGaps) {
           if (cg.volume == null) {
@@ -742,7 +745,8 @@ Rules:
     }
     if (missing.length > 0) {
       try {
-        const extra = await provider.getKeywordMetrics(missing.slice(0, 30), workspaceId);
+        const locationCode = resolveWorkspaceLocationCode(workspaceId) ?? undefined;
+        const extra = await provider.getKeywordMetrics(missing.slice(0, 30), workspaceId, undefined, locationCode);
         for (const m of extra) {
           if (isSuspiciousPlannerGroupedVolume(m.keyword, m.volume)) continue;
           found.push({ keyword: m.keyword, volume: m.volume, difficulty: m.difficulty });

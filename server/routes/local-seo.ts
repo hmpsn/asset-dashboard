@@ -25,6 +25,7 @@ import {
   getLocalSeoReadModel,
   resolveLocalSeoProviderLocation,
   runLocalSeoRefreshJob,
+  setPrimaryMarket,
   updateLocalSeoConfiguration,
 } from '../local-seo.js';
 import { enqueueLocationBackfill } from '../local-seo-location-backfill-queue.js';
@@ -176,6 +177,25 @@ router.put('/api/local-seo/:workspaceId', requireWorkspaceAccess('workspaceId'),
     next(err);
   }
 });
+
+router.put(
+  '/api/local-seo/:workspaceId/markets/:marketId/set-primary',
+  requireWorkspaceAccess('workspaceId'),
+  (req, res, next) => {
+    try {
+      if (!isFeatureEnabled('local-seo-visibility')) {
+        return res.status(403).json({ error: 'Local SEO visibility is not enabled for this environment' });
+      }
+      setPrimaryMarket(req.params.workspaceId, req.params.marketId);
+      res.json({ ok: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message === 'Local SEO market not found') return res.status(404).json({ error: message });
+      if (message === 'Primary market requires an active market with a provider location code') return res.status(400).json({ error: message });
+      next(err);
+    }
+  },
+);
 
 router.get('/api/local-seo/:workspaceId/location-lookup', requireWorkspaceAccess('workspaceId'), async (req, res, next) => {
   try {

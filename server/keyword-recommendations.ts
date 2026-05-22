@@ -7,6 +7,7 @@
  */
 import { getConfiguredProvider } from './seo-data-provider.js';
 import { getWorkspace } from './workspaces.js';
+import { resolveWorkspaceLocationCode } from './local-seo.js';
 import { getQueryPageData } from './search-console.js';
 import { callAI } from './ai.js';
 import { parseAIJson } from './openai-helpers.js';
@@ -333,8 +334,9 @@ export async function getKeywordRecommendations(
     };
   }
 
+  const locationCode = resolveWorkspaceLocationCode(workspaceId) ?? undefined;
   const [seedMetrics, related, recommendationContext] = await Promise.all([
-    provider.getKeywordMetrics([seedKeyword], workspaceId).catch(() => []),
+    provider.getKeywordMetrics([seedKeyword], workspaceId, undefined, locationCode).catch(() => []),
     provider.getRelatedKeywords(seedKeyword, workspaceId, maxCandidates).catch(() => []),
     buildRecommendationGenerationContext(workspaceId, {
       slices: recommendationSlices,

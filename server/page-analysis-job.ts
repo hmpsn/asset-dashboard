@@ -5,6 +5,7 @@ import { parseJsonSafe } from './db/json-validation.js';
 import { isProgrammingError } from './errors.js';
 import { applyBulkKeywordGuards, decodeEntities, resolvePagePath, sanitizeForPromptInjection, stripCodeFences, stripHtmlToText } from './helpers.js';
 import { updateJob, unregisterAbort, isJobCancelled } from './jobs.js';
+import { resolveWorkspaceLocationCode } from './local-seo.js';
 import { createLogger } from './logger.js';
 import { callAI } from './ai.js';
 import {
@@ -81,7 +82,8 @@ export async function prefetchSemrushForTopPages(
     if (withKeywords.length === 0) return cache;
 
     const keywords = withKeywords.map(pk => pk.primaryKeyword!);
-    const metrics = await provider.getKeywordMetrics(keywords, workspaceId).catch(() => []);
+    const locationCode = resolveWorkspaceLocationCode(workspaceId) ?? undefined;
+    const metrics = await provider.getKeywordMetrics(keywords, workspaceId, undefined, locationCode).catch(() => []);
     const metricsMap = new Map(metrics.map(m => [keywordComparisonKey(m.keyword), m])); // map-dup-ok
 
     for (const pk of withKeywords) {

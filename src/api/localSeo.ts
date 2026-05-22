@@ -60,6 +60,9 @@ export const localSeo = {
   refresh: (workspaceId: string, body: LocalSeoRefreshRequest = {}) =>
     post<LocalSeoRefreshStartResponse>(`/api/local-seo/${workspaceId}/refresh`, body),
 
+  setPrimaryMarket: (workspaceId: string, marketId: string) =>
+    put<{ ok: boolean }>(`/api/local-seo/${workspaceId}/markets/${marketId}/set-primary`, {}),
+
   listLocations: async (workspaceId: string) => {
     const response = await get<LocationsResponse>(`/api/local-seo/${workspaceId}/locations`);
     return response.locations;

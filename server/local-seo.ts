@@ -166,6 +166,7 @@ interface MarketRow {
   status: string;
   created_at: string;
   updated_at: string;
+  is_primary: number;
 }
 
 interface SnapshotRow {
@@ -226,13 +227,24 @@ const stmts = createStmtCache(() => ({
   listMarkets: db.prepare('SELECT * FROM local_seo_markets WHERE workspace_id = ? ORDER BY status ASC, label ASC'),
   getMarket: db.prepare('SELECT * FROM local_seo_markets WHERE id = ? AND workspace_id = ?'),
   countActiveMarkets: db.prepare("SELECT COUNT(*) AS count FROM local_seo_markets WHERE workspace_id = ? AND status = 'active'"),
+  getPrimaryMarket: db.prepare(
+    "SELECT * FROM local_seo_markets WHERE workspace_id = @workspaceId AND is_primary = 1 AND status = 'active' AND provider_location_code IS NOT NULL LIMIT 1",
+  ),
+  clearPrimary: db.prepare(
+    'UPDATE local_seo_markets SET is_primary = 0 WHERE workspace_id = @workspaceId',
+  ),
+  setMarketPrimary: db.prepare(
+    "UPDATE local_seo_markets SET is_primary = 1 WHERE workspace_id = @workspaceId AND id = @marketId AND status = 'active' AND provider_location_code IS NOT NULL",
+  ),
   upsertMarket: db.prepare(`
     INSERT INTO local_seo_markets (
       id, workspace_id, label, city, state_or_region, country, latitude, longitude,
-      provider_location_code, provider_location_name, source, status, created_at, updated_at
+      provider_location_code, provider_location_name, source, status, created_at, updated_at,
+      is_primary
     ) VALUES (
       @id, @workspace_id, @label, @city, @state_or_region, @country, @latitude, @longitude,
-      @provider_location_code, @provider_location_name, @source, @status, @created_at, @updated_at
+      @provider_location_code, @provider_location_name, @source, @status, @created_at, @updated_at,
+      @is_primary
     )
     ON CONFLICT(id) DO UPDATE SET
       label = excluded.label,
@@ -245,7 +257,11 @@ const stmts = createStmtCache(() => ({
       provider_location_name = excluded.provider_location_name,
       source = excluded.source,
       status = excluded.status,
-      updated_at = excluded.updated_at
+      updated_at = excluded.updated_at,
+      is_primary = CASE
+        WHEN excluded.status = 'active' AND excluded.provider_location_code IS NOT NULL THEN local_seo_markets.is_primary
+        ELSE 0
+      END
   `),
   insertSnapshot: db.prepare(`
     INSERT INTO local_visibility_snapshots (
@@ -361,6 +377,7 @@ function rowToMarket(row: MarketRow): LocalSeoMarket {
     longitude: row.longitude ?? undefined,
     providerLocationCode: row.provider_location_code ?? undefined,
     providerLocationName: row.provider_location_name ?? undefined,
+    isPrimary: row.is_primary === 1,
     source: Object.values(LOCAL_SEO_MARKET_SOURCE).includes(row.source as LocalSeoMarket['source']) ? row.source as LocalSeoMarket['source'] : LOCAL_SEO_MARKET_SOURCE.UNKNOWN,
     status: isMarketStatus(row.status) ? row.status : LOCAL_SEO_MARKET_STATUS.NEEDS_REVIEW,
     createdAt: row.created_at,
@@ -471,6 +488,48 @@ function writeSettings(settings: LocalSeoWorkspaceSettings): void {
 
 export function listLocalSeoMarkets(workspaceId: string): LocalSeoMarket[] {
   return (stmts().listMarkets.all(workspaceId) as MarketRow[]).map(rowToMarket);
+}
+
+export function getPrimaryMarketLocationCode(
+  workspaceId: string,
+): { locationCode: number; label: string } | null {
+  const market = stmts().getPrimaryMarket.get({ workspaceId }) as MarketRow | undefined;
+  if (!market || market.provider_location_code === null || market.provider_location_code === undefined) {
+    return null;
+  }
+  const label = market.state_or_region
+    ? `${market.city}, ${market.state_or_region}`
+    : `${market.city}, ${market.country}`;
+  return { locationCode: market.provider_location_code, label };
+}
+
+export function resolveWorkspaceLocationCode(workspaceId: string): number | null {
+  return getPrimaryMarketLocationCode(workspaceId)?.locationCode ?? null;
+}
+
+export function setPrimaryMarket(workspaceId: string, marketId: string): void {
+  db.transaction(() => {
+    stmts().clearPrimary.run({ workspaceId });
+    const result = stmts().setMarketPrimary.run({ workspaceId, marketId });
+    if (result.changes === 0) {
+      const existing = stmts().getMarket.get(marketId, workspaceId) as MarketRow | undefined;
+      if (existing) throw new Error('Primary market requires an active market with a provider location code');
+      throw new Error('Local SEO market not found');
+    }
+  })();
+
+  addActivity(
+    workspaceId,
+    'local_seo_updated',
+    'Primary market updated',
+    'Set primary market for keyword volume geo-targeting',
+    { source: 'local_seo' },
+  );
+  broadcastToWorkspace(workspaceId, WS_EVENTS.LOCAL_SEO_UPDATED, {
+    workspaceId,
+    action: 'primary_market_updated',
+    updatedAt: new Date().toISOString(),
+  });
 }
 
 function activeMarkets(workspaceId: string, marketIds?: string[]): LocalSeoMarket[] {
@@ -704,6 +763,7 @@ export function updateLocalSeoConfiguration(workspaceId: string, request: LocalS
           status: market.status ?? existingMarket?.status ?? LOCAL_SEO_MARKET_STATUS.ACTIVE,
           created_at: existing?.created_at ?? now,
           updated_at: now,
+          is_primary: 0,
         });
       }
     }

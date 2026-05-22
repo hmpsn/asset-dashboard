@@ -94,6 +94,7 @@ beforeEach(() => {
       provider_location_name TEXT,
       source TEXT NOT NULL DEFAULT 'unknown',
       status TEXT NOT NULL DEFAULT 'needs_review',
+      is_primary INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -143,6 +144,11 @@ beforeEach(() => {
       raw_results TEXT
     );
   `);
+  try {
+    db.exec(`ALTER TABLE local_seo_markets ADD COLUMN is_primary INTEGER NOT NULL DEFAULT 0`);
+  } catch (err) {
+    if (!(err instanceof Error) || !/duplicate column name/i.test(err.message)) throw err;
+  }
   for (const columnSql of [
     `ALTER TABLE local_visibility_snapshots ADD COLUMN matched_location_id TEXT`,
     `ALTER TABLE local_visibility_snapshots ADD COLUMN matched_location_name TEXT`,

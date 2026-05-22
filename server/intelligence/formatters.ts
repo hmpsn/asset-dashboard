@@ -298,6 +298,10 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
     }
   }
 
+  if (ctx.geoVolumeLabel && verbosity !== 'compact') {
+    lines.push(`Keyword volumes are geo-targeted to ${ctx.geoVolumeLabel}, not national figures.`);
+  }
+
   // Backlink profile — at standard+ verbosity (only present when enrichWithBacklinks opt-in was set)
   if (ctx.backlinkProfile && verbosity !== 'compact') {
     const bp = ctx.backlinkProfile;

@@ -252,6 +252,7 @@ export interface KeywordCommandCenterSummaryResponse {
   rawEvidenceReturned: number;
   generatedAt?: string | null;
   summarizedAt: string;
+  geoLabel?: string;
 }
 
 export interface KeywordCommandCenterRowsQuery {

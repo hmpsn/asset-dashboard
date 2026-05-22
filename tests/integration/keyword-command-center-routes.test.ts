@@ -14,11 +14,21 @@ let workspaceId = '';
 
 beforeAll(async () => {
   await ctx.startServer();
+  await api('/api/admin/feature-flags/local-seo-visibility', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: true }),
+  });
   workspaceId = createWorkspace('Keyword Command Center Route Test').id;
 }, 25_000);
 
 afterAll(async () => {
   deleteWorkspace(workspaceId);
+  await api('/api/admin/feature-flags/local-seo-visibility', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: null }),
+  });
   await ctx.stopServer();
 });
 
@@ -123,6 +133,52 @@ describe('Keyword Command Center routes', () => {
     });
     expect(retire.status).toBe(404);
     await expect(retire.json()).resolves.toEqual({ error: 'Keyword is not tracked' });
+  });
+});
+
+describe('KCC summary geoLabel', () => {
+  it('includes geoLabel when primary market has providerLocationCode', async () => {
+    const markets = await api(`/api/local-seo/${workspaceId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        markets: [{
+          label: 'Test City',
+          city: 'Austin',
+          stateOrRegion: 'TX',
+          country: 'US',
+          providerLocationCode: 1022162,
+          status: 'active',
+        }],
+      }),
+    });
+    expect(markets.status).toBe(200);
+    const marketsData = await markets.json();
+    const marketId = marketsData.markets[0].id;
+
+    const setPrimary = await api(`/api/local-seo/${workspaceId}/markets/${marketId}/set-primary`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    expect(setPrimary.status).toBe(200);
+
+    const res = await api(`/api/webflow/keyword-command-center/${workspaceId}/summary`);
+    expect(res.status).toBe(200);
+    const summary = await res.json();
+    expect(summary.geoLabel).toBe('Austin, TX');
+  });
+
+  it('omits geoLabel when no primary market is set', async () => {
+    const freshWsId = createWorkspace('KCC Summary No Geo Test').id;
+    try {
+      const res = await api(`/api/webflow/keyword-command-center/${freshWsId}/summary`);
+      expect(res.status).toBe(200);
+      const summary = await res.json();
+      expect(summary.geoLabel).toBeUndefined();
+    } finally {
+      deleteWorkspace(freshWsId);
+    }
   });
 });
 

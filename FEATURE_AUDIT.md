@@ -6424,6 +6424,21 @@ Staging QA also exposed a stability risk at keyword-strategy completion: the bac
 
 **Files:** `shared/types/keyword-command-center.ts`; `shared/types/local-seo.ts`; `server/local-seo.ts`; `server/keyword-command-center.ts`; `src/hooks/admin/useLocalSeo.ts`; `src/components/local-seo/LocalSeoVisibilityPanel.tsx`; `src/components/KeywordCommandCenter.tsx`; `tests/unit/local-seo.test.ts`; `tests/unit/keyword-command-center.test.ts`; `tests/component/LocalSeoVisibilityPanel.test.tsx`; `tests/component/KeywordCommandCenter.test.tsx`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
 
+## Geo-Targeted Keyword Volume
+
+**Status:** Shipped 2026-05-22
+**Roadmap:** `intel-quality-keyword-volume-geo-targeting`
+
+**What it does:** Keyword volume lookups are now city-targeted when a workspace designates a primary Local SEO market. `local_seo_markets.is_primary` stores the single primary market, `setPrimaryMarket()` updates it through a clear-then-set transaction, and `getPrimaryMarketLocationCode()` / `resolveWorkspaceLocationCode()` provide the DataForSEO city `location_code` to keyword metric callers.
+
+`SeoDataProvider.getKeywordMetrics()` accepts an optional numeric `locationCode`. DataForSEO uses that code for Google Ads `search_volume/live` and keyword difficulty payloads and keys both workspace file cache and global SQLite metric cache by numeric location code, preventing national and city volumes from sharing cached values. All current server keyword metric consumers pass the resolved workspace location code and fall back to national US volume when no primary market is set.
+
+Admins can set a market as primary from `LocalSeoMarketSetupDrawer`, and Keyword Command Center shows the active geography in the Demand column header via `geoLabel` (for example, `Demand · Austin, TX`). SEO context intelligence and MCP `get_keyword_analysis` include `geoVolumeLabel` so AI consumers know keyword volume figures are local, not national.
+
+**Boundaries:** This PR keeps the existing Google Ads search-volume endpoint; DFS Labs keyword overview, per-market volume storage for multi-market workspaces, and richer provenance tooltip copy remain follow-ons. No strategy regeneration, rank-tracking mutation, publishing, metadata writes, schema writes, GBP mutation, or geo-grid tracking was added.
+
+**Files:** `server/db/migrations/101-local-seo-market-primary.sql`; `shared/types/local-seo.ts`; `shared/types/keyword-command-center.ts`; `shared/types/intelligence.ts`; `server/local-seo.ts`; `server/routes/local-seo.ts`; `server/seo-data-provider.ts`; `server/providers/dataforseo-provider.ts`; `server/providers/semrush-provider.ts`; `server/providers/fake-seo-provider.ts`; `server/keyword-command-center.ts`; `server/intelligence/seo-context-slice.ts`; `server/intelligence/formatters.ts`; `server/mcp/tools/content.ts`; `src/api/localSeo.ts`; `src/hooks/admin/useLocalSeo.ts`; `src/components/KeywordCommandCenter.tsx`; `src/components/local-seo/LocalSeoMarketSetupDrawer.tsx`; `tests/integration/local-seo-primary-market.test.ts`; `tests/integration/keyword-command-center-routes.test.ts`; `tests/unit/dataforseo-provider.test.ts`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
 ## Local SEO Intelligence Slice (AI + MCP)
 
 **What it does:** Surfaces local SEO context (markets, visibility coverage, candidates) through `buildWorkspaceIntelligence` so AdminChat, content/recommendation generation, and external MCP consumers are no longer blind to local-specific signals. Adds `'localSeo'` to the `IntelligenceSlice` union, a `LocalSeoSlice` interface, and an `assembleLocalSeo(workspaceId)` slice assembler in `server/intelligence/local-seo-slice.ts`. The orchestrator (`server/workspace-intelligence.ts`) routes the slice through the existing `assembleSlice` switch and includes it in `ALL_SLICES`. The prompt formatter (`server/intelligence/formatters.ts`) renders `formatLocalSeoSection` which injects the slice's pre-formatted `effectiveLocalSeoBlock` directly per the authority-layered-fields rule.

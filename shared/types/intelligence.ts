@@ -118,6 +118,7 @@ export interface SeoContextSlice {
   serpFeatures?: SerpFeatures;
   rankTracking?: RankTrackingSummary;
   discoveredQuerySummary?: DiscoveredQuerySummary;
+  geoVolumeLabel?: string;
   strategyHistory?: StrategyHistory;
 }
 

@@ -14,7 +14,7 @@ import {
   LOCAL_SEO_MARKET_STATUS,
   LOCAL_SEO_POSTURE,
 } from '../../../shared/types/local-seo';
-import { useLocalSeoLocationLookup, useLocalSeoLocations, useLocalSeoRefresh, useLocalSeoUpdate } from '../../hooks/admin';
+import { useLocalSeoLocationLookup, useLocalSeoLocations, useLocalSeoRefresh, useLocalSeoUpdate, useSetPrimaryMarket } from '../../hooks/admin';
 import { adminPath } from '../../routes';
 import { Badge, Button, FormField, FormInput, FormSelect, Icon, IconButton, SectionCard, Skeleton, cn } from '../ui';
 
@@ -222,6 +222,7 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
   const update = useLocalSeoUpdate(workspaceId);
   const refresh = useLocalSeoRefresh(workspaceId);
   const locationLookup = useLocalSeoLocationLookup(workspaceId);
+  const setPrimary = useSetPrimaryMarket(workspaceId);
 
   useEffect(() => {
     if (!open) return;
@@ -578,26 +579,43 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
             ) : markets.map((market, index) => (
               <div key={market.id ?? `new-${index}`} className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-3)]/35 p-4 space-y-3">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="t-caption font-semibold text-[var(--brand-text-bright)] truncate">{marketLabel(market)}</p>
-                    <p className="t-caption-sm text-[var(--brand-text-muted)]">{market.status.replace(/_/g, ' ')}</p>
+                  <div className="min-w-0 flex items-center gap-2">
+                    {data.markets.find(item => item.id === market.id)?.isPrimary && (
+                      <Badge label="Primary" tone="teal" variant="soft" shape="pill" />
+                    )}
+                    <div className="min-w-0">
+                      <p className="t-caption font-semibold text-[var(--brand-text-bright)] truncate">{marketLabel(market)}</p>
+                      <p className="t-caption-sm text-[var(--brand-text-muted)]">{market.status.replace(/_/g, ' ')}</p>
+                    </div>
                   </div>
-                  <IconButton
-                    icon={Trash2}
-                    label={`Remove ${marketLabel(market)}`}
-                    variant="ghost"
-                    size="sm"
-                    className="text-[var(--brand-text-muted)] hover:text-red-400"
-                    onClick={() => {
-                      setMarkets(current => current.filter((_, i) => i !== index));
-                      if (market.id) {
-                        setRemovedMarkets(current => [
-                          ...current.filter(item => item.id !== market.id),
-                          { ...market, status: LOCAL_SEO_MARKET_STATUS.INACTIVE },
-                        ]);
-                      }
-                    }}
-                  />
+                  <div className="flex items-center gap-2">
+                    {market.id && market.providerLocationCode.trim() && !data.markets.find(item => item.id === market.id)?.isPrimary && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={saving || setPrimary.isPending}
+                        onClick={() => setPrimary.mutate(market.id!)}
+                      >
+                        Set as primary
+                      </Button>
+                    )}
+                    <IconButton
+                      icon={Trash2}
+                      label={`Remove ${marketLabel(market)}`}
+                      variant="ghost"
+                      size="sm"
+                      className="text-[var(--brand-text-muted)] hover:text-red-400"
+                      onClick={() => {
+                        setMarkets(current => current.filter((_, i) => i !== index));
+                        if (market.id) {
+                          setRemovedMarkets(current => [
+                            ...current.filter(item => item.id !== market.id),
+                            { ...market, status: LOCAL_SEO_MARKET_STATUS.INACTIVE },
+                          ]);
+                        }
+                      }}
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

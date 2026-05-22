@@ -10,6 +10,7 @@ import {
   buildLocalSeoKeywordVisibilityForKeyword,
   buildLocalSeoKeywordVisibilitySummaryByKey,
   buildLocalSeoKeywordVisibilityByKey,
+  getPrimaryMarketLocationCode,
   listLocalSeoMarkets,
   type LocalSeoKeywordCandidate,
 } from './local-seo.js';
@@ -1431,6 +1432,13 @@ export async function buildKeywordCommandCenterSummary(
     finalHeapMb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
   }, 'keyword command center summary built');
 
+  let geoLabel: string | undefined;
+  try {
+    geoLabel = getPrimaryMarketLocationCode(workspace.id)?.label;
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'KCC summary geo label lookup failed; omitting');
+  }
+
   return {
     counts,
     filters: buildFilterFacetsFromCounts(filterCounts),
@@ -1438,6 +1446,7 @@ export async function buildKeywordCommandCenterSummary(
     rawEvidenceReturned: Math.min(counts.evidence, RAW_EVIDENCE_ROW_LIMIT),
     generatedAt: workspace.keywordStrategy?.generatedAt ?? null,
     summarizedAt: new Date().toISOString(),
+    geoLabel,
   };
 }
 
