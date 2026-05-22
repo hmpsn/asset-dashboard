@@ -82,7 +82,7 @@ vi.mock('../../src/hooks/admin', () => ({
         setupLabel: 'Local visibility ready',
         setupDetail: 'Local visibility has recent market-specific evidence.',
       },
-      caps: { maxMarkets: 3, maxKeywordsPerRefresh: 50 },
+      caps: { maxMarkets: 3, maxKeywordsPerRefresh: 100, keywordsPerRefreshMin: 25, keywordsPerRefreshMax: 300, keywordsPerRefreshDefault: 100 },
     },
     isLoading: false,
     error: null,

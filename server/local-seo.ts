@@ -20,9 +20,12 @@ import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 import { buildDataForSeoLocationName } from '../shared/local-seo-location.js';
 import {
   LOCAL_BUSINESS_MATCH_CONFIDENCE,
+  LOCAL_SEO_DEFAULT_KEYWORDS_PER_REFRESH,
   LOCAL_SEO_DEVICE,
   LOCAL_SEO_MARKET_SOURCE,
   LOCAL_SEO_MARKET_STATUS,
+  LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP,
+  LOCAL_SEO_MIN_KEYWORDS_PER_REFRESH,
   LOCAL_SEO_POSTURE,
   LOCAL_SEO_POSTURE_SOURCE,
   LOCAL_SEO_VISIBILITY_POSTURE,
@@ -57,7 +60,32 @@ import type { Workspace } from '../shared/types/workspace.js';
 const log = createLogger('local-seo');
 
 export const LOCAL_SEO_MAX_MARKETS = 3;
-export const LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH = 50;
+/**
+ * Deprecated alias — kept temporarily for downstream readers that haven't
+ * migrated to the new per-workspace budget. New code should read
+ * `LOCAL_SEO_DEFAULT_KEYWORDS_PER_REFRESH` from `shared/types/local-seo.ts`
+ * or call `getEffectiveKeywordsPerRefresh(workspaceId)` for the resolved value.
+ */
+export const LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH = LOCAL_SEO_DEFAULT_KEYWORDS_PER_REFRESH;
+
+/**
+ * Resolved keywords-per-refresh budget for a given workspace. Returns the
+ * workspace's per-workspace override if set (clamped to
+ * [LOCAL_SEO_MIN_KEYWORDS_PER_REFRESH, LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP]),
+ * otherwise the global default.
+ *
+ * Returns the default when the workspace is unknown — callers that need a
+ * stricter not-found behavior should check workspace existence themselves.
+ */
+export function getEffectiveKeywordsPerRefresh(workspaceId: string): number {
+  const row = stmts().getSettings.get(workspaceId) as SettingsRow | undefined;
+  const override = row?.keywords_per_refresh;
+  if (typeof override !== 'number') return LOCAL_SEO_DEFAULT_KEYWORDS_PER_REFRESH;
+  return Math.max(
+    LOCAL_SEO_MIN_KEYWORDS_PER_REFRESH,
+    Math.min(LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP, Math.trunc(override)),
+  );
+}
 const LOCAL_CANDIDATE_HARD_CAP = 1000;
 const LOCAL_SEO_MAX_RESULTS = 10;
 const DEFAULT_LANGUAGE_CODE = 'en';
@@ -94,6 +122,7 @@ interface SettingsRow {
   suggested_posture: string | null;
   suggestion_reasons: string;
   updated_at: string;
+  keywords_per_refresh: number | null;
 }
 
 interface MarketRow {
@@ -155,14 +184,15 @@ interface SnapshotSummaryRow {
 const stmts = createStmtCache(() => ({
   getSettings: db.prepare('SELECT * FROM local_seo_workspace_settings WHERE workspace_id = ?'),
   upsertSettings: db.prepare(`
-    INSERT INTO local_seo_workspace_settings (workspace_id, posture, posture_source, suggested_posture, suggestion_reasons, updated_at)
-    VALUES (@workspace_id, @posture, @posture_source, @suggested_posture, @suggestion_reasons, @updated_at)
+    INSERT INTO local_seo_workspace_settings (workspace_id, posture, posture_source, suggested_posture, suggestion_reasons, updated_at, keywords_per_refresh)
+    VALUES (@workspace_id, @posture, @posture_source, @suggested_posture, @suggestion_reasons, @updated_at, @keywords_per_refresh)
     ON CONFLICT(workspace_id) DO UPDATE SET
       posture = excluded.posture,
       posture_source = excluded.posture_source,
       suggested_posture = excluded.suggested_posture,
       suggestion_reasons = excluded.suggestion_reasons,
-      updated_at = excluded.updated_at
+      updated_at = excluded.updated_at,
+      keywords_per_refresh = excluded.keywords_per_refresh
   `),
   listMarkets: db.prepare('SELECT * FROM local_seo_markets WHERE workspace_id = ? ORDER BY status ASC, label ASC'),
   getMarket: db.prepare('SELECT * FROM local_seo_markets WHERE id = ? AND workspace_id = ?'),
@@ -286,6 +316,7 @@ function rowToSettings(row: SettingsRow): LocalSeoWorkspaceSettings {
     suggestedPosture: row.suggested_posture && isLocalSeoPosture(row.suggested_posture) ? row.suggested_posture : undefined,
     suggestionReasons: parseJsonSafeArray(row.suggestion_reasons, z.string(), { workspaceId: row.workspace_id, table: 'local_seo_workspace_settings', field: 'suggestion_reasons' }),
     updatedAt: row.updated_at,
+    keywordsPerRefresh: row.keywords_per_refresh,
   };
 }
 
@@ -340,6 +371,7 @@ function defaultSettings(workspace: Workspace): LocalSeoWorkspaceSettings {
     suggestedPosture: derived.suggestedPosture,
     suggestionReasons: derived.suggestionReasons,
     updatedAt: new Date().toISOString(),
+    keywordsPerRefresh: null,
   };
 }
 
@@ -363,6 +395,7 @@ function writeSettings(settings: LocalSeoWorkspaceSettings): void {
     suggested_posture: settings.suggestedPosture ?? null,
     suggestion_reasons: JSON.stringify(settings.suggestionReasons),
     updated_at: settings.updatedAt,
+    keywords_per_refresh: settings.keywordsPerRefresh,
   });
 }
 
@@ -429,7 +462,10 @@ export function getLocalSeoReadModel(
       }),
       caps: {
         maxMarkets: LOCAL_SEO_MAX_MARKETS,
-        maxKeywordsPerRefresh: LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH,
+        maxKeywordsPerRefresh: LOCAL_SEO_DEFAULT_KEYWORDS_PER_REFRESH,
+        keywordsPerRefreshMin: LOCAL_SEO_MIN_KEYWORDS_PER_REFRESH,
+        keywordsPerRefreshMax: LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP,
+        keywordsPerRefreshDefault: LOCAL_SEO_DEFAULT_KEYWORDS_PER_REFRESH,
       },
     };
   }
@@ -453,7 +489,10 @@ export function getLocalSeoReadModel(
     }),
     caps: {
       maxMarkets: LOCAL_SEO_MAX_MARKETS,
-      maxKeywordsPerRefresh: LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH,
+      maxKeywordsPerRefresh: settings.keywordsPerRefresh ?? LOCAL_SEO_DEFAULT_KEYWORDS_PER_REFRESH,
+      keywordsPerRefreshMin: LOCAL_SEO_MIN_KEYWORDS_PER_REFRESH,
+      keywordsPerRefreshMax: LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP,
+      keywordsPerRefreshDefault: LOCAL_SEO_DEFAULT_KEYWORDS_PER_REFRESH,
     },
   };
 }
@@ -465,6 +504,7 @@ function disabledSettings(workspace: Workspace): LocalSeoWorkspaceSettings {
     postureSource: LOCAL_SEO_POSTURE_SOURCE.UNKNOWN,
     suggestionReasons: [],
     updatedAt: new Date().toISOString(),
+    keywordsPerRefresh: null,
   };
 }
 
@@ -502,6 +542,19 @@ export function updateLocalSeoConfiguration(workspaceId: string, request: LocalS
   const posture = request.posture ?? current.posture;
   const derived = derivePosture(workspace);
 
+  // Resolve next keywordsPerRefresh:
+  //   - undefined → unchanged
+  //   - null     → clear override (revert to global default)
+  //   - number   → clamp into [min, max] then store
+  const nextKeywordsPerRefresh: number | null = request.keywordsPerRefresh === undefined
+    ? current.keywordsPerRefresh
+    : request.keywordsPerRefresh === null
+      ? null
+      : Math.max(
+          LOCAL_SEO_MIN_KEYWORDS_PER_REFRESH,
+          Math.min(LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP, Math.trunc(request.keywordsPerRefresh)),
+        );
+
   const run = db.transaction(() => {
     writeSettings({
       ...current,
@@ -510,6 +563,7 @@ export function updateLocalSeoConfiguration(workspaceId: string, request: LocalS
       suggestedPosture: derived.suggestedPosture,
       suggestionReasons: request.posture ? [`Admin set local SEO posture to ${posture}`] : derived.suggestionReasons,
       updatedAt: now,
+      keywordsPerRefresh: nextKeywordsPerRefresh,
     });
 
     if (request.markets) {
@@ -1421,6 +1475,7 @@ export function countLocalSeoKeywordCandidates(workspaceId: string): number {
 }
 
 function selectExplicitLocalSeoKeywords(workspaceId: string, explicitKeywords: string[] = []): string[] {
+  const budget = getEffectiveKeywordsPerRefresh(workspaceId);
   const declined = new Set(getDeclinedKeywords(workspaceId).map(keywordComparisonKey));
   const inactiveTracked = new Set(
     getTrackedKeywords(workspaceId, { includeInactive: true })
@@ -1435,7 +1490,7 @@ function selectExplicitLocalSeoKeywords(workspaceId: string, explicitKeywords: s
     if (!display || !key || seen.has(key) || declined.has(key) || inactiveTracked.has(key)) continue;
     seen.add(key);
     selected.push(display);
-    if (selected.length >= LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH) break;
+    if (selected.length >= budget) break;
   }
   return selected;
 }
@@ -1444,10 +1499,9 @@ export function selectLocalIntentKeywords(workspaceId: string, explicitKeywords:
   if (explicitKeywords.length > 0) return selectExplicitLocalSeoKeywords(workspaceId, explicitKeywords);
   // Use the Evaluated variant here. Unlike the KCC/intelligence-slice/MCP read
   // paths (where the evaluator's `reasons` field is unused and the cheap
-  // default is the right contract), `selectLocalIntentKeywords` feeds the
-  // `LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH` budget for a real DataForSEO call —
-  // every chosen keyword costs provider credits and adds a row to local
-  // visibility snapshot history. The evaluator's noise-pattern /
+  // default is the right contract), `selectLocalIntentKeywords` feeds a real
+  // DataForSEO call — every chosen keyword costs provider credits and adds a
+  // row to local visibility snapshot history. The evaluator's noise-pattern /
   // authority-mismatch / business-fit suppression and `scoreDelta` are exactly
   // the signal-to-noise judgement we want spending that budget. The OOM
   // concern that drove the cheap default elsewhere does not apply: this
@@ -1455,7 +1509,7 @@ export function selectLocalIntentKeywords(workspaceId: string, explicitKeywords:
   // (a background job), not per request, and it caps the candidate set with
   // LOCAL_CANDIDATE_HARD_CAP before the evaluator even runs.
   return buildLocalSeoKeywordCandidatesEvaluated(workspaceId, explicitKeywords)
-    .slice(0, LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH)
+    .slice(0, getEffectiveKeywordsPerRefresh(workspaceId))
     .map(candidate => candidate.keyword);
 }
 
@@ -1463,7 +1517,7 @@ export function createLocalSeoRefreshPlan(workspaceId: string, request: LocalSeo
   const workspace = getWorkspace(workspaceId);
   if (!workspace) return null;
   const markets = activeMarkets(workspaceId, request.marketIds).slice(0, LOCAL_SEO_MAX_MARKETS);
-  const keywords = selectLocalIntentKeywords(workspaceId, request.keywords ?? []).slice(0, LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH);
+  const keywords = selectLocalIntentKeywords(workspaceId, request.keywords ?? []).slice(0, getEffectiveKeywordsPerRefresh(workspaceId));
   return {
     markets,
     keywords,

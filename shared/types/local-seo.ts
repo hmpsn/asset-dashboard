@@ -135,7 +135,40 @@ export interface LocalSeoWorkspaceSettings {
   suggestedPosture?: LocalSeoPosture;
   suggestionReasons: string[];
   updatedAt: string;
+  /**
+   * Per-workspace override for how many keywords the refresh job sends to
+   * DataForSEO per market on each refresh. `null` means "use the global
+   * default" (`LOCAL_SEO_DEFAULT_KEYWORDS_PER_REFRESH`, currently 100).
+   *
+   * Bounded server-side to [LOCAL_SEO_MIN_KEYWORDS_PER_REFRESH,
+   * LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP]. Higher values give better
+   * local-pack coverage on local-first workspaces (multi-market service
+   * businesses) at a small marginal DataForSEO cost (~$0.002/keyword).
+   */
+  keywordsPerRefresh: number | null;
 }
+
+/**
+ * Minimum allowed keywords-per-refresh override. Below this and the
+ * snapshot coverage stops being useful for trend analysis.
+ */
+export const LOCAL_SEO_MIN_KEYWORDS_PER_REFRESH = 25;
+
+/**
+ * Hard ceiling on the keywords-per-refresh override. Above this we
+ * approach the candidate hard cap (1000) and refresh duration starts
+ * eating into the background-job budget.
+ */
+export const LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP = 300;
+
+/**
+ * Global default used when a workspace doesn't override
+ * `keywordsPerRefresh`. Raised from 50 → 100 as part of the Tier 2 refactor —
+ * with the Evaluated builder filling the slots, 100 high-quality keywords
+ * cost ~$0.20 per refresh and give meaningfully broader local-pack
+ * coverage than the old 50-keyword default.
+ */
+export const LOCAL_SEO_DEFAULT_KEYWORDS_PER_REFRESH = 100;
 
 export interface LocalVisibilityBusinessResult {
   title: string;
@@ -433,7 +466,18 @@ export interface LocalSeoReadResponse {
   report: LocalSeoReportSummary;
   caps: {
     maxMarkets: number;
+    /**
+     * The CURRENT effective keywords-per-refresh budget for this workspace —
+     * the override if set, otherwise the global default. The UI displays this
+     * value and uses it as the initial state for any "edit budget" control.
+     */
     maxKeywordsPerRefresh: number;
+    /** Lower bound for a custom override. UI input minimum. */
+    keywordsPerRefreshMin: number;
+    /** Upper bound for a custom override. UI input maximum. */
+    keywordsPerRefreshMax: number;
+    /** Global default — used to render "Reset to default" + a hint. */
+    keywordsPerRefreshDefault: number;
   };
 }
 
@@ -451,6 +495,14 @@ export interface LocalSeoMarketUpdateRequest {
     providerLocationName?: string | null;
     status?: LocalSeoMarketStatus;
   }>;
+  /**
+   * Optional per-workspace override for the refresh keyword budget. Pass
+   * `null` to clear the override (revert to global default). Pass an integer
+   * in [LOCAL_SEO_MIN_KEYWORDS_PER_REFRESH, LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP]
+   * to set a custom value. Omit the field to leave the existing value
+   * unchanged.
+   */
+  keywordsPerRefresh?: number | null;
 }
 
 export interface LocalSeoRefreshRequest {

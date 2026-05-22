@@ -26,7 +26,8 @@ beforeEach(() => {
       posture_source TEXT NOT NULL DEFAULT 'unknown',
       suggested_posture TEXT,
       suggestion_reasons TEXT NOT NULL DEFAULT '[]',
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      keywords_per_refresh INTEGER
     );
     CREATE TABLE IF NOT EXISTS local_seo_markets (
       id TEXT PRIMARY KEY,
@@ -45,6 +46,13 @@ beforeEach(() => {
       updated_at TEXT NOT NULL
     );
   `);
+  // Defensive: if a prior test created the settings table without the new
+  // column, add it now. Ignore the duplicate-column error.
+  try {
+    db.exec(`ALTER TABLE local_seo_workspace_settings ADD COLUMN keywords_per_refresh INTEGER`);
+  } catch (err) {
+    if (!(err instanceof Error) || !/duplicate column name/i.test(err.message)) throw err;
+  }
   workspaceId = createWorkspace(`MCP Local SEO ${randomUUID().slice(0, 6)}`).id;
   updateWorkspace(workspaceId, {
     name: 'MCP local SEO test',

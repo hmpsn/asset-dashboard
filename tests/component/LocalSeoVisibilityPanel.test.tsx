@@ -78,7 +78,10 @@ function makeReadResponse(overrides: Partial<LocalSeoReadResponse> = {}): LocalS
     },
     caps: {
       maxMarkets: 3,
-      maxKeywordsPerRefresh: 50,
+      maxKeywordsPerRefresh: 100,
+      keywordsPerRefreshMin: 25,
+      keywordsPerRefreshMax: 300,
+      keywordsPerRefreshDefault: 100,
     },
   };
 
@@ -210,6 +213,7 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
         providerLocationName: 'Austin,Texas,United States',
         status: 'active',
       })],
+      keywordsPerRefresh: null,
     }));
   });
 
@@ -254,6 +258,7 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
     await waitFor(() => expect(updateMutateAsync).toHaveBeenCalledWith({
       posture: 'non_local',
       markets: [],
+      keywordsPerRefresh: null,
     }));
     expect(refreshMutateAsync).not.toHaveBeenCalled();
   });
@@ -316,6 +321,7 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
         expect.objectContaining({ id: 'market-austin', status: 'active' }),
         expect.objectContaining({ id: 'market-round-rock', status: 'inactive' }),
       ]),
+      keywordsPerRefresh: null,
     }));
   });
 
@@ -358,6 +364,7 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
         longitude: null,
         providerLocationName: 'Austin,Texas,United States',
       })],
+      keywordsPerRefresh: null,
     }));
   });
 });
