@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import type { ComponentProps } from 'react';
 import { LocalSeoVisibilityPanel } from '../../src/components/local-seo/LocalSeoVisibilityPanel';
 import type { LocalSeoReadResponse } from '../../shared/types/local-seo';
 
@@ -31,6 +33,11 @@ vi.mock('../../src/hooks/admin', () => ({
     mutateAsync: locationLookupMutateAsync,
     isPending: false,
     error: null,
+  }),
+  useLocalSeoLocations: () => ({
+    data: [],
+    isLoading: false,
+    isError: false,
   }),
 }));
 
@@ -96,6 +103,14 @@ function makeReadResponse(overrides: Partial<LocalSeoReadResponse> = {}): LocalS
   };
 }
 
+function renderPanel(props: ComponentProps<typeof LocalSeoVisibilityPanel> = { workspaceId: 'ws-1' }) {
+  return render(
+    <MemoryRouter>
+      <LocalSeoVisibilityPanel {...props} />
+    </MemoryRouter>,
+  );
+}
+
 describe('LocalSeoVisibilityPanel setup drawer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -138,7 +153,7 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
   });
 
   it('renders Configure market when local visibility needs setup', () => {
-    render(<LocalSeoVisibilityPanel workspaceId="ws-1" />);
+    renderPanel();
 
     expect(screen.getByRole('button', { name: /configure market/i })).toBeInTheDocument();
     expect(screen.getByText('Market setup needed')).toBeInTheDocument();
@@ -190,7 +205,7 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
       },
     });
 
-    render(<LocalSeoVisibilityPanel workspaceId="ws-1" onOpenKeywords={vi.fn()} />);
+    renderPanel({ workspaceId: 'ws-1', onOpenKeywords: vi.fn() });
 
     expect(screen.getByText('Keyword visibility lives in Keywords')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /view local keywords/i })[0]).toBeInTheDocument();
@@ -198,7 +213,7 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
   });
 
   it('uses a suggested market to populate a valid active market save', async () => {
-    render(<LocalSeoVisibilityPanel workspaceId="ws-1" />);
+    renderPanel();
 
     fireEvent.click(screen.getByRole('button', { name: /configure market/i }));
     fireEvent.click(screen.getByRole('button', { name: /use this market/i }));
@@ -221,7 +236,7 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
 
   it('can match a provider location code from entered city, state, and country', async () => {
     localSeoData = makeReadResponse({ suggestedMarkets: [] });
-    render(<LocalSeoVisibilityPanel workspaceId="ws-1" />);
+    renderPanel();
 
     fireEvent.click(screen.getByRole('button', { name: /configure market/i }));
     fireEvent.click(screen.getByRole('button', { name: /add market/i }));
@@ -235,7 +250,7 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
 
   it('does not submit active markets without provider identity', async () => {
     localSeoData = makeReadResponse({ suggestedMarkets: [] });
-    render(<LocalSeoVisibilityPanel workspaceId="ws-1" />);
+    renderPanel();
 
     fireEvent.click(screen.getByRole('button', { name: /configure market/i }));
     fireEvent.click(screen.getByRole('button', { name: /add market/i }));
@@ -249,7 +264,7 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
 
   it('allows non-local posture to save without configured markets', async () => {
     localSeoData = makeReadResponse({ suggestedMarkets: [] });
-    render(<LocalSeoVisibilityPanel workspaceId="ws-1" />);
+    renderPanel();
 
     fireEvent.click(screen.getByRole('button', { name: /configure market/i }));
     fireEvent.change(screen.getByLabelText(/local seo posture/i), { target: { value: 'non_local' } });
@@ -266,7 +281,7 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
   });
 
   it('saves and then starts a local visibility refresh', async () => {
-    render(<LocalSeoVisibilityPanel workspaceId="ws-1" />);
+    renderPanel();
 
     fireEvent.click(screen.getByRole('button', { name: /configure market/i }));
     fireEvent.click(screen.getByRole('button', { name: /use this market/i }));
@@ -311,7 +326,7 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
       ],
       report: { setupState: 'ready_no_data', activeMarketCount: 2, configuredMarketCount: 2 },
     });
-    render(<LocalSeoVisibilityPanel workspaceId="ws-1" />);
+    renderPanel();
 
     fireEvent.click(screen.getByRole('button', { name: /edit markets/i }));
     fireEvent.click(screen.getByRole('button', { name: /remove round rock/i }));
@@ -348,7 +363,7 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
       }],
       report: { setupState: 'ready_no_data', activeMarketCount: 1, configuredMarketCount: 1 },
     });
-    render(<LocalSeoVisibilityPanel workspaceId="ws-1" />);
+    renderPanel();
 
     fireEvent.click(screen.getByRole('button', { name: /edit markets/i }));
     fireEvent.click(screen.getByRole('button', { name: /provider identity/i }));

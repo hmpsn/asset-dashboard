@@ -27,6 +27,7 @@ export { useClientSignals, useUpdateSignalStatus, useCreateClientSignal } from '
 export { useNotifications, type NotificationItem } from './useNotifications';
 export { useAdminMeetingBrief } from './useAdminMeetingBrief';
 export { useLocalSeo, useLocalSeoLocationLookup, useLocalSeoRefresh, useLocalSeoUpdate } from './useLocalSeo';
+export { useLocalSeoLocations, useCreateLocation, useUpdateLocation, useDeleteLocation } from './useLocalSeoLocations';
 export { useBlueprints, useBlueprint, useBlueprintVersions } from './useBlueprints';
 export * from './useCopyPipeline';
 export { usePageJoin } from './usePageJoin';

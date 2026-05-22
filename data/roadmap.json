@@ -399,7 +399,7 @@
           "status": "done",
           "plannedSprint": "sprint-local-seo-h",
           "owner": "seo-health",
-          "notes": "PR1 server layer shipped. Added `client_locations`, matched-location snapshot columns, multi-location `evaluateLocalBusinessMatch`, owned-location competitor scrubbing, historical backfill job, LocalSeoSlice.locations, and admin CRUD endpoints at `/api/local-seo/:workspaceId/locations`. PR2 still needs the Settings/Local SEO UI for managing locations."
+          "notes": "PR1 server layer shipped. Added `client_locations`, matched-location snapshot columns, multi-location `evaluateLocalBusinessMatch`, owned-location competitor scrubbing, historical backfill job, LocalSeoSlice.locations, and admin CRUD endpoints at `/api/local-seo/:workspaceId/locations`. PR2 UI layer adds Workspace Settings -> Locations CRUD, seed-from-business-profile confirmation, Local SEO setup drawer shortcut, `admin-local-seo-locations` React Query hooks, and `local-seo:updated` invalidation for location reads."
         },
         {
           "id": "intel-quality-keyword-intent-classification",

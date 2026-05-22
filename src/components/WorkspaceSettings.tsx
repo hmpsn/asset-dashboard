@@ -7,9 +7,11 @@ import { FeaturesTab } from './settings/FeaturesTab';
 import { ClientDashboardTab } from './settings/ClientDashboardTab';
 import { BusinessProfileTab } from './settings/BusinessProfileTab';
 import { IntelligenceProfileTab } from './settings/IntelligenceProfileTab';
+import { LocationsTab } from './settings/LocationsTab';
 import { PublishSettings } from './PublishSettings';
 import { SectionCard, Icon, Button, IconButton, FormInput } from './ui';
 import { get, patch, post } from '../api/client';
+import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { resolveTabSearchParam } from '../lib/tab-search-param';
 
@@ -69,17 +71,31 @@ interface Props {
   onUpdate?: (patch: Record<string, unknown>) => void;
 }
 
-type SectionTab = 'connections' | 'features' | 'dashboard' | 'publishing' | 'business-profile' | 'intelligence-profile' | 'export' | 'llms-txt';
-const VALID_SECTION_TABS: readonly SectionTab[] = ['connections', 'features', 'dashboard', 'publishing', 'business-profile', 'intelligence-profile', 'export', 'llms-txt'];
+type SectionTab = 'connections' | 'features' | 'dashboard' | 'publishing' | 'business-profile' | 'intelligence-profile' | 'export' | 'llms-txt' | 'locations';
+const BASE_SECTION_TABS: readonly SectionTab[] = ['connections', 'features', 'dashboard', 'publishing', 'business-profile', 'intelligence-profile', 'export', 'llms-txt'];
+const VALID_SECTION_TABS: readonly SectionTab[] = [...BASE_SECTION_TABS, 'locations'];
+const SECTION_TAB_ITEMS: readonly [SectionTab, string][] = [
+  ['connections', 'Connections'],
+  ['features', 'Features'],
+  ['publishing', 'Publishing'],
+  ['business-profile', 'Business Profile'],
+  ['intelligence-profile', 'Intelligence Profile'],
+  ['dashboard', 'Client Dashboard'],
+  ['export', 'Data Export'],
+  ['llms-txt', 'LLMs.txt'],
+  ['locations', 'Locations'],
+];
 
 export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, webflowSiteName, onUpdate }: Props) {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
+  const localSeoVisibilityEnabled = useFeatureFlag('local-seo-visibility');
+  const validSectionTabs = localSeoVisibilityEnabled ? VALID_SECTION_TABS : BASE_SECTION_TABS;
   // Tab deep-link two-halves contract: senders append ?tab=X; receiver reads it here.
   // See CLAUDE.md "?tab= deep-link two-halves contract" + useDeepLinkFocus hook.
   const [tab, setTab] = useState<SectionTab>(() => {
     return resolveTabSearchParam<SectionTab>(searchParams.get('tab'), {
-      validValues: VALID_SECTION_TABS,
+      validValues: validSectionTabs,
       fallback: 'connections',
     });
   });
@@ -92,11 +108,11 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
   // is safe. (Devin Review BUG-0001 round 4 on PR #379.)
   useEffect(() => {
     setTab(resolveTabSearchParam<SectionTab>(searchParams.get('tab'), {
-      validValues: VALID_SECTION_TABS,
+      validValues: validSectionTabs,
       fallback: 'connections',
     }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [searchParams, localSeoVisibilityEnabled]);
   const [ws, setWs] = useState<WorkspaceData | null>(null);
   const [googleStatus, setGoogleStatus] = useState<{ connected: boolean; configured: boolean } | null>(null);
   const [gscSites, setGscSites] = useState<GscSite[]>([]);
@@ -226,7 +242,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
 
       {/* Tab nav */}
       <nav className="flex items-center gap-1 border-b border-[var(--brand-border)]">
-        {([['connections', 'Connections'], ['features', 'Features'], ['publishing', 'Publishing'], ['business-profile', 'Business Profile'], ['intelligence-profile', 'Intelligence Profile'], ['dashboard', 'Client Dashboard'], ['export', 'Data Export'], ['llms-txt', 'LLMs.txt']] as [SectionTab, string][]).map(([id, label]) => (
+        {SECTION_TAB_ITEMS.filter(([id]) => id !== 'locations' || localSeoVisibilityEnabled).map(([id, label]) => (
           <Button
             type="button"
             variant="ghost"
@@ -290,6 +306,16 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
           siteHasSearch={ws?.siteHasSearch}
           toast={toast}
           onSave={(profile) => setWs(w => w ? { ...w, businessProfile: profile } : w)}
+        />
+      )}
+
+      {tab === 'locations' && localSeoVisibilityEnabled && (
+        <LocationsTab
+          workspaceId={workspaceId}
+          workspaceName={workspaceName}
+          liveDomain={ws?.liveDomain as string | undefined}
+          businessProfile={ws?.businessProfile}
+          toast={toast}
         />
       )}
 

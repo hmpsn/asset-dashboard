@@ -97,6 +97,27 @@ beforeEach(() => {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS client_locations (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      domain TEXT,
+      phone TEXT,
+      street_address TEXT,
+      city TEXT,
+      state_or_region TEXT,
+      country TEXT,
+      is_primary INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'needs_review',
+      gbp_place_id TEXT,
+      primary_market_id TEXT,
+      page_target_path TEXT,
+      page_target_keyword_id TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_client_locations_workspace
+      ON client_locations(workspace_id);
     CREATE TABLE IF NOT EXISTS local_visibility_snapshots (
       id TEXT PRIMARY KEY,
       workspace_id TEXT NOT NULL,
