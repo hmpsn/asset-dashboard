@@ -15,6 +15,7 @@ import { listPageKeywords } from './page-keywords.js';
 import { getTrackedKeywords } from './rank-tracking.js';
 import { DEFAULT_SEO_DATA_PROVIDER, getProvider, isCapabilityDisabled, type ProviderName, type SeoDataProvider } from './seo-data-provider.js';
 import { getWorkspace } from './workspaces.js';
+import { getTaxonomyForIndustry } from './service-taxonomy.js';
 import { WS_EVENTS } from './ws-events.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 import { buildDataForSeoLocationName } from '../shared/local-seo-location.js';
@@ -48,6 +49,7 @@ import {
   type LocalSeoReportSummary,
   type LocalSeoReadResponse,
   type LocalSeoRepeatCompetitor,
+  type LocalSeoServiceGap,
   type LocalSeoRefreshRequest,
   type LocalSeoRefreshResult,
   type LocalSeoWorkspaceSettings,
@@ -485,6 +487,7 @@ export function getLocalSeoReadModel(
         latestSnapshots: [],
       }),
       competitorBrands: [],
+      serviceGaps: [],
       caps: {
         maxMarkets: LOCAL_SEO_MAX_MARKETS,
         maxKeywordsPerRefresh: LOCAL_SEO_DEFAULT_KEYWORDS_PER_REFRESH,
@@ -513,6 +516,7 @@ export function getLocalSeoReadModel(
       latestSnapshots,
     }),
     competitorBrands: getLocalSeoCompetitorBrands(workspaceId),
+    serviceGaps: featureEnabled ? getLocalSeoServiceGaps(workspaceId) : [],
     caps: {
       maxMarkets: LOCAL_SEO_MAX_MARKETS,
       maxKeywordsPerRefresh: settings.keywordsPerRefresh ?? LOCAL_SEO_DEFAULT_KEYWORDS_PER_REFRESH,
@@ -772,6 +776,28 @@ export function getLocalSeoCompetitorBrands(workspaceId: string, lookbackDays = 
   );
 
   return results.slice(0, TOP_LIMIT);
+}
+
+/**
+ * Returns services from the workspace's industry taxonomy that have no active
+ * tracking keyword mentioning them. Used to nudge admins in the setup drawer.
+ */
+export function getLocalSeoServiceGaps(workspaceId: string): LocalSeoServiceGap[] {
+  const workspace = getWorkspace(workspaceId);
+  if (!workspace) return [];
+  const taxonomy = getTaxonomyForIndustry(workspace.intelligenceProfile?.industry);
+  if (!taxonomy) return [];
+  const tracked = getTrackedKeywords(workspaceId); // active only (default)
+  const activeQueries = tracked.map(k => k.query.toLowerCase());
+  return taxonomy
+    .filter(service =>
+      !service.matchTerms.some(term => activeQueries.some(q => q.includes(term)))
+    )
+    .map(service => ({
+      serviceId: service.id,
+      serviceLabel: service.label,
+      starterKeywords: service.starterKeywords,
+    }));
 }
 
 function postureFromSummaryRow(row: SnapshotSummaryRow) {

@@ -467,6 +467,12 @@ export interface LocalSeoRepeatCompetitor {
   suggestedTrackingKeywords: string[];
 }
 
+export interface LocalSeoServiceGap {
+  serviceId: string;
+  serviceLabel: string;
+  starterKeywords: string[];
+}
+
 export interface LocalSeoReadResponse {
   featureEnabled: boolean;
   settings: LocalSeoWorkspaceSettings;
@@ -476,6 +482,7 @@ export interface LocalSeoReadResponse {
   latestSnapshots: LocalVisibilitySnapshot[];
   report: LocalSeoReportSummary;
   competitorBrands: LocalSeoRepeatCompetitor[];
+  serviceGaps: LocalSeoServiceGap[];
   caps: {
     maxMarkets: number;
     /**

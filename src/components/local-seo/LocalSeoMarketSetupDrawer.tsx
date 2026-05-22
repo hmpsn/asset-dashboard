@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ChevronDown, MapPin, Plus, RefreshCw, Sparkles, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, Copy, MapPin, Plus, RefreshCw, Sparkles, Trash2, X } from 'lucide-react';
 import type {
   LocalSeoLocationLookupCandidate,
   LocalSeoMarket,
   LocalSeoMarketStatus,
   LocalSeoPosture,
   LocalSeoReadResponse,
+  LocalSeoServiceGap,
 } from '../../../shared/types/local-seo';
 import { buildDataForSeoLocationName } from '../../../shared/local-seo-location';
 import {
@@ -103,6 +104,42 @@ function hasProviderIdentity(market: MarketDraft): boolean {
 
 function marketLabel(market: MarketDraft): string {
   return market.label.trim() || [market.city, market.stateOrRegion].filter(Boolean).join(', ') || 'New market';
+}
+
+function ServiceGapNudge({ gap }: { gap: LocalSeoServiceGap }) {
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy() {
+    void navigator.clipboard.writeText(gap.starterKeywords.join('\n')).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <div className="rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2.5">
+      <div className="flex items-center justify-between gap-2 mb-1.5">
+        <p className="t-caption font-semibold text-[var(--brand-text-bright)]">{gap.serviceLabel}</p>
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={copied ? Check : Copy}
+          className="t-caption-sm text-teal-400 hover:text-teal-300 px-1.5 py-0.5 h-auto"
+          aria-label={`Copy starter keywords for ${gap.serviceLabel}`}
+          onClick={handleCopy}
+        >
+          {copied ? 'Copied' : 'Copy keywords'}
+        </Button>
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {gap.starterKeywords.map(kw => (
+          <span key={kw} className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)]">
+            {kw}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: LocalSeoMarketSetupDrawerProps) {
@@ -398,6 +435,28 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
               </div>
             )}
           </section>
+
+          {data.serviceGaps.length > 0 && (
+            <section className="rounded-[var(--radius-lg)] border border-amber-500/20 bg-amber-500/8 p-4">
+              <div className="flex items-start gap-2 mb-3">
+                <Icon as={AlertTriangle} size="sm" className="text-amber-400 mt-0.5" />
+                <div>
+                  <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">
+                    Uncovered services
+                  </h3>
+                  <p className="t-caption-sm text-[var(--brand-text-muted)]">
+                    No tracking keywords found for {data.serviceGaps.length} service{data.serviceGaps.length === 1 ? '' : 's'}.
+                    Copy starter keywords to add them to Rank Tracker.
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {data.serviceGaps.map(gap => (
+                  <ServiceGapNudge key={gap.serviceId} gap={gap} />
+                ))}
+              </div>
+            </section>
+          )}
 
           {data.suggestedMarkets.length > 0 && (
             <section className="rounded-[var(--radius-lg)] border border-blue-500/20 bg-blue-500/8 p-4">

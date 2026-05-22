@@ -9,6 +9,7 @@ import {
   evaluateLocalBusinessMatch,
   getEffectiveKeywordsPerRefresh,
   getLocalSeoReadModel,
+  getLocalSeoServiceGaps,
   iterateLocalCandidateSignals,
   loadCandidateIterationContext,
   runLocalSeoRefreshJob,
@@ -1207,5 +1208,85 @@ describe('selectLocalIntentKeywords per-page source cap', () => {
     expect(fromCapPage.length).toBeLessThanOrEqual(5);
     // And at least one must have survived (confirming the cap isn't blocking everything)
     expect(fromCapPage.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('getLocalSeoServiceGaps — dental taxonomy', () => {
+  it('returns gaps for all dental services when no tracking keywords exist', () => {
+    setBroadcast(vi.fn(), vi.fn());
+    const ws = createWorkspace('Service Gap Test Dental');
+    cleanupWorkspaceIds.add(ws.id);
+    updateWorkspace(ws.id, {
+      intelligenceProfile: { industry: 'Dental Practice' },
+    });
+
+    const gaps = getLocalSeoServiceGaps(ws.id);
+    expect(gaps.length).toBeGreaterThan(0);
+    // All gaps should have the required shape
+    for (const gap of gaps) {
+      expect(gap).toEqual(expect.objectContaining({
+        serviceId: expect.any(String),
+        serviceLabel: expect.any(String),
+        starterKeywords: expect.any(Array),
+      }));
+      expect(gap.starterKeywords.length).toBeGreaterThan(0);
+    }
+    // All 12 dental services should be gaps since no keywords are tracked
+    expect(gaps.length).toBe(12);
+  });
+
+  it('excludes covered services when a matching tracked keyword exists', () => {
+    setBroadcast(vi.fn(), vi.fn());
+    const ws = createWorkspace('Service Gap Coverage Test');
+    cleanupWorkspaceIds.add(ws.id);
+    updateWorkspace(ws.id, {
+      intelligenceProfile: { industry: 'dental' },
+    });
+    // Add a keyword that covers 'teeth-whitening' service (matchTerm: 'whitening')
+    addTrackedKeyword(ws.id, 'teeth whitening near me', { source: TRACKED_KEYWORD_SOURCE.MANUAL });
+    // Add a keyword that covers 'dental-implants' service (matchTerm: 'implant')
+    addTrackedKeyword(ws.id, 'dental implants austin', { source: TRACKED_KEYWORD_SOURCE.MANUAL });
+
+    const gaps = getLocalSeoServiceGaps(ws.id);
+    const gapIds = gaps.map(g => g.serviceId);
+    // These two are covered — should not appear in gaps
+    expect(gapIds).not.toContain('teeth-whitening');
+    expect(gapIds).not.toContain('dental-implants');
+    // Others remain as gaps (10 uncovered out of 12)
+    expect(gaps.length).toBe(10);
+  });
+
+  it('returns empty array for workspace with no intelligenceProfile.industry', () => {
+    setBroadcast(vi.fn(), vi.fn());
+    const ws = createWorkspace('No Industry Test');
+    cleanupWorkspaceIds.add(ws.id);
+    // No intelligenceProfile set
+
+    const gaps = getLocalSeoServiceGaps(ws.id);
+    expect(gaps).toEqual([]);
+  });
+
+  it('returns empty array for a non-dental industry', () => {
+    setBroadcast(vi.fn(), vi.fn());
+    const ws = createWorkspace('Non-Dental Industry Test');
+    cleanupWorkspaceIds.add(ws.id);
+    updateWorkspace(ws.id, {
+      intelligenceProfile: { industry: 'E-commerce' },
+    });
+
+    const gaps = getLocalSeoServiceGaps(ws.id);
+    expect(gaps).toEqual([]);
+  });
+
+  it('matches case-insensitively on industry string', () => {
+    setBroadcast(vi.fn(), vi.fn());
+    const ws = createWorkspace('Case-Insensitive Dental Test');
+    cleanupWorkspaceIds.add(ws.id);
+    updateWorkspace(ws.id, {
+      intelligenceProfile: { industry: 'General Dentistry' },
+    });
+
+    const gaps = getLocalSeoServiceGaps(ws.id);
+    expect(gaps.length).toBe(12); // no tracked keywords — all gaps
   });
 });
