@@ -6419,3 +6419,19 @@ Staging QA also exposed a stability risk at keyword-strategy completion: the bac
 **Boundaries:** No new public routes, no publishing, no live metadata writes, no schema writes, no GBP mutation, no provider calls during intelligence assembly. Slice reads only existing `local-seo.ts` helpers. The `LocalSeoKeywordCandidate` shape does not yet expose `marketId`, so per-market stratification falls back to flat score-sorted top-N until that lands — tracked as `TODO(local-seo-marketId-passthrough)` in the slice file.
 
 **Files:** `shared/types/intelligence.ts`; `server/intelligence/local-seo-slice.ts`; `server/workspace-intelligence.ts`; `server/intelligence/formatters.ts`; `server/admin-chat-context.ts`; `server/intelligence/generation-context-builders.ts`; `server/mcp/tools/intelligence.ts`; `tests/integration/intelligence-local-seo.test.ts`; `tests/integration/mcp-local-seo.test.ts`; `docs/rules/workspace-intelligence.md`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+## Local SEO Sprint I — Intent Classification, Competitor Tracking, Service Gap Detection
+
+**What it does:** Quality pass on local SEO keyword selection and market intelligence. Five targeted improvements that raise the signal quality of local pack visibility refreshes and surface actionable competitive/coverage gaps in the admin UI.
+
+- **Keyword intent classification** — Server-only. `classifyLocalKeywordIntent()` in `server/local-seo.ts`. Regex-based, no API calls. 5 intents: transactional (default), commercial, informational, comparison, navigational. Informational and comparison keywords are excluded from refresh plans because they cannot produce local pack results (question-word prefixes require a trailing space to avoid false positives on names like `howard county`).
+
+- **Intent-prefixed keyword variants** — `iterateLocalCandidateSignals` yields up to 3 urgency/modifier variants per service-keyword page and content gap base. Variants follow `LOCAL_INTENT_PREFIXES` order: emergency first (`emergency X city`), open now (`open now X city`), best (`best X city`). Only emitted when the base keyword is transactional or commercial and a primary market city is configured.
+
+- **Per-source budget cap** — `applySourcePageCap()` caps non-explicit candidates from any single pagePath to 20% of the refresh budget. Explicit keywords (admin-pinned or client-requested) bypass the cap entirely. Prevents a single page from monopolizing the keyword selection budget on deep-content sites with many page-keyword assignments.
+
+- **Repeat competitor tracking** — `getLocalSeoCompetitorBrands()` aggregates 30-day snapshot history (`status=success`), counts appearances and wins per business name, and returns the top 10 competitors with `totalAppearances >= 2`. Surfaced as `RepeatCompetitorList` in non-compact `LocalSeoVisibilityPanel` only (not in the compact KCC summary strip). Types live in `shared/types/local-seo.ts` as `LocalSeoCompetitorBrand[]`.
+
+- **Service coverage gap detection** — `getLocalSeoServiceGaps()` compares active tracked keywords against `matchTerms` in the dental industry taxonomy (`server/service-taxonomy.ts`, 12 services). Uncovered services surface as an amber nudge section (`ServiceGapNudge`) in `LocalSeoMarketSetupDrawer` with copy-to-clipboard starter keyword suggestions. Taxonomy is industry-scoped: only fires for workspaces where the industry heuristic identifies dental practice context.
+
+**Files:** `server/local-seo.ts`; `server/service-taxonomy.ts`; `shared/types/local-seo.ts`; `src/components/local-seo/LocalSeoVisibilityPanel.tsx`; `src/components/local-seo/LocalSeoMarketSetupDrawer.tsx`; `tests/unit/local-seo.test.ts`; `tests/integration/local-seo-routes.test.ts`; `tests/component/LocalSeoVisibilityPanel.test.tsx`; `FEATURE_AUDIT.md`; `data/roadmap.json`.

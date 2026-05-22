@@ -403,27 +403,19 @@
         },
         {
           "id": "intel-quality-keyword-intent-classification",
-          "title": "Intent classification for local candidate selection",
-          "source": "Tier 2 staging quality audit on Swish 2026-05-22",
-          "priority": "P1",
-          "est": "1-2 days",
-          "status": "pending",
-          "plannedSprint": "sprint-local-seo-i",
-          "sprintBatch": "iterator-quality",
+          "title": "Local SEO keyword intent classification + question modifiers + source caps",
+          "source": "Sprint I local SEO quality pass 2026-05-22",
+          "status": "done",
           "owner": "seo-health",
-          "notes": "23% of selected keywords in the Swish refresh had no local pack (46/200): 'dental financing and insurance options', 'crowns vs veneers comparison', 'covid-19 dental impact', 'best dental insurance plans'. These are informational/comparison/educational queries — wrong intent class for local visibility tracking. They consumed ~$0.092 of the $0.40 spend and produced no useful local data. Root cause: the candidate iterator includes anything with a service term + market modifier, with no intent classification. Fix: (1) Classify each candidate keyword into one of {transactional, navigational, informational, comparison, commercial} via lightweight regex + dictionary lookup OR via DataForSEO's `dataforseo_labs/google/search_intent` endpoint. (2) Local refresh planner excludes informational + comparison intent — those belong in content strategy, not local SEO. (3) Surface intent classification on KCC row + drawer so admins see what each keyword is FOR. (4) Optional: route excluded keywords to a 'content brief candidates' queue. Eliminates ~25% of refresh budget waste."
+          "notes": "Intent classification + question modifiers + source caps. classifyLocalKeywordIntent, LOCAL_INTENT_PREFIXES, applySourcePageCap in selectLocalIntentKeywords."
         },
         {
           "id": "intel-quality-competitor-brand-tracking",
-          "title": "Auto-detect repeat competitors + offer competitor brand tracking",
-          "source": "Tier 2 staging quality audit on Swish 2026-05-22",
-          "priority": "P1",
-          "est": "1 day",
-          "status": "pending",
-          "plannedSprint": "sprint-local-seo-i",
-          "sprintBatch": "insight-surfaces",
+          "title": "Local SEO repeat competitor brand tracking",
+          "source": "Sprint I local SEO quality pass 2026-05-22",
+          "status": "done",
           "owner": "seo-health",
-          "notes": "Top-competitor data from snapshots is already collected but never operationalized. On Swish 2026-05-22: 'ATX Family Dental' beat Swish 9 times in queries where the pack was present but Swish wasn't found — #1 local competitor. 'Emergency Dental Care Houston 24/7' won 5 emergency queries. 'Toothbar' appeared 35 times. None of these are tracked as branded competitor queries in Swish's strategy. Fix: (1) Aggregate top_competitors across recent snapshots to surface a 'who keeps beating you' list (P1 surface). (2) For each repeat competitor, suggest branded competitor keywords to track: '[competitor name] reviews', '[competitor name] vs [client name]', '[competitor name] [city]'. (3) One-click 'track these competitor brands' that adds them to the keyword strategy as competitor-intent keywords. (4) New `competitor_brands` table or extension of existing strategy schema. This is a P0 in any consultancy playbook — branded competitor tracking is how you find weakness. Currently 100% missing."
+          "notes": "getLocalSeoCompetitorBrands: 30-day window, status=success filter, totalAppearances>=2 threshold, top 10 by wins. RepeatCompetitorList in LocalSeoVisibilityPanel (non-compact only)."
         },
         {
           "id": "intel-quality-keyword-volume-geo-targeting",
@@ -438,39 +430,27 @@
         },
         {
           "id": "intel-quality-service-coverage-gap-detection",
-          "title": "Service coverage gap detection for local SEO",
-          "source": "Tier 2 staging quality audit on Swish 2026-05-22",
-          "priority": "P2",
-          "est": "0.5 day",
-          "status": "pending",
-          "plannedSprint": "sprint-local-seo-i",
-          "sprintBatch": "insight-surfaces",
+          "title": "Local SEO service coverage gap detection (dental taxonomy)",
+          "source": "Sprint I local SEO quality pass 2026-05-22",
+          "status": "done",
           "owner": "seo-health",
-          "notes": "Swish refresh had 0 keywords tracking major dental categories: braces, cleaning, family dentistry, pediatric, root canal, orthodontist, fillings, extraction, wisdom teeth, dentures. Selection is heavily weighted toward strategy + page-map sources, so services without a dedicated page get no candidate representation. For a multi-service practice this creates major SEO blind spots — pediatric dentistry is a billion-dollar category Swish completely lacks coverage on; could be intentional but should be a deliberate choice. Fix: (1) Define service taxonomy per workspace industry (dental: 20 standard services, legal: 15, etc.) — or pull from intelligence profile. (2) Before refresh, compute keyword coverage per service. (3) Surface 'You have 0 keywords tracking pediatric dentistry — is that intentional?' as an admin nudge in the local SEO setup drawer. (4) Optional: offer 'add starter keywords for these services' one-click that seeds 3-5 keywords per missing service. Detects gaps proactively rather than relying on the admin to notice."
+          "notes": "Dental taxonomy (12 services) in service-taxonomy.ts. getLocalSeoServiceGaps surfaces uncovered services. ServiceGapNudge in LocalSeoMarketSetupDrawer with copy-to-clipboard starter keywords."
         },
         {
           "id": "intel-quality-question-intent-modifiers",
-          "title": "Question + intent modifier generation in candidate iterator",
-          "source": "Tier 2 staging quality audit on Swish 2026-05-22",
-          "priority": "P2",
-          "est": "0.5 day",
-          "status": "pending",
-          "plannedSprint": "sprint-local-seo-i",
-          "sprintBatch": "iterator-quality",
+          "title": "Local SEO intent-prefixed keyword variants (emergency/open now/best)",
+          "source": "Sprint I local SEO quality pass 2026-05-22",
+          "status": "done",
           "owner": "seo-health",
-          "notes": "Local candidate iterator generates city-modifier variants ('dentist austin') and near-me variants ('dentist near me') but skips high-intent question variants. Missing from Swish's 200 snapshots: 'best dentist austin', 'top rated dentist austin tx', 'emergency dentist austin 24 hour', 'affordable dentist austin', 'dentist accepting new patients austin', 'open now dentist austin'. These are high-intent pre-booking queries and matter more than generic city-modified terms. Fix: (1) Add a configurable list of intent prefixes/suffixes to `iterateLocalCandidateSignals`: ['best', 'top rated', 'affordable', 'cheap', 'emergency', 'open now', 'same day', 'accepting new patients', '24 hour', 'today']. (2) For each service-keyword base, generate a small bounded set of intent variants in addition to city/neighborhood variants. (3) Tier 2 cheap default still applies — no extra evaluator cost. Net effect: ~5-10 high-intent variants per service base, ~15-25% of refresh budget redirected to higher-value queries."
+          "notes": "Up to 3 intent-prefix variants per service-keyword base, primary market city, emergency/open now/best first."
         },
         {
           "id": "intel-quality-source-distribution-rebalancing",
-          "title": "Per-source budget caps in local candidate selection",
-          "source": "Tier 2 staging quality audit on Swish 2026-05-22",
-          "priority": "P2",
-          "est": "0.5 day",
-          "status": "pending",
-          "plannedSprint": "sprint-local-seo-i",
-          "sprintBatch": "iterator-quality",
+          "title": "Local SEO per-source budget cap (20% source page limit)",
+          "source": "Sprint I local SEO quality pass 2026-05-22",
+          "status": "done",
           "owner": "seo-health",
-          "notes": "Swish refresh over-indexed on 'appointment' variants — 23 of 100 Austin keywords (23%) were 'schedule X dental appointment' variants from the Schedule-an-Appointment page. These all returned rank 1 (already-winning bottom-of-funnel branded scheduling), so the budget was spent confirming what we already know. Higher-funnel discovery keywords got crowded out. Fix: in `selectLocalIntentKeywords` after sorting by score, enforce per-source caps: no more than e.g. 25% of refresh budget from a single source-page or single tracking source. Frees budget for higher-funnel diversity. Doesn't add complexity — just a single per-page counter in the slice loop."
+          "notes": "Per-source-page 20% budget cap via applySourcePageCap. Explicit keywords bypass cap."
         },
         {
           "id": "intel-quality-google-business-profile-health",
