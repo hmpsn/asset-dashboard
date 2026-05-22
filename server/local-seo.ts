@@ -14,6 +14,7 @@ import { isStrategyPoolEligibleKeyword, isNearDuplicateKeyword } from './keyword
 import { listPageKeywords } from './page-keywords.js';
 import { getTrackedKeywords } from './rank-tracking.js';
 import { DEFAULT_SEO_DATA_PROVIDER, getProvider, isCapabilityDisabled, type ProviderName, type SeoDataProvider } from './seo-data-provider.js';
+import { getTaxonomyForIndustry } from './service-taxonomy.js';
 import { getWorkspace } from './workspaces.js';
 import { WS_EVENTS } from './ws-events.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
@@ -38,6 +39,7 @@ import {
   type LocalSeoKeywordVisibility,
   type LocalSeoKeywordVisibilitySummary,
   type LocalSeoDevice,
+  type LocalSeoKeywordIntent,
   type LocalSeoLocationLookupRequest,
   type LocalSeoLocationLookupResponse,
   type LocalSeoMarket,
@@ -46,6 +48,8 @@ import {
   type LocalSeoPosture,
   type LocalSeoReportSummary,
   type LocalSeoReadResponse,
+  type LocalSeoRepeatCompetitor,
+  type LocalSeoServiceGap,
   type LocalSeoRefreshRequest,
   type LocalSeoRefreshResult,
   type LocalSeoWorkspaceSettings,
@@ -116,6 +120,7 @@ export interface LocalSeoKeywordCandidate {
   selected: boolean;
   score: number;
   reasons: string[];
+  intent: LocalSeoKeywordIntent;
 }
 
 const localResultSchema = z.object({
@@ -253,6 +258,14 @@ const stmts = createStmtCache(() => ({
     WHERE workspace_id = ? AND normalized_keyword = ?
     ORDER BY captured_at DESC
     LIMIT 50
+  `),
+  competitorSnapshots: db.prepare(`
+    SELECT workspace_id, business_found, local_pack_present, market_label, top_competitors
+    FROM local_visibility_snapshots
+    WHERE workspace_id = @workspaceId
+      AND captured_at >= datetime('now', '-' || @days || ' days')
+      AND status = 'success'
+    ORDER BY captured_at DESC
   `),
   latestSnapshotSummary: db.prepare(`
     SELECT
@@ -473,6 +486,8 @@ export function getLocalSeoReadModel(
         suggestedMarkets: [],
         latestSnapshots: [],
       }),
+      competitorBrands: [],
+      serviceGaps: [],
       caps: {
         maxMarkets: LOCAL_SEO_MAX_MARKETS,
         maxKeywordsPerRefresh: LOCAL_SEO_DEFAULT_KEYWORDS_PER_REFRESH,
@@ -500,6 +515,8 @@ export function getLocalSeoReadModel(
       suggestedMarkets,
       latestSnapshots,
     }),
+    competitorBrands: getLocalSeoCompetitorBrands(workspaceId),
+    serviceGaps: featureEnabled ? getLocalSeoServiceGaps(workspaceId) : [],
     caps: {
       maxMarkets: LOCAL_SEO_MAX_MARKETS,
       maxKeywordsPerRefresh: settings.keywordsPerRefresh ?? LOCAL_SEO_DEFAULT_KEYWORDS_PER_REFRESH,
@@ -678,6 +695,110 @@ function listLatestLocalVisibilitySnapshotsForKeyword(workspaceId: string, norma
 
 function listLatestLocalVisibilitySnapshotSummaryRows(workspaceId: string): SnapshotSummaryRow[] {
   return stmts().latestSnapshotSummary.all(workspaceId, workspaceId) as SnapshotSummaryRow[];
+}
+
+interface CompetitorSnapshotRow {
+  workspace_id: string;
+  business_found: number;
+  local_pack_present: number;
+  market_label: string;
+  top_competitors: string;
+}
+
+export function getLocalSeoCompetitorBrands(workspaceId: string, lookbackDays = 30): LocalSeoRepeatCompetitor[] {
+  const workspace = getWorkspace(workspaceId);
+  if (!workspace) return [];
+  const rows = stmts().competitorSnapshots.all({ workspaceId, days: lookbackDays }) as CompetitorSnapshotRow[];
+
+  const TOP_LIMIT = 10;
+  const MIN_APPEARANCES = 2;
+
+  interface Accumulator {
+    domain: string | undefined;
+    totalAppearances: number;
+    winsAgainstClient: number;
+    markets: Set<string>;
+  }
+  const map = new Map<string, Accumulator>();
+  // Collect the original (un-lowercased) title for display — use first seen title
+  const titleMap = new Map<string, string>();
+
+  for (const row of rows) {
+    const clientLost = row.business_found === 0 && row.local_pack_present === 1;
+    const competitors = parseJsonSafeArray(row.top_competitors, localResultSchema, { workspaceId, table: 'local_visibility_snapshots', field: 'top_competitors' });
+    for (const competitor of competitors) {
+      const key = competitor.title.toLowerCase().trim();
+      if (!key) continue;
+      const existing = map.get(key);
+      if (existing) {
+        existing.totalAppearances += 1;
+        if (clientLost) existing.winsAgainstClient += 1;
+        existing.markets.add(row.market_label);
+        if (!existing.domain && competitor.domain) existing.domain = competitor.domain;
+      } else {
+        map.set(key, {
+          domain: competitor.domain,
+          totalAppearances: 1,
+          winsAgainstClient: clientLost ? 1 : 0,
+          markets: new Set([row.market_label]),
+        });
+        titleMap.set(key, competitor.title);
+      }
+    }
+  }
+
+  const activeMarketCity = listLocalSeoMarkets(workspaceId)
+    .find(m => m.status === LOCAL_SEO_MARKET_STATUS.ACTIVE)?.city;
+
+  const results: LocalSeoRepeatCompetitor[] = [];
+  for (const [key, acc] of map.entries()) {
+    if (acc.totalAppearances < MIN_APPEARANCES) continue;
+    const title = titleMap.get(key) ?? key;
+    const suggestedTrackingKeywords: string[] = [
+      `${title} reviews`,
+    ];
+    if (workspace.name.trim()) {
+      suggestedTrackingKeywords.push(`${title} vs ${workspace.name.trim()}`);
+    }
+    if (activeMarketCity) suggestedTrackingKeywords.push(`${title} ${activeMarketCity}`);
+    results.push({
+      title,
+      domain: acc.domain,
+      totalAppearances: acc.totalAppearances,
+      winsAgainstClient: acc.winsAgainstClient,
+      markets: Array.from(acc.markets),
+      suggestedTrackingKeywords,
+    });
+  }
+
+  results.sort((a, b) =>
+    b.winsAgainstClient - a.winsAgainstClient
+    || b.totalAppearances - a.totalAppearances,
+  );
+
+  return results.slice(0, TOP_LIMIT);
+}
+
+/**
+ * Returns services from the workspace's industry taxonomy that have no active
+ * tracking keyword mentioning them. Used to nudge admins in the setup drawer.
+ */
+export function getLocalSeoServiceGaps(workspaceId: string): LocalSeoServiceGap[] {
+  const workspace = getWorkspace(workspaceId);
+  if (!workspace) return [];
+  const taxonomy = getTaxonomyForIndustry(workspace.intelligenceProfile?.industry);
+  if (!taxonomy) return [];
+  const tracked = getTrackedKeywords(workspaceId); // active only (default)
+  const activeQueries = tracked.map(k => k.query.toLowerCase());
+  return taxonomy
+    .filter(service =>
+      !service.matchTerms.some(term => activeQueries.some(q => q.includes(term)))
+    )
+    .map(service => ({
+      serviceId: service.id,
+      serviceLabel: service.label,
+      starterKeywords: service.starterKeywords,
+    }));
 }
 
 function postureFromSummaryRow(row: SnapshotSummaryRow) {
@@ -1030,6 +1151,45 @@ function hasMarketModifier(keyword: string, markets: LocalSeoMarket[]): boolean 
   });
 }
 
+/**
+ * Classify the search intent of a local SEO keyword using regex patterns.
+ * Runs in the hot path — no API calls.
+ *
+ * Priority order: comparison → informational → commercial → transactional (default)
+ *
+ * Note: 'navigational' is part of the LocalSeoKeywordIntent union but is never
+ * returned by this classifier (it requires workspace brand context not available here).
+ * It may be pre-assigned by signal iterators that have that context.
+ */
+export function classifyLocalKeywordIntent(keyword: string): LocalSeoKeywordIntent {
+  const kw = keyword.toLowerCase();
+  // Comparison: X vs Y, versus, alternatives, compare
+  if (/\bvs\b|\bversus\b|\balternative[s]?\b|\bcompare\b|\bcomparison\b/.test(kw)) {
+    return 'comparison';
+  }
+  // Informational: question words, educational patterns, cost/price research
+  if (/^(how |what |why |when |where |which |who |can |does |do |is |are )|\bguide\b|\btutorial\b|\btips\b|\bexplained\b|\boverview\b|\bhistory\b|\bfacts\b|\bstatistics\b|\btypes of\b|\bdifference between\b|\bcost of\b|\bprice of\b|\bpros and cons\b|\bbenefits of\b|\bcauses of\b|\bwhat is\b|\bimpact of\b/.test(kw)) {
+    return 'informational';
+  }
+  // Commercial: pre-buying research with quality signals (still useful for local)
+  if (/\b(best|top|top-rated|top rated|affordable|cheap|cheapest|discount|deal|coupon|budget|premium|quality)\b/.test(kw)) {
+    return 'commercial';
+  }
+  // Navigational: brand/domain search (hard to detect without workspace context, skip)
+  // Default: transactional (local service + city/near-me patterns)
+  return 'transactional';
+}
+
+const LOCAL_INTENT_PREFIXES = [
+  'emergency', 'open now', 'best',
+  'same day', 'affordable', 'cheap',
+  'top rated', 'accepting new patients', '24 hour',
+] as const;
+
+const LOCAL_INTENT_PREFIX_CAP_PER_BASE = 3;
+
+const LOCAL_SOURCE_PAGE_BUDGET_FRACTION = 0.20;
+
 function localVariantKeywords(baseKeyword: string, markets: LocalSeoMarket[]): string[] {
   const base = cleanKeywordDisplay(baseKeyword);
   if (!base) return [];
@@ -1137,6 +1297,7 @@ export interface CandidateSourceSignal {
   volume?: number;
   difficulty?: number;
   scoreBoost?: number;
+  intent?: LocalSeoKeywordIntent;
 }
 
 /**
@@ -1281,7 +1442,34 @@ export function* iterateLocalCandidateSignals(
           detail: page.pageTitle ?? page.pagePath,
           pagePath: page.pagePath,
           pageTitle: page.pageTitle,
+          intent: classifyLocalKeywordIntent(variant),
         };
+      }
+    }
+    // Intent modifier variants for service-keyword bases (primary keyword only, primary market only)
+    if (titleLooksLikeServiceKeyword(page.pageTitle) && markets.length > 0) {
+      const primaryBase = cleanKeywordDisplay(page.pageTitle);
+      const primaryMarket = markets[0];
+      if (primaryBase && primaryMarket) {
+        let intentCount = 0;
+        for (const prefix of LOCAL_INTENT_PREFIXES) {
+          if (intentCount >= LOCAL_INTENT_PREFIX_CAP_PER_BASE) break;
+          const variant = `${prefix} ${primaryBase} ${primaryMarket.city}`.toLowerCase().trim();
+          const variantIntent: LocalSeoKeywordIntent =
+            prefix === 'emergency' || prefix === 'same day' || prefix === 'open now' || prefix === '24 hour' || prefix === 'accepting new patients'
+              ? 'transactional'
+              : 'commercial';
+          yield {
+            keyword: variant,
+            source: 'local_variant',
+            sourceLabel: 'Intent candidate',
+            detail: page.pageTitle ?? page.pagePath,
+            pagePath: page.pagePath,
+            pageTitle: page.pageTitle,
+            intent: variantIntent,
+          };
+          intentCount++;
+        }
       }
     }
   }
@@ -1309,7 +1497,34 @@ export function* iterateLocalCandidateSignals(
         detail: gap.topic,
         volume: gap.volume,
         difficulty: gap.difficulty,
+        intent: classifyLocalKeywordIntent(variant),
       };
+    }
+    // Intent modifier variants for content gap bases
+    if (titleLooksLikeServiceKeyword(gap.targetKeyword) && markets.length > 0) {
+      const primaryBase = cleanKeywordDisplay(gap.targetKeyword);
+      const primaryMarket = markets[0];
+      if (primaryBase && primaryMarket) {
+        let intentCount = 0;
+        for (const prefix of LOCAL_INTENT_PREFIXES) {
+          if (intentCount >= LOCAL_INTENT_PREFIX_CAP_PER_BASE) break;
+          const variant = `${prefix} ${primaryBase} ${primaryMarket.city}`.toLowerCase().trim();
+          const variantIntent: LocalSeoKeywordIntent =
+            prefix === 'emergency' || prefix === 'same day' || prefix === 'open now' || prefix === '24 hour' || prefix === 'accepting new patients'
+              ? 'transactional'
+              : 'commercial';
+          yield {
+            keyword: variant,
+            source: 'local_variant',
+            sourceLabel: 'Intent candidate',
+            detail: gap.topic,
+            volume: gap.volume,
+            difficulty: gap.difficulty,
+            intent: variantIntent,
+          };
+          intentCount++;
+        }
+      }
     }
   }
 }
@@ -1344,6 +1559,7 @@ function upsertCandidate(
       ?? (signal.source === 'strategy' || signal.source === 'tracking' || signal.source === 'page_assignment'),
     score,
     reasons,
+    intent: signal.intent ?? classifyLocalKeywordIntent(display),
   };
   if (!existing || next.score > existing.score || (next.selected && !existing.selected)) {
     candidates.set(key, next);
@@ -1508,8 +1724,34 @@ function selectExplicitLocalSeoKeywords(workspaceId: string, explicitKeywords: s
   return selected;
 }
 
+/**
+ * Apply a per-source-page budget cap to prevent a single page from dominating
+ * the refresh budget. Explicit keywords are never capped — they are admin-chosen.
+ * Non-explicit keywords without a pagePath share a bucket per source type.
+ */
+function applySourcePageCap(candidates: LocalSeoKeywordCandidate[], budget: number): LocalSeoKeywordCandidate[] {
+  const pageCap = Math.max(1, Math.ceil(budget * LOCAL_SOURCE_PAGE_BUDGET_FRACTION));
+  const pageCounts = new Map<string, number>();
+  return candidates.filter(c => {
+    if (c.source === 'explicit') return true;
+    const key = c.pagePath ?? `__no_page__${c.source}`;
+    const count = pageCounts.get(key) ?? 0;
+    if (count >= pageCap) return false;
+    pageCounts.set(key, count + 1);
+    return true;
+  });
+}
+
 export function selectLocalIntentKeywords(workspaceId: string, explicitKeywords: string[] = []): string[] {
-  if (explicitKeywords.length > 0) return selectExplicitLocalSeoKeywords(workspaceId, explicitKeywords);
+  if (explicitKeywords.length > 0) {
+    const selected = selectExplicitLocalSeoKeywords(workspaceId, explicitKeywords);
+    // Apply intent filter even for explicit keywords — informational/comparison
+    // queries cannot produce local pack results regardless of how they were chosen.
+    return selected.filter(kw => {
+      const intent = classifyLocalKeywordIntent(kw);
+      return intent !== 'informational' && intent !== 'comparison';
+    });
+  }
   // Use the Evaluated variant here. Unlike the KCC/intelligence-slice/MCP read
   // paths (where the evaluator's `reasons` field is unused and the cheap
   // default is the right contract), `selectLocalIntentKeywords` feeds a real
@@ -1521,9 +1763,13 @@ export function selectLocalIntentKeywords(workspaceId: string, explicitKeywords:
   // function runs once per scheduled refresh inside `runLocalSeoRefreshJob`
   // (a background job), not per request, and it caps the candidate set with
   // LOCAL_CANDIDATE_HARD_CAP before the evaluator even runs.
-  return buildLocalSeoKeywordCandidatesEvaluated(workspaceId, explicitKeywords)
-    .slice(0, getEffectiveKeywordsPerRefresh(workspaceId))
-    .map(candidate => candidate.keyword);
+  const budget = getEffectiveKeywordsPerRefresh(workspaceId);
+  const candidates = buildLocalSeoKeywordCandidatesEvaluated(workspaceId, explicitKeywords);
+  // Filter out intents that can never produce local pack results (no credits spent on them)
+  const filteredCandidates = candidates.filter(c => c.intent !== 'informational' && c.intent !== 'comparison');
+  // Apply per-page cap to prevent any single source page from monopolizing the budget
+  const capped = applySourcePageCap(filteredCandidates, budget);
+  return capped.slice(0, budget).map(c => c.keyword);
 }
 
 export function createLocalSeoRefreshPlan(workspaceId: string, request: LocalSeoRefreshRequest = {}): { markets: LocalSeoMarket[]; keywords: string[]; device: LocalSeoDevice; languageCode: string } | null {

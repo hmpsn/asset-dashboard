@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { AlertTriangle, CheckCircle2, Globe2, MapPin, RefreshCw, Search, Settings2, XCircle } from 'lucide-react';
-import type { LocalSeoKeywordVisibility, LocalSeoVisibilityPosture } from '../../../shared/types/local-seo';
+import { AlertTriangle, CheckCircle2, Globe2, MapPin, RefreshCw, Search, Settings2, Swords, XCircle } from 'lucide-react';
+import type { LocalSeoKeywordVisibility, LocalSeoRepeatCompetitor, LocalSeoVisibilityPosture } from '../../../shared/types/local-seo';
 import { LOCAL_SEO_VISIBILITY_POSTURE } from '../../../shared/types/local-seo';
 import { useLocalSeo, useLocalSeoRefresh } from '../../hooks/admin';
 import { Badge, Button, Icon, SectionCard, StatCard, cn } from '../ui';
@@ -47,6 +47,57 @@ export function LocalSeoVisibilityBadge({ visibility, subtle = false }: { visibi
   );
 }
 
+function RepeatCompetitorList({ competitors }: { competitors: LocalSeoRepeatCompetitor[] }) {
+  if (competitors.length === 0) return null;
+  return (
+    <SectionCard title="Repeat Competitors">
+      <div className="space-y-3">
+        {competitors.map(competitor => (
+          <div
+            key={competitor.title}
+            className="rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-3)]/35 p-3"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="t-caption font-semibold text-[var(--brand-text-bright)] truncate">{competitor.title}</p>
+                {competitor.domain && (
+                  <p className="t-caption-sm text-[var(--brand-text-muted)] truncate">{competitor.domain}</p>
+                )}
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="t-caption-sm text-red-400/80 flex items-center gap-1">
+                    <Icon as={Swords} size="xs" />
+                    {competitor.winsAgainstClient} {competitor.winsAgainstClient === 1 ? 'loss' : 'losses'}
+                  </span>
+                  <span className="t-caption-sm text-blue-400">
+                    {competitor.totalAppearances} appearances
+                  </span>
+                  {competitor.markets.length > 0 && (
+                    <span className="t-caption-sm text-[var(--brand-text-muted)]">
+                      {competitor.markets.join(' · ')}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            {competitor.suggestedTrackingKeywords.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {competitor.suggestedTrackingKeywords.map(kw => (
+                  <span
+                    key={kw}
+                    className="inline-flex items-center rounded-[var(--radius-sm)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-2 py-0.5 t-caption-sm text-[var(--brand-text-muted)]"
+                  >
+                    {kw}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
 export function LocalSeoVisibilityPanel({ workspaceId, compact = false, onOpenKeywords }: LocalSeoVisibilityPanelProps) {
   const [setupOpen, setSetupOpen] = useState(false);
   const { data, isLoading, error } = useLocalSeo(workspaceId);
@@ -78,6 +129,7 @@ export function LocalSeoVisibilityPanel({ workspaceId, compact = false, onOpenKe
         : 'zinc';
 
   return (
+    <>
     <SectionCard
       title="Local SEO Visibility"
       titleExtra={
@@ -196,5 +248,9 @@ export function LocalSeoVisibilityPanel({ workspaceId, compact = false, onOpenKe
         onClose={() => setSetupOpen(false)}
       />
     </SectionCard>
+    {!compact && (report.setupState === 'has_data' || report.setupState === 'ready_no_data') && data.competitorBrands.length > 0 && (
+      <RepeatCompetitorList competitors={data.competitorBrands} />
+    )}
+    </>
   );
 }

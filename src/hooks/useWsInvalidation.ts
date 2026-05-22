@@ -325,6 +325,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.client.strategy(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.pageKeywords(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.localSeo(workspaceId) });
     },
     [WS_EVENTS.LOCAL_SEO_UPDATED]: () => {
       if (!workspaceId) return;
