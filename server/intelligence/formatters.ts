@@ -10,6 +10,7 @@ import type {
   ClientSignalsSlice,
   OperationalSlice,
   PageProfileSlice,
+  LocalSeoSlice,
 } from '../../shared/types/intelligence.js';
 import type { AudiencePersona } from '../../shared/types/workspace.js';
 import { matchPagePath } from '../helpers.js';
@@ -121,6 +122,11 @@ export function formatForPrompt(
   // Operational
   if (intelligence.operational && (!include || include.has('operational'))) {
     sections.push(formatOperationalSection(intelligence.operational, verbosity));
+  }
+
+  // Local SEO
+  if (intelligence.localSeo && (!include || include.has('localSeo'))) {
+    sections.push(formatLocalSeoSection(intelligence.localSeo, verbosity));
   }
 
   // Apply tokenBudget truncation if requested (§20 priority chain)
@@ -737,6 +743,22 @@ function formatOperationalSection(ops: OperationalSlice, verbosity: PromptVerbos
   }
 
   return lines.join('\n');
+}
+
+/**
+ * Format the local SEO slice for AI prompts.
+ *
+ * The slice's `effectiveLocalSeoBlock` is an authority-layered field (pre-formatted
+ * with stratified per-market sampling already applied). Per CLAUDE.md, callers
+ * inject it directly. The minimal-verbosity branch returns a one-liner instead.
+ */
+function formatLocalSeoSection(slice: LocalSeoSlice, verbosity: PromptVerbosity): string {
+  if (!slice.enabled) return '## Local SEO\nLocal SEO is disabled for this workspace.';
+  if (verbosity === 'compact') {
+    const activeMarkets = slice.markets.filter(m => m.status === 'active').length;
+    return `## Local SEO\n${activeMarkets} active markets. ${slice.visibility.visible} visible, ${slice.visibility.notVisible} not visible, ${slice.visibility.notChecked} not checked.`;
+  }
+  return `## Local SEO\n${slice.effectiveLocalSeoBlock}`;
 }
 
 function formatPageProfileSection(profile: PageProfileSlice, verbosity: PromptVerbosity): string {

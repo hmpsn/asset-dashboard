@@ -60,12 +60,32 @@ async function buildGenerationContext(
   };
 }
 
+/**
+ * Returns true when the workspace has at least one active local SEO market configured.
+ * Used to gate localSeo slice inclusion in generation context — workspaces without
+ * active markets don't pay token cost for an empty slice.
+ *
+ * Dynamic import keeps the local-seo subsystem off the synchronous import path of
+ * generation-context-builders, which is consistent with the lazy-load pattern other
+ * slice consumers use.
+ */
+async function hasActiveLocalMarkets(workspaceId: string): Promise<boolean> {
+  try {
+    const { listLocalSeoMarkets } = await import('../local-seo.js'); // dynamic-import-ok - lazy-load local SEO module to keep generation builders light
+    return listLocalSeoMarkets(workspaceId).some(m => m.status === 'active');
+  } catch { // catch-ok: gating check, missing module or DB error should fall back to "no markets" rather than fail the whole build
+    return false;
+  }
+}
+
 export async function buildContentGenerationContext(
   workspaceId: string,
   opts: ContentGenerationContextOptions = {},
 ): Promise<GenerationContextResult> {
-  const baseSlices = ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline'] as const;
-  const slices = opts.slices ?? (opts.pagePath ? [...baseSlices, 'pageProfile'] as const : baseSlices);
+  const baseSlices: IntelligenceSlice[] = ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline'];
+  if (opts.pagePath) baseSlices.push('pageProfile');
+  if (await hasActiveLocalMarkets(workspaceId)) baseSlices.push('localSeo');
+  const slices = opts.slices ?? baseSlices;
   return buildGenerationContext(workspaceId, slices, {
     ...opts,
     verbosity: opts.verbosity ?? 'detailed',
@@ -77,8 +97,10 @@ export async function buildRecommendationGenerationContext(
   workspaceId: string,
   opts: RecommendationGenerationContextOptions = {},
 ): Promise<GenerationContextResult> {
-  const baseSlices = ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline', 'siteHealth'] as const;
-  const slices = opts.slices ?? (opts.pagePath ? [...baseSlices, 'pageProfile'] as const : baseSlices);
+  const baseSlices: IntelligenceSlice[] = ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline', 'siteHealth'];
+  if (opts.pagePath) baseSlices.push('pageProfile');
+  if (await hasActiveLocalMarkets(workspaceId)) baseSlices.push('localSeo');
+  const slices = opts.slices ?? baseSlices;
   return buildGenerationContext(workspaceId, slices, {
     ...opts,
     verbosity: opts.verbosity ?? 'detailed',
