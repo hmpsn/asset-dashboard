@@ -28,7 +28,6 @@ import { buildKeywordStrategyUxPayload } from './keyword-strategy-ux.js';
 import { WS_EVENTS } from './ws-events.js';
 import { findBestParent, keywordComparisonKey } from '../shared/keyword-normalization.js';
 import {
-  getLostVisibilityCount,
   getLostVisibilityKeys,
   getLostVisibilityQueries,
 } from './client-discovered-queries.js';
@@ -209,14 +208,6 @@ function safeLostVisibilityRows(workspaceId: string): LostVisibilityQuery[] {
   }
 }
 
-function safeLostVisibilityCount(workspaceId: string): number {
-  try {
-    return getLostVisibilityCount(workspaceId);
-  } catch (err) {
-    log.debug({ err, workspaceId }, 'discovered_queries unavailable while reading lost visibility count');
-    return 0;
-  }
-}
 
 function feedbackState(row: FeedbackRow): KeywordCommandCenterFeedbackState | undefined {
   if (row.status !== 'approved' && row.status !== 'declined' && row.status !== 'requested') return undefined;
@@ -1333,8 +1324,8 @@ export async function buildKeywordCommandCenterSummary(
   }
 
   const latestRanks = getLatestSnapshotRanks(workspace.id);
-  const lostVisibilityCount = safeLostVisibilityCount(workspace.id);
   const lostVisibilityRows = safeLostVisibilityRows(workspace.id);
+  const lostVisibilityCount = lostVisibilityRows.length;
   const lostVisibilityKeys = new Set(lostVisibilityRows.map(row => keywordComparisonKey(row.query)).filter(Boolean));
   for (const key of lostVisibilityKeys) allKeys.add(key);
   const rankEvidenceKeys = new Set<string>();

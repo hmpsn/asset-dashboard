@@ -54,6 +54,7 @@ export function findBestParent(
     if (
       tokenCount > bestTokenCount
       || (tokenCount === bestTokenCount && impressions > bestImpressions)
+      || (tokenCount === bestTokenCount && impressions === bestImpressions && (best === null || key < best))
     ) {
       best = key;
       bestTokenCount = tokenCount;

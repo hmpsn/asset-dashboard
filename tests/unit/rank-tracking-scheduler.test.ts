@@ -19,6 +19,7 @@ import { runRankTrackingSnapshots } from '../../server/rank-tracking-scheduler.j
 import { getSearchOverview, getSearchQueryObservations } from '../../server/search-console.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { getLatestRanks, addTrackedKeyword } from '../../server/rank-tracking.js';
+import db from '../../server/db/index.js';
 
 const mockGetSearchOverview = vi.mocked(getSearchOverview);
 const mockGetSearchQueryObservations = vi.mocked(getSearchQueryObservations);
@@ -108,6 +109,11 @@ describe('runRankTrackingSnapshots', () => {
     const top = latest.find(r => r.query === 'seo audit tool');
     expect(top).toBeDefined();
     expect(top!.position).toBeCloseTo(4.2);
+
+    const discoveredRows = db.prepare(
+      'SELECT COUNT(*) as count FROM discovered_queries WHERE workspace_id = ?',
+    ).get(testWsId) as { count: number };
+    expect(discoveredRows.count).toBeGreaterThan(0);
   });
 
   it('continues processing other workspaces when one throws', async () => {

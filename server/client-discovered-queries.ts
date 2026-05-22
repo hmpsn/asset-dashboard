@@ -39,12 +39,14 @@ const stmts = createStmtCache(() => ({
                           END,
       best_impressions  = MAX(best_impressions, excluded.best_impressions),
       total_impressions = CASE
-                            WHEN last_snapshot_date = excluded.last_snapshot_date
-                            THEN MAX(0, total_impressions - last_snapshot_impressions + excluded.last_snapshot_impressions)
+                            WHEN last_snapshot_date IS NULL
+                              OR last_snapshot_date = excluded.last_snapshot_date
+                            THEN MAX(0, total_impressions - COALESCE(last_snapshot_impressions, 0) + excluded.last_snapshot_impressions)
                             ELSE total_impressions + excluded.total_impressions
                           END,
       snapshot_count    = CASE
-                            WHEN last_snapshot_date = excluded.last_snapshot_date
+                            WHEN last_snapshot_date IS NULL
+                              OR last_snapshot_date = excluded.last_snapshot_date
                             THEN snapshot_count
                             ELSE snapshot_count + 1
                           END,
@@ -145,7 +147,7 @@ export function getDiscoveredQuerySummary(workspaceId: string): DiscoveredQueryS
     lostVisibilityCount: lostRow?.count ?? 0,
     topLostQueries: topLostRows.map(row => ({
       query: row.query,
-      lastPosition: row.best_position ?? 0,
+      lastPosition: row.best_position ?? null,
       lastSeen: row.last_seen,
       totalImpressions: row.total_impressions,
     })),

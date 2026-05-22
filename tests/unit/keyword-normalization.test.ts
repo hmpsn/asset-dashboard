@@ -30,6 +30,11 @@ describe('isVariantOf', () => {
     expect(isVariantOf('', 'teeth whitening')).toBe(false);
     expect(isVariantOf('teeth whitening austin', '')).toBe(false);
   });
+
+  it('is case-insensitive', () => {
+    expect(isVariantOf('Teeth Whitening Austin', 'teeth whitening')).toBe(true);
+    expect(isVariantOf('teeth whitening austin', 'Teeth Whitening')).toBe(true);
+  });
 });
 
 describe('findBestParent', () => {
