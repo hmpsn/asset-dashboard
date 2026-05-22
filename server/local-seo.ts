@@ -89,6 +89,18 @@ export function getEffectiveKeywordsPerRefresh(workspaceId: string): number {
 const LOCAL_CANDIDATE_HARD_CAP = 1000;
 const LOCAL_SEO_MAX_RESULTS = 10;
 const LOCAL_SEO_REFRESH_CONCURRENCY = 5;
+/**
+ * Fire a `LOCAL_SEO_UPDATED` broadcast every N completed snapshots during a
+ * refresh so the UI invalidates its KCC + local-seo caches incrementally
+ * instead of waiting for the whole job. Without this, a 200-call refresh
+ * looks frozen until completion — the snapshots are landing in the DB but
+ * the React Query cache stays stale.
+ *
+ * 20 is a balance: enough cadence that a 4–5 minute concurrent refresh
+ * triggers ~10 mid-job invalidations (one every ~25s of wall-clock), few
+ * enough to avoid hammering subscribed clients with redundant refetches.
+ */
+const LOCAL_SEO_REFRESH_PROGRESS_BROADCAST_INTERVAL = 20;
 const DEFAULT_LANGUAGE_CODE = 'en';
 
 export interface LocalSeoKeywordCandidate {
@@ -1592,6 +1604,7 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
   let processed = 0;
   let refreshed = 0;
   let failed = 0;
+  let lastProgressBroadcastAt = 0;
   updateJob(jobId, { status: 'running', total, progress: 0, message: 'Refreshing local visibility...' });
 
   // Flatten (market × keyword) into a single work-item array, then process
@@ -1632,6 +1645,27 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
         });
       }
     }));
+
+    // Mid-job invalidation broadcast — fires every
+    // LOCAL_SEO_REFRESH_PROGRESS_BROADCAST_INTERVAL snapshots so the KCC and
+    // local-seo React Query caches refresh incrementally instead of looking
+    // frozen until completion. Skip when we're about to fire the final
+    // `refresh_completed` broadcast (processed === total) to avoid a redundant
+    // double-invalidation back-to-back.
+    if (
+      getJob(jobId)?.status !== 'cancelled'
+      && processed < total
+      && processed - lastProgressBroadcastAt >= LOCAL_SEO_REFRESH_PROGRESS_BROADCAST_INTERVAL
+    ) {
+      lastProgressBroadcastAt = processed;
+      broadcastToWorkspace(workspaceId, WS_EVENTS.LOCAL_SEO_UPDATED, {
+        workspaceId,
+        action: 'refresh_progress',
+        processed,
+        total,
+        updatedAt: new Date().toISOString(),
+      });
+    }
   }
 
   const result: LocalSeoRefreshResult = {

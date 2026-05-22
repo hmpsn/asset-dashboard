@@ -788,4 +788,76 @@ describe('local SEO refresh job concurrency', () => {
     // Wall-clock must be well under sequential floor, proving chunks ran concurrently.
     expect(elapsed).toBeLessThan(SEQUENTIAL_FLOOR_MS);
   });
+
+  it('emits mid-job LOCAL_SEO_UPDATED broadcasts so React Query caches invalidate before job completion', async () => {
+    // Without mid-job broadcasts, KCC + local-seo queries stay stale until the
+    // final 'refresh_completed' event — on a long refresh (20-min sequential or
+    // 4-5min concurrent) admins see "no data" badges on keywords that already
+    // have fresh snapshots in the DB. The broadcast cadence is every
+    // LOCAL_SEO_REFRESH_PROGRESS_BROADCAST_INTERVAL=20 completed snapshots.
+
+    // setBroadcast(globalBroadcast, workspaceBroadcast) — local SEO uses the workspace one.
+    const workspaceBroadcastSpy = vi.fn();
+    setBroadcast(vi.fn(), workspaceBroadcastSpy);
+
+    const ws = createWorkspace('Local SEO Progress Broadcast Test');
+    cleanupWorkspaceIds.add(ws.id);
+    updateWorkspace(ws.id, {
+      name: 'Progress Broadcast Dental',
+      liveDomain: 'https://progress-dental.example.com',
+      seoDataProvider: 'dataforseo',
+      businessProfile: {
+        phone: '(512) 555-0188',
+        address: { street: '1 Progress St', city: 'Austin', state: 'TX', country: 'US' },
+      },
+    });
+
+    // 1 market × 45 keywords = 45 work items. With interval=20 we expect
+    // mid-job broadcasts at ~20 and ~40 (2 broadcasts), plus the final
+    // 'refresh_completed' broadcast at completion.
+    updateLocalSeoConfiguration(ws.id, {
+      posture: LOCAL_SEO_POSTURE.LOCAL,
+      markets: [{
+        label: 'Austin, TX',
+        city: 'Austin',
+        stateOrRegion: 'TX',
+        country: 'US',
+        providerLocationCode: 1026201,
+        status: LOCAL_SEO_MARKET_STATUS.ACTIVE,
+      }],
+    }, true);
+
+    const keywords = Array.from({ length: 45 }, (_, i) => `progress keyword ${i + 1}`);
+    for (const kw of keywords) {
+      addTrackedKeyword(ws.id, kw, { source: TRACKED_KEYWORD_SOURCE.MANUAL });
+    }
+
+    registerProvider('dataforseo', new FakeSeoProvider());
+
+    const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, {
+      workspaceId: ws.id,
+      message: 'Progress broadcast test refresh',
+    });
+
+    await runLocalSeoRefreshJob(job.id, ws.id, { keywords });
+
+    // Workspace broadcast signature: (workspaceId, event, data)
+    const localSeoBroadcasts = workspaceBroadcastSpy.mock.calls
+      .filter(call => call[1] === 'local-seo:updated')
+      .map(call => call[2] as { action: string; processed?: number });
+
+    const progressBroadcasts = localSeoBroadcasts.filter(b => b.action === 'refresh_progress');
+    const completionBroadcasts = localSeoBroadcasts.filter(b => b.action === 'refresh_completed');
+
+    // At least 2 mid-job progress broadcasts for 45 items with interval=20.
+    expect(progressBroadcasts.length).toBeGreaterThanOrEqual(2);
+    // Each carries the processed count, monotonically increasing.
+    for (let i = 1; i < progressBroadcasts.length; i++) {
+      expect(progressBroadcasts[i].processed!).toBeGreaterThan(progressBroadcasts[i - 1].processed!);
+    }
+    // Final completion broadcast still fires exactly once.
+    expect(completionBroadcasts.length).toBe(1);
+    // No progress broadcast at processed === total (would be redundant with the completion event).
+    expect(progressBroadcasts.every(b => (b.processed ?? 0) < 45)).toBe(true);
+  });
 });
