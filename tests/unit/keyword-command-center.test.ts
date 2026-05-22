@@ -1208,6 +1208,8 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
     const detail = await buildKeywordCommandCenterDetail(workspaceId, 'awaiting data keyword');
     expect(detail!.row.tracking.status).toBe(TRACKED_KEYWORD_STATUS.ACTIVE);
     expect(detail!.row.tracking.hasSignal).toBe(false);
+  });
+
   it('infers UNKNOWN tracking source from strategy.siteKeywords', async () => {
     // Regression: Swish audit showed 231/235 active-tracked rows had source="unknown"
     // due to legacy migration. Read-time inference recovers provenance so the row

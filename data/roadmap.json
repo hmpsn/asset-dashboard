@@ -300,6 +300,8 @@
           "status": "done",
           "owner": "seo-health",
           "notes": "Completed in this PR on 2026-05-21. Live audit found 175/235 (74%) of Swish active-tracked rows had `metrics.currentPosition == null` AND no GSC clicks/impressions — they were tracked in name only because the rank snapshot worker only writes rows for keywords that actually surface in GSC results. Showing all of them as plain 'Active' overstated tracking coverage. Fix: added `tracking.hasSignal: boolean` to the public `KeywordCommandCenterTrackingState` contract, set in `finalizeDraftRow` based on `row.metrics.currentPosition || clicks || impressions`. Drawer UI now renders 'Active · Awaiting data' with an amber sub-line ('No GSC clicks, impressions, or rank position recorded yet for this keyword.') when status is active and hasSignal is false. Also cleaned up the source detail rendering so residual `unknown` enum values don't display literally — show 'Source not recorded' instead. Field is omitted (undefined) for not_tracked rows since the signal concept doesn't apply. Two regression tests cover the true/false states."
+        },
+        {
           "id": "intel-quality-kcc-tracking-source-backfill",
           "title": "Keyword Command Center tracking-source provenance recovery",
           "source": "Live data hygiene audit on Swish 2026-05-21",
