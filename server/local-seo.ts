@@ -88,6 +88,7 @@ export function getEffectiveKeywordsPerRefresh(workspaceId: string): number {
 }
 const LOCAL_CANDIDATE_HARD_CAP = 1000;
 const LOCAL_SEO_MAX_RESULTS = 10;
+const LOCAL_SEO_REFRESH_CONCURRENCY = 5;
 const DEFAULT_LANGUAGE_CODE = 'en';
 
 export interface LocalSeoKeywordCandidate {
@@ -1583,6 +1584,9 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
     updateJob(jobId, { status: 'error', message: 'No configured local visibility provider', error: 'No configured local visibility provider' });
     return;
   }
+  // Capture the narrowed method reference so TypeScript can see it's non-undefined
+  // inside async closures where control-flow narrowing doesn't persist.
+  const getLocalVisibility = provider.getLocalVisibility.bind(provider);
 
   const total = plan.markets.length * plan.keywords.length;
   let processed = 0;
@@ -1590,11 +1594,20 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
   let failed = 0;
   updateJob(jobId, { status: 'running', total, progress: 0, message: 'Refreshing local visibility...' });
 
-  for (const market of plan.markets) {
-    for (const keyword of plan.keywords) {
+  // Flatten (market × keyword) into a single work-item array, then process
+  // with bounded concurrency to cut wall-clock time 3–5× vs. fully sequential.
+  const workItems = plan.markets.flatMap(market =>
+    plan.keywords.map(keyword => ({ market, keyword }))
+  );
+
+  for (let i = 0; i < workItems.length; i += LOCAL_SEO_REFRESH_CONCURRENCY) {
+    if (getJob(jobId)?.status === 'cancelled') return;
+    const chunk = workItems.slice(i, i + LOCAL_SEO_REFRESH_CONCURRENCY);
+    await Promise.allSettled(chunk.map(async ({ market, keyword }) => {
+      // Bail before spending provider credits if the job was cancelled.
       if (getJob(jobId)?.status === 'cancelled') return;
       try {
-        const providerResult = await provider.getLocalVisibility({
+        const providerResult = await getLocalVisibility({
           keyword,
           market,
           device: plan.device,
@@ -1618,7 +1631,7 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
           message: `Refreshed ${processed}/${total} local visibility checks`,
         });
       }
-    }
+    }));
   }
 
   const result: LocalSeoRefreshResult = {

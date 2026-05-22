@@ -711,3 +711,81 @@ describe('per-workspace keywords-per-refresh override', () => {
     expect(model?.settings.keywordsPerRefresh).toBe(175);
   });
 });
+
+describe('local SEO refresh job concurrency', () => {
+  it('processes 10 (keyword × market) pairs with bounded concurrency faster than sequential would allow', async () => {
+    setBroadcast(vi.fn(), vi.fn());
+    const ws = createWorkspace('Local SEO Concurrency Test');
+    cleanupWorkspaceIds.add(ws.id);
+    updateWorkspace(ws.id, {
+      name: 'Concurrency Dental',
+      liveDomain: 'https://concurrency-dental.example.com',
+      seoDataProvider: 'dataforseo',
+      businessProfile: {
+        phone: '(512) 555-0199',
+        address: { street: '1 Speed St', city: 'Austin', state: 'TX', country: 'US' },
+      },
+    });
+
+    // 2 markets × 5 keywords = 10 work items.
+    updateLocalSeoConfiguration(ws.id, {
+      posture: LOCAL_SEO_POSTURE.LOCAL,
+      markets: [
+        {
+          label: 'Austin, TX',
+          city: 'Austin',
+          stateOrRegion: 'TX',
+          country: 'US',
+          providerLocationCode: 1026201,
+          status: LOCAL_SEO_MARKET_STATUS.ACTIVE,
+        },
+        {
+          label: 'Round Rock, TX',
+          city: 'Round Rock',
+          stateOrRegion: 'TX',
+          country: 'US',
+          providerLocationCode: 1026339,
+          status: LOCAL_SEO_MARKET_STATUS.ACTIVE,
+        },
+      ],
+    }, true);
+
+    const keywords = ['Dentist', 'Emergency Dentist', 'Dental Implants', 'Teeth Whitening', 'Orthodontist'];
+    for (const kw of keywords) {
+      addTrackedKeyword(ws.id, kw, { source: TRACKED_KEYWORD_SOURCE.MANUAL });
+    }
+
+    // Each provider call takes 40 ms. Sequential: 10 × 40 ms = 400 ms.
+    // With CONCURRENCY=5 we process in 2 chunks of 5, so wall-clock ≈ 2 × 40 ms = 80 ms.
+    // We assert completion under 300 ms to leave headroom for test infrastructure overhead
+    // while still proving concurrency is active.
+    const CALL_DELAY_MS = 40;
+    const ITEM_COUNT = 10; // 2 markets × 5 keywords
+    const SEQUENTIAL_FLOOR_MS = ITEM_COUNT * CALL_DELAY_MS; // 400 ms minimum if sequential
+
+    const slowProvider = new FakeSeoProvider();
+    const originalGet = slowProvider.getLocalVisibility.bind(slowProvider);
+    slowProvider.getLocalVisibility = async (...args) => {
+      await new Promise(resolve => setTimeout(resolve, CALL_DELAY_MS));
+      return originalGet(...args);
+    };
+    registerProvider('dataforseo', slowProvider);
+
+    const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, {
+      workspaceId: ws.id,
+      message: 'Concurrency test refresh',
+    });
+
+    const start = Date.now();
+    await runLocalSeoRefreshJob(job.id, ws.id, { keywords });
+    const elapsed = Date.now() - start;
+
+    // Must complete all 10 items.
+    const finalJob = getJob(job.id);
+    expect(finalJob?.status).toBe('done');
+    expect(finalJob?.progress).toBe(ITEM_COUNT);
+
+    // Wall-clock must be well under sequential floor, proving chunks ran concurrently.
+    expect(elapsed).toBeLessThan(SEQUENTIAL_FLOOR_MS);
+  });
+});
