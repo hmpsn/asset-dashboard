@@ -858,6 +858,9 @@ describe('local SEO refresh job concurrency', () => {
     // Final completion broadcast still fires exactly once.
     expect(completionBroadcasts.length).toBe(1);
     // No progress broadcast at processed === total (would be redundant with the completion event).
-    expect(progressBroadcasts.every(b => (b.processed ?? 0) < 45)).toBe(true);
+    expect(progressBroadcasts.length).toBeGreaterThan(0);
+    for (const b of progressBroadcasts) {
+      expect((b.processed ?? 0)).toBeLessThan(45);
+    }
   });
 });
