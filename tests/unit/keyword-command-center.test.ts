@@ -1188,6 +1188,107 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
     expect(row!.metrics.difficulty).toBe(55);
   });
 
+  it('infers UNKNOWN tracking source from strategy.siteKeywords', async () => {
+    // Regression: Swish audit showed 231/235 active-tracked rows had source="unknown"
+    // due to legacy migration. Read-time inference recovers provenance so the row
+    // gets proper source labels and protected-state UI.
+    updateWorkspace(workspaceId, {
+      keywordStrategy: {
+        siteKeywords: ['cosmetic dentistry'],
+        siteKeywordMetrics: [],
+        opportunities: [],
+        businessContext: 'Dental',
+        generatedAt: '2026-05-20T10:00:00.000Z',
+      },
+    });
+    addTrackedKeyword(workspaceId, 'cosmetic dentistry', {
+      source: TRACKED_KEYWORD_SOURCE.UNKNOWN,
+    });
+
+    const detail = await buildKeywordCommandCenterDetail(workspaceId, 'cosmetic dentistry');
+    expect(detail).not.toBeNull();
+    expect(detail!.row.tracking.source).toBe(TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD);
+    // Source label detail should no longer be the literal "unknown" string
+    const trackingSourceLabel = detail!.row.sourceLabels.find(s => s.kind === 'tracking');
+    expect(trackingSourceLabel?.detail).toBe('strategy site keyword');
+  });
+
+  it('infers UNKNOWN tracking source as STRATEGY_PRIMARY when keyword is in siteKeywordMetrics', async () => {
+    updateWorkspace(workspaceId, {
+      keywordStrategy: {
+        siteKeywords: [],
+        siteKeywordMetrics: [{ keyword: 'orthodontics', volume: 1200, difficulty: 45 }],
+        opportunities: [],
+        businessContext: 'Dental',
+        generatedAt: '2026-05-20T10:00:00.000Z',
+      },
+    });
+    addTrackedKeyword(workspaceId, 'orthodontics', { source: TRACKED_KEYWORD_SOURCE.UNKNOWN });
+
+    const detail = await buildKeywordCommandCenterDetail(workspaceId, 'orthodontics');
+    expect(detail!.row.tracking.source).toBe(TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY);
+  });
+
+  it('infers UNKNOWN tracking source as CLIENT_REQUESTED when matching requested feedback', async () => {
+    addTrackedKeyword(workspaceId, 'invisalign cost', { source: TRACKED_KEYWORD_SOURCE.UNKNOWN });
+    seedFeedback('invisalign cost', 'requested', 'Client asked');
+
+    const detail = await buildKeywordCommandCenterDetail(workspaceId, 'invisalign cost');
+    expect(detail!.row.tracking.source).toBe(TRACKED_KEYWORD_SOURCE.CLIENT_REQUESTED);
+  });
+
+  it('leaves UNKNOWN tracking source unchanged when no inference hint matches', async () => {
+    addTrackedKeyword(workspaceId, 'wholly unknown keyword', { source: TRACKED_KEYWORD_SOURCE.UNKNOWN });
+
+    const detail = await buildKeywordCommandCenterDetail(workspaceId, 'wholly unknown keyword');
+    expect(detail!.row.tracking.source).toBe(TRACKED_KEYWORD_SOURCE.UNKNOWN);
+    // UI must NOT display "unknown" as a meaningful source detail
+    const trackingSourceLabel = detail!.row.sourceLabels.find(s => s.kind === 'tracking');
+    expect(trackingSourceLabel?.detail).toBeUndefined();
+  });
+
+  it('preserves an explicit non-UNKNOWN source even if other hints match (recorded provenance wins)', async () => {
+    // If the keyword was explicitly added with MANUAL source, inference must not
+    // override it to STRATEGY_SITE_KEYWORD even when it happens to also be in strategy.
+    updateWorkspace(workspaceId, {
+      keywordStrategy: {
+        siteKeywords: ['emergency plumbing'],
+        siteKeywordMetrics: [],
+        opportunities: [],
+        businessContext: 'Plumbing',
+        generatedAt: '2026-05-20T10:00:00.000Z',
+      },
+    });
+    addTrackedKeyword(workspaceId, 'emergency plumbing', { source: TRACKED_KEYWORD_SOURCE.MANUAL });
+
+    const detail = await buildKeywordCommandCenterDetail(workspaceId, 'emergency plumbing');
+    expect(detail!.row.tracking.source).toBe(TRACKED_KEYWORD_SOURCE.MANUAL);
+  });
+
+  it('summary inStrategy count includes inferred-strategy tracked keywords', async () => {
+    // After inference, a tracked keyword with source=UNKNOWN that matches strategy
+    // gets upgraded to STRATEGY_SITE_KEYWORD, and trackedKeywordMatchesFilter then
+    // includes it in IN_STRATEGY. The badge and rows must stay aligned.
+    updateWorkspace(workspaceId, {
+      keywordStrategy: {
+        siteKeywords: ['inferred strategy match'],
+        siteKeywordMetrics: [],
+        opportunities: [],
+        businessContext: 'test',
+        generatedAt: '2026-05-20T10:00:00.000Z',
+      },
+    });
+    addTrackedKeyword(workspaceId, 'inferred strategy match', { source: TRACKED_KEYWORD_SOURCE.UNKNOWN });
+
+    const summary = await buildKeywordCommandCenterSummary(workspaceId);
+    const rows = await buildKeywordCommandCenterRows(workspaceId, {
+      filter: KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY,
+      pageSize: 100,
+    });
+    expect(rows!.pageInfo.totalRows).toBe(summary!.counts.inStrategy);
+    expect(rows!.rows.some(r => r.normalizedKeyword === 'inferred strategy match')).toBe(true);
+  });
+
   it('localCandidates summary count is intentionally 0 (computed off the hot path; follow-up cache)', async () => {
     // PR #876 introduced a generator-backed count here, but on rich workspaces
     // (Swish: 235 tracked + 50 pages + variants) that took ~35s because every
