@@ -1,9 +1,11 @@
+import { randomUUID } from 'crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { addTrackedKeyword } from '../../server/rank-tracking.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
+import db from '../../server/db/index.js';
 
 process.env.FEATURE_LOCAL_SEO_VISIBILITY = 'true';
 
@@ -374,5 +376,115 @@ describe('Local SEO routes', () => {
       }),
     });
     expect(crossWorkspace.status).toBe(404);
+  });
+});
+
+describe('competitorBrands aggregation', () => {
+  let brandWsId = '';
+  const marketId = randomUUID();
+
+  beforeAll(async () => {
+    const insertSnapshot = db.prepare(`
+      INSERT INTO local_visibility_snapshots (
+        id, workspace_id, keyword, normalized_keyword, market_id, market_label,
+        captured_at, local_pack_present, business_found, business_match_confidence,
+        local_rank, top_competitors, source_endpoint, provider, device, language_code, status
+      ) VALUES (
+        @id, @workspace_id, @keyword, @normalized_keyword, @market_id, @market_label,
+        @captured_at, @local_pack_present, @business_found, @business_match_confidence,
+        @local_rank, @top_competitors, @source_endpoint, @provider, @device, @language_code, @status
+      )
+    `);
+    const insertMarket = db.prepare(`
+      INSERT INTO local_seo_markets (id, workspace_id, label, city, country, source, status, created_at, updated_at)
+      VALUES (@id, @workspace_id, @label, @city, @country, @source, @status, @created_at, @updated_at)
+    `);
+    const ws = createWorkspace('Competitor Brands Test Dental');
+    brandWsId = ws.id;
+    const now = new Date().toISOString();
+    insertMarket.run({
+      id: marketId,
+      workspace_id: brandWsId,
+      label: 'Austin, TX',
+      city: 'Austin',
+      country: 'US',
+      source: 'admin_override',
+      status: 'active',
+      created_at: now,
+      updated_at: now,
+    });
+    const rivals = JSON.stringify([{ title: 'Test Rival', domain: 'testrival.com' }]);
+    const loneRival = JSON.stringify([{ title: 'Lone Rival', domain: 'lonerival.com' }]);
+    const degradedRival = JSON.stringify([{ title: 'Test Rival', domain: 'testrival.com' }]);
+
+    // Snapshot 1: client NOT found (business_found=0) → winsAgainstClient++
+    insertSnapshot.run({
+      id: randomUUID(), workspace_id: brandWsId, keyword: 'dentist austin', normalized_keyword: 'dentist austin',
+      market_id: marketId, market_label: 'Austin, TX', captured_at: now,
+      local_pack_present: 1, business_found: 0, business_match_confidence: 'not_found',
+      local_rank: null, top_competitors: rivals,
+      source_endpoint: 'google_local_pack', provider: 'dataforseo', device: 'desktop', language_code: 'en',
+      status: 'success',
+    });
+    // Snapshot 2: client found (business_found=1) → totalAppearances++ only
+    insertSnapshot.run({
+      id: randomUUID(), workspace_id: brandWsId, keyword: 'emergency dentist', normalized_keyword: 'emergency dentist',
+      market_id: marketId, market_label: 'Austin, TX', captured_at: now,
+      local_pack_present: 1, business_found: 1, business_match_confidence: 'verified',
+      local_rank: 1, top_competitors: rivals,
+      source_endpoint: 'google_local_pack', provider: 'dataforseo', device: 'desktop', language_code: 'en',
+      status: 'success',
+    });
+    // Snapshot 3: 'Lone Rival' appears only once — should NOT meet the >= 2 threshold
+    insertSnapshot.run({
+      id: randomUUID(), workspace_id: brandWsId, keyword: 'teeth whitening', normalized_keyword: 'teeth whitening',
+      market_id: marketId, market_label: 'Austin, TX', captured_at: now,
+      local_pack_present: 1, business_found: 0, business_match_confidence: 'not_found',
+      local_rank: null, top_competitors: loneRival,
+      source_endpoint: 'google_local_pack', provider: 'dataforseo', device: 'desktop', language_code: 'en',
+      status: 'success',
+    });
+    // Snapshot 4: degraded status with client NOT found and 'Test Rival' present —
+    // Fix 1 ensures this does NOT increment winsAgainstClient because status != 'success'
+    insertSnapshot.run({
+      id: randomUUID(), workspace_id: brandWsId, keyword: 'dental implants', normalized_keyword: 'dental implants',
+      market_id: marketId, market_label: 'Austin, TX', captured_at: now,
+      local_pack_present: 0, business_found: 0, business_match_confidence: 'not_found',
+      local_rank: null, top_competitors: degradedRival,
+      source_endpoint: 'google_local_pack', provider: 'dataforseo', device: 'desktop', language_code: 'en',
+      status: 'degraded',
+    });
+  });
+
+  afterAll(() => {
+    deleteWorkspace(brandWsId);
+  });
+
+  it('returns Test Rival with totalAppearances=2 and winsAgainstClient=1 (success snapshots only)', async () => {
+    const res = await api(`/api/local-seo/${brandWsId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const rival = body.competitorBrands.find((b: { title: string }) => b.title === 'Test Rival');
+    expect(rival).toBeDefined();
+    expect(rival.totalAppearances).toBe(2);
+    // Only one snapshot had business_found=0 and status='success' — the degraded one must NOT count
+    expect(rival.winsAgainstClient).toBe(1);
+  });
+
+  it('excludes competitors that appear only once (below the >= 2 threshold)', async () => {
+    const res = await api(`/api/local-seo/${brandWsId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const lone = body.competitorBrands.find((b: { title: string }) => b.title === 'Lone Rival');
+    expect(lone).toBeUndefined();
+  });
+
+  it('does not count winsAgainstClient from degraded snapshots (Fix 1 validation)', async () => {
+    const res = await api(`/api/local-seo/${brandWsId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const rival = body.competitorBrands.find((b: { title: string }) => b.title === 'Test Rival');
+    // If degraded snapshot were counted, winsAgainstClient would be 2 (both business_found=0 rows)
+    expect(rival?.winsAgainstClient).toBe(1);
   });
 });

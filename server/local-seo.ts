@@ -262,6 +262,7 @@ const stmts = createStmtCache(() => ({
     FROM local_visibility_snapshots
     WHERE workspace_id = @workspaceId
       AND captured_at >= datetime('now', '-' || @days || ' days')
+      AND status = 'success'
     ORDER BY captured_at DESC
   `),
   latestSnapshotSummary: db.prepare(`
@@ -714,12 +715,15 @@ export function getLocalSeoCompetitorBrands(workspaceId: string, lookbackDays = 
     markets: Set<string>;
   }
   const map = new Map<string, Accumulator>();
+  // Collect the original (un-lowercased) title for display — use first seen title
+  const titleMap = new Map<string, string>();
 
   for (const row of rows) {
     const clientLost = row.business_found === 0;
     const competitors = parseJsonSafeArray(row.top_competitors, localResultSchema, { workspaceId, table: 'local_visibility_snapshots', field: 'top_competitors' });
     for (const competitor of competitors) {
       const key = competitor.title.toLowerCase().trim();
+      if (!key) continue;
       const existing = map.get(key);
       if (existing) {
         existing.totalAppearances += 1;
@@ -733,17 +737,8 @@ export function getLocalSeoCompetitorBrands(workspaceId: string, lookbackDays = 
           winsAgainstClient: clientLost ? 1 : 0,
           markets: new Set([row.market_label]),
         });
+        titleMap.set(key, competitor.title);
       }
-    }
-  }
-
-  // Collect the original (un-lowercased) title for display — use first seen title
-  const titleMap = new Map<string, string>();
-  for (const row of rows) {
-    const competitors = parseJsonSafeArray(row.top_competitors, localResultSchema, { workspaceId, table: 'local_visibility_snapshots', field: 'top_competitors' });
-    for (const competitor of competitors) {
-      const key = competitor.title.toLowerCase().trim();
-      if (!titleMap.has(key)) titleMap.set(key, competitor.title);
     }
   }
 
@@ -756,8 +751,10 @@ export function getLocalSeoCompetitorBrands(workspaceId: string, lookbackDays = 
     const title = titleMap.get(key) ?? key;
     const suggestedTrackingKeywords: string[] = [
       `${title} reviews`,
-      `${title} vs ${workspace.name}`,
     ];
+    if (workspace.name.trim()) {
+      suggestedTrackingKeywords.push(`${title} vs ${workspace.name.trim()}`);
+    }
     if (activeMarketCity) suggestedTrackingKeywords.push(`${title} ${activeMarketCity}`);
     results.push({
       title,
