@@ -247,6 +247,71 @@ function protectedReason(keyword: TrackedKeyword | undefined): string | undefine
   return undefined;
 }
 
+/**
+ * Infer the most likely tracking source when a tracked keyword's stored source is
+ * UNKNOWN (typically a legacy migration artifact — pre-source-field rank_tracking_config
+ * entries default to UNKNOWN via rank-tracking.ts:140). Cross-references the
+ * workspace's current strategy + content gaps + feedback to recover provenance.
+ *
+ * Read-time only: does not write back to storage. Source ladder (most specific first):
+ *   1. siteKeywordMetrics  → STRATEGY_PRIMARY (strategy explicitly produced metrics for it)
+ *   2. siteKeywords        → STRATEGY_SITE_KEYWORD
+ *   3. keyword_feedback (requested) → CLIENT_REQUESTED
+ *   4. content_gaps        → CONTENT_GAP
+ *   5. fallback            → original source (likely UNKNOWN)
+ *
+ * Applied at bundle assembly time so all downstream consumers — `sourceKeysForRows`,
+ * `trackedKeywordMatchesFilter`, `protectedReason`, the row builder, summary counts —
+ * see the inferred sources uniformly. Without bundle-level application, the
+ * IN_STRATEGY filter would miss inferred-strategy keywords because
+ * `trackedKeywordMatchesFilter` reads `keyword.source` directly.
+ */
+function inferTrackedKeywordSources(
+  trackedKeywords: TrackedKeyword[],
+  context: {
+    strategy?: KeywordStrategy | null;
+    contentGaps?: ContentGap[];
+    feedback?: Map<string, FeedbackRow>;
+  },
+): TrackedKeyword[] {
+  const siteKeywordMetricKeys = new Set(
+    (context.strategy?.siteKeywordMetrics ?? [])
+      .map(m => keywordComparisonKey(m.keyword))
+      .filter(Boolean),
+  );
+  const siteKeywordKeys = new Set(
+    (context.strategy?.siteKeywords ?? [])
+      .map(k => keywordComparisonKey(k))
+      .filter(Boolean),
+  );
+  const contentGapKeys = new Set(
+    (context.contentGaps ?? [])
+      .map(gap => keywordComparisonKey(gap.targetKeyword))
+      .filter(Boolean),
+  );
+  return trackedKeywords.map(keyword => {
+    const existing = keyword.source ?? TRACKED_KEYWORD_SOURCE.UNKNOWN;
+    if (existing !== TRACKED_KEYWORD_SOURCE.UNKNOWN) return keyword;
+    const normalized = keywordComparisonKey(keyword.query);
+    if (!normalized) return keyword;
+    if (siteKeywordMetricKeys.has(normalized)) return { ...keyword, source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY };
+    if (siteKeywordKeys.has(normalized)) return { ...keyword, source: TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD };
+    const fb = context.feedback?.get(normalized);
+    if (fb?.status === 'requested') return { ...keyword, source: TRACKED_KEYWORD_SOURCE.CLIENT_REQUESTED };
+    if (contentGapKeys.has(normalized)) return { ...keyword, source: TRACKED_KEYWORD_SOURCE.CONTENT_GAP };
+    return keyword;
+  });
+}
+
+/**
+ * Friendly label for the addSource `detail` field. Avoids displaying the raw
+ * "unknown" enum value as if it were real provenance.
+ */
+function trackingSourceDetail(source: TrackedKeyword['source'] | undefined): string | undefined {
+  if (!source || source === TRACKED_KEYWORD_SOURCE.UNKNOWN) return undefined;
+  return source.replace(/_/g, ' ');
+}
+
 function lifecycleStatus(row: DraftRow): KeywordCommandCenterStatus {
   if (row.feedback?.status === 'declined') return KEYWORD_COMMAND_CENTER_STATUS.DECLINED;
   if (row.tracking && isInactiveTracking(row.tracking)) return KEYWORD_COMMAND_CENTER_STATUS.RETIRED;
@@ -788,7 +853,7 @@ async function populateDraftRows(rows: Map<string, DraftRow>, bundle: CommandCen
     addSource(row, {
       kind: keyword.source === TRACKED_KEYWORD_SOURCE.MANUAL ? 'manual' : 'tracking',
       label: 'Rank tracking',
-      detail: keyword.source?.replace(/_/g, ' '),
+      detail: trackingSourceDetail(keyword.source),
     });
     mergeMetrics(row, {
       volume: keyword.volume,
@@ -969,9 +1034,13 @@ async function buildKeywordCommandCenterModel(
   const pageMap = listPageKeywords(workspace.id);
   const contentGaps = listContentGaps(workspace.id);
   const keywordGaps = listKeywordGaps(workspace.id);
-  const trackedKeywords = getTrackedKeywords(workspace.id, { includeInactive: true });
+  const rawTrackedKeywords = getTrackedKeywords(workspace.id, { includeInactive: true });
   const latestRanks = getLatestSnapshotRanks(workspace.id);
   const feedback = readFeedback(workspace.id);
+  // Recover provenance for legacy UNKNOWN-source tracked keywords by cross-referencing
+  // current strategy / content gaps / requested feedback. Applied at bundle level so
+  // sourceKeysForRows + trackedKeywordMatchesFilter + protectedReason agree.
+  const trackedKeywords = inferTrackedKeywordSources(rawTrackedKeywords, { strategy, contentGaps, feedback });
   mark('sourceLoadingMs');
   const localVisibilityByKeyword = options.includeLocalSeo
     ? options.includeLocalSeoDetails
@@ -1071,7 +1140,16 @@ export async function buildKeywordCommandCenterSummary(
   const keywordGaps = listKeywordGaps(workspace.id);
   for (const gap of keywordGaps) addKey(rawEvidenceKeys, gap.keyword);
 
-  const trackedKeywords = getTrackedKeywords(workspace.id, { includeInactive: true });
+  // Load feedback early so it can hint the tracking-source inference.
+  const feedback = readFeedback(workspace.id);
+  const rawTrackedKeywords = getTrackedKeywords(workspace.id, { includeInactive: true });
+  // Recover provenance for legacy UNKNOWN-source tracked keywords via cross-reference.
+  // Applied at this level so trackedKeywordMatchesFilter (used below) sees inferred sources.
+  const trackedKeywords = inferTrackedKeywordSources(rawTrackedKeywords, {
+    strategy: workspace.keywordStrategy,
+    contentGaps,
+    feedback,
+  });
   for (const tracked of trackedKeywords) addKey(allKeys, tracked.query);
   const trackedKeys = new Set(trackedKeywords.map(keyword => keywordComparisonKey(keyword.query)).filter(Boolean));
 
@@ -1084,7 +1162,6 @@ export async function buildKeywordCommandCenterSummary(
     }
   }
 
-  const feedback = readFeedback(workspace.id);
   for (const row of feedback.values()) addKey(allKeys, row.keyword);
   const feedbackKeys = new Set([...feedback.keys()]);
 
@@ -1754,10 +1831,13 @@ export async function buildKeywordCommandCenterDetail(
   const pageMap = listPageKeywords(workspace.id).filter(page => pageMatchesKeyword(page, normalized));
   const contentGaps = listContentGaps(workspace.id).filter(gap => keywordComparisonKey(gap.targetKeyword) === normalized);
   const keywordGaps = listKeywordGaps(workspace.id).filter(gap => keywordComparisonKey(gap.keyword) === normalized);
-  const trackedKeywords = getTrackedKeywords(workspace.id, { includeInactive: true }).filter(entry => keywordComparisonKey(entry.query) === normalized);
+  const rawTrackedKeywords = getTrackedKeywords(workspace.id, { includeInactive: true }).filter(entry => keywordComparisonKey(entry.query) === normalized);
   const latestRanks = getLatestSnapshotRanks(workspace.id).filter(rank => keywordComparisonKey(rank.query) === normalized);
   const feedback = filterMapByKeys(readFeedback(workspace.id), new Set([normalized]));
   const strategy = filterStrategyForSingleKeyword(workspace.keywordStrategy, normalized);
+  // Recover provenance for legacy UNKNOWN-source tracked keywords so the drawer
+  // shows accurate source labels and protected-state UI for legacy data.
+  const trackedKeywords = inferTrackedKeywordSources(rawTrackedKeywords, { strategy, contentGaps, feedback });
   const localVisibility = options.includeLocalSeo
     ? buildLocalSeoKeywordVisibilityForKeyword(workspace.id, normalized)
     : undefined;
