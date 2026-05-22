@@ -1,0 +1,218 @@
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  detectLostVisibility,
+  getDiscoveredQuerySummary,
+  getLostVisibilityCount,
+  getLostVisibilityKeys,
+  upsertDiscoveredQueries,
+} from '../../server/client-discovered-queries.js';
+import db from '../../server/db/index.js';
+import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+
+let workspaceId = '';
+
+beforeEach(() => {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS discovered_queries (
+      workspace_id      TEXT NOT NULL,
+      query             TEXT NOT NULL,
+      first_seen        TEXT NOT NULL,
+      last_seen         TEXT NOT NULL,
+      best_position     REAL,
+      best_impressions  INTEGER NOT NULL DEFAULT 0,
+      total_impressions INTEGER NOT NULL DEFAULT 0,
+      snapshot_count    INTEGER NOT NULL DEFAULT 1,
+      last_snapshot_date TEXT,
+      last_snapshot_impressions INTEGER NOT NULL DEFAULT 0,
+      status            TEXT NOT NULL DEFAULT 'active',
+      PRIMARY KEY (workspace_id, query)
+    );
+  `);
+  for (const sql of [
+    'ALTER TABLE discovered_queries ADD COLUMN last_snapshot_date TEXT',
+    'ALTER TABLE discovered_queries ADD COLUMN last_snapshot_impressions INTEGER NOT NULL DEFAULT 0',
+  ]) {
+    try {
+      db.exec(sql);
+    } catch {
+      // Column already exists in migrated test databases.
+    }
+  }
+  workspaceId = createWorkspace(`Discovered Query Test ${Date.now()}`).id;
+});
+
+afterEach(() => {
+  db.prepare('DELETE FROM discovered_queries WHERE workspace_id = ?').run(workspaceId);
+  deleteWorkspace(workspaceId);
+});
+
+describe('upsertDiscoveredQueries', () => {
+  it('inserts new query rows', () => {
+    upsertDiscoveredQueries(
+      workspaceId,
+      [{ query: 'teeth whitening', position: 8.2, clicks: 5, impressions: 120, ctr: 4.2 }],
+      '2026-05-22',
+    );
+    const row = db.prepare(
+      'SELECT * FROM discovered_queries WHERE workspace_id = ? AND query = ?',
+    ).get(workspaceId, 'teeth whitening') as Record<string, unknown>;
+    expect(row).toBeTruthy();
+    expect(row.snapshot_count).toBe(1);
+    expect(row.status).toBe('active');
+    expect(row.total_impressions).toBe(120);
+  });
+
+  it('updates last_seen and accumulates impressions on second upsert', () => {
+    upsertDiscoveredQueries(
+      workspaceId,
+      [{ query: 'teeth whitening', position: 8.2, clicks: 5, impressions: 120, ctr: 4.2 }],
+      '2026-05-22',
+    );
+    upsertDiscoveredQueries(
+      workspaceId,
+      [{ query: 'teeth whitening', position: 7.5, clicks: 8, impressions: 150, ctr: 5.3 }],
+      '2026-05-23',
+    );
+    const row = db.prepare(
+      'SELECT * FROM discovered_queries WHERE workspace_id = ? AND query = ?',
+    ).get(workspaceId, 'teeth whitening') as Record<string, unknown>;
+    expect(row.snapshot_count).toBe(2);
+    expect(row.total_impressions).toBe(270);
+    expect(row.best_position).toBeCloseTo(7.5);
+    expect(row.last_seen).toBe('2026-05-23');
+  });
+
+  it('reactivates a lost_visibility query when it reappears', () => {
+    db.prepare(`
+      INSERT INTO discovered_queries
+        (workspace_id, query, first_seen, last_seen, snapshot_count, total_impressions, status)
+      VALUES (?, 'teeth whitening', '2026-04-01', '2026-04-01', 5, 500, 'lost_visibility')
+    `).run(workspaceId);
+    upsertDiscoveredQueries(
+      workspaceId,
+      [{ query: 'teeth whitening', position: 9.0, clicks: 3, impressions: 80, ctr: 3.75 }],
+      '2026-05-22',
+    );
+    const row = db.prepare(
+      'SELECT status FROM discovered_queries WHERE workspace_id = ? AND query = ?',
+    ).get(workspaceId, 'teeth whitening') as Record<string, unknown>;
+    expect(row.status).toBe('active');
+  });
+
+  it('replaces same-date impressions instead of double-counting reruns', () => {
+    upsertDiscoveredQueries(
+      workspaceId,
+      [{ query: 'teeth whitening', position: 8.2, clicks: 5, impressions: 120, ctr: 4.2, seenDate: '2026-05-20' }],
+      '2026-05-22',
+    );
+    upsertDiscoveredQueries(
+      workspaceId,
+      [{ query: 'teeth whitening', position: 7.5, clicks: 8, impressions: 150, ctr: 5.3, seenDate: '2026-05-20' }],
+      '2026-05-22',
+    );
+    const row = db.prepare(
+      'SELECT snapshot_count, total_impressions, last_seen FROM discovered_queries WHERE workspace_id = ? AND query = ?',
+    ).get(workspaceId, 'teeth whitening') as Record<string, unknown>;
+    expect(row.snapshot_count).toBe(1);
+    expect(row.total_impressions).toBe(150);
+    expect(row.last_seen).toBe('2026-05-20');
+  });
+});
+
+describe('detectLostVisibility', () => {
+  function insertQuery(query: string, lastSeen: string, snapshotCount: number, totalImpressions: number) {
+    db.prepare(`
+      INSERT INTO discovered_queries
+        (workspace_id, query, first_seen, last_seen, snapshot_count, total_impressions, status)
+      VALUES (?, ?, '2026-01-01', ?, ?, ?, 'active')
+    `).run(workspaceId, query, lastSeen, snapshotCount, totalImpressions);
+  }
+
+  it('marks query as lost_visibility when 14+ days elapsed and quality gate passes', () => {
+    insertQuery('teeth whitening', '2026-05-01', 3, 50);
+    detectLostVisibility(workspaceId, '2026-05-22');
+    const row = db.prepare(
+      'SELECT status FROM discovered_queries WHERE workspace_id = ? AND query = ?',
+    ).get(workspaceId, 'teeth whitening') as Record<string, unknown>;
+    expect(row.status).toBe('lost_visibility');
+  });
+
+  it('does not flag when gap is only 13 days', () => {
+    insertQuery('teeth whitening', '2026-05-09', 3, 50);
+    detectLostVisibility(workspaceId, '2026-05-22');
+    const row = db.prepare(
+      'SELECT status FROM discovered_queries WHERE workspace_id = ? AND query = ?',
+    ).get(workspaceId, 'teeth whitening') as Record<string, unknown>;
+    expect(row.status).toBe('active');
+  });
+
+  it('does not flag when snapshot_count is below the quality gate', () => {
+    insertQuery('teeth whitening', '2026-05-01', 1, 50);
+    detectLostVisibility(workspaceId, '2026-05-22');
+    const row = db.prepare(
+      'SELECT status FROM discovered_queries WHERE workspace_id = ? AND query = ?',
+    ).get(workspaceId, 'teeth whitening') as Record<string, unknown>;
+    expect(row.status).toBe('active');
+  });
+
+  it('does not flag when total_impressions is below the quality gate', () => {
+    insertQuery('teeth whitening', '2026-05-01', 5, 9);
+    detectLostVisibility(workspaceId, '2026-05-22');
+    const row = db.prepare(
+      'SELECT status FROM discovered_queries WHERE workspace_id = ? AND query = ?',
+    ).get(workspaceId, 'teeth whitening') as Record<string, unknown>;
+    expect(row.status).toBe('active');
+  });
+
+  it('is idempotent for already lost queries', () => {
+    db.prepare(`
+      INSERT INTO discovered_queries
+        (workspace_id, query, first_seen, last_seen, snapshot_count, total_impressions, status)
+      VALUES (?, 'already lost', '2026-01-01', '2026-01-01', 5, 100, 'lost_visibility')
+    `).run(workspaceId);
+    detectLostVisibility(workspaceId, '2026-05-22');
+    const row = db.prepare(
+      'SELECT status FROM discovered_queries WHERE workspace_id = ? AND query = ?',
+    ).get(workspaceId, 'already lost') as Record<string, unknown>;
+    expect(row.status).toBe('lost_visibility');
+  });
+});
+
+describe('lost visibility reads', () => {
+  it('returns normalized query keys for lost_visibility rows', () => {
+    db.prepare(`
+      INSERT INTO discovered_queries
+        (workspace_id, query, first_seen, last_seen, snapshot_count, total_impressions, status)
+      VALUES (?, 'Teeth Whitening', '2026-01-01', '2026-01-01', 5, 100, 'lost_visibility')
+    `).run(workspaceId);
+    const keys = getLostVisibilityKeys(workspaceId);
+    expect(keys.has('teeth whitening')).toBe(true);
+    expect(getLostVisibilityCount(workspaceId)).toBe(1);
+  });
+
+  it('returns an empty set when no lost_visibility rows exist', () => {
+    expect(getLostVisibilityKeys(workspaceId).size).toBe(0);
+    expect(getLostVisibilityCount(workspaceId)).toBe(0);
+  });
+});
+
+describe('getDiscoveredQuerySummary', () => {
+  it('returns totalDiscovered count and lostVisibilityCount', () => {
+    db.prepare(`
+      INSERT INTO discovered_queries
+        (workspace_id, query, first_seen, last_seen, best_position, snapshot_count, total_impressions, status)
+      VALUES
+        (?, 'query a', '2026-01-01', '2026-01-01', 12.4, 5, 200, 'lost_visibility'),
+        (?, 'query b', '2026-01-01', '2026-05-22', 4.2, 10, 500, 'active')
+    `).run(workspaceId, workspaceId);
+    const summary = getDiscoveredQuerySummary(workspaceId);
+    expect(summary.totalDiscovered).toBe(2);
+    expect(summary.lostVisibilityCount).toBe(1);
+    expect(summary.topLostQueries).toHaveLength(1);
+    expect(summary.topLostQueries[0]).toEqual(expect.objectContaining({
+      query: 'query a',
+      lastPosition: 12.4,
+      totalImpressions: 200,
+    }));
+  });
+});

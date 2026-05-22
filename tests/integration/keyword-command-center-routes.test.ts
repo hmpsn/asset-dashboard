@@ -1,5 +1,10 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createTestContext } from './helpers.js';
+import {
+  getLostVisibilityCount,
+  upsertDiscoveredQueries,
+} from '../../server/client-discovered-queries.js';
+import db from '../../server/db/index.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
 const ctx = createTestContext(13360); // port-ok: next free after 13359
@@ -118,5 +123,67 @@ describe('Keyword Command Center routes', () => {
     });
     expect(retire.status).toBe(404);
     await expect(retire.json()).resolves.toEqual({ error: 'Keyword is not tracked' });
+  });
+});
+
+describe('discovered_queries integration', () => {
+  let wsId = '';
+
+  beforeEach(() => {
+    wsId = createWorkspace(`DQ Test ${Date.now()}`).id;
+  });
+
+  afterEach(() => {
+    if (wsId) deleteWorkspace(wsId);
+    wsId = '';
+  });
+
+  it('upsertDiscoveredQueries populates the table after snapshot', () => {
+    upsertDiscoveredQueries(
+      wsId,
+      [{ query: 'teeth whitening', position: 8.0, clicks: 10, impressions: 200, ctr: 5.0 }],
+      '2026-05-22',
+    );
+    const row = db.prepare(
+      'SELECT * FROM discovered_queries WHERE workspace_id = ? AND query = ?',
+    ).get(wsId, 'teeth whitening') as Record<string, unknown>;
+    expect(row).toBeTruthy();
+    expect(row.snapshot_count).toBe(1);
+    expect(row.status).toBe('active');
+  });
+
+  it('KCC summary endpoint returns lostVisibility count', async () => {
+    db.prepare(`
+      INSERT INTO discovered_queries
+        (workspace_id, query, first_seen, last_seen, snapshot_count, total_impressions, status)
+      VALUES (?, 'lost keyword', '2026-01-01', '2026-01-01', 5, 100, 'lost_visibility')
+    `).run(wsId);
+
+    const res = await api(`/api/webflow/keyword-command-center/${wsId}/summary`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { counts: { lostVisibility?: number } };
+    expect(body.counts.lostVisibility).toBe(1);
+    expect(getLostVisibilityCount(wsId)).toBe(1);
+  });
+
+  it('second upsert with same query increments snapshot_count without duplicate rows', () => {
+    upsertDiscoveredQueries(
+      wsId,
+      [{ query: 'teeth whitening', position: 8.0, clicks: 10, impressions: 200, ctr: 5.0 }],
+      '2026-05-22',
+    );
+    upsertDiscoveredQueries(
+      wsId,
+      [{ query: 'teeth whitening', position: 7.5, clicks: 12, impressions: 220, ctr: 5.5 }],
+      '2026-05-23',
+    );
+    const count = db.prepare(
+      'SELECT COUNT(*) AS count FROM discovered_queries WHERE workspace_id = ? AND query = ?',
+    ).get(wsId, 'teeth whitening') as { count: number };
+    expect(count.count).toBe(1);
+    const row = db.prepare(
+      'SELECT snapshot_count FROM discovered_queries WHERE workspace_id = ? AND query = ?',
+    ).get(wsId, 'teeth whitening') as { snapshot_count: number };
+    expect(row.snapshot_count).toBe(2);
   });
 });

@@ -28,6 +28,10 @@ export interface SearchQuery {
   position: number;
 }
 
+export interface SearchQueryObservation extends SearchQuery {
+  date: string;
+}
+
 export interface SearchPage {
   page: string;
   clicks: number;
@@ -107,7 +111,7 @@ export async function getSearchOverview(
   const fmt = (d: Date) => d.toISOString().split('T')[0];
   const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
   const searchType = options.searchType || 'web';
-  const queryLimit = options.queryLimit || 500;
+  const maxQueryRows = options.queryLimit || 500;
   const pageLimit = options.pageLimit || 500;
   const startRow = options.startRow || 0;
 
@@ -128,19 +132,25 @@ export async function getSearchOverview(
   const avgCtr = totalsRow ? +(totalsRow.ctr * 100).toFixed(1) : 0;
   const avgPosition = totalsRow ? +totalsRow.position.toFixed(1) : 0;
 
-  // Fetch top queries
-  const queryData = await gscFetch(
-    `${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`,
-    token,
-    {
-      startDate: fmt(startDate),
-      endDate: fmt(endDate),
-      dimensions: ['query'],
-      rowLimit: queryLimit,
-      startRow,
-      type: searchType,
-    }
-  ) as { rows?: SearchAnalyticsRow[] };
+  // Fetch top queries with pagination so long-tail GSC variants are not capped at 500 rows.
+  const rawQueryRows = await paginateGscQuery(
+    async (pageStartRow, rowLimit) => {
+      const data = await gscFetch(
+        `${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`,
+        token,
+        {
+          startDate: fmt(startDate),
+          endDate: fmt(endDate),
+          dimensions: ['query'],
+          rowLimit,
+          startRow: pageStartRow + startRow,
+          type: searchType,
+        },
+      ) as { rows?: SearchAnalyticsRow[] };
+      return data.rows ?? [];
+    },
+    { maxRows: maxQueryRows, pageSize: 500 },
+  );
 
   // Fetch top pages
   const pageData = await gscFetch(
@@ -156,7 +166,7 @@ export async function getSearchOverview(
     }
   ) as { rows?: SearchAnalyticsRow[] };
 
-  const topQueries: SearchQuery[] = (queryData.rows || []).map(r => ({
+  const topQueries: SearchQuery[] = rawQueryRows.map(r => ({
     query: r.keys[0],
     clicks: r.clicks,
     impressions: r.impressions,
@@ -181,6 +191,60 @@ export async function getSearchOverview(
     topPages,
     dateRange: { start: fmt(startDate), end: fmt(endDate) },
   };
+}
+
+export async function getSearchQueryObservations(
+  siteId: string,
+  gscSiteUrl: string,
+  days: number = 28,
+  options: { maxRows?: number; searchType?: string } = {},
+  dateRange?: CustomDateRange,
+): Promise<SearchQueryObservation[]> {
+  const token = await getValidToken(siteId);
+  if (!token) throw new Error('Not connected to Google');
+
+  let endDate: Date, startDate: Date;
+  if (dateRange) {
+    startDate = new Date(dateRange.startDate);
+    endDate = new Date(dateRange.endDate);
+  } else {
+    endDate = new Date();
+    endDate.setDate(endDate.getDate() - 3);
+    startDate = new Date(endDate);
+    startDate.setDate(startDate.getDate() - days);
+  }
+
+  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
+  const searchType = options.searchType || 'web';
+
+  const rows = await paginateGscQuery(
+    async (startRow, rowLimit) => {
+      const data = await gscFetch(
+        `${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`,
+        token,
+        {
+          startDate: fmt(startDate),
+          endDate: fmt(endDate),
+          dimensions: ['query', 'date'],
+          rowLimit,
+          startRow,
+          type: searchType,
+        },
+      ) as { rows?: SearchAnalyticsRow[] };
+      return data.rows ?? [];
+    },
+    { maxRows: options.maxRows ?? 5000, pageSize: 500 },
+  );
+
+  return rows.map(row => ({
+    query: row.keys[0],
+    date: row.keys[1],
+    clicks: row.clicks,
+    impressions: row.impressions,
+    ctr: +(row.ctr * 100).toFixed(1),
+    position: +row.position.toFixed(1),
+  }));
 }
 
 export interface QueryPageRow {

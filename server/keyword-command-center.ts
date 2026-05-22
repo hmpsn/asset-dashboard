@@ -26,7 +26,12 @@ import { getWorkspace } from './workspaces.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { buildKeywordStrategyUxPayload } from './keyword-strategy-ux.js';
 import { WS_EVENTS } from './ws-events.js';
-import { keywordComparisonKey } from '../shared/keyword-normalization.js';
+import { findBestParent, keywordComparisonKey } from '../shared/keyword-normalization.js';
+import {
+  getLostVisibilityCount,
+  getLostVisibilityKeys,
+  getLostVisibilityQueries,
+} from './client-discovered-queries.js';
 import type { ContentGap, KeywordGapItem, KeywordStrategy, PageKeywordMap, Workspace } from '../shared/types/workspace.js';
 import {
   KEYWORD_COMMAND_CENTER_ACTIONS,
@@ -109,7 +114,15 @@ interface DraftRow {
   explanation?: KeywordStrategyExplanation;
   localCandidate?: LocalSeoKeywordCandidate;
   rank?: LatestRank;
+  variants?: LatestRank[];
   rawEvidenceOnly?: boolean;
+}
+
+interface LostVisibilityQuery {
+  query: string;
+  lastPosition: number | null;
+  lastSeen: string;
+  totalImpressions: number;
 }
 
 interface CommandCenterSourceBundle {
@@ -123,6 +136,7 @@ interface CommandCenterSourceBundle {
   latestRanks: LatestRank[];
   feedback: Map<string, FeedbackRow>;
   localCandidates?: LocalSeoKeywordCandidate[];
+  lostVisibilityRows?: LostVisibilityQuery[];
   includeStrategyUx?: boolean;
   includeWorkspaceIntelligence?: boolean;
 }
@@ -130,6 +144,7 @@ interface CommandCenterSourceBundle {
 interface RowFinalizeContext {
   localVisibilityByKeyword: Map<string, LocalSeoKeywordVisibilitySummary>;
   activeLocalMarketCount: number;
+  lostVisibilityKeys?: Set<string>;
 }
 
 interface FinalizedRows {
@@ -174,6 +189,33 @@ function readFeedback(workspaceId: string): Map<string, FeedbackRow> {
     feedback.set(key, row);
   }
   return feedback;
+}
+
+function safeLostVisibilityKeys(workspaceId: string): Set<string> {
+  try {
+    return getLostVisibilityKeys(workspaceId);
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'discovered_queries unavailable while reading lost visibility keys');
+    return new Set<string>();
+  }
+}
+
+function safeLostVisibilityRows(workspaceId: string): LostVisibilityQuery[] {
+  try {
+    return getLostVisibilityQueries(workspaceId);
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'discovered_queries unavailable while reading lost visibility rows');
+    return [];
+  }
+}
+
+function safeLostVisibilityCount(workspaceId: string): number {
+  try {
+    return getLostVisibilityCount(workspaceId);
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'discovered_queries unavailable while reading lost visibility count');
+    return 0;
+  }
 }
 
 function feedbackState(row: FeedbackRow): KeywordCommandCenterFeedbackState | undefined {
@@ -592,6 +634,7 @@ function matchesFilter(row: KeywordCommandCenterRow, filter: KeywordCommandCente
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.PROVIDER_DEGRADED) return row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.PROVIDER_DEGRADED;
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.REQUESTED) return row.feedback?.status === 'requested';
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.TRACKED) return row.tracking.status === TRACKED_KEYWORD_STATUS.ACTIVE;
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.LOST_VISIBILITY) return row.isLostVisibility === true;
   return row.lifecycleStatus === filter;
 }
 
@@ -670,6 +713,9 @@ function filterCount(rows: KeywordCommandCenterRow[], filter: KeywordCommandCent
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.TRACKED) {
     return rows.filter(row => row.tracking.status === TRACKED_KEYWORD_STATUS.ACTIVE).length;
   }
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.LOST_VISIBILITY) {
+    return rows.filter(row => row.isLostVisibility === true).length;
+  }
   return rows.filter(row => row.lifecycleStatus === filter).length;
 }
 
@@ -688,6 +734,7 @@ function buildCounts(rows: KeywordCommandCenterRow[]): KeywordCommandCenterCount
     localCandidates: rows.filter(row => row.localSeoState?.lifecycle === KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CANDIDATE).length,
     retired: rows.filter(row => row.lifecycleStatus === KEYWORD_COMMAND_CENTER_STATUS.RETIRED).length,
     declined: rows.filter(row => row.lifecycleStatus === KEYWORD_COMMAND_CENTER_STATUS.DECLINED).length,
+    lostVisibility: rows.filter(row => row.isLostVisibility === true).length,
     // Sentinel-masked volumes have already been dropped to undefined by mergeMetrics,
     // so any null/undefined here is genuinely missing (not a planner-bucket masquerade).
     missingVolume: rows.filter(row => row.metrics.volume == null || row.metrics.volume <= 0).length,
@@ -713,6 +760,7 @@ function buildFilters(rows: KeywordCommandCenterRow[]): KeywordCommandCenterFilt
     { id: KEYWORD_COMMAND_CENTER_FILTERS.REQUESTED, label: 'Requested' },
     { id: KEYWORD_COMMAND_CENTER_FILTERS.DECLINED, label: 'Declined' },
     { id: KEYWORD_COMMAND_CENTER_FILTERS.RETIRED, label: 'Retired' },
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.LOST_VISIBILITY, label: 'Lost Visibility' },
   ];
   return filters.map(filter => ({ ...filter, count: filterCount(rows, filter.id) }));
 }
@@ -735,6 +783,7 @@ interface SkinnyFilterCounts {
   requested: number;
   declined: number;
   retired: number;
+  lostVisibility: number;
 }
 
 function buildFilterFacetsFromCounts(counts: SkinnyFilterCounts): KeywordCommandCenterFilterMeta[] {
@@ -756,6 +805,7 @@ function buildFilterFacetsFromCounts(counts: SkinnyFilterCounts): KeywordCommand
     { id: KEYWORD_COMMAND_CENTER_FILTERS.REQUESTED, label: 'Requested', count: counts.requested },
     { id: KEYWORD_COMMAND_CENTER_FILTERS.DECLINED, label: 'Declined', count: counts.declined },
     { id: KEYWORD_COMMAND_CENTER_FILTERS.RETIRED, label: 'Retired', count: counts.retired },
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.LOST_VISIBILITY, label: 'Lost Visibility', count: counts.lostVisibility },
   ];
 }
 
@@ -881,8 +931,38 @@ async function populateDraftRows(rows: Map<string, DraftRow>, bundle: CommandCen
     if (draft.normalizedKeyword !== normalized) rows.set(normalized, draft);
   }
 
+  for (const lost of bundle.lostVisibilityRows ?? []) {
+    const row = ensureRow(rows, lost.query);
+    if (!row) continue;
+    row.rawEvidenceOnly = row.rawEvidenceOnly ?? true;
+    addSource(row, {
+      kind: 'rank_data',
+      label: 'Lost Search Console visibility',
+      detail: `Last seen ${lost.lastSeen}`,
+    });
+    mergeMetrics(row, {
+      currentPosition: lost.lastPosition ?? undefined,
+      impressions: lost.totalImpressions,
+    });
+  }
+
+  const strategyKeys = [...rows.entries()]
+    .filter(([, row]) => row.rawEvidenceOnly !== true)
+    .map(([key]) => key);
+  const metricsMap = new Map(
+    strategyKeys.map(key => [key, rows.get(key)?.metrics.impressions ?? 0]),
+  );
+  const variantParentMap = new Map<string, string>();
+  for (const rank of bundle.latestRanks) {
+    const normalizedQuery = keywordComparisonKey(rank.query);
+    if (!normalizedQuery || rows.has(normalizedQuery)) continue;
+    const parent = findBestParent(normalizedQuery, strategyKeys, metricsMap);
+    if (parent) variantParentMap.set(normalizedQuery, parent);
+  }
+
   const rankedUntracked = bundle.latestRanks
     .filter(rank => !rows.has(keywordComparisonKey(rank.query)))
+    .filter(rank => !variantParentMap.has(keywordComparisonKey(rank.query)))
     .sort((a, b) => (b.impressions ?? 0) - (a.impressions ?? 0))
     .slice(0, RANK_EVIDENCE_ROW_LIMIT);
   for (const rank of rankedUntracked) {
@@ -908,6 +988,24 @@ async function populateDraftRows(rows: Map<string, DraftRow>, bundle: CommandCen
       impressions: rank.impressions,
       ctr: rank.ctr,
     });
+  }
+
+  for (const rank of bundle.latestRanks) {
+    const normalizedQuery = keywordComparisonKey(rank.query);
+    const parentKey = variantParentMap.get(normalizedQuery);
+    if (!parentKey) continue;
+    const parentRow = rows.get(parentKey);
+    if (!parentRow) continue;
+    parentRow.variants = parentRow.variants ?? [];
+    parentRow.variants.push(rank);
+    parentRow.metrics.impressions = (parentRow.metrics.impressions ?? 0) + rank.impressions;
+    parentRow.metrics.clicks = (parentRow.metrics.clicks ?? 0) + rank.clicks;
+    if (
+      parentRow.metrics.currentPosition == null
+      || rank.position < parentRow.metrics.currentPosition
+    ) {
+      parentRow.metrics.currentPosition = rank.position;
+    }
   }
 
   for (const candidate of bundle.localCandidates ?? []) {
@@ -974,6 +1072,15 @@ function finalizeDraftRow(row: DraftRow, context: RowFinalizeContext): KeywordCo
     isProtected,
     protectionReason: protection,
     rawEvidenceOnly: row.rawEvidenceOnly,
+    variantCount: row.variants?.length ?? 0,
+    variants: row.variants?.map(variant => ({
+      query: variant.query,
+      position: variant.position,
+      clicks: variant.clicks,
+      impressions: variant.impressions,
+      ctr: variant.ctr,
+    })),
+    isLostVisibility: context.lostVisibilityKeys?.has(row.normalizedKeyword) ?? false,
   };
 }
 
@@ -1041,6 +1148,8 @@ async function buildKeywordCommandCenterModel(
   const rawTrackedKeywords = getTrackedKeywords(workspace.id, { includeInactive: true });
   const latestRanks = getLatestSnapshotRanks(workspace.id);
   const feedback = readFeedback(workspace.id);
+  const lostVisibilityRows = safeLostVisibilityRows(workspace.id);
+  const lostVisibilityKeys = new Set(lostVisibilityRows.map(row => keywordComparisonKey(row.query)).filter(Boolean));
   // Recover provenance for legacy UNKNOWN-source tracked keywords by cross-referencing
   // current strategy / content gaps / requested feedback. Applied at bundle level so
   // sourceKeysForRows + trackedKeywordMatchesFilter + protectedReason agree.
@@ -1085,6 +1194,7 @@ async function buildKeywordCommandCenterModel(
     latestRanks,
     feedback,
     localCandidates,
+    lostVisibilityRows,
     includeStrategyUx: options.includeStrategyUx,
   });
   ensureLocalVisibilityRows(rows, localVisibilityByKeyword);
@@ -1092,6 +1202,7 @@ async function buildKeywordCommandCenterModel(
   const finalized = finalizeDraftRows(rows, {
     localVisibilityByKeyword,
     activeLocalMarketCount,
+    lostVisibilityKeys,
   });
   const finalRows = finalized.rows;
   mark('rowIndexMs');
@@ -1222,6 +1333,10 @@ export async function buildKeywordCommandCenterSummary(
   }
 
   const latestRanks = getLatestSnapshotRanks(workspace.id);
+  const lostVisibilityCount = safeLostVisibilityCount(workspace.id);
+  const lostVisibilityRows = safeLostVisibilityRows(workspace.id);
+  const lostVisibilityKeys = new Set(lostVisibilityRows.map(row => keywordComparisonKey(row.query)).filter(Boolean));
+  for (const key of lostVisibilityKeys) allKeys.add(key);
   const rankEvidenceKeys = new Set<string>();
   for (const rank of latestRanks
     .filter(rank => !allKeys.has(keywordComparisonKey(rank.query)))
@@ -1278,6 +1393,7 @@ export async function buildKeywordCommandCenterSummary(
     retired: inactiveTracked.length,
     declined: declined.length,
     missingVolume,
+    lostVisibility: lostVisibilityCount,
   };
   const filterCounts: SkinnyFilterCounts = {
     all: counts.total,
@@ -1300,6 +1416,7 @@ export async function buildKeywordCommandCenterSummary(
     requested: requested.length,
     declined: declined.length,
     retired: inactiveTracked.length,
+    lostVisibility: lostVisibilityCount,
   };
 
   log.info({
@@ -1355,6 +1472,37 @@ function addPageKeys(target: Set<string>, pageMap: PageKeywordMap[]): void {
       if (key) target.add(key);
     }
   }
+}
+
+function parentableVariantKeys(input: {
+  strategy?: KeywordStrategy | null | undefined;
+  pageMap: PageKeywordMap[];
+  contentGaps: ContentGap[];
+  trackedKeywords: TrackedKeyword[];
+  feedback: Map<string, FeedbackRow>;
+}): string[] {
+  const keys = new Set<string>();
+  addStrategyKeys(keys, input.strategy);
+  addPageKeys(keys, input.pageMap);
+  for (const gap of input.contentGaps) {
+    const key = keywordComparisonKey(gap.targetKeyword);
+    if (key) keys.add(key);
+  }
+  for (const keyword of input.trackedKeywords) {
+    const key = keywordComparisonKey(keyword.query);
+    if (key) keys.add(key);
+  }
+  for (const row of input.feedback.values()) {
+    if (row.status === 'declined') continue;
+    const key = keywordComparisonKey(row.keyword);
+    if (key) keys.add(key);
+  }
+  return [...keys];
+}
+
+function findVariantParentKey(query: string, parentKeys: string[]): string | null {
+  if (parentKeys.length === 0) return null;
+  return findBestParent(query, parentKeys, new Map(parentKeys.map(key => [key, 0])));
 }
 
 function filterStrategyForKeys(strategy: KeywordStrategy | null | undefined, keys: Set<string> | null): KeywordStrategy | null | undefined {
@@ -1479,6 +1627,13 @@ function addCandidateKeysFromBundle(
   bundle: CommandCenterSourceBundle,
   localVisibility: Map<string, LocalSeoKeywordVisibilitySummary>,
 ): void {
+  const variantParentKeys = parentableVariantKeys({
+    strategy: bundle.strategy,
+    pageMap: bundle.pageMap,
+    contentGaps: bundle.contentGaps,
+    trackedKeywords: bundle.trackedKeywords,
+    feedback: bundle.feedback,
+  });
   for (const metric of bundle.strategy?.siteKeywordMetrics ?? []) {
     addCandidateKey(candidates, metric.keyword, 0, metric.volume ?? 0);
   }
@@ -1500,6 +1655,7 @@ function addCandidateKeysFromBundle(
     addCandidateKey(candidates, row.keyword, row.status === 'requested' ? 2 : row.status === 'declined' ? 6 : 1);
   }
   for (const rank of bundle.latestRanks) {
+    if (findVariantParentKey(keywordComparisonKey(rank.query), variantParentKeys)) continue;
     addCandidateKey(candidates, rank.query, 2, rank.impressions ?? 0, rank.position);
   }
   for (const gap of bundle.keywordGaps) {
@@ -1507,6 +1663,9 @@ function addCandidateKeysFromBundle(
   }
   for (const visibility of localVisibility.values()) {
     addCandidateKey(candidates, visibility.keyword, 2);
+  }
+  for (const lost of bundle.lostVisibilityRows ?? []) {
+    addCandidateKey(candidates, lost.query, 2, lost.totalImpressions, lost.lastPosition ?? undefined);
   }
 }
 
@@ -1576,6 +1735,7 @@ function sourceKeysForRows(input: {
   latestRanks: LatestRank[];
   feedback: Map<string, FeedbackRow>;
   localVisibility: Map<string, LocalSeoKeywordVisibilitySummary>;
+  lostVisibilityRows: LostVisibilityQuery[];
 }): Set<string> | null {
   const keys = new Set<string>();
   const add = (keyword: string | undefined | null) => {
@@ -1597,6 +1757,7 @@ function sourceKeysForRows(input: {
   }
   for (const key of input.feedback.keys()) selectedOrTrackedOrFeedbackKeys.add(key);
   const rawEvidenceKeys = new Set(input.keywordGaps.map(gap => keywordComparisonKey(gap.keyword)).filter(Boolean));
+  const lostVisibilityKeys = new Set(input.lostVisibilityRows.map(row => keywordComparisonKey(row.query)).filter(Boolean));
   const declinedKeys = new Set(
     [...input.feedback.values()]
       .filter(row => row.status === 'declined')
@@ -1609,6 +1770,7 @@ function sourceKeysForRows(input: {
       .map(row => keywordComparisonKey(row.keyword))
       .filter(Boolean),
   );
+  const variantParentKeys = parentableVariantKeys(input);
 
   switch (input.filter) {
     case KEYWORD_COMMAND_CENTER_FILTERS.ALL:
@@ -1619,9 +1781,11 @@ function sourceKeysForRows(input: {
       for (const keyword of input.trackedKeywords) add(keyword.query);
       for (const row of input.feedback.values()) add(row.keyword);
       for (const key of input.localVisibility.keys()) keys.add(key);
+      for (const key of lostVisibilityKeys) keys.add(key);
       for (const rank of input.latestRanks
         .filter(rank => {
           const key = keywordComparisonKey(rank.query);
+          if (findVariantParentKey(key, variantParentKeys)) return false;
           return key && !keys.has(key) && !rawEvidenceKeys.has(key);
         })
         .sort((a, b) => (b.impressions ?? 0) - (a.impressions ?? 0))
@@ -1647,6 +1811,7 @@ function sourceKeysForRows(input: {
       for (const rank of input.latestRanks
         .filter(rank => {
           const key = keywordComparisonKey(rank.query);
+          if (findVariantParentKey(key, variantParentKeys)) return false;
           return key && !selectedOrTrackedOrFeedbackKeys.has(key) && !rawEvidenceKeys.has(key);
         })
         .sort((a, b) => (b.impressions ?? 0) - (a.impressions ?? 0))
@@ -1672,6 +1837,9 @@ function sourceKeysForRows(input: {
       return keys;
     case KEYWORD_COMMAND_CENTER_FILTERS.DECLINED:
       for (const row of input.feedback.values()) if (row.status === 'declined') add(row.keyword);
+      return keys;
+    case KEYWORD_COMMAND_CENTER_FILTERS.LOST_VISIBILITY:
+      for (const key of lostVisibilityKeys) keys.add(key);
       return keys;
     case KEYWORD_COMMAND_CENTER_FILTERS.LOCAL:
     case KEYWORD_COMMAND_CENTER_FILTERS.VISIBLE_LOCALLY:
@@ -1699,6 +1867,14 @@ function buildFilteredBundle(input: {
   const trackedKeywords = getTrackedKeywords(input.workspace.id, { includeInactive: true });
   const latestRanks = getLatestSnapshotRanks(input.workspace.id);
   const feedback = readFeedback(input.workspace.id);
+  const lostVisibilityRows = safeLostVisibilityRows(input.workspace.id);
+  const variantParentKeys = parentableVariantKeys({
+    strategy,
+    pageMap,
+    contentGaps,
+    trackedKeywords,
+    feedback,
+  });
   const keys = sourceKeysForRows({
     filter: input.filter,
     strategy,
@@ -1709,6 +1885,7 @@ function buildFilteredBundle(input: {
     latestRanks,
     feedback,
     localVisibility: input.localVisibility,
+    lostVisibilityRows,
   });
 
   return {
@@ -1722,8 +1899,17 @@ function buildFilteredBundle(input: {
     contentGaps: keys ? contentGaps.filter(gap => keys.has(keywordComparisonKey(gap.targetKeyword))) : contentGaps,
     keywordGaps: keys ? keywordGaps.filter(gap => keys.has(keywordComparisonKey(gap.keyword))) : keywordGaps,
     trackedKeywords: keys ? trackedKeywords.filter(keyword => keys.has(keywordComparisonKey(keyword.query))) : trackedKeywords,
-    latestRanks: keys ? latestRanks.filter(rank => keys.has(keywordComparisonKey(rank.query))) : latestRanks,
+    latestRanks: keys
+      ? latestRanks.filter(rank => {
+        const key = keywordComparisonKey(rank.query);
+        const parent = findVariantParentKey(key, variantParentKeys);
+        return keys.has(key) || Boolean(parent && keys.has(parent));
+      })
+      : latestRanks,
     feedback: filterMapByKeys(feedback, keys),
+    lostVisibilityRows: keys
+      ? lostVisibilityRows.filter(row => keys.has(keywordComparisonKey(row.query)))
+      : lostVisibilityRows,
     includeStrategyUx: false,
   };
 }
@@ -1732,6 +1918,7 @@ function filterBundleToKeys(
   bundle: CommandCenterSourceBundle & { keys: Set<string> | null },
   keys: Set<string>,
 ): CommandCenterSourceBundle & { keys: Set<string> } {
+  const variantParentKeys = parentableVariantKeys(bundle);
   return {
     ...bundle,
     keys,
@@ -1742,8 +1929,13 @@ function filterBundleToKeys(
     contentGaps: bundle.contentGaps.filter(gap => keys.has(keywordComparisonKey(gap.targetKeyword))),
     keywordGaps: bundle.keywordGaps.filter(gap => keys.has(keywordComparisonKey(gap.keyword))),
     trackedKeywords: bundle.trackedKeywords.filter(keyword => keys.has(keywordComparisonKey(keyword.query))),
-    latestRanks: bundle.latestRanks.filter(rank => keys.has(keywordComparisonKey(rank.query))),
+    latestRanks: bundle.latestRanks.filter(rank => {
+      const key = keywordComparisonKey(rank.query);
+      const parent = findVariantParentKey(key, variantParentKeys);
+      return keys.has(key) || Boolean(parent && keys.has(parent));
+    }),
     feedback: filterMapByKeys(bundle.feedback, keys),
+    lostVisibilityRows: (bundle.lostVisibilityRows ?? []).filter(row => keys.has(keywordComparisonKey(row.query))),
   };
 }
 
@@ -1809,12 +2001,14 @@ async function buildKeywordCommandCenterRowsSkinny(
   const pageSelection = rowCandidateKeysForQuery(candidateBundle, localVisibilityByKeyword, query);
   const pagedBundle = filterBundleToKeys(bundle, pageSelection.keys);
   const pagedLocalVisibility = filterMapByKeys(localVisibilityByKeyword, pageSelection.keys);
+  const lostVisibilityKeys = safeLostVisibilityKeys(workspace.id);
   const rows = new Map<string, DraftRow>();
   await populateDraftRows(rows, pagedBundle);
   ensureLocalVisibilityRows(rows, pagedLocalVisibility);
   const finalized = finalizeDraftRows(rows, {
     localVisibilityByKeyword: pagedLocalVisibility,
     activeLocalMarketCount,
+    lostVisibilityKeys,
   });
   const filtered = finalized.rows
     .filter(row => matchesFilter(row, filter))
@@ -1891,6 +2085,7 @@ export async function buildKeywordCommandCenterDetail(
   const rawTrackedKeywords = getTrackedKeywords(workspace.id, { includeInactive: true }).filter(entry => keywordComparisonKey(entry.query) === normalized);
   const latestRanks = getLatestSnapshotRanks(workspace.id).filter(rank => keywordComparisonKey(rank.query) === normalized);
   const feedback = filterMapByKeys(readFeedback(workspace.id), new Set([normalized]));
+  const lostVisibilityRows = safeLostVisibilityRows(workspace.id).filter(row => keywordComparisonKey(row.query) === normalized);
   const strategy = filterStrategyForSingleKeyword(workspace.keywordStrategy, normalized);
   // Recover provenance for legacy UNKNOWN-source tracked keywords so the drawer
   // shows accurate source labels and protected-state UI for legacy data.
@@ -1913,6 +2108,7 @@ export async function buildKeywordCommandCenterDetail(
     || trackedKeywords.length > 0
     || latestRanks.length > 0
     || feedback.size > 0
+    || lostVisibilityRows.length > 0
     || hasLocalVisibility;
   if (
     !hasBaseSource
@@ -1930,12 +2126,17 @@ export async function buildKeywordCommandCenterDetail(
     trackedKeywords,
     latestRanks,
     feedback,
+    lostVisibilityRows,
     includeStrategyUx: true,
     includeWorkspaceIntelligence: false,
   });
   ensureLocalVisibilityRows(rows, localVisibilityByKeyword);
   const row = rows.get(normalized)
-    ? finalizeDraftRow(rows.get(normalized)!, { localVisibilityByKeyword, activeLocalMarketCount })
+    ? finalizeDraftRow(rows.get(normalized)!, {
+      localVisibilityByKeyword,
+      activeLocalMarketCount,
+      lostVisibilityKeys: safeLostVisibilityKeys(workspace.id),
+    })
     : null;
   if (!row) return null;
   log.info({

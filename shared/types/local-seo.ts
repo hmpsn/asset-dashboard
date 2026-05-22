@@ -104,6 +104,14 @@ export const CLIENT_LOCATION_STATUS = {
 
 export type ClientLocationStatus = typeof CLIENT_LOCATION_STATUS[keyof typeof CLIENT_LOCATION_STATUS];
 
+export const DISCOVERED_QUERY_STATUS = {
+  ACTIVE: 'active',
+  LOST_VISIBILITY: 'lost_visibility',
+} as const;
+
+export type DiscoveredQueryStatus =
+  typeof DISCOVERED_QUERY_STATUS[keyof typeof DISCOVERED_QUERY_STATUS];
+
 export interface ClientLocation {
   id: string;
   workspaceId: string;

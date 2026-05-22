@@ -281,6 +281,23 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
     lines.push(`Rank tracking: ${rt.trackedKeywords} keywords, avg position ${rt.avgPosition?.toFixed(1) ?? 'n/a'} (↑${rt.positionChanges.improved} ↓${rt.positionChanges.declined})`);
   }
 
+  // GSC discovered query summary — at standard+ verbosity
+  if (ctx.discoveredQuerySummary && verbosity !== 'compact') {
+    const dq = ctx.discoveredQuerySummary;
+    if (dq.lostVisibilityCount > 0) {
+      const examples = dq.topLostQueries
+        .slice(0, 3)
+        .map(query => `${query.query} (last rank: ${query.lastPosition.toFixed(1)})`)
+        .join(', ');
+      lines.push(
+        `GSC discovery: ${dq.totalDiscovered} queries tracked, `
+        + `${dq.lostVisibilityCount} lost visibility${examples ? ` — top losses: ${examples}` : ''}`,
+      );
+    } else {
+      lines.push(`GSC discovery: ${dq.totalDiscovered} queries tracked, none lost visibility`);
+    }
+  }
+
   // Backlink profile — at standard+ verbosity (only present when enrichWithBacklinks opt-in was set)
   if (ctx.backlinkProfile && verbosity !== 'compact') {
     const bp = ctx.backlinkProfile;
