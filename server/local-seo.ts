@@ -47,6 +47,7 @@ import {
   type LocalSeoPosture,
   type LocalSeoReportSummary,
   type LocalSeoReadResponse,
+  type LocalSeoRepeatCompetitor,
   type LocalSeoRefreshRequest,
   type LocalSeoRefreshResult,
   type LocalSeoWorkspaceSettings,
@@ -255,6 +256,13 @@ const stmts = createStmtCache(() => ({
     WHERE workspace_id = ? AND normalized_keyword = ?
     ORDER BY captured_at DESC
     LIMIT 50
+  `),
+  competitorSnapshots: db.prepare(`
+    SELECT workspace_id, business_found, market_label, top_competitors
+    FROM local_visibility_snapshots
+    WHERE workspace_id = @workspaceId
+      AND captured_at >= datetime('now', '-' || @days || ' days')
+    ORDER BY captured_at DESC
   `),
   latestSnapshotSummary: db.prepare(`
     SELECT
@@ -475,6 +483,7 @@ export function getLocalSeoReadModel(
         suggestedMarkets: [],
         latestSnapshots: [],
       }),
+      competitorBrands: [],
       caps: {
         maxMarkets: LOCAL_SEO_MAX_MARKETS,
         maxKeywordsPerRefresh: LOCAL_SEO_DEFAULT_KEYWORDS_PER_REFRESH,
@@ -502,6 +511,7 @@ export function getLocalSeoReadModel(
       suggestedMarkets,
       latestSnapshots,
     }),
+    competitorBrands: getLocalSeoCompetitorBrands(workspaceId),
     caps: {
       maxMarkets: LOCAL_SEO_MAX_MARKETS,
       maxKeywordsPerRefresh: settings.keywordsPerRefresh ?? LOCAL_SEO_DEFAULT_KEYWORDS_PER_REFRESH,
@@ -680,6 +690,91 @@ function listLatestLocalVisibilitySnapshotsForKeyword(workspaceId: string, norma
 
 function listLatestLocalVisibilitySnapshotSummaryRows(workspaceId: string): SnapshotSummaryRow[] {
   return stmts().latestSnapshotSummary.all(workspaceId, workspaceId) as SnapshotSummaryRow[];
+}
+
+interface CompetitorSnapshotRow {
+  workspace_id: string;
+  business_found: number;
+  market_label: string;
+  top_competitors: string;
+}
+
+export function getLocalSeoCompetitorBrands(workspaceId: string, lookbackDays = 30): LocalSeoRepeatCompetitor[] {
+  const workspace = getWorkspace(workspaceId);
+  if (!workspace) return [];
+  const rows = stmts().competitorSnapshots.all({ workspaceId, days: lookbackDays }) as CompetitorSnapshotRow[];
+
+  const TOP_LIMIT = 10;
+  const MIN_APPEARANCES = 2;
+
+  interface Accumulator {
+    domain: string | undefined;
+    totalAppearances: number;
+    winsAgainstClient: number;
+    markets: Set<string>;
+  }
+  const map = new Map<string, Accumulator>();
+
+  for (const row of rows) {
+    const clientLost = row.business_found === 0;
+    const competitors = parseJsonSafeArray(row.top_competitors, localResultSchema, { workspaceId, table: 'local_visibility_snapshots', field: 'top_competitors' });
+    for (const competitor of competitors) {
+      const key = competitor.title.toLowerCase().trim();
+      const existing = map.get(key);
+      if (existing) {
+        existing.totalAppearances += 1;
+        if (clientLost) existing.winsAgainstClient += 1;
+        existing.markets.add(row.market_label);
+        if (!existing.domain && competitor.domain) existing.domain = competitor.domain;
+      } else {
+        map.set(key, {
+          domain: competitor.domain,
+          totalAppearances: 1,
+          winsAgainstClient: clientLost ? 1 : 0,
+          markets: new Set([row.market_label]),
+        });
+      }
+    }
+  }
+
+  // Collect the original (un-lowercased) title for display — use first seen title
+  const titleMap = new Map<string, string>();
+  for (const row of rows) {
+    const competitors = parseJsonSafeArray(row.top_competitors, localResultSchema, { workspaceId, table: 'local_visibility_snapshots', field: 'top_competitors' });
+    for (const competitor of competitors) {
+      const key = competitor.title.toLowerCase().trim();
+      if (!titleMap.has(key)) titleMap.set(key, competitor.title);
+    }
+  }
+
+  const activeMarketCity = listLocalSeoMarkets(workspaceId)
+    .find(m => m.status === LOCAL_SEO_MARKET_STATUS.ACTIVE)?.city;
+
+  const results: LocalSeoRepeatCompetitor[] = [];
+  for (const [key, acc] of map.entries()) {
+    if (acc.totalAppearances < MIN_APPEARANCES) continue;
+    const title = titleMap.get(key) ?? key;
+    const suggestedTrackingKeywords: string[] = [
+      `${title} reviews`,
+      `${title} vs ${workspace.name}`,
+    ];
+    if (activeMarketCity) suggestedTrackingKeywords.push(`${title} ${activeMarketCity}`);
+    results.push({
+      title,
+      domain: acc.domain,
+      totalAppearances: acc.totalAppearances,
+      winsAgainstClient: acc.winsAgainstClient,
+      markets: Array.from(acc.markets),
+      suggestedTrackingKeywords,
+    });
+  }
+
+  results.sort((a, b) =>
+    b.winsAgainstClient - a.winsAgainstClient
+    || b.totalAppearances - a.totalAppearances,
+  );
+
+  return results.slice(0, TOP_LIMIT);
 }
 
 function postureFromSummaryRow(row: SnapshotSummaryRow) {

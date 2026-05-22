@@ -74,6 +74,7 @@ describe('Local SEO routes', () => {
       keywordsPerRefreshDefault: 100,
     });
     expect(body.latestSnapshots).toEqual([]);
+    expect(body.competitorBrands).toEqual(expect.any(Array));
     expect(body.report).toEqual(expect.objectContaining({
       workspacePosture: 'unknown',
       setupState: 'needs_market',

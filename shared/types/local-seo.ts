@@ -458,6 +458,15 @@ export interface LocalSeoReportSummary {
   setupDetail: string;
 }
 
+export interface LocalSeoRepeatCompetitor {
+  title: string;
+  domain?: string;
+  totalAppearances: number;
+  winsAgainstClient: number;
+  markets: string[];
+  suggestedTrackingKeywords: string[];
+}
+
 export interface LocalSeoReadResponse {
   featureEnabled: boolean;
   settings: LocalSeoWorkspaceSettings;
@@ -466,6 +475,7 @@ export interface LocalSeoReadResponse {
   /** Empty on summary-only reads. Request snapshot-inclusive reads only when rendering keyword-level local annotations. */
   latestSnapshots: LocalVisibilitySnapshot[];
   report: LocalSeoReportSummary;
+  competitorBrands: LocalSeoRepeatCompetitor[];
   caps: {
     maxMarkets: number;
     /**
