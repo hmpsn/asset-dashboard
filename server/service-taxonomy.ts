@@ -58,7 +58,7 @@ export const DENTAL_SERVICES: ServiceDefinition[] = [
     id: 'dental-crowns',
     label: 'Crowns & Bridges',
     starterKeywords: ['dental crown near me', 'tooth crown cost', 'dental bridge near me'],
-    matchTerms: ['crown', 'bridge', 'dental cap'],
+    matchTerms: ['dental crown', 'dental bridge', 'tooth crown', 'dental cap'],
   },
   {
     id: 'dentures',

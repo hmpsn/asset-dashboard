@@ -113,7 +113,7 @@ function ServiceGapNudge({ gap }: { gap: LocalSeoServiceGap }) {
     void navigator.clipboard.writeText(gap.starterKeywords.join('\n')).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    });
+    }).catch(() => { /* clipboard permission denied — silently ignore */ });
   }
 
   return (
