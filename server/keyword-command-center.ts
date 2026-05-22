@@ -1054,7 +1054,20 @@ async function buildKeywordCommandCenterModel(
   // KCC row enrichment uses sourceLabel/detail/pagePath/pageTitle/volume/difficulty.
   // `reasons` and the evaluator's suppression are not needed — cheap default is correct.
   const localCandidates = options.includeLocalSeo && options.includeLocalCandidates === true
-    ? buildLocalSeoKeywordCandidates(workspace.id).slice(0, LOCAL_CANDIDATE_ROW_LIMIT)
+    ? (() => {
+        // Sort unselected candidates first so the slice doesn't exhaust its budget on
+        // strategy/tracking-sourced entries (which are already IN_STRATEGY or TRACKED and
+        // therefore get lifecycle=SELECTED).  The "Local Candidates" filter only matches
+        // lifecycle=CANDIDATE, so without this reorder the filter returns 0 rows even
+        // when hundreds of local_variant / content_gap candidates exist further down the
+        // score-sorted list.  Within each group the original score order is preserved.
+        const all = buildLocalSeoKeywordCandidates(workspace.id);
+        const sorted = [
+          ...all.filter(c => !c.selected),
+          ...all.filter(c => c.selected),
+        ];
+        return sorted.slice(0, LOCAL_CANDIDATE_ROW_LIMIT);
+      })()
     : [];
   const activeLocalMarketCount = options.includeLocalSeo
     ? listLocalSeoMarkets(workspace.id).filter(market => market.status === LOCAL_SEO_MARKET_STATUS.ACTIVE).length

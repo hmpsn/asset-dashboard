@@ -358,12 +358,128 @@
           "notes": "Completed in this PR on 2026-05-21. Tier 2 refactor of `buildLocalSeoKeywordCandidates`. The old function ran the evaluator + suppression per candidate (scanning pageMap × secondaries × markets) and caused two production issues: (a) Strategy 'Refresh' button crashed staging via OOM kill, (b) KCC Local Candidates filter took 35–43s on Swish. Refactor: (1) Extracted `iterateLocalCandidateSignals` generator that yields source signals (explicit, strategy, tracking, page map, content gaps) without scoring or evaluation. (2) Split into two functions — `buildLocalSeoKeywordCandidates` is now the cheap default (no evaluator, empty reasons, no scoreDelta — safe for all current production callers: refresh path, KCC row enrichment, intelligence slice) and `buildLocalSeoKeywordCandidatesEvaluated` is the opt-in slow variant (preserves original evaluator+suppression+reasons). (3) `loadCandidateIterationContext` accepts `{ withEvaluationContext: true }` so the Evaluated path reuses the single `buildCandidateContext` read instead of calling it twice. (4) `countLocalSeoKeywordCandidates` rewritten to share the new generator. (5) No module-level TTL cache — an earlier draft included a 60s memo but it risked stale-data bugs after workspace mutations (admin declines a candidate but it reappears for 60s) and unbounded memory growth across explicitKeywords permutations; the cheap generator is fast enough on its own. pr-check rule retargeted to the Evaluated variant with new `local-candidates-evaluated-ok` hatch token. Scales for upcoming geo-grid tracking, local SEO recommendations, Google reviews, and client local SEO module — all of which need cheap candidate enumeration, not the evaluator. Includes regression tests for cheap-path reasons[], Evaluated-as-subset-of-cheap contract, Evaluated path reasons populated, and KCC Local Candidates <2s timing on a 30-page workspace."
         },
         {
+          "id": "kcc-ui-overhaul",
+          "title": "Keyword Command Center UI/UX overhaul — slide-over drawer, bulk actions, overflow polish",
+          "source": "Staging Swish keyword detail audit 2026-05-21",
+          "priority": "P1",
+          "est": "1-2 days",
+          "status": "pending",
+          "plannedSprint": "sprint-local-seo-h",
+          "owner": "frontend",
+          "notes": "Multi-item UI/UX cleanup of the Keyword Command Center surfaced during the Tier 2 staging test on Swish. (1) Drawer: today the keyword detail panel is rendered as a persistent inline column that consumes table width. Rewrite as a true slide-over overlay (matches `StrategyKeywordDrawer` pattern) that sits ON TOP of the keyword table — table stays full-width, drawer overlays. (2) Bulk actions: add multi-select checkbox column to KCC rows + bulk operations (add_to_strategy, track, pause_tracking, decline, retire). Per-row protection rules still apply (pinned keywords + manual-source require confirmation). Confirmation modal with summary count. (3) Detail panel layout: 'Page assignment: …' titles overflow mid-word — needs proper ellipsis + title attribute. Volume/Rank/CTR scalar cards need clearer empty-state when no signal (instead of just '—'). The 'WHERE IT CAME FROM' badge cluster needs wrap behavior. (4) Awaiting-data state polish: today the amber alarm box reads 'No GSC clicks, impressions, or rank position recorded yet' which is informative but visually loud for what's usually just a new tracking entry. Soften visual treatment; differentiate 'new and waiting' vs 'stale/should-have-data'. References: `src/components/KeywordCommandCenter.tsx`, `src/components/StrategyKeywordDrawer.tsx` (for the slide-over pattern)."
+        },
+        {
+          "id": "local-seo-surface-audit",
+          "title": "Local SEO surface audit — Strategy / Keywords / Page Intelligence",
+          "source": "Tier 2 staging review 2026-05-21",
+          "priority": "P2",
+          "est": "0.5 day scoping + 1 day implementation",
+          "status": "pending",
+          "plannedSprint": "sprint-local-seo-h",
+          "owner": "design",
+          "notes": "Local SEO content currently appears in three places: (1) Keyword Strategy page — high-level posture + market setup, (2) Keyword Command Center — keyword-level local visibility lens, (3) Page Intelligence — per-page local-intent annotations. Each surface is individually justified but the visual treatment doesn't make the relationship obvious; users see three near-duplicate panels. Audit task: design pass on which fields appear where, which surface is canonical for each fact, and what visual cues (icons, accent colors, links) clarify the hub-and-spoke relationship. Likely outcome: Strategy = posture + setup canonical home, Keywords = keyword-level lens with link to Strategy for setup, Page Intelligence = per-page annotation badge with link to Keywords. Treat as design-first scoping, not just implementation."
+        },
+        {
+          "id": "intel-quality-keyword-per-market-relevance",
+          "title": "Per-market keyword relevance — keyword↔market assignment model",
+          "source": "Tier 2 staging quality audit 2026-05-21",
+          "priority": "P2",
+          "est": "2-3 days",
+          "status": "pending",
+          "plannedSprint": "deferred",
+          "owner": "seo-health",
+          "notes": "Today the refresh planner pairs every selected keyword with every active market — `dentist at houston` gets queried against Austin's market and surfaces Houston competitors as 'top local results' in the Austin context. Confirmed on Swish staging refresh 2026-05-21 (55 of 200 snapshots = 27.5% cross-market noise). Fix is non-trivial because it requires a keyword↔market assignment model. (1) New `keyword_markets` join table mapping which keywords should be checked against which markets. (2) Default: keyword applies to all active markets (matches current implicit behavior, no migration of existing data needed). (3) Override path: admin pins a keyword to specific market(s). (4) Auto-inference: if keyword text contains an active market's city/region name, default assignment to that market only. (5) Iterator + refresh planner respect the assignment. (6) UI: per-market detail blocks in keyword drawer instead of single block, with pin/unpin controls. (7) **Per-market volume/clicks/impressions reporting**: the keyword detail surface should show separate volume, GSC clicks, GSC impressions, and CTR per active market the keyword applies to — today these are workspace-global and don't distinguish between Austin and Houston performance for the same keyword. Requires per-market metric storage AND geo-targeted DataForSEO volume queries (see intel-quality-keyword-volume-geo-targeting). Deferred to P2 because no current client uses multi-market in production — Swish is the only multi-market workspace and is internal."
+        },
+        {
+          "id": "intel-quality-multi-location-business-match",
+          "title": "Multi-location business match reconciliation",
+          "source": "Tier 2 staging quality audit on Swish 2026-05-22",
+          "priority": "P1",
+          "est": "0.5-1 day",
+          "status": "pending",
+          "plannedSprint": "sprint-local-seo-h",
+          "owner": "seo-health",
+          "notes": "Swish has multiple physical locations (Downtown, Midtown, East Austin) each with its own GBP listing. `evaluateLocalBusinessMatch` in `server/local-seo.ts` matches ONE listing per snapshot and treats the rest as third-party competitors. Result on Swish: 'Swish Dental Downtown' appears as a 'competitor' in 31 snapshots, 'Swish Dental - Midtown' in 15 — both are actually Swish. Verified-match rate dropped to 3-4% across 200 snapshots when reality is much higher. **This is the single biggest fix for dashboard credibility — we are systematically underreporting our own performance.** Fix: (1) New workspace concept of `client_locations` — multiple GBPs/URLs/phone numbers/addresses tied to one workspace. (2) `evaluateLocalBusinessMatch` checks against ALL configured locations, not just the primary workspace identity. (3) Snapshot `businessFound` returns true if ANY configured location matches. (4) `top_competitors` excludes the client's other locations from the competitor list. (5) UI shows which specific location matched. Affects business-match logic, snapshot enrichment, and 'top competitors' presentation across local SEO reporting."
+        },
+        {
+          "id": "intel-quality-keyword-intent-classification",
+          "title": "Intent classification for local candidate selection",
+          "source": "Tier 2 staging quality audit on Swish 2026-05-22",
+          "priority": "P1",
+          "est": "1-2 days",
+          "status": "pending",
+          "plannedSprint": "sprint-local-seo-i",
+          "sprintBatch": "iterator-quality",
+          "owner": "seo-health",
+          "notes": "23% of selected keywords in the Swish refresh had no local pack (46/200): 'dental financing and insurance options', 'crowns vs veneers comparison', 'covid-19 dental impact', 'best dental insurance plans'. These are informational/comparison/educational queries — wrong intent class for local visibility tracking. They consumed ~$0.092 of the $0.40 spend and produced no useful local data. Root cause: the candidate iterator includes anything with a service term + market modifier, with no intent classification. Fix: (1) Classify each candidate keyword into one of {transactional, navigational, informational, comparison, commercial} via lightweight regex + dictionary lookup OR via DataForSEO's `dataforseo_labs/google/search_intent` endpoint. (2) Local refresh planner excludes informational + comparison intent — those belong in content strategy, not local SEO. (3) Surface intent classification on KCC row + drawer so admins see what each keyword is FOR. (4) Optional: route excluded keywords to a 'content brief candidates' queue. Eliminates ~25% of refresh budget waste."
+        },
+        {
+          "id": "intel-quality-competitor-brand-tracking",
+          "title": "Auto-detect repeat competitors + offer competitor brand tracking",
+          "source": "Tier 2 staging quality audit on Swish 2026-05-22",
+          "priority": "P1",
+          "est": "1 day",
+          "status": "pending",
+          "plannedSprint": "sprint-local-seo-i",
+          "sprintBatch": "insight-surfaces",
+          "owner": "seo-health",
+          "notes": "Top-competitor data from snapshots is already collected but never operationalized. On Swish 2026-05-22: 'ATX Family Dental' beat Swish 9 times in queries where the pack was present but Swish wasn't found — #1 local competitor. 'Emergency Dental Care Houston 24/7' won 5 emergency queries. 'Toothbar' appeared 35 times. None of these are tracked as branded competitor queries in Swish's strategy. Fix: (1) Aggregate top_competitors across recent snapshots to surface a 'who keeps beating you' list (P1 surface). (2) For each repeat competitor, suggest branded competitor keywords to track: '[competitor name] reviews', '[competitor name] vs [client name]', '[competitor name] [city]'. (3) One-click 'track these competitor brands' that adds them to the keyword strategy as competitor-intent keywords. (4) New `competitor_brands` table or extension of existing strategy schema. This is a P0 in any consultancy playbook — branded competitor tracking is how you find weakness. Currently 100% missing."
+        },
+        {
+          "id": "intel-quality-keyword-volume-geo-targeting",
+          "title": "Geo-targeted volume + use DFS Labs keyword overview",
+          "source": "Tier 2 staging quality audit on Swish 2026-05-22",
+          "priority": "P1",
+          "est": "1 day",
+          "status": "pending",
+          "plannedSprint": "sprint-local-seo-h",
+          "owner": "seo-health",
+          "notes": "Volume data across the platform comes primarily from `keywords_data/google_ads/search_volume/live`, which (a) returns BUCKET-ROUNDED volumes (90, 110, 140, 1000, 1300…), not real numbers, and (b) is NOT geo-targeted by default in our code. Result: 'austin dentist' shows ~110 volume because Google Ads keyword planner returns ~110 nationally for that exact phrase. The REAL Austin-metro search volume across 'dentist near me', 'dentist austin tx', 'best dentist austin' etc. is 10,000+/mo. Affects every volume reading in the platform, not just local SEO. Fix: (1) Pass `location_code` from active markets to all volume queries — geo-target every fetch. (2) Move from `keywords_data/google_ads/search_volume/live` to `dataforseo_labs/google/keyword_overview` for primary volume — DFS Labs returns geo-targeted volumes + intent + competitive density in one call. (3) When workspace has multiple markets, store per-market volume (ties to intel-quality-keyword-per-market-relevance). (4) Surface volume provenance in UI tooltip: 'Austin-targeted volume via DFS Labs' vs 'global Google Ads keyword planner' so admins know what they're looking at. Likely improves perceived data quality more than any other single change."
+        },
+        {
+          "id": "intel-quality-service-coverage-gap-detection",
+          "title": "Service coverage gap detection for local SEO",
+          "source": "Tier 2 staging quality audit on Swish 2026-05-22",
+          "priority": "P2",
+          "est": "0.5 day",
+          "status": "pending",
+          "plannedSprint": "sprint-local-seo-i",
+          "sprintBatch": "insight-surfaces",
+          "owner": "seo-health",
+          "notes": "Swish refresh had 0 keywords tracking major dental categories: braces, cleaning, family dentistry, pediatric, root canal, orthodontist, fillings, extraction, wisdom teeth, dentures. Selection is heavily weighted toward strategy + page-map sources, so services without a dedicated page get no candidate representation. For a multi-service practice this creates major SEO blind spots — pediatric dentistry is a billion-dollar category Swish completely lacks coverage on; could be intentional but should be a deliberate choice. Fix: (1) Define service taxonomy per workspace industry (dental: 20 standard services, legal: 15, etc.) — or pull from intelligence profile. (2) Before refresh, compute keyword coverage per service. (3) Surface 'You have 0 keywords tracking pediatric dentistry — is that intentional?' as an admin nudge in the local SEO setup drawer. (4) Optional: offer 'add starter keywords for these services' one-click that seeds 3-5 keywords per missing service. Detects gaps proactively rather than relying on the admin to notice."
+        },
+        {
+          "id": "intel-quality-question-intent-modifiers",
+          "title": "Question + intent modifier generation in candidate iterator",
+          "source": "Tier 2 staging quality audit on Swish 2026-05-22",
+          "priority": "P2",
+          "est": "0.5 day",
+          "status": "pending",
+          "plannedSprint": "sprint-local-seo-i",
+          "sprintBatch": "iterator-quality",
+          "owner": "seo-health",
+          "notes": "Local candidate iterator generates city-modifier variants ('dentist austin') and near-me variants ('dentist near me') but skips high-intent question variants. Missing from Swish's 200 snapshots: 'best dentist austin', 'top rated dentist austin tx', 'emergency dentist austin 24 hour', 'affordable dentist austin', 'dentist accepting new patients austin', 'open now dentist austin'. These are high-intent pre-booking queries and matter more than generic city-modified terms. Fix: (1) Add a configurable list of intent prefixes/suffixes to `iterateLocalCandidateSignals`: ['best', 'top rated', 'affordable', 'cheap', 'emergency', 'open now', 'same day', 'accepting new patients', '24 hour', 'today']. (2) For each service-keyword base, generate a small bounded set of intent variants in addition to city/neighborhood variants. (3) Tier 2 cheap default still applies — no extra evaluator cost. Net effect: ~5-10 high-intent variants per service base, ~15-25% of refresh budget redirected to higher-value queries."
+        },
+        {
+          "id": "intel-quality-source-distribution-rebalancing",
+          "title": "Per-source budget caps in local candidate selection",
+          "source": "Tier 2 staging quality audit on Swish 2026-05-22",
+          "priority": "P2",
+          "est": "0.5 day",
+          "status": "pending",
+          "plannedSprint": "sprint-local-seo-i",
+          "sprintBatch": "iterator-quality",
+          "owner": "seo-health",
+          "notes": "Swish refresh over-indexed on 'appointment' variants — 23 of 100 Austin keywords (23%) were 'schedule X dental appointment' variants from the Schedule-an-Appointment page. These all returned rank 1 (already-winning bottom-of-funnel branded scheduling), so the budget was spent confirming what we already know. Higher-funnel discovery keywords got crowded out. Fix: in `selectLocalIntentKeywords` after sorting by score, enforce per-source caps: no more than e.g. 25% of refresh budget from a single source-page or single tracking source. Frees budget for higher-funnel diversity. Doesn't add complexity — just a single per-page counter in the slice loop."
+        },
+        {
           "id": "intel-quality-google-business-profile-health",
           "title": "Google Business Profile health",
           "source": "PR14 local SEO foundation audit 2026-05-20",
           "est": "6-10h",
           "priority": "P2",
           "status": "pending",
+          "plannedSprint": "deferred",
           "owner": "integrations",
           "notes": "Follow-on after local-pack visibility v1. Audit and implement Google Business Profile/profile-health intelligence only when provider/API access is confirmed. Candidate signals include profile completeness, primary/secondary categories, services/products, photos, posts, opening hours, website/call/direction/bookings actions, profile views, and query discovery where available. Keep claims source-backed and do not imply GBP ownership unless OAuth/provider identity is verified."
         },
@@ -374,6 +490,7 @@
           "est": "5-8h",
           "priority": "P2",
           "status": "pending",
+          "plannedSprint": "deferred",
           "owner": "analytics-intelligence",
           "notes": "Follow-on after local-pack visibility v1. Use Google Reviews or GBP-backed review sources only with explicit provider/cost guardrails. Candidate signals include rating, review count, review velocity, review themes, recent negative review posture, response opportunities, and competitor review gaps. This should feed local SEO reporting/recommendations and content/trust next actions, not auto-post reviews or responses."
         },
@@ -384,6 +501,7 @@
           "est": "8-14h",
           "priority": "P2",
           "status": "pending",
+          "plannedSprint": "deferred",
           "owner": "seo-health",
           "notes": "Follow-on after local-pack visibility v1 and cost validation. Add coordinate-point/geographic grid tracking for local map visibility with strict caps, scheduling, cache/telemetry, and UI designed for local businesses. Use DataForSEO Maps/SERP capabilities or another provider only after modeling cost by keyword x coordinate x device x cadence. Keep geo-grid separate from GSC Rank Tracker snapshots and avoid auto-inferred grids from keywords alone."
         },
@@ -394,6 +512,7 @@
           "est": "6-10h",
           "priority": "P2",
           "status": "pending",
+          "plannedSprint": "deferred",
           "owner": "analytics-intelligence",
           "notes": "Follow-on after local visibility, GBP/review posture, and local reporting have stable data. Generate local SEO recommendations that combine local-pack visibility, workspace local posture, page/service-area coverage, LocalBusiness schema evidence, reviews/GBP signals where available, local competitors, keyword lifecycle, and outcomes such as calls/forms/bookings/directions. Recommendations must be source-backed, conservative, and route to safe next actions rather than publishing or mutating live sites."
         },
@@ -1060,6 +1179,83 @@
         }
       ],
       "name": "Client Inbox IA — Phase 3 Deferred (3.1–3.4)"
+    },
+    {
+      "id": "sprint-local-seo-h",
+      "name": "Local SEO Quality — Foundation Fixes (Sprint H)",
+      "hours": "3-4 days",
+      "rationale": "Highest-credibility fixes from the Swish 200-snapshot audit. Two items need brainstorming sessions before coding (multi-location match, geo-targeted volume); two are design-first (KCC UX overhaul, surface audit). Start with KCC UX overhaul in parallel with the brainstorm sessions. Ship multi-location match and geo-targeted volume once architecture decisions are settled. Surface audit follows after the other two shape the final information hierarchy. Ordering: (1) Brainstorm intel-quality-multi-location-business-match — data model (new client_locations table vs JSON), match-tier logic, snapshot schema changes, top_competitors exclusion. (2) Brainstorm intel-quality-keyword-volume-geo-targeting — blast radius scoping (platform-wide, not just local SEO), per-market storage model, migration path for existing volume data. (3) Implement kcc-ui-overhaul (no brainstorm needed — pattern is StrategyKeywordDrawer). (4) Implement multi-location match + geo-targeted volume after architecture is settled (can be parallel PRs). (5) local-seo-surface-audit as design pass after #3 and #4 reshape the surfaces.",
+      "items": [
+        {
+          "id": "sprint-local-seo-h-ref-kcc-ui-overhaul",
+          "ref": "kcc-ui-overhaul",
+          "title": "KCC UI/UX overhaul — slide-over drawer, bulk actions, overflow polish",
+          "priority": "P1",
+          "est": "1-2 days",
+          "status": "pending",
+          "notes": "No brainstorm needed. Pattern: StrategyKeywordDrawer for slide-over. Start first — can run in parallel with the brainstorm sessions. See kcc-ui-overhaul in sprint-intelligence-quality-consolidation for full spec."
+        },
+        {
+          "id": "sprint-local-seo-h-ref-multi-location-match",
+          "ref": "intel-quality-multi-location-business-match",
+          "title": "Multi-location business match reconciliation",
+          "priority": "P1",
+          "est": "0.5-1 day after brainstorm",
+          "status": "pending",
+          "notes": "Brainstorm required first. Key decisions: (1) new client_locations table vs extend workspace settings JSON, (2) match confidence tiers with N locations, (3) snapshot businessFound semantics with multiple matches, (4) top_competitors exclusion query. This is the highest-credibility fix — we are reporting own locations as competitors."
+        },
+        {
+          "id": "sprint-local-seo-h-ref-volume-geo-targeting",
+          "ref": "intel-quality-keyword-volume-geo-targeting",
+          "title": "Geo-targeted volume + DFS Labs keyword overview",
+          "priority": "P1",
+          "est": "1 day after brainstorm",
+          "status": "pending",
+          "notes": "Brainstorm required first. Platform-wide blast radius — affects every volume reading, not just local SEO. Key decisions: (1) migrate primary volume source from google_ads/search_volume/live to dataforseo_labs/google/keyword_overview, (2) per-market volume storage schema, (3) backfill strategy for existing workspaces. Can ship in parallel with multi-location match once architecture is settled."
+        },
+        {
+          "id": "sprint-local-seo-h-ref-surface-audit",
+          "ref": "local-seo-surface-audit",
+          "title": "Local SEO surface audit — Strategy / Keywords / Page Intelligence",
+          "priority": "P2",
+          "est": "0.5 day scoping + 1 day implementation",
+          "status": "pending",
+          "notes": "Design-first. Run after KCC UX overhaul and multi-location/volume fixes settle the final information hierarchy. Audit which facts belong on which surface and what cross-links make the hub-and-spoke relationship obvious."
+        }
+      ]
+    },
+    {
+      "id": "sprint-local-seo-i",
+      "name": "Local SEO Quality — Iterator & Insight Batch (Sprint I)",
+      "hours": "2-3 days",
+      "rationale": "Items where the code path is completely clear and can be implemented as parallel subagent batches after Sprint H is merged. Two independent batches: (1) Iterator quality batch — all three items touch iterateLocalCandidateSignals + selectLocalIntentKeywords and should ship in one PR to avoid merge conflicts. (2) Insight surfaces batch — two additive features (competitor brand tracking, service coverage gap detection) that add new data flows and UI surfaces without touching the iterator. Both batches can run in parallel if parallel worktrees are used. No brainstorm needed for any item here.",
+      "items": [
+        {
+          "id": "sprint-local-seo-i-batch-iterator",
+          "title": "Iterator quality batch (PR)",
+          "priority": "P1",
+          "est": "1-2 days",
+          "status": "pending",
+          "batchItems": [
+            "intel-quality-keyword-intent-classification",
+            "intel-quality-question-intent-modifiers",
+            "intel-quality-source-distribution-rebalancing"
+          ],
+          "notes": "Ship as one PR — all three items touch iterateLocalCandidateSignals and selectLocalIntentKeywords. Parallel edits would conflict. Sequence within the PR: (1) intent classification (biggest change — adds per-candidate intent label, excludes informational/comparison from refresh), (2) question + intent modifier generation (additive to iterator signal set), (3) per-source budget caps (additive cap in selectLocalIntentKeywords after sort). Each item is a 0.5-1 day addition; combined PR is 1-2 days with tests. No new tables — all changes are in server/local-seo.ts."
+        },
+        {
+          "id": "sprint-local-seo-i-batch-insight-surfaces",
+          "title": "Insight surfaces batch (PR)",
+          "priority": "P1",
+          "est": "1.5-2 days",
+          "status": "pending",
+          "batchItems": [
+            "intel-quality-competitor-brand-tracking",
+            "intel-quality-service-coverage-gap-detection"
+          ],
+          "notes": "Ship as one PR — both items add new data flows and insight surfaces without touching the iterator. Can run in parallel worktree with the iterator batch. Competitor brand tracking: aggregate top_competitors from snapshots, surface 'who keeps beating you', one-click to track competitor brands (likely new competitor_brands table or extension of keyword strategy schema). Service coverage gap detection: define industry service taxonomy, compute coverage per service, surface as admin nudge in setup drawer. Both items have clear code paths — no brainstorm needed."
+        }
+      ]
     },
     {
       "id": "sprint-polish-quick-wins",

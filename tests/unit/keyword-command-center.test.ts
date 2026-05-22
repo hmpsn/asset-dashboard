@@ -22,6 +22,7 @@ import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import {
   KEYWORD_COMMAND_CENTER_ACTIONS,
   KEYWORD_COMMAND_CENTER_FILTERS,
+  KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE,
   KEYWORD_COMMAND_CENTER_STATUS,
 } from '../../shared/types/keyword-command-center.js';
 import {
@@ -1420,5 +1421,76 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
     const elapsed = Date.now() - start;
     expect(rows).toBeTruthy();
     expect(elapsed).toBeLessThan(2000);
+  });
+
+  it('Local Candidates filter returns rows when local_variant candidates exist beyond strategy-sourced top of pool', async () => {
+    // Regression test: the top LOCAL_CANDIDATE_ROW_LIMIT (75) slots were dominated by
+    // strategy/tracking-sourced candidates (selected=true, higher score).  These get
+    // lifecycle=SELECTED in buildLocalSeoState, not CANDIDATE, so the LOCAL_CANDIDATES
+    // filter matched zero rows even when hundreds of local_variant candidates existed.
+    // Fix: unselected candidates are sorted first before slicing.
+    updateWorkspace(workspaceId, {
+      name: 'Regression Plumbing',
+      liveDomain: 'https://regression-plumbing.example.com',
+      businessProfile: {
+        address: { street: '1 Main St', city: 'Austin', state: 'TX', country: 'US' },
+      },
+    });
+    updateLocalSeoConfiguration(workspaceId, {
+      posture: LOCAL_SEO_POSTURE.LOCAL,
+      markets: [{
+        label: 'Austin, TX',
+        city: 'Austin',
+        stateOrRegion: 'TX',
+        country: 'US',
+        providerLocationCode: 1026201,
+        status: LOCAL_SEO_MARKET_STATUS.ACTIVE,
+      }],
+    }, true);
+
+    // Seed 76 strategy/page-assignment keywords (all become selected=true in the pool).
+    // With the bug, these would fill the entire 75-slot slice, leaving no room for
+    // the local_variant candidate generated below.
+    for (let i = 0; i < 76; i++) {
+      upsertPageKeyword(workspaceId, {
+        pagePath: `/services/strategy-kw-${i}`,
+        pageTitle: `Strategy Keyword ${i}`,
+        primaryKeyword: `strategy keyword ${i}`,
+        secondaryKeywords: [],
+        searchIntent: 'commercial',
+        volume: 1000 + i,
+        difficulty: 30,
+      });
+    }
+
+    // Also seed one page keyword with a secondary keyword that generates a local_variant.
+    // This produces a candidate like "pipe repair austin" with selected=false.
+    upsertPageKeyword(workspaceId, {
+      pagePath: '/services/pipe-repair',
+      pageTitle: 'Pipe Repair',
+      primaryKeyword: 'pipe repair',
+      secondaryKeywords: ['emergency pipe fix'],
+      searchIntent: 'commercial',
+      volume: 800,
+      difficulty: 25,
+    });
+
+    // Confirm the summary count sees local candidates (so the badge would show > 0).
+    const summary = await buildKeywordCommandCenterSummary(workspaceId, { includeLocalSeo: true });
+    expect(summary!.counts.localCandidates).toBeGreaterThan(0);
+
+    // Build rows using the LOCAL_CANDIDATES filter — the bug caused 0 rows here.
+    const payload = await buildKeywordCommandCenterRows(
+      workspaceId,
+      { filter: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES, pageSize: 200 },
+      { includeLocalSeo: true },
+    );
+    expect(payload).not.toBeNull();
+    expect(payload!.rows.length).toBeGreaterThan(0);
+
+    // Every row returned must be lifecycle=CANDIDATE (the filter contract).
+    for (const row of payload!.rows) {
+      expect(row.localSeoState?.lifecycle).toBe(KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CANDIDATE);
+    }
   });
 });
