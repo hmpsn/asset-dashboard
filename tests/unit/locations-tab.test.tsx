@@ -99,6 +99,22 @@ describe('LocationsTab', () => {
     });
   });
 
+  it('prefills the add form from workspace data when editing the seed location', () => {
+    mockUseLocalSeoLocations.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+    } as ReturnType<typeof useLocalSeoLocations>);
+
+    renderInRouter(<LocationsTab {...defaultProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /edit before confirming/i }));
+
+    expect(screen.getByLabelText(/location name/i)).toHaveValue('Acme Corp');
+    expect(screen.getByLabelText(/domain/i)).toHaveValue('acme.com');
+    expect(screen.getByLabelText(/phone/i)).toHaveValue('+1 512 555 0101');
+    expect(screen.getByLabelText(/street address/i)).toHaveValue('123 Main St');
+  });
+
   it('renders needs_review location row with Confirm and Edit actions', () => {
     mockUseLocalSeoLocations.mockReturnValue({
       data: [
@@ -123,6 +139,71 @@ describe('LocationsTab', () => {
     expect(screen.getByRole('button', { name: /confirm location Austin HQ/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /edit location Austin HQ/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /remove location Austin HQ/i })).toBeTruthy();
+  });
+
+  it('sends empty strings when optional fields are cleared while editing', async () => {
+    const mutateAsync = vi.fn().mockResolvedValue(undefined);
+    mockUseUpdateLocation.mockReturnValue({ ...noopMutation, mutateAsync } as unknown as ReturnType<typeof useUpdateLocation>);
+    mockUseLocalSeoLocations.mockReturnValue({
+      data: [
+        {
+          id: 'loc-clear',
+          workspaceId: 'ws-1',
+          name: 'Austin HQ',
+          domain: 'austin.acme.com',
+          phone: '+1 512 555 0101',
+          streetAddress: '123 Main St',
+          city: 'Austin',
+          stateOrRegion: 'TX',
+          country: 'US',
+          isPrimary: true,
+          status: 'confirmed',
+          createdAt: '2026-05-22T00:00:00Z',
+          updatedAt: '2026-05-22T00:00:00Z',
+        },
+      ],
+      isLoading: false,
+      isError: false,
+    } as ReturnType<typeof useLocalSeoLocations>);
+
+    renderInRouter(<LocationsTab {...defaultProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /edit location Austin HQ/i }));
+    fireEvent.change(screen.getByLabelText(/domain/i), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(mutateAsync).toHaveBeenCalledWith({
+        locationId: 'loc-clear',
+        body: expect.objectContaining({ domain: '' }),
+      });
+    });
+  });
+
+  it('shows a toast when confirming a location fails', async () => {
+    const mutateAsync = vi.fn().mockRejectedValue(new Error('nope'));
+    mockUseUpdateLocation.mockReturnValue({ ...noopMutation, mutateAsync } as unknown as ReturnType<typeof useUpdateLocation>);
+    mockUseLocalSeoLocations.mockReturnValue({
+      data: [
+        {
+          id: 'loc-fail',
+          workspaceId: 'ws-1',
+          name: 'Austin HQ',
+          isPrimary: true,
+          status: 'needs_review',
+          createdAt: '2026-05-22T00:00:00Z',
+          updatedAt: '2026-05-22T00:00:00Z',
+        },
+      ],
+      isLoading: false,
+      isError: false,
+    } as ReturnType<typeof useLocalSeoLocations>);
+
+    renderInRouter(<LocationsTab {...defaultProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /confirm location Austin HQ/i }));
+
+    await waitFor(() => {
+      expect(defaultProps.toast).toHaveBeenCalledWith('Failed to confirm location', 'error');
+    });
   });
 
   it('renders confirmed location row without Confirm action', () => {

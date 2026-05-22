@@ -81,13 +81,26 @@ function formFromLocation(location: ClientLocation): LocationFormState {
 function formToBody(form: LocationFormState): CreateLocationBody {
   return {
     name: form.name.trim(),
-    domain: form.domain.trim() || undefined,
-    phone: form.phone.trim() || undefined,
-    streetAddress: form.streetAddress.trim() || undefined,
-    city: form.city.trim() || undefined,
-    stateOrRegion: form.stateOrRegion.trim() || undefined,
-    country: form.country.trim() || undefined,
+    domain: form.domain.trim(),
+    phone: form.phone.trim(),
+    streetAddress: form.streetAddress.trim(),
+    city: form.city.trim(),
+    stateOrRegion: form.stateOrRegion.trim(),
+    country: form.country.trim(),
     isPrimary: form.isPrimary,
+  };
+}
+
+function formFromSeedBody(body: CreateLocationBody): LocationFormState {
+  return {
+    name: body.name,
+    domain: body.domain ?? '',
+    phone: body.phone ?? '',
+    streetAddress: body.streetAddress ?? '',
+    city: body.city ?? '',
+    stateOrRegion: body.stateOrRegion ?? '',
+    country: body.country ?? '',
+    isPrimary: body.isPrimary ?? false,
   };
 }
 
@@ -154,9 +167,10 @@ interface LocationRowProps {
   location: ClientLocation;
   workspaceId: string;
   onDelete: (id: string) => void;
+  toast: LocationsTabProps['toast'];
 }
 
-function LocationRow({ location, workspaceId, onDelete }: LocationRowProps) {
+function LocationRow({ location, workspaceId, onDelete, toast }: LocationRowProps) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<LocationFormState>(() => formFromLocation(location));
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -164,13 +178,23 @@ function LocationRow({ location, workspaceId, onDelete }: LocationRowProps) {
   const needsReview = location.status === 'needs_review';
 
   const handleConfirm = async () => {
-    await updateMutation.mutateAsync({ locationId: location.id, body: { status: 'confirmed' } });
+    try {
+      await updateMutation.mutateAsync({ locationId: location.id, body: { status: 'confirmed' } });
+      toast('Location confirmed');
+    } catch {
+      toast('Failed to confirm location', 'error');
+    }
   };
 
   const handleSave = async () => {
     if (!form.name.trim()) return;
-    await updateMutation.mutateAsync({ locationId: location.id, body: formToBody(form) });
-    setEditing(false);
+    try {
+      await updateMutation.mutateAsync({ locationId: location.id, body: formToBody(form) });
+      setEditing(false);
+      toast('Location updated');
+    } catch {
+      toast('Failed to update location', 'error');
+    }
   };
 
   const cancelEdit = () => {
@@ -371,7 +395,14 @@ export function LocationsTab({ workspaceId, workspaceName, liveDomain, businessP
               <Button variant="primary" size="sm" icon={Check} onClick={() => { void handleSeedConfirm(); }} loading={seedConfirming || createMutation.isPending}>
                 Confirm
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setShowAddForm(true)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setAddForm(formFromSeedBody(seedBody));
+                  setShowAddForm(true);
+                }}
+              >
                 Edit before confirming
               </Button>
             </div>
@@ -383,7 +414,12 @@ export function LocationsTab({ workspaceId, workspaceName, liveDomain, businessP
         <div className="space-y-3" role="list" aria-label="Business locations">
           {locations.map(location => (
             <div key={location.id} role="listitem">
-              <LocationRow location={location} workspaceId={workspaceId} onDelete={locationId => { void handleDelete(locationId); }} />
+              <LocationRow
+                location={location}
+                workspaceId={workspaceId}
+                onDelete={locationId => { void handleDelete(locationId); }}
+                toast={toast}
+              />
             </div>
           ))}
         </div>
