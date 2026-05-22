@@ -385,7 +385,77 @@
           "est": "2-3 days",
           "status": "pending",
           "owner": "seo-health",
-          "notes": "Today the refresh planner pairs every selected keyword with every active market — `dentist at houston` gets queried against Austin's market and surfaces Houston competitors as 'top local results' in the Austin context. Confirmed on Swish staging refresh 2026-05-21. Fix is non-trivial because it requires a keyword↔market assignment model. (1) New `keyword_markets` join table mapping which keywords should be checked against which markets. (2) Default: keyword applies to all active markets (matches current implicit behavior, no migration of existing data needed). (3) Override path: admin pins a keyword to specific market(s). (4) Auto-inference: if keyword text contains an active market's city/region name, default assignment to that market only. (5) Iterator + refresh planner respect the assignment. (6) UI: per-market detail blocks in keyword drawer instead of single block, with pin/unpin controls. Deferred to P2 because no current client uses multi-market in production — Swish is the only multi-market workspace and is internal."
+          "notes": "Today the refresh planner pairs every selected keyword with every active market — `dentist at houston` gets queried against Austin's market and surfaces Houston competitors as 'top local results' in the Austin context. Confirmed on Swish staging refresh 2026-05-21 (55 of 200 snapshots = 27.5% cross-market noise). Fix is non-trivial because it requires a keyword↔market assignment model. (1) New `keyword_markets` join table mapping which keywords should be checked against which markets. (2) Default: keyword applies to all active markets (matches current implicit behavior, no migration of existing data needed). (3) Override path: admin pins a keyword to specific market(s). (4) Auto-inference: if keyword text contains an active market's city/region name, default assignment to that market only. (5) Iterator + refresh planner respect the assignment. (6) UI: per-market detail blocks in keyword drawer instead of single block, with pin/unpin controls. (7) **Per-market volume/clicks/impressions reporting**: the keyword detail surface should show separate volume, GSC clicks, GSC impressions, and CTR per active market the keyword applies to — today these are workspace-global and don't distinguish between Austin and Houston performance for the same keyword. Requires per-market metric storage AND geo-targeted DataForSEO volume queries (see intel-quality-keyword-volume-geo-targeting). Deferred to P2 because no current client uses multi-market in production — Swish is the only multi-market workspace and is internal."
+        },
+        {
+          "id": "intel-quality-multi-location-business-match",
+          "title": "Multi-location business match reconciliation",
+          "source": "Tier 2 staging quality audit on Swish 2026-05-22",
+          "priority": "P1",
+          "est": "0.5-1 day",
+          "status": "pending",
+          "owner": "seo-health",
+          "notes": "Swish has multiple physical locations (Downtown, Midtown, East Austin) each with its own GBP listing. `evaluateLocalBusinessMatch` in `server/local-seo.ts` matches ONE listing per snapshot and treats the rest as third-party competitors. Result on Swish: 'Swish Dental Downtown' appears as a 'competitor' in 31 snapshots, 'Swish Dental - Midtown' in 15 — both are actually Swish. Verified-match rate dropped to 3-4% across 200 snapshots when reality is much higher. **This is the single biggest fix for dashboard credibility — we are systematically underreporting our own performance.** Fix: (1) New workspace concept of `client_locations` — multiple GBPs/URLs/phone numbers/addresses tied to one workspace. (2) `evaluateLocalBusinessMatch` checks against ALL configured locations, not just the primary workspace identity. (3) Snapshot `businessFound` returns true if ANY configured location matches. (4) `top_competitors` excludes the client's other locations from the competitor list. (5) UI shows which specific location matched. Affects business-match logic, snapshot enrichment, and 'top competitors' presentation across local SEO reporting."
+        },
+        {
+          "id": "intel-quality-keyword-intent-classification",
+          "title": "Intent classification for local candidate selection",
+          "source": "Tier 2 staging quality audit on Swish 2026-05-22",
+          "priority": "P1",
+          "est": "1-2 days",
+          "status": "pending",
+          "owner": "seo-health",
+          "notes": "23% of selected keywords in the Swish refresh had no local pack (46/200): 'dental financing and insurance options', 'crowns vs veneers comparison', 'covid-19 dental impact', 'best dental insurance plans'. These are informational/comparison/educational queries — wrong intent class for local visibility tracking. They consumed ~$0.092 of the $0.40 spend and produced no useful local data. Root cause: the candidate iterator includes anything with a service term + market modifier, with no intent classification. Fix: (1) Classify each candidate keyword into one of {transactional, navigational, informational, comparison, commercial} via lightweight regex + dictionary lookup OR via DataForSEO's `dataforseo_labs/google/search_intent` endpoint. (2) Local refresh planner excludes informational + comparison intent — those belong in content strategy, not local SEO. (3) Surface intent classification on KCC row + drawer so admins see what each keyword is FOR. (4) Optional: route excluded keywords to a 'content brief candidates' queue. Eliminates ~25% of refresh budget waste."
+        },
+        {
+          "id": "intel-quality-competitor-brand-tracking",
+          "title": "Auto-detect repeat competitors + offer competitor brand tracking",
+          "source": "Tier 2 staging quality audit on Swish 2026-05-22",
+          "priority": "P1",
+          "est": "1 day",
+          "status": "pending",
+          "owner": "seo-health",
+          "notes": "Top-competitor data from snapshots is already collected but never operationalized. On Swish 2026-05-22: 'ATX Family Dental' beat Swish 9 times in queries where the pack was present but Swish wasn't found — #1 local competitor. 'Emergency Dental Care Houston 24/7' won 5 emergency queries. 'Toothbar' appeared 35 times. None of these are tracked as branded competitor queries in Swish's strategy. Fix: (1) Aggregate top_competitors across recent snapshots to surface a 'who keeps beating you' list (P1 surface). (2) For each repeat competitor, suggest branded competitor keywords to track: '[competitor name] reviews', '[competitor name] vs [client name]', '[competitor name] [city]'. (3) One-click 'track these competitor brands' that adds them to the keyword strategy as competitor-intent keywords. (4) New `competitor_brands` table or extension of existing strategy schema. This is a P0 in any consultancy playbook — branded competitor tracking is how you find weakness. Currently 100% missing."
+        },
+        {
+          "id": "intel-quality-keyword-volume-geo-targeting",
+          "title": "Geo-targeted volume + use DFS Labs keyword overview",
+          "source": "Tier 2 staging quality audit on Swish 2026-05-22",
+          "priority": "P1",
+          "est": "1 day",
+          "status": "pending",
+          "owner": "seo-health",
+          "notes": "Volume data across the platform comes primarily from `keywords_data/google_ads/search_volume/live`, which (a) returns BUCKET-ROUNDED volumes (90, 110, 140, 1000, 1300…), not real numbers, and (b) is NOT geo-targeted by default in our code. Result: 'austin dentist' shows ~110 volume because Google Ads keyword planner returns ~110 nationally for that exact phrase. The REAL Austin-metro search volume across 'dentist near me', 'dentist austin tx', 'best dentist austin' etc. is 10,000+/mo. Affects every volume reading in the platform, not just local SEO. Fix: (1) Pass `location_code` from active markets to all volume queries — geo-target every fetch. (2) Move from `keywords_data/google_ads/search_volume/live` to `dataforseo_labs/google/keyword_overview` for primary volume — DFS Labs returns geo-targeted volumes + intent + competitive density in one call. (3) When workspace has multiple markets, store per-market volume (ties to intel-quality-keyword-per-market-relevance). (4) Surface volume provenance in UI tooltip: 'Austin-targeted volume via DFS Labs' vs 'global Google Ads keyword planner' so admins know what they're looking at. Likely improves perceived data quality more than any other single change."
+        },
+        {
+          "id": "intel-quality-service-coverage-gap-detection",
+          "title": "Service coverage gap detection for local SEO",
+          "source": "Tier 2 staging quality audit on Swish 2026-05-22",
+          "priority": "P2",
+          "est": "0.5 day",
+          "status": "pending",
+          "owner": "seo-health",
+          "notes": "Swish refresh had 0 keywords tracking major dental categories: braces, cleaning, family dentistry, pediatric, root canal, orthodontist, fillings, extraction, wisdom teeth, dentures. Selection is heavily weighted toward strategy + page-map sources, so services without a dedicated page get no candidate representation. For a multi-service practice this creates major SEO blind spots — pediatric dentistry is a billion-dollar category Swish completely lacks coverage on; could be intentional but should be a deliberate choice. Fix: (1) Define service taxonomy per workspace industry (dental: 20 standard services, legal: 15, etc.) — or pull from intelligence profile. (2) Before refresh, compute keyword coverage per service. (3) Surface 'You have 0 keywords tracking pediatric dentistry — is that intentional?' as an admin nudge in the local SEO setup drawer. (4) Optional: offer 'add starter keywords for these services' one-click that seeds 3-5 keywords per missing service. Detects gaps proactively rather than relying on the admin to notice."
+        },
+        {
+          "id": "intel-quality-question-intent-modifiers",
+          "title": "Question + intent modifier generation in candidate iterator",
+          "source": "Tier 2 staging quality audit on Swish 2026-05-22",
+          "priority": "P2",
+          "est": "0.5 day",
+          "status": "pending",
+          "owner": "seo-health",
+          "notes": "Local candidate iterator generates city-modifier variants ('dentist austin') and near-me variants ('dentist near me') but skips high-intent question variants. Missing from Swish's 200 snapshots: 'best dentist austin', 'top rated dentist austin tx', 'emergency dentist austin 24 hour', 'affordable dentist austin', 'dentist accepting new patients austin', 'open now dentist austin'. These are high-intent pre-booking queries and matter more than generic city-modified terms. Fix: (1) Add a configurable list of intent prefixes/suffixes to `iterateLocalCandidateSignals`: ['best', 'top rated', 'affordable', 'cheap', 'emergency', 'open now', 'same day', 'accepting new patients', '24 hour', 'today']. (2) For each service-keyword base, generate a small bounded set of intent variants in addition to city/neighborhood variants. (3) Tier 2 cheap default still applies — no extra evaluator cost. Net effect: ~5-10 high-intent variants per service base, ~15-25% of refresh budget redirected to higher-value queries."
+        },
+        {
+          "id": "intel-quality-source-distribution-rebalancing",
+          "title": "Per-source budget caps in local candidate selection",
+          "source": "Tier 2 staging quality audit on Swish 2026-05-22",
+          "priority": "P2",
+          "est": "0.5 day",
+          "status": "pending",
+          "owner": "seo-health",
+          "notes": "Swish refresh over-indexed on 'appointment' variants — 23 of 100 Austin keywords (23%) were 'schedule X dental appointment' variants from the Schedule-an-Appointment page. These all returned rank 1 (already-winning bottom-of-funnel branded scheduling), so the budget was spent confirming what we already know. Higher-funnel discovery keywords got crowded out. Fix: in `selectLocalIntentKeywords` after sorting by score, enforce per-source caps: no more than e.g. 25% of refresh budget from a single source-page or single tracking source. Frees budget for higher-funnel diversity. Doesn't add complexity — just a single per-page counter in the slice loop."
         },
         {
           "id": "intel-quality-google-business-profile-health",
