@@ -1388,4 +1388,37 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
     const summary = await buildKeywordCommandCenterSummary(workspaceId, { includeLocalSeo: true });
     expect(summary!.counts.localCandidates).toBeLessThanOrEqual(1000);
   });
+
+  it('Local Candidates filter resolves under 500ms even on a rich workspace (cheap default)', async () => {
+    // Tier 2 contract: KCC row enrichment uses the cheap buildLocalSeoKeywordCandidates
+    // (no evaluator, no suppression). Pre-Tier-2 this filter took 35–43s on Swish.
+    // Seed enough sources to make the difference noticeable, then assert the wall
+    // clock stays well under the OOM-threshold timer.
+    updateLocalSeoConfiguration(workspaceId, {
+      posture: LOCAL_SEO_POSTURE.LOCAL,
+      markets: [
+        { label: 'Austin, TX', city: 'Austin', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1026201, status: LOCAL_SEO_MARKET_STATUS.ACTIVE },
+        { label: 'Houston, TX', city: 'Houston', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1026202, status: LOCAL_SEO_MARKET_STATUS.ACTIVE },
+      ],
+    }, true);
+    for (let i = 0; i < 30; i++) {
+      upsertPageKeyword(workspaceId, {
+        pagePath: `/services/service-${i}`,
+        pageTitle: `Service ${i} Repair`,
+        primaryKeyword: `service ${i} repair`,
+        secondaryKeywords: [`service ${i} cost`, `service ${i} cleaning`],
+        searchIntent: 'commercial',
+      });
+    }
+
+    const start = Date.now();
+    const rows = await buildKeywordCommandCenterRows(
+      workspaceId,
+      { filter: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES, pageSize: 100 },
+      { includeLocalSeo: true },
+    );
+    const elapsed = Date.now() - start;
+    expect(rows).toBeTruthy();
+    expect(elapsed).toBeLessThan(2000);
+  });
 });

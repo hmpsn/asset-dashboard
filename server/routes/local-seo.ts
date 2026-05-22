@@ -12,7 +12,6 @@ import { createJob, hasActiveJob } from '../jobs.js';
 import {
   createLocalSeoRefreshPlan,
   getLocalSeoReadModel,
-  LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH,
   resolveLocalSeoProviderLocation,
   runLocalSeoRefreshJob,
   updateLocalSeoConfiguration,
@@ -22,6 +21,8 @@ import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import {
   LOCAL_SEO_DEVICE,
   LOCAL_SEO_MARKET_STATUS,
+  LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP,
+  LOCAL_SEO_MIN_KEYWORDS_PER_REFRESH,
   LOCAL_SEO_POSTURE,
 } from '../../shared/types/local-seo.js';
 
@@ -54,11 +55,24 @@ const updateSchema = z.object({
   // Allow a full replacement save at the v1 cap: up to 3 active rows plus
   // up to 3 existing rows being explicitly marked inactive in the same request.
   markets: z.array(marketSchema).max(6).optional(),
+  // Per-workspace override for the local SEO refresh keyword budget.
+  // `null` clears any existing override (revert to global default).
+  // Integer in [min, max] sets a custom value. Omit to leave unchanged.
+  keywordsPerRefresh: z
+    .number()
+    .int()
+    .min(LOCAL_SEO_MIN_KEYWORDS_PER_REFRESH)
+    .max(LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP)
+    .nullable()
+    .optional(),
 }).strict();
 
 const refreshSchema = z.object({
   marketIds: z.array(z.string().min(1)).max(3).optional(),
-  keywords: z.array(z.string().min(1).max(200)).max(LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH).optional(),
+  // Use the hard ceiling here, not the workspace's effective budget — admin
+  // can submit explicit keywords up to the platform-wide maximum; the refresh
+  // plan clamps the final selection to the workspace's effective budget.
+  keywords: z.array(z.string().min(1).max(200)).max(LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP).optional(),
   device: z.enum([LOCAL_SEO_DEVICE.DESKTOP, LOCAL_SEO_DEVICE.MOBILE]).optional(),
   languageCode: z.string().min(2).max(8).optional(),
 }).strict();

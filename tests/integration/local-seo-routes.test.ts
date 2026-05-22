@@ -66,7 +66,13 @@ describe('Local SEO routes', () => {
         providerLocationName: 'Austin,Texas,United States',
       }),
     ]));
-    expect(body.caps).toEqual({ maxMarkets: 3, maxKeywordsPerRefresh: 50 });
+    expect(body.caps).toEqual({
+      maxMarkets: 3,
+      maxKeywordsPerRefresh: 100,
+      keywordsPerRefreshMin: 25,
+      keywordsPerRefreshMax: 300,
+      keywordsPerRefreshDefault: 100,
+    });
     expect(body.latestSnapshots).toEqual([]);
     expect(body.report).toEqual(expect.objectContaining({
       workspacePosture: 'unknown',

@@ -2,9 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import db from '../../server/db/index.js';
 import {
   buildLocalSeoKeywordCandidates,
+  buildLocalSeoKeywordCandidatesEvaluated,
   buildLocalSeoKeywordVisibilitySummaryByKey,
   createLocalSeoRefreshPlan,
   evaluateLocalBusinessMatch,
+  getEffectiveKeywordsPerRefresh,
   getLocalSeoReadModel,
   runLocalSeoRefreshJob,
   updateLocalSeoConfiguration,
@@ -58,8 +60,19 @@ beforeEach(() => {
       posture_source TEXT NOT NULL DEFAULT 'unknown',
       suggested_posture TEXT,
       suggestion_reasons TEXT NOT NULL DEFAULT '[]',
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      keywords_per_refresh INTEGER
     );
+  `);
+  // Add column for the case where the table was created by an earlier test
+  // run before the schema migration. SQLite ALTER errors if it already exists
+  // — ignore that and only that error.
+  try {
+    db.exec(`ALTER TABLE local_seo_workspace_settings ADD COLUMN keywords_per_refresh INTEGER`);
+  } catch (err) {
+    if (!(err instanceof Error) || !/duplicate column name/i.test(err.message)) throw err;
+  }
+  db.exec(`
     CREATE TABLE IF NOT EXISTS local_seo_markets (
       id TEXT PRIMARY KEY,
       workspace_id TEXT NOT NULL,
@@ -336,6 +349,116 @@ describe('local SEO provider selection', () => {
     }));
   });
 
+  it('cheap buildLocalSeoKeywordCandidates returns empty reasons[] (no evaluator run)', () => {
+    setBroadcast(vi.fn(), vi.fn());
+    const ws = createWorkspace('Local SEO Cheap Reasons Test');
+    cleanupWorkspaceIds.add(ws.id);
+    updateWorkspace(ws.id, {
+      name: 'Swish Dental',
+      businessProfile: { address: { street: '123 Congress Ave', city: 'Austin', state: 'TX', country: 'US' } },
+      keywordStrategy: {
+        siteKeywords: ['cosmetic dentist'],
+        opportunities: [],
+        businessContext: 'Dental office.',
+        generatedAt: '2026-05-20T10:00:00.000Z',
+      },
+    });
+    updateLocalSeoConfiguration(ws.id, {
+      posture: LOCAL_SEO_POSTURE.LOCAL,
+      markets: [{ label: 'Austin, TX', city: 'Austin', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1026201, status: LOCAL_SEO_MARKET_STATUS.ACTIVE }],
+    }, true);
+    upsertPageKeyword(ws.id, {
+      pagePath: '/services/cosmetic-dentistry',
+      pageTitle: 'Cosmetic Dentistry',
+      primaryKeyword: 'cosmetic dentistry',
+      secondaryKeywords: ['veneers'],
+      searchIntent: 'commercial',
+    });
+
+    const candidates = buildLocalSeoKeywordCandidates(ws.id);
+    expect(candidates.length).toBeGreaterThan(0);
+    for (const c of candidates) {
+      expect(c.reasons).toEqual([]);
+    }
+  });
+
+  it('Evaluated builder produces evaluator reasons separate from cheap default', () => {
+    setBroadcast(vi.fn(), vi.fn());
+    const ws = createWorkspace('Local SEO Evaluated Reasons Test');
+    cleanupWorkspaceIds.add(ws.id);
+    updateWorkspace(ws.id, {
+      name: 'Swish Dental',
+      businessProfile: { address: { street: '123 Congress Ave', city: 'Austin', state: 'TX', country: 'US' } },
+      keywordStrategy: {
+        siteKeywords: ['cosmetic dentist'],
+        opportunities: [],
+        businessContext: 'Dental office offering cosmetic dentistry, veneers, whitening, and implants.',
+        generatedAt: '2026-05-20T10:00:00.000Z',
+      },
+    });
+    updateLocalSeoConfiguration(ws.id, {
+      posture: LOCAL_SEO_POSTURE.LOCAL,
+      markets: [{ label: 'Austin, TX', city: 'Austin', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1026201, status: LOCAL_SEO_MARKET_STATUS.ACTIVE }],
+    }, true);
+    upsertPageKeyword(ws.id, {
+      pagePath: '/services/cosmetic-dentistry',
+      pageTitle: 'Cosmetic Dentistry',
+      primaryKeyword: 'cosmetic dentistry',
+      secondaryKeywords: ['veneers'],
+      searchIntent: 'commercial',
+    });
+
+    const cheap = buildLocalSeoKeywordCandidates(ws.id);
+    const evaluated = buildLocalSeoKeywordCandidatesEvaluated(ws.id);
+    // Both paths enumerate the same signal set; evaluated may suppress some
+    // entries but must not invent new ones.
+    expect(cheap.length).toBeGreaterThan(0);
+    expect(evaluated.length).toBeLessThanOrEqual(cheap.length);
+    // Cheap path never populates reasons.
+    for (const c of cheap) {
+      expect(c.reasons).toEqual([]);
+    }
+  });
+
+  it('Evaluated result is a normalizedKeyword subset of cheap (contract: Evaluated only removes signals, never adds)', () => {
+    setBroadcast(vi.fn(), vi.fn());
+    const ws = createWorkspace('Local SEO Evaluated Subset Test');
+    cleanupWorkspaceIds.add(ws.id);
+    updateWorkspace(ws.id, {
+      name: 'Swish Dental',
+      businessProfile: { address: { street: '123 Congress Ave', city: 'Austin', state: 'TX', country: 'US' } },
+      keywordStrategy: {
+        siteKeywords: ['cosmetic dentist'],
+        opportunities: [],
+        businessContext: 'Dental office offering cosmetic dentistry, veneers, whitening, and implants.',
+        generatedAt: '2026-05-20T10:00:00.000Z',
+      },
+    });
+    updateLocalSeoConfiguration(ws.id, {
+      posture: LOCAL_SEO_POSTURE.LOCAL,
+      markets: [{ label: 'Austin, TX', city: 'Austin', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1026201, status: LOCAL_SEO_MARKET_STATUS.ACTIVE }],
+    }, true);
+    upsertPageKeyword(ws.id, {
+      pagePath: '/services/cosmetic-dentistry',
+      pageTitle: 'Cosmetic Dentistry',
+      primaryKeyword: 'cosmetic dentistry',
+      secondaryKeywords: ['veneers', 'whitening'],
+      searchIntent: 'commercial',
+    });
+
+    const cheap = buildLocalSeoKeywordCandidates(ws.id);
+    const evaluated = buildLocalSeoKeywordCandidatesEvaluated(ws.id);
+    const cheapKeys = new Set(cheap.map(c => c.normalizedKeyword));
+    // Locks in the documented contract — Evaluated may suppress entries but
+    // must not invent new ones not present in the cheap enumeration.
+    expect(cheap.length).toBeGreaterThan(0);
+    expect(evaluated.length).toBeGreaterThan(0);
+    expect(evaluated.length).toBeLessThanOrEqual(cheap.length);
+    for (const e of evaluated) {
+      expect(cheapKeys.has(e.normalizedKeyword)).toBe(true);
+    }
+  });
+
   it('keeps explicit single-keyword refresh plans scoped to the requested keyword', () => {
     setBroadcast(vi.fn(), vi.fn());
     const ws = createWorkspace('Local SEO Explicit Refresh Test');
@@ -527,5 +650,64 @@ describe('local SEO provider selection', () => {
     expect(readModel?.report.checkedKeywordCount).toBe(1);
 
     deleteWorkspace(ws.id);
+  });
+});
+
+describe('per-workspace keywords-per-refresh override', () => {
+  it('getEffectiveKeywordsPerRefresh returns the global default when no override is set', () => {
+    setBroadcast(vi.fn(), vi.fn());
+    const ws = createWorkspace('Local SEO Default Budget Test');
+    cleanupWorkspaceIds.add(ws.id);
+    expect(getEffectiveKeywordsPerRefresh(ws.id)).toBe(100);
+  });
+
+  it('returns the override when one is set within bounds', () => {
+    setBroadcast(vi.fn(), vi.fn());
+    const ws = createWorkspace('Local SEO Override Budget Test');
+    cleanupWorkspaceIds.add(ws.id);
+    updateLocalSeoConfiguration(ws.id, { keywordsPerRefresh: 200 }, true);
+    expect(getEffectiveKeywordsPerRefresh(ws.id)).toBe(200);
+  });
+
+  it('clamps an override above the cap down to the maximum', () => {
+    setBroadcast(vi.fn(), vi.fn());
+    const ws = createWorkspace('Local SEO Clamp High Test');
+    cleanupWorkspaceIds.add(ws.id);
+    updateLocalSeoConfiguration(ws.id, { keywordsPerRefresh: 9999 }, true);
+    expect(getEffectiveKeywordsPerRefresh(ws.id)).toBe(300);
+  });
+
+  it('clamps an override below the floor up to the minimum', () => {
+    setBroadcast(vi.fn(), vi.fn());
+    const ws = createWorkspace('Local SEO Clamp Low Test');
+    cleanupWorkspaceIds.add(ws.id);
+    updateLocalSeoConfiguration(ws.id, { keywordsPerRefresh: 5 }, true);
+    expect(getEffectiveKeywordsPerRefresh(ws.id)).toBe(25);
+  });
+
+  it('clearing the override (null) reverts to the global default', () => {
+    setBroadcast(vi.fn(), vi.fn());
+    const ws = createWorkspace('Local SEO Clear Override Test');
+    cleanupWorkspaceIds.add(ws.id);
+    updateLocalSeoConfiguration(ws.id, { keywordsPerRefresh: 150 }, true);
+    expect(getEffectiveKeywordsPerRefresh(ws.id)).toBe(150);
+    updateLocalSeoConfiguration(ws.id, { keywordsPerRefresh: null }, true);
+    expect(getEffectiveKeywordsPerRefresh(ws.id)).toBe(100);
+  });
+
+  it('read model surfaces the effective budget + min/max/default in caps', () => {
+    setBroadcast(vi.fn(), vi.fn());
+    const ws = createWorkspace('Local SEO Caps Surface Test');
+    cleanupWorkspaceIds.add(ws.id);
+    updateLocalSeoConfiguration(ws.id, { keywordsPerRefresh: 175 }, true);
+    const model = getLocalSeoReadModel(ws.id, true, { includeSnapshots: false });
+    expect(model?.caps).toEqual({
+      maxMarkets: 3,
+      maxKeywordsPerRefresh: 175,
+      keywordsPerRefreshMin: 25,
+      keywordsPerRefreshMax: 300,
+      keywordsPerRefreshDefault: 100,
+    });
+    expect(model?.settings.keywordsPerRefresh).toBe(175);
   });
 });

@@ -1051,6 +1051,8 @@ async function buildKeywordCommandCenterModel(
       ? buildLocalSeoKeywordVisibilityByKey(workspace.id)
       : buildLocalSeoKeywordVisibilitySummaryByKey(workspace.id)
     : new Map();
+  // KCC row enrichment uses sourceLabel/detail/pagePath/pageTitle/volume/difficulty.
+  // `reasons` and the evaluator's suppression are not needed — cheap default is correct.
   const localCandidates = options.includeLocalSeo && options.includeLocalCandidates === true
     ? buildLocalSeoKeywordCandidates(workspace.id).slice(0, LOCAL_CANDIDATE_ROW_LIMIT)
     : [];

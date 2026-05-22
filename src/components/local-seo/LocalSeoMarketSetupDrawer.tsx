@@ -109,6 +109,9 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
   const [posture, setPosture] = useState<LocalSeoPosture>(data.settings.posture);
   const [markets, setMarkets] = useState<MarketDraft[]>([]);
   const [removedMarkets, setRemovedMarkets] = useState<MarketDraft[]>([]);
+  // Per-workspace keywords-per-refresh override. Stored as a string so we can
+  // distinguish "field empty" (revert to default = null) from a typed number.
+  const [keywordsPerRefreshInput, setKeywordsPerRefreshInput] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [locationCandidatesByIndex, setLocationCandidatesByIndex] = useState<Record<number, LocalSeoLocationLookupCandidate[]>>({});
   const [lookupPendingIndex, setLookupPendingIndex] = useState<number | null>(null);
@@ -124,6 +127,11 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
     setPosture(data.settings.posture);
     setMarkets(data.markets.map(market => draftFromMarket(market)));
     setRemovedMarkets([]);
+    setKeywordsPerRefreshInput(
+      typeof data.settings.keywordsPerRefresh === 'number'
+        ? String(data.settings.keywordsPerRefresh)
+        : '',
+    );
     setError(null);
     setLocationCandidatesByIndex({});
     setLookupPendingIndex(null);
@@ -288,6 +296,25 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
           resolvedMarkets.push(market);
         }
       }
+      // Resolve the keywords-per-refresh override input. Empty → null (clear
+       // override); a parseable integer in [min, max] → number; otherwise validate
+       // and bail with an error before the network call.
+      const trimmedBudget = keywordsPerRefreshInput.trim();
+      let nextKeywordsPerRefresh: number | null = null;
+      if (trimmedBudget !== '') {
+        const parsed = Number(trimmedBudget);
+        if (
+          !Number.isInteger(parsed)
+          || parsed < data.caps.keywordsPerRefreshMin
+          || parsed > data.caps.keywordsPerRefreshMax
+        ) {
+          setError(
+            `Keywords per refresh must be an integer between ${data.caps.keywordsPerRefreshMin} and ${data.caps.keywordsPerRefreshMax}, or empty to use the default.`,
+          );
+          return;
+        }
+        nextKeywordsPerRefresh = parsed;
+      }
       const response = await update.mutateAsync({
         posture,
         markets: [...resolvedMarkets, ...removedMarkets].map(market => ({
@@ -302,6 +329,7 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
           longitude: parseClearableNumber(market.longitude),
           status: market.status,
         })),
+        keywordsPerRefresh: nextKeywordsPerRefresh,
       });
       if (refreshAfterSave) {
         await refresh.mutateAsync({
@@ -536,6 +564,36 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
                 )}
               </div>
             ))}
+          </section>
+
+          <section className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-3)]/35 p-4">
+            <div className="mb-3">
+              <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">Refresh keyword budget</h3>
+              <p className="t-caption-sm text-[var(--brand-text-muted)]">
+                Each refresh spends ~$0.002 per keyword per market via DataForSEO. Default is {data.caps.keywordsPerRefreshDefault}; raise it for local-first clients where broader local-pack coverage matters.
+              </p>
+            </div>
+            <FormField
+              label={`Keywords per refresh (${data.caps.keywordsPerRefreshMin}–${data.caps.keywordsPerRefreshMax})`}
+            >
+              <FormInput
+                value={keywordsPerRefreshInput}
+                onChange={value => setKeywordsPerRefreshInput(value.replace(/[^0-9]/g, ''))}
+                placeholder={`Default: ${data.caps.keywordsPerRefreshDefault}`}
+                inputMode="numeric"
+              />
+            </FormField>
+            <p className="t-caption-sm text-[var(--brand-text-muted)] mt-2">
+              {keywordsPerRefreshInput.trim() === ''
+                ? `Using global default (${data.caps.keywordsPerRefreshDefault} keywords/refresh).`
+                : (() => {
+                    const parsed = Number(keywordsPerRefreshInput);
+                    if (!Number.isInteger(parsed)) return 'Enter a whole number or leave empty for default.';
+                    const activeCount = Math.max(1, markets.filter(m => m.status === LOCAL_SEO_MARKET_STATUS.ACTIVE).length);
+                    const cost = (parsed * activeCount * 0.002).toFixed(2);
+                    return `Estimated cost per refresh: ~$${cost} (${parsed} keywords × ${activeCount} active market${activeCount === 1 ? '' : 's'}).`;
+                  })()}
+            </p>
           </section>
 
           {(error || update.error || refresh.error) && (
