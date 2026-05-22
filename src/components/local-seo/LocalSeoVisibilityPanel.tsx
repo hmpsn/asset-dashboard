@@ -248,7 +248,7 @@ export function LocalSeoVisibilityPanel({ workspaceId, compact = false, onOpenKe
         onClose={() => setSetupOpen(false)}
       />
     </SectionCard>
-    {(report.setupState === 'has_data' || report.setupState === 'ready_no_data') && data.competitorBrands.length > 0 && (
+    {!compact && (report.setupState === 'has_data' || report.setupState === 'ready_no_data') && data.competitorBrands.length > 0 && (
       <RepeatCompetitorList competitors={data.competitorBrands} />
     )}
     </>

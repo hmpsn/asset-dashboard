@@ -920,6 +920,10 @@ describe('classifyLocalKeywordIntent', () => {
     // "affordable" should be commercial, no informational pattern matches "near me"
     expect(classifyLocalKeywordIntent('affordable dentist near me')).toBe('commercial');
   });
+
+  it('does not classify "howard county dentist" as informational (how prefix)', () => {
+    expect(classifyLocalKeywordIntent('howard county dentist')).not.toBe('informational');
+  });
 });
 
 describe('LocalSeoKeywordCandidate has intent field', () => {

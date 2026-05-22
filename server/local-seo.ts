@@ -1168,7 +1168,7 @@ export function classifyLocalKeywordIntent(keyword: string): LocalSeoKeywordInte
     return 'comparison';
   }
   // Informational: question words, educational patterns, cost/price research
-  if (/^(how|what|why|when|where|which|who|can |does |do |is |are )|\bguide\b|\btutorial\b|\btips\b|\bexplained\b|\boverview\b|\bhistory\b|\bfacts\b|\bstatistics\b|\btypes of\b|\bdifference between\b|\bcost of\b|\bprice of\b|\bpros and cons\b|\bbenefits of\b|\bcauses of\b|\bwhat is\b|\bimpact of\b/.test(kw)) {
+  if (/^(how |what |why |when |where |which |who |can |does |do |is |are )|\bguide\b|\btutorial\b|\btips\b|\bexplained\b|\boverview\b|\bhistory\b|\bfacts\b|\bstatistics\b|\btypes of\b|\bdifference between\b|\bcost of\b|\bprice of\b|\bpros and cons\b|\bbenefits of\b|\bcauses of\b|\bwhat is\b|\bimpact of\b/.test(kw)) {
     return 'informational';
   }
   // Commercial: pre-buying research with quality signals (still useful for local)
