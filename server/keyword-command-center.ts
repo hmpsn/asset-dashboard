@@ -14,6 +14,7 @@ import {
 } from './local-seo.js';
 import { createLogger } from './logger.js';
 import { listPageKeywords } from './page-keywords.js';
+import { isSuspiciousPlannerGroupedVolume } from './keyword-strategy-helpers.js';
 import {
   getLatestSnapshotRanks,
   getTrackedKeywords,
@@ -142,9 +143,21 @@ function addSource(row: DraftRow, source: KeywordCommandCenterSourceLabel): void
 }
 
 function mergeMetrics(row: DraftRow, metrics: KeywordCommandCenterMetrics): void {
+  // Filter DataForSEO planner-grouped bucket sentinels before merging.
+  // The Google Ads planner returns 1,000,000 as a grouped-forecast bucket value
+  // paired with difficulty=21 when it can't pin granular data. Letting this through
+  // overstates volume by orders of magnitude on branded long-tail keywords and
+  // overwrites real provider data from other sources (the merge spreads later
+  // sources over earlier ones, so a sentinel write after a real value wins).
+  // See server/keyword-strategy-helpers.ts:isSuspiciousPlannerGroupedVolume.
+  const filtered: KeywordCommandCenterMetrics = { ...metrics };
+  if (isSuspiciousPlannerGroupedVolume(row.keyword, filtered.volume)) {
+    filtered.volume = undefined;
+    filtered.difficulty = undefined; // 21 is the paired sentinel difficulty — drop both
+  }
   row.metrics = {
     ...row.metrics,
-    ...Object.fromEntries(Object.entries(metrics).filter(([, value]) => value != null)),
+    ...Object.fromEntries(Object.entries(filtered).filter(([, value]) => value != null)),
   };
 }
 
