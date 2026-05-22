@@ -10,7 +10,7 @@ export const DENTAL_SERVICES: ServiceDefinition[] = [
     id: 'general-dentistry',
     label: 'General Dentistry',
     starterKeywords: ['dentist near me', 'family dentist', 'general dentist'],
-    matchTerms: ['general dentist', 'family dentist', 'routine dental', 'dental checkup', 'teeth cleaning'],
+    matchTerms: ['dentist', 'general dentist', 'family dentist', 'routine dental', 'dental checkup', 'teeth cleaning'],
   },
   {
     id: 'teeth-whitening',

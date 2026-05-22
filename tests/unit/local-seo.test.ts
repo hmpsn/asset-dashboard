@@ -904,6 +904,22 @@ describe('classifyLocalKeywordIntent', () => {
     // "compare" triggers comparison before informational patterns
     expect(classifyLocalKeywordIntent('compare dental implants and dentures')).toBe('comparison');
   });
+
+  // false-positive guards — regression tests for patterns that were removed
+  it('does not classify "best dentist ranking austin" as comparison', () => {
+    // "ranking" alone should not trigger comparison intent
+    expect(classifyLocalKeywordIntent('best dentist ranking austin')).not.toBe('comparison');
+  });
+
+  it('does not classify "impact of dental crowns on jawbone" as commercial', () => {
+    // "impact of" triggers informational, not commercial
+    expect(classifyLocalKeywordIntent('impact of dental crowns on jawbone')).toBe('informational');
+  });
+
+  it('does not classify "affordable dentist near me" as informational', () => {
+    // "affordable" should be commercial, no informational pattern matches "near me"
+    expect(classifyLocalKeywordIntent('affordable dentist near me')).toBe('commercial');
+  });
 });
 
 describe('LocalSeoKeywordCandidate has intent field', () => {
@@ -966,6 +982,9 @@ describe('selectLocalIntentKeywords excludes informational/comparison', () => {
     // Use an explicit informational keyword — force=true so it bypasses the
     // hasLocalIntent gate, but the intent filter should still remove it.
     const result = selectLocalIntentKeywords(ws.id, ['what is dental implant austin tx']);
+    // An empty result is valid here — it proves the informational keyword was
+    // filtered out. The not.toContain is intentionally vacuous-safe: empty []
+    // never contains the keyword, which is the desired behavior.
     expect(result).not.toContain('what is dental implant austin tx');
   });
 
@@ -990,6 +1009,8 @@ describe('selectLocalIntentKeywords excludes informational/comparison', () => {
     }, true);
 
     const result = selectLocalIntentKeywords(ws.id, ['crowns vs veneers austin']);
+    // An empty result is valid — proves the comparison keyword was filtered out.
+    // The not.toContain is intentionally vacuous-safe: empty [] never contains the keyword.
     expect(result).not.toContain('crowns vs veneers austin');
   });
 

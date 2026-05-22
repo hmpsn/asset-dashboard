@@ -14,8 +14,8 @@ import { isStrategyPoolEligibleKeyword, isNearDuplicateKeyword } from './keyword
 import { listPageKeywords } from './page-keywords.js';
 import { getTrackedKeywords } from './rank-tracking.js';
 import { DEFAULT_SEO_DATA_PROVIDER, getProvider, isCapabilityDisabled, type ProviderName, type SeoDataProvider } from './seo-data-provider.js';
-import { getWorkspace } from './workspaces.js';
 import { getTaxonomyForIndustry } from './service-taxonomy.js';
+import { getWorkspace } from './workspaces.js';
 import { WS_EVENTS } from './ws-events.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 import { buildDataForSeoLocationName } from '../shared/local-seo-location.js';
@@ -260,7 +260,7 @@ const stmts = createStmtCache(() => ({
     LIMIT 50
   `),
   competitorSnapshots: db.prepare(`
-    SELECT workspace_id, business_found, market_label, top_competitors
+    SELECT workspace_id, business_found, local_pack_present, market_label, top_competitors
     FROM local_visibility_snapshots
     WHERE workspace_id = @workspaceId
       AND captured_at >= datetime('now', '-' || @days || ' days')
@@ -700,6 +700,7 @@ function listLatestLocalVisibilitySnapshotSummaryRows(workspaceId: string): Snap
 interface CompetitorSnapshotRow {
   workspace_id: string;
   business_found: number;
+  local_pack_present: number;
   market_label: string;
   top_competitors: string;
 }
@@ -723,7 +724,7 @@ export function getLocalSeoCompetitorBrands(workspaceId: string, lookbackDays = 
   const titleMap = new Map<string, string>();
 
   for (const row of rows) {
-    const clientLost = row.business_found === 0;
+    const clientLost = row.business_found === 0 && row.local_pack_present === 1;
     const competitors = parseJsonSafeArray(row.top_competitors, localResultSchema, { workspaceId, table: 'local_visibility_snapshots', field: 'top_competitors' });
     for (const competitor of competitors) {
       const key = competitor.title.toLowerCase().trim();
@@ -1155,6 +1156,10 @@ function hasMarketModifier(keyword: string, markets: LocalSeoMarket[]): boolean 
  * Runs in the hot path — no API calls.
  *
  * Priority order: comparison → informational → commercial → transactional (default)
+ *
+ * Note: 'navigational' is part of the LocalSeoKeywordIntent union but is never
+ * returned by this classifier (it requires workspace brand context not available here).
+ * It may be pre-assigned by signal iterators that have that context.
  */
 export function classifyLocalKeywordIntent(keyword: string): LocalSeoKeywordIntent {
   const kw = keyword.toLowerCase();
