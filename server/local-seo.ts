@@ -62,6 +62,25 @@ const LOCAL_CANDIDATE_HARD_CAP = 1000;
 const LOCAL_SEO_MAX_RESULTS = 10;
 const DEFAULT_LANGUAGE_CODE = 'en';
 
+const LOCAL_CANDIDATE_CACHE_TTL_MS = 60_000;
+type LocalCandidateCacheVariant = 'cheap' | 'evaluated';
+interface CachedCandidates { ts: number; candidates: LocalSeoKeywordCandidate[] }
+const localCandidateCache = new Map<string, CachedCandidates>();
+
+function localCandidateCacheKey(
+  workspaceId: string,
+  explicitKeywords: string[],
+  variant: LocalCandidateCacheVariant,
+): string {
+  const sorted = [...explicitKeywords].map(k => k.trim()).filter(Boolean).sort().join('|');
+  return `${workspaceId}::${variant}::${sorted}`;
+}
+
+/** Test-only helper. Leading underscore signals internal use. */
+export function _resetLocalCandidateCacheForTests(): void {
+  localCandidateCache.clear();
+}
+
 export interface LocalSeoKeywordCandidate {
   keyword: string;
   normalizedKeyword: string;
@@ -1238,238 +1257,183 @@ export function* iterateLocalCandidateSignals(
   }
 }
 
-export function buildLocalSeoKeywordCandidates(workspaceId: string, explicitKeywords: string[] = []): LocalSeoKeywordCandidate[] {
-  const workspace = getWorkspace(workspaceId);
-  if (!workspace) return [];
-  const markets = activeMarkets(workspaceId);
-  const { contentGaps, pageMap, declinedKeywords, evaluationContext } = buildCandidateContext(workspace);
-  const declined = new Set(declinedKeywords.map(keywordComparisonKey));
-  const trackedKeywords = getTrackedKeywords(workspaceId, { includeInactive: true });
-  const inactiveTracked = new Set(
-    trackedKeywords
-      .filter(tracked => (tracked.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) !== TRACKED_KEYWORD_STATUS.ACTIVE)
-      .map(tracked => keywordComparisonKey(tracked.query)),
-  );
+/**
+ * Build a `LocalSeoKeywordCandidate` from a source signal + computed score + reasons
+ * and dedup-insert into `candidates`. Shared by both the cheap and evaluated builders.
+ *
+ * Insert rule: only set when there's no existing entry, or the new score is higher,
+ * or the new entry is selected and the existing one isn't.
+ */
+function upsertCandidate(
+  candidates: Map<string, LocalSeoKeywordCandidate>,
+  key: string,
+  display: string,
+  signal: CandidateSourceSignal,
+  score: number,
+  reasons: string[],
+): void {
+  const existing = candidates.get(key);
+  const next: LocalSeoKeywordCandidate = {
+    keyword: display,
+    normalizedKeyword: key,
+    source: signal.source,
+    sourceLabel: signal.sourceLabel ?? signal.source.replace(/_/g, ' '),
+    detail: signal.detail,
+    pagePath: signal.pagePath,
+    pageTitle: signal.pageTitle,
+    volume: signal.volume,
+    difficulty: signal.difficulty,
+    selected: signal.selected
+      ?? (signal.source === 'strategy' || signal.source === 'tracking' || signal.source === 'page_assignment'),
+    score,
+    reasons,
+  };
+  if (!existing || next.score > existing.score || (next.selected && !existing.selected)) {
+    candidates.set(key, next);
+  }
+}
+
+/**
+ * Cheap default local SEO candidate builder.
+ *
+ * Skips the per-candidate `isStrategyPoolEligibleKeyword` evaluator entirely —
+ * that's the work that caused the 35-second wall-clock regression on rich
+ * workspaces (Swish, PR #876). Output shape is identical to the evaluated
+ * variant except:
+ *   - `reasons` is always `[]` (no eligibility-evaluator messages)
+ *   - `score` excludes `evaluation.scoreDelta` (no noise-pattern suppression bias)
+ *   - No noise-pattern / authority-mismatch / business-fit suppression
+ *
+ * Wrapped in a 60-second TTL memo cache keyed by (workspaceId, explicitKeywords,
+ * 'cheap'). Use this for any code path that just needs candidate enumeration
+ * without per-candidate noise filtering; use
+ * `buildLocalSeoKeywordCandidatesEvaluated` when you specifically need the
+ * eligibility evaluator's suppression and `reasons` messages.
+ */
+export function buildLocalSeoKeywordCandidates(
+  workspaceId: string,
+  explicitKeywords: string[] = [],
+): LocalSeoKeywordCandidate[] {
+  const cacheKey = localCandidateCacheKey(workspaceId, explicitKeywords, 'cheap');
+  const cached = localCandidateCache.get(cacheKey);
+  const now = Date.now();
+  if (cached && now - cached.ts < LOCAL_CANDIDATE_CACHE_TTL_MS) return cached.candidates;
+
+  const ctx = loadCandidateIterationContext(workspaceId, explicitKeywords);
+  if (!ctx) return [];
   const candidates = new Map<string, LocalSeoKeywordCandidate>();
   let candidateHardCapReached = false;
 
-  const add = (
-    keyword: string | undefined,
-    source: LocalSeoKeywordCandidate['source'],
-    options: {
-      force?: boolean;
-      selected?: boolean;
-      sourceLabel?: string;
-      detail?: string;
-      pagePath?: string;
-      pageTitle?: string;
-      volume?: number;
-      difficulty?: number;
-      scoreBoost?: number;
-    } = {},
-  ) => {
-    const display = cleanKeywordDisplay(keyword);
-    if (!display) return;
+  for (const signal of iterateLocalCandidateSignals(ctx)) {
+    const display = cleanKeywordDisplay(signal.keyword);
+    if (!display) continue;
     const key = keywordComparisonKey(display);
-    if (!key || declined.has(key) || inactiveTracked.has(key)) return;
+    if (!key || ctx.declined.has(key) || ctx.inactiveTracked.has(key)) continue;
     if (candidates.size >= LOCAL_CANDIDATE_HARD_CAP && !candidates.has(key)) {
       candidateHardCapReached = true;
-      return;
+      continue;
     }
-    if (!options.force && !hasLocalIntent(display, workspace) && !hasMarketModifier(display, markets)) return;
-    const evaluationSource = source === 'local_variant' ? 'local_generated' : source === 'tracking' ? 'gsc' : 'client';
-    const evaluation = isStrategyPoolEligibleKeyword({
-      keyword: display,
-      volume: options.volume ?? 0,
-      difficulty: options.difficulty ?? 0,
-      source: evaluationSource,
-    }, evaluationContext);
-    if (evaluation.suppressed) return;
-    const localIntentScore = hasMarketModifier(display, markets) ? 12 : hasLocalIntent(display, workspace) ? 8 : 0;
-    const score = candidateSourceScore(source) + localIntentScore + evaluation.scoreDelta + (options.scoreBoost ?? 0);
-    const existing = candidates.get(key);
-    const next: LocalSeoKeywordCandidate = {
-      keyword: display,
-      normalizedKeyword: key,
-      source,
-      sourceLabel: options.sourceLabel ?? source.replace(/_/g, ' '),
-      detail: options.detail,
-      pagePath: options.pagePath,
-      pageTitle: options.pageTitle,
-      volume: options.volume,
-      difficulty: options.difficulty,
-      selected: options.selected ?? (source === 'strategy' || source === 'tracking' || source === 'page_assignment'),
-      score,
-      reasons: evaluation.reasons.map(reason => reason.message).slice(0, 4),
-    };
-    if (!existing || next.score > existing.score || (next.selected && !existing.selected)) candidates.set(key, next);
-  };
+    if (!signal.force && !hasLocalIntent(display, ctx.workspace) && !hasMarketModifier(display, ctx.markets)) continue;
 
-  for (const keyword of explicitKeywords) add(keyword, 'explicit', { force: true, selected: true, sourceLabel: 'Selected for refresh', scoreBoost: 30 });
-  for (const keyword of workspace.keywordStrategy?.siteKeywords ?? []) {
-    add(keyword, 'strategy', { selected: true, sourceLabel: 'Strategy keyword', scoreBoost: 12 });
-  }
-  for (const tracked of trackedKeywords) {
-    if ((tracked.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) !== TRACKED_KEYWORD_STATUS.ACTIVE) continue;
-    add(tracked.query, 'tracking', {
-      selected: true,
-      sourceLabel: 'Rank tracking',
-      detail: tracked.source?.replace(/_/g, ' '),
-      pagePath: tracked.pagePath,
-      pageTitle: tracked.pageTitle,
-      volume: tracked.volume,
-      difficulty: tracked.difficulty,
-      scoreBoost: tracked.pinned ? 20 : 8,
-    });
-  }
-  for (const page of pageMap) {
-    const pageLooksLocal = /\/location\/|near me|appointment|austin|houston|san antonio|dallas/i.test(`${page.pagePath} ${page.pageTitle}`)
-      || page.serpFeatures?.includes('local_pack');
-    add(page.primaryKeyword, 'page_assignment', {
-      force: pageLooksLocal,
-      selected: true,
-      sourceLabel: 'Page assignment',
-      detail: page.pageTitle ?? page.pagePath,
-      pagePath: page.pagePath,
-      pageTitle: page.pageTitle,
-      volume: page.volume,
-      difficulty: page.difficulty,
-      scoreBoost: 10,
-    });
-    for (const secondary of page.secondaryKeywords ?? []) {
-      add(secondary, 'page_assignment', {
-        force: pageLooksLocal,
-        selected: true,
-        sourceLabel: 'Page assignment',
-        detail: page.pageTitle ?? page.pagePath,
-        pagePath: page.pagePath,
-        pageTitle: page.pageTitle,
-        scoreBoost: 4,
-      });
-    }
-    if (titleLooksLikeServiceKeyword(page.pageTitle)) {
-      add(page.pageTitle, 'page_assignment', {
-        force: pageLooksLocal,
-        selected: true,
-        sourceLabel: 'Service page',
-        detail: page.pagePath,
-        pagePath: page.pagePath,
-        pageTitle: page.pageTitle,
-      });
-    }
-    for (const base of [page.primaryKeyword, page.pageTitle, ...(page.secondaryKeywords ?? [])]) {
-      if (!base || !titleLooksLikeServiceKeyword(base) || isNearDuplicateKeyword(base, workspace.name)) continue;
-      for (const variant of localVariantKeywords(base, markets)) {
-        add(variant, 'local_variant', {
-          sourceLabel: 'Local candidate',
-          detail: page.pageTitle ?? page.pagePath,
-          pagePath: page.pagePath,
-          pageTitle: page.pageTitle,
-        });
-      }
-    }
-  }
-  for (const gap of contentGaps) {
-    const localGap = gap.suggestedPageType === 'location'
-      || gap.serpFeatures?.includes('local_pack')
-      || hasLocalIntent(`${gap.topic} ${gap.targetKeyword}`, workspace);
-    add(gap.targetKeyword, 'content_gap', {
-      force: localGap,
-      selected: false,
-      sourceLabel: 'Content opportunity',
-      detail: gap.topic,
-      volume: gap.volume,
-      difficulty: gap.difficulty,
-      scoreBoost: gap.priority === 'high' ? 8 : 0,
-    });
-    for (const variant of localVariantKeywords(gap.targetKeyword, markets)) {
-      add(variant, 'local_variant', {
-        sourceLabel: 'Local content candidate',
-        detail: gap.topic,
-        volume: gap.volume,
-        difficulty: gap.difficulty,
-      });
-    }
+    const localIntentScore = hasMarketModifier(display, ctx.markets) ? 12 : hasLocalIntent(display, ctx.workspace) ? 8 : 0;
+    const score = candidateSourceScore(signal.source) + localIntentScore + (signal.scoreBoost ?? 0);
+    upsertCandidate(candidates, key, display, signal, score, []);
   }
 
   if (candidateHardCapReached) {
     log.warn({ workspaceId, cap: LOCAL_CANDIDATE_HARD_CAP }, 'local SEO candidate hard cap reached; output truncated');
   }
+  const result = [...candidates.values()].sort((a, b) => b.score - a.score || a.keyword.localeCompare(b.keyword));
+  localCandidateCache.set(cacheKey, { ts: now, candidates: result });
+  return result;
+}
 
-  return [...candidates.values()]
-    .sort((a, b) => b.score - a.score || a.keyword.localeCompare(b.keyword));
+/**
+ * Slow opt-in local SEO candidate builder — preserves the original behavior of
+ * `buildLocalSeoKeywordCandidates` from before the cheap/evaluated split.
+ *
+ * Runs `isStrategyPoolEligibleKeyword` per candidate (noise-pattern suppression,
+ * authority-mismatch filter, business-fit check) and populates `reasons` with
+ * the evaluator's messages. Score includes `evaluation.scoreDelta`.
+ *
+ * Use this only when a caller specifically needs the suppression behavior or
+ * the per-candidate `reasons` messages — most paths should use the cheap
+ * default. Wrapped in a 60-second TTL memo cache keyed by (workspaceId,
+ * explicitKeywords, 'evaluated').
+ */
+export function buildLocalSeoKeywordCandidatesEvaluated(
+  workspaceId: string,
+  explicitKeywords: string[] = [],
+): LocalSeoKeywordCandidate[] {
+  const cacheKey = localCandidateCacheKey(workspaceId, explicitKeywords, 'evaluated');
+  const cached = localCandidateCache.get(cacheKey);
+  const now = Date.now();
+  if (cached && now - cached.ts < LOCAL_CANDIDATE_CACHE_TTL_MS) return cached.candidates;
+
+  const ctx = loadCandidateIterationContext(workspaceId, explicitKeywords);
+  if (!ctx) return [];
+  const evaluationContext = buildCandidateContext(ctx.workspace).evaluationContext;
+  const candidates = new Map<string, LocalSeoKeywordCandidate>();
+  let candidateHardCapReached = false;
+
+  for (const signal of iterateLocalCandidateSignals(ctx)) {
+    const display = cleanKeywordDisplay(signal.keyword);
+    if (!display) continue;
+    const key = keywordComparisonKey(display);
+    if (!key || ctx.declined.has(key) || ctx.inactiveTracked.has(key)) continue;
+    if (candidates.size >= LOCAL_CANDIDATE_HARD_CAP && !candidates.has(key)) {
+      candidateHardCapReached = true;
+      continue;
+    }
+    if (!signal.force && !hasLocalIntent(display, ctx.workspace) && !hasMarketModifier(display, ctx.markets)) continue;
+
+    const evaluationSource = signal.source === 'local_variant' ? 'local_generated' : signal.source === 'tracking' ? 'gsc' : 'client';
+    const evaluation = isStrategyPoolEligibleKeyword({
+      keyword: display,
+      volume: signal.volume ?? 0,
+      difficulty: signal.difficulty ?? 0,
+      source: evaluationSource,
+    }, evaluationContext);
+    if (evaluation.suppressed) continue;
+
+    const localIntentScore = hasMarketModifier(display, ctx.markets) ? 12 : hasLocalIntent(display, ctx.workspace) ? 8 : 0;
+    const score = candidateSourceScore(signal.source) + localIntentScore + evaluation.scoreDelta + (signal.scoreBoost ?? 0);
+    upsertCandidate(candidates, key, display, signal, score, evaluation.reasons.map(r => r.message).slice(0, 4));
+  }
+
+  if (candidateHardCapReached) {
+    log.warn({ workspaceId, cap: LOCAL_CANDIDATE_HARD_CAP }, 'local SEO candidate hard cap reached; output truncated');
+  }
+  const result = [...candidates.values()].sort((a, b) => b.score - a.score || a.keyword.localeCompare(b.keyword));
+  localCandidateCache.set(cacheKey, { ts: now, candidates: result });
+  return result;
 }
 
 /**
  * Count-only local SEO candidate iteration — sub-100ms even on rich workspaces.
  *
- * Mirrors `buildLocalSeoKeywordCandidates` but skips:
- *   - `isStrategyPoolEligibleKeyword` (the per-candidate scan that caused the
- *     35-second regression on Swish in PR #876)
- *   - Per-candidate score computation
- *   - Per-candidate `LocalSeoKeywordCandidate` object construction
- *
- * Filters retained (cheap): declined check, inactive-tracked check, market modifier
- * regex, local intent regex. Applies the same `LOCAL_CANDIDATE_HARD_CAP` so the
- * count caps at 1000 like the real generator.
+ * Shares the iteration generator with the cheap builder. Same filters (declined,
+ * inactive-tracked, market modifier, local intent) and same `LOCAL_CANDIDATE_HARD_CAP`.
  *
  * **Slight overcount possible:** without the eligibility evaluator we don't
  * suppress noise patterns / authority mismatches / business-fit failures. In
  * practice on Swish the cheap count returned within a few percent of the real
  * generator output. Used for the Local Candidates badge — UX accuracy is "this
  * is roughly how many candidates exist", not "this is precisely the displayable
- * list". The actual displayable list still comes from the full generator when
- * the user clicks into Local Candidates filter.
+ * list".
  */
 export function countLocalSeoKeywordCandidates(workspaceId: string): number {
-  const workspace = getWorkspace(workspaceId);
-  if (!workspace) return 0;
-  const markets = activeMarkets(workspaceId);
-  if (markets.length === 0) return 0;
-  const { contentGaps, pageMap, declinedKeywords } = buildCandidateContext(workspace);
-  const declined = new Set(declinedKeywords.map(keywordComparisonKey));
-  const trackedKeywords = getTrackedKeywords(workspaceId, { includeInactive: true });
-  const inactiveTracked = new Set(
-    trackedKeywords
-      .filter(tracked => (tracked.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) !== TRACKED_KEYWORD_STATUS.ACTIVE)
-      .map(tracked => keywordComparisonKey(tracked.query)),
-  );
+  const ctx = loadCandidateIterationContext(workspaceId, []);
+  if (!ctx || ctx.markets.length === 0) return 0;
   const seen = new Set<string>();
-
-  const consider = (keyword: string | undefined, force = false): void => {
-    if (seen.size >= LOCAL_CANDIDATE_HARD_CAP) return;
-    const display = cleanKeywordDisplay(keyword);
-    if (!display) return;
+  for (const signal of iterateLocalCandidateSignals(ctx)) {
+    if (seen.size >= LOCAL_CANDIDATE_HARD_CAP) break;
+    const display = cleanKeywordDisplay(signal.keyword);
+    if (!display) continue;
     const key = keywordComparisonKey(display);
-    if (!key || seen.has(key) || declined.has(key) || inactiveTracked.has(key)) return;
-    if (!force && !hasLocalIntent(display, workspace) && !hasMarketModifier(display, markets)) return;
+    if (!key || ctx.declined.has(key) || ctx.inactiveTracked.has(key)) continue;
+    if (!signal.force && !hasLocalIntent(display, ctx.workspace) && !hasMarketModifier(display, ctx.markets)) continue;
     seen.add(key);
-  };
-
-  // Strategy site keywords are always considered (force=true) by buildLocalSeoKeywordCandidates
-  for (const keyword of workspace.keywordStrategy?.siteKeywords ?? []) consider(keyword, true);
-  for (const tracked of trackedKeywords) {
-    if ((tracked.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE) {
-      consider(tracked.query, true);
-    }
-  }
-  for (const page of pageMap) {
-    const pageLooksLocal = /\/location\/|near me|appointment|austin|houston|san antonio|dallas/i.test(`${page.pagePath} ${page.pageTitle}`)
-      || page.serpFeatures?.includes('local_pack');
-    consider(page.primaryKeyword, pageLooksLocal);
-    for (const secondary of page.secondaryKeywords ?? []) consider(secondary, pageLooksLocal);
-    if (titleLooksLikeServiceKeyword(page.pageTitle)) consider(page.pageTitle, pageLooksLocal);
-    for (const base of [page.primaryKeyword, page.pageTitle, ...(page.secondaryKeywords ?? [])]) {
-      if (!base || !titleLooksLikeServiceKeyword(base) || isNearDuplicateKeyword(base, workspace.name)) continue;
-      for (const variant of localVariantKeywords(base, markets)) consider(variant);
-    }
-  }
-  for (const gap of contentGaps) {
-    const localGap = gap.suggestedPageType === 'location'
-      || gap.serpFeatures?.includes('local_pack')
-      || hasLocalIntent(`${gap.topic} ${gap.targetKeyword}`, workspace);
-    consider(gap.targetKeyword, localGap);
-    for (const variant of localVariantKeywords(gap.targetKeyword, markets)) consider(variant);
   }
   return seen.size;
 }
