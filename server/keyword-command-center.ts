@@ -955,6 +955,13 @@ function finalizeDraftRow(row: DraftRow, context: RowFinalizeContext): KeywordCo
       pageTitle: row.tracking.pageTitle,
       replacedBy: row.tracking.replacedBy,
       deprecatedAt: row.tracking.deprecatedAt,
+      // True when any rank/GSC signal has materialized for the row. Distinguishes
+      // active-with-data ("Active") from active-but-empty ("Awaiting data") in the UI.
+      // Audit on Swish found ~75% of active-tracked rows had no rank/clicks/impressions —
+      // they were tracked in name only until a snapshot showed up.
+      hasSignal: row.metrics.currentPosition != null
+        || row.metrics.clicks != null
+        || row.metrics.impressions != null,
     } : { status: 'not_tracked' },
     explanation: row.explanation,
     localSeo,

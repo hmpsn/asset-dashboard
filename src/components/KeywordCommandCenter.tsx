@@ -265,9 +265,22 @@ function KeywordDrawer({
     );
   }
 
+  const isAwaitingSignal = row.tracking.status === 'active' && row.tracking.hasSignal === false;
   const trackingLabel = row.tracking.status === 'not_tracked'
     ? 'Not tracked'
-    : row.tracking.status.replace(/_/g, ' ');
+    : isAwaitingSignal
+      ? 'Active · Awaiting data'
+      : row.tracking.status.replace(/_/g, ' ');
+
+  // Source rendering: PR E's read-time inference upgrades legacy UNKNOWN sources
+  // where it can, but residual UNKNOWN values still reach the UI for keywords that
+  // don't match any inference hint. Show a friendly label rather than the literal
+  // "unknown" enum value.
+  const trackingSourceLabel = row.tracking.source && row.tracking.source !== 'unknown'
+    ? row.tracking.source.replace(/_/g, ' ')
+    : row.tracking.status === 'not_tracked'
+      ? null
+      : 'Source not recorded';
 
   return (
     <SectionCard
@@ -328,9 +341,14 @@ function KeywordDrawer({
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="t-caption font-medium text-[var(--brand-text-bright)] capitalize">{trackingLabel}</p>
-                <p className="t-caption-sm text-[var(--brand-text-muted)]">
-                  {row.tracking.source ? row.tracking.source.replace(/_/g, ' ') : 'No source yet'}
-                </p>
+                {trackingSourceLabel && (
+                  <p className="t-caption-sm text-[var(--brand-text-muted)]">{trackingSourceLabel}</p>
+                )}
+                {isAwaitingSignal && (
+                  <p className="t-caption-sm text-amber-400/80 mt-1">
+                    No GSC clicks, impressions, or rank position recorded yet for this keyword.
+                  </p>
+                )}
               </div>
               {row.tracking.status !== 'not_tracked' && (
                 <Button
