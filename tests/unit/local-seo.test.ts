@@ -880,7 +880,7 @@ describe('classifyLocalKeywordIntent', () => {
 
   it('classifies informational queries', () => {
     expect(classifyLocalKeywordIntent('what is dental implant')).toBe('informational');
-    expect(classifyLocalKeywordIntent('covid dental impact')).toBe('informational');
+    expect(classifyLocalKeywordIntent('impact of dental crowns on jawbone')).toBe('informational');
     expect(classifyLocalKeywordIntent('how does teeth whitening work')).toBe('informational');
     expect(classifyLocalKeywordIntent('dental financing and insurance options guide')).toBe('informational');
     expect(classifyLocalKeywordIntent('cost of dental implants')).toBe('informational');

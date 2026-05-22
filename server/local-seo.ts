@@ -1040,12 +1040,12 @@ function hasMarketModifier(keyword: string, markets: LocalSeoMarket[]): boolean 
  */
 export function classifyLocalKeywordIntent(keyword: string): LocalSeoKeywordIntent {
   const kw = keyword.toLowerCase();
-  // Comparison: X vs Y, versus, alternatives, compare, ranking
-  if (/\bvs\b|\bversus\b|\balternative[s]?\b|\bcompare\b|\bcomparison\b|\branking\b/.test(kw)) {
+  // Comparison: X vs Y, versus, alternatives, compare
+  if (/\bvs\b|\bversus\b|\balternative[s]?\b|\bcompare\b|\bcomparison\b/.test(kw)) {
     return 'comparison';
   }
   // Informational: question words, educational patterns, cost/price research
-  if (/^(how|what|why|when|where|which|who|can |does |do |is |are )|\bguide\b|\btutorial\b|\btips\b|\bexplained\b|\boverview\b|\bhistory\b|\bfacts\b|\bstatistics\b|\btypes of\b|\bdifference between\b|\bcost of\b|\bprice of\b|\bpros and cons\b|\bbenefits of\b|\bcauses of\b|\bwhat is\b|\bimpact of\b|\bimpact\b/.test(kw)) {
+  if (/^(how|what|why|when|where|which|who|can |does |do |is |are )|\bguide\b|\btutorial\b|\btips\b|\bexplained\b|\boverview\b|\bhistory\b|\bfacts\b|\bstatistics\b|\btypes of\b|\bdifference between\b|\bcost of\b|\bprice of\b|\bpros and cons\b|\bbenefits of\b|\bcauses of\b|\bwhat is\b|\bimpact of\b/.test(kw)) {
     return 'informational';
   }
   // Commercial: pre-buying research with quality signals (still useful for local)
@@ -1058,8 +1058,9 @@ export function classifyLocalKeywordIntent(keyword: string): LocalSeoKeywordInte
 }
 
 const LOCAL_INTENT_PREFIXES = [
-  'best', 'top rated', 'affordable', 'cheap', 'emergency',
-  'open now', 'same day', 'accepting new patients', '24 hour',
+  'emergency', 'open now', 'best',
+  'same day', 'affordable', 'cheap',
+  'top rated', 'accepting new patients', '24 hour',
 ] as const;
 
 const LOCAL_INTENT_PREFIX_CAP_PER_BASE = 3;
