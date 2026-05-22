@@ -740,13 +740,14 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
             </p>
           </section>
 
-          {(error || update.error || refresh.error) && (
+          {(error || update.error || refresh.error || setPrimary.error) && (
             <div className="rounded-[var(--radius-lg)] border border-red-500/20 bg-red-500/8 px-4 py-3 flex items-start gap-2">
               <Icon as={AlertTriangle} size="sm" className="text-red-400/80 mt-0.5" />
               <p className="t-caption-sm text-red-400/90">
                 {error
                   ?? (update.error instanceof Error ? update.error.message : null)
                   ?? (refresh.error instanceof Error ? refresh.error.message : null)
+                  ?? (setPrimary.error instanceof Error ? setPrimary.error.message : null)
                   ?? 'Local SEO market setup could not be saved.'}
               </p>
             </div>
