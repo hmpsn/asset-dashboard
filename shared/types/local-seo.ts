@@ -97,6 +97,29 @@ export interface LocalSeoMarket {
   updatedAt: string;
 }
 
+export interface ClientLocation {
+  id: string;
+  workspaceId: string;
+  name: string;
+  domain?: string;
+  phone?: string;
+  streetAddress?: string;
+  city?: string;
+  stateOrRegion?: string;
+  country?: string;
+  isPrimary: boolean;
+  status: 'needs_review' | 'confirmed';
+  gbpPlaceId?: string;
+  /** Future: FK to local_seo_markets. Unused until per-location strategy sprint. */
+  primaryMarketId?: string;
+  /** Future: e.g. "/downtown-austin-dentist". Unused until per-location strategy sprint. */
+  pageTargetPath?: string;
+  /** Future: FK to page_keywords. Unused until per-location strategy sprint. */
+  pageTargetKeywordId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const LOCAL_SEO_LOCATION_LOOKUP_STATUS = {
   MATCHED: 'matched',
   AMBIGUOUS: 'ambiguous',
@@ -222,6 +245,10 @@ export interface LocalVisibilitySnapshot {
   languageCode: string;
   status: LocalVisibilityStatus;
   degradedReason?: string;
+  /** ID of the client_locations row that matched this result. Undefined for pre-backfill snapshots. */
+  matchedLocationId?: string;
+  /** Human-readable name of the matching location, e.g. "Swish Dental Downtown". */
+  matchedLocationName?: string;
 }
 
 export interface LocalSeoKeywordVisibility {

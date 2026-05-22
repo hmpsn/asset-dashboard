@@ -324,6 +324,15 @@ export interface PageElementSlice {
  * markets receive an empty-but-valid slice — never undefined.
  */
 export interface LocalSeoSlice {
+  /** Configured client locations for this workspace. Only 'confirmed' locations are included. */
+  locations: ReadonlyArray<{
+    id: string;
+    name: string;
+    isPrimary: boolean;
+    city?: string;
+    stateOrRegion?: string;
+    pageTargetPath?: string;
+  }>;
   /** Whether the local-seo-visibility feature flag is enabled. */
   enabled: boolean;
   /** Configured local markets and their status. Not capped. */

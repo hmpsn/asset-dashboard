@@ -396,10 +396,10 @@
           "source": "Tier 2 staging quality audit on Swish 2026-05-22",
           "priority": "P1",
           "est": "0.5-1 day",
-          "status": "pending",
+          "status": "done",
           "plannedSprint": "sprint-local-seo-h",
           "owner": "seo-health",
-          "notes": "Swish has multiple physical locations (Downtown, Midtown, East Austin) each with its own GBP listing. `evaluateLocalBusinessMatch` in `server/local-seo.ts` matches ONE listing per snapshot and treats the rest as third-party competitors. Result on Swish: 'Swish Dental Downtown' appears as a 'competitor' in 31 snapshots, 'Swish Dental - Midtown' in 15 — both are actually Swish. Verified-match rate dropped to 3-4% across 200 snapshots when reality is much higher. **This is the single biggest fix for dashboard credibility — we are systematically underreporting our own performance.** Fix: (1) New workspace concept of `client_locations` — multiple GBPs/URLs/phone numbers/addresses tied to one workspace. (2) `evaluateLocalBusinessMatch` checks against ALL configured locations, not just the primary workspace identity. (3) Snapshot `businessFound` returns true if ANY configured location matches. (4) `top_competitors` excludes the client's other locations from the competitor list. (5) UI shows which specific location matched. Affects business-match logic, snapshot enrichment, and 'top competitors' presentation across local SEO reporting."
+          "notes": "PR1 server layer shipped. Added `client_locations`, matched-location snapshot columns, multi-location `evaluateLocalBusinessMatch`, owned-location competitor scrubbing, historical backfill job, LocalSeoSlice.locations, and admin CRUD endpoints at `/api/local-seo/:workspaceId/locations`. PR2 still needs the Settings/Local SEO UI for managing locations."
         },
         {
           "id": "intel-quality-keyword-intent-classification",
