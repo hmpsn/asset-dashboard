@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { CLIENT_LOCATION_STATUS } from '../shared/types/local-seo.js';
 import type { ClientLocation } from '../shared/types/local-seo.js';
 
 interface LocationRow {
@@ -87,7 +88,9 @@ function rowToLocation(row: LocationRow): ClientLocation {
     stateOrRegion: row.state_or_region ?? undefined,
     country: row.country ?? undefined,
     isPrimary: row.is_primary === 1,
-    status: row.status === 'confirmed' ? 'confirmed' : 'needs_review',
+    status: (Object.values(CLIENT_LOCATION_STATUS) as string[]).includes(row.status)
+      ? row.status as ClientLocation['status']
+      : CLIENT_LOCATION_STATUS.NEEDS_REVIEW,
     gbpPlaceId: row.gbp_place_id ?? undefined,
     primaryMarketId: row.primary_market_id ?? undefined,
     pageTargetPath: row.page_target_path ?? undefined,

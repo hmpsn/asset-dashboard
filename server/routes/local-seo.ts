@@ -17,6 +17,7 @@ import {
   updateClientLocation,
 } from '../client-locations.js';
 import { isFeatureEnabled } from '../feature-flags.js';
+import db from '../db/index.js';
 import { createJob, hasActiveJob } from '../jobs.js';
 import {
   countLocalVisibilitySnapshots,
@@ -242,22 +243,35 @@ router.delete('/api/local-seo/:workspaceId/locations/:locationId', requireWorksp
   const { workspaceId, locationId } = req.params;
   const available = ensureLocalSeoLocationsAvailable(workspaceId);
   if (!available.ok) return res.status(available.status).json({ error: available.error });
-  const existing = getClientLocationById(locationId, workspaceId);
-  if (!existing) return res.status(404).json({ error: 'Location not found' });
 
-  const confirmedRemaining = getClientLocations(workspaceId)
-    .filter(location => location.status === 'confirmed' && location.id !== locationId)
-    .length;
-  const snapshotCount = countLocalVisibilitySnapshots(workspaceId);
-  if (existing.status === 'confirmed' && confirmedRemaining === 0 && snapshotCount > 0) {
-    return res.status(409).json({
-      error: 'Cannot remove the only configured location while local visibility snapshots exist. Add another location first.',
-    });
-  }
+  // Wrap the guard check + delete in a transaction to prevent two concurrent deletes
+  // of the last two confirmed locations both passing the guard and leaving zero confirmed.
+  type DeleteResult =
+    | { ok: true; existingName: string }
+    | { ok: false; status: number; error: string };
 
-  const deleted = deleteClientLocation(locationId, workspaceId);
-  if (!deleted) return res.status(404).json({ error: 'Location not found' });
-  recordLocationMutation(workspaceId, 'location_deleted', existing.name);
+  const result = db.transaction((): DeleteResult => {
+    const existing = getClientLocationById(locationId, workspaceId);
+    if (!existing) return { ok: false, status: 404, error: 'Location not found' };
+
+    const confirmedRemaining = getClientLocations(workspaceId)
+      .filter(location => location.status === 'confirmed' && location.id !== locationId)
+      .length;
+    const snapshotCount = countLocalVisibilitySnapshots(workspaceId);
+    if (existing.status === 'confirmed' && confirmedRemaining === 0 && snapshotCount > 0) {
+      return {
+        ok: false,
+        status: 409,
+        error: 'Cannot remove the only configured location while local visibility snapshots exist. Add another location first.',
+      };
+    }
+
+    deleteClientLocation(locationId, workspaceId);
+    return { ok: true, existingName: existing.name };
+  })();
+
+  if (!result.ok) return res.status(result.status).json({ error: result.error });
+  recordLocationMutation(workspaceId, 'location_deleted', result.existingName);
   const jobId = enqueueLocationBackfill(workspaceId);
   res.json({ deleted: true, jobId });
 });

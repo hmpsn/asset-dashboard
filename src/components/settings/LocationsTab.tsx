@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, MapPin, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Check, MapPin, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useCreateLocation, useDeleteLocation, useLocalSeoLocations, useUpdateLocation } from '../../hooks/admin/useLocalSeoLocations';
 import type { CreateLocationBody } from '../../api/localSeo';
 import type { ClientLocation } from '../../../shared/types/local-seo';
@@ -105,7 +105,7 @@ function formFromSeedBody(body: CreateLocationBody): LocationFormState {
 }
 
 function addressLine(location: ClientLocation): string {
-  return [location.streetAddress, location.city, location.stateOrRegion, location.country].filter(Boolean).join(', ') || 'No address';
+  return [location.streetAddress, location.city, location.stateOrRegion, location.country].filter(Boolean).join(', ');
 }
 
 interface LocationFormProps {
@@ -217,8 +217,7 @@ function LocationRow({ location, workspaceId, onDelete, toast }: LocationRowProp
                 {needsReview && <Badge label="Needs review" tone="amber" variant="outline" shape="pill" />}
               </div>
               <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">
-                {addressLine(location)}
-                {location.domain ? ` | ${location.domain}` : ''}
+                {[addressLine(location), location.domain].filter(Boolean).join(' | ') || 'No details'}
               </p>
             </div>
 
@@ -257,15 +256,6 @@ function LocationRow({ location, workspaceId, onDelete, toast }: LocationRowProp
               </div>
             )}
 
-            {editing && (
-              <IconButton
-                icon={X}
-                label="Cancel location edit"
-                variant="ghost"
-                size="sm"
-                onClick={cancelEdit}
-              />
-            )}
           </div>
 
           {editing && (
@@ -298,7 +288,7 @@ function LocationRow({ location, workspaceId, onDelete, toast }: LocationRowProp
 }
 
 export function LocationsTab({ workspaceId, workspaceName, liveDomain, businessProfile, toast }: LocationsTabProps) {
-  const { data: locations, isLoading, isError } = useLocalSeoLocations(workspaceId);
+  const { data: locations, isLoading, isError, refetch } = useLocalSeoLocations(workspaceId);
   const createMutation = useCreateLocation(workspaceId);
   const deleteMutation = useDeleteLocation(workspaceId);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -307,7 +297,8 @@ export function LocationsTab({ workspaceId, workspaceName, liveDomain, businessP
 
   const isEmpty = !isLoading && !isError && Array.isArray(locations) && locations.length === 0;
   const seedBody = buildSeedBody({ name: workspaceName, liveDomain, businessProfile });
-  const hasSeedData = Boolean(seedBody.name || seedBody.domain || seedBody.phone || seedBody.streetAddress);
+  // Exclude name — workspaceName is always truthy and doesn't count as seed contact data.
+  const hasSeedData = Boolean(seedBody.domain || seedBody.phone || seedBody.streetAddress);
   const showSeedBanner = isEmpty && hasSeedData && !showAddForm;
 
   const handleSeedConfirm = async () => {
@@ -338,8 +329,10 @@ export function LocationsTab({ workspaceId, workspaceName, liveDomain, businessP
     try {
       await deleteMutation.mutateAsync(locationId);
       toast('Location removed');
-    } catch {
-      toast('Failed to remove location', 'error');
+    } catch (err) {
+      // Surface the server error message (e.g. 409 "Cannot remove the only configured location").
+      const message = err instanceof Error && err.message ? err.message : 'Failed to remove location';
+      toast(message, 'error');
     }
   };
 
@@ -355,7 +348,12 @@ export function LocationsTab({ workspaceId, workspaceName, liveDomain, businessP
   if (isError) {
     return (
       <SectionCard title="Business locations">
-        <p className="t-body text-[var(--brand-text-muted)]">Failed to load locations. Refresh and try again.</p>
+        <div className="flex flex-col items-start gap-3">
+          <p className="t-body text-[var(--brand-text-muted)]">Failed to load locations.</p>
+          <Button variant="secondary" size="sm" onClick={() => { void refetch(); }}>
+            Try again
+          </Button>
+        </div>
       </SectionCard>
     );
   }

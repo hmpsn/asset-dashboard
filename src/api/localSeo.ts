@@ -65,17 +65,12 @@ export const localSeo = {
     return response.locations;
   },
 
-  createLocation: async (workspaceId: string, body: CreateLocationBody) => {
-    const response = await post<LocationMutationResponse>(`/api/local-seo/${workspaceId}/locations`, body);
-    return response.location;
-  },
+  createLocation: (workspaceId: string, body: CreateLocationBody) =>
+    post<LocationMutationResponse>(`/api/local-seo/${workspaceId}/locations`, body),
 
-  updateLocation: async (workspaceId: string, locationId: string, body: Partial<CreateLocationBody>) => {
-    const response = await put<LocationMutationResponse>(`/api/local-seo/${workspaceId}/locations/${locationId}`, body);
-    return response.location;
-  },
+  updateLocation: (workspaceId: string, locationId: string, body: Partial<CreateLocationBody>) =>
+    put<LocationMutationResponse>(`/api/local-seo/${workspaceId}/locations/${locationId}`, body),
 
-  deleteLocation: async (workspaceId: string, locationId: string) => {
-    await del(`/api/local-seo/${workspaceId}/locations/${locationId}`);
-  },
+  deleteLocation: (workspaceId: string, locationId: string) =>
+    del<{ deleted: boolean; jobId: string }>(`/api/local-seo/${workspaceId}/locations/${locationId}`),
 };

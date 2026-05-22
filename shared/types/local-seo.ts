@@ -97,6 +97,13 @@ export interface LocalSeoMarket {
   updatedAt: string;
 }
 
+export const CLIENT_LOCATION_STATUS = {
+  NEEDS_REVIEW: 'needs_review',
+  CONFIRMED: 'confirmed',
+} as const;
+
+export type ClientLocationStatus = typeof CLIENT_LOCATION_STATUS[keyof typeof CLIENT_LOCATION_STATUS];
+
 export interface ClientLocation {
   id: string;
   workspaceId: string;
@@ -108,7 +115,7 @@ export interface ClientLocation {
   stateOrRegion?: string;
   country?: string;
   isPrimary: boolean;
-  status: 'needs_review' | 'confirmed';
+  status: ClientLocationStatus;
   gbpPlaceId?: string;
   /** Future: FK to local_seo_markets. Unused until per-location strategy sprint. */
   primaryMarketId?: string;

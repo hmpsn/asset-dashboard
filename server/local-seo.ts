@@ -1099,7 +1099,9 @@ export function getEffectiveLocations(workspace: Workspace): ClientLocation[] {
   const configured = getClientLocations(workspace.id).filter(location => location.status === 'confirmed');
   if (configured.length > 0) return configured;
   const address = workspace.businessProfile?.address;
-  const now = new Date().toISOString();
+  // Use a fixed sentinel timestamp so two calls at different wall-clock times return
+  // structurally identical objects — avoids false cache misses from unstable timestamps.
+  const syntheticTimestamp = '1970-01-01T00:00:00.000Z';
   return [{
     id: `synthetic-${workspace.id}`,
     workspaceId: workspace.id,
@@ -1112,14 +1114,13 @@ export function getEffectiveLocations(workspace: Workspace): ClientLocation[] {
     country: address?.country,
     isPrimary: true,
     status: 'confirmed',
-    createdAt: now,
-    updatedAt: now,
+    createdAt: syntheticTimestamp,
+    updatedAt: syntheticTimestamp,
   }];
 }
 
-function isOwnedLocalResult(result: LocalVisibilityBusinessResult, locations: ClientLocation[]): boolean {
+export function isOwnedLocalResult(result: LocalVisibilityBusinessResult, locations: ClientLocation[]): boolean {
   const resultDomain = cleanDomain(result.domain ?? result.url);
-  const resultTitle = normalizeText(result.title);
   const resultPhone = normalizePhone(result.phone);
   const resultAddress = normalizeText(result.address);
   const resultProviderIdentity = normalizeProviderIdentity(result.cid);
@@ -1133,14 +1134,12 @@ function isOwnedLocalResult(result: LocalVisibilityBusinessResult, locations: Cl
     if (locationPhone && resultPhone && locationPhone === resultPhone) return true;
     const locationStreet = normalizeText(location.streetAddress);
     if (locationStreet && resultAddress.includes(locationStreet)) return true;
-    const locationName = normalizeText(location.name);
-    const nameMatch = Boolean(locationName && resultTitle && (resultTitle.includes(locationName) || locationName.includes(resultTitle)));
-    return Boolean(nameMatch && (
-      (locationDomain && resultDomain && locationDomain === resultDomain)
-      || (locationProviderIdentity && resultProviderIdentity && locationProviderIdentity === resultProviderIdentity)
-      || (locationPhone && resultPhone && locationPhone === resultPhone)
-      || (locationStreet && resultAddress.includes(locationStreet))
-    ));
+    // Name alone is NOT enough to claim ownership — domain, GBP identity, phone, or
+    // street address must corroborate. All four signals were already checked above
+    // via early-return; if we reach here, all four were false, so name-only can't
+    // produce a match. Returning false explicitly prevents a future reader from
+    // "simplifying" the early-returns and inadvertently enabling name-only scrubbing.
+    return false;
   });
 }
 

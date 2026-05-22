@@ -184,7 +184,7 @@ function BusinessLocationsShortcut({ workspaceId }: { workspaceId: string }) {
       className={hasNeedsReview ? 'border-amber-500/30 bg-amber-500/8' : undefined}
       noPadding
     >
-      <div className="px-4 py-3 flex items-center justify-between gap-3" aria-label="Business locations">
+      <div className="px-4 py-3 flex items-center justify-between gap-3" role="region" aria-label="Business locations">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <Icon as={MapPin} size="sm" className="text-[var(--brand-text-muted)]" />

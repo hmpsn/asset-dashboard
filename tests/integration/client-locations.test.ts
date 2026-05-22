@@ -205,6 +205,30 @@ describe('DELETE /api/local-seo/:workspaceId/locations/:locationId', () => {
     }
   });
 
+  it('returns 404 when deleting a nonexistent location', async () => {
+    const res = await ctx.del(`/api/local-seo/${workspaceId}/locations/does-not-exist`);
+    expect(res.status).toBe(404);
+  });
+
+  it('deletes the last location when no snapshots exist', async () => {
+    const freshWs = createWorkspace('No Snapshot Delete Workspace');
+    try {
+      // No insertSnapshot call — zero snapshots.
+      const createRes = await ctx.postJson(`/api/local-seo/${freshWs.id}/locations`, {
+        name: 'Only Location No Snaps',
+        status: 'confirmed',
+      });
+      const createBody = await readJson<LocationResponse>(createRes);
+      const deleteRes = await ctx.del(`/api/local-seo/${freshWs.id}/locations/${createBody.location.id}`);
+      const deleteBody = await readJson<{ deleted: boolean }>(deleteRes);
+      expect(deleteRes.status).toBe(200);
+      expect(deleteBody.deleted).toBe(true);
+      expect(getClientLocations(freshWs.id)).toHaveLength(0);
+    } finally {
+      deleteWorkspace(freshWs.id);
+    }
+  });
+
   it('deletes a location when others remain', async () => {
     const freshWs = createWorkspace('Multi Delete Workspace');
     try {

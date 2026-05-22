@@ -119,4 +119,68 @@ describe('LocalSeoLocationBackfillQueue', () => {
     expect(deps.createJob).toHaveBeenCalledTimes(2);
     expect(deps.logError).not.toHaveBeenCalled();
   });
+
+  it('logs the error and marks the job status:error when runJob rejects', async () => {
+    const scheduled: Array<() => void> = [];
+    const run = deferred();
+    let nextJob = 1;
+
+    const deps: LocalSeoLocationBackfillQueueDeps = {
+      createJob: vi.fn((_type, opts) => makeJob(`job-${nextJob++}`, opts?.workspaceId ?? 'unknown', opts?.total ?? 0)),
+      hasActiveJob: vi.fn(() => undefined),
+      updateJob: vi.fn(),
+      countSnapshots: vi.fn(() => 10),
+      runJob: vi.fn(() => run.promise),
+      schedule: vi.fn(task => scheduled.push(task)),
+      logError: vi.fn(),
+    };
+    const queue = new LocalSeoLocationBackfillQueue(deps);
+
+    const jobId = queue.enqueue('ws-err');
+    scheduled[0]();
+
+    const boom = new Error('provider timeout');
+    run.reject(boom);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(deps.logError).toHaveBeenCalledWith(boom, 'ws-err', jobId);
+    expect(deps.updateJob).toHaveBeenCalledWith(jobId, expect.objectContaining({
+      status: 'error',
+      error: 'provider timeout',
+    }));
+  });
+
+  it('recovers via hasActiveJob when an in-flight DB job has no in-memory record', async () => {
+    const scheduled: Array<() => void> = [];
+    const run = deferred();
+    let nextJob = 1;
+
+    const orphanJob = makeJob('job-orphan', 'ws-2', 50);
+
+    const deps: LocalSeoLocationBackfillQueueDeps = {
+      createJob: vi.fn((_type, opts) => makeJob(`job-${nextJob++}`, opts?.workspaceId ?? 'unknown', opts?.total ?? 0)),
+      // Simulates a job that was created by a previous process/restart and is still active in DB.
+      hasActiveJob: vi.fn(() => orphanJob),
+      updateJob: vi.fn(),
+      countSnapshots: vi.fn(() => 50),
+      runJob: vi.fn(() => run.promise),
+      schedule: vi.fn(task => scheduled.push(task)),
+      logError: vi.fn(),
+    };
+    const queue = new LocalSeoLocationBackfillQueue(deps);
+
+    const returnedId = queue.enqueue('ws-2');
+
+    // Should attach to the DB-recovered job, not create a new one.
+    expect(returnedId).toBe('job-orphan');
+    expect(deps.createJob).not.toHaveBeenCalled();
+    // Should mark a re-run as queued since there's no in-memory started flag.
+    expect(deps.updateJob).toHaveBeenCalledWith('job-orphan', expect.objectContaining({
+      message: expect.stringContaining('queued'),
+    }));
+    // No new schedule since we piggy-backed on the DB job.
+    expect(scheduled).toHaveLength(0);
+  });
 });
