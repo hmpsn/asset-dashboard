@@ -1025,6 +1025,219 @@ function buildCandidateContext(workspace: Workspace) {
   };
 }
 
+/**
+ * Shared iteration context for local SEO candidate enumeration.
+ *
+ * Holds the cheap data-loading surface that both the evaluated builder
+ * (`buildLocalSeoKeywordCandidates`) and the cheap counter
+ * (`countLocalSeoKeywordCandidates`) require. Built once per request via
+ * `loadCandidateIterationContext` and consumed by `iterateLocalCandidateSignals`.
+ */
+export interface CandidateIterationContext {
+  workspace: Workspace;
+  markets: LocalSeoMarket[];
+  declined: Set<string>;
+  inactiveTracked: Set<string>;
+  trackedKeywords: ReturnType<typeof getTrackedKeywords>;
+  contentGaps: ReturnType<typeof listContentGaps>;
+  pageMap: ReturnType<typeof listPageKeywords>;
+  explicitKeywords: string[];
+}
+
+/**
+ * A single source signal yielded by `iterateLocalCandidateSignals`.
+ *
+ * Pure enumeration — no eligibility evaluation, no scoring, no deduplication.
+ * Downstream consumers (the evaluated builder, the cheap counter) apply their
+ * own filters/scoring atop this stream.
+ */
+export interface CandidateSourceSignal {
+  keyword: string | undefined;
+  source: LocalSeoKeywordCandidate['source'];
+  force?: boolean;
+  selected?: boolean;
+  sourceLabel?: string;
+  detail?: string;
+  pagePath?: string;
+  pageTitle?: string;
+  volume?: number;
+  difficulty?: number;
+  scoreBoost?: number;
+}
+
+/**
+ * Load the cheap data-fetch surface shared by both candidate builders.
+ *
+ * Returns null if the workspace cannot be found. Does not load markets-gated
+ * behavior — callers decide whether an empty markets list short-circuits.
+ */
+export function loadCandidateIterationContext(
+  workspaceId: string,
+  explicitKeywords: string[] = [],
+): CandidateIterationContext | null {
+  const workspace = getWorkspace(workspaceId);
+  if (!workspace) return null;
+  const markets = activeMarkets(workspaceId);
+  const { contentGaps, pageMap, declinedKeywords } = buildCandidateContext(workspace);
+  const declined = new Set(declinedKeywords.map(keywordComparisonKey));
+  const trackedKeywords = getTrackedKeywords(workspaceId, { includeInactive: true });
+  const inactiveTracked = new Set(
+    trackedKeywords
+      .filter(tracked => (tracked.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) !== TRACKED_KEYWORD_STATUS.ACTIVE)
+      .map(tracked => keywordComparisonKey(tracked.query)),
+  );
+  return {
+    workspace,
+    markets,
+    declined,
+    inactiveTracked,
+    trackedKeywords,
+    contentGaps,
+    pageMap,
+    explicitKeywords,
+  };
+}
+
+/**
+ * Yield every source signal the workspace can produce, in the exact order
+ * the existing `buildLocalSeoKeywordCandidates` walks them. Pure enumeration:
+ *
+ *   1. Explicit keywords (force, selected, scoreBoost=30)
+ *   2. Strategy site keywords (selected, scoreBoost=12)
+ *   3. Active tracked keywords (selected, scoreBoost: pinned?20:8)
+ *   4. Page map: primaryKeyword, secondaryKeywords, service-keyword pageTitle,
+ *      then local variants of each service-keyword base
+ *   5. Content gaps: targetKeyword + local variants of targetKeyword
+ *
+ * No eligibility evaluation, no scoring, no deduplication — those belong to
+ * the consumer.
+ */
+export function* iterateLocalCandidateSignals(
+  ctx: CandidateIterationContext,
+): Generator<CandidateSourceSignal> {
+  const { workspace, markets, trackedKeywords, contentGaps, pageMap, explicitKeywords } = ctx;
+
+  for (const keyword of explicitKeywords) {
+    yield {
+      keyword,
+      source: 'explicit',
+      force: true,
+      selected: true,
+      sourceLabel: 'Selected for refresh',
+      scoreBoost: 30,
+    };
+  }
+
+  for (const keyword of workspace.keywordStrategy?.siteKeywords ?? []) {
+    yield {
+      keyword,
+      source: 'strategy',
+      selected: true,
+      sourceLabel: 'Strategy keyword',
+      scoreBoost: 12,
+    };
+  }
+
+  for (const tracked of trackedKeywords) {
+    if ((tracked.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) !== TRACKED_KEYWORD_STATUS.ACTIVE) continue;
+    yield {
+      keyword: tracked.query,
+      source: 'tracking',
+      selected: true,
+      sourceLabel: 'Rank tracking',
+      detail: tracked.source?.replace(/_/g, ' '),
+      pagePath: tracked.pagePath,
+      pageTitle: tracked.pageTitle,
+      volume: tracked.volume,
+      difficulty: tracked.difficulty,
+      scoreBoost: tracked.pinned ? 20 : 8,
+    };
+  }
+
+  for (const page of pageMap) {
+    const pageLooksLocal = /\/location\/|near me|appointment|austin|houston|san antonio|dallas/i.test(`${page.pagePath} ${page.pageTitle}`)
+      || page.serpFeatures?.includes('local_pack');
+    yield {
+      keyword: page.primaryKeyword,
+      source: 'page_assignment',
+      force: pageLooksLocal,
+      selected: true,
+      sourceLabel: 'Page assignment',
+      detail: page.pageTitle ?? page.pagePath,
+      pagePath: page.pagePath,
+      pageTitle: page.pageTitle,
+      volume: page.volume,
+      difficulty: page.difficulty,
+      scoreBoost: 10,
+    };
+    for (const secondary of page.secondaryKeywords ?? []) {
+      yield {
+        keyword: secondary,
+        source: 'page_assignment',
+        force: pageLooksLocal,
+        selected: true,
+        sourceLabel: 'Page assignment',
+        detail: page.pageTitle ?? page.pagePath,
+        pagePath: page.pagePath,
+        pageTitle: page.pageTitle,
+        scoreBoost: 4,
+      };
+    }
+    if (titleLooksLikeServiceKeyword(page.pageTitle)) {
+      yield {
+        keyword: page.pageTitle,
+        source: 'page_assignment',
+        force: pageLooksLocal,
+        selected: true,
+        sourceLabel: 'Service page',
+        detail: page.pagePath,
+        pagePath: page.pagePath,
+        pageTitle: page.pageTitle,
+      };
+    }
+    for (const base of [page.primaryKeyword, page.pageTitle, ...(page.secondaryKeywords ?? [])]) {
+      if (!base || !titleLooksLikeServiceKeyword(base) || isNearDuplicateKeyword(base, workspace.name)) continue;
+      for (const variant of localVariantKeywords(base, markets)) {
+        yield {
+          keyword: variant,
+          source: 'local_variant',
+          sourceLabel: 'Local candidate',
+          detail: page.pageTitle ?? page.pagePath,
+          pagePath: page.pagePath,
+          pageTitle: page.pageTitle,
+        };
+      }
+    }
+  }
+
+  for (const gap of contentGaps) {
+    const localGap = gap.suggestedPageType === 'location'
+      || gap.serpFeatures?.includes('local_pack')
+      || hasLocalIntent(`${gap.topic} ${gap.targetKeyword}`, workspace);
+    yield {
+      keyword: gap.targetKeyword,
+      source: 'content_gap',
+      force: localGap,
+      selected: false,
+      sourceLabel: 'Content opportunity',
+      detail: gap.topic,
+      volume: gap.volume,
+      difficulty: gap.difficulty,
+      scoreBoost: gap.priority === 'high' ? 8 : 0,
+    };
+    for (const variant of localVariantKeywords(gap.targetKeyword, markets)) {
+      yield {
+        keyword: variant,
+        source: 'local_variant',
+        sourceLabel: 'Local content candidate',
+        detail: gap.topic,
+        volume: gap.volume,
+        difficulty: gap.difficulty,
+      };
+    }
+  }
+}
+
 export function buildLocalSeoKeywordCandidates(workspaceId: string, explicitKeywords: string[] = []): LocalSeoKeywordCandidate[] {
   const workspace = getWorkspace(workspaceId);
   if (!workspace) return [];
