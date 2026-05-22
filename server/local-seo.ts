@@ -62,25 +62,6 @@ const LOCAL_CANDIDATE_HARD_CAP = 1000;
 const LOCAL_SEO_MAX_RESULTS = 10;
 const DEFAULT_LANGUAGE_CODE = 'en';
 
-const LOCAL_CANDIDATE_CACHE_TTL_MS = 60_000;
-type LocalCandidateCacheVariant = 'cheap' | 'evaluated';
-interface CachedCandidates { ts: number; candidates: LocalSeoKeywordCandidate[] }
-const localCandidateCache = new Map<string, CachedCandidates>();
-
-function localCandidateCacheKey(
-  workspaceId: string,
-  explicitKeywords: string[],
-  variant: LocalCandidateCacheVariant,
-): string {
-  const sorted = [...explicitKeywords].map(k => k.trim()).filter(Boolean).sort().join('|');
-  return `${workspaceId}::${variant}::${sorted}`;
-}
-
-/** Test-only helper. Leading underscore signals internal use. */
-export function _resetLocalCandidateCacheForTests(): void {
-  localCandidateCache.clear();
-}
-
 export interface LocalSeoKeywordCandidate {
   keyword: string;
   normalizedKeyword: string;
@@ -1061,6 +1042,13 @@ export interface CandidateIterationContext {
   contentGaps: ReturnType<typeof listContentGaps>;
   pageMap: ReturnType<typeof listPageKeywords>;
   explicitKeywords: string[];
+  /**
+   * Populated only when `loadCandidateIterationContext` is called with
+   * `{ withEvaluationContext: true }`. The cheap path leaves this undefined to
+   * avoid the extra `buildKeywordEligibilityContext` work; the Evaluated path
+   * requests it so `buildCandidateContext` runs once, not twice.
+   */
+  evaluationContext?: ReturnType<typeof buildCandidateContext>['evaluationContext'];
 }
 
 /**
@@ -1093,12 +1081,13 @@ export interface CandidateSourceSignal {
 export function loadCandidateIterationContext(
   workspaceId: string,
   explicitKeywords: string[] = [],
+  options: { withEvaluationContext?: boolean } = {},
 ): CandidateIterationContext | null {
   const workspace = getWorkspace(workspaceId);
   if (!workspace) return null;
   const markets = activeMarkets(workspaceId);
-  const { contentGaps, pageMap, declinedKeywords } = buildCandidateContext(workspace);
-  const declined = new Set(declinedKeywords.map(keywordComparisonKey));
+  const built = buildCandidateContext(workspace);
+  const declined = new Set(built.declinedKeywords.map(keywordComparisonKey));
   const trackedKeywords = getTrackedKeywords(workspaceId, { includeInactive: true });
   const inactiveTracked = new Set(
     trackedKeywords
@@ -1111,9 +1100,10 @@ export function loadCandidateIterationContext(
     declined,
     inactiveTracked,
     trackedKeywords,
-    contentGaps,
-    pageMap,
+    contentGaps: built.contentGaps,
+    pageMap: built.pageMap,
     explicitKeywords,
+    evaluationContext: options.withEvaluationContext ? built.evaluationContext : undefined,
   };
 }
 
@@ -1298,27 +1288,29 @@ function upsertCandidate(
  *
  * Skips the per-candidate `isStrategyPoolEligibleKeyword` evaluator entirely —
  * that's the work that caused the 35-second wall-clock regression on rich
- * workspaces (Swish, PR #876). Output shape is identical to the evaluated
+ * workspaces (Swish, PR #876). Output shape is identical to the Evaluated
  * variant except:
  *   - `reasons` is always `[]` (no eligibility-evaluator messages)
  *   - `score` excludes `evaluation.scoreDelta` (no noise-pattern suppression bias)
- *   - No noise-pattern / authority-mismatch / business-fit suppression
+ *   - No noise-pattern / authority-mismatch / business-fit suppression — so this
+ *     can return strictly MORE candidates than the Evaluated variant. The
+ *     Evaluated result is always a subset of the cheap result (modulo `reasons`
+ *     + `score`).
  *
- * Wrapped in a 60-second TTL memo cache keyed by (workspaceId, explicitKeywords,
- * 'cheap'). Use this for any code path that just needs candidate enumeration
- * without per-candidate noise filtering; use
- * `buildLocalSeoKeywordCandidatesEvaluated` when you specifically need the
- * eligibility evaluator's suppression and `reasons` messages.
+ * Always recomputes — no module-level cache. The generator is cheap enough on
+ * its own, and a wall-clock TTL cache invited stale-data bugs after workspace
+ * mutations and unbounded memory growth. Callers that need request-scoped
+ * memoization should add it at their own layer.
+ *
+ * Use this for any code path that just needs candidate enumeration without
+ * per-candidate noise filtering; use `buildLocalSeoKeywordCandidatesEvaluated`
+ * when you specifically need the eligibility evaluator's suppression and
+ * `reasons` messages.
  */
 export function buildLocalSeoKeywordCandidates(
   workspaceId: string,
   explicitKeywords: string[] = [],
 ): LocalSeoKeywordCandidate[] {
-  const cacheKey = localCandidateCacheKey(workspaceId, explicitKeywords, 'cheap');
-  const cached = localCandidateCache.get(cacheKey);
-  const now = Date.now();
-  if (cached && now - cached.ts < LOCAL_CANDIDATE_CACHE_TTL_MS) return cached.candidates;
-
   const ctx = loadCandidateIterationContext(workspaceId, explicitKeywords);
   if (!ctx) return [];
   const candidates = new Map<string, LocalSeoKeywordCandidate>();
@@ -1343,9 +1335,7 @@ export function buildLocalSeoKeywordCandidates(
   if (candidateHardCapReached) {
     log.warn({ workspaceId, cap: LOCAL_CANDIDATE_HARD_CAP }, 'local SEO candidate hard cap reached; output truncated');
   }
-  const result = [...candidates.values()].sort((a, b) => b.score - a.score || a.keyword.localeCompare(b.keyword));
-  localCandidateCache.set(cacheKey, { ts: now, candidates: result });
-  return result;
+  return [...candidates.values()].sort((a, b) => b.score - a.score || a.keyword.localeCompare(b.keyword));
 }
 
 /**
@@ -1358,21 +1348,15 @@ export function buildLocalSeoKeywordCandidates(
  *
  * Use this only when a caller specifically needs the suppression behavior or
  * the per-candidate `reasons` messages — most paths should use the cheap
- * default. Wrapped in a 60-second TTL memo cache keyed by (workspaceId,
- * explicitKeywords, 'evaluated').
+ * default. Always recomputes — no module-level cache (same rationale as cheap).
  */
 export function buildLocalSeoKeywordCandidatesEvaluated(
   workspaceId: string,
   explicitKeywords: string[] = [],
 ): LocalSeoKeywordCandidate[] {
-  const cacheKey = localCandidateCacheKey(workspaceId, explicitKeywords, 'evaluated');
-  const cached = localCandidateCache.get(cacheKey);
-  const now = Date.now();
-  if (cached && now - cached.ts < LOCAL_CANDIDATE_CACHE_TTL_MS) return cached.candidates;
-
-  const ctx = loadCandidateIterationContext(workspaceId, explicitKeywords);
-  if (!ctx) return [];
-  const evaluationContext = buildCandidateContext(ctx.workspace).evaluationContext;
+  const ctx = loadCandidateIterationContext(workspaceId, explicitKeywords, { withEvaluationContext: true });
+  if (!ctx || !ctx.evaluationContext) return [];
+  const evaluationContext = ctx.evaluationContext;
   const candidates = new Map<string, LocalSeoKeywordCandidate>();
   let candidateHardCapReached = false;
 
@@ -1404,9 +1388,7 @@ export function buildLocalSeoKeywordCandidatesEvaluated(
   if (candidateHardCapReached) {
     log.warn({ workspaceId, cap: LOCAL_CANDIDATE_HARD_CAP }, 'local SEO candidate hard cap reached; output truncated');
   }
-  const result = [...candidates.values()].sort((a, b) => b.score - a.score || a.keyword.localeCompare(b.keyword));
-  localCandidateCache.set(cacheKey, { ts: now, candidates: result });
-  return result;
+  return [...candidates.values()].sort((a, b) => b.score - a.score || a.keyword.localeCompare(b.keyword));
 }
 
 /**

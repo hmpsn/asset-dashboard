@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import db from '../../server/db/index.js';
 import {
-  _resetLocalCandidateCacheForTests,
   buildLocalSeoKeywordCandidates,
   buildLocalSeoKeywordCandidatesEvaluated,
   buildLocalSeoKeywordVisibilitySummaryByKey,
@@ -340,7 +339,6 @@ describe('local SEO provider selection', () => {
 
   it('cheap buildLocalSeoKeywordCandidates returns empty reasons[] (no evaluator run)', () => {
     setBroadcast(vi.fn(), vi.fn());
-    _resetLocalCandidateCacheForTests();
     const ws = createWorkspace('Local SEO Cheap Reasons Test');
     cleanupWorkspaceIds.add(ws.id);
     updateWorkspace(ws.id, {
@@ -374,7 +372,6 @@ describe('local SEO provider selection', () => {
 
   it('Evaluated builder produces evaluator reasons separate from cheap default', () => {
     setBroadcast(vi.fn(), vi.fn());
-    _resetLocalCandidateCacheForTests();
     const ws = createWorkspace('Local SEO Evaluated Reasons Test');
     cleanupWorkspaceIds.add(ws.id);
     updateWorkspace(ws.id, {
@@ -408,14 +405,19 @@ describe('local SEO provider selection', () => {
     expect(cheap.every(c => c.reasons.length === 0)).toBe(true);
   });
 
-  it('TTL cache returns the same array reference on repeated calls within window', () => {
+  it('Evaluated result is a normalizedKeyword subset of cheap (contract: Evaluated only removes signals, never adds)', () => {
     setBroadcast(vi.fn(), vi.fn());
-    _resetLocalCandidateCacheForTests();
-    const ws = createWorkspace('Local SEO Cache Test');
+    const ws = createWorkspace('Local SEO Evaluated Subset Test');
     cleanupWorkspaceIds.add(ws.id);
     updateWorkspace(ws.id, {
       name: 'Swish Dental',
       businessProfile: { address: { street: '123 Congress Ave', city: 'Austin', state: 'TX', country: 'US' } },
+      keywordStrategy: {
+        siteKeywords: ['cosmetic dentist'],
+        opportunities: [],
+        businessContext: 'Dental office offering cosmetic dentistry, veneers, whitening, and implants.',
+        generatedAt: '2026-05-20T10:00:00.000Z',
+      },
     });
     updateLocalSeoConfiguration(ws.id, {
       posture: LOCAL_SEO_POSTURE.LOCAL,
@@ -425,43 +427,16 @@ describe('local SEO provider selection', () => {
       pagePath: '/services/cosmetic-dentistry',
       pageTitle: 'Cosmetic Dentistry',
       primaryKeyword: 'cosmetic dentistry',
-      secondaryKeywords: [],
+      secondaryKeywords: ['veneers', 'whitening'],
       searchIntent: 'commercial',
     });
 
-    const first = buildLocalSeoKeywordCandidates(ws.id);
-    const second = buildLocalSeoKeywordCandidates(ws.id);
-    // Memoized reference — proves no recompute on the second call.
-    expect(second).toBe(first);
-  });
-
-  it('_resetLocalCandidateCacheForTests forces recomputation', () => {
-    setBroadcast(vi.fn(), vi.fn());
-    _resetLocalCandidateCacheForTests();
-    const ws = createWorkspace('Local SEO Cache Reset Test');
-    cleanupWorkspaceIds.add(ws.id);
-    updateWorkspace(ws.id, {
-      name: 'Swish Dental',
-      businessProfile: { address: { street: '123 Congress Ave', city: 'Austin', state: 'TX', country: 'US' } },
-    });
-    updateLocalSeoConfiguration(ws.id, {
-      posture: LOCAL_SEO_POSTURE.LOCAL,
-      markets: [{ label: 'Austin, TX', city: 'Austin', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1026201, status: LOCAL_SEO_MARKET_STATUS.ACTIVE }],
-    }, true);
-    upsertPageKeyword(ws.id, {
-      pagePath: '/services/cosmetic-dentistry',
-      pageTitle: 'Cosmetic Dentistry',
-      primaryKeyword: 'cosmetic dentistry',
-      secondaryKeywords: [],
-      searchIntent: 'commercial',
-    });
-
-    const before = buildLocalSeoKeywordCandidates(ws.id);
-    _resetLocalCandidateCacheForTests();
-    const after = buildLocalSeoKeywordCandidates(ws.id);
-    // Content should match but the reference must differ — cache was cleared.
-    expect(after).not.toBe(before);
-    expect(after.map(c => c.normalizedKeyword)).toEqual(before.map(c => c.normalizedKeyword));
+    const cheap = buildLocalSeoKeywordCandidates(ws.id);
+    const evaluated = buildLocalSeoKeywordCandidatesEvaluated(ws.id);
+    const cheapKeys = new Set(cheap.map(c => c.normalizedKeyword));
+    // Locks in the documented contract — Evaluated may suppress entries but
+    // must not invent new ones not present in the cheap enumeration.
+    expect(evaluated.every(e => cheapKeys.has(e.normalizedKeyword))).toBe(true);
   });
 
   it('keeps explicit single-keyword refresh plans scoped to the requested keyword', () => {
