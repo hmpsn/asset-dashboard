@@ -554,7 +554,7 @@ export interface DiscoveredQuerySummary {
   /** Top 10 by total_impressions DESC — for AI context. */
   topLostQueries: Array<{
     query: string;
-    lastPosition: number;
+    lastPosition: number | null;
     lastSeen: string;
     totalImpressions: number;
   }>;
