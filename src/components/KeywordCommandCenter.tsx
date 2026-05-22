@@ -220,8 +220,16 @@ function KeywordRow({
       <p className="t-caption text-[var(--brand-text)] tabular-nums">
         {row.metrics.currentPosition ? `#${row.metrics.currentPosition.toFixed(1)}` : row.metrics.difficulty != null ? `${row.metrics.difficulty}/100` : '—'}
       </p>
-      <p className="t-caption text-[var(--brand-text-muted)] truncate">
-        {row.assignment?.pageTitle || row.assignment?.pagePath || row.explanation?.nextAction?.label || 'No assignment yet'}
+      <p className={cn(
+        't-caption truncate',
+        // Highlight unassigned in-strategy rows in amber so admins notice keywords that
+        // are in the strategy but aren't yet mapped to a page. Audit on Swish found 3
+        // such rows out of 227 in_strategy — small but worth surfacing.
+        row.lifecycleStatus === 'in_strategy' && !row.assignment?.pageTitle && !row.assignment?.pagePath
+          ? 'text-amber-400/90'
+          : 'text-[var(--brand-text-muted)]',
+      )}>
+        {row.assignment?.pageTitle || row.assignment?.pagePath || row.explanation?.nextAction?.label || 'Not yet mapped to a page'}
       </p>
       <div className="flex items-center justify-end gap-1">
         {row.nextActions.slice(0, 2).map(action => (
@@ -320,6 +328,16 @@ function KeywordDrawer({
             ))}
           </div>
         </div>
+
+        {row.lifecycleStatus === 'in_strategy' && !row.assignment?.pageTitle && !row.assignment?.pagePath && (
+          <div className="rounded-[var(--radius-lg)] border border-amber-400/30 bg-amber-400/5 px-3 py-2">
+            <p className="t-caption-sm text-amber-400/90">
+              <span className="font-semibold">Not yet mapped to a page.</span> This keyword is in your
+              strategy but isn’t assigned to a page. Add it to a page in Page Intelligence so it can be
+              tracked, optimized, and reported on.
+            </p>
+          </div>
+        )}
 
         {row.explanation && (
           <div>
@@ -628,7 +646,23 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
         <SectionCard
           id="keyword-universe"
           title="Keyword Universe"
-          titleExtra={<Badge label={`${rowsResult.data?.pageInfo.totalRows ?? rows.length} visible`} tone="blue" variant="soft" shape="pill" />}
+          titleExtra={
+            <div className="flex items-center gap-2">
+              <Badge label={`${rowsResult.data?.pageInfo.totalRows ?? rows.length} visible`} tone="blue" variant="soft" shape="pill" />
+              {/* Volume-null diagnostic: surface when missingVolume is non-trivial (>5% of universe) so admins can decide whether to refresh providers */}
+              {summary.data?.counts.missingVolume != null
+                && summary.data.counts.missingVolume > 0
+                && summary.data.counts.total > 0
+                && summary.data.counts.missingVolume / summary.data.counts.total > 0.05 && (
+                <Badge
+                  label={`${summary.data.counts.missingVolume} missing demand`}
+                  tone="amber"
+                  variant="soft"
+                  shape="pill"
+                />
+              )}
+            </div>
+          }
           action={
             <div className="w-[260px]">
               <FormInput

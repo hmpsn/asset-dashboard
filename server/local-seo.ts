@@ -1187,6 +1187,80 @@ export function buildLocalSeoKeywordCandidates(workspaceId: string, explicitKeyw
     .sort((a, b) => b.score - a.score || a.keyword.localeCompare(b.keyword));
 }
 
+/**
+ * Count-only local SEO candidate iteration — sub-100ms even on rich workspaces.
+ *
+ * Mirrors `buildLocalSeoKeywordCandidates` but skips:
+ *   - `isStrategyPoolEligibleKeyword` (the per-candidate scan that caused the
+ *     35-second regression on Swish in PR #876)
+ *   - Per-candidate score computation
+ *   - Per-candidate `LocalSeoKeywordCandidate` object construction
+ *
+ * Filters retained (cheap): declined check, inactive-tracked check, market modifier
+ * regex, local intent regex. Applies the same `LOCAL_CANDIDATE_HARD_CAP` so the
+ * count caps at 1000 like the real generator.
+ *
+ * **Slight overcount possible:** without the eligibility evaluator we don't
+ * suppress noise patterns / authority mismatches / business-fit failures. In
+ * practice on Swish the cheap count returned within a few percent of the real
+ * generator output. Used for the Local Candidates badge — UX accuracy is "this
+ * is roughly how many candidates exist", not "this is precisely the displayable
+ * list". The actual displayable list still comes from the full generator when
+ * the user clicks into Local Candidates filter.
+ */
+export function countLocalSeoKeywordCandidates(workspaceId: string): number {
+  const workspace = getWorkspace(workspaceId);
+  if (!workspace) return 0;
+  const markets = activeMarkets(workspaceId);
+  if (markets.length === 0) return 0;
+  const { contentGaps, pageMap, declinedKeywords } = buildCandidateContext(workspace);
+  const declined = new Set(declinedKeywords.map(keywordComparisonKey));
+  const trackedKeywords = getTrackedKeywords(workspaceId, { includeInactive: true });
+  const inactiveTracked = new Set(
+    trackedKeywords
+      .filter(tracked => (tracked.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) !== TRACKED_KEYWORD_STATUS.ACTIVE)
+      .map(tracked => keywordComparisonKey(tracked.query)),
+  );
+  const seen = new Set<string>();
+
+  const consider = (keyword: string | undefined, force = false): void => {
+    if (seen.size >= LOCAL_CANDIDATE_HARD_CAP) return;
+    const display = cleanKeywordDisplay(keyword);
+    if (!display) return;
+    const key = keywordComparisonKey(display);
+    if (!key || seen.has(key) || declined.has(key) || inactiveTracked.has(key)) return;
+    if (!force && !hasLocalIntent(display, workspace) && !hasMarketModifier(display, markets)) return;
+    seen.add(key);
+  };
+
+  // Strategy site keywords are always considered (force=true) by buildLocalSeoKeywordCandidates
+  for (const keyword of workspace.keywordStrategy?.siteKeywords ?? []) consider(keyword, true);
+  for (const tracked of trackedKeywords) {
+    if ((tracked.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE) {
+      consider(tracked.query, true);
+    }
+  }
+  for (const page of pageMap) {
+    const pageLooksLocal = /\/location\/|near me|appointment|austin|houston|san antonio|dallas/i.test(`${page.pagePath} ${page.pageTitle}`)
+      || page.serpFeatures?.includes('local_pack');
+    consider(page.primaryKeyword, pageLooksLocal);
+    for (const secondary of page.secondaryKeywords ?? []) consider(secondary, pageLooksLocal);
+    if (titleLooksLikeServiceKeyword(page.pageTitle)) consider(page.pageTitle, pageLooksLocal);
+    for (const base of [page.primaryKeyword, page.pageTitle, ...(page.secondaryKeywords ?? [])]) {
+      if (!base || !titleLooksLikeServiceKeyword(base) || isNearDuplicateKeyword(base, workspace.name)) continue;
+      for (const variant of localVariantKeywords(base, markets)) consider(variant);
+    }
+  }
+  for (const gap of contentGaps) {
+    const localGap = gap.suggestedPageType === 'location'
+      || gap.serpFeatures?.includes('local_pack')
+      || hasLocalIntent(`${gap.topic} ${gap.targetKeyword}`, workspace);
+    consider(gap.targetKeyword, localGap);
+    for (const variant of localVariantKeywords(gap.targetKeyword, markets)) consider(variant);
+  }
+  return seen.size;
+}
+
 function selectExplicitLocalSeoKeywords(workspaceId: string, explicitKeywords: string[] = []): string[] {
   const declined = new Set(getDeclinedKeywords(workspaceId).map(keywordComparisonKey));
   const inactiveTracked = new Set(

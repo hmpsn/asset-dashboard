@@ -1769,6 +1769,35 @@
       "shippedAt": "2026-04-25"
     },
     {
+      "id": "sprint-broadcast-invalidation-audit",
+      "name": "✅ SHIPPED — Broadcast Invalidation Audit (do next)",
+      "hours": "3-6",
+      "rationale": "Recurring UX symptom: components show stale/empty data on first mount and 'fix themselves' on hard refresh. Root cause pattern — long staleTime React Query hooks without a useWorkspaceEvents broadcast subscription (violates Data Flow Rule #2). PageIntelligence is the confirmed instance; likely a platform-wide class of bug.",
+      "items": [
+        {
+          "id": 596,
+          "title": "Fix PageIntelligence missing broadcast invalidation",
+          "source": "User report 2026-04-21 — 'page intelligence doesn't display data at first, but then on refresh it does'",
+          "est": "30m-1h",
+          "priority": "P0",
+          "notes": "Shipped 2026-04-21 alongside Devin-flag fixes for PR #249. Added useWorkspaceEvents subscription to src/components/PageIntelligence.tsx that invalidates queryKeys.admin.keywordStrategy on STRATEGY_UPDATED broadcasts. Resolves staleTime 10min cache-miss UX where users saw empty data until hard refresh. #597 (platform-wide audit) still pending.",
+          "status": "done",
+          "shippedAt": "2026-04-21"
+        },
+        {
+          "id": 597,
+          "title": "Platform-wide audit: useQuery hooks with staleTime but no broadcast subscription",
+          "source": "Post-PageIntelligence diagnosis 2026-04-21",
+          "est": "2-4h",
+          "priority": "P0",
+          "notes": "Shipped 2026-04-21. Centralized 7 workspace-scoped events in src/hooks/useWsInvalidation.ts (STRATEGY_UPDATED, BRANDSCRIPT_UPDATED, DISCOVERY_UPDATED, VOICE_PROFILE_UPDATED, BRAND_IDENTITY_UPDATED, BLUEPRINT_UPDATED, BLUEPRINT_GENERATED — total centralized now 43). Removed redundant inline useWorkspaceEvents subscriptions from 10 component files (PageIntelligence, SeoEditor, KeywordStrategy, VoiceTab, IdentityTab, BrandscriptTab, DiscoveryTab, PageStrategyTab, BlueprintDetail, BlueprintVersionHistory). Added two-layer regression guardrail: pr-check rule (self-syncing allowlist parsed from useWsInvalidation.ts, escape hatch `// ws-invalidation-ok`) catches reintroduced inline handlers; contract test (tests/contract/ws-invalidation-coverage.test.ts) catches new WS_EVENTS entries added without either centralization or an explicit LOCAL_ONLY_EVENTS rationale. Blueprint queries rely on React Query prefix invalidation (['admin-blueprint', wsId] / ['admin-blueprint-versions', wsId]).",
+          "status": "done",
+          "shippedAt": "2026-04-21"
+        }
+      ],
+      "shippedAt": "2026-04-21"
+    },
+    {
       "id": "sprint-connected-intelligence",
       "name": "✅ SHIPPED — Connected Intelligence Engine",
       "items": [

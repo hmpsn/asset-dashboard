@@ -313,11 +313,17 @@
           "id": "intel-quality-localcandidates-cheap-count",
           "title": "Cheap localCandidates count for Keyword Command Center summary",
           "source": "Render staging crash logs 2026-05-21",
-          "est": "2-4h",
-          "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "owner": "seo-health",
-          "notes": "Restore the Local Candidates badge count in `buildKeywordCommandCenterSummary` without running `buildLocalSeoKeywordCandidates` on the hot path. Three viable approaches: (1) workspace-level counter cached in `local_seo_workspace_settings` or a new sidecar table, recomputed asynchronously when page_keywords, content_gaps, local_seo_markets, or active rank_tracking_config change for the workspace; (2) cheap SQL approximation — count distinct (page_keyword + content_gap_target + active_tracked_query) keys × active_market_count, optionally filtered by a fast local-intent regex check; (3) background generator that materializes a `local_seo_candidates` cache table and the summary reads `SELECT COUNT(*)`. Approach 1 is the smallest blast radius. Whichever lands, the summary read MUST be O(1) or O(scalar SQL). Acceptance: badge shows a real number on Swish; summary `totalMs` stays under 200ms on rich workspaces; a regression test asserts the cheap path is invoked (not `buildLocalSeoKeywordCandidates`). Until this lands, the badge intentionally reports 0 to keep summary fast — UI should consider hiding the badge or showing `—` rather than `0`."
+          "notes": "Completed in PR #G on 2026-05-21. Added `countLocalSeoKeywordCandidates(workspaceId)` in server/local-seo.ts that mirrors the candidate generator's outer iteration and cheap filters (declined, inactive, intent regex, market modifier regex) but skips `evaluateKeywordCandidate` — the per-candidate scan that caused the 35-second regression in PR #876. Sub-100ms even on Swish-scale workspaces. Slight overcount is possible (no eligibility evaluation) but acceptable as a UX hint — the actual displayable list still comes from the full generator when the user opens the Local Candidates filter. Three regression tests cover the cheap-path activation, the no-markets short-circuit (returns 0), and the LOCAL_CANDIDATE_HARD_CAP guardrail (count never exceeds 1000)."
+        },
+        {
+          "id": "intel-quality-kcc-data-hygiene-polish",
+          "title": "Keyword Command Center data hygiene polish",
+          "source": "Live data hygiene audit on Swish 2026-05-21",
+          "status": "done",
+          "owner": "seo-health",
+          "notes": "Completed in PR #G on 2026-05-21. Final polish pass on the four medium-severity findings from the data hygiene audit. (1) Assignment-gap UI: in-strategy rows lacking an assignment now render the inline column label in amber and show a dedicated drawer block explaining the keyword is in strategy but not yet mapped to a page. (2) Promotion CTA for untracked-with-rank rows: verified already working — needs_review + untracked rows show [add_to_strategy, track, decline] as next actions via existing buildNextActions logic (line 400-409 of keyword-command-center.ts). No code change needed; confirmed live on Swish. (3) Volume-null diagnostic: added `missingVolume` count to summary via parallel `keysWithVolume` set computation, properly excluding planner-bucket sentinels. UI surfaces an amber 'X missing demand' badge in the panel header when missingVolume > 5% of the universe. (4) Local lifecycle state verification: all five KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE values (SELECTED, CANDIDATE, CHECKED, RAW_EVIDENCE, NOT_CHECKED) verified reachable in buildLocalSeoState. The audit's 100% 'selected' observation reflects natural data distribution on Swish (most checked-local keywords are also in_strategy), not a bug."
         },
         {
           "id": "intel-quality-kcc-planner-bucket-mask",
@@ -2791,35 +2797,6 @@
         }
       ],
       "shippedAt": "2026-04-23"
-    },
-    {
-      "id": "sprint-broadcast-invalidation-audit",
-      "name": "✅ SHIPPED — Broadcast Invalidation Audit (do next)",
-      "hours": "3-6",
-      "rationale": "Recurring UX symptom: components show stale/empty data on first mount and 'fix themselves' on hard refresh. Root cause pattern — long staleTime React Query hooks without a useWorkspaceEvents broadcast subscription (violates Data Flow Rule #2). PageIntelligence is the confirmed instance; likely a platform-wide class of bug.",
-      "items": [
-        {
-          "id": 596,
-          "title": "Fix PageIntelligence missing broadcast invalidation",
-          "source": "User report 2026-04-21 — 'page intelligence doesn't display data at first, but then on refresh it does'",
-          "est": "30m-1h",
-          "priority": "P0",
-          "notes": "Shipped 2026-04-21 alongside Devin-flag fixes for PR #249. Added useWorkspaceEvents subscription to src/components/PageIntelligence.tsx that invalidates queryKeys.admin.keywordStrategy on STRATEGY_UPDATED broadcasts. Resolves staleTime 10min cache-miss UX where users saw empty data until hard refresh. #597 (platform-wide audit) still pending.",
-          "status": "done",
-          "shippedAt": "2026-04-21"
-        },
-        {
-          "id": 597,
-          "title": "Platform-wide audit: useQuery hooks with staleTime but no broadcast subscription",
-          "source": "Post-PageIntelligence diagnosis 2026-04-21",
-          "est": "2-4h",
-          "priority": "P0",
-          "notes": "Shipped 2026-04-21. Centralized 7 workspace-scoped events in src/hooks/useWsInvalidation.ts (STRATEGY_UPDATED, BRANDSCRIPT_UPDATED, DISCOVERY_UPDATED, VOICE_PROFILE_UPDATED, BRAND_IDENTITY_UPDATED, BLUEPRINT_UPDATED, BLUEPRINT_GENERATED — total centralized now 43). Removed redundant inline useWorkspaceEvents subscriptions from 10 component files (PageIntelligence, SeoEditor, KeywordStrategy, VoiceTab, IdentityTab, BrandscriptTab, DiscoveryTab, PageStrategyTab, BlueprintDetail, BlueprintVersionHistory). Added two-layer regression guardrail: pr-check rule (self-syncing allowlist parsed from useWsInvalidation.ts, escape hatch `// ws-invalidation-ok`) catches reintroduced inline handlers; contract test (tests/contract/ws-invalidation-coverage.test.ts) catches new WS_EVENTS entries added without either centralization or an explicit LOCAL_ONLY_EVENTS rationale. Blueprint queries rely on React Query prefix invalidation (['admin-blueprint', wsId] / ['admin-blueprint-versions', wsId]).",
-          "status": "done",
-          "shippedAt": "2026-04-21"
-        }
-      ],
-      "shippedAt": "2026-04-21"
     }
   ]
 }
