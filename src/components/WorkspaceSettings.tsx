@@ -7,6 +7,7 @@ import { FeaturesTab } from './settings/FeaturesTab';
 import { ClientDashboardTab } from './settings/ClientDashboardTab';
 import { BusinessProfileTab } from './settings/BusinessProfileTab';
 import { IntelligenceProfileTab } from './settings/IntelligenceProfileTab';
+import { LocationsTab } from './settings/LocationsTab';
 import { PublishSettings } from './PublishSettings';
 import { SectionCard, Icon, Button, IconButton, FormInput } from './ui';
 import { get, patch, post } from '../api/client';
@@ -69,8 +70,8 @@ interface Props {
   onUpdate?: (patch: Record<string, unknown>) => void;
 }
 
-type SectionTab = 'connections' | 'features' | 'dashboard' | 'publishing' | 'business-profile' | 'intelligence-profile' | 'export' | 'llms-txt';
-const VALID_SECTION_TABS: readonly SectionTab[] = ['connections', 'features', 'dashboard', 'publishing', 'business-profile', 'intelligence-profile', 'export', 'llms-txt'];
+type SectionTab = 'connections' | 'features' | 'dashboard' | 'publishing' | 'business-profile' | 'intelligence-profile' | 'export' | 'llms-txt' | 'locations';
+const VALID_SECTION_TABS: readonly SectionTab[] = ['connections', 'features', 'dashboard', 'publishing', 'business-profile', 'intelligence-profile', 'export', 'llms-txt', 'locations'];
 
 export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, webflowSiteName, onUpdate }: Props) {
   const { toast } = useToast();
@@ -226,7 +227,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
 
       {/* Tab nav */}
       <nav className="flex items-center gap-1 border-b border-[var(--brand-border)]">
-        {([['connections', 'Connections'], ['features', 'Features'], ['publishing', 'Publishing'], ['business-profile', 'Business Profile'], ['intelligence-profile', 'Intelligence Profile'], ['dashboard', 'Client Dashboard'], ['export', 'Data Export'], ['llms-txt', 'LLMs.txt']] as [SectionTab, string][]).map(([id, label]) => (
+        {([['connections', 'Connections'], ['features', 'Features'], ['publishing', 'Publishing'], ['business-profile', 'Business Profile'], ['intelligence-profile', 'Intelligence Profile'], ['dashboard', 'Client Dashboard'], ['export', 'Data Export'], ['llms-txt', 'LLMs.txt'], ['locations', 'Locations']] as [SectionTab, string][]).map(([id, label]) => (
           <Button
             type="button"
             variant="ghost"
@@ -290,6 +291,16 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
           siteHasSearch={ws?.siteHasSearch}
           toast={toast}
           onSave={(profile) => setWs(w => w ? { ...w, businessProfile: profile } : w)}
+        />
+      )}
+
+      {tab === 'locations' && (
+        <LocationsTab
+          workspaceId={workspaceId}
+          workspaceName={workspaceName}
+          liveDomain={ws?.liveDomain as string | undefined}
+          businessProfile={ws?.businessProfile}
+          toast={toast}
         />
       )}
 

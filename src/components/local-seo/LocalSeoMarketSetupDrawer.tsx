@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AlertTriangle, Check, ChevronDown, Copy, MapPin, Plus, RefreshCw, Sparkles, Trash2, X } from 'lucide-react';
 import type {
   LocalSeoLocationLookupCandidate,
@@ -13,8 +14,9 @@ import {
   LOCAL_SEO_MARKET_STATUS,
   LOCAL_SEO_POSTURE,
 } from '../../../shared/types/local-seo';
-import { useLocalSeoLocationLookup, useLocalSeoRefresh, useLocalSeoUpdate } from '../../hooks/admin';
-import { Badge, Button, FormField, FormInput, FormSelect, Icon, IconButton, cn } from '../ui';
+import { useLocalSeoLocationLookup, useLocalSeoLocations, useLocalSeoRefresh, useLocalSeoUpdate } from '../../hooks/admin';
+import { adminPath } from '../../routes';
+import { Badge, Button, FormField, FormInput, FormSelect, Icon, IconButton, SectionCard, Skeleton, cn } from '../ui';
 
 interface LocalSeoMarketSetupDrawerProps {
   workspaceId: string;
@@ -139,6 +141,69 @@ function ServiceGapNudge({ gap }: { gap: LocalSeoServiceGap }) {
         ))}
       </div>
     </div>
+  );
+}
+
+function BusinessLocationsShortcut({ workspaceId }: { workspaceId: string }) {
+  const { data: locations, isLoading } = useLocalSeoLocations(workspaceId);
+  const settingsLocationsUrl = `${adminPath(workspaceId, 'workspace-settings')}?tab=locations`;
+
+  if (isLoading) {
+    return (
+      <SectionCard variant="subtle">
+        <Skeleton className="h-5 w-56" />
+      </SectionCard>
+    );
+  }
+
+  const confirmedCount = Array.isArray(locations)
+    ? locations.filter(location => location.status === 'confirmed').length
+    : 0;
+  const needsReviewCount = Array.isArray(locations)
+    ? locations.filter(location => location.status === 'needs_review').length
+    : 0;
+  const totalCount = Array.isArray(locations) ? locations.length : 0;
+  const hasNeedsReview = needsReviewCount > 0;
+  const hasConfirmed = confirmedCount > 0;
+
+  const label = hasNeedsReview
+    ? `${needsReviewCount} location${needsReviewCount === 1 ? '' : 's'} need review`
+    : hasConfirmed
+      ? `${totalCount} location${totalCount === 1 ? '' : 's'} configured`
+      : 'No locations configured';
+  const description = hasNeedsReview
+    ? 'Confirm your locations to improve match accuracy.'
+    : hasConfirmed
+      ? 'Used for local business match detection.'
+      : 'Your primary domain is used for matching until locations are added.';
+  const cta = hasNeedsReview ? 'Review' : hasConfirmed ? 'Manage' : 'Add locations';
+
+  return (
+    <SectionCard
+      variant="subtle"
+      className={hasNeedsReview ? 'border-amber-500/30 bg-amber-500/8' : undefined}
+      noPadding
+    >
+      <div className="px-4 py-3 flex items-center justify-between gap-3" aria-label="Business locations">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <Icon as={MapPin} size="sm" className="text-[var(--brand-text-muted)]" />
+            <p className="t-caption font-semibold text-[var(--brand-text-bright)]">Business locations</p>
+            {hasNeedsReview && <Badge label="Needs review" tone="amber" variant="soft" shape="pill" />}
+          </div>
+          <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">
+            {label} - {description}
+          </p>
+        </div>
+        <Link
+          to={settingsLocationsUrl}
+          className="t-caption-sm font-medium text-teal-400 hover:text-teal-300 transition-colors shrink-0 whitespace-nowrap"
+          aria-label={`${cta} in Workspace Settings`}
+        >
+          {cta}
+        </Link>
+      </div>
+    </SectionCard>
   );
 }
 
@@ -414,6 +479,8 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+          <BusinessLocationsShortcut workspaceId={workspaceId} />
+
           <section className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-3)]/35 p-4">
             <div className="flex items-center justify-between gap-3 mb-3">
               <div>

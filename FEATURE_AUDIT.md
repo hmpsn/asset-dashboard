@@ -8,13 +8,13 @@ A comprehensive value assessment of every feature in the platform — **446 feat
 
 ### 446. Multi-Location Local SEO Business Match
 
-**What it does:** Adds the server-layer foundation for matching local visibility results against multiple client-owned physical locations. Workspaces can now store `client_locations` with branch names, domains, phone numbers, addresses, status, and future per-location strategy fields. Local visibility snapshots record the matched location ID/name, match evaluation checks every configured location, client-owned branches are scrubbed from `top_competitors`, a background job recalculates historical snapshots after location changes, and admin CRUD endpoints expose the location store for the upcoming UI.
+**What it does:** Matches local visibility results against multiple client-owned physical locations and gives admins a dedicated management UI. Workspaces can store `client_locations` with branch names, domains, phone numbers, addresses, status, and future per-location strategy fields. Local visibility snapshots record the matched location ID/name, match evaluation checks every configured location, client-owned branches are scrubbed from `top_competitors`, and a background job recalculates historical snapshots after location changes. Workspace Settings now includes a Locations tab for CRUD, seed-from-business-profile confirmation, review/confirm flows, and delete confirmation. The Local SEO setup drawer links directly to `?tab=locations` and summarizes configured/needs-review locations.
 
-**Agency value:** Fixes the credibility gap where a client’s own branch listings could appear as competitors. Strategists get cleaner local pack reporting and a backfill path for historical snapshots before PR2 adds the management UI.
+**Agency value:** Fixes the credibility gap where a client’s own branch listings could appear as competitors. Strategists get cleaner local pack reporting, a backfill path for historical snapshots, and a low-friction settings surface for keeping branch identity data accurate.
 
 **Client value:** Multi-location businesses should see more accurate “are we visible?” reporting because any confirmed branch can satisfy the business match, and owned branches no longer inflate competitor lists.
 
-**Mutual:** Establishes the durable data model needed for later per-location strategy, page targets, and GBP integration while preserving single-location fallback behavior for existing workspaces.
+**Mutual:** Establishes the durable data model needed for later per-location strategy, page targets, and GBP integration while preserving single-location fallback behavior for existing workspaces. Key UI/data surfaces include `src/components/settings/LocationsTab.tsx`, `src/hooks/admin/useLocalSeoLocations.ts`, `src/api/localSeo.ts` location methods, `admin-local-seo-locations`, and `local-seo:updated` invalidation for location reads.
 
 ---
 
