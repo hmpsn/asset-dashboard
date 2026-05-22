@@ -1159,9 +1159,13 @@ describe('iterateLocalCandidateSignals generates intent-prefixed variants', () =
 // ─── Change 3: Per-source budget caps ───────────────────────────────────────
 
 describe('selectLocalIntentKeywords per-page source cap', () => {
-  it('caps candidates from a single page to 20% of budget', () => {
+  it('caps tracked (non-explicit) keywords from a single pagePath to 20% of budget', () => {
+    // This test verifies the real applySourcePageCap behavior:
+    // - 30 tracked keywords all pinned to the same pagePath
+    // - budget=25 (minimum allowed) → cap = ceil(25 * 0.20) = 5
+    // - result must contain at most 5 keywords from that page
     setBroadcast(vi.fn(), vi.fn());
-    const ws = createWorkspace('Local SEO Source Cap Test');
+    const ws = createWorkspace('Local SEO Source Cap Behavioral Test');
     cleanupWorkspaceIds.add(ws.id);
     updateWorkspace(ws.id, {
       name: 'Swish Dental',
@@ -1170,104 +1174,38 @@ describe('selectLocalIntentKeywords per-page source cap', () => {
       keywordStrategy: {
         siteKeywords: [],
         opportunities: [],
-        businessContext: 'Dental office offering dental services.',
+        businessContext: 'Dental implants and restorative dental services.',
         generatedAt: '2026-05-20T10:00:00.000Z',
       },
     });
+    // Set keywordsPerRefresh to the minimum (25) so the 20% cap = ceil(5) = 5.
+    // This means any single pagePath can contribute at most 5 keywords to the result.
     updateLocalSeoConfiguration(ws.id, {
       posture: LOCAL_SEO_POSTURE.LOCAL,
+      keywordsPerRefresh: 25,
       markets: [{ label: 'Austin, TX', city: 'Austin', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1026201, status: LOCAL_SEO_MARKET_STATUS.ACTIVE }],
     }, true);
 
-    // Insert many tracked keywords from the same "page" via rank tracking
-    // with pageTitle/pagePath pointing to the same page, to simulate a
-    // single page dominating the candidates. We use explicit keywords
-    // to bypass the page_assignment source and exercise the cap.
-    const manyKeywords = Array.from({ length: 60 }, (_, i) => `dental service ${i} austin tx`);
+    // Seed 30 tracked (MANUAL, non-explicit) keywords all on the same pagePath.
+    // Each keyword includes "dental implants austin" to pass both hasLocalIntent
+    // and hasMarketModifier checks so they survive as candidates.
+    const capPage = '/services/dental-implants';
+    for (let i = 1; i <= 30; i++) {
+      addTrackedKeyword(ws.id, `dental implants austin ${i}`, {
+        source: TRACKED_KEYWORD_SOURCE.MANUAL,
+        pagePath: capPage,
+        pageTitle: 'Dental Implants',
+      });
+    }
 
-    // With budget=100 and 20% cap = 20 max per page, but explicit keywords
-    // are never capped — test with non-explicit source needed.
-    // For explicit: all should pass (explicit is exempt).
-    const explicit = selectLocalIntentKeywords(ws.id, manyKeywords.slice(0, 5));
-    // All 5 explicit transactional should survive (and some may be filtered out
-    // if informational/comparison, but these are transactional).
-    expect(explicit.length).toBeGreaterThanOrEqual(0); // just shouldn't crash
-  });
-
-  it('does not cap explicit keywords regardless of count', () => {
-    setBroadcast(vi.fn(), vi.fn());
-    const ws = createWorkspace('Local SEO Explicit No Cap Test');
-    cleanupWorkspaceIds.add(ws.id);
-    updateWorkspace(ws.id, {
-      name: 'Swish Dental',
-      liveDomain: 'https://swish.example.com',
-      businessProfile: { address: { street: '123 Congress Ave', city: 'Austin', state: 'TX', country: 'US' } },
-      keywordStrategy: {
-        siteKeywords: [],
-        opportunities: [],
-        businessContext: 'Dental office.',
-        generatedAt: '2026-05-20T10:00:00.000Z',
-      },
-    });
-    updateLocalSeoConfiguration(ws.id, {
-      posture: LOCAL_SEO_POSTURE.LOCAL,
-      markets: [{ label: 'Austin, TX', city: 'Austin', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1026201, status: LOCAL_SEO_MARKET_STATUS.ACTIVE }],
-    }, true);
-
-    // These are explicit keywords — they should bypass the page cap
-    const explicitKeywords = [
-      'dentist austin',
-      'cosmetic dentist austin',
-      'emergency dentist austin',
-    ];
-    // When provided as explicit, selectLocalIntentKeywords routes to
-    // selectExplicitLocalSeoKeywords which bypasses the evaluated path
-    // entirely — just verify it returns them (not filtered by cap).
-    const result = selectLocalIntentKeywords(ws.id, explicitKeywords);
-    // All 3 are transactional/commercial — should all pass
-    expect(result.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('the page cap applies independently per unique pagePath', () => {
-    setBroadcast(vi.fn(), vi.fn());
-    const ws = createWorkspace('Local SEO Per-Page Cap Test');
-    cleanupWorkspaceIds.add(ws.id);
-    updateWorkspace(ws.id, {
-      name: 'Swish Dental',
-      liveDomain: 'https://swish.example.com',
-      businessProfile: { address: { street: '123 Congress Ave', city: 'Austin', state: 'TX', country: 'US' } },
-      keywordStrategy: {
-        siteKeywords: [],
-        opportunities: [],
-        businessContext: 'Dental office.',
-        generatedAt: '2026-05-20T10:00:00.000Z',
-      },
-    });
-    updateLocalSeoConfiguration(ws.id, {
-      posture: LOCAL_SEO_POSTURE.LOCAL,
-      markets: [{ label: 'Austin, TX', city: 'Austin', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1026201, status: LOCAL_SEO_MARKET_STATUS.ACTIVE }],
-    }, true);
-    // Two different pages
-    upsertPageKeyword(ws.id, {
-      pagePath: '/services/cosmetic-dentistry',
-      pageTitle: 'Cosmetic Dentistry',
-      primaryKeyword: 'cosmetic dentistry',
-      secondaryKeywords: ['veneers dentist', 'teeth whitening dentist', 'dental bonding austin'],
-      searchIntent: 'commercial',
-    });
-    upsertPageKeyword(ws.id, {
-      pagePath: '/services/implants',
-      pageTitle: 'Dental Implants',
-      primaryKeyword: 'dental implants',
-      secondaryKeywords: ['implant dentist', 'full arch implants', 'same day implants austin'],
-      searchIntent: 'transactional',
-    });
-
-    // With two pages, each can contribute up to cap candidates
-    const candidates = buildLocalSeoKeywordCandidates(ws.id);
-    expect(candidates.length).toBeGreaterThan(0);
-    // Verify the function runs without error when two pages are present
     const result = selectLocalIntentKeywords(ws.id, []);
-    expect(Array.isArray(result)).toBe(true);
+
+    // The cap is ceil(25 * 0.20) = 5. No single page may contribute more than 5
+    // keywords to the final selection. Count how many results originated from
+    // our seeded page (all seeded keywords are uniquely prefixed "dental implants austin N").
+    const fromCapPage = result.filter(kw => /^dental implants austin \d+$/.test(kw));
+    expect(fromCapPage.length).toBeLessThanOrEqual(5);
+    // And at least one must have survived (confirming the cap isn't blocking everything)
+    expect(fromCapPage.length).toBeGreaterThanOrEqual(1);
   });
 });
