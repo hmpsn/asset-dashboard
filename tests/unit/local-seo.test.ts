@@ -400,9 +400,12 @@ describe('local SEO provider selection', () => {
     const evaluated = buildLocalSeoKeywordCandidatesEvaluated(ws.id);
     // Both paths enumerate the same signal set; evaluated may suppress some
     // entries but must not invent new ones.
+    expect(cheap.length).toBeGreaterThan(0);
     expect(evaluated.length).toBeLessThanOrEqual(cheap.length);
     // Cheap path never populates reasons.
-    expect(cheap.every(c => c.reasons.length === 0)).toBe(true);
+    for (const c of cheap) {
+      expect(c.reasons).toEqual([]);
+    }
   });
 
   it('Evaluated result is a normalizedKeyword subset of cheap (contract: Evaluated only removes signals, never adds)', () => {
@@ -436,7 +439,12 @@ describe('local SEO provider selection', () => {
     const cheapKeys = new Set(cheap.map(c => c.normalizedKeyword));
     // Locks in the documented contract — Evaluated may suppress entries but
     // must not invent new ones not present in the cheap enumeration.
-    expect(evaluated.every(e => cheapKeys.has(e.normalizedKeyword))).toBe(true);
+    expect(cheap.length).toBeGreaterThan(0);
+    expect(evaluated.length).toBeGreaterThan(0);
+    expect(evaluated.length).toBeLessThanOrEqual(cheap.length);
+    for (const e of evaluated) {
+      expect(cheapKeys.has(e.normalizedKeyword)).toBe(true);
+    }
   });
 
   it('keeps explicit single-keyword refresh plans scoped to the requested keyword', () => {
