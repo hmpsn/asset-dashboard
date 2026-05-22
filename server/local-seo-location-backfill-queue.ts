@@ -4,8 +4,14 @@ import { createJob, hasActiveJob, updateJob, type Job } from './jobs.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('local-seo-location-backfill-queue');
+const LOCAL_SEO_LOCATION_BACKFILL_DEBOUNCE_MS = 750;
 
 type ScheduleFn = (task: () => void) => void;
+
+interface ActiveBackfill {
+  jobId: string;
+  started: boolean;
+}
 
 export interface LocalSeoLocationBackfillQueueDeps {
   createJob: typeof createJob;
@@ -18,7 +24,7 @@ export interface LocalSeoLocationBackfillQueueDeps {
 }
 
 export class LocalSeoLocationBackfillQueue {
-  private readonly runningJobIds = new Map<string, string>();
+  private readonly activeBackfills = new Map<string, ActiveBackfill>();
   private readonly rerunRequested = new Set<string>();
   private readonly deps: LocalSeoLocationBackfillQueueDeps;
 
@@ -27,10 +33,12 @@ export class LocalSeoLocationBackfillQueue {
   }
 
   enqueue(workspaceId: string): string {
-    const runningJobId = this.runningJobIds.get(workspaceId);
-    if (runningJobId) {
-      this.queueRerun(workspaceId, runningJobId);
-      return runningJobId;
+    const activeBackfill = this.activeBackfills.get(workspaceId);
+    if (activeBackfill) {
+      if (activeBackfill.started) {
+        this.queueRerun(workspaceId, activeBackfill.jobId);
+      }
+      return activeBackfill.jobId;
     }
 
     const activeJob = this.deps.hasActiveJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_LOCATION_BACKFILL, workspaceId);
@@ -56,8 +64,12 @@ export class LocalSeoLocationBackfillQueue {
       total,
       message: 'Preparing local match history recalculation...',
     });
-    this.runningJobIds.set(workspaceId, job.id);
+    this.activeBackfills.set(workspaceId, { jobId: job.id, started: false });
     this.deps.schedule(() => {
+      const activeBackfill = this.activeBackfills.get(workspaceId);
+      if (activeBackfill?.jobId === job.id) {
+        activeBackfill.started = true;
+      }
       void this.runAndDrain(workspaceId, job);
     });
     return job.id;
@@ -74,8 +86,8 @@ export class LocalSeoLocationBackfillQueue {
         error: err instanceof Error ? err.message : 'Local match history recalculation failed',
       });
     } finally {
-      if (this.runningJobIds.get(workspaceId) === job.id) {
-        this.runningJobIds.delete(workspaceId);
+      if (this.activeBackfills.get(workspaceId)?.jobId === job.id) {
+        this.activeBackfills.delete(workspaceId);
       }
 
       if (this.rerunRequested.delete(workspaceId)) {
@@ -91,7 +103,9 @@ export const localSeoLocationBackfillQueue = new LocalSeoLocationBackfillQueue({
   updateJob,
   countSnapshots: countLocalVisibilitySnapshots,
   runJob: runLocationBackfillJob,
-  schedule: task => setImmediate(task),
+  schedule: task => {
+    setTimeout(task, LOCAL_SEO_LOCATION_BACKFILL_DEBOUNCE_MS);
+  },
   logError: (err, workspaceId, jobId) => {
     log.error({ err, workspaceId, jobId }, 'runLocationBackfillJob failed');
   },

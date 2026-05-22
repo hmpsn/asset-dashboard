@@ -29,6 +29,40 @@ function makeJob(id: string, workspaceId: string, total: number): Job {
 }
 
 describe('LocalSeoLocationBackfillQueue', () => {
+  it('coalesces bursts before the first scheduled backfill starts', async () => {
+    const scheduled: Array<() => void> = [];
+    const run = deferred();
+    let nextJob = 1;
+
+    const deps: LocalSeoLocationBackfillQueueDeps = {
+      createJob: vi.fn((_type, opts) => makeJob(`job-${nextJob++}`, opts?.workspaceId ?? 'unknown', opts?.total ?? 0)),
+      hasActiveJob: vi.fn(() => undefined),
+      updateJob: vi.fn(),
+      countSnapshots: vi.fn(() => 226),
+      runJob: vi.fn(() => run.promise),
+      schedule: vi.fn(task => scheduled.push(task)),
+      logError: vi.fn(),
+    };
+    const queue = new LocalSeoLocationBackfillQueue(deps);
+
+    expect(queue.enqueue('ws-1')).toBe('job-1');
+    expect(queue.enqueue('ws-1')).toBe('job-1');
+    expect(queue.enqueue('ws-1')).toBe('job-1');
+
+    expect(deps.createJob).toHaveBeenCalledTimes(1);
+    expect(deps.updateJob).not.toHaveBeenCalled();
+    expect(scheduled).toHaveLength(1);
+
+    scheduled[0]();
+    expect(deps.runJob).toHaveBeenCalledWith('job-1', 'ws-1');
+    run.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(deps.createJob).toHaveBeenCalledTimes(1);
+    expect(deps.logError).not.toHaveBeenCalled();
+  });
+
   it('coalesces repeated enqueue calls into one catch-up job after the running backfill', async () => {
     const scheduled: Array<() => void> = [];
     const firstRun = deferred();
