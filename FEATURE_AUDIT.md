@@ -1,8 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **445 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **446 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 446. Multi-Location Local SEO Business Match
+
+**What it does:** Adds the server-layer foundation for matching local visibility results against multiple client-owned physical locations. Workspaces can now store `client_locations` with branch names, domains, phone numbers, addresses, status, and future per-location strategy fields. Local visibility snapshots record the matched location ID/name, match evaluation checks every configured location, client-owned branches are scrubbed from `top_competitors`, a background job recalculates historical snapshots after location changes, and admin CRUD endpoints expose the location store for the upcoming UI.
+
+**Agency value:** Fixes the credibility gap where a client’s own branch listings could appear as competitors. Strategists get cleaner local pack reporting and a backfill path for historical snapshots before PR2 adds the management UI.
+
+**Client value:** Multi-location businesses should see more accurate “are we visible?” reporting because any confirmed branch can satisfy the business match, and owned branches no longer inflate competitor lists.
+
+**Mutual:** Establishes the durable data model needed for later per-location strategy, page targets, and GBP integration while preserving single-location fallback behavior for existing workspaces.
 
 ---
 

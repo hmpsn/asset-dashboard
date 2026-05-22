@@ -18,6 +18,7 @@ export const BACKGROUND_JOB_TYPES = {
   SEO_BULK_ACCEPT_FIXES: 'seo-bulk-accept-fixes',
   ACTION_PLAYBOOK_EXECUTE: 'action-playbook-execute',
   LOCAL_SEO_REFRESH: 'local-seo-refresh',
+  LOCAL_SEO_LOCATION_BACKFILL: 'local-seo-location-backfill',
 } as const;
 
 export type BackgroundJobType = typeof BACKGROUND_JOB_TYPES[keyof typeof BACKGROUND_JOB_TYPES];
@@ -148,6 +149,12 @@ export const BACKGROUND_JOB_METADATA: { [K in BackgroundJobType]: BackgroundJobT
     description: 'Refreshes local pack visibility for selected markets and keywords.',
     cancellable: false,
     resultBehavior: 'domain-store-and-result',
+  },
+  [BACKGROUND_JOB_TYPES.LOCAL_SEO_LOCATION_BACKFILL]: {
+    label: 'Recalculating local match history',
+    description: 'Re-evaluates saved local visibility snapshots against configured client locations.',
+    cancellable: false,
+    resultBehavior: 'ephemeral',
   },
 };
 

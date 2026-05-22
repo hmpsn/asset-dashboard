@@ -7,6 +7,7 @@ import { parseJsonSafeArray } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
+import { getClientLocations } from './client-locations.js';
 import { listContentGaps } from './content-gaps.js';
 import { updateJob, getJob } from './jobs.js';
 import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js';
@@ -35,6 +36,7 @@ import {
   localSeoKeywordVisibilityFromSnapshot,
   localSeoKeywordVisibilitySummaryFromSnapshots,
   summarizeLocalSeoKeywordVisibility,
+  type ClientLocation,
   type LocalBusinessMatchConfidence,
   type LocalSeoKeywordVisibility,
   type LocalSeoKeywordVisibilitySummary,
@@ -180,6 +182,9 @@ interface SnapshotRow {
   language_code: string;
   status: string;
   degraded_reason: string | null;
+  matched_location_id: string | null;
+  matched_location_name: string | null;
+  raw_results: string | null;
 }
 
 interface SnapshotSummaryRow {
@@ -240,12 +245,35 @@ const stmts = createStmtCache(() => ({
     INSERT INTO local_visibility_snapshots (
       id, workspace_id, keyword, normalized_keyword, market_id, market_label, captured_at,
       local_pack_present, business_found, business_match_confidence, business_match_reason,
-      local_rank, top_competitors, source_endpoint, provider, device, language_code, status, degraded_reason
+      local_rank, top_competitors, source_endpoint, provider, device, language_code, status,
+      degraded_reason, matched_location_id, matched_location_name, raw_results
     ) VALUES (
       @id, @workspace_id, @keyword, @normalized_keyword, @market_id, @market_label, @captured_at,
       @local_pack_present, @business_found, @business_match_confidence, @business_match_reason,
-      @local_rank, @top_competitors, @source_endpoint, @provider, @device, @language_code, @status, @degraded_reason
+      @local_rank, @top_competitors, @source_endpoint, @provider, @device, @language_code, @status,
+      @degraded_reason, @matched_location_id, @matched_location_name, @raw_results
     )
+  `),
+  updateSnapshotMatch: db.prepare(`
+    UPDATE local_visibility_snapshots
+    SET business_found = @business_found,
+      business_match_confidence = @business_match_confidence,
+      business_match_reason = @business_match_reason,
+      local_rank = @local_rank,
+      matched_location_id = @matched_location_id,
+      matched_location_name = @matched_location_name,
+      top_competitors = @top_competitors,
+      raw_results = COALESCE(raw_results, @raw_results)
+    WHERE id = @id AND workspace_id = @workspace_id
+  `),
+  listAllSnapshotsForWorkspace: db.prepare(`
+    SELECT * FROM local_visibility_snapshots
+    WHERE workspace_id = ?
+    ORDER BY captured_at DESC
+  `),
+  countSnapshotsForWorkspace: db.prepare(`
+    SELECT COUNT(*) AS count FROM local_visibility_snapshots
+    WHERE workspace_id = ?
   `),
   latestSnapshots: db.prepare(`
     SELECT * FROM local_visibility_snapshots
@@ -369,7 +397,17 @@ function rowToSnapshot(row: SnapshotRow): LocalVisibilitySnapshot {
     languageCode: row.language_code,
     status: Object.values(LOCAL_VISIBILITY_STATUS).includes(row.status as LocalVisibilitySnapshot['status']) ? row.status as LocalVisibilitySnapshot['status'] : LOCAL_VISIBILITY_STATUS.DEGRADED,
     degradedReason: row.degraded_reason ?? undefined,
+    matchedLocationId: row.matched_location_id ?? undefined,
+    matchedLocationName: row.matched_location_name ?? undefined,
   };
+}
+
+function rowToRawLocalResults(row: SnapshotRow): LocalVisibilityBusinessResult[] {
+  return parseJsonSafeArray(row.raw_results ?? row.top_competitors, localResultSchema, {
+    workspaceId: row.workspace_id,
+    table: 'local_visibility_snapshots',
+    field: row.raw_results ? 'raw_results' : 'top_competitors',
+  });
 }
 
 function derivePosture(workspace: Workspace): Pick<LocalSeoWorkspaceSettings, 'suggestedPosture' | 'suggestionReasons'> {
@@ -1024,72 +1062,218 @@ function normalizeText(value: string | undefined): string {
   return (value ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
-export function evaluateLocalBusinessMatch(workspace: Workspace, results: LocalVisibilityBusinessResult[]): {
+function normalizeProviderIdentity(value: string | undefined): string | undefined {
+  const normalized = value?.toLowerCase().replace(/[^a-z0-9]+/g, '') ?? '';
+  return normalized || undefined;
+}
+
+type LocalBusinessMatchResult = {
   confidence: LocalBusinessMatchConfidence;
   found: boolean;
   rank?: number;
   reason?: string;
-} {
-  if (results.length === 0) return { confidence: LOCAL_BUSINESS_MATCH_CONFIDENCE.NOT_FOUND, found: false, reason: 'No local pack results returned' };
-  const workspaceDomain = cleanDomain(workspace.liveDomain ?? workspace.gscPropertyUrl);
-  const workspaceName = normalizeText(workspace.name);
-  const workspacePhone = normalizePhone(workspace.businessProfile?.phone);
-  const street = normalizeText(workspace.businessProfile?.address?.street);
+  matchedLocationId?: string;
+  matchedLocationName?: string;
+};
 
-  for (const result of results) {
-    const resultDomain = cleanDomain(result.domain ?? result.url);
-    const title = normalizeText(result.title);
-    const address = normalizeText(result.address);
-    const phone = normalizePhone(result.phone);
-    const domainMatch = Boolean(workspaceDomain && resultDomain && resultDomain === workspaceDomain);
-    const phoneMatch = Boolean(workspacePhone && phone && workspacePhone === phone);
-    const nameMatch = Boolean(workspaceName && title && (title.includes(workspaceName) || workspaceName.includes(title)));
-    const streetAddressMatch = Boolean(street && address.includes(street));
-    if (domainMatch && (nameMatch || phoneMatch || streetAddressMatch)) {
-      return { confidence: LOCAL_BUSINESS_MATCH_CONFIDENCE.VERIFIED, found: true, rank: result.rank, reason: 'Domain plus name, phone, address, or provider identity matched' };
-    }
-    if (domainMatch || (nameMatch && (phoneMatch || streetAddressMatch))) {
-      return { confidence: LOCAL_BUSINESS_MATCH_CONFIDENCE.STRONG_MATCH, found: true, rank: result.rank, reason: 'Strong business identity match in local result' };
-    }
-    if (nameMatch || phoneMatch || streetAddressMatch) {
-      return { confidence: LOCAL_BUSINESS_MATCH_CONFIDENCE.POSSIBLE_MATCH, found: true, rank: result.rank, reason: 'Possible business match; review before treating as verified' };
+function confidencePriority(confidence: LocalBusinessMatchConfidence): number {
+  switch (confidence) {
+    case LOCAL_BUSINESS_MATCH_CONFIDENCE.VERIFIED:
+      return 3;
+    case LOCAL_BUSINESS_MATCH_CONFIDENCE.STRONG_MATCH:
+      return 2;
+    case LOCAL_BUSINESS_MATCH_CONFIDENCE.POSSIBLE_MATCH:
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+export function getEffectiveLocations(workspace: Workspace): ClientLocation[] {
+  const configured = getClientLocations(workspace.id).filter(location => location.status === 'confirmed');
+  if (configured.length > 0) return configured;
+  const address = workspace.businessProfile?.address;
+  const now = new Date().toISOString();
+  return [{
+    id: `synthetic-${workspace.id}`,
+    workspaceId: workspace.id,
+    name: workspace.name,
+    domain: workspace.liveDomain ?? workspace.gscPropertyUrl ?? undefined,
+    phone: workspace.businessProfile?.phone,
+    streetAddress: address?.street,
+    city: address?.city,
+    stateOrRegion: address?.state,
+    country: address?.country,
+    isPrimary: true,
+    status: 'confirmed',
+    createdAt: now,
+    updatedAt: now,
+  }];
+}
+
+function isOwnedLocalResult(result: LocalVisibilityBusinessResult, locations: ClientLocation[]): boolean {
+  const resultDomain = cleanDomain(result.domain ?? result.url);
+  const resultTitle = normalizeText(result.title);
+  const resultPhone = normalizePhone(result.phone);
+  const resultAddress = normalizeText(result.address);
+  const resultProviderIdentity = normalizeProviderIdentity(result.cid);
+
+  return locations.some(location => {
+    const locationDomain = cleanDomain(location.domain);
+    if (locationDomain && resultDomain && locationDomain === resultDomain) return true;
+    const locationProviderIdentity = normalizeProviderIdentity(location.gbpPlaceId);
+    if (locationProviderIdentity && resultProviderIdentity && locationProviderIdentity === resultProviderIdentity) return true;
+    const locationPhone = normalizePhone(location.phone);
+    if (locationPhone && resultPhone && locationPhone === resultPhone) return true;
+    const locationStreet = normalizeText(location.streetAddress);
+    if (locationStreet && resultAddress.includes(locationStreet)) return true;
+    const locationName = normalizeText(location.name);
+    const nameMatch = Boolean(locationName && resultTitle && (resultTitle.includes(locationName) || locationName.includes(resultTitle)));
+    return Boolean(nameMatch && (
+      (locationDomain && resultDomain && locationDomain === resultDomain)
+      || (locationProviderIdentity && resultProviderIdentity && locationProviderIdentity === resultProviderIdentity)
+      || (locationPhone && resultPhone && locationPhone === resultPhone)
+      || (locationStreet && resultAddress.includes(locationStreet))
+    ));
+  });
+}
+
+function scrubOwnedLocalResults(
+  results: LocalVisibilityBusinessResult[],
+  locations: ClientLocation[],
+): LocalVisibilityBusinessResult[] {
+  return results
+    .filter(result => !isOwnedLocalResult(result, locations))
+    .slice(0, LOCAL_SEO_MAX_RESULTS);
+}
+
+function isBetterLocalBusinessMatch(
+  candidate: LocalBusinessMatchResult,
+  current: LocalBusinessMatchResult | null,
+): boolean {
+  if (!current) return true;
+  const candidatePriority = confidencePriority(candidate.confidence);
+  const currentPriority = confidencePriority(current.confidence);
+  if (candidatePriority !== currentPriority) return candidatePriority > currentPriority;
+  const candidateRank = candidate.rank ?? Number.POSITIVE_INFINITY;
+  const currentRank = current.rank ?? Number.POSITIVE_INFINITY;
+  return candidateRank < currentRank;
+}
+
+export function evaluateLocalBusinessMatch(
+  locations: ClientLocation[],
+  results: LocalVisibilityBusinessResult[],
+): LocalBusinessMatchResult {
+  if (results.length === 0 || locations.length === 0) {
+    return {
+      confidence: LOCAL_BUSINESS_MATCH_CONFIDENCE.NOT_FOUND,
+      found: false,
+      reason: 'No local pack results returned',
+    };
+  }
+
+  let best: LocalBusinessMatchResult | null = null;
+
+  for (const location of locations) {
+    const locationDomain = cleanDomain(location.domain);
+    const locationName = normalizeText(location.name);
+    const locationPhone = normalizePhone(location.phone);
+    const locationStreet = normalizeText(location.streetAddress);
+
+    for (const result of results) {
+      const resultDomain = cleanDomain(result.domain ?? result.url);
+      const title = normalizeText(result.title);
+      const address = normalizeText(result.address);
+      const phone = normalizePhone(result.phone);
+      const providerIdentity = normalizeProviderIdentity(result.cid);
+      const domainMatch = Boolean(locationDomain && resultDomain && resultDomain === locationDomain);
+      const phoneMatch = Boolean(locationPhone && phone && locationPhone === phone);
+      const nameMatch = Boolean(locationName && title && (title.includes(locationName) || locationName.includes(title)));
+      const streetAddressMatch = Boolean(locationStreet && address.includes(locationStreet));
+      const locationProviderIdentity = normalizeProviderIdentity(location.gbpPlaceId);
+      const providerIdentityMatch = Boolean(
+        locationProviderIdentity && providerIdentity && locationProviderIdentity === providerIdentity,
+      );
+
+      let candidate: LocalBusinessMatchResult | null = null;
+      if (providerIdentityMatch || (domainMatch && (nameMatch || phoneMatch || streetAddressMatch))) {
+        candidate = {
+          confidence: LOCAL_BUSINESS_MATCH_CONFIDENCE.VERIFIED,
+          found: true,
+          rank: result.rank,
+          reason: 'Domain plus name, phone, address, or provider identity matched',
+          matchedLocationId: location.id,
+          matchedLocationName: location.name,
+        };
+      } else if (domainMatch || (nameMatch && (phoneMatch || streetAddressMatch))) {
+        candidate = {
+          confidence: LOCAL_BUSINESS_MATCH_CONFIDENCE.STRONG_MATCH,
+          found: true,
+          rank: result.rank,
+          reason: 'Strong business identity match in local result',
+          matchedLocationId: location.id,
+          matchedLocationName: location.name,
+        };
+      } else if (nameMatch || phoneMatch || streetAddressMatch) {
+        candidate = {
+          confidence: LOCAL_BUSINESS_MATCH_CONFIDENCE.POSSIBLE_MATCH,
+          found: true,
+          rank: result.rank,
+          reason: 'Possible business match; review before treating as verified',
+          matchedLocationId: location.id,
+          matchedLocationName: location.name,
+        };
+      }
+
+      if (candidate && isBetterLocalBusinessMatch(candidate, best)) {
+        best = candidate;
+      }
     }
   }
-  return { confidence: LOCAL_BUSINESS_MATCH_CONFIDENCE.NOT_FOUND, found: false, reason: 'No likely business match found in local results' };
+
+  return best ?? {
+    confidence: LOCAL_BUSINESS_MATCH_CONFIDENCE.NOT_FOUND,
+    found: false,
+    reason: 'No likely business match found in local results',
+  };
 }
 
 function snapshotFromProviderResult(
-  workspace: Workspace,
+  workspaceId: string,
+  locations: ClientLocation[],
   market: LocalSeoMarket,
   providerResult: LocalVisibilityProviderResult,
   device: LocalSeoDevice,
   languageCode: string,
 ): LocalVisibilitySnapshot {
-  const match = evaluateLocalBusinessMatch(workspace, providerResult.results);
+  const match = evaluateLocalBusinessMatch(locations, providerResult.results);
+  const isSuccess = providerResult.status === LOCAL_VISIBILITY_STATUS.SUCCESS;
   return {
     id: randomUUID(),
-    workspaceId: workspace.id,
+    workspaceId,
     keyword: providerResult.keyword,
     normalizedKeyword: keywordComparisonKey(providerResult.keyword),
     marketId: market.id,
     marketLabel: market.label,
     capturedAt: providerResult.capturedAt,
     localPackPresent: providerResult.localPackPresent,
-    businessFound: match.found,
-    businessMatchConfidence: providerResult.status === LOCAL_VISIBILITY_STATUS.SUCCESS ? match.confidence : LOCAL_BUSINESS_MATCH_CONFIDENCE.UNKNOWN,
-    businessMatchReason: providerResult.status === LOCAL_VISIBILITY_STATUS.SUCCESS ? match.reason : providerResult.degradedReason,
-    localRank: match.rank,
-    topCompetitors: providerResult.results.slice(0, LOCAL_SEO_MAX_RESULTS),
+    businessFound: isSuccess && match.found,
+    businessMatchConfidence: isSuccess ? match.confidence : LOCAL_BUSINESS_MATCH_CONFIDENCE.UNKNOWN,
+    businessMatchReason: isSuccess ? match.reason : providerResult.degradedReason,
+    localRank: isSuccess ? match.rank : undefined,
+    topCompetitors: scrubOwnedLocalResults(providerResult.results, locations),
     sourceEndpoint: providerResult.sourceEndpoint,
     provider: providerResult.provider,
     device,
     languageCode,
     status: providerResult.status,
     degradedReason: providerResult.degradedReason,
+    matchedLocationId: isSuccess ? match.matchedLocationId : undefined,
+    matchedLocationName: isSuccess ? match.matchedLocationName : undefined,
   };
 }
 
-function storeSnapshot(snapshot: LocalVisibilitySnapshot): void {
+function storeSnapshot(snapshot: LocalVisibilitySnapshot, rawResults: LocalVisibilityBusinessResult[] = snapshot.topCompetitors): void {
   stmts().insertSnapshot.run({
     id: snapshot.id,
     workspace_id: snapshot.workspaceId,
@@ -1110,6 +1294,9 @@ function storeSnapshot(snapshot: LocalVisibilitySnapshot): void {
     language_code: snapshot.languageCode,
     status: snapshot.status,
     degraded_reason: snapshot.degradedReason ?? null,
+    matched_location_id: snapshot.matchedLocationId ?? null,
+    matched_location_name: snapshot.matchedLocationName ?? null,
+    raw_results: JSON.stringify(rawResults.slice(0, LOCAL_SEO_MAX_RESULTS)),
   });
 }
 
@@ -1825,6 +2012,7 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
     updateJob(jobId, { status: 'error', message: 'Workspace not found', error: 'Workspace not found' });
     return;
   }
+  const locations = getEffectiveLocations(workspace);
   const plan = createLocalSeoRefreshPlan(workspaceId, request);
   if (!plan || plan.markets.length === 0 || plan.keywords.length === 0) {
     updateJob(jobId, {
@@ -1874,8 +2062,8 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
           maxResults: LOCAL_SEO_MAX_RESULTS,
         }, workspaceId);
         if (getJob(jobId)?.status === 'cancelled') return;
-        const snapshot = snapshotFromProviderResult(workspace, market, providerResult, plan.device, plan.languageCode);
-        storeSnapshot(snapshot);
+        const snapshot = snapshotFromProviderResult(workspaceId, locations, market, providerResult, plan.device, plan.languageCode);
+        storeSnapshot(snapshot, providerResult.results);
         if (providerResult.status === LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED) failed++;
         else refreshed++;
       } catch (err) {
@@ -1926,4 +2114,99 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
   broadcastToWorkspace(workspaceId, WS_EVENTS.LOCAL_SEO_UPDATED, { workspaceId, action: 'refresh_completed', refreshed, failed, updatedAt: new Date().toISOString() });
   addActivity(workspaceId, 'local_seo_updated', 'Local SEO visibility refreshed', `${refreshed} local visibility checks refreshed`, { source: 'local_seo', refreshed, failed });
   updateJob(jobId, { status: 'done', progress: total, total, message: `Local visibility refreshed — ${refreshed}/${total} checks`, result });
+}
+
+export function countLocalVisibilitySnapshots(workspaceId: string): number {
+  const row = stmts().countSnapshotsForWorkspace.get(workspaceId) as { count: number };
+  return row.count;
+}
+
+export async function runLocationBackfillJob(jobId: string, workspaceId: string): Promise<void> {
+  const workspace = getWorkspace(workspaceId);
+  if (!workspace) {
+    updateJob(jobId, { status: 'error', message: 'Workspace not found', error: 'Workspace not found' });
+    return;
+  }
+
+  const locations = getEffectiveLocations(workspace);
+  const rows = stmts().listAllSnapshotsForWorkspace.all(workspaceId) as SnapshotRow[];
+  const total = rows.length;
+
+  if (total === 0) {
+    updateJob(jobId, {
+      status: 'done',
+      progress: 100,
+      total: 0,
+      message: 'No snapshots to recalculate',
+      result: { workspaceId, updated: 0 },
+    });
+    return;
+  }
+
+  updateJob(jobId, {
+    status: 'running',
+    progress: 0,
+    total,
+    message: `Recalculating match data for ${total} snapshots...`,
+  });
+
+  const batchSize = 100;
+  let processed = 0;
+
+  for (let i = 0; i < rows.length; i += batchSize) {
+    if (getJob(jobId)?.status === 'cancelled') return;
+    const batch = rows.slice(i, i + batchSize);
+
+    db.transaction(() => {
+      for (const row of batch) {
+        const snapshot = rowToSnapshot(row);
+        const rawResults = rowToRawLocalResults(row);
+        const match = evaluateLocalBusinessMatch(locations, rawResults);
+        const isSuccess = snapshot.status === LOCAL_VISIBILITY_STATUS.SUCCESS;
+
+        stmts().updateSnapshotMatch.run({
+          id: snapshot.id,
+          workspace_id: workspaceId,
+          business_found: isSuccess && match.found ? 1 : 0,
+          business_match_confidence: isSuccess ? match.confidence : LOCAL_BUSINESS_MATCH_CONFIDENCE.UNKNOWN,
+          business_match_reason: isSuccess ? (match.reason ?? null) : (snapshot.degradedReason ?? null),
+          local_rank: isSuccess ? (match.rank ?? null) : null,
+          matched_location_id: isSuccess ? (match.matchedLocationId ?? null) : null,
+          matched_location_name: isSuccess ? (match.matchedLocationName ?? null) : null,
+          top_competitors: JSON.stringify(scrubOwnedLocalResults(rawResults, locations)),
+          raw_results: JSON.stringify(rawResults.slice(0, LOCAL_SEO_MAX_RESULTS)),
+        });
+      }
+    })();
+
+    processed += batch.length;
+    updateJob(jobId, {
+      status: 'running',
+      progress: processed,
+      total,
+      message: `Recalculating match data... (${processed}/${total})`,
+    });
+  }
+
+  broadcastToWorkspace(workspaceId, WS_EVENTS.LOCAL_SEO_UPDATED, {
+    workspaceId,
+    action: 'backfill_completed',
+    updated: total,
+    updatedAt: new Date().toISOString(),
+  });
+  addActivity(
+    workspaceId,
+    'local_seo_updated',
+    'Local match history recalculated',
+    `${total} snapshots updated with multi-location match data`,
+    { source: 'local_seo', updated: total },
+  );
+
+  updateJob(jobId, {
+    status: 'done',
+    progress: total,
+    total,
+    message: `Match history updated for ${total} snapshots`,
+    result: { workspaceId, updated: total },
+  });
 }

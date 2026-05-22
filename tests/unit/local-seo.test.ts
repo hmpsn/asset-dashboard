@@ -7,16 +7,19 @@ import {
   classifyLocalKeywordIntent,
   createLocalSeoRefreshPlan,
   evaluateLocalBusinessMatch,
+  getEffectiveLocations,
   getEffectiveKeywordsPerRefresh,
   getLocalSeoReadModel,
   getLocalSeoServiceGaps,
   iterateLocalCandidateSignals,
   loadCandidateIterationContext,
+  runLocationBackfillJob,
   runLocalSeoRefreshJob,
   selectLocalIntentKeywords,
   updateLocalSeoConfiguration,
 } from '../../server/local-seo.js';
 import { setBroadcast } from '../../server/broadcast.js';
+import { createClientLocation } from '../../server/client-locations.js';
 import { clearCompletedJobs, createJob, getJob } from '../../server/jobs.js';
 import { FakeSeoProvider } from '../../server/providers/fake-seo-provider.js';
 import { _resetRegistryForTest, registerProvider } from '../../server/seo-data-provider.js';
@@ -113,9 +116,23 @@ beforeEach(() => {
       device TEXT NOT NULL DEFAULT 'desktop',
       language_code TEXT NOT NULL DEFAULT 'en',
       status TEXT NOT NULL DEFAULT 'success',
-      degraded_reason TEXT
+      degraded_reason TEXT,
+      matched_location_id TEXT,
+      matched_location_name TEXT,
+      raw_results TEXT
     );
   `);
+  for (const columnSql of [
+    `ALTER TABLE local_visibility_snapshots ADD COLUMN matched_location_id TEXT`,
+    `ALTER TABLE local_visibility_snapshots ADD COLUMN matched_location_name TEXT`,
+    `ALTER TABLE local_visibility_snapshots ADD COLUMN raw_results TEXT`,
+  ]) {
+    try {
+      db.exec(columnSql);
+    } catch (err) {
+      if (!(err instanceof Error) || !/duplicate column name/i.test(err.message)) throw err;
+    }
+  }
 });
 
 afterEach(() => {
@@ -146,7 +163,7 @@ describe('local SEO DataForSEO location identity', () => {
 
 describe('local SEO business match confidence', () => {
   it('does not treat city-only competitor addresses as business matches', () => {
-    const match = evaluateLocalBusinessMatch(workspace, [{
+    const match = evaluateLocalBusinessMatch(getEffectiveLocations(workspace), [{
       title: 'Competitor Dental',
       rank: 1,
       domain: 'competitor.example.com',
@@ -160,7 +177,7 @@ describe('local SEO business match confidence', () => {
   });
 
   it('uses domain plus identity evidence for verified matches', () => {
-    const match = evaluateLocalBusinessMatch(workspace, [{
+    const match = evaluateLocalBusinessMatch(getEffectiveLocations(workspace), [{
       title: 'Local Dental',
       rank: 2,
       domain: 'local-dental.example.com',
@@ -177,7 +194,7 @@ describe('local SEO business match confidence', () => {
   });
 
   it('does not verify domain-only matches just because the provider returned a cid', () => {
-    const match = evaluateLocalBusinessMatch(workspace, [{
+    const match = evaluateLocalBusinessMatch(getEffectiveLocations(workspace), [{
       title: 'Unrelated Directory Listing',
       rank: 2,
       domain: 'local-dental.example.com',
@@ -192,7 +209,7 @@ describe('local SEO business match confidence', () => {
   });
 
   it('keeps name-only matches as possible, not verified', () => {
-    const match = evaluateLocalBusinessMatch(workspace, [{
+    const match = evaluateLocalBusinessMatch(getEffectiveLocations(workspace), [{
       title: 'Local Dental',
       rank: 3,
       domain: 'directory.example.com',
@@ -600,6 +617,95 @@ describe('local SEO provider selection', () => {
     expect(readModel?.latestSnapshots).toHaveLength(2);
     expect(readModel?.report.checkedKeywordCount).toBe(2);
     expect(readModel?.report.activeMarketCount).toBe(2);
+  });
+
+  it('preserves raw local results so repeated location backfills keep match evidence', async () => {
+    setBroadcast(vi.fn(), vi.fn());
+    const ws = createWorkspace('Local SEO Backfill Raw Results');
+    cleanupWorkspaceIds.add(ws.id);
+    updateLocalSeoConfiguration(ws.id, {
+      posture: LOCAL_SEO_POSTURE.LOCAL,
+      markets: [{
+        label: 'Austin, TX',
+        city: 'Austin',
+        stateOrRegion: 'TX',
+        country: 'US',
+        providerLocationCode: 1026201,
+        status: LOCAL_SEO_MARKET_STATUS.ACTIVE,
+      }],
+    }, true);
+    createClientLocation(ws.id, {
+      name: 'Acme Downtown',
+      domain: 'acme.example.com',
+      status: 'confirmed',
+    });
+    const market = db.prepare('SELECT id FROM local_seo_markets WHERE workspace_id = ? LIMIT 1').get(ws.id) as { id: string };
+    const rawResults = [
+      { title: 'Acme Downtown', domain: 'acme.example.com', rank: 2 },
+      { title: 'Acme Downtown Reviews', domain: 'reviews.example.com', rank: 3 },
+      { title: 'Other Dental', domain: 'other.example.com', rank: 1 },
+    ];
+    db.prepare(`
+      INSERT INTO local_visibility_snapshots (
+        id, workspace_id, keyword, normalized_keyword, market_id, market_label, captured_at,
+        local_pack_present, business_found, business_match_confidence, business_match_reason,
+        local_rank, top_competitors, source_endpoint, provider, device, language_code, status,
+        degraded_reason, matched_location_id, matched_location_name, raw_results
+      ) VALUES (
+        @id, @workspace_id, @keyword, @normalized_keyword, @market_id, @market_label, @captured_at,
+        @local_pack_present, @business_found, @business_match_confidence, @business_match_reason,
+        @local_rank, @top_competitors, @source_endpoint, @provider, @device, @language_code, @status,
+        @degraded_reason, @matched_location_id, @matched_location_name, @raw_results
+      )
+    `).run({
+      id: 'raw-backfill-snapshot',
+      workspace_id: ws.id,
+      keyword: 'Austin Dentist',
+      normalized_keyword: 'austin dentist',
+      market_id: market.id,
+      market_label: 'Austin, TX',
+      captured_at: '2026-05-20T10:00:00.000Z',
+      local_pack_present: 1,
+      business_found: 0,
+      business_match_confidence: LOCAL_BUSINESS_MATCH_CONFIDENCE.NOT_FOUND,
+      business_match_reason: null,
+      local_rank: null,
+      top_competitors: JSON.stringify(rawResults),
+      source_endpoint: 'google_organic_serp',
+      provider: 'fake-seo-provider',
+      device: 'desktop',
+      language_code: 'en',
+      status: LOCAL_VISIBILITY_STATUS.SUCCESS,
+      degraded_reason: null,
+      matched_location_id: null,
+      matched_location_name: null,
+      raw_results: null,
+    });
+
+    const firstJob = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_LOCATION_BACKFILL, { workspaceId: ws.id });
+    await runLocationBackfillJob(firstJob.id, ws.id);
+    const afterFirst = db.prepare('SELECT * FROM local_visibility_snapshots WHERE id = ?').get('raw-backfill-snapshot') as {
+      business_found: number;
+      local_rank: number | null;
+      top_competitors: string;
+      raw_results: string | null;
+    };
+    expect(afterFirst.business_found).toBe(1);
+    expect(afterFirst.local_rank).toBe(2);
+    expect(JSON.parse(afterFirst.top_competitors)).toEqual([
+      { title: 'Acme Downtown Reviews', domain: 'reviews.example.com', rank: 3 },
+      { title: 'Other Dental', domain: 'other.example.com', rank: 1 },
+    ]);
+    expect(JSON.parse(afterFirst.raw_results ?? '[]')).toEqual(rawResults);
+
+    const secondJob = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_LOCATION_BACKFILL, { workspaceId: ws.id });
+    await runLocationBackfillJob(secondJob.id, ws.id);
+    const afterSecond = db.prepare('SELECT business_found, local_rank FROM local_visibility_snapshots WHERE id = ?').get('raw-backfill-snapshot') as {
+      business_found: number;
+      local_rank: number | null;
+    };
+    expect(afterSecond.business_found).toBe(1);
+    expect(afterSecond.local_rank).toBe(2);
   });
 
   it('keeps summary visibility aligned with detail granularity across device and language snapshots', async () => {

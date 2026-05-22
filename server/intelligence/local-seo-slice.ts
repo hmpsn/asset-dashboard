@@ -1,4 +1,5 @@
 import type { LocalSeoSlice } from '../../shared/types/intelligence.js';
+import { getClientLocations } from '../client-locations.js';
 import { createLogger } from '../logger.js';
 import { isFeatureEnabled } from '../feature-flags.js';
 
@@ -27,6 +28,7 @@ export async function assembleLocalSeo(workspaceId: string): Promise<LocalSeoSli
   const enabled = isFeatureEnabled('local-seo-visibility');
 
   const baseline: LocalSeoSlice = {
+    locations: [],
     enabled,
     markets: [],
     visibility: { visible: 0, possibleMatch: 0, notVisible: 0, notChecked: 0, providerDegraded: 0 },
@@ -40,6 +42,16 @@ export async function assembleLocalSeo(workspaceId: string): Promise<LocalSeoSli
   if (!enabled) return baseline;
 
   try {
+    const locations: LocalSeoSlice['locations'] = getClientLocations(workspaceId)
+      .filter(location => location.status === 'confirmed')
+      .map(location => ({
+        id: location.id,
+        name: location.name,
+        isPrimary: location.isPrimary,
+        city: location.city,
+        stateOrRegion: location.stateOrRegion,
+        pageTargetPath: location.pageTargetPath,
+      }));
     const localSeoModule = await import('../local-seo.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
     const {
       listLocalSeoMarkets,
@@ -49,7 +61,7 @@ export async function assembleLocalSeo(workspaceId: string): Promise<LocalSeoSli
     } = localSeoModule;
 
     const rawMarkets = listLocalSeoMarkets(workspaceId);
-    if (rawMarkets.length === 0) return baseline;
+    if (rawMarkets.length === 0) return { ...baseline, locations };
 
     const markets: LocalSeoSlice['markets'] = rawMarkets.map(m => ({
       id: m.id,
@@ -109,13 +121,14 @@ export async function assembleLocalSeo(workspaceId: string): Promise<LocalSeoSli
 
     const sampledCandidates = stratifiedSample(candidates, markets, PROMPT_BLOCK_PER_MARKET_CAP, PROMPT_BLOCK_TOTAL_CAP);
     const effectiveLocalSeoBlock = renderLocalSeoBlock({
+      locations,
       markets,
       visibility,
       sampledCandidates,
       latestSnapshotAt,
     });
 
-    return { enabled, markets, visibility, candidates, effectiveLocalSeoBlock, latestSnapshotAt };
+    return { locations, enabled, markets, visibility, candidates, effectiveLocalSeoBlock, latestSnapshotAt };
   } catch (err) {
     log.warn({ err, workspaceId }, 'assembleLocalSeo: failed, degrading to empty slice');
     return baseline;
@@ -158,13 +171,24 @@ function stratifiedSample(
 }
 
 function renderLocalSeoBlock(args: {
+  locations: LocalSeoSlice['locations'];
   markets: LocalSeoSlice['markets'];
   visibility: LocalSeoSlice['visibility'];
   sampledCandidates: LocalSeoSlice['candidates'];
   latestSnapshotAt: string | null;
 }): string {
-  const { markets, visibility, sampledCandidates, latestSnapshotAt } = args;
+  const { locations, markets, visibility, sampledCandidates, latestSnapshotAt } = args;
   const lines: string[] = [];
+  if (locations.length > 0) {
+    lines.push(`Configured client locations (${locations.length} confirmed):`);
+    for (const location of locations.slice(0, PROMPT_BLOCK_MARKET_LIST_CAP)) {
+      const city = [location.city, location.stateOrRegion].filter(Boolean).join(', ');
+      const primary = location.isPrimary ? 'primary' : 'branch';
+      const target = location.pageTargetPath ? ` -> ${location.pageTargetPath}` : '';
+      lines.push(`  - ${location.name}${city ? ` (${city})` : ''} [${primary}]${target}`);
+    }
+    lines.push('');
+  }
   const activeCount = markets.filter(m => m.status === 'active').length;
   lines.push(`Local SEO posture (${activeCount} active markets):`);
   for (const market of markets.slice(0, PROMPT_BLOCK_MARKET_LIST_CAP)) {
