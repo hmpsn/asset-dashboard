@@ -8,6 +8,9 @@ const log = createLogger('workspace-intelligence/local-seo');
 const PROMPT_BLOCK_TOTAL_CAP = 50;
 const PROMPT_BLOCK_PER_MARKET_CAP = 8;
 const PROMPT_BLOCK_MARKET_LIST_CAP = 10;
+// Reused for locations list (same order-of-magnitude cap — a workspace rarely has more than
+// a handful of locations, so the market cap is a safe upper bound here too).
+const PROMPT_BLOCK_LOCATION_LIST_CAP = PROMPT_BLOCK_MARKET_LIST_CAP;
 
 /**
  * Assemble the local SEO intelligence slice for a workspace.
@@ -181,7 +184,7 @@ function renderLocalSeoBlock(args: {
   const lines: string[] = [];
   if (locations.length > 0) {
     lines.push(`Configured client locations (${locations.length} confirmed):`);
-    for (const location of locations.slice(0, PROMPT_BLOCK_MARKET_LIST_CAP)) {
+    for (const location of locations.slice(0, PROMPT_BLOCK_LOCATION_LIST_CAP)) {
       const city = [location.city, location.stateOrRegion].filter(Boolean).join(', ');
       const primary = location.isPrimary ? 'primary' : 'branch';
       const target = location.pageTargetPath ? ` -> ${location.pageTargetPath}` : '';
