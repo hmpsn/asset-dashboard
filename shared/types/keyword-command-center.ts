@@ -201,6 +201,13 @@ export interface KeywordCommandCenterCounts {
   localCandidates: number;
   retired: number;
   declined: number;
+  /**
+   * Count of keywords across the universe that have no provider volume data
+   * attached. Surfaced as a diagnostic in the panel header so admins can tell
+   * whether a "—" volume value is normal or signals a provider-refresh need.
+   * Always defined when summary is computed; may be 0.
+   */
+  missingVolume?: number;
 }
 
 export interface KeywordCommandCenterFilterMeta {

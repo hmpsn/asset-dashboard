@@ -6,6 +6,7 @@ import { listContentGaps } from './content-gaps.js';
 import { listKeywordGaps } from './keyword-gaps.js';
 import {
   buildLocalSeoKeywordCandidates,
+  countLocalSeoKeywordCandidates,
   buildLocalSeoKeywordVisibilityForKeyword,
   buildLocalSeoKeywordVisibilitySummaryByKey,
   buildLocalSeoKeywordVisibilityByKey,
@@ -687,6 +688,9 @@ function buildCounts(rows: KeywordCommandCenterRow[]): KeywordCommandCenterCount
     localCandidates: rows.filter(row => row.localSeoState?.lifecycle === KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CANDIDATE).length,
     retired: rows.filter(row => row.lifecycleStatus === KEYWORD_COMMAND_CENTER_STATUS.RETIRED).length,
     declined: rows.filter(row => row.lifecycleStatus === KEYWORD_COMMAND_CENTER_STATUS.DECLINED).length,
+    // Sentinel-masked volumes have already been dropped to undefined by mergeMetrics,
+    // so any null/undefined here is genuinely missing (not a planner-bucket masquerade).
+    missingVolume: rows.filter(row => row.metrics.volume == null || row.metrics.volume <= 0).length,
   };
 }
 
@@ -1112,22 +1116,40 @@ export async function buildKeywordCommandCenterSummary(
   const pageAssignedKeys = new Set<string>();
   const contentKeys = new Set<string>();
   const rawEvidenceKeys = new Set<string>();
+  // Track which keys have at least one source contributing a positive volume
+  // value. Used to surface "{X} keywords missing demand data" diagnostic.
+  const keysWithVolume = new Set<string>();
   const addKey = (target: Set<string>, keyword: string | undefined) => {
     const key = keywordComparisonKey(keyword ?? '');
     if (!key) return;
     target.add(key);
     allKeys.add(key);
   };
+  const markVolume = (keyword: string | undefined, volume: number | undefined | null) => {
+    if (volume == null || volume <= 0) return;
+    // Mirror the planner-bucket mask from mergeMetrics — a 1M+ planner sentinel
+    // is NOT real demand data, so it must not count toward the volume diagnostic.
+    if (isSuspiciousPlannerGroupedVolume(keyword, volume)) return;
+    const key = keywordComparisonKey(keyword ?? '');
+    if (!key) return;
+    keysWithVolume.add(key);
+  };
 
-  for (const metric of workspace.keywordStrategy?.siteKeywordMetrics ?? []) addKey(inStrategyKeys, metric.keyword);
+  for (const metric of workspace.keywordStrategy?.siteKeywordMetrics ?? []) {
+    addKey(inStrategyKeys, metric.keyword);
+    markVolume(metric.keyword, metric.volume);
+  }
   for (const keyword of workspace.keywordStrategy?.siteKeywords ?? []) addKey(inStrategyKeys, keyword);
 
   for (const page of listPageKeywords(workspace.id)) {
     addKey(pageAssignedKeys, page.primaryKeyword);
     addKey(inStrategyKeys, page.primaryKeyword);
+    markVolume(page.primaryKeyword, page.volume);
     for (const secondary of page.secondaryKeywords ?? []) {
       addKey(pageAssignedKeys, secondary);
       addKey(inStrategyKeys, secondary);
+      // Page secondaries don't carry their own volume — the page's volume is
+      // associated with the primary keyword only.
     }
   }
 
@@ -1135,10 +1157,14 @@ export async function buildKeywordCommandCenterSummary(
   for (const gap of contentGaps) {
     addKey(contentKeys, gap.targetKeyword);
     addKey(inStrategyKeys, gap.targetKeyword);
+    markVolume(gap.targetKeyword, gap.volume);
   }
 
   const keywordGaps = listKeywordGaps(workspace.id);
-  for (const gap of keywordGaps) addKey(rawEvidenceKeys, gap.keyword);
+  for (const gap of keywordGaps) {
+    addKey(rawEvidenceKeys, gap.keyword);
+    markVolume(gap.keyword, gap.volume);
+  }
 
   // Load feedback early so it can hint the tracking-source inference.
   const feedback = readFeedback(workspace.id);
@@ -1150,7 +1176,10 @@ export async function buildKeywordCommandCenterSummary(
     contentGaps,
     feedback,
   });
-  for (const tracked of trackedKeywords) addKey(allKeys, tracked.query);
+  for (const tracked of trackedKeywords) {
+    addKey(allKeys, tracked.query);
+    markVolume(tracked.query, tracked.volume);
+  }
   const trackedKeys = new Set(trackedKeywords.map(keyword => keywordComparisonKey(keyword.query)).filter(Boolean));
 
   // Align with sourceKeysForRows(IN_STRATEGY): tracked keywords promoted from the
@@ -1201,15 +1230,27 @@ export async function buildKeywordCommandCenterSummary(
   for (const key of localVisibility.keys()) allKeys.add(key);
   const localVisibilityValues = [...localVisibility.values()];
 
-  // NOTE: We do NOT compute localCandidatesCount in the summary hot path.
-  // buildLocalSeoKeywordCandidates runs evaluateKeywordCandidate for every
-  // candidate, which scans pageMap × secondaries per call — observed at ~35s
-  // on rich workspaces (Swish: 235 tracked + 50 pages + variants). The previous
-  // attempt to compute this here re-introduced the OOM/timeout regression that
-  // PRs #871–#873 fixed. The badge intentionally reports 0 until a workspace-level
-  // counter or cheap SQL proxy is wired in (tracked as
-  // `intel-quality-localcandidates-cheap-count` in roadmap).
-  const localCandidatesCount = 0;
+  // Local Candidates badge: cheap count-only path that skips evaluateKeywordCandidate
+  // (the per-candidate scan that caused the 35-second regression in PR #876).
+  // `countLocalSeoKeywordCandidates` mirrors the candidate generator's outer iteration
+  // and source filters (declined/inactive/intent/market) but never builds row objects
+  // or runs eligibility evaluation. Sub-100ms even on Swish-scale workspaces.
+  // Slight overcount possible — the displayable list still comes from the full
+  // generator when the user clicks into the Local Candidates filter.
+  let localCandidatesCount = 0;
+  if (options.includeLocalSeo) {
+    try {
+      // local-candidates-unconditional-ok: countLocalSeoKeywordCandidates is the cheap-count helper, not the full generator; capped at LOCAL_CANDIDATE_HARD_CAP
+      localCandidatesCount = countLocalSeoKeywordCandidates(workspace.id);
+    } catch (err) {
+      log.warn({ err, workspaceId }, 'localCandidates count failed; reporting 0');
+    }
+  }
+
+  // Keywords across the universe with no real provider volume attached.
+  // Planner-bucket sentinels (1M+) are intentionally excluded from "has volume"
+  // so they count as missing — consistent with the mergeMetrics mask in rows.
+  const missingVolume = Math.max(0, allKeys.size - keysWithVolume.size);
 
   const counts: KeywordCommandCenterCounts = {
     total: allKeys.size,
@@ -1221,6 +1262,7 @@ export async function buildKeywordCommandCenterSummary(
     localCandidates: localCandidatesCount,
     retired: inactiveTracked.length,
     declined: declined.length,
+    missingVolume,
   };
   const filterCounts: SkinnyFilterCounts = {
     all: counts.total,

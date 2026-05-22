@@ -1311,14 +1311,15 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
     expect(rows!.rows.some(r => r.normalizedKeyword === 'inferred strategy match')).toBe(true);
   });
 
-  it('localCandidates summary count is intentionally 0 (computed off the hot path; follow-up cache)', async () => {
-    // PR #876 introduced a generator-backed count here, but on rich workspaces
-    // (Swish: 235 tracked + 50 pages + variants) that took ~35s because every
-    // candidate runs through evaluateKeywordCandidate which scans pageMap.
-    // Reverted to 0 in this PR — a cheap SQL/cache-backed count will land separately
-    // (roadmap: intel-quality-localcandidates-cheap-count). This test locks in the
-    // expectation so a future "fix" doesn't reintroduce the same hot-path regression
-    // without addressing the underlying cost first.
+  it('localCandidates summary count uses the cheap counter (skips evaluateKeywordCandidate)', async () => {
+    // PR #876 introduced a generator-backed count that called
+    // buildLocalSeoKeywordCandidates() — that hit evaluateKeywordCandidate per
+    // entry and ran 35s on Swish. PR #878 reverted to 0. This PR restores a real
+    // count via countLocalSeoKeywordCandidates(), which mirrors the generator's
+    // iteration + cheap filters but skips eligibility evaluation. The badge is
+    // allowed to slightly overcount (it's a UX hint, not a precise list); the
+    // actual displayable list still comes from the full generator when the user
+    // opens the Local Candidates filter.
     updateWorkspace(workspaceId, {
       name: 'Test Local Business',
       businessProfile: {
@@ -1342,6 +1343,49 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
     });
 
     const summary = await buildKeywordCommandCenterSummary(workspaceId, { includeLocalSeo: true });
+    // Real number greater than 0 for a workspace with markets + service pages
+    expect(summary!.counts.localCandidates).toBeGreaterThan(0);
+  });
+
+  it('localCandidates summary count is 0 when no markets configured (count is short-circuited)', async () => {
+    // Cheap counter short-circuits when activeMarkets is empty — saves any
+    // candidate-generation work for non-local workspaces.
+    upsertPageKeyword(workspaceId, {
+      pagePath: '/anything',
+      pageTitle: 'Anything',
+      primaryKeyword: 'anything',
+      secondaryKeywords: [],
+      searchIntent: 'commercial',
+    });
+
+    const summary = await buildKeywordCommandCenterSummary(workspaceId, { includeLocalSeo: true });
     expect(summary!.counts.localCandidates).toBe(0);
+  });
+
+  it('localCandidates summary count stays under hard cap even with many sources', async () => {
+    // Guardrail: countLocalSeoKeywordCandidates applies the same LOCAL_CANDIDATE_HARD_CAP
+    // as the full generator so the count never balloons unbounded. Seed enough
+    // sources to exceed the cap and assert <= cap.
+    updateLocalSeoConfiguration(workspaceId, {
+      posture: LOCAL_SEO_POSTURE.LOCAL,
+      markets: [
+        { label: 'Austin, TX', city: 'Austin', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1026201, status: LOCAL_SEO_MARKET_STATUS.ACTIVE },
+        { label: 'Houston, TX', city: 'Houston', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1026202, status: LOCAL_SEO_MARKET_STATUS.ACTIVE },
+        { label: 'Dallas, TX', city: 'Dallas', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1026203, status: LOCAL_SEO_MARKET_STATUS.ACTIVE },
+      ],
+    }, true);
+    // 60 pages × multiple keywords each × 3 markets × variants exceeds the cap
+    for (let i = 0; i < 60; i++) {
+      upsertPageKeyword(workspaceId, {
+        pagePath: `/services/service-${i}`,
+        pageTitle: `Service ${i} Repair`,
+        primaryKeyword: `service ${i} repair`,
+        secondaryKeywords: [`service ${i} cost`, `service ${i} cleaning`],
+        searchIntent: 'commercial',
+      });
+    }
+
+    const summary = await buildKeywordCommandCenterSummary(workspaceId, { includeLocalSeo: true });
+    expect(summary!.counts.localCandidates).toBeLessThanOrEqual(1000);
   });
 });
