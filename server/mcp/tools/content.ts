@@ -88,10 +88,12 @@ export async function handleContentTool(
     }
 
     if (name === 'get_keyword_analysis') {
+      const { getLostVisibilityQueries } = await import('../../client-discovered-queries.js'); // dynamic-import-ok - optional discovery table degrades through outer tool error handling
       const result = {
         gaps: listKeywordGaps(workspaceId),
         topicClusters: listTopicClusters(workspaceId),
         cannibalization: listCannibalizationIssues(workspaceId),
+        lostVisibility: getLostVisibilityQueries(workspaceId),
       };
       return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
     }

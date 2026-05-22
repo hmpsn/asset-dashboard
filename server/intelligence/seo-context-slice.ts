@@ -100,6 +100,13 @@ export async function assembleSeoContext(
     log.debug({ err, workspaceId }, 'assembleSeoContext: rank tracking optional, degrading gracefully');
   }
 
+  try {
+    const { getDiscoveredQuerySummary } = await import('../client-discovered-queries.js'); // dynamic-import-ok - optional discovered query table may not exist during migration windows
+    base.discoveredQuerySummary = getDiscoveredQuerySummary(workspaceId);
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleSeoContext: discoveredQuerySummary optional, degrading gracefully');
+  }
+
   // Business profile from structured intelligence editor (Phase 3B)
   const iProfile = workspace?.intelligenceProfile;
   if (iProfile && (iProfile.industry || (iProfile.goals && iProfile.goals.length > 0) || iProfile.targetAudience)) {

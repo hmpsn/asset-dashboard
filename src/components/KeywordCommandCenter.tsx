@@ -5,6 +5,8 @@ import {
   AlertTriangle,
   Archive,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Eye,
   FileText,
   Gauge,
@@ -86,6 +88,7 @@ const FILTER_ICONS: Record<KeywordCommandCenterFilter, typeof Search> = {
   [KEYWORD_COMMAND_CENTER_FILTERS.REQUESTED]: ShieldCheck,
   [KEYWORD_COMMAND_CENTER_FILTERS.DECLINED]: XCircle,
   [KEYWORD_COMMAND_CENTER_FILTERS.RETIRED]: Archive,
+  [KEYWORD_COMMAND_CENTER_FILTERS.LOST_VISIBILITY]: AlertTriangle,
 };
 
 function filterCountLabel(filterId: KeywordCommandCenterFilter, count: number): string {
@@ -183,60 +186,113 @@ function SummaryMetric({
   );
 }
 
+type VariantRow = NonNullable<KeywordCommandCenterRow['variants']>[number];
+
+function VariantSubRow({ variant }: { variant: VariantRow }) {
+  return (
+    <div className="grid grid-cols-[minmax(220px,1.5fr)_120px_150px_100px_100px_minmax(180px,1fr)_130px] gap-3 items-center px-4 py-2 border-b border-[var(--brand-border)] bg-[var(--surface-3)]/15">
+      <div className="min-w-0 pl-6 flex items-center gap-2">
+        <ChevronRight className="h-3 w-3 text-[var(--brand-text-muted)] flex-shrink-0" aria-hidden="true" />
+        <p className="t-caption-sm text-[var(--brand-text-muted)] truncate">{variant.query}</p>
+      </div>
+      <span className="t-caption-sm text-[var(--brand-text-muted)]">Variant</span>
+      <span className="t-caption-sm text-[var(--brand-text-muted)]">—</span>
+      <span className="t-caption-sm text-blue-400 tabular-nums">{compactNumber(variant.impressions)}</span>
+      <span className="t-caption-sm text-[var(--brand-text)] tabular-nums">#{variant.position.toFixed(1)}</span>
+      <span className="t-caption-sm text-[var(--brand-text-muted)] truncate">Search Console variant</span>
+      <span className="t-caption-sm text-blue-400 tabular-nums text-right">{compactNumber(variant.clicks)} clicks</span>
+    </div>
+  );
+}
+
 function KeywordRow({
   row,
   active,
   onSelect,
+  variantsExpanded,
+  onToggleVariants,
 }: {
   row: KeywordCommandCenterRow;
   active: boolean;
   onSelect: () => void;
+  variantsExpanded: boolean;
+  onToggleVariants: () => void;
 }) {
   const primarySource = row.sourceLabels[0];
   return (
-    <ClickableRow
-      active={active}
-      onClick={onSelect}
-      className={cn(
-        'grid grid-cols-[minmax(220px,1.5fr)_120px_150px_100px_100px_minmax(180px,1fr)_130px] gap-3 items-center px-4 py-3 border-b border-[var(--brand-border)] last:border-b-0',
-        'hover:bg-teal-500/5',
-      )}
-    >
-      <div className="min-w-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <p className="t-caption font-semibold text-[var(--brand-text-bright)] truncate">{row.keyword}</p>
-          {row.isProtected && <Badge label="Protected" tone="amber" variant="soft" shape="pill" />}
-          <LocalSeoVisibilityBadge visibility={row.localSeo} subtle />
+    <div>
+      <ClickableRow
+        active={active}
+        onClick={onSelect}
+        className={cn(
+          'grid grid-cols-[minmax(220px,1.5fr)_120px_150px_100px_100px_minmax(180px,1fr)_130px] gap-3 items-center px-4 py-3 border-b border-[var(--brand-border)] last:border-b-0',
+          'hover:bg-teal-500/5',
+        )}
+      >
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <p className="t-caption font-semibold text-[var(--brand-text-bright)] truncate">{row.keyword}</p>
+            {row.isProtected && <Badge label="Protected" tone="amber" variant="soft" shape="pill" />}
+            {row.isLostVisibility && (
+              <Badge
+                label="Lost Visibility"
+                tone="amber"
+                variant="outline"
+                shape="pill"
+                ariaLabel="Lost visibility: this query has not appeared in GSC snapshots for 14 or more days."
+              />
+            )}
+            <LocalSeoVisibilityBadge visibility={row.localSeo} subtle />
+          </div>
+          <p className="t-caption-sm text-[var(--brand-text-muted)] truncate">
+            {primarySource ? `${primarySource.label}${primarySource.detail ? ` · ${primarySource.detail}` : ''}` : 'Keyword universe'}
+          </p>
         </div>
-        <p className="t-caption-sm text-[var(--brand-text-muted)] truncate">
-          {primarySource ? `${primarySource.label}${primarySource.detail ? ` · ${primarySource.detail}` : ''}` : 'Keyword universe'}
+        <Badge label={row.statusLabel} tone={STATUS_TONE[row.lifecycleStatus]} variant="outline" shape="pill" />
+        <div className="min-w-0">
+          <LocalSeoStateBadge row={row} />
+        </div>
+        <p className="t-caption text-blue-400 tabular-nums">{compactNumber(row.metrics.volume ?? row.metrics.impressions)}</p>
+        <p className="t-caption text-[var(--brand-text)] tabular-nums">
+          {row.metrics.currentPosition ? `#${row.metrics.currentPosition.toFixed(1)}` : row.metrics.difficulty != null ? `${row.metrics.difficulty}/100` : '—'}
         </p>
-      </div>
-      <Badge label={row.statusLabel} tone={STATUS_TONE[row.lifecycleStatus]} variant="outline" shape="pill" />
-      <div className="min-w-0">
-        <LocalSeoStateBadge row={row} />
-      </div>
-      <p className="t-caption text-blue-400 tabular-nums">{compactNumber(row.metrics.volume ?? row.metrics.impressions)}</p>
-      <p className="t-caption text-[var(--brand-text)] tabular-nums">
-        {row.metrics.currentPosition ? `#${row.metrics.currentPosition.toFixed(1)}` : row.metrics.difficulty != null ? `${row.metrics.difficulty}/100` : '—'}
-      </p>
-      <p className={cn(
-        't-caption truncate',
-        // Highlight unassigned in-strategy rows in amber so admins notice keywords that
-        // are in the strategy but aren't yet mapped to a page. Audit on Swish found 3
-        // such rows out of 227 in_strategy — small but worth surfacing.
-        row.lifecycleStatus === 'in_strategy' && !row.assignment?.pageTitle && !row.assignment?.pagePath
-          ? 'text-amber-400/90'
-          : 'text-[var(--brand-text-muted)]',
-      )}>
-        {row.assignment?.pageTitle || row.assignment?.pagePath || row.explanation?.nextAction?.label || 'Not yet mapped to a page'}
-      </p>
-      <div className="flex items-center justify-end gap-1">
-        {row.nextActions.slice(0, 2).map(action => (
-          <Badge key={action.type} label={action.label} tone={action.tone === 'red' ? 'red' : action.tone === 'amber' ? 'amber' : action.tone === 'blue' ? 'blue' : 'teal'} variant="soft" />
-        ))}
-      </div>
-    </ClickableRow>
+        <p className={cn(
+          't-caption truncate',
+          // Highlight unassigned in-strategy rows in amber so admins notice keywords that
+          // are in the strategy but aren't yet mapped to a page. Audit on Swish found 3
+          // such rows out of 227 in_strategy — small but worth surfacing.
+          row.lifecycleStatus === 'in_strategy' && !row.assignment?.pageTitle && !row.assignment?.pagePath
+            ? 'text-amber-400/90'
+            : 'text-[var(--brand-text-muted)]',
+        )}>
+          {row.assignment?.pageTitle || row.assignment?.pagePath || row.explanation?.nextAction?.label || 'Not yet mapped to a page'}
+        </p>
+        <div className="flex items-center justify-end gap-1">
+          {(row.variantCount ?? 0) > 0 && <Badge label={`${row.variantCount} variants`} tone="blue" variant="soft" />}
+          {row.nextActions.slice(0, 2).map(action => (
+            <Badge key={action.type} label={action.label} tone={action.tone === 'red' ? 'red' : action.tone === 'amber' ? 'amber' : action.tone === 'blue' ? 'blue' : 'teal'} variant="soft" />
+          ))}
+        </div>
+      </ClickableRow>
+      {(row.variantCount ?? 0) > 0 && (
+        <div className="px-4 py-2 border-b border-[var(--brand-border)] bg-[var(--surface-3)]/10 flex justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={variantsExpanded ? ChevronDown : ChevronRight}
+            onClick={onToggleVariants}
+            className="text-[var(--brand-text-muted)] hover:bg-teal-500/10 hover:text-teal-300"
+            aria-label={`${variantsExpanded ? 'Collapse' : 'Expand'} ${row.variantCount} variants for ${row.keyword}`}
+            title={`${variantsExpanded ? 'Collapse' : 'Expand'} GSC variants`}
+          >
+            {variantsExpanded ? 'Hide variants' : 'Show variants'}
+          </Button>
+        </div>
+      )}
+      {variantsExpanded && (row.variants ?? []).map(variant => (
+        <VariantSubRow key={variant.query} variant={variant} />
+      ))}
+    </div>
   );
 }
 
@@ -491,6 +547,7 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
     row: KeywordCommandCenterRow;
     action: KeywordCommandCenterNextAction;
   } | null>(null);
+  const [expandedVariants, setExpandedVariants] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const timeout = window.setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
@@ -661,6 +718,14 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
                   shape="pill"
                 />
               )}
+              {summary.data?.counts.lostVisibility != null && summary.data.counts.lostVisibility > 0 && (
+                <Badge
+                  label={`${summary.data.counts.lostVisibility} lost visibility`}
+                  tone="amber"
+                  variant="outline"
+                  shape="pill"
+                />
+              )}
             </div>
           }
           action={
@@ -723,6 +788,18 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
                       row={row}
                       active={selectedRow?.normalizedKeyword === row.normalizedKeyword}
                       onSelect={() => setSelectedKey(row.normalizedKeyword)}
+                      variantsExpanded={expandedVariants.has(row.normalizedKeyword)}
+                      onToggleVariants={() => {
+                        setExpandedVariants(previous => {
+                          const next = new Set(previous);
+                          if (next.has(row.normalizedKeyword)) {
+                            next.delete(row.normalizedKeyword);
+                          } else {
+                            next.add(row.normalizedKeyword);
+                          }
+                          return next;
+                        });
+                      }}
                     />
                   ))}
                 </div>

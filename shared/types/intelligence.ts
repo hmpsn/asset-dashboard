@@ -117,6 +117,7 @@ export interface SeoContextSlice {
   backlinkProfile?: BacklinkProfile;
   serpFeatures?: SerpFeatures;
   rankTracking?: RankTrackingSummary;
+  discoveredQuerySummary?: DiscoveredQuerySummary;
   strategyHistory?: StrategyHistory;
 }
 
@@ -542,6 +543,20 @@ export interface RankTrackingSummary {
   trackedKeywords: number;
   avgPosition: number | null;
   positionChanges: { improved: number; declined: number; stable: number };
+}
+
+export interface DiscoveredQuerySummary {
+  /** All-time unique query count ever seen for this workspace. */
+  totalDiscovered: number;
+  /** Queries currently flagged status = 'lost_visibility'. */
+  lostVisibilityCount: number;
+  /** Top 10 by total_impressions DESC — for AI context. */
+  topLostQueries: Array<{
+    query: string;
+    lastPosition: number;
+    lastSeen: string;
+    totalImpressions: number;
+  }>;
 }
 
 export interface StrategyHistory {

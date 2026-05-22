@@ -1,8 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **446 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **447 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 447. GSC Discovery Pipeline
+
+**What it does:** Adds a persistent Search Console discovery layer for keyword intelligence. `getSearchOverview()` now paginates query rows up to 5,000, daily rank snapshots use a 28-day window, and the new `discovered_queries` table stores every query footprint over time. The snapshot job upserts discovered queries and flags quality-gated `lost_visibility` rows when a query has been absent for 14+ days after at least two snapshots and 10 total impressions. Keyword Command Center now links variant GSC queries such as `teeth whitening austin` onto the parent strategy keyword `teeth whitening`, shows expandable variant sub-rows, and surfaces an amber Lost Visibility filter/badge. The SEO context intelligence slice and MCP `get_keyword_analysis` tool both expose lost-visibility query data, with `scripts/backfill-discovered-queries.ts` available for historical seeding from existing rank snapshots.
+
+**Agency value:** Gives strategists a deeper and more durable Search Console memory. Long-tail query variants stop becoming disconnected raw evidence, and keywords that fall out of visibility remain visible as an operating signal instead of disappearing from the latest snapshot.
+
+**Client value:** Clients get steadier keyword reporting because the platform can distinguish “not selected,” “variant evidence,” and “lost visibility” rather than treating absent GSC rows as if they never existed.
+
+**Mutual:** Strengthens the keyword operating loop: query discovery feeds KCC, rank snapshots, AI context, and MCP analysis through one persistent table while keeping the implementation additive and backward-compatible.
 
 ---
 

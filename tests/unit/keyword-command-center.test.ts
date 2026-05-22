@@ -50,6 +50,7 @@ beforeEach(() => {
       posture_source TEXT NOT NULL DEFAULT 'unknown',
       suggested_posture TEXT,
       suggestion_reasons TEXT NOT NULL DEFAULT '[]',
+      keywords_per_refresh INTEGER,
       updated_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS local_seo_markets (
@@ -87,15 +88,51 @@ beforeEach(() => {
       device TEXT NOT NULL DEFAULT 'desktop',
       language_code TEXT NOT NULL DEFAULT 'en',
       status TEXT NOT NULL DEFAULT 'success',
-      degraded_reason TEXT
+      degraded_reason TEXT,
+      matched_location_id TEXT,
+      matched_location_name TEXT,
+      raw_results TEXT
+    );
+    CREATE TABLE IF NOT EXISTS discovered_queries (
+      workspace_id      TEXT NOT NULL,
+      query             TEXT NOT NULL,
+      first_seen        TEXT NOT NULL,
+      last_seen         TEXT NOT NULL,
+      best_position     REAL,
+      best_impressions  INTEGER NOT NULL DEFAULT 0,
+      total_impressions INTEGER NOT NULL DEFAULT 0,
+      snapshot_count    INTEGER NOT NULL DEFAULT 1,
+      last_snapshot_date TEXT,
+      last_snapshot_impressions INTEGER NOT NULL DEFAULT 0,
+      status            TEXT NOT NULL DEFAULT 'active',
+      PRIMARY KEY (workspace_id, query)
     );
   `);
+  try {
+    db.exec('ALTER TABLE local_seo_workspace_settings ADD COLUMN keywords_per_refresh INTEGER');
+  } catch {
+    // Column already exists in migrated test databases.
+  }
+  for (const sql of [
+    'ALTER TABLE local_visibility_snapshots ADD COLUMN matched_location_id TEXT',
+    'ALTER TABLE local_visibility_snapshots ADD COLUMN matched_location_name TEXT',
+    'ALTER TABLE local_visibility_snapshots ADD COLUMN raw_results TEXT',
+    'ALTER TABLE discovered_queries ADD COLUMN last_snapshot_date TEXT',
+    'ALTER TABLE discovered_queries ADD COLUMN last_snapshot_impressions INTEGER NOT NULL DEFAULT 0',
+  ]) {
+    try {
+      db.exec(sql);
+    } catch {
+      // Column already exists in migrated test databases.
+    }
+  }
   workspaceId = createWorkspace(`Keyword Command Center ${Date.now()}`).id;
 });
 
 afterEach(() => {
   _resetRegistryForTest();
   if (workspaceId) clearCompletedJobs({ workspaceId });
+  if (workspaceId) db.prepare('DELETE FROM discovered_queries WHERE workspace_id = ?').run(workspaceId);
   if (workspaceId) deleteWorkspace(workspaceId);
   workspaceId = '';
 });
@@ -739,6 +776,77 @@ describe('buildKeywordCommandCenter', () => {
     const row = payload!.rows.find(item => item.normalizedKeyword === 'austin dentist');
 
     expect(row?.localSeo).toBeUndefined();
+  });
+});
+
+describe('Keyword Command Center variant matching', () => {
+  beforeEach(() => {
+    updateWorkspace(workspaceId, {
+      keywordStrategy: {
+        siteKeywords: ['teeth whitening'],
+        siteKeywordMetrics: [{ keyword: 'teeth whitening', volume: 500, difficulty: 32 }],
+        generatedAt: new Date().toISOString(),
+      } as KeywordStrategy,
+    });
+    storeRankSnapshot(workspaceId, '2026-05-22', [
+      { query: 'teeth whitening', position: 8.0, clicks: 10, impressions: 200, ctr: 5.0 },
+      { query: 'teeth whitening austin', position: 10.6, clicks: 3, impressions: 120, ctr: 2.5 },
+    ]);
+  });
+
+  it('aggregates variant query metrics onto the parent row', async () => {
+    const rows = await buildKeywordCommandCenterRows(workspaceId, { pageSize: 100 });
+    const parentRow = rows?.rows.find(row => row.normalizedKeyword === 'teeth whitening');
+    expect(parentRow).toBeTruthy();
+    expect(parentRow?.variantCount).toBe(1);
+    expect(parentRow?.variants?.[0]).toEqual(expect.objectContaining({
+      query: 'teeth whitening austin',
+      impressions: 120,
+    }));
+    expect(parentRow?.metrics.impressions).toBe(320);
+  });
+
+  it('does not show a variant query as standalone raw evidence', async () => {
+    const rows = await buildKeywordCommandCenterRows(workspaceId, { pageSize: 100 });
+    const variantRow = rows?.rows.find(row => row.normalizedKeyword === 'teeth whitening austin');
+    expect(variantRow).toBeUndefined();
+  });
+});
+
+describe('Keyword Command Center lost visibility', () => {
+  beforeEach(() => {
+    db.prepare(`
+      INSERT INTO discovered_queries
+        (workspace_id, query, first_seen, last_seen, snapshot_count, total_impressions, status)
+      VALUES (?, 'vanished keyword', '2026-01-01', '2026-01-01', 5, 100, 'lost_visibility')
+    `).run(workspaceId);
+    updateWorkspace(workspaceId, {
+      keywordStrategy: {
+        siteKeywords: ['vanished keyword'],
+        siteKeywordMetrics: [{ keyword: 'vanished keyword', volume: 200, difficulty: 28 }],
+        generatedAt: new Date().toISOString(),
+      } as KeywordStrategy,
+    });
+  });
+
+  it('includes lostVisibility count in summary', async () => {
+    const summary = await buildKeywordCommandCenterSummary(workspaceId);
+    expect(summary?.counts.lostVisibility).toBe(1);
+    expect(summary?.filters.find(filter => filter.id === KEYWORD_COMMAND_CENTER_FILTERS.LOST_VISIBILITY)?.count).toBe(1);
+  });
+
+  it('marks matching rows and supports the lost visibility filter', async () => {
+    const rows = await buildKeywordCommandCenterRows(workspaceId, { pageSize: 100 });
+    const row = rows?.rows.find(item => item.normalizedKeyword === 'vanished keyword');
+    expect(row?.isLostVisibility).toBe(true);
+
+    const filtered = await buildKeywordCommandCenterRows(workspaceId, {
+      filter: KEYWORD_COMMAND_CENTER_FILTERS.LOST_VISIBILITY,
+      pageSize: 100,
+    });
+    expect(filtered?.rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({ normalizedKeyword: 'vanished keyword', isLostVisibility: true }),
+    ]));
   });
 });
 

@@ -36,6 +36,7 @@ export const KEYWORD_COMMAND_CENTER_FILTERS = {
   REQUESTED: 'requested',
   DECLINED: 'declined',
   RETIRED: 'retired',
+  LOST_VISIBILITY: 'lost_visibility',
 } as const;
 
 export type KeywordCommandCenterFilter =
@@ -189,6 +190,18 @@ export interface KeywordCommandCenterRow {
   isProtected: boolean;
   protectionReason?: string;
   rawEvidenceOnly?: boolean;
+  /** Number of GSC query variants aggregated onto this row. */
+  variantCount?: number;
+  /** Aggregated GSC query variants (populated when variantCount > 0). */
+  variants?: Array<{
+    query: string;
+    position: number;
+    clicks: number;
+    impressions: number;
+    ctr: number;
+  }>;
+  /** True if this keyword has lost GSC visibility for 14+ days (quality-gated). */
+  isLostVisibility?: boolean;
 }
 
 export interface KeywordCommandCenterCounts {
@@ -208,6 +221,11 @@ export interface KeywordCommandCenterCounts {
    * Always defined when summary is computed; may be 0.
    */
   missingVolume?: number;
+  /**
+   * Count of keywords that have lost GSC visibility (status = 'lost_visibility' in
+   * discovered_queries). Only populated when the discovered_queries table has data.
+   */
+  lostVisibility?: number;
 }
 
 export interface KeywordCommandCenterFilterMeta {
