@@ -83,6 +83,7 @@ function makeReadResponse(overrides: Partial<LocalSeoReadResponse> = {}): LocalS
       keywordsPerRefreshMax: 300,
       keywordsPerRefreshDefault: 100,
     },
+    competitorBrands: [],
   };
 
   return {
