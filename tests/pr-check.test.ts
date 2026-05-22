@@ -4684,7 +4684,7 @@ describe('Meta: customCheck rule name registry', () => {
     'Missing broadcastToWorkspace after DB write in route handler',
     // Keyword Command Center crash-hardening follow-up
     'Keyword Command Center summary/detail must not use full model',
-    'Local SEO candidates must be explicitly gated',
+    'Local SEO Evaluated candidates must be explicitly gated',
     // P2 expansion rules
     'Admin route mutation without addActivity',
     'useGlobalAdminEvents called with workspace-scoped event name',
@@ -5200,8 +5200,24 @@ describe('Rule: Keyword Command Center summary/detail must not use full model', 
 
 });
 
-describe('Rule: Local SEO candidates must be explicitly gated', () => {
-  it('flags ungated local candidate generation in command center read paths', () => {
+describe('Rule: Local SEO Evaluated candidates must be explicitly gated', () => {
+  const RULE = 'Local SEO Evaluated candidates must be explicitly gated';
+
+  it('flags ungated Evaluated candidate generation in command center read paths', () => {
+    const file = write(
+      uniqPath('rule-kcc-local-candidates', 'server/keyword-command-center.ts'),
+      lines(
+        'export async function buildKeywordCommandCenterRowsSkinny(workspaceId: string) {',
+        '  return buildLocalSeoKeywordCandidatesEvaluated(workspaceId);',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('buildKeywordCommandCenterRowsSkinny');
+  });
+
+  it('does NOT flag the cheap default buildLocalSeoKeywordCandidates', () => {
     const file = write(
       uniqPath('rule-kcc-local-candidates', 'server/keyword-command-center.ts'),
       lines(
@@ -5210,21 +5226,19 @@ describe('Rule: Local SEO candidates must be explicitly gated', () => {
         '}',
       ),
     );
-    const hits = runRule('Local SEO candidates must be explicitly gated', [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].text).toContain('buildKeywordCommandCenterRowsSkinny');
+    expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
-  it('accepts local candidate generation in the explicit local-candidate path', () => {
+  it('accepts Evaluated generation in the explicit local-candidate path', () => {
     const file = write(
       uniqPath('rule-kcc-local-candidates', 'server/keyword-command-center.ts'),
       lines(
         'async function buildKeywordCommandCenterRowsViaModel(workspaceId: string) {',
-        '  return buildLocalSeoKeywordCandidates(workspaceId);',
+        '  return buildLocalSeoKeywordCandidatesEvaluated(workspaceId);',
         '}',
       ),
     );
-    expect(runRule('Local SEO candidates must be explicitly gated', [file])).toHaveLength(0);
+    expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
   it('accepts an explicit temporary hatch for selected-keyword detail fallback', () => {
@@ -5232,12 +5246,12 @@ describe('Rule: Local SEO candidates must be explicitly gated', () => {
       uniqPath('rule-kcc-local-candidates', 'server/keyword-command-center.ts'),
       lines(
         'export async function buildKeywordCommandCenterDetail(workspaceId: string) {',
-        '  // local-candidates-unconditional-ok: explicit selected keyword fallback',
-        '  return buildLocalSeoKeywordCandidates(workspaceId);',
+        '  // local-candidates-evaluated-ok: explicit selected keyword fallback',
+        '  return buildLocalSeoKeywordCandidatesEvaluated(workspaceId);',
         '}',
       ),
     );
-    expect(runRule('Local SEO candidates must be explicitly gated', [file])).toHaveLength(0);
+    expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
   it('does not let an allowlisted function name leak into later helpers', () => {
@@ -5245,28 +5259,28 @@ describe('Rule: Local SEO candidates must be explicitly gated', () => {
       uniqPath('rule-kcc-local-candidates', 'server/keyword-command-center.ts'),
       lines(
         'async function buildKeywordCommandCenterRowsViaModel(workspaceId: string) {',
-        '  return buildLocalSeoKeywordCandidates(workspaceId);',
+        '  return buildLocalSeoKeywordCandidatesEvaluated(workspaceId);',
         '}',
         'function buildKeywordCommandCenterRowsSkinny(workspaceId: string) {',
-        '  return buildLocalSeoKeywordCandidates(workspaceId);',
+        '  return buildLocalSeoKeywordCandidatesEvaluated(workspaceId);',
         '}',
       ),
     );
-    const hits = runRule('Local SEO candidates must be explicitly gated', [file]);
+    const hits = runRule(RULE, [file]);
     expect(hits).toHaveLength(1);
     expect(hits[0].text).toContain('buildKeywordCommandCenterRowsSkinny');
   });
 
-  it('flags ungated arrow-function candidate generation', () => {
+  it('flags ungated arrow-function Evaluated generation', () => {
     const file = write(
       uniqPath('rule-kcc-local-candidates', 'server/keyword-command-center.ts'),
       lines(
         'const buildKeywordCommandCenterRowsSkinny = async (workspaceId: string) => {',
-        '  return buildLocalSeoKeywordCandidates(workspaceId);',
+        '  return buildLocalSeoKeywordCandidatesEvaluated(workspaceId);',
         '};',
       ),
     );
-    const hits = runRule('Local SEO candidates must be explicitly gated', [file]);
+    const hits = runRule(RULE, [file]);
     expect(hits).toHaveLength(1);
     expect(hits[0].text).toContain('buildKeywordCommandCenterRowsSkinny');
   });
@@ -5277,11 +5291,11 @@ describe('Rule: Local SEO candidates must be explicitly gated', () => {
       lines(
         'const buildKeywordCommandCenterRowsViaModel = () => 1;',
         'function buildKeywordCommandCenterRowsSkinny(workspaceId: string) {',
-        '  return buildLocalSeoKeywordCandidates(workspaceId);',
+        '  return buildLocalSeoKeywordCandidatesEvaluated(workspaceId);',
         '}',
       ),
     );
-    const hits = runRule('Local SEO candidates must be explicitly gated', [file]);
+    const hits = runRule(RULE, [file]);
     expect(hits).toHaveLength(1);
     expect(hits[0].text).toContain('buildKeywordCommandCenterRowsSkinny');
   });

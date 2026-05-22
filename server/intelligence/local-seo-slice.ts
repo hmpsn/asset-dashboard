@@ -58,11 +58,11 @@ export async function assembleLocalSeo(workspaceId: string): Promise<LocalSeoSli
       location: [m.city, m.stateOrRegion, m.country].filter(Boolean).join(', '),
     }));
 
-    // local-candidates-unconditional-ok: intelligence slice IS the local SEO consumer; generator is hard-capped at LOCAL_CANDIDATE_HARD_CAP in local-seo.ts
     // Slice surfaces keyword/source/sourceLabel/pageTitle/pagePath/marketId/volume/
     // difficulty/score. Reasons are not exposed; suppression is not required.
     // Cheap default is the right contract for AdminChat, content gen, recommendation
-    // gen, MCP — and the upcoming local SEO recommendations layer.
+    // gen, MCP — and the upcoming local SEO recommendations layer. The Evaluated
+    // variant remains opt-in for callers that genuinely need scoreDelta+reasons.
     const rawCandidates = buildLocalSeoKeywordCandidates(workspaceId);
     const candidates: LocalSeoSlice['candidates'] = rawCandidates.map(c => ({
       keyword: c.keyword,

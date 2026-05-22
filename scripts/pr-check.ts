@@ -987,13 +987,13 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    name: 'Local SEO candidates must be explicitly gated',
+    name: 'Local SEO Evaluated candidates must be explicitly gated',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
     displayScope: 'server/keyword-command-center.ts',
-    message: 'buildLocalSeoKeywordCandidates() is expensive and must only run in an explicit local-candidate path or with a documented hatch.',
+    message: 'buildLocalSeoKeywordCandidatesEvaluated() is the expensive variant (scans pageMap × secondaries, runs evaluator+suppression). Call the cheap buildLocalSeoKeywordCandidates() default or add a documented hatch.',
     severity: 'error',
-    rationale: 'Prevents local candidate generation from running on default Keyword Command Center navigation paths.',
+    rationale: 'After the Tier 2 cheap/Evaluated split, the Evaluated variant is the OOM-prone hot path. The cheap default is correct for KCC row enrichment, intelligence slice, and refresh path.',
     claudeMdRef: '#data-flow-rules-mandatory',
     customCheck: (files) => {
       const matches: CustomCheckMatch[] = [];
@@ -1011,13 +1011,13 @@ export const CHECKS: Check[] = [
             functionDepth = 0;
           }
           if (
-            line.includes('buildLocalSeoKeywordCandidates(')
+            line.includes('buildLocalSeoKeywordCandidatesEvaluated(')
             && !line.includes('import ')
             && currentFunction !== 'buildKeywordCommandCenterModel'
             && currentFunction !== 'buildKeywordCommandCenterRowsViaModel'
-            && !hasHatch(lines, i, 'local-candidates-unconditional-ok')
+            && !hasHatch(lines, i, 'local-candidates-evaluated-ok')
           ) {
-            matches.push({ file, line: i + 1, text: `ungated local candidate generation in ${currentFunction || 'module scope'}` });
+            matches.push({ file, line: i + 1, text: `ungated Evaluated candidate generation in ${currentFunction || 'module scope'}` });
           }
           if (currentFunction) {
             functionDepth += (line.match(/\{/g) ?? []).length;

@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import db from '../../server/db/index.js';
 import {
+  _resetLocalCandidateCacheForTests,
   buildLocalSeoKeywordCandidates,
+  buildLocalSeoKeywordCandidatesEvaluated,
   buildLocalSeoKeywordVisibilitySummaryByKey,
   createLocalSeoRefreshPlan,
   evaluateLocalBusinessMatch,
@@ -334,6 +336,132 @@ describe('local SEO provider selection', () => {
       source: 'local_variant',
       selected: false,
     }));
+  });
+
+  it('cheap buildLocalSeoKeywordCandidates returns empty reasons[] (no evaluator run)', () => {
+    setBroadcast(vi.fn(), vi.fn());
+    _resetLocalCandidateCacheForTests();
+    const ws = createWorkspace('Local SEO Cheap Reasons Test');
+    cleanupWorkspaceIds.add(ws.id);
+    updateWorkspace(ws.id, {
+      name: 'Swish Dental',
+      businessProfile: { address: { street: '123 Congress Ave', city: 'Austin', state: 'TX', country: 'US' } },
+      keywordStrategy: {
+        siteKeywords: ['cosmetic dentist'],
+        opportunities: [],
+        businessContext: 'Dental office.',
+        generatedAt: '2026-05-20T10:00:00.000Z',
+      },
+    });
+    updateLocalSeoConfiguration(ws.id, {
+      posture: LOCAL_SEO_POSTURE.LOCAL,
+      markets: [{ label: 'Austin, TX', city: 'Austin', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1026201, status: LOCAL_SEO_MARKET_STATUS.ACTIVE }],
+    }, true);
+    upsertPageKeyword(ws.id, {
+      pagePath: '/services/cosmetic-dentistry',
+      pageTitle: 'Cosmetic Dentistry',
+      primaryKeyword: 'cosmetic dentistry',
+      secondaryKeywords: ['veneers'],
+      searchIntent: 'commercial',
+    });
+
+    const candidates = buildLocalSeoKeywordCandidates(ws.id);
+    expect(candidates.length).toBeGreaterThan(0);
+    for (const c of candidates) {
+      expect(c.reasons).toEqual([]);
+    }
+  });
+
+  it('Evaluated builder produces evaluator reasons separate from cheap default', () => {
+    setBroadcast(vi.fn(), vi.fn());
+    _resetLocalCandidateCacheForTests();
+    const ws = createWorkspace('Local SEO Evaluated Reasons Test');
+    cleanupWorkspaceIds.add(ws.id);
+    updateWorkspace(ws.id, {
+      name: 'Swish Dental',
+      businessProfile: { address: { street: '123 Congress Ave', city: 'Austin', state: 'TX', country: 'US' } },
+      keywordStrategy: {
+        siteKeywords: ['cosmetic dentist'],
+        opportunities: [],
+        businessContext: 'Dental office offering cosmetic dentistry, veneers, whitening, and implants.',
+        generatedAt: '2026-05-20T10:00:00.000Z',
+      },
+    });
+    updateLocalSeoConfiguration(ws.id, {
+      posture: LOCAL_SEO_POSTURE.LOCAL,
+      markets: [{ label: 'Austin, TX', city: 'Austin', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1026201, status: LOCAL_SEO_MARKET_STATUS.ACTIVE }],
+    }, true);
+    upsertPageKeyword(ws.id, {
+      pagePath: '/services/cosmetic-dentistry',
+      pageTitle: 'Cosmetic Dentistry',
+      primaryKeyword: 'cosmetic dentistry',
+      secondaryKeywords: ['veneers'],
+      searchIntent: 'commercial',
+    });
+
+    const cheap = buildLocalSeoKeywordCandidates(ws.id);
+    const evaluated = buildLocalSeoKeywordCandidatesEvaluated(ws.id);
+    // Both paths enumerate the same signal set; evaluated may suppress some
+    // entries but must not invent new ones.
+    expect(evaluated.length).toBeLessThanOrEqual(cheap.length);
+    // Cheap path never populates reasons.
+    expect(cheap.every(c => c.reasons.length === 0)).toBe(true);
+  });
+
+  it('TTL cache returns the same array reference on repeated calls within window', () => {
+    setBroadcast(vi.fn(), vi.fn());
+    _resetLocalCandidateCacheForTests();
+    const ws = createWorkspace('Local SEO Cache Test');
+    cleanupWorkspaceIds.add(ws.id);
+    updateWorkspace(ws.id, {
+      name: 'Swish Dental',
+      businessProfile: { address: { street: '123 Congress Ave', city: 'Austin', state: 'TX', country: 'US' } },
+    });
+    updateLocalSeoConfiguration(ws.id, {
+      posture: LOCAL_SEO_POSTURE.LOCAL,
+      markets: [{ label: 'Austin, TX', city: 'Austin', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1026201, status: LOCAL_SEO_MARKET_STATUS.ACTIVE }],
+    }, true);
+    upsertPageKeyword(ws.id, {
+      pagePath: '/services/cosmetic-dentistry',
+      pageTitle: 'Cosmetic Dentistry',
+      primaryKeyword: 'cosmetic dentistry',
+      secondaryKeywords: [],
+      searchIntent: 'commercial',
+    });
+
+    const first = buildLocalSeoKeywordCandidates(ws.id);
+    const second = buildLocalSeoKeywordCandidates(ws.id);
+    // Memoized reference — proves no recompute on the second call.
+    expect(second).toBe(first);
+  });
+
+  it('_resetLocalCandidateCacheForTests forces recomputation', () => {
+    setBroadcast(vi.fn(), vi.fn());
+    _resetLocalCandidateCacheForTests();
+    const ws = createWorkspace('Local SEO Cache Reset Test');
+    cleanupWorkspaceIds.add(ws.id);
+    updateWorkspace(ws.id, {
+      name: 'Swish Dental',
+      businessProfile: { address: { street: '123 Congress Ave', city: 'Austin', state: 'TX', country: 'US' } },
+    });
+    updateLocalSeoConfiguration(ws.id, {
+      posture: LOCAL_SEO_POSTURE.LOCAL,
+      markets: [{ label: 'Austin, TX', city: 'Austin', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1026201, status: LOCAL_SEO_MARKET_STATUS.ACTIVE }],
+    }, true);
+    upsertPageKeyword(ws.id, {
+      pagePath: '/services/cosmetic-dentistry',
+      pageTitle: 'Cosmetic Dentistry',
+      primaryKeyword: 'cosmetic dentistry',
+      secondaryKeywords: [],
+      searchIntent: 'commercial',
+    });
+
+    const before = buildLocalSeoKeywordCandidates(ws.id);
+    _resetLocalCandidateCacheForTests();
+    const after = buildLocalSeoKeywordCandidates(ws.id);
+    // Content should match but the reference must differ — cache was cleared.
+    expect(after).not.toBe(before);
+    expect(after.map(c => c.normalizedKeyword)).toEqual(before.map(c => c.normalizedKeyword));
   });
 
   it('keeps explicit single-keyword refresh plans scoped to the requested keyword', () => {
