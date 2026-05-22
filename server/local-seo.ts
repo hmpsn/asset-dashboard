@@ -38,6 +38,7 @@ import {
   type LocalSeoKeywordVisibility,
   type LocalSeoKeywordVisibilitySummary,
   type LocalSeoDevice,
+  type LocalSeoKeywordIntent,
   type LocalSeoLocationLookupRequest,
   type LocalSeoLocationLookupResponse,
   type LocalSeoMarket,
@@ -116,6 +117,7 @@ export interface LocalSeoKeywordCandidate {
   selected: boolean;
   score: number;
   reasons: string[];
+  intent: LocalSeoKeywordIntent;
 }
 
 const localResultSchema = z.object({
@@ -1030,6 +1032,40 @@ function hasMarketModifier(keyword: string, markets: LocalSeoMarket[]): boolean 
   });
 }
 
+/**
+ * Classify the search intent of a local SEO keyword using regex patterns.
+ * Runs in the hot path — no API calls.
+ *
+ * Priority order: comparison → informational → commercial → transactional (default)
+ */
+export function classifyLocalKeywordIntent(keyword: string): LocalSeoKeywordIntent {
+  const kw = keyword.toLowerCase();
+  // Comparison: X vs Y, versus, alternatives, compare, ranking
+  if (/\bvs\b|\bversus\b|\balternative[s]?\b|\bcompare\b|\bcomparison\b|\branking\b/.test(kw)) {
+    return 'comparison';
+  }
+  // Informational: question words, educational patterns, cost/price research
+  if (/^(how|what|why|when|where|which|who|can |does |do |is |are )|\bguide\b|\btutorial\b|\btips\b|\bexplained\b|\boverview\b|\bhistory\b|\bfacts\b|\bstatistics\b|\btypes of\b|\bdifference between\b|\bcost of\b|\bprice of\b|\bpros and cons\b|\bbenefits of\b|\bcauses of\b|\bwhat is\b|\bimpact of\b|\bimpact\b/.test(kw)) {
+    return 'informational';
+  }
+  // Commercial: pre-buying research with quality signals (still useful for local)
+  if (/\b(best|top|top-rated|top rated|affordable|cheap|cheapest|discount|deal|coupon|budget|premium|quality)\b/.test(kw)) {
+    return 'commercial';
+  }
+  // Navigational: brand/domain search (hard to detect without workspace context, skip)
+  // Default: transactional (local service + city/near-me patterns)
+  return 'transactional';
+}
+
+const LOCAL_INTENT_PREFIXES = [
+  'best', 'top rated', 'affordable', 'cheap', 'emergency',
+  'open now', 'same day', 'accepting new patients', '24 hour',
+] as const;
+
+const LOCAL_INTENT_PREFIX_CAP_PER_BASE = 3;
+
+const LOCAL_SOURCE_PAGE_BUDGET_FRACTION = 0.20;
+
 function localVariantKeywords(baseKeyword: string, markets: LocalSeoMarket[]): string[] {
   const base = cleanKeywordDisplay(baseKeyword);
   if (!base) return [];
@@ -1137,6 +1173,7 @@ export interface CandidateSourceSignal {
   volume?: number;
   difficulty?: number;
   scoreBoost?: number;
+  intent?: LocalSeoKeywordIntent;
 }
 
 /**
@@ -1281,7 +1318,34 @@ export function* iterateLocalCandidateSignals(
           detail: page.pageTitle ?? page.pagePath,
           pagePath: page.pagePath,
           pageTitle: page.pageTitle,
+          intent: classifyLocalKeywordIntent(variant),
         };
+      }
+    }
+    // Intent modifier variants for service-keyword bases (primary keyword only, primary market only)
+    if (titleLooksLikeServiceKeyword(page.pageTitle) && markets.length > 0) {
+      const primaryBase = cleanKeywordDisplay(page.pageTitle);
+      const primaryMarket = markets[0];
+      if (primaryBase && primaryMarket) {
+        let intentCount = 0;
+        for (const prefix of LOCAL_INTENT_PREFIXES) {
+          if (intentCount >= LOCAL_INTENT_PREFIX_CAP_PER_BASE) break;
+          const variant = `${prefix} ${primaryBase} ${primaryMarket.city}`.toLowerCase().trim();
+          const variantIntent: LocalSeoKeywordIntent =
+            prefix === 'emergency' || prefix === 'same day' || prefix === 'open now' || prefix === '24 hour' || prefix === 'accepting new patients'
+              ? 'transactional'
+              : 'commercial';
+          yield {
+            keyword: variant,
+            source: 'local_variant',
+            sourceLabel: 'Intent candidate',
+            detail: page.pageTitle ?? page.pagePath,
+            pagePath: page.pagePath,
+            pageTitle: page.pageTitle,
+            intent: variantIntent,
+          };
+          intentCount++;
+        }
       }
     }
   }
@@ -1309,7 +1373,34 @@ export function* iterateLocalCandidateSignals(
         detail: gap.topic,
         volume: gap.volume,
         difficulty: gap.difficulty,
+        intent: classifyLocalKeywordIntent(variant),
       };
+    }
+    // Intent modifier variants for content gap bases
+    if (titleLooksLikeServiceKeyword(gap.targetKeyword) && markets.length > 0) {
+      const primaryBase = cleanKeywordDisplay(gap.targetKeyword);
+      const primaryMarket = markets[0];
+      if (primaryBase && primaryMarket) {
+        let intentCount = 0;
+        for (const prefix of LOCAL_INTENT_PREFIXES) {
+          if (intentCount >= LOCAL_INTENT_PREFIX_CAP_PER_BASE) break;
+          const variant = `${prefix} ${primaryBase} ${primaryMarket.city}`.toLowerCase().trim();
+          const variantIntent: LocalSeoKeywordIntent =
+            prefix === 'emergency' || prefix === 'same day' || prefix === 'open now' || prefix === '24 hour' || prefix === 'accepting new patients'
+              ? 'transactional'
+              : 'commercial';
+          yield {
+            keyword: variant,
+            source: 'local_variant',
+            sourceLabel: 'Intent candidate',
+            detail: gap.topic,
+            volume: gap.volume,
+            difficulty: gap.difficulty,
+            intent: variantIntent,
+          };
+          intentCount++;
+        }
+      }
     }
   }
 }
@@ -1344,6 +1435,7 @@ function upsertCandidate(
       ?? (signal.source === 'strategy' || signal.source === 'tracking' || signal.source === 'page_assignment'),
     score,
     reasons,
+    intent: signal.intent ?? classifyLocalKeywordIntent(display),
   };
   if (!existing || next.score > existing.score || (next.selected && !existing.selected)) {
     candidates.set(key, next);
@@ -1508,8 +1600,34 @@ function selectExplicitLocalSeoKeywords(workspaceId: string, explicitKeywords: s
   return selected;
 }
 
+/**
+ * Apply a per-source-page budget cap to prevent a single page from dominating
+ * the refresh budget. Explicit keywords are never capped — they are admin-chosen.
+ * Non-explicit keywords without a pagePath share a bucket per source type.
+ */
+function applySourcePageCap(candidates: LocalSeoKeywordCandidate[], budget: number): LocalSeoKeywordCandidate[] {
+  const pageCap = Math.max(1, Math.ceil(budget * LOCAL_SOURCE_PAGE_BUDGET_FRACTION));
+  const pageCounts = new Map<string, number>();
+  return candidates.filter(c => {
+    if (c.source === 'explicit') return true;
+    const key = c.pagePath ?? `__no_page__${c.source}`;
+    const count = pageCounts.get(key) ?? 0;
+    if (count >= pageCap) return false;
+    pageCounts.set(key, count + 1);
+    return true;
+  });
+}
+
 export function selectLocalIntentKeywords(workspaceId: string, explicitKeywords: string[] = []): string[] {
-  if (explicitKeywords.length > 0) return selectExplicitLocalSeoKeywords(workspaceId, explicitKeywords);
+  if (explicitKeywords.length > 0) {
+    const selected = selectExplicitLocalSeoKeywords(workspaceId, explicitKeywords);
+    // Apply intent filter even for explicit keywords — informational/comparison
+    // queries cannot produce local pack results regardless of how they were chosen.
+    return selected.filter(kw => {
+      const intent = classifyLocalKeywordIntent(kw);
+      return intent !== 'informational' && intent !== 'comparison';
+    });
+  }
   // Use the Evaluated variant here. Unlike the KCC/intelligence-slice/MCP read
   // paths (where the evaluator's `reasons` field is unused and the cheap
   // default is the right contract), `selectLocalIntentKeywords` feeds a real
@@ -1521,9 +1639,13 @@ export function selectLocalIntentKeywords(workspaceId: string, explicitKeywords:
   // function runs once per scheduled refresh inside `runLocalSeoRefreshJob`
   // (a background job), not per request, and it caps the candidate set with
   // LOCAL_CANDIDATE_HARD_CAP before the evaluator even runs.
-  return buildLocalSeoKeywordCandidatesEvaluated(workspaceId, explicitKeywords)
-    .slice(0, getEffectiveKeywordsPerRefresh(workspaceId))
-    .map(candidate => candidate.keyword);
+  const budget = getEffectiveKeywordsPerRefresh(workspaceId);
+  const candidates = buildLocalSeoKeywordCandidatesEvaluated(workspaceId, explicitKeywords);
+  // Filter out intents that can never produce local pack results (no credits spent on them)
+  const filteredCandidates = candidates.filter(c => c.intent !== 'informational' && c.intent !== 'comparison');
+  // Apply per-page cap to prevent any single source page from monopolizing the budget
+  const capped = applySourcePageCap(filteredCandidates, budget);
+  return capped.slice(0, budget).map(c => c.keyword);
 }
 
 export function createLocalSeoRefreshPlan(workspaceId: string, request: LocalSeoRefreshRequest = {}): { markets: LocalSeoMarket[]; keywords: string[]; device: LocalSeoDevice; languageCode: string } | null {

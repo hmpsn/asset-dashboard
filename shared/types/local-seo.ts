@@ -1,3 +1,5 @@
+export type LocalSeoKeywordIntent = 'transactional' | 'commercial' | 'navigational' | 'informational' | 'comparison';
+
 export const LOCAL_SEO_POSTURE = {
   LOCAL: 'local',
   NON_LOCAL: 'non_local',
