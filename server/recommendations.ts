@@ -367,7 +367,7 @@ function getTrafficForSlug(traffic: TrafficMap, slug: string): { clicks: number;
 }
 
 /** Compute a 0–100 impact score for a recommendation */
-function computeImpactScore(
+export function computeImpactScore(
   severity: 'error' | 'warning' | 'info',
   isCritical: boolean,
   trafficScore: number,
@@ -385,7 +385,7 @@ function computeImpactScore(
 }
 
 /** Determine priority tier from impact score and severity */
-function determinePriority(
+export function determinePriority(
   impactScore: number,
   severity: 'error' | 'warning' | 'info',
   trafficScore: number,
@@ -427,7 +427,7 @@ const URL_SLUG_PREFIXES = ['insight:ctr_opportunity:', 'insight:freshness_alert:
  * which applies this function to the source portion and toPageSlug() to the
  * suffix portion separately.
  */
-function migrateSourceKey(source: string): string {
+export function migrateSourceKey(source: string): string {
   for (const prefix of URL_SLUG_PREFIXES) {
     if (source.startsWith(prefix)) {
       const slug = source.slice(prefix.length);
@@ -445,7 +445,7 @@ function migrateSourceKey(source: string): string {
  * recs produce matching keys, preserving in_progress/dismissed status across
  * the one-time migration.
  */
-function buildMergeKey(rec: { source: string; affectedPages: string[]; title: string }): string {
+export function buildMergeKey(rec: { source: string; affectedPages: string[]; title: string }): string {
   const source = migrateSourceKey(rec.source);
   if (!source.startsWith('strategy:')) return source;
   const page = rec.affectedPages[0] ? toPageSlug(rec.affectedPages[0]) : rec.title;
@@ -453,7 +453,7 @@ function buildMergeKey(rec: { source: string; affectedPages: string[]; title: st
 }
 
 /** Weight impact score based on page type (homepage/service pages matter more) */
-function pageImportanceMultiplier(slug: string): number {
+export function pageImportanceMultiplier(slug: string): number {
   const s = slug.toLowerCase().replace(/^\//, '');
   if (s === '' || s === 'index' || s === 'home') return 1.5;
   if (/(?:^|\/)services?|solutions?|products?|pricing|packages/.test(s)) return 1.2;
@@ -462,7 +462,7 @@ function pageImportanceMultiplier(slug: string): number {
 }
 
 /** Map check name to recommendation type */
-function checkToRecType(check: string, category?: string): RecType {
+export function checkToRecType(check: string, category?: string): RecType {
   const chk = check.toLowerCase();
   if (chk.startsWith('aeo-')) return 'aeo';
   if (chk.includes('meta') || chk.includes('title') || chk.includes('description')) return 'metadata';
@@ -474,7 +474,7 @@ function checkToRecType(check: string, category?: string): RecType {
 }
 
 /** Map issue type to purchasable product */
-function mapToProduct(recType: RecType, pageCount: number): { productType?: string; productPrice?: number } {
+export function mapToProduct(recType: RecType, pageCount: number): { productType?: string; productPrice?: number } {
   switch (recType) {
     case 'metadata':
       return pageCount >= 10
@@ -518,7 +518,7 @@ function inferSchemaTypes(slugs: string[]): string {
   return Array.from(types).join(', ');
 }
 
-function auditInsight(
+export function auditInsight(
   check: string,
   _severity: string,
   affectedCount: number,
