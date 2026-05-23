@@ -12,7 +12,7 @@
  *      value test — a workspace that WAS on trial must NOT retain Growth access)
  *   4. Effective tier endpoint reflects all of the above consistently
  *
- * Port 13364 — verify uniqueness: grep -r 'createTestContext(13364' tests/
+ * Port 13364 — verify uniqueness with: grep -r '13364' tests/
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
