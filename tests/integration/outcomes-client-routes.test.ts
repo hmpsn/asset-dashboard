@@ -547,7 +547,7 @@ describe('Suite 6: Feature flag gate', () => {
 // Suite 7: Trend computation — recentWinRate vs overallWinRate overlap bug
 // ══════════════════════════════════════════════════════════════════════════════
 
-describe('Suite 7: Trend computation — recentWinRate overlap in computeScorecard', () => {
+describe('Suite 7: Trend computation — recent vs older cohort (not recent vs overall)', () => {
   let wsId = '';
   let cleanupWs: () => void;
 
@@ -588,75 +588,77 @@ describe('Suite 7: Trend computation — recentWinRate overlap in computeScoreca
     expect(['improving', 'stable', 'declining']).toContain(scorecard.trend);
   });
 
-  it('TREND OVERLAP BUG: recentWinRate is computed from a subset that overlaps with overallWinRate', async () => {
-    // computeScorecard() computes:
-    //   recentActions = actions.slice(0, ceil(actions.length / 2))   -- first N/2 = newest
-    //   overallWinRate = totalWins / totalScored   -- includes ALL actions (recent + old)
-    // Then: if (recentWinRate > overallWinRate + 0.1) trend = 'improving'
-    //
-    // PROBLEM: recentWinRate is a subset of the same population used to compute overallWinRate.
-    // "Trend" should compare a new cohort vs an old cohort (non-overlapping windows).
-    // With this overlap, the recent window always pulls the overall rate toward itself,
-    // making the trend threshold harder to trigger than the developer intended.
-    //
-    // We document this by seeding a scenario where the recent half is all wins and
-    // the old half is all losses. The current implementation:
-    //   - overallWinRate = 3 wins / 6 scored = 0.5
-    //   - recentWinRate = 3 wins / 3 scored = 1.0
-    //   - 1.0 > 0.5 + 0.1 → should be 'improving'
-    // This test verifies that's what actually happens.
-
+  it('trend is "improving" when recent half is all wins and older half is all losses', async () => {
+    // computeScorecard() now compares recent cohort against older cohort (non-overlapping).
+    //   recentWinRate (1.0) > olderWinRate (0.0) + 0.1 → 'improving'
     const freshWs = seedWorkspace({ clientPassword: '' });
     const fwsId = freshWs.workspaceId;
     try {
-      // Insert 6 actions: first 3 (most recent, newest) all wins, last 3 all losses
-      // Note: getActionsByWorkspace orders by created_at DESC, so the last inserted = index 0
+      // Insert 6 actions. getActionsByWorkspace orders DESC, so last-inserted = index 0 = "recent".
       const actionIds: string[] = [];
       for (let i = 0; i < 6; i++) {
         const r = await postJson(`/api/outcomes/${fwsId}/actions`, {
           actionType: 'audit_fix_applied',
-          sourceType: 'trend-overlap',
-          sourceId: `overlap-${RUN_ID}-${i}`,
+          sourceType: 'trend-extreme',
+          sourceId: `extreme-${RUN_ID}-${i}`,
           baselineSnapshot: { position: i + 1 },
         });
         expect(r.status).toBe(200);
         actionIds.push((await r.json()).action.id);
       }
-
-      // Last 3 inserted (indices 3,4,5) will appear first in DESC order
-      // Score them all as wins (= the "recent" half)
+      // Last 3 inserted (indices 3-5) → DESC positions 0-2 → "recent" half — all wins
       insertOutcomeRow({ actionId: actionIds[3], score: 'win' });
       insertOutcomeRow({ actionId: actionIds[4], score: 'win' });
       insertOutcomeRow({ actionId: actionIds[5], score: 'win' });
-
-      // First 3 inserted (indices 0,1,2) are the "older" half in DESC order
-      // Score them all as losses
+      // First 3 inserted (indices 0-2) → DESC positions 3-5 → "older" half — all losses
       insertOutcomeRow({ actionId: actionIds[0], score: 'loss' });
       insertOutcomeRow({ actionId: actionIds[1], score: 'loss' });
       insertOutcomeRow({ actionId: actionIds[2], score: 'loss' });
 
       const scoreRes = await api(`/api/outcomes/${fwsId}/scorecard`);
       expect(scoreRes.status).toBe(200);
-      const scorecard = await scoreRes.json();
+      const sc = await scoreRes.json();
+      expect(sc.overallWinRate).toBeCloseTo(0.5, 5);
+      expect(sc.totalScored).toBe(6);
+      expect(sc.trend).toBe('improving');
+    } finally {
+      freshWs.cleanup();
+    }
+  });
 
-      // overallWinRate = 3 / 6 = 0.5
-      expect(scorecard.overallWinRate).toBeCloseTo(0.5, 5);
-      // totalScored = 6
-      expect(scorecard.totalScored).toBe(6);
+  it('trend correctly detects improving when old code would have returned stable (regression)', async () => {
+    // Scenario: 8 actions, older 4 = 3 wins (olderWinRate=0.75), recent 4 = 4 wins (recentWinRate=1.0).
+    // Old code: overallWinRate = 7/8 = 0.875; 1.0 > 0.875+0.1=0.975? NO → 'stable' (wrong).
+    // New code: 1.0 > 0.75+0.1=0.85? YES → 'improving' (correct).
+    const freshWs = seedWorkspace({ clientPassword: '' });
+    const fwsId = freshWs.workspaceId;
+    try {
+      const actionIds: string[] = [];
+      for (let i = 0; i < 8; i++) {
+        const r = await postJson(`/api/outcomes/${fwsId}/actions`, {
+          actionType: 'meta_updated',
+          sourceType: 'trend-regression',
+          sourceId: `regression-${RUN_ID}-${i}`,
+          baselineSnapshot: { position: i + 1 },
+        });
+        expect(r.status).toBe(200);
+        actionIds.push((await r.json()).action.id);
+      }
+      // Last 4 inserted → "recent" half in DESC order — all 4 wins
+      for (let i = 4; i < 8; i++) insertOutcomeRow({ actionId: actionIds[i], score: 'win' });
+      // First 4 inserted → "older" half — 3 wins, 1 loss
+      insertOutcomeRow({ actionId: actionIds[0], score: 'win' });
+      insertOutcomeRow({ actionId: actionIds[1], score: 'win' });
+      insertOutcomeRow({ actionId: actionIds[2], score: 'win' });
+      insertOutcomeRow({ actionId: actionIds[3], score: 'loss' });
 
-      // With the overlap design: recentWinRate = 3/3 = 1.0 > 0.5 + 0.1 → 'improving'
-      // This is the observed behavior — documenting that the trend fires correctly
-      // even though overallWinRate includes the same recent actions.
-      expect(scorecard.trend).toBe('improving');
-
-      // Summarize the overlap bug in a comment for reviewers:
-      // The correct non-overlapping design would be:
-      //   recentWinRate = wins_in_recent_half / scored_in_recent_half
-      //   baselineWinRate = wins_in_older_half / scored_in_older_half
-      //   trend = compare(recentWinRate, baselineWinRate)
-      // Instead, overallWinRate is the average across BOTH halves, so trend thresholds
-      // behave asymmetrically — the recent half must beat the full average by 10%,
-      // not just the old-half average.
+      const scoreRes = await api(`/api/outcomes/${fwsId}/scorecard`);
+      expect(scoreRes.status).toBe(200);
+      const sc = await scoreRes.json();
+      // overallWinRate = 7/8 = 0.875 (both halves combined)
+      expect(sc.overallWinRate).toBeCloseTo(0.875, 5);
+      // New code: recentWinRate(1.0) vs olderWinRate(0.75) → delta=0.25>0.1 → 'improving'
+      expect(sc.trend).toBe('improving');
     } finally {
       freshWs.cleanup();
     }

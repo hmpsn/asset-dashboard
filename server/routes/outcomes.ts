@@ -97,8 +97,13 @@ function computeScorecard(workspaceId: string): OutcomeScorecard {
     scored: data.scored,
   }));
 
-  // Determine trend from recent vs older win rate
-  const recentActions = actions.slice(0, Math.ceil(actions.length / 2));
+  // Determine trend by comparing the recent half against the older half.
+  // Comparing recent against overallWinRate is incorrect because overall
+  // includes the recent cohort, shrinking the effective delta and making
+  // improving/declining harder to trigger than intended.
+  const splitIdx = Math.ceil(actions.length / 2);
+  const recentActions = actions.slice(0, splitIdx);
+  const olderActions = actions.slice(splitIdx);
   let recentWins = 0;
   let recentScored = 0;
   for (const a of recentActions) {
@@ -110,12 +115,24 @@ function computeScorecard(workspaceId: string): OutcomeScorecard {
       if (WIN_SCORES.includes(latest.score!)) recentWins++;
     }
   }
+  let olderWins = 0;
+  let olderScored = 0;
+  for (const a of olderActions) {
+    const outcomes = getOutcomesForAction(a.id);
+    const scored = outcomes.filter(o => o.score && o.score !== 'insufficient_data' && o.score !== 'inconclusive');
+    if (scored.length > 0) {
+      olderScored++;
+      const latest = scored[scored.length - 1];
+      if (WIN_SCORES.includes(latest.score!)) olderWins++;
+    }
+  }
   const recentWinRate = recentScored > 0 ? recentWins / recentScored : 0;
+  const olderWinRate = olderScored > 0 ? olderWins / olderScored : 0;
   const overallWinRate = totalScored > 0 ? totalWins / totalScored : 0;
   let trend: LearningsTrend = 'stable';
-  if (recentScored >= 3) {
-    if (recentWinRate > overallWinRate + 0.1) trend = 'improving';
-    else if (recentWinRate < overallWinRate - 0.1) trend = 'declining';
+  if (recentScored >= 3 && olderScored > 0) {
+    if (recentWinRate > olderWinRate + 0.1) trend = 'improving';
+    else if (recentWinRate < olderWinRate - 0.1) trend = 'declining';
   }
 
   return {
