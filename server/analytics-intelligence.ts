@@ -864,7 +864,7 @@ const MAX_PER_TYPE = 5; // prevent any single insight type from dominating the f
  * then fill remaining slots by impact score. When a specific insightType
  * filter is requested, skip diversity (return up to PUBLIC_CAP of that type).
  */
-function capWithDiversity(insights: AnalyticsInsight[], typeFilter?: InsightType): AnalyticsInsight[] {
+export function capWithDiversity(insights: AnalyticsInsight[], typeFilter?: InsightType): AnalyticsInsight[] {
   if (typeFilter) return insights.slice(0, PUBLIC_CAP);
 
   // Already sorted by impact_score DESC from the DB query
