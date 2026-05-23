@@ -269,7 +269,7 @@ export function listPosts(workspaceId: string): GeneratedPost[] {
   return rows.map(rowToPost);
 }
 
-function monthKeys(now: Date, months: number): string[] {
+export function monthKeys(now: Date, months: number): string[] {
   const keys: string[] = [];
   const current = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   for (let i = months - 1; i >= 0; i--) {
