@@ -102,8 +102,8 @@ function FullScorecard({ scorecard }: { scorecard: OutcomeScorecard }) {
           valueColor={winRateColor(scorecard.strongWinRate)}
         />
         <StatCard
-          label="Actions tracked"
-          value={scorecard.totalTracked.toString()}
+          label="Scored actions"
+          value={scorecard.totalScored.toString()}
         />
         <StatCard
           label="Pending results"
