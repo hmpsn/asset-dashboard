@@ -15,10 +15,12 @@ const mocks = vi.hoisted(() => ({
   keywordStrategyData: {
     strategy: null,
     seoDataAvailable: true,
+    providers: [{ name: 'semrush', configured: true }] as Array<{ name: string; configured: boolean }>,
     workspaceData: { competitorDomains: ['competitor.test'], seoDataProvider: 'semrush' },
   } as {
     strategy: null;
     seoDataAvailable: boolean;
+    providers?: Array<{ name: string; configured: boolean }>;
     workspaceData: { competitorDomains?: string[]; seoDataProvider?: 'semrush' | 'dataforseo' };
   },
 }));
@@ -106,6 +108,7 @@ describe('KeywordStrategyPanel background job wiring', () => {
     mocks.keywordStrategyData = {
       strategy: null,
       seoDataAvailable: true,
+      providers: [{ name: 'semrush', configured: true }],
       workspaceData: { competitorDomains: ['competitor.test'], seoDataProvider: 'semrush' },
     };
   });
@@ -139,6 +142,10 @@ describe('KeywordStrategyPanel background job wiring', () => {
     mocks.keywordStrategyData = {
       strategy: null,
       seoDataAvailable: true,
+      providers: [
+        { name: 'semrush', configured: true },
+        { name: 'dataforseo', configured: true },
+      ],
       workspaceData: { competitorDomains: ['competitor.test'] },
     };
     renderPanel();

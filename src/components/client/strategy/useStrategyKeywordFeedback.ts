@@ -39,12 +39,11 @@ export function useStrategyKeywordFeedback({ workspaceId, setToast }: UseStrateg
     },
     enabled: !!workspaceId,
     staleTime: 5 * 60 * 1000,
-    retry: 2,
   });
 
   const feedbackMap = keywordFeedback ?? new Map<string, KeywordFeedbackStatus>();
 
-  const loadFeedback = useCallback(() => { void refetch(); }, [refetch]);
+  const loadFeedback = useCallback(() => { if (workspaceId) void refetch(); }, [refetch, workspaceId]);
   // STRATEGY_UPDATED invalidation is handled centrally in useWsInvalidation.ts
 
   const submitFeedback = useCallback(async (

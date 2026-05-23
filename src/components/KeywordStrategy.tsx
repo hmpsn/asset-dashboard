@@ -112,7 +112,12 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   });
   const trackedKeywords = trackedKeywordsData ?? new Set<string>();
 
-  // Initialize active provider from workspace data when hook data arrives
+  // Reset active provider when workspace changes so the init effect can re-fire with new workspace data
+  useEffect(() => {
+    setActiveProvider(undefined);
+  }, [workspaceId]);
+
+  // Initialize active provider from workspace data when it's not yet set
   useEffect(() => {
     const provider = savedSeoDataProvider ?? defaultSeoDataProvider(keywordData?.providers ?? []);
     if (provider && !activeProvider) setActiveProvider(provider);
