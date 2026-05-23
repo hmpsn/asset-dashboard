@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { keywordFeedback as kwFeedbackApi } from '../../../api';
 import { keywordComparisonKey } from '../../../../shared/keyword-normalization';
+import { queryKeys } from '../../../lib/queryKeys';
 
 export type KeywordFeedbackStatus = 'approved' | 'declined' | 'requested';
 
@@ -24,23 +26,26 @@ interface FeedbackMutationOptions {
 }
 
 export function useStrategyKeywordFeedback({ workspaceId, setToast }: UseStrategyKeywordFeedbackOptions) {
-  const [keywordFeedback, setKeywordFeedback] = useState<Map<string, KeywordFeedbackStatus>>(new Map());
+  const queryClient = useQueryClient();
   const [feedbackLoading, setFeedbackLoading] = useState<Set<string>>(new Set());
-  const [feedbackLoadError, setFeedbackLoadError] = useState(false);
 
-  const loadFeedback = useCallback(() => {
-    if (!workspaceId) return;
-    setFeedbackLoadError(false);
-    kwFeedbackApi.get(workspaceId)
-      .then((items) => {
-        const map = new Map<string, KeywordFeedbackStatus>();
-        for (const item of items as KeywordFeedback[]) map.set(keywordComparisonKey(item.keyword), item.status);
-        setKeywordFeedback(map);
-      })
-      .catch(() => { setFeedbackLoadError(true); });
-  }, [workspaceId]);
+  const { data: keywordFeedback, isError: feedbackLoadError, refetch } = useQuery({
+    queryKey: queryKeys.client.keywordFeedback(workspaceId ?? ''),
+    queryFn: async () => {
+      const items = await kwFeedbackApi.get(workspaceId!);
+      const map = new Map<string, KeywordFeedbackStatus>();
+      for (const item of items as KeywordFeedback[]) map.set(keywordComparisonKey(item.keyword), item.status);
+      return map;
+    },
+    enabled: !!workspaceId,
+    staleTime: 5 * 60 * 1000,
+    retry: 2,
+  });
 
-  useEffect(() => { loadFeedback(); }, [loadFeedback]);
+  const feedbackMap = keywordFeedback ?? new Map<string, KeywordFeedbackStatus>();
+
+  const loadFeedback = useCallback(() => { void refetch(); }, [refetch]);
+  // STRATEGY_UPDATED invalidation is handled centrally in useWsInvalidation.ts
 
   const submitFeedback = useCallback(async (
     keyword: string,
@@ -54,11 +59,14 @@ export function useStrategyKeywordFeedback({ workspaceId, setToast }: UseStrateg
     setFeedbackLoading(prev => new Set(prev).add(kw));
     try {
       await kwFeedbackApi.submit(workspaceId, { keyword: keyword.trim(), status, source, reason });
-      setKeywordFeedback(prev => {
-        const next = new Map(prev);
-        next.set(kw, status);
-        return next;
-      });
+      queryClient.setQueryData(
+        queryKeys.client.keywordFeedback(workspaceId),
+        (old: Map<string, KeywordFeedbackStatus> | undefined) => {
+          const next = new Map(old ?? []);
+          next.set(kw, status);
+          return next;
+        },
+      );
       if (options?.toast !== false) {
         setToast?.(status === 'approved' ? `"${keyword}" marked relevant - it can shape future recommendations` : `"${keyword}" marked not relevant - it won't appear in future strategies`);
       }
@@ -68,7 +76,7 @@ export function useStrategyKeywordFeedback({ workspaceId, setToast }: UseStrateg
     } finally {
       setFeedbackLoading(prev => { const next = new Set(prev); next.delete(kw); return next; });
     }
-  }, [workspaceId, setToast]);
+  }, [workspaceId, setToast, queryClient]);
 
   const removeFeedback = useCallback(async (keyword: string, options?: FeedbackMutationOptions) => {
     if (!workspaceId) return;
@@ -76,26 +84,36 @@ export function useStrategyKeywordFeedback({ workspaceId, setToast }: UseStrateg
     setFeedbackLoading(prev => new Set(prev).add(kw));
     try {
       await kwFeedbackApi.remove(workspaceId, kw);
-      setKeywordFeedback(prev => { const next = new Map(prev); next.delete(kw); return next; });
+      queryClient.setQueryData(
+        queryKeys.client.keywordFeedback(workspaceId),
+        (old: Map<string, KeywordFeedbackStatus> | undefined) => {
+          const next = new Map(old ?? []);
+          next.delete(kw);
+          return next;
+        },
+      );
       if (options?.toast !== false) setToast?.(`"${keyword}" restored - it can appear in future strategies`);
     } catch {
       if (options?.clearOnError) {
-        setKeywordFeedback(prev => {
-          const next = new Map(prev);
-          next.delete(kw);
-          return next;
-        });
+        queryClient.setQueryData(
+          queryKeys.client.keywordFeedback(workspaceId),
+          (old: Map<string, KeywordFeedbackStatus> | undefined) => {
+            const next = new Map(old ?? []);
+            next.delete(kw);
+            return next;
+          },
+        );
       }
       if (options?.toast !== false) setToast?.('Failed to undo');
       if (options?.rethrow) throw new Error('Failed to undo keyword feedback');
     } finally {
       setFeedbackLoading(prev => { const next = new Set(prev); next.delete(kw); return next; });
     }
-  }, [workspaceId, setToast]);
+  }, [workspaceId, setToast, queryClient]);
 
   const getFeedbackStatus = useCallback(
-    (keyword: string) => keywordFeedback.get(keywordComparisonKey(keyword)),
-    [keywordFeedback],
+    (keyword: string) => feedbackMap.get(keywordComparisonKey(keyword)),
+    [feedbackMap],
   );
 
   const isLoadingFeedback = useCallback(
@@ -104,12 +122,12 @@ export function useStrategyKeywordFeedback({ workspaceId, setToast }: UseStrateg
   );
 
   const requestedKeywords = useMemo(
-    () => [...keywordFeedback.entries()].filter(([, s]) => s === 'requested').map(([k]) => k),
-    [keywordFeedback],
+    () => [...feedbackMap.entries()].filter(([, s]) => s === 'requested').map(([k]) => k),
+    [feedbackMap],
   );
 
   return {
-    keywordFeedback,
+    keywordFeedback: feedbackMap,
     feedbackLoadError,
     loadFeedback,
     submitFeedback,

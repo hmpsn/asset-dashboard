@@ -18,6 +18,7 @@ interface WorkspaceData {
 interface KeywordStrategyData {
   strategy: KeywordStrategy | null;
   seoDataAvailable: boolean;
+  providers: Array<{ name: string; configured: boolean }>;
   workspaceData: WorkspaceData | null;
 }
 
@@ -30,11 +31,14 @@ export function useKeywordStrategy(workspaceId: string) {
         keywords.providerStatus().catch(() => ({ providers: [] })),
         workspaceId ? workspaces.getById(workspaceId).catch(() => null) : Promise.resolve(null)
       ]);
-      
+
+      const rawProviders = (providerStatus as { providers?: Array<{ name: string; configured: boolean }> })?.providers ?? [];
+
       return {
         strategy: strategyResponse || null,
-        seoDataAvailable: Boolean((providerStatus as { providers?: Array<{ configured: boolean }> })?.providers?.some(provider => provider.configured)),
-        workspaceData: workspaceResponse as WorkspaceData | null
+        seoDataAvailable: Boolean(rawProviders.some(p => p.configured)),
+        providers: rawProviders,
+        workspaceData: workspaceResponse as WorkspaceData | null,
       };
     },
     staleTime: 10 * 60 * 1000, // 10 minutes

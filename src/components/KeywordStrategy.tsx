@@ -9,7 +9,7 @@ import {
 import { Badge, StatCard, SectionCard, AIContextIndicator, TabBar, ErrorState, ProgressIndicator, NextStepsCard, LoadingState, Icon, PageHeader, Button, ClickableRow, IconButton, FormInput, FormTextarea } from './ui';
 import { KeywordStrategyGuide } from './strategy/KeywordStrategyGuide';
 import { useKeywordStrategy } from '../hooks/admin';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BacklinkProfile } from './strategy/BacklinkProfile';
 import { CompetitiveIntel } from './strategy/CompetitiveIntel';
 import { ContentGaps } from './strategy/ContentGaps';
@@ -24,10 +24,8 @@ import { LocalSeoVisibilityPanel } from './local-seo/LocalSeoVisibilityPanel';
 import { keywords, rankTracking } from '../api/seo';
 import { workspaces } from '../api';
 import { queryKeys } from '../lib/queryKeys';
-import { WS_EVENTS } from '../lib/wsEvents';
 import { keywordTrackingKey } from '../lib/keywordTracking';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
-import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
 
 /** Minimum monthly search volume to display a strategy card. Cards below this are noise. */
@@ -91,54 +89,34 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const [discoverError, setDiscoverError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(true);
   const [showNextSteps, setShowNextSteps] = useState(false);
-  const [trackedKeywords, setTrackedKeywords] = useState<Set<string>>(new Set());
-  const [providerList, setProviderList] = useState<SeoProviderOption[]>([]);
   const [activeProvider, setActiveProvider] = useState<string | undefined>(undefined);
   const [strategyTab, setStrategyTab] = useState<'analysis' | 'guide'>('analysis');
   const activeStrategyJob = findActiveJob({ type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, workspaceId });
   const completedStartedJob = lastStartedJobId ? jobs.find(job => job.id === lastStartedJobId) : undefined;
   const generating = startingStrategyJob || Boolean(activeStrategyJob);
   const displayedSeoDataMode = strategy?.seoDataMode ?? strategy?.semrushMode;
+  // Derive providerList before selectedSeoDataProvider so the computed value has access to it
+  const providerList = keywordData?.providers ?? [];
   const selectedSeoDataProvider = activeProvider
     ?? savedSeoDataProvider
     ?? defaultSeoDataProvider(providerList)
     ?? DEFAULT_SEO_DATA_PROVIDER;
 
-  // Seed trackedKeywords from server on mount so buttons reflect actual state
-  const loadTrackedKeywords = useCallback(() => {
-    rankTracking.keywords(workspaceId)
-      .then(kws => setTrackedKeywords(new Set((kws || []).map(k => keywordTrackingKey(k.query)))))
-      .catch(() => {});
-  }, [workspaceId]);
-
-  useEffect(() => {
-    loadTrackedKeywords();
-  }, [loadTrackedKeywords]);
-
-  useWorkspaceEvents(workspaceId, {
-    // ws-invalidation-ok: this component keeps a local Set for tracking badges outside React Query.
-    [WS_EVENTS.RANK_TRACKING_UPDATED]: loadTrackedKeywords,
+  // Tracked keywords via React Query — buttons reflect actual server state with keywordTrackingKey normalization
+  const { data: trackedKeywordsData } = useQuery({
+    queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId),
+    queryFn: () => rankTracking.keywords(workspaceId)
+      .then(kws => new Set((kws || []).map(k => keywordTrackingKey(k.query)))),
+    staleTime: 5 * 60 * 1000,
+    enabled: !!workspaceId,
   });
+  const trackedKeywords = trackedKeywordsData ?? new Set<string>();
 
-  // Load provider status + workspace preference
+  // Initialize active provider from workspace data when hook data arrives
   useEffect(() => {
-    let cancelled = false;
-    Promise.all([
-      keywords.providerStatus().catch(() => ({ providers: [] })),
-      workspaces.getById(workspaceId).catch(() => null),
-    ]).then(([data, ws]) => {
-      if (cancelled) return;
-      const providers = data?.providers ?? [];
-      setProviderList(providers);
-      setActiveProvider(() => {
-        const wsObj = ws as Record<string, unknown> | null;
-        return typeof wsObj?.seoDataProvider === 'string'
-          ? wsObj.seoDataProvider
-          : defaultSeoDataProvider(providers);
-      });
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [workspaceId]);
+    const provider = savedSeoDataProvider ?? defaultSeoDataProvider(keywordData?.providers ?? []);
+    if (provider && !activeProvider) setActiveProvider(provider);
+  }, [savedSeoDataProvider, keywordData?.providers, activeProvider]);
 
   // Initialize SEO provider availability from React Query hook
   useEffect(() => {
@@ -221,16 +199,19 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     }
   };
 
-  const trackKeyword = async (kw: string) => {
+  const trackKeyword = useCallback(async (kw: string) => {
     const key = keywordTrackingKey(kw);
     if (!key || trackedKeywords.has(key)) return;
     try {
       await rankTracking.addKeyword(workspaceId, { query: kw });
-      setTrackedKeywords(prev => new Set(prev).add(key));
+      queryClient.setQueryData(
+        queryKeys.admin.rankTrackingKeywords(workspaceId),
+        (old: Set<string> | undefined) => new Set([...(old ?? []), key]),
+      );
     } catch {
       // silently ignore duplicates — server deduplicates
     }
-  };
+  }, [trackedKeywords, workspaceId, queryClient]);
 
   const positionColor = (pos?: number) => {
     if (!pos) return 'text-[var(--brand-text-muted)]';
