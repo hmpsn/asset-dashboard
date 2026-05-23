@@ -358,7 +358,13 @@ const patchStrategySchema = z.object({
     searchIntent: z.string().optional(),
   }).passthrough()).optional(),
   siteKeywords: z.array(z.string()).optional(),
-  contentGaps: z.array(z.any()).optional(),
+  contentGaps: z.array(z.object({
+    topic: z.string(),
+    targetKeyword: z.string(),
+    intent: z.enum(['informational', 'commercial', 'transactional', 'navigational']),
+    priority: z.enum(['high', 'medium', 'low']),
+    rationale: z.string(),
+  }).passthrough()).optional(),
   quickWins: z.array(z.object({
     pagePath: z.string(),
     currentKeyword: z.string().optional(),

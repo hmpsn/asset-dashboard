@@ -9,6 +9,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import React from 'react';
 
 vi.mock('../../src/api', () => ({
   keywordFeedback: {
@@ -23,13 +25,24 @@ import { useStrategyKeywordFeedback } from '../../src/components/client/strategy
 
 const mockedApi = vi.mocked(kwFeedbackApi);
 
+/** Creates a fresh QueryClient + wrapper per test (retry: false so tests don't stall) */
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  const wrapper = ({ children }: { children: React.ReactNode }) =>
+    React.createElement(QueryClientProvider, { client: queryClient }, children);
+  return wrapper;
+}
+
 describe('useStrategyKeywordFeedback — initial load', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('starts with an empty feedback map and no error', async () => {
     mockedApi.get.mockResolvedValueOnce([]);
-    const { result } = renderHook(() =>
-      useStrategyKeywordFeedback({ workspaceId: 'ws-1' }),
+    const { result } = renderHook(
+      () => useStrategyKeywordFeedback({ workspaceId: 'ws-1' }),
+      { wrapper: createWrapper() },
     );
     expect(result.current.keywordFeedback.size).toBe(0);
     expect(result.current.feedbackLoadError).toBe(false);
@@ -37,7 +50,7 @@ describe('useStrategyKeywordFeedback — initial load', () => {
   });
 
   it('does NOT call the API when workspaceId is undefined', () => {
-    renderHook(() => useStrategyKeywordFeedback({}));
+    renderHook(() => useStrategyKeywordFeedback({}), { wrapper: createWrapper() });
     expect(mockedApi.get).not.toHaveBeenCalled();
   });
 
@@ -47,8 +60,9 @@ describe('useStrategyKeywordFeedback — initial load', () => {
       { keyword: 'bar', status: 'declined' },
       { keyword: 'baz', status: 'requested' },
     ]);
-    const { result } = renderHook(() =>
-      useStrategyKeywordFeedback({ workspaceId: 'ws-1' }),
+    const { result } = renderHook(
+      () => useStrategyKeywordFeedback({ workspaceId: 'ws-1' }),
+      { wrapper: createWrapper() },
     );
     await waitFor(() => expect(result.current.keywordFeedback.size).toBe(3));
     expect(result.current.keywordFeedback.get('foo')).toBe('approved');
@@ -58,8 +72,9 @@ describe('useStrategyKeywordFeedback — initial load', () => {
 
   it('flips feedbackLoadError to true when the API rejects', async () => {
     mockedApi.get.mockRejectedValueOnce(new Error('boom'));
-    const { result } = renderHook(() =>
-      useStrategyKeywordFeedback({ workspaceId: 'ws-1' }),
+    const { result } = renderHook(
+      () => useStrategyKeywordFeedback({ workspaceId: 'ws-1' }),
+      { wrapper: createWrapper() },
     );
     await waitFor(() => expect(result.current.feedbackLoadError).toBe(true));
     expect(result.current.keywordFeedback.size).toBe(0);
@@ -74,9 +89,12 @@ describe('useStrategyKeywordFeedback — submitFeedback', () => {
 
   it('preserves display keyword text for submissions while storing canonical local keys', async () => {
     mockedApi.submit.mockResolvedValueOnce({});
-    const { result } = renderHook(() =>
-      useStrategyKeywordFeedback({ workspaceId: 'ws-1' }),
+    const { result } = renderHook(
+      () => useStrategyKeywordFeedback({ workspaceId: 'ws-1' }),
+      { wrapper: createWrapper() },
     );
+    // Wait for initial load so the in-flight GET doesn't overwrite setQueryData
+    await waitFor(() => expect(mockedApi.get).toHaveBeenCalledWith('ws-1'));
     await act(async () => {
       await result.current.submitFeedback('  Pizza Delivery - Near-Me  ', 'approved', 'manual');
     });
@@ -89,9 +107,12 @@ describe('useStrategyKeywordFeedback — submitFeedback', () => {
 
   it('updates state optimistically once the API resolves', async () => {
     mockedApi.submit.mockResolvedValueOnce({});
-    const { result } = renderHook(() =>
-      useStrategyKeywordFeedback({ workspaceId: 'ws-1' }),
+    const { result } = renderHook(
+      () => useStrategyKeywordFeedback({ workspaceId: 'ws-1' }),
+      { wrapper: createWrapper() },
     );
+    // Wait for initial load so the in-flight GET doesn't overwrite setQueryData
+    await waitFor(() => expect(mockedApi.get).toHaveBeenCalledWith('ws-1'));
     await act(async () => {
       await result.current.submitFeedback('foo', 'declined', 'review');
     });
@@ -102,8 +123,9 @@ describe('useStrategyKeywordFeedback — submitFeedback', () => {
   it('emits the approved-style toast on approve', async () => {
     mockedApi.submit.mockResolvedValueOnce({});
     const setToast = vi.fn();
-    const { result } = renderHook(() =>
-      useStrategyKeywordFeedback({ workspaceId: 'ws-1', setToast }),
+    const { result } = renderHook(
+      () => useStrategyKeywordFeedback({ workspaceId: 'ws-1', setToast }),
+      { wrapper: createWrapper() },
     );
     await act(async () => {
       await result.current.submitFeedback('seo', 'approved', 'manual');
@@ -114,8 +136,9 @@ describe('useStrategyKeywordFeedback — submitFeedback', () => {
   it('emits the declined-style toast on decline', async () => {
     mockedApi.submit.mockResolvedValueOnce({});
     const setToast = vi.fn();
-    const { result } = renderHook(() =>
-      useStrategyKeywordFeedback({ workspaceId: 'ws-1', setToast }),
+    const { result } = renderHook(
+      () => useStrategyKeywordFeedback({ workspaceId: 'ws-1', setToast }),
+      { wrapper: createWrapper() },
     );
     await act(async () => {
       await result.current.submitFeedback('seo', 'declined', 'manual');
@@ -126,8 +149,9 @@ describe('useStrategyKeywordFeedback — submitFeedback', () => {
   it('suppresses toasts when options.toast === false', async () => {
     mockedApi.submit.mockResolvedValueOnce({});
     const setToast = vi.fn();
-    const { result } = renderHook(() =>
-      useStrategyKeywordFeedback({ workspaceId: 'ws-1', setToast }),
+    const { result } = renderHook(
+      () => useStrategyKeywordFeedback({ workspaceId: 'ws-1', setToast }),
+      { wrapper: createWrapper() },
     );
     await act(async () => {
       await result.current.submitFeedback('seo', 'approved', 'manual', undefined, { toast: false });
@@ -138,8 +162,9 @@ describe('useStrategyKeywordFeedback — submitFeedback', () => {
   it('surfaces an error toast when the API rejects', async () => {
     mockedApi.submit.mockRejectedValueOnce(new Error('500'));
     const setToast = vi.fn();
-    const { result } = renderHook(() =>
-      useStrategyKeywordFeedback({ workspaceId: 'ws-1', setToast }),
+    const { result } = renderHook(
+      () => useStrategyKeywordFeedback({ workspaceId: 'ws-1', setToast }),
+      { wrapper: createWrapper() },
     );
     await act(async () => {
       await result.current.submitFeedback('seo', 'approved', 'manual');
@@ -150,8 +175,9 @@ describe('useStrategyKeywordFeedback — submitFeedback', () => {
 
   it('rethrows when options.rethrow is true and the API fails', async () => {
     mockedApi.submit.mockRejectedValueOnce(new Error('500'));
-    const { result } = renderHook(() =>
-      useStrategyKeywordFeedback({ workspaceId: 'ws-1' }),
+    const { result } = renderHook(
+      () => useStrategyKeywordFeedback({ workspaceId: 'ws-1' }),
+      { wrapper: createWrapper() },
     );
     await act(async () => {
       await expect(
@@ -163,8 +189,9 @@ describe('useStrategyKeywordFeedback — submitFeedback', () => {
   it('clears the per-keyword loading flag after success', async () => {
     let resolveSubmit!: (v: unknown) => void;
     mockedApi.submit.mockReturnValueOnce(new Promise(r => { resolveSubmit = r; }));
-    const { result } = renderHook(() =>
-      useStrategyKeywordFeedback({ workspaceId: 'ws-1' }),
+    const { result } = renderHook(
+      () => useStrategyKeywordFeedback({ workspaceId: 'ws-1' }),
+      { wrapper: createWrapper() },
     );
 
     let submitPromise!: Promise<void>;
@@ -182,7 +209,10 @@ describe('useStrategyKeywordFeedback — submitFeedback', () => {
   });
 
   it('does NOT call the API when workspaceId is undefined', async () => {
-    const { result } = renderHook(() => useStrategyKeywordFeedback({}));
+    const { result } = renderHook(
+      () => useStrategyKeywordFeedback({}),
+      { wrapper: createWrapper() },
+    );
     await act(async () => {
       await result.current.submitFeedback('seo', 'approved', 'manual');
     });
@@ -202,8 +232,9 @@ describe('useStrategyKeywordFeedback — removeFeedback', () => {
   it('removes the keyword from the map and emits a restore toast', async () => {
     mockedApi.remove.mockResolvedValueOnce({ deleted: 'foo' });
     const setToast = vi.fn();
-    const { result } = renderHook(() =>
-      useStrategyKeywordFeedback({ workspaceId: 'ws-1', setToast }),
+    const { result } = renderHook(
+      () => useStrategyKeywordFeedback({ workspaceId: 'ws-1', setToast }),
+      { wrapper: createWrapper() },
     );
     await waitFor(() => expect(result.current.keywordFeedback.size).toBe(2));
 
@@ -218,8 +249,9 @@ describe('useStrategyKeywordFeedback — removeFeedback', () => {
 
   it('clears the local entry when options.clearOnError is set, even on API failure', async () => {
     mockedApi.remove.mockRejectedValueOnce(new Error('500'));
-    const { result } = renderHook(() =>
-      useStrategyKeywordFeedback({ workspaceId: 'ws-1' }),
+    const { result } = renderHook(
+      () => useStrategyKeywordFeedback({ workspaceId: 'ws-1' }),
+      { wrapper: createWrapper() },
     );
     await waitFor(() => expect(result.current.keywordFeedback.size).toBe(2));
 
@@ -232,8 +264,9 @@ describe('useStrategyKeywordFeedback — removeFeedback', () => {
   it('keeps the local entry on failure when clearOnError is unset', async () => {
     mockedApi.remove.mockRejectedValueOnce(new Error('500'));
     const setToast = vi.fn();
-    const { result } = renderHook(() =>
-      useStrategyKeywordFeedback({ workspaceId: 'ws-1', setToast }),
+    const { result } = renderHook(
+      () => useStrategyKeywordFeedback({ workspaceId: 'ws-1', setToast }),
+      { wrapper: createWrapper() },
     );
     await waitFor(() => expect(result.current.keywordFeedback.size).toBe(2));
 
@@ -246,8 +279,9 @@ describe('useStrategyKeywordFeedback — removeFeedback', () => {
 
   it('rethrows when options.rethrow is true and the API fails', async () => {
     mockedApi.remove.mockRejectedValueOnce(new Error('500'));
-    const { result } = renderHook(() =>
-      useStrategyKeywordFeedback({ workspaceId: 'ws-1' }),
+    const { result } = renderHook(
+      () => useStrategyKeywordFeedback({ workspaceId: 'ws-1' }),
+      { wrapper: createWrapper() },
     );
     await waitFor(() => expect(result.current.keywordFeedback.size).toBe(2));
 
@@ -269,8 +303,9 @@ describe('useStrategyKeywordFeedback — derived selectors', () => {
       { keyword: 'c', status: 'requested' },
       { keyword: 'd', status: 'requested' },
     ]);
-    const { result } = renderHook(() =>
-      useStrategyKeywordFeedback({ workspaceId: 'ws-1' }),
+    const { result } = renderHook(
+      () => useStrategyKeywordFeedback({ workspaceId: 'ws-1' }),
+      { wrapper: createWrapper() },
     );
     await waitFor(() => expect(result.current.keywordFeedback.size).toBe(4));
     expect(new Set(result.current.requestedKeywords)).toEqual(new Set(['c', 'd']));
@@ -278,8 +313,9 @@ describe('useStrategyKeywordFeedback — derived selectors', () => {
 
   it('getFeedbackStatus normalizes the lookup key', async () => {
     mockedApi.get.mockResolvedValueOnce([{ keyword: 'pizza delivery', status: 'approved' }]);
-    const { result } = renderHook(() =>
-      useStrategyKeywordFeedback({ workspaceId: 'ws-1' }),
+    const { result } = renderHook(
+      () => useStrategyKeywordFeedback({ workspaceId: 'ws-1' }),
+      { wrapper: createWrapper() },
     );
     await waitFor(() => expect(result.current.keywordFeedback.size).toBe(1));
     expect(result.current.getFeedbackStatus('  PIZZA Delivery  ')).toBe('approved');
@@ -288,8 +324,9 @@ describe('useStrategyKeywordFeedback — derived selectors', () => {
 
   it('exposes undoFeedback as an alias of removeFeedback', () => {
     mockedApi.get.mockResolvedValueOnce([]);
-    const { result } = renderHook(() =>
-      useStrategyKeywordFeedback({ workspaceId: 'ws-1' }),
+    const { result } = renderHook(
+      () => useStrategyKeywordFeedback({ workspaceId: 'ws-1' }),
+      { wrapper: createWrapper() },
     );
     expect(result.current.undoFeedback).toBe(result.current.removeFeedback);
   });
