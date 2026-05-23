@@ -289,8 +289,10 @@ describe('outcome-tracking write paths', () => {
       const ws1Actions = getActionsByWorkspace(ws.workspaceId);
       const ws2Actions = getActionsByWorkspace(ws2.workspaceId);
 
-      expect(ws1Actions.every(a => a.workspaceId === ws.workspaceId)).toBe(true);
-      expect(ws2Actions.every(a => a.workspaceId === ws2.workspaceId)).toBe(true);
+      expect(ws1Actions.length).toBeGreaterThan(0);
+      expect(ws2Actions.length).toBeGreaterThan(0);
+      expect(ws1Actions.every(a => a.workspaceId === ws.workspaceId)).toBe(true); // every-ok: length guard above
+      expect(ws2Actions.every(a => a.workspaceId === ws2.workspaceId)).toBe(true); // every-ok: length guard above
       expect(ws1Actions.some(a => a.pageUrl === '/page-ws2')).toBe(false);
       expect(ws2Actions.some(a => a.pageUrl === '/page-ws1')).toBe(false);
     });
@@ -850,7 +852,8 @@ describe('outcome-tracking write paths', () => {
       const wins = getTopWinsFromActions(actions, 10);
 
       // Only WIN_SCORES (strong_win, win) qualify — loss is excluded
-      expect(wins.every(w => WIN_SCORES.includes(w.score))).toBe(true);
+      expect(wins.length).toBeGreaterThan(0);
+      expect(wins.every(w => WIN_SCORES.includes(w.score))).toBe(true); // every-ok: length guard above
       // Sorted by absolute delta_percent descending: a3 (80%) before a1 (10%)
       expect(wins[0].delta.delta_percent).toBeGreaterThan(wins[1]?.delta.delta_percent ?? -Infinity);
       expect(wins[0].actionId).toBe(a3.id);
