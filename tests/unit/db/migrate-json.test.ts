@@ -1219,23 +1219,17 @@ describe('migrateRecommendations', () => {
     expect(JSON.parse(row['recommendations'] as string)).toEqual([{ id: 'r1', title: 'Fix metadata' }]);
   });
 
-  it('tmig-rec-002: array input passes typeof object check and is treated as a record (bug documentation)', async () => {
-    // Bug: typeof [] === 'object' is true, so the `!record || typeof record !== 'object'` check
-    // does NOT skip arrays — it treats an array as a valid record and tries to insert it.
-    // This documents the existing behavior: arrays are NOT rejected and produce a row with
-    // empty recommendations (because record.recommendations is undefined on an array).
+  it('tmig-rec-002: array input is rejected — Array.isArray guard prevents silent bad insert', async () => {
+    // typeof [] === 'object' is true, so the guard must explicitly check Array.isArray.
+    // Without it, an array file would be inserted as a record with recommendations='[]'.
     writeJson(path.join(mockPaths.data, 'recommendations', 'tmig-ws-rec2.json'), [
       { id: 'r1', title: 'Rec one' },
     ]);
 
     await runMigration();
 
-    // The migration does NOT skip arrays — it inserts a row with workspace_id from filename
-    // and recommendations = '[]' (since record.recommendations on an array object is undefined).
-    const row = db.prepare("SELECT recommendations FROM recommendation_sets WHERE workspace_id = 'tmig-ws-rec2'").get() as { recommendations: string } | undefined;
-    // Document the bug: array input is NOT filtered out, a row IS inserted.
-    expect(row).toBeTruthy();
-    expect(JSON.parse(row!.recommendations)).toEqual([]);
+    const row = db.prepare("SELECT recommendations FROM recommendation_sets WHERE workspace_id = 'tmig-ws-rec2'").get();
+    expect(row).toBeUndefined();
   });
 
   it('tmig-rec-003: missing recommendations dir inserts 0 records', async () => {

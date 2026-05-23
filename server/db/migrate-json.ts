@@ -826,7 +826,7 @@ function migrateRecommendations(): number {
       const wsId = path.basename(file, '.json');
       let record: any;
       try { record = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch { continue; }
-      if (!record || typeof record !== 'object') continue;
+      if (!record || typeof record !== 'object' || Array.isArray(record)) continue;
       const info = insert.run({
         workspace_id: record.workspaceId || wsId,
         generated_at: record.generatedAt || new Date().toISOString(),
@@ -939,7 +939,7 @@ function migrateContentDecay(): number {
       const wsId = path.basename(file, '.json');
       let record: any;
       try { record = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch { continue; }
-      if (!record || typeof record !== 'object') continue;
+      if (!record || typeof record !== 'object' || Array.isArray(record)) continue;
       const info = insert.run({
         workspace_id: record.workspaceId || wsId,
         analyzed_at: record.analyzedAt || new Date().toISOString(),
