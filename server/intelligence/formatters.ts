@@ -55,6 +55,7 @@ export function formatForPrompt(
       (include.has('operational') && intelligence.operational != null) ||
       (include.has('contentPipeline') && intelligence.contentPipeline != null) ||
       (include.has('siteHealth') && intelligence.siteHealth != null) ||
+      (include.has('localSeo') && intelligence.localSeo != null) ||
       // pageElements is page-scoped and only assembled when pagePath is supplied;
       // a section-filtered request for it implies the caller already knows the
       // slice should exist, so a populated slice should bypass cold-start.
