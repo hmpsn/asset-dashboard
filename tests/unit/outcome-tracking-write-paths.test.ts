@@ -311,7 +311,7 @@ describe('outcome-tracking write paths', () => {
 
       expect(action.attribution).toBe('platform_executed');
 
-      updateAttribution(action.id, 'externally_executed');
+      updateAttribution(action.id, ws.workspaceId, 'externally_executed');
 
       const updated = getAction(action.id);
       expect(updated).not.toBeNull();
@@ -319,8 +319,8 @@ describe('outcome-tracking write paths', () => {
     });
 
     it('updating attribution on an unknown ID does not throw and silently no-ops', () => {
-      // The underlying statement is UPDATE ... WHERE id = ? so a miss is silent
-      expect(() => updateAttribution('non-existent-id-xyz', 'not_acted_on')).not.toThrow();
+      // UPDATE ... WHERE id = ? AND workspace_id = ? — missing row is a silent no-op
+      expect(() => updateAttribution('non-existent-id-xyz', ws.workspaceId, 'not_acted_on')).not.toThrow();
     });
 
     it('updating attribution on an action from a different workspace does not affect the original action', () => {
@@ -344,7 +344,7 @@ describe('outcome-tracking write paths', () => {
       });
 
       // Update ws2's action — should not affect ws1's action
-      updateAttribution(ws2Action.id, 'externally_executed');
+      updateAttribution(ws2Action.id, ws2.workspaceId, 'externally_executed');
 
       const ws1Check = getAction(ws1Action.id);
       expect(ws1Check!.attribution).toBe('platform_executed');
@@ -367,7 +367,7 @@ describe('outcome-tracking write paths', () => {
 
       expect(action.measurementComplete).toBe(false);
 
-      markActionComplete(action.id);
+      markActionComplete(action.id, ws.workspaceId);
 
       const updated = getAction(action.id);
       expect(updated).not.toBeNull();
@@ -375,7 +375,7 @@ describe('outcome-tracking write paths', () => {
     });
 
     it('calling on an unknown ID does not throw', () => {
-      expect(() => markActionComplete('non-existent-uuid')).not.toThrow();
+      expect(() => markActionComplete('non-existent-uuid', ws.workspaceId)).not.toThrow();
     });
 
     it('does not affect a different action with a different ID', () => {
@@ -392,7 +392,7 @@ describe('outcome-tracking write paths', () => {
         baselineSnapshot: BASELINE,
       });
 
-      markActionComplete(actionA.id);
+      markActionComplete(actionA.id, ws.workspaceId);
 
       const checkA = getAction(actionA.id);
       const checkB = getAction(actionB.id);
@@ -415,7 +415,7 @@ describe('outcome-tracking write paths', () => {
         baselineSnapshot: BASELINE,
       });
 
-      markActionComplete(ws2Action.id);
+      markActionComplete(ws2Action.id, ws2.workspaceId);
 
       expect(getAction(ws1Action.id)!.measurementComplete).toBe(false);
       expect(getAction(ws2Action.id)!.measurementComplete).toBe(true);
@@ -439,7 +439,7 @@ describe('outcome-tracking write paths', () => {
         detectionChecks: 3,
       };
 
-      updateActionContext(action.id, newContext);
+      updateActionContext(action.id, ws.workspaceId, newContext);
 
       const updated = getAction(action.id);
       expect(updated).not.toBeNull();
@@ -458,7 +458,7 @@ describe('outcome-tracking write paths', () => {
       });
 
       // Replace entirely — detectionChecks from original should be gone
-      updateActionContext(action.id, { notes: 'replaced note' });
+      updateActionContext(action.id, ws.workspaceId, { notes: 'replaced note' });
 
       const updated = getAction(action.id);
       expect(updated!.context.notes).toBe('replaced note');
@@ -482,7 +482,7 @@ describe('outcome-tracking write paths', () => {
         context: { notes: 'ws2 context' },
       });
 
-      updateActionContext(ws2Action.id, { notes: 'ws2 updated' });
+      updateActionContext(ws2Action.id, ws2.workspaceId, { notes: 'ws2 updated' });
 
       // ws1 action must be unaffected
       expect(getAction(ws1Action.id)!.context.notes).toBe('ws1 context');
@@ -510,7 +510,7 @@ describe('outcome-tracking write paths', () => {
         sessions: 180,
       };
 
-      updateBaselineSnapshot(action.id, newSnapshot);
+      updateBaselineSnapshot(action.id, ws.workspaceId, newSnapshot);
 
       const updated = getAction(action.id);
       expect(updated).not.toBeNull();
@@ -534,7 +534,7 @@ describe('outcome-tracking write paths', () => {
         baselineSnapshot: makeBaseline({ clicks: 999 }),
       });
 
-      updateBaselineSnapshot(ws2Action.id, makeBaseline({ clicks: 777 }));
+      updateBaselineSnapshot(ws2Action.id, ws2.workspaceId, makeBaseline({ clicks: 777 }));
 
       // ws1 action clicks must still be 50
       expect(getAction(ws1Action.id)!.baselineSnapshot.clicks).toBe(50);
@@ -774,7 +774,7 @@ describe('outcome-tracking write paths', () => {
       });
 
       // Mark a1 complete
-      markActionComplete(a1.id);
+      markActionComplete(a1.id, ws.workspaceId);
 
       const counts = getWorkspaceCounts(ws.workspaceId);
       expect(counts.total).toBe(3);

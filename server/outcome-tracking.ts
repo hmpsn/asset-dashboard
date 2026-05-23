@@ -279,9 +279,14 @@ export function recordOutcome(params: {
       measured_at: new Date().toISOString(),
     });
 
-    // Mark action complete after 90-day checkpoint
+    // Mark action complete after 90-day checkpoint.
+    // markComplete requires both id AND workspace_id; look up the row inside the
+    // transaction so workspace_id is available without adding it to the public API.
     if (params.checkpointDays === 90) {
-      stmts().markComplete.run(params.actionId);
+      const actionRow = stmts().getById.get(params.actionId) as TrackedActionRow | undefined;
+      if (actionRow) {
+        stmts().markComplete.run(params.actionId, actionRow.workspace_id);
+      }
     }
   });
 
