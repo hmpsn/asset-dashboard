@@ -547,7 +547,7 @@ export function auditInsight(
   if (chk.includes('canonical')) {
     return `${affectedCount} pages have canonical tag issues. Without proper canonicals, Google may see duplicate content and dilute your rankings across multiple URLs.`;
   }
-  if (chk.includes('structured') || chk.includes('schema')) {
+  if ((chk.includes('structured') || chk.includes('schema')) && !chk.startsWith('aeo-')) {
     const schemaTypes = affectedSlugs && affectedSlugs.length > 0
       ? inferSchemaTypes(affectedSlugs)
       : null;

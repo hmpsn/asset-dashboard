@@ -645,15 +645,10 @@ describe('auditInsight', () => {
     expect(result.toLowerCase()).toMatch(/author|byline/i);
   });
 
-  it('aeo-faq-no-schema hits the structured-data branch (contains "schema")', () => {
-    // NOTE: 'aeo-faq-no-schema' contains the substring 'schema', so it matches
-    // the chk.includes('schema') branch before reaching the aeo-faq-no-schema exact match.
-    // This is a real bug in the auditInsight routing — the structured-data branch fires
-    // instead of the dedicated AEO-FAQ branch.
+  it('aeo-faq-no-schema reaches its dedicated branch and mentions FAQPage', () => {
     const result = auditInsight('aeo-faq-no-schema', 'info', 2, 0);
-    // It should reach the dedicated aeo-faq-no-schema branch, but actually hits structured-data first
     expect(result).toContain('2');
-    expect(result.toLowerCase()).toMatch(/schema|structured/i);
+    expect(result).toContain('FAQPage');
   });
 
   it('cwv with traffic mentions Core Web Vitals and traffic number', () => {
