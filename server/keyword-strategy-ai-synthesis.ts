@@ -21,6 +21,7 @@ import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js
 import { resolveWorkspaceLocationCode } from './local-seo.js';
 import { filterDeclinedFromPool } from './strategy-filters.js';
 import { buildWorkspaceIntelligence, formatPersonasForPrompt, formatKnowledgeBaseForPrompt, formatForPrompt } from './workspace-intelligence.js';
+import { withActiveLocalSeoSlice } from './intelligence/generation-context-builders.js';
 import { buildStrategyIntelligenceBlock, getPagesNeedingAnalysis, isStrategyQualityDiscoveryKeyword, isSuspiciousPlannerGroupedVolume, upsertKeywordPoolCandidate } from './keyword-strategy-helpers.js';
 import { buildOutcomeLearningStatusNote } from './outcome-learning-default-path.js';
 import { isStrategyPoolEligibleKeyword, normalizeKeyword, type KeywordEvaluationContext } from './keyword-intelligence/index.js';
@@ -211,17 +212,27 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
   if (businessContext) {
     businessSection = `\nBUSINESS CONTEXT: ${businessContext}\n`;
   }
-  const strategyIntel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline'],
+  const strategySlices = await withActiveLocalSeoSlice(ws.id, ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline']);
+  const strategyIntel = await buildWorkspaceIntelligence(ws.id, { slices: strategySlices,
     learningsDomain: 'strategy',
   });
     const strategySeo = strategyIntel.seoContext;
     const kbBlock = formatKnowledgeBaseForPrompt(strategySeo?.knowledgeBase);
     const persBlock = formatPersonasForPrompt(strategySeo?.personas ?? []);
+    const localSeoBlock = formatForPrompt(strategyIntel, {
+      verbosity: 'standard',
+      sections: ['localSeo'],
+      tokenBudget: 1600,
+      learningsDomain: 'strategy',
+    });
     if (kbBlock) {
       businessSection += kbBlock + '\n';
     }
     if (persBlock) {
       businessSection += persBlock + '\n';
+    }
+    if (/##\s/.test(localSeoBlock)) {
+      businessSection += `${localSeoBlock}\nUse Local SEO evidence conservatively. It can shape local content/page posture, but do not treat local visibility as GSC rank tracking and do not imply provider checks ran during this strategy generation.\n`;
     }
 
     const clientSignals = strategyIntel.clientSignals;

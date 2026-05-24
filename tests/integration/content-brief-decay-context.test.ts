@@ -21,6 +21,7 @@ vi.mock('../../server/intelligence/generation-context-builders.js', () => ({
 
 // Mock workspace-intelligence to avoid needing a fully-populated workspace
 vi.mock('../../server/workspace-intelligence.js', () => ({
+  formatForPrompt: vi.fn(() => ''),
   formatKeywordsForPrompt: vi.fn(() => ''),
   formatPersonasForPrompt: vi.fn(() => ''),
   formatPageMapForPrompt: vi.fn(() => ''),

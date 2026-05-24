@@ -17,6 +17,10 @@ vi.mock('../workspace-intelligence.js', () => ({
   buildWorkspaceIntelligence: buildWorkspaceIntelligenceMock,
 }));
 
+vi.mock('../intelligence/generation-context-builders.js', () => ({
+  withActiveLocalSeoSlice: vi.fn(async (_workspaceId: string, slices: readonly string[]) => slices),
+}));
+
 vi.mock('../ai.js', () => ({
   callAI: callAIMock,
 }));

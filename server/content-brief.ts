@@ -1,6 +1,7 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import {
+  formatForPrompt,
   formatKeywordsForPrompt,
   formatPersonasForPrompt,
   formatPageMapForPrompt,
@@ -26,6 +27,7 @@ import { z } from 'zod';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
 import { buildOutcomeLearningStatusNote } from './outcome-learning-default-path.js';
+import type { WorkspaceIntelligence } from '../shared/types/intelligence.js';
 
 
 const log = createLogger('content-brief');
@@ -580,6 +582,16 @@ function hasMeaningfulBuilderPromptContext(promptContext: string): boolean {
   return /##\s/.test(promptContext);
 }
 
+function formatLocalSeoForContentPrompt(intelligence: WorkspaceIntelligence): string {
+  const block = formatForPrompt(intelligence, {
+    verbosity: 'standard',
+    sections: ['localSeo'],
+    tokenBudget: 1400,
+  });
+  if (!hasMeaningfulBuilderPromptContext(block)) return '';
+  return `\n\n${block}\nUse Local SEO evidence conservatively: shape local topic/page guidance when relevant, but do not claim verified local rank unless the evidence explicitly supports it.`;
+}
+
 function buildBriefIntelligenceBlockFromSlice(
   targetKeyword: string,
   workspaceId: string,
@@ -621,6 +633,7 @@ export async function regenerateBrief(
   });
   const seo = intelligence.seoContext;
   const keywordBlock = formatKeywordsForPrompt(seo);
+  const localSeoBlock = formatLocalSeoForContentPrompt(intelligence);
   // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
   const brandVoiceBlock = seo?.effectiveBrandVoiceBlock ?? '';
   const knowledgeBlock = formatKnowledgeBaseForPrompt(seo?.knowledgeBase);
@@ -656,7 +669,7 @@ The user has reviewed this brief and wants you to regenerate it with the followi
 
 USER FEEDBACK:
 ${feedback}
-${keywordBlock}${brandVoiceBlock}${knowledgeBlock}
+${keywordBlock}${brandVoiceBlock}${knowledgeBlock}${localSeoBlock}
 
 Please regenerate the ENTIRE brief incorporating the user's feedback. Keep everything that was good, improve what the user requested, and maintain all required fields.
 
@@ -806,6 +819,7 @@ export async function regenerateOutline(
   });
   const seo = intelligence.seoContext;
   const keywordBlock = formatKeywordsForPrompt(seo);
+  const localSeoBlock = formatLocalSeoForContentPrompt(intelligence);
   // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
   const brandVoiceBlock = seo?.effectiveBrandVoiceBlock ?? '';
   const ptConfig = getPageTypeConfig(existingBrief.pageType);
@@ -821,7 +835,7 @@ Title: ${existingBrief.suggestedTitle}
 Word count target: ${existingBrief.wordCountTarget}
 Intent: ${existingBrief.intent}
 Audience: ${existingBrief.audience}
-${keywordBlock}${brandVoiceBlock}
+${keywordBlock}${brandVoiceBlock}${localSeoBlock}
 
 Current outline:
 ${currentOutline}
@@ -971,6 +985,7 @@ export async function generateBrief(
   });
   const seo = seoContextResult.seoContext;
   const keywordBlock = formatKeywordsForPrompt(seo);
+  const localSeoBlock = formatLocalSeoForContentPrompt(seoContextResult);
   // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
   const brandVoiceBlock = seo?.effectiveBrandVoiceBlock ?? '';
   const stratBizCtx = seo?.businessContext ?? '';
@@ -992,6 +1007,7 @@ export async function generateBrief(
     const { intelligence: pageProfileResult } = await buildContentGenerationContext(workspaceId, {
       pagePath: matchedPage.pagePath,
       slices: ['pageProfile'],
+      includeLocalSeo: false,
     });
     const profile = pageProfileResult.pageProfile;
     if (profile) {
@@ -1157,6 +1173,7 @@ The outline sections MUST match the following template sections in order. You ma
   try {
     const { intelligence } = await buildContentGenerationContext(workspaceId, {
       slices: ['insights'],
+      includeLocalSeo: false,
     });
     intelligenceBlock = buildBriefIntelligenceBlockFromSlice(
       targetKeyword,
@@ -1174,6 +1191,7 @@ The outline sections MUST match the following template sections in order. You ma
     const { promptContext, learningsAvailability } = await buildContentGenerationContext(workspaceId, {
       slices: ['learnings'],
       learningsDomain: 'content',
+      includeLocalSeo: false,
     });
     if (hasMeaningfulBuilderPromptContext(promptContext)) {
       learningsBlock = `\n\n${promptContext}`;
@@ -1202,7 +1220,7 @@ Related search queries from Google Search Console:
 ${relatedStr}
 
 Existing pages on the site:
-${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${providerMetricsBlock}${ga4Block}${pageAnalysisBlock}${decayBlock}${serpFeaturesDirectiveBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${strategyCardBlock}${intelligenceBlock}${learningsBlock}${learningsStatusBlock}
+${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${localSeoBlock}${providerMetricsBlock}${ga4Block}${pageAnalysisBlock}${decayBlock}${serpFeaturesDirectiveBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${strategyCardBlock}${intelligenceBlock}${learningsBlock}${learningsStatusBlock}
 
 Generate a content brief in the following JSON format:
 {

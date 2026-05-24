@@ -16,6 +16,7 @@ interface GenerationContextBuilderOptions {
   learningsDomain?: LearningsDomain;
   slices?: readonly IntelligenceSlice[];
   enrichWithBacklinks?: boolean;
+  includeLocalSeo?: boolean;
 }
 
 export interface GenerationContextResult {
@@ -78,14 +79,23 @@ async function hasActiveLocalMarkets(workspaceId: string): Promise<boolean> {
   }
 }
 
+export async function withActiveLocalSeoSlice(
+  workspaceId: string,
+  slices: readonly IntelligenceSlice[],
+  includeLocalSeo = true,
+): Promise<readonly IntelligenceSlice[]> {
+  if (!includeLocalSeo || slices.includes('localSeo')) return slices;
+  if (!(await hasActiveLocalMarkets(workspaceId))) return slices;
+  return [...slices, 'localSeo'];
+}
+
 export async function buildContentGenerationContext(
   workspaceId: string,
   opts: ContentGenerationContextOptions = {},
 ): Promise<GenerationContextResult> {
   const baseSlices: IntelligenceSlice[] = ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline'];
   if (opts.pagePath) baseSlices.push('pageProfile');
-  if (await hasActiveLocalMarkets(workspaceId)) baseSlices.push('localSeo');
-  const slices = opts.slices ?? baseSlices;
+  const slices = await withActiveLocalSeoSlice(workspaceId, opts.slices ?? baseSlices, opts.includeLocalSeo ?? true);
   return buildGenerationContext(workspaceId, slices, {
     ...opts,
     verbosity: opts.verbosity ?? 'detailed',
@@ -99,8 +109,7 @@ export async function buildRecommendationGenerationContext(
 ): Promise<GenerationContextResult> {
   const baseSlices: IntelligenceSlice[] = ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline', 'siteHealth'];
   if (opts.pagePath) baseSlices.push('pageProfile');
-  if (await hasActiveLocalMarkets(workspaceId)) baseSlices.push('localSeo');
-  const slices = opts.slices ?? baseSlices;
+  const slices = await withActiveLocalSeoSlice(workspaceId, opts.slices ?? baseSlices, opts.includeLocalSeo ?? true);
   return buildGenerationContext(workspaceId, slices, {
     ...opts,
     verbosity: opts.verbosity ?? 'detailed',

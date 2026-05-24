@@ -8,10 +8,15 @@ import {
   buildWorkspaceIntelligence,
   formatForPrompt,
 } from '../../server/workspace-intelligence.js';
+import { listLocalSeoMarkets } from '../../server/local-seo.js';
 
 vi.mock('../../server/workspace-intelligence.js', () => ({
   buildWorkspaceIntelligence: vi.fn(),
   formatForPrompt: vi.fn(),
+}));
+
+vi.mock('../../server/local-seo.js', () => ({
+  listLocalSeoMarkets: vi.fn(() => []),
 }));
 
 const mockIntelligence: WorkspaceIntelligence = {
@@ -34,6 +39,7 @@ describe('generation context builders', () => {
     vi.clearAllMocks();
     vi.mocked(buildWorkspaceIntelligence).mockResolvedValue(mockIntelligence);
     vi.mocked(formatForPrompt).mockReturnValue('[Workspace Intelligence]');
+    vi.mocked(listLocalSeoMarkets).mockReturnValue([]);
   });
 
   it('buildContentGenerationContext uses the default content slices and content learnings domain', async () => {
@@ -143,6 +149,65 @@ describe('generation context builders', () => {
       learningsDomain: 'content',
     });
     expect(result.slices).toBe(customSlices);
+  });
+
+  it('adds localSeo to explicit slice overrides when active local markets exist', async () => {
+    vi.mocked(listLocalSeoMarkets).mockReturnValue([
+      {
+        id: 'market-1',
+        workspaceId: 'ws-local',
+        label: 'Austin, TX',
+        city: 'Austin',
+        stateOrRegion: 'TX',
+        country: 'US',
+        status: 'active',
+        source: 'admin_override',
+        createdAt: '2026-05-21T00:00:00.000Z',
+        updatedAt: '2026-05-21T00:00:00.000Z',
+      },
+    ]);
+
+    const result = await buildContentGenerationContext('ws-local', {
+      slices: ['seoContext'],
+    });
+
+    expect(buildWorkspaceIntelligence).toHaveBeenCalledWith('ws-local', {
+      slices: ['seoContext', 'localSeo'],
+      pagePath: undefined,
+      learningsDomain: 'content',
+      enrichWithBacklinks: undefined,
+    });
+    expect(result.slices).toEqual(['seoContext', 'localSeo']);
+  });
+
+  it('allows page-only callers to opt out of localSeo widening', async () => {
+    vi.mocked(listLocalSeoMarkets).mockReturnValue([
+      {
+        id: 'market-1',
+        workspaceId: 'ws-local',
+        label: 'Austin, TX',
+        city: 'Austin',
+        stateOrRegion: 'TX',
+        country: 'US',
+        status: 'active',
+        source: 'admin_override',
+        createdAt: '2026-05-21T00:00:00.000Z',
+        updatedAt: '2026-05-21T00:00:00.000Z',
+      },
+    ]);
+
+    await buildContentGenerationContext('ws-local', {
+      pagePath: '/services',
+      slices: ['pageProfile'],
+      includeLocalSeo: false,
+    });
+
+    expect(buildWorkspaceIntelligence).toHaveBeenCalledWith('ws-local', {
+      slices: ['pageProfile'],
+      pagePath: '/services',
+      learningsDomain: 'content',
+      enrichWithBacklinks: undefined,
+    });
   });
 
   it('surfaces not_requested learnings availability when the learnings slice is omitted', async () => {

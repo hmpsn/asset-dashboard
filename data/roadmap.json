@@ -510,6 +510,17 @@
           "notes": "Follow-on after local visibility, GBP/review posture, and local reporting have stable data. Generate local SEO recommendations that combine local-pack visibility, workspace local posture, page/service-area coverage, LocalBusiness schema evidence, reviews/GBP signals where available, local competitors, keyword lifecycle, and outcomes such as calls/forms/bookings/directions. Recommendations must be source-backed, conservative, and route to safe next actions rather than publishing or mutating live sites."
         },
         {
+          "id": "intel-quality-client-local-seo-dashboard-rollout",
+          "title": "Client-facing Local SEO dashboard and advisor rollout",
+          "source": "Focused local SEO wiring audit 2026-05-24",
+          "est": "5-8h",
+          "priority": "P2",
+          "status": "pending",
+          "plannedSprint": "deferred",
+          "owner": "analytics-intelligence",
+          "notes": "Deferred until admin staging QA proves local visibility data quality and copy clarity. Public/client surfaces currently expose only legacy `local_pack` SERP-feature chips, not LocalSeoSlice data. Rollout should add a scrubbed client-safe local SEO summary to `/api/public/intelligence/:workspaceId`, the client Overview/Strategy surfaces, public AI advisor context, and briefing/recommendation surfaces only after conservative copy and tier gating are approved. Do not expose raw provider evidence, match internals, admin-only candidate state, or claim verified local rank unless the evidence explicitly supports it."
+        },
+        {
           "id": "intel-quality-local-seo-intelligence-layer",
           "title": "Local SEO intelligence layer for service-area businesses",
           "source": "Staging QA and keyword operating-loop discussion 2026-05-19; decomposed by PR14 audit 2026-05-20",
