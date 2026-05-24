@@ -60,7 +60,7 @@ export interface SalesAuditResult {
 
 // --- HTML parsing helpers ---
 
-function extractTag(html: string, tag: string): string[] {
+export function extractTag(html: string, tag: string): string[] {
   const regex = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, 'gi');
   const matches: string[] = [];
   let m;
@@ -68,23 +68,23 @@ function extractTag(html: string, tag: string): string[] {
   return matches;
 }
 
-function extractMetaContent(html: string, nameOrProp: string): string | null {
+export function extractMetaContent(html: string, nameOrProp: string): string | null {
   const r1 = new RegExp(`<meta[^>]*(?:name|property)=["']${nameOrProp}["'][^>]*content=["']([^"']*)["']`, 'i');
   const r2 = new RegExp(`<meta[^>]*content=["']([^"']*)["'][^>]*(?:name|property)=["']${nameOrProp}["']`, 'i');
   const m = html.match(r1) || html.match(r2);
   return m ? m[1] : null;
 }
 
-function extractTitle(html: string): string {
+export function extractTitle(html: string): string {
   const m = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
   return m ? decodeEntities(m[1].trim()) : '';
 }
 
-function extractMetaDescription(html: string): string {
+export function extractMetaDescription(html: string): string {
   return extractMetaContent(html, 'description') || '';
 }
 
-function countWords(html: string): number {
+export function countWords(html: string): number {
   const text = html.replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/<[^>]+>/g, ' ')
@@ -92,7 +92,7 @@ function countWords(html: string): number {
   return text.split(/\s+/).filter(w => w.length > 0).length;
 }
 
-function extractLinks(html: string): { href: string; text: string }[] {
+export function extractLinks(html: string): { href: string; text: string }[] {
   const links: { href: string; text: string }[] = [];
   const regex = /<a\s+([^>]*)>([\s\S]*?)<\/a>/gi;
   let m;
@@ -105,7 +105,7 @@ function extractLinks(html: string): { href: string; text: string }[] {
   return links;
 }
 
-function extractImgTags(html: string): { src: string; alt: string; loading?: string; hasWidth: boolean; hasHeight: boolean }[] {
+export function extractImgTags(html: string): { src: string; alt: string; loading?: string; hasWidth: boolean; hasHeight: boolean }[] {
   const imgs: { src: string; alt: string; loading?: string; hasWidth: boolean; hasHeight: boolean }[] = [];
   const regex = /<img\s+([^>]*)>/gi;
   let m;
@@ -121,7 +121,7 @@ function extractImgTags(html: string): { src: string; alt: string; loading?: str
   return imgs;
 }
 
-function extractStyleBlocks(html: string): number {
+export function extractStyleBlocks(html: string): number {
   const regex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
   let total = 0;
   let m;
@@ -129,7 +129,7 @@ function extractStyleBlocks(html: string): number {
   return total;
 }
 
-function extractInlineScripts(html: string): number {
+export function extractInlineScripts(html: string): number {
   const regex = /<script(?![^>]*\bsrc\b)[^>]*>([\s\S]*?)<\/script>/gi;
   let total = 0;
   let m;
@@ -140,7 +140,7 @@ function extractInlineScripts(html: string): number {
   return total;
 }
 
-function countExternalResources(html: string): { stylesheets: number; scripts: number } {
+export function countExternalResources(html: string): { stylesheets: number; scripts: number } {
   const cssRegex = /<link[^>]*rel=["']stylesheet["'][^>]*>/gi;
   const jsRegex = /<script[^>]*src=["'][^"']+["'][^>]*>/gi;
   let stylesheets = 0, scripts = 0;
@@ -274,7 +274,7 @@ async function parseSitemap(baseUrl: string): Promise<string[]> {
 
 // --- Page audit (HTML-only, no API) ---
 
-function auditPageFromHtml(url: string, html: string): SalesPageResult {
+export function auditPageFromHtml(url: string, html: string): SalesPageResult {
   const issues: SalesIssue[] = [];
   const pagePath = new URL(url).pathname || '/';
   const pageName = pagePath === '/' ? 'Home' : pagePath.replace(/^\//, '').replace(/\/$/, '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());

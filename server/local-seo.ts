@@ -1049,7 +1049,7 @@ function buildLocalSeoVisibilityMap(
   return map;
 }
 
-function cleanDomain(value: string | undefined): string | undefined {
+export function cleanDomain(value: string | undefined): string | undefined {
   if (!value) return undefined;
   try {
     return new URL(value.startsWith('http') ? value : `https://${value}`).hostname.replace(/^www\./, '').toLowerCase();
@@ -1059,16 +1059,16 @@ function cleanDomain(value: string | undefined): string | undefined {
   }
 }
 
-function normalizePhone(value: string | undefined): string | undefined {
+export function normalizePhone(value: string | undefined): string | undefined {
   const digits = value?.replace(/\D/g, '') ?? '';
   return digits.length >= 7 ? digits.slice(-10) : undefined;
 }
 
-function normalizeText(value: string | undefined): string {
+export function normalizeText(value: string | undefined): string {
   return (value ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
-function normalizeProviderIdentity(value: string | undefined): string | undefined {
+export function normalizeProviderIdentity(value: string | undefined): string | undefined {
   const normalized = value?.toLowerCase().replace(/[^a-z0-9]+/g, '') ?? '';
   return normalized || undefined;
 }
@@ -1082,7 +1082,7 @@ type LocalBusinessMatchResult = {
   matchedLocationName?: string;
 };
 
-function confidencePriority(confidence: LocalBusinessMatchConfidence): number {
+export function confidencePriority(confidence: LocalBusinessMatchConfidence): number {
   switch (confidence) {
     case LOCAL_BUSINESS_MATCH_CONFIDENCE.VERIFIED:
       return 3;
@@ -1319,13 +1319,13 @@ function hasLocalIntent(keyword: string, workspace: Workspace): boolean {
   return false;
 }
 
-function cleanKeywordDisplay(keyword: string | undefined): string | undefined {
+export function cleanKeywordDisplay(keyword: string | undefined): string | undefined {
   const cleaned = keyword?.replace(/\s+/g, ' ').trim();
   if (!cleaned || cleaned.length < 3 || cleaned.length > 90) return undefined;
   return cleaned;
 }
 
-function titleLooksLikeServiceKeyword(title: string | undefined): boolean {
+export function titleLooksLikeServiceKeyword(title: string | undefined): boolean {
   const cleaned = cleanKeywordDisplay(title);
   if (!cleaned) return false;
   const tokens = cleaned.split(/\s+/);
@@ -1333,7 +1333,7 @@ function titleLooksLikeServiceKeyword(title: string | undefined): boolean {
   return /dent|dental|implant|invisalign|veneer|whiten|emergency|orthodont|clinic|law|attorney|restaurant|contractor|plumb|roof|med spa|service/i.test(cleaned);
 }
 
-function hasMarketModifier(keyword: string, markets: LocalSeoMarket[]): boolean {
+export function hasMarketModifier(keyword: string, markets: LocalSeoMarket[]): boolean {
   const normalized = normalizeText(keyword);
   if (/\bnear me\b|\blocal\b/.test(normalized)) return true;
   return markets.some(market => {
@@ -1382,7 +1382,7 @@ const LOCAL_INTENT_PREFIX_CAP_PER_BASE = 3;
 
 const LOCAL_SOURCE_PAGE_BUDGET_FRACTION = 0.20;
 
-function localVariantKeywords(baseKeyword: string, markets: LocalSeoMarket[]): string[] {
+export function localVariantKeywords(baseKeyword: string, markets: LocalSeoMarket[]): string[] {
   const base = cleanKeywordDisplay(baseKeyword);
   if (!base) return [];
   const variants = new Set<string>();
@@ -1398,7 +1398,7 @@ function localVariantKeywords(baseKeyword: string, markets: LocalSeoMarket[]): s
   return [...variants];
 }
 
-function candidateSourceScore(source: LocalSeoKeywordCandidate['source']): number {
+export function candidateSourceScore(source: LocalSeoKeywordCandidate['source']): number {
   switch (source) {
     case 'explicit': return 120;
     case 'strategy': return 95;
@@ -1921,7 +1921,7 @@ function selectExplicitLocalSeoKeywords(workspaceId: string, explicitKeywords: s
  * the refresh budget. Explicit keywords are never capped — they are admin-chosen.
  * Non-explicit keywords without a pagePath share a bucket per source type.
  */
-function applySourcePageCap(candidates: LocalSeoKeywordCandidate[], budget: number): LocalSeoKeywordCandidate[] {
+export function applySourcePageCap(candidates: LocalSeoKeywordCandidate[], budget: number): LocalSeoKeywordCandidate[] {
   const pageCap = Math.max(1, Math.ceil(budget * LOCAL_SOURCE_PAGE_BUDGET_FRACTION));
   const pageCounts = new Map<string, number>();
   return candidates.filter(c => {

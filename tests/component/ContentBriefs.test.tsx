@@ -1,0 +1,527 @@
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
+import { ContentBriefs } from '../../src/components/ContentBriefs';
+import type { ContentBrief, ContentTopicRequest, PostSummary } from '../../shared/types/content';
+
+// ─── Module mocks (hoisted) ────────────────────────────────────────────────
+const mocks = vi.hoisted(() => ({
+  postFn: vi.fn(),
+  patchFn: vi.fn(),
+  delFn: vi.fn(),
+  getSafeFn: vi.fn(),
+  getFn: vi.fn(),
+  getTextFn: vi.fn(),
+  trackJob: vi.fn(),
+}));
+
+vi.mock('../../src/api/client', () => ({
+  post: mocks.postFn,
+  patch: mocks.patchFn,
+  del: mocks.delFn,
+  getSafe: mocks.getSafeFn,
+  get: mocks.getFn,
+  getText: mocks.getTextFn,
+}));
+
+vi.mock('../../src/hooks/useBackgroundTasks', () => ({
+  useBackgroundTasks: () => ({
+    trackJob: mocks.trackJob,
+    jobs: [],
+    activeJobs: [],
+    startJob: vi.fn(),
+    getJobResult: vi.fn(),
+    findActiveJob: vi.fn(),
+    findLatestTerminalJob: vi.fn(),
+    jobsForWorkspace: vi.fn().mockReturnValue([]),
+    cancelJob: vi.fn(),
+    dismissJob: vi.fn(),
+    clearDone: vi.fn(),
+  }),
+}));
+
+vi.mock('../../src/lib/background-job-helpers', () => ({
+  attachTrackedJob: vi.fn(),
+  startAndTrackJob: vi.fn(),
+  cancelTrackedJob: vi.fn(),
+}));
+
+// Admin hooks
+vi.mock('../../src/hooks/admin', async () => {
+  const actual = await vi.importActual<typeof import('../../src/hooks/admin')>('../../src/hooks/admin');
+  return {
+    ...actual,
+    useAdminBriefsList: vi.fn(),
+    useAdminRequestsList: vi.fn(),
+    useAdminPostsList: vi.fn(),
+    useAdminBriefTemplateCrossref: vi.fn(),
+  };
+});
+
+// Heavy sub-components → lightweight stubs
+vi.mock('../../src/components/PostEditor', () => ({
+  PostEditor: ({ onClose }: { onClose: () => void }) => (
+    <div data-testid="post-editor">
+      <button onClick={onClose}>Close Editor</button>
+    </div>
+  ),
+}));
+
+vi.mock('../../src/components/briefs/BriefGenerator', () => ({
+  BriefGenerator: ({ keyword, onKeywordChange, onGenerate, generating, error }: {
+    keyword: string;
+    onKeywordChange: (v: string) => void;
+    onGenerate: () => void;
+    generating: boolean;
+    error: string;
+  }) => (
+    <div data-testid="brief-generator">
+      <input
+        data-testid="keyword-input"
+        value={keyword}
+        onChange={e => onKeywordChange(e.target.value)}
+        placeholder="Target keyword"
+      />
+      <button data-testid="generate-btn" onClick={onGenerate} disabled={generating}>
+        {generating ? 'Generating...' : 'Generate Brief'}
+      </button>
+      {error && <div data-testid="generate-error">{error}</div>}
+    </div>
+  ),
+}));
+
+vi.mock('../../src/components/briefs/RequestList', () => ({
+  RequestList: ({ clientRequests }: { clientRequests: ContentTopicRequest[] }) => (
+    <div data-testid="request-list">
+      {clientRequests.map(r => (
+        <div key={r.id} data-testid={`request-${r.id}`}>{r.topic}</div>
+      ))}
+    </div>
+  ),
+}));
+
+vi.mock('../../src/components/briefs/BriefList', () => ({
+  BriefList: ({
+    briefs,
+    onConfirmDeleteBrief,
+    onSetExpanded,
+  }: {
+    briefs: ContentBrief[];
+    onConfirmDeleteBrief: (b: ContentBrief) => void;
+    onSetExpanded: (id: string | null) => void;
+  }) => (
+    <div data-testid="brief-list">
+      {briefs.length === 0 && <div data-testid="no-briefs">No briefs</div>}
+      {briefs.map(b => (
+        <div key={b.id} data-testid={`brief-card-${b.id}`}>
+          <span data-testid={`brief-keyword-${b.id}`}>{b.targetKeyword}</span>
+          <span data-testid={`brief-title-${b.id}`}>{b.suggestedTitle}</span>
+          <button
+            data-testid={`brief-expand-${b.id}`}
+            onClick={() => onSetExpanded(b.id)}
+          >
+            Open
+          </button>
+          <button
+            data-testid={`brief-delete-${b.id}`}
+            onClick={() => onConfirmDeleteBrief(b)}
+          >
+            Delete
+          </button>
+        </div>
+      ))}
+    </div>
+  ),
+}));
+
+// ─── Fixtures ──────────────────────────────────────────────────────────────
+function makeBrief(overrides: Partial<ContentBrief> = {}): ContentBrief {
+  return {
+    id: 'brief-1',
+    workspaceId: 'ws-1',
+    targetKeyword: 'content marketing',
+    secondaryKeywords: ['blogging', 'SEO writing'],
+    suggestedTitle: 'Content Marketing Guide',
+    suggestedMetaDesc: 'Learn content marketing from scratch.',
+    outline: [
+      { heading: 'Introduction', notes: 'Overview', wordCount: 200 },
+      { heading: 'Strategy', notes: 'Key tactics', wordCount: 500 },
+    ],
+    wordCountTarget: 1500,
+    intent: 'informational',
+    audience: 'marketers',
+    competitorInsights: 'Competitors focus on short-form',
+    internalLinkSuggestions: ['blog', 'services'],
+    createdAt: '2026-05-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function makeRequest(overrides: Partial<ContentTopicRequest> = {}): ContentTopicRequest {
+  return {
+    id: 'req-1',
+    workspaceId: 'ws-1',
+    topic: 'SEO Best Practices',
+    targetKeyword: 'seo tips',
+    intent: 'informational',
+    priority: 'high',
+    rationale: 'High search volume',
+    status: 'requested',
+    createdAt: '2026-05-01T00:00:00.000Z',
+    updatedAt: '2026-05-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function makePost(overrides: Partial<PostSummary> = {}): PostSummary {
+  return {
+    id: 'post-1',
+    briefId: 'brief-1',
+    targetKeyword: 'content marketing',
+    title: 'Content Marketing Guide Post',
+    totalWordCount: 1500,
+    status: 'draft',
+    createdAt: '2026-05-01T00:00:00.000Z',
+    updatedAt: '2026-05-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+// ─── Helpers ───────────────────────────────────────────────────────────────
+import * as adminHooks from '../../src/hooks/admin';
+
+function setHooks({
+  briefs = [makeBrief()],
+  requests = [] as ContentTopicRequest[],
+  posts = [] as PostSummary[],
+  briefsLoading = false,
+  requestsLoading = false,
+  postsLoading = false,
+} = {}) {
+  vi.mocked(adminHooks.useAdminBriefsList).mockReturnValue({
+    data: briefs,
+    isLoading: briefsLoading,
+    error: null,
+  } as any);
+  vi.mocked(adminHooks.useAdminRequestsList).mockReturnValue({
+    data: requests,
+    isLoading: requestsLoading,
+    error: null,
+  } as any);
+  vi.mocked(adminHooks.useAdminPostsList).mockReturnValue({
+    data: posts,
+    isLoading: postsLoading,
+    error: null,
+  } as any);
+  vi.mocked(adminHooks.useAdminBriefTemplateCrossref).mockReturnValue({
+    data: null,
+    isLoading: false,
+    error: null,
+  } as any);
+}
+
+function renderComponent(workspaceId = 'ws-1', props: Record<string, unknown> = {}) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <ContentBriefs workspaceId={workspaceId} {...(props as any)} />
+      </MemoryRouter>
+    </QueryClientProvider>
+  );
+}
+
+// ─── Tests ─────────────────────────────────────────────────────────────────
+describe('ContentBriefs', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setHooks();
+  });
+
+  // 1. Renders without crash with mocked brief list
+  it('renders without crash with a brief list', () => {
+    renderComponent();
+    expect(screen.getByTestId('brief-list')).toBeInTheDocument();
+    expect(screen.getByTestId('brief-card-brief-1')).toBeInTheDocument();
+    expect(screen.getByTestId('brief-keyword-brief-1')).toHaveTextContent('content marketing');
+  });
+
+  // 2. Loading state
+  it('shows spinner when data is loading', () => {
+    setHooks({ briefsLoading: true });
+    renderComponent();
+    // Loading spinner is rendered instead of the content
+    const { container } = renderComponent();
+    const spinner = container.querySelector('.animate-spin');
+    expect(spinner).toBeInTheDocument();
+  });
+
+  // 3. Empty state when no briefs
+  it('renders empty state when no briefs exist', () => {
+    setHooks({ briefs: [] });
+    renderComponent();
+    expect(screen.getByTestId('no-briefs')).toBeInTheDocument();
+  });
+
+  // 4. Brief cards render with title and keyword
+  it('renders brief cards with keyword and title', () => {
+    const brief = makeBrief({ targetKeyword: 'seo strategy', suggestedTitle: 'SEO Strategy Guide' });
+    setHooks({ briefs: [brief] });
+    renderComponent();
+    expect(screen.getByTestId(`brief-keyword-${brief.id}`)).toHaveTextContent('seo strategy');
+    expect(screen.getByTestId(`brief-title-${brief.id}`)).toHaveTextContent('SEO Strategy Guide');
+  });
+
+  // 5. Multiple briefs render
+  it('renders multiple brief cards', () => {
+    const b1 = makeBrief({ id: 'brief-1', targetKeyword: 'keyword 1' });
+    const b2 = makeBrief({ id: 'brief-2', targetKeyword: 'keyword 2' });
+    setHooks({ briefs: [b1, b2] });
+    renderComponent();
+    expect(screen.getByTestId('brief-card-brief-1')).toBeInTheDocument();
+    expect(screen.getByTestId('brief-card-brief-2')).toBeInTheDocument();
+  });
+
+  // 6. PageHeader shows brief count
+  it('shows the correct brief count in the PageHeader subtitle', () => {
+    setHooks({ briefs: [makeBrief()] });
+    renderComponent();
+    expect(screen.getByText('1 total brief')).toBeInTheDocument();
+  });
+
+  it('uses plural for multiple briefs in PageHeader', () => {
+    setHooks({ briefs: [makeBrief({ id: 'b1' }), makeBrief({ id: 'b2' })] });
+    renderComponent();
+    expect(screen.getByText('2 total briefs')).toBeInTheDocument();
+  });
+
+  // 7. Brief generator is rendered
+  it('renders the BriefGenerator section', () => {
+    renderComponent();
+    expect(screen.getByTestId('brief-generator')).toBeInTheDocument();
+    expect(screen.getByTestId('generate-btn')).toBeInTheDocument();
+  });
+
+  // 8. Search bar renders and filters trigger
+  it('renders a search input for filtering briefs', () => {
+    renderComponent();
+    const searchInput = screen.getByPlaceholderText('Search briefs...');
+    expect(searchInput).toBeInTheDocument();
+  });
+
+  it('shows clear button when search has text', async () => {
+    renderComponent();
+    const searchInput = screen.getByPlaceholderText('Search briefs...');
+    await act(async () => { fireEvent.change(searchInput, { target: { value: 'marketing' } }); });
+    expect(screen.getByLabelText('Clear search')).toBeInTheDocument();
+  });
+
+  it('clears search when X button is clicked', async () => {
+    renderComponent();
+    const searchInput = screen.getByPlaceholderText('Search briefs...');
+    await act(async () => { fireEvent.change(searchInput, { target: { value: 'marketing' } }); });
+    const clearBtn = screen.getByLabelText('Clear search');
+    await act(async () => { fireEvent.click(clearBtn); });
+    expect((searchInput as HTMLInputElement).value).toBe('');
+  });
+
+  // 9. Sort dropdown
+  it('renders a sort dropdown with options', () => {
+    renderComponent();
+    const sortSelect = screen.getByDisplayValue('Newest');
+    expect(sortSelect).toBeInTheDocument();
+  });
+
+  it('can change sort order', async () => {
+    renderComponent();
+    const sortSelect = screen.getByDisplayValue('Newest');
+    await act(async () => { fireEvent.change(sortSelect, { target: { value: 'keyword' } }); });
+    expect(screen.getByDisplayValue('Keyword A-Z')).toBeInTheDocument();
+  });
+
+  // 10. Delete confirmation modal
+  it('opens delete confirmation modal when delete is triggered', async () => {
+    renderComponent();
+    const deleteBtn = screen.getByTestId('brief-delete-brief-1');
+    await act(async () => { fireEvent.click(deleteBtn); });
+    expect(screen.getByText('Delete Brief?')).toBeInTheDocument();
+    // Modal body contains the warning text about the action being irreversible
+    expect(screen.getByText('This action cannot be undone.')).toBeInTheDocument();
+  });
+
+  it('closes delete modal when Cancel is clicked', async () => {
+    renderComponent();
+    const deleteBtn = screen.getByTestId('brief-delete-brief-1');
+    await act(async () => { fireEvent.click(deleteBtn); });
+    expect(screen.getByText('Delete Brief?')).toBeInTheDocument();
+    const cancelBtn = screen.getByRole('button', { name: 'Cancel' });
+    await act(async () => { fireEvent.click(cancelBtn); });
+    expect(screen.queryByText('Delete Brief?')).not.toBeInTheDocument();
+  });
+
+  it('calls del API and removes brief when Delete is confirmed', async () => {
+    mocks.delFn.mockResolvedValue(undefined);
+    renderComponent();
+    const deleteBtn = screen.getByTestId('brief-delete-brief-1');
+    await act(async () => { fireEvent.click(deleteBtn); });
+    // The modal has a footer with a danger "Delete" button — use getAllByRole + find
+    const allDeleteBtns = screen.getAllByRole('button', { name: 'Delete' });
+    const confirmDeleteBtn = allDeleteBtns[allDeleteBtns.length - 1];
+    await act(async () => { fireEvent.click(confirmDeleteBtn); });
+    expect(mocks.delFn).toHaveBeenCalledWith(
+      expect.stringContaining('/api/content-briefs/ws-1/brief-1')
+    );
+  });
+
+  // 11. Brief generate flow
+  it('calls post API when brief generation is triggered', async () => {
+    const newBrief = makeBrief({ id: 'brief-new', targetKeyword: 'new keyword' });
+    mocks.postFn.mockResolvedValue(newBrief);
+    renderComponent();
+    const keywordInput = screen.getByTestId('keyword-input');
+    await act(async () => { fireEvent.change(keywordInput, { target: { value: 'new keyword' } }); });
+    const generateBtn = screen.getByTestId('generate-btn');
+    await act(async () => { fireEvent.click(generateBtn); });
+    await waitFor(() => {
+      expect(mocks.postFn).toHaveBeenCalledWith(
+        expect.stringContaining('/api/content-briefs/ws-1/generate'),
+        expect.objectContaining({ targetKeyword: 'new keyword' })
+      );
+    });
+  });
+
+  it('shows error message when brief generation fails', async () => {
+    mocks.postFn.mockRejectedValue(new Error('Server error'));
+    renderComponent();
+    const keywordInput = screen.getByTestId('keyword-input');
+    await act(async () => { fireEvent.change(keywordInput, { target: { value: 'fail keyword' } }); });
+    const generateBtn = screen.getByTestId('generate-btn');
+    await act(async () => { fireEvent.click(generateBtn); });
+    await waitFor(() => {
+      expect(screen.getByTestId('generate-error')).toHaveTextContent('Server error');
+    });
+  });
+
+  // 12. Client requests are rendered
+  it('renders RequestList with client requests', () => {
+    const req = makeRequest();
+    setHooks({ requests: [req] });
+    renderComponent();
+    expect(screen.getByTestId('request-list')).toBeInTheDocument();
+    expect(screen.getByTestId(`request-${req.id}`)).toHaveTextContent('SEO Best Practices');
+  });
+
+  // 13. onRequestCountChange is called with pending count
+  it('calls onRequestCountChange with the count of requested items', () => {
+    const onRequestCountChange = vi.fn();
+    const req1 = makeRequest({ id: 'r1', status: 'requested' });
+    const req2 = makeRequest({ id: 'r2', status: 'brief_generated' });
+    setHooks({ requests: [req1, req2] });
+    renderComponent('ws-1', { onRequestCountChange });
+    expect(onRequestCountChange).toHaveBeenCalledWith(1);
+  });
+
+  // 14. Generated posts list
+  it('renders generated posts when posts exist', () => {
+    const post = makePost();
+    setHooks({ posts: [post] });
+    renderComponent();
+    expect(screen.getByText('Generated Posts')).toBeInTheDocument();
+    expect(screen.getByText('Content Marketing Guide Post')).toBeInTheDocument();
+  });
+
+  it('does not render posts section when no posts', () => {
+    setHooks({ posts: [] });
+    renderComponent();
+    expect(screen.queryByText('Generated Posts')).not.toBeInTheDocument();
+  });
+
+  // 15. Post status badges in posts list
+  it('shows correct badge label for generating post status', () => {
+    const post = makePost({ status: 'generating' });
+    setHooks({ posts: [post] });
+    renderComponent();
+    expect(screen.getByText('Generating...')).toBeInTheDocument();
+  });
+
+  it('shows capitalised status badge for non-generating posts', () => {
+    const post = makePost({ status: 'approved' });
+    setHooks({ posts: [post] });
+    renderComponent();
+    expect(screen.getByText('Approved')).toBeInTheDocument();
+  });
+
+  // 16. Clicking a post row opens the PostEditor
+  it('opens PostEditor when a post row is clicked', async () => {
+    const post = makePost();
+    setHooks({ posts: [post] });
+    renderComponent();
+    const postRow = screen.getByText('Content Marketing Guide Post').closest('button, [role="button"]')
+      ?? screen.getByText('Content Marketing Guide Post').parentElement!;
+    await act(async () => { fireEvent.click(postRow); });
+    await waitFor(() => {
+      expect(screen.getByTestId('post-editor')).toBeInTheDocument();
+    });
+  });
+
+  // 17. Closing PostEditor returns to posts list
+  it('closes PostEditor when close is triggered', async () => {
+    const post = makePost();
+    setHooks({ posts: [post] });
+    renderComponent();
+    const postRow = screen.getByText('Content Marketing Guide Post').closest('button, [role="button"]')
+      ?? screen.getByText('Content Marketing Guide Post').parentElement!;
+    await act(async () => { fireEvent.click(postRow); });
+    await waitFor(() => screen.getByTestId('post-editor'));
+    const closeEditorBtn = screen.getByText('Close Editor');
+    await act(async () => { fireEvent.click(closeEditorBtn); });
+    expect(screen.queryByTestId('post-editor')).not.toBeInTheDocument();
+  });
+
+  // 18. Posts list hides when PostEditor is active
+  it('hides posts list when PostEditor is open', async () => {
+    const post = makePost();
+    setHooks({ posts: [post] });
+    renderComponent();
+    const postRow = screen.getByText('Content Marketing Guide Post').closest('button, [role="button"]')
+      ?? screen.getByText('Content Marketing Guide Post').parentElement!;
+    await act(async () => { fireEvent.click(postRow); });
+    await waitFor(() => screen.getByTestId('post-editor'));
+    // The "Generated Posts" header should be gone while editor is open
+    expect(screen.queryByText('Generated Posts')).not.toBeInTheDocument();
+  });
+
+  // 19. fixContext prefills keyword
+  it('prefills keyword from fixContext.primaryKeyword', () => {
+    const fixContext = {
+      targetRoute: 'seo-briefs',
+      primaryKeyword: 'my-target-keyword',
+      pageId: 'page-1',
+      pageSlug: '/page',
+      pageName: 'My Page',
+    };
+    const clearFixContext = vi.fn();
+    renderComponent('ws-1', { fixContext, clearFixContext });
+    const keywordInput = screen.getByTestId('keyword-input') as HTMLInputElement;
+    // hyphens replaced with spaces
+    expect(keywordInput.value).toBe('my target keyword');
+    expect(clearFixContext).toHaveBeenCalled();
+  });
+
+  // 20. No crash with empty/null data
+  it('renders without crash when all data is empty arrays', () => {
+    setHooks({ briefs: [], requests: [], posts: [] });
+    expect(() => renderComponent()).not.toThrow();
+    expect(screen.getByTestId('brief-list')).toBeInTheDocument();
+    expect(screen.getByTestId('request-list')).toBeInTheDocument();
+  });
+
+  // 21. Content Briefs header is visible
+  it('renders Content Briefs page header', () => {
+    renderComponent();
+    expect(screen.getByText('Content Briefs')).toBeInTheDocument();
+  });
+});
