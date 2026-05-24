@@ -11,7 +11,7 @@
  *   - Trend computation (recentWinRate vs overallWinRate overlap)
  *
  * NOTE: Port 13357 was already allocated to admin-chat-route-validation.test.ts.
- * This file uses port 13363 (next available after 13362).
+ * This file uses port 13386 (next available after 13385).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
@@ -22,7 +22,7 @@ import db from '../../server/db/index.js';
 // Enable outcome tracking feature flag before server starts
 process.env.FEATURE_OUTCOME_TRACKING = 'true';
 
-const ctx = createTestContext(13363); // port-ok: 13357 already allocated to admin-chat-route-validation
+const ctx = createTestContext(13386); // port-ok: next free after 13385
 const { api, postJson } = ctx;
 
 const RUN_ID = Date.now().toString(36);
