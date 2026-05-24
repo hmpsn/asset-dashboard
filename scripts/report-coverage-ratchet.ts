@@ -17,10 +17,10 @@ import {
 export type CoverageRatchetFloor = Record<CoverageMetric, number>;
 
 export const COVERAGE_RATCHET_FLOORS: CoverageRatchetFloor = {
-  lines: 49.4,
-  statements: 47.1,
-  branches: 40.5,
-  functions: 40.7,
+  lines: 50.8,
+  statements: 48.6,
+  branches: 41.7,
+  functions: 42.3,
 };
 
 type CoverageSummaryNode = {
