@@ -29,11 +29,11 @@ describe('critical domain coverage report', () => {
     expect(parsed.contextsExpected).toEqual(CANONICAL_BOUNDED_CONTEXTS);
     expect(parsed.entries.map(entry => entry.contextId)).toEqual([...CANONICAL_BOUNDED_CONTEXTS].sort());
     expect(parsed.currentGlobalCoverage).toEqual({
-      measuredAt: '2026-05-23',
-      lines: 42.18,
-      statements: 40.09,
-      branches: 33.49,
-      functions: 32.92,
+      measuredAt: '2026-05-24',
+      lines: 42.43,
+      statements: 40.33,
+      branches: 33.62,
+      functions: 33.09,
     });
     expect(parsed.currentGlobalCoverage).toEqual(CURRENT_GLOBAL_COVERAGE);
   });
@@ -66,8 +66,8 @@ describe('critical domain coverage report', () => {
     const markdown = formatCriticalDomainCoverageReportAsMarkdown();
 
     expect(markdown).toContain('# Critical Domain Coverage Baseline');
-    expect(markdown).toContain('42.18% lines');
-    expect(markdown).toContain('32.92% functions');
+    expect(markdown).toContain('42.43% lines');
+    expect(markdown).toContain('33.09% functions');
     expect(markdown).toContain('Structural gaps: 0');
     expect(markdown).toContain('`client-portal`');
   });
