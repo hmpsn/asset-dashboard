@@ -19,6 +19,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from '../integration/helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
+import { expectNoLocalSeoClientBoundaryFields } from '../helpers/local-seo-client-boundary.js';
 import { upsertInsight } from '../../server/analytics-insights-store.js';
 
 const ctx = createTestContext(13303);
@@ -295,6 +296,18 @@ describe('admin-only insight scrubbing — strategy_alignment never in response'
 // ── Sensitive fields scrubbed — all tiers ─────────────────────────────────
 
 describe('sensitive fields scrubbed — never in any tier response', () => {
+  it('does not expose Local SEO internals while client rollout is deferred', async () => {
+    const tierBodies = await Promise.all([
+      fetchIntelligence(freeWsId),
+      fetchIntelligence(growthWsId),
+      fetchIntelligence(premiumWsId),
+    ]);
+
+    for (const body of tierBodies) {
+      expectNoLocalSeoClientBoundaryFields(body, 'public intelligence response');
+    }
+  });
+
   it('free tier: no churnRisk field', async () => {
     const body = await fetchIntelligence(freeWsId);
     expect(body).not.toHaveProperty('churnRisk');

@@ -23,6 +23,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { WebSocket } from 'ws';
 import { createTestContext } from './helpers.js';
+import { expectNoLocalSeoClientBoundaryFields } from '../helpers/local-seo-client-boundary.js';
 import {
   createWorkspace,
   updateWorkspace,
@@ -735,6 +736,17 @@ describe('GET /api/public/seo-strategy — brand keyword filtering', () => {
     expect(body.semrushMode).toBeUndefined();
     expect(body.keywordPool).toBeUndefined();
     expect(body.decayingPages).toBeUndefined();
+  });
+
+  it('response does not expose Local SEO internals while client rollout is deferred', async () => {
+    const res = await api(`/api/public/seo-strategy/${brandWsId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+
+    expectNoLocalSeoClientBoundaryFields(body, 'public strategy response');
+    if (body.strategyUx && typeof body.strategyUx === 'object') {
+      expectNoLocalSeoClientBoundaryFields(body.strategyUx as Record<string, unknown>, 'public strategy UX payload');
+    }
   });
 
   it('response exposes competitorDomains field as businessContext only, not raw domains', async () => {

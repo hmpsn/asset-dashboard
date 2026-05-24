@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestContext } from './helpers.js';
+import { expectNoLocalSeoClientBoundaryFields } from '../helpers/local-seo-client-boundary.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { createBatch } from '../../server/approvals.js';
 import { createContentRequest, updateContentRequest } from '../../server/content-requests.js';
@@ -240,6 +241,7 @@ describe('public/client serialization contract matrix', () => {
     expect(workspace.stripeSubscriptionId).toBeUndefined();
     expect(workspace.portalContacts).toBeUndefined();
     expect(workspace.knowledgeBase).toBeUndefined();
+    expectNoLocalSeoClientBoundaryFields(workspace, 'public workspace response');
   });
 
   it('public intelligence read stays client-safe and never leaks workspace secrets', async () => {
@@ -260,6 +262,7 @@ describe('public/client serialization contract matrix', () => {
     expect(intelligence.stripeSubscriptionId).toBeUndefined();
     expect(intelligence.eventConfig).toBeUndefined();
     expect(intelligence.eventGroups).toBeUndefined();
+    expectNoLocalSeoClientBoundaryFields(intelligence, 'public intelligence response');
   });
 
   it('password-protected workspace keeps bootstrap reads open but gates sensitive reads without auth', async () => {
