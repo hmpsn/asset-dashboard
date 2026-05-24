@@ -518,7 +518,7 @@
           "status": "pending",
           "plannedSprint": "deferred",
           "owner": "analytics-intelligence",
-          "notes": "Deferred until admin staging QA proves local visibility data quality and copy clarity. Public/client surfaces currently expose only legacy `local_pack` SERP-feature chips, not LocalSeoSlice data. Rollout should add a scrubbed client-safe local SEO summary to `/api/public/intelligence/:workspaceId`, the client Overview/Strategy surfaces, public AI advisor context, and briefing/recommendation surfaces only after conservative copy and tier gating are approved. Do not expose raw provider evidence, match internals, admin-only candidate state, or claim verified local rank unless the evidence explicitly supports it."
+          "notes": "Deferred until admin staging QA proves local visibility data quality and copy clarity. Public/client surfaces currently expose only legacy `local_pack` SERP-feature chips, not LocalSeoSlice data. Rollout should add a scrubbed client-safe local SEO summary to `/api/public/intelligence/:workspaceId`, the client Overview/Strategy surfaces, public AI advisor context, and briefing/recommendation surfaces only after conservative copy and tier gating are approved. Do not expose raw provider evidence, match internals, admin-only candidate state, or claim verified local rank unless the evidence explicitly supports it. Guardrails added on 2026-05-24 to pin the deferred boundary: public workspace bootstrap, public intelligence, and public strategy responses must not expose LocalSeoSlice, local visibility snapshots, candidate state, service/repeat-competitor internals, or prompt-only local SEO blocks until this rollout item is intentionally implemented."
         },
         {
           "id": "intel-quality-local-seo-intelligence-layer",
@@ -1188,7 +1188,7 @@
       "id": "sprint-local-seo-h",
       "name": "Local SEO Quality — Foundation Fixes (Sprint H)",
       "hours": "3-4 days",
-      "rationale": "Highest-credibility fixes from the Swish 200-snapshot audit. Two items need brainstorming sessions before coding (multi-location match, geo-targeted volume); two are design-first (KCC UX overhaul, surface audit). Start with KCC UX overhaul in parallel with the brainstorm sessions. Ship multi-location match and geo-targeted volume once architecture decisions are settled. Surface audit follows after the other two shape the final information hierarchy. Ordering: (1) Brainstorm intel-quality-multi-location-business-match — data model (new client_locations table vs JSON), match-tier logic, snapshot schema changes, top_competitors exclusion. (2) Brainstorm intel-quality-keyword-volume-geo-targeting — blast radius scoping (platform-wide, not just local SEO), per-market storage model, migration path for existing volume data. (3) Implement kcc-ui-overhaul (no brainstorm needed — pattern is StrategyKeywordDrawer). (4) Implement multi-location match + geo-targeted volume after architecture is settled (can be parallel PRs). (5) local-seo-surface-audit as design pass after #3 and #4 reshape the surfaces.",
+      "rationale": "Archive sprint for highest-credibility fixes from the Swish 200-snapshot audit. KCC UX overhaul, multi-location business match, and primary-market geo-targeted volume have shipped through their canonical roadmap items. The remaining active item is local-seo-surface-audit, a design-first pass to clarify which local SEO facts belong on Strategy, Keywords, and Page Intelligence.",
       "items": [
         {
           "id": "sprint-local-seo-h-ref-kcc-ui-overhaul",
@@ -1205,8 +1205,9 @@
           "title": "Multi-location business match reconciliation",
           "priority": "P1",
           "est": "0.5-1 day after brainstorm",
-          "status": "pending",
-          "notes": "Brainstorm required first. Key decisions: (1) new client_locations table vs extend workspace settings JSON, (2) match confidence tiers with N locations, (3) snapshot businessFound semantics with multiple matches, (4) top_competitors exclusion query. This is the highest-credibility fix — we are reporting own locations as competitors."
+          "status": "done",
+          "notes": "Closed as a Sprint H reference item. Canonical work is tracked and completed under intel-quality-multi-location-business-match: client_locations table, multi-location match logic, matched-location snapshot fields, owned-location competitor scrubbing, historical backfill, LocalSeoSlice.locations, admin CRUD API, and Settings/Local SEO UI wiring.",
+          "shippedAt": "2026-05-22"
         },
         {
           "id": "sprint-local-seo-h-ref-volume-geo-targeting",
@@ -1214,8 +1215,9 @@
           "title": "Geo-targeted volume + DFS Labs keyword overview",
           "priority": "P1",
           "est": "1 day after brainstorm",
-          "status": "pending",
-          "notes": "Brainstorm required first. Platform-wide blast radius — affects every volume reading, not just local SEO. Key decisions: (1) migrate primary volume source from google_ads/search_volume/live to dataforseo_labs/google/keyword_overview, (2) per-market volume storage schema, (3) backfill strategy for existing workspaces. Can ship in parallel with multi-location match once architecture is settled."
+          "status": "done",
+          "notes": "Closed as a Sprint H reference item. Canonical primary-market geo-targeted volume work is tracked and completed under intel-quality-keyword-volume-geo-targeting. Follow-ons such as DFS Labs keyword_overview as the primary provider source, explicit per-market volume storage, and richer volume provenance tooltip copy remain documented in the canonical item rather than as this duplicate sprint ref.",
+          "shippedAt": "2026-05-22"
         },
         {
           "id": "sprint-local-seo-h-ref-surface-audit",
@@ -1230,36 +1232,39 @@
     },
     {
       "id": "sprint-local-seo-i",
-      "name": "Local SEO Quality — Iterator & Insight Batch (Sprint I)",
+      "name": "✅ SHIPPED — Local SEO Quality — Iterator & Insight Batch (Sprint I)",
       "hours": "2-3 days",
-      "rationale": "Items where the code path is completely clear and can be implemented as parallel subagent batches after Sprint H is merged. Two independent batches: (1) Iterator quality batch — all three items touch iterateLocalCandidateSignals + selectLocalIntentKeywords and should ship in one PR to avoid merge conflicts. (2) Insight surfaces batch — two additive features (competitor brand tracking, service coverage gap detection) that add new data flows and UI surfaces without touching the iterator. Both batches can run in parallel if parallel worktrees are used. No brainstorm needed for any item here.",
+      "rationale": "Archive sprint for Local SEO iterator and insight-surface quality work. The iterator quality batch and insight surfaces batch have shipped through their canonical roadmap items; remaining local SEO work now lives in the active/deferred canonical items such as local-seo-surface-audit, per-market keyword relevance, GBP/reviews, geo-grid tracking, local recommendations, and client dashboard rollout.",
       "items": [
         {
           "id": "sprint-local-seo-i-batch-iterator",
           "title": "Iterator quality batch (PR)",
           "priority": "P1",
           "est": "1-2 days",
-          "status": "pending",
+          "status": "done",
           "batchItems": [
             "intel-quality-keyword-intent-classification",
             "intel-quality-question-intent-modifiers",
             "intel-quality-source-distribution-rebalancing"
           ],
-          "notes": "Ship as one PR — all three items touch iterateLocalCandidateSignals and selectLocalIntentKeywords. Parallel edits would conflict. Sequence within the PR: (1) intent classification (biggest change — adds per-candidate intent label, excludes informational/comparison from refresh), (2) question + intent modifier generation (additive to iterator signal set), (3) per-source budget caps (additive cap in selectLocalIntentKeywords after sort). Each item is a 0.5-1 day addition; combined PR is 1-2 days with tests. No new tables — all changes are in server/local-seo.ts."
+          "notes": "Closed as a Sprint I reference batch. Canonical work is completed across intel-quality-keyword-intent-classification, intel-quality-question-intent-modifiers, and intel-quality-source-distribution-rebalancing: local keyword intent classification, emergency/open now/best variants, and per-source-page budget caps in local candidate selection.",
+          "shippedAt": "2026-05-22"
         },
         {
           "id": "sprint-local-seo-i-batch-insight-surfaces",
           "title": "Insight surfaces batch (PR)",
           "priority": "P1",
           "est": "1.5-2 days",
-          "status": "pending",
+          "status": "done",
           "batchItems": [
             "intel-quality-competitor-brand-tracking",
             "intel-quality-service-coverage-gap-detection"
           ],
-          "notes": "Ship as one PR — both items add new data flows and insight surfaces without touching the iterator. Can run in parallel worktree with the iterator batch. Competitor brand tracking: aggregate top_competitors from snapshots, surface 'who keeps beating you', one-click to track competitor brands (likely new competitor_brands table or extension of keyword strategy schema). Service coverage gap detection: define industry service taxonomy, compute coverage per service, surface as admin nudge in setup drawer. Both items have clear code paths — no brainstorm needed."
+          "notes": "Closed as a Sprint I reference batch. Canonical work is completed across intel-quality-competitor-brand-tracking and intel-quality-service-coverage-gap-detection: repeat competitor aggregation from local visibility snapshots and dental service coverage gap nudges in the Local SEO setup flow.",
+          "shippedAt": "2026-05-22"
         }
-      ]
+      ],
+      "shippedAt": "2026-05-22"
     },
     {
       "id": "sprint-polish-quick-wins",
