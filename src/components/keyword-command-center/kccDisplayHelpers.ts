@@ -19,24 +19,12 @@ import {
 import {
   KEYWORD_COMMAND_CENTER_ACTIONS,
   KEYWORD_COMMAND_CENTER_FILTERS,
-  KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE,
   KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY,
-  KEYWORD_COMMAND_CENTER_STATUS,
   type KeywordCommandCenterActionType,
   type KeywordCommandCenterFilter,
   type KeywordCommandCenterNextAction,
   type KeywordCommandCenterRow,
-  type KeywordCommandCenterStatus,
 } from '../../../shared/types/keyword-command-center';
-
-export const STATUS_TONE: Record<KeywordCommandCenterStatus, 'teal' | 'blue' | 'amber' | 'red' | 'zinc'> = {
-  [KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY]: 'teal',
-  [KEYWORD_COMMAND_CENTER_STATUS.TRACKED]: 'blue',
-  [KEYWORD_COMMAND_CENTER_STATUS.NEEDS_REVIEW]: 'amber',
-  [KEYWORD_COMMAND_CENTER_STATUS.RAW_EVIDENCE]: 'zinc',
-  [KEYWORD_COMMAND_CENTER_STATUS.DECLINED]: 'red',
-  [KEYWORD_COMMAND_CENTER_STATUS.RETIRED]: 'zinc',
-};
 
 export const FILTER_ICONS: Record<KeywordCommandCenterFilter, LucideIcon> = {
   [KEYWORD_COMMAND_CENTER_FILTERS.ALL]: SlidersHorizontal,
@@ -80,13 +68,6 @@ export function localPriorityTone(priority: NonNullable<KeywordCommandCenterRow[
   if (priority === KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY.HIGH_OPPORTUNITY) return 'teal';
   if (priority === KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY.DEFEND) return 'emerald';
   if (priority === KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY.INVESTIGATE || priority === KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY.NEEDS_SETUP) return 'amber';
-  return 'zinc';
-}
-
-export function localLifecycleTone(lifecycle: NonNullable<KeywordCommandCenterRow['localSeoState']>['lifecycle']): 'teal' | 'blue' | 'amber' | 'zinc' {
-  if (lifecycle === KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.SELECTED) return 'teal';
-  if (lifecycle === KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CHECKED) return 'blue';
-  if (lifecycle === KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CANDIDATE || lifecycle === KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.NOT_CHECKED) return 'amber';
   return 'zinc';
 }
 

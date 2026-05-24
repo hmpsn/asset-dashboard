@@ -372,10 +372,10 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
                 label={someVisibleSelected && !allVisibleSelected ? 'Select all visible keywords' : 'Select visible keywords'}
                 srOnlyLabel
               />
-              <p className="t-label text-[var(--brand-text-muted)]">Keyword</p>
-              <p className="t-label text-[var(--brand-text-muted)]">Status</p>
-              <p className="t-label text-[var(--brand-text-muted)]">Local</p>
-              <p className="t-label text-[var(--brand-text-muted)]">
+              <p className="t-label uppercase tracking-wider text-[var(--brand-text-muted)]">Keyword</p>
+              <p className="t-label uppercase tracking-wider text-[var(--brand-text-muted)]">Status</p>
+              <p className="t-label uppercase tracking-wider text-[var(--brand-text-muted)]">Local</p>
+              <p className="t-label uppercase tracking-wider text-[var(--brand-text-muted)]">
                 <span>Demand</span>
                 {summary.data?.geoLabel && (
                   <span className="ml-1 normal-case t-caption-sm text-[var(--brand-text-muted)]">
@@ -383,9 +383,9 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
                   </span>
                 )}
               </p>
-              <p className="t-label text-[var(--brand-text-muted)]">Rank/KD</p>
-              <p className="t-label text-[var(--brand-text-muted)]">Assignment</p>
-              <p className="t-label text-[var(--brand-text-muted)] text-right">Next</p>
+              <p className="t-label uppercase tracking-wider text-[var(--brand-text-muted)]">Rank/KD</p>
+              <p className="t-label uppercase tracking-wider text-[var(--brand-text-muted)]">Assignment</p>
+              <p className="t-label uppercase tracking-wider text-[var(--brand-text-muted)] text-right">Next</p>
             </div>
 
             {rowsResult.isFetching ? (

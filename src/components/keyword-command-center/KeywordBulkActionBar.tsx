@@ -1,4 +1,4 @@
-import { Archive, Check, Pause, Target, XCircle } from 'lucide-react';
+import { Archive, Check, Pause, Target, X, XCircle } from 'lucide-react';
 
 import {
   KEYWORD_COMMAND_CENTER_ACTIONS,
@@ -18,7 +18,12 @@ export function KeywordBulkActionBar({ selectedCount, isPending, onAction, onCle
 
   return (
     <div className="fixed inset-x-0 bottom-4 z-[var(--z-sticky)] pointer-events-none">
-      <div className="mx-auto w-[min(960px,calc(100%-2rem))] rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)] shadow-2xl px-3 py-3 pointer-events-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div
+        role="toolbar"
+        aria-label="Selected keyword bulk actions"
+        className="mx-auto w-[min(960px,calc(100%-2rem))] rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-3 pointer-events-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+        style={{ boxShadow: 'var(--brand-shadow-md)' }}
+      >
         <div className="min-w-0">
           <p className="t-caption font-semibold text-[var(--brand-text-bright)]">{selectedCount} selected</p>
           <p className="t-caption-sm text-[var(--brand-text-muted)]">Bulk lifecycle changes preserve protected keywords unless confirmed.</p>
@@ -69,7 +74,7 @@ export function KeywordBulkActionBar({ selectedCount, isPending, onAction, onCle
           >
             Decline
           </Button>
-          <Button size="sm" variant="ghost" disabled={isPending} onClick={onClear}>
+          <Button size="sm" variant="ghost" icon={X} disabled={isPending} onClick={onClear}>
             Clear
           </Button>
         </div>

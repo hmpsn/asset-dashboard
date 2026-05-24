@@ -86,6 +86,11 @@ describe('StatusBadge', () => {
     expect(screen.getByText('Resolved')).toBeInTheDocument();
   });
 
+  it('renders Keyword Command Center lifecycle statuses', () => {
+    render(<StatusBadge domain="keyword-command-center" status="needs_review" />);
+    expect(screen.getByText('Needs Review')).toBeInTheDocument();
+  });
+
   it('hides unknown statuses by default', () => {
     const { container } = render(<StatusBadge domain="content" status="mystery" />);
     expect(container.innerHTML).toBe('');
