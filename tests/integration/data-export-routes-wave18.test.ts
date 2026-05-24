@@ -132,16 +132,13 @@ describe('Fresh workspace — all routes return 200 empty', () => {
     expect(body).toHaveLength(0);
   });
 
-  it('strategy: returns 200 for fresh workspace with empty strategy (any content-type)', async () => {
-    // NOTE: The /strategy route has an early-return `res.json([])` when there are
-    // no page keywords — this bypasses sendExport() so format=csv is ignored and
-    // application/json is returned regardless. The test reflects actual behavior.
+  it('strategy: returns 200 with correct content-type for empty strategy (format=csv)', async () => {
     const res = await api(`/api/export/${wsId}/strategy?format=csv`);
     expect(res.status).toBe(200);
-    // The early-exit path returns JSON regardless of the requested format
-    const body = await res.json();
-    expect(Array.isArray(body)).toBe(true);
-    expect(body).toHaveLength(0);
+    expect(res.headers.get('content-type')).toContain('text/csv');
+    const text = await res.text();
+    // CSV for empty data: just a header row
+    expect(text).toContain('pagePath');
   });
 });
 
