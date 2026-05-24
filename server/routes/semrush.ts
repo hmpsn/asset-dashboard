@@ -52,7 +52,16 @@ router.get('/api/semrush/competitive-intel/:workspaceId', requireWorkspaceAccess
     // Backlinks are optional; if DataForSEO is selected/default but backlinks are disabled,
     // omit backlink fields instead of silently falling back to SEMRush.
     const blProvider = getBacklinksProvider(ws.seoDataProvider);
-    const cappedCompetitors = competitors;
+    // Sanitize and validate competitor domains before sending to the provider.
+    // Bare names without TLDs (e.g. "theaustindentist") pass the CSV parser but cause
+    // DataForSEO error 40501 "Invalid Field: 'target'". Re-running cleanCompetitorDomains
+    // here drops any entries that failed isProviderSafeDomain — including legacy stored
+    // values saved before input validation was enforced.
+    const cappedCompetitors = cleanCompetitorDomains(competitors, myDomain);
+    const droppedCount = competitors.length - cappedCompetitors.length;
+    if (droppedCount > 0) {
+      log.warn({ dropped: competitors.filter(c => !cappedCompetitors.includes(c)), workspaceId }, 'competitive-intel: dropped invalid competitor domains');
+    }
     const allDomains = [myDomain, ...cappedCompetitors];
     const [overviews, backlinks, keywordGaps] = await Promise.all([
       Promise.all(allDomains.map(d => provider.getDomainOverview(d, workspaceId).catch(() => null))),
