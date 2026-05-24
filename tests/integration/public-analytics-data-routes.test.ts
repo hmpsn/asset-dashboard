@@ -24,7 +24,7 @@ import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
 import { randomUUID } from 'crypto';
 
-const ctx = createTestContext(13368);
+const ctx = createTestContext(13368); // port-ok: confirmed free, above 13356 (current max)
 const { api } = ctx;
 
 // ── Workspace fixtures ──────────────────────────────────────────────────────
