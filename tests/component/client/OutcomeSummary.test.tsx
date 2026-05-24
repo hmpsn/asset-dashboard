@@ -162,11 +162,12 @@ describe('OutcomeSummary — growth tier', () => {
     expect(screen.getByText('65%')).toBeInTheDocument();
   });
 
-  it('shows total actions tracked count', () => {
+  it('shows total scored actions count', () => {
     mockUseClientOutcomeSummary.mockReturnValue({ data: makeScorecard(), isLoading: false });
     render(<OutcomeSummary workspaceId={WORKSPACE_ID} tier="growth" />);
-    expect(screen.getByText('Actions tracked')).toBeInTheDocument();
-    expect(screen.getByText('20')).toBeInTheDocument();
+    expect(screen.getByText('Scored actions')).toBeInTheDocument();
+    // totalScored=14; totalTracked=20 is not displayed as a standalone stat
+    expect(screen.getByText('14')).toBeInTheDocument();
   });
 
   it('shows pending results count', () => {
@@ -229,7 +230,7 @@ describe('OutcomeSummary — premium tier', () => {
     mockUseClientOutcomeSummary.mockReturnValue({ data: makeScorecard(), isLoading: false });
     render(<OutcomeSummary workspaceId={WORKSPACE_ID} tier="premium" />);
     expect(screen.getByText('Total scored actions')).toBeInTheDocument();
-    expect(screen.getByText('14')).toBeInTheDocument();
+    expect(screen.getAllByText('14').length).toBeGreaterThan(0);
   });
 
   it('shows strong wins rate in premium breakdown', () => {

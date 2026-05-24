@@ -871,31 +871,33 @@ describe('DELETE /api/webflow/keyword-feedback/:wsId/:keyword', () => {
     const wsId = freshWs('DELETE nonexistent keyword');
     cleanFeedback(wsId);
 
-    // keyword never existed
+    // keyword never existed — server normalizes the URL param (hyphens → spaces)
     const res = await ctx.del(`/api/webflow/keyword-feedback/${wsId}/nonexistent-kw`);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.deleted).toBe('nonexistent-kw');
+    expect(body.deleted).toBe('nonexistent kw');
   });
 
   it('URL-decodes keywords with special characters before deletion', async () => {
     const wsId = freshWs('DELETE url-encoded keyword');
     cleanFeedback(wsId);
-    const rawKeyword = 'seo & content';
+    // Server normalizes via keywordComparisonKey: '&' → space, spaces collapsed → 'seo content'
+    const normalizedKeyword = 'seo content';
     db.prepare(`
       INSERT INTO keyword_feedback (workspace_id, keyword, status, reason, source, declined_by)
       VALUES (?, ?, ?, NULL, 'page_map', NULL)
-    `).run(wsId, rawKeyword, 'declined');
+    `).run(wsId, normalizedKeyword, 'declined');
 
-    const encoded = encodeURIComponent(rawKeyword);  // 'seo%20%26%20content'
+    const rawInput = 'seo & content';
+    const encoded = encodeURIComponent(rawInput);  // 'seo%20%26%20content'
     const res = await ctx.del(`/api/webflow/keyword-feedback/${wsId}/${encoded}`);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.deleted).toBe(rawKeyword);
+    expect(body.deleted).toBe(normalizedKeyword);
 
     const remaining = db.prepare(
       'SELECT * FROM keyword_feedback WHERE workspace_id = ? AND keyword = ?'
-    ).get(wsId, rawKeyword);
+    ).get(wsId, normalizedKeyword);
     expect(remaining).toBeUndefined();
   });
 

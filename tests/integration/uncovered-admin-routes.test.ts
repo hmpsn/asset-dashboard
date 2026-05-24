@@ -34,7 +34,7 @@ const ROOT = path.resolve(__dirname, '../..');
 //  a) The ai-stats authenticated tests can derive a matching HMAC admin token.
 //  b) All other routes work normally (SESSION_SECRET doesn't affect them).
 
-const PORT = 13384;
+const PORT = 13385;
 const BASE = `http://localhost:${PORT}`;
 const SESSION_SECRET = 'test-uncovered-admin-routes-wave14';
 
