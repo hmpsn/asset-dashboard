@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 import { z } from 'zod';
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
+import { withActiveLocalSeoSlice } from './intelligence/generation-context-builders.js';
 import { callAI } from './ai.js';
 import { parseStructuredAIOutput, StructuredAIOutputError } from './ai-structured-output.js';
 import { buildSystemPrompt, getCustomPromptNotes } from './prompt-assembly.js';
@@ -66,6 +67,9 @@ export function buildBriefPrompt(intel: WorkspaceIntelligence): string {
   const priorities = intel.clientSignals?.businessPriorities ?? [];
   const pipeline = intel.contentPipeline;
   const strategy = intel.seoContext?.strategy;
+  const localSeoBlock = intel.localSeo?.enabled && intel.localSeo.effectiveLocalSeoBlock
+    ? `\nLOCAL SEO:\n${intel.localSeo.effectiveLocalSeoBlock}\n`
+    : '';
 
   const insightLines = top.map(i =>
     `- [${i.severity.toUpperCase()}] ${i.insightType}: ${i.pageTitle ?? i.pageId ?? 'workspace'} — ${JSON.stringify(i.data).slice(0, 200)}`
@@ -89,6 +93,7 @@ SITE CONTEXT:
 PIPELINE:
 - Briefs in progress: ${pipeline?.briefs.total ?? 0}
 - Posts: ${pipeline?.posts.total ?? 0}
+${localSeoBlock}
 
 TOP INSIGHTS (ordered by impact):
 ${insightLines || '(no open insights)'}
@@ -111,6 +116,7 @@ Return a JSON object with exactly these keys:
 Rules:
 - Never use admin jargon (no 'insight', 'severity', 'impact score', 'bridge')
 - Be specific: name pages, queries, percentages
+- If Local SEO context is present, use conservative language such as "visible in local results" or "possible business match"; never call it verified local rank unless evidence explicitly says so
 - Wins first — the meeting should feel constructive
 - 3-5 items per list maximum
 - blueprintProgress is always null in this version (Phase 1)
@@ -136,6 +142,13 @@ function buildPromptHash(intel: WorkspaceIntelligence, customPromptNotes: string
     rankingOpportunities: intel.insights?.byType.ranking_opportunity?.length,
     priorities: intel.clientSignals?.businessPriorities ?? [],
     siteKeywords: intel.seoContext?.strategy?.siteKeywords?.slice(0, 5) ?? [],
+    localSeo: intel.localSeo ? {
+      enabled: intel.localSeo.enabled,
+      activeMarkets: intel.localSeo.markets.filter(m => m.status === 'active').map(m => m.label),
+      visibility: intel.localSeo.visibility,
+      latestSnapshotAt: intel.localSeo.latestSnapshotAt,
+      promptBlock: intel.localSeo.effectiveLocalSeoBlock,
+    } : null,
     customPromptNotes,
   };
   return createHash('sha256').update(JSON.stringify(relevant)).digest('hex');
@@ -146,7 +159,8 @@ function buildPromptHash(intel: WorkspaceIntelligence, customPromptNotes: string
  * Skips AI call if intelligence data hash matches the stored brief.
  */
 export async function generateMeetingBrief(workspaceId: string): Promise<MeetingBrief> {
-  const intel = await buildWorkspaceIntelligence(workspaceId, { slices: BRIEF_SLICES });
+  const slices = await withActiveLocalSeoSlice(workspaceId, BRIEF_SLICES);
+  const intel = await buildWorkspaceIntelligence(workspaceId, { slices });
   const customPromptNotes = getCustomPromptNotes(workspaceId);
   const hash = buildPromptHash(intel, customPromptNotes);
   const cachedHash = getMeetingBriefHash(workspaceId);

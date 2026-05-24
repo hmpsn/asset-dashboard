@@ -6455,6 +6455,8 @@ Admins can set a market as primary from `LocalSeoMarketSetupDrawer`, and Keyword
 
 **Client value:** No client-facing changes in this PR. Improves the quality of downstream client deliverables because content briefs, recommendations, and AI advice for local businesses now ground in real local SEO posture.
 
+**May 2026 prompt wiring audit follow-up:** The generation-context builders now append `localSeo` even when callers pass narrow explicit slice overrides, with an opt-out for page-only lookups that would otherwise duplicate local context. Keyword Strategy synthesis, content brief generation/regeneration/outline regeneration, and meeting brief generation now receive conservative Local SEO context when active markets exist. Meeting brief cache invalidation includes the local prompt block and latest snapshot state so stale local narratives are not reused. Client dashboard/advisor exposure remains deferred in `data/roadmap.json` until the local summary copy and public payload contract are approved.
+
 **Mutual:** Establishes the canonical pattern for surfacing local SEO data per CLAUDE.md Data Flow Rule #6: any new workspace data must surface through `server/intelligence/<name>-slice.ts`. Replaces ad-hoc direct reads of local-seo helpers with a single typed slice that respects the authority-layered-fields rule.
 
 **Boundaries:** No new public routes, no publishing, no live metadata writes, no schema writes, no GBP mutation, no provider calls during intelligence assembly. Slice reads only existing `local-seo.ts` helpers. The `LocalSeoKeywordCandidate` shape does not yet expose `marketId`, so per-market stratification falls back to flat score-sorted top-N until that lands — tracked as `TODO(local-seo-marketId-passthrough)` in the slice file.
