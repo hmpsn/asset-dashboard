@@ -92,21 +92,23 @@ beforeAll(async () => {
     stdio: 'pipe',
   });
   proc.stderr?.on('data', (d: Buffer) => process.stderr.write(d));
+  // Drain stdout to prevent pipe buffer backpressure from blocking the child.
+  // We don't need to parse the output — readiness is detected by HTTP polling.
+  proc.stdout?.resume();
 
   await new Promise<void>((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error('Server did not start in time')), 30_000);
-    proc!.stdout?.on('data', (data: Buffer) => {
-      if (data.toString().includes('running on')) {
-        waitForServer(BASE)
-          .then(() => { clearTimeout(timeout); resolve(); })
-          .catch(err => { clearTimeout(timeout); reject(err); });
-      }
-    });
     proc!.on('error', (err) => { clearTimeout(timeout); reject(err); });
     proc!.on('exit', (code) => {
       clearTimeout(timeout);
       if (code !== null && code !== 0) reject(new Error(`Server exited with code ${code}`));
     });
+    // Poll for server readiness directly — avoids relying on stdout log parsing
+    // which can silently miss the "running on" line on Node 24 due to pino-pretty's
+    // async thread-stream flush behavior.
+    waitForServer(BASE, { maxRetries: 150, intervalMs: 200 })
+      .then(() => { clearTimeout(timeout); resolve(); })
+      .catch(err => { clearTimeout(timeout); reject(err); });
   });
 
   // Workspace used across tests
