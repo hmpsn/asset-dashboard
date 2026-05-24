@@ -39,10 +39,10 @@ export type CriticalDomainCoverageReport = {
 
 export const CURRENT_GLOBAL_COVERAGE: CoverageBaseline = {
   measuredAt: '2026-05-24',
-  lines: 47.28,
-  statements: 45.07,
-  branches: 38.46,
-  functions: 37.98,
+  lines: 49.31,
+  statements: 47.05,
+  branches: 40.42,
+  functions: 40.61,
 };
 
 export const CRITICAL_DOMAIN_COVERAGE_BASELINE: CriticalDomainCoverageEntry[] = [
