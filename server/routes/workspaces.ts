@@ -617,7 +617,16 @@ router.patch('/api/workspaces/:id/client-users/:userId', requireWorkspaceAccess(
   // handlers below. See PR #168 staging-hardening flag (cross-workspace authz).
   try {
     const { name, email, role, avatarUrl } = req.body;
-    const user = await updateClientUser(req.params.userId, req.params.id, { name, email, role, avatarUrl });
+    // Only include fields that are explicitly present in the payload.
+    // Spreading `undefined` values (e.g. when `email` is omitted from the
+    // request) would override the existing value with undefined, causing a
+    // NOT NULL constraint violation on the next DB write.
+    const updates: Partial<Pick<import('../client-users.js').ClientUser, 'name' | 'email' | 'role' | 'avatarUrl'>> = {};
+    if (name !== undefined) updates.name = name;
+    if (email !== undefined) updates.email = email;
+    if (role !== undefined) updates.role = role;
+    if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
+    const user = await updateClientUser(req.params.userId, req.params.id, updates);
     if (!user) return res.status(404).json({ error: 'Client user not found' });
     res.json(user);
   } catch (err) {
