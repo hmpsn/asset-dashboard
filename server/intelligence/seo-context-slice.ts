@@ -1,5 +1,6 @@
 import type { IntelligenceOptions, SeoContextSlice, SerpFeatures } from '../../shared/types/intelligence.js';
 import type { RankEntry } from '../rank-tracking.js';
+import { getPrimaryMarketLocationCode } from '../local-seo.js';
 import { createLogger } from '../logger.js';
 import { findPageMapEntry } from '../helpers.js';
 import { createStmtCache } from '../db/stmt-cache.js';
@@ -105,6 +106,13 @@ export async function assembleSeoContext(
     base.discoveredQuerySummary = getDiscoveredQuerySummary(workspaceId);
   } catch (err) {
     log.debug({ err, workspaceId }, 'assembleSeoContext: discoveredQuerySummary optional, degrading gracefully');
+  }
+
+  try {
+    const geo = getPrimaryMarketLocationCode(workspaceId);
+    if (geo) base.geoVolumeLabel = geo.label;
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleSeoContext: geoVolumeLabel optional, degrading gracefully');
   }
 
   // Business profile from structured intelligence editor (Phase 3B)

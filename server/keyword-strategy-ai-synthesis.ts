@@ -18,6 +18,7 @@ import { filterBrandedKeywords, filterBrandedContentGaps, extractBrandTokens } f
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { isProgrammingError } from './errors.js';
 import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js';
+import { resolveWorkspaceLocationCode } from './local-seo.js';
 import { filterDeclinedFromPool } from './strategy-filters.js';
 import { buildWorkspaceIntelligence, formatPersonasForPrompt, formatKnowledgeBaseForPrompt, formatForPrompt } from './workspace-intelligence.js';
 import { buildStrategyIntelligenceBlock, getPagesNeedingAnalysis, isStrategyQualityDiscoveryKeyword, isSuspiciousPlannerGroupedVolume, upsertKeywordPoolCandidate } from './keyword-strategy-helpers.js';
@@ -727,7 +728,8 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
             }
           }
           const uniqueNeeds = [...uniqueNeedsByKey.values()];
-          const metrics = await provider.getKeywordMetrics(uniqueNeeds.slice(0, 100), ws.id);
+          const locationCode = resolveWorkspaceLocationCode(ws.id) ?? undefined;
+          const metrics = await provider.getKeywordMetrics(uniqueNeeds.slice(0, 100), ws.id, undefined, locationCode);
           const metricMap = new Map(metrics.map(m => [normalizeKeyword(m.keyword), m])); // map-dup-ok
 
           let unvalidated = 0;

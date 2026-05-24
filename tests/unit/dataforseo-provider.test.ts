@@ -348,6 +348,32 @@ describe('DataForSeoProvider — keyword difficulty endpoint', () => {
     expect(results[0].difficulty).toBe(45); // falls back to competition_index
   });
 
+  it('uses the supplied geo location code for search volume and keyword difficulty payloads', async () => {
+    const provider = new DataForSeoProvider();
+
+    const fetchSpy = vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ tasks: [{ status_code: 20000, cost: 0.001, result: [
+          { keyword: 'teeth whitening', search_volume: 300, competition_index: 20, cpc: 1.5, competition: 0.2, monthly_searches: [] },
+        ]}] }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ tasks: [{ status_code: 20000, cost: 0.0005, result: [
+          { keyword: 'teeth whitening', keyword_difficulty: 48 },
+        ]}] }),
+      } as Response);
+
+    await provider.getKeywordMetrics(['teeth whitening'], 'ws-geo-test', 'us', 1022162);
+
+    const volumePayload = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string);
+    const difficultyPayload = JSON.parse((fetchSpy.mock.calls[1][1] as RequestInit).body as string);
+    expect(volumePayload[0].location_code).toBe(1022162);
+    expect(difficultyPayload[0].location_code).toBe(1022162);
+    expect(getCachedMetricsBatch).toHaveBeenCalledWith(['teeth whitening'], '1022162', expect.any(Number));
+  });
+
   it('uses keyword_difficulty from keyword_info in getRelatedKeywords', async () => {
     const provider = new DataForSeoProvider();
 
@@ -395,6 +421,29 @@ describe('DataForSeoProvider — L1 global SQLite cache', () => {
     expect(results[0].difficulty).toBe(42);
   });
 
+  it('falls back to legacy national L1 cache keys before making an API call', async () => {
+    vi.mocked(getCachedMetricsBatch).mockClear();
+    vi.mocked(getCachedMetricsBatch)
+      .mockReturnValueOnce(new Map())
+      .mockReturnValueOnce(new Map([
+        ['legacy keyword', { keyword: 'legacy keyword', volume: 1200, difficulty: 35, cpc: 1.1, competition: 0.2, results: 0, trend: [] }],
+      ]));
+
+    const fetchSpy = vi.spyOn(global, 'fetch');
+
+    const provider = new DataForSeoProvider();
+    const results = await provider.getKeywordMetrics(['legacy keyword'], 'ws-legacy-cache', 'us');
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(getCachedMetricsBatch).toHaveBeenNthCalledWith(1, ['legacy keyword'], '2840', expect.any(Number));
+    expect(getCachedMetricsBatch).toHaveBeenNthCalledWith(2, ['legacy keyword'], 'us', expect.any(Number));
+    expect(cacheMetricsBatch).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ keyword: 'legacy keyword', volume: 1200 })]),
+      '2840',
+    );
+    expect(results[0].volume).toBe(1200);
+  });
+
   it('writes API results to L1 cache after fetching', async () => {
     vi.spyOn(global, 'fetch')
       .mockResolvedValueOnce({
@@ -422,7 +471,7 @@ describe('DataForSeoProvider — L1 global SQLite cache', () => {
     expect(global.fetch).toHaveBeenCalled();
     expect(cacheSpy).toHaveBeenCalledWith(
       expect.arrayContaining([expect.objectContaining({ keyword: 'l1-write-test-kw', volume: 5000 })]),
-      'us'
+      '2840'
     );
   });
 });

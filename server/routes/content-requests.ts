@@ -39,6 +39,7 @@ import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
 import { isProgrammingError } from '../errors.js';
 import { loadDecayAnalysis } from '../content-decay.js';
+import { resolveWorkspaceLocationCode } from '../local-seo.js';
 
 const log = createLogger('content-requests');
 
@@ -268,8 +269,9 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
     const providerLabel = seoProvider ? getProviderDisplayName(seoProvider.name) : 'SEMRush';
     if (seoProvider) {
       try {
+        const locationCode = resolveWorkspaceLocationCode(req.params.workspaceId) ?? undefined;
         const [metrics, related] = await Promise.all([
-          seoProvider.getKeywordMetrics([request.targetKeyword], req.params.workspaceId),
+          seoProvider.getKeywordMetrics([request.targetKeyword], req.params.workspaceId, undefined, locationCode),
           seoProvider.getRelatedKeywords(request.targetKeyword, req.params.workspaceId, 15),
         ]);
         if (metrics.length > 0) keywordMetrics = metrics[0];

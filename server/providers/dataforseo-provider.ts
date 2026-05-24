@@ -53,7 +53,7 @@ const LOCATION_CODES: Record<string, number> = {
   fr: 2250,
 };
 
-function locationCode(database = 'us'): number {
+function locationCodeFromDatabase(database = 'us'): number {
   return LOCATION_CODES[database.toLowerCase()] ?? 2840;
 }
 
@@ -685,14 +685,27 @@ export class DataForSeoProvider implements SeoDataProvider {
   }
 
   // ── getKeywordMetrics → search_volume ──
-  async getKeywordMetrics(keywords: string[], workspaceId: string, database = 'us'): Promise<KeywordMetrics[]> {
+  async getKeywordMetrics(
+    keywords: string[],
+    workspaceId: string,
+    database = 'us',
+    locationCode?: number,
+  ): Promise<KeywordMetrics[]> {
+    const resolvedLocationCode = locationCode ?? locationCodeFromDatabase(database);
+    const cacheRegion = String(resolvedLocationCode);
+    const useLegacyRegionFallback = locationCode === undefined && database !== cacheRegion;
     const results: KeywordMetrics[] = [];
     const uncached: string[] = [];
 
     // Check cache first
     for (const kw of keywords) {
-      const cacheKey = `kw_${database}_${kw.toLowerCase().replace(/\s+/g, '_')}`;
-      const cached = readCache<KeywordMetrics>(workspaceId, cacheKey, CACHE_TTL_KEYWORD);
+      const cacheKey = `kw_${cacheRegion}_${kw.toLowerCase().replace(/\s+/g, '_')}`;
+      let cached = readCache<KeywordMetrics>(workspaceId, cacheKey, CACHE_TTL_KEYWORD);
+      if (!cached && useLegacyRegionFallback) {
+        const legacyCacheKey = `kw_${database}_${kw.toLowerCase().replace(/\s+/g, '_')}`;
+        cached = readCache<KeywordMetrics>(workspaceId, legacyCacheKey, CACHE_TTL_KEYWORD);
+        if (cached) writeCache(workspaceId, cacheKey, cached);
+      }
       if (cached) {
         results.push(cached);
         logCreditUsage({ credits: 0, endpoint: 'search_volume', query: kw, rowsReturned: 1, workspaceId, cached: true });
@@ -706,7 +719,7 @@ export class DataForSeoProvider implements SeoDataProvider {
     // L1: Check global SQLite cache for keywords that missed L2
     let globalHits: Map<string, KeywordMetrics>;
     try {
-      const rawHits = getCachedMetricsBatch(uncached, database, CACHE_TTL_KEYWORD);
+      const rawHits = getCachedMetricsBatch(uncached, cacheRegion, CACHE_TTL_KEYWORD);
       globalHits = rawHits as Map<string, KeywordMetrics>;
     } catch (err) {
       log.warn({ err }, 'DataForSEO L1 cache lookup failed — falling through to API');
@@ -723,6 +736,26 @@ export class DataForSeoProvider implements SeoDataProvider {
       }
     }
 
+    if (stillUncached.length > 0 && useLegacyRegionFallback) {
+      try {
+        const rawLegacyHits = getCachedMetricsBatch([...stillUncached], database, CACHE_TTL_KEYWORD);
+        const legacyHits = rawLegacyHits as Map<string, KeywordMetrics>;
+        const legacyBackfill: KeywordMetrics[] = [];
+        for (let i = stillUncached.length - 1; i >= 0; i--) {
+          const kw = stillUncached[i];
+          const hit = legacyHits.get(keywordComparisonKey(kw));
+          if (!hit) continue;
+          results.push(hit);
+          legacyBackfill.push(hit);
+          stillUncached.splice(i, 1);
+          logCreditUsage({ credits: 0, endpoint: 'search_volume', query: kw, rowsReturned: 1, workspaceId, cached: true });
+        }
+        cacheMetricsBatch(legacyBackfill, cacheRegion);
+      } catch (err) {
+        log.warn({ err }, 'DataForSEO legacy L1 cache lookup failed — falling through to API');
+      }
+    }
+
     if (stillUncached.length === 0 || areCreditsExhausted()) return results;
 
     // Batch up to 1000 per request
@@ -736,12 +769,12 @@ export class DataForSeoProvider implements SeoDataProvider {
         const [volumeJson, kdJson] = await Promise.all([
           apiCall('keywords_data/google_ads/search_volume/live', [{
             keywords: batch,
-            location_code: locationCode(database),
+            location_code: resolvedLocationCode,
             language_code: 'en',
           }], workspaceId),
           apiCall('dataforseo_labs/google/keyword_difficulty/live', [{
             keywords: batch,
-            location_code: locationCode(database),
+            location_code: resolvedLocationCode,
             language_code: 'en',
           }], workspaceId).catch(() => null),   // graceful fallback if KD endpoint unavailable
         ]);
@@ -786,11 +819,11 @@ export class DataForSeoProvider implements SeoDataProvider {
 
           results.push(metrics);
           batchResults.push(metrics);
-          const cacheKey = `kw_${database}_${keyword.toLowerCase().replace(/\s+/g, '_')}`;
+          const cacheKey = `kw_${cacheRegion}_${keyword.toLowerCase().replace(/\s+/g, '_')}`;
           writeCache(workspaceId, cacheKey, metrics);
         }
 
-        cacheMetricsBatch(batchResults, database);
+        cacheMetricsBatch(batchResults, cacheRegion);
         logCreditUsage({ credits: cost, endpoint: 'search_volume', query: batch.join(',').slice(0, 100), rowsReturned: taskResults.length, workspaceId, cached: false });
       } catch (err) {
         log.error({ err }, 'DataForSEO search_volume error');
@@ -814,7 +847,7 @@ export class DataForSeoProvider implements SeoDataProvider {
     try {
       const json = await apiCall('dataforseo_labs/google/related_keywords/live', [{
         keyword,
-        location_code: locationCode(database),
+        location_code: locationCodeFromDatabase(database),
         language_code: 'en',
         limit,
         depth: 1,
@@ -859,7 +892,7 @@ export class DataForSeoProvider implements SeoDataProvider {
     try {
       const json = await apiCall('dataforseo_labs/google/keyword_suggestions/live', [{
         keyword,
-        location_code: locationCode(database),
+        location_code: locationCodeFromDatabase(database),
         language_code: 'en',
         limit,
         filters: ['keyword', 'regex', '^(how|what|why|when|where|who|which|can|does|is|are|do|will|should) '],
@@ -905,7 +938,7 @@ export class DataForSeoProvider implements SeoDataProvider {
     try {
       const json = await apiCall('dataforseo_labs/google/keyword_suggestions/live', [{
         keyword: seed,
-        location_code: locationCode(database),
+        location_code: locationCodeFromDatabase(database),
         language_code: 'en',
         limit: cappedLimit,
       }], workspaceId);
@@ -943,7 +976,7 @@ export class DataForSeoProvider implements SeoDataProvider {
     try {
       const json = await apiCall('dataforseo_labs/google/keyword_ideas/live', [{
         keywords: seeds,
-        location_code: locationCode(database),
+        location_code: locationCodeFromDatabase(database),
         language_code: 'en',
         limit: cappedLimit,
       }], workspaceId);
@@ -981,7 +1014,7 @@ export class DataForSeoProvider implements SeoDataProvider {
     try {
       const json = await apiCall('dataforseo_labs/google/keywords_for_site/live', [{
         target: cleanTarget,
-        location_code: locationCode(database),
+        location_code: locationCodeFromDatabase(database),
         language_code: 'en',
         limit: cappedLimit,
       }], workspaceId);
@@ -1019,7 +1052,7 @@ export class DataForSeoProvider implements SeoDataProvider {
     try {
       const json = await apiCall('keywords_data/google_ads/keywords_for_keywords/live', [{
         keywords: seeds,
-        location_code: locationCode(database),
+        location_code: locationCodeFromDatabase(database),
         language_code: 'en',
         sort_by: 'relevance',
       }], workspaceId);
@@ -1210,7 +1243,7 @@ export class DataForSeoProvider implements SeoDataProvider {
       // `ranked_serp_element.serp_item.type` in the dedupe loop below.
       const json = await apiCall('dataforseo_labs/google/ranked_keywords/live', [{
         target,
-        location_code: locationCode(database),
+        location_code: locationCodeFromDatabase(database),
         language_code: 'en',
         limit,
         order_by: ['keyword_data.keyword_info.search_volume,desc'],
@@ -1291,7 +1324,7 @@ export class DataForSeoProvider implements SeoDataProvider {
     try {
       const json = await apiCall('dataforseo_labs/google/ranked_keywords/live', [{
         target,
-        location_code: locationCode(database),
+        location_code: locationCodeFromDatabase(database),
         language_code: 'en',
         limit,
         order_by: ['keyword_data.keyword_info.search_volume,desc'],
@@ -1352,7 +1385,7 @@ export class DataForSeoProvider implements SeoDataProvider {
       // aggregates across all types regardless of what's returned in `items`.
       const json = await apiCall('dataforseo_labs/google/ranked_keywords/live', [{
         target,
-        location_code: locationCode(database),
+        location_code: locationCodeFromDatabase(database),
         language_code: 'en',
         limit: 1,
       }], workspaceId);
@@ -1402,7 +1435,7 @@ export class DataForSeoProvider implements SeoDataProvider {
     try {
       const json = await apiCall('dataforseo_labs/google/competitors_domain/live', [{
         target,
-        location_code: locationCode(database),
+        location_code: locationCodeFromDatabase(database),
         language_code: 'en',
         limit,
         item_types: ['organic'],

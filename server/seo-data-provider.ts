@@ -109,7 +109,7 @@ export interface SeoDataProvider {
   init?(): Promise<void>;
 
   // Keyword Intelligence
-  getKeywordMetrics(keywords: string[], workspaceId: string, database?: string): Promise<KeywordMetrics[]>;
+  getKeywordMetrics(keywords: string[], workspaceId: string, database?: string, locationCode?: number): Promise<KeywordMetrics[]>;
   getRelatedKeywords(keyword: string, workspaceId: string, limit?: number, database?: string): Promise<RelatedKeyword[]>;
   getQuestionKeywords(keyword: string, workspaceId: string, limit?: number, database?: string): Promise<QuestionKeyword[]>;
   getKeywordIdeas?(keywords: string[], workspaceId: string, limit?: number, database?: string): Promise<KeywordSourceEvidence[]>;

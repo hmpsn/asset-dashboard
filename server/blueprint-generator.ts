@@ -10,6 +10,7 @@ import { stripCodeFences } from './helpers.js';
 import { callAI } from './ai.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { getBrandscript } from './brandscript.js';
+import { resolveWorkspaceLocationCode } from './local-seo.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
 import { getWorkspace } from './workspaces.js';
 import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelligence.js';
@@ -301,7 +302,8 @@ async function enrichKeywords(
       log.info({ blueprintId, keywordCount: keywords.length }, 'Blueprint keyword enrichment skipped — no SEO data provider configured');
       return;
     }
-    const metrics = await provider.getKeywordMetrics(keywords, workspaceId);
+    const locationCode = resolveWorkspaceLocationCode(workspaceId) ?? undefined;
+    const metrics = await provider.getKeywordMetrics(keywords, workspaceId, undefined, locationCode);
     log.info(
       { blueprintId, keywordCount: keywords.length, metricsReturned: metrics.length },
       'Blueprint keyword enrichment complete',

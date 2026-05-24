@@ -41,6 +41,7 @@ import { getInsights } from '../analytics-insights-store.js';
 import { recordAction } from '../outcome-tracking.js';
 import { isProgrammingError } from '../errors.js';
 import { validate, z } from '../middleware/validate.js';
+import { resolveWorkspaceLocationCode } from '../local-seo.js';
 import { listMatrices } from '../content-matrices.js';
 import { getTemplate } from '../content-templates.js';
 import { BRIEF_PAGE_TYPES } from '../../shared/types/content.js';
@@ -235,8 +236,9 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
     const providerLabel = seoProvider ? getProviderDisplayName(seoProvider.name) : 'SEMRush';
     if (seoProvider) {
       try {
+        const locationCode = resolveWorkspaceLocationCode(req.params.workspaceId) ?? undefined;
         const [metrics, related] = await Promise.all([
-          seoProvider.getKeywordMetrics([targetKeyword], req.params.workspaceId),
+          seoProvider.getKeywordMetrics([targetKeyword], req.params.workspaceId, undefined, locationCode),
           seoProvider.getRelatedKeywords(targetKeyword, req.params.workspaceId, 15),
         ]);
         if (metrics.length > 0) keywordMetrics = metrics[0];
@@ -493,7 +495,8 @@ router.post('/api/content-briefs/:workspaceId/validate-keyword', requireWorkspac
   }
 
   try {
-    const metrics = await kwProvider.getKeywordMetrics([keyword], req.params.workspaceId);
+    const locationCode = resolveWorkspaceLocationCode(req.params.workspaceId) ?? undefined;
+    const metrics = await kwProvider.getKeywordMetrics([keyword], req.params.workspaceId, undefined, locationCode);
     const kw = metrics[0];
 
     if (!kw) {
@@ -558,7 +561,8 @@ router.post('/api/content-briefs/:workspaceId/validate-keywords', requireWorkspa
   }
 
   try {
-    const metrics = await bulkProvider.getKeywordMetrics(keywords.slice(0, 50), req.params.workspaceId);
+    const locationCode = resolveWorkspaceLocationCode(req.params.workspaceId) ?? undefined;
+    const metrics = await bulkProvider.getKeywordMetrics(keywords.slice(0, 50), req.params.workspaceId, undefined, locationCode);
     const metricsMap = new Map(metrics.map(m => [normalizeKeyword(m.keyword), m])); // map-dup-ok
 
     const results = keywords.slice(0, 50).map((kw: string) => {

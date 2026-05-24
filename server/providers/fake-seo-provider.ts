@@ -36,7 +36,7 @@ export class FakeSeoProvider implements SeoDataProvider {
     return true;
   }
 
-  async getKeywordMetrics(keywords: string[]): Promise<KeywordMetrics[]> {
+  async getKeywordMetrics(keywords: string[], _workspaceId?: string, _database?: string, _locationCode?: number): Promise<KeywordMetrics[]> {
     return keywords.map(keywordMetric);
   }
 

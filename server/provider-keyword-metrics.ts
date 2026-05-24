@@ -1,4 +1,5 @@
 import { createLogger } from './logger.js';
+import { resolveWorkspaceLocationCode } from './local-seo.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
 import { getWorkspace } from './workspaces.js';
 import type { PageKeywordMap } from '../shared/types/workspace.js';
@@ -32,7 +33,8 @@ export async function getProviderMetricsForKeywords(
   if (!provider) return results;
 
   try {
-    const metrics = await provider.getKeywordMetrics(cleanKeywords, workspaceId);
+    const locationCode = resolveWorkspaceLocationCode(workspaceId) ?? undefined;
+    const metrics = await provider.getKeywordMetrics(cleanKeywords, workspaceId, undefined, locationCode);
     for (const metric of metrics) {
       results.set(keywordComparisonKey(metric.keyword), { difficulty: metric.difficulty, volume: metric.volume });
     }

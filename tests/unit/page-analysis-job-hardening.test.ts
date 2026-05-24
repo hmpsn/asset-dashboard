@@ -68,6 +68,7 @@ vi.mock('../../server/seo-data-provider.js', () => ({
   getConfiguredProvider: mocks.getConfiguredProvider,
   getProviderDisplayName: vi.fn(() => 'Provider'),
 }));
+vi.mock('../../server/local-seo.js', () => ({ resolveWorkspaceLocationCode: vi.fn(() => null) }));
 vi.mock('../../server/url-helpers.js', () => ({ resolveBaseUrl: mocks.resolveBaseUrl }));
 vi.mock('../../server/webflow.js', () => ({
   buildStaticPathSet: vi.fn(() => new Set()),

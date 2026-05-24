@@ -766,7 +766,14 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
                 <p className="t-label text-[var(--brand-text-muted)]">Keyword</p>
                 <p className="t-label text-[var(--brand-text-muted)]">Status</p>
                 <p className="t-label text-[var(--brand-text-muted)]">Local</p>
-                <p className="t-label text-[var(--brand-text-muted)]">Demand</p>
+                <p className="t-label text-[var(--brand-text-muted)]">
+                  <span>Demand</span>
+                  {summary.data?.geoLabel && (
+                    <span className="ml-1 normal-case t-caption-sm text-[var(--brand-text-muted)]">
+                      · {summary.data.geoLabel}
+                    </span>
+                  )}
+                </p>
                 <p className="t-label text-[var(--brand-text-muted)]">Rank/KD</p>
                 <p className="t-label text-[var(--brand-text-muted)]">Assignment</p>
                 <p className="t-label text-[var(--brand-text-muted)] text-right">Next</p>

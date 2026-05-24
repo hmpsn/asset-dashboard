@@ -422,6 +422,8 @@ describe('URL-level keyword intelligence', () => {
     expect(getKeywordMetrics).toHaveBeenCalledWith(
       ['schedule dental appointment austin'],
       'ws_planner_grouped_page_map_guard',
+      undefined,
+      undefined,
     );
     const page = result.strategy.pageMap?.[0];
     expect(page?.volume).toBeUndefined();

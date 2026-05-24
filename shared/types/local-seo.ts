@@ -91,6 +91,7 @@ export interface LocalSeoMarket {
   longitude?: number;
   providerLocationCode?: number;
   providerLocationName?: string;
+  isPrimary?: boolean;
   source: LocalSeoMarketSource;
   status: LocalSeoMarketStatus;
   createdAt: string;

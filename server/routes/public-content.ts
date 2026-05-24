@@ -32,6 +32,7 @@ import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
 import { handleContentPerformance } from './content-requests.js';
 import { isProgrammingError } from '../errors.js';
 import { getConfiguredProvider } from '../seo-data-provider.js';
+import { resolveWorkspaceLocationCode } from '../local-seo.js';
 import { createLogger } from '../logger.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { validate } from '../middleware/validate.js';
@@ -601,7 +602,8 @@ router.post('/api/public/tracked-keywords/:workspaceId', validate(addTrackedKeyw
     // callers from amplifying SEO provider spend on passwordless workspaces.
     const provider = actor ? getConfiguredProvider(ws.seoDataProvider ?? undefined) : null;
     if (provider) {
-      provider.getKeywordMetrics([keyword], ws.id).catch((err: unknown) => {
+      const locationCode = resolveWorkspaceLocationCode(ws.id) ?? undefined;
+      provider.getKeywordMetrics([keyword], ws.id, undefined, locationCode).catch((err: unknown) => {
         // url-fetch-ok: async keyword enrichment is best-effort provider prewarming.
         if (isProgrammingError(err)) log.warn({ err }, 'tracked-keyword enrichment: programming error');
         // Non-critical — enrichment will run again on next strategy generation
