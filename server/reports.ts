@@ -452,7 +452,7 @@ export async function extractSiteLogo(baseUrl: string): Promise<string | null> {
   }
 }
 
-function resolveUrl(base: string, relative: string): string {
+export function resolveUrl(base: string, relative: string): string {
   if (relative.startsWith('http://') || relative.startsWith('https://')) return relative;
   if (relative.startsWith('//')) return 'https:' + relative;
   try {

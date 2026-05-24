@@ -77,8 +77,12 @@ function normalizeTopicKeyword(value: string | undefined): string {
   return keywordComparisonKey(value);
 }
 
-function hasMultiWordTopicSignal(keyword: string): boolean {
+export function _hasMultiWordTopicSignal(keyword: string): boolean {
   return normalizeTopicKeyword(keyword).split(' ').filter(Boolean).length >= 2;
+}
+
+function hasMultiWordTopicSignal(keyword: string): boolean {
+  return _hasMultiWordTopicSignal(keyword);
 }
 
 export function isTopicKeywordCoveredByPageMap(
@@ -113,7 +117,7 @@ export function isTopicKeywordCoveredByPageMap(
   return false;
 }
 
-function removePageCoveredContentGaps(
+export function _removePageCoveredContentGaps(
   contentGaps: StrategyContentGap[] | undefined,
   pageMap: StrategyPageMapEntry[] | undefined,
 ): { kept: StrategyContentGap[]; removed: StrategyContentGap[] } {
@@ -130,7 +134,7 @@ function removePageCoveredContentGaps(
   return { kept, removed };
 }
 
-function resolvePageUrl(baseUrl: string, pagePath: string): string | null {
+export function _resolvePageUrl(baseUrl: string, pagePath: string): string | null {
   if (!baseUrl || !pagePath) return null;
   try {
     return new URL(normalizePath(pagePath), baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`).toString();
@@ -139,7 +143,7 @@ function resolvePageUrl(baseUrl: string, pagePath: string): string | null {
   }
 }
 
-function chooseUrlLevelKeyword(keywords: DomainKeyword[]): DomainKeyword | undefined {
+export function _chooseUrlLevelKeyword(keywords: DomainKeyword[]): DomainKeyword | undefined {
   return keywords
     .filter(k => k.keyword?.trim())
     .sort((a, b) =>
@@ -165,11 +169,11 @@ async function applyUrlLevelKeywordIntelligence(options: {
   let enriched = 0;
   let nextIndex = 0;
   const enrichCandidate = async (pm: StrategyPageMapEntry): Promise<boolean> => {
-    const pageUrl = resolvePageUrl(options.baseUrl, pm.pagePath);
+    const pageUrl = _resolvePageUrl(options.baseUrl, pm.pagePath);
     if (!pageUrl) return false;
     try {
       const urlKeywords = await getUrlKeywords(pageUrl, options.workspaceId, URL_LEVEL_KEYWORD_PER_PAGE_LIMIT);
-      const top = chooseUrlLevelKeyword(urlKeywords);
+      const top = _chooseUrlLevelKeyword(urlKeywords);
       if (!top) return false;
       pm.urlLevelKeywords = urlKeywords.slice(0, URL_LEVEL_KEYWORD_PER_PAGE_LIMIT).map(k => ({
         keyword: k.keyword,
@@ -495,7 +499,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
   }
 
   if (strategy.contentGaps?.length) {
-    const { kept, removed } = removePageCoveredContentGaps(strategy.contentGaps, strategy.pageMap);
+    const { kept, removed } = _removePageCoveredContentGaps(strategy.contentGaps, strategy.pageMap);
     if (removed.length > 0) {
       log.info({
         workspaceId,

@@ -111,7 +111,8 @@ export {
   kdClassificationNote,
 } from './authority-context.js';
 
-function recommendationOutcomeActionType(type: RecType, source: string): ActionType {
+/** @internal exported for unit testing */
+export function recommendationOutcomeActionType(type: RecType, source: string): ActionType {
   if (type === 'content_refresh') return 'content_refreshed';
   if (type === 'metadata') return 'meta_updated';
   if (type === 'schema') return 'schema_deployed';
@@ -366,8 +367,10 @@ function getTrafficForSlug(traffic: TrafficMap, slug: string): { clicks: number;
   return { clicks: t.clicks, impressions: t.impressions };
 }
 
-/** Compute a 0–100 impact score for a recommendation */
-function computeImpactScore(
+/** Compute a 0–100 impact score for a recommendation
+ * @internal exported for unit testing
+ */
+export function computeImpactScore(
   severity: 'error' | 'warning' | 'info',
   isCritical: boolean,
   trafficScore: number,
@@ -384,8 +387,10 @@ function computeImpactScore(
   return Math.min(100, Math.round(sevBase + critBonus + trafficMultiplier));
 }
 
-/** Determine priority tier from impact score and severity */
-function determinePriority(
+/** Determine priority tier from impact score and severity
+ * @internal exported for unit testing
+ */
+export function determinePriority(
   impactScore: number,
   severity: 'error' | 'warning' | 'info',
   trafficScore: number,
@@ -402,7 +407,8 @@ function determinePriority(
  * Decay analysis also stores absolute URLs in some code paths.
  * All other callers pass relative paths (/foo or foo) — those work unchanged.
  */
-function toPageSlug(url: string): string {
+/** @internal exported for unit testing */
+export function toPageSlug(url: string): string {
   let path = url;
   if (url.startsWith('http')) {
     try { path = new URL(url).pathname; } catch { /* fall through */ }
@@ -427,7 +433,8 @@ const URL_SLUG_PREFIXES = ['insight:ctr_opportunity:', 'insight:freshness_alert:
  * which applies this function to the source portion and toPageSlug() to the
  * suffix portion separately.
  */
-function migrateSourceKey(source: string): string {
+/** @internal exported for unit testing */
+export function migrateSourceKey(source: string): string {
   for (const prefix of URL_SLUG_PREFIXES) {
     if (source.startsWith(prefix)) {
       const slug = source.slice(prefix.length);
@@ -445,15 +452,18 @@ function migrateSourceKey(source: string): string {
  * recs produce matching keys, preserving in_progress/dismissed status across
  * the one-time migration.
  */
-function buildMergeKey(rec: { source: string; affectedPages: string[]; title: string }): string {
+/** @internal exported for unit testing */
+export function buildMergeKey(rec: { source: string; affectedPages: string[]; title: string }): string {
   const source = migrateSourceKey(rec.source);
   if (!source.startsWith('strategy:')) return source;
   const page = rec.affectedPages[0] ? toPageSlug(rec.affectedPages[0]) : rec.title;
   return `${source}::${page}`;
 }
 
-/** Weight impact score based on page type (homepage/service pages matter more) */
-function pageImportanceMultiplier(slug: string): number {
+/** Weight impact score based on page type (homepage/service pages matter more)
+ * @internal exported for unit testing
+ */
+export function pageImportanceMultiplier(slug: string): number {
   const s = slug.toLowerCase().replace(/^\//, '');
   if (s === '' || s === 'index' || s === 'home') return 1.5;
   if (/(?:^|\/)services?|solutions?|products?|pricing|packages/.test(s)) return 1.2;
@@ -461,8 +471,10 @@ function pageImportanceMultiplier(slug: string): number {
   return 1.0;
 }
 
-/** Map check name to recommendation type */
-function checkToRecType(check: string, category?: string): RecType {
+/** Map check name to recommendation type
+ * @internal exported for unit testing
+ */
+export function checkToRecType(check: string, category?: string): RecType {
   const chk = check.toLowerCase();
   if (chk.startsWith('aeo-')) return 'aeo';
   if (chk.includes('meta') || chk.includes('title') || chk.includes('description')) return 'metadata';
@@ -473,8 +485,10 @@ function checkToRecType(check: string, category?: string): RecType {
   return 'technical';
 }
 
-/** Map issue type to purchasable product */
-function mapToProduct(recType: RecType, pageCount: number): { productType?: string; productPrice?: number } {
+/** Map issue type to purchasable product
+ * @internal exported for unit testing
+ */
+export function mapToProduct(recType: RecType, pageCount: number): { productType?: string; productPrice?: number } {
   switch (recType) {
     case 'metadata':
       return pageCount >= 10
@@ -501,8 +515,10 @@ function mapToProduct(recType: RecType, pageCount: number): { productType?: stri
 
 // ─── Insight Text Generators ──────────────────────────────────────
 
-/** Infer the most appropriate schema type(s) from a list of page slugs */
-function inferSchemaTypes(slugs: string[]): string {
+/** Infer the most appropriate schema type(s) from a list of page slugs
+ * @internal exported for unit testing
+ */
+export function inferSchemaTypes(slugs: string[]): string {
   const types = new Set<string>();
   for (const slug of slugs) {
     const s = slug.toLowerCase();
