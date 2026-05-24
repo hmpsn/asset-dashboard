@@ -273,6 +273,7 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
 
       <LocalSeoVisibilityPanel
         workspaceId={workspaceId}
+        mode="keywords"
         onOpenKeywords={() => {
           setFilter(KEYWORD_COMMAND_CENTER_FILTERS.LOCAL);
           setPage(1);

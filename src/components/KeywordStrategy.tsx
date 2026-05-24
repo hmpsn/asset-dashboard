@@ -1,4 +1,5 @@
 import { useCallback, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { MetricsSource } from '../../shared/types/keywords.js';
 import {
   Loader2, Target, ChevronDown, ChevronRight, RefreshCw,
@@ -27,6 +28,7 @@ import { queryKeys } from '../lib/queryKeys';
 import { keywordTrackingKey } from '../lib/keywordTracking';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
+import { adminPath } from '../routes';
 
 /** Minimum monthly search volume to display a strategy card. Cards below this are noise. */
 const VOLUME_THRESHOLD = 10;
@@ -63,6 +65,7 @@ interface Props {
 }
 
 export function KeywordStrategyPanel({ workspaceId }: Props) {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { jobs, startJob, findActiveJob } = useBackgroundTasks();
   const [startingStrategyJob, setStartingStrategyJob] = useState(false);
@@ -338,7 +341,11 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         <AIContextIndicator workspaceId={workspaceId} feature="strategy" />
       )}
 
-      <LocalSeoVisibilityPanel workspaceId={workspaceId} compact />
+      <LocalSeoVisibilityPanel
+        workspaceId={workspaceId}
+        mode="strategy"
+        onOpenKeywords={() => navigate(adminPath(workspaceId, 'seo-keywords'))}
+      />
 
       {/* Settings Panel */}
       {/* pr-check-disable-next-line -- brand asymmetric signature on KeywordStrategy settings panel; intentional non-SectionCard chrome (collapsible, button-as-first-child) */}

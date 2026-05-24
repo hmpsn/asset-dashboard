@@ -386,10 +386,10 @@
           "source": "Tier 2 staging review 2026-05-21",
           "priority": "P2",
           "est": "0.5 day scoping + 1 day implementation",
-          "status": "pending",
+          "status": "done",
           "plannedSprint": "sprint-local-seo-h",
           "owner": "design",
-          "notes": "Local SEO content currently appears in three places: (1) Keyword Strategy page — high-level posture + market setup, (2) Keyword Command Center — keyword-level local visibility lens, (3) Page Intelligence — per-page local-intent annotations. Each surface is individually justified but the visual treatment doesn't make the relationship obvious; users see three near-duplicate panels. Audit task: design pass on which fields appear where, which surface is canonical for each fact, and what visual cues (icons, accent colors, links) clarify the hub-and-spoke relationship. Likely outcome: Strategy = posture + setup canonical home, Keywords = keyword-level lens with link to Strategy for setup, Page Intelligence = per-page annotation badge with link to Keywords. Treat as design-first scoping, not just implementation."
+          "notes": "Completed 2026-05-24 in `docs/superpowers/audits/2026-05-24-local-seo-surface-audit.md` plus the follow-up surface-mode implementation. The audit confirmed the intended hub-and-spoke IA: Strategy is the canonical local posture/setup surface, Keyword Command Center is the canonical keyword-level local visibility hub, and Page Intelligence keeps only page-level local evidence annotations with handoff back to Keywords. Implementation replaced the old `LocalSeoVisibilityPanel compact` call sites with explicit `mode: 'strategy' | 'keywords' | 'page'`: Strategy now renders Local SEO Setup with market configuration and aggregate evidence, KCC renders Local Keyword Visibility as the full local lens, and Page Intelligence renders annotation-only guidance without workspace stats/global refresh controls. Focused component tests pin all three surface roles. Client-facing Local SEO remains deferred."
         },
         {
           "id": "intel-quality-keyword-per-market-relevance",
@@ -1186,9 +1186,9 @@
     },
     {
       "id": "sprint-local-seo-h",
-      "name": "Local SEO Quality — Foundation Fixes (Sprint H)",
+      "name": "✅ SHIPPED — Local SEO Quality — Foundation Fixes (Sprint H)",
       "hours": "3-4 days",
-      "rationale": "Archive sprint for highest-credibility fixes from the Swish 200-snapshot audit. KCC UX overhaul, multi-location business match, and primary-market geo-targeted volume have shipped through their canonical roadmap items. The remaining active item is local-seo-surface-audit, a design-first pass to clarify which local SEO facts belong on Strategy, Keywords, and Page Intelligence.",
+      "rationale": "Shipped archive sprint for highest-credibility fixes from the Swish 200-snapshot audit. KCC UX overhaul, multi-location business match, primary-market geo-targeted volume, and the Local SEO surface audit have shipped through their canonical roadmap items.",
       "items": [
         {
           "id": "sprint-local-seo-h-ref-kcc-ui-overhaul",
@@ -1225,16 +1225,17 @@
           "title": "Local SEO surface audit — Strategy / Keywords / Page Intelligence",
           "priority": "P2",
           "est": "0.5 day scoping + 1 day implementation",
-          "status": "pending",
-          "notes": "Design-first. Run after KCC UX overhaul and multi-location/volume fixes settle the final information hierarchy. Audit which facts belong on which surface and what cross-links make the hub-and-spoke relationship obvious."
+          "status": "done",
+          "notes": "Closed as a Sprint H reference item. Canonical audit and implementation completed under `local-seo-surface-audit` on 2026-05-24 with explicit surface modes: Strategy = posture/setup, Keywords = keyword-level local visibility hub, Page Intelligence = page-level annotation and handoff."
         }
-      ]
+      ],
+      "shippedAt": "2026-05-22"
     },
     {
       "id": "sprint-local-seo-i",
       "name": "✅ SHIPPED — Local SEO Quality — Iterator & Insight Batch (Sprint I)",
       "hours": "2-3 days",
-      "rationale": "Archive sprint for Local SEO iterator and insight-surface quality work. The iterator quality batch and insight surfaces batch have shipped through their canonical roadmap items; remaining local SEO work now lives in the active/deferred canonical items such as local-seo-surface-audit, per-market keyword relevance, GBP/reviews, geo-grid tracking, local recommendations, and client dashboard rollout.",
+      "rationale": "Archive sprint for Local SEO iterator and insight-surface quality work. The iterator quality batch and insight surfaces batch have shipped through their canonical roadmap items; remaining local SEO work now lives in active/deferred canonical items such as per-market keyword relevance, GBP/reviews, geo-grid tracking, local recommendations, and client dashboard rollout.",
       "items": [
         {
           "id": "sprint-local-seo-i-batch-iterator",
