@@ -217,6 +217,85 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
     expect(screen.queryByText('cosmetic dentistry austin')).not.toBeInTheDocument();
   });
 
+  it('renders Strategy mode as the posture and setup home', () => {
+    localSeoData = makeReadResponse({
+      markets: [{
+        id: 'market-austin',
+        workspaceId: 'ws-1',
+        label: 'Austin, TX',
+        city: 'Austin',
+        stateOrRegion: 'TX',
+        country: 'US',
+        source: 'admin_override',
+        status: 'active',
+        createdAt: '2026-05-20T12:00:00.000Z',
+        updatedAt: '2026-05-20T12:00:00.000Z',
+      }],
+      report: {
+        setupState: 'ready_no_data',
+        setupLabel: 'Local setup ready',
+        setupDetail: 'Refresh local visibility when you are ready to measure this market.',
+        activeMarketCount: 1,
+        configuredMarketCount: 1,
+      },
+    });
+
+    renderPanel({ workspaceId: 'ws-1', mode: 'strategy', onOpenKeywords: vi.fn() });
+
+    expect(screen.getByText('Local SEO Setup')).toBeInTheDocument();
+    expect(screen.getByText('Local setup ready')).toBeInTheDocument();
+    expect(screen.getByText('Austin, TX')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /view local keywords/i })).toBeInTheDocument();
+    expect(screen.queryByText('Local Keyword Visibility')).not.toBeInTheDocument();
+  });
+
+  it('renders Keywords mode as the local keyword visibility hub', () => {
+    localSeoData = makeReadResponse({
+      report: {
+        setupState: 'has_data',
+        setupLabel: 'Local visibility ready',
+        setupDetail: 'Use Keywords to inspect local visibility by keyword.',
+        activeMarketCount: 1,
+        configuredMarketCount: 1,
+        checkedKeywordCount: 12,
+        visibleCount: 4,
+        possibleMatchCount: 3,
+        notVisibleCount: 5,
+      },
+    });
+
+    renderPanel({ workspaceId: 'ws-1', mode: 'keywords', onOpenKeywords: vi.fn() });
+
+    expect(screen.getByText('Local Keyword Visibility')).toBeInTheDocument();
+    expect(screen.getByText('Keyword visibility lives in Keywords')).toBeInTheDocument();
+    expect(screen.getByText('Possible')).toBeInTheDocument();
+    expect(screen.getByText('Not Found')).toBeInTheDocument();
+  });
+
+  it('renders Page mode as annotation-only without workspace stats or refresh controls', () => {
+    localSeoData = makeReadResponse({
+      report: {
+        setupState: 'has_data',
+        setupLabel: 'Local visibility ready',
+        setupDetail: 'Use Keywords to inspect local visibility by keyword.',
+        activeMarketCount: 1,
+        configuredMarketCount: 1,
+        checkedKeywordCount: 2,
+        visibleCount: 1,
+      },
+    });
+
+    renderPanel({ workspaceId: 'ws-1', mode: 'page', onOpenKeywords: vi.fn() });
+
+    expect(screen.getByText('Local visibility annotation')).toBeInTheDocument();
+    expect(screen.getByText(/Page rows show local evidence/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /open keywords/i })).toBeInTheDocument();
+    expect(screen.queryByText('Markets')).not.toBeInTheDocument();
+    expect(screen.queryByText('Checked')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^refresh$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /configure market/i })).not.toBeInTheDocument();
+  });
+
   it('uses a suggested market to populate a valid active market save', async () => {
     renderPanel();
 

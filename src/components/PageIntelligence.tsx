@@ -257,7 +257,11 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
         onSortChange={handleSortChange}
       />
 
-      <LocalSeoVisibilityPanel workspaceId={workspaceId} compact />
+      <LocalSeoVisibilityPanel
+        workspaceId={workspaceId}
+        mode="page"
+        onOpenKeywords={() => navigate(adminPath(workspaceId, 'seo-keywords'))}
+      />
 
       <PageIntelligencePageList
         pages={filtered}
