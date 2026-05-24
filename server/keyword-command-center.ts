@@ -2074,7 +2074,12 @@ export async function buildKeywordCommandCenterDetail(
   const contentGaps = listContentGaps(workspace.id).filter(gap => keywordComparisonKey(gap.targetKeyword) === normalized);
   const keywordGaps = listKeywordGaps(workspace.id).filter(gap => keywordComparisonKey(gap.keyword) === normalized);
   const rawTrackedKeywords = getTrackedKeywords(workspace.id, { includeInactive: true }).filter(entry => keywordComparisonKey(entry.query) === normalized);
-  const latestRanks = getLatestSnapshotRanks(workspace.id).filter(rank => keywordComparisonKey(rank.query) === normalized);
+  // Load all ranks for variant aggregation — populateDraftRows uses variantParentMap to
+  // cluster GSC query variants (e.g. "teeth whitening san antonio") under their canonical
+  // keyword. Filtering to exact matches here would prevent variant metrics from rolling up.
+  // Use the filtered set only for the hasBaseSource check below.
+  const allLatestRanks = getLatestSnapshotRanks(workspace.id);
+  const latestRanks = allLatestRanks.filter(rank => keywordComparisonKey(rank.query) === normalized);
   const feedback = filterMapByKeys(readFeedback(workspace.id), new Set([normalized]));
   const lostVisibilityRows = safeLostVisibilityRows(workspace.id).filter(row => keywordComparisonKey(row.query) === normalized);
   const strategy = filterStrategyForSingleKeyword(workspace.keywordStrategy, normalized);
@@ -2115,7 +2120,7 @@ export async function buildKeywordCommandCenterDetail(
     contentGaps,
     keywordGaps,
     trackedKeywords,
-    latestRanks,
+    latestRanks: allLatestRanks,
     feedback,
     lostVisibilityRows,
     includeStrategyUx: true,
