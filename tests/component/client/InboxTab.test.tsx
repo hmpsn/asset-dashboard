@@ -14,12 +14,6 @@ import { InboxTab } from '../../../src/components/client/InboxTab';
 import type { ApprovalBatch, ClientRequest, ClientContentRequest } from '../../../src/components/client/types';
 import type { ClientAction } from '../../../shared/types/client-actions';
 
-// ── React Router — MemoryRouter is used directly in each test ─────────────────
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
-  return { ...actual };
-});
-
 // ── BetaContext ───────────────────────────────────────────────────────────────
 vi.mock('../../../src/components/client/BetaContext', () => ({
   useBetaMode: () => false,
