@@ -455,11 +455,13 @@ describe('PostReviewCard — inline editing', () => {
     expect(screen.getAllByTestId('rich-text-editor').length).toBeGreaterThan(0);
   });
 
-  it('shows Done button after entering edit mode for a section', () => {
+  it('shows Done button after entering edit mode for a section', async () => {
     renderCard();
     const editButtons = screen.getAllByRole('button', { name: /edit/i });
     // Third Edit button opens the first section editor
     fireEvent.click(editButtons[2]);
-    expect(screen.getAllByRole('button', { name: /done/i }).length).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: /done/i }).length).toBeGreaterThan(0);
+    });
   });
 });
