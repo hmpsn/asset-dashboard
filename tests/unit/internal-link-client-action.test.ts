@@ -28,8 +28,10 @@ describe('internal link client action helpers', () => {
   it('normalizes legacy payload rows without coercing URL fields into title fields', () => {
     const normalized = normalizeInternalLinkSuggestion({
       anchorText: 'SEO services',
-      targetUrl: '/services',
+      targetUrl: ' /services ',
+      targetTitle: '/services',
       sourcePage: '/about',
+      sourcePageTitle: '/about',
     });
 
     expect(normalized).toEqual({

@@ -70,6 +70,32 @@ describe('usePageRewriteChatShell', () => {
     });
   });
 
+  it('prints the editor document for PDF export and cleans up print state', async () => {
+    const toast = vi.fn();
+    const print = vi.fn();
+    Object.defineProperty(window, 'print', {
+      value: print,
+      configurable: true,
+    });
+
+    const { result } = renderHook(() =>
+      usePageRewriteChatShell({
+        workspaceId: 'ws-pdf-export',
+        toast,
+      })
+    );
+
+    act(() => {
+      result.current.docBodyRefCallback(document.createElement('div'));
+      result.current.handleExport('pdf');
+      window.dispatchEvent(new Event('afterprint'));
+    });
+
+    expect(print).toHaveBeenCalledOnce();
+    expect(document.body.classList.contains('page-rewrite-printing')).toBe(false);
+    expect(document.getElementById('page-rewrite-print-root')?.innerHTML).toBe('');
+  });
+
   it('prevents duplicate sendMessage calls while request is in flight', async () => {
     const toast = vi.fn();
     let resolveRequest: ((value: { answer: string }) => void) | null = null;

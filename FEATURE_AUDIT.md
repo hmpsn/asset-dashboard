@@ -1,8 +1,32 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **447 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **449 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 449. Page Rewriter PDF Export
+
+**What it does:** Adds a lightweight PDF/print export path to Page Rewriter briefs. The Export brief menu now includes Download PDF, which renders the current editable document into a hidden print-only root, applies scoped print styling, and opens the browser print flow without adding another dependency. Markdown and DOCX exports remain available.
+
+**Agency value:** Gives operators a fast share/print path for rewrite briefs when DOCX is more than the handoff needs.
+
+**Client value:** Makes rewrite recommendations easier to review in a familiar PDF-style format.
+
+**Mutual:** Improves handoff flexibility while keeping export behavior local to the Page Rewriter shell.
+
+---
+
+### 448. Internal Link Review Field Separation
+
+**What it does:** Hardens internal-link client review rendering so target URL, target title, source page URL, and source title stay distinct. Current payloads already carry explicit fields; the display normalizer now also protects legacy or malformed rows from rendering URL/path values in title columns.
+
+**Agency value:** Reduces review confusion when sending internal-link recommendations to clients.
+
+**Client value:** Clients can see what anchor text is being proposed, which page receives the link, and where the link should be added without title/URL ambiguity.
+
+**Mutual:** Keeps the approval workflow unchanged while making the review payload more trustworthy.
 
 ---
 

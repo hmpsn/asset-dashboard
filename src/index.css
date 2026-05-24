@@ -87,6 +87,95 @@ input::placeholder, textarea::placeholder {
   color: var(--brand-text-bright);
 }
 
+.page-rewrite-print-root {
+  display: none;
+}
+
+@media print {
+  @page {
+    margin: 0.75in;
+  }
+
+  body.page-rewrite-printing {
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  body.page-rewrite-printing > *:not(.page-rewrite-print-root) {
+    display: none !important;
+  }
+
+  body.page-rewrite-printing .page-rewrite-print-root {
+    display: block !important;
+  }
+
+  .page-rewrite-print-doc {
+    color: #111;
+    font: 11pt/1.55 Georgia, 'Times New Roman', serif;
+  }
+
+  .page-rewrite-print-doc h1,
+  .page-rewrite-print-doc h2,
+  .page-rewrite-print-doc h3,
+  .page-rewrite-print-doc h4 {
+    color: #111 !important;
+    font-family: Arial, Helvetica, sans-serif;
+    page-break-after: avoid;
+  }
+
+  .page-rewrite-print-doc h1 {
+    font-size: 24pt;
+    margin: 0 0 14pt;
+  }
+
+  .page-rewrite-print-doc h2 {
+    font-size: 16pt;
+    margin: 18pt 0 8pt;
+  }
+
+  .page-rewrite-print-doc h3,
+  .page-rewrite-print-doc h4 {
+    font-size: 12pt;
+    margin: 14pt 0 6pt;
+  }
+
+  .page-rewrite-print-doc p,
+  .page-rewrite-print-doc li {
+    color: #222 !important;
+    font-size: 11pt;
+  }
+
+  .page-rewrite-print-meta {
+    border-bottom: 1px solid #ddd;
+    color: #666 !important;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 9pt !important;
+    margin: 0 0 18pt;
+    padding-bottom: 8pt;
+  }
+
+  .page-rewrite-print-issues {
+    border: 1px solid #ddd;
+    margin: 0 0 18pt;
+    padding: 10pt 12pt;
+  }
+
+  .page-rewrite-print-issues h2 {
+    font-size: 12pt;
+    margin: 0 0 6pt;
+  }
+
+  .page-rewrite-print-issues ul {
+    margin: 0;
+    padding-left: 16pt;
+  }
+
+  .page-rewrite-print-body a {
+    color: #0f766e !important;
+    text-decoration: underline;
+  }
+}
+
 /* ─── Styleguide accent compatibility layer ────────────────────────────────
    Client-facing UI may only use the styleguide accent palette. These aliases
    keep legacy Tailwind accent classes visually mapped to the canonical tokens
