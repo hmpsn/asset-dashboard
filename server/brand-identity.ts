@@ -131,7 +131,7 @@ function buildBrandContext(workspaceId: string): string {
   return parts.join('\n\n');
 }
 
-function getDeliverableInstructions(type: DeliverableType): string {
+export function getDeliverableInstructions(type: DeliverableType): string {
   const instructions: Partial<Record<DeliverableType, string>> = {
     mission: 'Write a mission statement: 1-2 sentences explaining why this business exists. Start with an action verb. Specific to this business.',
     vision: 'Write a vision statement: 1-2 sentences describing where this business is headed in 5-10 years. Aspirational but grounded.',
