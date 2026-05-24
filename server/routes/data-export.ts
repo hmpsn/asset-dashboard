@@ -76,7 +76,7 @@ router.get('/api/export/:workspaceId/strategy', requireWorkspaceAccess('workspac
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const pageMap = listPageKeywords(req.params.workspaceId);
-  if (!pageMap.length) return res.json([]);
+  if (!pageMap.length) return sendExport(res, [], ['pagePath', 'pageTitle', 'primaryKeyword', 'secondaryKeywords'], `strategy-${req.params.workspaceId}`, format);
   log.info(`EXPORT strategy ${req.params.workspaceId}: ${pageMap.length} pages as ${format}`);
   const rows = pageMap.map(p => ({
     pagePath: p.pagePath,
