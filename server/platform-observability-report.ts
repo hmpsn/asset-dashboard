@@ -31,19 +31,19 @@ type JobRow = {
 
 const DEFAULT_DAYS = 14;
 
-function p95(values: number[]): number | null {
+export function p95(values: number[]): number | null {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);
   const idx = Math.max(0, Math.ceil(sorted.length * 0.95) - 1);
   return sorted[idx] ?? null;
 }
 
-function avg(values: number[]): number | null {
+export function avg(values: number[]): number | null {
   if (values.length === 0) return null;
   return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
 }
 
-function estimateAiCostUsd(entry: {
+export function estimateAiCostUsd(entry: {
   promptTokens: number;
   completionTokens: number;
   model: string;

@@ -644,12 +644,20 @@ describe('Background Job transitions', () => {
       expect(validate('pending', 'error')).toBe('error');
     });
 
+    it('pending → cancelled', () => {
+      expect(validate('pending', 'cancelled')).toBe('cancelled');
+    });
+
     it('running → done', () => {
       expect(validate('running', 'done')).toBe('done');
     });
 
     it('running → error', () => {
       expect(validate('running', 'error')).toBe('error');
+    });
+
+    it('running → cancelled', () => {
+      expect(validate('running', 'cancelled')).toBe('cancelled');
     });
   });
 
@@ -658,16 +666,338 @@ describe('Background Job transitions', () => {
       expect(() => validate('done', 'running')).toThrow(InvalidTransitionError);
     });
 
+    it('done → pending (terminal)', () => {
+      expect(() => validate('done', 'pending')).toThrow(InvalidTransitionError);
+    });
+
+    it('done → error (terminal)', () => {
+      expect(() => validate('done', 'error')).toThrow(InvalidTransitionError);
+    });
+
+    it('done → cancelled (terminal)', () => {
+      expect(() => validate('done', 'cancelled')).toThrow(InvalidTransitionError);
+    });
+
     it('error → running (terminal)', () => {
       expect(() => validate('error', 'running')).toThrow(InvalidTransitionError);
+    });
+
+    it('error → pending (terminal)', () => {
+      expect(() => validate('error', 'pending')).toThrow(InvalidTransitionError);
+    });
+
+    it('error → done (terminal)', () => {
+      expect(() => validate('error', 'done')).toThrow(InvalidTransitionError);
+    });
+
+    it('error → cancelled (terminal)', () => {
+      expect(() => validate('error', 'cancelled')).toThrow(InvalidTransitionError);
     });
 
     it('cancelled → running (terminal)', () => {
       expect(() => validate('cancelled', 'running')).toThrow(InvalidTransitionError);
     });
 
+    it('cancelled → done (terminal)', () => {
+      expect(() => validate('cancelled', 'done')).toThrow(InvalidTransitionError);
+    });
+
+    it('cancelled → error (terminal)', () => {
+      expect(() => validate('cancelled', 'error')).toThrow(InvalidTransitionError);
+    });
+
     it('running → pending (no rollback)', () => {
       expect(() => validate('running', 'pending')).toThrow(InvalidTransitionError);
     });
+  });
+
+  it('all terminal states have empty transition arrays', () => {
+    expect(BACKGROUND_JOB_TRANSITIONS['done']).toEqual([]);
+    expect(BACKGROUND_JOB_TRANSITIONS['error']).toEqual([]);
+    expect(BACKGROUND_JOB_TRANSITIONS['cancelled']).toEqual([]);
+  });
+});
+
+// ── Generated Post — additional coverage gaps ──
+
+describe('Generated Post transitions — additional coverage', () => {
+  const validate = (from: string, to: string) =>
+    validateTransition('post', POST_STATUS_TRANSITIONS, from, to);
+
+  it('generating → error (generation failure path)', () => {
+    expect(validate('generating', 'error')).toBe('error');
+  });
+
+  it('error → draft (recovery after error)', () => {
+    expect(validate('error', 'draft')).toBe('draft');
+  });
+
+  it('error → generating (no rollback to generating)', () => {
+    expect(() => validate('error', 'generating')).toThrow(InvalidTransitionError);
+  });
+
+  it('error → review (cannot skip draft after error)', () => {
+    expect(() => validate('error', 'review')).toThrow(InvalidTransitionError);
+  });
+
+  it('error → approved (cannot skip to terminal after error)', () => {
+    expect(() => validate('error', 'approved')).toThrow(InvalidTransitionError);
+  });
+});
+
+// ── Client Action — additional coverage gaps ──
+
+describe('Client Action transitions — additional coverage', () => {
+  const validate = (from: string, to: string) =>
+    validateTransition('client_action', CLIENT_ACTION_TRANSITIONS, from, to);
+
+  it('pending → archived (direct archive path)', () => {
+    expect(validate('pending', 'archived')).toBe('archived');
+  });
+
+  it('approved → archived', () => {
+    expect(validate('approved', 'archived')).toBe('archived');
+  });
+
+  it('changes_requested → completed', () => {
+    expect(validate('changes_requested', 'completed')).toBe('completed');
+  });
+
+  it('changes_requested → archived', () => {
+    expect(validate('changes_requested', 'archived')).toBe('archived');
+  });
+
+  it('approved → pending (not allowed — must go through changes_requested)', () => {
+    expect(() => validate('approved', 'pending')).toThrow(InvalidTransitionError);
+  });
+
+  it('completed → approved (terminal except archive)', () => {
+    expect(() => validate('completed', 'approved')).toThrow(InvalidTransitionError);
+  });
+
+  it('completed → changes_requested (terminal except archive)', () => {
+    expect(() => validate('completed', 'changes_requested')).toThrow(InvalidTransitionError);
+  });
+
+  it('archived → changes_requested (terminal)', () => {
+    expect(() => validate('archived', 'changes_requested')).toThrow(InvalidTransitionError);
+  });
+
+  it('archived → approved (terminal)', () => {
+    expect(() => validate('archived', 'approved')).toThrow(InvalidTransitionError);
+  });
+});
+
+// ── Content Request — additional coverage gaps ──
+
+describe('Content Request transitions — additional coverage', () => {
+  const validate = (from: string, to: string) =>
+    validateTransition('content_request', CONTENT_REQUEST_TRANSITIONS, from, to);
+
+  it('in_progress → post_review', () => {
+    expect(validate('in_progress', 'post_review')).toBe('post_review');
+  });
+
+  it('post_review → changes_requested', () => {
+    expect(validate('post_review', 'changes_requested')).toBe('changes_requested');
+  });
+
+  it('post_review → delivered', () => {
+    expect(validate('post_review', 'delivered')).toBe('delivered');
+  });
+
+  it('post_review → published', () => {
+    expect(validate('post_review', 'published')).toBe('published');
+  });
+
+  it('post_review → declined', () => {
+    expect(validate('post_review', 'declined')).toBe('declined');
+  });
+
+  it('post_review → requested (backward movement blocked)', () => {
+    expect(() => validate('post_review', 'requested')).toThrow(InvalidTransitionError);
+  });
+
+  it('post_review → in_progress (not a valid post_review exit)', () => {
+    expect(() => validate('post_review', 'in_progress')).toThrow(InvalidTransitionError);
+  });
+
+  it('changes_requested → in_progress', () => {
+    expect(validate('changes_requested', 'in_progress')).toBe('in_progress');
+  });
+
+  it('changes_requested → post_review', () => {
+    expect(validate('changes_requested', 'post_review')).toBe('post_review');
+  });
+
+  it('changes_requested → delivered', () => {
+    expect(validate('changes_requested', 'delivered')).toBe('delivered');
+  });
+
+  it('changes_requested → published', () => {
+    expect(validate('changes_requested', 'published')).toBe('published');
+  });
+
+  it('delivered → declined (not an allowed exit from delivered)', () => {
+    expect(() => validate('delivered', 'declined')).toThrow(InvalidTransitionError);
+  });
+
+  it('delivered → in_progress (backward movement blocked)', () => {
+    expect(() => validate('delivered', 'in_progress')).toThrow(InvalidTransitionError);
+  });
+});
+
+// ── InvalidTransitionError — instanceof and Error chain ──
+
+describe('InvalidTransitionError — class hierarchy and properties', () => {
+  it('is instanceof Error', () => {
+    let caught: unknown;
+    try {
+      validateTransition('approval', APPROVAL_ITEM_TRANSITIONS, 'applied', 'pending');
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(Error);
+  });
+
+  it('is instanceof InvalidTransitionError', () => {
+    let caught: unknown;
+    try {
+      validateTransition('approval', APPROVAL_ITEM_TRANSITIONS, 'applied', 'pending');
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(InvalidTransitionError);
+  });
+
+  it('carries the correct entity name', () => {
+    let caught: InvalidTransitionError | null = null;
+    try {
+      validateTransition('my_entity', APPROVAL_ITEM_TRANSITIONS, 'applied', 'pending');
+    } catch (e) {
+      caught = e as InvalidTransitionError;
+    }
+    expect(caught!.entity).toBe('my_entity');
+  });
+
+  it('carries the correct from value', () => {
+    let caught: InvalidTransitionError | null = null;
+    try {
+      validateTransition('approval', APPROVAL_ITEM_TRANSITIONS, 'applied', 'pending');
+    } catch (e) {
+      caught = e as InvalidTransitionError;
+    }
+    expect(caught!.from).toBe('applied');
+  });
+
+  it('carries the correct to value', () => {
+    let caught: InvalidTransitionError | null = null;
+    try {
+      validateTransition('approval', APPROVAL_ITEM_TRANSITIONS, 'applied', 'pending');
+    } catch (e) {
+      caught = e as InvalidTransitionError;
+    }
+    expect(caught!.to).toBe('pending');
+  });
+
+  it('message format: "Invalid <entity> transition: \'<from>\' → \'<to>\'"', () => {
+    let caught: InvalidTransitionError | null = null;
+    try {
+      validateTransition('approval', APPROVAL_ITEM_TRANSITIONS, 'applied', 'pending');
+    } catch (e) {
+      caught = e as InvalidTransitionError;
+    }
+    expect(caught!.message).toBe("Invalid approval transition: 'applied' → 'pending'");
+  });
+
+  it('unknown from state: entity, from, to are all set on the error', () => {
+    let caught: InvalidTransitionError | null = null;
+    try {
+      validateTransition('approval', APPROVAL_ITEM_TRANSITIONS, 'ghost_state' as never, 'pending');
+    } catch (e) {
+      caught = e as InvalidTransitionError;
+    }
+    expect(caught!.entity).toBe('approval');
+    expect(caught!.from).toBe('ghost_state');
+    expect(caught!.to).toBe('pending');
+  });
+});
+
+// ── Unknown `from` state — silent-failure guard ──
+
+describe('unknown from state throws across all maps', () => {
+  it('CONTENT_REQUEST_TRANSITIONS unknown from state throws', () => {
+    expect(() =>
+      validateTransition('cr', CONTENT_REQUEST_TRANSITIONS, 'unknown' as never, 'requested'),
+    ).toThrow(InvalidTransitionError);
+  });
+
+  it('POST_STATUS_TRANSITIONS unknown from state throws', () => {
+    expect(() =>
+      validateTransition('post', POST_STATUS_TRANSITIONS, 'nonexistent' as never, 'draft'),
+    ).toThrow(InvalidTransitionError);
+  });
+
+  it('WORK_ORDER_TRANSITIONS unknown from state throws', () => {
+    expect(() =>
+      validateTransition('wo', WORK_ORDER_TRANSITIONS, 'bogus' as never, 'completed'),
+    ).toThrow(InvalidTransitionError);
+  });
+
+  it('CONTENT_SUB_TRANSITIONS unknown from state throws', () => {
+    expect(() =>
+      validateTransition('sub', CONTENT_SUB_TRANSITIONS, 'mystery' as never, 'active'),
+    ).toThrow(InvalidTransitionError);
+  });
+
+  it('CLIENT_ACTION_TRANSITIONS unknown from state throws', () => {
+    expect(() =>
+      validateTransition('action', CLIENT_ACTION_TRANSITIONS, 'invented' as never, 'pending'),
+    ).toThrow(InvalidTransitionError);
+  });
+
+  it('BRIEFING_DRAFT_TRANSITIONS unknown from state throws', () => {
+    expect(() =>
+      validateTransition('briefing', BRIEFING_DRAFT_TRANSITIONS, 'typo_state' as never, 'draft'),
+    ).toThrow(InvalidTransitionError);
+  });
+
+  it('BACKGROUND_JOB_TRANSITIONS unknown from state throws', () => {
+    expect(() =>
+      validateTransition('job', BACKGROUND_JOB_TRANSITIONS, 'stale_state' as never, 'running'),
+    ).toThrow(InvalidTransitionError);
+  });
+});
+
+// ── Return value chaining contract ──
+
+describe('validateTransition return value contract', () => {
+  it('returns the to value (not from, not void)', () => {
+    const result = validateTransition('post', POST_STATUS_TRANSITIONS, 'draft', 'review');
+    expect(result).toBe('review');
+    expect(result).not.toBe('draft');
+  });
+
+  it('returned value is suitable for direct DB assignment', () => {
+    // Simulates: const next = validateTransition(...); stmt.run({ status: next })
+    const next = validateTransition('work_order', WORK_ORDER_TRANSITIONS, 'pending', 'in_progress');
+    const record = { status: next };
+    expect(record.status).toBe('in_progress');
+  });
+
+  it('returned value equals the to parameter for all maps', () => {
+    const pairs: Array<[Record<string, readonly string[]>, string, string]> = [
+      [APPROVAL_ITEM_TRANSITIONS, 'pending', 'rejected'],
+      [CONTENT_REQUEST_TRANSITIONS, 'brief_generated', 'in_progress'],
+      [POST_STATUS_TRANSITIONS, 'review', 'approved'],
+      [WORK_ORDER_TRANSITIONS, 'in_progress', 'completed'],
+      [CONTENT_SUB_TRANSITIONS, 'paused', 'active'],
+      [CLIENT_ACTION_TRANSITIONS, 'approved', 'completed'],
+      [BRIEFING_DRAFT_TRANSITIONS, 'approved', 'published'],
+      [BACKGROUND_JOB_TRANSITIONS, 'running', 'done'],
+    ];
+    for (const [map, from, to] of pairs) {
+      expect(validateTransition('entity', map, from, to)).toBe(to);
+    }
   });
 });

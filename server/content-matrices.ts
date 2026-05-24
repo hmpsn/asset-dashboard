@@ -76,7 +76,7 @@ const stmts = createStmtCache(() => ({
 
 // ── Helpers ──
 
-function computeStats(cells: MatrixCell[]): ContentMatrix['stats'] {
+export function computeStats(cells: MatrixCell[]): ContentMatrix['stats'] {
   const stats = { total: cells.length, planned: 0, briefGenerated: 0, drafted: 0, reviewed: 0, published: 0 };
   for (const c of cells) {
     switch (c.status) {
@@ -124,7 +124,7 @@ function rowToMatrix(row: MatrixRow): ContentMatrix {
  * Generate cells from dimensions by computing the cartesian product of all
  * dimension values, then applying URL and keyword patterns.
  */
-function generateCells(
+export function generateCells(
   dimensions: MatrixDimension[],
   urlPattern: string,
   keywordPattern: string,
