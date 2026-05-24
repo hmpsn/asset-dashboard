@@ -2,6 +2,8 @@ import { get, post } from './client';
 import type {
   KeywordCommandCenterActionRequest,
   KeywordCommandCenterActionResult,
+  KeywordCommandCenterBulkActionRequest,
+  KeywordCommandCenterBulkActionResult,
   KeywordCommandCenterDetailResponse,
   KeywordCommandCenterRowsQuery,
   KeywordCommandCenterRowsResponse,
@@ -32,4 +34,7 @@ export const keywordCommandCenter = {
 
   action: (wsId: string, body: KeywordCommandCenterActionRequest) =>
     post<KeywordCommandCenterActionResult>(`/api/webflow/keyword-command-center/${wsId}/actions`, body),
+
+  bulkAction: (wsId: string, body: KeywordCommandCenterBulkActionRequest) =>
+    post<KeywordCommandCenterBulkActionResult>(`/api/webflow/keyword-command-center/${wsId}/actions/bulk`, body),
 };

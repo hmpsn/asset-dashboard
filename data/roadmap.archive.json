@@ -1769,6 +1769,111 @@
       "shippedAt": "2026-04-25"
     },
     {
+      "id": "sprint-seo-tier2-capabilities",
+      "name": "✅ SHIPPED — SEO Tier 2 Capabilities",
+      "hours": null,
+      "shippedAt": "2026-04-23",
+      "items": [
+        {
+          "id": 618,
+          "title": "Content Gap Opportunity Score (Item 8)",
+          "source": "SEO Tier 2 Capabilities plan",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped 2026-04-23. computeOpportunityScore() exported from server/routes/keyword-strategy.ts. Scores content gaps 0–100 by composing volume (45% weight, capped at 10K/mo), ease-of-ranking via 1−KD/100 (45% weight), and a GSC impressions additive bonus (up to 5% of the raw score, capped at 2K impressions). A trend multiplier (×1.3 rising / ×0.7 declining / ×1.0 stable) is applied last. Results sorted descending in both admin ContentGaps.tsx and client StrategyTab.tsx with blue score badges.",
+          "status": "done",
+          "shippedAt": "2026-04-23"
+        },
+        {
+          "id": 619,
+          "title": "Emerging Keyword Insights (Item 9)",
+          "source": "SEO Tier 2 Capabilities plan",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped 2026-04-23. Phase 5 in server/analytics-intelligence.ts. isKeywordEmerging() exported to detect trend-rising keywords (≥20% volume gain + positive second-half slope). Emits emerging_keyword InsightType. Wired into insight narrative, admin chat context, and InsightCards.tsx rendering with sparkline and percentage-change badge.",
+          "status": "done",
+          "shippedAt": "2026-04-23"
+        },
+        {
+          "id": 620,
+          "title": "Competitor Monitoring (Item 10)",
+          "source": "SEO Tier 2 Capabilities plan",
+          "est": "3-4h",
+          "priority": "P1",
+          "notes": "Shipped 2026-04-23. server/competitor-snapshot-store.ts + migrations 070/071. Weekly cron startCompetitorMonitoringCron() in server/intelligence-crons.ts (Monday 15min delayed). Snapshots competitor keywords, diffs against previous week, emits competitor_alert insights. Captures new rankings, losses, and schema additions. Wired into narrative, admin chat, and InsightCards UI.",
+          "status": "done",
+          "shippedAt": "2026-04-23"
+        },
+        {
+          "id": 621,
+          "title": "Content Freshness Alerts (Item 11)",
+          "source": "SEO Tier 2 Capabilities plan",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped 2026-04-23. Phase 6 in server/analytics-intelligence.ts. Flags pages with analysisGeneratedAt > 90 days old AND ≥100 impressions as freshness_alert (critical at 180d, warning at 90-180d). Auto-generates content_refresh recommendations. Wired into narrative, admin chat context, InsightCards.tsx with age badge and refresh CTA.",
+          "status": "done",
+          "shippedAt": "2026-04-23"
+        }
+      ]
+    },
+    {
+      "id": "sprint-rec-intelligence-tier1",
+      "name": "✅ SHIPPED — Recommendation Intelligence Tier 1",
+      "items": [
+        {
+          "id": 613,
+          "title": "CTR gap → title/meta recommendations (Item 1)",
+          "source": "SEO Recommendation Intelligence plan",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped 2026-04-23. Pulls ctr_opportunity insights from insight store, creates fix_now/fix_soon metadata recommendations for pages underperforming their expected CTR at their SERP position. Up to 10 per run sorted by click gap. Tested in tests/integration/recommendations-ctr-gap.test.ts (port 13335).",
+          "status": "done",
+          "shippedAt": "2026-04-23"
+        },
+        {
+          "id": 614,
+          "title": "Conversion-weighted traffic scoring (Item 2)",
+          "source": "SEO Recommendation Intelligence plan",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped 2026-04-23. getTrafficScore() now accepts optional conversionRate parameter. Pages with CVR > 2% receive up to 1.5x boost (proportional, capped). Conversion rates sourced from conversion_attribution insights. Applied to audit page scoring and sorting. Tested in tests/unit/recommendations-conversion.test.ts.",
+          "status": "done",
+          "shippedAt": "2026-04-23"
+        },
+        {
+          "id": 615,
+          "title": "Authority-adjusted KD filtering (Item 4)",
+          "source": "SEO Recommendation Intelligence plan",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped 2026-04-23. New adjustKdImpactScore() helper: KD 30+ above domain strength → 40% penalty, KD 15-30 above → 20% penalty, KD 20+ below → 20% boost (capped 100). Domain strength derived from SEMRush/DataForSEO organic keyword count. KD context appended to estimatedGain text. Tested in tests/unit/recommendations-authority-kd.test.ts.",
+          "status": "done",
+          "shippedAt": "2026-04-23"
+        },
+        {
+          "id": 616,
+          "title": "Search intent mismatch detection (Item 5)",
+          "source": "SEO Recommendation Intelligence plan",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped 2026-04-23. New inferPageType() classifies pages from slug patterns. isIntentMismatch() flags service/product pages targeting informational keywords and blog pages targeting transactional keywords. Emits fix_soon strategy recommendations, capped at 10 per run. Tested in tests/unit/recommendations-intent-mismatch.test.ts.",
+          "status": "done",
+          "shippedAt": "2026-04-23"
+        },
+        {
+          "id": 617,
+          "title": "Diagnostic remediation → auto-created recommendations (Item 6)",
+          "source": "SEO Recommendation Intelligence plan",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped 2026-04-23. Completed diagnostic reports with P0/P1 actions auto-generate fix_now recommendations (technical or content type based on action.owner). Up to 3 reports × 5 actions per run. Source keyed as diagnostic:{reportId}:{actionTitle} for merge stability. Tested in tests/integration/recommendations-diagnostic.test.ts (port 13337).",
+          "status": "done",
+          "shippedAt": "2026-04-23"
+        }
+      ],
+      "shippedAt": "2026-04-23"
+    },
+    {
       "id": "sprint-broadcast-invalidation-audit",
       "name": "✅ SHIPPED — Broadcast Invalidation Audit (do next)",
       "hours": "3-6",

@@ -429,6 +429,24 @@ Two-zone flat list + slide-in detail drawer introduced in the May 2026 rebuild.
 - Volume → audience size label (e.g. "~2.4K searches/mo")
 - Trend → "Interest growing / steady / declining"
 
+### Keyword Command Center (`KeywordCommandCenter.tsx`)
+
+The admin Keywords surface uses a full-width dense table with overlay detail, not a persistent side column.
+
+| Element | Color | Rationale |
+|---------|-------|-----------|
+| Row hover / selected tint | `bg-teal-500/5` | Teal = active interaction state |
+| Multi-select checkbox | `Checkbox` primitive (`--brand-mint`) | Teal action law; native checkbox accessibility preserved |
+| Bulk action bar | `bg-[var(--surface-2)] border-[var(--brand-border)]` with Button primitives | Operational control surface, not a marketing card |
+| Bulk add-to-strategy | Primary Button (`from-teal-600 to-emerald-600`) | Strategy action |
+| Bulk track | Secondary Button | Lifecycle action with lower emphasis than strategy add |
+| Bulk pause / retire | Ghost Button, destructive confirmation for retire | Pause is reversible; retire needs confirmation |
+| Bulk decline | Danger Button | Decline is a destructive strategy feedback action |
+| Detail drawer | Fixed right slide-over desktop, bottom sheet mobile; `bg-[var(--surface-2)]`, token z-index | Matches StrategyKeywordDrawer pattern while preserving table width |
+| Metric values | Blue for volume/CTR, neutral for rank | Blue = read-only demand/performance data |
+| Awaiting-data copy | Muted text inside tracking-state block | New tracking entries should not look like an error |
+| Source badges | Badge primitive, wrapping cluster | Prevents long source labels from overflowing the drawer |
+
 | Element | Color | Rationale |
 |---------|-------|-----------|
 | Drawer backdrop | `fixed inset-0 z-[var(--z-modal-backdrop)]` | Standard modal backdrop token |

@@ -42,6 +42,9 @@ import {
   type KeywordCommandCenterActionRequest,
   type KeywordCommandCenterActionResult,
   type KeywordCommandCenterAssignment,
+  type KeywordCommandCenterBulkActionItem,
+  type KeywordCommandCenterBulkActionRequest,
+  type KeywordCommandCenterBulkActionResult,
   type KeywordCommandCenterCounts,
   type KeywordCommandCenterDetailResponse,
   type KeywordCommandCenterFeedbackState,
@@ -2277,9 +2280,35 @@ function retireTrackedKeyword(workspaceId: string, keyword: string, status: type
   }));
 }
 
-export function applyKeywordCommandCenterAction(
+interface ApplyKeywordCommandCenterActionOptions {
+  skipBroadcast?: boolean;
+  skipActivity?: boolean;
+}
+
+function broadcastKeywordCommandCenterAction(
+  workspaceId: string,
+  request: Pick<KeywordCommandCenterActionRequest, 'action'>,
+  payload: Record<string, unknown>,
+): void {
+  if (
+    request.action === KEYWORD_COMMAND_CENTER_ACTIONS.ADD_TO_STRATEGY
+    || request.action === KEYWORD_COMMAND_CENTER_ACTIONS.DECLINE
+    || request.action === KEYWORD_COMMAND_CENTER_ACTIONS.RESTORE
+  ) {
+    broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_UPDATED, payload);
+    broadcastToWorkspace(workspaceId, WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED, {
+      workspaceId,
+      reason: 'keyword_command_center',
+      updatedAt: payload.updatedAt,
+    });
+  }
+  broadcastToWorkspace(workspaceId, WS_EVENTS.RANK_TRACKING_UPDATED, payload);
+}
+
+function applyKeywordCommandCenterActionInternal(
   workspaceId: string,
   request: KeywordCommandCenterActionRequest,
+  options: ApplyKeywordCommandCenterActionOptions = {},
 ): KeywordCommandCenterActionResult {
   const workspace = getWorkspace(workspaceId);
   if (!workspace) throw new Error('Workspace not found');
@@ -2352,24 +2381,16 @@ export function applyKeywordCommandCenterAction(
 
   invalidateIntelligenceCache(workspace.id);
   const payload = { keyword, action: request.action, source: 'keyword_command_center', updatedAt: now };
-  if (
-    request.action === KEYWORD_COMMAND_CENTER_ACTIONS.ADD_TO_STRATEGY
-    || request.action === KEYWORD_COMMAND_CENTER_ACTIONS.DECLINE
-    || request.action === KEYWORD_COMMAND_CENTER_ACTIONS.RESTORE
-  ) {
-    broadcastToWorkspace(workspace.id, WS_EVENTS.STRATEGY_UPDATED, payload);
-    broadcastToWorkspace(workspace.id, WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED, {
-      workspaceId: workspace.id,
-      reason: 'keyword_command_center',
-      updatedAt: now,
+  if (!options.skipBroadcast) {
+    broadcastKeywordCommandCenterAction(workspace.id, request, payload);
+  }
+  if (!options.skipActivity) {
+    addActivity(workspace.id, 'rank_tracking_updated', 'Keyword lifecycle updated', message, {
+      keyword,
+      action: request.action,
+      source: 'keyword_command_center',
     });
   }
-  broadcastToWorkspace(workspace.id, WS_EVENTS.RANK_TRACKING_UPDATED, payload);
-  addActivity(workspace.id, 'rank_tracking_updated', 'Keyword lifecycle updated', message, {
-    keyword,
-    action: request.action,
-    source: 'keyword_command_center',
-  });
 
   return {
     ok: true,
@@ -2379,4 +2400,103 @@ export function applyKeywordCommandCenterAction(
     message,
     trackedKeywords,
   };
+}
+
+export function applyKeywordCommandCenterAction(
+  workspaceId: string,
+  request: KeywordCommandCenterActionRequest,
+): KeywordCommandCenterActionResult {
+  return applyKeywordCommandCenterActionInternal(workspaceId, request);
+}
+
+function bulkActionLabel(action: KeywordCommandCenterBulkActionRequest['action']): string {
+  if (action === KEYWORD_COMMAND_CENTER_ACTIONS.ADD_TO_STRATEGY) return 'added to strategy';
+  if (action === KEYWORD_COMMAND_CENTER_ACTIONS.TRACK) return 'activated in tracking';
+  if (action === KEYWORD_COMMAND_CENTER_ACTIONS.PAUSE_TRACKING) return 'paused from active tracking';
+  if (action === KEYWORD_COMMAND_CENTER_ACTIONS.RETIRE) return 'retired from active tracking';
+  if (action === KEYWORD_COMMAND_CENTER_ACTIONS.DECLINE) return 'declined from future strategy consideration';
+  return String(action).replace(/_/g, ' ');
+}
+
+export function applyKeywordCommandCenterBulkAction(
+  workspaceId: string,
+  request: KeywordCommandCenterBulkActionRequest,
+): KeywordCommandCenterBulkActionResult {
+  const workspace = getWorkspace(workspaceId);
+  if (!workspace) throw new Error('Workspace not found');
+  if (!Array.isArray(request.keywords) || request.keywords.length === 0) {
+    throw new Error('keywords required');
+  }
+
+  const uniqueKeywords = Array.from(
+    request.keywords.reduce((deduped, rawKeyword) => {
+      const keyword = rawKeyword.trim();
+      const key = keywordComparisonKey(keyword);
+      if (keyword && key && !deduped.has(key)) deduped.set(key, keyword);
+      return deduped;
+    }, new Map<string, string>()).values(),
+  );
+  if (uniqueKeywords.length === 0) throw new Error('keywords required');
+
+  const items: KeywordCommandCenterBulkActionItem[] = [];
+  let applied = 0;
+  let skipped = 0;
+  let failed = 0;
+  const now = new Date().toISOString();
+
+  for (const keyword of uniqueKeywords) {
+    try {
+      applyKeywordCommandCenterActionInternal(workspace.id, {
+        action: request.action,
+        keyword,
+        reason: request.reason,
+        force: request.force,
+      }, { skipBroadcast: true, skipActivity: true });
+      items.push({ keyword, status: 'applied' });
+      applied++;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes('requires explicit confirmation')) {
+        items.push({ keyword, status: 'skipped_protected', error: message });
+        skipped++;
+      } else if (message === 'Keyword is not tracked') {
+        items.push({ keyword, status: 'skipped_not_tracked', error: message });
+        skipped++;
+      } else {
+        items.push({ keyword, status: 'error', error: message });
+        failed++;
+      }
+    }
+  }
+
+  const actionLabel = bulkActionLabel(request.action);
+  const message = `${applied} keyword${applied === 1 ? '' : 's'} ${actionLabel}${skipped > 0 ? `, ${skipped} skipped` : ''}${failed > 0 ? `, ${failed} failed` : ''}`;
+
+  if (applied > 0) {
+    addActivity(
+      workspace.id,
+      'rank_tracking_updated',
+      'Keyword lifecycle updated (bulk)',
+      message,
+      {
+        action: request.action,
+        applied,
+        skipped,
+        failed,
+        source: 'keyword_command_center_bulk',
+      },
+    );
+
+    broadcastKeywordCommandCenterAction(workspace.id, request, {
+      action: request.action,
+      keywords: uniqueKeywords,
+      applied,
+      skipped,
+      failed,
+      source: 'keyword_command_center_bulk',
+      updatedAt: now,
+    });
+  }
+
+  return { action: request.action, applied, skipped, failed, items, message };
 }
