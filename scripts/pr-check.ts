@@ -3189,7 +3189,7 @@ export const CHECKS: Check[] = [
     // to bind gets EADDRINUSE and the CI run is flaky. This rule collects
     // all port allocations across every `*.test.ts` file and flags any
     // duplicate. It also flags ports outside the documented range
-    // (13201–13399 per CLAUDE.md) as a separate warning.
+    // (13201–13499 per CLAUDE.md) as a separate warning.
     name: 'Port collision in integration tests',
     pattern: '',
     fileGlobs: ['*.test.ts'],
@@ -3198,7 +3198,7 @@ export const CHECKS: Check[] = [
     message:
       'Two or more test files use the same port in createTestContext(). ' +
       'Each integration test must use a unique port to avoid EADDRINUSE in parallel CI runs. ' +
-      'Pick an unused port in the 13201–13399 range (grep existing ports first). ' +
+      'Pick an unused port in the 13201–13499 range (grep existing ports first). ' +
       'Suppress with // port-ok if this is intentionally shared.',
     severity: 'error',
     rationale:
@@ -3233,9 +3233,9 @@ export const CHECKS: Check[] = [
           for (const u of usages) hits.push(u);
         }
       }
-      // Flag ports outside the documented 13201–13399 range
+      // Flag ports outside the documented 13201–13499 range
       const PORT_MIN = 13201;
-      const PORT_MAX = 13399;
+      const PORT_MAX = 13499;
       for (const [port, usages] of portMap) {
         if (port < PORT_MIN || port > PORT_MAX) {
           for (const u of usages) {
