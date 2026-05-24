@@ -18,7 +18,8 @@ import {
 } from '../client-locations.js';
 import { isFeatureEnabled } from '../feature-flags.js';
 import db from '../db/index.js';
-import { createJob, hasActiveJob } from '../jobs.js';
+import { createJob, hasActiveJob, updateJob } from '../jobs.js';
+import { createLogger } from '../logger.js';
 import {
   countLocalVisibilitySnapshots,
   createLocalSeoRefreshPlan,
@@ -42,6 +43,7 @@ import {
 } from '../../shared/types/local-seo.js';
 
 const router = Router();
+const log = createLogger('local-seo-routes');
 
 const marketSchema = z.object({
   id: z.string().min(1).optional(),
@@ -229,7 +231,17 @@ router.post('/api/local-seo/:workspaceId/refresh', requireWorkspaceAccess('works
     message: 'Preparing local SEO visibility refresh...',
   });
   res.json({ jobId: job.id, selectedKeywordCount: plan.keywords.length, selectedMarketCount: plan.markets.length });
-  void runLocalSeoRefreshJob(job.id, workspaceId, req.body);
+  // Use .catch() instead of void so any unexpected throw (e.g. from addActivity/broadcastToWorkspace
+  // after the main loop) becomes a logged error + failed job rather than an unhandled rejection
+  // that kills the Node.js process.
+  runLocalSeoRefreshJob(job.id, workspaceId, req.body).catch(err => {
+    log.error({ err, jobId: job.id, workspaceId }, 'local-seo refresh: unhandled error escaped job runner — marking failed');
+    updateJob(job.id, {
+      status: 'error',
+      error: err instanceof Error ? err.message : String(err),
+      message: 'Local SEO refresh failed unexpectedly',
+    });
+  });
 });
 
 router.get('/api/local-seo/:workspaceId/locations', requireWorkspaceAccess('workspaceId'), (req, res) => {
