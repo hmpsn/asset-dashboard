@@ -94,7 +94,11 @@ export function getEffectiveKeywordsPerRefresh(workspaceId: string): number {
 }
 const LOCAL_CANDIDATE_HARD_CAP = 1000;
 const LOCAL_SEO_MAX_RESULTS = 10;
-const LOCAL_SEO_REFRESH_CONCURRENCY = 5;
+// Reduced from 5 → 3: each concurrent slot holds a full DataForSEO serp/google/organic/live/advanced
+// JSON response in memory during parsing. On memory-constrained hosts (Render starter) running
+// 5 concurrent responses alongside an active KCC build pushed the process toward OOM.
+// 3 still gives ~3× speedup over sequential while cutting peak SERP-response memory ~40%.
+const LOCAL_SEO_REFRESH_CONCURRENCY = 3;
 /**
  * Fire a `LOCAL_SEO_UPDATED` broadcast every N completed snapshots during a
  * refresh so the UI invalidates its KCC + local-seo caches incrementally

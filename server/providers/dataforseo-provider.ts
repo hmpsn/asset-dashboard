@@ -207,7 +207,10 @@ function readCache<T>(workspaceId: string, key: string, maxAgeHours = 168): T | 
 }
 
 function writeCache(workspaceId: string, key: string, data: unknown): void {
-  fs.writeFileSync(getCachePath(workspaceId, key), JSON.stringify({ cachedAt: new Date().toISOString(), data }, null, 2));
+  // Compact JSON (no indentation) — pretty-printing large SERP responses held both
+  // the compact and indented strings in memory simultaneously before the write,
+  // doubling the transient allocation. Compact is fine for machine-read cache files.
+  fs.writeFileSync(getCachePath(workspaceId, key), JSON.stringify({ cachedAt: new Date().toISOString(), data }));
 }
 
 // ── API helpers ──
