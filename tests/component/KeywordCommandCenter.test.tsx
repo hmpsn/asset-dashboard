@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { KeywordCommandCenter } from '../../src/components/KeywordCommandCenter';
 import {
+  KEYWORD_COMMAND_CENTER_ACTIONS,
   KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE,
   KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY,
   KEYWORD_COMMAND_CENTER_STATUS,
@@ -14,6 +15,7 @@ import {
 import { TRACKED_KEYWORD_STATUS } from '../../shared/types/rank-tracking';
 
 const mutateMock = vi.fn();
+const bulkMutateMock = vi.fn();
 const localRefreshMutateMock = vi.fn();
 const navigateMock = vi.fn();
 
@@ -30,6 +32,7 @@ vi.mock('../../src/hooks/admin/useKeywordCommandCenter', () => ({
   useKeywordCommandCenterRows: vi.fn(),
   useKeywordCommandCenterDetail: vi.fn(),
   useKeywordCommandCenterAction: vi.fn(),
+  useKeywordCommandCenterBulkAction: vi.fn(),
 }));
 
 vi.mock('../../src/hooks/admin/useLocalSeo', () => ({
@@ -321,6 +324,12 @@ describe('KeywordCommandCenter', () => {
       isPending: false,
       variables: undefined,
     } as ReturnType<typeof hooks.useKeywordCommandCenterAction>);
+    vi.mocked(hooks.useKeywordCommandCenterBulkAction).mockReturnValue({
+      mutate: bulkMutateMock,
+      isPending: false,
+      variables: undefined,
+      error: null,
+    } as ReturnType<typeof hooks.useKeywordCommandCenterBulkAction>);
   });
 
   afterEach(() => {
@@ -336,6 +345,12 @@ describe('KeywordCommandCenter', () => {
     expect(screen.getAllByText('Raw Evidence').length).toBeGreaterThan(0);
     expect(screen.getByText('Raw provider evidence · competitor.example')).toBeInTheDocument();
     expect(screen.getAllByText('Visible #2').length).toBeGreaterThan(0);
+  });
+
+  it('keeps selection checkboxes outside row activation buttons', () => {
+    renderCommandCenter();
+
+    expect(screen.getByLabelText('Select cosmetic dentistry').closest('button')).toBeNull();
   });
 
   it('filters and searches the keyword universe together', () => {
@@ -397,6 +412,36 @@ describe('KeywordCommandCenter', () => {
       pagePath: undefined,
     });
     expect(screen.getByText(/They do not publish content or write live metadata/i)).toBeInTheDocument();
+  });
+
+  it('closes the slide-over drawer with Escape', () => {
+    renderCommandCenter();
+
+    fireEvent.click(screen.getByText('best teeth whitening strips'));
+    expect(screen.getByText('Safe Next Actions')).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(screen.queryByText('Safe Next Actions')).not.toBeInTheDocument();
+  });
+
+  it('surfaces bulk partial result summaries', () => {
+    bulkMutateMock.mockImplementation((_body, options) => {
+      options?.onSuccess?.({
+        action: KEYWORD_COMMAND_CENTER_ACTIONS.TRACK,
+        applied: 0,
+        skipped: 1,
+        failed: 0,
+        items: [{ keyword: 'best teeth whitening strips', status: 'skipped_not_tracked', error: 'Keyword is not tracked' }],
+        message: '0 keywords activated in tracking, 1 skipped',
+      });
+    });
+    renderCommandCenter();
+
+    fireEvent.click(screen.getByLabelText('Select best teeth whitening strips'));
+    fireEvent.click(screen.getByRole('button', { name: 'Track' }));
+
+    expect(screen.getByText('0 keywords activated in tracking, 1 skipped')).toBeInTheDocument();
+    expect(screen.getByText(/1 skipped by protection or tracking state/i)).toBeInTheDocument();
   });
 
   it('requires explicit confirmation before forcing protected keyword actions', async () => {

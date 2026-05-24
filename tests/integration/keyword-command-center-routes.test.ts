@@ -134,6 +134,48 @@ describe('Keyword Command Center routes', () => {
     expect(retire.status).toBe(404);
     await expect(retire.json()).resolves.toEqual({ error: 'Keyword is not tracked' });
   });
+
+  it('POST /actions/bulk applies action to multiple keywords and returns summary', async () => {
+    const res = await postJson(`/api/webflow/keyword-command-center/${workspaceId}/actions/bulk`, {
+      action: 'track',
+      keywords: ['bulk-kw-1', 'bulk-kw-2', 'bulk-kw-3'],
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual(expect.objectContaining({
+      action: 'track',
+      applied: 3,
+      skipped: 0,
+      failed: 0,
+    }));
+    expect(body.items).toHaveLength(3);
+  });
+
+  it('POST /actions/bulk rejects request with no keywords', async () => {
+    const res = await postJson(`/api/webflow/keyword-command-center/${workspaceId}/actions/bulk`, {
+      action: 'pause_tracking',
+      keywords: [],
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('POST /actions/bulk rejects request with too many keywords', async () => {
+    const keywords = Array.from({ length: 51 }, (_, i) => `kw-${i}`);
+    const res = await postJson(`/api/webflow/keyword-command-center/${workspaceId}/actions/bulk`, {
+      action: 'pause_tracking',
+      keywords,
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('POST /actions/bulk rejects non-bulk-eligible actions', async () => {
+    const res = await postJson(`/api/webflow/keyword-command-center/${workspaceId}/actions/bulk`, {
+      action: 'restore',
+      keywords: ['kw'],
+    });
+    expect(res.status).toBe(400);
+  });
 });
 
 describe('KCC summary geoLabel', () => {

@@ -299,3 +299,44 @@ export interface KeywordCommandCenterActionResult {
   message: string;
   trackedKeywords?: TrackedKeyword[];
 }
+
+/**
+ * Action types that are eligible for bulk application. Navigation-only and
+ * per-row assist actions are deliberately excluded from the bulk lifecycle path.
+ */
+export const KEYWORD_COMMAND_CENTER_BULK_ACTIONS = [
+  KEYWORD_COMMAND_CENTER_ACTIONS.ADD_TO_STRATEGY,
+  KEYWORD_COMMAND_CENTER_ACTIONS.TRACK,
+  KEYWORD_COMMAND_CENTER_ACTIONS.PAUSE_TRACKING,
+  KEYWORD_COMMAND_CENTER_ACTIONS.RETIRE,
+  KEYWORD_COMMAND_CENTER_ACTIONS.DECLINE,
+] as const;
+
+export type KeywordCommandCenterBulkActionType =
+  typeof KEYWORD_COMMAND_CENTER_BULK_ACTIONS[number];
+
+/** Wire format for POST /api/webflow/keyword-command-center/:workspaceId/actions/bulk */
+export interface KeywordCommandCenterBulkActionRequest {
+  action: KeywordCommandCenterBulkActionType;
+  /** 1..50 unique keyword strings. */
+  keywords: string[];
+  /** Applied to all keywords in the batch. */
+  reason?: string;
+  /** Bypasses protected-keyword confirmation guards when true. */
+  force?: boolean;
+}
+
+export interface KeywordCommandCenterBulkActionItem {
+  keyword: string;
+  status: 'applied' | 'skipped_protected' | 'skipped_not_tracked' | 'error';
+  error?: string;
+}
+
+export interface KeywordCommandCenterBulkActionResult {
+  action: KeywordCommandCenterBulkActionType;
+  applied: number;
+  skipped: number;
+  failed: number;
+  items: KeywordCommandCenterBulkActionItem[];
+  message: string;
+}

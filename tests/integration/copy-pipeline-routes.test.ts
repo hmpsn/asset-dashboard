@@ -899,16 +899,12 @@ describe('Export', () => {
 // confirms the middleware chain ran rather than Express returning 404 (no route).
 
 describe('AI-dependent endpoint wiring (Zod validation fires = route is registered)', () => {
-  it('generate endpoint: empty body passes Zod (accumulatedSteering is optional) but returns non-404', async () => {
-    // generateCopySchema: { accumulatedSteering?: string[] }
-    // An empty body is valid per Zod, so we expect the request to reach the handler
-    // (which will 500 because AI is unavailable), not return a 404 from a missing route.
+  it('generate endpoint: invalid accumulatedSteering returns 400 — Zod ran = route is registered', async () => {
     const res = await postJson(
       `/api/copy/${wsA.workspaceId}/${blueprintAId}/${entryAId}/generate`,
-      {},
+      { accumulatedSteering: 'not-an-array' },
     );
-    // 500 = route found, AI call failed. If 404 were returned, the route wouldn't be registered.
-    expect(res.status).not.toBe(404);
+    expect(res.status).toBe(400);
   });
 
   it('regenerate endpoint: missing required field "note" returns 400 — Zod ran = route is registered', async () => {

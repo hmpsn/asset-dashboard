@@ -10,6 +10,7 @@ import { requireWorkspaceAccess } from '../auth.js';
 import { validate, z } from '../middleware/validate.js';
 import {
   applyKeywordCommandCenterAction,
+  applyKeywordCommandCenterBulkAction,
   buildKeywordCommandCenterDetail,
   buildKeywordCommandCenterRows,
   buildKeywordCommandCenterSummary,
@@ -18,6 +19,7 @@ import { isFeatureEnabled } from '../feature-flags.js';
 import { getWorkspace } from '../workspaces.js';
 import {
   KEYWORD_COMMAND_CENTER_ACTIONS,
+  KEYWORD_COMMAND_CENTER_BULK_ACTIONS,
   KEYWORD_COMMAND_CENTER_FILTERS,
 } from '../../shared/types/keyword-command-center.js';
 
@@ -36,6 +38,13 @@ const actionSchema = z.object({
   keyword: z.string().min(1),
   pagePath: z.string().optional(),
   reason: z.string().optional(),
+  force: z.boolean().optional(),
+}).strict();
+
+const bulkActionSchema = z.object({
+  action: z.enum(KEYWORD_COMMAND_CENTER_BULK_ACTIONS),
+  keywords: z.array(z.string().min(1).max(200)).min(1).max(50),
+  reason: z.string().max(500).optional(),
   force: z.boolean().optional(),
 }).strict();
 
@@ -121,6 +130,18 @@ router.post('/api/webflow/keyword-command-center/:workspaceId/actions', requireW
     if (message === 'Keyword is not tracked') return res.status(404).json({ error: message });
     if (message === 'keyword required') return res.status(400).json({ error: message });
     if (message.includes('requires explicit confirmation')) return res.status(409).json({ error: message });
+    next(err);
+  }
+});
+
+router.post('/api/webflow/keyword-command-center/:workspaceId/actions/bulk', requireWorkspaceAccess('workspaceId'), validate(bulkActionSchema), (req, res, next) => {
+  try {
+    const result = applyKeywordCommandCenterBulkAction(req.params.workspaceId, req.body);
+    res.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Bulk keyword action failed';
+    if (message === 'Workspace not found') return res.status(404).json({ error: message });
+    if (message === 'keywords required') return res.status(400).json({ error: message });
     next(err);
   }
 });
