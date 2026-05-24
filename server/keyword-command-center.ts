@@ -209,7 +209,7 @@ function safeLostVisibilityRows(workspaceId: string): LostVisibilityQuery[] {
 }
 
 
-function feedbackState(row: FeedbackRow): KeywordCommandCenterFeedbackState | undefined {
+export function feedbackState(row: FeedbackRow): KeywordCommandCenterFeedbackState | undefined {
   if (row.status !== 'approved' && row.status !== 'declined' && row.status !== 'requested') return undefined;
   return {
     status: row.status,
@@ -219,7 +219,7 @@ function feedbackState(row: FeedbackRow): KeywordCommandCenterFeedbackState | un
   };
 }
 
-function ensureRow(rows: Map<string, DraftRow>, keyword: string): DraftRow | null {
+export function ensureRow(rows: Map<string, DraftRow>, keyword: string): DraftRow | null {
   const normalizedKeyword = keywordComparisonKey(keyword);
   if (!normalizedKeyword) return null;
   const existing = rows.get(normalizedKeyword);
@@ -234,7 +234,7 @@ function ensureRow(rows: Map<string, DraftRow>, keyword: string): DraftRow | nul
   return row;
 }
 
-function assignmentPriority(role: KeywordCommandCenterAssignment['role'] | undefined): number {
+export function assignmentPriority(role: KeywordCommandCenterAssignment['role'] | undefined): number {
   if (role === 'page_keyword') return 4;
   if (role === 'content_gap') return 3;
   if (role === 'site_keyword') return 2;
@@ -248,7 +248,7 @@ function setAssignment(row: DraftRow, assignment: KeywordCommandCenterAssignment
   }
 }
 
-function sourceFromExplanation(explanation: KeywordStrategyExplanation): KeywordCommandCenterSourceLabel {
+export function sourceFromExplanation(explanation: KeywordStrategyExplanation): KeywordCommandCenterSourceLabel {
   if (explanation.role === 'page_keyword') {
     return { kind: 'page_assignment', label: 'Page assignment', detail: explanation.pageTitle ?? explanation.pagePath };
   }
@@ -261,7 +261,7 @@ function sourceFromExplanation(explanation: KeywordStrategyExplanation): Keyword
   return { kind: 'strategy', label: 'Strategy keyword', detail: explanation.surfaceLabel };
 }
 
-function sourceFromKeywordGap(gap: KeywordGapItem): KeywordCommandCenterSourceLabel {
+export function sourceFromKeywordGap(gap: KeywordGapItem): KeywordCommandCenterSourceLabel {
   return {
     kind: 'raw_evidence',
     label: 'Raw provider evidence',
@@ -269,11 +269,11 @@ function sourceFromKeywordGap(gap: KeywordGapItem): KeywordCommandCenterSourceLa
   };
 }
 
-function isInactiveTracking(keyword: TrackedKeyword): boolean {
+export function isInactiveTracking(keyword: TrackedKeyword): boolean {
   return (keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) !== TRACKED_KEYWORD_STATUS.ACTIVE;
 }
 
-function protectedReason(keyword: TrackedKeyword | undefined): string | undefined {
+export function protectedReason(keyword: TrackedKeyword | undefined): string | undefined {
   if (!keyword) return undefined;
   if (keyword.pinned) return 'Pinned keyword';
   if (keyword.source === TRACKED_KEYWORD_SOURCE.CLIENT_REQUESTED) return 'Client-requested keyword';
@@ -346,7 +346,7 @@ function trackingSourceDetail(source: TrackedKeyword['source'] | undefined): str
   return source.replace(/_/g, ' ');
 }
 
-function lifecycleStatus(row: DraftRow): KeywordCommandCenterStatus {
+export function lifecycleStatus(row: DraftRow): KeywordCommandCenterStatus {
   if (row.feedback?.status === 'declined') return KEYWORD_COMMAND_CENTER_STATUS.DECLINED;
   if (row.tracking && isInactiveTracking(row.tracking)) return KEYWORD_COMMAND_CENTER_STATUS.RETIRED;
   if (row.feedback?.status === 'approved') return KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY;
@@ -365,7 +365,7 @@ function lifecycleStatus(row: DraftRow): KeywordCommandCenterStatus {
   return KEYWORD_COMMAND_CENTER_STATUS.RAW_EVIDENCE;
 }
 
-function statusLabel(status: KeywordCommandCenterStatus): string {
+export function statusLabel(status: KeywordCommandCenterStatus): string {
   switch (status) {
     case KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY: return 'In Strategy';
     case KEYWORD_COMMAND_CENTER_STATUS.TRACKED: return 'Tracked';
@@ -376,7 +376,7 @@ function statusLabel(status: KeywordCommandCenterStatus): string {
   }
 }
 
-function localPriority(
+export function localPriority(
   visibility: LocalSeoKeywordVisibilitySummary | undefined,
   activeMarketCount: number,
 ): Pick<KeywordCommandCenterLocalSeoState, 'priority' | 'priorityLabel'> {
@@ -569,7 +569,7 @@ function buildNextActions(
   return actions;
 }
 
-function sortRows(a: KeywordCommandCenterRow, b: KeywordCommandCenterRow): number {
+export function sortRows(a: KeywordCommandCenterRow, b: KeywordCommandCenterRow): number {
   const statusOrder: Record<KeywordCommandCenterStatus, number> = {
     [KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY]: 0,
     [KEYWORD_COMMAND_CENTER_STATUS.TRACKED]: 1,
@@ -586,7 +586,7 @@ function sortRows(a: KeywordCommandCenterRow, b: KeywordCommandCenterRow): numbe
   return a.keyword.localeCompare(b.keyword);
 }
 
-function sortRowsForQuery(sort: KeywordCommandCenterSort | undefined): (a: KeywordCommandCenterRow, b: KeywordCommandCenterRow) => number {
+export function sortRowsForQuery(sort: KeywordCommandCenterSort | undefined): (a: KeywordCommandCenterRow, b: KeywordCommandCenterRow) => number {
   if (sort === 'keyword') return (a, b) => a.keyword.localeCompare(b.keyword);
   if (sort === 'demand') {
     return (a, b) => {
@@ -607,7 +607,7 @@ function sortRowsForQuery(sort: KeywordCommandCenterSort | undefined): (a: Keywo
   return sortRows;
 }
 
-function matchesFilter(row: KeywordCommandCenterRow, filter: KeywordCommandCenterFilter): boolean {
+export function matchesFilter(row: KeywordCommandCenterRow, filter: KeywordCommandCenterFilter): boolean {
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.ALL) return true;
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.CONTENT) return row.assignment?.role === 'content_gap';
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.PAGE_ASSIGNED) return row.assignment?.role === 'page_keyword';
@@ -629,7 +629,7 @@ function matchesFilter(row: KeywordCommandCenterRow, filter: KeywordCommandCente
   return row.lifecycleStatus === filter;
 }
 
-function matchesSearch(row: KeywordCommandCenterRow, search: string | undefined): boolean {
+export function matchesSearch(row: KeywordCommandCenterRow, search: string | undefined): boolean {
   const query = keywordComparisonKey(search ?? '');
   if (!query) return true;
   return row.normalizedKeyword.includes(query)
@@ -637,7 +637,7 @@ function matchesSearch(row: KeywordCommandCenterRow, search: string | undefined)
     || row.assignment?.pageTitle?.toLowerCase().includes(query) === true;
 }
 
-function stripLocalSeoVisibility<T extends LocalSeoKeywordVisibilitySummary | undefined>(visibility: T): T {
+export function stripLocalSeoVisibility<T extends LocalSeoKeywordVisibilitySummary | undefined>(visibility: T): T {
   if (!visibility) return visibility;
   return {
     ...visibility,
@@ -659,7 +659,7 @@ function stripRowForList(row: KeywordCommandCenterRow): KeywordCommandCenterRow 
   };
 }
 
-function paginateRows(rows: KeywordCommandCenterRow[], query: KeywordCommandCenterRowsQuery): KeywordCommandCenterRowsResponse['pageInfo'] & { rows: KeywordCommandCenterRow[] } {
+export function paginateRows(rows: KeywordCommandCenterRow[], query: KeywordCommandCenterRowsQuery): KeywordCommandCenterRowsResponse['pageInfo'] & { rows: KeywordCommandCenterRow[] } {
   const pageSize = Math.min(Math.max(Number(query.pageSize) || DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE);
   const totalRows = rows.length;
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
@@ -676,7 +676,7 @@ function paginateRows(rows: KeywordCommandCenterRow[], query: KeywordCommandCent
   };
 }
 
-function filterCount(rows: KeywordCommandCenterRow[], filter: KeywordCommandCenterFilter): number {
+export function filterCount(rows: KeywordCommandCenterRow[], filter: KeywordCommandCenterFilter): number {
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.ALL) return rows.length;
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.CONTENT) return rows.filter(row => row.assignment?.role === 'content_gap').length;
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.PAGE_ASSIGNED) return rows.filter(row => row.assignment?.role === 'page_keyword').length;
@@ -714,7 +714,7 @@ export function filterNeedsLocalCandidates(filter: KeywordCommandCenterFilter | 
   return filter === KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES;
 }
 
-function buildCounts(rows: KeywordCommandCenterRow[]): KeywordCommandCenterCounts {
+export function buildCounts(rows: KeywordCommandCenterRow[]): KeywordCommandCenterCounts {
   return {
     total: rows.length,
     inStrategy: rows.filter(row => row.lifecycleStatus === KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY).length,
@@ -777,7 +777,7 @@ interface SkinnyFilterCounts {
   lostVisibility: number;
 }
 
-function buildFilterFacetsFromCounts(counts: SkinnyFilterCounts): KeywordCommandCenterFilterMeta[] {
+export function buildFilterFacetsFromCounts(counts: SkinnyFilterCounts): KeywordCommandCenterFilterMeta[] {
   return [
     { id: KEYWORD_COMMAND_CENTER_FILTERS.ALL, label: 'All', count: counts.all },
     { id: KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY, label: 'In Strategy', count: counts.inStrategy },
@@ -1432,7 +1432,7 @@ export async function buildKeywordCommandCenterSummary(
   };
 }
 
-function trackedKeywordMatchesFilter(keyword: TrackedKeyword, filter: KeywordCommandCenterFilter): boolean {
+export function trackedKeywordMatchesFilter(keyword: TrackedKeyword, filter: KeywordCommandCenterFilter): boolean {
   const status = keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE;
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.TRACKED) return status === TRACKED_KEYWORD_STATUS.ACTIVE;
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.RETIRED) return status !== TRACKED_KEYWORD_STATUS.ACTIVE;
