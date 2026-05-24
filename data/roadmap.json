@@ -552,8 +552,9 @@
           "source": "User request Apr 2026",
           "est": "1h",
           "priority": "P3",
-          "status": "pending",
-          "notes": "Add 'Download PDF' option to the Export brief menu. Cleanest approach: inject document content into a hidden print-only div with a styled print stylesheet and call window.print(). No new dependencies. DOCX export (#579 shipped) is the primary export; PDF is a lightweight complement for sharing/printing."
+          "status": "done",
+          "notes": "Completed 2026-05-24 on `codex/roadmap-quick-wins`. Added a Download PDF option to the Page Rewriter export menu using a hidden print root, scoped print stylesheet, and `window.print()` with no new dependencies. Markdown and DOCX export behavior remains unchanged.",
+          "shippedAt": "2026-05-24"
         },
         {
           "id": 632,
@@ -561,8 +562,9 @@
           "source": "USER REQUEST",
           "est": "2-3h",
           "priority": "P2",
-          "notes": "Follow-up from backend hardening PR 5. Clean up the internal-link recommendation model and client-review display so Target URL, target title, source page path, and source title are carried as distinct typed fields. Current client review display can show target URL as a page title and source page as a slug, which makes review confusing. Preserve reviewer-support wording and avoid changing the broader approval workflow.",
-          "status": "pending"
+          "notes": "Completed 2026-05-24 on `codex/roadmap-quick-wins`. `origin/staging` already carried explicit internal-link payload fields and separate target/source title+URL client review columns; this pass hardened normalization so malformed legacy rows cannot render URL/path values as titles, preserving reviewer-support wording and the existing approval workflow.",
+          "status": "done",
+          "shippedAt": "2026-05-24"
         },
         {
           "id": 356,
@@ -598,8 +600,9 @@
           "est": "30m",
           "priority": "P2",
           "sprint": "future",
-          "status": "pending",
-          "notes": "After schema-yoast-parity-fields PR1, buildSchemaContext still computes pageKeywordMap from ws?.keywordStrategy?.pageMap and returns it (server/helpers.ts:343, :410-418, :539). Both callers (server/routes/webflow-schema.ts:51, server/routes/jobs.ts:636) destructure it and pass to generateSchemaSuggestions, which immediately voids it (server/schema-suggester.ts:391). Per-page keywords are now fetched via buildWorkspaceIntelligence inside the page loop. Cleanup: drop the pageKeywordMap return field, the parameter, and the void discard. While in there, audit the other 5 voided params on generateSchemaSuggestions (gscMap, ga4Map, queryPageData, insightsMap, validationsByPageId) — likely also dead. Devin Review explicitly recommended deferring to a follow-up PR; doesn't affect correctness."
+          "status": "done",
+          "notes": "Completed 2026-05-24 on `codex/roadmap-quick-wins` as a staging reconciliation. The dead `pageKeywordMap` return field, caller destructures, schema-suggester parameter, and void discard were already removed on `origin/staging`; `generateSchemaSuggestions()` now reads per-page keywords through `buildWorkspaceIntelligence()` inside the page loop. This item is closed as roadmap cleanup with no additional production code changes needed.",
+          "shippedAt": "2026-05-24"
         },
         {
           "id": "schema-engagement-signals",

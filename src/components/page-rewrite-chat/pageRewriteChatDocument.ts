@@ -97,6 +97,24 @@ export function serializeDocToMarkdown(docBody: HTMLElement | null, pageData: Pa
   return lines.join('\n');
 }
 
+export function buildPrintableDocHtml(docBody: HTMLElement | null, pageData: PageData | null): string {
+  const pageLabel = pageData?.slug || pageData?.url || pageData?.title || '';
+  const issueItems = pageData?.issues.map(issue => (
+    `<li><strong>${escapeHtml(issue.severity)}</strong>: ${escapeHtml(issue.message)}</li>`
+  )) ?? [];
+  const issueBlock = issueItems.length > 0
+    ? `<section class="page-rewrite-print-issues"><h2>Issues</h2><ul>${issueItems.join('')}</ul></section>`
+    : '';
+
+  return [
+    '<article class="page-rewrite-print-doc">',
+    pageLabel ? `<p class="page-rewrite-print-meta">${escapeHtml(pageLabel)}</p>` : '',
+    issueBlock,
+    `<section class="page-rewrite-print-body">${docBody?.innerHTML ?? ''}</section>`,
+    '</article>',
+  ].join('');
+}
+
 export function serializeDocToDocx(docBody: HTMLElement | null, pageData: PageData | null): Paragraph[] {
   const paragraphs: Paragraph[] = [];
   const severityColor: Record<string, string> = {

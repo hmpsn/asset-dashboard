@@ -18,6 +18,14 @@ export interface InternalLinkDisplaySuggestion {
   contextSnippet: string | null;
 }
 
+function normalizeTitle(value: string | undefined, url: string | null): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  if (url && trimmed === url) return null;
+  if (trimmed.startsWith('/') || /^https?:\/\//i.test(trimmed)) return null;
+  return trimmed;
+}
+
 export function toInternalLinkClientActionItem(suggestion: InternalLinkSuggestionInput): InternalLinkItem {
   return {
     anchorText: suggestion.anchorText,
@@ -30,13 +38,14 @@ export function toInternalLinkClientActionItem(suggestion: InternalLinkSuggestio
 }
 
 export function normalizeInternalLinkSuggestion(item: InternalLinkItem): InternalLinkDisplaySuggestion {
-  const targetTitle = item.targetTitle?.trim() || null;
+  const targetUrl = item.targetUrl.trim();
   const sourcePageUrl = item.sourcePageUrl?.trim() || item.sourcePage?.trim() || null;
-  const sourcePageTitle = item.sourcePageTitle?.trim() || null;
+  const targetTitle = normalizeTitle(item.targetTitle, targetUrl);
+  const sourcePageTitle = normalizeTitle(item.sourcePageTitle, sourcePageUrl);
 
   return {
     anchorText: item.anchorText,
-    targetUrl: item.targetUrl,
+    targetUrl,
     targetTitle,
     sourcePageUrl,
     sourcePageTitle,

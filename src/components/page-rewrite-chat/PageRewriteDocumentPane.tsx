@@ -1,10 +1,10 @@
-import { AlertTriangle, Copy, ExternalLink, FileText, Loader2 } from 'lucide-react';
+import { AlertTriangle, Copy, ExternalLink, FileText, Loader2, Printer } from 'lucide-react';
 import type { RefObject } from 'react';
 import { Button, ClickableRow, Icon } from '../ui';
 import { normalizePageUrl } from '../../lib/pathUtils';
 import type { PageData } from './pageRewriteChatModel';
 
-type ExportMode = 'copy' | 'download' | 'docx';
+type ExportMode = 'copy' | 'download' | 'docx' | 'pdf';
 
 interface PageRewriteDocumentPaneProps {
   pageData: PageData | null;
@@ -113,6 +113,12 @@ export function PageRewriteDocumentPane({
                     className="flex items-center gap-2 px-3 py-1.5 rounded t-caption-sm text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)]"
                   >
                     <Icon as={FileText} size="sm" /> Download .docx
+                  </ClickableRow>
+                  <ClickableRow
+                    onClick={() => onExport('pdf')}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded t-caption-sm text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)]"
+                  >
+                    <Icon as={Printer} size="sm" /> Download PDF
                   </ClickableRow>
                 </div>
               )}
