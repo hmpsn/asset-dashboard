@@ -2,23 +2,22 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 
 import type { KeywordCommandCenterRow } from '../../../shared/types/keyword-command-center';
 import { LocalSeoVisibilityBadge } from '../local-seo/LocalSeoVisibilityPanel';
-import { Badge, Button, Checkbox, ClickableRow, cn } from '../ui';
+import { Badge, Button, Checkbox, ClickableRow, StatusBadge, cn } from '../ui';
 import { KEYWORD_ROW_CONTENT_GRID, KEYWORD_ROW_GRID, VariantSubRow } from './VariantSubRow';
 import {
-  STATUS_TONE,
   compactNumber,
-  localLifecycleTone,
 } from './kccDisplayHelpers';
 
 function LocalSeoStateBadge({ row }: { row: KeywordCommandCenterRow }) {
   if (!row.localSeoState) return <span className="t-caption-sm text-[var(--brand-text-muted)]">-</span>;
   if (row.localSeo) return <LocalSeoVisibilityBadge visibility={row.localSeo} subtle />;
   return (
-    <Badge
-      label={row.localSeoState.lifecycleLabel}
-      tone={localLifecycleTone(row.localSeoState.lifecycle)}
+    <StatusBadge
+      domain="keyword-command-center"
+      status={row.localSeoState.lifecycle}
       variant="soft"
       shape="pill"
+      fallback="neutral"
     />
   );
 }
@@ -86,7 +85,13 @@ export function KeywordRow({
               {primarySource ? `${primarySource.label}${primarySource.detail ? ` · ${primarySource.detail}` : ''}` : 'Keyword universe'}
             </p>
           </div>
-          <Badge label={row.statusLabel} tone={STATUS_TONE[row.lifecycleStatus]} variant="outline" shape="pill" />
+          <StatusBadge
+            domain="keyword-command-center"
+            status={row.lifecycleStatus}
+            variant="outline"
+            shape="pill"
+            fallback="neutral"
+          />
           <div className="min-w-0">
             <LocalSeoStateBadge row={row} />
           </div>

@@ -5,12 +5,11 @@ import { CheckCircle2, History, Search, X } from 'lucide-react';
 import { adminPath } from '../../routes';
 import type { KeywordCommandCenterNextAction, KeywordCommandCenterRow } from '../../../shared/types/keyword-command-center';
 import { LocalSeoVisibilityBadge } from '../local-seo/LocalSeoVisibilityPanel';
-import { Badge, Button, EmptyState, Icon, IconButton, TableSkeleton } from '../ui';
+import { Badge, Button, EmptyState, Icon, IconButton, StatusBadge, TableSkeleton } from '../ui';
+import { KeywordDetailPanel } from './KeywordDetailPanel';
 import {
-  STATUS_TONE,
   actionVariant,
   compactNumber,
-  localLifecycleTone,
   localPriorityTone,
   percent,
 } from './kccDisplayHelpers';
@@ -120,7 +119,8 @@ export function KeywordDetailDrawer({
         aria-modal="true"
         aria-label={row ? `Keyword details: ${row.keyword}` : 'Keyword details'}
         tabIndex={-1}
-        className="fixed inset-x-0 bottom-0 h-[78vh] sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:h-auto sm:w-full sm:max-w-[440px] bg-[var(--surface-2)] border-t border-[var(--brand-border)] sm:border-t-0 sm:border-l z-[var(--z-modal)] flex flex-col overflow-hidden rounded-t-[var(--radius-signature-lg)] sm:rounded-none shadow-2xl outline-none animate-in slide-in-from-right" // pr-check-disable-next-line -- Brand signature radius intentional for bottom-sheet drawer top corners on mobile
+        className="fixed inset-x-0 bottom-0 h-[78vh] sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:h-auto sm:w-full sm:max-w-[440px] bg-[var(--surface-2)] border-t border-[var(--brand-border)] sm:border-t-0 sm:border-l z-[var(--z-modal)] flex flex-col overflow-hidden rounded-t-[var(--radius-signature-lg)] sm:rounded-none outline-none animate-in slide-in-from-right" // pr-check-disable-next-line -- Brand signature radius intentional for bottom-sheet drawer top corners on mobile
+        style={{ boxShadow: 'var(--brand-shadow-md)' }}
       >
         <div className="flex items-start justify-between gap-3 px-4 pt-4 pb-3 border-b border-[var(--brand-border)] flex-shrink-0">
           <div className="min-w-0 flex-1">
@@ -129,7 +129,13 @@ export function KeywordDetailDrawer({
             </h2>
             {row && (
               <div className="mt-2 flex items-center gap-2 flex-wrap">
-                <Badge label={row.statusLabel} tone={STATUS_TONE[row.lifecycleStatus]} variant="outline" shape="pill" />
+                <StatusBadge
+                  domain="keyword-command-center"
+                  status={row.lifecycleStatus}
+                  variant="outline"
+                  shape="pill"
+                  fallback="neutral"
+                />
                 {row.isProtected && <Badge label="Protected" tone="amber" variant="soft" shape="pill" />}
                 {row.isLostVisibility && <Badge label="Lost visibility" tone="amber" variant="outline" shape="pill" />}
               </div>
@@ -158,20 +164,20 @@ export function KeywordDetailDrawer({
           ) : (
             <div className="space-y-5">
               <div className="grid grid-cols-3 gap-2">
-                <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-3)]/40 p-3">
+                <KeywordDetailPanel>
                   <p className="t-caption-sm text-[var(--brand-text-muted)]">Volume</p>
                   <p className="t-caption font-semibold text-blue-400 tabular-nums">{compactNumber(row.metrics.volume)}</p>
-                </div>
-                <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-3)]/40 p-3">
+                </KeywordDetailPanel>
+                <KeywordDetailPanel>
                   <p className="t-caption-sm text-[var(--brand-text-muted)]">Rank</p>
                   <p className="t-caption font-semibold text-[var(--brand-text-bright)] tabular-nums">
                     {row.metrics.currentPosition ? `#${row.metrics.currentPosition.toFixed(1)}` : '-'}
                   </p>
-                </div>
-                <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-3)]/40 p-3">
+                </KeywordDetailPanel>
+                <KeywordDetailPanel>
                   <p className="t-caption-sm text-[var(--brand-text-muted)]">CTR</p>
                   <p className="t-caption font-semibold text-blue-400 tabular-nums">{percent(row.metrics.ctr)}</p>
-                </div>
+                </KeywordDetailPanel>
               </div>
 
               <div>
@@ -191,11 +197,11 @@ export function KeywordDetailDrawer({
               </div>
 
               {row.lifecycleStatus === 'in_strategy' && !row.assignment?.pageTitle && !row.assignment?.pagePath && (
-                <div className="rounded-[var(--radius-lg)] border border-amber-400/30 bg-amber-400/5 px-3 py-2">
+                <KeywordDetailPanel tone="amber" className="py-2">
                   <p className="t-caption-sm text-amber-400/90">
                     <span className="font-semibold">Not yet mapped to a page.</span> This keyword is in the strategy but is not assigned to a page.
                   </p>
-                </div>
+                </KeywordDetailPanel>
               )}
 
               {row.explanation && (
@@ -203,10 +209,10 @@ export function KeywordDetailDrawer({
                   <p className="t-label text-[var(--brand-text-muted)] mb-2">Why It Matters</p>
                   <div className="space-y-2">
                     {row.explanation.reasons.map(reason => (
-                      <div key={reason} className="flex gap-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/40 border border-[var(--brand-border)] px-3 py-2">
+                      <KeywordDetailPanel key={reason} className="flex gap-2 py-2">
                         <Icon as={CheckCircle2} size="sm" className="text-teal-400 mt-0.5 flex-shrink-0" />
                         <p className="t-caption-sm text-[var(--brand-text)] break-words">{reason}</p>
-                      </div>
+                      </KeywordDetailPanel>
                     ))}
                   </div>
                 </div>
@@ -214,7 +220,7 @@ export function KeywordDetailDrawer({
 
               <div>
                 <p className="t-label text-[var(--brand-text-muted)] mb-2">Tracking State</p>
-                <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-3)]/40 p-3">
+                <KeywordDetailPanel>
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="t-caption font-medium text-[var(--brand-text-bright)] capitalize">{trackingLabel}</p>
@@ -241,23 +247,28 @@ export function KeywordDetailDrawer({
                   {row.protectionReason && (
                     <p className="t-caption-sm text-amber-400/80 mt-2">{row.protectionReason} is protected from accidental retirement.</p>
                   )}
-                </div>
+                </KeywordDetailPanel>
               </div>
 
               {row.feedback?.status && (
                 <div>
                   <p className="t-label text-[var(--brand-text-muted)] mb-2">Feedback</p>
-                  <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-3)]/40 p-3">
-                    <Badge label={row.feedback.status} tone={row.feedback.status === 'declined' ? 'red' : row.feedback.status === 'requested' ? 'amber' : 'emerald'} variant="outline" />
+                  <KeywordDetailPanel>
+                    <StatusBadge
+                      domain="keyword-command-center"
+                      status={row.feedback.status}
+                      variant="outline"
+                      fallback="neutral"
+                    />
                     {row.feedback.reason && <p className="t-caption-sm text-[var(--brand-text)] mt-2 break-words">{row.feedback.reason}</p>}
-                  </div>
+                  </KeywordDetailPanel>
                 </div>
               )}
 
               {row.localSeoState && (
                 <div>
                   <p className="t-label text-[var(--brand-text-muted)] mb-2">Local Visibility</p>
-                  <div className="rounded-[var(--radius-lg)] border border-blue-500/20 bg-blue-500/8 p-3">
+                  <KeywordDetailPanel tone="blue">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="t-caption font-medium text-[var(--brand-text-bright)]">
@@ -270,7 +281,13 @@ export function KeywordDetailDrawer({
                         {row.localSeo ? (
                           <LocalSeoVisibilityBadge visibility={row.localSeo} />
                         ) : (
-                          <Badge label={row.localSeoState.lifecycleLabel} tone={localLifecycleTone(row.localSeoState.lifecycle)} variant="soft" shape="pill" />
+                          <StatusBadge
+                            domain="keyword-command-center"
+                            status={row.localSeoState.lifecycle}
+                            variant="soft"
+                            shape="pill"
+                            fallback="neutral"
+                          />
                         )}
                       </div>
                     </div>
@@ -290,7 +307,7 @@ export function KeywordDetailDrawer({
                       )}
                     </div>
                     {row.localSeo?.topCompetitors && row.localSeo.topCompetitors.length > 0 && (
-                      <div className="mt-3 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-3)]/40 p-3">
+                      <KeywordDetailPanel className="mt-3">
                         <p className="t-caption-sm font-semibold text-[var(--brand-text-bright)] mb-2">Top local result evidence</p>
                         <div className="space-y-1.5">
                           {row.localSeo.topCompetitors.slice(0, 3).map(result => (
@@ -302,12 +319,12 @@ export function KeywordDetailDrawer({
                             </div>
                           ))}
                         </div>
-                      </div>
+                      </KeywordDetailPanel>
                     )}
                     <p className="t-caption-sm text-[var(--brand-text-muted)] mt-2">
                       Local SEO is market-specific local-pack visibility. Rank Tracker remains Search Console measurement.
                     </p>
-                  </div>
+                  </KeywordDetailPanel>
                 </div>
               )}
             </div>
