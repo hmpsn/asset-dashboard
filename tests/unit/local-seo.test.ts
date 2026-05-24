@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import db from '../../server/db/index.js';
 import {
+  __resetRefreshTimingsForTesting,
+  __setRefreshTimingsForTesting,
   buildLocalSeoKeywordCandidates,
   buildLocalSeoKeywordCandidatesEvaluated,
   buildLocalSeoKeywordVisibilitySummaryByKey,
@@ -851,7 +853,20 @@ describe('per-workspace keywords-per-refresh override', () => {
 });
 
 describe('local SEO refresh job concurrency', () => {
-  it('processes 10 (keyword × market) pairs with bounded concurrency faster than sequential would allow', async () => {
+  // Neutralize the production 150 ms inter-item yield + 2 s heap-headroom waits
+  // so these tests measure just refresh logic, not the GC-headroom backpressure
+  // that protects memory-constrained hosts. Production behavior is verified by
+  // the `__setRefreshTimingsForTesting` hook's existence and the constants in
+  // local-seo.ts; the sleep delays themselves are an operational concern, not
+  // a behavioral one we need to assert in unit tests.
+  beforeEach(() => {
+    __setRefreshTimingsForTesting({ itemYieldMs: 0, heapHeadroomThresholdMb: Number.MAX_SAFE_INTEGER });
+  });
+  afterEach(() => {
+    __resetRefreshTimingsForTesting();
+  });
+
+  it('processes 10 (keyword × market) pairs sequentially and completes', async () => {
     setBroadcast(vi.fn(), vi.fn());
     const ws = createWorkspace('Local SEO Concurrency Test');
     cleanupWorkspaceIds.add(ws.id);
@@ -893,38 +908,46 @@ describe('local SEO refresh job concurrency', () => {
       addTrackedKeyword(ws.id, kw, { source: TRACKED_KEYWORD_SOURCE.MANUAL });
     }
 
-    // Each provider call takes 40 ms. Sequential: 10 × 40 ms = 400 ms.
-    // With CONCURRENCY=5 we process in 2 chunks of 5, so wall-clock ≈ 2 × 40 ms = 80 ms.
-    // We assert completion under 300 ms to leave headroom for test infrastructure overhead
-    // while still proving concurrency is active.
-    const CALL_DELAY_MS = 40;
+    // PR #910: refresh is now fully sequential (CONCURRENCY=1) to cut peak
+    // SERP-response memory on memory-constrained hosts. Assert all items complete
+    // in order rather than asserting wall-clock < sequential floor (which was the
+    // pre-PR-#910 invariant). With itemYieldMs=0 the only delay is the fake
+    // provider's 5 ms per call; 10 calls should comfortably complete.
+    const CALL_DELAY_MS = 5;
     const ITEM_COUNT = 10; // 2 markets × 5 keywords
-    const SEQUENTIAL_FLOOR_MS = ITEM_COUNT * CALL_DELAY_MS; // 400 ms minimum if sequential
 
     const slowProvider = new FakeSeoProvider();
     const originalGet = slowProvider.getLocalVisibility.bind(slowProvider);
+    let concurrentCalls = 0;
+    let maxConcurrentObserved = 0;
     slowProvider.getLocalVisibility = async (...args) => {
-      await new Promise(resolve => setTimeout(resolve, CALL_DELAY_MS));
-      return originalGet(...args);
+      concurrentCalls++;
+      maxConcurrentObserved = Math.max(maxConcurrentObserved, concurrentCalls);
+      try {
+        await new Promise(resolve => setTimeout(resolve, CALL_DELAY_MS));
+        return await originalGet(...args);
+      } finally {
+        concurrentCalls--;
+      }
     };
     registerProvider('dataforseo', slowProvider);
 
     const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, {
       workspaceId: ws.id,
-      message: 'Concurrency test refresh',
+      message: 'Sequential refresh test',
     });
 
-    const start = Date.now();
     await runLocalSeoRefreshJob(job.id, ws.id, { keywords });
-    const elapsed = Date.now() - start;
 
     // Must complete all 10 items.
     const finalJob = getJob(job.id);
     expect(finalJob?.status).toBe('done');
     expect(finalJob?.progress).toBe(ITEM_COUNT);
 
-    // Wall-clock must be well under sequential floor, proving chunks ran concurrently.
-    expect(elapsed).toBeLessThan(SEQUENTIAL_FLOOR_MS);
+    // Refresh is sequential by design — no two getLocalVisibility calls ever
+    // overlap. This is the load-bearing invariant: PR #910 reduced concurrency
+    // 5 → 3 → 1 to bound peak SERP-response memory on Render starter.
+    expect(maxConcurrentObserved).toBe(1);
   });
 
   it('emits mid-job LOCAL_SEO_UPDATED broadcasts so React Query caches invalidate before job completion', async () => {

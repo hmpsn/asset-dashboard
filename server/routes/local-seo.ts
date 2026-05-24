@@ -223,6 +223,21 @@ router.post('/api/local-seo/:workspaceId/refresh', requireWorkspaceAccess('works
   }
   const active = hasActiveJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, workspaceId);
   if (active) return res.status(409).json({ error: 'Local SEO refresh is already running for this workspace', jobId: active.id });
+  // Global cross-workspace coalescing — each refresh holds DataForSEO SERP responses
+  // in memory; on memory-constrained hosts (Render starter ~512 MB) concurrent
+  // refreshes from different workspaces stack and OOM-kill the Node process with no
+  // error log. Serialize globally: only one local SEO refresh runs at a time across
+  // the whole platform. Wall-clock cost is acceptable per product call ("OK if it
+  // takes a while"). Returns 409 with the other workspace's jobId so the UI can
+  // surface a "waiting for another refresh" state if desired.
+  const globalActive = hasActiveJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH);
+  if (globalActive) {
+    return res.status(409).json({
+      error: 'Another workspace is currently running a local SEO refresh — please wait for it to complete',
+      jobId: globalActive.id,
+      blockingWorkspaceId: globalActive.workspaceId,
+    });
+  }
   const plan = createLocalSeoRefreshPlan(workspaceId, req.body);
   if (!plan) return res.status(404).json({ error: 'Workspace not found' });
   const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, {

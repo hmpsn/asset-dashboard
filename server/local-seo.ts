@@ -94,11 +94,78 @@ export function getEffectiveKeywordsPerRefresh(workspaceId: string): number {
 }
 const LOCAL_CANDIDATE_HARD_CAP = 1000;
 const LOCAL_SEO_MAX_RESULTS = 10;
-// Reduced from 5 → 3: each concurrent slot holds a full DataForSEO serp/google/organic/live/advanced
-// JSON response in memory during parsing. On memory-constrained hosts (Render starter) running
-// 5 concurrent responses alongside an active KCC build pushed the process toward OOM.
-// 3 still gives ~3× speedup over sequential while cutting peak SERP-response memory ~40%.
-const LOCAL_SEO_REFRESH_CONCURRENCY = 3;
+// Fully sequential SERP calls. Iteration history: 5 (initial) → 3 (PR #909) → 1 (PR #910).
+// Each concurrent slot holds a full DataForSEO serp/google/organic/live/advanced JSON
+// response in memory during parsing (~20–30 MB). On memory-constrained hosts (Render
+// starter ~512 MB) even 3 concurrent responses stacked with an active KCC build (~110 MB
+// heap) and other request handlers exceeded the process memory limit and triggered an
+// OOM SIGKILL with no error log. Going fully sequential cuts peak SERP-response memory
+// to a single response (~25 MB). Combined with LOCAL_SEO_REFRESH_ITEM_YIELD_MS below
+// and waitForMemoryHeadroom() before each batch, this gives V8 time to reclaim the
+// previous response and lets concurrent KCC reads complete without competing for memory.
+// Wall-clock is ~3× longer than before; that trade is explicitly acceptable.
+const LOCAL_SEO_REFRESH_CONCURRENCY = 1;
+// Production defaults for the inter-item yield and heap-headroom backpressure
+// applied inside the refresh loop. Test-only override via
+// `__setRefreshTimingsForTesting()` keeps unit tests fast without changing
+// production behavior. Tuned for Render starter (~512 MB total): KCC alone
+// uses ~110 MB heap, so 220 MB leaves room for one SERP response (~25 MB) plus
+// baseline (~80 MB) without approaching the OOM cliff.
+const DEFAULT_REFRESH_ITEM_YIELD_MS = 150;
+const DEFAULT_HEAP_HEADROOM_THRESHOLD_MB = 220;
+const DEFAULT_HEAP_HEADROOM_WAIT_MS = 2000;
+const DEFAULT_HEAP_HEADROOM_MAX_WAITS = 3;
+
+const refreshTimings = {
+  itemYieldMs: DEFAULT_REFRESH_ITEM_YIELD_MS,
+  heapHeadroomThresholdMb: DEFAULT_HEAP_HEADROOM_THRESHOLD_MB,
+  heapHeadroomWaitMs: DEFAULT_HEAP_HEADROOM_WAIT_MS,
+  heapHeadroomMaxWaits: DEFAULT_HEAP_HEADROOM_MAX_WAITS,
+};
+
+/**
+ * Test-only hook: override refresh timing constants so unit tests run fast
+ * without the 150 ms × N inter-item sleep and the 2 s heap-headroom pause.
+ * Production code never calls this — the defaults above are the live values.
+ */
+export function __setRefreshTimingsForTesting(overrides: Partial<typeof refreshTimings>): void {
+  Object.assign(refreshTimings, overrides);
+}
+
+/**
+ * Test-only hook: restore production refresh timings. Call from `afterEach`
+ * so a test that opted in to fast timings doesn't leak the override into
+ * adjacent tests.
+ */
+export function __resetRefreshTimingsForTesting(): void {
+  refreshTimings.itemYieldMs = DEFAULT_REFRESH_ITEM_YIELD_MS;
+  refreshTimings.heapHeadroomThresholdMb = DEFAULT_HEAP_HEADROOM_THRESHOLD_MB;
+  refreshTimings.heapHeadroomWaitMs = DEFAULT_HEAP_HEADROOM_WAIT_MS;
+  refreshTimings.heapHeadroomMaxWaits = DEFAULT_HEAP_HEADROOM_MAX_WAITS;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Heap-aware backpressure: before allocating another SERP response, ensure heap
+ * headroom exists on memory-constrained hosts. If heap is above the threshold,
+ * sleep and retry up to `maxWaits` times. After that, proceed anyway — we'd
+ * rather risk one more allocation than stall the refresh indefinitely waiting
+ * for memory that may never drain (e.g. a long-running KCC build).
+ */
+async function waitForMemoryHeadroom(): Promise<void> {
+  for (let attempt = 0; attempt < refreshTimings.heapHeadroomMaxWaits; attempt++) {
+    const heapMb = process.memoryUsage().heapUsed / 1024 / 1024;
+    if (heapMb < refreshTimings.heapHeadroomThresholdMb) return;
+    log.warn(
+      { heapMb: Math.round(heapMb), thresholdMb: refreshTimings.heapHeadroomThresholdMb, attempt: attempt + 1 },
+      'local-seo refresh: heap above threshold — pausing for GC headroom',
+    );
+    await sleep(refreshTimings.heapHeadroomWaitMs);
+  }
+}
 /**
  * Fire a `LOCAL_SEO_UPDATED` broadcast every N completed snapshots during a
  * refresh so the UI invalidates its KCC + local-seo caches incrementally
@@ -2118,6 +2185,10 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
 
   for (let i = 0; i < workItems.length; i += LOCAL_SEO_REFRESH_CONCURRENCY) {
     if (getJob(jobId)?.status === 'cancelled') return;
+    // Layer 4: heap-aware backpressure. If heap is above the soft threshold,
+    // pause briefly so GC + concurrent KCC reads can drain before we allocate
+    // another big SERP response. See LOCAL_SEO_HEAP_HEADROOM_THRESHOLD_MB.
+    await waitForMemoryHeadroom();
     const chunk = workItems.slice(i, i + LOCAL_SEO_REFRESH_CONCURRENCY);
     await Promise.allSettled(chunk.map(async ({ market, keyword }) => {
       // Bail before spending provider credits if the job was cancelled.
@@ -2169,6 +2240,11 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
         updatedAt: new Date().toISOString(),
       });
     }
+
+    // Layer 2: inter-item yield. Sleep briefly so V8 has time to GC the SERP
+    // response from this chunk before the next iteration allocates a fresh one.
+    // Skip when this was the last chunk — no more allocations coming.
+    if (processed < total && refreshTimings.itemYieldMs > 0) await sleep(refreshTimings.itemYieldMs);
   }
 
   const result: LocalSeoRefreshResult = {
