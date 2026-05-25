@@ -203,7 +203,10 @@ export function InboxTab({
     .map(action => normalizeClientAction(action));
 
   // Filter chip counts
-  const decisionsCount = decisionItems.length + planReviewCount + approvalsForDecisions.length;
+  const decisionsCount = decisionItems.length
+    + planReviewCount
+    + approvalsForDecisions.length
+    + (!betaMode && schemaPlanPending ? 1 : 0);
   const reviewsCount = contentReviews + copyReviewCount + (!betaMode && schemaPlanPending ? 1 : 0);
   const conversationsCount = requestReplies + approvalsForConversations.length + conversationItems.length;
 

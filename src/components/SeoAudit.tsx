@@ -432,10 +432,26 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   if (auditSubTab === 'guide') return <div>{auditTabBar}{pageHeader}<SeoAuditGuide /></div>;
 
   if (auditSubTab === 'content-decay' && workspaceId) {
-    return <div>{auditTabBar}{pageHeader}<Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-[var(--radius-pill)] animate-spin border-[var(--brand-border)] border-t-amber-400" /></div>}><ContentDecay workspaceId={workspaceId} /></Suspense></div>;
+    return (
+      <div>
+        {auditTabBar}
+        {pageHeader}
+        <Suspense fallback={<LoadingState message="Loading content decay insights..." size="lg" className="py-16" />}>
+          <ContentDecay workspaceId={workspaceId} />
+        </Suspense>
+      </div>
+    );
   }
   if (auditSubTab === 'aeo-review' && workspaceId) {
-    return <div>{auditTabBar}{pageHeader}<Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-[var(--radius-pill)] animate-spin border-[var(--brand-border)] border-t-[var(--teal)]" /></div>}><AeoReview workspaceId={workspaceId} /></Suspense></div>;
+    return (
+      <div>
+        {auditTabBar}
+        {pageHeader}
+        <Suspense fallback={<LoadingState message="Loading answer engine optimization review..." size="lg" className="py-16" />}>
+          <AeoReview workspaceId={workspaceId} />
+        </Suspense>
+      </div>
+    );
   }
   if (auditSubTab === 'history') {
     return <div>{auditTabBar}{pageHeader}<AuditHistory siteId={siteId} history={history} onRefresh={loadHistory} /></div>;
@@ -589,19 +605,25 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         const hasRedirectIssues = allIssues.some(i => ['redirect_chain', 'broken_link', 'missing_canonical'].includes(i.check));
         const hasPerformanceIssues = allIssues.some(i => i.category === 'performance');
         const hasSchemaIssues = allIssues.some(i => ['missing_schema', 'schema_errors'].includes(i.check));
-        const tips: { icon: typeof Globe; label: string; tool: string }[] = [];
-        if (hasMetaIssues) tips.push({ icon: FileText, label: 'Fix titles & meta descriptions in the SEO Editor', tool: 'SEO Editor' });
-        if (hasRedirectIssues) tips.push({ icon: AlertTriangle, label: 'Review redirect chains in the Redirects tool', tool: 'Redirects' });
-        if (hasSchemaIssues) tips.push({ icon: Globe, label: 'Generate structured data with the Schema tool', tool: 'Schema' });
-        if (hasPerformanceIssues) tips.push({ icon: TrendingDown, label: 'Check page weight & speed in the Performance tab', tool: 'Performance' });
+        const tips: Array<{ icon: typeof Globe; label: string; target: string }> = [];
+        if (hasMetaIssues) tips.push({ icon: FileText, label: 'Fix titles & meta descriptions in SEO Editor', target: adminPath(workspaceId || '', 'seo-editor') });
+        if (hasRedirectIssues) tips.push({ icon: AlertTriangle, label: 'Review redirect chains in Redirects', target: adminPath(workspaceId || '', 'links') });
+        if (hasSchemaIssues) tips.push({ icon: Globe, label: 'Generate structured data in Schema', target: adminPath(workspaceId || '', 'seo-schema') });
+        if (hasPerformanceIssues) tips.push({ icon: TrendingDown, label: 'Review speed and Core Web Vitals in Performance', target: adminPath(workspaceId || '', 'performance') });
         if (tips.length === 0) return null;
         return (
           <div className="flex items-center gap-2 px-4 py-2.5 rounded-[var(--radius-lg)] bg-[var(--surface-2)]/50 border border-[var(--brand-border)] flex-wrap">
             <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium tracking-wider mr-1">Quick fixes →</span>
             {tips.map(tip => (
-              <span key={tip.tool} className="flex items-center gap-1 t-caption-sm text-accent-brand bg-teal-500/5 px-2 py-1 rounded border border-teal-500/10">
+              <Button
+                key={tip.label}
+                variant="ghost"
+                size="sm"
+                onClick={() => workspaceId && navigate(tip.target)}
+                className="!px-2 !py-1 !rounded-[var(--radius-md)] !h-auto !min-h-0 flex items-center gap-1 t-caption-sm !text-accent-brand bg-teal-500/5 border border-teal-500/10 hover:!bg-teal-500/10"
+              >
                 <Icon as={tip.icon} size="sm" /> {tip.label}
-              </span>
+              </Button>
             ))}
           </div>
         );

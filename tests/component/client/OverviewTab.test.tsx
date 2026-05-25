@@ -4,7 +4,7 @@
  * Heavy sub-components (MonthlyDigest, IntelligenceSummaryCard, HealthScoreCard,
  * PredictionShowcaseCard, InsightsDigest, InsightsBriefingPage) are stubbed so
  * tests stay focused on the OverviewTab logic: welcome message, stat card grid,
- * action-needed banner, primary CTA, empty state, and the insights-engine sidebar.
+ * action-needed banner, primary CTA, empty state, and the SEO-advisor sidebar.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
@@ -142,9 +142,9 @@ describe('OverviewTab — basic rendering', () => {
     expect(screen.getByTestId('insights-digest')).toBeInTheDocument();
   });
 
-  it('renders Ask the Insights Engine section with quick questions', () => {
+  it('renders Ask your SEO advisor section with quick questions', () => {
     render(<OverviewTab {...baseProps} />);
-    expect(screen.getByText('Ask the Insights Engine')).toBeInTheDocument();
+    expect(screen.getByText('Ask your SEO advisor')).toBeInTheDocument();
   });
 });
 
