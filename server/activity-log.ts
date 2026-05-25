@@ -46,6 +46,7 @@ export type ActivityType =
   | 'schema_plan_sent'
   | 'redirects_scanned'
   | 'strategy_generated'
+  | 'keyword_added'
   | 'rank_tracking_updated'
   | 'rank_snapshot'
   | 'chat_session'
@@ -56,6 +57,7 @@ export type ActivityType =
   | 'anomaly_positive'
   | 'post_generated'
   | 'post_reverted'
+  | 'brief_sent_for_review'
   | 'post_sent_for_review'
   | 'content_published'
   | 'aeo_review'
@@ -176,7 +178,7 @@ const CLIENT_VISIBLE_TYPES: Set<ActivityType> = new Set([
   'content_declined', 'content_request_commented', 'brief_generated', 'brief_approved',
   'changes_requested', 'briefing_published', 'briefing_auto_published', 'content_upgraded', 'fix_completed',
   'content_published', 'copy_sent_to_client', 'post_approved', 'post_changes_requested',
-  'post_client_edit', 'post_sent_for_review', 'client_action_sent', 'client_action_approved',
+  'post_client_edit', 'brief_sent_for_review', 'post_sent_for_review', 'client_action_sent', 'client_action_approved',
   'client_action_changes_requested', 'client_action_completed',
 ]);
 
