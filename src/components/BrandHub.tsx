@@ -88,8 +88,15 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ws?.id]);
 
+  // Sync knowledge base textarea from loaded workspace once
+  useEffect(() => {
+    if (ws?.knowledgeBase !== undefined) setKbDraft(ws.knowledgeBase || '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ws?.id]);
+
   // Knowledge Base state
-  const [kbDraft, setKbDraft] = useState<string | null>(null);
+  const [kbDraft, setKbDraft] = useState('');
+  const [savingKnowledgeBase, setSavingKnowledgeBase] = useState(false);
   const [startingKbJob, setStartingKbJob] = useState(false);
   const [lastKbJobId, setLastKbJobId] = useState<string | null>(() =>
     readStoredContextJobId(workspaceId, BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION)
@@ -257,6 +264,21 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
     }
   };
 
+  const saveKnowledgeBaseHandler = async () => {
+    if (!ws) return;
+    const value = kbDraft.trim();
+    if (value === (ws.knowledgeBase || '')) return;
+    setSavingKnowledgeBase(true);
+    try {
+      await patchWorkspace({ knowledgeBase: value });
+      toast('Knowledge base saved');
+    } catch {
+      toast('Failed to save knowledge base', 'error');
+    } finally {
+      setSavingKnowledgeBase(false);
+    }
+  };
+
   return (
     <ErrorBoundary label="Brand Hub">
     <div className="space-y-8">
@@ -369,21 +391,23 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
           <p className="t-caption text-[var(--brand-text-muted)]">Business context for AI — services, capabilities, FAQs, industry info</p>
           <FormTextarea
             id="knowledge-base-textarea"
-            value={kbDraft !== null ? kbDraft : (ws?.knowledgeBase || '')}
+            value={kbDraft}
             onChange={setKbDraft}
             rows={8}
             placeholder={"Example:\n- Industry: Home services (plumbing, HVAC)\n- Location: Denver metro area\n- Key services: Emergency repair, new installations, maintenance plans\n- Differentiators: 24/7 availability, licensed & insured, 15+ years\n- Target audience: Homeowners, property managers\n- Common client questions: pricing, response time, service areas"}
-            onBlur={async (e) => {
-              const val = e.target.value.trim();
-              if (val !== (ws?.knowledgeBase || '')) {
-                await patchWorkspace({ knowledgeBase: val });
-                toast('Knowledge base saved');
-                setKbDraft(null);
-              }
-            }}
-            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2.5 t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500 resize-y font-mono leading-relaxed"
+            className="font-mono leading-relaxed"
           />
           <div className="flex items-center gap-2">
+            <Button
+              variant="primary"
+              size="sm"
+              icon={savingKnowledgeBase ? undefined : Save}
+              loading={savingKnowledgeBase}
+              onClick={saveKnowledgeBaseHandler}
+              disabled={savingKnowledgeBase || kbDraft.trim() === (ws?.knowledgeBase || '')}
+            >
+              Save Knowledge Base
+            </Button>
             <Button
               type="button"
               variant="secondary"
@@ -413,8 +437,8 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
             >
               {generatingKB ? 'Crawling site...' : 'Generate from Website'}
             </Button>
-            {kbDraft !== null && kbDraft !== (ws?.knowledgeBase || '') && (
-              <span className="t-caption-sm text-accent-warning">Unsaved changes — click outside the textarea to save</span>
+            {kbDraft.trim() !== (ws?.knowledgeBase || '') && (
+              <span className="t-caption-sm text-accent-warning">Unsaved changes</span>
             )}
           </div>
           <p className="t-caption-sm text-[var(--brand-text-muted)]">

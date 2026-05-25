@@ -76,6 +76,7 @@ export const queryKeys = {
     seoSuggestions: (wsId: string) => ['seo-suggestions', wsId] as const,
     rewritePages: (wsId: string) => ['admin-rewrite-pages', wsId] as const,
     keywordStrategy: (wsId: string) => ['keyword-strategy', wsId] as const,
+    keywordFeedback: (wsId: string) => ['admin-keyword-feedback', wsId] as const,
     keywordCommandCenter: (wsId: string) => ['admin-keyword-command-center', wsId] as const,
     keywordCommandCenterSummary: (wsId: string) => ['admin-keyword-command-center', wsId, 'summary'] as const,
     keywordCommandCenterRows: (wsId: string, query: unknown) => ['admin-keyword-command-center', wsId, 'rows', query] as const,
@@ -83,8 +84,13 @@ export const queryKeys = {
     localSeo: (wsId: string) => ['admin-local-seo', wsId] as const,
     localSeoLocations: (wsId: string) => ['admin-local-seo-locations', wsId] as const,
     rankTrackingKeywords: (wsId: string) => ['admin-rank-tracking-keywords', wsId] as const,
+    rankTrackingKeywordRows: (wsId: string) => ['admin-rank-tracking-keyword-rows', wsId] as const,
     rankTrackingLatest: (wsId: string) => ['admin-rank-tracking-latest', wsId] as const,
     rankTrackingHistory: (wsId: string) => ['admin-rank-tracking-history', wsId] as const,
+    rankTrackingHistoryQueries: (wsId: string, queries: string[]) =>
+      ['admin-rank-tracking-history', wsId, 'queries', ...[...queries].sort()] as const,
+    internalLinksSnapshot: (siteId: string, wsId?: string) =>
+      wsId ? ['admin-internal-links-snapshot', siteId, wsId] as const : ['admin-internal-links-snapshot', siteId] as const,
     anomalyAlerts: (wsId: string) => ['anomaly-alerts', wsId] as const,
     competitorIntel: (wsId: string, competitorKey: string) =>
       ['admin-competitive-intel', wsId, competitorKey] as const,
@@ -199,6 +205,7 @@ export const queryKeys = {
     schemaPlan: (wsId: string) => ['client-schema-plan', wsId] as const,
     schemaSnapshot: (wsId: string) => ['client-schema-snapshot', wsId] as const,
     strategy: (wsId: string) => ['client-strategy', wsId] as const,
+    roi: (wsId: string) => ['client-roi', wsId] as const,
     keywordFeedback: (wsId: string) => ['client-keyword-feedback', wsId] as const,
     pricing: (wsId: string) => ['client-pricing', wsId] as const,
     contentSubscription: (wsId: string) => ['client-content-subscription', wsId] as const,

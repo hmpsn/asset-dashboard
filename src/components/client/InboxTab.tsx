@@ -4,7 +4,7 @@ import {
   Inbox, Flag, ExternalLink, Check, Shield,
   ChevronDown, ChevronRight,
 } from 'lucide-react';
-import { Badge, Button, EmptyState, FormInput, FormTextarea, Icon, StatusBadge } from '../ui';
+import { Badge, Button, EmptyState, FormInput, FormTextarea, Icon, LoadingState, StatusBadge } from '../ui';
 import { ApprovalBatchCard } from './ApprovalBatchCard';
 import { ApprovalsTab } from './ApprovalsTab';
 import { RequestsTab } from './RequestsTab';
@@ -22,7 +22,7 @@ import { queryKeys } from '../../lib/queryKeys';
 import type { ClientAction } from '../../../shared/types/client-actions';
 import { DecisionCard } from './DecisionCard';
 import { DecisionDetailModal } from './DecisionDetailModal';
-import { normalizeClientAction } from '../../lib/decision-adapters';
+import { clientActionSourceLabel, normalizeClientAction } from '../../lib/decision-adapters';
 import type { FlaggedItem } from '../../../shared/types/decision';
 import { useInboxTabShell, type InboxMode } from './inbox/useInboxTabShell';
 import type { InboxFilter } from './inbox/inbox-filter';
@@ -259,6 +259,11 @@ export function InboxTab({
   const showSection1 = mode === 'active' && (filter === 'all' || filter === 'decisions' || filter === 'conversations');
   const showSection2 = mode === 'active' && (filter === 'all' || filter === 'decisions');
   const showSection3 = mode === 'active' && !betaMode && (filter === 'all' || filter === 'reviews');
+  const inboxLoading = mode === 'active'
+    && (approvalsLoading || requestsLoading)
+    && decisionsCount === 0
+    && reviewsCount === 0
+    && conversationsCount === 0;
 
   return (
     <div className="space-y-6">
@@ -293,6 +298,10 @@ export function InboxTab({
           ))}
         </div>
       </div>
+
+      {inboxLoading && (
+        <LoadingState message="Loading your inbox items..." size="lg" />
+      )}
 
       {newInboxIa ? (
         /* === NEW 3-SECTION LAYOUT (flag: new-inbox-ia) === */
@@ -590,7 +599,7 @@ export function InboxTab({
                   {completedClientActions.map(action => (
                     <div key={action.id} className="rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4 opacity-70">
                       <div className="flex items-center gap-2 mb-1">
-                        <Badge label={action.sourceType.replace(/_/g, ' ')} tone="zinc" variant="outline" shape="pill" className="capitalize" />
+                        <Badge label={clientActionSourceLabel(action.sourceType)} tone="zinc" variant="outline" shape="pill" />
                         {action.status === 'approved' || action.status === 'changes_requested' ? (
                           <StatusBadge status={action.status} domain="client-action" variant="outline" shape="pill" />
                         ) : (
@@ -640,7 +649,7 @@ export function InboxTab({
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <Badge label={action.sourceType.replace(/_/g, ' ')} tone="zinc" variant="outline" shape="pill" className="capitalize" />
+                            <Badge label={clientActionSourceLabel(action.sourceType)} tone="zinc" variant="outline" shape="pill" />
                             {action.priority === 'high' && (
                               <span className="t-caption-sm font-medium text-accent-warning">High priority</span>
                             )}
@@ -924,7 +933,7 @@ export function InboxTab({
                   {completedClientActions.map(action => (
                     <div key={action.id} className="rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4 opacity-70">
                       <div className="flex items-center gap-2 mb-1">
-                        <Badge label={action.sourceType.replace(/_/g, ' ')} tone="zinc" variant="outline" shape="pill" className="capitalize" />
+                        <Badge label={clientActionSourceLabel(action.sourceType)} tone="zinc" variant="outline" shape="pill" />
                         {action.status === 'approved' || action.status === 'changes_requested' ? (
                           <StatusBadge status={action.status} domain="client-action" variant="outline" shape="pill" />
                         ) : (

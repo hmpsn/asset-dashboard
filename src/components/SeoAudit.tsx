@@ -486,14 +486,12 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     <div>
       {auditTabBar}
       {pageHeader}
-      {auditError && (
-        <ErrorState
-          type="general"
-          title="SEO Audit Failed"
-          message={auditError}
-          action={{ label: 'Run Again', onClick: runAudit }}
-        />
-      )}
+      <ErrorState
+        type="general"
+        title={auditError ? 'SEO Audit Failed' : 'No audit data available'}
+        message={auditError ?? 'No saved audit was found for this site yet. Run a fresh SEO audit to generate a report.'}
+        action={{ label: 'Run SEO Audit', onClick: runAudit }}
+      />
     </div>
   );
 

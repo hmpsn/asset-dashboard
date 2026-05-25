@@ -4,15 +4,7 @@ import type {
   CollaborationArtifact,
   CollaborationArtifactSection,
 } from '../../shared/types/collaboration-artifact.js';
-import { badgeForBatch } from './decision-adapters';
-
-const CLIENT_ACTION_BADGES: Record<string, string> = {
-  aeo_change: 'AEO',
-  internal_link: 'Internal Links',
-  redirect_proposal: 'Redirects',
-  content_decay: 'Content',
-  keyword_strategy: 'Keywords', // deprecated legacy rows only
-};
+import { badgeForBatch, clientActionSourceLabel } from './decision-adapters';
 
 function hasConversationNote(note: string | null | undefined): boolean {
   return typeof note === 'string' && note.trim().length > 0;
@@ -40,7 +32,7 @@ export function collaborationArtifactFromAction(action: ClientAction): Collabora
     summary: action.summary,
     createdAt: action.createdAt,
     priority: action.priority,
-    badge: CLIENT_ACTION_BADGES[action.sourceType] ?? action.sourceType.replace(/_/g, ' '),
+    badge: clientActionSourceLabel(action.sourceType),
     itemCount: actionItemCount(action),
     hasConversationNote: section === 'conversations',
     section,

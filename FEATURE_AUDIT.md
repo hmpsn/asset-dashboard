@@ -1,8 +1,26 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **449 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **450 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 450. Platform UX Quick Wins Sweep (Audit 2026-05-19)
+
+**What it does:** Ships the first focused remediation batch from the 54-finding platform UX audit (`docs/audits/2026-05-19-platform-ux-audit.md`). This pass removes client-facing vendor jargon in ROI error copy, adds retry affordances, maps internal action-source enums to client-safe labels in Inbox/modals, replaces hard-coded admin route strings with `adminPath()` in key navigation surfaces, upgrades HealthTab's no-audit fallback to `<EmptyState>` with CTA support, replaces generic `Loading...` fallbacks in Content Pipeline, renames Search tab “Raw Data” to client-readable wording, updates onboarding routing off legacy `content` alias usage, and replaces GA4 jargon labels (“Key Events” / “Event Explorer”) with client-oriented language.
+
+**Agency value:** Reduces avoidable support friction and misnavigation by tightening labels, fallback behavior, and route contracts in high-traffic client/admin surfaces.
+
+**Client value:** The dashboard is clearer and more actionable: fewer blank/dead-end moments, less internal jargon, and more predictable navigation.
+
+**Mutual:** Improves trust and adoption with low-risk UX fixes while preserving existing data contracts and deep-link behavior.
+
+**Batch 2 follow-up (2026-05-25):** Closed additional high-signal UX gaps from the same audit pass: added an explicit no-data fallback in `PerformanceTab` when both GSC and GA4 are unavailable, included copy-review presence in the client Inbox nav badge count, replaced dynamic Tailwind `grid-cols-${n}` construction in Overview metrics with static responsive class mappings, made Search Health Summary responsive on smaller screens, deep-linked the Overview "Generate Brief" CTA to Inbox Reviews (`/inbox?tab=reviews`), and replaced the admin unknown-tab blank-screen fallback with a safe redirect to workspace Home.
+
+**Batch 3 follow-up (2026-05-25):** Closed additional workflow and visibility gaps: replaced SEO Audit's silent `!data` blank pane with an explicit actionable `ErrorState`; surfaced loading state in active Inbox views while approvals/requests are still in flight; made Content Plan "needs review" badges deep-link to Inbox Reviews; added explicit admin toast confirmation (and failure feedback) for "Send to client" in Content Briefs; added a reusable "Show welcome tour" entrypoint in the client header; upgraded Strategy's no-data empty state with an actionable Inbox CTA; surfaced `client_suggestions` in the admin Copy Review panel so client edit proposals are visible to operators; and wired annotation create/update/delete routes to broadcast workspace events so annotation consumers refresh in real time.
+
+**Batch 4 follow-up (2026-05-25):** Closed the remaining high-priority dead-end and state-consistency items from the same audit wave: added navigation drill-ins from Meeting Brief metrics/wins/attention/recommendations/blueprint blocks to their source admin tabs; made Outcomes Overview rows keyboard/click navigable to each workspace Action Results tab and added a non-blank disabled-flag fallback; added Rank Tracker navigation handoffs (row-level "Open page" links to Page Intelligence plus Strategy CTA from empty state); and standardized explicit error/loading behavior across Rank Tracker, Page Intelligence, Content Briefs, Internal Links, and Workspace Home with contextual `LoadingState` and actionable `ErrorState` fallbacks.
 
 ---
 

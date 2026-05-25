@@ -1,16 +1,18 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Loader2, TrendingUp, Minus, Plus, Trash2, Pin, RefreshCw,
   Target, ArrowUp, ArrowDown, LineChart, ChevronDown, MapPin,
 } from 'lucide-react';
-import { get, post, patch, del } from '../api/client';
-import { Badge, EmptyState, SectionCard, Icon, Button, IconButton, PageHeader, FormInput } from './ui';
+import { get } from '../api/client';
+import { rankTracking } from '../api/seo';
+import { Badge, EmptyState, SectionCard, Icon, Button, IconButton, PageHeader, FormInput, LoadingState, ErrorState } from './ui';
 import { FeatureFlag } from './ui/FeatureFlag';
-import { WS_EVENTS } from '../lib/wsEvents';
 import { cn } from '../lib/utils';
 import { chartGridColor, chartAxisColor, CHART_SERIES_COLORS } from './ui/constants';
-import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
-import type { LatestRank, TrackedKeyword } from '../../shared/types/rank-tracking';
+import { queryKeys } from '../lib/queryKeys';
+import { adminPath } from '../routes';
+import type { LatestRank } from '../../shared/types/rank-tracking';
 
 // ── Trend colors (blue/teal/green family per design system — no violet/indigo) ──
 // chart-hex-ok — multi-keyword trend chart needs 7+ visually distinct cool-hue steps
@@ -154,127 +156,165 @@ type HistoryPoint = { date: string; positions: Record<string, number> };
 interface Props {
   workspaceId: string;
   hasGsc?: boolean;
+  onNavigate?: (to: string, options?: { state?: unknown }) => void;
 }
 
-export function RankTracker({ workspaceId, hasGsc }: Props) {
-  const [keywords, setKeywords] = useState<TrackedKeyword[]>([]);
-  const [latestRanks, setLatestRanks] = useState<LatestRank[]>([]);
-  const [loading, setLoading] = useState(true);
+export function RankTracker({ workspaceId, hasGsc, onNavigate }: Props) {
+  const queryClient = useQueryClient();
   const [newKeyword, setNewKeyword] = useState('');
-  const [adding, setAdding] = useState(false);
-  const [snapshotting, setSnapshotting] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   // Trend/sparkline state
   const [expandedQuery, setExpandedQuery] = useState<string | null>(null);
-  const [queryHistory, setQueryHistory] = useState<{ date: string; position: number }[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
   const [showTrends, setShowTrends] = useState(false);
-  const [trendsData, setTrendsData] = useState<HistoryPoint[]>([]);
-  const [trendsLoading, setTrendsLoading] = useState(false);
-  const expandedQueryRef = useRef<string | null>(null);
+  const trackedKeywordsQuery = useQuery({
+    queryKey: queryKeys.admin.rankTrackingKeywordRows(workspaceId),
+    queryFn: () => rankTracking.keywords(workspaceId),
+    enabled: !!workspaceId,
+    staleTime: 60 * 1000,
+  });
 
-  const load = useCallback(async () => {
-    try {
-      const [kw, ranks] = await Promise.all([
-        get<TrackedKeyword[]>(`/api/rank-tracking/${workspaceId}/keywords`),
-        get<LatestRank[]>(`/api/rank-tracking/${workspaceId}/latest`),
-      ]);
-      if (Array.isArray(kw)) setKeywords(kw);
-      if (Array.isArray(ranks)) setLatestRanks(ranks);
-    } catch (err) {
-      console.error('RankTracker operation failed:', err);
-      setError('Failed to load rank data');
-    }
-    setLoading(false);
-  }, [workspaceId]);
+  const latestRanksQuery = useQuery({
+    queryKey: queryKeys.admin.rankTrackingLatest(workspaceId),
+    queryFn: () => get<LatestRank[]>(`/api/rank-tracking/${workspaceId}/latest`),
+    enabled: !!workspaceId,
+    staleTime: 60 * 1000,
+  });
 
-  useEffect(() => { load(); }, [load]);
-  useWorkspaceEvents(workspaceId, {
-    // ws-invalidation-ok: RankTracker owns local table/chart state in addition to centralized query invalidation.
-    [WS_EVENTS.RANK_TRACKING_UPDATED]: () => { void load(); },
-    // ws-invalidation-ok: strategy refresh can change tracked keyword lifecycle metadata displayed in local state.
-    [WS_EVENTS.STRATEGY_UPDATED]: () => { void load(); },
+  const keywords = trackedKeywordsQuery.data ?? [];
+  const latestRanks = latestRanksQuery.data ?? [];
+
+  const pinnedKeywords = useMemo(
+    () => latestRanks.filter(rank => rank.pinned).map(rank => rank.query),
+    [latestRanks],
+  );
+
+  const expandedHistoryQuery = useQuery({
+    queryKey: queryKeys.admin.rankTrackingHistoryQueries(
+      workspaceId,
+      expandedQuery ? [expandedQuery] : [],
+    ),
+    queryFn: async () => {
+      if (!expandedQuery) return [] as HistoryPoint[];
+      return get<HistoryPoint[]>(`/api/rank-tracking/${workspaceId}/history?queries=${encodeURIComponent(expandedQuery)}`);
+    },
+    enabled: !!workspaceId && !!expandedQuery,
+    staleTime: 60 * 1000,
+  });
+
+  const trendsQuery = useQuery({
+    queryKey: queryKeys.admin.rankTrackingHistoryQueries(workspaceId, pinnedKeywords),
+    queryFn: () => get<HistoryPoint[]>(`/api/rank-tracking/${workspaceId}/history?queries=${encodeURIComponent(pinnedKeywords.join(','))}`),
+    enabled: !!workspaceId && showTrends && pinnedKeywords.length > 0,
+    staleTime: 60 * 1000,
+  });
+
+  const addKeywordMutation = useMutation({
+    mutationFn: (query: string) => rankTracking.addKeyword(workspaceId, { query }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywordRows(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(workspaceId) });
+    },
+  });
+
+  const removeKeywordMutation = useMutation({
+    mutationFn: (query: string) => rankTracking.removeKeyword(workspaceId, query),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywordRows(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingHistory(workspaceId) });
+    },
+  });
+
+  const togglePinMutation = useMutation({
+    mutationFn: (query: string) => rankTracking.togglePin(workspaceId, query),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywordRows(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingHistory(workspaceId) });
+    },
+  });
+
+  const snapshotMutation = useMutation({
+    mutationFn: () => rankTracking.snapshot(workspaceId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingHistory(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywordRows(workspaceId) });
+    },
   });
 
   const addKeyword = async () => {
     if (!newKeyword.trim()) return;
-    setAdding(true);
-    setError('');
+    setError(null);
     try {
-      await post(`/api/rank-tracking/${workspaceId}/keywords`, { query: newKeyword.trim() });
+      await addKeywordMutation.mutateAsync(newKeyword.trim());
       setNewKeyword('');
-      await load();
-    } catch { setError('Failed to add keyword'); }
-    setAdding(false);
+    } catch {
+      setError('Failed to add keyword');
+    }
   };
 
   const removeKeyword = async (query: string) => {
-    await del(`/api/rank-tracking/${workspaceId}/keywords/${encodeURIComponent(query)}`);
-    setKeywords(prev => prev.filter(k => k.query !== query));
-    setLatestRanks(prev => prev.filter(r => r.query !== query));
+    setError(null);
+    try {
+      await removeKeywordMutation.mutateAsync(query);
+    } catch {
+      setError('Failed to remove keyword');
+    }
   };
 
   const togglePin = async (query: string) => {
-    await patch(`/api/rank-tracking/${workspaceId}/keywords/${encodeURIComponent(query)}/pin`, {});
-    setKeywords(prev => prev.map(k => k.query === query ? { ...k, pinned: !k.pinned } : k));
-    setLatestRanks(prev => prev.map(r => r.query === query ? { ...r, pinned: !r.pinned } : r));
+    setError(null);
+    try {
+      await togglePinMutation.mutateAsync(query);
+    } catch {
+      setError('Failed to update pin state');
+    }
   };
 
   const takeSnapshot = async () => {
-    setSnapshotting(true);
-    setError('');
+    setError(null);
     try {
-      await post(`/api/rank-tracking/${workspaceId}/snapshot`);
-      await load();
+      await snapshotMutation.mutateAsync();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Snapshot failed');
     }
-    setSnapshotting(false);
   };
 
   // Expand a keyword row to show its sparkline
-  const toggleExpand = useCallback(async (query: string) => {
-    if (expandedQueryRef.current === query) {
-      expandedQueryRef.current = null;
+  const toggleExpand = (query: string) => {
+    if (expandedQuery === query) {
       setExpandedQuery(null);
       return;
     }
-    expandedQueryRef.current = query;
     setExpandedQuery(query);
-    setHistoryLoading(true);
-    try {
-      const history = await get<HistoryPoint[]>(`/api/rank-tracking/${workspaceId}/history?queries=${encodeURIComponent(query)}`);
-      // Guard against stale response — only update if this query is still expanded
-      if (expandedQueryRef.current !== query) return;
-      setQueryHistory(
-        (history || []).filter(h => h.positions[query] !== undefined).map(h => ({ date: h.date, position: h.positions[query] }))
-      );
-    } catch {
-      if (expandedQueryRef.current !== query) return;
-      setQueryHistory([]);
-    }
-    setHistoryLoading(false);
-  }, [workspaceId]);
+  };
 
-  // Load trends data for all pinned keywords
-  const loadTrends = useCallback(async () => {
-    const pinned = latestRanks.filter(r => r.pinned).map(r => r.query);
-    if (pinned.length === 0) { setShowTrends(false); return; }
-    setShowTrends(true);
-    setTrendsLoading(true);
-    try {
-      const history = await get<HistoryPoint[]>(`/api/rank-tracking/${workspaceId}/history?queries=${encodeURIComponent(pinned.join(','))}`);
-      setTrendsData(history || []);
-    } catch { setTrendsData([]); }
-    setTrendsLoading(false);
-  }, [workspaceId, latestRanks]);
+  const queryHistory = useMemo(() => {
+    if (!expandedQuery || !expandedHistoryQuery.data) return [];
+    return expandedHistoryQuery.data
+      .filter(point => point.positions[expandedQuery] !== undefined)
+      .map(point => ({ date: point.date, position: point.positions[expandedQuery] }));
+  }, [expandedHistoryQuery.data, expandedQuery]);
+
+  const loading = trackedKeywordsQuery.isLoading || latestRanksQuery.isLoading;
+  const historyLoading = expandedHistoryQuery.isFetching;
+  const trendsLoading = trendsQuery.isFetching;
+  const trendsData = trendsQuery.data ?? [];
+  const adding = addKeywordMutation.isPending;
+  const snapshotting = snapshotMutation.isPending;
+  const initialLoadError =
+    (trackedKeywordsQuery.error instanceof Error && trackedKeywordsQuery.error.message)
+    || (latestRanksQuery.error instanceof Error && latestRanksQuery.error.message)
+    || null;
+  const effectiveError = error || initialLoadError;
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <Icon as={Loader2} size="lg" className="animate-spin text-teal-400" />
-      </div>
+      <LoadingState message="Loading rank tracking snapshots and keyword positions..." size="lg" />
     );
   }
 
@@ -291,9 +331,9 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
         icon={<Icon as={Target} size="lg" className="text-accent-brand" />}
         actions={
           <div className="flex items-center gap-2">
-            {latestRanks.some(r => r.pinned) && (
+            {pinnedKeywords.length > 0 && (
               <Button
-                onClick={() => showTrends ? setShowTrends(false) : loadTrends()}
+                onClick={() => setShowTrends(prev => !prev)}
                 disabled={trendsLoading}
                 variant="ghost"
                 size="sm"
@@ -345,7 +385,21 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
         </SectionCard>
       </FeatureFlag>
 
-      {error && <p className="text-xs text-red-400">{error}</p>}
+      {effectiveError && (
+        <ErrorState
+          title="Couldn't load rank tracker data"
+          message={effectiveError}
+          action={{
+            label: 'Retry',
+            onClick: () => {
+              void trackedKeywordsQuery.refetch();
+              void latestRanksQuery.refetch();
+            },
+          }}
+          type="data"
+          className="py-4"
+        />
+      )}
 
       {/* Add keyword */}
       <div className="flex items-center gap-2">
@@ -371,12 +425,10 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
 
       {/* Trends chart for pinned keywords */}
       {showTrends && !trendsLoading && trendsData.length >= 2 && (
-        <TrendsChart data={trendsData} keywords={latestRanks.filter(r => r.pinned).map(r => r.query)} />
+        <TrendsChart data={trendsData} keywords={pinnedKeywords} />
       )}
       {showTrends && trendsLoading && (
-        <div className="flex items-center justify-center py-8 gap-2 text-[var(--brand-text-muted)] text-xs">
-          <Icon as={Loader2} size="md" className="animate-spin text-blue-400" /> Loading trend data...
-        </div>
+        <LoadingState message="Loading pinned keyword trend history..." size="sm" className="py-8" />
       )}
 
       {/* Rankings table */}
@@ -416,7 +468,32 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
                         {rank.source === 'client_requested' && <Badge tone="blue" size="sm" label="Client" />}
                       </div>
                       {rank.pagePath && (
-                        <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{rank.pageTitle || rank.pagePath}</div>
+                        <div className="mt-0.5 flex items-center gap-2 min-w-0">
+                          <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{rank.pageTitle || rank.pagePath}</div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="px-1.5 py-0.5 t-caption-sm text-accent-brand flex-shrink-0"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              if (onNavigate) {
+                                onNavigate(adminPath(workspaceId, 'page-intelligence'), {
+                                  state: {
+                                    fixContext: {
+                                      targetRoute: 'page-intelligence',
+                                      pageSlug: rank.pagePath,
+                                      pageName: rank.pageTitle || rank.pagePath,
+                                    },
+                                  },
+                                });
+                                return;
+                              }
+                              window.location.assign(adminPath(workspaceId, 'page-intelligence'));
+                            }}
+                          >
+                            Open page
+                          </Button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -451,9 +528,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
                 {isExpanded && (
                   <div className="px-4 py-3 border-b border-[var(--brand-border)]/50 bg-[var(--surface-1)]/40">
                     {historyLoading ? (
-                      <div className="flex items-center gap-2 py-2 text-[var(--brand-text-muted)] text-xs">
-                        <Icon as={Loader2} size="sm" className="animate-spin text-blue-400" /> Loading history...
-                      </div>
+                      <LoadingState message="Loading position history..." size="sm" className="py-2" />
                     ) : (
                       <PositionSparkline data={queryHistory} />
                     )}
@@ -484,7 +559,27 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
           }
         />
       ) : (
-        <EmptyState icon={Target} title="No keywords tracked yet" description="Add keywords above, or generate a Keyword Strategy from the sidebar to discover target keywords" className="py-8" />
+        <EmptyState
+          icon={Target}
+          title="No keywords tracked yet"
+          description="Add keywords above, or generate a Keyword Strategy from the sidebar to discover target keywords"
+          className="py-8"
+          action={
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                if (onNavigate) {
+                  onNavigate(adminPath(workspaceId, 'seo-strategy'));
+                  return;
+                }
+                window.location.assign(adminPath(workspaceId, 'seo-strategy'));
+              }}
+            >
+              Open Strategy
+            </Button>
+          }
+        />
       )}
 
       {/* Keywords without rank data */}

@@ -407,7 +407,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
 
     if (tab === 'home') return <WorkspaceHome key={`home-${selected.id}`} workspaceId={selected.id} workspaceName={selected.webflowSiteName || selected.name} webflowSiteId={selected.webflowSiteId} webflowSiteName={selected.webflowSiteName} gscPropertyUrl={selected.gscPropertyUrl} ga4PropertyId={selected.ga4PropertyId} />;
     // 'brief' kept for backward compat — WorkspaceHome tab is the primary discovery path
-    if (tab === 'brief') return <MeetingBriefPage key={`brief-${selected.id}`} workspaceId={selected.id} />;
+    if (tab === 'brief') return <MeetingBriefPage key={`brief-${selected.id}`} workspaceId={selected.id} onNavigate={navigate} />;
     if (tab === 'diagnostics') return (
       <FeatureFlag
         flag="deep-diagnostics"
@@ -455,7 +455,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
         <BrandHub key={`brand-${selected.id}`} workspaceId={selected.id} webflowSiteId={selected.webflowSiteId} />
       </FeatureFlag>
     );
-        if (tab === 'seo-ranks') return <RankTracker key={`ranks-${selected.id}`} workspaceId={selected.id} hasGsc={!!selected.gscPropertyUrl} />;
+    if (tab === 'seo-ranks') return <RankTracker key={`ranks-${selected.id}`} workspaceId={selected.id} hasGsc={!!selected.gscPropertyUrl} onNavigate={navigate} />;
     if (tab === 'analytics-hub') return <AnalyticsHub key={`analytics-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId} gscPropertyUrl={selected.gscPropertyUrl} ga4PropertyId={selected.ga4PropertyId} />;
     if (tab === 'performance') return <Performance key={`perf-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} />;
     if (tab === 'content-perf') return <ContentPerformance key={`content-perf-${selected.id}`} workspaceId={selected.id} />;
@@ -479,7 +479,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'rewrite') return <PageRewriteChat key={`rewrite-${selected.id}`} workspaceId={selected.id} initialPageUrl={rewritePageUrl || undefined} focusMode={effectiveFocusMode} onFocusModeToggle={() => setFocusMode(f => !f)} onBack={() => { setRewritePageUrl(null); navigate(adminPath(selected.id, 'seo-audit')); }} />;
     if (tab === 'outcomes') return <OutcomeDashboard key={`outcomes-${selected.id}`} workspaceId={selected.id} />;
 
-    return null;
+    return <Navigate to={adminPath(selected.id, 'home')} replace />;
   };
 
   return (

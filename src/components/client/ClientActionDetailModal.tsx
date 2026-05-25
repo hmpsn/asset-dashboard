@@ -19,6 +19,7 @@ import type {
   AeoChangeDiff,
 } from '../../../shared/types/client-actions';
 import { normalizeInternalLinkSuggestion } from '../../lib/internal-link-client-action';
+import { clientActionSourceLabel } from '../../lib/decision-adapters';
 
 /** Allow only http/https URLs in rendered <a> tags — blocks javascript: and data: schemes. */
 function safeHref(url: string): string | undefined {
@@ -226,8 +227,8 @@ export function ClientActionDetailModal({
       <div className="flex items-start justify-between px-6 py-4 border-b border-[var(--brand-border)] flex-shrink-0 gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5">
-            <span className="t-caption-sm font-medium px-2 py-0.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)] capitalize">
-              {action.sourceType.replace(/_/g, ' ')}
+            <span className="t-caption-sm font-medium px-2 py-0.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)]">
+              {clientActionSourceLabel(action.sourceType)}
             </span>
           </div>
           <h2 id="client-action-modal-title" className="t-h2 text-[var(--brand-text-bright)] truncate">{action.title}</h2>

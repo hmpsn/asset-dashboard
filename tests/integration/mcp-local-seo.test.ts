@@ -42,6 +42,7 @@ beforeEach(() => {
       provider_location_name TEXT,
       source TEXT NOT NULL DEFAULT 'unknown',
       status TEXT NOT NULL DEFAULT 'needs_review',
+      is_primary INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -50,6 +51,11 @@ beforeEach(() => {
   // column, add it now. Ignore the duplicate-column error.
   try {
     db.exec(`ALTER TABLE local_seo_workspace_settings ADD COLUMN keywords_per_refresh INTEGER`);
+  } catch (err) {
+    if (!(err instanceof Error) || !/duplicate column name/i.test(err.message)) throw err;
+  }
+  try {
+    db.exec(`ALTER TABLE local_seo_markets ADD COLUMN is_primary INTEGER NOT NULL DEFAULT 0`);
   } catch (err) {
     if (!(err instanceof Error) || !/duplicate column name/i.test(err.message)) throw err;
   }

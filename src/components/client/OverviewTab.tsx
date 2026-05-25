@@ -167,8 +167,17 @@ export function OverviewTab({
       }
       const totalItems = cards.length + (audit ? 1 : 0);
       if (totalItems === 0) return null;
+      const metricsGridClass = totalItems === 1
+        ? 'grid-cols-1'
+        : totalItems === 2
+          ? 'grid-cols-1 sm:grid-cols-2'
+          : totalItems === 3
+            ? 'grid-cols-1 sm:grid-cols-3'
+            : totalItems === 4
+              ? 'grid-cols-2 sm:grid-cols-4'
+              : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5';
       return (
-        <div className={`grid gap-3 ${totalItems <= 3 ? 'grid-cols-' + totalItems : totalItems === 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'}`}>
+        <div className={`grid gap-3 ${metricsGridClass}`}>
           {audit && (
             <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-3 text-left" style={{ borderRadius: 'var(--radius-signature)' }}>
               <div className="flex items-center gap-1.5 mb-2">
@@ -262,7 +271,7 @@ export function OverviewTab({
                 </div>
               </div>
               <Button
-                onClick={() => navigate(clientPath(workspaceId, 'inbox', betaMode))}
+                onClick={() => navigate(`${clientPath(workspaceId, 'inbox', betaMode)}?tab=reviews`)}
               >
                 Generate Brief
               </Button>
