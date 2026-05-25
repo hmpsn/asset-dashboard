@@ -171,6 +171,48 @@ describe('mcp content action tools', () => {
     );
   });
 
+  it('save_post rejects brief mismatch between handle and content payload', async () => {
+    (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'brief_1',
+      workspaceId: 'ws-1',
+      targetKeyword: 'hvac',
+    });
+    const prepared = await handleContentActionTool('prepare_post_context', {
+      workspace_id: 'ws-1',
+      brief_id: 'brief_1',
+    });
+    const preparedPayload = JSON.parse(prepared.content[0].text) as { post_request_handle: string };
+    const result = await handleContentActionTool('save_post', {
+      workspace_id: 'ws-1',
+      post_request_handle: preparedPayload.post_request_handle,
+      content: {
+        briefId: 'brief_2',
+        targetKeyword: 'hvac',
+        title: 'Post title',
+        metaDescription: 'Meta',
+        introduction: '<p>Intro</p>',
+        sections: [
+          {
+            index: 0,
+            heading: 'H2',
+            content: '<p>Body</p>',
+            wordCount: 100,
+            targetWordCount: 120,
+            keywords: ['hvac'],
+            status: 'done',
+          },
+        ],
+        conclusion: '<p>End</p>',
+        totalWordCount: 1000,
+        targetWordCount: 1200,
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/does not match prepared request briefId/);
+    expect(savePost).not.toHaveBeenCalled();
+  });
+
   it('send_to_client from brief handle creates a request', async () => {
     const prepared = await handleContentActionTool('prepare_brief_context', {
       workspace_id: 'ws-1',
@@ -209,5 +251,63 @@ describe('mcp content action tools', () => {
     expect(result.isError).toBeUndefined();
     expect(createContentRequest).toHaveBeenCalledOnce();
     expect(updateContentRequest).toHaveBeenCalled();
+  });
+
+  it('send_to_client updates existing parent request with update event', async () => {
+    const prepared = await handleContentActionTool('prepare_brief_context', {
+      workspace_id: 'ws-1',
+      topic: 'HVAC tips',
+      layout: { type: 'outline', structure: { sections: [{ heading: { level: 1, text: 'Intro' } }] } },
+    });
+    const preparedPayload = JSON.parse(prepared.content[0].text) as { brief_request_handle: string };
+    const parentRequestId = 'cr_parent';
+    const saved = await handleContentActionTool('save_brief', {
+      workspace_id: 'ws-1',
+      brief_request_handle: preparedPayload.brief_request_handle,
+      parent_request_id: parentRequestId,
+      content: {
+        targetKeyword: 'hvac tips',
+        secondaryKeywords: ['ac maintenance'],
+        suggestedTitle: 'Best HVAC Tips',
+        suggestedMetaDesc: 'Meta',
+        outline: [{ heading: 'H2', notes: 'n' }],
+        wordCountTarget: 1200,
+        intent: 'informational',
+        audience: 'homeowners',
+        competitorInsights: 'none',
+        internalLinkSuggestions: ['/a'],
+      },
+    });
+    const savedPayload = JSON.parse(saved.content[0].text) as { brief_id: string; brief_handle: string };
+    (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: savedPayload.brief_id,
+      suggestedTitle: 'Best HVAC Tips',
+      targetKeyword: 'hvac tips',
+      intent: 'informational',
+      pageType: 'blog',
+    });
+    (getContentRequest as ReturnType<typeof vi.fn>).mockReturnValueOnce({ id: parentRequestId });
+
+    const result = await handleContentActionTool('send_to_client', {
+      workspace_id: 'ws-1',
+      brief_handle: savedPayload.brief_handle,
+      note: 'Please review',
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(createContentRequest).not.toHaveBeenCalled();
+    expect(updateContentRequest).toHaveBeenCalledWith(
+      'ws-1',
+      parentRequestId,
+      expect.objectContaining({
+        briefId: savedPayload.brief_id,
+        status: 'client_review',
+      }),
+    );
+    expect(broadcastToWorkspace).toHaveBeenCalledWith(
+      'ws-1',
+      'content-request:update',
+      expect.objectContaining({ id: parentRequestId }),
+    );
   });
 });

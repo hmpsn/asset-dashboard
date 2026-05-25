@@ -229,6 +229,9 @@ async function handleStartSeoAudit(
   const { workspace_id: workspaceId, site_id: siteId, options } = parsed.data;
   const workspace = requireWorkspace(workspaceId);
   if ('isError' in workspace) return workspace;
+  if (workspace.webflowSiteId !== siteId) {
+    return mcpError(`Workspace ${workspaceId} is not linked to site ${siteId}`);
+  }
 
   const active = hasActiveJob(BACKGROUND_JOB_TYPES.SEO_AUDIT, workspaceId);
   if (active) return mcpError(`An SEO audit is already running (${active.id})`);

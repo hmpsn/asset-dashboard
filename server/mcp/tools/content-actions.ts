@@ -303,6 +303,11 @@ async function handleSavePost(
   }
 
   const post = buildPostEntity(workspaceId, content, payload);
+  if (post.briefId !== payload.briefId) {
+    return mcpError(
+      `Post briefId (${post.briefId}) does not match prepared request briefId (${payload.briefId})`,
+    );
+  }
   savePost(workspaceId, post);
   broadcastToWorkspace(workspaceId, WS_EVENTS.POST_UPDATED, {
     workspaceId,
@@ -354,22 +359,22 @@ async function handleSavePost(
   });
 }
 
-function ensureBriefRequest(workspaceId: string, briefId: string, note: string | undefined): string {
+function ensureBriefRequest(workspaceId: string, brief: ContentBrief, note: string | undefined): string {
   const request = createContentRequest(workspaceId, {
-    topic: `Review brief: ${briefId}`,
-    targetKeyword: `brief:${briefId}`,
-    intent: 'informational',
+    topic: brief.suggestedTitle,
+    targetKeyword: brief.targetKeyword,
+    intent: brief.intent || 'informational',
     priority: 'medium',
-    rationale: 'Brief shared from MCP',
+    rationale: brief.executiveSummary || `Content brief for "${brief.targetKeyword}"`,
     source: 'strategy',
     serviceType: 'brief_only',
-    pageType: 'blog',
+    pageType: brief.pageType || 'blog',
     initialStatus: 'brief_generated',
     dedupe: false,
     clientNote: note,
   });
   updateContentRequest(workspaceId, request.id, {
-    briefId,
+    briefId: brief.id,
     status: 'client_review',
     internalNote: note,
   });
@@ -393,7 +398,7 @@ function ensurePostRequest(workspaceId: string, post: GeneratedPost, note: strin
   updateContentRequest(workspaceId, request.id, {
     briefId: post.briefId,
     postId: post.id,
-    status: 'client_review',
+    status: 'post_review',
     internalNote: note,
   });
   return request.id;
@@ -417,7 +422,7 @@ async function handleSendToClient(
 
       const requestId = payload.parentRequestId && getContentRequest(workspaceId, payload.parentRequestId)
         ? payload.parentRequestId
-        : ensureBriefRequest(workspaceId, brief.id, note);
+        : ensureBriefRequest(workspaceId, brief, note);
 
       if (requestId === payload.parentRequestId) {
         updateContentRequest(workspaceId, requestId, {
@@ -427,7 +432,10 @@ async function handleSendToClient(
         });
       }
 
-      broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_REQUEST_CREATED, { id: requestId });
+      const requestEvent = requestId === payload.parentRequestId
+        ? WS_EVENTS.CONTENT_REQUEST_UPDATE
+        : WS_EVENTS.CONTENT_REQUEST_CREATED;
+      broadcastToWorkspace(workspaceId, requestEvent, { id: requestId });
       broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, {
         action: 'mcp_brief_sent_to_client',
         briefId: brief.id,
@@ -465,12 +473,15 @@ async function handleSendToClient(
     if (requestId === payload.parentRequestId) {
       updateContentRequest(workspaceId, requestId, {
         postId: post.id,
-        status: 'client_review',
+        status: 'post_review',
         internalNote: note,
       });
     }
 
-    broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_REQUEST_CREATED, { id: requestId });
+    const requestEvent = requestId === payload.parentRequestId
+      ? WS_EVENTS.CONTENT_REQUEST_UPDATE
+      : WS_EVENTS.CONTENT_REQUEST_CREATED;
+    broadcastToWorkspace(workspaceId, requestEvent, { id: requestId });
     broadcastToWorkspace(workspaceId, WS_EVENTS.POST_UPDATED, {
       action: 'mcp_post_sent_to_client',
       postId: post.id,

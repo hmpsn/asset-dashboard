@@ -108,6 +108,19 @@ describe('mcp job action tools', () => {
     );
   });
 
+  it('start_seo_audit rejects site ids that do not belong to workspace', async () => {
+    const result = await handleJobActionTool('start_seo_audit', {
+      workspace_id: 'ws-1',
+      site_id: 'site-2',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(createJob).not.toHaveBeenCalledWith(
+      BACKGROUND_JOB_TYPES.SEO_AUDIT,
+      expect.anything(),
+    );
+  });
+
   it('start_local_seo_refresh creates a local-seo-refresh job and runs worker', async () => {
     const result = await handleJobActionTool('start_local_seo_refresh', {
       workspace_id: 'ws-1',
