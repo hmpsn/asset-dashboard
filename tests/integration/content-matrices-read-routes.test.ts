@@ -7,8 +7,14 @@
  * - GET /api/content-matrices/:workspaceId/:matrixId unknown id → 404
  * - POST /api/content-matrices/:workspaceId missing name → 400
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import http from 'http';
+
+vi.mock('../../server/broadcast.js', () => ({
+  setBroadcast: vi.fn(),
+  broadcast: vi.fn(),
+  broadcastToWorkspace: vi.fn(),
+}));
 import type { AddressInfo } from 'net';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
