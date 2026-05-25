@@ -97,7 +97,7 @@ export function ClientChatWidget({
           size="lg"
           className="fixed bottom-6 right-6 rounded-[var(--radius-pill)] shadow-lg shadow-teal-900/30 z-[var(--z-modal)]"
         >
-          Insights Engine
+          SEO Advisor
         </Button>
       )}
       {chatOpen && (
@@ -106,7 +106,7 @@ export function ClientChatWidget({
           <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--brand-border)] flex-shrink-0">
             <div className="flex items-center gap-2">
               <Icon as={Sparkles} size="md" className="text-accent-brand" />
-              <span className="t-ui font-medium text-[var(--brand-text-bright)]">Insights Engine</span>
+              <span className="t-ui font-medium text-[var(--brand-text-bright)]">SEO Advisor</span>
               {!betaMode && chatUsage && chatUsage.tier === 'free' ? (
                 <span className={cn('t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok font-medium', chatUsage.remaining > 0 ? 'text-[var(--brand-text)] bg-[var(--surface-3)]' : 'text-accent-warning bg-amber-500/8 border border-amber-500/20')}>
                   {chatUsage.remaining}/{chatUsage.limit} left

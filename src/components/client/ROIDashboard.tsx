@@ -3,10 +3,13 @@ import {
   DollarSign, BarChart3, Target, TrendingUp,
   Lock, Shield, MousePointerClick, Eye, Layers,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { EmptyState, SectionCard, Button, StatCard, ErrorState, LoadingState } from '../ui';
 import { Icon } from '../ui/Icon';
 import { fmtMoney, fmtMoneyFull } from '../../utils/formatNumbers';
 import { useClientROI } from '../../hooks/client';
+import { useBetaMode } from './BetaContext';
+import { clientPath } from '../../routes';
 
 interface ROIDashboardProps {
   workspaceId: string;
@@ -14,6 +17,8 @@ interface ROIDashboardProps {
 }
 
 export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
+  const navigate = useNavigate();
+  const betaMode = useBetaMode();
   const [showAllPages, setShowAllPages] = useState(false);
   const {
     data,
@@ -71,9 +76,18 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
         title="ROI data unavailable"
         description="ROI appears once traffic and keyword cost data are available for this workspace."
         action={(
-          <Button variant="secondary" size="sm" onClick={() => void refetch()} disabled={isFetching}>
-            {isFetching ? 'Refreshing...' : 'Try again'}
-          </Button>
+          <div className="flex items-center justify-center gap-2">
+            <Button variant="secondary" size="sm" onClick={() => void refetch()} disabled={isFetching}>
+              {isFetching ? 'Refreshing...' : 'Try again'}
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => navigate(clientPath(workspaceId, 'strategy', betaMode))}
+            >
+              Open Strategy
+            </Button>
+          </div>
         )}
       />
     );
@@ -246,7 +260,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
 
       {/* Methodology note */}
       <div className="t-caption-sm text-[var(--brand-text-muted)] text-center px-4">
-        Values calculated from Google Search Console click data × SEMRush CPC estimates.
+        Values calculated from Google Search Console click data and keyword cost estimates.
         Actual value may vary based on conversion rates and business metrics.
       </div>
     </div>

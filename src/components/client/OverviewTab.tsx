@@ -144,7 +144,7 @@ export function OverviewTab({
     </p>
 
     {/* Headline health score */}
-    <HealthScoreCard score={clientIntel?.compositeHealthScore} />
+    <HealthScoreCard score={clientIntel?.compositeHealthScore} workspaceId={workspaceId} />
 
     {/* Key metrics — full-span StatCards */}
     {(() => {
@@ -410,9 +410,9 @@ export function OverviewTab({
 
       {/* Right sidebar (2/5) */}
       <div className="lg:col-span-2 space-y-8">
-        {/* Ask the Insights Engine */}
+        {/* Ask your SEO advisor */}
         <SectionCard
-          title="Ask the Insights Engine"
+          title="Ask your SEO advisor"
           titleIcon={<Icon as={Sparkles} size="md" className="text-accent-brand" />}
           className="bg-gradient-to-br from-teal-500/5 via-[var(--surface-2)] to-[var(--surface-2)] border-teal-500/15"
         >

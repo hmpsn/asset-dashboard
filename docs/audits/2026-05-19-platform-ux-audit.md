@@ -73,7 +73,7 @@
 - **Area:** Client Dashboard UX
 - **Files:** `src/components/client/ROIDashboard.tsx:98`
 - **Issue:** Error message: *"ROI data requires a keyword strategy with CPC data. Run a strategy with SEMRush enrichment to unlock this."* Vendor names must never appear in client-facing UI. No upgrade CTA or retry button — pure dead end.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -81,7 +81,7 @@
 - **Area:** Client Dashboard UX
 - **Files:** `src/components/client/InboxTab.tsx:643`
 - **Issue:** Action badge renders `action.sourceType.replace(/_/g, ' ')` directly — clients see `"content decay"`, `"keyword opportunity"`, etc. These are internal type names with no client meaning.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -91,7 +91,7 @@
 - **Issue:**
   - `InsightFeedItem` constructs `` `/ws/${workspaceId}/diagnostics?report=${report.id}` `` — bypasses `adminPath()`
   - `WorkspaceHome` constructs `` `/client/${workspaceId}/roi` `` — admin component navigating to client portal silently drops `betaMode`
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -99,7 +99,7 @@
 - **Area:** Client Dashboard UX
 - **Files:** `src/components/client/OverviewTab.tsx:342`
 - **Issue:** `` `grid-cols-${totalItems}` `` — Tailwind purges dynamic class strings not present as static strings elsewhere. If `grid-cols-3`, `grid-cols-4`, etc. aren't used statically in the bundle, the production build emits invalid CSS for those column counts.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -109,7 +109,7 @@
 - **Area:** Admin→Client Handoff
 - **Files:** `server/routes/annotations.ts`, `server/routes/google.ts`
 - **Issue:** Neither annotation POST nor DELETE calls `broadcastToWorkspace()`. The client's annotation handler (`ANNOTATION_BRIDGE_CREATED`) only fires from outcome tracking, not manual admin annotation creation. Client must reload to see newly added chart markers.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -117,7 +117,7 @@
 - **Area:** Feature Cross-Linking
 - **Files:** `src/components/admin/MeetingBrief/MeetingBriefPage.tsx`
 - **Issue:** The meeting brief surfaces health scores, wins, and recommendations from across the platform. Not a single piece of data links back to its source tab (`BriefSection`, `RecommendationsList`, `AtAGlanceStrip`, `BlueprintProgress` all render read-only text). Admin reads the brief and has no one-click path to investigate anything it references.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -125,7 +125,7 @@
 - **Area:** Feature Cross-Linking
 - **Files:** `src/components/admin/outcomes/OutcomesOverview.tsx`
 - **Issue:** `WorkspaceRow` renders attention flags but is not interactive. Admin sees which workspaces need attention but cannot click through to that workspace's outcomes tab.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -133,7 +133,7 @@
 - **Area:** Feature Cross-Linking
 - **Files:** `src/components/RankTracker.tsx`
 - **Issue:** No outbound navigation anywhere in the file. Keywords with ranking drops have no "Analyze this page" link to Page Intelligence. Empty state says "generate a Keyword Strategy from the sidebar" as unlinked prose. Rank Tracker is a fully read-only island.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -146,7 +146,7 @@
   - `ContentBriefs.tsx` — silent; three queries fail → empty arrays → blank UI
   - `InternalLinks.tsx` — error shown only in pre-run state; post-load errors invisible
   - `WorkspaceHome.tsx` — no `isError` branch; workspace home silently appears empty
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -154,7 +154,7 @@
 - **Area:** Empty/Error/Loading States
 - **Files:** `PageIntelligence.tsx:181`, `ContentBriefs.tsx:360`, `RankTracker.tsx:272`, `InternalLinks.tsx:179`, `WorkspaceHome.tsx:123`
 - **Issue:** Five admin features with hand-rolled spinners instead of the standard `<LoadingState>` primitive, creating visual inconsistency across the admin tab experience.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -170,7 +170,7 @@
 - **Area:** Client Dashboard UX
 - **Files:** `src/components/client/SearchTab.tsx:105`
 - **Issue:** "Search Health Summary" uses `grid-cols-4` with no responsive modifier. At 375px, each of 4 columns is ~70px — stat values and labels will be truncated or unreadable.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -178,7 +178,7 @@
 - **Area:** Admin Tab UX
 - **Files:** `src/components/admin/outcomes/OutcomesOverview.tsx`
 - **Issue:** Wrapped in `<FeatureFlag flag="outcome-dashboard">` with no fallback. If the flag is off, the `outcomes-overview` route renders a completely blank page — no "coming soon," no redirect, no explanation.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -186,7 +186,7 @@
 - **Area:** Client Dashboard UX / Empty States
 - **Files:** `src/components/client/HealthTab.tsx:95-106`
 - **Issue:** When neither `audit` nor `auditDetail` exists, a raw `div` renders "Site Health Check Coming Soon" with no CTA. Clients have no way to request an audit or understand when one will arrive.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -194,7 +194,7 @@
 - **Area:** Routing & Navigation
 - **Files:** `src/App.tsx:480`
 - **Issue:** `renderContent()` returns `null` for any unrecognized `Page` value. Navigating to a retired or mistyped admin tab shows the sidebar and breadcrumb but nothing in the content area — no error, no redirect, no message.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -202,7 +202,7 @@
 - **Area:** Empty/Error/Loading States
 - **Files:** `src/components/client/InboxTab.tsx`
 - **Issue:** Loading props are passed from the parent but never used for rendering. The inbox renders empty sections silently while data is in flight.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -252,7 +252,7 @@
 - **Area:** Client Dashboard UX
 - **Files:** `src/components/client/ClientHeader.tsx:95`, `src/components/client/OverviewTab.tsx:404`
 - **Issue:** Subtitle reads "Insights Engine" — internal product name meaningless to a client. Same label appears in OverviewTab ("Ask the Insights Engine"). Should be user-oriented language.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -260,7 +260,7 @@
 - **Area:** Client Dashboard UX / Feature Cross-Linking
 - **Files:** `src/components/client/ContentPlanTab.tsx`
 - **Issue:** `Badge` inside `ClickableRow` shows "N needs review" but is cosmetic. Clicking the plan opens `MatrixProgressView` inside the same tab — no path to Inbox → Reviews where the client actually acts.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -299,7 +299,7 @@
 - **Area:** Admin→Client Handoff
 - **Files:** `src/components/ContentBriefs.tsx`
 - **Issue:** After `handleSendToClient()` succeeds, the brief disappears from the list — no toast, no success message, no confirmation the client was notified. Admin must switch to the requests view to verify delivery.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -307,7 +307,7 @@
 - **Area:** Empty/Error/Loading States
 - **Files:** `src/components/ContentPipeline.tsx:244`
 - **Issue:** All three lazy sub-tabs use `<LoadingState size="lg" message="Loading..." />` — the exact generic message the design system prohibits. Should be contextual.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -315,7 +315,7 @@
 - **Area:** Client Dashboard UX
 - **Files:** `src/components/client/OnboardingWizard.tsx:46`
 - **Issue:** Features tour CTA has `tab: 'content'` — a legacy `ClientInboxAlias` that redirects to Inbox → Reviews. The onboarding tour navigates the client somewhere unexpected.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -323,7 +323,7 @@
 - **Area:** Client Dashboard UX
 - **Files:** `src/components/client/OnboardingWizard.tsx`
 - **Issue:** Once the wizard is dismissed there is no "Help" or "Restart tour" button anywhere in the UI. First-time clients who click through too quickly have no way to revisit it.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -331,7 +331,7 @@
 - **Area:** Routing & Navigation
 - **Files:** `src/components/ClientDashboard.tsx:717`
 - **Issue:** `initialSeverity` is read from `window.location.search` as a one-time snapshot (not reactive `useSearchParams()`). No component in the codebase sends `?severity=X` via `navigate()`. Dead receiver with no sender.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -339,7 +339,7 @@
 - **Area:** Empty/Error/Loading States
 - **Files:** `src/components/client/StrategyTab.tsx:316-320`
 - **Issue:** `<EmptyState>` with description "Check back soon!" — no action button, no way for the user to navigate to the inbox or contact their team.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -347,7 +347,7 @@
 - **Area:** Client Dashboard UX
 - **Files:** `src/components/client/SearchTab.tsx:174`
 - **Issue:** Collapsible section labelled "Raw Data" — clients won't understand why they'd want "raw data." Should be "All Keywords & Pages" or similar.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -355,7 +355,7 @@
 - **Area:** Admin Tab UX
 - **Files:** `src/components/admin/DiagnosticReport/DiagnosticReportPage.tsx`
 - **Issue:** `r.anomalyType` (e.g. `"traffic_drop"`) can appear directly in the list row subtitle. Internal type names with no display-name mapping applied at the list level.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -363,7 +363,7 @@
 - **Area:** Admin→Client Handoff
 - **Files:** `src/components/client/ClientCopyReview.tsx`, `server/copy-review.ts`
 - **Issue:** No WS event fired specifically when admin marks a suggestion as accepted/rejected. Client only sees the change on next page load.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -379,7 +379,7 @@
 - **Area:** Client Dashboard UX
 - **Files:** `src/components/client/OverviewTab.tsx:251-269`
 - **Issue:** "Ready to create content?" CTA navigates to `/client/:id/inbox` (root) not `/client/:id/inbox?tab=reviews`. A client with no content requests will see an empty Decisions section and be confused about why they were told to "generate a brief."
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -389,7 +389,7 @@
 - **Area:** Feature Cross-Linking
 - **Files:** `src/components/SeoAudit.tsx:594-610`
 - **Issue:** Mentions "SEO Editor" as fix location but renders as non-navigable `<span>`. User must manually navigate to the editor.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -413,7 +413,7 @@
 - **Area:** Admin Tab UX
 - **Files:** `src/components/admin/DiagnosticReport/DiagnosticReportPage.tsx:134-144`
 - **Issue:** Empty state: "Run a deep diagnostic from an anomaly insight" — no navigation button or link to the home tab's anomaly feed.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -461,7 +461,7 @@
 - **Area:** Routing & Navigation
 - **Files:** `src/components/layout/Sidebar.tsx:230`
 - **Issue:** Inconsistent URL construction for global tabs — works today but is a fragile pattern if route structure changes.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -469,7 +469,7 @@
 - **Area:** Client Dashboard UX
 - **Files:** `src/components/client/AnalyticsTab.tsx:382, 452`
 - **Issue:** "Key Events" is GA4 internal terminology; "Event Explorer" is technical jargon. Clients won't know what these mean. Consider "Actions on your site" / "Filter by action or page."
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -477,4 +477,4 @@
 - **Area:** Admin→Client Handoff
 - **Files:** `src/components/client/HealthScoreCard.tsx`
 - **Issue:** Score is purely read-only. Clients who see a score below 60 ("Your site needs attention") have no in-portal mechanism to ask for help or request action.
-- [ ] Fixed
+- [x] Fixed

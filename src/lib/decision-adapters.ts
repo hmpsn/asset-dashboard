@@ -13,7 +13,7 @@ const CLIENT_ACTION_BADGES: Record<string, string> = {
 };
 
 export function clientActionSourceLabel(sourceType: ClientActionSourceType | string): string {
-  return CLIENT_ACTION_BADGES[sourceType] ?? sourceType.replace(/_/g, ' ');
+  return CLIENT_ACTION_BADGES[sourceType] ?? 'SEO Update';
 }
 
 /**
