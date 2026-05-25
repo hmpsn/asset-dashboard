@@ -139,11 +139,14 @@ export async function assembleOperational(
     const pending = getPendingActions();
     const wsActions: TrackedAction[] = pending.filter((a: TrackedAction) => a.workspaceId === workspaceId);
     let oldestAge: number | null = null;
-    if (wsActions.length > 0) {
-      const oldest = wsActions.reduce((min, a) =>
-        new Date(a.createdAt).getTime() < new Date(min.createdAt).getTime() ? a : min,
-      );
-      oldestAge = Math.floor((Date.now() - new Date(oldest.createdAt).getTime()) / (24 * 60 * 60 * 1000));
+    for (const action of wsActions) {
+      const createdAtMs = new Date(action.createdAt ?? '').getTime();
+      if (!Number.isFinite(createdAtMs)) continue;
+      const ageDays = Math.floor((Date.now() - createdAtMs) / (24 * 60 * 60 * 1000));
+      if (ageDays < 0) continue;
+      if (oldestAge === null || ageDays > oldestAge) {
+        oldestAge = ageDays;
+      }
     }
     actionBacklog = { pendingMeasurement: wsActions.length, oldestAge };
   } catch (err) {

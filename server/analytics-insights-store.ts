@@ -332,6 +332,10 @@ export function suppressInsights(workspaceId: string, ids: string[]): number {
 export function stampDiagnosticReportId(workspaceId: string, insightId: string, reportId: string): void {
   const row = stmts().selectById.get(insightId, workspaceId) as InsightRow | undefined;
   if (!row) return;
-  const parsed = parseJsonFallback<Record<string, unknown>>(row.data, {});
-  stmts().stampData.run(JSON.stringify({ ...parsed, diagnosticReportId: reportId }), insightId, workspaceId);
+  if (row.insight_type !== 'anomaly_digest') return;
+  const parsed = parseJsonFallback<unknown>(row.data, {});
+  const baseData = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    ? parsed as Record<string, unknown>
+    : {};
+  stmts().stampData.run(JSON.stringify({ ...baseData, diagnosticReportId: reportId }), insightId, workspaceId);
 }

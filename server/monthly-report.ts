@@ -286,7 +286,6 @@ export async function triggerMonthlyReport(workspaceId: string): Promise<{ sent:
   const reportId = saveMonthlyReport(workspaceId, ws.name, html, data);
   if (ws.clientEmail && isEmailConfigured()) {
     await sendMonthlyReportEmail(ws, data);
-    recordSend(ws.clientEmail, 'report', 'monthly_report', workspaceId, 1);
     return { sent: true, html, reportId };
   }
   return { sent: false, html, reportId };

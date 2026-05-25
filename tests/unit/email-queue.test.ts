@@ -222,6 +222,64 @@ describe('email-queue behavior', () => {
     expect(emailQueue.getQueueStats()).toEqual({ buckets: 0, totalEvents: 0 });
   });
 
+  it('drops bucket when digest renderer returns empty html', async () => {
+    vi.useFakeTimers();
+    const emailQueue = await loadEmailQueueModule();
+    const send = vi.fn().mockResolvedValue(true);
+    emailQueue.registerSendFn(send);
+
+    renderDigestMock.mockReturnValueOnce({ subject: 'empty', html: '' });
+
+    emailQueue.queueEmail(makeEvent());
+    await vi.advanceTimersByTimeAsync(BATCH_WINDOW_MS);
+
+    expect(send).not.toHaveBeenCalled();
+    expect(throttleMock.recordSend).not.toHaveBeenCalled();
+    expect(emailQueue.getQueueStats()).toEqual({ buckets: 0, totalEvents: 0 });
+  });
+
+  it('does not record throttle send when outbound sendFn returns false', async () => {
+    vi.useFakeTimers();
+    const emailQueue = await loadEmailQueueModule();
+    const send = vi.fn().mockResolvedValue(false);
+    emailQueue.registerSendFn(send);
+
+    emailQueue.queueEmail(makeEvent());
+    await vi.advanceTimersByTimeAsync(BATCH_WINDOW_MS);
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(throttleMock.recordSend).not.toHaveBeenCalled();
+    expect(emailQueue.getQueueStats()).toEqual({ buckets: 0, totalEvents: 0 });
+  });
+
+  it('restoreQueue safely ignores invalid persisted JSON', async () => {
+    const emailQueue = await loadEmailQueueModule();
+
+    fsMock.existsSync.mockReturnValue(true);
+    fsMock.readFileSync.mockReturnValue('{invalid-json');
+
+    expect(() => emailQueue.restoreQueue()).not.toThrow();
+    expect(emailQueue.getQueueStats()).toEqual({ buckets: 0, totalEvents: 0 });
+  });
+
+  it('status events use morning-delay timer window', async () => {
+    vi.useFakeTimers();
+    const emailQueue = await loadEmailQueueModule();
+    const send = vi.fn().mockResolvedValue(true);
+    emailQueue.registerSendFn(send);
+
+    throttleMock.msUntilMorning.mockReturnValue(2 * 60 * 60 * 1000);
+
+    emailQueue.queueEmail(makeEvent({ type: 'request_status' }));
+
+    await vi.advanceTimersByTimeAsync(BATCH_WINDOW_MS);
+    expect(send).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(2 * 60 * 60 * 1000 - BATCH_WINDOW_MS);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith('client@example.com', 'request_status digest (1)', '<p>1 events</p>');
+  });
+
   it('getQueueStats reflects queued and flushed state transitions', async () => {
     const emailQueue = await loadEmailQueueModule();
     const send = vi.fn().mockResolvedValue(true);
@@ -239,5 +297,27 @@ describe('email-queue behavior', () => {
 
     expect(send).toHaveBeenCalledTimes(2);
     expect(emailQueue.getQueueStats()).toEqual({ buckets: 0, totalEvents: 0 });
+  });
+
+  it('resets batch timer on repeated events and flushes on sliding-window boundary', async () => {
+    vi.useFakeTimers();
+    const emailQueue = await loadEmailQueueModule();
+    const send = vi.fn().mockResolvedValue(true);
+    emailQueue.registerSendFn(send);
+
+    emailQueue.queueEmail(makeEvent({ data: { itemId: 'sw-1' } }));
+    await vi.advanceTimersByTimeAsync(BATCH_WINDOW_MS - 1_000);
+    expect(send).not.toHaveBeenCalled();
+
+    emailQueue.queueEmail(makeEvent({ data: { itemId: 'sw-2' } }));
+    await vi.advanceTimersByTimeAsync(1_001);
+    expect(send).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(BATCH_WINDOW_MS - 1_001);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(renderDigestMock).toHaveBeenCalledWith('approval_ready', expect.arrayContaining([
+      expect.objectContaining({ data: { itemId: 'sw-1' } }),
+      expect.objectContaining({ data: { itemId: 'sw-2' } }),
+    ]));
   });
 });

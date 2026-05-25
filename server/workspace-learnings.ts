@@ -436,7 +436,11 @@ export function getWorkspaceLearnings(
   if (row) {
     const age = Date.now() - new Date(row.computed_at).getTime();
     if (age < CACHE_TTL_MS) {
-      return rowToWorkspaceLearnings(row);
+      const parsed = rowToWorkspaceLearnings(row);
+      if (parsed) return parsed;
+      // Corrupt or schema-drifted cache payload: recompute below instead of
+      // silently returning null for a still-fresh row.
+      log.warn({ workspaceId }, 'Cached workspace learnings payload invalid — recomputing');
     }
   }
 

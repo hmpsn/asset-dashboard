@@ -33,7 +33,8 @@ const MONTH_ABBREVIATIONS = [
 export function fmtNum(n: number): string {
   if (!Number.isFinite(n)) return '0';
   const safe = n < 0 ? 0 : n;
-  if (safe >= 1_000_000) return `${(safe / 1_000_000).toFixed(1)}m`;
+  const millionsRounded = Number((safe / 1_000_000).toFixed(1));
+  if (safe >= 1_000_000 || millionsRounded >= 1) return `${millionsRounded.toFixed(1)}m`;
   if (safe >= 1_000) return `${(safe / 1_000).toFixed(1)}k`;
   return safe.toLocaleString();
 }

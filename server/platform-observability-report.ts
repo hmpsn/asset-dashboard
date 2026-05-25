@@ -53,8 +53,8 @@ export function estimateAiCostUsd(entry: {
   if (model.startsWith('gpt-5.4-nano')) return (entry.promptTokens * 0.0000002) + (entry.completionTokens * 0.00000125);
   if (model.startsWith('gpt-5.4-mini')) return (entry.promptTokens * 0.00000075) + (entry.completionTokens * 0.0000045);
   if (model.startsWith('gpt-5.4')) return (entry.promptTokens * 0.0000025) + (entry.completionTokens * 0.000015);
-  if (model === 'gpt-4.1-nano') return (entry.promptTokens * 0.0000001) + (entry.completionTokens * 0.0000004);
-  if (model === 'gpt-4.1-mini') return (entry.promptTokens * 0.0000004) + (entry.completionTokens * 0.0000016);
+  if (model.startsWith('gpt-4.1-nano')) return (entry.promptTokens * 0.0000001) + (entry.completionTokens * 0.0000004);
+  if (model.startsWith('gpt-4.1-mini')) return (entry.promptTokens * 0.0000004) + (entry.completionTokens * 0.0000016);
   if (model.startsWith('gpt-4.1')) return (entry.promptTokens * 0.000002) + (entry.completionTokens * 0.000008);
   if (model.includes('claude-sonnet-4')) return (entry.promptTokens * 0.000003) + (entry.completionTokens * 0.000015);
   if (model.includes('claude-haiku-4-5')) return (entry.promptTokens * 0.000001) + (entry.completionTokens * 0.000005);

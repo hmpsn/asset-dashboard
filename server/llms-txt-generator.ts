@@ -305,7 +305,8 @@ export function buildLlmsTxtIndex(input: IndexInput): string {
     };
 
     for (const p of plannedPages) {
-      const url = baseUrl ? `${baseUrl}${p.url.startsWith('/') ? p.url : '/' + p.url}` : p.url;
+      const normalizedPath = p.url.startsWith('/') ? p.url : `/${p.url}`;
+      const url = baseUrl ? `${baseUrl}${normalizedPath}` : normalizedPath;
       const label = statusLabel[p.status] || 'Planned';
       lines.push(`- [${p.keyword}](${url}) — ${label}`);
     }

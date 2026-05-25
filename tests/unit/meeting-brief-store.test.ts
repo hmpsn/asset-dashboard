@@ -137,6 +137,40 @@ describe('meeting-brief-store', () => {
       expect(mockParseJsonSafeArray).not.toHaveBeenCalled();
       expect(mockParseJsonSafe).not.toHaveBeenCalled();
     });
+
+    it('degrades safely when JSON columns parse to fallback shapes', () => {
+      const row = {
+        workspace_id: 'ws-bad-json',
+        generated_at: '2026-05-24T12:00:00.000Z',
+        situation_summary: 'Summary',
+        wins: 'not json',
+        attention: 'not json',
+        recommendations: 'not json',
+        blueprint_progress: null,
+        prompt_hash: null,
+        metrics: 'not json',
+      };
+
+      mockGetStmt.get.mockReturnValueOnce(row);
+      mockParseJsonSafeArray
+        .mockReturnValueOnce([])
+        .mockReturnValueOnce([])
+        .mockReturnValueOnce([]);
+      mockParseJsonSafe.mockReturnValueOnce(expectedMetricsFallback);
+
+      const result = getMeetingBrief('ws-bad-json');
+
+      expect(result).toEqual({
+        workspaceId: 'ws-bad-json',
+        generatedAt: '2026-05-24T12:00:00.000Z',
+        situationSummary: 'Summary',
+        wins: [],
+        attention: [],
+        recommendations: [],
+        blueprintProgress: null,
+        metrics: expectedMetricsFallback,
+      });
+    });
   });
 
   describe('upsertMeetingBrief', () => {
@@ -147,13 +181,13 @@ describe('meeting-brief-store', () => {
         situationSummary: 'Pipeline is healthy with minor technical blockers.',
         wins: ['Won featured snippet on pricing page'],
         attention: ['Two 5xx pages detected in crawl'],
-        recommendations: [{ title: 'Fix 5xx pages', impact: 'high', owner: 'dev' }],
+        recommendations: [{ action: 'Fix 5xx pages', rationale: 'Recover crawl budget and avoid user drop-off' }],
         blueprintProgress: null,
         metrics: {
           siteHealthScore: 78,
           openRankingOpportunities: 14,
           contentInPipeline: 6,
-          overallWinRate: 0.42,
+          overallWinRate: 42,
           criticalIssues: 2,
         },
       };
@@ -171,6 +205,28 @@ describe('meeting-brief-store', () => {
         prompt_hash: 'prompt-hash-789',
         metrics: JSON.stringify(brief.metrics),
       });
+    });
+
+    it('stores null prompt_hash when omitted', () => {
+      const brief: MeetingBrief = {
+        workspaceId: 'ws-no-hash',
+        generatedAt: '2026-05-25T09:45:00.000Z',
+        situationSummary: 'No hash case.',
+        wins: [],
+        attention: [],
+        recommendations: [],
+        blueprintProgress: null,
+        metrics: expectedMetricsFallback,
+      };
+
+      upsertMeetingBrief(brief);
+
+      expect(mockUpsertStmt.run).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workspace_id: 'ws-no-hash',
+          prompt_hash: null,
+        }),
+      );
     });
   });
 

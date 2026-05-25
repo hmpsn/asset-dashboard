@@ -197,4 +197,16 @@ describe('email throttle', () => {
 
     expect(getLastSendTime(to, 'action')).toBeNull();
   });
+
+  it('registers cleanup timers only once across duplicate startup calls', () => {
+    vi.useFakeTimers();
+    const intervalSpy = vi.spyOn(globalThis, 'setInterval');
+    const timeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+    startThrottleCleanup();
+    startThrottleCleanup();
+
+    expect(intervalSpy).toHaveBeenCalledTimes(1);
+    expect(timeoutSpy).toHaveBeenCalledTimes(1);
+  });
 });

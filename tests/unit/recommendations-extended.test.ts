@@ -18,7 +18,8 @@
  *   - isIntentMismatch (product page case)
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
+import db from '../../server/db/index.js';
 import {
   recommendationOutcomeActionType,
   getRecSourceCategory,
@@ -34,7 +35,90 @@ import {
   determinePriority,
   inferPageType,
   isIntentMismatch,
+  saveRecommendations,
+  loadRecommendations,
+  updateRecommendationStatus,
+  dismissRecommendation,
 } from '../../server/recommendations.js';
+import type { RecommendationSet } from '../../shared/types/recommendations.js';
+
+const recWorkspaceIds = new Set<string>();
+
+afterEach(() => {
+  for (const workspaceId of recWorkspaceIds) {
+    db.prepare('DELETE FROM recommendation_sets WHERE workspace_id = ?').run(workspaceId);
+  }
+  recWorkspaceIds.clear();
+});
+
+function makeWorkspaceId(prefix: string): string {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function makeRecommendationSet(workspaceId: string): RecommendationSet {
+  const now = new Date().toISOString();
+  return {
+    workspaceId,
+    generatedAt: now,
+    recommendations: [
+      {
+        id: 'rec-1',
+        workspaceId,
+        priority: 'fix_now',
+        type: 'technical',
+        title: 'Fix title tag',
+        description: 'Title tag is missing',
+        insight: 'Missing title suppresses CTR',
+        impact: 'high',
+        effort: 'low',
+        impactScore: 90,
+        source: 'audit:title',
+        affectedPages: ['/services'],
+        trafficAtRisk: 300,
+        impressionsAtRisk: 2500,
+        estimatedGain: '5-15%',
+        actionType: 'manual',
+        status: 'pending',
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: 'rec-2',
+        workspaceId,
+        priority: 'fix_soon',
+        type: 'schema',
+        title: 'Add FAQ schema',
+        description: 'FAQ blocks detected without schema',
+        insight: 'Rich results opportunity',
+        impact: 'medium',
+        effort: 'medium',
+        impactScore: 52,
+        source: 'audit:structured-data',
+        affectedPages: ['/faq'],
+        trafficAtRisk: 80,
+        impressionsAtRisk: 900,
+        estimatedGain: '5-10%',
+        actionType: 'purchase',
+        productType: 'schema_page',
+        productPrice: 39,
+        status: 'in_progress',
+        assignedTo: 'team',
+        createdAt: now,
+        updatedAt: now,
+      },
+    ],
+    summary: {
+      fixNow: 1,
+      fixSoon: 1,
+      fixLater: 0,
+      ongoing: 0,
+      totalImpactScore: 142,
+      trafficAtRisk: 380,
+      estimatedRecoverableClicks: 46,
+      estimatedRecoverableImpressions: 408,
+    },
+  };
+}
 
 // ─── recommendationOutcomeActionType ─────────────────────────────────────────
 
@@ -665,5 +749,93 @@ describe('isIntentMismatch — product page case', () => {
 
   it('does not flag blog targeting informational intent', () => {
     expect(isIntentMismatch('blog', 'informational').mismatch).toBe(false);
+  });
+});
+
+describe('recommendation persistence integrity', () => {
+  it('round-trips persisted recommendation sets without data loss', () => {
+    const workspaceId = makeWorkspaceId('ws_rec_roundtrip');
+    recWorkspaceIds.add(workspaceId);
+    const set = makeRecommendationSet(workspaceId);
+
+    saveRecommendations(set);
+    const loaded = loadRecommendations(workspaceId);
+
+    expect(loaded).toEqual(set);
+  });
+
+  it('updates only the targeted recommendation status and persists updatedAt', () => {
+    const workspaceId = makeWorkspaceId('ws_rec_status');
+    recWorkspaceIds.add(workspaceId);
+    const set = makeRecommendationSet(workspaceId);
+    saveRecommendations(set);
+
+    const updated = updateRecommendationStatus(workspaceId, 'rec-1', 'completed');
+    expect(updated).toBeDefined();
+    expect(updated?.status).toBe('completed');
+    expect(updated?.updatedAt).toEqual(expect.any(String));
+
+    const loaded = loadRecommendations(workspaceId);
+    expect(loaded?.recommendations.find((rec) => rec.id === 'rec-1')?.status).toBe('completed');
+    expect(loaded?.recommendations.find((rec) => rec.id === 'rec-2')?.status).toBe('in_progress');
+  });
+
+  it('falls back gracefully when stored recommendations/summary JSON is malformed', () => {
+    const workspaceId = makeWorkspaceId('ws_rec_corrupt');
+    recWorkspaceIds.add(workspaceId);
+    const set = makeRecommendationSet(workspaceId);
+    saveRecommendations(set);
+
+    db.prepare(
+      'UPDATE recommendation_sets SET recommendations = ?, summary = ? WHERE workspace_id = ?',
+    ).run(
+      '{"broken"',
+      '{"broken"',
+      workspaceId,
+    );
+
+    const loaded = loadRecommendations(workspaceId);
+    expect(loaded).toBeDefined();
+    expect(loaded?.recommendations).toEqual([]);
+    expect(loaded?.summary).toEqual({
+      fixNow: 0,
+      fixSoon: 0,
+      fixLater: 0,
+      ongoing: 0,
+      totalImpactScore: 0,
+      trafficAtRisk: 0,
+      estimatedRecoverableClicks: 0,
+      estimatedRecoverableImpressions: 0,
+    });
+  });
+
+  it('keeps valid recommendations when one stored item is malformed', () => {
+    const workspaceId = makeWorkspaceId('ws_rec_partial');
+    recWorkspaceIds.add(workspaceId);
+    const set = makeRecommendationSet(workspaceId);
+    saveRecommendations(set);
+
+    const row = db.prepare('SELECT recommendations FROM recommendation_sets WHERE workspace_id = ?')
+      .get(workspaceId) as { recommendations: string } | undefined;
+    expect(row).toBeDefined();
+    const parsed = JSON.parse(row!.recommendations) as Array<Record<string, unknown>>;
+    const mixed = [
+      parsed[0],
+      { ...parsed[1], impactScore: 'not-a-number' },
+    ];
+    db.prepare('UPDATE recommendation_sets SET recommendations = ? WHERE workspace_id = ?')
+      .run(JSON.stringify(mixed), workspaceId);
+
+    const loaded = loadRecommendations(workspaceId);
+    expect(loaded?.recommendations).toHaveLength(1);
+    expect(loaded?.recommendations[0].id).toBe('rec-1');
+  });
+
+  it('dismissRecommendation returns false for unknown recommendation ids', () => {
+    const workspaceId = makeWorkspaceId('ws_rec_missing');
+    recWorkspaceIds.add(workspaceId);
+    saveRecommendations(makeRecommendationSet(workspaceId));
+
+    expect(dismissRecommendation(workspaceId, 'nope')).toBe(false);
   });
 });

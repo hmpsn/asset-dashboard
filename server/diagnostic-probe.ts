@@ -147,23 +147,46 @@ function countLinksInPage(
   let linksToTarget = 0;
   const uniqueInternalTargets = new Set<string>();
   const normalizedTarget = targetPath.replace(/\/$/, '');
+  const liveOrigin = getOrigin(liveDomain);
 
   while ((match = hrefRegex.exec(html)) !== null) {
     const href = match[1];
-    // Check if internal link (relative path or same domain)
-    if (href.startsWith('/') || href.startsWith(liveDomain)) {
-      // Strip query strings for both relative and absolute URLs so
-      // /blog/article?ref=nav matches target /blog/article consistently.
-      const rawPath = href.startsWith('/') ? href : new URL(href).pathname;
-      const normalizedPath = rawPath.split('?')[0].replace(/\/$/, '');
-      uniqueInternalTargets.add(normalizedPath);
-      if (normalizedPath === normalizedTarget) {
-        linksToTarget++;
-      }
+    const rawPath = resolveInternalPath(href, liveOrigin);
+    if (!rawPath) continue;
+
+    // Strip query strings for both relative and absolute URLs so
+    // /blog/article?ref=nav matches target /blog/article consistently.
+    const normalizedPath = rawPath.split('?')[0].replace(/\/$/, '');
+    uniqueInternalTargets.add(normalizedPath);
+    if (normalizedPath === normalizedTarget) {
+      linksToTarget++;
     }
   }
 
   return { linksToTarget, uniqueInternalTargets };
+}
+
+function getOrigin(input: string): string | null {
+  try {
+    return new URL(input).origin;
+  } catch (err) {
+    void err;
+    return null;
+  }
+}
+
+function resolveInternalPath(href: string, liveOrigin: string | null): string | null {
+  if (href.startsWith('/')) return href;
+  if (!liveOrigin) return null;
+
+  try {
+    const parsed = new URL(href);
+    if (parsed.origin !== liveOrigin) return null;
+    return parsed.pathname + parsed.search;
+  } catch (err) {
+    void err;
+    return null;
+  }
 }
 
 function computeMedian(values: number[]): number {

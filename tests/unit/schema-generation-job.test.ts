@@ -157,4 +157,60 @@ describe('runSchemaGenerationJob', () => {
 
     expect(mocks.unregisterAbort).toHaveBeenCalledWith('job-finally');
   });
+
+  it('does not persist/broadcast/activity-log when generation returns zero pages', async () => {
+    mocks.generateSchemaSuggestions.mockImplementation(
+      async (
+        _siteId: string,
+        _token: string,
+        _ctx: unknown,
+        onProgress: (partial: Array<{ pageId: string }>, done: boolean, message: string) => void,
+      ) => {
+        onProgress([], false, 'Scanning pages');
+        return [];
+      },
+    );
+
+    await runSchemaGenerationJob({
+      jobId: 'job-empty',
+      siteId: 'site-1',
+      token: 'token-1',
+      workspaceId: 'ws-1',
+    });
+
+    expect(mocks.saveSchemaSnapshot).not.toHaveBeenCalled();
+    expect(mocks.broadcastToWorkspace).not.toHaveBeenCalled();
+    expect(mocks.addActivity).not.toHaveBeenCalled();
+    expect(mocks.updateJob).toHaveBeenCalledWith('job-empty', {
+      status: 'done',
+      result: [],
+      message: 'Done — 0 page schemas generated',
+      progress: 0,
+      total: 0,
+    });
+  });
+
+  it('logs programming errors via warn path and marks job as error', async () => {
+    const programmingErr = new Error('programming failure');
+    mocks.isProgrammingError.mockReturnValue(true);
+    mocks.generateSchemaSuggestions.mockRejectedValue(programmingErr);
+
+    await runSchemaGenerationJob({
+      jobId: 'job-programming-error',
+      siteId: 'site-1',
+      token: 'token-1',
+      workspaceId: 'ws-1',
+    });
+
+    expect(mocks.logger.warn).toHaveBeenCalledWith(
+      { err: programmingErr },
+      'schema-generation-job: job failed with programming error',
+    );
+    expect(mocks.logger.debug).not.toHaveBeenCalled();
+    expect(mocks.updateJob).toHaveBeenCalledWith('job-programming-error', {
+      status: 'error',
+      error: 'programming failure',
+      message: 'Schema generation failed',
+    });
+  });
 });

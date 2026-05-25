@@ -54,6 +54,9 @@ async function fetchAndCachePages(
   siteId: string,
 ): Promise<PageCacheEntry> {
   const key = `${workspaceId}:${siteId}`;
+  // Preserve a pre-fetch stale fallback before get() potentially deletes
+  // natural-TTL expired entries.
+  const staleFallback = pageCache.peek(key);
 
   // Check cache (LRU handles TTL expiry)
   const cached = pageCache.get(key);
@@ -89,10 +92,9 @@ async function fetchAndCachePages(
     } catch (err) {
       log.warn({ workspaceId, siteId, err }, 'Failed to fetch Webflow pages');
       // Return stale cache if available — preserve fallback-on-error behavior.
-      // Use peek() instead of get() because get() hard-deletes expired entries,
-      // making the fallback unreachable after TTL expiry.
-      const stale = pageCache.peek(key);
-      if (stale) return stale;
+      // Use the pre-fetched snapshot because get() may hard-delete naturally
+      // expired entries during this call.
+      if (staleFallback) return staleFallback;
       return { allPages: [], publishedPages: [], fetchedAt: 0 } as PageCacheEntry;
     }
   });

@@ -247,8 +247,11 @@ export function isOverdueForMorning(createdAt: string): boolean {
 // ── Scheduled cleanup ──
 
 let _cleanupInterval: ReturnType<typeof setInterval> | null = null;
+let _cleanupStartupTimeout: ReturnType<typeof setTimeout> | null = null;
 
 export function startThrottleCleanup() {
+  if (_cleanupInterval || _cleanupStartupTimeout) return;
+
   // Clean up old records daily
   _cleanupInterval = setInterval(() => {
     const removed = cleanupOldSends();
@@ -256,7 +259,8 @@ export function startThrottleCleanup() {
   }, 24 * 60 * 60 * 1000);
 
   // Initial cleanup after 2 min
-  setTimeout(() => {
+  _cleanupStartupTimeout = setTimeout(() => {
+    _cleanupStartupTimeout = null;
     const removed = cleanupOldSends();
     if (removed > 0) log.info(`Initial cleanup: ${removed} old email_sends records`);
   }, 2 * 60 * 1000);
@@ -265,6 +269,10 @@ export function startThrottleCleanup() {
 }
 
 export function stopThrottleCleanup() {
+  if (_cleanupStartupTimeout) {
+    clearTimeout(_cleanupStartupTimeout);
+    _cleanupStartupTimeout = null;
+  }
   if (_cleanupInterval) {
     clearInterval(_cleanupInterval);
     _cleanupInterval = null;

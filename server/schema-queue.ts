@@ -38,7 +38,7 @@ const stmts = createStmtCache(() => ({
            (@id, @workspace_id, @matrix_id, @cell_id, @schema_json, @status, @created_at, @updated_at)`,
   ),
   selectByWorkspace: db.prepare(
-    `SELECT * FROM pending_schemas WHERE workspace_id = ? ORDER BY created_at DESC`,
+    `SELECT * FROM pending_schemas WHERE workspace_id = ? AND status = 'pending' ORDER BY created_at DESC`,
   ),
   selectByCellId: db.prepare(
     `SELECT * FROM pending_schemas WHERE cell_id = ? AND workspace_id = ? AND status = 'pending' LIMIT 1`,

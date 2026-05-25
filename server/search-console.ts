@@ -670,6 +670,9 @@ export async function inspectUrlForRichResults(
       log.warn({ siteId }, 'GSC URL Inspection API quota exhausted');
       return null;
     }
+    if (res.status === 401 || res.status === 403) {
+      throw new Error(`GSC URL Inspection authentication error (${res.status}): ${errText.slice(0, 200)}`);
+    }
     if (res.status >= 400 && res.status < 500) {
       log.warn({ siteId, status: res.status }, 'GSC URL Inspection API client error — treating as no_gsc');
       return null;
@@ -720,7 +723,17 @@ export async function inspectUrlForRichResults(
 
 /** Shared date range helper (GSC has ~3 day data delay) */
 export function gscDateRange(days: number, dateRange?: CustomDateRange) {
-  if (dateRange) return { startDate: dateRange.startDate, endDate: dateRange.endDate };
+  if (dateRange) {
+    const start = new Date(`${dateRange.startDate}T00:00:00.000Z`);
+    const end = new Date(`${dateRange.endDate}T00:00:00.000Z`);
+    if (
+      Number.isFinite(start.getTime()) &&
+      Number.isFinite(end.getTime()) &&
+      end.getTime() >= start.getTime()
+    ) {
+      return { startDate: dateRange.startDate, endDate: dateRange.endDate };
+    }
+  }
   const endDate = new Date();
   endDate.setDate(endDate.getDate() - 3);
   const startDate = new Date(endDate);
@@ -954,12 +967,19 @@ export async function getSearchPeriodComparison(
   const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
 
   const { startDate: curStart, endDate: curEnd } = gscDateRange(days, dateRange);
+  const curStartDate = new Date(`${curStart}T00:00:00.000Z`);
+  const curEndDate = new Date(`${curEnd}T00:00:00.000Z`);
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+  const derivedPeriodDays = (Number.isFinite(curStartDate.getTime()) && Number.isFinite(curEndDate.getTime()))
+    ? Math.round((curEndDate.getTime() - curStartDate.getTime()) / MS_PER_DAY) + 1
+    : days;
+  const periodDays = Math.max(1, derivedPeriodDays);
 
-  // Previous period: shift both dates back by `days`
-  const prevEnd = new Date(curStart);
+  // Previous period: shift by the actual current window length (custom ranges included).
+  const prevEnd = new Date(`${curStart}T00:00:00.000Z`);
   prevEnd.setDate(prevEnd.getDate() - 1);
   const prevStart = new Date(prevEnd);
-  prevStart.setDate(prevStart.getDate() - days + 1);
+  prevStart.setDate(prevStart.getDate() - periodDays + 1);
   const fmt = (d: Date) => d.toISOString().split('T')[0];
 
   const [curData, prevData] = await Promise.all([
