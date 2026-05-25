@@ -127,6 +127,7 @@ export const savePostInputSchema = z.object({
   workspace_id: workspaceIdSchema,
   post_request_handle: handleIdSchema,
   content: postContentSchema,
+  parent_request_id: z.string().optional(),
 });
 
 export const sendToClientInputSchema = z.object({

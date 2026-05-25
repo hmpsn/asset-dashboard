@@ -233,6 +233,43 @@ A comprehensive value assessment of every feature in the platform — **450 feat
 
 ---
 
+### 368. MCP Action Phase 2 Tool Implementation (10 Write Tools)
+
+**What it does:** Implements all 10 MCP write tools planned in the Phase 2 spec and wires them into the MCP server:
+- Shared infra:
+  - `server/mcp/json-schema.ts` (`zod-to-json-schema` wrapper for MCP tool/input payload schemas)
+  - `server/mcp/paid-call-counter.ts` (soft-cap paid-call warning counter)
+  - `server/mcp/tool-helpers.ts` (standard MCP success/error/workspace helpers)
+- Keyword tools (`server/mcp/tools/keyword-actions.ts`):
+  - `research_keywords`
+  - `add_keyword_to_strategy`
+- Content tools (`server/mcp/tools/content-actions.ts`):
+  - `prepare_brief_context`
+  - `save_brief`
+  - `prepare_post_context`
+  - `save_post`
+  - `send_to_client`
+- Job tools (`server/mcp/tools/job-actions.ts`):
+  - `start_keyword_strategy_generation`
+  - `start_seo_audit`
+  - `start_local_seo_refresh`
+- MCP server wiring in `server/mcp/server.ts` now registers and dispatches all three new tool groups.
+- New unit coverage:
+  - `tests/unit/mcp-paid-call-counter.test.ts`
+  - `tests/unit/mcp-tools-keyword.test.ts`
+  - `tests/unit/mcp-tools-content.test.ts`
+  - `tests/unit/mcp-tools-jobs.test.ts`
+
+All persistence paths route through existing domain service functions and pair writes with broadcasts + `addActivity(..., { source: 'mcp-chat' })`, matching the Phase 1 guardrails.
+
+**Agency value:** Lets operators execute high-leverage strategy/content/job actions from chat while preserving existing service-layer contracts, activity provenance, and websocket invalidation behavior.
+
+**Client value:** Faster execution loops for briefs/posts/strategy refreshes and clearer progress via the existing background-job + activity-feed surfaces.
+
+**Mutual:** Extends MCP from read-only intelligence into controlled write operations without bypassing platform safety rails.
+
+---
+
 ### 366. Background Job Helper Layer
 
 **What it does:** Adds composable background-job lifecycle helpers (`src/lib/background-job-helpers.ts`) for start+track, attach, cancel, and completion invalidation behavior. Migrates SEO bulk workflow and content post generation tracking to these helpers and adds dedicated unit/contract test coverage.
