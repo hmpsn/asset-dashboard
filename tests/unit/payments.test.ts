@@ -233,7 +233,7 @@ describe('server/payments.ts', () => {
     const all = listAllPayments();
 
     expect(scoped.map((p) => p.id)).toEqual(['pay_a', 'pay_b']);
-    expect(scoped.every((p) => p.workspaceId === 'ws_scope')).toBe(true);
+    expect(scoped.map((p) => p.workspaceId)).toEqual(['ws_scope', 'ws_scope']);
     expect(all.map((p) => p.workspaceId)).toEqual(['ws_a', 'ws_b']);
   });
 
