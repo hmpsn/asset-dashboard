@@ -2,9 +2,9 @@ import { useState, useEffect, useRef, useDeferredValue } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { get, post, patch, del, getSafe, getText } from '../api/client';
 import {
-  Loader2, Trash2, AlertTriangle, PenLine, Clipboard, Search, X, ArrowUpDown,
+  Trash2, AlertTriangle, PenLine, Clipboard, Search, X, ArrowUpDown,
 } from 'lucide-react';
-import { Badge, Icon, IconButton, ClickableRow, FormInput, FormSelect, Button, Modal, PageHeader } from './ui';
+import { Badge, Icon, IconButton, ClickableRow, FormInput, FormSelect, Button, Modal, PageHeader, LoadingState, ErrorState } from './ui';
 import type { FixContext } from '../App';
 import type { ContentBrief, ContentTopicRequest, PostSummary } from '../../shared/types/content';
 import { PostEditor } from './PostEditor';
@@ -16,6 +16,7 @@ import { queryKeys } from '../lib/queryKeys';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
 import { attachTrackedJob } from '../lib/background-job-helpers';
+import { useToast } from './Toast';
 
 /** targetRoute values that ContentBriefs recognises as legitimate brief-generation navigations.
  *  Any fixContext without one of these routes is treated as stale (e.g. from seo-editor). */
@@ -24,6 +25,7 @@ type BriefRoute = typeof BRIEF_ROUTES[number];
 
 export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, clearFixContext }: { workspaceId: string; onRequestCountChange?: (pending: number) => void; fixContext?: FixContext | null; clearFixContext?: () => void }) {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const { trackJob } = useBackgroundTasks();
   const [keyword, setKeyword] = useState('');
   const deferredKeyword = useDeferredValue(keyword);
@@ -39,6 +41,11 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
   // "Open Post" buttons. If posts hasn't loaded yet we'd mistakenly show "Generate
   // Post" for briefs that already have one, causing duplicate post creation on click.
   const loading = briefsQ.isLoading || requestsQ.isLoading || postsQ.isLoading;
+  const hasBlockingQueryError =
+    (briefsQ.isError || requestsQ.isError || postsQ.isError) &&
+    briefs.length === 0 &&
+    clientRequests.length === 0 &&
+    posts.length === 0;
 
   // Notify parent of pending request count whenever requests data changes
   useEffect(() => {
@@ -253,8 +260,12 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
       const result = await post<{ ok: boolean; requestId: string }>(`/api/content-briefs/${workspaceId}/${b.id}/send-to-client`);
       if (result.ok) {
         queryClient.invalidateQueries({ queryKey: queryKeys.admin.requests(workspaceId) });
+        toast('Brief sent to client');
       }
-    } catch (err) { console.error('ContentBriefs operation failed:', err); }
+    } catch (err) {
+      console.error('ContentBriefs operation failed:', err);
+      toast('Failed to send brief to client', 'error');
+    }
     setSendingToClient(null);
   };
 
@@ -359,9 +370,32 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <Icon as={Loader2} size="lg" className="animate-spin text-accent-brand" />
-      </div>
+      <LoadingState message="Loading briefs, client requests, and generated posts..." size="lg" className="py-16" />
+    );
+  }
+
+  if (hasBlockingQueryError) {
+    return (
+      <ErrorState
+        title="Couldn't load content pipeline data"
+        message="Briefs, requests, or post data failed to load. Try reloading this workspace."
+        actions={[
+          {
+            label: 'Retry',
+            onClick: () => {
+              void briefsQ.refetch();
+              void requestsQ.refetch();
+              void postsQ.refetch();
+            },
+          },
+          {
+            label: 'Refresh page',
+            onClick: () => window.location.reload(),
+            variant: 'secondary',
+          },
+        ]}
+        type="data"
+      />
     );
   }
 

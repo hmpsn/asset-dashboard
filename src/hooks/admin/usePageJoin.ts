@@ -37,6 +37,7 @@ export function usePageJoin(
   webflowPages: UnifiedPage[];
   isLoading: boolean;
   error: Error | null;
+  refetch: () => Promise<void>;
 } {
   // ── Fetch Webflow pages (all-pages with CMS, falling back to static-only) ──
   const pagesQuery = useQuery({
@@ -133,5 +134,9 @@ export function usePageJoin(
   const error: Error | null =
     (pagesQuery.error as Error | null) ?? (strategyQuery.error as Error | null) ?? null;
 
-  return { pages, strategyPages, webflowPages, isLoading, error };
+  const refetch = async () => {
+    await Promise.all([pagesQuery.refetch(), strategyQuery.refetch()]);
+  };
+
+  return { pages, strategyPages, webflowPages, isLoading, error, refetch };
 }

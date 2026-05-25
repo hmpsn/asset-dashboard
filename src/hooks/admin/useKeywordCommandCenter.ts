@@ -42,6 +42,7 @@ export function useKeywordCommandCenterAction(workspaceId: string) {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywordRows(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingHistory(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
@@ -57,6 +58,7 @@ export function useKeywordCommandCenterBulkAction(workspaceId: string) {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywordRows(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingHistory(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Search, LineChart } from 'lucide-react';
-import { TabBar } from '../ui';
+import { TabBar, EmptyState } from '../ui';
 import { SearchTab } from './SearchTab';
 import { AnalyticsTab } from './AnalyticsTab';
 import type {
@@ -72,6 +72,16 @@ export function PerformanceTab(props: PerformanceTabProps) {
       setSubTab('search');
     }
   }, [props.initialSubTab, hasAnalytics, hasSearch, searchExpected]);
+
+  if (!hasSearch && !hasAnalytics) {
+    return (
+      <EmptyState
+        icon={LineChart}
+        title="Performance data is coming soon"
+        description="Connect Google Search Console and Google Analytics in workspace settings to unlock search and traffic performance insights."
+      />
+    );
+  }
 
   return (
     <>

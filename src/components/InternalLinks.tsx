@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Loader2, ArrowRight, RefreshCw, ExternalLink, Search as SearchIcon,
+  ArrowRight, RefreshCw, ExternalLink, Search as SearchIcon,
   Link, AlertCircle, ChevronDown, ChevronRight, ArrowUpRight,
   AlertTriangle, Copy, Check, LayoutList, List, Send,
 } from 'lucide-react';
-import { PageHeader, StatCard, Icon, Button, IconButton, ClickableRow, FormInput, FormTextarea } from './ui';
+import { PageHeader, StatCard, Icon, Button, IconButton, ClickableRow, FormInput, FormTextarea, LoadingState, ErrorState } from './ui';
 import { webflow } from '../api/seo';
 import { clientActions } from '../api/clientActions';
 import { toInternalLinkClientActionItem } from '../lib/internal-link-client-action';
+import { queryKeys } from '../lib/queryKeys';
 
 interface LinkSuggestion {
   fromPage: string;
@@ -52,8 +54,7 @@ const priorityConfig = {
 };
 
 export function InternalLinks({ siteId, workspaceId }: Props) {
-  const [data, setData] = useState<InternalLinkResult | null>(null);
-  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<PriorityFilter>('all');
   const [search, setSearch] = useState('');
@@ -64,36 +65,48 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
   const [sendingToClient, setSendingToClient] = useState(false);
   const [sentToClient, setSentToClient] = useState(false);
   const [note, setNote] = useState('');
+  const snapshotKey = queryKeys.admin.internalLinksSnapshot(siteId, workspaceId);
+
+  const snapshotQuery = useQuery({
+    queryKey: snapshotKey,
+    queryFn: async () => {
+      const snap = await webflow.internalLinksSnapshot(siteId, workspaceId) as { result?: InternalLinkResult } | null;
+      return snap?.result ?? null;
+    },
+    enabled: !!siteId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const analyzeMutation = useMutation({
+    mutationFn: async () => {
+      const result = await webflow.internalLinksWithParams(siteId, workspaceId) as InternalLinkResult & { error?: string };
+      if (result.error) throw new Error(result.error);
+      return result;
+    },
+    onSuccess: (result) => {
+      queryClient.setQueryData(snapshotKey, result);
+      setError(null);
+    },
+    onError: (err) => {
+      console.error('InternalLinks operation failed:', err);
+      setError(err instanceof Error ? err.message : 'Failed to analyze internal links');
+    },
+  });
 
   const runAnalysis = async () => {
-    setLoading(true);
     setError(null);
     try {
-      const result = await webflow.internalLinksWithParams(siteId, workspaceId) as InternalLinkResult & { error?: string };
-      if (result.error) {
-        setError(result.error);
-      } else {
-        setData(result);
-      }
-    } catch (err) {
-      console.error('InternalLinks operation failed:', err);
-      setError('Failed to analyze internal links');
-    } finally {
-      setLoading(false);
+      await analyzeMutation.mutateAsync();
+    } catch {
+      // onError already sets user-facing state; keep this catch to avoid
+      // unhandled promise rejections from event handlers.
     }
   };
 
-  // Load last saved snapshot on mount
-  useEffect(() => {
-    let cancelled = false;
-    webflow.internalLinksSnapshot(siteId, workspaceId)
-      .then(snap => {
-        const s = snap as { result?: InternalLinkResult } | null;
-        if (!cancelled && s?.result) setData(s.result);
-      })
-      .catch((err) => { console.error('InternalLinks operation failed:', err); });
-    return () => { cancelled = true; };
-  }, [siteId, workspaceId]);
+  const data = snapshotQuery.data ?? null;
+  const loading = analyzeMutation.isPending;
+  const initialLoading = !data && (snapshotQuery.isLoading || analyzeMutation.isPending);
+  const snapshotError = snapshotQuery.error instanceof Error ? snapshotQuery.error.message : null;
 
   const toggleExpanded = (idx: number) => {
     setExpanded(prev => {
@@ -152,7 +165,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
     }
   };
 
-  if (!data && !loading) {
+  if (!data && !initialLoading) {
     return (
       <div className="space-y-8">
         {/* pr-check-disable-next-line -- brand asymmetric signature on internal-links empty state; intentional non-SectionCard chrome */}
@@ -163,12 +176,12 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
             Analyze your site's content and discover missing internal links.
             AI finds topically related pages that should link to each other to boost SEO and user navigation.
           </p>
-          <Button variant="primary" onClick={runAnalysis} icon={ArrowUpRight} className="mx-auto">
+          <Button variant="primary" onClick={() => void runAnalysis()} icon={ArrowUpRight} className="mx-auto" disabled={loading}>
             Analyze Internal Links
           </Button>
-          {error && (
+          {(error || snapshotError) && (
             <div className="mt-4 bg-red-500/10 border border-red-500/30 rounded-[var(--radius-lg)] px-4 py-2 text-xs text-red-400">
-              {error}
+              {error || snapshotError}
             </div>
           )}
         </div>
@@ -176,13 +189,13 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
     );
   }
 
-  if (loading) {
+  if (initialLoading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-2">
-        <Loader2 className="w-6 h-6 animate-spin text-teal-400" />
-        <span className="text-sm text-[var(--brand-text)]">Analyzing page content &amp; finding link opportunities...</span>
-        <span className="t-caption-sm text-[var(--brand-text-muted)]">This fetches and reads every page — may take 30-60 seconds</span>
-      </div>
+      <LoadingState
+        message="Analyzing page content and finding internal link opportunities..."
+        size="lg"
+        className="py-20"
+      />
     );
   }
 
@@ -201,12 +214,25 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
                 {sendingToClient ? 'Sending...' : sentToClient ? 'Sent' : 'Send to Client'}
               </Button>
             )}
-            <Button variant="secondary" size="sm" icon={RefreshCw} onClick={runAnalysis} disabled={loading}>
-              Reanalyze
+            <Button variant="secondary" size="sm" icon={RefreshCw} onClick={() => void runAnalysis()} disabled={loading}>
+              {loading ? 'Reanalyzing...' : 'Reanalyze'}
             </Button>
           </div>
         }
       />
+
+      {error && (
+        <ErrorState
+          title="Couldn't complete the last internal-link action"
+          message={error}
+          actions={[
+            { label: 'Retry analysis', onClick: () => void runAnalysis() },
+            { label: 'Dismiss', onClick: () => setError(null), variant: 'secondary' },
+          ]}
+          type="network"
+          className="py-4"
+        />
+      )}
 
       {/* Send to Client Note */}
       {workspaceId && data.suggestions.length > 0 && !sentToClient && (

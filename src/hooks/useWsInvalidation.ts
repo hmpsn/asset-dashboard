@@ -75,6 +75,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.roi(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.contentRequests(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.contentPlan(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(workspaceId) });
@@ -127,6 +128,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.roi(workspaceId) });
     },
     [WS_EVENTS.CONTENT_SUBSCRIPTION_CREATED]: () => {
       if (!workspaceId) return;
@@ -135,6 +137,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.roi(workspaceId) });
     },
     [WS_EVENTS.CONTENT_SUBSCRIPTION_UPDATED]: () => {
       if (!workspaceId) return;
@@ -143,6 +146,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.roi(workspaceId) });
     },
     [WS_EVENTS.CONTENT_SUBSCRIPTION_RENEWED]: () => {
       if (!workspaceId) return;
@@ -151,6 +155,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.roi(workspaceId) });
     },
     [WS_EVENTS.WORK_ORDER_UPDATE]: () => {
       if (!workspaceId) return;
@@ -302,10 +307,14 @@ export function useWsInvalidation(workspaceId: string | undefined) {
     [WS_EVENTS.STRATEGY_UPDATED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.keywordFeedback(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywordRows(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingHistory(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.roi(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.strategy(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.pageKeywords(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.keywordFeedback(workspaceId) });
@@ -316,6 +325,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
     [WS_EVENTS.RANK_TRACKING_UPDATED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywordRows(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingHistory(workspaceId) });

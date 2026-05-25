@@ -1,51 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   DollarSign, BarChart3, Target, TrendingUp,
   Lock, Shield, MousePointerClick, Eye, Layers,
 } from 'lucide-react';
-import { EmptyState, SectionCard, Button, StatCard } from '../ui';
+import { EmptyState, SectionCard, Button, StatCard, ErrorState, LoadingState } from '../ui';
 import { Icon } from '../ui/Icon';
 import { fmtMoney, fmtMoneyFull } from '../../utils/formatNumbers';
-import { get } from '../../api/client';
-import { LoadingState } from '../ui';
-
-interface PageROI {
-  pagePath: string;
-  pageTitle: string;
-  primaryKeyword: string;
-  clicks: number;
-  impressions: number;
-  cpc: number;
-  trafficValue: number;
-  position: number | null;
-}
-
-interface ContentItemROI {
-  requestId: string;
-  topic: string;
-  targetKeyword: string;
-  targetPageId: string;
-  targetPageSlug?: string;
-  status: string;
-  clicks: number;
-  impressions: number;
-  trafficValue: number;
-  source?: 'request' | 'matrix';
-}
-
-interface ROIData {
-  organicTrafficValue: number;
-  adSpendEquivalent: number;
-  growthPercent: number | null;
-  pageBreakdown: PageROI[];
-  totalClicks: number;
-  totalImpressions: number;
-  avgCPC: number;
-  trackedPages: number;
-  contentROI: { totalContentSpend: number; totalContentValue: number; roi: number; postsPublished: number } | null;
-  contentItems: ContentItemROI[];
-  computedAt: string;
-}
+import { useClientROI } from '../../hooks/client';
 
 interface ROIDashboardProps {
   workspaceId: string;
@@ -53,17 +14,15 @@ interface ROIDashboardProps {
 }
 
 export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
-  const [data, setData] = useState<ROIData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [showAllPages, setShowAllPages] = useState(false);
-
-  useEffect(() => {
-    get<ROIData>(`/api/public/roi/${workspaceId}`)
-      .then(d => { setData(d); setError(null); })
-      .catch(e => setError(e instanceof Error ? e.message : 'Failed to load ROI data'))
-      .finally(() => setLoading(false));
-  }, [workspaceId]);
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isFetching,
+  } = useClientROI(workspaceId, !!workspaceId);
 
   // Gate for premium tier
   if (tier !== 'premium' && tier !== 'growth') {
@@ -83,7 +42,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
     );
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <SectionCard noPadding>
         <div className="p-8">
@@ -93,9 +52,30 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
     );
   }
 
-  if (error || !data) {
+  if (isError) {
+    const message = error instanceof Error ? error.message : 'Failed to load ROI data';
     return (
-      <EmptyState icon={DollarSign} title="ROI data unavailable" description={error || 'ROI data requires a keyword strategy with CPC data. Run a strategy with SEMRush enrichment to unlock this.'} />
+      <ErrorState
+        type="data"
+        title="Couldn’t load ROI data"
+        message={message}
+        action={{ label: 'Try again', onClick: () => void refetch() }}
+      />
+    );
+  }
+
+  if (!data) {
+    return (
+      <EmptyState
+        icon={DollarSign}
+        title="ROI data unavailable"
+        description="ROI appears once traffic and keyword cost data are available for this workspace."
+        action={(
+          <Button variant="secondary" size="sm" onClick={() => void refetch()} disabled={isFetching}>
+            {isFetching ? 'Refreshing...' : 'Try again'}
+          </Button>
+        )}
+      />
     );
   }
 

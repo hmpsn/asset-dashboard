@@ -379,8 +379,8 @@ export function AnalyticsTab({
           })}
           {/* Ungrouped events */}
           {(ungroupedEvents.length > 0 || modulePageFilters['__ungrouped__']) && (
-            <SectionCard title={groups.length > 0 ? 'Other Events' : 'Key Events'}>
-              <p className="t-body text-[var(--brand-text-muted)] mb-3">{groups.length > 0 ? 'Events not assigned to a group' : 'Custom and conversion events tracked on your site'}</p>
+            <SectionCard title={groups.length > 0 ? 'Other Actions' : 'Top Actions'}>
+              <p className="t-body text-[var(--brand-text-muted)] mb-3">{groups.length > 0 ? 'Actions not assigned to a group' : 'Top actions tracked on your site'}</p>
               {renderPageFilter('__ungrouped__')}
               {modulePageFilters['__ungrouped__'] && ungroupedEvents.length === 0 && !modulePageLoading['__ungrouped__'] ? (
                 <div className="text-center py-4 t-caption-sm text-[var(--brand-text-muted)]">No events found for this page</div>
@@ -441,19 +441,19 @@ export function AnalyticsTab({
       );
     })()}
 
-    {/* ── Collapsible Event Explorer ── */}
+    {/* ── Collapsible Action Explorer ── */}
     <SectionCard noPadding>
       <Button variant="ghost" onClick={() => setShowExplorer(!showExplorer)}
         className="w-full !rounded-none !px-5 !py-3 !flex !items-center !justify-between hover:!bg-[var(--surface-3)] transition-colors">
         <div className="flex items-center gap-2">
           <Icon as={Filter} size="md" className="text-accent-brand" />
-          <span className="t-ui font-medium text-[var(--brand-text-bright)]">Event Explorer</span>
+          <span className="t-ui font-medium text-[var(--brand-text-bright)]">Action Explorer</span>
         </div>
         {showExplorer ? <Icon as={ChevronUp} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" />}
       </Button>
       {showExplorer && (
         <div className="px-5 pb-5">
-          <p className="t-caption-sm text-[var(--brand-text-muted)] mb-4">Break down events by page, or see which events fire on a specific page.</p>
+          <p className="t-caption-sm text-[var(--brand-text-muted)] mb-4">Break down actions by page, or see which actions fire on a specific page.</p>
           <div className="flex flex-wrap items-end gap-3 mb-4">
             <div className="flex-1 min-w-[180px]">
               <label className="t-caption-sm text-[var(--brand-text-muted)] mb-1 block">Event Name</label>

@@ -102,7 +102,7 @@ export function SearchTab({
         {/* Search Health Summary */}
         <SectionCard title="Search Health Summary">
 
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="text-center">
               <div className={`t-stat-sm ${insights.page1 > 5 ? 'text-accent-success' : 'text-accent-warning'}`}>{insights.page1}</div>
               <div className="t-caption-sm text-[var(--brand-text-muted)]">Page 1 Rankings</div>
@@ -163,7 +163,7 @@ export function SearchTab({
       </SectionCard>
     )}
 
-    {/* Raw data tables — collapsible, secondary */}
+    {/* Detailed keyword/page tables — collapsible, secondary */}
     <SectionCard noPadding>
       <ClickableRow
         onClick={() => setShowRawData(!showRawData)}
@@ -171,7 +171,7 @@ export function SearchTab({
       >
         {showRawData ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)]" />}
         <Icon as={Table2} size="md" className="text-[var(--brand-text-muted)]" />
-        <span className="t-ui font-medium text-[var(--brand-text-bright)]">Raw Data</span>
+        <span className="t-ui font-medium text-[var(--brand-text-bright)]">All Keywords & Pages</span>
         <span className="t-caption-sm text-[var(--brand-text-muted)] ml-1">{overview.topQueries.length} queries, {overview.topPages.length} pages</span>
       </ClickableRow>
       {showRawData && (

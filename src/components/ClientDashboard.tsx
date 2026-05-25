@@ -644,9 +644,11 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         customEndRef={customEndRef}
         clientUser={clientUser}
         handleClientLogout={handleClientLogout}
+        onShowTour={() => setShowWelcome(true)}
         setShowUpgradeModal={setShowUpgradeModal}
         pendingApprovals={pendingApprovals}
         unreadTeamNotes={unreadTeamNotes}
+        hasCopyEntries={hasCopyEntries}
         contentPlanSummary={contentPlanSummary}
         hasData={hasData}
         contentRequests={contentRequests}

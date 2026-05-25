@@ -314,8 +314,18 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   };
 
   if (!strategyData) {
+    const action = onTabChange ? (
+      <Button size="sm" onClick={() => onTabChange('inbox')}>
+        Open Inbox
+      </Button>
+    ) : undefined;
     return (
-      <EmptyState icon={Target} title="SEO strategy is being prepared" description={`${STUDIO_NAME} is building a keyword strategy for your site. Check back soon!`} />
+      <EmptyState
+        icon={Target}
+        title="SEO strategy is being prepared"
+        description={`${STUDIO_NAME} is building a keyword strategy for your site. Check back soon, or open Inbox to send your team a request.`}
+        action={action}
+      />
     );
   }
 

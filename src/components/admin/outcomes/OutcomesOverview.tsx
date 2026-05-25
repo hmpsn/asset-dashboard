@@ -2,12 +2,14 @@
 // Cross-workspace outcomes summary — admin only.
 
 import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Minus, AlertTriangle, BarChart3, Activity } from 'lucide-react';
 import { TrendBadge } from '../../ui/TrendBadge';
 import { PageHeader, SectionCard, StatCard, EmptyState, Skeleton, Badge } from '../../ui';
 import { FeatureFlag } from '../../ui/FeatureFlag';
 import { ErrorBoundary } from '../../ErrorBoundary';
 import { useOutcomeOverview } from '../../../hooks/admin/useOutcomes';
+import { adminPath } from '../../../routes';
 import { scoreColorClass } from '../../ui/constants';
 import type { WorkspaceOutcomeOverview, LearningsTrend } from '../../../../shared/types/outcome-tracking';
 
@@ -80,11 +82,30 @@ function AggregateStats({ workspaces }: { workspaces: WorkspaceOutcomeOverview[]
 
 // --- Workspace row ----------------------------------------------------
 
-function WorkspaceRow({ ws }: { ws: WorkspaceOutcomeOverview }) {
+function WorkspaceRow({
+  ws,
+  onOpenWorkspace,
+}: {
+  ws: WorkspaceOutcomeOverview;
+  onOpenWorkspace: (workspaceId: string) => void;
+}) {
   const winPct = Math.round(ws.winRate * 100);
+  const handleOpenWorkspace = () => onOpenWorkspace(ws.workspaceId);
 
   return (
-    <tr className="border-t border-[var(--brand-border)] hover:bg-[var(--surface-3)] transition-colors">
+    <tr
+      className="border-t border-[var(--brand-border)] hover:bg-[var(--surface-3)] transition-colors cursor-pointer"
+      onClick={handleOpenWorkspace}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          handleOpenWorkspace();
+        }
+      }}
+      tabIndex={0}
+      role="button"
+      aria-label={`Open ${ws.workspaceName} outcomes`}
+    >
       {/* Workspace name */}
       <td className="py-3 px-4">
         <div className="flex items-center gap-2">
@@ -168,6 +189,7 @@ function TableSkeleton() {
 // --- Main component ---------------------------------------------------
 
 export default function OutcomesOverview() {
+  const navigate = useNavigate();
   const { data: workspaces = [], isLoading } = useOutcomeOverview();
 
   const sortedWorkspaces = useMemo(
@@ -179,7 +201,26 @@ export default function OutcomesOverview() {
   );
 
   return (
-    <FeatureFlag flag="outcome-dashboard">
+    <FeatureFlag
+      flag="outcome-dashboard"
+      fallback={
+        <ErrorBoundary>
+          <div className="space-y-6">
+            <PageHeader
+              title="Outcomes Overview"
+              subtitle="Cross-workspace outcome tracking is currently disabled."
+            />
+            <SectionCard>
+              <EmptyState
+                icon={BarChart3}
+                title="Outcomes overview is unavailable"
+                description="Enable the outcome dashboard feature flag to view cross-workspace win-rate and trend data."
+              />
+            </SectionCard>
+          </div>
+        </ErrorBoundary>
+      }
+    >
       <ErrorBoundary>
         <div className="space-y-6">
           <PageHeader
@@ -240,8 +281,12 @@ export default function OutcomesOverview() {
                     </thead>
                     <tbody>
                       {sortedWorkspaces.map(ws => (
-                          <WorkspaceRow key={ws.workspaceId} ws={ws} />
-                        ))}
+                        <WorkspaceRow
+                          key={ws.workspaceId}
+                          ws={ws}
+                          onOpenWorkspace={(workspaceId) => navigate(adminPath(workspaceId, 'outcomes'))}
+                        />
+                      ))}
                     </tbody>
                   </table>
                 </div>
