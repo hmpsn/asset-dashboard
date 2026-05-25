@@ -213,6 +213,26 @@ A comprehensive value assessment of every feature in the platform — **450 feat
 
 ---
 
+### 367. MCP Action Phase 1 Shared Infra + Activity Feed Provenance Badge
+
+**What it does:** Adds Phase 1 MCP write-action foundation pieces that are intentionally live-but-unused until Phase 2 tool handlers land:
+- `server/mcp/handles.ts`: workspace-scoped, TTL-backed (15 minute default) single-use handle store for chained MCP mutations with typed error classes (`HandleNotFoundError`, `HandleExpiredError`, `HandleKindMismatchError`, `HandleWorkspaceMismatchError`).
+- `shared/types/mcp-action-schemas.ts`: Zod input contracts for all 10 planned MCP write tools plus shared layout/typed-outline schemas.
+- `scripts/pr-check.ts`: three MCP-specific guardrails for future `server/mcp/tools/*` implementations:
+  - `mcp-action-must-route-through-service`
+  - `mcp-action-must-tag-source`
+  - `mcp-action-must-broadcast`
+- `tests/contract/mcp-tool-job-name-lockstep.test.ts`: contract guard so MCP job actions must use job types from `BACKGROUND_JOB_TYPES`.
+- `src/components/workspace-home/ActivityFeed.tsx`: renders a neutral zinc `chat` badge when `activity.metadata.source === 'mcp-chat'` so chat-originated mutations are visibly auditable.
+
+**Agency value:** Prevents an entire class of Phase 2 mistakes (direct DB writes, missing activity provenance, missing broadcasts, invalid job names) before those tools ship.
+
+**Client value:** Better trust and transparency once chat actions go live, because operators can distinguish chat-driven changes from UI-driven changes in activity history.
+
+**Mutual:** Establishes hard contracts now so the Phase 2 rollout can focus on behavior instead of re-fixing infrastructure consistency.
+
+---
+
 ### 366. Background Job Helper Layer
 
 **What it does:** Adds composable background-job lifecycle helpers (`src/lib/background-job-helpers.ts`) for start+track, attach, cancel, and completion invalidation behavior. Migrates SEO bulk workflow and content post generation tracking to these helpers and adds dedicated unit/contract test coverage.
