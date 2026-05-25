@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { TrackedAction } from '../../shared/types/outcome-tracking.js';
 
 const mocks = vi.hoisted(() => ({
   getNotActedOnActions: vi.fn(),
@@ -7,117 +6,177 @@ const mocks = vi.hoisted(() => ({
   updateActionContext: vi.fn(),
   fetchGscSnapshot: vi.fn(),
   broadcastToWorkspace: vi.fn(),
+  logInfo: vi.fn(),
+  logWarn: vi.fn(),
+  logError: vi.fn(),
 }));
 
-vi.mock('../../server/logger.js', () => ({
-  createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
-}));
 vi.mock('../../server/outcome-tracking.js', () => ({
   getNotActedOnActions: mocks.getNotActedOnActions,
   updateAttribution: mocks.updateAttribution,
   updateActionContext: mocks.updateActionContext,
 }));
+
 vi.mock('../../server/outcome-measurement.js', () => ({
   fetchGscSnapshot: mocks.fetchGscSnapshot,
 }));
+
 vi.mock('../../server/broadcast.js', () => ({
   broadcastToWorkspace: mocks.broadcastToWorkspace,
 }));
+
 vi.mock('../../server/ws-events.js', () => ({
-  WS_EVENTS: { OUTCOME_EXTERNAL_DETECTED: 'outcome:external_detected' },
+  WS_EVENTS: {
+    OUTCOME_EXTERNAL_DETECTED: 'outcome:external_detected',
+  },
 }));
 
-function makeAction(overrides: Partial<TrackedAction> = {}): TrackedAction {
+vi.mock('../../server/logger.js', () => ({
+  createLogger: () => ({
+    info: mocks.logInfo,
+    warn: mocks.logWarn,
+    error: mocks.logError,
+    debug: vi.fn(),
+  }),
+}));
+
+async function loadModule() {
+  vi.resetModules();
+  return import('../../server/external-detection.js');
+}
+
+function action(overrides: Record<string, unknown> = {}) {
   return {
-    id: 'act-1',
-    workspaceId: 'ws-1',
-    actionType: 'meta_updated',
-    sourceType: 'insight',
-    sourceId: 'ins-1',
-    pageUrl: 'https://example.com/page-a',
-    targetKeyword: null,
-    baselineSnapshot: {
-      captured_at: '2026-05-01T00:00:00.000Z',
-      clicks: 10,
-      position: 12,
-    },
-    trailingHistory: { metric: 'clicks', dataPoints: [] },
-    attribution: 'not_acted_on',
-    measurementWindow: 30,
-    measurementComplete: false,
-    sourceFlag: 'live',
-    baselineConfidence: 'exact',
-    context: {},
-    createdAt: '2026-05-01T00:00:00.000Z',
-    updatedAt: '2026-05-01T00:00:00.000Z',
+    id: 'a1',
+    workspaceId: 'ws_1',
+    actionType: 'update_meta_title',
+    pageUrl: 'https://example.com/page',
+    baselineSnapshot: { position: 12, clicks: 20 },
+    context: { detectionChecks: 0 },
     ...overrides,
   };
 }
 
-describe('external-detection', () => {
+describe('external-detection behavior', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getNotActedOnActions.mockReturnValue([]);
-    mocks.fetchGscSnapshot.mockResolvedValue({ captured_at: '2026-05-25T00:00:00.000Z', clicks: 20, position: 8 });
   });
 
-  it('returns checked/detected counts when no actions are eligible', async () => {
-    const { detectExternalExecutions } = await import('../../server/external-detection.js');
-    const result = await detectExternalExecutions();
-    expect(result).toEqual({ detected: 0, checked: 0 });
+  it('requires two consecutive positive checks before attribution', async () => {
+    const { detectExternalExecutions } = await loadModule();
+
+    mocks.getNotActedOnActions.mockReturnValue([action({ context: { detectionChecks: 0 } })]);
+    mocks.fetchGscSnapshot.mockResolvedValue({ position: 8, clicks: 20 });
+
+    const first = await detectExternalExecutions();
+    expect(first).toEqual({ detected: 0, checked: 1 });
+    expect(mocks.updateActionContext).toHaveBeenCalledWith(
+      'a1',
+      'ws_1',
+      expect.objectContaining({ detectionChecks: 1 }),
+    );
+    expect(mocks.updateAttribution).not.toHaveBeenCalled();
+
+    mocks.getNotActedOnActions.mockReturnValue([action({ context: { detectionChecks: 1 } })]);
+    const second = await detectExternalExecutions();
+
+    expect(second).toEqual({ detected: 1, checked: 1 });
+    expect(mocks.updateAttribution).toHaveBeenCalledWith('a1', 'ws_1', 'externally_executed');
+    expect(mocks.broadcastToWorkspace).toHaveBeenCalledWith(
+      'ws_1',
+      'outcome:external_detected',
+      { actionId: 'a1' },
+    );
   });
 
-  it('increments detectionChecks on first positive execution signal', async () => {
-    const action = makeAction({ context: {} });
-    mocks.getNotActedOnActions.mockReturnValue([action]);
+  it('resets detectionChecks when improvement is no longer present', async () => {
+    const { detectExternalExecutions } = await loadModule();
 
-    const { detectExternalExecutions } = await import('../../server/external-detection.js');
+    mocks.getNotActedOnActions.mockReturnValue([action({ context: { detectionChecks: 2 } })]);
+    mocks.fetchGscSnapshot.mockResolvedValue({ position: 11, clicks: 21 });
+
     const result = await detectExternalExecutions();
 
     expect(result).toEqual({ detected: 0, checked: 1 });
-    expect(mocks.updateActionContext).toHaveBeenCalledWith('act-1', 'ws-1', expect.objectContaining({ detectionChecks: 1 }));
+    expect(mocks.updateActionContext).toHaveBeenCalledWith(
+      'a1',
+      'ws_1',
+      expect.objectContaining({ detectionChecks: 0 }),
+    );
     expect(mocks.updateAttribution).not.toHaveBeenCalled();
-    expect(mocks.broadcastToWorkspace).not.toHaveBeenCalled();
   });
 
-  it('marks externally_executed on second consecutive positive check', async () => {
-    const action = makeAction({ context: { detectionChecks: 1 } });
-    mocks.getNotActedOnActions.mockReturnValue([action]);
+  it('requires at least +5 absolute clicks even if 20% threshold is met', async () => {
+    const { detectExternalExecutions } = await loadModule();
 
-    const { detectExternalExecutions } = await import('../../server/external-detection.js');
+    mocks.getNotActedOnActions.mockReturnValue([action({ baselineSnapshot: { clicks: 20 }, context: { detectionChecks: 1 } })]);
+    mocks.fetchGscSnapshot.mockResolvedValue({ clicks: 24 });
+
     const result = await detectExternalExecutions();
 
-    expect(result).toEqual({ detected: 1, checked: 1 });
-    expect(mocks.updateAttribution).toHaveBeenCalledWith('act-1', 'ws-1', 'externally_executed');
-    expect(mocks.broadcastToWorkspace).toHaveBeenCalledWith('ws-1', 'outcome:external_detected', { actionId: 'act-1' });
+    expect(result).toEqual({ detected: 0, checked: 1 });
+    expect(mocks.updateAttribution).not.toHaveBeenCalled();
+    expect(mocks.updateActionContext).toHaveBeenCalledWith(
+      'a1',
+      'ws_1',
+      expect.objectContaining({ detectionChecks: 0 }),
+    );
+  });
+
+  it('does not evaluate actions lacking actionable baseline or page URL', async () => {
+    const { detectExternalExecutions } = await loadModule();
+
+    mocks.getNotActedOnActions.mockReturnValue([
+      action({ id: 'no_url', pageUrl: undefined }),
+      action({ id: 'no_base', baselineSnapshot: { captured_at: '2026-05-01T00:00:00.000Z' } }),
+    ]);
+
+    const result = await detectExternalExecutions();
+
+    expect(result).toEqual({ detected: 0, checked: 2 });
+    expect(mocks.fetchGscSnapshot).not.toHaveBeenCalled();
+    expect(mocks.updateAttribution).not.toHaveBeenCalled();
     expect(mocks.updateActionContext).not.toHaveBeenCalled();
   });
 
-  it('resets detectionChecks when signal disappears after prior positive checks', async () => {
-    const action = makeAction({ context: { detectionChecks: 2 } });
-    mocks.getNotActedOnActions.mockReturnValue([action]);
-    mocks.fetchGscSnapshot.mockResolvedValue({ captured_at: '2026-05-25T00:00:00.000Z', clicks: 9, position: 12 });
+  it('continues checking later actions when one GSC lookup throws', async () => {
+    const { detectExternalExecutions } = await loadModule();
 
-    const { detectExternalExecutions } = await import('../../server/external-detection.js');
-    const result = await detectExternalExecutions();
-
-    expect(result).toEqual({ detected: 0, checked: 1 });
-    expect(mocks.updateActionContext).toHaveBeenCalledWith('act-1', 'ws-1', expect.objectContaining({ detectionChecks: 0 }));
-    expect(mocks.updateAttribution).not.toHaveBeenCalled();
-  });
-
-  it('isolates per-action errors and keeps processing remaining actions', async () => {
-    const badAction = makeAction({ id: 'act-bad', pageUrl: 'https://example.com/bad' });
-    const goodAction = makeAction({ id: 'act-good', pageUrl: 'https://example.com/good', context: { detectionChecks: 1 } });
-    mocks.getNotActedOnActions.mockReturnValue([badAction, goodAction]);
+    mocks.getNotActedOnActions.mockReturnValue([
+      action({ id: 'bad' }),
+      action({ id: 'good', context: { detectionChecks: 1 }, baselineSnapshot: { clicks: 10 } }),
+    ]);
     mocks.fetchGscSnapshot
-      .mockRejectedValueOnce(new Error('network'))
-      .mockResolvedValueOnce({ captured_at: '2026-05-25T00:00:00.000Z', clicks: 18, position: 8 });
+      .mockRejectedValueOnce(new Error('gsc timeout'))
+      .mockResolvedValueOnce({ clicks: 20 });
 
-    const { detectExternalExecutions } = await import('../../server/external-detection.js');
     const result = await detectExternalExecutions();
 
     expect(result).toEqual({ detected: 1, checked: 2 });
-    expect(mocks.updateAttribution).toHaveBeenCalledWith('act-good', 'ws-1', 'externally_executed');
+    expect(mocks.updateAttribution).toHaveBeenCalledWith('good', 'ws_1', 'externally_executed');
+    expect(mocks.logWarn).toHaveBeenCalledWith(
+      { err: expect.any(Error), actionId: 'bad' },
+      'Error checking external execution',
+    );
+  });
+
+  it('tolerates malformed action context without aborting the run', async () => {
+    const { detectExternalExecutions } = await loadModule();
+
+    mocks.getNotActedOnActions.mockReturnValue([
+      action({ id: 'bad_ctx', context: undefined }),
+      action({ id: 'good', context: { detectionChecks: 1 }, baselineSnapshot: { position: 12, clicks: 20 } }),
+    ]);
+    mocks.fetchGscSnapshot
+      .mockResolvedValueOnce({ position: 8, clicks: 20 })
+      .mockResolvedValueOnce({ position: 8, clicks: 20 });
+
+    const result = await detectExternalExecutions();
+
+    expect(result).toEqual({ detected: 1, checked: 2 });
+    expect(mocks.logWarn).toHaveBeenCalledWith(
+      { err: expect.anything(), actionId: 'bad_ctx' },
+      'Error checking external execution',
+    );
   });
 });
