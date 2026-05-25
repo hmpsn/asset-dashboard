@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import db from '../../server/db/index.js';
 import {
   countPageKeywords,
   getPageKeyword,
@@ -143,5 +144,67 @@ describe('page-keywords integrity behavior', () => {
 
     const pages = listPageKeywords(ws.id).filter((p) => p.pagePath === '/services/path-test');
     expect(pages).toHaveLength(1);
+  });
+
+  it('preserves url-level keyword enrichment when strategy-only updates omit url_level_keywords', () => {
+    const ws = createWorkspace(`PK URL Level Preserve ${Date.now()}`);
+    cleanupWorkspaceIds.add(ws.id);
+
+    upsertPageKeyword(ws.id, makePage({
+      pagePath: '/url-level',
+      primaryKeyword: 'seo services',
+      urlLevelKeywords: [
+        { keyword: 'seo services', position: 8, volume: 900, difficulty: 42, cpc: 4.2 },
+      ],
+      urlLevelKeywordSource: 'semrush',
+    }));
+
+    upsertPageKeyword(ws.id, makePage({
+      pagePath: '/url-level',
+      primaryKeyword: 'seo services',
+      volume: 1300,
+      difficulty: 35,
+      // urlLevelKeywords intentionally omitted
+    }));
+
+    const row = getPageKeyword(ws.id, '/url-level');
+    expect(row?.urlLevelKeywordSource).toBe('semrush');
+    expect(row?.urlLevelKeywords).toEqual([
+      { keyword: 'seo services', position: 8, volume: 900, difficulty: 42, cpc: 4.2 },
+    ]);
+  });
+
+  it('degrades gracefully when persisted JSON columns are corrupted', () => {
+    const ws = createWorkspace(`PK Corrupt JSON ${Date.now()}`);
+    cleanupWorkspaceIds.add(ws.id);
+
+    upsertPageKeyword(ws.id, makePage({
+      pagePath: '/corrupt-json',
+      primaryKeyword: 'seo services',
+      secondaryKeywords: ['seo agency'],
+      optimizationIssues: ['Issue A'],
+      recommendations: ['Fix H1'],
+      serpFeatures: ['featured_snippet'],
+    }));
+
+    db.prepare(`
+      UPDATE page_keywords
+      SET secondary_keywords = ?, optimization_issues = ?, recommendations = ?, serp_features = ?
+      WHERE workspace_id = ? AND page_path = ?
+    `).run(
+      '{"bad"',
+      '{"bad"',
+      '{"bad"',
+      '{"bad"',
+      ws.id,
+      '/corrupt-json',
+    );
+
+    const row = getPageKeyword(ws.id, '/corrupt-json');
+    expect(row).toBeDefined();
+    expect(row?.secondaryKeywords).toEqual([]);
+    expect(row?.optimizationIssues).toEqual([]);
+    expect(row?.recommendations).toEqual([]);
+    expect(row?.serpFeatures).toEqual([]);
   });
 });
