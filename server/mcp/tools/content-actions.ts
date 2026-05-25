@@ -398,7 +398,7 @@ function ensurePostRequest(workspaceId: string, post: GeneratedPost, note: strin
     source: 'strategy',
     serviceType: 'full_post',
     pageType: 'blog',
-    initialStatus: 'requested',
+    initialStatus: 'in_progress',
     dedupe: false,
     clientNote: note,
   });

@@ -114,7 +114,7 @@ export function getContentRequest(workspaceId: string, id: string): ContentTopic
 
 export function createContentRequest(
   workspaceId: string,
-  data: { topic: string; targetKeyword: string; intent: string; priority: string; rationale: string; clientNote?: string; source?: 'strategy' | 'client'; serviceType?: 'brief_only' | 'full_post'; pageType?: ContentTopicRequest['pageType']; initialStatus?: 'pending_payment' | 'requested' | 'brief_generated'; targetPageId?: string; targetPageSlug?: string; dedupe?: boolean }
+  data: { topic: string; targetKeyword: string; intent: string; priority: string; rationale: string; clientNote?: string; source?: 'strategy' | 'client'; serviceType?: 'brief_only' | 'full_post'; pageType?: ContentTopicRequest['pageType']; initialStatus?: 'pending_payment' | 'requested' | 'brief_generated' | 'in_progress'; targetPageId?: string; targetPageSlug?: string; dedupe?: boolean }
 ): ContentTopicRequest {
   // Prevent duplicate requests for the same keyword
   if (data.dedupe !== false) {
