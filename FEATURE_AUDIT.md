@@ -233,9 +233,15 @@ A comprehensive value assessment of every feature in the platform — **450 feat
 
 ---
 
-### 368. MCP Action Phase 2 Tool Implementation (10 Write Tools)
+### 368. MCP Action Tools (Phases 2-4) — Full Rollout + Integration Verification
 
-**What it does:** Implements all 10 MCP write tools planned in the Phase 2 spec and wires them into the MCP server:
+**What it does:** Ships and verifies the full MCP write-action rollout across four PR phases:
+- Phase 0 ([#925](https://github.com/hmpsn/asset-dashboard/pull/925)): contracts and guardrails (`shared/types/mcp-action-schemas.ts`, handle store, pr-check rules, activity provenance badge, job-name lockstep contract test).
+- Phase 1 + 3-UI ([#926](https://github.com/hmpsn/asset-dashboard/pull/926)): shared infra and activity-feed chat badge wiring.
+- Phase 2 ([#929](https://github.com/hmpsn/asset-dashboard/pull/929)): all 10 write tools and server wiring.
+- Phase 3 + 4 (this PR): activity-type correctness fix, stale WS allowlist cleanup, end-to-end integration tests, and final verification/docs closeout.
+
+Final 10 tool set:
 - Shared infra:
   - `server/mcp/json-schema.ts` (`zod-to-json-schema` wrapper for MCP tool/input payload schemas)
   - `server/mcp/paid-call-counter.ts` (soft-cap paid-call warning counter)
@@ -254,13 +260,25 @@ A comprehensive value assessment of every feature in the platform — **450 feat
   - `start_seo_audit`
   - `start_local_seo_refresh`
 - MCP server wiring in `server/mcp/server.ts` now registers and dispatches all three new tool groups.
-- New unit coverage:
+- Coverage:
   - `tests/unit/mcp-paid-call-counter.test.ts`
   - `tests/unit/mcp-tools-keyword.test.ts`
   - `tests/unit/mcp-tools-content.test.ts`
   - `tests/unit/mcp-tools-jobs.test.ts`
+  - `tests/integration/mcp-tools-keyword.test.ts`
+  - `tests/integration/mcp-tools-content.test.ts`
+  - `tests/integration/mcp-tools-jobs.test.ts`
+
+Phase 3 correctness fixes:
+- `send_to_client` brief/post activity types now use `brief_sent_for_review` and `post_sent_for_review` (instead of `brief_generated` / `content_updated`) to align with existing admin route semantics and analytics/test consumers.
+- Post send-to-client request creation now uses an `in_progress` initial state so the subsequent `post_review` transition remains state-machine valid.
+- Removed stale `brief:updated` `KNOWN_CONSTANTS_PENDING_ROUTES` allowlist entry now that MCP `save_brief` broadcasts `WS_EVENTS.BRIEF_UPDATED`.
 
 All persistence paths route through existing domain service functions and pair writes with broadcasts + `addActivity(..., { source: 'mcp-chat' })`, matching the Phase 1 guardrails.
+Reference docs:
+- Spec: `docs/superpowers/specs/2026-05-25-mcp-actions-keyword-and-content-design.md`
+- Audit: `docs/superpowers/audits/2026-05-25-mcp-actions-audit.md`
+- Plans: `docs/superpowers/plans/2026-05-25-mcp-actions-phase-{0,1,2,3-and-4}*.md`
 
 **Agency value:** Lets operators execute high-leverage strategy/content/job actions from chat while preserving existing service-layer contracts, activity provenance, and websocket invalidation behavior.
 

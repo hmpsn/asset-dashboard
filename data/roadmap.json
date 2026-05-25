@@ -528,6 +528,17 @@
           "priority": "P3",
           "status": "done",
           "notes": "Superseded and decomposed by the PR14 local SEO foundation audit. The original broad local SEO intelligence-layer concept is now split into execution-ready roadmap items: `intel-quality-local-pack-visibility-foundation`, `intel-quality-local-seo-reporting-strategy-integration`, `intel-quality-google-business-profile-health`, `intel-quality-google-reviews-local-reputation`, `intel-quality-local-geo-grid-tracking`, and `intel-quality-local-seo-recommendations`. Keeping this item marked done prevents duplicate roadmap selection while preserving the original intent: local SEO should remain posture-aware, optional for non-local workspaces, conservative about match confidence, and integrated through the keyword/intelligence operating loop rather than as one-off city-modifier logic."
+        },
+        {
+          "id": "superpowers-mcp-actions-phase-3-4-finalization",
+          "title": "MCP actions phases 3+4 integration verification closeout",
+          "source": "docs/superpowers/plans/2026-05-25-mcp-actions-phase-3-and-4-integration-and-verification.md",
+          "est": "3-5h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-05-25",
+          "shippedAt": "2026-05-25",
+          "notes": "Completed on 2026-05-25. Closed out MCP actions with end-to-end integration coverage for all 10 tools (`tests/integration/mcp-tools-{keyword,content,jobs}.test.ts`), corrected send-to-client activity typing to `brief_sent_for_review` / `post_sent_for_review`, removed the stale `brief:updated` pending-routes allowlist entry now that MCP save_brief broadcasts it, and fixed post send-to-client request lifecycle typing so creation supports `in_progress` before transitioning to `post_review`. Final verification gate passed: typecheck, pr-check, targeted MCP test suites, and full suite/build in this phase."
         }
       ]
     },

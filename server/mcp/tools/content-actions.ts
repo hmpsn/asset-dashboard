@@ -398,7 +398,7 @@ function ensurePostRequest(workspaceId: string, post: GeneratedPost, note: strin
     source: 'strategy',
     serviceType: 'full_post',
     pageType: 'blog',
-    initialStatus: 'requested',
+    initialStatus: 'in_progress',
     dedupe: false,
     clientNote: note,
   });
@@ -450,8 +450,8 @@ async function handleSendToClient(
       });
       addActivity(
         workspaceId,
-        'brief_generated',
-        `Sent brief "${brief.suggestedTitle}" to client`,
+        'brief_sent_for_review',
+        `Sent brief "${brief.suggestedTitle}" to client for review`,
         `Keyword: ${brief.targetKeyword}`,
         {
           source: 'mcp-chat',
@@ -497,8 +497,8 @@ async function handleSendToClient(
     });
     addActivity(
       workspaceId,
-      'content_updated',
-      `Sent post "${post.title}" to client`,
+      'post_sent_for_review',
+      `Sent post "${post.title}" to client for review`,
       `Keyword: ${post.targetKeyword}`,
       {
         source: 'mcp-chat',

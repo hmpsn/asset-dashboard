@@ -310,9 +310,7 @@ function collectFrontendHandlers(
  * Each entry must have a comment explaining why.
  */
 const KNOWN_UNHANDLED_BROADCASTS = new Set<string>([
-  // Reserved in Phase 0 for upcoming MCP brief workflows; no server
-  // broadcast or frontend handler is intentionally wired yet.
-  'brief:updated',
+  // (intentionally empty)
 ]);
 
 /**
@@ -453,8 +451,8 @@ describe('broadcast ↔ handler pairing audit', () => {
   // ── WS_EVENTS definition coverage ─────────────────────────────────────────
 
   const KNOWN_CONSTANTS_PENDING_ROUTES = new Set<string>([
-    // Reserved in Phase 0 for upcoming MCP brief workflows.
-    'brief:updated',
+    // Intentionally empty: every WS_EVENTS constant is now broadcast
+    // by at least one backend route.
   ]);
 
   it('every WS_EVENTS constant is actually used in a broadcastToWorkspace() call', () => {
