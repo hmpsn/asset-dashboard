@@ -290,7 +290,12 @@ async function handleSavePost(
   const parsed = savePostInputSchema.safeParse(args);
   if (!parsed.success) return zodErrorToMcp(parsed.error);
 
-  const { workspace_id: workspaceId, post_request_handle: postRequestHandle, content } = parsed.data;
+  const {
+    workspace_id: workspaceId,
+    post_request_handle: postRequestHandle,
+    content,
+    parent_request_id: parentRequestIdFromArgs,
+  } = parsed.data;
   const workspace = requireWorkspace(workspaceId);
   if ('isError' in workspace) return workspace;
 
@@ -315,14 +320,16 @@ async function handleSavePost(
     action: 'mcp_post_saved',
   });
 
-  if (payload.parentRequestId) {
+  const parentRequestId = parentRequestIdFromArgs ?? payload.parentRequestId;
+
+  if (parentRequestId) {
     try {
-      updateContentRequest(workspaceId, payload.parentRequestId, {
+      updateContentRequest(workspaceId, parentRequestId, {
         postId: post.id,
         status: 'in_progress',
       });
       broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, {
-        id: payload.parentRequestId,
+        id: parentRequestId,
         action: 'mcp_post_linked',
       });
     } catch (err) {
@@ -340,7 +347,7 @@ async function handleSavePost(
       source: 'mcp-chat',
       postId: post.id,
       briefId: post.briefId,
-      parentRequestId: payload.parentRequestId,
+      parentRequestId,
       action: 'mcp_post_saved',
     },
   );
@@ -348,7 +355,7 @@ async function handleSavePost(
   const postHandle = issueHandle('post', workspaceId, {
     postId: post.id,
     briefId: post.briefId,
-    parentRequestId: payload.parentRequestId,
+    parentRequestId,
   } satisfies PostSavedPayload);
 
   return mcpSuccess({
@@ -472,6 +479,7 @@ async function handleSendToClient(
 
     if (requestId === payload.parentRequestId) {
       updateContentRequest(workspaceId, requestId, {
+        briefId: post.briefId,
         postId: post.id,
         status: 'post_review',
         internalNote: note,

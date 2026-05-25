@@ -115,10 +115,7 @@ describe('mcp job action tools', () => {
     });
 
     expect(result.isError).toBe(true);
-    expect(createJob).not.toHaveBeenCalledWith(
-      BACKGROUND_JOB_TYPES.SEO_AUDIT,
-      expect.anything(),
-    );
+    expect(createJob).not.toHaveBeenCalled();
   });
 
   it('start_local_seo_refresh creates a local-seo-refresh job and runs worker', async () => {

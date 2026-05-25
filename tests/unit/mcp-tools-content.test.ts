@@ -213,6 +213,78 @@ describe('mcp content action tools', () => {
     expect(savePost).not.toHaveBeenCalled();
   });
 
+  it('save_post accepts parent_request_id and post send_to_client updates parent request', async () => {
+    (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'brief_1',
+      workspaceId: 'ws-1',
+      targetKeyword: 'hvac',
+    });
+    const prepared = await handleContentActionTool('prepare_post_context', {
+      workspace_id: 'ws-1',
+      brief_id: 'brief_1',
+    });
+    const preparedPayload = JSON.parse(prepared.content[0].text) as { post_request_handle: string };
+
+    const saved = await handleContentActionTool('save_post', {
+      workspace_id: 'ws-1',
+      post_request_handle: preparedPayload.post_request_handle,
+      parent_request_id: 'cr_parent_post',
+      content: {
+        briefId: 'brief_1',
+        targetKeyword: 'hvac',
+        title: 'Post title',
+        metaDescription: 'Meta',
+        introduction: '<p>Intro</p>',
+        sections: [
+          {
+            index: 0,
+            heading: 'H2',
+            content: '<p>Body</p>',
+            wordCount: 100,
+            targetWordCount: 120,
+            keywords: ['hvac'],
+            status: 'done',
+          },
+        ],
+        conclusion: '<p>End</p>',
+        totalWordCount: 1000,
+        targetWordCount: 1200,
+      },
+    });
+    const savedPayload = JSON.parse(saved.content[0].text) as { post_id: string; post_handle: string };
+    (getPost as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: savedPayload.post_id,
+      workspaceId: 'ws-1',
+      briefId: 'brief_1',
+      targetKeyword: 'hvac',
+      title: 'Post title',
+    });
+    (getContentRequest as ReturnType<typeof vi.fn>).mockReturnValueOnce({ id: 'cr_parent_post' });
+
+    const result = await handleContentActionTool('send_to_client', {
+      workspace_id: 'ws-1',
+      post_handle: savedPayload.post_handle,
+      note: 'Ready for client',
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(createContentRequest).not.toHaveBeenCalled();
+    expect(updateContentRequest).toHaveBeenCalledWith(
+      'ws-1',
+      'cr_parent_post',
+      expect.objectContaining({
+        briefId: 'brief_1',
+        postId: savedPayload.post_id,
+        status: 'post_review',
+      }),
+    );
+    expect(broadcastToWorkspace).toHaveBeenCalledWith(
+      'ws-1',
+      'content-request:update',
+      expect.objectContaining({ id: 'cr_parent_post' }),
+    );
+  });
+
   it('send_to_client from brief handle creates a request', async () => {
     const prepared = await handleContentActionTool('prepare_brief_context', {
       workspace_id: 'ws-1',
