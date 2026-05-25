@@ -57,6 +57,13 @@ vi.mock('../../server/workspaces.js', async (importOriginal) => {
   };
 });
 
+// local-seo.ts uses eager db.prepare() calls that require local_seo_markets.is_primary.
+// The test doesn't exercise local SEO — resolveWorkspaceLocationCode only passes a location
+// code to the already-mocked getKeywordMetrics, so null is the correct stub value.
+vi.mock('../../server/local-seo.js', () => ({
+  resolveWorkspaceLocationCode: vi.fn(() => null),
+}));
+
 const baseContext = {
   intelligence: {
     version: 1 as const,
