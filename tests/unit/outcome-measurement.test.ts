@@ -32,7 +32,7 @@ vi.mock('../../server/ws-events.js', () => ({
   WS_EVENTS: { OUTCOME_SCORED: 'outcome_scored' },
 }));
 
-import { computeDelta, scoreOutcome, isDueForCheckpoint } from '../../server/outcome-measurement.js';
+import { computeDelta, scoreOutcome, isDueForCheckpoint, resolveFullPageUrl } from '../../server/outcome-measurement.js';
 import { getOutcomesForAction } from '../../server/outcome-tracking.js';
 import type { BaselineSnapshot, TrackedAction, DeltaSummary, ScoringConfig } from '../../shared/types/outcome-tracking.js';
 
@@ -120,6 +120,28 @@ function makeClicksConfig(): ScoringConfig {
     },
   };
 }
+
+describe('resolveFullPageUrl', () => {
+  it('returns absolute URL unchanged', () => {
+    const page = 'https://example.com/blog/post';
+    expect(resolveFullPageUrl(page, { liveDomain: 'example.com' })).toBe(page);
+  });
+
+  it('resolves relative URL against liveDomain when liveDomain lacks scheme', () => {
+    expect(resolveFullPageUrl('/blog/post', { liveDomain: 'example.com' }))
+      .toBe('https://example.com/blog/post');
+  });
+
+  it('resolves relative URL against liveDomain when liveDomain has scheme', () => {
+    expect(resolveFullPageUrl('blog/post', { liveDomain: 'https://example.com' }))
+      .toBe('https://example.com/blog/post');
+  });
+
+  it('does not use sc-domain property as URL base when liveDomain is missing', () => {
+    expect(resolveFullPageUrl('/blog/post', { gscPropertyUrl: 'sc-domain:example.com' }))
+      .toBe('/blog/post');
+  });
+});
 
 // --- computeDelta ---
 
