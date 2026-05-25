@@ -11,6 +11,7 @@ interface ActivityEntry {
   title: string;
   description?: string;
   createdAt: string;
+  metadata?: Record<string, unknown>;
 }
 
 const ICON_MAP: Record<string, typeof Activity> = {

@@ -170,6 +170,7 @@ const CONTEXT_BY_EVENT_KEY: Record<WsEventKey, BoundedContextId> = {
   CONTENT_REQUEST_CREATED: 'content-pipeline',
   CONTENT_REQUEST_UPDATE: 'content-pipeline',
   CONTENT_UPDATED: 'content-pipeline',
+  BRIEF_UPDATED: 'content-pipeline',
   ACTIVITY_NEW: 'platform-foundation',
   AUDIT_COMPLETE: 'seo-health',
   WORK_ORDER_UPDATE: 'inbox',
