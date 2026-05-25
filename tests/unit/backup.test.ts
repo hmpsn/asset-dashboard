@@ -371,6 +371,16 @@ describe('server/backup behavior', () => {
     expect(mocks.dbExec).toHaveBeenCalledTimes(2);
   });
 
+  it('startBackupScheduler is idempotent across duplicate startup calls', async () => {
+    const backup = await import('../../server/backup.js');
+
+    backup.startBackupScheduler();
+    backup.startBackupScheduler();
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(mocks.dbExec).toHaveBeenCalledTimes(1);
+  });
+
   it('runBackup with S3 bucket uploads archive and attempts prune via S3 client commands', async () => {
     process.env.BACKUP_S3_BUCKET = 'bucket-test';
     process.env.BACKUP_S3_REGION = 'us-west-2';
