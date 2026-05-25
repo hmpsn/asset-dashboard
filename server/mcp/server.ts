@@ -11,6 +11,9 @@ import { intelligenceTools, handleIntelligenceTool } from './tools/intelligence.
 import { insightTools, handleInsightTool } from './tools/insights.js';
 import { contentTools, handleContentTool } from './tools/content.js';
 import { clientTools, handleClientTool } from './tools/clients.js';
+import { keywordActionTools, handleKeywordActionTool } from './tools/keyword-actions.js';
+import { contentActionTools, handleContentActionTool } from './tools/content-actions.js';
+import { jobActionTools, handleJobActionTool } from './tools/job-actions.js';
 
 const log = createLogger('mcp-server');
 
@@ -20,6 +23,9 @@ const ALL_TOOLS = [
   ...insightTools,
   ...contentTools,
   ...clientTools,
+  ...keywordActionTools,
+  ...contentActionTools,
+  ...jobActionTools,
 ];
 
 // Factory: create a fresh Server + Transport per request.
@@ -56,6 +62,15 @@ function createMcpServer() {
     }
     if (clientTools.some(t => t.name === name)) {
       return handleClientTool(name, safeArgs);
+    }
+    if (keywordActionTools.some(t => t.name === name)) {
+      return handleKeywordActionTool(name, safeArgs);
+    }
+    if (contentActionTools.some(t => t.name === name)) {
+      return handleContentActionTool(name, safeArgs);
+    }
+    if (jobActionTools.some(t => t.name === name)) {
+      return handleJobActionTool(name, safeArgs);
     }
 
     return {
