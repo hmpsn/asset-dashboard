@@ -320,10 +320,10 @@ describe('src/lib/decision-adapters — normalizeClientAction', () => {
     expect(result.badge).toBe('AEO');
   });
 
-  it('falls back to humanized sourceType for unknown type', () => {
+  it('falls back to generic SEO Update label for unknown type', () => {
     const action = { ...baseAction, sourceType: 'custom_type' as never };
     const result = normalizeClientAction(action);
-    expect(result.badge).toBe('custom type');
+    expect(result.badge).toBe('SEO Update');
   });
 });
 
