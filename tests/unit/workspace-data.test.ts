@@ -72,6 +72,50 @@ describe('getWorkspacePages', () => {
     await getWorkspacePages('ws-2', 'site-2');
     expect(mockListPages).toHaveBeenCalledTimes(2); // ws-2 cache hit
   });
+
+  it('returns stale cached pages when refresh fails after TTL expiry (regression)', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-25T12:00:00.000Z'));
+
+    mockListPages.mockResolvedValueOnce([
+      { id: 'p1', title: 'Home', slug: 'home' },
+      { id: 'p2', title: 'About', slug: 'about' },
+    ] as any);
+
+    const first = await getWorkspacePages('ws-1', 'site-1');
+    expect(first.map((p: any) => p.id)).toEqual(['p1', 'p2']);
+
+    // Past PAGE_CACHE_TTL (10m) but within LRU max staleness (24h).
+    vi.advanceTimersByTime(10 * 60 * 1000 + 1);
+    mockListPages.mockRejectedValueOnce(new Error('webflow transient outage'));
+
+    const second = await getWorkspacePages('ws-1', 'site-1');
+    expect(second.map((p: any) => p.id)).toEqual(['p1', 'p2']);
+    expect(mockListPages).toHaveBeenCalledTimes(2);
+
+    vi.useRealTimers();
+  });
+
+  it('does not repopulate cache from an in-flight fetch invalidated mid-request', async () => {
+    let resolveFetch: ((pages: any[]) => void) | null = null;
+    mockListPages.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveFetch = resolve;
+        }) as any,
+    );
+
+    const inflight = getWorkspacePages('ws-1', 'site-1');
+    invalidatePageCache('ws-1');
+    resolveFetch?.([{ id: 'p-stale', title: 'Stale', slug: 'stale' }]);
+    const first = await inflight;
+    expect(first).toEqual([{ id: 'p-stale', title: 'Stale', slug: 'stale' }]);
+
+    mockListPages.mockResolvedValueOnce([{ id: 'p-fresh', title: 'Fresh', slug: 'fresh' }] as any);
+    const second = await getWorkspacePages('ws-1', 'site-1');
+    expect(second).toEqual([{ id: 'p-fresh', title: 'Fresh', slug: 'fresh' }]);
+    expect(mockListPages).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('getWorkspaceAllPages', () => {
