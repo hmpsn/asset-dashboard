@@ -452,10 +452,10 @@ describe('broadcast ↔ handler pairing audit', () => {
 
   // ── WS_EVENTS definition coverage ─────────────────────────────────────────
 
-const KNOWN_CONSTANTS_PENDING_ROUTES = new Set<string>([
-  // Intentionally empty: every WS_EVENTS constant is now broadcast
-  // by at least one backend route.
-]);
+  const KNOWN_CONSTANTS_PENDING_ROUTES = new Set<string>([
+    // Intentionally empty: every WS_EVENTS constant is now broadcast
+    // by at least one backend route.
+  ]);
 
   it('every WS_EVENTS constant is actually used in a broadcastToWorkspace() call', () => {
     const definedValues = [...serverWsEventsMap.values()];
