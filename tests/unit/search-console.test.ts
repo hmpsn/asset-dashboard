@@ -26,6 +26,7 @@ describe('search-console behavior', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it('returns null from inspectUrlForRichResults when OAuth token is unavailable', async () => {
@@ -92,6 +93,24 @@ describe('search-console behavior', () => {
     ).rejects.toThrow('GSC URL Inspection authentication error (403): forbidden');
   });
 
+  it('treats non-auth 4xx inspection errors as soft-unavailable and logs warning', async () => {
+    mocks.getValidToken.mockResolvedValue('token');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        text: vi.fn().mockResolvedValue('not found'),
+      }),
+    );
+
+    const { inspectUrlForRichResults } = await import('../../server/search-console.js');
+    const result = await inspectUrlForRichResults('site-1', 'https://example.com/a', 'sc-domain:example.com');
+
+    expect(result).toBeNull();
+    expect(mocks.loggerWarn).toHaveBeenCalled();
+  });
+
   it('builds previous-period dates from custom dateRange length when custom range is supplied', async () => {
     mocks.getValidToken.mockResolvedValue('token');
 
@@ -141,6 +160,52 @@ describe('search-console behavior', () => {
     expect(result.current.clicks).toBe(100);
     expect(result.previous.clicks).toBe(100);
     expect(result.changePercent.clicks).toBe(0);
+  });
+
+  it('falls back to default delayed date window when custom dateRange is malformed', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-25T12:00:00.000Z'));
+
+    mocks.getValidToken.mockResolvedValue('token');
+    const requestBodies: Array<Record<string, unknown>> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async (_url: string, opts?: RequestInit) => {
+        const body = JSON.parse(String(opts?.body ?? '{}')) as Record<string, unknown>;
+        requestBodies.push(body);
+        return {
+          ok: true,
+          json: async () => ({
+            rows: [
+              {
+                keys: [],
+                clicks: 10,
+                impressions: 100,
+                ctr: 0.1,
+                position: 5,
+              },
+            ],
+          }),
+        };
+      }),
+    );
+
+    const { getSearchPeriodComparison } = await import('../../server/search-console.js');
+
+    const result = await getSearchPeriodComparison('site-1', 'sc-domain:example.com', 28, {
+      startDate: 'bad-start',
+      endDate: 'bad-end',
+    });
+
+    expect(result.current.clicks).toBe(10);
+    expect(requestBodies[0]).toMatchObject({
+      startDate: '2026-04-24',
+      endDate: '2026-05-22',
+    });
+    expect(requestBodies[1]).toMatchObject({
+      startDate: '2026-03-26',
+      endDate: '2026-04-23',
+    });
   });
 
   it('continues search-type breakdown when one type fetch fails', async () => {

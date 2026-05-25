@@ -723,7 +723,17 @@ export async function inspectUrlForRichResults(
 
 /** Shared date range helper (GSC has ~3 day data delay) */
 export function gscDateRange(days: number, dateRange?: CustomDateRange) {
-  if (dateRange) return { startDate: dateRange.startDate, endDate: dateRange.endDate };
+  if (dateRange) {
+    const start = new Date(`${dateRange.startDate}T00:00:00.000Z`);
+    const end = new Date(`${dateRange.endDate}T00:00:00.000Z`);
+    if (
+      Number.isFinite(start.getTime()) &&
+      Number.isFinite(end.getTime()) &&
+      end.getTime() >= start.getTime()
+    ) {
+      return { startDate: dateRange.startDate, endDate: dateRange.endDate };
+    }
+  }
   const endDate = new Date();
   endDate.setDate(endDate.getDate() - 3);
   const startDate = new Date(endDate);
@@ -966,7 +976,7 @@ export async function getSearchPeriodComparison(
   const periodDays = Math.max(1, derivedPeriodDays);
 
   // Previous period: shift by the actual current window length (custom ranges included).
-  const prevEnd = new Date(curStart);
+  const prevEnd = new Date(`${curStart}T00:00:00.000Z`);
   prevEnd.setDate(prevEnd.getDate() - 1);
   const prevStart = new Date(prevEnd);
   prevStart.setDate(prevStart.getDate() - periodDays + 1);

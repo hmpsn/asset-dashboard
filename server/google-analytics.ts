@@ -135,6 +135,16 @@ function dateStr(daysAgo: number): string {
 
 export type CustomDateRange = AnalyticsDateRange;
 
+function parseIntSafe(value: string | undefined): number {
+  const parsed = Number.parseInt(value ?? '', 10);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function parseFloatSafe(value: string | undefined): number {
+  const parsed = Number.parseFloat(value ?? '');
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 /**
  * Get overview metrics for a GA4 property.
  */
@@ -157,15 +167,15 @@ export async function getGA4Overview(propertyId: string, days: number = 28, date
   };
 
   const row = data.rows?.[0]?.metricValues;
-  const totalUsers = parseInt(row?.[0]?.value || '0');
-  const newUsers = parseInt(row?.[5]?.value || '0');
+  const totalUsers = parseIntSafe(row?.[0]?.value);
+  const newUsers = parseIntSafe(row?.[5]?.value);
 
   return {
     totalUsers,
-    totalSessions: parseInt(row?.[1]?.value || '0'),
-    totalPageviews: parseInt(row?.[2]?.value || '0'),
-    avgSessionDuration: parseFloat(row?.[3]?.value || '0'),
-    bounceRate: parseFloat(parseFloat(row?.[4]?.value || '0').toFixed(1)),
+    totalSessions: parseIntSafe(row?.[1]?.value),
+    totalPageviews: parseIntSafe(row?.[2]?.value),
+    avgSessionDuration: parseFloatSafe(row?.[3]?.value),
+    bounceRate: parseFloat(parseFloatSafe(row?.[4]?.value).toFixed(1)),
     newUserPercentage: totalUsers > 0 ? parseFloat(((newUsers / totalUsers) * 100).toFixed(1)) : 0,
     dateRange: { start: startDate, end: endDate },
   };
@@ -657,12 +667,23 @@ export async function getGA4PeriodComparison(
   days: number = 28,
   dateRange?: CustomDateRange,
 ): Promise<GA4PeriodComparison> {
-  const curStart = dateRange?.startDate || dateStr(days);
-  const curEnd = dateRange?.endDate || dateStr(1);
+  let curStart = dateRange?.startDate || dateStr(days);
+  let curEnd = dateRange?.endDate || dateStr(1);
+  const curStartDate = new Date(`${curStart}T00:00:00.000Z`);
+  const curEndDate = new Date(`${curEnd}T00:00:00.000Z`);
+  if (
+    !Number.isFinite(curStartDate.getTime()) ||
+    !Number.isFinite(curEndDate.getTime()) ||
+    curEndDate.getTime() < curStartDate.getTime()
+  ) {
+    curStart = dateStr(days);
+    curEnd = dateStr(1);
+  }
+
   // Compute previous period from the span of the current period
-  const curSpanMs = new Date(curEnd).getTime() - new Date(curStart).getTime();
-  const curSpanDays = Math.round(curSpanMs / (1000 * 60 * 60 * 24));
-  const prevEnd = new Date(curStart); prevEnd.setDate(prevEnd.getDate() - 1);
+  const curSpanMs = new Date(`${curEnd}T00:00:00.000Z`).getTime() - new Date(`${curStart}T00:00:00.000Z`).getTime();
+  const curSpanDays = Math.max(1, Math.round(curSpanMs / (1000 * 60 * 60 * 24)) + 1);
+  const prevEnd = new Date(`${curStart}T00:00:00.000Z`); prevEnd.setDate(prevEnd.getDate() - 1);
   const prevStart = new Date(prevEnd); prevStart.setDate(prevStart.getDate() - curSpanDays + 1);
   const fmtD = (d: Date) => d.toISOString().split('T')[0];
 
