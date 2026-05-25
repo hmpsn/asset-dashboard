@@ -3,7 +3,7 @@ import { createTestContext } from './helpers.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 
 const MCP_TEST_KEY = 'test-mcp-key-content';
-const ctx = createTestContext(13701, {
+const ctx = createTestContext(13704, {
   env: { MCP_API_KEY: MCP_TEST_KEY },
 });
 
