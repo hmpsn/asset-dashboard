@@ -282,6 +282,43 @@ describe('OverviewTab — primary CTA banners', () => {
   });
 });
 
+describe('OverviewTab — metrics grid classes', () => {
+  it('uses static 5-column class mapping for the largest metrics layout', () => {
+    render(
+      <OverviewTab
+        {...baseProps}
+        ga4Overview={{
+          totalUsers: 1200,
+          totalSessions: 1800,
+          dateRange: { start: '2026-05-01', end: '2026-05-31' },
+        } as never}
+        overview={{
+          totalClicks: 640,
+          totalImpressions: 12200,
+          avgPosition: 12.5,
+          avgCtr: 0.052,
+          dateRange: null,
+        } as never}
+        strategyData={{
+          pageMap: [{ pagePath: '/services', currentPosition: 7.2 }],
+        } as never}
+        audit={{ id: 'a-grid', createdAt: '2026-05-01', siteScore: 88, totalPages: 25, errors: 2, warnings: 4 }}
+      />,
+    );
+
+    const visitors = screen.getByText('Visitors');
+    let el: HTMLElement | null = visitors.parentElement;
+    while (el && (!el.className.includes('grid') || !el.className.includes('gap-3'))) {
+      el = el.parentElement;
+    }
+
+    expect(el).not.toBeNull();
+    expect(el!.className).toContain('grid-cols-2');
+    expect(el!.className).toContain('sm:grid-cols-3');
+    expect(el!.className).toContain('lg:grid-cols-5');
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('OverviewTab — activity log', () => {

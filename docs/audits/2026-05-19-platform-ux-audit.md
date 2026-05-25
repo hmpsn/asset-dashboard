@@ -73,7 +73,7 @@
 - **Area:** Client Dashboard UX
 - **Files:** `src/components/client/ROIDashboard.tsx:98`
 - **Issue:** Error message: *"ROI data requires a keyword strategy with CPC data. Run a strategy with SEMRush enrichment to unlock this."* Vendor names must never appear in client-facing UI. No upgrade CTA or retry button — pure dead end.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -81,7 +81,7 @@
 - **Area:** Client Dashboard UX
 - **Files:** `src/components/client/InboxTab.tsx:643`
 - **Issue:** Action badge renders `action.sourceType.replace(/_/g, ' ')` directly — clients see `"content decay"`, `"keyword opportunity"`, etc. These are internal type names with no client meaning.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -91,7 +91,7 @@
 - **Issue:**
   - `InsightFeedItem` constructs `` `/ws/${workspaceId}/diagnostics?report=${report.id}` `` — bypasses `adminPath()`
   - `WorkspaceHome` constructs `` `/client/${workspaceId}/roi` `` — admin component navigating to client portal silently drops `betaMode`
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -99,7 +99,7 @@
 - **Area:** Client Dashboard UX
 - **Files:** `src/components/client/OverviewTab.tsx:342`
 - **Issue:** `` `grid-cols-${totalItems}` `` — Tailwind purges dynamic class strings not present as static strings elsewhere. If `grid-cols-3`, `grid-cols-4`, etc. aren't used statically in the bundle, the production build emits invalid CSS for those column counts.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 

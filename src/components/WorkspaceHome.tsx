@@ -18,7 +18,7 @@ import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useAuditSummary } from '../hooks/useAuditSummary';
 import { AnomalyAlerts } from './AnomalyAlerts';
 import { SeoWorkStatus, ActivityFeed, RankingsSnapshot, ActiveRequestsAnnotations, SeoChangeImpact, WeeklyAccomplishments } from './workspace-home';
-import { type Page, adminPath } from '../routes';
+import { type Page, adminPath, clientPath } from '../routes';
 import { useWorkspaceHomeData, useAdminROI, useWorkspaceIntelligence } from '../hooks/admin';
 import { queryKeys } from '../lib/queryKeys';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
@@ -442,7 +442,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             icon={DollarSign}
             iconColor="#22c55e"
             sub={`≈ $${fmt(roiData.adSpendEquivalent)} ad spend`}
-            onClick={() => navigate(`/client/${workspaceId}/roi`)}
+            onClick={() => navigate(clientPath(workspaceId, 'roi'))}
             size="hero"
             staggerIndex={4}
           />
