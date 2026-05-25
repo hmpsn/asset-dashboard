@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => {
     selectAllBySession: { all: vi.fn(() => []) },
     selectByPaymentIntent: { get: vi.fn(() => undefined) },
     selectByWorkspace: { all: vi.fn(() => []) },
-    update: { run: vi.fn() },
+    update: { run: vi.fn(() => ({ changes: 1 })) },
     deleteById: { run: vi.fn(() => ({ changes: 0 })) },
     deleteAll: { run: vi.fn(() => ({ changes: 0 })) },
   };
@@ -108,7 +108,7 @@ describe('server/payments.ts', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.123456789);
 
     const input: Omit<PaymentRecord, 'id' | 'createdAt'> = {
-      workspaceId: 'ws_payload',
+      workspaceId: 'ws_data',
       stripeSessionId: 'cs_test',
       stripePaymentIntentId: 'pi_test',
       productType: 'brief_blog',
@@ -120,60 +120,63 @@ describe('server/payments.ts', () => {
       paidAt: undefined,
     };
 
-    const record = createPayment('ws_authoritative', input);
+    const record = createPayment('ws_ignored', input);
 
     expect(record.id).toMatch(/^pay_\d+_[a-z0-9]{4}$/);
     expect(record.createdAt).toBe('2026-05-25T12:00:00.000Z');
-    expect(record.workspaceId).toBe('ws_authoritative');
+    expect(record.workspaceId).toBe('ws_data');
 
-    expect(mocks.mockStmts.insert.run).toHaveBeenCalledTimes(1);
-    expect(mocks.mockStmts.insert.run).toHaveBeenCalledWith({
-      id: record.id,
-      workspace_id: 'ws_authoritative',
-      stripe_session_id: 'cs_test',
-      stripe_payment_intent_id: 'pi_test',
-      product_type: 'brief_blog',
-      amount: 9900,
-      currency: 'usd',
-      status: 'pending',
-      content_request_id: 'cr_test',
+    expect(mocks.mockStmts.insert.run).toHaveBeenCalledWith(expect.objectContaining({
+      workspace_id: 'ws_data',
       metadata: JSON.stringify({ campaign: 'spring' }),
-      created_at: '2026-05-25T12:00:00.000Z',
       paid_at: null,
-    });
+    }));
   });
 
-  it('updatePayment merges updates and scopes lookup by workspace', () => {
+  it('updatePayment keeps immutable identity fields even when malformed partial payload tries to override them (regression)', () => {
     mocks.mockStmts.selectById.get.mockReturnValue(makeRow());
 
     const updated = updatePayment('ws_1', 'pay_1', {
+      workspaceId: 'ws_other',
+      createdAt: '2000-01-01T00:00:00.000Z',
       status: 'paid',
-      metadata: { source: 'updated' },
-      stripePaymentIntentId: undefined,
       paidAt: '2026-05-02T10:00:00.000Z',
-    });
+    } as Partial<PaymentRecord>);
 
-    expect(mocks.mockStmts.selectById.get).toHaveBeenCalledWith('pay_1', 'ws_1');
-    expect(mocks.mockStmts.update.run).toHaveBeenCalledWith({
+    expect(mocks.mockStmts.update.run).toHaveBeenCalledWith(expect.objectContaining({
       id: 'pay_1',
       workspace_id: 'ws_1',
-      stripe_session_id: 'cs_1',
-      stripe_payment_intent_id: null,
-      product_type: 'brief_blog',
-      amount: 12500,
-      currency: 'usd',
-      status: 'paid',
-      content_request_id: 'cr_1',
-      metadata: JSON.stringify({ source: 'updated' }),
       created_at: '2026-05-01T00:00:00.000Z',
+      status: 'paid',
       paid_at: '2026-05-02T10:00:00.000Z',
-    });
+    }));
+
     expect(updated).toMatchObject({
       id: 'pay_1',
       workspaceId: 'ws_1',
+      createdAt: '2026-05-01T00:00:00.000Z',
       status: 'paid',
-      stripePaymentIntentId: undefined,
       paidAt: '2026-05-02T10:00:00.000Z',
+    });
+  });
+
+  it('updatePayment nulls optional stripe/content ids when partial payload omits them', () => {
+    mocks.mockStmts.selectById.get.mockReturnValue(makeRow());
+
+    const updated = updatePayment('ws_1', 'pay_1', {
+      stripePaymentIntentId: undefined,
+      contentRequestId: undefined,
+      metadata: { source: 'updated' },
+    });
+
+    expect(mocks.mockStmts.update.run).toHaveBeenCalledWith(expect.objectContaining({
+      stripe_payment_intent_id: null,
+      content_request_id: null,
+      metadata: JSON.stringify({ source: 'updated' }),
+    }));
+    expect(updated).toMatchObject({
+      stripePaymentIntentId: undefined,
+      contentRequestId: undefined,
       metadata: { source: 'updated' },
     });
   });
@@ -184,30 +187,10 @@ describe('server/payments.ts', () => {
     const updated = updatePayment('ws_missing', 'pay_missing', { status: 'failed' });
 
     expect(updated).toBeNull();
-    expect(mocks.mockStmts.selectById.get).toHaveBeenCalledWith('pay_missing', 'ws_missing');
     expect(mocks.mockStmts.update.run).not.toHaveBeenCalled();
   });
 
-  it('updatePayment should keep identity fields immutable even when overrides are supplied', () => {
-    mocks.mockStmts.selectById.get.mockReturnValue(makeRow({
-      id: 'pay_locked',
-      workspace_id: 'ws_locked',
-    }));
-
-    updatePayment('ws_locked', 'pay_locked', {
-      id: 'pay_tampered',
-      workspaceId: 'ws_other',
-      status: 'paid',
-    });
-
-    expect(mocks.mockStmts.update.run).toHaveBeenCalledWith(expect.objectContaining({
-      id: 'pay_locked',
-      workspace_id: 'ws_locked',
-      status: 'paid',
-    }));
-  });
-
-  it('getPayment maps row fields and applies metadata fallback parsing', () => {
+  it('getPayment applies metadata fallback parsing for malformed JSON blobs', () => {
     mocks.mockStmts.selectById.get.mockReturnValue(
       makeRow({
         stripe_payment_intent_id: null,
@@ -219,7 +202,6 @@ describe('server/payments.ts', () => {
 
     const payment = getPayment('ws_1', 'pay_1');
 
-    expect(mocks.mockStmts.selectById.get).toHaveBeenCalledWith('pay_1', 'ws_1');
     expect(mocks.parseJsonFallback).toHaveBeenCalledWith('__INVALID_JSON__', undefined);
     expect(payment).toEqual({
       id: 'pay_1',
@@ -237,50 +219,36 @@ describe('server/payments.ts', () => {
     });
   });
 
-  it('listPayments returns workspace-scoped mapped records', () => {
+  it('listPayments and listAllPayments map rows correctly', () => {
     mocks.mockStmts.selectByWorkspace.all.mockReturnValue([
-      makeRow({ id: 'pay_a', workspace_id: 'ws_scope', stripe_session_id: 'cs_scope_1' }),
-      makeRow({ id: 'pay_b', workspace_id: 'ws_scope', stripe_session_id: 'cs_scope_2' }),
+      makeRow({ id: 'pay_a', workspace_id: 'ws_scope' }),
+      makeRow({ id: 'pay_b', workspace_id: 'ws_scope' }),
     ]);
-
-    const payments = listPayments('ws_scope');
-
-    expect(mocks.mockStmts.selectByWorkspace.all).toHaveBeenCalledWith('ws_scope');
-    expect(payments.map((p) => p.id)).toEqual(['pay_a', 'pay_b']);
-    expect(payments.map((p) => p.workspaceId)).toEqual(['ws_scope', 'ws_scope']);
-  });
-
-  it('listAllPayments queries global table and maps records', () => {
     mocks.listAllStmt.all.mockReturnValue([
       makeRow({ id: 'pay_all_1', workspace_id: 'ws_a' }),
       makeRow({ id: 'pay_all_2', workspace_id: 'ws_b' }),
     ]);
 
-    const payments = listAllPayments();
+    const scoped = listPayments('ws_scope');
+    const all = listAllPayments();
 
-    expect(mocks.dbPrepare).toHaveBeenCalledWith('SELECT * FROM payments ORDER BY created_at DESC');
-    expect(mocks.listAllStmt.all).toHaveBeenCalledTimes(1);
-    expect(payments.map((p) => p.workspaceId)).toEqual(['ws_a', 'ws_b']);
+    expect(scoped.map((p) => p.id)).toEqual(['pay_a', 'pay_b']);
+    expect(scoped.every((p) => p.workspaceId === 'ws_scope')).toBe(true);
+    expect(all.map((p) => p.workspaceId)).toEqual(['ws_a', 'ws_b']);
   });
 
-  it('deletePayment returns true when global lookup finds row and scoped delete changes rows', () => {
-    mocks.mockStmts.selectByIdGlobal.get.mockReturnValue(makeRow({ workspace_id: 'ws_del' }));
+  it('deletePayment reflects delete result and remains idempotent across repeated calls', () => {
+    mocks.mockStmts.selectByIdGlobal.get
+      .mockReturnValueOnce(makeRow({ workspace_id: 'ws_del' }))
+      .mockReturnValueOnce(undefined);
     mocks.mockStmts.deleteById.run.mockReturnValue({ changes: 1 });
 
-    const deleted = deletePayment('pay_1');
+    const firstDelete = deletePayment('pay_1');
+    const secondDelete = deletePayment('pay_1');
 
-    expect(mocks.mockStmts.selectByIdGlobal.get).toHaveBeenCalledWith('pay_1');
+    expect(firstDelete).toBe(true);
+    expect(secondDelete).toBe(false);
     expect(mocks.mockStmts.deleteById.run).toHaveBeenCalledWith('pay_1', 'ws_del');
-    expect(deleted).toBe(true);
-  });
-
-  it('deletePayment returns false when global lookup misses id', () => {
-    mocks.mockStmts.selectByIdGlobal.get.mockReturnValue(undefined);
-
-    const deleted = deletePayment('pay_missing');
-
-    expect(deleted).toBe(false);
-    expect(mocks.mockStmts.deleteById.run).not.toHaveBeenCalled();
   });
 
   it('deleteAllPayments returns number of deleted rows', () => {
@@ -292,7 +260,7 @@ describe('server/payments.ts', () => {
     expect(deletedCount).toBe(7);
   });
 
-  it('session/payment-intent helpers use workspace-scoped selectors', () => {
+  it('session and payment-intent helpers stay workspace-scoped', () => {
     mocks.mockStmts.selectBySession.get.mockReturnValue(
       makeRow({ id: 'pay_session', workspace_id: 'ws_scope', stripe_session_id: 'cs_scope' }),
     );

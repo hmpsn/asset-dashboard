@@ -175,17 +175,28 @@ export function backfillCompletedRecommendations(workspaceId: string): number {
 
   for (const rec of completed) {
     try {
-      const existing = getActionBySource('recommendation', rec.id);
+      const recId = typeof rec.id === 'string' ? rec.id.trim() : '';
+      if (!recId) {
+        log.warn(
+          { workspaceId, rec },
+          'Skipping malformed completed recommendation during backfill (missing id)',
+        );
+        continue;
+      }
+
+      const existing = getActionBySource('recommendation', recId);
       if (existing) continue;
 
-      const firstAffectedPage = rec.affectedPages?.[0] ?? null;
+      const firstAffectedPage = Array.isArray(rec.affectedPages)
+        ? rec.affectedPages.find((page): page is string => typeof page === 'string' && page.trim().length > 0) ?? null
+        : null;
 
       if (workspaceId) {
         recordAction({ // recordAction-ok: workspaceId guarded by if (workspaceId)
           workspaceId,
           actionType: 'audit_fix_applied',
           sourceType: 'recommendation',
-          sourceId: rec.id,
+          sourceId: recId,
           pageUrl: firstAffectedPage,
           targetKeyword: null,
           baselineSnapshot: {

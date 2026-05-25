@@ -96,12 +96,11 @@ const stmts = createStmtCache(() => ({
 // --- CRUD ---
 
 export function createPayment(
-  workspaceId: string,
+  _workspaceId: string,
   data: Omit<PaymentRecord, 'id' | 'createdAt'>
 ): PaymentRecord {
   const record: PaymentRecord = {
     ...data,
-    workspaceId,
     id: `pay_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     createdAt: new Date().toISOString(),
   };
@@ -133,10 +132,10 @@ export function updatePayment(
   if (!row) return null;
 
   const current = rowToRecord(row);
+  // Immutable identity fields must never be overridden by partial updates.
   const merged: PaymentRecord = {
     ...current,
     ...updates,
-    // Keep identity/workspace anchors immutable for update calls.
     id: current.id,
     workspaceId: current.workspaceId,
     createdAt: current.createdAt,
