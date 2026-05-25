@@ -18,6 +18,7 @@ const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // every 6 hours
 const REMINDER_DAYS = [4, 1]; // days before expiry to send reminders
 
 let interval: ReturnType<typeof setInterval> | null = null;
+let startupTimeout: ReturnType<typeof setTimeout> | null = null;
 
 
 async function checkTrialExpiry() {
@@ -71,10 +72,11 @@ async function checkTrialExpiry() {
 }
 
 export function startTrialReminders() {
-  if (interval) return;
+  if (interval || startupTimeout) return;
 
   // Check 90s after startup, then every 6 hours
-  setTimeout(() => {
+  startupTimeout = setTimeout(() => {
+    startupTimeout = null;
     checkTrialExpiry().catch(err => log.error({ err }, 'Error'));
   }, 90_000);
 
@@ -86,6 +88,10 @@ export function startTrialReminders() {
 }
 
 export function stopTrialReminders() {
+  if (startupTimeout) {
+    clearTimeout(startupTimeout);
+    startupTimeout = null;
+  }
   if (interval) {
     clearInterval(interval);
     interval = null;
