@@ -291,7 +291,7 @@
 - **Area:** Admin→Client Handoff
 - **Files:** `src/components/client/InboxTab.tsx:206 vs 221`
 - **Issue:** Legacy layout adds `schemaPlanPending` to the decisions count. The `new-inbox-ia` flag layout does not. Same workspace shows different badge totals depending on active flag.
-- [x] Fixed
+- [ ] Fixed
 
 ---
 
