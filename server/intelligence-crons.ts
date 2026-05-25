@@ -94,69 +94,73 @@ async function runCompetitorCheck(): Promise<void> {
     const cycleStart = new Date().toISOString();
 
     for (const ws of workspaces) {
-      if (!ws.liveDomain || !ws.competitorDomains?.length || !ws.seoDataProvider) {
-        deleteStaleInsightsByType(ws.id, 'competitor_alert', cycleStart);
-        continue;
-      }
-      const provider = getConfiguredProvider(ws.seoDataProvider);
-      if (!provider?.isConfigured()) {
-        deleteStaleInsightsByType(ws.id, 'competitor_alert', cycleStart);
-        continue;
-      }
-
-      let anyDomainFailed = false;
-      let anyDomainProcessed = false;
-      for (const domain of ws.competitorDomains) {
-        if (snapshotExistsForDate(ws.id, domain, today)) continue;
-        anyDomainProcessed = true;
-        try {
-          // Read previous snapshot BEFORE saving current so diff is meaningful
-          const previous = getLatestCompetitorSnapshot(ws.id, domain);
-          const kwResults = await provider.getDomainKeywords(domain, ws.id, 50);
-          const topKeywords = kwResults.map(k => ({
-            keyword: k.keyword,
-            position: k.position ?? 0,
-            volume: k.volume,
-          }));
-          const current = saveCompetitorSnapshot(ws.id, domain, today, topKeywords, kwResults.length);
-          if (!previous || previous.snapshotDate === today) continue;
-          const alerts = detectCompetitorAlerts(ws.id, domain, current, previous);
-          saveCompetitorAlerts(alerts);
-          for (const alert of alerts) {
-            // Use a stable unique pageId so each (domain, keyword) alert gets its own DB row
-            const alertPageId = `competitor_alert::${alert.competitorDomain}::${alert.keyword ?? 'domain'}`;
-            const insight = upsertInsight({
-              workspaceId: ws.id,
-              pageId: alertPageId,
-              insightType: 'competitor_alert',
-              data: {
-                competitorDomain: alert.competitorDomain,
-                alertType: alert.alertType,
-                keyword: alert.keyword,
-                previousPosition: alert.previousPosition,
-                currentPosition: alert.currentPosition,
-                positionChange: alert.positionChange,
-                volume: alert.volume,
-                snapshotDate: alert.snapshotDate,
-              },
-              severity: alert.severity,
-            });
-            // Link the alert row back to its insight for traceability
-            linkAlertToInsight(alert.id, insight.id, ws.id);
-          }
-        } catch (err) {
-          anyDomainFailed = true;
-          log.warn({ err, workspaceId: ws.id, domain }, 'Failed competitor monitoring check');
+      try {
+        if (!ws.liveDomain || !ws.competitorDomains?.length || !ws.seoDataProvider) {
+          deleteStaleInsightsByType(ws.id, 'competitor_alert', cycleStart);
+          continue;
         }
-      }
-      // Skip stale cleanup if any domain failed — transient provider errors shouldn't wipe
-      // prior-week alerts that simply weren't refreshed this cycle. Mirrors the failedCategories
-      // guard in server/recommendations.ts:1237-1238.
-      // Also skip if no domains were processed this cycle (e.g. server restarted mid-Monday and
-      // all domains were skipped via snapshotExistsForDate). Running cleanup with a fresh cycleStart
-      // in that case would delete valid insights written by the pre-restart run.
-      if (anyDomainProcessed && !anyDomainFailed) {
-        deleteStaleInsightsByType(ws.id, 'competitor_alert', cycleStart);
+        const provider = getConfiguredProvider(ws.seoDataProvider);
+        if (!provider?.isConfigured()) {
+          deleteStaleInsightsByType(ws.id, 'competitor_alert', cycleStart);
+          continue;
+        }
+
+        let anyDomainFailed = false;
+        let anyDomainProcessed = false;
+        for (const domain of ws.competitorDomains) {
+          if (snapshotExistsForDate(ws.id, domain, today)) continue;
+          anyDomainProcessed = true;
+          try {
+            // Read previous snapshot BEFORE saving current so diff is meaningful
+            const previous = getLatestCompetitorSnapshot(ws.id, domain);
+            const kwResults = await provider.getDomainKeywords(domain, ws.id, 50);
+            const topKeywords = kwResults.map(k => ({
+              keyword: k.keyword,
+              position: k.position ?? 0,
+              volume: k.volume,
+            }));
+            const current = saveCompetitorSnapshot(ws.id, domain, today, topKeywords, kwResults.length);
+            if (!previous || previous.snapshotDate === today) continue;
+            const alerts = detectCompetitorAlerts(ws.id, domain, current, previous);
+            saveCompetitorAlerts(alerts);
+            for (const alert of alerts) {
+              // Use a stable unique pageId so each (domain, keyword) alert gets its own DB row
+              const alertPageId = `competitor_alert::${alert.competitorDomain}::${alert.keyword ?? 'domain'}`;
+              const insight = upsertInsight({
+                workspaceId: ws.id,
+                pageId: alertPageId,
+                insightType: 'competitor_alert',
+                data: {
+                  competitorDomain: alert.competitorDomain,
+                  alertType: alert.alertType,
+                  keyword: alert.keyword,
+                  previousPosition: alert.previousPosition,
+                  currentPosition: alert.currentPosition,
+                  positionChange: alert.positionChange,
+                  volume: alert.volume,
+                  snapshotDate: alert.snapshotDate,
+                },
+                severity: alert.severity,
+              });
+              // Link the alert row back to its insight for traceability
+              linkAlertToInsight(alert.id, insight.id, ws.id);
+            }
+          } catch (err) {
+            anyDomainFailed = true;
+            log.warn({ err, workspaceId: ws.id, domain }, 'Failed competitor monitoring check');
+          }
+        }
+        // Skip stale cleanup if any domain failed — transient provider errors shouldn't wipe
+        // prior-week alerts that simply weren't refreshed this cycle. Mirrors the failedCategories
+        // guard in server/recommendations.ts:1237-1238.
+        // Also skip if no domains were processed this cycle (e.g. server restarted mid-Monday and
+        // all domains were skipped via snapshotExistsForDate). Running cleanup with a fresh cycleStart
+        // in that case would delete valid insights written by the pre-restart run.
+        if (anyDomainProcessed && !anyDomainFailed) {
+          deleteStaleInsightsByType(ws.id, 'competitor_alert', cycleStart);
+        }
+      } catch (err) {
+        log.warn({ err, workspaceId: ws.id }, 'Competitor monitoring workspace failed — continuing');
       }
     }
   } finally {

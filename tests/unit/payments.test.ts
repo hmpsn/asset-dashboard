@@ -108,7 +108,7 @@ describe('server/payments.ts', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.123456789);
 
     const input: Omit<PaymentRecord, 'id' | 'createdAt'> = {
-      workspaceId: 'ws_data',
+      workspaceId: 'ws_payload',
       stripeSessionId: 'cs_test',
       stripePaymentIntentId: 'pi_test',
       productType: 'brief_blog',
@@ -120,16 +120,16 @@ describe('server/payments.ts', () => {
       paidAt: undefined,
     };
 
-    const record = createPayment('ws_ignored', input);
+    const record = createPayment('ws_authoritative', input);
 
     expect(record.id).toMatch(/^pay_\d+_[a-z0-9]{4}$/);
     expect(record.createdAt).toBe('2026-05-25T12:00:00.000Z');
-    expect(record.workspaceId).toBe('ws_data');
+    expect(record.workspaceId).toBe('ws_authoritative');
 
     expect(mocks.mockStmts.insert.run).toHaveBeenCalledTimes(1);
     expect(mocks.mockStmts.insert.run).toHaveBeenCalledWith({
       id: record.id,
-      workspace_id: 'ws_data',
+      workspace_id: 'ws_authoritative',
       stripe_session_id: 'cs_test',
       stripe_payment_intent_id: 'pi_test',
       product_type: 'brief_blog',
@@ -186,6 +186,25 @@ describe('server/payments.ts', () => {
     expect(updated).toBeNull();
     expect(mocks.mockStmts.selectById.get).toHaveBeenCalledWith('pay_missing', 'ws_missing');
     expect(mocks.mockStmts.update.run).not.toHaveBeenCalled();
+  });
+
+  it('updatePayment should keep identity fields immutable even when overrides are supplied', () => {
+    mocks.mockStmts.selectById.get.mockReturnValue(makeRow({
+      id: 'pay_locked',
+      workspace_id: 'ws_locked',
+    }));
+
+    updatePayment('ws_locked', 'pay_locked', {
+      id: 'pay_tampered',
+      workspaceId: 'ws_other',
+      status: 'paid',
+    });
+
+    expect(mocks.mockStmts.update.run).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'pay_locked',
+      workspace_id: 'ws_locked',
+      status: 'paid',
+    }));
   });
 
   it('getPayment maps row fields and applies metadata fallback parsing', () => {

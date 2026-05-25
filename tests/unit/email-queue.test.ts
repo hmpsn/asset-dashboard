@@ -240,4 +240,26 @@ describe('email-queue behavior', () => {
     expect(send).toHaveBeenCalledTimes(2);
     expect(emailQueue.getQueueStats()).toEqual({ buckets: 0, totalEvents: 0 });
   });
+
+  it('resets batch timer on repeated events and flushes on sliding-window boundary', async () => {
+    vi.useFakeTimers();
+    const emailQueue = await loadEmailQueueModule();
+    const send = vi.fn().mockResolvedValue(true);
+    emailQueue.registerSendFn(send);
+
+    emailQueue.queueEmail(makeEvent({ data: { itemId: 'sw-1' } }));
+    await vi.advanceTimersByTimeAsync(BATCH_WINDOW_MS - 1_000);
+    expect(send).not.toHaveBeenCalled();
+
+    emailQueue.queueEmail(makeEvent({ data: { itemId: 'sw-2' } }));
+    await vi.advanceTimersByTimeAsync(1_001);
+    expect(send).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(BATCH_WINDOW_MS - 1_001);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(renderDigestMock).toHaveBeenCalledWith('approval_ready', expect.arrayContaining([
+      expect.objectContaining({ data: { itemId: 'sw-1' } }),
+      expect.objectContaining({ data: { itemId: 'sw-2' } }),
+    ]));
+  });
 });

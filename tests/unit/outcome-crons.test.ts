@@ -108,4 +108,32 @@ describe('outcome crons', () => {
 
     expect(mocks.measurePendingOutcomes).toHaveBeenCalledTimes(measureCallsAfterStartup);
   });
+
+  it('does not run detection/playbook jobs when those feature flags are disabled', async () => {
+    mocks.isFeatureEnabled.mockImplementation((flag: string) => flag === 'outcome-tracking');
+
+    startOutcomeCrons();
+    await vi.advanceTimersByTimeAsync(36_000);
+
+    expect(mocks.measurePendingOutcomes).toHaveBeenCalledTimes(1);
+    expect(mocks.recomputeAllWorkspaceLearnings).toHaveBeenCalledTimes(1);
+    expect(mocks.archiveOldActions).toHaveBeenCalledTimes(1);
+    expect(mocks.detectExternalExecutions).not.toHaveBeenCalled();
+    expect(mocks.detectAllWorkspacePlaybooks).not.toHaveBeenCalled();
+  });
+
+  it('suppresses duplicate backlog activity alerts when a recent alert already exists', async () => {
+    const pending = Array.from({ length: 20 }, (_, index) => ({
+      workspaceId: 'ws_1',
+      createdAt: `2026-05-${String(index + 1).padStart(2, '0')}T12:00:00.000Z`,
+    }));
+    mocks.getPendingActions.mockReturnValue(pending);
+    mocks.countActivityByType.mockReturnValue(2);
+
+    startOutcomeCrons();
+    await vi.advanceTimersByTimeAsync(16_000);
+
+    expect(mocks.countActivityByType).toHaveBeenCalledWith('ws_1', 'action_backlog_alert', 7);
+    expect(mocks.addActivity).not.toHaveBeenCalled();
+  });
 });

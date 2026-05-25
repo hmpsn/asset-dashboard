@@ -128,4 +128,43 @@ describe('intelligence crons', () => {
     expect(mocks.linkAlertToInsight).toHaveBeenCalledWith('alert_1', 'ins_1', 'ws_1');
     expect(mocks.deleteStaleInsightsByType).toHaveBeenCalledWith('ws_1', 'competitor_alert', expect.any(String));
   });
+
+  it('continues processing later workspaces when stale-cleanup fails for an ineligible workspace', async () => {
+    const getDomainKeywords = vi.fn().mockResolvedValue([{ keyword: 'seo agency', position: 3, volume: 700 }]);
+
+    mocks.listWorkspaces.mockReturnValue([
+      {
+        id: 'ws_ineligible',
+        liveDomain: '',
+        competitorDomains: ['skip.com'],
+        seoDataProvider: 'semrush',
+      },
+      {
+        id: 'ws_eligible',
+        liveDomain: 'https://example.com',
+        competitorDomains: ['competitor.com'],
+        seoDataProvider: 'semrush',
+      },
+    ]);
+
+    mocks.getConfiguredProvider.mockReturnValue({
+      isConfigured: () => true,
+      getDomainKeywords,
+    });
+    mocks.getLatestCompetitorSnapshot.mockReturnValue({ snapshotDate: '2026-05-18' });
+    mocks.saveCompetitorSnapshot.mockReturnValue({ snapshotDate: '2026-05-25' });
+    mocks.detectCompetitorAlerts.mockReturnValue([]);
+
+    mocks.deleteStaleInsightsByType.mockImplementation((workspaceId: string) => {
+      if (workspaceId === 'ws_ineligible') {
+        throw new Error('cleanup failure');
+      }
+      return 0;
+    });
+
+    startCompetitorMonitoringCron();
+    await vi.advanceTimersByTimeAsync(15 * 60 * 1000);
+
+    expect(getDomainKeywords).toHaveBeenCalledWith('competitor.com', 'ws_eligible', 50);
+  });
 });
