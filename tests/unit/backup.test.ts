@@ -412,4 +412,70 @@ describe('server/backup behavior', () => {
 
     expect(mocks.fsApi.unlinkSync).toHaveBeenCalledWith('/backups-root/backup-2026-05-25T12-00-00.tar.gz');
   });
+
+  it('runBackup degrades gracefully when SQLite VACUUM fails', async () => {
+    mocks.seedDir('/uploads-root/workspace-c');
+    mocks.seedFile('/uploads-root/workspace-c/logo.png', Buffer.alloc(12));
+
+    mocks.dbExec.mockImplementationOnce(() => {
+      throw new Error('disk I/O error');
+    });
+
+    const backup = await import('../../server/backup.js');
+    const result = await backup.runBackup();
+
+    // Upload file still copied; DB file not counted.
+    expect(result.files).toBe(1);
+    expect(result.bytes).toBe(12);
+
+    const manifestCall = mocks.fsApi.writeFileSync.mock.calls.find(([filePath]) => String(filePath).endsWith('/_manifest.json'));
+    expect(manifestCall).toBeDefined();
+    const manifest = JSON.parse(String(manifestCall?.[1]));
+    expect(manifest.verified).toBe(false);
+    expect(manifest.tableCounts).toEqual({});
+  });
+
+  it('runBackup marks manifest unverified when integrity check is not ok', async () => {
+    mocks.seedDir('/uploads-root/workspace-d');
+    mocks.seedFile('/uploads-root/workspace-d/logo.png', Buffer.alloc(10));
+
+    mocks.dbVerify.pragma.mockReturnValueOnce([{ integrity_check: 'not ok' }]);
+
+    const backup = await import('../../server/backup.js');
+    const result = await backup.runBackup();
+
+    expect(result.files).toBe(2);
+    expect(result.bytes).toBe(110);
+
+    const manifestCall = mocks.fsApi.writeFileSync.mock.calls.find(([filePath]) => String(filePath).endsWith('/_manifest.json'));
+    expect(manifestCall).toBeDefined();
+    const manifest = JSON.parse(String(manifestCall?.[1]));
+    expect(manifest.verified).toBe(false);
+    expect(manifest.tableCounts).toEqual({});
+  });
+
+  it('runBackup continues successfully when S3 upload fails', async () => {
+    process.env.BACKUP_S3_BUCKET = 'bucket-test';
+    process.env.BACKUP_S3_REGION = 'us-west-2';
+    process.env.BACKUP_S3_PREFIX = 'backups';
+
+    mocks.seedDir('/uploads-root/workspace-e');
+    mocks.seedFile('/uploads-root/workspace-e/image.png', Buffer.alloc(9));
+
+    mocks.s3Send.mockImplementationOnce(async (command: { constructor: { name: string } }) => {
+      if (command.constructor.name === 'PutObjectCommand') {
+        throw new Error('S3 unavailable');
+      }
+      return {};
+    });
+
+    const backup = await import('../../server/backup.js');
+    const result = await backup.runBackup();
+
+    expect(result.backupDir).toBe('/backups-root/backup-2026-05-25T12-00-00');
+    // upload file + dashboard.db are still counted before S3 stage
+    expect(result.files).toBe(2);
+    expect(result.bytes).toBe(109);
+    expect(mocks.fsApi.unlinkSync).toHaveBeenCalledWith('/backups-root/backup-2026-05-25T12-00-00.tar.gz');
+  });
 });

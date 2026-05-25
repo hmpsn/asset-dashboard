@@ -10,7 +10,7 @@ afterEach(() => {
 });
 
 describe('probeCanonical', () => {
-  it('returns canonical and marks selfReferencing true when canonical matches URL', async () => {
+  it('extracts canonical across attribute-order variants and ignores query params for self-reference', async () => {
     globalThis.fetch = vi.fn(async () => ({
       status: 200,
       text: async () => '<html><head><link href="https://example.com/page/" rel="canonical" /></head></html>',
@@ -38,6 +38,22 @@ describe('probeCanonical', () => {
       canonical: null,
       selfReferencing: false,
       statusCode: 204,
+      error: null,
+    });
+  });
+
+  it('marks selfReferencing false when canonical differs by path', async () => {
+    globalThis.fetch = vi.fn(async () => ({
+      status: 200,
+      text: async () => '<html><head><link rel="canonical" href="https://example.com/new-path" /></head></html>',
+    })) as typeof fetch;
+
+    const result = await probeCanonical('https://example.com/old-path');
+
+    expect(result).toEqual({
+      canonical: 'https://example.com/new-path',
+      selfReferencing: false,
+      statusCode: 200,
       error: null,
     });
   });
@@ -105,6 +121,44 @@ describe('countInternalLinks', () => {
     expect(result.deficit).toBe(1);
     expect(result.topLinkingPages).toEqual(['https://example.com/source-1']);
     expect(globalThis.fetch).toHaveBeenCalledTimes(4);
+  });
+
+  it('does not treat lookalike external domains as internal links (regression)', async () => {
+    const pagesToCrawl = ['https://example.com/source'];
+
+    globalThis.fetch = vi.fn(async () => ({
+      status: 200,
+      text: async () => [
+        '<a href="https://example.com.evil.org/target">spoof</a>',
+        '<a href="https://example.com/target">real-internal</a>',
+        '<a href="/also-internal">relative</a>',
+      ].join(''),
+    })) as typeof fetch;
+
+    const result = await countInternalLinks('/target', pagesToCrawl, 'https://example.com');
+
+    expect(result.count).toBe(1);
+    expect(result.topLinkingPages).toEqual(['https://example.com/source']);
+    expect(result.siteMedian).toBe(1);
+    expect(result.deficit).toBe(0);
+  });
+
+  it('ignores malformed absolute href values instead of dropping the whole page', async () => {
+    const pagesToCrawl = ['https://example.com/source'];
+
+    globalThis.fetch = vi.fn(async () => ({
+      status: 200,
+      text: async () => [
+        '<a href="https://example.com:bad-port/target">broken</a>',
+        '<a href="/target">valid</a>',
+      ].join(''),
+    })) as typeof fetch;
+
+    const result = await countInternalLinks('/target', pagesToCrawl, 'https://example.com');
+
+    expect(result.count).toBe(1);
+    expect(result.topLinkingPages).toEqual(['https://example.com/source']);
+    expect(result.siteMedian).toBe(1);
   });
 
   it('respects MAX_PAGES_TO_CRAWL by fetching only the first 20 pages', async () => {
