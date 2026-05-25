@@ -4768,6 +4768,9 @@ describe('Meta: customCheck rule name registry', () => {
     // PR 1.5 Phase 1 IA prevention rules (2026-05-10)
     'feedback-module-reintroduction',
     'prediction-showcase-ungated',
+    // MCP actions Phase 1 (2026-05-25)
+    'mcp-action-must-tag-source',
+    'mcp-action-must-broadcast',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -8435,5 +8438,127 @@ describe('Rule: inbox-action-queue-strip', () => {
     ].join('\n'));
     const hits = checkDirectory(path.join(TMPDIR, 'rule-inbox-aq-strip-hatch'), CHECKS.find(c => c.name === RULE)!);
     expect(hits.length).toBe(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: mcp-action-must-tag-source
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: mcp-action-must-tag-source', () => {
+  const RULE = 'mcp-action-must-tag-source';
+
+  it('flags addActivity() calls without source: \'mcp-chat\' in the call block', () => {
+    const file = write(
+      uniqPath('rule-mcp-tag-source', 'server/mcp/tools/content-actions.ts'),
+      lines(
+        'async function save(workspaceId: string) {',
+        '  await addActivity(workspaceId, { type: "brief_generated" }, { metadata: { via: "chat" } });',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('does NOT flag when addActivity() includes source: \'mcp-chat\'', () => {
+    const file = write(
+      uniqPath('rule-mcp-tag-source', 'server/mcp/tools/content-actions.ts'),
+      lines(
+        'async function save(workspaceId: string) {',
+        '  await addActivity(workspaceId, { type: "brief_generated" }, {',
+        '    source: "mcp-chat",',
+        '    metadata: { via: "chat" },',
+        '  });',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects inline // mcp-action-must-tag-source-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-mcp-tag-source', 'server/mcp/tools/content-actions.ts'),
+      lines(
+        'async function save(workspaceId: string) {',
+        '  await addActivity(workspaceId, { type: "brief_generated" }, { metadata: { via: "chat" } }); // mcp-action-must-tag-source-ok',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects above-line // mcp-action-must-tag-source-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-mcp-tag-source', 'server/mcp/tools/content-actions.ts'),
+      lines(
+        'async function save(workspaceId: string) {',
+        '  // mcp-action-must-tag-source-ok: legacy migration path',
+        '  await addActivity(workspaceId, { type: "brief_generated" }, { metadata: { via: "chat" } });',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: mcp-action-must-broadcast
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: mcp-action-must-broadcast', () => {
+  const RULE = 'mcp-action-must-broadcast';
+
+  it('flags MCP tool files that mutate without broadcastToWorkspace()', () => {
+    const file = write(
+      uniqPath('rule-mcp-broadcast', 'server/mcp/tools/brief-actions.ts'),
+      lines(
+        'async function run(workspaceId: string) {',
+        '  await upsertBrief(workspaceId, { id: "b1" });',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('does NOT flag when mutation service call is paired with broadcastToWorkspace()', () => {
+    const file = write(
+      uniqPath('rule-mcp-broadcast', 'server/mcp/tools/brief-actions.ts'),
+      lines(
+        'async function run(workspaceId: string) {',
+        '  await upsertBrief(workspaceId, { id: "b1" });',
+        '  broadcastToWorkspace(workspaceId, "brief:updated", { id: "b1" });',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects inline // mcp-action-must-broadcast-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-mcp-broadcast', 'server/mcp/tools/brief-actions.ts'),
+      lines(
+        'async function run(workspaceId: string) {',
+        '  await upsertBrief(workspaceId, { id: "b1" }); // mcp-action-must-broadcast-ok',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects above-line // mcp-action-must-broadcast-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-mcp-broadcast', 'server/mcp/tools/brief-actions.ts'),
+      lines(
+        'async function run(workspaceId: string) {',
+        '  // mcp-action-must-broadcast-ok: migration-safe legacy path',
+        '  await upsertBrief(workspaceId, { id: "b1" });',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
   });
 });

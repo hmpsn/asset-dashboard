@@ -6593,6 +6593,94 @@ export const CHECKS: Check[] = [
     rationale: 'MCP write tools must go through service functions so broadcasts, activity logging, and state-machine guards all fire.',
     claudeMdRef: '#mcp-actions',
   },
+  {
+    name: 'mcp-action-must-tag-source',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/mcp/tools/',
+    message: 'MCP write tools must tag activity with { source: \'mcp-chat\' } in the metadata arg. Every addActivity() call from server/mcp/tools/ must include \"source: \'mcp-chat\'\" in its arguments.',
+    severity: 'error',
+    excludeLines: ['mcp-action-must-tag-source-ok'],
+    rationale: 'mcp-chat-tagged activity entries get a \"chat\" badge in the activity feed so operators can audit chat-driven mutations.',
+    claudeMdRef: '#mcp-actions',
+    customCheck: (files) => {
+      const matches: { file: string; line: number; text: string }[] = [];
+      for (const file of files) {
+        let text: string;
+        try {
+          text = readFileSync(file, 'utf8');
+        } catch {
+          continue;
+        }
+        const lines = text.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (!/\baddActivity\(/.test(line)) continue;
+          if (hasHatch(lines, i, 'mcp-action-must-tag-source-ok')) continue;
+          let depth = 0;
+          let foundCloseParen = false;
+          let foundSourceTag = false;
+          for (let j = i; j < Math.min(i + 20, lines.length); j++) {
+            const segment = lines[j];
+            for (const ch of segment) {
+              if (ch === '(') depth++;
+              else if (ch === ')') {
+                depth--;
+                if (depth === 0) {
+                  foundCloseParen = true;
+                  break;
+                }
+              }
+            }
+            if (/source\s*:\s*['"]mcp-chat['"]/.test(segment)) foundSourceTag = true;
+            if (foundCloseParen) break;
+          }
+          if (foundCloseParen && !foundSourceTag) {
+            matches.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+      return matches;
+    },
+  },
+  {
+    name: 'mcp-action-must-broadcast',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/mcp/tools/',
+    message: 'MCP write tool file calls a mutation service (upsertBrief / savePost / upsertPageKeyword / notifyContentUpdated) but never calls broadcastToWorkspace(). Every persistence path from server/mcp/tools/ must broadcast a workspace event so the frontend invalidates its caches.',
+    severity: 'error',
+    excludeLines: ['mcp-action-must-broadcast-ok'],
+    rationale: 'broadcast pairs every write so React Query caches stay fresh; MCP tools own this since the underlying service functions are unbroadcast.',
+    claudeMdRef: '#mcp-actions',
+    customCheck: (files) => {
+      const matches: { file: string; line: number; text: string }[] = [];
+      const mutationFnRe = /\b(upsertBrief|savePost|upsertPageKeyword|notifyContentUpdated)\(/;
+      for (const file of files) {
+        let text: string;
+        try {
+          text = readFileSync(file, 'utf8');
+        } catch {
+          continue;
+        }
+        const lines = text.split('\n');
+        let firstMutationLine = -1;
+        let hasBroadcast = false;
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (/\bbroadcastToWorkspace\(/.test(line)) {
+            hasBroadcast = true;
+          }
+          if (firstMutationLine === -1 && mutationFnRe.test(line)) {
+            if (hasHatch(lines, i, 'mcp-action-must-broadcast-ok')) continue;
+            firstMutationLine = i + 1;
+          }
+        }
+        if (firstMutationLine !== -1 && !hasBroadcast) {
+          matches.push({ file, line: firstMutationLine, text: lines[firstMutationLine - 1].trim() });
+        }
+      }
+      return matches;
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
