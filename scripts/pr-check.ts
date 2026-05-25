@@ -6583,6 +6583,16 @@ export const CHECKS: Check[] = [
     claudeMdRef: '#code-conventions',
     excludeLines: ['inbox-action-queue-strip-ok'],
   },
+  {
+    name: 'mcp-action-must-route-through-service',
+    pattern: 'stmts\\(\\)\\.[a-zA-Z_]+\\.run\\(',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/mcp/tools/',
+    message: 'MCP write tools must route persistence through service functions (e.g. upsertBrief, savePost, upsertPageKeyword). Do not call stmts().*.run() directly from server/mcp/tools/ - that bypasses broadcasts, activity logging, and state-machine guards.',
+    severity: 'error',
+    rationale: 'MCP write tools must go through service functions so broadcasts, activity logging, and state-machine guards all fire.',
+    claudeMdRef: '#mcp-actions',
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
