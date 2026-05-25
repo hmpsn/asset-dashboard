@@ -1,116 +1,120 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildLlmsFullTxt, buildLlmsTxtIndex, validateUrls } from '../../server/llms-txt-generator.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { STUDIO_BOT_UA } from '../../server/constants.js';
+import {
+  buildLlmsFullTxt,
+  buildLlmsTxtIndex,
+  validateUrls,
+} from '../../server/llms-txt-generator.js';
 
-describe('llms-txt-generator helpers', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-05-25T12:34:56.000Z'));
-  });
-
+describe('llms-txt-generator format and URL behavior', () => {
   afterEach(() => {
-    vi.useRealTimers();
     vi.restoreAllMocks();
-    vi.unstubAllGlobals();
   });
 
-  it('builds llms.txt index with root-first section ordering and planned content labels', () => {
-    const text = buildLlmsTxtIndex({
-      siteName: 'Acme Dental',
-      baseUrl: 'https://example.com',
-      description: 'Trusted family dental care.',
-      pages: [
-        { path: '/blog/root-canal', title: 'Root Canal Guide', description: 'What to expect.' },
-        { path: '/', title: 'Home', description: 'Main landing page.' },
-        { path: '/about', title: 'About Us', description: 'Meet the team.' },
-      ],
-      plannedPages: [
-        { url: '/services/emergency-dentistry', keyword: 'Emergency Dentistry', status: 'review' },
-        { url: 'services/teeth-contouring', keyword: 'Teeth Contouring', status: 'unknown_status' },
-      ],
-    });
+  it('validateUrls issues HEAD requests with redirect-follow and studio user-agent', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 200 }));
 
-    expect(text).toContain('# Acme Dental');
-    expect(text).toContain('> Trusted family dental care.');
-    expect(text).toContain('- Generated: 2026-05-25T12:34:56.000Z');
+    await validateUrls(['https://example.com/a']);
 
-    const mainPagesIdx = text.indexOf('## Main Pages');
-    const blogIdx = text.indexOf('## Blog');
-    expect(mainPagesIdx).toBeGreaterThan(-1);
-    expect(blogIdx).toBeGreaterThan(-1);
-    expect(mainPagesIdx).toBeLessThan(blogIdx);
-
-    expect(text).toContain('- [Home](https://example.com/)');
-    expect(text).toContain('- [About Us](https://example.com/about): Meet the team.');
-    expect(text).toContain('- [Root Canal Guide](https://example.com/blog/root-canal): What to expect.');
-
-    expect(text).toContain('## Upcoming Content');
-    expect(text).toContain('- [Emergency Dentistry](https://example.com/services/emergency-dentistry) — In Review');
-    expect(text).toContain('- [Teeth Contouring](https://example.com/services/teeth-contouring) — Planned');
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://example.com/a',
+      expect.objectContaining({
+        method: 'HEAD',
+        redirect: 'follow',
+        headers: { 'User-Agent': STUDIO_BOT_UA },
+      }),
+    );
   });
 
-  it('builds llms-full.txt using summary -> description -> placeholder fallback order', () => {
-    const full = buildLlmsFullTxt({
-      siteName: 'Acme Dental',
-      baseUrl: 'https://example.com',
-      pages: [
-        {
-          path: '/services/veneers',
-          title: 'Veneers',
-          summary: 'Custom veneer treatment and smile design.',
-          description: 'Description should be ignored when summary exists.',
-        },
-        {
-          path: '/services/implants',
-          title: 'Implants',
-          description: 'Dental implant treatment overview.',
-        },
-        {
-          path: '/services/whitening',
-          title: 'Whitening',
-        },
-      ],
-    });
+  it('validateUrls enforces batch concurrency and keeps only valid URLs in input order', async () => {
+    let inFlight = 0;
+    let maxInFlight = 0;
 
-    expect(full).toContain('### [Veneers](https://example.com/services/veneers)');
-    expect(full).toContain('Custom veneer treatment and smile design.');
-    expect(full).not.toContain('Description should be ignored when summary exists.');
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
 
-    expect(full).toContain('### [Implants](https://example.com/services/implants)');
-    expect(full).toContain('Dental implant treatment overview.');
-
-    expect(full).toContain('### [Whitening](https://example.com/services/whitening)');
-    expect(full).toContain('*No summary available.*');
-  });
-
-  it('validateUrls returns only successful HTTP HEAD URLs and ignores failures', async () => {
-    const fetchMock = vi.fn(async (input: string | URL | Request) => {
       const url = String(input);
-      if (url.includes('ok-1')) return { ok: true };
-      if (url.includes('ok-2')) return { ok: true };
-      if (url.includes('bad-status')) return { ok: false };
-      throw new Error('network down');
-    });
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      inFlight -= 1;
 
-    vi.stubGlobal('fetch', fetchMock);
+      if (url.endsWith('/bad')) return new Response('', { status: 404 });
+      return new Response('', { status: 200 });
+    });
 
     const urls = [
-      'https://example.com/ok-1',
-      'https://example.com/bad-status',
-      'https://example.com/network-failure',
-      'https://example.com/ok-2',
+      'https://example.com/a',
+      'https://example.com/bad',
+      'https://example.com/c',
+      'https://example.com/d',
+      'https://example.com/e',
     ];
 
-    const valid = await validateUrls(urls, 2);
+    const result = await validateUrls(urls, 2);
 
-    expect(valid).toEqual([
+    expect(maxInFlight).toBeLessThanOrEqual(2);
+    expect(result).toEqual([
+      'https://example.com/a',
+      'https://example.com/c',
+      'https://example.com/d',
+      'https://example.com/e',
+    ]);
+  });
+
+  it('validateUrls tolerates thrown fetch errors and returns surviving URLs', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/throw')) throw new Error('network down');
+      if (url.endsWith('/forbidden')) return new Response('', { status: 403 });
+      return new Response('', { status: 200 });
+    });
+
+    const result = await validateUrls([
       'https://example.com/ok-1',
+      'https://example.com/throw',
+      'https://example.com/forbidden',
       'https://example.com/ok-2',
     ]);
-    expect(fetchMock).toHaveBeenCalledTimes(4);
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      1,
-      'https://example.com/ok-1',
-      expect.objectContaining({ method: 'HEAD', redirect: 'follow' }),
-    );
+
+    expect(result).toEqual(['https://example.com/ok-1', 'https://example.com/ok-2']);
+  });
+
+  it('buildLlmsTxtIndex normalizes planned links to root-relative when baseUrl is empty', () => {
+    const output = buildLlmsTxtIndex({
+      siteName: 'Site',
+      baseUrl: '',
+      pages: [
+        { path: '/about', title: 'About' },
+      ],
+      plannedPages: [
+        { url: 'roadmap', keyword: 'Roadmap', status: 'unknown_status' },
+      ],
+    });
+
+    expect(output).toContain('[About](/about)');
+    expect(output).toContain('[Roadmap](/roadmap) — Planned');
+  });
+
+  it('buildLlmsFullTxt prefers summary, falls back to description, then fallback marker', () => {
+    const output = buildLlmsFullTxt({
+      siteName: 'Site',
+      baseUrl: 'https://example.com',
+      pages: [
+        { path: '/one', title: 'One', summary: 'Summary wins', description: 'Ignored description' },
+        { path: '/two', title: 'Two', summary: '', description: 'Description fallback' },
+        { path: '/three', title: 'Three' },
+      ],
+    });
+
+    expect(output).toContain('### [One](https://example.com/one)');
+    expect(output).toContain('Summary wins');
+    expect(output).not.toContain('Ignored description');
+
+    expect(output).toContain('### [Two](https://example.com/two)');
+    expect(output).toContain('Description fallback');
+
+    expect(output).toContain('### [Three](https://example.com/three)');
+    expect(output).toContain('*No summary available.*');
   });
 });

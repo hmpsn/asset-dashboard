@@ -670,6 +670,9 @@ export async function inspectUrlForRichResults(
       log.warn({ siteId }, 'GSC URL Inspection API quota exhausted');
       return null;
     }
+    if (res.status === 401 || res.status === 403) {
+      throw new Error(`GSC URL Inspection authentication error (${res.status}): ${errText.slice(0, 200)}`);
+    }
     if (res.status >= 400 && res.status < 500) {
       log.warn({ siteId, status: res.status }, 'GSC URL Inspection API client error — treating as no_gsc');
       return null;
@@ -954,12 +957,19 @@ export async function getSearchPeriodComparison(
   const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
 
   const { startDate: curStart, endDate: curEnd } = gscDateRange(days, dateRange);
+  const curStartDate = new Date(`${curStart}T00:00:00.000Z`);
+  const curEndDate = new Date(`${curEnd}T00:00:00.000Z`);
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+  const derivedPeriodDays = (Number.isFinite(curStartDate.getTime()) && Number.isFinite(curEndDate.getTime()))
+    ? Math.round((curEndDate.getTime() - curStartDate.getTime()) / MS_PER_DAY) + 1
+    : days;
+  const periodDays = Math.max(1, derivedPeriodDays);
 
-  // Previous period: shift both dates back by `days`
+  // Previous period: shift by the actual current window length (custom ranges included).
   const prevEnd = new Date(curStart);
   prevEnd.setDate(prevEnd.getDate() - 1);
   const prevStart = new Date(prevEnd);
-  prevStart.setDate(prevStart.getDate() - days + 1);
+  prevStart.setDate(prevStart.getDate() - periodDays + 1);
   const fmt = (d: Date) => d.toISOString().split('T')[0];
 
   const [curData, prevData] = await Promise.all([
