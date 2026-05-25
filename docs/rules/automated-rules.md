@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **137** — 122 error, 15 warn.
+Total rules: **140** — 125 error, 15 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -138,6 +138,9 @@ advisory but tracked.
 | 120 | send-for-review-anti-pattern | error | pattern | `src/` | `send-for-review-anti-pattern-ok` | Enforces the Admin Send Convention introduced in PR 1.4: one 'Send to client' button replaces the old dual 'Send for Review' / 'Flag for Client' pattern. |
 | 121 | prediction-showcase-ungated | error | custom | `src/` | `prediction-showcase-ungated-ok` | PredictionShowcaseCard must be gated behind the winsEnabled feature flag to prevent uncontrolled rollout to all clients. |
 | 122 | inbox-action-queue-strip | error | pattern | `InboxTab.tsx` | `inbox-action-queue-strip-ok` | Prevents re-introduction of ActionQueueStrip into InboxTab.tsx after the inbox IA restructure removed it (§5.6 of IA spec). |
+| 123 | mcp-action-must-route-through-service | error | pattern | `server/mcp/tools/` | — | MCP write tools must go through service functions so broadcasts, activity logging, and state-machine guards all fire. |
+| 124 | mcp-action-must-tag-source | error | custom | `server/mcp/tools/` | `mcp-action-must-tag-source-ok` | mcp-chat-tagged activity entries get a "chat" badge in the activity feed so operators can audit chat-driven mutations. |
+| 125 | mcp-action-must-broadcast | error | custom | `server/mcp/tools/` | `mcp-action-must-broadcast-ok` | broadcast pairs every write so React Query caches stay fresh; MCP tools own this since the underlying service functions are unbroadcast. |
 
 ---
 
