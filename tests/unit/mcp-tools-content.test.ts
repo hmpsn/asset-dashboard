@@ -283,6 +283,16 @@ describe('mcp content action tools', () => {
       'content-request:update',
       expect.objectContaining({ id: 'cr_parent_post' }),
     );
+    expect(addActivity).toHaveBeenCalledWith(
+      'ws-1',
+      'post_sent_for_review',
+      expect.stringContaining('for review'),
+      expect.any(String),
+      expect.objectContaining({
+        source: 'mcp-chat',
+        action: 'mcp_post_sent_to_client',
+      }),
+    );
   });
 
   it('send_to_client from brief handle creates a request', async () => {
@@ -323,6 +333,16 @@ describe('mcp content action tools', () => {
     expect(result.isError).toBeUndefined();
     expect(createContentRequest).toHaveBeenCalledOnce();
     expect(updateContentRequest).toHaveBeenCalled();
+    expect(addActivity).toHaveBeenCalledWith(
+      'ws-1',
+      'brief_sent_for_review',
+      expect.stringContaining('for review'),
+      expect.any(String),
+      expect.objectContaining({
+        source: 'mcp-chat',
+        action: 'mcp_brief_sent_to_client',
+      }),
+    );
   });
 
   it('send_to_client updates existing parent request with update event', async () => {
