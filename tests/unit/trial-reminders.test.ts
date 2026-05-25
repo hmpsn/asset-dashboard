@@ -73,6 +73,23 @@ describe('trial-reminders', () => {
     expect(mocks.pruneReminders).toHaveBeenCalledWith('-30 days');
   });
 
+  it('prioritizes 1-day reminder key when only one day remains', async () => {
+    mocks.listWorkspaces.mockReturnValue([
+      {
+        id: 'ws-urgent',
+        name: 'Urgent Workspace',
+        clientEmail: 'urgent@example.com',
+        trialEndsAt: '2026-05-26T00:01:00.000Z',
+      },
+    ]);
+
+    const mod = await import('../../server/trial-reminders.js');
+    mod.startTrialReminders();
+    await vi.advanceTimersByTimeAsync(90_000);
+
+    expect(mocks.markReminderSent).toHaveBeenCalledWith('trial:ws-urgent:1');
+  });
+
   it('does not run startup send after stop is called before the startup timeout', async () => {
     const mod = await import('../../server/trial-reminders.js');
     mod.startTrialReminders();
