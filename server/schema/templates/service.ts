@@ -148,6 +148,11 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
 
 export function buildProductSchema(input: ServiceInput): Record<string, unknown> {
   const { pageData, baseUrl } = input;
+  const offers = (input.offers ?? [])
+    .filter((offer) => {
+      const price = Number.parseFloat(offer.price);
+      return Number.isFinite(price) && price > 0 && !!safeText(offer.priceCurrency);
+    });
 
   const primary = dropUndefined({
     '@type': 'Product',
@@ -157,8 +162,8 @@ export function buildProductSchema(input: ServiceInput): Record<string, unknown>
     'image': pageData.image ? [pageData.image] : undefined,
     'url': pageData.canonicalUrl,
     'brand': { '@type': 'Brand', 'name': pageData.publisher.name },
-    'offers': input.offers && input.offers.length > 0
-      ? input.offers.map((offer, idx) => dropUndefined({
+    'offers': offers.length > 0
+      ? offers.map((offer, idx) => dropUndefined({
           '@type': 'Offer' as const,
           '@id': `${pageData.canonicalUrl}#offer-${idx}`,
           'name': offer.name,
