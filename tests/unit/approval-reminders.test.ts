@@ -185,6 +185,18 @@ describe('approval reminders', () => {
     expect(mocks.upsertReminder).not.toHaveBeenCalled();
   });
 
+  it('treats a batch older than 3 days (e.g. 3.5 days) as stale and sends reminder', async () => {
+    mocks.listBatches.mockReturnValue([
+      batch({ id: 'stale_half_day', createdAt: '2026-05-02T00:00:00.000Z' }),
+    ]);
+
+    await checkStaleApprovals();
+
+    expect(mocks.sendEmail).toHaveBeenCalledTimes(1);
+    expect(mocks.recordSend).toHaveBeenCalledTimes(1);
+    expect(mocks.upsertReminder).toHaveBeenCalledWith('approval:stale_half_day');
+  });
+
   it('skips recently reminded batches without recording another send', async () => {
     mocks.getReminderSentAt.mockReturnValue('2026-05-04T12:00:00.000Z');
     mocks.listBatches.mockReturnValue([batch()]);
