@@ -174,12 +174,12 @@ export default defineConfig(async () => ({
         '**/*.test.{ts,tsx}',
       ],
       // Baseline 2026-05-05 (staging): lines 28.6%, branches 21.4%, functions 20.4%, stmts 26.9%
-      // Thresholds = baseline - 5pts. Ratchet up as coverage improves.
+      // Thresholds = ratchet floor - 5pts. Ratchet up as coverage improves.
       thresholds: {
-        lines: 24,
-        branches: 16,
-        functions: 15,
-        statements: 22,
+        lines: 47,
+        branches: 37,
+        functions: 39,
+        statements: 45,
       },
     },
   },
