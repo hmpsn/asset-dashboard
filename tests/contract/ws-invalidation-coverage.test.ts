@@ -54,11 +54,6 @@ const LOCAL_ONLY_EVENTS = new Set<string>([
   // but ClientDashboard owns that client-side subscription because the admin
   // useWsInvalidation hook is not mounted on /client routes.
   'SCHEMA_PLAN_SENT',
-
-  // BRIEF_UPDATED is a reserved Phase 0 contract constant for upcoming MCP
-  // actions work. No broadcasts are wired yet, so no centralized invalidation
-  // exists in this phase.
-  'BRIEF_UPDATED',
 ]);
 
 // ---------------------------------------------------------------------------

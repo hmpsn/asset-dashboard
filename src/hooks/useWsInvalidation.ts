@@ -63,6 +63,16 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
     },
+    [WS_EVENTS.BRIEF_UPDATED]: () => {
+      // Fired by MCP save_brief and any future brief-mutation paths. Keeps the
+      // admin briefs list, content pipeline, and activity feed fresh when a
+      // brief is saved from outside the admin UI (e.g. a Claude chat session
+      // via the MCP).
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.briefs(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+    },
     [WS_EVENTS.CONTENT_UPDATED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.briefs(workspaceId) });

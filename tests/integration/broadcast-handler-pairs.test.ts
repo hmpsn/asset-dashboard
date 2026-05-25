@@ -310,9 +310,7 @@ function collectFrontendHandlers(
  * Each entry must have a comment explaining why.
  */
 const KNOWN_UNHANDLED_BROADCASTS = new Set<string>([
-  // Reserved in Phase 0 for upcoming MCP brief workflows; no server
-  // broadcast or frontend handler is intentionally wired yet.
-  'brief:updated',
+  // (intentionally empty)
 ]);
 
 /**
