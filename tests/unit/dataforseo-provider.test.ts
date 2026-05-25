@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { isCapabilityDisabled, clearCapabilityDisabled } from '../../server/seo-data-provider.js';
+import { isCapabilityDisabled, clearCapabilityDisabled, _resetRegistryForTest } from '../../server/seo-data-provider.js';
 
 // Mock fs so writeCache/readCache don't touch disk
 vi.mock('fs', async (importOriginal) => {
@@ -707,9 +707,13 @@ describe('DataForSeoProvider — getReferringDomains date normalization', () => 
 });
 
 describe('DataForSeoProvider — init() capability probe', () => {
+  beforeEach(() => {
+    _resetRegistryForTest();
+    reapplyFsMocks();
+  });
   afterEach(() => {
     vi.restoreAllMocks();
-    clearCapabilityDisabled('dataforseo', 'backlinks');
+    _resetRegistryForTest();
   });
 
   it('marks backlinks disabled when probe returns subscription error', async () => {
