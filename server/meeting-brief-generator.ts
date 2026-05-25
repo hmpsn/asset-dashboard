@@ -44,14 +44,14 @@ function normalizeMeetingBriefAiOutput(
 export function assembleMeetingBriefMetrics(intel: WorkspaceIntelligence): MeetingBriefMetrics {
   return {
     siteHealthScore: intel.siteHealth?.auditScore ?? null,
-    openRankingOpportunities: intel.insights?.byType.ranking_opportunity?.length ?? 0,
+    openRankingOpportunities: intel.insights?.byType?.ranking_opportunity?.length ?? 0,
     contentInPipeline:
-      (intel.contentPipeline?.briefs.total ?? 0) +
-      (intel.contentPipeline?.posts.total ?? 0),
+      (intel.contentPipeline?.briefs?.total ?? 0) +
+      (intel.contentPipeline?.posts?.total ?? 0),
     overallWinRate: intel.learnings?.overallWinRate != null
       ? Math.round(intel.learnings.overallWinRate * 100)
       : null,
-    criticalIssues: intel.insights?.bySeverity.critical ?? 0,
+    criticalIssues: intel.insights?.bySeverity?.critical ?? 0,
   };
 }
 
@@ -91,8 +91,8 @@ SITE CONTEXT:
 - Client priorities: ${priorities.length > 0 ? priorities.join('; ') : 'not specified'}
 
 PIPELINE:
-- Briefs in progress: ${pipeline?.briefs.total ?? 0}
-- Posts: ${pipeline?.posts.total ?? 0}
+- Briefs in progress: ${pipeline?.briefs?.total ?? 0}
+- Posts: ${pipeline?.posts?.total ?? 0}
 ${localSeoBlock}
 
 TOP INSIGHTS (ordered by impact):
@@ -132,19 +132,19 @@ function buildPromptHash(intel: WorkspaceIntelligence, customPromptNotes: string
     topIds: intel.insights?.topByImpact?.slice(0, 10).map(i => `${i.id}:${i.computedAt}`) ?? [],
     siteScore: intel.siteHealth?.auditScore,
     scoreDelta: intel.siteHealth?.auditScoreDelta,
-    briefsTotal: intel.contentPipeline?.briefs.total,
-    postsTotal: intel.contentPipeline?.posts.total,
+    briefsTotal: intel.contentPipeline?.briefs?.total,
+    postsTotal: intel.contentPipeline?.posts?.total,
     winRate: intel.learnings?.overallWinRate,
     // Include score + delta_percent: both are mutable (outcome INSERT OR REPLACE), so a changed
     // result must bust the cache even when the action ID stays the same.
     topWins: intel.learnings?.topWins?.slice(0, 5).map(w => `${w.actionId}:${w.score}:${w.delta?.delta_percent ?? 0}`) ?? [],
-    criticalIssues: intel.insights?.bySeverity.critical,
-    rankingOpportunities: intel.insights?.byType.ranking_opportunity?.length,
+    criticalIssues: intel.insights?.bySeverity?.critical,
+    rankingOpportunities: intel.insights?.byType?.ranking_opportunity?.length,
     priorities: intel.clientSignals?.businessPriorities ?? [],
     siteKeywords: intel.seoContext?.strategy?.siteKeywords?.slice(0, 5) ?? [],
     localSeo: intel.localSeo ? {
       enabled: intel.localSeo.enabled,
-      activeMarkets: intel.localSeo.markets.filter(m => m.status === 'active').map(m => m.label),
+      activeMarkets: (intel.localSeo.markets ?? []).filter(m => m.status === 'active').map(m => m.label),
       visibility: intel.localSeo.visibility,
       latestSnapshotAt: intel.localSeo.latestSnapshotAt,
       promptBlock: intel.localSeo.effectiveLocalSeoBlock,
