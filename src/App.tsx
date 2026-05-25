@@ -14,7 +14,6 @@ import { useWorkspaces, useCreateWorkspace, useDeleteWorkspace, useLinkSite, use
 import { useQueryClient } from '@tanstack/react-query';
 import { ToastProvider } from './components/Toast';
 import { BackgroundTaskProvider } from './hooks/useBackgroundTasks';
-import { TaskPanel } from './components/TaskPanel';
 import { AdminChat } from './components/AdminChat';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { CommandPalette } from './components/CommandPalette';
@@ -48,6 +47,7 @@ const WorkspaceHome = lazyWithRetry(() => import('./components/WorkspaceHome').t
 // ── Lazy-loaded SEO sub-tool chunks (split from SeoAudit #131) ──
 const SeoEditorWrapper = lazyWithRetry(() => import('./components/SeoEditorWrapper').then(m => ({ default: m.SeoEditorWrapper })));
 const KeywordStrategyPanel = lazyWithRetry(() => import('./components/KeywordStrategy').then(m => ({ default: m.KeywordStrategyPanel })));
+const KeywordCommandCenter = lazyWithRetry(() => import('./components/KeywordCommandCenter').then(m => ({ default: m.KeywordCommandCenter })));
 const PageIntelligence = lazyWithRetry(() => import('./components/PageIntelligence').then(m => ({ default: m.PageIntelligence })));
 const SchemaSuggester = lazyWithRetry(() => import('./components/SchemaSuggester').then(m => ({ default: m.SchemaSuggester })));
 const ContentBriefs = lazyWithRetry(() => import('./components/ContentBriefs').then(m => ({ default: m.ContentBriefs })));
@@ -131,6 +131,13 @@ function ClientRoutes({ betaMode = false }: { betaMode?: boolean }) {
     const target = clientPath(workspaceId, splatRoot, betaMode);
     return <Navigate to={target + (qs ? `${target.includes('?') ? '&' : '?'}${qs}` : '')} replace />;
   }
+  if (workspaceId && splatRoot === 'schema-review') {
+    const remaining = new URLSearchParams(searchParams);
+    remaining.delete('tab');
+    const qs = remaining.toString();
+    const target = clientPath(workspaceId, 'schema-review', betaMode);
+    return <Navigate to={target + (qs ? `${target.includes('?') ? '&' : '?'}${qs}` : '')} replace />;
+  }
   return <ClientDashboard workspaceId={workspaceId} initialTab={splatTab} betaMode={betaMode} />;
 }
 
@@ -166,7 +173,7 @@ function AdminApp() {
     return <div className={theme === 'light' ? 'dashboard-light' : ''}><LoginScreen onLogin={auth.login} /></div>;
   }
 
-  return <div className={theme === 'light' ? 'dashboard-light' : ''}><Dashboard onLogout={auth.logout} theme={theme} toggleTheme={toggleTheme} /><TaskPanel /></div>;
+  return <div className={theme === 'light' ? 'dashboard-light' : ''}><Dashboard onLogout={auth.logout} theme={theme} toggleTheme={toggleTheme} /></div>;
 }
 
 function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; theme: 'dark' | 'light'; toggleTheme: () => void }) {
@@ -366,7 +373,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     : queue;
 
   // ── Content renderer ──
-  const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'links', 'seo-strategy', 'seo-schema', 'seo-briefs', 'seo-ranks', 'content-perf', 'content', 'subscriptions', 'brand', 'content-pipeline']);
+  const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'links', 'seo-strategy', 'seo-keywords', 'seo-schema', 'seo-briefs', 'seo-ranks', 'content-perf', 'content', 'subscriptions', 'brand', 'content-pipeline']);
   const needsSite = !!(SEO_TABS.has(tab) || tab === 'analytics-hub' || tab === 'performance');
   const renderContent = () => {
     if (tab === 'settings') return <SettingsPanel />;
@@ -419,6 +426,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'seo-audit') return <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} siteName={selected.webflowSiteName || selected.name} />;
     if (tab === 'seo-editor') return <SeoEditorWrapper key={`editor-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} />;
     if (tab === 'seo-strategy') return <KeywordStrategyPanel key={`strategy-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId!} />;
+    if (tab === 'seo-keywords') return <KeywordCommandCenter key={`keywords-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'page-intelligence') return <PageIntelligence key={`pageintel-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId!} fixContext={fixContext} />;
     if (tab === 'links') return <LinksPanel key={`links-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} />;
     if (tab === 'seo-schema') return <SchemaSuggester key={`schema-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} businessProfile={selected.businessProfile} intelligenceProfile={selected.intelligenceProfile} />;

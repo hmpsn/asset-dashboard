@@ -9,49 +9,50 @@ import type {
   GA4NewVsReturning, GA4OrganicOverview, GA4LandingPage,
 } from '../../shared/types/analytics';
 import type { ClientIntelligence } from '../../shared/types/intelligence.js';
+import type { AnalyticsDateRange } from '../../shared/types/analytics-contract.js';
 
 // ── Query-string helper ────────────────────────────────────────────
-function qs(days: number, dateRange?: { startDate: string; endDate: string }): string {
+function qs(days: number, dateRange?: AnalyticsDateRange): string {
   const dr = dateRange ? `&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}` : '';
   return `?days=${days}${dr}`;
 }
 
 // ── Search Console (GSC) ───────────────────────────────────────────
 export const gsc = {
-  overview: (wsId: string, days: number, dateRange?: { startDate: string; endDate: string }) =>
+  overview: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
     getOptional<SearchOverview>(`/api/public/search-overview/${wsId}${qs(days, dateRange)}`),
 
-  trend: (wsId: string, days: number, dateRange?: { startDate: string; endDate: string }) =>
+  trend: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
     getSafe<PerformanceTrend[]>(`/api/public/performance-trend/${wsId}${qs(days, dateRange)}`, []),
 
-  comparison: (wsId: string, days: number, dateRange?: { startDate: string; endDate: string }) =>
+  comparison: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
     getSafe<SearchComparison | null>(`/api/public/search-comparison/${wsId}${qs(days, dateRange)}`, null),
 
-  devices: (wsId: string, days: number, dateRange?: { startDate: string; endDate: string }) =>
+  devices: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
     getSafe<SearchDeviceBreakdown[]>(`/api/public/search-devices/${wsId}${qs(days, dateRange)}`, []),
 };
 
 // ── Google Analytics 4 (GA4) ───────────────────────────────────────
 export const ga4 = {
-  overview: (wsId: string, days: number, dateRange?: { startDate: string; endDate: string }) =>
+  overview: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
     getOptional<GA4Overview>(`/api/public/analytics-overview/${wsId}${qs(days, dateRange)}`),
 
-  trend: (wsId: string, days: number, dateRange?: { startDate: string; endDate: string }) =>
+  trend: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
     getSafe<GA4DailyTrend[]>(`/api/public/analytics-trend/${wsId}${qs(days, dateRange)}`, []),
 
-  topPages: (wsId: string, days: number, dateRange?: { startDate: string; endDate: string }) =>
+  topPages: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
     getSafe<GA4TopPage[]>(`/api/public/analytics-top-pages/${wsId}${qs(days, dateRange)}`, []),
 
-  sources: (wsId: string, days: number, dateRange?: { startDate: string; endDate: string }) =>
+  sources: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
     getSafe<GA4TopSource[]>(`/api/public/analytics-sources/${wsId}${qs(days, dateRange)}`, []),
 
-  devices: (wsId: string, days: number, dateRange?: { startDate: string; endDate: string }) =>
+  devices: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
     getSafe<GA4DeviceBreakdown[]>(`/api/public/analytics-devices/${wsId}${qs(days, dateRange)}`, []),
 
-  countries: (wsId: string, days: number, dateRange?: { startDate: string; endDate: string }) =>
+  countries: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
     getSafe<GA4CountryBreakdown[]>(`/api/public/analytics-countries/${wsId}${qs(days, dateRange)}`, []),
 
-  events: (wsId: string, days: number, dateRange?: { startDate: string; endDate: string }) =>
+  events: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
     getSafe<GA4Event[]>(`/api/public/analytics-events/${wsId}${qs(days, dateRange)}`, []),
 
   eventTrend: (wsId: string, eventName: string, days: number) =>
@@ -60,19 +61,19 @@ export const ga4 = {
   eventPages: (wsId: string, eventName: string, days: number) =>
     getSafe<GA4EventPageBreakdown[]>(`/api/public/analytics-event-explorer/${wsId}?event=${encodeURIComponent(eventName)}&days=${days}`, []),
 
-  conversions: (wsId: string, days: number, dateRange?: { startDate: string; endDate: string }) =>
+  conversions: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
     getSafe<GA4ConversionSummary[]>(`/api/public/analytics-conversions/${wsId}${qs(days, dateRange)}`, []),
 
-  comparison: (wsId: string, days: number, dateRange?: { startDate: string; endDate: string }) =>
+  comparison: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
     getSafe<GA4Comparison | null>(`/api/public/analytics-comparison/${wsId}${qs(days, dateRange)}`, null),
 
-  newVsReturning: (wsId: string, days: number, dateRange?: { startDate: string; endDate: string }) =>
+  newVsReturning: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
     getSafe<GA4NewVsReturning[]>(`/api/public/analytics-new-vs-returning/${wsId}${qs(days, dateRange)}`, []),
 
-  organic: (wsId: string, days: number, dateRange?: { startDate: string; endDate: string }) =>
+  organic: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
     getSafe<GA4OrganicOverview | null>(`/api/public/analytics-organic/${wsId}${qs(days, dateRange)}`, null),
 
-  landingPages: (wsId: string, days: number, opts?: { dateRange?: { startDate: string; endDate: string }; organic?: boolean; limit?: number }) => {
+  landingPages: (wsId: string, days: number, opts?: { dateRange?: AnalyticsDateRange; organic?: boolean; limit?: number }) => {
     let url = `/api/public/analytics-landing-pages/${wsId}${qs(days, opts?.dateRange)}`;
     if (opts?.organic) url += '&organic=true';
     if (opts?.limit) url += `&limit=${opts.limit}`;

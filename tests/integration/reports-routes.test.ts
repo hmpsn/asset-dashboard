@@ -11,6 +11,7 @@
  * - PATCH /api/reports/snapshot/:id/actions/:actionId (update action item)
  * - DELETE /api/reports/snapshot/:id/actions/:actionId (delete action item)
  * - GET /api/sales-reports (list sales reports)
+ * - POST /api/competitor-compare (maxPages validation)
  * - GET /api/public/reports/:workspaceId (unified report list)
  * - GET /api/public/report/:id (public report JSON)
  */
@@ -472,12 +473,94 @@ describe('Reports — action items CRUD', () => {
   });
 });
 
+describe('Reports — public audit workspace guards', () => {
+  it('GET /api/public/audit-summary/:workspaceId returns 404 for unknown workspaces', async () => {
+    const res = await api('/api/public/audit-summary/ws_reports_missing_workspace');
+    expect(res.status).toBe(404);
+    await expect(res.json()).resolves.toEqual({ error: 'Workspace not found' });
+  });
+
+  it('GET /api/public/audit-detail/:workspaceId returns 400 when workspace has no linked site', async () => {
+    const ws = createWorkspace('Reports Guard No Site Workspace');
+    try {
+      const res = await api(`/api/public/audit-detail/${ws.id}`);
+      expect(res.status).toBe(400);
+      await expect(res.json()).resolves.toEqual({ error: 'No site linked' });
+    } finally {
+      deleteWorkspace(ws.id);
+    }
+  });
+});
+
 describe('Reports — sales reports', () => {
   it('GET /api/sales-reports returns array', async () => {
     const res = await api('/api/sales-reports');
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(Array.isArray(body)).toBe(true);
+  });
+
+  it('POST /api/sales-report rejects non-positive maxPages', async () => {
+    const res = await postJson('/api/sales-report', {
+      url: 'https://example.com',
+      maxPages: 0,
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'maxPages must be a positive integer' });
+  });
+
+  it('POST /api/sales-report rejects maxPages above 100', async () => {
+    const res = await postJson('/api/sales-report', {
+      url: 'https://example.com',
+      maxPages: 101,
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'maxPages must be between 1 and 100' });
+  });
+
+  it('POST /api/sales-report rejects non-integer maxPages', async () => {
+    const res = await postJson('/api/sales-report', {
+      url: 'https://example.com',
+      maxPages: 1.5,
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'maxPages must be a positive integer' });
+  });
+
+  it('POST /api/competitor-compare rejects non-positive maxPages', async () => {
+    const res = await postJson('/api/competitor-compare', {
+      myUrl: 'https://example.com',
+      competitorUrl: 'https://competitor.example',
+      maxPages: 0,
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'maxPages must be a positive integer' });
+  });
+
+  it('POST /api/competitor-compare rejects non-integer maxPages', async () => {
+    const res = await postJson('/api/competitor-compare', {
+      myUrl: 'https://example.com',
+      competitorUrl: 'https://competitor.example',
+      maxPages: 2.5,
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'maxPages must be a positive integer' });
+  });
+
+  it('POST /api/competitor-compare rejects maxPages above 30', async () => {
+    const res = await postJson('/api/competitor-compare', {
+      myUrl: 'https://example.com',
+      competitorUrl: 'https://competitor.example',
+      maxPages: 31,
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'maxPages must be between 1 and 30' });
   });
 });
 

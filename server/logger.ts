@@ -1,6 +1,7 @@
 import pino from 'pino';
 
 const IS_PROD = process.env.NODE_ENV === 'production';
+const IS_TEST = process.env.VITEST === 'true' || process.env.NODE_ENV === 'test';
 
 /**
  * Root logger instance for the application.
@@ -8,7 +9,7 @@ const IS_PROD = process.env.NODE_ENV === 'production';
  * - Pretty-printed in development (via pino-pretty)
  */
 const logger = pino({
-  level: process.env.LOG_LEVEL || (IS_PROD ? 'info' : 'debug'),
+  level: process.env.LOG_LEVEL || (IS_TEST ? 'silent' : IS_PROD ? 'info' : 'debug'),
   ...(IS_PROD
     ? {}
     : {

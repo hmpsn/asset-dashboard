@@ -9,7 +9,9 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import type { UnifiedPage } from '../../../shared/types/page-join';
+import type { LocalSeoKeywordVisibilitySummary } from '../../../shared/types/local-seo';
 import { scoreColorClass, Icon, IconButton, ClickableRow } from '../ui';
+import { LocalSeoVisibilityBadge } from '../local-seo/LocalSeoVisibilityPanel';
 import {
   intentColor,
   kdColor,
@@ -18,6 +20,8 @@ import {
 import { summarizeScoreTrend } from './pageIntelligenceData';
 import type { ContentScore, KeywordData, KeywordEditDraft, SeoCopy } from './pageIntelligenceTypes';
 import { PageIntelligencePageDetails } from './PageIntelligencePageDetails';
+import { keywordTrackingKey } from '../../lib/keywordTracking';
+import { keywordComparisonKey } from '../../../shared/keyword-normalization';
 
 interface Props {
   page: UnifiedPage;
@@ -32,6 +36,7 @@ interface Props {
   generatingCopy: string | null;
   copiedField: string | null;
   trackedKeywords: Set<string>;
+  localSeoByKeyword?: Map<string, LocalSeoKeywordVisibilitySummary>;
   onToggleExpanded: (pageId: string) => void;
   onTrackKeyword: (keyword: string) => void;
   onStartEdit: (page: UnifiedPage) => void;
@@ -60,6 +65,7 @@ export function PageIntelligencePageRow({
   generatingCopy,
   copiedField,
   trackedKeywords,
+  localSeoByKeyword,
   onToggleExpanded,
   onTrackKeyword,
   onStartEdit,
@@ -75,6 +81,12 @@ export function PageIntelligencePageRow({
   onViewFullAnalysis,
 }: Props) {
   const strategy = page.strategy;
+  const primaryKeywordTracked = strategy?.primaryKeyword
+    ? trackedKeywords.has(keywordTrackingKey(strategy.primaryKeyword))
+    : false;
+  const localSeoVisibility = strategy?.primaryKeyword
+    ? localSeoByKeyword?.get(keywordComparisonKey(strategy.primaryKeyword))
+    : undefined;
   const displayScore = analysis?.optimizationScore ?? strategy?.optimizationScore;
   const scoreTrend = summarizeScoreTrend(strategy?.optimizationScoreHistory);
   const trendIcon = scoreTrend?.direction === 'up'
@@ -123,19 +135,20 @@ export function PageIntelligencePageRow({
             <span className="inline-flex items-center gap-1 t-caption-sm text-accent-brand bg-teal-500/10 px-1.5 py-0.5 rounded max-w-[200px]">
               <span className="truncate">{strategy.primaryKeyword}</span>
               <IconButton
-                icon={trackedKeywords.has(strategy.primaryKeyword) ? Check : Plus}
-                label={trackedKeywords.has(strategy.primaryKeyword) ? 'Tracking' : 'Track in Rank Tracker'}
-                title={trackedKeywords.has(strategy.primaryKeyword) ? 'Tracking' : 'Track in Rank Tracker'}
+                icon={primaryKeywordTracked ? Check : Plus}
+                label={primaryKeywordTracked ? 'Tracking' : 'Track in Rank Tracker'}
+                title={primaryKeywordTracked ? 'Tracking' : 'Track in Rank Tracker'}
                 size="sm"
                 variant="ghost"
                 onClick={event => {
                   event.stopPropagation();
                   onTrackKeyword(strategy.primaryKeyword);
                 }}
-                className={`!h-auto !w-auto !p-0 flex-shrink-0 transition-colors ${trackedKeywords.has(strategy.primaryKeyword) ? 'text-accent-success' : 'text-accent-brand hover:text-accent-brand'}`}
+                className={`!h-auto !w-auto !p-0 flex-shrink-0 transition-colors ${primaryKeywordTracked ? 'text-accent-success' : 'text-accent-brand hover:text-accent-brand'}`}
               />
             </span>
           )}
+          <LocalSeoVisibilityBadge visibility={localSeoVisibility} subtle />
           {strategy?.validated === false && (
             <span className="t-micro text-accent-warning bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20" title="Keyword not validated in SEMRush">{/* // arbitrary-text-ok */}
               Unvalidated
@@ -180,6 +193,7 @@ export function PageIntelligencePageRow({
           generatingCopy={generatingCopy}
           copiedField={copiedField}
           trackedKeywords={trackedKeywords}
+          localSeoVisibility={localSeoVisibility}
           onTrackKeyword={onTrackKeyword}
           onStartEdit={onStartEdit}
           onEditDraftChange={onEditDraftChange}

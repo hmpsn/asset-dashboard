@@ -39,6 +39,7 @@ import {
   generateKeywordStrategy,
   hasActiveKeywordStrategyGeneration,
   KeywordStrategyGenerationError,
+  KEYWORD_STRATEGY_MAX_PAGE_CAP,
 } from '../keyword-strategy-generation.js';
 import { saveSnapshot, getLatestSnapshotBefore } from '../reports.js';
 import { getEffectiveAudit, getEffectivePreviousScore } from '../audit-snapshot-views.js';
@@ -103,6 +104,33 @@ const keywordStrategyStepLabels: Record<string, string> = {
   enrichment: 'Enriching data',
   complete: 'Complete',
 };
+
+function keywordStrategyJobResultSummary(
+  strategy: {
+    generatedAt?: unknown;
+    pageMap?: unknown;
+    siteKeywords?: unknown;
+    contentGaps?: unknown;
+    quickWins?: unknown;
+  },
+  options: { upToDate?: boolean; freshPageCount?: number } = {},
+): Record<string, unknown> {
+  const pageMap = strategy.pageMap;
+  const siteKeywords = strategy.siteKeywords;
+  const contentGaps = strategy.contentGaps;
+  const quickWins = strategy.quickWins;
+
+  return {
+    persisted: true,
+    upToDate: Boolean(options.upToDate),
+    freshPageCount: options.freshPageCount,
+    generatedAt: typeof strategy.generatedAt === 'string' ? strategy.generatedAt : undefined,
+    pageCount: Array.isArray(pageMap) ? pageMap.length : 0,
+    siteKeywordCount: Array.isArray(siteKeywords) ? siteKeywords.length : 0,
+    contentGapCount: Array.isArray(contentGaps) ? contentGaps.length : 0,
+    quickWinCount: Array.isArray(quickWins) ? quickWins.length : 0,
+  };
+}
 
 // --- Background Job Endpoints ---
 router.get('/api/jobs', (_req, res) => {
@@ -596,12 +624,19 @@ router.post('/api/jobs', async (req, res) => {
       case 'sales-report': {
         const { url, maxPages } = params as { url: string; maxPages?: number };
         if (!url) return res.status(400).json({ error: 'url required' });
+        const requestedMaxPages = maxPages == null ? 25 : Number(maxPages);
+        if (!Number.isInteger(requestedMaxPages) || requestedMaxPages <= 0) {
+          return res.status(400).json({ error: 'maxPages must be a positive integer' });
+        }
+        if (requestedMaxPages > 100) {
+          return res.status(400).json({ error: 'maxPages must be between 1 and 100' });
+        }
         const job = createJob('sales-report', { message: `Auditing ${url}...` });
         res.json({ jobId: job.id });
         (async () => {
           try {
             updateJob(job.id, { status: 'running', message: 'Crawling site...' });
-            const result = await runSalesAudit(url, maxPages || 25);
+            const result = await runSalesAudit(url, requestedMaxPages);
             const reportsDir = getDataDir('sales-reports');
             const reportId = `sr_${Date.now()}`;
             const reportFile = path.join(reportsDir, `${reportId}.json`);
@@ -644,7 +679,7 @@ router.post('/api/jobs', async (req, res) => {
       case BACKGROUND_JOB_TYPES.PERSONA_GENERATION: {
         const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
         try {
-          const started = startWorkspaceContextGenerationJob(type, wsId);
+          const started = await startWorkspaceContextGenerationJob(type, wsId);
           res.json(started);
         } catch (err) {
           const response = workspaceContextJobErrorResponse(err);
@@ -656,6 +691,13 @@ router.post('/api/jobs', async (req, res) => {
       case BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY: {
         const wsId = params.workspaceId as string;
         if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
+        const maxPages = params.maxPages == null ? undefined : Number(params.maxPages);
+        if (maxPages != null && (!Number.isInteger(maxPages) || maxPages < 0)) {
+          return res.status(400).json({ error: 'maxPages must be a non-negative integer' });
+        }
+        if (maxPages != null && maxPages > KEYWORD_STRATEGY_MAX_PAGE_CAP) {
+          return res.status(400).json({ error: `maxPages must be between 0 and ${KEYWORD_STRATEGY_MAX_PAGE_CAP}` });
+        }
         const activeStrat = hasActiveJob('keyword-strategy', wsId);
         if (activeStrat) return res.status(409).json({ error: 'A keyword strategy is already being generated for this workspace', jobId: activeStrat.id });
         if (hasActiveKeywordStrategyGeneration(wsId)) return res.status(409).json({ error: 'A keyword strategy is already being generated for this workspace' });
@@ -674,14 +716,15 @@ router.post('/api/jobs', async (req, res) => {
               updateJob(job.id, { status: 'running', message: 'Fetching pages and analyzing keywords...' });
               const businessContext = (params.businessContext as string) || stratWs.keywordStrategy?.businessContext || '';
               const seoDataMode = (params.seoDataMode as string) || (params.semrushMode as string) || 'none';
+              const seoDataProvider = typeof params.seoDataProvider === 'string' ? params.seoDataProvider : undefined;
               const competitorDomainsProvided = Array.isArray(params.competitorDomains);
               const competitorDomains = competitorDomainsProvided ? params.competitorDomains as string[] : stratWs.competitorDomains || [];
-              const maxPages = params.maxPages != null ? Number(params.maxPages) : undefined;
               const mode = params.mode === 'incremental' ? 'incremental' : 'full';
               const generationResult = await generateKeywordStrategy({
                 workspaceId: wsId,
                 businessContext,
                 seoDataMode,
+                seoDataProvider,
                 competitorDomains,
                 competitorDomainsProvided,
                 maxPages,
@@ -713,7 +756,9 @@ router.post('/api/jobs', async (req, res) => {
               const pageCount = Array.isArray(pageMap) ? pageMap.length : 0;
               updateJob(job.id, {
                 status: 'done',
-                result: stratResult,
+                result: keywordStrategyJobResultSummary(stratResult, {
+                  freshPageCount: generationResult.freshPageCount,
+                }),
                 progress: 100,
                 total: 100,
                 message: `Strategy complete — ${pageCount} pages mapped`,

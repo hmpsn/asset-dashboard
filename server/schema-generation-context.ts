@@ -1,6 +1,6 @@
 import { buildSchemaContext } from './helpers.js';
 import { getCachedArchitecture } from './site-architecture.js';
-import { getValidation, getValidations, type SchemaValidation } from './schema-validator.js';
+import { getValidation } from './schema-validator.js';
 import type { SchemaContext } from './schema-suggester.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
@@ -8,24 +8,15 @@ import { createLogger } from './logger.js';
 const log = createLogger('schema-generation-context');
 
 type SchemaContextBundle = Awaited<ReturnType<typeof buildSchemaContext>>;
-
-export interface BulkSchemaGenerationContext extends SchemaContextBundle {
-  validationsByPageId: Map<string, SchemaValidation>;
-}
-
-export async function prepareBulkSchemaGenerationContext(siteId: string): Promise<BulkSchemaGenerationContext> {
+export async function prepareBulkSchemaGenerationContext(siteId: string): Promise<SchemaContextBundle> {
   const context = await buildSchemaContext(siteId, { includeAnalytics: true });
   const { ctx } = context;
-  const validationsByPageId = new Map<string, SchemaValidation>();
 
   if (ctx.workspaceId) {
-    for (const validation of getValidations(ctx.workspaceId)) {
-      validationsByPageId.set(validation.pageId, validation);
-    }
     await attachArchitectureTree(ctx);
   }
 
-  return { ...context, validationsByPageId };
+  return context;
 }
 
 export async function prepareSinglePageSchemaGenerationContext(

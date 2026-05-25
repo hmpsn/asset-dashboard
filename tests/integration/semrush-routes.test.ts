@@ -249,6 +249,20 @@ describe('SEMRush HTTP routes', () => {
       expect(body).toHaveProperty('error');
     });
 
+    it('accepts repeated competitors query params without throwing', async () => {
+      const res = await api(`/api/semrush/competitive-intel/${testWsId}?competitors=rival.com&competitors=other.com`);
+      expect([400, 503]).toContain(res.status);
+      const body = await res.json();
+      expect(body).toHaveProperty('error');
+    });
+
+    it('rejects competitor lists above the allowed cap', async () => {
+      const domains = Array.from({ length: 6 }, (_unused, idx) => `rival-${idx + 1}.example`);
+      const res = await api(`/api/semrush/competitive-intel/${testWsId}?competitors=${domains.join(',')}`);
+      expect(res.status).toBe(400);
+      await expect(res.json()).resolves.toEqual({ error: 'competitors must include at most 5 domains' });
+    });
+
     it('returns 404 for unknown workspace', async () => {
       const res = await api('/api/semrush/competitive-intel/no-such-ws?competitors=rival.com');
       expect(res.status).toBe(404);

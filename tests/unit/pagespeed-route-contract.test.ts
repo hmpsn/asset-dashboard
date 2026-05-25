@@ -15,7 +15,7 @@ describe('single-page PageSpeed route contract', () => {
     expect(routeSource).toContain('runSinglePageSpeed(url, resolvedStrategy');
   });
 
-  it('does not reconstruct single-page URLs from the Webflow site shortName', () => {
+  it('does not reconstruct single-page URLs from invalid Webflow shortName fragments', () => {
     expect(routeSource).not.toMatch(/https:\/\/api\.webflow\.com\/v2\/sites\/\$\{siteId\}/);
     expect(routeSource).not.toContain('shortName');
     expect(routeSource).not.toContain('webflow.io/${pageSlug}');

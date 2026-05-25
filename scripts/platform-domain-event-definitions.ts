@@ -215,6 +215,8 @@ const CONTEXT_BY_EVENT_KEY: Record<WsEventKey, BoundedContextId> = {
   BULK_OPERATION_FAILED: 'seo-health',
   RECOMMENDATIONS_UPDATED: 'seo-health',
   STRATEGY_UPDATED: 'seo-health',
+  RANK_TRACKING_UPDATED: 'seo-health',
+  LOCAL_SEO_UPDATED: 'seo-health',
 };
 
 const PAYLOAD_NOTE_BY_EVENT_KEY: Partial<Record<WsEventKey, string>> = {
@@ -227,6 +229,8 @@ const PAYLOAD_NOTE_BY_EVENT_KEY: Partial<Record<WsEventKey, string>> = {
   BRIEFING_PUBLISHED: 'Briefing publication signal for weekly briefing consumers.',
   DIAGNOSTIC_FAILED: 'Diagnostic failure payload with report id and failure context.',
   STRATEGY_UPDATED: 'Strategy keyword/score updates and related summary invalidation payload.',
+  RANK_TRACKING_UPDATED: 'Rank-tracking keyword lifecycle, snapshot, and strategy reconciliation updates.',
+  LOCAL_SEO_UPDATED: 'Local SEO market configuration and visibility refresh updates.',
 };
 
 const INVALIDATION_OVERRIDES: Partial<Record<WsEventKey, string[]>> = {
@@ -239,6 +243,8 @@ const INVALIDATION_OVERRIDES: Partial<Record<WsEventKey, string[]>> = {
   SCHEMA_SNAPSHOT_UPDATED: ['queryKeys.admin.schemaSnapshot*', 'queryKeys.admin.schemaGraphValidation*'],
   BRIEFING_PUBLISHED: ['queryKeys.client.briefing', 'queryKeys.admin.briefing'],
   STRATEGY_UPDATED: ['queryKeys.admin.keywordStrategy', 'queryKeys.client.strategy', 'queryKeys.admin.workspaceHome'],
+  RANK_TRACKING_UPDATED: ['queryKeys.admin.rankTracking*', 'queryKeys.client.rankTracking*', 'queryKeys.admin.keywordStrategy', 'queryKeys.client.strategy', 'queryKeys.admin.pageKeywords', 'queryKeys.admin.intelligence'],
+  LOCAL_SEO_UPDATED: ['queryKeys.admin.localSeo', 'queryKeys.admin.keywordCommandCenter', 'queryKeys.admin.keywordStrategy'],
 };
 
 const ACTIVITY_OVERRIDES: Partial<Record<WsEventKey, string[]>> = {
@@ -258,6 +264,8 @@ const ACTIVITY_OVERRIDES: Partial<Record<WsEventKey, string[]>> = {
   DIAGNOSTIC_FAILED: ['diagnostic_failed'],
   RECOMMENDATIONS_UPDATED: ['recommendation_resolved'],
   STRATEGY_UPDATED: ['client_keyword_feedback', 'client_keyword_tracked'],
+  RANK_TRACKING_UPDATED: ['rank_tracking_updated', 'rank_snapshot'],
+  LOCAL_SEO_UPDATED: ['local_seo_updated'],
 };
 
 function collectTsFiles(dir: string): string[] {
@@ -285,6 +293,10 @@ function sortRecordValues(record: Record<string, string[]>): Record<string, stri
     sorted[key] = [...values].sort((a, b) => a.localeCompare(b));
   }
   return sorted;
+}
+
+function uniqueSorted(values: string[]): string[] {
+  return [...new Set(values)].sort((a, b) => a.localeCompare(b));
 }
 
 function discoverProducerModulesByEvent(): Record<string, string[]> {
@@ -489,12 +501,23 @@ export function buildDomainEventDefinitionsReport(
   discovery: DomainEventDiscovery = discoverDomainEventUsage(),
 ): DomainEventDefinitionsReport {
   const coverageEntries: DomainEventCoverageEntry[] = entries
-    .map(entry => ({
-      ...entry,
-      discoveredProducerModules: discovery.producerModulesByEvent[entry.eventName] ?? [],
-      discoveredAdminListenerModules: discovery.adminListenersByEvent[entry.eventName] ?? [],
-      discoveredClientListenerModules: discovery.clientListenersByEvent[entry.eventName] ?? [],
-    }))
+    .map(entry => {
+      const discoveredProducerModules = discovery.producerModulesByEvent[entry.eventName] ?? [];
+      const discoveredAdminListenerModules = discovery.adminListenersByEvent[entry.eventName] ?? [];
+      const discoveredClientListenerModules = discovery.clientListenersByEvent[entry.eventName] ?? [];
+
+      return {
+        ...entry,
+        // Keep curated defaults, but automatically include newly discovered modules
+        // so advisory drift focuses on structural gaps rather than stale mappings.
+        producerModules: uniqueSorted([...entry.producerModules, ...discoveredProducerModules]),
+        adminListeners: uniqueSorted([...entry.adminListeners, ...discoveredAdminListenerModules]),
+        clientListeners: uniqueSorted([...entry.clientListeners, ...discoveredClientListenerModules]),
+        discoveredProducerModules,
+        discoveredAdminListenerModules,
+        discoveredClientListenerModules,
+      };
+    })
     .sort((a, b) => a.eventName.localeCompare(b.eventName));
 
   return {

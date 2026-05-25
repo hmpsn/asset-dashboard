@@ -19,10 +19,15 @@ export type {
   ApprovalItem, ApprovalBatch,
 } from '../../../shared/types/approvals.ts';
 
+export type {
+  LatestRank, RankHistoryEntry,
+} from '../../../shared/types/rank-tracking.ts';
+
 // ── Client-specific types (not shared with server) ──────────────
 
 import type { EventDisplayConfig, EventGroup } from '../../../shared/types/workspace.ts';
 import type { MetricsSource } from '../../../shared/types/keywords.js';
+import type { KeywordStrategyUxPayload } from '../../../shared/types/keyword-strategy-ux.js';
 
 export interface ContentPricing { briefPrice: number; fullPostPrice: number; currency: string; briefLabel?: string; fullPostLabel?: string; briefDescription?: string; fullPostDescription?: string; }
 export interface BusinessProfile { phone?: string; email?: string; address?: { street?: string; city?: string; state?: string; zip?: string; country?: string }; socialProfiles?: string[]; openingHours?: string; foundedDate?: string; numberOfEmployees?: string; }
@@ -53,8 +58,6 @@ export interface ActivityLogItem {
   createdAt: string;
 }
 
-export interface RankHistoryEntry { date: string; positions: Record<string, number> }
-export interface LatestRank { query: string; position: number; clicks: number; impressions: number; ctr: number; change?: number }
 export interface AnnotationItem { id: string; date: string; label: string; description?: string; color?: string; createdAt: string }
 export interface AnomalyItem { id: string; workspaceId?: string; workspaceName?: string; type: string; severity: string; title: string; description: string; metric: string; currentValue: number; previousValue: number; changePct: number; aiSummary?: string; detectedAt: string; dismissedAt?: string; acknowledgedAt?: string; source: string }
 
@@ -136,6 +139,7 @@ export interface ClientKeywordStrategy {
   topicClusters?: { topic: string; keywords: string[]; ownedCount: number; totalCount: number; coveragePercent: number; avgPosition?: number; topCompetitor?: string; topCompetitorCoverage?: number; gap: string[] }[];
   cannibalization?: { keyword: string; pages: { path: string; position?: number; impressions?: number; clicks?: number; source: 'keyword_map' | 'gsc' }[]; severity: 'high' | 'medium' | 'low'; recommendation: string; canonicalPath?: string; canonicalUrl?: string; action?: 'canonical_tag' | 'redirect_301' | 'differentiate' | 'noindex' }[];
   questionKeywords?: { seed: string; questions: { keyword: string; volume: number }[] }[];
+  strategyUx?: KeywordStrategyUxPayload;
   businessContext?: string;
   generatedAt: string | null;
 }

@@ -38,6 +38,8 @@ import reportsRoutes from './routes/reports.js';
 import googleRoutes from './routes/google.js';
 import aiRoutes from './routes/ai.js';
 import keywordStrategyRoutes from './routes/keyword-strategy.js';
+import keywordCommandCenterRoutes from './routes/keyword-command-center.js';
+import localSeoRoutes from './routes/local-seo.js';
 import semrushRoutes from './routes/semrush.js';
 import approvalsRoutes from './routes/approvals.js';
 import requestsRoutes from './routes/requests.js';
@@ -286,6 +288,8 @@ export function createApp(): express.Express {
   app.use(googleRoutes);
   app.use(aiRoutes);
   app.use(keywordStrategyRoutes);
+  app.use(keywordCommandCenterRoutes);
+  app.use(localSeoRoutes);
   app.use(semrushRoutes);
   app.use(approvalsRoutes);
   registerPublicRoutes(app);

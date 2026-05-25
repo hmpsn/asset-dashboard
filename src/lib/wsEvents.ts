@@ -79,6 +79,10 @@ export const WS_EVENTS = {
 
   // Keyword Strategy
   STRATEGY_UPDATED: 'strategy:updated',
+  RANK_TRACKING_UPDATED: 'rank-tracking:updated',
+
+  // Local SEO
+  LOCAL_SEO_UPDATED: 'local-seo:updated',
 
   // Client Briefing (weekly editorial)
   BRIEFING_GENERATED: 'briefing:generated',

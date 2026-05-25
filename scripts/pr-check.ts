@@ -532,6 +532,38 @@ export function extractDbPrepareArg(chunk: string): string {
   return chunk.slice(argStart); // never closed within chunk — fall through
 }
 
+/**
+ * Extract the full `buildWorkspaceIntelligence(...)` call starting at the first
+ * occurrence in `chunk`. Like `extractDbPrepareArg`, this walks the characters
+ * and respects nested parens plus string literals so multiline option objects
+ * are inspected as one unit.
+ */
+export function extractBuildWorkspaceIntelligenceCall(chunk: string): string {
+  const startIdx = chunk.search(/buildWorkspaceIntelligence\s*\(/);
+  if (startIdx === -1) return chunk;
+  let i = chunk.indexOf('(', startIdx);
+  if (i === -1) return chunk;
+  let depth = 1;
+  let quote: string | null = null;
+  i++;
+  while (i < chunk.length) {
+    const ch = chunk[i];
+    if (quote) {
+      if (ch === '\\' && i + 1 < chunk.length) { i += 2; continue; }
+      if (ch === quote) quote = null;
+    } else {
+      if (ch === '`' || ch === "'" || ch === '"') quote = ch;
+      else if (ch === '(') depth++;
+      else if (ch === ')') {
+        depth--;
+        if (depth === 0) return chunk.slice(startIdx, i + 1);
+      }
+    }
+    i++;
+  }
+  return chunk.slice(startIdx);
+}
+
 // ─── Slice field rendering helpers ────────────────────────────────────────────
 //
 // Used by the 'Assembled-but-never-rendered slice fields' rule to detect fields
@@ -564,7 +596,8 @@ const KNOWN_UNRENDERED_FIELDS = new Set([
   // bySeverity: rendered via `const { bySeverity } = insights` (destructuring, not .bySeverity)
   'bySeverity',
   // LearningsSlice
-  'forPage', 'winRateByActionType',
+  // availability is control-plane metadata for callers; it intentionally does not render into prompt text
+  'availability', 'forPage', 'winRateByActionType',
   // SiteHealthSlice
   // PageProfileSlice
   // searchIntent: accessed via local pageKw.searchIntent variable, not profile.searchIntent
@@ -919,6 +952,87 @@ export const CHECKS: Check[] = [
     severity: 'error',
   },
   {
+    name: 'Keyword Command Center summary/detail must not use full model',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    displayScope: 'server/keyword-command-center.ts',
+    message: 'Summary/detail endpoints must stay skinny. Do not call buildKeywordCommandCenterModel() from buildKeywordCommandCenterSummary() or buildKeywordCommandCenterDetail().',
+    severity: 'error',
+    rationale: 'Prevents the OOM-prone full keyword universe builder from being reintroduced into lightweight Command Center endpoints.',
+    claudeMdRef: '#data-flow-rules-mandatory',
+    customCheck: (files) => {
+      const matches: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('server/keyword-command-center.ts')) continue;
+        const lines = readFileOrEmpty(file).split('\n');
+        let current: string | null = null;
+        let depth = 0;
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const fnMatch = line.match(/export\s+async\s+function\s+(buildKeywordCommandCenterSummary|buildKeywordCommandCenterDetail)\b/);
+          if (fnMatch) {
+            current = fnMatch[1];
+            depth = 0;
+          }
+          if (!current) continue;
+          if (line.includes('buildKeywordCommandCenterModel(')) {
+            matches.push({ file, line: i + 1, text: `${current} calls buildKeywordCommandCenterModel()` });
+          }
+          depth += (line.match(/\{/g) ?? []).length;
+          depth -= (line.match(/\}/g) ?? []).length;
+          if (depth <= 0 && line.trim() === '}') current = null;
+        }
+      }
+      return matches;
+    },
+  },
+  {
+    name: 'Local SEO Evaluated candidates must be explicitly gated',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    displayScope: 'server/keyword-command-center.ts',
+    message: 'buildLocalSeoKeywordCandidatesEvaluated() is the expensive variant (scans pageMap × secondaries, runs evaluator+suppression). Call the cheap buildLocalSeoKeywordCandidates() default or add a documented hatch.',
+    severity: 'error',
+    rationale: 'After the Tier 2 cheap/Evaluated split, the Evaluated variant is the OOM-prone hot path. The cheap default is correct for KCC row enrichment, intelligence slice, and refresh path.',
+    claudeMdRef: '#data-flow-rules-mandatory',
+    customCheck: (files) => {
+      const matches: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('server/keyword-command-center.ts')) continue;
+        const lines = readFileOrEmpty(file).split('\n');
+        let currentFunction = '';
+        let functionDepth = 0;
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const fnMatch = line.match(/(?:export\s+)?(?:async\s+)?function\s+(\w+)\b/)
+            ?? line.match(/(?:const|let)\s+(\w+)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>\s*\{/);
+          if (!currentFunction && fnMatch) {
+            currentFunction = fnMatch[1];
+            functionDepth = 0;
+          }
+          if (
+            line.includes('buildLocalSeoKeywordCandidatesEvaluated(')
+            && !line.includes('import ')
+            && currentFunction !== 'buildKeywordCommandCenterModel'
+            && currentFunction !== 'buildKeywordCommandCenterRowsViaModel'
+            && !hasHatch(lines, i, 'local-candidates-evaluated-ok')
+          ) {
+            matches.push({ file, line: i + 1, text: `ungated Evaluated candidate generation in ${currentFunction || 'module scope'}` });
+          }
+          if (currentFunction) {
+            functionDepth += (line.match(/\{/g) ?? []).length;
+            functionDepth -= (line.match(/\}/g) ?? []).length;
+            if (functionDepth <= 0 && line.trim() === '}') {
+              currentFunction = '';
+              functionDepth = 0;
+            }
+          }
+        }
+      }
+      return matches;
+    },
+  },
+  {
     name: 'Bare JSON.parse on server',
     pattern: 'JSON\\.parse\\(',
     fileGlobs: ['*.ts'],
@@ -1224,16 +1338,38 @@ export const CHECKS: Check[] = [
   },
   {
     name: 'buildWorkspaceIntelligence() without slices (assembles all 8 slices)',
-    // Matches calls that don't specify slices — typically: buildWorkspaceIntelligence(id) or buildWorkspaceIntelligence(id, { pagePath })
-    pattern: 'buildWorkspaceIntelligence\\(',
+    // customCheck so multiline object literals with `slices` shorthand are
+    // treated correctly. The old line-based pattern falsely warned on the
+    // shared generation context builders because `slices` lived on the next line.
+    pattern: '',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
     exclude: ['server/workspace-intelligence.ts'],
-    // Lines with slices: already correct; lines in route/intelligence.ts that dynamically pass slices are also fine
-    // 'slices:' catches key:value form; ' slices,' and ' slices }' catch object shorthand (const slices = [...]; { slices, pagePath })
-    excludeLines: ['slices:', ' slices,', ' slices }', ' slices)', '// bwi-all-ok'],
+    excludeLines: ['// bwi-all-ok'],
     message: 'Always pass { slices: [...] } to buildWorkspaceIntelligence(). Omitting it assembles all 8 slices (expensive). Add `// bwi-all-ok` if intentional.',
     severity: 'warn',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        const rel = path.relative(ROOT, file).split(path.sep).join('/');
+        const inServerScope = rel.startsWith('server/') || rel.includes('/server/');
+        if (!inServerScope || rel.endsWith('/server/workspace-intelligence.ts') || rel === 'server/workspace-intelligence.ts') continue;
+        const content = readFileOrEmpty(file);
+        if (!content.includes('buildWorkspaceIntelligence(')) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!lines[i].includes('buildWorkspaceIntelligence(')) continue;
+          if (hasHatch(lines, i, '// bwi-all-ok')) continue;
+          const chunk = lines.slice(i, i + 12).join('\n');
+          const call = extractBuildWorkspaceIntelligenceCall(chunk);
+          if (/\bslices\s*:/.test(call) || /\{\s*slices\b/.test(call) || /,\s*slices\s*[,\}]/.test(call)) {
+            continue;
+          }
+          hits.push({ file, line: i + 1, text: lines[i] });
+        }
+      }
+      return hits;
+    },
   },
   {
     name: 'formatForPrompt with inline sections literal (use buildIntelPrompt or sections: slices)',
@@ -3053,7 +3189,7 @@ export const CHECKS: Check[] = [
     // to bind gets EADDRINUSE and the CI run is flaky. This rule collects
     // all port allocations across every `*.test.ts` file and flags any
     // duplicate. It also flags ports outside the documented range
-    // (13201–13319 per CLAUDE.md) as a separate warning.
+    // (13201–13899 per CLAUDE.md) as a separate warning.
     name: 'Port collision in integration tests',
     pattern: '',
     fileGlobs: ['*.test.ts'],
@@ -3062,7 +3198,7 @@ export const CHECKS: Check[] = [
     message:
       'Two or more test files use the same port in createTestContext(). ' +
       'Each integration test must use a unique port to avoid EADDRINUSE in parallel CI runs. ' +
-      'Pick an unused port in the 13201–13319 range (grep existing ports first). ' +
+      'Pick an unused port in the 13201–13899 range (grep existing ports first). ' +
       'Suppress with // port-ok if this is intentionally shared.',
     severity: 'error',
     rationale:
@@ -3097,9 +3233,9 @@ export const CHECKS: Check[] = [
           for (const u of usages) hits.push(u);
         }
       }
-      // Flag ports outside the documented 13201–13319 range
+      // Flag ports outside the documented 13201–13899 range
       const PORT_MIN = 13201;
-      const PORT_MAX = 13319;
+      const PORT_MAX = 13899;
       for (const [port, usages] of portMap) {
         if (port < PORT_MIN || port > PORT_MAX) {
           for (const u of usages) {
@@ -5722,6 +5858,194 @@ export const CHECKS: Check[] = [
       return hits;
     },
   },
+  {
+    name: 'muted-text-two-tier-only',
+    severity: 'warn',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: ['src/components/ui/'],
+    message:
+      'Potential muted-tier drift detected. Body/caption copy should usually stay on canonical body/muted tiers; reserve dim for tertiary metadata only. Hatch intentional exceptions with // muted-tier-ok.',
+    rationale:
+      'Type hierarchy drift often comes from overusing dim text on primary copy, reducing contrast and making live surfaces feel noisier/less legible than styleguide specimens.',
+    claudeMdRef: '#uiux-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const eligibleTagRe = /<(p|span|div|li|small|BodyText)\b/;
+      const bodyLikeTypeRe = /\b(?:t-body|t-page|t-caption|t-caption-sm|t-ui)\b/;
+      const dimToneRe = /\btext-\[var\(--brand-text-dim\)\]/;
+
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+
+        let src: string;
+        try {
+          src = readFileSync(file, 'utf-8');
+        } catch {
+          continue;
+        }
+
+        const lines = src.split('\n');
+        for (let index = 0; index < lines.length; index += 1) {
+          if (!eligibleTagRe.test(lines[index])) continue;
+
+          const tagLines: string[] = [];
+          for (let offset = index; offset < Math.min(lines.length, index + 10); offset += 1) {
+            tagLines.push(lines[offset]);
+            if (/\/?>/.test(lines[offset])) break;
+          }
+          const tagText = tagLines.join(' ');
+          if (hasHatch(lines, index, 'muted-tier-ok')) continue;
+
+          if (/<BodyText\b/.test(tagText)) {
+            if (!/\btone\s*=\s*["']dim["']/.test(tagText)) continue;
+            hits.push({
+              file,
+              line: index + 1,
+              text: 'BodyText tone="dim" on visible copy',
+            });
+            continue;
+          }
+
+          if (!/\bclassName\s*=/.test(tagText)) continue;
+          if (!bodyLikeTypeRe.test(tagText)) continue;
+          if (/\b(?:t-label|t-micro)\b/.test(tagText)) continue;
+          if (!dimToneRe.test(tagText)) continue;
+
+          hits.push({
+            file,
+            line: index + 1,
+            text: 'body/caption typography using --brand-text-dim',
+          });
+        }
+      }
+
+      return hits;
+    },
+  },
+  {
+    name: 'raw-z-index-inline-literal',
+    severity: 'warn',
+    fileGlobs: ['*.ts', '*.tsx', '*.css'],
+    pathFilter: 'src/',
+    exclude: ['src/tokens.css'],
+    message:
+      'Raw numeric z-index literal detected. Use a concrete z token class such as z-[var(--z-sticky)] or var(--z-*) tokens instead. Hatch intentional exceptions with // z-index-ok.',
+    rationale:
+      'Inline numeric z-index values drift from the canonical token scale and make stacking behavior unpredictable across overlays, toasts, and modals.',
+    claudeMdRef: '#token-authority',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const jsLiteralRe = /\bzIndex\s*:\s*(\d+)\b/;
+      const cssLiteralRe = /\bz-index\s*:\s*(\d+)\b/;
+
+      for (const file of files) {
+        const src = readFileOrEmpty(file);
+        if (!src) continue;
+        const lines = src.split('\n');
+
+        for (let index = 0; index < lines.length; index += 1) {
+          const line = lines[index];
+          if (!jsLiteralRe.test(line) && !cssLiteralRe.test(line)) continue;
+          if (hasHatch(lines, index, 'z-index-ok')) continue;
+          if (/z-index\s*:\s*var\(/.test(line) || /zIndex\s*:\s*['"`]?var\(/.test(line)) continue;
+          if (/--z-/.test(line)) continue;
+          const match = line.match(jsLiteralRe) ?? line.match(cssLiteralRe);
+          const literal = match?.[1] ?? 'unknown';
+          hits.push({
+            file,
+            line: index + 1,
+            text: `raw z-index literal (${literal})`,
+          });
+        }
+      }
+
+      return hits;
+    },
+  },
+  {
+    name: 'focus-visible-ring-contract',
+    severity: 'warn',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    message:
+      'Keyboard-focusable controls that disable outline (`focus:outline-none`) should define explicit focus-visible styling. Add focus-visible:ring-* / focus-visible:outline-* or hatch with // focus-ring-ok.',
+    rationale:
+      'Removing default focus outlines without an explicit focus-visible fallback risks keyboard-invisible controls and drifts from the styleguide focus ring contract.',
+    claudeMdRef: '#uiux-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const outlineNoneRe = /\bfocus:outline-none\b/;
+
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        let src: string;
+        try {
+          src = readFileSync(file, 'utf-8');
+        } catch {
+          continue;
+        }
+        const lines = src.split('\n');
+        for (let index = 0; index < lines.length; index += 1) {
+          if (!outlineNoneRe.test(lines[index])) continue;
+          if (hasHatch(lines, index, 'focus-ring-ok')) continue;
+          const start = Math.max(0, index - 5);
+          const end = Math.min(lines.length, index + 7);
+          const windowText = lines.slice(start, end).join(' ');
+          if (!/\bclassName\s*=/.test(windowText)) continue;
+          if (/\bfocus-visible:(?:ring|outline)-/.test(windowText)) continue;
+          hits.push({
+            file,
+            line: index + 1,
+            text: 'focus:outline-none without focus-visible ring/outline fallback',
+          });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'stat-primitive-bypass-signal',
+    severity: 'warn',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: ['src/components/ui/'],
+    message:
+      'Potential hand-rolled stat typography detected. Prefer StatCard/CompactStatBar (or hatch with // stat-primitive-ok for intentional custom metric shells).',
+    rationale:
+      'Direct t-stat typography usage in feature shells often re-implements StatCard/CompactStatBar chrome and drifts from canonical spacing, labels, and responsive behavior.',
+    claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const statClassRe = /\bt-stat(?:-lg|-sm)?\b/;
+
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+
+        let src: string;
+        try {
+          src = readFileSync(file, 'utf-8');
+        } catch {
+          continue;
+        }
+
+        if (/<(?:StatCard|CompactStatBar|Stat)\b/.test(src)) continue;
+
+        const lines = src.split('\n');
+        for (let index = 0; index < lines.length; index += 1) {
+          if (!statClassRe.test(lines[index])) continue;
+          if (!/\bclassName\b/.test(lines[index])) continue;
+          if (hasHatch(lines, index, 'stat-primitive-ok')) continue;
+          hits.push({
+            file,
+            line: index + 1,
+            text: 't-stat typography used outside StatCard/CompactStatBar primitive',
+          });
+        }
+      }
+      return hits;
+    },
+  },
 
   // ─── Phase C — 5 new rules (2026-04-27) ──────────────────────────────────────
   // Added after Phase B domain sweeps. Rules whose backlog is zero ship at error;
@@ -5842,7 +6166,7 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    name: 'Raw z-index class (use z-[var(--z-*)] tokens)',
+    name: 'Raw z-index class (use z token classes)',
     pattern: '\\bz-(10|20|30|40|50|60)\\b',
     fileGlobs: ['*.ts', '*.tsx'],
     pathFilter: 'src/',

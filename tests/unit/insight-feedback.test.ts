@@ -103,6 +103,88 @@ describe('buildStrategySignals', () => {
     expect(signals[0].detail).toContain('react seo');
   });
 
+
+  it('filters noisy keyword-derived strategy signals when keyword-intelligence context is provided', () => {
+    const noisy = makeInsight({
+      id: 'gap_noisy',
+      insightType: 'competitor_gap',
+      data: { keyword: 'paper tiger', competitorDomain: 'rival.com', competitorPosition: 2, ourPosition: null, volume: 9000, difficulty: 12 },
+      impactScore: 95,
+    });
+    const staleProviderNoise = makeInsight({
+      id: 'gap_domain_extension_noise',
+      insightType: 'competitor_gap',
+      data: { keyword: 'list of all domain name extensions', competitorDomain: 'rival.com', competitorPosition: 4, ourPosition: null, volume: 3600, difficulty: 30 },
+      impactScore: 90,
+    });
+    const useful = makeInsight({
+      id: 'gap_useful',
+      insightType: 'competitor_gap',
+      data: { keyword: 'keyword intelligence platform', competitorDomain: 'rival.com', competitorPosition: 3, ourPosition: null, volume: 300, difficulty: 35 },
+      impactScore: 80,
+    });
+
+    const signals = buildStrategySignals([noisy, staleProviderNoise, useful], {
+      keywordEvaluationContext: {
+        workspaceId: 'ws_test',
+        businessTerms: ['SEO analytics platform for agencies', 'keyword intelligence'],
+        strictBusinessFit: true,
+      },
+    });
+
+    expect(signals.map(signal => signal.keyword)).toEqual(['keyword intelligence platform']);
+  });
+
+  it('filters weak-fit keyword-derived strategy signals when strict business context is available', () => {
+    const weakFit = makeInsight({
+      id: 'gap_weak_fit',
+      insightType: 'competitor_gap',
+      data: { keyword: 'fountain pen refills', competitorDomain: 'rival.com', competitorPosition: 2, ourPosition: null, volume: 900, difficulty: 20 },
+      impactScore: 95,
+    });
+    const useful = makeInsight({
+      id: 'gap_useful',
+      insightType: 'competitor_gap',
+      data: { keyword: 'local seo services', competitorDomain: 'rival.com', competitorPosition: 3, ourPosition: null, volume: 300, difficulty: 35 },
+      impactScore: 80,
+    });
+
+    const signals = buildStrategySignals([weakFit, useful], {
+      keywordEvaluationContext: {
+        workspaceId: 'ws_test',
+        businessTerms: ['local seo agency'],
+        strictBusinessFit: true,
+      },
+    });
+
+    expect(signals.map(signal => signal.keyword)).toEqual(['local seo services']);
+  });
+
+  it('filters no-volume weak-fit keyword-derived strategy signals', () => {
+    const weakFit = makeInsight({
+      id: 'mover_weak_fit',
+      insightType: 'ranking_mover',
+      data: { query: 'fountain pen refills', previousPosition: 12, currentPosition: 4 },
+      impactScore: 95,
+    });
+    const useful = makeInsight({
+      id: 'mover_useful',
+      insightType: 'ranking_mover',
+      data: { query: 'local seo services', previousPosition: 12, currentPosition: 4 },
+      impactScore: 80,
+    });
+
+    const signals = buildStrategySignals([weakFit, useful], {
+      keywordEvaluationContext: {
+        workspaceId: 'ws_test',
+        businessTerms: ['local seo agency'],
+        strictBusinessFit: true,
+      },
+    });
+
+    expect(signals.map(signal => signal.keyword)).toEqual(['local seo services']);
+  });
+
   it('sorts signals by impactScore descending', () => {
     const low = makeInsight({
       id: 'gap_low',

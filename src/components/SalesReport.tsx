@@ -158,7 +158,7 @@ export function SalesReport() {
                 onChange={setUrl}
                 onKeyDown={(e) => e.key === 'Enter' && !loading && runReport()}
                 placeholder="Enter website URL (e.g. swishsmiles.com)"
-                className="w-full pl-10 pr-4 py-3 rounded-[var(--radius-lg)] text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 bg-[var(--surface-2)] border border-[var(--brand-border)] text-[var(--brand-text-bright)]"
+                className="w-full pl-10 pr-4 py-3 rounded-[var(--radius-lg)] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:ring-2 focus:ring-teal-500/50 bg-[var(--surface-2)] border border-[var(--brand-border)] text-[var(--brand-text-bright)]"
                 disabled={loading}
               />
             </div>

@@ -3,7 +3,7 @@
  *
  * Verifies:
  * - runRankTrackingSnapshots() skips workspaces without GSC configured
- * - It calls getSearchOverview with ws.webflowSiteId (not ws.id)
+ * - It calls getSearchOverview with ws.webflowSiteId (not ws.id) on the 28-day discovery window
  * - It stores a snapshot when GSC returns data
  * - It skips workspaces with no webflowSiteId
  */
@@ -12,14 +12,17 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 // Mock getSearchOverview — must be hoisted before any imports that use it
 vi.mock('../../server/search-console.js', () => ({
   getSearchOverview: vi.fn(),
+  getSearchQueryObservations: vi.fn(),
 }));
 
 import { runRankTrackingSnapshots } from '../../server/rank-tracking-scheduler.js';
-import { getSearchOverview } from '../../server/search-console.js';
+import { getSearchOverview, getSearchQueryObservations } from '../../server/search-console.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { getLatestRanks, addTrackedKeyword } from '../../server/rank-tracking.js';
+import db from '../../server/db/index.js';
 
 const mockGetSearchOverview = vi.mocked(getSearchOverview);
+const mockGetSearchQueryObservations = vi.mocked(getSearchQueryObservations);
 
 let testWsId = '';
 
@@ -48,13 +51,21 @@ describe('runRankTrackingSnapshots', () => {
       webflowSiteId: 'wf-site-abc123',  // explicitly set
     });
     mockGetSearchOverview.mockResolvedValueOnce({ topQueries: [] });
+    mockGetSearchQueryObservations.mockResolvedValueOnce([]);
 
     await runRankTrackingSnapshots([testWsId]);
 
     expect(mockGetSearchOverview).toHaveBeenCalledWith(
       'wf-site-abc123',        // must be webflowSiteId, not the UUID
       'sc-domain:example.com',
-      7,
+      28,
+      { queryLimit: 5000 },
+    );
+    expect(mockGetSearchQueryObservations).toHaveBeenCalledWith(
+      'wf-site-abc123',
+      'sc-domain:example.com',
+      28,
+      { maxRows: 5000 },
     );
     expect(mockGetSearchOverview).not.toHaveBeenCalledWith(
       testWsId,                // workspace UUID must NOT be used
@@ -83,6 +94,10 @@ describe('runRankTrackingSnapshots', () => {
         { query: 'webflow seo', position: 7.1, clicks: 55, impressions: 410, ctr: 0.134 },
       ],
     });
+    mockGetSearchQueryObservations.mockResolvedValueOnce([
+      { query: 'seo audit tool', date: '2026-05-19', position: 4.2, clicks: 120, impressions: 900, ctr: 13.3 },
+      { query: 'webflow seo', date: '2026-05-19', position: 7.1, clicks: 55, impressions: 410, ctr: 13.4 },
+    ]);
 
     // Track the keyword so getLatestRanks can resolve it from the snapshot
     addTrackedKeyword(testWsId, 'seo audit tool');
@@ -94,6 +109,11 @@ describe('runRankTrackingSnapshots', () => {
     const top = latest.find(r => r.query === 'seo audit tool');
     expect(top).toBeDefined();
     expect(top!.position).toBeCloseTo(4.2);
+
+    const discoveredRows = db.prepare(
+      'SELECT COUNT(*) as count FROM discovered_queries WHERE workspace_id = ?',
+    ).get(testWsId) as { count: number };
+    expect(discoveredRows.count).toBeGreaterThan(0);
   });
 
   it('continues processing other workspaces when one throws', async () => {
@@ -110,6 +130,7 @@ describe('runRankTrackingSnapshots', () => {
     mockGetSearchOverview
       .mockRejectedValueOnce(new Error('GSC auth failed'))  // first workspace throws
       .mockResolvedValueOnce({ topQueries: [] });           // second workspace succeeds
+    mockGetSearchQueryObservations.mockResolvedValueOnce([]);
 
     await runRankTrackingSnapshots([testWsId, ws2.id]);
 

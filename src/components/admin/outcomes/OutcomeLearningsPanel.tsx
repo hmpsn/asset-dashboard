@@ -329,15 +329,15 @@ export default function OutcomeLearningsPanel({ workspaceId }: Props) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div>
             <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Win Rate</p>
-            <p className="t-stat text-accent-success">{pct(overall.totalWinRate)}</p>
+            <p className="t-h2 text-accent-success">{pct(overall.totalWinRate)}</p>
           </div>
           <div>
             <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Strong Win Rate</p>
-            <p className="t-stat text-[var(--brand-text-bright)]">{pct(overall.strongWinRate)}</p>
+            <p className="t-h2 text-[var(--brand-text-bright)]">{pct(overall.strongWinRate)}</p>
           </div>
           <div>
             <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Scored Actions</p>
-            <p className="t-stat text-accent-info">{learnings.totalScoredActions}</p>
+            <p className="t-h2 text-accent-info">{learnings.totalScoredActions}</p>
           </div>
           <div>
             <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Top Action</p>

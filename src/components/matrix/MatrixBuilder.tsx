@@ -328,7 +328,7 @@ export function MatrixBuilder({ workspaceId, templates, onComplete, onCancel }: 
                       type="text"
                       value={cellKeywordOverrides[cell.id] ?? cell.targetKeyword}
                       onChange={value => setCellKeywordOverrides(prev => ({ ...prev, [cell.id]: value }))}
-                      className="w-48 px-2 py-1 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] font-mono focus:border-teal-500/40 focus:outline-none transition-colors"
+                      className="w-48 px-2 py-1 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] font-mono focus:border-teal-500/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 transition-colors"
                     />
                   </div>
                 );

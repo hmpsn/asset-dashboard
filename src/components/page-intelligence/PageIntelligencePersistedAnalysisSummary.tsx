@@ -12,12 +12,13 @@ export function PageIntelligencePersistedAnalysisSummary({
   onAnalyzePage,
 }: Props) {
   const sp = page.strategy;
-  if (!sp?.analysisGeneratedAt) return null;
+  const analysisRunAt = sp?.optimizationScoreHistory?.at(-1)?.recordedAt ?? sp?.analysisGeneratedAt;
+  if (!analysisRunAt || sp?.optimizationScore == null) return null;
 
   return (
     <div className="pt-2 border-t border-[var(--brand-border)]">
       <div className="flex items-center justify-between">
-        <span className="t-caption-sm text-accent-success">Analysis on file (run {new Date(sp.analysisGeneratedAt).toLocaleDateString()})</span>
+        <span className="t-caption-sm text-accent-success">Analysis on file (run {new Date(analysisRunAt).toLocaleDateString()})</span>
         <Button
           onClick={() => onAnalyzePage(page)}
           variant="ghost"

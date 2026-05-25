@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { useQuery } from '@tanstack/react-query';
 import { FeatureFlagSettings } from '../../src/components/FeatureFlagSettings';
 
 // Mock the API client
@@ -145,5 +146,18 @@ describe('FeatureFlagSettings', () => {
       expect(otherSection.parentElement).not.toHaveTextContent('smart-placeholders');
       expect(otherSection.parentElement).not.toHaveTextContent('client-brand-section');
     }
+  });
+
+  it('renders an explicit error state when feature flags fail to load', () => {
+    vi.mocked(useQuery).mockReturnValueOnce({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error('upstream unavailable'),
+    } as any);
+
+    render(<FeatureFlagSettings />);
+    expect(screen.getByText('Failed to load feature flags')).toBeInTheDocument();
+    expect(screen.getByText('upstream unavailable')).toBeInTheDocument();
   });
 });

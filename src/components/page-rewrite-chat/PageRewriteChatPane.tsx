@@ -86,7 +86,7 @@ export function PageRewriteChatPane({
                     <div
                       contentEditable
                       suppressContentEditableWarning
-                      className="text-xs leading-relaxed focus:outline-none border border-transparent focus:border-[var(--brand-border-hover)] rounded p-1 -m-1 transition-colors"
+                      className="text-xs leading-relaxed focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 border border-transparent focus:border-[var(--brand-border-hover)] rounded p-1 -m-1 transition-colors"
                       onInput={e => onMessageEdit(i, (e.currentTarget as HTMLDivElement).innerText)}
                       ref={(el) => {
                         if (el && !el.dataset.initialized) {

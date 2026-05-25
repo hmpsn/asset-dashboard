@@ -11,7 +11,7 @@ import {
   type PageData,
   type SitemapPage,
 } from './pageRewriteChatModel';
-import { buildDocHtml, serializeDocToDocx, serializeDocToMarkdown } from './pageRewriteChatDocument';
+import { buildDocHtml, buildPrintableDocHtml, serializeDocToDocx, serializeDocToMarkdown } from './pageRewriteChatDocument';
 import {
   applyRewriteToSection,
   clearFormattingSelection,
@@ -20,6 +20,7 @@ import {
 } from './pageRewriteChatActions';
 
 type ToastFn = (message: string, type?: 'success' | 'error' | 'info') => void;
+type ExportMode = 'copy' | 'download' | 'docx' | 'pdf';
 
 interface UsePageRewriteChatShellParams {
   workspaceId: string;
@@ -251,8 +252,34 @@ export function usePageRewriteChatShell({ workspaceId, initialPageUrl, toast }: 
     }
   }, [toast]);
 
-  const handleExport = useCallback((mode: 'copy' | 'download' | 'docx') => {
+  const handleExport = useCallback((mode: ExportMode) => {
     const slug = (pageData?.slug || 'page').replace(/\//g, '-').replace(/^-/, '');
+    if (mode === 'pdf') {
+      try {
+        const printRoot = document.getElementById('page-rewrite-print-root') ?? document.createElement('div');
+        printRoot.id = 'page-rewrite-print-root';
+        printRoot.className = 'page-rewrite-print-root';
+        printRoot.innerHTML = buildPrintableDocHtml(docBodyRef.current, pageData);
+        if (!printRoot.parentElement) document.body.appendChild(printRoot);
+
+        const cleanup = () => {
+          document.body.classList.remove('page-rewrite-printing');
+          printRoot.innerHTML = '';
+          window.removeEventListener('afterprint', cleanup);
+        };
+
+        document.body.classList.add('page-rewrite-printing');
+        window.addEventListener('afterprint', cleanup, { once: true });
+        setExportOpen(false);
+        window.print();
+        window.setTimeout(cleanup, 60_000);
+      } catch (err) {
+        console.error('PDF export failed:', err);
+        setExportOpen(false);
+        toast('PDF export failed. Please try again.', 'error');
+      }
+      return;
+    }
     if (mode === 'docx') {
       const doc = new Document({
         styles: {

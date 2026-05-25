@@ -7,6 +7,7 @@ import {
 import { PageHeader, StatCard, Icon, Button, IconButton, ClickableRow, FormInput, FormTextarea } from './ui';
 import { webflow } from '../api/seo';
 import { clientActions } from '../api/clientActions';
+import { toInternalLinkClientActionItem } from '../lib/internal-link-client-action';
 
 interface LinkSuggestion {
   fromPage: string;
@@ -134,13 +135,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
         clientNote: note.trim() || undefined,
         payload: {
           analyzedAt: data.analyzedAt,
-          suggestions: filtered.map(s => ({
-            anchorText: s.anchorText,
-            targetUrl: s.toPage,
-            targetTitle: s.toTitle,
-            sourcePage: s.fromPage,
-            contextSnippet: s.reason,
-          })),
+          suggestions: filtered.map(toInternalLinkClientActionItem),
           summary: {
             pageCount: data.pageCount,
             existingLinkCount: data.existingLinkCount,

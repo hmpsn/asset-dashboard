@@ -1,5 +1,66 @@
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
+import type { KeywordSourceEvidence } from '../shared/types/keywords.js';
 import type { Workspace } from '../shared/types/workspace.js';
+import { keywordComparisonKey } from '../shared/keyword-normalization.js';
+
+export interface KeywordPoolCandidate {
+  volume: number;
+  difficulty: number;
+  source: string;
+}
+
+function keywordPoolSourcePriority(source: string): number {
+  if (source.startsWith('gap:')) return 6;
+  if (source.startsWith('competitor:')) return 5;
+  if (source === 'dataforseo' || source === 'semrush' || source === 'seo-provider') return 4;
+  if (source.startsWith('discovery:')) return 3;
+  if (source === 'related') return 2;
+  if (source === 'gsc') return 1;
+  if (source === 'client') return 0;
+  return 1;
+}
+
+export function upsertKeywordPoolCandidate(
+  pool: Map<string, KeywordPoolCandidate>,
+  keyword: string,
+  candidate: KeywordPoolCandidate,
+): boolean {
+  const normalized = keywordComparisonKey(keyword);
+  if (!normalized) return false;
+
+  const existing = pool.get(normalized);
+  if (!existing) {
+    pool.set(normalized, candidate);
+    return true;
+  }
+
+  const existingPriority = keywordPoolSourcePriority(existing.source);
+  const candidatePriority = keywordPoolSourcePriority(candidate.source);
+  const shouldUpgrade = candidatePriority > existingPriority
+    || (candidatePriority === existingPriority && candidate.volume > existing.volume)
+    || (existing.source === 'gsc' && candidate.volume > 0 && candidate.source !== 'gsc');
+
+  if (!shouldUpgrade) return false;
+  pool.set(normalized, candidate);
+  return true;
+}
+
+export function isStrategyQualityDiscoveryKeyword(keyword: KeywordSourceEvidence): boolean {
+  return keyword.keyword.trim().length > 0
+    && keyword.volume > 0
+    && keyword.difficulty > 0;
+}
+
+const PLANNER_GROUPED_VOLUME_FLOOR = 1_000_000;
+
+export function isSuspiciousPlannerGroupedVolume(keyword: string | undefined, volume: number | undefined | null): boolean {
+  if (volume == null || volume < PLANNER_GROUPED_VOLUME_FLOOR) return false;
+  // DataForSEO Google Ads search-volume lookups can return planner-grouped
+  // buckets. A million-volume value on strategy-assigned page keywords is more
+  // likely a grouped forecast than a granular SEO signal, so callers should
+  // prefer organic/ranking evidence or leave volume unknown.
+  return !!keyword?.trim();
+}
 
 /** Composite opportunity score (0–100) for a content gap.
  * Weighted components of the raw score (pre-trend):

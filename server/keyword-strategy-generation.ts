@@ -3,7 +3,7 @@
  *
  * Shared by the direct keyword strategy route and background job worker.
  */
-import { getConfiguredProvider } from './seo-data-provider.js';
+import { DEFAULT_SEO_DATA_PROVIDER, getConfiguredProvider, type ProviderName } from './seo-data-provider.js';
 import { incrementIfAllowed, decrementUsage } from './usage-tracking.js';
 import { updateWorkspace, getWorkspace, getTokenForSite } from './workspaces.js';
 import { createLogger } from './logger.js';
@@ -18,12 +18,21 @@ import {
 } from './keyword-strategy-ai-synthesis.js';
 import { enrichKeywordStrategy } from './keyword-strategy-enrichment.js';
 import { persistKeywordStrategy } from './keyword-strategy-persistence.js';
-import { queueKeywordStrategyPostUpdateFollowOns, seedKeywordStrategyTrackedKeywords } from './keyword-strategy-follow-ons.js';
+import { sanitizeKeywordStrategyDerivedArtifacts, sanitizeKeywordStrategyKeywordGaps, sanitizeKeywordStrategyOutput } from './keyword-strategy-sanitizer.js';
+import { queueKeywordStrategyPostUpdateFollowOns, seedKeywordStrategyTrackedKeywords, workspaceHasStrategyOwnedRankTracking } from './keyword-strategy-follow-ons.js';
+import { listContentGaps } from './content-gaps.js';
+import { listQuickWins } from './quick-wins.js';
+import { listKeywordGaps } from './keyword-gaps.js';
+import { listTopicClusters } from './topic-clusters.js';
+import { listCannibalizationIssues } from './cannibalization-issues.js';
+import { normalizePath } from './helpers.js';
+import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 
 // Re-exported for backward compatibility with existing callers.
 export { buildStrategyIntelligenceBlock, computeOpportunityScore, shouldFetchCompetitorData } from './keyword-strategy-helpers.js';
 
 const log = createLogger('keyword-strategy');
+export const KEYWORD_STRATEGY_MAX_PAGE_CAP = 2000;
 
 // Concurrent generation guard: prevents two simultaneous strategy generations for the same
 // workspace from racing to the DB. The second request receives a 409 immediately.
@@ -40,6 +49,7 @@ export interface GenerateKeywordStrategyOptions {
   businessContext?: string;
   mode?: 'full' | 'incremental';
   seoDataMode?: 'quick' | 'full' | 'none' | string;
+  seoDataProvider?: ProviderName | string;
   /** @deprecated use seoDataMode. Preserved for legacy route/job callers. */
   semrushMode?: 'quick' | 'full' | 'none' | string;
   competitorDomains?: string[];
@@ -75,6 +85,10 @@ function normalizeSeoDataMode(mode: string | undefined): 'quick' | 'full' | 'non
   return mode === 'quick' || mode === 'full' ? mode : 'none';
 }
 
+function normalizeSeoDataProvider(provider: string | undefined): ProviderName | undefined {
+  return provider === 'dataforseo' || provider === 'semrush' ? provider : undefined;
+}
+
 export async function generateKeywordStrategy(options: GenerateKeywordStrategyOptions): Promise<GenerateKeywordStrategyResult> {
   const ws = getWorkspace(options.workspaceId);
   if (!ws) throw new KeywordStrategyGenerationError(404, { error: 'Workspace not found' });
@@ -100,14 +114,17 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
     throw new KeywordStrategyGenerationError(500, { error: 'OPENAI_API_KEY not configured' });
   }
 
-  const provider = getConfiguredProvider(ws.seoDataProvider);
+  const providerPreference = normalizeSeoDataProvider(options.seoDataProvider)
+    ?? ws.seoDataProvider
+    ?? DEFAULT_SEO_DATA_PROVIDER;
+  const provider = getConfiguredProvider(providerPreference);
 
   const businessContext = options.businessContext || ws.keywordStrategy?.businessContext || '';
   const strategyMode = options.mode === 'incremental' ? 'incremental' : 'full'; // 'full' | 'incremental'
   const seoDataMode = normalizeSeoDataMode(options.seoDataMode ?? options.semrushMode);
   const competitorDomains = options.competitorDomains ? [...options.competitorDomains] : [...(ws.competitorDomains || [])];
   const rawMaxPages = options.maxPages != null ? Number(options.maxPages) : 500;
-  const maxPagesParam = rawMaxPages > 0 ? Math.min(rawMaxPages, 2000) : 0; // 0 = no cap, clamped at 2000
+  const maxPagesParam = rawMaxPages > 0 ? Math.min(rawMaxPages, KEYWORD_STRATEGY_MAX_PAGE_CAP) : 0; // 0 = no cap
   const token = getTokenForSite(ws.webflowSiteId) || undefined;
 
   // Save competitor domains if provided
@@ -165,10 +182,11 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
 
     // 5. SEO provider data gathering (based on mode)
     // The keyword pool paradigm: provider data supplies the keyword universe, AI assigns terms to pages.
-    const {
+    let {
       seoContext: semrushContext,
       domainKeywords: semrushDomainData,
       keywordGaps,
+      discoveryKeywords,
       relatedKeywords: relatedKws,
       questionKeywords: allQuestionKws,
       competitorKeywords: competitorKeywordData,
@@ -211,6 +229,7 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       seoContext: semrushContext,
       domainKeywords: semrushDomainData,
       keywordGaps,
+      discoveryKeywords,
       relatedKeywords: relatedKws,
       competitorKeywords: competitorKeywordData,
       provider,
@@ -218,6 +237,90 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
     });
 
     if (synthesis.upToDate) {
+      const noOpStrategy = (synthesis.strategy ?? { pageMap: [] }) as StrategyOutput;
+      const preservedContentGaps = listContentGaps(ws.id);
+      const preservedQuickWins = listQuickWins(ws.id);
+      const shouldCleanPageAssignments = workspaceHasStrategyOwnedRankTracking(ws.id);
+      const noOpSanitizer = shouldCleanPageAssignments
+        ? sanitizeKeywordStrategyOutput({
+          workspaceId: ws.id,
+          strategy: {
+            ...noOpStrategy,
+            contentGaps: preservedContentGaps,
+            quickWins: preservedQuickWins,
+          },
+          keywordPool: synthesis.keywordPool,
+          evaluationContext: synthesis.keywordEvaluationContext,
+          stage: 'post-enrichment',
+        })
+        : {
+          strategy: {
+            ...noOpStrategy,
+            contentGaps: preservedContentGaps,
+            quickWins: preservedQuickWins,
+          },
+          removed: { pageMappings: [], siteKeywords: [], contentGaps: [], quickWins: [], secondaryKeywords: [] },
+          repaired: [],
+          updatedPagePaths: [],
+        };
+      const noOpRemovedPagePaths = noOpSanitizer.removed.pageMappings.map(page => page.pagePath);
+      const noOpUpdatedPagePaths = noOpSanitizer.updatedPagePaths;
+      const existingKeywordGaps = listKeywordGaps(ws.id);
+      const sanitizedNoOpKeywordGaps = sanitizeKeywordStrategyKeywordGaps({
+        keywordGaps: existingKeywordGaps,
+        keywordPool: synthesis.keywordPool,
+        evaluationContext: synthesis.keywordEvaluationContext,
+      });
+      const noOpChanged = noOpRemovedPagePaths.length > 0
+        || noOpUpdatedPagePaths.length > 0
+        || noOpSanitizer.removed.siteKeywords.length > 0
+        || noOpSanitizer.removed.contentGaps.length > 0
+        || noOpSanitizer.removed.quickWins.length > 0
+        || noOpSanitizer.removed.secondaryKeywords.length > 0
+        || noOpSanitizer.repaired.length > 0
+        || sanitizedNoOpKeywordGaps.length !== existingKeywordGaps.length;
+      if (noOpChanged) {
+        const existingStrategy = ws.keywordStrategy;
+        const { keywordStrategy, pageMap } = persistKeywordStrategy({
+          ws,
+          strategy: noOpSanitizer.strategy,
+          strategyMode,
+          pagesToAnalyze: [],
+          extraPagePaths: noOpUpdatedPagePaths,
+          removedPagePaths: noOpRemovedPagePaths,
+          siteKeywordMetrics: existingStrategy?.siteKeywordMetrics ?? [],
+          keywordGaps: sanitizedNoOpKeywordGaps,
+          competitorKeywordData: existingStrategy?.competitorKeywordData ?? competitorKeywordData,
+          topicClusters: listTopicClusters(ws.id),
+          cannibalization: listCannibalizationIssues(ws.id).map(issue => ({
+            ...issue,
+            action: issue.action ?? 'differentiate',
+          })),
+          questionKeywords: existingStrategy?.questionKeywords ?? allQuestionKws,
+          businessContext,
+          seoDataMode,
+          seoDataStatus,
+          searchData: {
+            deviceBreakdown,
+            countryBreakdown,
+            periodComparison,
+            organicLandingPages,
+            organicOverview,
+          },
+        });
+        const responseStrategy = { ...keywordStrategy, pageMap };
+        seedKeywordStrategyTrackedKeywords({
+          workspaceId: ws.id,
+          workspaceName: ws.name,
+          keywordStrategy,
+          pageMap,
+        });
+        clearKeepalive();
+        activeGenerations.delete(ws.id);
+        responseSent = true;
+        queueKeywordStrategyPostUpdateFollowOns({ workspaceId: ws.id });
+        return { strategy: responseStrategy as KeywordStrategy & { pageMap: PageKeywordMap[] }, upToDate: false, freshPageCount: synthesis.freshPageCount };
+      }
       clearKeepalive();
       activeGenerations.delete(ws.id);
       try {
@@ -229,17 +332,32 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       return { strategy: synthesis.strategy as (KeywordStrategy & { pageMap?: PageKeywordMap[] }) | null, upToDate: true, freshPageCount: synthesis.freshPageCount };
     }
 
-    const strategy = synthesis.strategy as StrategyOutput;
+    let strategy = synthesis.strategy as StrategyOutput;
     const pagesToAnalyze = synthesis.pagesToAnalyze;
     const keywordPool = synthesis.keywordPool;
     const businessSection = synthesis.businessSection;
+    const keywordEvaluationContext = synthesis.keywordEvaluationContext;
 
     if (!strategy?.pageMap) {
       const errMsg = 'Strategy generation produced no results';
       throw new KeywordStrategyGenerationError(500, { error: errMsg });
     }
 
-    const {
+    const postSynthesisSanitizer = sanitizeKeywordStrategyOutput({
+      workspaceId: ws.id,
+      strategy,
+      keywordPool,
+      evaluationContext: keywordEvaluationContext,
+      stage: 'post-synthesis',
+    });
+    strategy = postSynthesisSanitizer.strategy;
+    const sanitizedRemovedPagePaths = new Set(postSynthesisSanitizer.removed.pageMappings.map(page => page.pagePath));
+    const sanitizedUpdatedPagePaths = new Set(postSynthesisSanitizer.updatedPagePaths);
+    if (!strategy.pageMap?.length) {
+      throw new KeywordStrategyGenerationError(500, { error: 'Strategy generation produced no valid page keyword assignments' });
+    }
+
+    let {
       siteKeywordMetrics,
       topicClusters,
       cannibalization,
@@ -267,6 +385,50 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       sendProgress,
     });
 
+    const postEnrichmentSanitizer = sanitizeKeywordStrategyOutput({
+      workspaceId: ws.id,
+      strategy,
+      keywordPool,
+      evaluationContext: keywordEvaluationContext,
+      stage: 'post-enrichment',
+    });
+    strategy = postEnrichmentSanitizer.strategy;
+    for (const removed of postEnrichmentSanitizer.removed.pageMappings) {
+      sanitizedRemovedPagePaths.add(removed.pagePath);
+    }
+    for (const updatedPagePath of postEnrichmentSanitizer.updatedPagePaths) {
+      sanitizedUpdatedPagePaths.add(updatedPagePath);
+    }
+    if (!strategy.pageMap?.length) {
+      throw new KeywordStrategyGenerationError(500, { error: 'Strategy generation produced no valid page keyword assignments after enrichment' });
+    }
+    const finalSiteKeywordSet = new Set((strategy.siteKeywords ?? []).map(keyword => keywordComparisonKey(keyword)));
+    siteKeywordMetrics = siteKeywordMetrics.filter(metric => finalSiteKeywordSet.has(keywordComparisonKey(metric.keyword)));
+    ({ topicClusters, cannibalization } = sanitizeKeywordStrategyDerivedArtifacts({
+      topicClusters,
+      cannibalization,
+      pageMap: strategy.pageMap,
+      keywordPool,
+      evaluationContext: keywordEvaluationContext,
+      domainKeywords: semrushDomainData,
+      competitorKeywords: competitorKeywordData,
+    }));
+    keywordGaps = sanitizeKeywordStrategyKeywordGaps({
+      keywordGaps,
+      keywordPool,
+      evaluationContext: keywordEvaluationContext,
+    });
+
+    if (strategyMode === 'incremental') {
+      const finalPagePaths = new Set((strategy.pageMap ?? []).map(page => normalizePath(page.pagePath)));
+      for (const page of pagesToAnalyze) {
+        const pagePath = normalizePath(page.path);
+        if (!finalPagePaths.has(pagePath)) {
+          sanitizedRemovedPagePaths.add(page.path);
+        }
+      }
+    }
+
     // 7. Save to workspace — pageMap goes to page_keywords table, rest to workspace blob
     sendProgress('complete', 'Strategy complete!', 1.0);
     const { keywordStrategy, pageMap } = persistKeywordStrategy({
@@ -274,6 +436,8 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       strategy,
       strategyMode,
       pagesToAnalyze,
+      extraPagePaths: [...sanitizedUpdatedPagePaths],
+      removedPagePaths: [...sanitizedRemovedPagePaths],
       siteKeywordMetrics,
       keywordGaps,
       competitorKeywordData,

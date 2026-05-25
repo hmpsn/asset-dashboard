@@ -13,6 +13,7 @@ import { WorkflowStepper } from './ui';
 import { adminPath } from '../routes';
 import { useWorkspaceIntelligence } from '../hooks/admin';
 import type { FixContext } from '../App';
+import { clearTabSearchParam, resolveTabSearchParam } from '../lib/tab-search-param';
 
 const ContentPlanner = lazyWithRetry(() => import('./ContentPlanner').then(m => ({ default: m.ContentPlanner })));
 const ContentCalendar = lazyWithRetry(() => import('./ContentCalendar').then(m => ({ default: m.ContentCalendar })));
@@ -47,16 +48,17 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<PipelineTab>(() => {
-    const param = searchParams.get('tab');
-    return TABS.some(t => t.id === param) ? (param as PipelineTab) : 'briefs';
+    return resolveTabSearchParam<PipelineTab>(searchParams.get('tab'), {
+      validValues: TABS.map(t => t.id),
+      fallback: 'briefs',
+    });
   });
 
   // Clear ?tab= from URL on manual tab change so refresh shows last selection
   const handleTabChange = (id: string) => {
     setActiveTab(id as PipelineTab);
-    if (searchParams.has('tab')) {
-      const next = new URLSearchParams(searchParams);
-      next.delete('tab');
+    const next = clearTabSearchParam(searchParams);
+    if (next) {
       setSearchParams(next, { replace: true });
     }
   };

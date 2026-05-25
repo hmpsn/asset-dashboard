@@ -1,4 +1,5 @@
 import type { UnifiedPage } from '../../../shared/types/page-join';
+import type { LocalSeoKeywordVisibilitySummary } from '../../../shared/types/local-seo';
 import type { ContentScore, KeywordData, KeywordEditDraft, SeoCopy } from './pageIntelligenceTypes';
 import { PageIntelligencePageRow } from './PageIntelligencePageRow';
 
@@ -16,6 +17,7 @@ interface Props {
   generatingCopy: string | null;
   copiedField: string | null;
   trackedKeywords: Set<string>;
+  localSeoByKeyword?: Map<string, LocalSeoKeywordVisibilitySummary>;
   onToggleExpanded: (pageId: string) => void;
   onTrackKeyword: (keyword: string) => void;
   onStartEdit: (page: UnifiedPage) => void;
@@ -45,6 +47,7 @@ export function PageIntelligencePageList({
   generatingCopy,
   copiedField,
   trackedKeywords,
+  localSeoByKeyword,
   onToggleExpanded,
   onTrackKeyword,
   onStartEdit,
@@ -77,6 +80,7 @@ export function PageIntelligencePageList({
           generatingCopy={generatingCopy}
           copiedField={copiedField}
           trackedKeywords={trackedKeywords}
+          localSeoByKeyword={localSeoByKeyword}
           onToggleExpanded={onToggleExpanded}
           onTrackKeyword={onTrackKeyword}
           onStartEdit={onStartEdit}

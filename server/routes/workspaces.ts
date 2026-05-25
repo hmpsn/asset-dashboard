@@ -316,6 +316,7 @@ const intelligenceProfileSchema = z.object({
   goals: z.array(z.string().max(500)).max(20).optional(),
   targetAudience: z.string().max(2000).optional(),
 });
+const intelligenceProfileGoalSchema = z.string().max(500);
 
 router.put('/api/workspaces/:id/intelligence-profile', requireWorkspaceAccess(), validate(intelligenceProfileSchema), (req, res) => {
   const ws = updateWorkspace(req.params.id, { intelligenceProfile: req.body });
@@ -349,8 +350,7 @@ router.post('/api/workspaces/:id/intelligence-profile/autofill', requireWorkspac
     if (contentGapTopics) contextParts.push(`Content topics: ${contentGapTopics}`);
 
     const result = await callAI({
-      model: 'gpt-5.4-mini',
-      feature: 'intelligence-profile-autofill',
+      operation: 'intelligence-profile-autofill',
       workspaceId: ws.id,
       temperature: 0.3,  // low temperature for consistent JSON output
       maxTokens: 300,    // response is a small JSON object
@@ -363,11 +363,33 @@ router.post('/api/workspaces/:id/intelligence-profile/autofill', requireWorkspac
       ],
     });
 
-    // parseAIJson strips markdown fences (```json ... ```) that LLMs occasionally emit
-    // even when instructed not to. parseJsonFallback does bare JSON.parse and silently
-    // returns {} on fenced output, leaving the frontend fields blank with no error shown.
     let suggestion: { industry?: string; goals?: string[]; targetAudience?: string } = {};
-    try { suggestion = parseAIJson(result.text); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'workspaces: programming error'); /* malformed — fall through to empty fields */ }
+    try {
+      const parsed = parseAIJson<Record<string, unknown>>(result.text);
+      if (parsed && typeof parsed === 'object') {
+        const industryResult = intelligenceProfileSchema.shape.industry.safeParse(parsed.industry);
+        if (industryResult.success) suggestion.industry = industryResult.data;
+
+        if (Array.isArray(parsed.goals)) {
+          const goals = parsed.goals
+            .map(goal => intelligenceProfileGoalSchema.safeParse(goal))
+            .filter((goal): goal is { success: true; data: string } => goal.success)
+            .map(goal => goal.data)
+            .slice(0, 20);
+          if (goals.length > 0) suggestion.goals = goals;
+        }
+
+        const audienceResult = intelligenceProfileSchema.shape.targetAudience.safeParse(parsed.targetAudience);
+        if (audienceResult.success) suggestion.targetAudience = audienceResult.data;
+      }
+    } catch (err) {
+      if (err instanceof SyntaxError) {
+        log.warn({ err }, 'workspaces: intelligence profile autofill returned malformed JSON');
+      } else if (isProgrammingError(err)) {
+        log.warn({ err }, 'workspaces: programming error');
+      }
+      /* malformed — fall through to empty fields */
+    }
 
     return res.json({
       industry: typeof suggestion.industry === 'string' ? suggestion.industry : '',
@@ -384,7 +406,7 @@ router.post('/api/workspaces/:id/intelligence-profile/autofill', requireWorkspac
 // --- Auto-generate knowledge base from website crawl ---
 router.post('/api/workspaces/:id/generate-knowledge-base', requireWorkspaceAccess(), async (req, res) => {
   try {
-    const started = startWorkspaceContextGenerationJob(BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION, req.params.id);
+    const started = await startWorkspaceContextGenerationJob(BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION, req.params.id);
     res.json(started);
   } catch (err) {
     const response = workspaceContextJobErrorResponse(err);
@@ -395,7 +417,7 @@ router.post('/api/workspaces/:id/generate-knowledge-base', requireWorkspaceAcces
 // --- Auto-generate brand voice from website crawl ---
 router.post('/api/workspaces/:id/generate-brand-voice', requireWorkspaceAccess(), async (req, res) => {
   try {
-    const started = startWorkspaceContextGenerationJob(BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION, req.params.id);
+    const started = await startWorkspaceContextGenerationJob(BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION, req.params.id);
     res.json(started);
   } catch (err) {
     const response = workspaceContextJobErrorResponse(err);
@@ -406,7 +428,7 @@ router.post('/api/workspaces/:id/generate-brand-voice', requireWorkspaceAccess()
 // --- Auto-generate audience personas from website crawl ---
 router.post('/api/workspaces/:id/generate-personas', requireWorkspaceAccess(), async (req, res) => {
   try {
-    const started = startWorkspaceContextGenerationJob(BACKGROUND_JOB_TYPES.PERSONA_GENERATION, req.params.id);
+    const started = await startWorkspaceContextGenerationJob(BACKGROUND_JOB_TYPES.PERSONA_GENERATION, req.params.id);
     res.json(started);
   } catch (err) {
     const response = workspaceContextJobErrorResponse(err);
@@ -595,7 +617,16 @@ router.patch('/api/workspaces/:id/client-users/:userId', requireWorkspaceAccess(
   // handlers below. See PR #168 staging-hardening flag (cross-workspace authz).
   try {
     const { name, email, role, avatarUrl } = req.body;
-    const user = await updateClientUser(req.params.userId, req.params.id, { name, email, role, avatarUrl });
+    // Only include fields that are explicitly present in the payload.
+    // Spreading `undefined` values (e.g. when `email` is omitted from the
+    // request) would override the existing value with undefined, causing a
+    // NOT NULL constraint violation on the next DB write.
+    const updates: Partial<Pick<import('../client-users.js').ClientUser, 'name' | 'email' | 'role' | 'avatarUrl'>> = {};
+    if (name !== undefined) updates.name = name;
+    if (email !== undefined) updates.email = email;
+    if (role !== undefined) updates.role = role;
+    if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
+    const user = await updateClientUser(req.params.userId, req.params.id, updates);
     if (!user) return res.status(404).json({ error: 'Client user not found' });
     res.json(user);
   } catch (err) {

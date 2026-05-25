@@ -1,80 +1,299 @@
 /**
- * Smart Keyword Recommendations — fetches SEMRush related keywords,
- * scores them by opportunity (volume-to-difficulty ratio), and optionally
- * uses AI to rank by business relevance.
+ * Smart Keyword Recommendations — fetches SEO provider related keywords,
+ * scores them by opportunity + strategic fit, and optionally uses AI to
+ * re-rank by business relevance when enough workspace context exists.
  *
  * Used by content matrices to recommend the best target keyword for each cell.
  */
 import { getConfiguredProvider } from './seo-data-provider.js';
 import { getWorkspace } from './workspaces.js';
+import { resolveWorkspaceLocationCode } from './local-seo.js';
 import { getQueryPageData } from './search-console.js';
 import { callAI } from './ai.js';
 import { parseAIJson } from './openai-helpers.js';
-import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelligence.js';
+import { buildRecommendationGenerationContext } from './intelligence/generation-context-builders.js';
+import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js';
+import { checkKeywordCannibalization, type CannibalizationConflict } from './cannibalization-detection.js';
 import { createLogger } from './logger.js';
-import type { KeywordCandidate } from '../shared/types/content.ts';
-import { isProgrammingError } from './errors.js';
+import { applyOutcomeAdjustmentScore, buildOutcomeAdjustment, buildOutcomeLearningStatusNote } from './outcome-learning-default-path.js';
+import { assessAuthorityFromBacklinks } from './authority-context.js';
+import type {
+  KeywordCandidate,
+  KeywordRecommendationReasoning,
+  KeywordRecommendationResult,
+} from '../shared/types/content.ts';
+import type { ClientSignalsSlice, LearningsSlice, SeoContextSlice } from '../shared/types/intelligence.ts';
+import type { PageKeywordMap } from '../shared/types/workspace.ts';
 import { sanitizeQueryForPrompt } from './helpers.js';
-import type * as WorkspaceLearnings from './workspace-learnings.js';
+import {
+  evaluateKeywordCandidate,
+  normalizeKeyword,
+  opportunityScore,
+  shouldIncludeKeywordCandidate,
+} from './keyword-intelligence/index.js';
 
 const log = createLogger('keyword-recommendations');
 
-type ScoredCandidate = KeywordCandidate & { _score: number };
+const recommendationSlices = ['seoContext', 'learnings', 'clientSignals'] as const;
 
-function stripScore(c: ScoredCandidate): KeywordCandidate {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { _score, ...rest } = c;
+type ConflictSeverity = CannibalizationConflict['severity'];
+
+type ScoredCandidate = KeywordCandidate & {
+  _score: number;
+  _reasons: string[];
+  _penaltyReasons: string[];
+  _fitSignals: string[];
+  _conflictSeverity: ConflictSeverity | null;
+};
+
+interface CandidateScoringContext {
+  seedKeyword: string;
+  pageMap: PageKeywordMap[];
+  declinedKeywords: string[];
+  requestedKeywords: string[];
+  approvedKeywords: string[];
+  businessPriorities: string[];
+  contentGapTopics: string[];
+  recentChatTopics: string[];
+  rejectionReasons: string[];
+  learnings?: LearningsSlice;
+  backlinkProfile: SeoContextSlice['backlinkProfile'];
+  excludedConflictIdentifiers: string[];
+  workspaceId: string;
+  businessTerms: string[];
+}
+
+function getStrongestConflictSeverity(conflicts: CannibalizationConflict[]): ConflictSeverity | null {
+  if (conflicts.some(conflict => conflict.severity === 'high')) return 'high';
+  if (conflicts.some(conflict => conflict.severity === 'medium')) return 'medium';
+  if (conflicts.some(conflict => conflict.severity === 'low')) return 'low';
+  return null;
+}
+
+function buildConflictReason(conflicts: CannibalizationConflict[]): string | null {
+  const strongest = conflicts[0];
+  if (!strongest) return null;
+  if (strongest.conflictsWith.type === 'existing_page') {
+    return `Competes with an existing page target (${strongest.conflictsWith.identifier})`;
+  }
+  return strongest.reason;
+}
+
+function shouldUseSmartRanking(
+  useAI: boolean,
+  seoContext: SeoContextSlice | undefined,
+  clientSignals: ClientSignalsSlice | undefined,
+): boolean {
+  if (!useAI) return false;
+  const hasMeaningfulContext = !!(
+    seoContext?.businessContext
+    || seoContext?.knowledgeBase
+    || seoContext?.brandVoice
+    || seoContext?.personas?.length
+    || seoContext?.strategy
+    || clientSignals?.businessPriorities?.length
+    || clientSignals?.keywordFeedback?.approved?.length
+    || clientSignals?.keywordFeedback?.rejected?.length
+    || clientSignals?.recentChatTopics?.length
+  );
+  return hasMeaningfulContext;
+}
+
+function buildScoringContext(
+  workspaceId: string,
+  workspaceName: string | undefined,
+  seedKeyword: string,
+  seoContext: SeoContextSlice | undefined,
+  learnings: LearningsSlice | undefined,
+  clientSignals: ClientSignalsSlice | undefined,
+  excludedConflictIdentifiers: string[],
+): CandidateScoringContext {
+  return {
+    workspaceId,
+    seedKeyword,
+    pageMap: seoContext?.strategy?.pageMap ?? [],
+    declinedKeywords: getDeclinedKeywords(workspaceId),
+    requestedKeywords: getRequestedKeywords(workspaceId),
+    approvedKeywords: clientSignals?.keywordFeedback.approved ?? [],
+    businessPriorities: clientSignals?.businessPriorities ?? [],
+    contentGapTopics: (clientSignals?.contentGapVotes ?? []).map(vote => vote.topic),
+    recentChatTopics: clientSignals?.recentChatTopics ?? [],
+    rejectionReasons: clientSignals?.keywordFeedback.patterns.topRejectionReasons ?? [],
+    learnings: learnings ?? undefined,
+    backlinkProfile: seoContext?.backlinkProfile,
+    excludedConflictIdentifiers,
+    businessTerms: [
+      workspaceName ?? '',
+      seoContext?.businessContext ?? '',
+      seoContext?.knowledgeBase ?? '',
+      seoContext?.brandVoice ?? '',
+      ...(seoContext?.personas ?? []).map(persona => `${persona.name} ${persona.painPoints?.join(' ') ?? ''} ${persona.goals?.join(' ') ?? ''}`),
+      ...(clientSignals?.businessPriorities ?? []),
+      ...(clientSignals?.recentChatTopics ?? []),
+    ],
+  };
+}
+
+function dedupeCandidates(candidates: KeywordCandidate[]): KeywordCandidate[] {
+  return candidates.reduce<KeywordCandidate[]>((deduped, candidate) => {
+    const existingIndex = deduped.findIndex(existing => normalizeKeyword(existing.keyword) === normalizeKeyword(candidate.keyword));
+    if (existingIndex === -1) {
+      deduped.push(candidate);
+      return deduped;
+    }
+
+    const existing = deduped[existingIndex];
+    const keepExisting = existing.source === 'pattern'
+      || (existing.source === 'gsc' && candidate.source !== 'pattern')
+      || existing.volume >= candidate.volume;
+    if (!keepExisting) {
+      deduped[existingIndex] = candidate;
+    }
+    return deduped;
+  }, []);
+}
+
+function scoreKeywordCandidate(candidate: KeywordCandidate, ctx: CandidateScoringContext): ScoredCandidate | null {
+  if (!shouldIncludeKeywordCandidate(candidate.source, candidate.volume)) return null;
+
+  let score = opportunityScore(candidate.volume, candidate.difficulty, candidate.cpc);
+  const reasons: string[] = [];
+  const penaltyReasons: string[] = [];
+  const fitSignals: string[] = [];
+
+  const sharedEvaluation = evaluateKeywordCandidate(candidate, {
+    workspaceId: ctx.workspaceId,
+    seedKeyword: ctx.seedKeyword,
+    pageMap: ctx.pageMap,
+    declinedKeywords: ctx.declinedKeywords,
+    requestedKeywords: ctx.requestedKeywords,
+    approvedKeywords: ctx.approvedKeywords,
+    businessPriorities: ctx.businessPriorities,
+    businessTerms: ctx.businessTerms,
+    contentGapTopics: ctx.contentGapTopics,
+    recentChatTopics: ctx.recentChatTopics,
+    rejectionReasons: ctx.rejectionReasons,
+    backlinkProfile: ctx.backlinkProfile,
+    strictBusinessFit: true,
+  });
+  score += sharedEvaluation.scoreDelta;
+  fitSignals.push(...sharedEvaluation.fitSignals);
+  for (const reason of sharedEvaluation.reasons) {
+    if (reason.weight < 0) {
+      penaltyReasons.push(reason.message);
+    } else {
+      reasons.push(reason.message);
+    }
+  }
+
+  const outcomeAdjustment = buildOutcomeAdjustment({
+    actionType: 'strategy_keyword_added',
+    learnings: ctx.learnings,
+    difficulty: candidate.difficulty,
+  });
+  if (outcomeAdjustment.multiplier !== 1) {
+    score = applyOutcomeAdjustmentScore(score, outcomeAdjustment);
+    for (const reason of outcomeAdjustment.reasons) {
+      if (reason.toLowerCase().includes('underperformed')) {
+        penaltyReasons.push(reason);
+      } else {
+        reasons.push(reason);
+      }
+    }
+  }
+
+  const conflictCandidates = checkKeywordCannibalization(ctx.workspaceId, candidate.keyword)
+    .filter(conflict => !ctx.excludedConflictIdentifiers.includes(conflict.conflictsWith.identifier));
+  const conflictSeverity = getStrongestConflictSeverity(conflictCandidates);
+  const conflictReason = buildConflictReason(conflictCandidates);
+  if (conflictSeverity === 'high') {
+    score -= 35;
+    penaltyReasons.push(conflictReason ?? 'High cannibalization risk with an existing page');
+  } else if (conflictSeverity === 'medium') {
+    score -= 18;
+    penaltyReasons.push(conflictReason ?? 'Medium cannibalization risk with existing targets');
+  } else if (conflictSeverity === 'low') {
+    score -= 8;
+    penaltyReasons.push(conflictReason ?? 'Low cannibalization risk');
+  }
+
+  const authorityAssessment = candidate.authorityAssessment ?? assessAuthorityFromBacklinks(candidate.difficulty, ctx.backlinkProfile);
+
+  const uniqueReasons = [...new Set([...reasons, ...penaltyReasons])].slice(0, 5);
+  if (sharedEvaluation.suppressed) {
+    return null;
+  }
+
+  return {
+    ...candidate,
+    _score: score,
+    _reasons: uniqueReasons,
+    _penaltyReasons: [...new Set(penaltyReasons)],
+    _fitSignals: [...new Set(fitSignals)],
+    _conflictSeverity: conflictSeverity,
+    authorityAssessment,
+  };
+}
+
+function stripScore(candidate: ScoredCandidate): KeywordCandidate {
+  const {
+    _score,
+    _reasons,
+    _penaltyReasons,
+    _fitSignals,
+    _conflictSeverity,
+    ...rest
+  } = candidate;
   return rest;
 }
 
-// ── Opportunity scoring ──
+function buildReasoning(candidates: ScoredCandidate[]): KeywordRecommendationReasoning | undefined {
+  const recommended = candidates[0];
+  if (!recommended) return undefined;
 
-/**
- * Score a keyword on a 0–110 scale based on volume, difficulty, and commercial intent.
- * Base score is 0–100 (55% volume + 45% difficulty inversion); CPC adds up to 10 bonus points.
- * Higher volume + lower difficulty + higher CPC = higher score.
- * @internal exported for unit testing
- */
-export function opportunityScore(volume: number, difficulty: number, cpc: number = 0): number {
-  if (volume <= 0) return 0;
-  // Normalize volume: log scale (0 = 0, 10 = 33, 100 = 50, 1000 = 67, 10000 = 83, 100000 = 100)
-  const volScore = Math.min(100, (Math.log10(volume) / 5) * 100);
-  // Invert difficulty: 0 difficulty = 100 score, 100 difficulty = 0 score
-  const diffScore = 100 - difficulty;
-  // CPC bonus: up to 10 points for high commercial intent (CPC $5+ = max bonus)
-  const cpcBonus = Math.min(10, cpc * 2);
-  // Weighted: 55% volume, 45% difficulty, plus CPC bonus
-  return Math.round(volScore * 0.55 + diffScore * 0.45 + cpcBonus);
+  const recommendedReasons = recommended._reasons.length > 0
+    ? recommended._reasons.slice(0, 2)
+    : ['Best blend of opportunity, strategic fit, and execution risk'];
+  const authorityLead = recommended.authorityAssessment?.posture !== 'within_current_authority_range'
+    ? recommended.authorityAssessment?.note
+    : undefined;
+
+  return {
+    recommendedReason: [authorityLead, ...recommendedReasons].filter(Boolean).join(' '),
+    alternatives: candidates
+      .slice(1, 4)
+      .map(candidate => ({
+        keyword: candidate.keyword,
+        reasons: candidate._reasons.length > 0
+          ? candidate._reasons.slice(0, 3)
+          : ['Lower-ranked after strategic-fit and risk checks'],
+      })),
+  };
 }
 
-/**
- * Returns true if a keyword candidate should be included in scoring.
- * Seed keywords (source === 'pattern') are always kept; related keywords require
- * at least 10 monthly searches to avoid noise.
- * @internal exported for unit testing
- */
-export function shouldIncludeKeywordCandidate(source: string, volume: number): boolean {
-  return source === 'pattern' || source === 'gsc' || volume >= 10;
+function formatCandidateForAi(candidate: ScoredCandidate): string {
+  const signals = [
+    ...candidate._fitSignals,
+    candidate._conflictSeverity ? `cannibalization:${candidate._conflictSeverity}` : '',
+  ].filter(Boolean).join(', ') || 'none';
+  const reasons = candidate._reasons.slice(0, 3).join('; ') || 'opportunity-led fallback';
+  return `- "${candidate.keyword}" (vol: ${candidate.volume}, KD: ${candidate.difficulty}, CPC: $${candidate.cpc.toFixed(2)}, score: ${candidate._score}, signals: ${signals}, notes: ${reasons})`;
 }
 
-// ── Core recommendation function ──
+export { opportunityScore, shouldIncludeKeywordCandidate } from './keyword-intelligence/index.js';
 
-export interface KeywordRecommendationResult {
-  seedKeyword: string;
-  candidates: KeywordCandidate[];
-  recommended: string | null;
-  message?: string;
-}
+// ── Core recommendation function ───────────────────────────────────────────
 
 /**
  * Get keyword recommendations for a seed keyword.
  *
  * Flow:
- * 1. Fetch SEMRush overview for the seed keyword
- * 2. Fetch SEMRush related keywords
- * 3. Score all candidates by opportunity
- * 4. Optionally use AI to rank by business relevance
- * 5. Return sorted candidates with a recommended pick
+ * 1. Fetch provider metrics for the seed keyword
+ * 2. Fetch provider related keywords
+ * 3. Enrich with GSC queries when available
+ * 4. Score all candidates by opportunity + strategic fit + execution risk
+ * 5. Optionally use AI to re-rank when meaningful workspace context exists
+ * 6. Return sorted candidates with an optional reasoning payload
  */
 export async function getKeywordRecommendations(
   workspaceId: string,
@@ -82,106 +301,137 @@ export async function getKeywordRecommendations(
   options: {
     useAI?: boolean;
     maxCandidates?: number;
+    includeReasoning?: boolean;
+    excludeConflictIdentifiers?: readonly string[];
   } = {},
 ): Promise<KeywordRecommendationResult> {
-  const { useAI = false, maxCandidates = 15 } = options;
+  const { useAI = false, maxCandidates = 15, includeReasoning = false } = options;
 
   const ws = getWorkspace(workspaceId);
   const provider = getConfiguredProvider(ws?.seoDataProvider);
   if (!provider) {
-    return {
-      seedKeyword,
-      candidates: [{
-        keyword: seedKeyword,
-        volume: 0,
-        difficulty: 0,
-        cpc: 0,
-        source: 'pattern',
-        isRecommended: true,
-      }],
-      recommended: seedKeyword,
-      message: 'No SEO data provider configured — seed keyword used as-is',
-    };
-  }
-
-  // Fetch seed metrics + related keywords in parallel
-  const [seedMetrics, related] = await Promise.all([
-    provider.getKeywordMetrics([seedKeyword], workspaceId).catch(() => []),
-    provider.getRelatedKeywords(seedKeyword, workspaceId, maxCandidates).catch(() => []),
-  ]);
-
-  const seed = seedMetrics[0];
-  const candidates: KeywordCandidate[] = [];
-
-  // Add seed keyword as a candidate
-  if (seed) {
-    candidates.push({
-      keyword: seed.keyword,
-      volume: seed.volume,
-      difficulty: seed.difficulty,
-      cpc: seed.cpc,
-      source: 'pattern',
-      isRecommended: false,
-    });
-  } else {
-    candidates.push({
+    const candidates: KeywordCandidate[] = [{
       keyword: seedKeyword,
       volume: 0,
       difficulty: 0,
       cpc: 0,
       source: 'pattern',
-      isRecommended: false,
-    });
+      isRecommended: true,
+      authorityAssessment: {
+        posture: 'authority_unknown',
+        note: 'Authority unknown — backlink data is unavailable, so treat keyword difficulty cautiously.',
+      },
+    }];
+    return {
+      seedKeyword,
+      candidates,
+      recommended: seedKeyword,
+      message: 'No SEO data provider configured — seed keyword used as-is',
+      reasoning: includeReasoning ? {
+        recommendedReason: 'No SEO provider is configured, so the seed keyword stays as the safest fallback.',
+        alternatives: [],
+      } : undefined,
+    };
   }
 
-  // Add related keywords as candidates
-  for (const r of related.slice(0, maxCandidates - 1)) {
+  const locationCode = resolveWorkspaceLocationCode(workspaceId) ?? undefined;
+  const [seedMetrics, related, recommendationContext] = await Promise.all([
+    provider.getKeywordMetrics([seedKeyword], workspaceId, undefined, locationCode).catch(() => []),
+    provider.getRelatedKeywords(seedKeyword, workspaceId, maxCandidates).catch(() => []),
+    buildRecommendationGenerationContext(workspaceId, {
+      slices: recommendationSlices,
+      learningsDomain: 'strategy',
+      verbosity: 'detailed',
+      tokenBudget: 2400,
+      enrichWithBacklinks: true,
+    }).catch(err => {
+      log.warn({ err, workspaceId }, 'Keyword recommendation context build failed — continuing with provider-only fallback');
+      return null;
+    }),
+  ]);
+
+  const seoContext = recommendationContext?.intelligence.seoContext;
+  const learnings = recommendationContext?.intelligence.learnings;
+  const clientSignals = recommendationContext?.intelligence.clientSignals;
+  const scoringContext = buildScoringContext(
+    workspaceId,
+    ws?.name,
+    seedKeyword,
+    seoContext,
+    learnings,
+    clientSignals,
+    [...(options.excludeConflictIdentifiers ?? [])],
+  );
+  const outcomeLearningStatusNote = buildOutcomeLearningStatusNote(
+    recommendationContext?.learningsAvailability,
+    'strategy',
+  );
+
+  const seed = seedMetrics[0];
+  const candidates: KeywordCandidate[] = [];
+
+  candidates.push(seed
+    ? {
+        keyword: seed.keyword,
+        volume: seed.volume,
+        difficulty: seed.difficulty,
+        cpc: seed.cpc,
+        source: 'pattern',
+        isRecommended: false,
+        authorityAssessment: undefined,
+      }
+    : {
+        keyword: seedKeyword,
+        volume: 0,
+        difficulty: 0,
+        cpc: 0,
+        source: 'pattern',
+        isRecommended: false,
+        authorityAssessment: {
+          posture: 'authority_unknown',
+          note: 'Authority unknown — backlink data is unavailable, so treat keyword difficulty cautiously.',
+        },
+      });
+
+  for (const relatedKeyword of related.slice(0, maxCandidates - 1)) {
     candidates.push({
-      keyword: r.keyword,
-      volume: r.volume,
-      difficulty: r.difficulty,
-      cpc: r.cpc,
+      keyword: relatedKeyword.keyword,
+      volume: relatedKeyword.volume,
+      difficulty: relatedKeyword.difficulty,
+      cpc: relatedKeyword.cpc,
       source: 'semrush_related',
       isRecommended: false,
     });
   }
 
-  // Fetch GSC queries as additional candidates (proven search terms).
   if (ws?.gscPropertyUrl && ws?.webflowSiteId) {
     try {
       const gscRows = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90, { maxRows: 200 });
-      // Keep 2-char seed words (e.g. "AI", "UX") so short seeds don't fall through
-      // to the substring-match branch, which would match "email" for seed "AI".
-      // 1-char words are dropped as noise (stop-words like "a", "I").
       const seedWords = new Set(
-        seedKeyword.toLowerCase().split(/\s+/).filter(w => w.length >= 2),
+        seedKeyword.toLowerCase().split(/\s+/).filter(word => word.length >= 2),
       );
       const relevantQueries = gscRows
-        .filter(r => {
-          const qWords = r.query.toLowerCase().split(/\s+/);
+        .filter(row => {
+          const qWords = row.query.toLowerCase().split(/\s+/);
           const hasOverlap = seedWords.size > 0
-            ? qWords.some(w => seedWords.has(w))
-            : r.query.toLowerCase().includes(seedKeyword.toLowerCase());
-          return hasOverlap && r.impressions >= 10 && r.query.split(' ').length >= 2;
+            ? qWords.some(word => seedWords.has(word))
+            : row.query.toLowerCase().includes(seedKeyword.toLowerCase());
+          return hasOverlap && row.impressions >= 10 && row.query.split(' ').length >= 2;
         })
         .sort((a, b) => b.impressions - a.impressions)
         .slice(0, 10);
 
-      for (const r of relevantQueries) {
-        const sanitizedQuery = sanitizeQueryForPrompt(r.query);
-        if (!candidates.some(c => c.keyword.toLowerCase() === sanitizedQuery.toLowerCase())) {
-          // GSC impressions are 90-day site-specific impression counts, NOT monthly search volume.
-          // Two corrections to prevent GSC candidates from systematically outranking SEMRush ones:
-          //   1. Divide by 3 to approximate monthly exposure (still a proxy, not true search volume).
-          //   2. Use difficulty=50 (neutral) instead of 0 — a 0 difficulty grants a 45-pt bonus in
-          //      opportunityScore that GSC candidates have not earned.
+      for (const row of relevantQueries) {
+        const sanitizedQuery = sanitizeQueryForPrompt(row.query);
+        if (!candidates.some(candidate => normalizeKeyword(candidate.keyword) === normalizeKeyword(sanitizedQuery))) {
           candidates.push({
             keyword: sanitizedQuery,
-            volume: Math.max(1, Math.round(r.impressions / 3)),
+            volume: Math.max(1, Math.round(row.impressions / 3)),
             difficulty: 50,
             cpc: 0,
             source: 'gsc',
             isRecommended: false,
+            authorityAssessment: undefined,
           });
         }
       }
@@ -190,105 +440,72 @@ export async function getKeywordRecommendations(
     }
   }
 
-  // Score and sort by opportunity
-  const scored = candidates
-    .filter(c => shouldIncludeKeywordCandidate(c.source, c.volume)) // Keep seed keyword; filter low-volume related keywords
-    .map(c => ({ ...c, _score: opportunityScore(c.volume, c.difficulty, c.cpc) }))
-    .sort((a, b) => b._score - a._score);
+  const dedupedCandidates = dedupeCandidates(candidates);
 
-  // ── Bridge #9: Weight by empirical win rate per KD range ──────────
-  try {
-    const { getWorkspaceLearnings }: typeof WorkspaceLearnings = await import('./workspace-learnings.js'); // dynamic-import-ok
-    const learnings = getWorkspaceLearnings(workspaceId, 'strategy');
-    const kdRangeWinRates = learnings?.strategy?.winRateByDifficultyRange;
-    if (kdRangeWinRates && Object.keys(kdRangeWinRates).length > 0) {
-      for (const candidate of scored) {
-        const kd = candidate.difficulty ?? 0;
-        // Match KD to the range buckets used by workspace-learnings: 0-20, 21-40, 41-60, 61-80, 81-100
-        const range = kd <= 20 ? '0-20' : kd <= 40 ? '21-40' : kd <= 60 ? '41-60' : kd <= 80 ? '61-80' : '81-100';
-        const winRate = kdRangeWinRates[range];
-        if (winRate != null && winRate > 0.5) {
-          candidate._score = Math.round((candidate._score ?? 0) * 1.2);
-        } else if (winRate != null && winRate < 0.3) {
-          candidate._score = Math.round((candidate._score ?? 0) * 0.8);
-        }
-      }
-      // Re-sort after score adjustments
-      scored.sort((a, b) => b._score - a._score);
-    }
-  } catch (err) {
-    if (isProgrammingError(err)) {
-      log.warn({ err, workspaceId }, 'keyword-recommendations: programming error in workspace-learnings — check export names');
-    } else {
-      log.debug({ err, workspaceId }, 'keyword-recommendations: learnings enrichment optional, degrading gracefully');
-    }
-  }
+  const scored = dedupedCandidates
+    .map(candidate => scoreKeywordCandidate(candidate, scoringContext))
+    .filter((candidate): candidate is ScoredCandidate => !!candidate)
+    .sort((a, b) => b._score - a._score)
+    .slice(0, maxCandidates);
 
-  // If AI scoring is enabled and we have business context, re-rank
-  if (useAI && candidates.length > 1) {
+  const shouldSmartRank = shouldUseSmartRanking(useAI, seoContext, clientSignals);
+  if (shouldSmartRank && scored.length > 1 && recommendationContext?.promptContext) {
     try {
-      const slices = ['seoContext', 'learnings'] as const;
-      const kwIntel = await buildWorkspaceIntelligence(workspaceId, { slices });
-      const seoCtx = kwIntel.seoContext;
-      // Only call AI ranking when meaningful workspace context exists (formatForPrompt always returns non-empty).
-      // Include strategy check — workspaces with only a keyword strategy still benefit from AI ranking.
-      const hasMeaningfulContext = !!(seoCtx?.businessContext || seoCtx?.knowledgeBase || seoCtx?.brandVoice || seoCtx?.personas?.length || seoCtx?.strategy);
-      // Use full context (business context + brand voice + personas + knowledge + learnings) for richer ranking
-      const bizContext = hasMeaningfulContext ? formatForPrompt(kwIntel, { verbosity: 'detailed', sections: slices }) : '';
-      if (bizContext) {
-        const aiRanked = await aiRankKeywords(scored, bizContext, workspaceId);
-        // Mark the AI-recommended keyword
-        for (const c of aiRanked) {
-          c.isRecommended = false;
-        }
-        if (aiRanked.length > 0) {
-          aiRanked[0].isRecommended = true;
-        }
-        return {
-          seedKeyword,
-          candidates: aiRanked,
-          recommended: aiRanked[0]?.keyword ?? seedKeyword,
-        };
-      }
+      const aiContext = outcomeLearningStatusNote
+        ? `${recommendationContext.promptContext}\n\nOUTCOME LEARNING STATUS:\n${outcomeLearningStatusNote}`
+        : recommendationContext.promptContext;
+      const aiRanked = await aiRankKeywords(scored, aiContext, workspaceId);
+      const candidateMap = new Map(scored.map(candidate => [normalizeKeyword(candidate.keyword), candidate])); // map-dup-ok — candidates are deduped by normalized keyword earlier in this function
+      const reordered = aiRanked
+        .map(candidate => candidateMap.get(normalizeKeyword(candidate.keyword)))
+        .filter((candidate): candidate is ScoredCandidate => !!candidate);
+      const reorderedKeys = new Set(reordered.map(candidate => normalizeKeyword(candidate.keyword)));
+      const remaining = scored.filter(candidate => !reorderedKeys.has(normalizeKeyword(candidate.keyword)));
+      const finalScored = [...reordered, ...remaining].slice(0, maxCandidates);
+      for (const candidate of finalScored) candidate.isRecommended = false;
+      if (finalScored[0]) finalScored[0].isRecommended = true;
+
+      return {
+        seedKeyword,
+        candidates: finalScored.map(stripScore),
+        recommended: finalScored[0]?.keyword ?? seedKeyword,
+        reasoning: includeReasoning ? buildReasoning(finalScored) : undefined,
+      };
     } catch (err) {
-      log.warn({ err }, 'AI keyword ranking failed — falling back to opportunity score');
+      log.warn({ err, workspaceId }, 'AI keyword ranking failed — falling back to deterministic smart scoring');
     }
   }
 
-  // Mark the top-scored keyword as recommended
-  const final = scored.map(stripScore);
-  if (final.length > 0) {
-    final[0].isRecommended = true;
-  }
+  for (const candidate of scored) candidate.isRecommended = false;
+  if (scored[0]) scored[0].isRecommended = true;
 
   return {
     seedKeyword,
-    candidates: final,
-    recommended: final[0]?.keyword ?? seedKeyword,
+    candidates: scored.map(stripScore),
+    recommended: scored[0]?.keyword ?? seedKeyword,
+    reasoning: includeReasoning ? buildReasoning(scored) : undefined,
   };
 }
 
-// ── AI relevance ranking ──
+// ── AI relevance ranking ────────────────────────────────────────────────────
 
 async function aiRankKeywords(
   candidates: ScoredCandidate[],
   businessContext: string,
   workspaceId: string,
 ): Promise<KeywordCandidate[]> {
-  const kwList = candidates
-    .map(c => `- "${c.keyword}" (vol: ${c.volume}, KD: ${c.difficulty}, CPC: $${c.cpc.toFixed(2)}, opp_score: ${c._score})`)
-    .join('\n');
+  const kwList = candidates.map(formatCandidateForAi).join('\n');
 
-  const prompt = `You are an SEO strategist. Given the business context and keyword candidates below, rank them from BEST to WORST target keyword for a new content page.
+  const prompt = `You are an SEO strategist. Given the workspace context and keyword candidates below, rank them from BEST to WORST target keyword for a new content page.
 
-Consider:
-1. Relevance to the business (most important)
-2. Search volume (higher is better)
-3. Keyword difficulty (lower is better for achievable ranking)
-4. Commercial intent (higher CPC suggests buyer intent)
-5. Specificity (long-tail often converts better than generic)
+Prioritize, in order:
+1. Business fit and client demand signals
+2. Avoiding obvious cannibalization or duplicate page targets
+3. Achievable ranking potential for this workspace
+4. Search volume and commercial value
+5. Specificity over broad, noisy adjacent terms when both are plausible
 
-BUSINESS CONTEXT:
+WORKSPACE CONTEXT:
 ${businessContext.slice(0, 2500)}
 
 KEYWORD CANDIDATES:
@@ -309,21 +526,20 @@ Return a JSON array of the keywords in ranked order (best first). Only return th
   const ranked = parseAIJson<string[]>(result.text);
   if (!Array.isArray(ranked)) throw new Error('AI did not return an array');
 
-  // Reorder candidates by AI ranking
-  const candidateMap = new Map(candidates.map(c => [c.keyword.toLowerCase(), c])); // map-dup-ok
+  const candidateMap = new Map(candidates.map(candidate => [normalizeKeyword(candidate.keyword), candidate])); // map-dup-ok — ranked input is already deduped before AI reordering
   const reordered: KeywordCandidate[] = [];
 
-  for (const kw of ranked) {
-    const match = candidateMap.get(kw.toLowerCase());
+  for (const keyword of ranked) {
+    const normalizedKeyword = normalizeKeyword(keyword);
+    const match = candidateMap.get(normalizedKeyword);
     if (match) {
       reordered.push(stripScore(match));
-      candidateMap.delete(kw.toLowerCase());
+      candidateMap.delete(normalizedKeyword);
     }
   }
 
-  // Append any candidates the AI missed
-  for (const [, c] of candidateMap) {
-    reordered.push(stripScore(c));
+  for (const [, candidate] of candidateMap) {
+    reordered.push(stripScore(candidate));
   }
 
   return reordered;

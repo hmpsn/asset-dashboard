@@ -42,7 +42,7 @@ router.get('/api/webflow/seo-suggestions/:workspaceId', requireWorkspaceAccess('
 router.patch('/api/webflow/seo-suggestions/:workspaceId/:suggestionId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { workspaceId, suggestionId } = req.params;
   const { selectedIndex } = req.body as { selectedIndex: number };
-  if (typeof selectedIndex !== 'number' || selectedIndex < 0 || selectedIndex > 2) {
+  if (!Number.isInteger(selectedIndex) || selectedIndex < 0 || selectedIndex > 2) {
     return res.status(400).json({ error: 'selectedIndex must be 0, 1, or 2' });
   }
   const suggestion = getPendingSuggestion(workspaceId, suggestionId);

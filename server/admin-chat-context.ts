@@ -367,6 +367,12 @@ export async function assembleAdminContext(
   if (categories.has('client') || categories.has('general')) intelSlices.push('clientSignals');
   if (categories.has('approvals') && !intelSlices.includes('operational')) intelSlices.push('operational');
   if (categories.has('copy') && !intelSlices.includes('contentPipeline')) intelSlices.push('contentPipeline');
+  // localSeo: include on performance/general questions and when the question itself mentions
+  // local signals. Workspaces with no active markets get the empty-but-valid baseline (~200
+  // chars), so the token cost is bounded for non-local workspaces.
+  const questionLower = question.toLowerCase();
+  const mentionsLocal = /\b(local|near me|near-me|gbp|google business|local pack|market|markets|location|city)\b/.test(questionLower);
+  if (categories.has('performance') || categories.has('general') || mentionsLocal) intelSlices.push('localSeo');
 
   const intel = await buildWorkspaceIntelligence(workspaceId, { // bwi-all-ok — slices built dynamically above; general queries union operational+siteHealth+clientSignals
     slices: intelSlices as IntelligenceSlice[],

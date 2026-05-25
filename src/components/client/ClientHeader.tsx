@@ -5,6 +5,7 @@ import { STUDIO_NAME } from '../../constants';
 import { Badge, Button, FormInput, Icon, IconButton } from '../ui';
 import { Modal } from '../ui/overlay/Modal';
 import type { WorkspaceInfo, ClientTab, ClientContentRequest } from './types';
+import type { AnalyticsDateRange } from '../../../shared/types/analytics-contract.js';
 
 // Module-level date defaults — computed once at import time (not during render)
 const MODULE_DEFAULT_START = new Date(Date.now() - 28 * 86400000).toISOString().split('T')[0];
@@ -19,7 +20,7 @@ interface ClientHeaderProps {
   setTab: (t: ClientTab) => void;
   NAV: Array<{ id: ClientTab; label: string; icon: React.ElementType; locked: boolean }>;
   days: number;
-  customDateRange: { startDate: string; endDate: string } | null;
+  customDateRange: AnalyticsDateRange | null;
   showDatePicker: boolean;
   setShowDatePicker: React.Dispatch<React.SetStateAction<boolean>>;
   changeDays: (d: number, ws: WorkspaceInfo) => void;

@@ -36,4 +36,12 @@ describe('CmsEditor phase-3 AI workflow hook extraction contract', () => {
     expect(hookSource).toContain('const aiRewriteBoth = async');
     expect(hookSource).toContain("post<{ text?: string; variations?: string[] }>('/api/webflow/seo-rewrite'");
   });
+
+  it('prevents invalid duplicate aiError state ownership across shell and hook', () => {
+    const cmsEditorSource = readFileSync(CMS_EDITOR_PATH, 'utf-8'); // readFile-ok - regression guard: aiError state should remain hook-owned
+    const hookSource = readFileSync(CMS_EDITOR_AI_HOOK_PATH, 'utf-8'); // readFile-ok - regression guard: aiError state should remain in hook
+
+    expect(cmsEditorSource).not.toContain('const [aiError, setAiError]');
+    expect(hookSource).toContain('const [aiError, setAiError]');
+  });
 });

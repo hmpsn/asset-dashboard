@@ -86,4 +86,15 @@ describe('SchemaSuggester CMS workflow extraction', () => {
     expect(source.slice(matchedPageIndex, fetchMetaIndex + 60)).toContain('matchedPage ?');
     expect(source).toContain('slug: matchedPage.slug || resolvePagePath(matchedPage)');
   });
+
+  it('flags invalid regression when CMS single-page generation drops active-plan context threading', () => {
+    const source = readFileSync('server/schema-suggester.ts', 'utf-8'); // readFile-ok — failure-path guard for CMS context authority chain.
+    const cmsBranchStart = source.indexOf('if (cmsItem) {');
+    const cmsBranchEnd = source.indexOf('const matchedPage = allPages.find(p => p.id === pageId);');
+    const cmsBranch = source.slice(cmsBranchStart, cmsBranchEnd);
+
+    expect(cmsBranch).toContain('activePlan?.canonicalEntities ?? []');
+    expect(cmsBranch).toContain('siteContextForCms');
+    expect(cmsBranch).not.toContain('assembleSiteContext(contextPages, baseUrl)');
+  });
 });

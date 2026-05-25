@@ -2701,6 +2701,46 @@ describe('Rule: requireAuth usage outside allowed route files', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// Rule: buildWorkspaceIntelligence() without slices (assembles all 8 slices)
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: buildWorkspaceIntelligence() without slices (assembles all 8 slices)', () => {
+  const RULE = 'buildWorkspaceIntelligence() without slices (assembles all 8 slices)';
+
+  it('flags a truly slice-less call', () => {
+    const file = write(
+      uniqPath('rule-bwi-slices', 'server/no-slices.ts'),
+      lines(
+        "import { buildWorkspaceIntelligence } from './workspace-intelligence.js';",
+        "export async function run(workspaceId: string) {",
+        "  return buildWorkspaceIntelligence(workspaceId, { pagePath: '/pricing' });",
+        "}",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  it('does not flag multiline object shorthand when slices is provided on a later line', () => {
+    const file = write(
+      uniqPath('rule-bwi-slices', 'server/intelligence/generation-context-builders.ts'),
+      lines(
+        "import { buildWorkspaceIntelligence } from '../workspace-intelligence.js';",
+        "export async function buildCtx(workspaceId: string, slices: readonly string[], pagePath?: string) {",
+        "  const intelligence = await buildWorkspaceIntelligence(workspaceId, {",
+        "    slices,",
+        "    pagePath,",
+        "  });",
+        "  return intelligence;",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // Rule: Duplicate globally-applied rate limiter in route file
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -4614,6 +4654,7 @@ describe('Meta: customCheck rule name registry', () => {
     'Hand-rolled card div (use SectionCard)',
     'Public-portal mutation without addActivity',
     'broadcastToWorkspace inside bridge callback',
+    'buildWorkspaceIntelligence() without slices (assembles all 8 slices)',
     'Layout-driving state set in useEffect',
     'useGlobalAdminEvents import restriction',
     'Raw string literal in broadcastToWorkspace() event arg',
@@ -4641,6 +4682,9 @@ describe('Meta: customCheck rule name registry', () => {
     'Port collision in integration tests',
     'Inline React Query string key (use queryKeys.*)',
     'Missing broadcastToWorkspace after DB write in route handler',
+    // Keyword Command Center crash-hardening follow-up
+    'Keyword Command Center summary/detail must not use full model',
+    'Local SEO Evaluated candidates must be explicitly gated',
     // P2 expansion rules
     'Admin route mutation without addActivity',
     'useGlobalAdminEvents called with workspace-scoped event name',
@@ -4690,6 +4734,10 @@ describe('Meta: customCheck rule name registry', () => {
     'nested-card-density-signal',
     'blue-action-semantic-drift',
     'status-semantic-mapping-drift',
+    'muted-text-two-tier-only',
+    'raw-z-index-inline-literal',
+    'focus-visible-ring-contract',
+    'stat-primitive-bypass-signal',
     // Phase C new rules (2026-04-27)
     'score-color-law-parity',
     // Phase 2 Batch 1 follow-up — converted from pattern to customCheck so
@@ -5114,6 +5162,142 @@ describe('Rule: useWorkspaceEvents handler for centralized event', () => {
       )
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: Keyword Command Center summary/detail must not use full model', () => {
+  it('flags summary/detail calling the full model builder', () => {
+    const file = write(
+      uniqPath('rule-kcc-skinny', 'server/keyword-command-center.ts'),
+      lines(
+        'export async function buildKeywordCommandCenterSummary(workspaceId: string) {',
+        '  return buildKeywordCommandCenterModel(workspaceId);',
+        '}',
+        'export async function buildKeywordCommandCenterDetail(workspaceId: string) {',
+        '  return { ok: true };',
+        '}',
+      ),
+    );
+    const hits = runRule('Keyword Command Center summary/detail must not use full model', [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('buildKeywordCommandCenterSummary');
+  });
+
+  it('accepts skinny summary/detail implementations', () => {
+    const file = write(
+      uniqPath('rule-kcc-skinny', 'server/keyword-command-center.ts'),
+      lines(
+        'export async function buildKeywordCommandCenterSummary(workspaceId: string) {',
+        '  return buildSummaryCounts(workspaceId);',
+        '}',
+        'export async function buildKeywordCommandCenterDetail(workspaceId: string) {',
+        '  return buildSingleKeyword(workspaceId);',
+        '}',
+      ),
+    );
+    expect(runRule('Keyword Command Center summary/detail must not use full model', [file])).toHaveLength(0);
+  });
+
+});
+
+describe('Rule: Local SEO Evaluated candidates must be explicitly gated', () => {
+  const RULE = 'Local SEO Evaluated candidates must be explicitly gated';
+
+  it('flags ungated Evaluated candidate generation in command center read paths', () => {
+    const file = write(
+      uniqPath('rule-kcc-local-candidates', 'server/keyword-command-center.ts'),
+      lines(
+        'export async function buildKeywordCommandCenterRowsSkinny(workspaceId: string) {',
+        '  return buildLocalSeoKeywordCandidatesEvaluated(workspaceId);',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('buildKeywordCommandCenterRowsSkinny');
+  });
+
+  it('does NOT flag the cheap default buildLocalSeoKeywordCandidates', () => {
+    const file = write(
+      uniqPath('rule-kcc-local-candidates', 'server/keyword-command-center.ts'),
+      lines(
+        'export async function buildKeywordCommandCenterRowsSkinny(workspaceId: string) {',
+        '  return buildLocalSeoKeywordCandidates(workspaceId);',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('accepts Evaluated generation in the explicit local-candidate path', () => {
+    const file = write(
+      uniqPath('rule-kcc-local-candidates', 'server/keyword-command-center.ts'),
+      lines(
+        'async function buildKeywordCommandCenterRowsViaModel(workspaceId: string) {',
+        '  return buildLocalSeoKeywordCandidatesEvaluated(workspaceId);',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('accepts an explicit temporary hatch for selected-keyword detail fallback', () => {
+    const file = write(
+      uniqPath('rule-kcc-local-candidates', 'server/keyword-command-center.ts'),
+      lines(
+        'export async function buildKeywordCommandCenterDetail(workspaceId: string) {',
+        '  // local-candidates-evaluated-ok: explicit selected keyword fallback',
+        '  return buildLocalSeoKeywordCandidatesEvaluated(workspaceId);',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not let an allowlisted function name leak into later helpers', () => {
+    const file = write(
+      uniqPath('rule-kcc-local-candidates', 'server/keyword-command-center.ts'),
+      lines(
+        'async function buildKeywordCommandCenterRowsViaModel(workspaceId: string) {',
+        '  return buildLocalSeoKeywordCandidatesEvaluated(workspaceId);',
+        '}',
+        'function buildKeywordCommandCenterRowsSkinny(workspaceId: string) {',
+        '  return buildLocalSeoKeywordCandidatesEvaluated(workspaceId);',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('buildKeywordCommandCenterRowsSkinny');
+  });
+
+  it('flags ungated arrow-function Evaluated generation', () => {
+    const file = write(
+      uniqPath('rule-kcc-local-candidates', 'server/keyword-command-center.ts'),
+      lines(
+        'const buildKeywordCommandCenterRowsSkinny = async (workspaceId: string) => {',
+        '  return buildLocalSeoKeywordCandidatesEvaluated(workspaceId);',
+        '};',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('buildKeywordCommandCenterRowsSkinny');
+  });
+
+  it('does not let a one-line allowlisted arrow declaration leak scope', () => {
+    const file = write(
+      uniqPath('rule-kcc-local-candidates', 'server/keyword-command-center.ts'),
+      lines(
+        'const buildKeywordCommandCenterRowsViaModel = () => 1;',
+        'function buildKeywordCommandCenterRowsSkinny(workspaceId: string) {',
+        '  return buildLocalSeoKeywordCandidatesEvaluated(workspaceId);',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('buildKeywordCommandCenterRowsSkinny');
   });
 });
 
@@ -7437,6 +7621,191 @@ describe('Rule: status-semantic-mapping-drift', () => {
         'export function Foo({ status }: { status: string }) {',
         '  const statusColor = status === "ok" ? "emerald" : "red"; // status-semantic-ok: HTTP status code badge map',
         '  return <span className={statusColor}>{status}</span>;',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: muted-text-two-tier-only', () => {
+  const RULE = 'muted-text-two-tier-only';
+
+  it('flags body/caption typography rendered with dim text tier', () => {
+    const file = write(
+      uniqPath('rule-muted-tier', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return <p className="t-body text-[var(--brand-text-dim)]">Important supporting copy</p>;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('body/caption');
+  });
+
+  it('flags BodyText tone="dim" usage', () => {
+    const file = write(
+      uniqPath('rule-muted-tier', 'src/components/Foo.tsx'),
+      lines(
+        "import { BodyText } from '../ui/typography';",
+        'export function Foo() {',
+        '  return <BodyText tone="dim">Supporting copy</BodyText>;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('BodyText tone="dim"');
+  });
+
+  it('respects muted-tier-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-muted-tier', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return <p className="t-caption text-[var(--brand-text-dim)]">Timestamp</p>; // muted-tier-ok: intentionally tertiary metadata',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: raw-z-index-inline-literal', () => {
+  const RULE = 'raw-z-index-inline-literal';
+
+  it('flags inline zIndex numeric literals', () => {
+    const file = write(
+      uniqPath('rule-raw-zindex', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return <div style={{ zIndex: 999 }}>Overlay</div>;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('raw z-index literal');
+  });
+
+  it('flags CSS z-index numeric literals', () => {
+    const file = write(
+      uniqPath('rule-raw-zindex', 'src/components/probe.css'),
+      lines(
+        '.overlay {',
+        '  z-index: 1200;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+  });
+
+  it('respects z-index-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-raw-zindex', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return <div style={{ zIndex: 999 }}>Overlay</div>; // z-index-ok: third-party embed overlay stack',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag var(--z-*) token usage', () => {
+    const file = write(
+      uniqPath('rule-raw-zindex', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        "  return <div style={{ zIndex: 'var(--z-modal)' }}>Overlay</div>;",
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: focus-visible-ring-contract', () => {
+  const RULE = 'focus-visible-ring-contract';
+
+  it('flags className with focus:outline-none and no focus-visible fallback', () => {
+    const file = write(
+      uniqPath('rule-focus-ring', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return <input className="px-3 py-2 focus:outline-none focus:border-teal-500" />;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('focus:outline-none');
+  });
+
+  it('passes when focus-visible ring classes exist', () => {
+    const file = write(
+      uniqPath('rule-focus-ring', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return <input className="px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500" />;',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects focus-ring-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-focus-ring', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return <input className="px-3 py-2 focus:outline-none focus:border-teal-500" />; // focus-ring-ok: browser-native focus handled by host app shell',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: stat-primitive-bypass-signal', () => {
+  const RULE = 'stat-primitive-bypass-signal';
+
+  it('flags t-stat usage in files without stat primitives', () => {
+    const file = write(
+      uniqPath('rule-stat-bypass', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return <p className="t-stat text-[var(--brand-text-bright)]">45</p>;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('t-stat typography');
+  });
+
+  it('does not flag files using StatCard', () => {
+    const file = write(
+      uniqPath('rule-stat-bypass', 'src/components/Foo.tsx'),
+      lines(
+        "import { StatCard } from '../ui';",
+        'export function Foo() {',
+        '  return <StatCard label="Clicks" value="45" />;',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects stat-primitive-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-stat-bypass', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return <p className="t-stat text-[var(--brand-text-bright)]">45</p>; // stat-primitive-ok: inline sparkline annotation shell',
         '}',
       ),
     );

@@ -21,7 +21,7 @@ export async function detectExternalExecutions(): Promise<{ detected: number; ch
         // Require 2 consecutive positive checks before committing attribution
         const checks = action.context.detectionChecks ?? 0;
         if (checks >= 1) {
-          updateAttribution(action.id, 'externally_executed');
+          updateAttribution(action.id, action.workspaceId, 'externally_executed');
           broadcastToWorkspace(action.workspaceId, WS_EVENTS.OUTCOME_EXTERNAL_DETECTED, { actionId: action.id });
           detected++;
           log.info({ actionId: action.id, actionType: action.actionType }, 'External execution detected');
@@ -30,11 +30,11 @@ export async function detectExternalExecutions(): Promise<{ detected: number; ch
             ...action.context,
             detectionChecks: checks + 1,
           };
-          updateActionContext(action.id, ctx);
+          updateActionContext(action.id, action.workspaceId, ctx);
         }
       } else if ((action.context.detectionChecks ?? 0) > 0) {
         // Reset counter — checks must be consecutive
-        updateActionContext(action.id, { ...action.context, detectionChecks: 0 });
+        updateActionContext(action.id, action.workspaceId, { ...action.context, detectionChecks: 0 });
       }
     } catch (err) {
       log.warn({ err, actionId: action.id }, 'Error checking external execution');

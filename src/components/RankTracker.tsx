@@ -1,12 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Loader2, TrendingUp, Minus, Plus, Trash2, Pin, RefreshCw,
-  Target, ArrowUp, ArrowDown, LineChart, ChevronDown,
+  Target, ArrowUp, ArrowDown, LineChart, ChevronDown, MapPin,
 } from 'lucide-react';
 import { get, post, patch, del } from '../api/client';
-import { EmptyState, SectionCard, Icon, Button, IconButton, PageHeader, FormInput } from './ui';
+import { Badge, EmptyState, SectionCard, Icon, Button, IconButton, PageHeader, FormInput } from './ui';
+import { FeatureFlag } from './ui/FeatureFlag';
+import { WS_EVENTS } from '../lib/wsEvents';
 import { cn } from '../lib/utils';
 import { chartGridColor, chartAxisColor, CHART_SERIES_COLORS } from './ui/constants';
+import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
+import type { LatestRank, TrackedKeyword } from '../../shared/types/rank-tracking';
 
 // ── Trend colors (blue/teal/green family per design system — no violet/indigo) ──
 // chart-hex-ok — multi-keyword trend chart needs 7+ visually distinct cool-hue steps
@@ -14,7 +18,7 @@ const TREND_COLORS = [CHART_SERIES_COLORS.blue, '#38bdf8', '#22d3ee', CHART_SERI
 
 // ── Sparkline: compact position-over-time for a single keyword ──
 function PositionSparkline({ data }: { data: { date: string; position: number }[] }) {
-  if (data.length < 2) return <span className="t-caption text-[var(--brand-text-dim)] italic">Not enough snapshots for trend</span>;
+  if (data.length < 2) return <span className="t-caption text-[var(--brand-text-muted)] italic">Not enough snapshots for trend</span>;
 
   const W = 200, H = 40, P = 4;
   const positions = data.map(d => d.position);
@@ -95,7 +99,7 @@ function TrendsChart({ data, keywords }: { data: HistoryPoint[]; keywords: strin
     <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 rounded-[var(--radius-signature-lg)]">
       <div className="flex items-center justify-between mb-3">
         <h4 className="text-xs font-semibold text-[var(--brand-text-bright)]">Position History — Pinned Keywords</h4>
-        <span className="t-caption-sm text-[var(--brand-text-dim)]">{data.length} snapshots · lower is better</span>
+        <span className="t-caption-sm text-[var(--brand-text-muted)]">{data.length} snapshots · lower is better</span>
       </div>
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" className="overflow-visible">
         {/* Y gridlines + labels */}
@@ -147,23 +151,6 @@ function TrendsChart({ data, keywords }: { data: HistoryPoint[]; keywords: strin
 
 type HistoryPoint = { date: string; positions: Record<string, number> };
 
-interface TrackedKeyword {
-  query: string;
-  pinned: boolean;
-  addedAt: string;
-}
-
-interface LatestRank {
-  query: string;
-  position: number;
-  previousPosition: number | null;
-  clicks: number;
-  impressions: number;
-  ctr: number;
-  change: number | null;
-  pinned: boolean;
-}
-
 interface Props {
   workspaceId: string;
   hasGsc?: boolean;
@@ -187,7 +174,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
   const [trendsLoading, setTrendsLoading] = useState(false);
   const expandedQueryRef = useRef<string | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const [kw, ranks] = await Promise.all([
         get<TrackedKeyword[]>(`/api/rank-tracking/${workspaceId}/keywords`),
@@ -200,9 +187,15 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
       setError('Failed to load rank data');
     }
     setLoading(false);
-  };
+  }, [workspaceId]);
 
-  useEffect(() => { load(); }, [workspaceId]);
+  useEffect(() => { load(); }, [load]);
+  useWorkspaceEvents(workspaceId, {
+    // ws-invalidation-ok: RankTracker owns local table/chart state in addition to centralized query invalidation.
+    [WS_EVENTS.RANK_TRACKING_UPDATED]: () => { void load(); },
+    // ws-invalidation-ok: strategy refresh can change tracked keyword lifecycle metadata displayed in local state.
+    [WS_EVENTS.STRATEGY_UPDATED]: () => { void load(); },
+  });
 
   const addKeyword = async () => {
     if (!newKeyword.trim()) return;
@@ -336,6 +329,22 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
         </div>
       )}
 
+      <FeatureFlag flag="local-seo-visibility">
+        <SectionCard variant="subtle">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-[var(--radius-lg)] border border-blue-500/20 bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+              <Icon as={MapPin} size="md" className="text-blue-400" />
+            </div>
+            <div>
+              <p className="t-caption font-semibold text-[var(--brand-text-bright)]">Rank Tracker is Search Console measurement</p>
+              <p className="t-caption-sm text-[var(--brand-text-muted)]">
+                Local SEO visibility is measured separately by market and local-pack evidence. Use Keywords for local visibility posture; use this page for GSC query positions, clicks, and impressions.
+              </p>
+            </div>
+          </div>
+        </SectionCard>
+      </FeatureFlag>
+
       {error && <p className="text-xs text-red-400">{error}</p>}
 
       {/* Add keyword */}
@@ -400,7 +409,16 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
                       className={cn('flex-shrink-0', rank.pinned ? 'text-amber-400' : 'text-[var(--brand-border-hover)] hover:text-[var(--brand-text)]')}
                     />
                     <Icon as={ChevronDown} size="sm" className={cn('text-[var(--brand-text-dim)] flex-shrink-0 transition-transform', isExpanded && 'rotate-180')} />
-                    <span className="text-xs text-[var(--brand-text-bright)] truncate">{rank.query}</span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-xs text-[var(--brand-text-bright)] truncate">{rank.query}</span>
+                        {rank.source?.startsWith('strategy_') && <Badge tone="teal" size="sm" label="Strategy" />}
+                        {rank.source === 'client_requested' && <Badge tone="blue" size="sm" label="Client" />}
+                      </div>
+                      {rank.pagePath && (
+                        <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{rank.pageTitle || rank.pagePath}</div>
+                      )}
+                    </div>
                   </div>
                   <div className="text-right">
                     <span className={cn('text-sm font-bold', rank.position <= 3 ? 'text-emerald-400' : rank.position <= 10 ? 'text-teal-400' : rank.position <= 20 ? 'text-amber-400' : 'text-[var(--brand-text)]')}>

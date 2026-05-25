@@ -132,7 +132,7 @@ export function ContentSubscriptions({ workspaceId }: Props) {
                 >
                   <div className="t-ui text-[var(--brand-text-bright)]">{plan.displayName}</div>
                   <div className="t-caption-sm text-[var(--brand-text)] mt-1">{plan.description}</div>
-                  <div className="t-stat-sm text-accent-brand mt-2">${plan.priceUsd}<span className="t-caption-sm text-[var(--brand-text-muted)]">/mo</span></div>
+                  <div className="t-page font-semibold text-accent-brand mt-2">${plan.priceUsd}<span className="t-caption-sm text-[var(--brand-text-muted)]">/mo</span></div>
                 </ClickableRow>
               ))}
             </div>

@@ -78,4 +78,13 @@ describe('mutation lifecycle invalidation contracts', () => {
     expect(clientDashboardSource).toContain("refetchClient('content-plan'");
     expect(clientDashboardSource).toContain("refetchClient('intelligence'");
   });
+
+  it('treats missing WORK_ORDER_UPDATE invalidation wiring as an invalid regression', () => {
+    const invalidationSource = readProjectFile('src/hooks/useWsInvalidation.ts');
+    const workOrderBlock = eventBlock(invalidationSource, 'WORK_ORDER_UPDATE');
+
+    expect(workOrderBlock).toContain('queryKeys.admin.workspaceHome(workspaceId)');
+    expect(workOrderBlock).toContain('queryKeys.client.workOrders(workspaceId)');
+    expect(workOrderBlock).not.toContain('queryKeys.client.contentRequests(workspaceId)');
+  });
 });

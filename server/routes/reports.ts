@@ -100,8 +100,16 @@ router.post('/api/sales-report', async (req, res) => {
   try {
     const { url, maxPages } = req.body;
     if (!url) return res.status(400).json({ error: 'URL is required' });
+    const requestedMaxPages = maxPages == null ? 25 : Number(maxPages);
+    if (!Number.isInteger(requestedMaxPages) || requestedMaxPages < 1) {
+      return res.status(400).json({ error: 'maxPages must be a positive integer' });
+    }
+    if (requestedMaxPages > 100) {
+      return res.status(400).json({ error: 'maxPages must be between 1 and 100' });
+    }
+    const boundedMaxPages = Math.min(requestedMaxPages, 100);
     log.info(`Starting audit for ${url}`);
-    const result = await runSalesAudit(url, maxPages || 25);
+    const result = await runSalesAudit(url, boundedMaxPages);
 
     // Save to disk
     const reportsDir = getDataDir('sales-reports');
@@ -331,6 +339,9 @@ router.post('/api/monthly-report/:workspaceId', requireWorkspaceAccess('workspac
     const result = await triggerMonthlyReport(req.params.workspaceId);
     res.json({ sent: result.sent, html: result.html, reportId: result.reportId });
   } catch (err) {
+    if (err instanceof Error && err.message === 'Workspace not found') {
+      return res.status(404).json({ error: 'Workspace not found' });
+    }
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate report' });
   }
 });

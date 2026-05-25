@@ -374,7 +374,7 @@ function TextPasteForm({ workspaceId, onUploaded, onCancel }: TextPasteFormProps
               value={sourceType}
               onChange={value => setSourceType(value as SourceType)}
               options={SOURCE_TYPE_OPTIONS}
-              className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] focus:outline-none focus:border-teal-600"
+              className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-600"
             />
           </div>
         </div>
@@ -484,7 +484,7 @@ function UploadZone({ workspaceId, onUploaded, onCancel }: UploadZoneProps) {
             value={sourceType}
             onChange={value => setSourceType(value as SourceType)}
             options={SOURCE_TYPE_OPTIONS}
-            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] focus:outline-none focus:border-teal-600"
+            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-600"
           />
         </div>
 

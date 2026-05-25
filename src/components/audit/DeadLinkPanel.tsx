@@ -101,7 +101,7 @@ export function DeadLinkPanel({ deadLinkDetails, siteId, workspaceId }: DeadLink
                     <span className="t-caption-sm text-[var(--brand-text)] truncate">{link.foundOn || link.foundOnSlug}</span>
                     {link.anchorText && (
                       <>
-                        <span className="t-caption-sm text-[var(--brand-text-dim)]">·</span>
+                        <span className="t-caption-sm text-[var(--brand-text-muted)]">·</span>
                         <span className="t-caption-sm text-[var(--brand-text-muted)] italic truncate">"{link.anchorText}"</span>
                       </>
                     )}
@@ -162,7 +162,7 @@ export function DeadLinkPanel({ deadLinkDetails, siteId, workspaceId }: DeadLink
                       if (e.key === 'Escape') { setRedirectFormUrl(null); setRedirectFormTo(''); }
                     }}
                     placeholder="/new-path or https://example.com/new"
-                    className="flex-1 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded px-2 py-1 t-caption text-[var(--brand-text-bright)] placeholder-zinc-600 focus:outline-none focus:border-teal-500"
+                    className="flex-1 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded px-2 py-1 t-caption text-[var(--brand-text-bright)] placeholder-zinc-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500"
                     autoFocus
                   />
                   <Button

@@ -21,11 +21,22 @@ import { isProgrammingError } from '../errors.js';
 
 const log = createLogger('semrush-routes');
 
+function parseCsvQuery(rawValue: unknown): string[] {
+  const rawParts = Array.isArray(rawValue) ? rawValue : [rawValue];
+  return rawParts
+    .flatMap(value => typeof value === 'string' ? value.split(',') : [])
+    .map(value => value.trim())
+    .filter(Boolean);
+}
+
 // --- Competitive Intelligence Hub ---
 router.get('/api/semrush/competitive-intel/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { workspaceId } = req.params;
-  const competitors = (req.query.competitors as string || '').split(',').map(d => d.trim()).filter(Boolean);
+  const competitors = parseCsvQuery(req.query.competitors);
   if (competitors.length === 0) return res.status(400).json({ error: 'competitors query param required (comma-separated domains)' });
+  if (competitors.length > MAX_COMPETITORS) {
+    return res.status(400).json({ error: `competitors must include at most ${MAX_COMPETITORS} domains` });
+  }
 
   const ws = listWorkspaces().find(w => w.id === workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -37,10 +48,20 @@ router.get('/api/semrush/competitive-intel/:workspaceId', requireWorkspaceAccess
   if (!myDomain) return res.status(400).json({ error: 'Workspace has no live domain configured' });
 
   try {
-    // Fetch domain overviews in parallel (my domain + configured competitor cap)
-    // Use backlinks-specific provider which falls back to SEMRush if DataForSEO lacks subscription
+    // Fetch domain overviews in parallel (my domain + configured competitor cap).
+    // Backlinks are optional; if DataForSEO is selected/default but backlinks are disabled,
+    // omit backlink fields instead of silently falling back to SEMRush.
     const blProvider = getBacklinksProvider(ws.seoDataProvider);
-    const cappedCompetitors = competitors.slice(0, MAX_COMPETITORS);
+    // Sanitize and validate competitor domains before sending to the provider.
+    // Bare names without TLDs (e.g. "theaustindentist") pass the CSV parser but cause
+    // DataForSEO error 40501 "Invalid Field: 'target'". Re-running cleanCompetitorDomains
+    // here drops any entries that failed isProviderSafeDomain — including legacy stored
+    // values saved before input validation was enforced.
+    const cappedCompetitors = cleanCompetitorDomains(competitors, myDomain);
+    const droppedCount = competitors.length - cappedCompetitors.length;
+    if (droppedCount > 0) {
+      log.warn({ dropped: competitors.filter(c => !cappedCompetitors.includes(c)), workspaceId }, 'competitive-intel: dropped invalid competitor domains');
+    }
     const allDomains = [myDomain, ...cappedCompetitors];
     const [overviews, backlinks, keywordGaps] = await Promise.all([
       Promise.all(allDomains.map(d => provider.getDomainOverview(d, workspaceId).catch(() => null))),

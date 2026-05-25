@@ -1,5 +1,6 @@
 # Git worktrees
 .worktrees/
+.claire/
 
 # Logs
 logs
@@ -29,6 +30,7 @@ dist-ssr
 *.sw?
 .superpowers/
 .claude/scheduled_tasks.lock
+.claude/worktrees/
 
 # Coverage reports
 coverage/

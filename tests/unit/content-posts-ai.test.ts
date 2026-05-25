@@ -10,6 +10,10 @@ vi.mock('../../server/ai.js', () => ({
   callAI: callAIMock,
 }));
 
+vi.mock('../../server/anthropic-helpers.js', () => ({
+  isAnthropicConfigured: vi.fn(() => false),
+}));
+
 vi.mock('../../server/workspace-intelligence.js', () => ({
   buildWorkspaceIntelligence: vi.fn(async () => ({
     version: 1,
@@ -23,7 +27,7 @@ vi.mock('../../server/workspace-intelligence.js', () => ({
   formatPageMapForPrompt: vi.fn(() => ''),
 }));
 
-import { scoreVoiceMatch } from '../../server/content-posts-ai.js';
+import { generateSeoMeta, scoreVoiceMatch, unifyPost } from '../../server/content-posts-ai.js';
 
 function makeBrief(): ContentBrief {
   return {
@@ -70,11 +74,86 @@ function makePost(): GeneratedPost {
   };
 }
 
-describe('scoreVoiceMatch', () => {
-  beforeEach(() => {
-    callAIMock.mockReset();
+beforeEach(() => {
+  callAIMock.mockReset();
+});
+
+describe('generateSeoMeta', () => {
+  it('parses fenced JSON through the structured-output boundary', async () => {
+    callAIMock.mockResolvedValueOnce({
+      text: '```json\n{"seoTitle":"SEO Audit Checklist","seoMetaDescription":"A strong meta description."}\n```',
+    });
+
+    const result = await generateSeoMeta(makePost(), makeBrief(), 'ws_test');
+    expect(result).toEqual({
+      seoTitle: 'SEO Audit Checklist',
+      seoMetaDescription: 'A strong meta description.',
+    });
+    expect(callAIMock).toHaveBeenCalledWith(expect.objectContaining({
+      operation: 'content-post-seo-meta',
+    }));
   });
 
+  it('returns null when structured JSON is malformed', async () => {
+    callAIMock.mockResolvedValueOnce({
+      text: '{"seoTitle":42,"seoMetaDescription":"Still wrong"}',
+    });
+
+    const result = await generateSeoMeta(makePost(), makeBrief(), 'ws_test');
+    expect(result).toBeNull();
+  });
+});
+
+describe('unifyPost', () => {
+  it('returns unified content when valid structured output is returned', async () => {
+    const longPost = {
+      ...makePost(),
+      introduction: `<p>${'intro '.repeat(120)}</p>`,
+      sections: [{
+        ...makePost().sections[0],
+        content: `<h2>Section</h2><p>${'body '.repeat(260)}</p>`,
+        wordCount: 260,
+        targetWordCount: 280,
+      }],
+      conclusion: `<h2>Next Steps</h2><p>${'outro '.repeat(80)}</p>`,
+    };
+    callAIMock.mockResolvedValueOnce({
+      text: '{"introduction":"<p>Unified intro</p>","sections":["<h2>Section</h2><p>Unified body</p>"],"conclusion":"<h2>Next Steps</h2><p>Unified outro</p>"}',
+    });
+
+    const result = await unifyPost(longPost, makeBrief(), 'VOICE CONTEXT', 'ws_test');
+    expect(result).toEqual({
+      introduction: '<p>Unified intro</p>',
+      sections: ['<h2>Section</h2><p>Unified body</p>'],
+      conclusion: '<h2>Next Steps</h2><p>Unified outro</p>',
+    });
+    expect(callAIMock).toHaveBeenCalledWith(expect.objectContaining({
+      operation: 'content-post-unify',
+    }));
+  });
+
+  it('returns null when structured output has the wrong shape', async () => {
+    const longPost = {
+      ...makePost(),
+      introduction: `<p>${'intro '.repeat(120)}</p>`,
+      sections: [{
+        ...makePost().sections[0],
+        content: `<h2>Section</h2><p>${'body '.repeat(260)}</p>`,
+        wordCount: 260,
+        targetWordCount: 280,
+      }],
+      conclusion: `<h2>Next Steps</h2><p>${'outro '.repeat(80)}</p>`,
+    };
+    callAIMock.mockResolvedValueOnce({
+      text: '{"introduction":"<p>Intro</p>","sections":"not-an-array","conclusion":"<h2>Outro</h2>"}',
+    });
+
+    const result = await unifyPost(longPost, makeBrief(), 'VOICE CONTEXT', 'ws_test');
+    expect(result).toBeNull();
+  });
+});
+
+describe('scoreVoiceMatch', () => {
   it('fails closed when AI returns a non-finite voiceScore', async () => {
     callAIMock.mockResolvedValueOnce({
       text: '{"voiceScore":"NaN","voiceFeedback":"Looks okay."}',
@@ -82,7 +161,7 @@ describe('scoreVoiceMatch', () => {
 
     const result = await scoreVoiceMatch(makePost(), makeBrief(), 'ws_test');
     expect(result.voiceScore).toBeNull();
-    expect(result.voiceFeedback).toContain('invalid score');
+    expect(result.voiceFeedback).toContain('could not parse AI response');
   });
 
   it('returns a clamped rounded score for valid numeric output', async () => {
@@ -93,5 +172,18 @@ describe('scoreVoiceMatch', () => {
     const result = await scoreVoiceMatch(makePost(), makeBrief(), 'ws_test');
     expect(result.voiceScore).toBe(100);
     expect(result.voiceFeedback).toBe('Strong match.');
+    expect(callAIMock).toHaveBeenCalledWith(expect.objectContaining({
+      operation: 'voice-scoring',
+    }));
+  });
+
+  it('preserves a valid score when voiceFeedback is blank', async () => {
+    callAIMock.mockResolvedValueOnce({
+      text: '{"voiceScore": 87, "voiceFeedback":""}',
+    });
+
+    const result = await scoreVoiceMatch(makePost(), makeBrief(), 'ws_test');
+    expect(result.voiceScore).toBe(87);
+    expect(result.voiceFeedback).toBe('No feedback provided.');
   });
 });

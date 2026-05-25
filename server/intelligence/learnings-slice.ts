@@ -13,6 +13,7 @@ export async function assembleLearnings(
   // Only assemble if feature flag is enabled
   if (!isFeatureEnabled('outcome-ai-injection')) {
     return {
+      availability: 'disabled',
       summary: null,
       confidence: null,
       topActionTypes: [],
@@ -24,12 +25,15 @@ export async function assembleLearnings(
 
   let summary: ReturnType<Awaited<typeof import('../workspace-learnings.js')>['getWorkspaceLearnings']> | undefined;
   let playbooks: ReturnType<Awaited<typeof import('../outcome-playbooks.js')>['getPlaybooks']> = [];
+  let availability: LearningsSlice['availability'] = 'no_data';
   try {
     const { getWorkspaceLearnings } = await import('../workspace-learnings.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
     const { getPlaybooks } = await import('../outcome-playbooks.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
     summary = getWorkspaceLearnings(workspaceId, opts?.learningsDomain ?? 'all');
     playbooks = getPlaybooks(workspaceId);
+    availability = summary ? 'ready' : 'no_data';
   } catch (err) {
+    availability = 'degraded';
     log.warn({ err, workspaceId }, 'assembleLearnings: core data load failed, degrading to empty learnings');
   }
 
@@ -101,6 +105,7 @@ export async function assembleLearnings(
   }
 
   return {
+    availability,
     summary: summary ?? null,
     confidence: summary?.confidence ?? null,
     topActionTypes: summary?.overall.topActionTypes.slice(0, 5) ?? [],

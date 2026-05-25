@@ -4,7 +4,7 @@ import {
   Clock, FileText, Loader2, ChevronDown, ChevronRight, Users, Layers, TrendingUp, Search,
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from 'recharts';
-import { Button, ClickableRow, PageHeader, SectionCard, EmptyState, Badge, Icon } from './ui';
+import { Button, ClickableRow, PageHeader, SectionCard, EmptyState, Badge, Icon, StatCard } from './ui';
 import { CHART_SERIES_COLORS } from './ui/constants';
 import { contentPerformance } from '../api/seo';
 
@@ -196,34 +196,30 @@ export function ContentPerformance({ workspaceId }: Props) {
         <>
           {/* Summary cards */}
           <div className="grid grid-cols-4 gap-3">
-            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-4 py-3 rounded-[var(--radius-signature)]">
-              <div className="flex items-center gap-2 mb-1">
-                <Icon as={MousePointer} size="md" className="text-accent-info" />
-                <span className="t-label text-[var(--brand-text-muted)]">Total Clicks</span>
-              </div>
-              <p className="t-stat text-[var(--brand-text-bright)]">{totalClicks.toLocaleString()}</p>
-            </div>
-            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-4 py-3 rounded-[var(--radius-signature)]">
-              <div className="flex items-center gap-2 mb-1">
-                <Icon as={Eye} size="md" className="text-accent-cyan" />
-                <span className="t-label text-[var(--brand-text-muted)]">Impressions</span>
-              </div>
-              <p className="t-stat text-[var(--brand-text-bright)]">{totalImpressions.toLocaleString()}</p>
-            </div>
-            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-4 py-3 rounded-[var(--radius-signature)]">
-              <div className="flex items-center gap-2 mb-1">
-                <Icon as={Users} size="md" className="text-accent-brand" />
-                <span className="t-label text-[var(--brand-text-muted)]">Sessions</span>
-              </div>
-              <p className="t-stat text-[var(--brand-text-bright)]">{totalSessions.toLocaleString()}</p>
-            </div>
-            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-4 py-3 rounded-[var(--radius-signature)]">
-              <div className="flex items-center gap-2 mb-1">
-                <Icon as={Target} size="md" className="text-accent-warning" />
-                <span className="t-label text-[var(--brand-text-muted)]">Avg Position</span>
-              </div>
-              <p className="t-stat text-[var(--brand-text-bright)]">{avgPosition > 0 ? avgPosition.toFixed(1) : '—'}</p>
-            </div>
+            <StatCard
+              label="Total Clicks"
+              value={totalClicks.toLocaleString()}
+              icon={MousePointer}
+              valueColor="text-[var(--brand-text-bright)]"
+            />
+            <StatCard
+              label="Impressions"
+              value={totalImpressions.toLocaleString()}
+              icon={Eye}
+              valueColor="text-[var(--brand-text-bright)]"
+            />
+            <StatCard
+              label="Sessions"
+              value={totalSessions.toLocaleString()}
+              icon={Users}
+              valueColor="text-[var(--brand-text-bright)]"
+            />
+            <StatCard
+              label="Avg Position"
+              value={avgPosition > 0 ? avgPosition.toFixed(1) : '—'}
+              icon={Target}
+              valueColor="text-[var(--brand-text-bright)]"
+            />
           </div>
 
           {/* Sort controls */}
@@ -283,7 +279,7 @@ export function ContentPerformance({ workspaceId }: Props) {
                       <div className="flex items-center gap-3 mt-0.5">
                         <span className="t-caption-sm text-[var(--brand-text-muted)]">{item.targetKeyword}</span>
                         {item.targetPageSlug && (
-                          <span className="t-caption-sm text-[var(--brand-text-dim)]">{item.targetPageSlug}</span>
+                          <span className="t-caption-sm text-[var(--brand-text-muted)]">{item.targetPageSlug}</span>
                         )}
                       </div>
                     </div>
@@ -308,7 +304,7 @@ export function ContentPerformance({ workspaceId }: Props) {
                           </div>
                         </>
                       ) : (
-                        <span className="t-caption-sm text-[var(--brand-text-dim)]">No GSC data</span>
+                        <span className="t-caption-sm text-[var(--brand-text-muted)]">No GSC data</span>
                       )}
 
                       <div className="text-right pl-3 border-l border-[var(--brand-border)]">

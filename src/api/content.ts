@@ -6,7 +6,8 @@ import type {
   ContentTopicRequest,
   ContentTemplate,
   ContentMatrix,
-  KeywordCandidate,
+  KeywordRecommendationOptions,
+  KeywordRecommendationResult,
   AiFixResult,
   AIReviewResponse,
   IssueKey,
@@ -205,14 +206,14 @@ export const contentMatrices = {
   remove: (wsId: string, matrixId: string) =>
     del(`/api/content-matrices/${wsId}/${matrixId}`),
 
-  recommendKeywords: (wsId: string, seedKeyword: string, opts?: { useAI?: boolean; maxCandidates?: number }) =>
-    post<{ seedKeyword: string; candidates: KeywordCandidate[]; recommended: string | null; message?: string }>(
+  recommendKeywords: (wsId: string, seedKeyword: string, opts?: KeywordRecommendationOptions) =>
+    post<KeywordRecommendationResult>(
       `/api/content-matrices/${wsId}/recommend-keywords`,
       { seedKeyword, ...opts },
     ),
 
-  recommendKeywordsForCell: (wsId: string, matrixId: string, cellId: string, opts?: { seedKeyword?: string; useAI?: boolean; maxCandidates?: number }) =>
-    post<{ seedKeyword: string; candidates: KeywordCandidate[]; recommended: string | null; message?: string }>(
+  recommendKeywordsForCell: (wsId: string, matrixId: string, cellId: string, opts?: ({ seedKeyword?: string } & KeywordRecommendationOptions)) =>
+    post<KeywordRecommendationResult>(
       `/api/content-matrices/${wsId}/${matrixId}/cells/${cellId}/recommend-keywords`,
       opts ?? {},
     ),

@@ -17,6 +17,7 @@ const ALL_INTELLIGENCE_SLICES: IntelligenceSlice[] = [
   'siteHealth',
   'clientSignals',
   'operational',
+  'localSeo',
 ];
 
 export const intelligenceTools: Tool[] = [
@@ -32,7 +33,7 @@ export const intelligenceTools: Tool[] = [
           type: 'array',
           items: { type: 'string' },
           description:
-            'Optional: limit to specific slices. Valid values: seoContext, insights, learnings, pageProfile, pageElements, siteInventory, contentPipeline, siteHealth, clientSignals, operational. Omit for all slices.',
+            'Optional: limit to specific slices. Valid values: seoContext, insights, learnings, pageProfile, pageElements, siteInventory, contentPipeline, siteHealth, clientSignals, operational, localSeo. Omit for all slices. The localSeo slice carries the full bounded candidate universe (capped at 1000) plus a pre-formatted prompt block — external agents get the full data; internal AI prompts use the sampled block.',
         },
       },
       required: ['workspaceId'],

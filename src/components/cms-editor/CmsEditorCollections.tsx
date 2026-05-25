@@ -248,7 +248,7 @@ export function CmsEditorCollections({
                               type="text"
                               value={edits[item.id]?.name || ''}
                               onChange={value => updateField(item.id, 'name', value)}
-                              className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-[var(--brand-border-hover)]"
+                              className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-[var(--brand-border-hover)]"
                             />
                             {variations[item.id]?.fieldSlug === 'name' && variations[item.id].options.length > 1 && (
                               <div className="mt-1.5 space-y-1">
@@ -277,7 +277,7 @@ export function CmsEditorCollections({
                               type="text"
                               value={edits[item.id]?.slug || ''}
                               onChange={value => updateField(item.id, 'slug', value)}
-                              className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] font-mono focus:outline-none focus:border-[var(--brand-border-hover)]"
+                              className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] font-mono focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-[var(--brand-border-hover)]"
                             />
                           </div>
 
@@ -308,14 +308,14 @@ export function CmsEditorCollections({
                                     type="text"
                                     value={val}
                                     onChange={value => updateField(item.id, field.slug, value)}
-                                    className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-[var(--brand-border-hover)]"
+                                    className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-[var(--brand-border-hover)]"
                                   />
                                 ) : (
                                   <FormTextarea
                                     value={val}
                                     onChange={value => updateField(item.id, field.slug, value)}
                                     rows={3}
-                                    className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-[var(--brand-border-hover)] resize-none"
+                                    className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-[var(--brand-border-hover)] resize-none"
                                   />
                                 )}
                                 {variations[item.id]?.fieldSlug === field.slug && variations[item.id].options.length > 1 && (

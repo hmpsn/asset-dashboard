@@ -100,7 +100,7 @@ export function BacklinkProfile({ workspaceId }: Props) {
       <div className="flex items-center gap-2 mb-1">
         <Icon as={Link2} size="md" className="text-teal-400" />
         <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Backlink Profile</h3>
-        <span className="t-caption-sm text-[var(--brand-text-dim)] ml-1">{domain}</span>
+        <span className="t-caption-sm text-[var(--brand-text-muted)] ml-1">{domain}</span>
       </div>
 
       {/* Stat cards */}

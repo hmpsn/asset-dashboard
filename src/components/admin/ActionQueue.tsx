@@ -96,7 +96,7 @@ export function ActionQueue({ workspaceId }: Props) {
                     placeholder="Add a resolution note (optional)..."
                     value={note}
                     onChange={value => setNoteInputs(prev => ({ ...prev, [item.id]: value }))}
-                    className="w-full t-caption-sm bg-[var(--surface-1)] border border-[var(--brand-border-hover)] rounded px-2.5 py-1.5 text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500/50"
+                    className="w-full t-caption-sm bg-[var(--surface-1)] border border-[var(--brand-border-hover)] rounded px-2.5 py-1.5 text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500/50"
                   />
 
                   {/* Resolution buttons — teal for actions */}

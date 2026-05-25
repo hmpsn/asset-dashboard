@@ -112,7 +112,7 @@ export function PageRewriteHeaderBar({
                 onChange={value => { onComboQueryChange(value); onSetComboIdx(0); }}
                 onKeyDown={onComboKeyDown}
                 placeholder="Search pages or paste a URL…"
-                className="flex-1 bg-transparent text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none"
+                className="flex-1 bg-transparent text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60"
               />
               {loadingPage && <Loader2 className="w-3 h-3 animate-spin text-accent-brand flex-shrink-0" />}
             </div>

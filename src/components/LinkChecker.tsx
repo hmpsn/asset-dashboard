@@ -118,7 +118,7 @@ export function LinkChecker({ siteId, workspaceId }: Props) {
                 { value: domains.staging, label: `${domains.staging.replace('https://', '')} (staging)` },
                 ...domains.customDomains.map(d => ({ value: d, label: `${d.replace('https://', '')} (live)` })),
               ]}
-              className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-1.5 t-caption text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none"
+              className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-1.5 t-caption text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60"
             />
           </div>
         )}

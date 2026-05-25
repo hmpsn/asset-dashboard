@@ -43,6 +43,13 @@ function ClientRoutes({ betaMode = false }: { betaMode?: boolean }) {
     const target = clientPath(workspaceId, splatRoot, betaMode);
     return <Navigate to={target + (qs ? `${target.includes('?') ? '&' : '?'}${qs}` : '')} replace />;
   }
+  if (workspaceId && splatRoot === 'schema-review') {
+    const remaining = new URLSearchParams(searchParams);
+    remaining.delete('tab');
+    const qs = remaining.toString();
+    const target = clientPath(workspaceId, 'schema-review', betaMode);
+    return <Navigate to={target + (qs ? `${target.includes('?') ? '&' : '?'}${qs}` : '')} replace />;
+  }
   // Stand-in for ClientDashboard so we can introspect what initialTab + URL
   // would have been delivered.
   return <DashboardStub workspaceId={workspaceId} initialTab={splatTab} />;
@@ -126,6 +133,12 @@ describe('ClientRoutes legacy ?tab= redirect', () => {
     expect(getByTestId('initialTab').textContent).toBe('inbox');
     expect(getByTestId('tabParam').textContent).toBe('decisions');
   });
+
+  it('redirects legacy /client/:id/schema-review to inbox reviews filter', () => {
+    const { getByTestId } = renderRoutes('/client/ws_test/schema-review');
+    expect(getByTestId('initialTab').textContent).toBe('inbox');
+    expect(getByTestId('tabParam').textContent).toBe('reviews');
+  });
 });
 
 describe('clientPath legacy client inbox aliases', () => {
@@ -143,5 +156,9 @@ describe('clientPath legacy client inbox aliases', () => {
 
   it('preserves normal client tab paths', () => {
     expect(clientPath('ws_test', 'performance')).toBe('/client/ws_test/performance');
+  });
+
+  it('maps retired schema-review links to the inbox reviews filter', () => {
+    expect(clientPath('ws_test', 'schema-review')).toBe('/client/ws_test/inbox?tab=reviews');
   });
 });

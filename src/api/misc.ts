@@ -1,6 +1,7 @@
 // ── Miscellaneous API endpoints ────────────────────────────────────
 import { get, post, patch, del, getSafe, getOptional, getText, postForm } from './client';
 import type { ContentSubscription, ContentSubscriptionPlanConfig } from '../../shared/types/content';
+import type { TrackedKeyword } from '../../shared/types/rank-tracking';
 export {
   jobs,
   roadmap,
@@ -288,19 +289,19 @@ export const keywordFeedback = {
 // ── Public: tracked keywords ─────────────────────────────────
 export const trackedKeywords = {
   get: (wsId: string) =>
-    getSafe<{ keywords: Array<{ query: string; pinned: boolean; addedAt: string }> }>(
+    getSafe<{ keywords: TrackedKeyword[] }>(
       `/api/public/tracked-keywords/${wsId}`,
       { keywords: [] },
     ),
 
   add: (wsId: string, keyword: string) =>
-    post<{ keywords: Array<{ query: string; pinned: boolean; addedAt: string }> }>(
+    post<{ keywords: TrackedKeyword[] }>(
       `/api/public/tracked-keywords/${wsId}`,
       { keyword },
     ),
 
   remove: (wsId: string, keyword: string) =>
-    del<{ keywords: Array<{ query: string; pinned: boolean; addedAt: string }> }>(
+    del<{ keywords: TrackedKeyword[] }>(
       `/api/public/tracked-keywords/${wsId}`,
       { keyword },
     ),

@@ -98,10 +98,12 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   });
   const reviewEvidence: ContentReviewEvidence | undefined = (() => {
     const brief = briefQ.data as ContentBrief | undefined;
+    const referenceUrls = brief?.referenceUrls?.filter(Boolean).slice(0, 8) ?? [];
     const peopleAlsoAsk = brief?.realPeopleAlsoAsk?.filter(Boolean).slice(0, 8) ?? [];
     const topResults = brief?.realTopResults?.filter(result => result.title && result.url).slice(0, 8) ?? [];
-    if (!peopleAlsoAsk.length && !topResults.length) return undefined;
+    if (!referenceUrls.length && !peopleAlsoAsk.length && !topResults.length) return undefined;
     return {
+      referenceUrls,
       peopleAlsoAsk,
       topResults,
       note: 'SERP evidence used for grounding support. Verify important factual claims against the original sources before checking provenance-sensitive items.',

@@ -1,5 +1,6 @@
 import type { IntelligenceOptions, SeoContextSlice, SerpFeatures } from '../../shared/types/intelligence.js';
 import type { RankEntry } from '../rank-tracking.js';
+import { getPrimaryMarketLocationCode } from '../local-seo.js';
 import { createLogger } from '../logger.js';
 import { findPageMapEntry } from '../helpers.js';
 import { createStmtCache } from '../db/stmt-cache.js';
@@ -100,6 +101,20 @@ export async function assembleSeoContext(
     log.debug({ err, workspaceId }, 'assembleSeoContext: rank tracking optional, degrading gracefully');
   }
 
+  try {
+    const { getDiscoveredQuerySummary } = await import('../client-discovered-queries.js'); // dynamic-import-ok - optional discovered query table may not exist during migration windows
+    base.discoveredQuerySummary = getDiscoveredQuerySummary(workspaceId);
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleSeoContext: discoveredQuerySummary optional, degrading gracefully');
+  }
+
+  try {
+    const geo = getPrimaryMarketLocationCode(workspaceId);
+    if (geo) base.geoVolumeLabel = geo.label;
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleSeoContext: geoVolumeLabel optional, degrading gracefully');
+  }
+
   // Business profile from structured intelligence editor (Phase 3B)
   const iProfile = workspace?.intelligenceProfile;
   if (iProfile && (iProfile.industry || (iProfile.goals && iProfile.goals.length > 0) || iProfile.targetAudience)) {
@@ -183,8 +198,8 @@ export async function assembleSeoContext(
       const domain = workspace?.liveDomain?.replace(/^https?:\/\//, '').replace(/\/$/, '') ?? '';
       if (domain) {
         // Pass workspace.seoDataProvider so provider selection respects the per-workspace
-        // preference and falls back to a capable provider if backlinks are disabled on the
-        // primary (e.g. DataForSEO without a backlinks subscription).
+        // preference. If DataForSEO is selected/default but backlinks are disabled, backlink
+        // enrichment is omitted instead of silently spending SEMRush credits.
         const provider = getBacklinksProvider(workspace?.seoDataProvider);
         if (provider?.isConfigured()) {
           const overview = await provider.getBacklinksOverview(domain, workspaceId);

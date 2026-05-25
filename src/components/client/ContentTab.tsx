@@ -150,7 +150,7 @@ export function ContentTab({
         <div className="grid grid-cols-4 gap-3">
           {stats.map(s => (
             <div key={s.label} className={`${s.bg} border ${s.border} rounded-[var(--radius-lg)] px-3 py-2 text-center`}>
-              <div className={`t-stat-sm ${s.color}`}>{s.value}</div>
+              <div className={`t-page font-semibold ${s.color}`}>{s.value}</div>
               <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium">{s.label}</div>
             </div>
           ))}
@@ -324,7 +324,7 @@ export function ContentTab({
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2.5 border border-[var(--brand-border)]">
                         <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Word Count</div>
-                        <div className="t-stat-sm text-accent-brand">{brief.wordCountTarget?.toLocaleString()}</div>
+                        <div className="t-page font-semibold text-accent-brand">{brief.wordCountTarget?.toLocaleString()}</div>
                       </div>
                       <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2.5 border border-[var(--brand-border)]">
                         <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Search Intent</div>
@@ -339,7 +339,7 @@ export function ContentTab({
                       {brief.difficultyScore != null && (
                         <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2.5 border border-[var(--brand-border)]">
                           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Difficulty</div>
-                          <div className={`t-stat-sm ${brief.difficultyScore <= 30 ? 'text-accent-success' : brief.difficultyScore <= 60 ? 'text-accent-warning' : 'text-accent-danger'}`}>{brief.difficultyScore}/100</div>
+                          <div className={`t-page font-semibold ${brief.difficultyScore <= 30 ? 'text-accent-success' : brief.difficultyScore <= 60 ? 'text-accent-warning' : 'text-accent-danger'}`}>{brief.difficultyScore}/100</div>
                         </div>
                       )}
                     </div>
@@ -593,29 +593,29 @@ export function ContentTab({
                         {gsc && <>
                           <div className="bg-[var(--surface-1)]/60 rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]/50">
                             <div className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] mb-0.5"><Icon as={MousePointerClick} size="sm" /> Clicks</div>
-                            <div className="t-stat-sm text-accent-brand">{gsc.clicks.toLocaleString()}</div>
+                            <div className="t-page font-semibold text-accent-brand">{gsc.clicks.toLocaleString()}</div>
                           </div>
                           <div className="bg-[var(--surface-1)]/60 rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]/50">
                             <div className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] mb-0.5"><Icon as={Eye} size="sm" /> Impressions</div>
-                            <div className="t-stat-sm text-accent-info">{gsc.impressions.toLocaleString()}</div>
+                            <div className="t-page font-semibold text-accent-info">{gsc.impressions.toLocaleString()}</div>
                           </div>
                           <div className="bg-[var(--surface-1)]/60 rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]/50">
                             <div className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] mb-0.5"><Icon as={ArrowUpRight} size="sm" /> CTR</div>
-                            <div className="t-stat-sm text-[var(--brand-text)]">{gsc.ctr}%</div>
+                            <div className="t-page font-semibold text-[var(--brand-text)]">{gsc.ctr}%</div>
                           </div>
                           <div className="bg-[var(--surface-1)]/60 rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]/50">
                             <div className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] mb-0.5"><Icon as={TrendingUp} size="sm" /> Avg Position</div>
-                            <div className={`t-stat-sm ${gsc.position <= 10 ? 'text-accent-success' : gsc.position <= 20 ? 'text-accent-warning' : 'text-[var(--brand-text)]'}`}>{gsc.position}</div>
+                            <div className={`t-page font-semibold ${gsc.position <= 10 ? 'text-accent-success' : gsc.position <= 20 ? 'text-accent-warning' : 'text-[var(--brand-text)]'}`}>{gsc.position}</div>
                           </div>
                         </>}
                         {ga4 && !gsc && <>
                           <div className="bg-[var(--surface-1)]/60 rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]/50">
                             <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Sessions</div>
-                            <div className="t-stat-sm text-accent-brand">{ga4.sessions.toLocaleString()}</div>
+                            <div className="t-page font-semibold text-accent-brand">{ga4.sessions.toLocaleString()}</div>
                           </div>
                           <div className="bg-[var(--surface-1)]/60 rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]/50">
                             <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Users</div>
-                            <div className="t-stat-sm text-accent-info">{ga4.users.toLocaleString()}</div>
+                            <div className="t-page font-semibold text-accent-info">{ga4.users.toLocaleString()}</div>
                           </div>
                         </>}
                       </div>

@@ -8,8 +8,23 @@ import path from 'path';
 import { getUploadRoot, getDataDir } from '../data-dir.js';
 import { createLogger } from '../logger.js';
 import { getCachedMetricsBatch, cacheMetricsBatch } from '../keyword-metrics-cache.js';
+import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 import { KEYWORD_GAP_COMPETITOR_KEYWORD_LIMIT, MAX_COMPETITORS } from '../constants.js';
 import { recordExternalApiTelemetry, recordOperationTrace } from '../platform-observability.js';
+import { KEYWORD_SOURCE_KIND, type KeywordSourceEvidence, type KeywordSourceKind } from '../../shared/types/keywords.js';
+import {
+  LOCAL_SEO_LOCATION_LOOKUP_STATUS,
+  LOCAL_SEO_DEVICE,
+  LOCAL_VISIBILITY_SOURCE_ENDPOINT,
+  LOCAL_VISIBILITY_STATUS,
+  type LocalSeoLocationLookupCandidate,
+  type LocalSeoLocationLookupRequest,
+  type LocalSeoLocationLookupResponse,
+  type LocalVisibilityBusinessResult,
+  type LocalVisibilityProviderRequest,
+  type LocalVisibilityProviderResult,
+} from '../../shared/types/local-seo.js';
+import { buildDataForSeoLocationName, normalizeLocalSeoCountryName } from '../../shared/local-seo-location.js';
 import type {
   SeoDataProvider,
   KeywordMetrics,
@@ -38,7 +53,7 @@ const LOCATION_CODES: Record<string, number> = {
   fr: 2250,
 };
 
-function locationCode(database = 'us'): number {
+function locationCodeFromDatabase(database = 'us'): number {
   return LOCATION_CODES[database.toLowerCase()] ?? 2840;
 }
 
@@ -109,7 +124,7 @@ function areCreditsExhausted(): boolean {
 // ── Backlinks subscription detection ──
 // DataForSEO backlinks is a separate paid subscription (error 40204).
 // Once detected, we mark the capability disabled on the registry (with a 24h TTL)
-// so the resolver can fall back to SEMRush for backlink calls.
+// so optional backlink enrichment can degrade without spending provider credits.
 // The registry itself handles TTL expiry and auto-re-enables the capability.
 
 const BACKLINK_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -161,10 +176,13 @@ function isSubscriptionError(err: unknown): boolean {
 
 const CACHE_TTL_KEYWORD = 720;         // 30 days
 const CACHE_TTL_RELATED = 720;         // 30 days
+const CACHE_TTL_DISCOVERY = 720;       // 30 days
 const CACHE_TTL_DOMAIN_ORGANIC = 168;  // 7 days
 const CACHE_TTL_DOMAIN_OVERVIEW = 168; // 7 days
 const CACHE_TTL_BACKLINKS = 168;       // 7 days
 const CACHE_TTL_COMPETITORS = 336;     // 14 days
+const CACHE_TTL_LOCAL_VISIBILITY = 168; // 7 days
+const CACHE_TTL_LOCAL_LOCATIONS = 720;  // 30 days
 
 function getCacheDir(workspaceId: string): string {
   const dir = path.join(UPLOAD_ROOT, workspaceId, '.dataforseo-cache');
@@ -189,7 +207,10 @@ function readCache<T>(workspaceId: string, key: string, maxAgeHours = 168): T | 
 }
 
 function writeCache(workspaceId: string, key: string, data: unknown): void {
-  fs.writeFileSync(getCachePath(workspaceId, key), JSON.stringify({ cachedAt: new Date().toISOString(), data }, null, 2));
+  // Compact JSON (no indentation) — pretty-printing large SERP responses held both
+  // the compact and indented strings in memory simultaneously before the write,
+  // doubling the transient allocation. Compact is fine for machine-read cache files.
+  fs.writeFileSync(getCachePath(workspaceId, key), JSON.stringify({ cachedAt: new Date().toISOString(), data }));
 }
 
 // ── API helpers ──
@@ -208,6 +229,23 @@ function cleanUrlTarget(url: string): string {
   }
 }
 
+function cacheKeyPart(value: string): string {
+  return value.toLowerCase().trim().replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 180);
+}
+
+function normalizeSeedKeywords(keywords: string[], limit = 10): string[] {
+  const seen = new Set<string>();
+  const seeds: string[] = [];
+  for (const kw of keywords) {
+    const normalized = kw.toLowerCase().trim();
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    seeds.push(normalized);
+    if (seeds.length >= limit) break;
+  }
+  return seeds;
+}
+
 interface DataForSeoResponse {
   version?: string;
   status_code?: number;
@@ -220,6 +258,13 @@ interface DataForSeoResponse {
     result_count?: number;
     result?: Array<Record<string, unknown>>;
   }>;
+}
+
+interface DataForSeoLocationRow {
+  location_code?: number;
+  location_name?: string;
+  country_iso_code?: string;
+  location_type?: string;
 }
 
 async function apiCall(endpoint: string, body: unknown[], workspaceId?: string): Promise<DataForSeoResponse> {
@@ -313,6 +358,88 @@ async function apiCall(endpoint: string, body: unknown[], workspaceId?: string):
   return json;
 }
 
+async function apiGet(endpoint: string, workspaceId?: string): Promise<DataForSeoResponse> {
+  const startedAt = Date.now();
+  const operation = `dataforseo:${endpoint}`;
+  let json: DataForSeoResponse;
+  try {
+    json = await fetchProviderJson<DataForSeoResponse>({
+      url: `https://api.dataforseo.com/v3/${endpoint}`,
+      method: 'GET',
+      headers: {
+        'Authorization': authHeader(),
+        'Content-Type': 'application/json',
+      },
+      timeoutMs: 20_000,
+      redirect: 'follow',
+      logContext: { module: 'dataforseo', endpoint },
+    });
+  } catch (err) {
+    if (isExternalFetchError(err)) {
+      const durationMs = Date.now() - startedAt;
+      recordExternalApiTelemetry({
+        provider: 'dataforseo',
+        endpoint,
+        workspaceId,
+        durationMs,
+        status: 'error',
+        errorKind: err.kind,
+      });
+      recordOperationTrace({
+        source: 'integration',
+        operation,
+        status: 'error',
+        workspaceId,
+        durationMs,
+        message: `DataForSEO fetch ${err.kind}${err.status ? ` ${err.status}` : ''}`,
+      });
+      throw new Error(`DataForSEO ${endpoint} ${err.kind}${err.status ? ` ${err.status}` : ''}: ${err.responseBodySnippet || err.message}`);
+    }
+    throw err;
+  }
+
+  const task = json.tasks?.[0];
+  if (task && task.status_code !== 20000) {
+    const msg = task.status_message || 'Unknown error';
+    const durationMs = Date.now() - startedAt;
+    recordExternalApiTelemetry({
+      provider: 'dataforseo',
+      endpoint,
+      workspaceId,
+      durationMs,
+      status: 'error',
+      errorKind: 'task_error',
+    });
+    recordOperationTrace({
+      source: 'integration',
+      operation,
+      status: 'error',
+      workspaceId,
+      durationMs,
+      message: `task ${task.status_code}: ${msg}`,
+    });
+    throw new Error(`DataForSEO ${endpoint} task error ${task.status_code}: ${msg}`);
+  }
+
+  const durationMs = Date.now() - startedAt;
+  recordExternalApiTelemetry({
+    provider: 'dataforseo',
+    endpoint,
+    workspaceId,
+    durationMs,
+    status: 'success',
+  });
+  recordOperationTrace({
+    source: 'integration',
+    operation,
+    status: 'success',
+    workspaceId,
+    durationMs,
+    message: `DataForSEO ${endpoint} success`,
+  });
+  return json;
+}
+
 function getTaskResult(json: DataForSeoResponse): Record<string, unknown>[] {
   const result = json.tasks?.[0]?.result;
   if (!result || !Array.isArray(result)) return [];
@@ -321,6 +448,205 @@ function getTaskResult(json: DataForSeoResponse): Record<string, unknown>[] {
 
 function getTaskCost(json: DataForSeoResponse): number {
   return json.tasks?.[0]?.cost ?? 0;
+}
+
+function normalizeMonthlyTrend(kwInfo: Record<string, unknown> | undefined): number[] | undefined {
+  const monthlies = kwInfo?.monthly_searches as Array<{ search_volume?: number }> | undefined;
+  return monthlies ? monthlies.map(m => m.search_volume ?? 0) : undefined;
+}
+
+function countryIsoForLocations(country: string): string | undefined {
+  const normalized = normalizeLocalSeoCountryName(country).toLowerCase();
+  if (normalized === 'united states') return 'us';
+  if (/^[a-z]{2}$/i.test(country.trim())) return country.trim().toLowerCase();
+  return undefined;
+}
+
+function localLocationKey(value: string | undefined): string {
+  return (value ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function scoreLocalLocation(row: DataForSeoLocationRow, request: LocalSeoLocationLookupRequest): number {
+  const locationName = row.location_name ?? '';
+  if (!locationName || typeof row.location_code !== 'number') return 0;
+  const expectedName = buildDataForSeoLocationName(request);
+  const expectedKey = localLocationKey(expectedName);
+  const locationKey = localLocationKey(locationName);
+  const cityKey = localLocationKey(request.city);
+  const stateKey = localLocationKey(request.stateOrRegion);
+  const countryKey = localLocationKey(normalizeLocalSeoCountryName(request.country));
+  let score = 0;
+  if (expectedKey && locationKey === expectedKey) score += 100;
+  if (cityKey && locationKey.split(' ').includes(cityKey)) score += 35;
+  if (stateKey && locationKey.includes(stateKey)) score += 25;
+  if (countryKey && locationKey.includes(countryKey)) score += 20;
+  if (/city/i.test(row.location_type ?? '')) score += 15;
+  if (/state|region|country/i.test(row.location_type ?? '')) score -= 15;
+  if (!stateKey && /united states/i.test(normalizeLocalSeoCountryName(request.country))) score -= 20;
+  return score;
+}
+
+function normalizeLocationCandidate(row: DataForSeoLocationRow, request: LocalSeoLocationLookupRequest): LocalSeoLocationLookupCandidate | null {
+  if (typeof row.location_code !== 'number' || !row.location_name) return null;
+  const score = scoreLocalLocation(row, request);
+  if (score <= 0) return null;
+  return {
+    providerLocationCode: row.location_code,
+    providerLocationName: row.location_name,
+    countryIsoCode: row.country_iso_code,
+    locationType: row.location_type,
+    score,
+  };
+}
+
+function evidenceFromKeywordData(
+  keywordData: Record<string, unknown> | undefined,
+  options: {
+    provider: string;
+    sourceKind: KeywordSourceKind;
+    seed?: string;
+    sourceTarget?: string;
+    confidence?: KeywordSourceEvidence['confidence'];
+  },
+): KeywordSourceEvidence | null {
+  const keyword = (keywordData?.keyword as string | undefined)?.trim();
+  if (!keyword) return null;
+  const kwInfo = keywordData?.keyword_info as Record<string, unknown> | undefined;
+  const serpInfo = keywordData?.serp_info as Record<string, unknown> | undefined;
+  const searchIntentInfo = keywordData?.search_intent_info as Record<string, unknown> | undefined;
+  const competition = kwInfo?.competition as number | undefined;
+  const competitionIndex = kwInfo?.competition_index as number | undefined;
+  const difficulty = kwInfo?.keyword_difficulty as number | undefined;
+  const mainIntent = searchIntentInfo?.main_intent as string | undefined;
+  const serpFeatures = Array.isArray(serpInfo?.serp_item_types)
+    ? (serpInfo.serp_item_types as string[]).join(',')
+    : undefined;
+
+  return {
+    keyword,
+    volume: (kwInfo?.search_volume as number) ?? 0,
+    difficulty: difficulty ?? competitionIndex ?? Math.round((competition ?? 0) * 100),
+    cpc: (kwInfo?.cpc as number) ?? 0,
+    competition: typeof competition === 'number' ? competition : undefined,
+    trend: normalizeMonthlyTrend(kwInfo),
+    provider: options.provider,
+    sourceKind: options.sourceKind,
+    seed: options.seed,
+    sourceTarget: options.sourceTarget,
+    confidence: options.confidence,
+    intent: mainIntent,
+    serpFeatures,
+  };
+}
+
+function evidenceFromKeywordDataItems(
+  items: Array<Record<string, unknown>>,
+  options: {
+    provider: string;
+    sourceKind: KeywordSourceKind;
+    seed?: string;
+    sourceTarget?: string;
+    confidence?: KeywordSourceEvidence['confidence'];
+  },
+): KeywordSourceEvidence[] {
+  const seen = new Set<string>();
+  const results: KeywordSourceEvidence[] = [];
+  for (const item of items) {
+    const keywordData = (item.keyword_data as Record<string, unknown> | undefined) ?? item;
+    const evidence = evidenceFromKeywordData(keywordData, options);
+    if (!evidence) continue;
+    const normalized = evidence.keyword.toLowerCase();
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    results.push(evidence);
+  }
+  return results;
+}
+
+function evidenceFromGoogleAdsKeywordItem(
+  item: Record<string, unknown>,
+  options: {
+    provider: string;
+    sourceKind: KeywordSourceKind;
+    seed?: string;
+    confidence?: KeywordSourceEvidence['confidence'];
+  },
+): KeywordSourceEvidence | null {
+  const keyword = (item.keyword as string | undefined)?.trim();
+  if (!keyword) return null;
+  const competition = item.competition as number | undefined;
+  const competitionIndex = item.competition_index as number | undefined;
+  const monthlies = item.monthly_searches as Array<{ search_volume?: number }> | undefined;
+  return {
+    keyword,
+    volume: (item.search_volume as number) ?? 0,
+    difficulty: competitionIndex ?? Math.round((competition ?? 0) * 100),
+    cpc: (item.cpc as number) ?? 0,
+    competition: typeof competition === 'number' ? competition : undefined,
+    trend: monthlies ? monthlies.map(m => m.search_volume ?? 0) : undefined,
+    provider: options.provider,
+    sourceKind: options.sourceKind,
+    seed: options.seed,
+    confidence: options.confidence,
+  };
+}
+
+function stringFromUnknown(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function numberFromUnknown(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function normalizeLocalResultItem(item: Record<string, unknown>, fallbackRank?: number): LocalVisibilityBusinessResult | null {
+  const title = stringFromUnknown(item.title) ?? stringFromUnknown(item.name);
+  if (!title) return null;
+  const url = stringFromUnknown(item.url) ?? stringFromUnknown(item.website);
+  let domain = stringFromUnknown(item.domain);
+  if (!domain && url) domain = cleanDomain(url);
+  const address = stringFromUnknown(item.address) ?? stringFromUnknown(item.description);
+  return {
+    title,
+    rank: numberFromUnknown(item.rank_group) ?? numberFromUnknown(item.rank_absolute) ?? fallbackRank,
+    domain,
+    url,
+    phone: stringFromUnknown(item.phone),
+    address,
+    cid: stringFromUnknown(item.cid) ?? stringFromUnknown(item.place_id),
+  };
+}
+
+function extractLocalPackItems(result: Record<string, unknown>): LocalVisibilityBusinessResult[] {
+  const items = Array.isArray(result.items) ? result.items as Array<Record<string, unknown>> : [];
+  const localPacks = items.filter(item => stringFromUnknown(item.type) === 'local_pack');
+  const results: LocalVisibilityBusinessResult[] = [];
+
+  for (const localPack of localPacks) {
+    const nested = Array.isArray(localPack.items)
+      ? localPack.items as Array<Record<string, unknown>>
+      : Array.isArray(localPack.local_pack)
+        ? localPack.local_pack as Array<Record<string, unknown>>
+        : [];
+    if (nested.length > 0) {
+      for (const item of nested) {
+        const normalized = normalizeLocalResultItem(item, results.length + 1);
+        if (normalized) results.push(normalized);
+      }
+      continue;
+    }
+
+    const single = normalizeLocalResultItem(localPack, results.length + 1);
+    if (single) results.push(single);
+  }
+  return results;
+}
+
+function localVisibilityLocationIdentity(market: LocalVisibilityProviderRequest['market']): string {
+  if (market.providerLocationCode) return String(market.providerLocationCode);
+  if (market.providerLocationName?.trim()) return market.providerLocationName.trim();
+  if (typeof market.latitude === 'number' && typeof market.longitude === 'number') return `${market.latitude}_${market.longitude}`;
+  return market.id;
 }
 
 // ── Provider Implementation ──
@@ -354,7 +680,7 @@ export class DataForSeoProvider implements SeoDataProvider {
       if (errMsg.includes('40204')) {
         markBacklinksDisabled();
         writeProbeCache('backlinks-disabled');
-        log.info('DataForSEO backlinks subscription not available — proactively falling back to SEMRush');
+        log.info('DataForSEO backlinks subscription not available — backlink enrichment disabled');
       }
       // Non-subscription errors (network, rate limit) are silently ignored — reactive detection
       // handles them, and we deliberately don't cache them so transient issues get retried next boot.
@@ -362,14 +688,27 @@ export class DataForSeoProvider implements SeoDataProvider {
   }
 
   // ── getKeywordMetrics → search_volume ──
-  async getKeywordMetrics(keywords: string[], workspaceId: string, database = 'us'): Promise<KeywordMetrics[]> {
+  async getKeywordMetrics(
+    keywords: string[],
+    workspaceId: string,
+    database = 'us',
+    locationCode?: number,
+  ): Promise<KeywordMetrics[]> {
+    const resolvedLocationCode = locationCode ?? locationCodeFromDatabase(database);
+    const cacheRegion = String(resolvedLocationCode);
+    const useLegacyRegionFallback = locationCode === undefined && database !== cacheRegion;
     const results: KeywordMetrics[] = [];
     const uncached: string[] = [];
 
     // Check cache first
     for (const kw of keywords) {
-      const cacheKey = `kw_${database}_${kw.toLowerCase().replace(/\s+/g, '_')}`;
-      const cached = readCache<KeywordMetrics>(workspaceId, cacheKey, CACHE_TTL_KEYWORD);
+      const cacheKey = `kw_${cacheRegion}_${kw.toLowerCase().replace(/\s+/g, '_')}`;
+      let cached = readCache<KeywordMetrics>(workspaceId, cacheKey, CACHE_TTL_KEYWORD);
+      if (!cached && useLegacyRegionFallback) {
+        const legacyCacheKey = `kw_${database}_${kw.toLowerCase().replace(/\s+/g, '_')}`;
+        cached = readCache<KeywordMetrics>(workspaceId, legacyCacheKey, CACHE_TTL_KEYWORD);
+        if (cached) writeCache(workspaceId, cacheKey, cached);
+      }
       if (cached) {
         results.push(cached);
         logCreditUsage({ credits: 0, endpoint: 'search_volume', query: kw, rowsReturned: 1, workspaceId, cached: true });
@@ -383,7 +722,7 @@ export class DataForSeoProvider implements SeoDataProvider {
     // L1: Check global SQLite cache for keywords that missed L2
     let globalHits: Map<string, KeywordMetrics>;
     try {
-      const rawHits = getCachedMetricsBatch(uncached, database, CACHE_TTL_KEYWORD);
+      const rawHits = getCachedMetricsBatch(uncached, cacheRegion, CACHE_TTL_KEYWORD);
       globalHits = rawHits as Map<string, KeywordMetrics>;
     } catch (err) {
       log.warn({ err }, 'DataForSEO L1 cache lookup failed — falling through to API');
@@ -391,12 +730,32 @@ export class DataForSeoProvider implements SeoDataProvider {
     }
     const stillUncached: string[] = [];
     for (const kw of uncached) {
-      const hit = globalHits.get(kw.toLowerCase());
+      const hit = globalHits.get(keywordComparisonKey(kw));
       if (hit) {
         results.push(hit);
         logCreditUsage({ credits: 0, endpoint: 'search_volume', query: kw, rowsReturned: 1, workspaceId, cached: true });
       } else {
         stillUncached.push(kw);
+      }
+    }
+
+    if (stillUncached.length > 0 && useLegacyRegionFallback) {
+      try {
+        const rawLegacyHits = getCachedMetricsBatch([...stillUncached], database, CACHE_TTL_KEYWORD);
+        const legacyHits = rawLegacyHits as Map<string, KeywordMetrics>;
+        const legacyBackfill: KeywordMetrics[] = [];
+        for (let i = stillUncached.length - 1; i >= 0; i--) {
+          const kw = stillUncached[i];
+          const hit = legacyHits.get(keywordComparisonKey(kw));
+          if (!hit) continue;
+          results.push(hit);
+          legacyBackfill.push(hit);
+          stillUncached.splice(i, 1);
+          logCreditUsage({ credits: 0, endpoint: 'search_volume', query: kw, rowsReturned: 1, workspaceId, cached: true });
+        }
+        cacheMetricsBatch(legacyBackfill, cacheRegion);
+      } catch (err) {
+        log.warn({ err }, 'DataForSEO legacy L1 cache lookup failed — falling through to API');
       }
     }
 
@@ -413,12 +772,12 @@ export class DataForSeoProvider implements SeoDataProvider {
         const [volumeJson, kdJson] = await Promise.all([
           apiCall('keywords_data/google_ads/search_volume/live', [{
             keywords: batch,
-            location_code: locationCode(database),
+            location_code: resolvedLocationCode,
             language_code: 'en',
           }], workspaceId),
           apiCall('dataforseo_labs/google/keyword_difficulty/live', [{
             keywords: batch,
-            location_code: locationCode(database),
+            location_code: resolvedLocationCode,
             language_code: 'en',
           }], workspaceId).catch(() => null),   // graceful fallback if KD endpoint unavailable
         ]);
@@ -463,11 +822,11 @@ export class DataForSeoProvider implements SeoDataProvider {
 
           results.push(metrics);
           batchResults.push(metrics);
-          const cacheKey = `kw_${database}_${keyword.toLowerCase().replace(/\s+/g, '_')}`;
+          const cacheKey = `kw_${cacheRegion}_${keyword.toLowerCase().replace(/\s+/g, '_')}`;
           writeCache(workspaceId, cacheKey, metrics);
         }
 
-        cacheMetricsBatch(batchResults, database);
+        cacheMetricsBatch(batchResults, cacheRegion);
         logCreditUsage({ credits: cost, endpoint: 'search_volume', query: batch.join(',').slice(0, 100), rowsReturned: taskResults.length, workspaceId, cached: false });
       } catch (err) {
         log.error({ err }, 'DataForSEO search_volume error');
@@ -491,7 +850,7 @@ export class DataForSeoProvider implements SeoDataProvider {
     try {
       const json = await apiCall('dataforseo_labs/google/related_keywords/live', [{
         keyword,
-        location_code: locationCode(database),
+        location_code: locationCodeFromDatabase(database),
         language_code: 'en',
         limit,
         depth: 1,
@@ -536,7 +895,7 @@ export class DataForSeoProvider implements SeoDataProvider {
     try {
       const json = await apiCall('dataforseo_labs/google/keyword_suggestions/live', [{
         keyword,
-        location_code: locationCode(database),
+        location_code: locationCodeFromDatabase(database),
         language_code: 'en',
         limit,
         filters: ['keyword', 'regex', '^(how|what|why|when|where|who|which|can|does|is|are|do|will|should) '],
@@ -566,6 +925,308 @@ export class DataForSeoProvider implements SeoDataProvider {
     }
   }
 
+  async getKeywordSuggestions(keyword: string, workspaceId: string, limit = 25, database = 'us'): Promise<KeywordSourceEvidence[]> {
+    const seed = keyword.toLowerCase().trim();
+    if (!seed) return [];
+    const cappedLimit = Math.min(Math.max(limit, 1), 100);
+    const cacheKey = `discovery_suggestions_${database}_${cacheKeyPart(seed)}_${cappedLimit}`;
+    const cached = readCache<KeywordSourceEvidence[]>(workspaceId, cacheKey, CACHE_TTL_DISCOVERY);
+    if (cached) {
+      logCreditUsage({ credits: 0, endpoint: 'keyword_suggestions_general', query: seed, rowsReturned: cached.length, workspaceId, cached: true });
+      return cached;
+    }
+
+    if (areCreditsExhausted()) return [];
+
+    try {
+      const json = await apiCall('dataforseo_labs/google/keyword_suggestions/live', [{
+        keyword: seed,
+        location_code: locationCodeFromDatabase(database),
+        language_code: 'en',
+        limit: cappedLimit,
+      }], workspaceId);
+      const taskResults = getTaskResult(json);
+      const cost = getTaskCost(json);
+      const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
+      const results = evidenceFromKeywordDataItems(items, {
+        provider: this.name,
+        sourceKind: KEYWORD_SOURCE_KIND.KEYWORD_SUGGESTIONS,
+        seed,
+        confidence: 'medium',
+      });
+      logCreditUsage({ credits: cost, endpoint: 'keyword_suggestions_general', query: seed, rowsReturned: results.length, workspaceId, cached: false });
+      writeCache(workspaceId, cacheKey, results);
+      return results;
+    } catch (err) {
+      log.error({ err }, `DataForSEO keyword_suggestions discovery error for "${seed}"`);
+      return [];
+    }
+  }
+
+  async getKeywordIdeas(keywords: string[], workspaceId: string, limit = 50, database = 'us'): Promise<KeywordSourceEvidence[]> {
+    const seeds = normalizeSeedKeywords(keywords, 10);
+    if (seeds.length === 0) return [];
+    const cappedLimit = Math.min(Math.max(limit, 1), 200);
+    const cacheKey = `discovery_ideas_${database}_${cacheKeyPart(seeds.join('_'))}_${cappedLimit}`;
+    const cached = readCache<KeywordSourceEvidence[]>(workspaceId, cacheKey, CACHE_TTL_DISCOVERY);
+    if (cached) {
+      logCreditUsage({ credits: 0, endpoint: 'keyword_ideas', query: seeds.join(',').slice(0, 100), rowsReturned: cached.length, workspaceId, cached: true });
+      return cached;
+    }
+
+    if (areCreditsExhausted()) return [];
+
+    try {
+      const json = await apiCall('dataforseo_labs/google/keyword_ideas/live', [{
+        keywords: seeds,
+        location_code: locationCodeFromDatabase(database),
+        language_code: 'en',
+        limit: cappedLimit,
+      }], workspaceId);
+      const taskResults = getTaskResult(json);
+      const cost = getTaskCost(json);
+      const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
+      const results = evidenceFromKeywordDataItems(items, {
+        provider: this.name,
+        sourceKind: KEYWORD_SOURCE_KIND.KEYWORD_IDEAS,
+        seed: seeds.join(', '),
+        confidence: 'medium',
+      });
+      logCreditUsage({ credits: cost, endpoint: 'keyword_ideas', query: seeds.join(',').slice(0, 100), rowsReturned: results.length, workspaceId, cached: false });
+      writeCache(workspaceId, cacheKey, results);
+      return results;
+    } catch (err) {
+      log.error({ err }, `DataForSEO keyword_ideas error for "${seeds.join(', ')}"`);
+      return [];
+    }
+  }
+
+  async getKeywordsForSite(target: string, workspaceId: string, limit = 50, database = 'us'): Promise<KeywordSourceEvidence[]> {
+    const cleanTarget = cleanDomain(target);
+    if (!cleanTarget) return [];
+    const cappedLimit = Math.min(Math.max(limit, 1), 200);
+    const cacheKey = `discovery_site_${database}_${cacheKeyPart(cleanTarget)}_${cappedLimit}`;
+    const cached = readCache<KeywordSourceEvidence[]>(workspaceId, cacheKey, CACHE_TTL_DISCOVERY);
+    if (cached) {
+      logCreditUsage({ credits: 0, endpoint: 'keywords_for_site', query: cleanTarget, rowsReturned: cached.length, workspaceId, cached: true });
+      return cached;
+    }
+
+    if (areCreditsExhausted()) return [];
+
+    try {
+      const json = await apiCall('dataforseo_labs/google/keywords_for_site/live', [{
+        target: cleanTarget,
+        location_code: locationCodeFromDatabase(database),
+        language_code: 'en',
+        limit: cappedLimit,
+      }], workspaceId);
+      const taskResults = getTaskResult(json);
+      const cost = getTaskCost(json);
+      const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
+      const results = evidenceFromKeywordDataItems(items, {
+        provider: this.name,
+        sourceKind: KEYWORD_SOURCE_KIND.KEYWORDS_FOR_SITE,
+        sourceTarget: cleanTarget,
+        confidence: 'high',
+      });
+      logCreditUsage({ credits: cost, endpoint: 'keywords_for_site', query: cleanTarget, rowsReturned: results.length, workspaceId, cached: false });
+      writeCache(workspaceId, cacheKey, results);
+      return results;
+    } catch (err) {
+      log.error({ err }, `DataForSEO keywords_for_site error for "${cleanTarget}"`);
+      return [];
+    }
+  }
+
+  async getKeywordsForKeywords(keywords: string[], workspaceId: string, limit = 50, database = 'us'): Promise<KeywordSourceEvidence[]> {
+    const seeds = normalizeSeedKeywords(keywords, 20);
+    if (seeds.length === 0) return [];
+    const cappedLimit = Math.min(Math.max(limit, 1), 200);
+    const cacheKey = `google_ads_keywords_${database}_${cacheKeyPart(seeds.join('_'))}_${cappedLimit}`;
+    const cached = readCache<KeywordSourceEvidence[]>(workspaceId, cacheKey, CACHE_TTL_DISCOVERY);
+    if (cached) {
+      logCreditUsage({ credits: 0, endpoint: 'keywords_for_keywords', query: seeds.join(',').slice(0, 100), rowsReturned: cached.length, workspaceId, cached: true });
+      return cached;
+    }
+
+    if (areCreditsExhausted()) return [];
+
+    try {
+      const json = await apiCall('keywords_data/google_ads/keywords_for_keywords/live', [{
+        keywords: seeds,
+        location_code: locationCodeFromDatabase(database),
+        language_code: 'en',
+        sort_by: 'relevance',
+      }], workspaceId);
+      const taskResults = getTaskResult(json);
+      const cost = getTaskCost(json);
+      const rawItems = taskResults[0]?.items as Array<Record<string, unknown>> | undefined;
+      const items = rawItems ?? taskResults;
+      const seen = new Set<string>();
+      const results: KeywordSourceEvidence[] = [];
+      for (const item of items.slice(0, cappedLimit)) {
+        const evidence = evidenceFromGoogleAdsKeywordItem(item, {
+          provider: this.name,
+          sourceKind: KEYWORD_SOURCE_KIND.GOOGLE_ADS_KEYWORDS_FOR_KEYWORDS,
+          seed: seeds.join(', '),
+          confidence: 'medium',
+        });
+        if (!evidence) continue;
+        const normalized = evidence.keyword.toLowerCase();
+        if (seen.has(normalized)) continue;
+        seen.add(normalized);
+        results.push(evidence);
+      }
+      logCreditUsage({ credits: cost, endpoint: 'keywords_for_keywords', query: seeds.join(',').slice(0, 100), rowsReturned: results.length, workspaceId, cached: false });
+      writeCache(workspaceId, cacheKey, results);
+      return results;
+    } catch (err) {
+      log.error({ err }, `DataForSEO keywords_for_keywords error for "${seeds.join(', ')}"`);
+      return [];
+    }
+  }
+
+  async resolveLocalSeoLocation(request: LocalSeoLocationLookupRequest, workspaceId: string): Promise<LocalSeoLocationLookupResponse> {
+    const countryIso = countryIsoForLocations(request.country);
+    const cacheKey = ['local_locations', countryIso ?? 'all'].join('_');
+    let rows = readCache<DataForSeoLocationRow[]>(workspaceId, cacheKey, CACHE_TTL_LOCAL_LOCATIONS);
+
+    try {
+      if (!rows) {
+        const endpoint = countryIso ? `serp/google/locations/${countryIso}` : 'serp/google/locations';
+        const json = await apiGet(endpoint, workspaceId);
+        rows = getTaskResult(json) as DataForSeoLocationRow[];
+        writeCache(workspaceId, cacheKey, rows);
+        logCreditUsage({ credits: 0, endpoint: 'local_location_lookup', query: countryIso ?? 'all', rowsReturned: rows.length, workspaceId, cached: false });
+      } else {
+        logCreditUsage({ credits: 0, endpoint: 'local_location_lookup', query: countryIso ?? 'all', rowsReturned: rows.length, workspaceId, cached: true });
+      }
+
+      const candidates = rows
+        .map(row => normalizeLocationCandidate(row, request))
+        .filter((candidate): candidate is LocalSeoLocationLookupCandidate => candidate !== null)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5);
+
+      const bestCandidate = candidates[0];
+      if (!bestCandidate) {
+        return {
+          query: request,
+          status: LOCAL_SEO_LOCATION_LOOKUP_STATUS.NOT_FOUND,
+          candidates: [],
+          degradedReason: 'No matching DataForSEO location found for this market.',
+        };
+      }
+
+      const status = bestCandidate.score >= 95 || candidates.length === 1
+        ? LOCAL_SEO_LOCATION_LOOKUP_STATUS.MATCHED
+        : LOCAL_SEO_LOCATION_LOOKUP_STATUS.AMBIGUOUS;
+      return {
+        query: request,
+        status,
+        candidates,
+        bestCandidate,
+      };
+    } catch (err) {
+      log.error({ err, request }, 'DataForSEO local location lookup error');
+      return {
+        query: request,
+        status: LOCAL_SEO_LOCATION_LOOKUP_STATUS.PROVIDER_FAILED,
+        candidates: [],
+        degradedReason: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
+  async getLocalVisibility(request: LocalVisibilityProviderRequest, workspaceId: string): Promise<LocalVisibilityProviderResult> {
+    const keyword = request.keyword.trim();
+    const market = request.market;
+    const device = request.device === LOCAL_SEO_DEVICE.MOBILE ? LOCAL_SEO_DEVICE.MOBILE : LOCAL_SEO_DEVICE.DESKTOP;
+    const languageCode = request.languageCode || 'en';
+    const sourceEndpoint = LOCAL_VISIBILITY_SOURCE_ENDPOINT.GOOGLE_ORGANIC_SERP;
+    const capturedAt = new Date().toISOString();
+    const cacheKey = [
+      'local_visibility',
+      cacheKeyPart(keyword),
+      market.id,
+      cacheKeyPart(localVisibilityLocationIdentity(market)),
+      device,
+      languageCode,
+      sourceEndpoint,
+    ].join('_');
+    const cached = readCache<LocalVisibilityProviderResult>(workspaceId, cacheKey, CACHE_TTL_LOCAL_VISIBILITY);
+    if (cached) {
+      logCreditUsage({ credits: 0, endpoint: 'local_visibility_google_organic_serp', query: `${keyword} @ ${market.label}`, rowsReturned: cached.results.length, workspaceId, cached: true });
+      return { ...cached, capturedAt };
+    }
+
+    if (areCreditsExhausted()) {
+      return {
+        keyword,
+        marketId: market.id,
+        provider: this.name,
+        sourceEndpoint,
+        capturedAt,
+        localPackPresent: false,
+        results: [],
+        status: LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED,
+        degradedReason: 'DataForSEO credits are temporarily exhausted',
+      };
+    }
+
+    try {
+      const locationSelector = market.providerLocationCode
+        ? { location_code: market.providerLocationCode }
+        : market.providerLocationName
+          ? { location_name: market.providerLocationName }
+          : typeof market.latitude === 'number' && typeof market.longitude === 'number'
+            ? { location_coordinate: `${market.latitude},${market.longitude},200` }
+            : null;
+      if (!locationSelector) {
+        throw new Error('Local visibility requires a DataForSEO location code, location name, or coordinates');
+      }
+      const json = await apiCall('serp/google/organic/live/advanced', [{
+        keyword,
+        ...locationSelector,
+        language_code: languageCode,
+        device,
+        depth: Math.max(10, Math.min(request.maxResults, 20)),
+      }], workspaceId);
+      const result = getTaskResult(json)[0] ?? {};
+      const localResults = extractLocalPackItems(result).slice(0, request.maxResults);
+      const localPackPresent = localResults.length > 0
+        || (Array.isArray(result.items) && (result.items as Array<Record<string, unknown>>).some(item => stringFromUnknown(item.type) === 'local_pack'));
+      const payload: LocalVisibilityProviderResult = {
+        keyword,
+        marketId: market.id,
+        provider: this.name,
+        sourceEndpoint,
+        capturedAt,
+        localPackPresent,
+        results: localResults,
+        status: LOCAL_VISIBILITY_STATUS.SUCCESS,
+      };
+      const cost = getTaskCost(json);
+      logCreditUsage({ credits: cost, endpoint: 'local_visibility_google_organic_serp', query: `${keyword} @ ${market.label}`, rowsReturned: localResults.length, workspaceId, cached: false });
+      writeCache(workspaceId, cacheKey, payload);
+      return payload;
+    } catch (err) {
+      log.error({ err, keyword, marketId: market.id }, 'DataForSEO local visibility error');
+      return {
+        keyword,
+        marketId: market.id,
+        provider: this.name,
+        sourceEndpoint,
+        capturedAt,
+        localPackPresent: false,
+        results: [],
+        status: LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED,
+        degradedReason: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
   // ── getDomainKeywords → ranked_keywords ──
   async getDomainKeywords(domain: string, workspaceId: string, limit = 100, database = 'us'): Promise<DomainKeyword[]> {
     const target = cleanDomain(domain);
@@ -585,7 +1246,7 @@ export class DataForSeoProvider implements SeoDataProvider {
       // `ranked_serp_element.serp_item.type` in the dedupe loop below.
       const json = await apiCall('dataforseo_labs/google/ranked_keywords/live', [{
         target,
-        location_code: locationCode(database),
+        location_code: locationCodeFromDatabase(database),
         language_code: 'en',
         limit,
         order_by: ['keyword_data.keyword_info.search_volume,desc'],
@@ -666,7 +1327,7 @@ export class DataForSeoProvider implements SeoDataProvider {
     try {
       const json = await apiCall('dataforseo_labs/google/ranked_keywords/live', [{
         target,
-        location_code: locationCode(database),
+        location_code: locationCodeFromDatabase(database),
         language_code: 'en',
         limit,
         order_by: ['keyword_data.keyword_info.search_volume,desc'],
@@ -727,7 +1388,7 @@ export class DataForSeoProvider implements SeoDataProvider {
       // aggregates across all types regardless of what's returned in `items`.
       const json = await apiCall('dataforseo_labs/google/ranked_keywords/live', [{
         target,
-        location_code: locationCode(database),
+        location_code: locationCodeFromDatabase(database),
         language_code: 'en',
         limit: 1,
       }], workspaceId);
@@ -777,7 +1438,7 @@ export class DataForSeoProvider implements SeoDataProvider {
     try {
       const json = await apiCall('dataforseo_labs/google/competitors_domain/live', [{
         target,
-        location_code: locationCode(database),
+        location_code: locationCodeFromDatabase(database),
         language_code: 'en',
         limit,
         item_types: ['organic'],

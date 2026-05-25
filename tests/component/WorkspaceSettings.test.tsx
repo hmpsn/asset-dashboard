@@ -6,11 +6,16 @@ import { WorkspaceSettings } from '../../src/components/WorkspaceSettings';
 const getMock = vi.fn();
 const patchMock = vi.fn();
 const postMock = vi.fn();
+const useFeatureFlagMock = vi.fn();
 
 vi.mock('../../src/api/client', () => ({
   get: (...args: unknown[]) => getMock(...args),
   patch: (...args: unknown[]) => patchMock(...args),
   post: (...args: unknown[]) => postMock(...args),
+}));
+
+vi.mock('../../src/hooks/useFeatureFlag', () => ({
+  useFeatureFlag: (...args: unknown[]) => useFeatureFlagMock(...args),
 }));
 
 vi.mock('../../src/components/settings/ConnectionsTab', () => ({
@@ -28,6 +33,9 @@ vi.mock('../../src/components/settings/BusinessProfileTab', () => ({
 vi.mock('../../src/components/settings/IntelligenceProfileTab', () => ({
   IntelligenceProfileTab: () => <div>IntelligenceProfileTabStub</div>,
 }));
+vi.mock('../../src/components/settings/LocationsTab', () => ({
+  LocationsTab: () => <div>LocationsTabStub</div>,
+}));
 vi.mock('../../src/components/PublishSettings', () => ({
   PublishSettings: () => <div>PublishSettingsStub</div>,
 }));
@@ -37,6 +45,8 @@ describe('WorkspaceSettings', () => {
     getMock.mockReset();
     patchMock.mockReset();
     postMock.mockReset();
+    useFeatureFlagMock.mockReset();
+    useFeatureFlagMock.mockReturnValue(true);
 
     getMock.mockImplementation((url: string) => {
       if (url.startsWith('/api/workspaces/')) return Promise.resolve({ id: 'ws-1', name: 'Acme Workspace' });
@@ -73,5 +83,40 @@ describe('WorkspaceSettings', () => {
     );
 
     expect(await screen.findByText('FeaturesTabStub')).toBeInTheDocument();
+  });
+
+  it('honors ?tab=locations when local SEO visibility is enabled', async () => {
+    render(
+      <MemoryRouter initialEntries={['/workspace?tab=locations']}>
+        <Routes>
+          <Route
+            path="/workspace"
+            element={<WorkspaceSettings workspaceId="ws-1" workspaceName="Acme Workspace" />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('LocationsTabStub')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Locations' })).toBeInTheDocument();
+  });
+
+  it('hides locations and falls back when local SEO visibility is disabled', async () => {
+    useFeatureFlagMock.mockReturnValue(false);
+
+    render(
+      <MemoryRouter initialEntries={['/workspace?tab=locations']}>
+        <Routes>
+          <Route
+            path="/workspace"
+            element={<WorkspaceSettings workspaceId="ws-1" workspaceName="Acme Workspace" />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('ConnectionsTabStub')).toBeInTheDocument();
+    expect(screen.queryByText('LocationsTabStub')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Locations' })).not.toBeInTheDocument();
   });
 });

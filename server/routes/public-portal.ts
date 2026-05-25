@@ -31,7 +31,8 @@ import { debouncedStrategyInvalidate, invalidateSubCachePrefix } from '../bridge
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { getBookingUrl } from '../studio-config.js';
 import { listBlueprints } from '../page-strategy.js';
-import { addTrackedKeyword } from '../rank-tracking.js';
+import { addTrackedKeyword, addTrackedKeywords } from '../rank-tracking.js';
+import { trackedKeywordSourceForFeedback } from '../keyword-feedback-tracking.js';
 import { listContentGaps } from '../content-gaps.js';
 import { getSection, getSectionsForEntry, getEntryCopyStatus, updateSectionStatus, addClientSuggestion } from '../copy-review.js';
 import {
@@ -51,6 +52,7 @@ import {
 import { isProgrammingError } from '../errors.js';
 import { normalizeSocialProfiles } from '../social-profiles.js';
 import { toPublicWorkspaceView } from '../serializers/client-safe.js';
+import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 
 const log = createLogger('public-portal');
 
@@ -224,9 +226,9 @@ router.get('/api/public/pricing/:id', (req, res) => {
   // Apply workspace content pricing overrides for brief/post
   if (pricing) {
     for (const key of Object.keys(priceMap)) {
-      if (key.startsWith('brief_') && pricing.briefPrice) priceMap[key].price = pricing.briefPrice;
+      if (key.startsWith('brief_') && typeof pricing.briefPrice === 'number') priceMap[key].price = pricing.briefPrice;
     }
-    if (priceMap['post_polished'] && pricing.fullPostPrice) priceMap['post_polished'].price = pricing.fullPostPrice;
+    if (priceMap['post_polished'] && typeof pricing.fullPostPrice === 'number') priceMap['post_polished'].price = pricing.fullPostPrice;
   }
   // Bundle definitions
   const bundles = [
@@ -239,7 +241,8 @@ router.get('/api/public/pricing/:id', (req, res) => {
 
 router.get('/api/public/audit-summary/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
-  if (!ws?.webflowSiteId) return res.status(400).json({ error: 'No site linked' });
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (!ws.webflowSiteId) return res.status(400).json({ error: 'No site linked' });
   const latest = getLatestEffectiveSnapshot(ws.webflowSiteId, ws.auditSuppressions || []);
   if (!latest) return res.json(null);
   const filtered = latest.audit;
@@ -257,7 +260,8 @@ router.get('/api/public/audit-summary/:workspaceId', (req, res) => {
 
 router.get('/api/public/audit-detail/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
-  if (!ws?.webflowSiteId) return res.status(400).json({ error: 'No site linked' });
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (!ws.webflowSiteId) return res.status(400).json({ error: 'No site linked' });
   const latest = getLatestEffectiveSnapshot(ws.webflowSiteId, ws.auditSuppressions || []);
   if (!latest) return res.json(null);
   const filtered = latest.audit;
@@ -342,6 +346,16 @@ router.get('/api/public/audit-traffic/:workspaceId', async (req, res) => {
 
 // ── Client Keyword Feedback ──────────────────────────
 
+function notifyPublicKeywordFeedbackChanged(workspaceId: string, payload: Record<string, unknown>): void {
+  invalidateIntelligenceCache(workspaceId);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED, {
+    workspaceId,
+    reason: 'keyword_feedback',
+    updatedAt: new Date().toISOString(),
+  });
+  broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_UPDATED, payload);
+}
+
 // Client: list their keyword feedback
 router.get('/api/public/keyword-feedback/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
@@ -356,7 +370,8 @@ router.post('/api/public/keyword-feedback/:workspaceId', requireClientStrategyMu
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const { keyword, status, reason, source } = req.body as KeywordFeedbackBody;
-  const kw = keyword.toLowerCase().trim();
+  const kw = keywordComparisonKey(keyword);
+  const displayKeyword = keyword.trim();
   const declinedBy = typeof res.locals.clientEmail === 'string' ? res.locals.clientEmail : 'client';
 
   db.prepare(`
@@ -369,10 +384,13 @@ router.post('/api/public/keyword-feedback/:workspaceId', requireClientStrategyMu
       updated_at = datetime('now')
   `).run(ws.id, kw, status, reason || null, source, declinedBy);
 
-  if (status === 'approved') addTrackedKeyword(ws.id, kw);
+  if (status === 'approved') {
+    addTrackedKeyword(ws.id, displayKeyword, { source: trackedKeywordSourceForFeedback(source) });
+    broadcastToWorkspace(ws.id, WS_EVENTS.RANK_TRACKING_UPDATED, { keyword: displayKeyword, action: 'feedback_approved', source: 'client_feedback' });
+  }
 
   log.info(`Client keyword feedback: "${kw}" → ${status} for workspace ${ws.id}`);
-  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { keyword: kw, status, source });
+  notifyPublicKeywordFeedbackChanged(ws.id, { keyword: kw, status, source });
   // client-visibility-ok: this activity is for internal audit history, not client timeline display.
   addActivity(wsId, 'client_keyword_feedback', `Client gave ${status} feedback on keyword: ${kw}`, 'Via client portal');
   res.json({ keyword: kw, status, reason: reason || null });
@@ -396,22 +414,39 @@ router.post('/api/public/keyword-feedback/:workspaceId/bulk', requireClientStrat
       updated_at = datetime('now')
   `);
 
+  const approvedKeywordEntries: Parameters<typeof addTrackedKeywords>[1] = [];
   const insert = db.transaction((items: KeywordFeedbackBody[]) => {
     for (const item of items) {
-      const kw = item.keyword.toLowerCase().trim();
+      const kw = keywordComparisonKey(item.keyword);
       stmt.run(ws.id, kw, item.status, item.reason || null, item.source, declinedBy);
-      if (item.status === 'approved') addTrackedKeyword(ws.id, kw);
+      if (item.status === 'approved') {
+        approvedKeywordEntries.push({
+          query: item.keyword.trim(),
+          options: { source: trackedKeywordSourceForFeedback(item.source) },
+        });
+      }
     }
+    if (approvedKeywordEntries.length > 0) addTrackedKeywords(ws.id, approvedKeywordEntries);
   });
   insert(keywords);
+  const approvedKeywords = approvedKeywordEntries.map(entry => entry.query);
   log.info(`Client bulk keyword feedback: ${keywords.length} keywords for workspace ${ws.id}`);
-  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { updated: keywords.length });
+  notifyPublicKeywordFeedbackChanged(ws.id, { updated: keywords.length });
+  if (approvedKeywords.length > 0) {
+    broadcastToWorkspace(ws.id, WS_EVENTS.RANK_TRACKING_UPDATED, {
+      action: 'feedback_bulk_approved',
+      source: 'client_feedback',
+      keywords: approvedKeywords,
+      count: approvedKeywords.length,
+    });
+  }
   // client-visibility-ok: this activity is for internal audit history, not client timeline display.
   addActivity(wsId, 'client_keyword_feedback', `Client gave bulk keyword feedback (${keywords.length} keywords)`, 'Via client portal');
   res.json({ updated: keywords.length });
 });
 
 // Client: remove keyword feedback so a previously removed/restored keyword returns to neutral.
+// broadcast-ok: notifyPublicKeywordFeedbackChanged broadcasts strategy/signal invalidation after real feedback deletes.
 router.delete('/api/public/keyword-feedback/:workspaceId', (req, res) => {
   const wsId = req.params.workspaceId;
   const sessionToken = req.cookies?.[`client_session_${wsId}`];
@@ -431,7 +466,7 @@ router.delete('/api/public/keyword-feedback/:workspaceId', (req, res) => {
       : typeof req.body?.keyword === 'string'
         ? req.body.keyword
         : '';
-  const keyword = rawKeyword.toLowerCase().trim();
+  const keyword = keywordComparisonKey(rawKeyword);
   if (!keyword) return res.status(400).json({ error: 'keyword required' });
 
   const removeFeedback = db.transaction(() => {
@@ -450,7 +485,7 @@ router.delete('/api/public/keyword-feedback/:workspaceId', (req, res) => {
   }
 
   log.info(`Client keyword feedback removed: "${keyword}" for workspace ${ws.id} (was ${existing.status})`);
-  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, {
+  notifyPublicKeywordFeedbackChanged(ws.id, {
     keyword,
     status: 'cleared',
     previousStatus: existing.status,
@@ -605,7 +640,7 @@ router.post('/api/public/content-gap-vote/:workspaceId', requireClientStrategyMu
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
   const { keyword, vote } = req.body as ContentGapVoteBody;
-  const kw = keyword.toLowerCase().trim();
+  const kw = keywordComparisonKey(keyword);
 
   // The two write paths below (DELETE for "clear" + INSERT/UPDATE for
   // "set") are mutually exclusive — only one runs per request — but the
@@ -889,17 +924,18 @@ router.get('/api/public/briefing/:workspaceId', (req, res) => {
   // public boundary. Defensive: pull via optional chaining so older drafts
   // without `aiPolish` round-trip cleanly.
   const weeklyOpener = latest.sourceMetadata?.aiPolish?.weeklyOpener;
+  const briefing = {
+    weekOf: latest.weekOf,
+    publishedAt: latest.publishedAt,
+    stories: latest.stories,
+    issueSummary,
+    issueNumber,
+    recommendations,
+    weeklyOpener: weeklyOpener || undefined,
+  };
 
   res.json({
-    briefing: {
-      weekOf: latest.weekOf,
-      publishedAt: latest.publishedAt,
-      stories: latest.stories,
-      issueSummary,
-      issueNumber,
-      recommendations,
-      ...(weeklyOpener ? { weeklyOpener } : {}),
-    },
+    briefing,
   });
 });
 

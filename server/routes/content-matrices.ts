@@ -196,6 +196,8 @@ router.post('/api/content-matrices/:workspaceId/:matrixId/cells/:cellId/recommen
     const result = await getKeywordRecommendations(req.params.workspaceId, seedKeyword, {
       useAI: req.body.useAI ?? false,
       maxCandidates: req.body.maxCandidates ?? 15,
+      includeReasoning: req.body.includeReasoning ?? false,
+      excludeConflictIdentifiers: [cell.id],
     });
     res.json(result);
   } catch (err) {
@@ -213,6 +215,7 @@ router.post('/api/content-matrices/:workspaceId/recommend-keywords', requireWork
     const result = await getKeywordRecommendations(req.params.workspaceId, seedKeyword, {
       useAI: req.body.useAI ?? false,
       maxCandidates: req.body.maxCandidates ?? 15,
+      includeReasoning: req.body.includeReasoning ?? false,
     });
     res.json(result);
   } catch (err) {

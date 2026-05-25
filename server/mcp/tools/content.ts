@@ -6,6 +6,7 @@ import { listCannibalizationIssues } from '../../cannibalization-issues.js';
 import { buildWorkspaceIntelligence } from '../../workspace-intelligence.js';
 import { getWorkspace } from '../../workspaces.js';
 import type { IntelligenceSlice } from '../../../shared/types/intelligence.js';
+import { getPrimaryMarketLocationCode } from '../../local-seo.js';
 import { createLogger } from '../../logger.js';
 
 const log = createLogger('mcp-tools-content');
@@ -88,10 +89,21 @@ export async function handleContentTool(
     }
 
     if (name === 'get_keyword_analysis') {
+      const { getLostVisibilityQueries } = await import('../../client-discovered-queries.js'); // dynamic-import-ok - optional discovery table degrades through outer tool error handling
+      const geo = (() => {
+        try {
+          return getPrimaryMarketLocationCode(workspaceId);
+        } catch (err) {
+          log.debug({ err, workspaceId }, 'get_keyword_analysis: geoVolumeLabel optional, degrading gracefully');
+          return null;
+        }
+      })();
       const result = {
         gaps: listKeywordGaps(workspaceId),
         topicClusters: listTopicClusters(workspaceId),
         cannibalization: listCannibalizationIssues(workspaceId),
+        lostVisibility: getLostVisibilityQueries(workspaceId),
+        geoVolumeLabel: geo?.label ?? null,
       };
       return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
     }

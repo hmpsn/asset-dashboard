@@ -207,7 +207,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                             onKeyDown={(e) => e.key === 'Enter' && fetchSitesForToken(linkToken)}
                             onClick={(e) => e.stopPropagation()}
                             placeholder="Paste API token..."
-                            className="w-full px-2 py-1 pr-7 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption focus:outline-none focus:border-[var(--brand-border-hover)] placeholder-[var(--brand-border-hover)]"
+                            className="w-full px-2 py-1 pr-7 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-[var(--brand-border-hover)] placeholder-[var(--brand-border-hover)]"
                           />
                           <IconButton
                             onClick={(e) => { e.stopPropagation(); setShowToken(!showToken); }}
@@ -271,7 +271,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                   onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
                   placeholder="Workspace name..."
                   autoFocus
-                  className="flex-1 px-3 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] t-body focus:outline-none focus:border-[var(--brand-text-muted)]"
+                  className="flex-1 px-3 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] t-body focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-[var(--brand-text-muted)]"
                 />
                 <Button
                   onClick={handleCreate}

@@ -8,8 +8,10 @@ import { Router } from 'express';
 
 const router = Router();
 
-import { addTrackedKeyword } from '../rank-tracking.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { addActivity } from '../activity-log.js';
+import { addTrackedKeyword, addTrackedKeywords, getTrackedKeywords } from '../rank-tracking.js';
+import { trackedKeywordSourceForFeedback } from '../keyword-feedback-tracking.js';
+import { buildWorkspaceIntelligence, invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { debouncedStrategyInvalidate, debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { updateWorkspace, getWorkspace } from '../workspaces.js';
 import { upsertAndCleanPageKeywords, listPageKeywords } from '../page-keywords.js';
@@ -24,13 +26,16 @@ import db from '../db/index.js';
 import { parseJsonFallback } from '../db/json-validation.js';
 import { getInsights } from '../analytics-insights-store.js';
 import type { KeywordStrategy, ContentGap, QuickWin, KeywordGapItem, TopicCluster, CannibalizationItem } from '../../shared/types/workspace.js';
+import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 import { buildStrategySignals } from '../insight-feedback.js';
+import { buildStrategyKeywordEvaluationContext } from '../keyword-strategy-context.js';
+import { getDeclinedKeywords, getRequestedKeywords } from '../keyword-feedback.js';
 import { requireWorkspaceAccess } from '../auth.js';
 import { isProgrammingError } from '../errors.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { hasActiveJob } from '../jobs.js';
-import { generateKeywordStrategy, KeywordStrategyGenerationError } from '../keyword-strategy-generation.js';
+import { generateKeywordStrategy, KeywordStrategyGenerationError, KEYWORD_STRATEGY_MAX_PAGE_CAP } from '../keyword-strategy-generation.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import {
   adminBulkKeywordFeedbackSchema,
@@ -38,6 +43,11 @@ import {
   type AdminBulkKeywordFeedbackBody,
   type AdminKeywordFeedbackBody,
 } from '../schemas/keyword-feedback.js';
+import {
+  attachKeywordStrategyUxToDiff,
+  buildKeywordStrategyRefreshSummary,
+  buildKeywordStrategyUxPayload,
+} from '../keyword-strategy-ux.js';
 export { buildStrategyIntelligenceBlock, computeOpportunityScore, shouldFetchCompetitorData } from '../keyword-strategy-generation.js';
 
 const log = createLogger('keyword-strategy');
@@ -49,6 +59,12 @@ function readSeoDataMode(body: unknown): string | undefined {
   return typeof candidate === 'string' ? candidate : undefined;
 }
 
+function readSeoDataProvider(body: unknown): string | undefined {
+  if (!body || typeof body !== 'object') return undefined;
+  const candidate = (body as { seoDataProvider?: unknown }).seoDataProvider;
+  return typeof candidate === 'string' ? candidate : undefined;
+}
+
 function serializeKeywordStrategy(
   strategy: KeywordStrategy,
   pageMap: ReturnType<typeof listPageKeywords>,
@@ -57,6 +73,7 @@ function serializeKeywordStrategy(
   keywordGaps: KeywordGapItem[],
   topicClusters: TopicCluster[],
   cannibalization: CannibalizationItem[],
+  strategyUx?: Awaited<ReturnType<typeof buildKeywordStrategyUxPayload>>,
 ) {
   // Strip any stale table-backed fields left in the blob in favor of
   // the table-backed sources —
@@ -88,6 +105,7 @@ function serializeKeywordStrategy(
     keywordGaps,
     topicClusters,
     cannibalization,
+    strategyUx,
   };
 }
 
@@ -123,15 +141,26 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
       return;
     }
 
+    const requestedMaxPages = req.body?.maxPages == null ? undefined : Number(req.body.maxPages);
+    if (requestedMaxPages != null && (!Number.isInteger(requestedMaxPages) || requestedMaxPages < 0)) {
+      res.status(400).json({ error: 'maxPages must be a non-negative integer' });
+      return;
+    }
+    if (requestedMaxPages != null && requestedMaxPages > KEYWORD_STRATEGY_MAX_PAGE_CAP) {
+      res.status(400).json({ error: `maxPages must be between 0 and ${KEYWORD_STRATEGY_MAX_PAGE_CAP}` });
+      return;
+    }
+
     const competitorDomainsProvided = Array.isArray(req.body?.competitorDomains);
     const result = await generateKeywordStrategy({
       workspaceId: req.params.workspaceId,
       businessContext: typeof req.body?.businessContext === 'string' ? req.body.businessContext : undefined,
       mode: req.body?.mode === 'incremental' ? 'incremental' : 'full',
       seoDataMode: readSeoDataMode(req.body),
+      seoDataProvider: readSeoDataProvider(req.body),
       competitorDomains: competitorDomainsProvided ? req.body.competitorDomains : undefined,
       competitorDomainsProvided,
-      maxPages: req.body?.maxPages != null ? Number(req.body.maxPages) : undefined,
+      maxPages: requestedMaxPages,
       onProgress: wantsStream ? (event) => writeSse(event) : undefined,
       startKeepalive: wantsStream ? () => {
         ensureStream();
@@ -178,93 +207,145 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
 // so Page Intelligence must be able to surface those rows without requiring a
 // full strategy generation run. Short-circuits to null only when both sources
 // are empty.
-router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  const ws = getWorkspace(req.params.workspaceId);
-  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const strategy = ws.keywordStrategy;
-  const pageMap = listPageKeywords(ws.id);
-  const contentGapsFromTable = listContentGaps(ws.id);
-  const contentGaps = contentGapsFromTable.length > 0 ? contentGapsFromTable : (strategy?.contentGaps || []);
-  const quickWinsFromTable = listQuickWins(ws.id);
-  const quickWins = quickWinsFromTable.length > 0 ? quickWinsFromTable : (strategy?.quickWins || []);
-  const keywordGapsFromTable = listKeywordGaps(ws.id);
-  const keywordGaps = keywordGapsFromTable.length > 0 ? keywordGapsFromTable : (strategy?.keywordGaps || []);
-  const topicClustersFromTable = listTopicClusters(ws.id);
-  const topicClusters = topicClustersFromTable.length > 0 ? topicClustersFromTable : (strategy?.topicClusters || []);
-  const cannibalizationFromTable = listCannibalizationIssues(ws.id);
-  const cannibalization = cannibalizationFromTable.length > 0 ? cannibalizationFromTable : (strategy?.cannibalization || []);
-  if (!strategy && pageMap.length === 0 && contentGaps.length === 0 && quickWins.length === 0 && keywordGaps.length === 0 && topicClusters.length === 0 && cannibalization.length === 0) return res.json(null);
-  if (!strategy) {
-    return res.json({
-      siteKeywords: [],
-      opportunities: [],
+router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res, next) => {
+  try {
+    const ws = getWorkspace(req.params.workspaceId);
+    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+    const strategy = ws.keywordStrategy;
+    const pageMap = listPageKeywords(ws.id);
+    const contentGapsFromTable = listContentGaps(ws.id);
+    const contentGaps = contentGapsFromTable.length > 0 ? contentGapsFromTable : (strategy?.contentGaps || []);
+    const quickWinsFromTable = listQuickWins(ws.id);
+    const quickWins = quickWinsFromTable.length > 0 ? quickWinsFromTable : (strategy?.quickWins || []);
+    const keywordGapsFromTable = listKeywordGaps(ws.id);
+    const keywordGaps = keywordGapsFromTable.length > 0 ? keywordGapsFromTable : (strategy?.keywordGaps || []);
+    const topicClustersFromTable = listTopicClusters(ws.id);
+    const topicClusters = topicClustersFromTable.length > 0 ? topicClustersFromTable : (strategy?.topicClusters || []);
+    const cannibalizationFromTable = listCannibalizationIssues(ws.id);
+    const cannibalization = cannibalizationFromTable.length > 0 ? cannibalizationFromTable : (strategy?.cannibalization || []);
+    if (!strategy && pageMap.length === 0 && contentGaps.length === 0 && quickWins.length === 0 && keywordGaps.length === 0 && topicClusters.length === 0 && cannibalization.length === 0) return res.json(null);
+    if (!strategy) {
+      return res.json({
+        siteKeywords: [],
+        opportunities: [],
+        pageMap,
+        contentGaps,
+        quickWins,
+        keywordGaps,
+        topicClusters,
+        cannibalization,
+        strategyUx: await buildKeywordStrategyUxPayload({
+          workspaceId: ws.id,
+          workspaceName: ws.name,
+          strategy: null,
+          pageMap,
+          contentGaps,
+          keywordGaps,
+          surface: 'admin',
+        }),
+        generatedAt: null,
+      });
+    }
+    const strategyUx = await buildKeywordStrategyUxPayload({
+      workspaceId: ws.id,
+      workspaceName: ws.name,
+      strategy,
       pageMap,
       contentGaps,
-      quickWins,
       keywordGaps,
-      topicClusters,
-      cannibalization,
-      generatedAt: null,
+      surface: 'admin',
     });
+    res.json(serializeKeywordStrategy(strategy, pageMap, contentGaps, quickWins, keywordGaps, topicClusters, cannibalization, strategyUx));
+  } catch (err) {
+    next(err);
   }
-  res.json(serializeKeywordStrategy(strategy, pageMap, contentGaps, quickWins, keywordGaps, topicClusters, cannibalization));
 });
 
 // Get strategy diff (compare current vs previous)
-router.get('/api/webflow/keyword-strategy/:workspaceId/diff', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  const ws = getWorkspace(req.params.workspaceId);
-  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+router.get('/api/webflow/keyword-strategy/:workspaceId/diff', requireWorkspaceAccess('workspaceId'), async (req, res, next) => {
+  try {
+    const ws = getWorkspace(req.params.workspaceId);
+    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
-  const current = ws.keywordStrategy;
-  if (!current) return res.json(null);
+    const current = ws.keywordStrategy;
+    if (!current) return res.json(null);
 
-  const prev = db.prepare('SELECT strategy_json, page_map_json, generated_at FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC LIMIT 1').get(ws.id) as { strategy_json: string; page_map_json: string; generated_at: string } | undefined;
-  if (!prev) return res.json(null);
+    const prev = db.prepare('SELECT strategy_json, page_map_json, generated_at FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC LIMIT 1').get(ws.id) as { strategy_json: string; page_map_json: string; generated_at: string } | undefined;
+    if (!prev) return res.json(null);
 
-  type PrevStrategyShape = {
-    siteKeywords?: string[];
-    contentGaps?: { targetKeyword: string }[];
-  };
-  const prevStrategy = parseJsonFallback<PrevStrategyShape>(prev.strategy_json, {});
-  const prevPageMap = parseJsonFallback<Array<{ pagePath: string; primaryKeyword: string }>>(prev.page_map_json, []);
-  const currentPageMap = listPageKeywords(ws.id);
+    type PrevStrategyShape = {
+      siteKeywords?: string[];
+      contentGaps?: { targetKeyword: string }[];
+    };
+    const prevStrategy = parseJsonFallback<PrevStrategyShape>(prev.strategy_json, {});
+    const prevPageMap = parseJsonFallback<Array<{ pagePath: string; primaryKeyword: string }>>(prev.page_map_json, []);
+    const currentPageMap = listPageKeywords(ws.id);
+    const trackedKeywords = getTrackedKeywords(ws.id, { includeInactive: true });
 
-  // Compute diffs
-  const prevSiteKws = new Set<string>(prevStrategy.siteKeywords || []);
-  const currSiteKws = new Set<string>(current.siteKeywords || []);
-  const newKeywords = [...currSiteKws].filter((k: string) => !prevSiteKws.has(k));
-  const lostKeywords = [...prevSiteKws].filter((k: string) => !currSiteKws.has(k));
+    // Compute diffs
+    const prevSiteKws = new Set<string>(prevStrategy.siteKeywords || []);
+    const currSiteKws = new Set<string>(current.siteKeywords || []);
+    const newKeywords = [...currSiteKws].filter((k: string) => !prevSiteKws.has(k));
+    const lostKeywords = [...prevSiteKws].filter((k: string) => !currSiteKws.has(k));
 
-  // Previous gaps come from the history snapshot (which now bakes in the
-  // table state at save-time, see keyword-strategy-persistence.ts).
-  // Current gaps come from the live content_gaps table — the blob no longer
-  // carries them after #365 normalization.
-  const currentContentGaps = listContentGaps(ws.id);
-  const prevGapKws = new Set<string>((prevStrategy.contentGaps || []).map((g: { targetKeyword: string }) => g.targetKeyword));
-  const currGapKws = new Set<string>(currentContentGaps.map((g) => g.targetKeyword));
-  const newGaps = [...currGapKws].filter((k: string) => !prevGapKws.has(k));
-  const resolvedGaps = [...prevGapKws].filter((k: string) => !currGapKws.has(k));
+    // Previous gaps come from the history snapshot (which now bakes in the
+    // table state at save-time, see keyword-strategy-persistence.ts).
+    // Current gaps come from the live content_gaps table - the blob no longer
+    // carries them after #365 normalization.
+    const currentContentGaps = listContentGaps(ws.id);
+    const prevGapKws = new Set<string>((prevStrategy.contentGaps || []).map((g: { targetKeyword: string }) => g.targetKeyword));
+    const currGapKws = new Set<string>(currentContentGaps.map((g) => g.targetKeyword));
+    const newGaps = [...currGapKws].filter((k: string) => !prevGapKws.has(k));
+    const resolvedGaps = [...prevGapKws].filter((k: string) => !currGapKws.has(k));
 
-  // Page map changes
-  const prevPageKws = new Map(prevPageMap.map((p: { pagePath: string; primaryKeyword: string }) => [p.pagePath, p.primaryKeyword]));
-  const currPageKws = new Map(currentPageMap.map((p: { pagePath: string; primaryKeyword: string }) => [p.pagePath, p.primaryKeyword]));
-  const keywordChanges: { pagePath: string; oldKeyword: string; newKeyword: string }[] = [];
-  for (const [path, kw] of currPageKws) {
-    const old = prevPageKws.get(path);
-    if (old && old !== kw) keywordChanges.push({ pagePath: path, oldKeyword: old, newKeyword: kw });
+    // Page map changes
+    const prevPageKws = new Map(prevPageMap.map((p: { pagePath: string; primaryKeyword: string }) => [p.pagePath, p.primaryKeyword]));
+    const currPageKws = new Map(currentPageMap.map((p: { pagePath: string; primaryKeyword: string }) => [p.pagePath, p.primaryKeyword]));
+    const keywordChanges: { pagePath: string; oldKeyword: string; newKeyword: string }[] = [];
+    for (const [path, kw] of currPageKws) {
+      const old = prevPageKws.get(path);
+      if (old && old !== kw) keywordChanges.push({ pagePath: path, oldKeyword: old, newKeyword: kw });
+    }
+
+    const diff = {
+      previousGeneratedAt: prev.generated_at,
+      currentGeneratedAt: current.generatedAt,
+      newKeywords,
+      lostKeywords,
+      newGaps,
+      resolvedGaps,
+      keywordChanges,
+      prevSiteKeywordCount: prevSiteKws.size,
+      currSiteKeywordCount: currSiteKws.size,
+    };
+    const summary = buildKeywordStrategyRefreshSummary({
+      previousGeneratedAt: prev.generated_at,
+      currentGeneratedAt: current.generatedAt,
+      previousSiteKeywords: prevStrategy.siteKeywords ?? [],
+      currentSiteKeywords: current.siteKeywords ?? [],
+      previousContentGapKeywords: prevStrategy.contentGaps?.map(gap => gap.targetKeyword) ?? [],
+      currentContentGapKeywords: currentContentGaps.map(gap => gap.targetKeyword),
+      previousPageMap: prevPageMap,
+      currentPageMap,
+      trackedKeywords,
+    });
+    const keywordGapsFromTable = listKeywordGaps(ws.id);
+    const keywordGaps = keywordGapsFromTable.length > 0 ? keywordGapsFromTable : (current.keywordGaps || []);
+    const strategyUx = await buildKeywordStrategyUxPayload({
+      workspaceId: ws.id,
+      workspaceName: ws.name,
+      strategy: current,
+      pageMap: currentPageMap,
+      contentGaps: currentContentGaps,
+      keywordGaps,
+      surface: 'admin',
+      summary,
+      trackedKeywords,
+    });
+    res.json(attachKeywordStrategyUxToDiff(diff, strategyUx));
+  } catch (err) {
+    next(err);
   }
-
-  res.json({
-    previousGeneratedAt: prev.generated_at,
-    currentGeneratedAt: current.generatedAt,
-    newKeywords,
-    lostKeywords,
-    newGaps,
-    resolvedGaps,
-    keywordChanges,
-    prevSiteKeywordCount: prevSiteKws.size,
-    currSiteKeywordCount: currSiteKws.size,
-  });
 });
 
 // Update keyword strategy (manual edits)
@@ -277,7 +358,13 @@ const patchStrategySchema = z.object({
     searchIntent: z.string().optional(),
   }).passthrough()).optional(),
   siteKeywords: z.array(z.string()).optional(),
-  contentGaps: z.array(z.any()).optional(),
+  contentGaps: z.array(z.object({
+    topic: z.string(),
+    targetKeyword: z.string(),
+    intent: z.enum(['informational', 'commercial', 'transactional', 'navigational']),
+    priority: z.enum(['high', 'medium', 'low']),
+    rationale: z.string(),
+  }).passthrough()).optional(),
   quickWins: z.array(z.object({
     pagePath: z.string(),
     currentKeyword: z.string().optional(),
@@ -452,6 +539,16 @@ function getAllFeedback(workspaceId: string) {
   return db.prepare('SELECT * FROM keyword_feedback WHERE workspace_id = ? ORDER BY updated_at DESC').all(workspaceId);
 }
 
+function notifyKeywordFeedbackChanged(workspaceId: string, payload: Record<string, unknown>): void {
+  invalidateIntelligenceCache(workspaceId);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED, {
+    workspaceId,
+    reason: 'keyword_feedback',
+    updatedAt: new Date().toISOString(),
+  });
+  broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_UPDATED, payload);
+}
+
 // Admin: list all feedback for workspace
 router.get('/api/webflow/keyword-feedback/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
@@ -460,12 +557,13 @@ router.get('/api/webflow/keyword-feedback/:workspaceId', requireWorkspaceAccess(
 });
 
 // Admin or client: submit feedback on a keyword
-// activity-ok: keyword approve/decline is transient feedback state, not a workspace activity event
+// activity-ok: keyword approve/decline is transient feedback state; approved tracking writes are logged separately.
 router.post('/api/webflow/keyword-feedback/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(adminKeywordFeedbackSchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const { keyword, status, reason, source, declinedBy } = req.body as AdminKeywordFeedbackBody;
-  const kw = keyword.toLowerCase().trim();
+  const kw = keywordComparisonKey(keyword);
+  const displayKeyword = keyword.trim();
 
   db.prepare(`
     INSERT INTO keyword_feedback (workspace_id, keyword, status, reason, source, declined_by)
@@ -477,15 +575,24 @@ router.post('/api/webflow/keyword-feedback/:workspaceId', requireWorkspaceAccess
       updated_at = datetime('now')
   `).run(ws.id, kw, status, reason || null, source, declinedBy || null);
 
-  if (status === 'approved') addTrackedKeyword(ws.id, kw);
+  if (status === 'approved') {
+    const trackingSource = trackedKeywordSourceForFeedback(source);
+    addTrackedKeyword(ws.id, displayKeyword, { source: trackingSource });
+    addActivity(ws.id, 'rank_tracking_updated', 'Tracked keyword approved', `"${displayKeyword}" added to rank tracking from keyword approval`, {
+      keyword: displayKeyword,
+      source: trackingSource,
+      action: 'feedback_approved',
+    });
+    broadcastToWorkspace(ws.id, WS_EVENTS.RANK_TRACKING_UPDATED, { keyword: displayKeyword, action: 'feedback_approved', source: 'admin_feedback' });
+  }
 
   log.info(`Keyword feedback: "${kw}" → ${status} for workspace ${ws.id}${reason ? ` (reason: ${reason})` : ''}`);
-  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { keyword: kw, status, source });
+  notifyKeywordFeedbackChanged(ws.id, { keyword: kw, status, source });
   res.json({ keyword: kw, status, reason: reason || null });
 });
 
 // Bulk feedback (approve/decline multiple keywords at once)
-// activity-ok: keyword approve/decline is transient feedback state, not a workspace activity event
+// activity-ok: keyword approve/decline is transient feedback state; approved tracking writes are logged separately.
 router.post('/api/webflow/keyword-feedback/:workspaceId/bulk', requireWorkspaceAccess('workspaceId'), validate(adminBulkKeywordFeedbackSchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -501,34 +608,60 @@ router.post('/api/webflow/keyword-feedback/:workspaceId/bulk', requireWorkspaceA
       updated_at = datetime('now')
   `);
 
+  const approvedKeywordEntries: Parameters<typeof addTrackedKeywords>[1] = [];
   const insert = db.transaction((items: AdminBulkKeywordFeedbackBody['keywords']) => {
     for (const item of items) {
-      stmt.run(ws.id, item.keyword.toLowerCase().trim(), item.status, item.reason || null, item.source, declinedBy || null);
+      const kw = keywordComparisonKey(item.keyword);
+      stmt.run(ws.id, kw, item.status, item.reason || null, item.source, declinedBy || null);
+      if (item.status === 'approved') {
+        approvedKeywordEntries.push({
+          query: item.keyword.trim(),
+          options: { source: trackedKeywordSourceForFeedback(item.source) },
+        });
+      }
     }
+    if (approvedKeywordEntries.length > 0) addTrackedKeywords(ws.id, approvedKeywordEntries);
   });
   insert(keywords);
-
-  for (const item of keywords) {
-    if (item.status === 'approved') addTrackedKeyword(ws.id, item.keyword.toLowerCase().trim());
-  }
+  const approvedKeywords = approvedKeywordEntries.map(entry => entry.query);
 
   log.info(`Bulk keyword feedback: ${keywords.length} keywords for workspace ${ws.id}`);
-  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { updated: keywords.length });
+  notifyKeywordFeedbackChanged(ws.id, { updated: keywords.length });
+  if (approvedKeywords.length > 0) {
+    addActivity(ws.id, 'rank_tracking_updated', 'Tracked keywords approved', `${approvedKeywords.length} approved keywords added to rank tracking`, {
+      keywords: approvedKeywords,
+      count: approvedKeywords.length,
+      action: 'feedback_bulk_approved',
+    });
+    broadcastToWorkspace(ws.id, WS_EVENTS.RANK_TRACKING_UPDATED, {
+      action: 'feedback_bulk_approved',
+      source: 'admin_feedback',
+      keywords: approvedKeywords,
+      count: approvedKeywords.length,
+    });
+  }
   res.json({ updated: keywords.length });
 });
 
 // Delete feedback (un-decline a keyword)
-// activity-ok: keyword approve/decline is transient feedback state, not a workspace activity event
+// broadcast-ok: notifyKeywordFeedbackChanged broadcasts strategy/signal invalidation after real feedback deletes.
+// activity-ok: keyword approve/decline is transient feedback state, not a workspace activity event.
 router.delete('/api/webflow/keyword-feedback/:workspaceId/:keyword', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const kw = decodeURIComponent(req.params.keyword).toLowerCase().trim();
+  const kw = keywordComparisonKey(decodeURIComponent(req.params.keyword));
   const removeFeedback = db.transaction(() => {
     const existing = db.prepare('SELECT keyword, status, source FROM keyword_feedback WHERE workspace_id = ? AND keyword = ?').get(ws.id, kw) as { keyword: string; status: string; source: string | null } | undefined; // txn-ok: read-before-delete and delete are enclosed by removeFeedback transaction
     db.prepare('DELETE FROM keyword_feedback WHERE workspace_id = ? AND keyword = ?').run(ws.id, kw);
     return existing;
   });
   const existing = removeFeedback();
+  invalidateIntelligenceCache(ws.id);
+  broadcastToWorkspace(ws.id, WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED, {
+    workspaceId: ws.id,
+    reason: 'keyword_feedback',
+    updatedAt: new Date().toISOString(),
+  });
   broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { keyword: kw, status: 'cleared', previousStatus: existing?.status ?? null, source: existing?.source ?? null });
   res.json({ deleted: kw });
 });
@@ -536,13 +669,30 @@ router.delete('/api/webflow/keyword-feedback/:workspaceId/:keyword', requireWork
 // --- Intelligence Signals ---
 // GET /api/webflow/keyword-strategy/:workspaceId/signals
 
-router.get('/api/webflow/keyword-strategy/:workspaceId/signals', requireWorkspaceAccess('workspaceId'), (req, res) => {
+router.get('/api/webflow/keyword-strategy/:workspaceId/signals', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   try {
     const insights = getInsights(ws.id);
-    const signals = buildStrategySignals(insights);
-    res.json({ signals });
+    try {
+      const intelligence = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext', 'clientSignals'] });
+      const keywordEvaluationContext = buildStrategyKeywordEvaluationContext({
+        workspaceId: ws.id,
+        workspaceName: ws.name,
+        businessContext: ws.keywordStrategy?.businessContext,
+        seoContext: intelligence.seoContext,
+        clientSignals: intelligence.clientSignals,
+        declinedKeywords: [...new Set([...(intelligence.clientSignals?.keywordFeedback.rejected ?? []), ...getDeclinedKeywords(ws.id)])],
+        requestedKeywords: getRequestedKeywords(ws.id),
+        approvedKeywords: intelligence.clientSignals?.keywordFeedback.approved ?? [],
+        strictBusinessFit: true,
+      });
+      const signals = buildStrategySignals(insights, { keywordEvaluationContext });
+      return res.json({ signals });
+    } catch (err) {
+      log.warn({ err, workspaceId: ws.id }, 'Failed to build keyword context for strategy signals; returning unfiltered signals');
+      return res.json({ signals: buildStrategySignals(insights) });
+    }
   } catch (err) {
     log.error({ err, workspaceId: ws.id }, 'Failed to build strategy signals');
     res.json({ signals: [] });

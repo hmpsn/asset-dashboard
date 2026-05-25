@@ -8,6 +8,7 @@ import { validate, z } from '../middleware/validate.js';
 import { isFeatureEnabled } from '../feature-flags.js';
 import { createLogger } from '../logger.js';
 import { broadcastToWorkspace } from '../broadcast.js';
+import { withWorkspaceLock } from '../bridge-infrastructure.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { listWorkspaces } from '../workspaces.js';
 import {
@@ -96,8 +97,13 @@ function computeScorecard(workspaceId: string): OutcomeScorecard {
     scored: data.scored,
   }));
 
-  // Determine trend from recent vs older win rate
-  const recentActions = actions.slice(0, Math.ceil(actions.length / 2));
+  // Determine trend by comparing the recent half against the older half.
+  // Comparing recent against overallWinRate is incorrect because overall
+  // includes the recent cohort, shrinking the effective delta and making
+  // improving/declining harder to trigger than intended.
+  const splitIdx = Math.ceil(actions.length / 2);
+  const recentActions = actions.slice(0, splitIdx);
+  const olderActions = actions.slice(splitIdx);
   let recentWins = 0;
   let recentScored = 0;
   for (const a of recentActions) {
@@ -109,12 +115,24 @@ function computeScorecard(workspaceId: string): OutcomeScorecard {
       if (WIN_SCORES.includes(latest.score!)) recentWins++;
     }
   }
+  let olderWins = 0;
+  let olderScored = 0;
+  for (const a of olderActions) {
+    const outcomes = getOutcomesForAction(a.id);
+    const scored = outcomes.filter(o => o.score && o.score !== 'insufficient_data' && o.score !== 'inconclusive');
+    if (scored.length > 0) {
+      olderScored++;
+      const latest = scored[scored.length - 1];
+      if (WIN_SCORES.includes(latest.score!)) olderWins++;
+    }
+  }
   const recentWinRate = recentScored > 0 ? recentWins / recentScored : 0;
+  const olderWinRate = olderScored > 0 ? olderWins / olderScored : 0;
   const overallWinRate = totalScored > 0 ? totalWins / totalScored : 0;
   let trend: LearningsTrend = 'stable';
-  if (recentScored >= 3) {
-    if (recentWinRate > overallWinRate + 0.1) trend = 'improving';
-    else if (recentWinRate < overallWinRate - 0.1) trend = 'declining';
+  if (recentScored >= 3 && olderScored > 0) {
+    if (recentWinRate > olderWinRate + 0.1) trend = 'improving';
+    else if (recentWinRate < olderWinRate - 0.1) trend = 'declining';
   }
 
   return {
@@ -248,30 +266,33 @@ router.post(
     attribution: attributionEnum.optional(),
     measurementWindow: z.number().int().min(7).max(365).optional(),
   })),
-  (req, res) => {
+  async (req, res) => {
     try {
-      // Idempotency: if sourceId is provided, check for existing action in THIS workspace
-      if (req.body.sourceId) {
-        const existing = getActionByWorkspaceAndSource(req.params.workspaceId, req.body.sourceType, req.body.sourceId);
-        if (existing) {
-          return res.json({ success: true, action: existing, deduplicated: true });
+      const response = await withWorkspaceLock(req.params.workspaceId, async () => {
+        // Idempotency: if sourceId is provided, check for existing action in THIS workspace
+        if (req.body.sourceId) {
+          const existing = getActionByWorkspaceAndSource(req.params.workspaceId, req.body.sourceType, req.body.sourceId);
+          if (existing) {
+            return { success: true, action: existing, deduplicated: true } as const;
+          }
         }
-      }
 
-      const action = recordAction({ // recordAction-ok: workspaceId validated by requireWorkspaceAccess middleware
-        workspaceId: req.params.workspaceId,
-        actionType: req.body.actionType as ActionType,
-        sourceType: req.body.sourceType,
-        sourceId: req.body.sourceId,
-        pageUrl: req.body.pageUrl,
-        targetKeyword: req.body.targetKeyword,
-        baselineSnapshot: { ...req.body.baselineSnapshot, captured_at: new Date().toISOString() },
-        attribution: req.body.attribution,
-        measurementWindow: req.body.measurementWindow,
+        const action = recordAction({ // recordAction-ok: workspaceId validated by requireWorkspaceAccess middleware
+          workspaceId: req.params.workspaceId,
+          actionType: req.body.actionType as ActionType,
+          sourceType: req.body.sourceType,
+          sourceId: req.body.sourceId,
+          pageUrl: req.body.pageUrl,
+          targetKeyword: req.body.targetKeyword,
+          baselineSnapshot: { ...req.body.baselineSnapshot, captured_at: new Date().toISOString() },
+          attribution: req.body.attribution,
+          measurementWindow: req.body.measurementWindow,
+        });
+
+        broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.OUTCOME_ACTION_RECORDED, { actionId: action.id });
+        return { success: true, action } as const;
       });
-
-      broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.OUTCOME_ACTION_RECORDED, { actionId: action.id });
-      res.json({ success: true, action });
+      res.json(response);
     } catch (err) {
       log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to record action');
       res.status(500).json({ error: 'Failed to record action' });
@@ -338,7 +359,7 @@ router.post(
         ...action.context,
         notes: existingNotes ? `${existingNotes}\n${req.body.note}` : req.body.note,
       };
-      updateActionContext(req.params.actionId, updatedContext);
+      updateActionContext(req.params.actionId, req.params.workspaceId, updatedContext);
       res.json({ success: true });
     } catch (err) {
       log.error({ err, workspaceId: req.params.workspaceId, actionId: req.params.actionId }, 'Failed to add note');

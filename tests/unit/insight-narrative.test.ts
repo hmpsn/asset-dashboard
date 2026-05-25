@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import type { InsightType, InsightSeverity } from '../../shared/types/analytics.js';
+import {
+  CLIENT_INSIGHT_EXCLUDED_TYPES,
+  CLIENT_INSIGHT_STORY_TYPES,
+} from '../../server/signal-story-registry.js';
 
 // Import the internal functions via the module
 // Since toClientInsight and isClientRelevant are not exported, we test via buildClientInsights
@@ -35,12 +39,14 @@ describe('insight-narrative', () => {
 
     it('excludes strategy_alignment and keyword_cluster from client view', () => {
       // These InsightType values must not appear in client-facing output
-      const adminOnlyTypes: InsightType[] = ['strategy_alignment', 'keyword_cluster'];
+      const adminOnlyTypes: InsightType[] = [...CLIENT_INSIGHT_EXCLUDED_TYPES];
       const clientSafeTypes: InsightType[] = [
         'page_health', 'ranking_opportunity', 'content_decay',
         'ranking_mover', 'ctr_opportunity', 'anomaly_digest',
         'serp_opportunity', 'competitor_gap', 'conversion_attribution',
-        'cannibalization',
+        'cannibalization', 'audit_finding', 'site_health',
+        'emerging_keyword', 'competitor_alert', 'freshness_alert',
+        'milestone_attribution',
       ];
       for (const t of adminOnlyTypes) {
         expect(clientSafeTypes).not.toContain(t);
@@ -83,12 +89,21 @@ describe('insight-narrative', () => {
         'conversion_attribution',
         'cannibalization',
         'anomaly_digest',
+        'audit_finding',
+        'site_health',
+        'emerging_keyword',
+        'competitor_alert',
+        'freshness_alert',
+        'milestone_attribution',
       ];
       // Verify all types are real InsightType values (TypeScript would catch typos)
       expect(clientTypes.length).toBeGreaterThan(0);
       // Each type should be unique
       const unique = new Set(clientTypes);
       expect(unique.size).toBe(clientTypes.length);
+      for (const type of clientTypes) {
+        expect(CLIENT_INSIGHT_STORY_TYPES).toContain(type);
+      }
     });
   });
 });

@@ -4,9 +4,30 @@ import { kdFraming, kdTooltip } from '../../../lib/kdFraming.js';
 import { Badge, Button, ClickableRow, Icon, SectionCard, TierGate, TrendBadge, type BadgeTone, type Tier } from '../../ui';
 import type { ClientContentRequest, ClientKeywordStrategy } from '../types';
 import { fmtNum, kdColor } from './strategyKeywordDisplay';
+import { keywordComparisonKey } from '../../../../shared/keyword-normalization';
 
 type ContentGap = NonNullable<ClientKeywordStrategy['contentGaps']>[number];
 type KeywordFeedbackStatus = 'approved' | 'declined' | 'requested';
+
+export function findActiveContentRequestForKeyword(
+  contentRequests: ClientContentRequest[] | undefined,
+  targetKeyword: string,
+): ClientContentRequest | undefined {
+  const targetKeywordKey = keywordComparisonKey(targetKeyword);
+  if (!targetKeywordKey) return undefined;
+  return contentRequests?.find(request =>
+    keywordComparisonKey(request.targetKeyword) === targetKeywordKey && request.status !== 'declined'
+  );
+}
+
+export function isContentGapAlreadyRequested(
+  contentRequests: ClientContentRequest[] | undefined,
+  requestedTopics: Set<string>,
+  targetKeyword: string,
+): boolean {
+  const targetKeywordKey = keywordComparisonKey(targetKeyword);
+  return findActiveContentRequestForKeyword(contentRequests, targetKeyword) != null || requestedTopics.has(targetKeywordKey);
+}
 
 interface PricingModalState {
   serviceType: 'brief_only' | 'full_post';
@@ -88,9 +109,10 @@ function ContentGapCard({
   hidePrices,
   onTabChange,
 }: Omit<StrategyContentOpportunitiesSectionProps, 'newContentRef' | 'effectiveTier' | 'newContentTopicCount' | 'contentGapsFound' | 'keywordGapCount' | 'strategyData' | 'expandedSections' | 'toggleSection'> & { gap: ContentGap }) {
-  const matchingReq = contentRequests?.find(r => r.targetKeyword === gap.targetKeyword && r.status !== 'declined');
-  const alreadyRequested = matchingReq != null || requestedTopics.has(gap.targetKeyword);
-  const planStatus = contentPlanKeywords?.get(gap.targetKeyword.toLowerCase());
+  const targetKeywordKey = keywordComparisonKey(gap.targetKeyword);
+  const matchingReq = findActiveContentRequestForKeyword(contentRequests, gap.targetKeyword);
+  const alreadyRequested = isContentGapAlreadyRequested(contentRequests, requestedTopics, gap.targetKeyword);
+  const planStatus = contentPlanKeywords?.get(targetKeywordKey);
   const pageType = gap.suggestedPageType || 'blog';
   const isDataValidated = (gap.volume != null && gap.volume > 0) || (gap.impressions != null && gap.impressions > 0);
   const hasTrendOrSerp = gap.trendDirection || (Array.isArray(gap.serpFeatures) && gap.serpFeatures.length > 0) || gap.competitorProof;
@@ -364,11 +386,11 @@ export function StrategyContentOpportunitiesSection({
                 <div className="mt-4">
                   <div className="flex items-center gap-2 mb-2">
                     <Icon as={Target} size="md" className="text-accent-warning" />
-                    <span className="t-caption font-medium text-[var(--brand-text)]">Review Keyword Ideas</span>
+                    <span className="t-caption font-medium text-[var(--brand-text)]">Market Evidence To Review</span>
                     <span className="t-caption-sm text-[var(--brand-text-muted)]">({strategyData.keywordGaps.length})</span>
                   </div>
                   <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">
-                    Search terms seen in competitor or market data. These are review candidates, not automatic recommendations.
+                    Search terms seen in competitor or market data. These are evidence candidates, not selected strategy actions.
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {strategyData.keywordGaps.slice(0, expandedSections.has('competitor-gaps-all') ? undefined : 6).map((gap, i) => (

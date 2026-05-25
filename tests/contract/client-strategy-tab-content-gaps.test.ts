@@ -11,11 +11,11 @@ describe('client StrategyTab content opportunity split', () => {
     expect(strategyTabSrc).toContain('<StrategyContentOpportunitiesSection');
     expect(strategyTabSrc).not.toContain('Strong Recommendations sub-section');
     expect(strategyTabSrc).not.toContain('Clear new-page recommendations come first');
-    expect(strategyTabSrc).not.toContain('Review Keyword Ideas');
+    expect(strategyTabSrc).not.toContain('Market Evidence To Review');
 
     expect(sectionSrc).toContain('function ContentGapCard');
     expect(sectionSrc).toContain('Strong Recommendations');
-    expect(sectionSrc).toContain('Review Keyword Ideas');
+    expect(sectionSrc).toContain('Market Evidence To Review');
     expect(sectionSrc).toContain('Additional Page Ideas');
     expect(sectionSrc).toContain("setPricingModal({ serviceType: 'brief_only'");
     expect(sectionSrc).toContain("submitFeedback(gap.targetKeyword, 'approved', 'content_gap')");

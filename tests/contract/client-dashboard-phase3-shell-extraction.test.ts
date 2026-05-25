@@ -27,6 +27,13 @@ describe('ClientDashboard phase-3 shell extraction contract', () => {
     expect(source).not.toContain("{tab === 'inbox' && (");
   });
 
+  it('fails contract if invalid tab-composition logic leaks back into the root shell', () => {
+    const source = readFileSync(DASHBOARD_PATH, 'utf-8'); // readFile-ok - invalid regression guard for extracted tab composition ownership.
+
+    expect(source).not.toContain('const chatFirstTabs = new Set<ClientTab>');
+    expect(source).not.toContain('const panel = panels[tab] ?? null');
+  });
+
   it('keeps nav/bootstrap/tab orchestration in dedicated modules', () => {
     const navSource = readFileSync(NAV_PATH, 'utf-8'); // readFile-ok - migration guard for nav derivation extraction.
     const bootstrapSource = readFileSync(BOOTSTRAP_PATH, 'utf-8'); // readFile-ok - migration guard for workspace bootstrap extraction.

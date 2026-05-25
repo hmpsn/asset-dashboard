@@ -59,6 +59,7 @@ const MOCK_INTELLIGENCE: WorkspaceIntelligence = {
     seoEdits: { pending: 0, applied: 0, inReview: 0 },
   },
   learnings: {
+    availability: 'ready',
     summary: null,
     confidence: null,
     topActionTypes: [],
@@ -124,6 +125,28 @@ describe('buildBriefPrompt', () => {
     expect(prompt).toContain('meta_updated on /about-us');
     expect(prompt).toContain('seo services');
     expect(prompt).toContain('+18.5%');
+  });
+
+  it('includes conservative local SEO context when present', () => {
+    const prompt = buildBriefPrompt({
+      ...MOCK_INTELLIGENCE,
+      localSeo: {
+        locations: [],
+        enabled: true,
+        markets: [
+          { id: 'market-1', label: 'Austin, TX', status: 'active', location: 'Austin, Texas, United States' },
+        ],
+        visibility: { visible: 2, possibleMatch: 1, notVisible: 3, notChecked: 4, providerDegraded: 0 },
+        candidates: [],
+        effectiveLocalSeoBlock: 'Local SEO posture (1 active markets):\n  - Austin, TX (active)\n\nVisibility coverage: 2 visible / 1 possible match / 3 not visible / 4 not checked / 0 provider degraded.',
+        latestSnapshotAt: '2026-05-21T00:00:00.000Z',
+      },
+    });
+
+    expect(prompt).toContain('LOCAL SEO:');
+    expect(prompt).toContain('Austin, TX');
+    expect(prompt).toContain('possible business match');
+    expect(prompt).toContain('never call it verified local rank unless evidence explicitly says so');
   });
 
   it('handles sparse intelligence without crashing', () => {

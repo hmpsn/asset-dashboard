@@ -44,7 +44,7 @@ export function StrategySnapshotSection({
     <SectionCard>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-4">
-          <div className={`t-stat-lg ${scoreClass}`}>
+          <div className={`t-h1 ${scoreClass}`}>
             {/* score-color-deviation-ok: planning readiness, not a health grade - teal avoids false alarm */}
             {healthScore}<span className="t-caption-sm text-[var(--brand-text-muted)]">/100</span>
           </div>
@@ -59,19 +59,19 @@ export function StrategySnapshotSection({
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-[560px]">
           <div className="rounded-[var(--radius-lg)] bg-[var(--surface-3)]/45 border border-[var(--brand-border)]/60 px-3 py-2">
             <div className="t-caption-sm text-[var(--brand-text-muted)]">Create content</div>
-            <div className="t-stat-sm text-[var(--brand-text-bright)]">{contentGapsFound}</div>
+            <div className="t-page font-semibold text-[var(--brand-text-bright)]">{contentGapsFound}</div>
           </div>
           <div className="rounded-[var(--radius-lg)] bg-[var(--surface-3)]/45 border border-[var(--brand-border)]/60 px-3 py-2">
             <div className="t-caption-sm text-[var(--brand-text-muted)]">Improve pages</div>
-            <div className="t-stat-sm text-[var(--brand-text-bright)]">{totalPageImprovements}</div>
+            <div className="t-page font-semibold text-[var(--brand-text-bright)]">{totalPageImprovements}</div>
           </div>
           <div className="rounded-[var(--radius-lg)] bg-[var(--surface-3)]/45 border border-[var(--brand-border)]/60 px-3 py-2">
             <div className="t-caption-sm text-[var(--brand-text-muted)]">Ranking coverage</div>
-            <div className="t-stat-sm text-[var(--brand-text-bright)]">{pagesRanking}/{totalPages}</div>
+            <div className="t-page font-semibold text-[var(--brand-text-bright)]">{pagesRanking}/{totalPages}</div>
           </div>
           <div className="rounded-[var(--radius-lg)] bg-[var(--surface-3)]/45 border border-[var(--brand-border)]/60 px-3 py-2">
             <div className="t-caption-sm text-[var(--brand-text-muted)]">Strategy keywords</div>
-            <div className="t-stat-sm text-[var(--brand-text-bright)]">{strategyKeywordCount}</div>
+            <div className="t-page font-semibold text-[var(--brand-text-bright)]">{strategyKeywordCount}</div>
           </div>
         </div>
       </div>

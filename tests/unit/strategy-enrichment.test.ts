@@ -16,7 +16,7 @@ import {
   hasSerpOpportunity,
   trendDirection,
 } from '../../server/seo-provider-signals.js';
-import { enrichKeywordStrategy } from '../../server/keyword-strategy-enrichment.js';
+import { enrichKeywordStrategy, isTopicKeywordCoveredByPageMap } from '../../server/keyword-strategy-enrichment.js';
 import type { SeoDataProvider } from '../../server/seo-data-provider.js';
 import { METRICS_SOURCE } from '../../shared/types/keywords.js';
 import {
@@ -371,6 +371,118 @@ describe('question keyword matching logic', () => {
 });
 
 describe('URL-level keyword intelligence', () => {
+  it('does not apply suspicious million-volume bulk metrics to page assignments', async () => {
+    const getKeywordMetrics = vi.fn(async () => [
+      {
+        keyword: 'schedule dental appointment austin',
+        volume: 1_000_000,
+        difficulty: 21,
+        cpc: 0,
+        competition: 0,
+        results: 0,
+        trend: [],
+      },
+    ]);
+    const provider = {
+      name: 'dataforseo',
+      isConfigured: () => true,
+      getKeywordMetrics,
+      getRelatedKeywords: async () => [],
+      getQuestionKeywords: async () => [],
+      getDomainKeywords: async () => [],
+      getDomainOverview: async () => null,
+      getCompetitors: async () => [],
+      getKeywordGap: async () => [],
+      getBacklinksOverview: async () => null,
+      getReferringDomains: async () => [],
+    } satisfies SeoDataProvider;
+
+    const result = await enrichKeywordStrategy({
+      workspaceId: 'ws_planner_grouped_page_map_guard',
+      baseUrl: 'https://example.com',
+      strategy: {
+        pageMap: [{
+          pagePath: '/schedule-dental-appointment/austin',
+          pageTitle: 'Schedule Dental Appointment Austin',
+          primaryKeyword: 'schedule dental appointment austin',
+          secondaryKeywords: [],
+        }],
+      },
+      keywordPool: new Map(),
+      businessSection: '',
+      searchData: { gscData: [], analyticsData: null, insights: [], decayContexts: [] },
+      domainKeywords: [],
+      questionKeywords: [],
+      competitorKeywords: [],
+      provider,
+      seoDataMode: 'quick',
+      sendProgress: () => undefined,
+    });
+
+    expect(getKeywordMetrics).toHaveBeenCalledWith(
+      ['schedule dental appointment austin'],
+      'ws_planner_grouped_page_map_guard',
+      undefined,
+      undefined,
+    );
+    const page = result.strategy.pageMap?.[0];
+    expect(page?.volume).toBeUndefined();
+    expect(page?.difficulty).toBeUndefined();
+    expect(page?.metricsSource).toBeUndefined();
+  });
+
+  it('does not apply suspicious million-volume bulk metrics to content gaps', async () => {
+    const provider = {
+      name: 'dataforseo',
+      isConfigured: () => true,
+      getKeywordMetrics: vi.fn(async () => [
+        {
+          keyword: 'schedule dental appointment austin',
+          volume: 1_000_000,
+          difficulty: 21,
+          cpc: 0,
+          competition: 0,
+          results: 0,
+          trend: [],
+        },
+      ]),
+      getRelatedKeywords: async () => [],
+      getQuestionKeywords: async () => [],
+      getDomainKeywords: async () => [],
+      getDomainOverview: async () => null,
+      getCompetitors: async () => [],
+      getKeywordGap: async () => [],
+      getBacklinksOverview: async () => null,
+      getReferringDomains: async () => [],
+    } satisfies SeoDataProvider;
+
+    const result = await enrichKeywordStrategy({
+      workspaceId: 'ws_planner_grouped_content_gap_guard',
+      baseUrl: 'https://example.com',
+      strategy: {
+        pageMap: [],
+        contentGaps: [{
+          topic: 'Scheduling',
+          targetKeyword: 'schedule dental appointment austin',
+          priority: 'medium',
+        }],
+      },
+      keywordPool: new Map(),
+      businessSection: '',
+      searchData: { gscData: [], analyticsData: null, insights: [], decayContexts: [] },
+      domainKeywords: [],
+      questionKeywords: [],
+      competitorKeywords: [],
+      provider,
+      seoDataMode: 'quick',
+      sendProgress: () => undefined,
+    });
+
+    const gap = result.strategy.contentGaps?.[0];
+    expect(gap?.volume).toBeUndefined();
+    expect(gap?.difficulty).toBeUndefined();
+  });
+
   it('uses provider URL-level keywords before domain-level fallback for page assignments', async () => {
     const provider = {
       name: 'semrush',
@@ -497,6 +609,139 @@ describe('URL-level keyword intelligence', () => {
 
     expect(getUrlKeywords).not.toHaveBeenCalled();
     expect(result.strategy.pageMap?.[0]?.metricsSource).toBe(METRICS_SOURCE.EXACT);
+  });
+});
+
+// ── Topical Authority Coverage ────────────────────────────────────────
+
+describe('isTopicKeywordCoveredByPageMap', () => {
+  it('counts explicit strategy keywords as topic coverage', () => {
+    expect(isTopicKeywordCoveredByPageMap('teeth whitening', [{
+      pagePath: '/services/cosmetic-dentistry',
+      pageTitle: 'Cosmetic Dentistry',
+      primaryKeyword: 'cosmetic dentistry',
+      secondaryKeywords: ['professional teeth whitening'],
+    }])).toBe(true);
+  });
+
+  it('counts page title and slug phrase matches as topic coverage', () => {
+    expect(isTopicKeywordCoveredByPageMap('cosmetic dentistry', [{
+      pagePath: '/services/cosmetic-dentistry',
+      pageTitle: 'Cosmetic Dentistry',
+      primaryKeyword: 'smile makeovers',
+      secondaryKeywords: [],
+    }])).toBe(true);
+  });
+
+  it('does not claim broad one-word terms from page title or slug matches', () => {
+    expect(isTopicKeywordCoveredByPageMap('dental', [{
+      pagePath: '/services/dental-implants',
+      pageTitle: 'Dental Implants',
+      primaryKeyword: 'implant dentistry',
+      secondaryKeywords: [],
+    }])).toBe(false);
+  });
+
+  it('does not treat a generic mapped keyword as covering location or cost long-tails', () => {
+    expect(isTopicKeywordCoveredByPageMap('austin dental implants', [{
+      pagePath: '/services/dental-implants',
+      pageTitle: 'Dental Implants',
+      primaryKeyword: 'dental implants',
+      secondaryKeywords: [],
+    }])).toBe(false);
+  });
+});
+
+describe('content gap page coverage guard', () => {
+  it('removes content gaps already covered by an existing strategy page', async () => {
+    const result = await enrichKeywordStrategy({
+      workspaceId: 'ws_content_gap_coverage',
+      baseUrl: 'https://example.com',
+      strategy: {
+        pageMap: [{
+          pagePath: '/services/cosmetic-dentistry',
+          pageTitle: 'Cosmetic Dentistry',
+          primaryKeyword: 'cosmetic dentistry',
+          secondaryKeywords: ['professional teeth whitening'],
+        }],
+        contentGaps: [
+          {
+            topic: 'Cosmetic Dentistry',
+            targetKeyword: 'cosmetic dentistry',
+            priority: 'high',
+          },
+          {
+            topic: 'Dental Implant Guide',
+            targetKeyword: 'dental implant cost',
+            priority: 'medium',
+          },
+        ],
+      },
+      keywordPool: new Map([
+        ['cosmetic dentistry', { volume: 1200, difficulty: 35, source: 'related' }],
+        ['dental implant cost', { volume: 900, difficulty: 40, source: 'related' }],
+      ]),
+      businessSection: '',
+      searchData: { gscData: [], analyticsData: null, insights: [], decayContexts: [] },
+      domainKeywords: [],
+      questionKeywords: [],
+      competitorKeywords: [],
+      provider: null,
+      seoDataMode: 'none',
+      sendProgress: () => undefined,
+    });
+
+    expect(result.strategy.contentGaps?.map(gap => gap.targetKeyword)).toEqual(['dental implant cost']);
+  });
+});
+
+describe('empty primary keyword enrichment guards', () => {
+  it('does not match every GSC query or create blank cannibalization issues', async () => {
+    const result = await enrichKeywordStrategy({
+      workspaceId: 'ws_empty_primary_guard',
+      baseUrl: 'https://example.com',
+      strategy: {
+        pageMap: [
+          {
+            pagePath: '/declined-a',
+            pageTitle: 'Declined A',
+            primaryKeyword: '',
+            secondaryKeywords: [],
+          },
+          {
+            pagePath: '/declined-b',
+            pageTitle: 'Declined B',
+            primaryKeyword: '',
+            secondaryKeywords: [],
+          },
+        ],
+      },
+      keywordPool: new Map(),
+      businessSection: '',
+      searchData: {
+        gscData: [
+          {
+            page: 'https://example.com/declined-a',
+            query: 'cosmetic dentistry',
+            clicks: 2,
+            impressions: 200,
+            position: 8,
+          },
+        ],
+        analyticsData: null,
+        insights: [],
+        decayContexts: [],
+      },
+      domainKeywords: [],
+      questionKeywords: [],
+      competitorKeywords: [],
+      provider: null,
+      seoDataMode: 'none',
+      sendProgress: () => undefined,
+    });
+
+    expect(result.strategy.pageMap?.[0].currentPosition).toBeUndefined();
+    expect(result.cannibalization).toEqual([]);
   });
 });
 

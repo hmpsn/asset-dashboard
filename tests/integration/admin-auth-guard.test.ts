@@ -72,6 +72,7 @@ async function startGatedServer(): Promise<void> {
       PORT: String(GATED_PORT),
       NODE_ENV: 'test',
       APP_PASSWORD: TEST_APP_PASSWORD,
+      LOG_LEVEL: 'info',
     },
     stdio: 'pipe',
   });
@@ -579,6 +580,7 @@ describe('Integration — ungated server (APP_PASSWORD empty) baseline', () => {
         PORT: String(UNGATED_PORT),
         NODE_ENV: 'test',
         APP_PASSWORD: '',
+        LOG_LEVEL: 'info',
       },
       stdio: 'pipe',
     });

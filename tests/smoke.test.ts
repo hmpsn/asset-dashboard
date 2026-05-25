@@ -29,6 +29,10 @@ beforeAll(async () => {
       NODE_ENV: 'development',
       // Ensure no APP_PASSWORD so endpoints are open for testing
       APP_PASSWORD: '',
+      // The test waits for the startup "running on" line on stdout. The child
+      // stdout is parsed but not echoed, so this preserves readiness detection
+      // without making the Vitest reporter noisy.
+      LOG_LEVEL: 'info',
     },
     stdio: 'pipe',
   });

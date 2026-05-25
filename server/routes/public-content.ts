@@ -28,13 +28,16 @@ import { getClientActor, requireClientPortalAuth } from '../middleware.js';
 import { getPageTrend, getQueryPageData } from '../search-console.js';
 import { getWorkspace } from '../workspaces.js';
 import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword } from '../rank-tracking.js';
+import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
 import { handleContentPerformance } from './content-requests.js';
 import { isProgrammingError } from '../errors.js';
 import { getConfiguredProvider } from '../seo-data-provider.js';
+import { resolveWorkspaceLocationCode } from '../local-seo.js';
 import { createLogger } from '../logger.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { validate } from '../middleware/validate.js';
 import { computeOpportunityScore } from './keyword-strategy.js';
+import { buildKeywordStrategyUxPayload, buildLatestKeywordStrategyRefreshSummary } from '../keyword-strategy-ux.js';
 import {
   createContentRequestSchema,
   submitContentRequestSchema,
@@ -55,6 +58,7 @@ import type { ContentTopicRequest, GeneratedPost } from '../../shared/types/cont
 const log = createLogger('public-content');
 const router = Router();
 const ACTIVITY_COMMENT_PREVIEW_LENGTH = 200;
+type TrackedKeywordActivityType = 'client_keyword_tracked' | 'client_keyword_removed';
 
 router.use('/api/public/:resource/:workspaceId', requireClientPortalAuth('workspaceId'));
 
@@ -62,6 +66,19 @@ function activityCommentPreview(content: string): string {
   return content.length > ACTIVITY_COMMENT_PREVIEW_LENGTH
     ? `${content.slice(0, ACTIVITY_COMMENT_PREVIEW_LENGTH - 3)}...`
     : content;
+}
+
+function recordTrackedKeywordActivity(
+  workspaceId: string,
+  type: TrackedKeywordActivityType,
+  title: string,
+  actor?: { id?: string; name?: string },
+): void {
+  try {
+    addActivity(workspaceId, type, title, '', {}, actor); // client-visibility-ok: admin-only signal, not surfaced in client activity feed
+  } catch (err) {
+    log.warn({ err, workspaceId, type }, 'tracked-keyword activity log failed');
+  }
 }
 
 function assertClientReviewRequest(workspaceId: string, requestId: string, res: import('express').Response) {
@@ -101,117 +118,144 @@ function findAssociatedPostRequest(
 // --- Public SEO Strategy (client dashboard) ---
 // seoClientView controls tab visibility in the UI; the data is always safe to return
 // and is needed unconditionally by Overview insights, InsightsDigest, and AI chat context.
-router.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
-  const ws = getWorkspace(req.params.workspaceId);
-  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const strategy = ws.keywordStrategy;
-  // Reassemble pageMap from page_keywords table
-  const fullPageMap = listPageKeywords(ws.id);
-  // Reassemble contentGaps from content_gaps table (post-#365 normalization)
-  const contentGapsList = listContentGaps(ws.id);
-  const contentGaps = contentGapsList.length > 0 ? contentGapsList : (strategy?.contentGaps || []);
-  // Reassemble quickWins from quick_wins table (post-#367 normalization).
-  // Fallback to blob data for legacy workspaces that have not been migrated yet.
-  const quickWinsList = listQuickWins(ws.id);
-  const quickWins = quickWinsList.length > 0 ? quickWinsList : (strategy?.quickWins || []);
-  // Reassemble keywordGaps from keyword_gaps table (post-#368 normalization).
-  // Fallback to blob data for legacy workspaces that have not been migrated yet.
-  const keywordGapsList = listKeywordGaps(ws.id);
-  const keywordGaps = keywordGapsList.length > 0 ? keywordGapsList : (strategy?.keywordGaps || []);
-  // Reassemble topicClusters and cannibalization from normalized tables.
-  // Fallback to blob data for legacy workspaces that have not been migrated yet.
-  const topicClustersList = listTopicClusters(ws.id);
-  const topicClusters = topicClustersList.length > 0 ? topicClustersList : (strategy?.topicClusters || []);
-  const cannibalizationList = listCannibalizationIssues(ws.id);
-  const cannibalization = cannibalizationList.length > 0 ? cannibalizationList : (strategy?.cannibalization || []);
-  if (
-    !strategy
-    && fullPageMap.length === 0
-    && contentGaps.length === 0
-    && quickWins.length === 0
-    && keywordGaps.length === 0
-    && topicClusters.length === 0
-    && cannibalization.length === 0
-  ) {
-    return res.json(null);
-  }
-  // Return client-safe subset (no SEO data mode/provider internals)
-  res.json({
-    siteKeywords: strategy?.siteKeywords || [],
-    siteKeywordMetrics: strategy?.siteKeywordMetrics || undefined,
-    pageMap: fullPageMap.map(p => ({
-      pagePath: p.pagePath,
-      pageTitle: p.pageTitle,
-      primaryKeyword: p.primaryKeyword,
-      secondaryKeywords: p.secondaryKeywords || [],
-      searchIntent: p.searchIntent,
-      currentPosition: p.currentPosition,
-      previousPosition: p.previousPosition,
-      impressions: p.impressions,
-      clicks: p.clicks,
-      volume: p.volume,
-      difficulty: p.difficulty,
-      metricsSource: p.metricsSource,
-      validated: p.validated,
-      gscKeywords: p.gscKeywords || [],
-    })),
-    opportunities: strategy?.opportunities || [],
-    contentGaps: contentGaps.map(g => ({
-      topic: g.topic,
-      targetKeyword: g.targetKeyword,
-      intent: g.intent,
-      priority: g.priority,
-      rationale: g.rationale,
-      suggestedPageType: g.suggestedPageType || 'blog',
-      volume: g.volume,
-      difficulty: g.difficulty,
-      impressions: g.impressions,
-      trendDirection: g.trendDirection,
-      serpFeatures: g.serpFeatures,
-      competitorProof: g.competitorProof,
-      questionKeywords: g.questionKeywords,
-      opportunityScore: g.opportunityScore ?? computeOpportunityScore(g),
-    })),
-    quickWins: quickWins.map(q => ({
-      pagePath: q.pagePath,
-      action: q.action,
-      estimatedImpact: q.estimatedImpact,
-      rationale: q.rationale,
-    })),
-    keywordGaps: keywordGaps.slice(0, 20).map(g => ({
-      keyword: g.keyword,
-      volume: g.volume,
-      difficulty: g.difficulty,
-    })),
-    topicClusters: topicClusters.map(c => ({
-      topic: c.topic,
-      keywords: c.keywords,
-      ownedCount: c.ownedCount,
-      totalCount: c.totalCount,
-      coveragePercent: c.coveragePercent,
-      avgPosition: c.avgPosition,
-      topCompetitor: c.topCompetitor,
-      topCompetitorCoverage: c.topCompetitorCoverage,
-      gap: c.gap,
-    })),
-    cannibalization: cannibalization.map(c => ({
-      keyword: c.keyword,
-      pages: c.pages.map(page => ({
-        path: page.path,
-        position: page.position,
-        impressions: page.impressions,
-        clicks: page.clicks,
-        source: page.source,
+router.get('/api/public/seo-strategy/:workspaceId', async (req, res, next) => {
+  try {
+    const ws = getWorkspace(req.params.workspaceId);
+    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+    const strategy = ws.keywordStrategy;
+    // Reassemble pageMap from page_keywords table
+    const fullPageMap = listPageKeywords(ws.id);
+    // Reassemble contentGaps from content_gaps table (post-#365 normalization)
+    const contentGapsList = listContentGaps(ws.id);
+    const contentGaps = contentGapsList.length > 0 ? contentGapsList : (strategy?.contentGaps || []);
+    // Reassemble quickWins from quick_wins table (post-#367 normalization).
+    // Fallback to blob data for legacy workspaces that have not been migrated yet.
+    const quickWinsList = listQuickWins(ws.id);
+    const quickWins = quickWinsList.length > 0 ? quickWinsList : (strategy?.quickWins || []);
+    // Reassemble keywordGaps from keyword_gaps table (post-#368 normalization).
+    // Fallback to blob data for legacy workspaces that have not been migrated yet.
+    const keywordGapsList = listKeywordGaps(ws.id);
+    const keywordGaps = keywordGapsList.length > 0 ? keywordGapsList : (strategy?.keywordGaps || []);
+    // Reassemble topicClusters and cannibalization from normalized tables.
+    // Fallback to blob data for legacy workspaces that have not been migrated yet.
+    const topicClustersList = listTopicClusters(ws.id);
+    const topicClusters = topicClustersList.length > 0 ? topicClustersList : (strategy?.topicClusters || []);
+    const cannibalizationList = listCannibalizationIssues(ws.id);
+    const cannibalization = cannibalizationList.length > 0 ? cannibalizationList : (strategy?.cannibalization || []);
+    if (
+      !strategy
+      && fullPageMap.length === 0
+      && contentGaps.length === 0
+      && quickWins.length === 0
+      && keywordGaps.length === 0
+      && topicClusters.length === 0
+      && cannibalization.length === 0
+    ) {
+      return res.json(null);
+    }
+    // Return client-safe subset (no SEO data mode/provider internals)
+    const trackedKeywords = getTrackedKeywords(ws.id, { includeInactive: true });
+    const strategyUx = await buildKeywordStrategyUxPayload({
+      workspaceId: ws.id,
+      workspaceName: ws.name,
+      strategy,
+      pageMap: fullPageMap,
+      contentGaps,
+      keywordGaps,
+      trackedKeywords,
+      surface: 'client',
+      // Public strategy reads are latency-sensitive. Keep this derived UX layer
+      // on already-loaded strategy/tracking/feedback data; admin routes opt into
+      // heavier workspace-intelligence context where richer diagnostics matter.
+      includeWorkspaceIntelligence: false,
+      summary: buildLatestKeywordStrategyRefreshSummary({
+        workspaceId: ws.id,
+        strategy,
+        pageMap: fullPageMap,
+        contentGaps,
+        trackedKeywords,
+      }),
+    });
+    res.json({
+      siteKeywords: strategy?.siteKeywords || [],
+      siteKeywordMetrics: strategy?.siteKeywordMetrics || undefined,
+      pageMap: fullPageMap.map(p => ({
+        pagePath: p.pagePath,
+        pageTitle: p.pageTitle,
+        primaryKeyword: p.primaryKeyword,
+        secondaryKeywords: p.secondaryKeywords || [],
+        searchIntent: p.searchIntent,
+        currentPosition: p.currentPosition,
+        previousPosition: p.previousPosition,
+        impressions: p.impressions,
+        clicks: p.clicks,
+        volume: p.volume,
+        difficulty: p.difficulty,
+        metricsSource: p.metricsSource,
+        validated: p.validated,
+        gscKeywords: p.gscKeywords || [],
       })),
-      severity: c.severity,
-      recommendation: c.recommendation,
-      canonicalPath: c.canonicalPath,
-      canonicalUrl: c.canonicalUrl,
-      action: c.action,
-    })),
-    businessContext: strategy?.businessContext || '',
-    generatedAt: strategy?.generatedAt ?? null,
-  });
+      opportunities: strategy?.opportunities || [],
+      contentGaps: contentGaps.map(g => ({
+        topic: g.topic,
+        targetKeyword: g.targetKeyword,
+        intent: g.intent,
+        priority: g.priority,
+        rationale: g.rationale,
+        suggestedPageType: g.suggestedPageType || 'blog',
+        volume: g.volume,
+        difficulty: g.difficulty,
+        impressions: g.impressions,
+        trendDirection: g.trendDirection,
+        serpFeatures: g.serpFeatures,
+        competitorProof: g.competitorProof,
+        questionKeywords: g.questionKeywords,
+        opportunityScore: g.opportunityScore ?? computeOpportunityScore(g),
+      })),
+      quickWins: quickWins.map(q => ({
+        pagePath: q.pagePath,
+        action: q.action,
+        estimatedImpact: q.estimatedImpact,
+        rationale: q.rationale,
+      })),
+      keywordGaps: keywordGaps.slice(0, 20).map(g => ({
+        keyword: g.keyword,
+        volume: g.volume,
+        difficulty: g.difficulty,
+      })),
+      topicClusters: topicClusters.map(c => ({
+        topic: c.topic,
+        keywords: c.keywords,
+        ownedCount: c.ownedCount,
+        totalCount: c.totalCount,
+        coveragePercent: c.coveragePercent,
+        avgPosition: c.avgPosition,
+        topCompetitor: c.topCompetitor,
+        topCompetitorCoverage: c.topCompetitorCoverage,
+        gap: c.gap,
+      })),
+      cannibalization: cannibalization.map(c => ({
+        keyword: c.keyword,
+        pages: c.pages.map(page => ({
+          path: page.path,
+          position: page.position,
+          impressions: page.impressions,
+          clicks: page.clicks,
+          source: page.source,
+        })),
+        severity: c.severity,
+        recommendation: c.recommendation,
+        canonicalPath: c.canonicalPath,
+        canonicalUrl: c.canonicalUrl,
+        action: c.action,
+      })),
+      strategyUx,
+      businessContext: strategy?.businessContext || '',
+      generatedAt: strategy?.generatedAt ?? null,
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
 // --- Public Page Keywords (approval card context — NOT gated on seoClientView) ---
@@ -543,12 +587,14 @@ router.post('/api/public/tracked-keywords/:workspaceId', validate(addTrackedKeyw
   const actor = getClientActor(req, ws.id);
   const existingKeywords = getTrackedKeywords(ws.id);
   const alreadyTracked = existingKeywords.some(k => k.query === keyword);
-  const keywords = alreadyTracked ? existingKeywords : addTrackedKeyword(ws.id, keyword);
+  const keywords = alreadyTracked ? existingKeywords : addTrackedKeyword(ws.id, keyword, {
+    source: TRACKED_KEYWORD_SOURCE.CLIENT_REQUESTED,
+  });
   res.json({ keywords });
 
   if (!alreadyTracked) {
-    addActivity(ws.id, 'client_keyword_tracked', `"${keyword}" added to strategy keywords`, '', {}, actor ?? undefined); // client-visibility-ok: admin-only signal, not surfaced in client activity feed
-    broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { keyword });
+    recordTrackedKeywordActivity(ws.id, 'client_keyword_tracked', `"${keyword}" added to strategy keywords`, actor ?? undefined);
+    broadcastToWorkspace(ws.id, WS_EVENTS.RANK_TRACKING_UPDATED, { keyword });
 
     // Fire-and-forget: pre-warm the DataForSEO cache for this keyword so the next
     // strategy GET has volume/difficulty data available immediately.
@@ -556,7 +602,8 @@ router.post('/api/public/tracked-keywords/:workspaceId', validate(addTrackedKeyw
     // callers from amplifying SEO provider spend on passwordless workspaces.
     const provider = actor ? getConfiguredProvider(ws.seoDataProvider ?? undefined) : null;
     if (provider) {
-      provider.getKeywordMetrics([keyword], ws.id).catch((err: unknown) => {
+      const locationCode = resolveWorkspaceLocationCode(ws.id) ?? undefined;
+      provider.getKeywordMetrics([keyword], ws.id, undefined, locationCode).catch((err: unknown) => {
         // url-fetch-ok: async keyword enrichment is best-effort provider prewarming.
         if (isProgrammingError(err)) log.warn({ err }, 'tracked-keyword enrichment: programming error');
         // Non-critical — enrichment will run again on next strategy generation
@@ -576,8 +623,8 @@ router.delete('/api/public/tracked-keywords/:workspaceId', validate(removeTracke
   res.json({ keywords });
   if (wasTracked) {
     const actor = getClientActor(req, ws.id);
-    addActivity(ws.id, 'client_keyword_removed', `"${keyword}" removed from strategy keywords`, '', {}, actor ?? undefined); // client-visibility-ok: admin-only signal, not surfaced in client activity feed
-    broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { keyword, removed: true });
+    recordTrackedKeywordActivity(ws.id, 'client_keyword_removed', `"${keyword}" removed from strategy keywords`, actor ?? undefined);
+    broadcastToWorkspace(ws.id, WS_EVENTS.RANK_TRACKING_UPDATED, { keyword, removed: true });
   }
 });
 

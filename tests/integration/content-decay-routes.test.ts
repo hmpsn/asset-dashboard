@@ -350,14 +350,11 @@ describe('POST /api/content-decay/:workspaceId/analyze', () => {
     expect(body).toHaveProperty('error');
   });
 
-  it('returns 500 when workspace has no GSC configuration', async () => {
+  it('returns 400 when workspace has no GSC configuration', async () => {
     // wsEmpty has no gscPropertyUrl or webflowSiteId — analyzeContentDecay will throw
     const res = await postJson(`/api/content-decay/${wsEmpty}/analyze`, {});
-    // The route catches the error and returns 500 with { error: string }
-    expect(res.status).toBe(500);
-    const body = await res.json();
-    expect(body).toHaveProperty('error');
-    expect(typeof body.error).toBe('string');
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'GSC not configured for this workspace' });
   });
 });
 
@@ -377,6 +374,27 @@ describe('POST /api/content-decay/:workspaceId/recommendations', () => {
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.error).toBe('Run decay analysis first');
+  });
+
+  it('returns 400 when maxPages is non-positive', async () => {
+    const res = await postJson(`/api/content-decay/${wsWithData}/recommendations`, { maxPages: 0 });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'maxPages must be a positive integer' });
+  });
+
+  it('returns 400 when maxPages exceeds the supported window', async () => {
+    const res = await postJson(`/api/content-decay/${wsWithData}/recommendations`, { maxPages: 26 });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'maxPages must be between 1 and 25' });
+  });
+
+  it('returns 400 when maxPages is not an integer', async () => {
+    const res = await postJson(`/api/content-decay/${wsWithData}/recommendations`, { maxPages: 1.5 });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'maxPages must be a positive integer' });
   });
 
   // Timeout stays generous for slower CI machines, but the server now inherits

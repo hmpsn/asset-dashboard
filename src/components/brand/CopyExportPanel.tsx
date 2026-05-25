@@ -370,7 +370,7 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
                   label: `${entry.name} — ${entry.primaryKeyword}`,
                 })),
               ]}
-              className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500 appearance-none cursor-pointer"
+              className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500 appearance-none cursor-pointer"
               aria-label="Select entry to export"
             />
           </div>

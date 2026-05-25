@@ -10,16 +10,40 @@ const mocks = vi.hoisted(() => ({
   startJob: vi.fn(),
   findActiveJob: vi.fn(),
   jobs: [] as BackgroundJob[],
+  providerStatus: vi.fn(),
+  getWorkspaceById: vi.fn(),
+  keywordStrategyData: {
+    strategy: null,
+    seoDataAvailable: true,
+    providers: [{ name: 'semrush', configured: true }] as Array<{ name: string; configured: boolean }>,
+    workspaceData: { competitorDomains: ['competitor.test'], seoDataProvider: 'semrush' },
+  } as {
+    strategy: null;
+    seoDataAvailable: boolean;
+    providers?: Array<{ name: string; configured: boolean }>;
+    workspaceData: { competitorDomains?: string[]; seoDataProvider?: 'semrush' | 'dataforseo' };
+  },
 }));
 
 vi.mock('../../src/hooks/admin', () => ({
   useKeywordStrategy: () => ({
-    data: {
-      strategy: null,
-      seoDataAvailable: true,
-      workspaceData: { competitorDomains: ['competitor.test'] },
-    },
+    data: mocks.keywordStrategyData,
     isLoading: false,
+  }),
+  useLocalSeo: () => ({
+    data: { featureEnabled: false },
+    isLoading: false,
+  }),
+  useLocalSeoRefresh: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+    error: null,
+  }),
+  useLocalSeoUpdate: () => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+    error: null,
   }),
 }));
 
@@ -33,7 +57,7 @@ vi.mock('../../src/hooks/useBackgroundTasks', () => ({
 
 vi.mock('../../src/api/seo', () => ({
   keywords: {
-    providerStatus: vi.fn().mockResolvedValue({ providers: [{ name: 'semrush', configured: true }] }),
+    providerStatus: mocks.providerStatus,
     discoverCompetitors: vi.fn(),
     saveCompetitors: vi.fn(),
   },
@@ -45,7 +69,7 @@ vi.mock('../../src/api/seo', () => ({
 
 vi.mock('../../src/api', () => ({
   workspaces: {
-    getById: vi.fn().mockResolvedValue({ seoDataProvider: 'semrush' }),
+    getById: mocks.getWorkspaceById,
     update: vi.fn().mockResolvedValue({}),
   },
 }));
@@ -79,6 +103,14 @@ describe('KeywordStrategyPanel background job wiring', () => {
     mocks.jobs = [];
     mocks.findActiveJob.mockReturnValue(undefined);
     mocks.startJob.mockResolvedValue('job-keyword-1');
+    mocks.providerStatus.mockResolvedValue({ providers: [{ name: 'semrush', configured: true }] });
+    mocks.getWorkspaceById.mockResolvedValue({ seoDataProvider: 'semrush' });
+    mocks.keywordStrategyData = {
+      strategy: null,
+      seoDataAvailable: true,
+      providers: [{ name: 'semrush', configured: true }],
+      workspaceData: { competitorDomains: ['competitor.test'], seoDataProvider: 'semrush' },
+    };
   });
 
   it('starts keyword strategy generation through the shared background job API', async () => {
@@ -92,9 +124,56 @@ describe('KeywordStrategyPanel background job wiring', () => {
         workspaceId: 'ws-1',
         businessContext: undefined,
         seoDataMode: 'quick',
+        seoDataProvider: 'semrush',
         competitorDomains: ['competitor.test'],
         maxPages: 500,
       });
+    });
+  });
+
+  it('defaults keyword strategy jobs to DataForSEO when no workspace preference is saved', async () => {
+    mocks.providerStatus.mockResolvedValue({
+      providers: [
+        { name: 'semrush', configured: true },
+        { name: 'dataforseo', configured: true },
+      ],
+    });
+    mocks.getWorkspaceById.mockResolvedValue({});
+    mocks.keywordStrategyData = {
+      strategy: null,
+      seoDataAvailable: true,
+      providers: [
+        { name: 'semrush', configured: true },
+        { name: 'dataforseo', configured: true },
+      ],
+      workspaceData: { competitorDomains: ['competitor.test'] },
+    };
+    renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByText('DataForSEO')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /generate strategy/i }));
+
+    await waitFor(() => {
+      expect(mocks.startJob).toHaveBeenCalledWith(
+        BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
+        expect.objectContaining({ seoDataProvider: 'dataforseo' }),
+      );
+    });
+  });
+
+  it('passes maxPages=0 for the All pages setting instead of dropping it', async () => {
+    renderPanel();
+
+    fireEvent.click(screen.getByText('All'));
+    fireEvent.click(screen.getByRole('button', { name: /generate strategy/i }));
+
+    await waitFor(() => {
+      expect(mocks.startJob).toHaveBeenCalledWith(
+        BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
+        expect.objectContaining({ maxPages: 0 }),
+      );
     });
   });
 
@@ -167,5 +246,30 @@ describe('KeywordStrategyPanel background job wiring', () => {
     await waitFor(() => {
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['keyword-strategy', 'ws-1'] });
     });
+  });
+
+  it('shows an error state when a started job fails', async () => {
+    const { queryClient, rerender } = renderPanel();
+
+    fireEvent.click(screen.getByRole('button', { name: /generate strategy/i }));
+
+    await waitFor(() => {
+      expect(mocks.startJob).toHaveBeenCalled();
+    });
+
+    mocks.jobs = [{
+      id: 'job-keyword-1',
+      type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
+      status: 'error',
+      error: 'Provider timeout',
+      message: 'Provider timeout',
+      createdAt: '2026-05-04T00:00:00.000Z',
+      updatedAt: '2026-05-04T00:00:01.000Z',
+      workspaceId: 'ws-1',
+    }];
+    rerender(panelUi(queryClient));
+
+    expect(await screen.findByText('Strategy Generation Failed')).toBeInTheDocument();
+    expect(screen.getByText('Provider timeout')).toBeInTheDocument();
   });
 });

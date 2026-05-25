@@ -15,6 +15,7 @@ import { useAdminBriefsList, useAdminRequestsList, useAdminPostsList, useAdminBr
 import { queryKeys } from '../lib/queryKeys';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
+import { attachTrackedJob } from '../lib/background-job-helpers';
 
 /** targetRoute values that ContentBriefs recognises as legitimate brief-generation navigations.
  *  Any fixContext without one of these routes is treated as stale (e.g. from seo-editor). */
@@ -274,7 +275,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
     try {
       const skeleton = await post<PostSummary & { jobId?: string }>(`/api/content-posts/${workspaceId}/generate`, { briefId });
       if (skeleton.jobId) {
-        trackJob(BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION, skeleton.jobId, { workspaceId });
+        attachTrackedJob({ trackJob }, BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION, skeleton.jobId, { workspaceId });
       }
       queryClient.setQueryData(queryKeys.admin.posts(workspaceId), (old: unknown) => [skeleton, ...(Array.isArray(old) ? old : [])]);
       setActivePostId(skeleton.id);
@@ -514,7 +515,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
                 { value: 'date', label: 'Newest' },
                 { value: 'keyword', label: 'Keyword A-Z' },
                 { value: 'difficulty', label: 'Difficulty' },
-              ]} className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded px-1.5 py-1 t-caption-sm text-[var(--brand-text)] focus:outline-none cursor-pointer" />
+              ]} className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded px-1.5 py-1 t-caption-sm text-[var(--brand-text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 cursor-pointer" />
             </div>
           </div>
         }

@@ -10,6 +10,7 @@ import type {
   ClientSignalsSlice,
   OperationalSlice,
   PageProfileSlice,
+  LocalSeoSlice,
 } from '../../shared/types/intelligence.js';
 import type { AudiencePersona } from '../../shared/types/workspace.js';
 import { matchPagePath } from '../helpers.js';
@@ -54,6 +55,7 @@ export function formatForPrompt(
       (include.has('operational') && intelligence.operational != null) ||
       (include.has('contentPipeline') && intelligence.contentPipeline != null) ||
       (include.has('siteHealth') && intelligence.siteHealth != null) ||
+      (include.has('localSeo') && intelligence.localSeo != null) ||
       // pageElements is page-scoped and only assembled when pagePath is supplied;
       // a section-filtered request for it implies the caller already knows the
       // slice should exist, so a populated slice should bypass cold-start.
@@ -121,6 +123,11 @@ export function formatForPrompt(
   // Operational
   if (intelligence.operational && (!include || include.has('operational'))) {
     sections.push(formatOperationalSection(intelligence.operational, verbosity));
+  }
+
+  // Local SEO
+  if (intelligence.localSeo && (!include || include.has('localSeo'))) {
+    sections.push(formatLocalSeoSection(intelligence.localSeo, verbosity));
   }
 
   // Apply tokenBudget truncation if requested (§20 priority chain)
@@ -273,6 +280,27 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
   if (ctx.rankTracking && verbosity !== 'compact') {
     const rt = ctx.rankTracking;
     lines.push(`Rank tracking: ${rt.trackedKeywords} keywords, avg position ${rt.avgPosition?.toFixed(1) ?? 'n/a'} (↑${rt.positionChanges.improved} ↓${rt.positionChanges.declined})`);
+  }
+
+  // GSC discovered query summary — at standard+ verbosity
+  if (ctx.discoveredQuerySummary && verbosity !== 'compact') {
+    const dq = ctx.discoveredQuerySummary;
+    if (dq.lostVisibilityCount > 0) {
+      const examples = dq.topLostQueries
+        .slice(0, 3)
+        .map(query => `${query.query} (last rank: ${query.lastPosition != null ? query.lastPosition.toFixed(1) : 'unknown'})`)
+        .join(', ');
+      lines.push(
+        `GSC discovery: ${dq.totalDiscovered} queries tracked, `
+        + `${dq.lostVisibilityCount} lost visibility${examples ? ` — top losses: ${examples}` : ''}`,
+      );
+    } else {
+      lines.push(`GSC discovery: ${dq.totalDiscovered} queries tracked, none lost visibility`);
+    }
+  }
+
+  if (ctx.geoVolumeLabel && verbosity !== 'compact') {
+    lines.push(`Keyword volumes are geo-targeted to ${ctx.geoVolumeLabel}, not national figures.`);
   }
 
   // Backlink profile — at standard+ verbosity (only present when enrichWithBacklinks opt-in was set)
@@ -737,6 +765,22 @@ function formatOperationalSection(ops: OperationalSlice, verbosity: PromptVerbos
   }
 
   return lines.join('\n');
+}
+
+/**
+ * Format the local SEO slice for AI prompts.
+ *
+ * The slice's `effectiveLocalSeoBlock` is an authority-layered field (pre-formatted
+ * with stratified per-market sampling already applied). Per CLAUDE.md, callers
+ * inject it directly. The minimal-verbosity branch returns a one-liner instead.
+ */
+function formatLocalSeoSection(slice: LocalSeoSlice, verbosity: PromptVerbosity): string {
+  if (!slice.enabled) return '## Local SEO\nLocal SEO is disabled for this workspace.';
+  if (verbosity === 'compact') {
+    const activeMarkets = slice.markets.filter(m => m.status === 'active').length;
+    return `## Local SEO\n${activeMarkets} active markets. ${slice.visibility.visible} visible, ${slice.visibility.notVisible} not visible, ${slice.visibility.notChecked} not checked.`;
+  }
+  return `## Local SEO\n${slice.effectiveLocalSeoBlock}`;
 }
 
 function formatPageProfileSection(profile: PageProfileSlice, verbosity: PromptVerbosity): string {

@@ -368,6 +368,54 @@ describe('Webflow SEO extracted route coverage', () => {
     vi.restoreAllMocks();
   });
 
+  it('rejects non-integer selectedIndex values when selecting a suggestion variation', async () => {
+    const suggestion = saveSuggestion({
+      workspaceId: ws.workspaceId,
+      siteId: ws.webflowSiteId,
+      pageId: 'page-non-integer-index',
+      pageTitle: 'Index Validation Page',
+      pageSlug: 'index-validation-page',
+      field: 'title',
+      currentValue: 'Old title',
+      variations: ['Var A', 'Var B', 'Var C'],
+    });
+
+    const { status, body } = await patchJson(
+      baseUrl,
+      `/api/webflow/seo-suggestions/${ws.workspaceId}/${suggestion.id}`,
+      { selectedIndex: 1.5 },
+    );
+
+    expect(status).toBe(400);
+    expect(body).toEqual({ error: 'selectedIndex must be 0, 1, or 2' });
+    expect(listSuggestions(ws.workspaceId).some(row => row.id === suggestion.id)).toBe(true);
+    expect(vi.mocked(broadcastToWorkspace)).not.toHaveBeenCalled();
+  });
+
+  it('rejects out-of-range selectedIndex values when selecting a suggestion variation', async () => {
+    const suggestion = saveSuggestion({
+      workspaceId: ws.workspaceId,
+      siteId: ws.webflowSiteId,
+      pageId: 'page-out-of-range-index',
+      pageTitle: 'Out of Range Validation Page',
+      pageSlug: 'out-of-range-validation-page',
+      field: 'description',
+      currentValue: 'Old description',
+      variations: ['Var A', 'Var B', 'Var C'],
+    });
+
+    const { status, body } = await patchJson(
+      baseUrl,
+      `/api/webflow/seo-suggestions/${ws.workspaceId}/${suggestion.id}`,
+      { selectedIndex: 3 },
+    );
+
+    expect(status).toBe(400);
+    expect(body).toEqual({ error: 'selectedIndex must be 0, 1, or 2' });
+    expect(listSuggestions(ws.workspaceId).some(row => row.id === suggestion.id)).toBe(true);
+    expect(vi.mocked(broadcastToWorkspace)).not.toHaveBeenCalled();
+  });
+
   it('selects and applies multiple suggestions for the same page without leaving one pending', async () => {
     const titleSuggestion = saveSuggestion({
       workspaceId: ws.workspaceId,

@@ -148,18 +148,18 @@ function TreeNode({ node, defaultExpanded, coverageMap }: { node: SiteNode; defa
               <span className="hidden lg:inline">{cov.schemaTypes.length}</span>
             </span>
           ) : (
-            <span className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text-dim)]" title="No schema">
+            <span className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text-muted)]" title="No schema">
               <Icon as={XCircle} size="sm" />
             </span>
           )
         )}
 
-        <span className="t-caption-sm text-[var(--brand-text-dim)] font-mono min-w-0 truncate hidden md:block max-w-[160px]" title={node.path}>
+        <span className="t-caption-sm text-[var(--brand-text-muted)] font-mono min-w-0 truncate hidden md:block max-w-[160px]" title={node.path}>
           {node.path}
         </span>
 
         {hasChildren && (
-          <span className="t-caption-sm text-[var(--brand-text-dim)] flex-shrink-0">
+          <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">
             {node.children.length}
           </span>
         )}
@@ -468,7 +468,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
                       <span className="t-caption-sm text-red-400" title="Orphan page — no inbound links">orphan</span>
                     )}
                     {p.inboundLinks !== null && !p.isOrphan && (
-                      <span className="t-caption-sm text-[var(--brand-text-dim)]" title={`${p.inboundLinks} inbound links`}>
+                      <span className="t-caption-sm text-[var(--brand-text-muted)]" title={`${p.inboundLinks} inbound links`}>
                         {p.inboundLinks} in
                       </span>
                     )}

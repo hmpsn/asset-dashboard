@@ -9,7 +9,8 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { getAllGscPages, getQueryPageData } from './search-console.js';
 import type { CustomDateRange } from './google-analytics.js';
 import { callAI } from './ai.js';
-import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelligence.js';
+import { buildRecommendationGenerationContext } from './intelligence/generation-context-builders.js';
+import { buildOutcomeLearningStatusNote } from './outcome-learning-default-path.js';
 import type { Workspace } from './workspaces.js';
 import { createLogger } from './logger.js';
 import { parseJsonFallback } from './db/json-validation.js';
@@ -256,8 +257,11 @@ export async function generateRefreshRecommendation(
   page: DecayingPage,
 ): Promise<string> {
   const slices = ['seoContext', 'learnings', 'pageProfile'] as const;
-  const intel = await buildWorkspaceIntelligence(ws.id, { slices, pagePath: page.page });
-  const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext', 'learnings', 'pageProfile'] }); // bip-ok: slices is a superset
+  const { promptContext: fullContext, learningsAvailability } = await buildRecommendationGenerationContext(ws.id, {
+    pagePath: page.page,
+    slices,
+  });
+  const learningsStatusNote = buildOutcomeLearningStatusNote(learningsAvailability, 'content');
 
   // Fetch per-query GSC data for this specific page to show which queries are declining.
   let queryBreakdownBlock = '';
@@ -290,7 +294,7 @@ Click decline: ${page.clickDeclinePct}% (from ${page.previousClicks} to ${page.c
 Impression change: ${page.impressionChangePct}%
 Position change: ${page.positionChange > 0 ? '+' : ''}${page.positionChange} (now ${page.currentPosition})
 
-${fullContext ? `SEO Context:\n${fullContext}\n` : ''}${queryBreakdownBlock}
+${fullContext ? `SEO Context:\n${fullContext}\n` : ''}${learningsStatusNote ? `Outcome learning status: ${learningsStatusNote}\n` : ''}${queryBreakdownBlock}
 
 Provide a concise, actionable content refresh plan (3-5 bullet points). Focus on:
 1. What's likely causing the decline (algorithm changes, fresher competitors, outdated info)

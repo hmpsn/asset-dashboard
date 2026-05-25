@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   adjustKdImpactScore,
+  assessAuthorityFromBacklinks,
   classifyKdGap,
   kdClassificationNote,
-} from '../../server/recommendations.js';
+} from '../../server/authority-context.js';
 
 describe('classifyKdGap', () => {
   it('returns "aligned" when domain strength is unknown (0)', () => {
@@ -87,5 +88,51 @@ describe('kdClassificationNote — single source of truth with adjustKdImpactSco
     // within-reach (kdGap = 0 - 50 = -50).
     expect(adjustKdImpactScore(65, 0, 50)).toBe(Math.min(100, Math.round(65 * 1.2)));
     expect(kdClassificationNote(0, 50)).toBe(' (KD 0 is well within reach for your domain)');
+  });
+});
+
+describe('assessAuthorityFromBacklinks', () => {
+  it('returns authority_unknown when backlink data is unavailable', () => {
+    expect(assessAuthorityFromBacklinks(65, undefined)).toEqual(expect.objectContaining({
+      posture: 'authority_unknown',
+    }));
+  });
+
+  it('returns authority_unknown with a difficulty-specific note when keyword difficulty is unavailable', () => {
+    expect(assessAuthorityFromBacklinks(null, {
+      totalBacklinks: 2400,
+      referringDomains: 85,
+    })).toEqual(expect.objectContaining({
+      posture: 'authority_unknown',
+      note: expect.stringContaining('keyword difficulty data is unavailable'),
+    }));
+  });
+
+  it('returns requires_authority_building when the backlink footprint is effectively zero', () => {
+    expect(assessAuthorityFromBacklinks(35, {
+      totalBacklinks: 0,
+      referringDomains: 0,
+    })).toEqual(expect.objectContaining({
+      posture: 'requires_authority_building',
+      note: expect.stringContaining('minimal'),
+    }));
+  });
+
+  it('returns requires_authority_building when KD is ambitious for the backlink footprint', () => {
+    expect(assessAuthorityFromBacklinks(72, {
+      totalBacklinks: 120,
+      referringDomains: 12,
+    })).toEqual(expect.objectContaining({
+      posture: 'requires_authority_building',
+    }));
+  });
+
+  it('returns within_current_authority_range when KD fits the backlink footprint', () => {
+    expect(assessAuthorityFromBacklinks(28, {
+      totalBacklinks: 2400,
+      referringDomains: 85,
+    })).toEqual(expect.objectContaining({
+      posture: 'within_current_authority_range',
+    }));
   });
 });

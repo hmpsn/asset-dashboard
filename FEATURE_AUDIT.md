@@ -1,8 +1,233 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **363 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **449 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 449. Page Rewriter PDF Export
+
+**What it does:** Adds a lightweight PDF/print export path to Page Rewriter briefs. The Export brief menu now includes Download PDF, which renders the current editable document into a hidden print-only root, applies scoped print styling, and opens the browser print flow without adding another dependency. Markdown and DOCX exports remain available.
+
+**Agency value:** Gives operators a fast share/print path for rewrite briefs when DOCX is more than the handoff needs.
+
+**Client value:** Makes rewrite recommendations easier to review in a familiar PDF-style format.
+
+**Mutual:** Improves handoff flexibility while keeping export behavior local to the Page Rewriter shell.
+
+---
+
+### 448. Internal Link Review Field Separation
+
+**What it does:** Hardens internal-link client review rendering so target URL, target title, source page URL, and source title stay distinct. Current payloads already carry explicit fields; the display normalizer now also protects legacy or malformed rows from rendering URL/path values in title columns.
+
+**Agency value:** Reduces review confusion when sending internal-link recommendations to clients.
+
+**Client value:** Clients can see what anchor text is being proposed, which page receives the link, and where the link should be added without title/URL ambiguity.
+
+**Mutual:** Keeps the approval workflow unchanged while making the review payload more trustworthy.
+
+---
+
+### 447. GSC Discovery Pipeline
+
+**What it does:** Adds a persistent Search Console discovery layer for keyword intelligence. `getSearchOverview()` now paginates query rows up to 5,000, daily rank snapshots use a 28-day window, and the new `discovered_queries` table stores every query footprint over time. The snapshot job upserts discovered queries and flags quality-gated `lost_visibility` rows when a query has been absent for 14+ days after at least two snapshots and 10 total impressions. Keyword Command Center now links variant GSC queries such as `teeth whitening austin` onto the parent strategy keyword `teeth whitening`, shows expandable variant sub-rows, and surfaces an amber Lost Visibility filter/badge. The SEO context intelligence slice and MCP `get_keyword_analysis` tool both expose lost-visibility query data, with `scripts/backfill-discovered-queries.ts` available for historical seeding from existing rank snapshots.
+
+**Agency value:** Gives strategists a deeper and more durable Search Console memory. Long-tail query variants stop becoming disconnected raw evidence, and keywords that fall out of visibility remain visible as an operating signal instead of disappearing from the latest snapshot.
+
+**Client value:** Clients get steadier keyword reporting because the platform can distinguish “not selected,” “variant evidence,” and “lost visibility” rather than treating absent GSC rows as if they never existed.
+
+**Mutual:** Strengthens the keyword operating loop: query discovery feeds KCC, rank snapshots, AI context, and MCP analysis through one persistent table while keeping the implementation additive and backward-compatible.
+
+---
+
+### 446. Multi-Location Local SEO Business Match
+
+**What it does:** Matches local visibility results against multiple client-owned physical locations and gives admins a dedicated management UI. Workspaces can store `client_locations` with branch names, domains, phone numbers, addresses, status, and future per-location strategy fields. Local visibility snapshots record the matched location ID/name, match evaluation checks every configured location, client-owned branches are scrubbed from `top_competitors`, and a background job recalculates historical snapshots after location changes. Workspace Settings now includes a Locations tab for CRUD, seed-from-business-profile confirmation, review/confirm flows, and delete confirmation. The Local SEO setup drawer links directly to `?tab=locations` and summarizes configured/needs-review locations.
+
+**Agency value:** Fixes the credibility gap where a client’s own branch listings could appear as competitors. Strategists get cleaner local pack reporting, a backfill path for historical snapshots, and a low-friction settings surface for keeping branch identity data accurate.
+
+**Client value:** Multi-location businesses should see more accurate “are we visible?” reporting because any confirmed branch can satisfy the business match, and owned branches no longer inflate competitor lists.
+
+**Mutual:** Establishes the durable data model needed for later per-location strategy, page targets, and GBP integration while preserving single-location fallback behavior for existing workspaces. Key UI/data surfaces include `src/components/settings/LocationsTab.tsx`, `src/hooks/admin/useLocalSeoLocations.ts`, `src/api/localSeo.ts` location methods, `admin-local-seo-locations`, and `local-seo:updated` invalidation for location reads.
+
+---
+
+### 445. Shared Keyword Intelligence Engine
+
+**What it does:** Adds a server-local shared keyword-intelligence module that both keyword recommendations and strategy generation can consume for deterministic keyword judgment. The engine centralizes keyword normalization, near-duplicate matching, candidate inclusion thresholds, opportunity scoring, declined/requested/approved feedback handling, page-map conflict detection, business-fit posture, authority mismatch reasoning, and explicit low-actionability/noise suppression. Keyword recommendations now evaluate candidates through this shared rule layer, and keyword strategy generation now applies the same shared eligibility gate before provider/discovery/related candidates enter the AI keyword pool. Staging-observed noisy terms such as `paper tiger` and `typing tiger` are now regression fixtures for hmpsn studio-like business context.
+
+**Agency value:** Gives strategists one consistent substrate for deciding whether a keyword is worth considering, regardless of whether it appears in recommendations or full strategy generation. This reduces the “same term, different judgment” problem and stops obvious provider-noise terms earlier in the operating loop.
+
+**Client value:** Clients should see fewer irrelevant or low-actionability keyword ideas survive into strategy and recommendation surfaces, while their requested/approved keywords remain protected from overly aggressive filtering.
+
+**Mutual:** Completes the rule-sharing layer needed before PR13's explainability/action-loop UX. The platform can now explain and test keyword suppression/down-ranking with typed reasons instead of relying on scattered local heuristics.
+
+---
+### 444. Keyword Strategy Rank-Tracking Reconciliation
+
+**What it does:** Turns keyword strategy refreshes into a real rank-tracking lifecycle event. Strategy generation now reconciles tracked keywords after persistence: newly selected site/page keywords are added with source/page/strategy/baseline metadata, retained keywords are refreshed, page reassignments are detected, removed strategy-owned keywords are marked deprecated, and replaced page keywords keep `replacedBy` metadata instead of silently lingering as active strategy terms. Manual, client-requested, recommendation/content-gap, unknown, and pinned keywords are preserved so regeneration does not clobber human-selected tracking. Rank-tracking mutations now broadcast a dedicated event and refresh relevant admin/client caches.
+
+**Agency value:** Strategists can trust that regeneration updates the tracking plan instead of leaving stale strategy keywords mixed with live terms. The platform can now answer why a keyword is tracked, which page/strategy selected it, and whether it was retained, replaced, or preserved manually.
+
+**Client value:** Sets up clearer reporting around what the team is watching after a strategy refresh. Clients should see tracked keywords reflect the latest strategy without losing manually requested or pinned terms.
+
+**Mutual:** Completes the propagation layer needed before the shared keyword-intelligence and explainability PRs. The keyword operating loop now has source-data expansion plus lifecycle reconciliation, giving future UX a reliable change set to explain.
+
+### 443. Keyword Source Data Expansion
+
+**What it does:** Expands the keyword provider layer with normalized discovery evidence from DataForSEO Labs keyword ideas, keywords-for-site, general keyword suggestions, and Google Ads keywords-for-keywords. Strategy generation can now collect richer cold-start and seed-expansion candidates through `SeoDataProvider` capabilities, preserve source metadata, and fall back safely if any discovery endpoint is unavailable. After staging QA on 2026-05-19, Google Ads keywords-for-keywords remains implemented behind the provider abstraction but is not fed into strategy generation by default because planner-style grouped volumes produced noisy high-volume page-assignment candidates; PR12's shared keyword-intelligence engine should decide if/how to reintroduce that source with explicit quality gates. A follow-up functional audit tightened source quality and strategy semantics: provider/competitor/gap metrics can upgrade GSC-only pool entries, weak discovery candidates require usable volume and difficulty before entering strategy synthesis, content gaps already covered by mapped pages are removed, empty declined primary keywords no longer match every GSC query, topical-authority coverage distinguishes mapped-page coverage from ranking coverage, and Page Intelligence analysis is preserved only while the page's primary keyword remains the same.
+
+**Agency value:** Gives strategists a wider raw candidate pool before the shared keyword intelligence engine starts filtering and scoring. This is especially helpful for sparse or under-optimized sites where existing rankings alone do not reveal enough opportunity.
+
+**Client value:** Sets up keyword strategies that can discover new opportunities beyond what the site already ranks for, while keeping the current ranking behavior stable until the next quality/scoring PRs land.
+
+**Mutual:** Builds the source-data foundation for the next keyword operating-loop phases: rank-tracking reconciliation, shared keyword intelligence, and explainable strategy UX. Provider-specific payloads stay isolated, so the platform gets better inputs without making strategy code vendor-specific.
+
+---
+
+### 442. Keyword Operating Loop Source + Lifecycle Audit
+
+**What it does:** Adds a read-only audit of the full keyword operating loop before the next keyword intelligence implementation PRs. The audit maps current keyword sources, consumers, mutations, DataForSEO endpoint coverage, strategy refresh follow-ons, rank-tracking behavior, strategy-history diffs, client feedback, outcome tracking, broadcasts/cache invalidation, and source-to-surface handoffs. It also documents rich-data and sparse-workspace lifecycle traces so the next PRs can improve source data, rank-tracking reconciliation, shared keyword intelligence, and UX explainability without rediscovering scope.
+
+**Agency value:** Gives strategists and engineers a clear source-of-truth map for where keywords come from, why they are chosen, where they should appear, and what should update after regeneration. This reduces the risk of fixing one surface while leaving rank tracking, recommendations, or client views stale.
+
+**Client value:** Sets up a more useful keyword strategy experience: chosen keywords should eventually be tracked, explained, connected to content actions, and refreshed consistently rather than treated as a static generated document.
+
+**Mutual:** Converts keyword strategy into an operating-loop roadmap. The platform can move toward "why this keyword, what changed, what are we tracking, and what should we do next" with cleaner implementation boundaries.
+
+---
+
+### 374. Authority-Aware Recommendation Context
+
+**What it does:** Expands recommendation intelligence with an explicit authority-context layer for ambition-sensitive keyword and content suggestions. `server/authority-context.ts` now owns the shared KD-vs-authority classification and backlink-footprint posture used by recommendation consumers. Recommendation-style builders can opt into backlink enrichment without making it a shared default, keyword recommendation candidates now return an explicit posture (`authority_unknown`, `within_current_authority_range`, or `requires_authority_building`), and ambition-sensitive recommendation copy can now say whether an opportunity is realistically within reach or probably needs authority building first.
+
+**Agency value:** Makes keyword and content recommendations more trustworthy. Strategists can separate “good idea, but too ambitious right now” from “worth acting on immediately” without relying on gut feel or hidden scoring penalties.
+
+**Client value:** Recommendations become easier to understand and act on. Instead of only seeing KD numbers, clients and internal teams get clearer guidance about whether the site can realistically compete now or needs backlink/authority work first.
+
+**Mutual:** Raises the quality bar for recommendation framing without increasing noise. The platform stays honest when authority data is missing and more useful when it is available.
+
+---
+
+### 373. Evidence Ledger MVP for Content Review
+
+**What it does:** Adds a minimal evidence-ledger layer to the content-post AI review flow so provenance-sensitive checklist items can show claim-level reviewer support instead of only a flat `claimsToVerify` list. The platform now preserves saved brief evidence (`referenceUrls`, `realPeopleAlsoAsk`, `realTopResults`) as a normalized source pack, then attaches likely source candidates to each claim when a conservative overlap match exists. When no likely candidate is found, the review explicitly says so instead of implying hidden evidence. The review checklist UI now shows the claim, likely sources, and a manual-review posture for unsupported claims.
+
+**Agency value:** Makes factual review faster and safer. Reviewers no longer have to mentally map a numeric/statistical claim back to a source pack on their own, and the platform is clearer about which claims still need manual confirmation.
+
+**Client value:** Improves content trust and QA rigor without pretending the system performed automated fact-checking. Clients receive reviewed content with a stronger human-verification workflow behind it.
+
+**Mutual:** Raises confidence in AI-assisted content operations while preserving the human-in-the-loop grounding contract. The system is more helpful, but still honest about what it knows.
+
+---
+
+### 372. AI Operation Contract Hardening
+
+**What it does:** Expands the named AI operation registry and adds a shared structured-output boundary for high-value JSON-returning AI features. `server/ai-operation-registry.ts` now covers content-post SEO meta generation, content-post unification, voice scoring, meeting briefs, voice-feedback suggestions, and intelligence-profile autofill. `server/ai-structured-output.ts` centralizes the “parse once, validate always” rule: strip fences/wrappers with `parseAIJson()`, then validate the payload with Zod before trusting it. The most user-visible callers now use operation-backed defaults and explicit malformed-output handling instead of regex-first JSON extraction.
+
+**Agency value:** Reduces the frustrating class of failures where the model produced a usable answer but the platform silently dropped it because the JSON wrapper or field shape drifted. Debugging gets faster because provider/model/timeout/retry posture lives in one auditable place.
+
+**Client value:** More reliable SEO meta generation, content-post unification, voice feedback, meeting briefs, and autofill suggestions. The AI features feel steadier because malformed model output degrades predictably instead of becoming mystery failures.
+
+**Mutual:** Raises confidence in the whole AI layer. Better context and outcome learning only matter if the structured outputs survive the boundary cleanly, and this feature makes that boundary explicit and testable.
+
+---
+
+### 371. Intelligence Consumer Builder Foundation
+
+**What it does:** Adds a shared server-side generation-context layer in `server/intelligence/generation-context-builders.ts` for canonical content and recommendation intelligence assembly. The foundation wraps `buildWorkspaceIntelligence()` and `formatForPrompt()` into explicit `buildContentGenerationContext()` and `buildRecommendationGenerationContext()` paths, alongside a repo audit artifact, an intelligence-consumer rules doc, and an inventory contract test that classifies current AI/recommendation consumers as native, hybrid, or legacy.
+
+**Agency value:** Reduces future prompt-quality work from “grep-and-guess” refactors into guided migrations with a known inventory, tested defaults, and one place to standardize slices, `pagePath`, and learnings-domain behavior.
+
+**Client value:** Indirectly improves recommendation and content quality by making workspace-derived context more consistent before later prompt migrations land.
+
+**Mutual:** Converts a fragile convention into an explicit platform contract, lowering regression risk as more AI/recommendation features are consolidated onto the intelligence layer.
+
+---
+
+### 370. Unified Notification Hub (Notifications + Background Tasks)
+
+**What it does:** Merges the top-right notification drawer and the separate floating task panel into one unified hub. The drawer now presents categorized sections for Actions Needed, Alerts, and System Events, and includes in-place background task lifecycle controls (progress, cancel, dismiss, clear completed) scoped to the active workspace.
+
+**Agency value:** Reduces operator context-switching and duplicated “what needs attention now” surfaces during daily triage.
+
+**Client value:** Indirectly improves response time and consistency by making high-priority actions and system task outcomes visible in one canonical panel.
+
+**Mutual:** Consolidates attention management into a single, predictable contract and lowers UI fragmentation drift.
+
+---
+
+### 369. Wave 6 Product Surface Audit Artifact
+
+**What it does:** Adds a machine-readable product surface audit report (`data/product-surface-audit.json`) generated by `scripts/report-product-surface-audit.ts` and a human prioritization guide (`docs/workflows/product-surface-audit-wave6.md`). The report ties bounded-context surface placement, recommendation buckets, and human-verification queue items to current `FEATURE_AUDIT.md` headline counts.
+
+**Agency value:** Turns product-surface simplification from ad hoc opinion into an auditable workflow with reproducible outputs and ownership-level routing.
+
+**Client value:** Indirectly improves product clarity by creating a concrete queue for progressive disclosure and legacy-surface retirement decisions.
+
+**Mutual:** Aligns roadmap prioritization, UX simplification, and governance evidence in one contract.
+
+---
+
+### 368. Shared Demo Scenario Contract
+
+**What it does:** Introduces canonical demo workspace scenarios in `shared/demo-workspace-scenarios.ts` and rewires `scripts/seed-demo-workspaces.ts` to consume that shared definition set. Adds test-fixture accessors (`tests/fixtures/demo-scenario-seed.ts`) and parity checks (`tests/unit/demo-scenario-parity.test.ts`) so demo seeding and test fixtures reference the same workspace identities and integration shape.
+
+**Agency value:** Reduces drift between what QA/demo sees and what integration tests assume, making reproduction faster.
+
+**Client value:** More reliable staging and demo validation translates into fewer regressions reaching client-facing flows.
+
+**Mutual:** One source of truth for scenario identity improves confidence across manual QA and automated checks.
+
+---
+
+### 367. Collaboration Artifact Base (Inbox Routing Foundation)
+
+**What it does:** Adds a normalized collaboration-artifact contract (`shared/types/collaboration-artifact.ts`) and adapters (`src/lib/collaboration-artifacts.ts`) to unify `approval_batches` and `client_actions` as one routing primitive. `InboxTab` now partitions pending items by shared note-based routing semantics rather than duplicated local predicates.
+
+**Agency value:** Send-to-client surfaces can rely on one routing base for Decisions vs Conversations instead of per-tool branching logic.
+
+**Client value:** More consistent placement of collaboration items in Inbox reduces ambiguity about where to act/respond.
+
+**Mutual:** Lowers silent drift risk between data shape, routing rules, and UI rendering.
+
+---
+
+### 366. Background Job Helper Layer
+
+**What it does:** Adds composable background-job lifecycle helpers (`src/lib/background-job-helpers.ts`) for start+track, attach, cancel, and completion invalidation behavior. Migrates SEO bulk workflow and content post generation tracking to these helpers and adds dedicated unit/contract test coverage.
+
+**Agency value:** Fewer custom async-job wiring patterns and less copy/paste around cancellation and query invalidation.
+
+**Client value:** More predictable long-running task UX (progress, completion refresh, cancellation handling).
+
+**Mutual:** Improves reliability without changing the underlying job architecture.
+
+---
+
+### 365. Analytics Date/Metric Contract
+
+**What it does:** Introduces shared analytics boundary contracts in `shared/types/analytics-contract.ts` (date range and metric display semantics) and applies them to analytics API wrappers, client GA4/GSC hooks, query key types, and GA4 server date-range typing. Adds explicit percentage-semantic contracts for CTR/bounce-rate/new-user metrics to prevent multiply/divide drift.
+
+**Agency value:** Reduces cross-surface analytics bugs caused by inconsistent date-range and percentage handling.
+
+**Client value:** More trustworthy reporting because chart/table math semantics stay consistent.
+
+**Mutual:** A typed contract keeps admin and client analytics interpretation aligned.
+
+---
+
+### 364. Shared URL/Tab Search Param Helper
+
+**What it does:** Adds `src/lib/tab-search-param.ts` for canonical `?tab=` resolution (valid-tab guards, legacy aliases, fallback behavior, optional normalization, and cleanup on manual tab changes). Migrates Inbox filter resolution, Content Pipeline, Links panel, and Workspace Settings tab initialization to this shared helper; adds unit and contract coverage.
+
+**Agency value:** Eliminates repeated tab-parsing logic and makes deep-link behavior predictable during refactors.
+
+**Client value:** Fewer navigation regressions when opening deep-linked tabs from emails/chips/cross-links.
+
+**Mutual:** Stabilizes sender/receiver tab-link contract across admin and client surfaces.
 
 ---
 
@@ -201,10 +426,36 @@ A comprehensive value assessment of every feature in the platform — **363 feat
 - **State machine fix (Bug 8)**: Removed `post_review` from `changes_requested` allowed transitions. "Re-queue for Revision" button transitions to `in_progress` instead.
 - **Email notifications (Bug 9)**: New `content_changes_requested` event type with `notifyTeamChangesRequested` function called from both brief and post change-request endpoints.
 
+**PR2 builder migration (2026-05-18):**
+- **Shared intelligence consumer path**: `generateBrief()`, `regenerateBrief()`, and `regenerateOutline()` now source workspace-derived prompt context through `buildContentGenerationContext()` instead of direct `buildWorkspaceIntelligence()` + direct `getInsights()` / `getWorkspaceLearnings()` prompt assembly. Caller-owned enrichments remain separate: SERP data, reference URL scraping, style examples, template constraints, GA4 page performance, and decay-query context.
+- **Parity-safe prompt consolidation**: the shared builder now supports explicit slice overrides so brief generation can keep its existing prompt shape during migration rather than widening to all builder defaults. Matched-page `pageProfile` analysis is also read through the builder path.
+
 ---
 
 ### 8.5. SEO Tier 3 Data Source Enrichment
 **What it does:** Six backend enrichments that inject richer data into AI prompts and summary math across keyword recommendations, content decay analysis, content briefs, copy refresh, job analysis, and recovery rate calculations. **(Item 12)** GSC queries as keyword candidates in `keyword-recommendations.ts` — queries with word overlap and ≥10 impressions added alongside SEMRush related terms, deduped against existing candidates, enabling recommendations from actual search behavior. **(Item 13)** Per-page GSC query breakdown injected into decay-refresh AI prompt in `content-decay.ts` — top 3 decaying queries for the page provide context for refresh recommendations. **(Item 13b)** Decay query context injected into content briefs for decaying pages in `content-brief.ts` and `content-requests.ts` — when a brief is generated for a request whose targetPageSlug matches a page flagged by decay analysis, the brief prompt receives the decay context (declining queries, traffic trend) for targeted recovery content. **(Item 13c)** GSC `topQueries` populated in `DecayContext` and injected into copy-refresh AI prompt in `copy-refresh.ts` — section-refresh AI receives the top GSC queries for a decaying page, improving the relevance of copy rewrites to actual search traffic patterns. **(Item 14)** SEMRush pre-fetch for top-N pages before bulk-analysis batch loop in `server/routes/jobs.ts` — exported helper `prefetchSemrushForTopPages(workspace, pageIds)` fetches domain and URL-level organic metrics for priority pages in parallel before the batch loop, reducing per-page API latency and improving response times. **(Item 15)** Issue-type-specific recovery rates replacing flat 12% in `server/recommendations.ts` — exported `getRecoveryRate(issueType)` returns rates calibrated to each issue category (metadata: 8%, heading structure: 6%, content depth: 15%, internal linking: 12%, schema: 18%) instead of a one-size-fits-all constant, improving recovery estimates in opportunity scoring and monthly report win attribution math.
+
+**PR2 builder migration (2026-05-18):**
+- **Decay recommendation builder adoption**: `generateRefreshRecommendation()` now uses `buildRecommendationGenerationContext()` with a parity-safe slice override (`seoContext`, `learnings`, `pageProfile`) so the workspace-derived prompt context follows the shared intelligence builder convention while keeping the page-specific GSC query breakdown as a caller-owned enrichment block.
+
+**PR3 keyword recommendation quality pass (2026-05-18):**
+- **Shared recommendation-context builder adoption**: `server/keyword-recommendations.ts` now sources ranking context through `buildRecommendationGenerationContext()` with `seoContext + learnings + clientSignals`, removing the old ad hoc learnings import and promoting keyword recommendations onto the canonical intelligence-consumer path.
+- **Smarter opt-in ranking**: content-matrix keyword recommendation routes can now use the smart ranking path with meaningful workspace context, while preserving the legacy omitted-`useAI` contract and degrading safely to deterministic scoring if the AI path or context build fails.
+- **Noise reduction and strategic negatives**: keyword scoring now filters previously declined terms, down-ranks cannibalization conflicts and existing page-map overlaps, penalizes broad/weak-overlap adjacent terms, and boosts requested/business-priority/client-interest matches.
+- **Optional explainability**: recommendation responses accept `includeReasoning` and can return the winning rationale plus de-prioritized alternatives for admin/debug surfaces without changing the default payload for existing callers.
+
+**PR4 story registry consolidation (2026-05-19):**
+- **Server-local signal-story registry**: added `server/signal-story-registry.ts` as the shared boundary for signal→story projection across client insight narratives, deterministic briefing insight dispatch, and overlapping recommendation copy.
+- **Client insight narrative coverage hardening**: `server/insight-narrative.ts` now consumes registry projectors instead of an inline narrative map, eliminating generic fallback copy for active client-visible insight types such as `audit_finding`, `site_health`, and `milestone_attribution`.
+- **Briefing boundary alignment**: `server/briefing-templates/index.ts` now routes insight/content-gap dispatch through the shared registry while keeping the existing deterministic template modules as the briefing source of truth.
+- **Recommendation copy normalization**: `server/recommendations.ts` now uses centralized story builders for content gaps, ranking opportunities, content decay, CTR underperformance, and freshness alerts so overlapping signals stop drifting in title/description/insight phrasing across surfaces.
+
+**PR5 outcome learning default path (2026-05-19):**
+- **Typed learnings availability**: `shared/types/intelligence.ts` and `server/intelligence/learnings-slice.ts` now distinguish `ready`, `disabled`, `no_data`, and `degraded` learnings states instead of forcing callers to infer absence from an empty block. Shared generation builders surface this as `learningsAvailability`, with a builder-local `not_requested` state when a caller intentionally omits the learnings slice.
+- **Shared outcome adjustment seam**: added `server/outcome-learning-default-path.ts` so recommendation engines can apply workspace-specific outcome multipliers through one typed helper instead of hand-rolling win-rate logic per caller. The helper currently calibrates against `winRateByActionType` and strategy difficulty-range performance, then clamps scores safely.
+- **Builder-backed prompt fallback messaging**: content brief generation, content decay refresh recommendations, and keyword strategy synthesis now append a short outcome-learning status note when learnings are unavailable, so prompts fall back explicitly to general best practices rather than silently implying prior wins exist.
+- **Recommendation scoring now consumes learnings**: `server/recommendations.ts` and `server/keyword-recommendations.ts` now fetch learnings via shared recommendation-context builders and route impact/ranking scores through the outcome-adjustment helper. This makes recommendations more workspace-specific when measured outcomes exist while remaining rollout-safe when the feature flag is off.
+- **Ad hoc brief-route learnings removed**: `server/routes/content-briefs.ts` no longer reaches into `getWorkspaceLearnings()` / `formatLearningsForPrompt()` directly; learnings now flow through the builder-backed `generateBrief()` path, which keeps content prompts aligned with the intelligence-slice contract.
 
 **Agency value:** Every AI recommendation now factors in real search behavior (GSC queries) and market-proven recovery baselines. Content briefs for decaying pages arrive with context instead of generic generation. Recovery math in opportunities reflects issue-type reality instead of guessed averages.
 
@@ -5518,7 +5769,7 @@ Bug hardening included:
 **PR:** #662
 
 ### 400. SchemaReviewModal
-**What it does:** Full-screen modal wrapper around SchemaReviewTab, triggered from the schema plan card in InboxTab's Decisions section. Replaces the retired standalone `schema-review` ClientTab route. Escape key closes; WAI-ARIA `role="dialog"` with focus management.
+**What it does:** Full-screen modal wrapper around SchemaReviewTab, triggered from the schema plan card in InboxTab's Decisions section. Replaces the retired standalone `schema-review` ClientTab route. Escape key closes; WAI-ARIA `role="dialog"` with focus management. Legacy route closeout hardening now canonicalizes both `/client/:workspaceId/schema-review` and `?tab=schema-review` to `/client/:workspaceId/inbox?tab=reviews` so old bookmarks land directly on Reviews.
 
 **Agency value:** Schema review is now embedded in the client inbox workflow instead of a separate nav tab, reducing client confusion about where to find schema feedback.
 
@@ -5526,7 +5777,7 @@ Bug hardening included:
 
 **Mutual:** SchemaReviewTab component is reused (not duplicated); route cleanup removes a stale client navigation entry.
 
-**Files:** `src/components/client/SchemaReviewModal.tsx`; `src/components/client/InboxTab.tsx`; `src/components/ClientDashboard.tsx` (route entry removed).
+**Files:** `src/components/client/SchemaReviewModal.tsx`; `src/components/client/InboxTab.tsx`; `src/components/ClientDashboard.tsx` (route entry removed); `src/App.tsx`; `src/routes.ts`; `tests/unit/client-routes-redirect.test.tsx`.
 
 **PR:** #662
 
@@ -5546,7 +5797,7 @@ Bug hardening included:
 ---
 
 ### 402. Action Playbooks Resolution
-**What it does:** Closes the client approval dead-end. On `approved` response from client portal: (1) admin team notified via `action_approved` email event (batched, never throttled — internal category); (2) `content_decay` actions auto-create a content brief via `ACTION_PLAYBOOK_EXECUTE` background job and transition to `completed`; (3) all other approved action types surface in admin UI with an "Awaiting implementation" amber badge and one-click teal "Mark complete" button.
+**What it does:** Closes the client approval dead-end. On `approved` response from client portal: (1) admin team notified via `action_approved` email event (batched, never throttled — internal category); (2) `content_decay` actions auto-create a content brief via `ACTION_PLAYBOOK_EXECUTE` background job and transition to `completed`; (3) all other approved action types surface in admin UI with an "Awaiting implementation" amber badge and one-click teal "Mark complete" button. Wave cleanup follow-up (2026-05-18) adds a shared feedback loop helper that runs on approval/completion to connect client actions back into intelligence/outcomes: resolve originating insights (explicit origin IDs first, conservative page/keyword fallback only when unambiguous), record lifecycle tracked actions (`sourceType='client_action'`), and upgrade pre-action intent rows (e.g., `content_decay`) when `trackingSourceId` metadata is provided.
 
 **Agency value:** Approved actions no longer disappear into a void. Admin team is instantly notified. `content_decay` briefs are auto-generated—no manual creation required. Other action types show in admin UI for tracking and manual completion.
 
@@ -5554,7 +5805,7 @@ Bug hardening included:
 
 **Mutual:** Closes the approval→implementation handoff gap. Systematic post-approval workflow prevents lost context. Email notifications keep admin team in sync without requiring constant UI checks.
 
-**Files:** `server/playbooks.ts` (new), `server/email-templates.ts`, `server/email.ts`, `server/routes/client-actions.ts`, `shared/types/background-jobs.ts`, `src/components/admin/ClientActionsTab.tsx` (new).
+**Files:** `server/playbooks.ts` (new), `server/email-templates.ts`, `server/email.ts`, `server/routes/client-actions.ts`, `server/domains/inbox/client-action-feedback-loop.ts`, `server/domains/inbox/client-actions-mutations.ts`, `shared/types/background-jobs.ts`, `shared/types/client-actions.ts`, `src/components/admin/ClientActionsTab.tsx` (new), `src/components/AeoReview.tsx`, `src/components/ContentDecay.tsx`, `tests/integration/client-actions-mutation-safety.test.ts`.
 
 ---
 
@@ -6025,3 +6276,231 @@ Bug hardening included:
 **Mutual:** Complements the styleguide ratchet by adding delivery-path integrity gates, not just code-style enforcement.
 
 **Files:** `scripts/report-staging-merge-integrity.ts`; `data/staging-merge-integrity-exceptions.json`; `package.json`; `.github/workflows/ci.yml`; `.github/workflows/pr-check-nightly.yml`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+---
+
+### 439. Styleguide Parity Ratchet Wave 18 (Typography Hierarchy Advisory Kickoff)
+**What it does:** Starts typography hierarchy ratcheting with a new warn-tier rule, `muted-text-two-tier-only`, in `pr-check`. The detector flags likely muted-tier drift where body/caption-level copy uses dim text semantics (including `BodyText tone="dim"` and `.t-body`/`.t-page`/`.t-caption*` with `text-[var(--brand-text-dim)]`) and supports explicit local hatches via `// muted-tier-ok`. In parallel, `scripts/report-style-drift.ts` now reports a file-level advisory metric (`mutedTextTierViolationCount` + top files) so cleanup can be assigned by ownership slice before any promotion to blocking.
+
+**Agency value:** Creates an objective signal for one of the highest-visibility “styleguide feels cleaner than app” problems without introducing immediate CI friction.
+
+**Client value:** Improves readability and hierarchy consistency over time by reducing over-dimmed copy in live surfaces.
+
+**Mutual:** Continues the ratchet pattern: advisory instrumentation first, targeted cleanup second, and promotion to error only after sustained zero-hit evidence.
+
+**Files:** `scripts/pr-check.ts`; `tests/pr-check.test.ts`; `scripts/report-style-drift.ts`; `docs/rules/automated-rules.md`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-rule-registry.md`; `data/styleguide-rule-registry.json`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 440. Styleguide Parity Ratchet Wave 19 (Focus/Z-Index/Stat Advisory Activation)
+**What it does:** Activates three additional Wave 17 planned directives as warn-tier advisory checks with fixture coverage and drift-report visibility: `focus-visible-ring-contract`, `raw-z-index-inline-literal`, and `stat-primitive-bypass-signal`. `scripts/pr-check.ts` now detects (1) `focus:outline-none` usage lacking any explicit `focus-visible` ring/outline fallback, (2) raw numeric `zIndex` / `z-index` literals that bypass z-layer tokens, and (3) direct `.t-stat*` usage in component shells that are not using `StatCard`, `CompactStatBar`, or `Stat` primitives. `scripts/report-style-drift.ts` now emits file-level advisory counts for these three categories so cleanup waves can be assigned by ownership slice and tracked as measurable debt. `tests/pr-check.test.ts` adds trigger/negative/hatch fixtures for each new detector.
+
+**Agency value:** Expands parity instrumentation into three recurring drift classes before they harden into widespread visual inconsistency.
+
+**Client value:** Improves keyboard-focus clarity, overlay stacking consistency, and metric-surface uniformity over time by spotlighting violations early.
+
+**Mutual:** Preserves ratchet discipline by converting planned contracts into measured advisories with tests before any warn→error promotion.
+
+**Files:** `scripts/pr-check.ts`; `scripts/report-style-drift.ts`; `tests/pr-check.test.ts`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-rule-registry.md`; `data/styleguide-rule-registry.json`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 441. SEO Intelligence Backend Closeout (`#355`, `#631`, `#633`)
+**What it does:** Closes three pending SEO Intelligence Depth backend items in one pass. **`#355` Research Mode hardening:** expanded factual grounding contract in `server/ai.ts` so research-mode outputs must distinguish observed evidence from inference, avoid presenting inferred/example values as verified facts, and explicitly disclose when source verification is unavailable. Admin chat now runs through `callAI({ researchMode: true })`, and a contract test guards against regression. **`#631` Internal-link source audit:** added a dated audit artifact at `docs/superpowers/audits/2026-05-18-internal-link-recommendation-source-audit.md` that inventories all internal-link recommendation producers/consumers, documents cross-surface contract drift, and defines scanner recommendations as the canonical actionable source with follow-on cleanup queued in `#632`. **`#633` effective summary optimization:** suppression-adjusted audit history reads now compute from one ordered snapshot list in memory via `listSnapshotsDetailed(siteId)` instead of per-row snapshot fetches + repeated previous lookup calls, preserving response shape/semantics while removing the N+1 summary-read pattern.
+
+**Agency value:** Improves factual reliability for admin analysis, codifies internal-link ownership/contracts before model cleanup, and reduces audit-history read amplification in suppression-heavy workspaces.
+
+**Client value:** Client-visible audit history numbers remain consistent while backend reads are more efficient; internal-link review cleanup now has a concrete contract baseline for clearer follow-through.
+
+**Mutual:** Converts partial hardening into closed roadmap outcomes with regression tests and documented ownership boundaries.
+
+**Files:** `server/ai.ts`; `server/routes/ai.ts`; `tests/contract/factual-ai-output-contracts.test.ts`; `server/reports.ts`; `server/audit-snapshot-views.ts`; `tests/unit/audit-snapshot-views.test.ts`; `docs/superpowers/audits/2026-05-18-internal-link-recommendation-source-audit.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 442. Keyword Strategy Refactor + Signal Hygiene
+**What it does:** Adds the missing final hygiene boundary between the PR12 shared keyword-intelligence engine and persisted keyword strategy outputs. `server/keyword-strategy-sanitizer.ts` now runs before persistence/rank-tracking reconciliation, removing blank, declined, or known-noisy selected keywords; repairing page primaries through an explicit fallback order; and dropping unrecoverable page mappings rather than persisting empty strategy keywords. Strategy Signals now route keyword-derived signals through shared keyword-intelligence evaluation when context is available, so stale/noisy competitor-gap insights no longer leak into the Strategy card or strategy-generation prompt blocks.
+
+**Agency value:** Makes keyword strategy generation easier to reason about by giving final selected outputs one deterministic quality gate after AI/enrichment mutations. This reduces whack-a-mole debugging when provider data, AI assignments, insight feedback, and rank tracking disagree.
+
+**Client value:** Strategy and rank-tracking surfaces stop carrying obviously irrelevant or stale generated terms forward, while historical rank data and raw insight history remain preserved for auditability.
+
+**Mutual:** Creates a cleaner foundation for the upcoming strategy explainability/action-loop UX pass: the UI can explain selected keywords and retired tracking state without first compensating for noisy backend primitives.
+
+**Files:** `server/keyword-strategy-context.ts`; `server/keyword-strategy-sanitizer.ts`; `server/keyword-strategy-generation.ts`; `server/keyword-strategy-ai-synthesis.ts`; `server/insight-feedback.ts`; `server/routes/keyword-strategy.ts`; `tests/unit/keyword-strategy-sanitizer.test.ts`; `tests/unit/insight-feedback.test.ts`; `tests/unit/rank-tracking-reconciliation.test.ts`; `docs/superpowers/audits/2026-05-20-keyword-strategy-refactor-signal-hygiene.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 443. Keyword Strategy Quality, Explainability + Action Loop UX
+**What it does:** Adds the PR13 visible explanation layer for the keyword operating loop. A new shared optional contract (`shared/types/keyword-strategy-ux.ts`) and server-local read-only assembler (`server/keyword-strategy-ux.ts`) derive refresh summaries, keyword explanations, tracking/action state, and raw-evidence posture from existing strategy, page-keyword, content-gap, keyword-gap, feedback, rank-tracking lifecycle, and shared keyword-intelligence data. Admin strategy diff now shows a richer “What Changed” summary with added/retained/reassigned/retired/preserved counts and explanation previews. Competitor keyword gaps are explicitly labeled as raw provider evidence rather than selected actions. Client Strategy surfaces now get client-safe refresh summary and explanation affordances in the keyword drawer and page keyword map, with existing feedback/request flows preserved.
+
+**Agency value:** Makes strategy QA and client conversations easier because admins can quickly answer what changed, why a keyword exists, what is being tracked, what was retired, and what safe action comes next.
+
+**Client value:** Turns keyword strategy from a static generated artifact into a clearer operating plan: what changed, what we are watching, and what we recommend reviewing next, without exposing raw provider jargon or noisy terms as recommendations.
+
+**Mutual:** Preserves the no-publishing/no-live-site-write posture while connecting cleaner strategy primitives to safe next actions like generate brief, review page, track keyword, or keep watching.
+
+**Files:** `shared/types/keyword-strategy-ux.ts`; `server/keyword-strategy-ux.ts`; `server/routes/keyword-strategy.ts`; `server/routes/public-content.ts`; `src/api/seo.ts`; `src/components/strategy/StrategyDiff.tsx`; `src/components/strategy/KeywordGaps.tsx`; `src/components/client/StrategyTab.tsx`; `src/components/client/types.ts`; `src/components/client/strategy/StrategyRefreshSummarySection.tsx`; `src/components/client/strategy/StrategyKeywordDrawer.tsx`; `src/components/client/strategy/StrategyPageKeywordMapSection.tsx`; `src/components/client/PageKeywordMapContent.tsx`; `src/components/client/strategy/StrategyContentOpportunitiesSection.tsx`; `src/components/RankTracker.tsx`; `tests/unit/keyword-strategy-ux.test.ts`; `docs/superpowers/audits/2026-05-20-pr13-keyword-strategy-quality-ux.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 444. Keyword Command Center
+**What it does:** Adds a dedicated admin `Keywords` surface at `/ws/:workspaceId/seo-keywords` as the single operating layer for keyword lifecycle management. The compatibility read model (`GET /api/webflow/keyword-command-center/:workspaceId`) assembles strategy site/page/content keywords, raw keyword-gap/provider evidence, tracked keywords including inactive lifecycle rows, client/admin feedback, latest rank evidence, and PR13 strategy explanations into one command view. The optimized app path now uses split read models: `/summary` for counts/filter metadata, `/rows` for server-side paginated/searchable table rows, and `/detail` for the rich drawer payload for one keyword. Row reads omit heavy explanation/local-competitor detail, local visibility summary reads avoid parsing snapshot competitor JSON, and route timing logs expose source loading, local SEO, strategy UX, and row-index stages. The action route (`POST /api/webflow/keyword-command-center/:workspaceId/actions`) supports `add_to_strategy`, `promote_evidence`, `track`, `pause_tracking`, `retire`, `decline`, and `restore` without hard-deleting rank history or publishing anything live. Manual, pinned, and client-requested keywords are protected from accidental retirement/decline unless explicitly forced. The UI adds lifecycle summary cards, server-backed filters/search, a dense keyword table, and a sticky lazy-loaded detail drawer with source evidence, tracking state, feedback, explanations, and safe handoffs to Strategy, Rank Tracker, Page Intelligence, and content planning.
+
+**May 2026 stability hotfix:** Staging crash testing showed rich workspaces could still push the Command Center read path into Render 502/OOM territory because split endpoints shared a heavy full-universe builder and local candidate generation was capped only after the intermediate map had grown. The hotfix keeps wire shapes unchanged while making `/summary` scalar/count-only, gating local candidate generation to the explicit Local Candidates filter on `/rows`, hard-capping local SEO candidate generation at 1000 intermediate rows, and logging heap/timing fields for read-model builds. Follow-up staging QA confirmed aggregate Local / Not Checked filters must remain snapshot-only so they cannot trigger candidate generation or Render health-check failures.
+
+**May 2026 skinny architecture follow-up:** The split Command Center endpoints now have independent read paths instead of hiding the full-universe model behind the UI. `/summary` remains scalar/count-only, normal `/rows` filters use a skinny source-bundle path with `rows-skinny` timing logs, and `/detail` assembles only the selected keyword with `detail-skinny` logs. The legacy full `GET /api/webflow/keyword-command-center/:workspaceId` endpoint, API helper, and unused hook were removed so new callers cannot accidentally rebuild the whole keyword universe. Local Candidates intentionally remains on the explicit capped temporary path until the follow-on candidate-cache work lands. pr-check guardrails now block summary/detail from calling the full model and block ungated local candidate generation in Command Center reads.
+
+**May 2026 UI/UX overhaul:** The admin Keywords surface now keeps the keyword table full-width and opens rich keyword detail in a true slide-over drawer on desktop / bottom sheet on mobile. The UI is split into `src/components/keyword-command-center/` modules for the drawer, table rows, variant rows, summary metrics, bulk action bar, confirmation dialog, drawer detail panels, and shared display/action helpers. Rows now support checkbox multi-select and a sticky bulk lifecycle bar for add-to-strategy, track, pause, retire, and decline. The new bulk API (`POST /api/webflow/keyword-command-center/:workspaceId/actions/bulk`) reuses the single-keyword transition/protection path per row, canonicalizes duplicate keyword variants, returns per-keyword applied/skipped/error outcomes, writes one summary activity entry, and emits one coalesced workspace broadcast per batch. Drawer polish includes wrapping source badges, `StatusBadge domain="keyword-command-center"` lifecycle semantics, softer awaiting-data copy for new tracked keywords, and clearer empty placeholders for missing metrics.
+
+**May 2026 Local SEO refresh budget — default 100, per-workspace override 25–300:** The flat 50-keyword refresh budget was a conservative initial default with no signal-quality or cost analysis behind it. With the Tier 2 cheap/Evaluated split landing the same week, raised the global default to 100 (~$0.20/refresh per active market — still trivial) and added a per-workspace `keywordsPerRefresh` override in `local_seo_workspace_settings` (migration 098). Bounds: min 25, max 300, default 100. Local-first clients with broad service-area coverage can be bumped to 200–300; non-local clients can be dropped to 25 to save credits. Surfaced in the Local SEO setup drawer as a numeric input with live cost-estimate text (`keywords × active_markets × $0.002`). Wire-up: shared `LOCAL_SEO_MIN/DEFAULT/MAX_KEYWORDS_PER_REFRESH(_CAP)` constants, `getEffectiveKeywordsPerRefresh(workspaceId)` resolver that clamps + falls back, route validation in `keywordsPerRefresh` Zod field, KCC + LocalSeoVisibilityPanel `caps` payload now carries `keywordsPerRefreshMin/Max/Default` for the UI.
+
+**May 2026 Local SEO candidate architecture — Tier 2 cheap/Evaluated split:** The Strategy 'Refresh' button on local workspaces was killing the staging instance via OOM, and the KCC Local Candidates filter took 35–43s on Swish. Both shared one root cause: `buildLocalSeoKeywordCandidates` ran the eligibility evaluator + noise-pattern suppression per candidate while scanning pageMap × secondaries × markets. Refactor splits the function in two: `buildLocalSeoKeywordCandidates` is now the cheap default (no evaluator, empty reasons, no scoreDelta — safe for every current production caller: refresh path, KCC row enrichment, intelligence slice, AdminChat, MCP, content/recommendation gen) and `buildLocalSeoKeywordCandidatesEvaluated` is the opt-in slow variant. Shared `iterateLocalCandidateSignals` generator powers all three production code paths (cheap, Evaluated, count). `loadCandidateIterationContext` accepts `{ withEvaluationContext: true }` so the Evaluated path reuses the single `buildCandidateContext` read instead of calling it twice. No module-level cache — wall-clock TTL caches risk stale data after workspace mutations and unbounded memory growth; the cheap generator is fast enough on its own. pr-check rule retargeted to the Evaluated variant with new `local-candidates-evaluated-ok` hatch. Architecture scales for upcoming geo-grid tracking, local SEO recommendations, Google Business Profile health, Google reviews, and client local SEO module — all of which need cheap candidate enumeration, not the evaluator's suppression chain.
+
+**May 2026 row expansion + localCandidates count fix:** Filtered tabs on staging were inflating beyond their badge counts (Tracked badge 235 / table 275; Visible Locally 1 / table showed many `—` rows). Root cause was `pageMatchesKeys` letting pages survive whole if ANY of their primary/secondary keywords was selected, then `populateDraftRows` materializing a row per page keyword. Replaced with `restrictPageToKeys`, a transformer that trims each surviving page's keywords to only those in the selected key set (and drops pages with nothing left). Added post-materialization filter validation in the skinny rows path with a `rowsDropped` diagnostic in the structured log so future drift surfaces in staging logs. Also fixed `localCandidates: 0` hardcoded in the skinny summary so the badge reflects the bounded candidate generator output. Six regression tests cover tracked sibling pollution, empty-tracking pages, visible_locally / possible_match posture matching, all-count alignment with summary, and the localCandidates badge.
+
+**Agency value:** Gives admins one place to answer the operational keyword questions that were previously scattered: what keywords exist, what state each keyword is in, where it came from, whether it is tracked/retired/declined/raw evidence, and what action is safe next.
+
+**Client value:** Improves the quality and consistency of downstream client-facing strategy because keyword lifecycle decisions are easier for admins to manage intentionally instead of leaking through Rank Tracker, Strategy, and Page Intelligence in slightly different states.
+
+**Mutual:** Clarifies product boundaries: Rank Tracker is measurement-only, Strategy is generation/explanation, Page Intelligence is page-first, and the Command Center owns keyword lifecycle. Raw provider evidence remains auditable but is not presented as a selected strategy action.
+
+**Files:** `shared/keyword-normalization.ts`; `shared/types/keyword-command-center.ts`; `server/keyword-command-center.ts`; `server/routes/keyword-command-center.ts`; `server/db/migrations/097-keyword-command-center-read-indexes.sql`; `server/app.ts`; `src/api/keywordCommandCenter.ts`; `src/hooks/admin/useKeywordCommandCenter.ts`; `src/components/KeywordCommandCenter.tsx`; `src/components/keyword-command-center/*`; `src/routes.ts`; `src/App.tsx`; `src/components/layout/Sidebar.tsx`; `src/components/layout/Breadcrumbs.tsx`; `src/components/CommandPalette.tsx`; `tests/unit/keyword-command-center.test.ts`; `tests/unit/keyword-command-center-bulk.test.ts`; `tests/unit/kcc-action-helpers.test.ts`; `tests/integration/keyword-command-center-routes.test.ts`; `tests/component/KeywordCommandCenter.test.tsx`; `docs/rules/keyword-command-center.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 445. Local SEO Foundation Audit + Workspace Posture Contract
+**What it does:** Establishes the implementation baseline for the next local SEO workstream without changing production behavior. The PR14 audit (`docs/superpowers/audits/2026-05-20-local-seo-foundation-source-market-audit.md`) verifies the current Strategy, Keywords, Rank Tracker, Page Intelligence, Client Strategy, schema, business profile, provider, and intelligence prompt paths before local-pack visibility implementation begins. A new rule doc (`docs/rules/local-seo-visibility.md`) defines the local SEO boundary: local visibility is market-specific evidence, not a replacement for Rank Tracker, Keyword Command Center, Strategy, or Schema. The audit also defines the future workspace posture contract (`local`, `non_local`, `hybrid`, `unknown`), local market identity shape, conservative business-match confidence, provider/cost guardrails, and DataForSEO local-source candidates.
+
+**Agency value:** Prevents the next local SEO feature from becoming another scattered keyword surface. Admins get a decision-ready blueprint for measuring local-pack visibility safely, with explicit cost caps, match-confidence language, and clear boundaries between global rank measurement and local visibility evidence.
+
+**Client value:** Sets up local-business reporting that can eventually answer the questions clients actually care about — where they are visible locally, whether map/local-pack visibility exists in the right market, and what safe action comes next — without making unverified rank or GBP claims.
+
+**Mutual:** Keeps local SEO optional and posture-aware so dentists, clinics, attorneys, restaurants, and service-area businesses get local visibility intelligence while SaaS/global workspaces avoid noisy local modules. The audit also keeps GBP health, reviews/reputation, geo-grid tracking, and local recommendations as separate roadmap items instead of overloading v1.
+
+**Files:** `docs/superpowers/audits/2026-05-20-local-seo-foundation-source-market-audit.md`; `docs/rules/local-seo-visibility.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 446. Keyword Normalization + Route Reliability Hardening
+**What it does:** Stabilizes keyword equality across the high-value keyword operating loop before local SEO provider work begins. The shared keyword comparison helper is now the canonical semantic key for Strategy, Rank Tracker, rank-tracking reconciliation, Page Keywords, Keyword Command Center, keyword recommendations, strategy enrichment/synthesis, content-pipeline coverage gaps, client Strategy feedback, keyword gaps, cannibalization issues, and provider metric joins. Raw display strings and provider request payloads remain untouched where exact wording is meaningful.
+
+**Agency value:** Reduces duplicate/stale keyword gremlins caused by punctuation, casing, spacing, and near-me/local modifier variants. Admins can trust that tracking, feedback, strategy, and Command Center lifecycle actions agree on whether two strings are the same keyword.
+
+**Client value:** Client requests and declines are more reliably honored across Strategy and future local SEO surfaces, so irrelevant or retired keywords are less likely to reappear because of small wording differences.
+
+**Mutual:** Gives the upcoming local-pack visibility work a safer foundation. Local SEO will multiply city, neighborhood, and near-me variants; this PR keeps those variants from fracturing strategy, tracking, feedback, and reporting joins.
+
+**Files:** `shared/keyword-normalization.ts`; `server/keyword-intelligence/rules.ts`; `server/rank-tracking.ts`; `server/rank-tracking-reconciliation.ts`; `server/page-keywords.ts`; `server/keyword-strategy-helpers.ts`; `server/keyword-strategy-ai-synthesis.ts`; `server/keyword-strategy-enrichment.ts`; `server/keyword-strategy-generation.ts`; `server/keyword-strategy-seo-data.ts`; `server/keyword-recommendations.ts`; `server/keyword-gaps.ts`; `server/cannibalization-issues.ts`; `server/provider-keyword-metrics.ts`; `server/routes/keyword-strategy.ts`; `server/routes/rank-tracking.ts`; `server/routes/public-portal.ts`; `server/routes/content-briefs.ts`; `src/lib/keywordTracking.ts`; `src/components/KeywordStrategy.tsx`; `src/components/client/PageKeywordMapContent.tsx`; `src/components/client/strategy/strategyKeywordDisplay.ts`; `src/components/client/strategy/useStrategyKeywordFeedback.ts`; `tests/unit/keyword-command-center.test.ts`; `tests/unit/rank-tracking-reconciliation.test.ts`; `tests/integration/rank-tracking-routes.test.ts`; `docs/rules/keyword-normalization-route-hardening.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+## Local Pack Visibility Foundation (PR16)
+
+**Status:** Shipped to staging branch workstream on 2026-05-20
+**Owner:** `seo-health`
+**Roadmap:** `intel-quality-local-pack-visibility-foundation`
+
+**What it does:** Adds the server-side foundation for market-specific local pack visibility without mixing it into GSC Rank Tracker or keyword strategy generation. The new shared contract in `shared/types/local-seo.ts` defines workspace local posture, market identity, provider source endpoints, visibility snapshots, conservative business-match confidence, and degraded/failure states. Storage lives in dedicated local SEO tables for settings, explicit markets, and append-only snapshots.
+
+The provider seam is now capability-aware through `SeoDataProvider.getLocalVisibility()`. DataForSEO local-pack collection is implemented inside `server/providers/dataforseo-provider.ts` using Google Organic SERP live advanced results, with local endpoint credit labels, cache keys that include keyword + market + endpoint + device + language, and typed provider-failure fallback. Strategy, UI, and local SEO service code do not import DataForSEO directly.
+
+Admin APIs now support local SEO setup and refresh: `GET /api/local-seo/:workspaceId`, `PUT /api/local-seo/:workspaceId`, and `POST /api/local-seo/:workspaceId/refresh`. Refreshes are gated by the `local-seo-visibility` feature flag, run as `local-seo-refresh` background jobs, cap v1 fanout to three markets and twenty-five keywords, select local-intent keywords from active tracked/page-assigned terms, store snapshots separately from Rank Tracker, broadcast `LOCAL_SEO_UPDATED`, and log activity. Intelligence-slice consumption is intentionally deferred to PR17 so this foundation does not imply prompt usage before reporting semantics are validated.
+
+**Agency value:** Gives local businesses a separate evidence layer for market-specific visibility while preserving the clarity of existing global SEO measurement. Dentists, clinics, attorneys, home services, and other local/hybrid clients can now be measured against explicit markets without polluting Rank Tracker or creating a second keyword lifecycle system.
+
+**Client value:** No client-facing local SEO claims ship yet. The foundation keeps future reporting conservative by storing match confidence as `verified`, `strong_match`, `possible_match`, `not_found`, or `unknown` rather than implying unverified local rank.
+
+**Boundaries:** No reporting UI, no client payloads, no GBP health, no Google reviews, no geo-grid tracking, no synchronous strategy-generation provider fanout, no automatic publishing, and no live metadata/schema writes. PR17 should surface this evidence in admin reporting, Keyword Command Center, Strategy, and Page Intelligence behind the feature flag.
+
+**Files:** `shared/types/local-seo.ts`; `shared/types/feature-flags.ts`; `shared/types/background-jobs.ts`; `shared/types/index.ts`; `server/db/migrations/096-local-seo-visibility.sql`; `server/seo-data-provider.ts`; `server/providers/dataforseo-provider.ts`; `server/providers/fake-seo-provider.ts`; `server/local-seo.ts`; `server/routes/local-seo.ts`; `server/app.ts`; `server/ws-events.ts`; `server/activity-log.ts`; `src/lib/wsEvents.ts`; `src/lib/queryKeys.ts`; `src/hooks/useWsInvalidation.ts`; `scripts/platform-domain-event-definitions.ts`; `tests/contract/background-job-coverage-contract.test.ts`; `tests/unit/dataforseo-provider.test.ts`; `tests/unit/local-seo.test.ts`; `tests/integration/local-seo-routes.test.ts`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+## Local SEO Reporting + Strategy Integration (PR17)
+
+**Status:** Shipped to staging branch workstream on 2026-05-20
+**Owner:** `seo-health`
+**Roadmap:** `intel-quality-local-seo-reporting-strategy-integration`
+
+**What it does:** Adds the admin reporting layer on top of the local-pack visibility foundation without changing strategy scoring, publishing content, writing live SEO metadata, or mixing local visibility into GSC Rank Tracker. `GET /api/local-seo/:workspaceId` now returns an optional report summary with workspace posture, setup state, active market count, checked keyword count, visible/possible/not-found counts, and latest capture time.
+
+The new `LocalSeoVisibilityPanel` surfaces local-market setup and snapshot evidence behind the `local-seo-visibility` feature flag. Admins can open a lightweight setup drawer from the reporting panel, review suggested markets, configure up to three v1 markets, save workspace posture, and optionally start a local visibility refresh through the existing background job flow. The drawer now resolves admin-entered city/state/country markets against DataForSEO's free Google locations list, stores the matched `location_code` plus provider location name when available, and falls back to explicit provider identity/coordinates only when lookup is unavailable or ambiguous. Keyword Strategy shows a compact visibility summary, Keyword Command Center annotates rows and drawer details with local visibility posture, and Page Intelligence annotates local-intent page keywords when stored snapshots exist. Rank Tracker now includes handoff copy that explains it measures Search Console query performance while local SEO measures market-specific local-pack visibility.
+
+**May 2026 surface IA pass:** `LocalSeoVisibilityPanel` now uses explicit surface modes instead of the old boolean compact mode. Strategy renders `mode="strategy"` as the Local SEO setup/posture home with market configuration, aggregate evidence, and a handoff to Keywords. Keyword Command Center renders `mode="keywords"` as the full local keyword visibility hub, preserving local filters, row badges, drawer evidence, and keyword-scoped refresh actions. Page Intelligence renders `mode="page"` as an annotation-only strip and keeps detailed evidence on page rows/details, avoiding a duplicate workspace-level Local SEO dashboard. Focused component tests pin the three surface roles.
+
+**Agency value:** Gives admins a clear local SEO operating view for dentists, clinics, attorneys, home services, and other market-specific businesses. They can configure the market being measured, see whether a keyword was checked locally, whether the business was visible or only a possible match, and which surface should handle the next step.
+
+**Client value:** Client-facing local SEO remains deferred until staging data quality is validated, but this PR creates the safe language and evidence model needed to eventually report local visibility without overclaiming "verified rank" or GBP ownership.
+
+**Boundaries:** Admin-first and feature-flagged. No client payload changes, no automatic strategy regeneration, no local provider calls in render paths, no GBP health/reviews, no geo-grid tracking, no publishing, and no live metadata/schema writes.
+
+**Files:** `shared/types/local-seo.ts`; `shared/types/keyword-command-center.ts`; `server/local-seo.ts`; `server/keyword-command-center.ts`; `src/api/localSeo.ts`; `src/hooks/admin/useLocalSeo.ts`; `src/hooks/admin/index.ts`; `src/components/local-seo/LocalSeoVisibilityPanel.tsx`; `src/components/local-seo/LocalSeoMarketSetupDrawer.tsx`; `src/components/KeywordCommandCenter.tsx`; `src/components/KeywordStrategy.tsx`; `src/components/PageIntelligence.tsx`; `src/components/RankTracker.tsx`; `src/components/ui/SectionCard.tsx`; `src/components/page-intelligence/PageIntelligencePageDetails.tsx`; `src/components/page-intelligence/PageIntelligencePageList.tsx`; `src/components/page-intelligence/PageIntelligencePageRow.tsx`; `tests/unit/local-seo.test.ts`; `tests/integration/local-seo-routes.test.ts`; `tests/unit/keyword-command-center.test.ts`; `tests/integration/keyword-command-center-routes.test.ts`; `tests/component/KeywordCommandCenter.test.tsx`; `tests/component/LocalSeoVisibilityPanel.test.tsx`; `docs/rules/local-seo-visibility.md`; `FEATURE_AUDIT.md`; `data/roadmap.json`; `data/features.json`.
+
+## Local Keyword Lens + Visibility Usability
+
+**Status:** Shipped 2026-05-20
+**Roadmap:** `intel-quality-local-keyword-lens-visibility-usability`
+
+**What it does:** Turns Local SEO Visibility into a keyword lens inside the Keyword Command Center instead of a separate keyword silo. The Local SEO panel now acts as a summary/control card for market setup, refresh state, and aggregate counts, while keyword-level local visibility, local candidates, local priority, local-pack posture, business-match confidence, and safe next actions live in the main Keywords surface.
+
+The local refresh source set is now built from strategy terms, active tracked terms, page-assigned keywords, service page titles, content gaps, configured market city/state, and safe city/near-me variants. Candidates are deduped through the shared keyword normalizer, screened with shared keyword-intelligence rules, and exclude declined, retired, weak-fit, and known noisy terms. Refreshes remain background-job based and bounded, with a 50-keyword prioritized cap.
+
+Staging QA also exposed a stability risk at keyword-strategy completion: the background job was storing and broadcasting the full generated strategy object even though the strategy is already persisted in the domain store. Keyword strategy jobs now return a compact completion summary only, reducing SQLite/job-cache/WebSocket payload pressure during heavy generation runs.
+
+**Agency value:** Gives admins one place to understand and act on local keyword opportunities: what is visible locally, what is a possible match, what is not visible, what has not been checked, and which local candidates should be tracked, promoted, declined, or reviewed. This makes local SEO feel like part of the keyword operating loop rather than a separate report to hunt through.
+
+**Client value:** Client-facing local SEO remains deferred, but the admin evidence model now supports safer future reporting because local candidates are not presented as selected strategy terms until promoted and local visibility copy stays conservative.
+
+**Boundaries:** No strategy regeneration, no publishing, no live metadata/schema writes, no GBP mutation, no geo-grid tracking, and no separate local keyword manager. Rank Tracker remains Search Console measurement-only.
+
+**Files:** `shared/types/keyword-command-center.ts`; `shared/types/local-seo.ts`; `server/local-seo.ts`; `server/keyword-command-center.ts`; `src/hooks/admin/useLocalSeo.ts`; `src/components/local-seo/LocalSeoVisibilityPanel.tsx`; `src/components/KeywordCommandCenter.tsx`; `tests/unit/local-seo.test.ts`; `tests/unit/keyword-command-center.test.ts`; `tests/component/LocalSeoVisibilityPanel.test.tsx`; `tests/component/KeywordCommandCenter.test.tsx`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+## Geo-Targeted Keyword Volume
+
+**Status:** Shipped 2026-05-22
+**Roadmap:** `intel-quality-keyword-volume-geo-targeting`
+
+**What it does:** Keyword volume lookups are now city-targeted when a workspace designates a primary Local SEO market. `local_seo_markets.is_primary` stores the single primary market, `setPrimaryMarket()` updates it through a clear-then-set transaction, and `getPrimaryMarketLocationCode()` / `resolveWorkspaceLocationCode()` provide the DataForSEO city `location_code` to keyword metric callers.
+
+`SeoDataProvider.getKeywordMetrics()` accepts an optional numeric `locationCode`. DataForSEO uses that code for Google Ads `search_volume/live` and keyword difficulty payloads and keys both workspace file cache and global SQLite metric cache by numeric location code, preventing national and city volumes from sharing cached values. All current server keyword metric consumers pass the resolved workspace location code and fall back to national US volume when no primary market is set.
+
+Admins can set a market as primary from `LocalSeoMarketSetupDrawer`, and Keyword Command Center shows the active geography in the Demand column header via `geoLabel` (for example, `Demand · Austin, TX`). SEO context intelligence and MCP `get_keyword_analysis` include `geoVolumeLabel` so AI consumers know keyword volume figures are local, not national.
+
+**Boundaries:** This PR keeps the existing Google Ads search-volume endpoint; DFS Labs keyword overview, per-market volume storage for multi-market workspaces, and richer provenance tooltip copy remain follow-ons. No strategy regeneration, rank-tracking mutation, publishing, metadata writes, schema writes, GBP mutation, or geo-grid tracking was added.
+
+**Files:** `server/db/migrations/101-local-seo-market-primary.sql`; `shared/types/local-seo.ts`; `shared/types/keyword-command-center.ts`; `shared/types/intelligence.ts`; `server/local-seo.ts`; `server/routes/local-seo.ts`; `server/seo-data-provider.ts`; `server/providers/dataforseo-provider.ts`; `server/providers/semrush-provider.ts`; `server/providers/fake-seo-provider.ts`; `server/keyword-command-center.ts`; `server/intelligence/seo-context-slice.ts`; `server/intelligence/formatters.ts`; `server/mcp/tools/content.ts`; `src/api/localSeo.ts`; `src/hooks/admin/useLocalSeo.ts`; `src/components/KeywordCommandCenter.tsx`; `src/components/local-seo/LocalSeoMarketSetupDrawer.tsx`; `tests/integration/local-seo-primary-market.test.ts`; `tests/integration/keyword-command-center-routes.test.ts`; `tests/unit/dataforseo-provider.test.ts`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+## Local SEO Intelligence Slice (AI + MCP)
+
+**What it does:** Surfaces local SEO context (markets, visibility coverage, candidates) through `buildWorkspaceIntelligence` so AdminChat, content/recommendation generation, and external MCP consumers are no longer blind to local-specific signals. Adds `'localSeo'` to the `IntelligenceSlice` union, a `LocalSeoSlice` interface, and an `assembleLocalSeo(workspaceId)` slice assembler in `server/intelligence/local-seo-slice.ts`. The orchestrator (`server/workspace-intelligence.ts`) routes the slice through the existing `assembleSlice` switch and includes it in `ALL_SLICES`. The prompt formatter (`server/intelligence/formatters.ts`) renders `formatLocalSeoSection` which injects the slice's pre-formatted `effectiveLocalSeoBlock` directly per the authority-layered-fields rule.
+
+**Two-layer contract — full data for MCP, sampled prompt block for AI:** `LocalSeoSlice.candidates` carries the full bounded candidate universe (capped only by `LOCAL_CANDIDATE_HARD_CAP = 1000` in `server/local-seo.ts`) so MCP consumers (`get_workspace_intelligence`) get the entire list as JSON for programmatic analysis. `LocalSeoSlice.effectiveLocalSeoBlock` is a pre-formatted prompt block that internally samples candidates with stratified per-active-market sampling (top 8 per market, capped at 50 total) so AI prompts stay within token budget even on hyper-local workspaces.
+
+**Per-consumer integration:** AdminChat (`server/admin-chat-context.ts`) requests the `localSeo` slice on `performance`/`general` question categories and when the question mentions local signals (local, near me, GBP, market, location, city). Content generation (`buildContentGenerationContext`) and recommendation generation (`buildRecommendationGenerationContext`) gate inclusion on a cheap active-markets check via `listLocalSeoMarkets`, so workspaces without active markets pay zero token cost. Content-gen paths additionally have access to `selectRelevantLocalCandidates(slice, targetKeyword, limit=15)` which boosts token-overlap and market-match candidates above unrelated higher-score ones so per-piece prompts only see locally relevant context. MCP `get_workspace_intelligence` accepts `localSeo` via its `slices` arg and includes it by default in the ALL_INTELLIGENCE_SLICES list.
+
+**Empty-but-valid baseline:** When the `local-seo-visibility` feature flag is off OR no markets are configured, `assembleLocalSeo` returns a typed object with empty arrays and a short explanatory `effectiveLocalSeoBlock`. Consumers never see `undefined`. Token cost on non-local workspaces is approximately 80 characters when the slice is explicitly requested.
+
+**Agency value:** AdminChat can now answer market-specific questions like "how is our Austin local visibility doing?" with real workspace data instead of generic guidance. Content generation surfaces locally relevant keyword neighbors for pieces about specific services or markets. External MCP agents working in Claude chat receive the full candidate list, not a truncated 25-item sample.
+
+**Client value:** No client-facing changes in this PR. Improves the quality of downstream client deliverables because content briefs, recommendations, and AI advice for local businesses now ground in real local SEO posture.
+
+**May 2026 prompt wiring audit follow-up:** The generation-context builders now append `localSeo` even when callers pass narrow explicit slice overrides, with an opt-out for page-only lookups that would otherwise duplicate local context. Keyword Strategy synthesis, content brief generation/regeneration/outline regeneration, and meeting brief generation now receive conservative Local SEO context when active markets exist. Meeting brief cache invalidation includes the local prompt block and latest snapshot state so stale local narratives are not reused. Client dashboard/advisor exposure remains deferred in `data/roadmap.json` until the local summary copy and public payload contract are approved.
+
+**Mutual:** Establishes the canonical pattern for surfacing local SEO data per CLAUDE.md Data Flow Rule #6: any new workspace data must surface through `server/intelligence/<name>-slice.ts`. Replaces ad-hoc direct reads of local-seo helpers with a single typed slice that respects the authority-layered-fields rule.
+
+**Boundaries:** No new public routes, no publishing, no live metadata writes, no schema writes, no GBP mutation, no provider calls during intelligence assembly. Slice reads only existing `local-seo.ts` helpers. The `LocalSeoKeywordCandidate` shape does not yet expose `marketId`, so per-market stratification falls back to flat score-sorted top-N until that lands — tracked as `TODO(local-seo-marketId-passthrough)` in the slice file.
+
+**Files:** `shared/types/intelligence.ts`; `server/intelligence/local-seo-slice.ts`; `server/workspace-intelligence.ts`; `server/intelligence/formatters.ts`; `server/admin-chat-context.ts`; `server/intelligence/generation-context-builders.ts`; `server/mcp/tools/intelligence.ts`; `tests/integration/intelligence-local-seo.test.ts`; `tests/integration/mcp-local-seo.test.ts`; `docs/rules/workspace-intelligence.md`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+## Local SEO Sprint I — Intent Classification, Competitor Tracking, Service Gap Detection
+
+**What it does:** Quality pass on local SEO keyword selection and market intelligence. Five targeted improvements that raise the signal quality of local pack visibility refreshes and surface actionable competitive/coverage gaps in the admin UI.
+
+- **Keyword intent classification** — Server-only. `classifyLocalKeywordIntent()` in `server/local-seo.ts`. Regex-based, no API calls. 5 intents: transactional (default), commercial, informational, comparison, navigational. Informational and comparison keywords are excluded from refresh plans because they cannot produce local pack results (question-word prefixes require a trailing space to avoid false positives on names like `howard county`).
+
+- **Intent-prefixed keyword variants** — `iterateLocalCandidateSignals` yields up to 3 urgency/modifier variants per service-keyword page and content gap base. Variants follow `LOCAL_INTENT_PREFIXES` order: emergency first (`emergency X city`), open now (`open now X city`), best (`best X city`). Only emitted when the base keyword is transactional or commercial and a primary market city is configured.
+
+- **Per-source budget cap** — `applySourcePageCap()` caps non-explicit candidates from any single pagePath to 20% of the refresh budget. Explicit keywords (admin-pinned or client-requested) bypass the cap entirely. Prevents a single page from monopolizing the keyword selection budget on deep-content sites with many page-keyword assignments.
+
+- **Repeat competitor tracking** — `getLocalSeoCompetitorBrands()` aggregates 30-day snapshot history (`status=success`), counts appearances and wins per business name, and returns the top 10 competitors with `totalAppearances >= 2`. Surfaced as `RepeatCompetitorList` in non-compact `LocalSeoVisibilityPanel` only (not in the compact KCC summary strip). Types live in `shared/types/local-seo.ts` as `LocalSeoCompetitorBrand[]`.
+
+- **Service coverage gap detection** — `getLocalSeoServiceGaps()` compares active tracked keywords against `matchTerms` in the dental industry taxonomy (`server/service-taxonomy.ts`, 12 services). Uncovered services surface as an amber nudge section (`ServiceGapNudge`) in `LocalSeoMarketSetupDrawer` with copy-to-clipboard starter keyword suggestions. Taxonomy is industry-scoped: only fires for workspaces where the industry heuristic identifies dental practice context.
+
+**Files:** `server/local-seo.ts`; `server/service-taxonomy.ts`; `shared/types/local-seo.ts`; `src/components/local-seo/LocalSeoVisibilityPanel.tsx`; `src/components/local-seo/LocalSeoMarketSetupDrawer.tsx`; `tests/unit/local-seo.test.ts`; `tests/integration/local-seo-routes.test.ts`; `tests/component/LocalSeoVisibilityPanel.test.tsx`; `FEATURE_AUDIT.md`; `data/roadmap.json`.

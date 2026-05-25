@@ -58,7 +58,7 @@ const TECHNICAL_ACTION_TYPES: ActionType[] = [
   'meta_updated',
 ];
 
-type ScoredActionWithOutcome = {
+export type ScoredActionWithOutcome = {
   action: TrackedAction;
   outcome: ActionOutcome;
 };
@@ -71,13 +71,13 @@ function isStrongWin(score: ActionOutcome['score']): boolean {
   return score === 'strong_win';
 }
 
-function computeConfidence(count: number): LearningsConfidence {
+export function computeConfidence(count: number): LearningsConfidence {
   if (count >= 25) return 'high';
   if (count >= 10) return 'medium';
   return 'low';
 }
 
-function computeTrend(scoredItems: ScoredActionWithOutcome[]): LearningsTrend {
+export function computeTrend(scoredItems: ScoredActionWithOutcome[]): LearningsTrend {
   if (scoredItems.length < 6) return 'stable';
 
   // Sort by measured_at descending, compare recent half vs older half
@@ -98,7 +98,7 @@ function computeTrend(scoredItems: ScoredActionWithOutcome[]): LearningsTrend {
   return 'stable';
 }
 
-function computeWinRate(items: ScoredActionWithOutcome[]): number {
+export function computeWinRate(items: ScoredActionWithOutcome[]): number {
   if (items.length === 0) return 0;
   const wins = items.filter(x => isWin(x.outcome.score)).length;
   return Math.round((wins / items.length) * 100) / 100;
@@ -106,7 +106,7 @@ function computeWinRate(items: ScoredActionWithOutcome[]): number {
 
 // --- Content learnings ---
 
-function computeContentLearnings(items: ScoredActionWithOutcome[]): ContentLearnings | null {
+export function computeContentLearnings(items: ScoredActionWithOutcome[]): ContentLearnings | null {
   const contentItems = items.filter(x => CONTENT_ACTION_TYPES.includes(x.action.actionType));
   if (contentItems.length < 10) return null;
 
@@ -195,7 +195,7 @@ function computeContentLearnings(items: ScoredActionWithOutcome[]): ContentLearn
 
 // --- Strategy learnings ---
 
-function computeStrategyLearnings(items: ScoredActionWithOutcome[]): StrategyLearnings | null {
+export function computeStrategyLearnings(items: ScoredActionWithOutcome[]): StrategyLearnings | null {
   const strategyItems = items.filter(x => STRATEGY_ACTION_TYPES.includes(x.action.actionType));
   if (strategyItems.length < 10) return null;
 
@@ -280,7 +280,7 @@ function computeStrategyLearnings(items: ScoredActionWithOutcome[]): StrategyLea
 
 // --- Technical learnings ---
 
-function computeTechnicalLearnings(items: ScoredActionWithOutcome[]): TechnicalLearnings | null {
+export function computeTechnicalLearnings(items: ScoredActionWithOutcome[]): TechnicalLearnings | null {
   const techItems = items.filter(x => TECHNICAL_ACTION_TYPES.includes(x.action.actionType));
   if (techItems.length < 10) return null;
 
@@ -345,7 +345,7 @@ function computeTechnicalLearnings(items: ScoredActionWithOutcome[]): TechnicalL
 
 // --- Overall learnings ---
 
-function computeOverallLearnings(
+export function computeOverallLearnings(
   items: ScoredActionWithOutcome[]
 ): OverallLearnings {
   const totalWinRate = computeWinRate(items);

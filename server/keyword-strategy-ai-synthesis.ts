@@ -7,6 +7,7 @@ import { listPageKeywords } from './page-keywords.js';
 import { createLogger } from './logger.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
+import type { KeywordSourceEvidence } from '../shared/types/keywords.js';
 import type { KeywordStrategy, Workspace } from '../shared/types/workspace.js';
 import type { KeywordStrategyPageInfo } from './keyword-strategy-pages.js';
 import type { KeywordStrategySearchData } from './keyword-strategy-search-data.js';
@@ -17,9 +18,14 @@ import { filterBrandedKeywords, filterBrandedContentGaps, extractBrandTokens } f
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { isProgrammingError } from './errors.js';
 import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js';
+import { resolveWorkspaceLocationCode } from './local-seo.js';
 import { filterDeclinedFromPool } from './strategy-filters.js';
 import { buildWorkspaceIntelligence, formatPersonasForPrompt, formatKnowledgeBaseForPrompt, formatForPrompt } from './workspace-intelligence.js';
-import { buildStrategyIntelligenceBlock, getPagesNeedingAnalysis } from './keyword-strategy-helpers.js';
+import { withActiveLocalSeoSlice } from './intelligence/generation-context-builders.js';
+import { buildStrategyIntelligenceBlock, getPagesNeedingAnalysis, isStrategyQualityDiscoveryKeyword, isSuspiciousPlannerGroupedVolume, upsertKeywordPoolCandidate } from './keyword-strategy-helpers.js';
+import { buildOutcomeLearningStatusNote } from './outcome-learning-default-path.js';
+import { isStrategyPoolEligibleKeyword, normalizeKeyword, type KeywordEvaluationContext } from './keyword-intelligence/index.js';
+import { buildStrategyKeywordEvaluationContext } from './keyword-strategy-context.js';
 
 const log = createLogger('keyword-strategy:synthesis');
 
@@ -117,6 +123,7 @@ interface SynthesizeKeywordStrategyOptions {
   seoContext: string;
   domainKeywords: DomainKeyword[];
   keywordGaps: KeywordGapEntry[];
+  discoveryKeywords: KeywordSourceEvidence[];
   relatedKeywords: RelatedKeyword[];
   competitorKeywords: CompetitorKeywordData[];
   provider: SeoDataProvider | null;
@@ -128,6 +135,7 @@ export interface SynthesizeKeywordStrategyResult {
   pagesToAnalyze: KeywordStrategyPageInfo[];
   keywordPool: KeywordStrategyKeywordPool;
   businessSection: string;
+  keywordEvaluationContext: KeywordEvaluationContext;
   upToDate?: boolean;
   freshPageCount?: number;
 }
@@ -176,6 +184,7 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
     seoContext: semrushContext,
     domainKeywords: semrushDomainData,
     keywordGaps,
+    discoveryKeywords,
     relatedKeywords: relatedKws,
     competitorKeywords: competitorKeywordData,
     provider,
@@ -203,17 +212,27 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
   if (businessContext) {
     businessSection = `\nBUSINESS CONTEXT: ${businessContext}\n`;
   }
-  const strategyIntel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline'],
+  const strategySlices = await withActiveLocalSeoSlice(ws.id, ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline']);
+  const strategyIntel = await buildWorkspaceIntelligence(ws.id, { slices: strategySlices,
     learningsDomain: 'strategy',
   });
     const strategySeo = strategyIntel.seoContext;
     const kbBlock = formatKnowledgeBaseForPrompt(strategySeo?.knowledgeBase);
     const persBlock = formatPersonasForPrompt(strategySeo?.personas ?? []);
+    const localSeoBlock = formatForPrompt(strategyIntel, {
+      verbosity: 'standard',
+      sections: ['localSeo'],
+      tokenBudget: 1600,
+      learningsDomain: 'strategy',
+    });
     if (kbBlock) {
       businessSection += kbBlock + '\n';
     }
     if (persBlock) {
       businessSection += persBlock + '\n';
+    }
+    if (/##\s/.test(localSeoBlock)) {
+      businessSection += `${localSeoBlock}\nUse Local SEO evidence conservatively. It can shape local content/page posture, but do not treat local visibility as GSC rank tracking and do not imply provider checks ran during this strategy generation.\n`;
     }
 
     const clientSignals = strategyIntel.clientSignals;
@@ -265,7 +284,24 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
     if (learningsBlock) {
       businessSection += `\n\n${learningsBlock}\n`;
       log.info({ workspaceId: ws.id }, 'Injected workspace learnings into strategy prompt');
+    } else {
+      const learningsStatusNote = buildOutcomeLearningStatusNote(strategyIntel.learnings?.availability, 'strategy');
+      if (learningsStatusNote) {
+        businessSection += `\nOUTCOME LEARNING STATUS: ${learningsStatusNote}\n`;
+      }
     }
+
+    const strategyKeywordEvaluationContext = buildStrategyKeywordEvaluationContext({
+      workspaceId: ws.id,
+      workspaceName: ws.name,
+      businessContext,
+      seoContext: strategySeo,
+      clientSignals,
+      declinedKeywords,
+      requestedKeywords,
+      approvedKeywords,
+      strictBusinessFit: true,
+    });
 
     let strategy: StrategyOutput = {};
     // Hoisted out of the try-block so incremental-mode post-processing (below) can reference it.
@@ -289,7 +325,11 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
       if (pagesToAnalyze.length === 0) {
         log.info({ workspaceId: ws.id }, 'Incremental mode: all pages already fresh, skipping re-analysis');
         sendProgress('complete', 'All pages are already up to date — no re-analysis needed.', 1.0);
-        return { strategy: ws.keywordStrategy ?? null, upToDate: true, freshPageCount: pagesToPreserve.length, pagesToAnalyze, keywordPool, businessSection };
+        const currentStrategy = {
+          ...(ws.keywordStrategy ?? {}),
+          pageMap: existingPageKeywords,
+        } as StrategyOutput;
+        return { strategy: currentStrategy, upToDate: true, freshPageCount: pagesToPreserve.length, pagesToAnalyze, keywordPool, businessSection, keywordEvaluationContext: strategyKeywordEvaluationContext };
       }
     }
     // For AI batching we only process stale pages; preserved pages are merged back after.
@@ -318,69 +358,123 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
     let semrushBatchRef = '';
     const semrushByPath = new Map<string, typeof semrushDomainData>();
     // Populate keyword pool from ALL available data sources
+    const isEligibleStrategyPoolKeyword = (keyword: { keyword: string; volume?: number; difficulty?: number; cpc?: number; source?: string; sourceKind?: string }): boolean => {
+      const evaluation = isStrategyPoolEligibleKeyword(keyword, strategyKeywordEvaluationContext);
+      if (evaluation.suppressed) {
+        log.info({ workspaceId: ws.id, keyword: keyword.keyword, reasons: evaluation.reasons.map(reason => reason.message) }, 'Suppressed keyword pool candidate via shared keyword intelligence');
+        return false;
+      }
+      return true;
+    };
+    const isEligibleGeneratedKeyword = (keyword: string): boolean => {
+      const normalizedKeyword = normalizeKeyword(keyword);
+      const poolMatch = keywordPool.get(normalizedKeyword);
+      return isEligibleStrategyPoolKeyword({
+        keyword,
+        volume: poolMatch?.volume ?? 0,
+        difficulty: poolMatch?.difficulty ?? 0,
+        source: poolMatch?.source ?? 'ai_suggested',
+      });
+    };
+    let sanitizedProviderKeywordLines = 0;
+    const sanitizedProviderContext = semrushContext.split('\n').filter(line => {
+      const keywordMatch = line.match(/^\s*-\s*"([^"]+)"/);
+      if (!keywordMatch) return true;
+
+      const volumeMatch = line.match(/vol:\s*([\d,]+)/i);
+      const difficultyMatch = line.match(/KD:\s*([\d.]+)/i);
+      const keyword = keywordMatch[1];
+      const eligible = isEligibleStrategyPoolKeyword({
+        keyword,
+        volume: volumeMatch ? Number(volumeMatch[1].replace(/,/g, '')) : 0,
+        difficulty: difficultyMatch ? Number(difficultyMatch[1]) : 0,
+        source: 'provider_context',
+      });
+      if (eligible) sanitizedProviderKeywordLines++;
+      return eligible;
+    }).join('\n');
+    const eligibleKeywordGapCount = keywordGaps.filter(gap =>
+      isEligibleStrategyPoolKeyword({
+        keyword: gap.keyword,
+        volume: gap.volume,
+        difficulty: gap.difficulty,
+        source: `gap:${gap.competitorDomain}`,
+      })
+    ).length;
+
     if (semrushDomainData.length > 0) {
       // Group domain keywords by URL path for per-page matching
       for (const k of semrushDomainData) {
+        const eligible = isEligibleStrategyPoolKeyword({ keyword: k.keyword, volume: k.volume, difficulty: k.difficulty, source: provider?.name ?? 'seo-provider' });
+        if (!eligible) continue;
         try {
           const p = new URL(k.url).pathname;
           if (!semrushByPath.has(p)) semrushByPath.set(p, []);
           semrushByPath.get(p)!.push(k);
         } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* skip */ } // url-fetch-ok
-        keywordPool.set(k.keyword.toLowerCase(), { volume: k.volume, difficulty: k.difficulty, source: provider?.name ?? 'seo-provider' });
+        upsertKeywordPoolCandidate(keywordPool, k.keyword, { volume: k.volume, difficulty: k.difficulty, source: provider?.name ?? 'seo-provider' });
       }
     }
     // Add GSC queries to the pool (these are proven search terms)
     for (const r of gscData) {
-      const q = r.query.toLowerCase();
-      if (!keywordPool.has(q) && q.length > 3 && q.split(' ').length >= 2) {
-        keywordPool.set(q, { volume: r.impressions, difficulty: 0, source: 'gsc' });
+      const q = normalizeKeyword(r.query);
+      if (q.length > 3 && q.split(' ').length >= 2) {
+        upsertKeywordPoolCandidate(keywordPool, q, { volume: r.impressions, difficulty: 0, source: 'gsc' });
       }
     }
     // Add competitor keywords to the pool — these are proven industry terms with real volume
     for (const ck of competitorKeywordData) {
-      const kw = ck.keyword.toLowerCase();
-      if (!keywordPool.has(kw) && ck.volume > 0) {
-        keywordPool.set(kw, { volume: ck.volume, difficulty: ck.difficulty, source: `competitor:${ck.domain}` });
+      const kw = normalizeKeyword(ck.keyword);
+      if (ck.volume > 0 && isEligibleStrategyPoolKeyword({ keyword: kw, volume: ck.volume, difficulty: ck.difficulty, source: `competitor:${ck.domain}` })) {
+        upsertKeywordPoolCandidate(keywordPool, kw, { volume: ck.volume, difficulty: ck.difficulty, source: `competitor:${ck.domain}` });
       }
     }
     // Add keyword gaps to the pool — highest priority since competitors rank and you don't
     for (const gap of keywordGaps) {
-      const kw = gap.keyword.toLowerCase();
-      if (!keywordPool.has(kw) && gap.volume > 0) {
-        keywordPool.set(kw, { volume: gap.volume, difficulty: gap.difficulty, source: `gap:${gap.competitorDomain}` });
+      const kw = normalizeKeyword(gap.keyword);
+      if (gap.volume > 0 && isEligibleStrategyPoolKeyword({ keyword: kw, volume: gap.volume, difficulty: gap.difficulty, source: `gap:${gap.competitorDomain}` })) {
+        upsertKeywordPoolCandidate(keywordPool, kw, { volume: gap.volume, difficulty: gap.difficulty, source: `gap:${gap.competitorDomain}` });
+      }
+    }
+    // Add provider discovery keywords to the pool for sparse/low-footprint sites.
+    for (const dk of discoveryKeywords) {
+      const kw = normalizeKeyword(dk.keyword);
+      if (isStrategyQualityDiscoveryKeyword(dk) && isEligibleStrategyPoolKeyword(dk)) {
+        upsertKeywordPoolCandidate(keywordPool, kw, { volume: dk.volume, difficulty: dk.difficulty, source: `discovery:${dk.sourceKind}` });
       }
     }
     // Add related keywords to the pool
     for (const rk of relatedKws) {
-      const kw = rk.keyword.toLowerCase();
-      if (!keywordPool.has(kw) && rk.volume > 0) {
-        keywordPool.set(kw, { volume: rk.volume, difficulty: rk.difficulty, source: 'related' });
+      const kw = normalizeKeyword(rk.keyword);
+      if (rk.volume > 0 && isEligibleStrategyPoolKeyword({ keyword: kw, volume: rk.volume, difficulty: rk.difficulty, cpc: rk.cpc, source: 'related' })) {
+        upsertKeywordPoolCandidate(keywordPool, kw, { volume: rk.volume, difficulty: rk.difficulty, source: 'related' });
       }
     }
     // Add client-tracked keywords to the pool — these are keywords the client explicitly wants to target
     const clientTracked = getTrackedKeywords(ws.id);
     let clientKeywordsAdded = 0;
     for (const tk of clientTracked) {
-      const kw = tk.query.toLowerCase().trim();
-      if (!keywordPool.has(kw) && kw.length > 1) {
-        keywordPool.set(kw, { volume: 0, difficulty: 0, source: 'client' });
+      const kw = normalizeKeyword(tk.query);
+      if (kw.length > 1) {
+        const added = upsertKeywordPoolCandidate(keywordPool, kw, { volume: 0, difficulty: 0, source: 'client' });
+        if (!added) continue;
         clientKeywordsAdded++;
       }
     }
     // Add client-requested keywords to pool
     for (const kw of requestedKeywords) {
-      if (!keywordPool.has(kw.toLowerCase())) {
-        keywordPool.set(kw.toLowerCase(), { volume: 0, difficulty: 0, source: 'client' });
+      const added = upsertKeywordPoolCandidate(keywordPool, kw, { volume: 0, difficulty: 0, source: 'client' });
+      if (added) {
         clientKeywordsAdded++;
       }
     }
     // Filter branded competitor keywords from the pool BEFORE feeding to AI
     const brandedRemoved = filterBrandedKeywords(keywordPool, competitorDomains);
     // Hard filter: remove declined keywords before the AI sees the pool (prompt instruction is soft)
-    const declinedSet = new Set(declinedKeywords.map(k => k.toLowerCase()));
+    const declinedSet = new Set(declinedKeywords.map(k => normalizeKeyword(k)).filter(Boolean));
     const declinedPoolRemoved = filterDeclinedFromPool(keywordPool, declinedKeywords);
     if (declinedPoolRemoved > 0) log.info(`Removed ${declinedPoolRemoved} declined keywords from keyword pool`);
-    log.info(`Keyword pool: ${keywordPool.size} unique terms (${semrushDomainData.length} domain + ${competitorKeywordData.length} competitor + ${keywordGaps.length} gaps + ${clientKeywordsAdded} client + GSC)${brandedRemoved > 0 ? ` — removed ${brandedRemoved} branded competitor keywords` : ''}`);
+    log.info(`Keyword pool: ${keywordPool.size} unique terms (${semrushDomainData.length} domain + ${competitorKeywordData.length} competitor + ${keywordGaps.length} gaps + ${discoveryKeywords.length} discovery + ${clientKeywordsAdded} client + GSC)${brandedRemoved > 0 ? ` — removed ${brandedRemoved} branded competitor keywords` : ''}`);
     if (keywordPool.size > 0) {
       // Sort by volume descending and include ALL keywords
       const poolList = [...keywordPool.entries()]
@@ -410,6 +504,32 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
       secondaryMetrics?: { keyword: string; volume: number; difficulty: number }[];
       validated?: boolean;
       _parseError?: boolean;
+    };
+
+    const existingKeywordByPath = new Map(existingPageKeywords.map(pk => [pk.pagePath, pk]));
+    const pageInfoByPath = new Map(pageInfo.map(page => [page.path, page]));
+    const fallbackKeywordFromPageIdentity = (pagePath: string): string | null => {
+      const page = pageInfoByPath.get(pagePath);
+      const titleFallback = page?.seoTitle || page?.title;
+      const slugFallback = pagePath.split('/').filter(Boolean).join(' ');
+      const fallback = normalizeKeyword(titleFallback || slugFallback);
+      return fallback || null;
+    };
+    const findFallbackKeywordForPage = (pagePath: string): string | null => {
+      const existingKeyword = existingKeywordByPath.get(pagePath)?.primaryKeyword;
+      if (existingKeyword && isEligibleGeneratedKeyword(existingKeyword)) {
+        return existingKeyword;
+      }
+
+      const providerKeyword = [...(semrushByPath.get(pagePath) ?? [])]
+        .sort((a, b) => b.volume - a.volume)
+        .find(keyword => isEligibleGeneratedKeyword(keyword.keyword));
+      if (providerKeyword) return providerKeyword.keyword;
+
+      const gscKeyword = [...(gscByPath.get(pagePath) ?? [])]
+        .sort((a, b) => b.impressions - a.impressions)
+        .find(keyword => isEligibleGeneratedKeyword(keyword.query));
+      return gscKeyword?.query ?? fallbackKeywordFromPageIdentity(pagePath);
     };
 
     const runBatch = async (batch: typeof pageInfo, batchIdx: number): Promise<PageMapping[]> => {
@@ -481,8 +601,36 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
           if (pm.primaryKeyword) {
             pm.primaryKeyword = pm.primaryKeyword.replace(/\s*\(invented\)\s*$/i, '').trim();
           }
+          if (!Array.isArray(pm.secondaryKeywords)) {
+            pm.secondaryKeywords = [];
+          }
+          if (pm.secondaryKeywords?.length) {
+            pm.secondaryKeywords = pm.secondaryKeywords
+              .map(keyword => keyword.replace(/\s*\(invented\)\s*$/i, '').trim())
+              .filter(Boolean)
+              .filter(keyword => isEligibleGeneratedKeyword(keyword));
+          }
+          if (pm.primaryKeyword) {
+            const primaryEvaluation = isEligibleGeneratedKeyword(pm.primaryKeyword);
+            if (!primaryEvaluation) {
+              const promotedSecondary = pm.secondaryKeywords.shift();
+              if (promotedSecondary) {
+                pm.primaryKeyword = promotedSecondary;
+              } else {
+                const fallbackKeyword = findFallbackKeywordForPage(pm.pagePath);
+                if (fallbackKeyword) {
+                  pm.primaryKeyword = fallbackKeyword;
+                  pm.validated = false;
+                } else {
+                  pm.primaryKeyword = '';
+                  pm._parseError = true;
+                  continue;
+                }
+              }
+            }
+          }
           // Pre-enrich from pool — if the keyword is in our pool, apply the data now
-          const poolMatch = keywordPool.get(pm.primaryKeyword?.toLowerCase());
+          const poolMatch = keywordPool.get(normalizeKeyword(pm.primaryKeyword ?? ''));
           if (poolMatch && poolMatch.source !== 'gsc') {
             pm.volume = poolMatch.volume;
             pm.difficulty = poolMatch.difficulty;
@@ -516,8 +664,8 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
     // Filter out pages with parse errors and log warning
     const parseErrors = allPageMappings.filter((pm: { _parseError?: boolean }) => pm._parseError);
     if (parseErrors.length > 0) {
-      log.warn(`${parseErrors.length} pages had JSON parse errors and were assigned empty keywords`);
-      // Remove parse-error pages from the mappings
+      log.warn(`${parseErrors.length} pages had JSON parse or keyword validation errors and were assigned empty keywords`);
+      // Remove invalid pages from the mappings so empty primary keywords are not persisted.
       const validMappings = allPageMappings.filter((pm: { _parseError?: boolean }) => !pm._parseError);
       allPageMappings.length = 0;
       allPageMappings.push(...validMappings);
@@ -545,18 +693,18 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
     // --- Post-AI keyword validation via SEO provider bulk lookup ---
     // Optimization: check domain organic data + existing page_keywords before calling API
     if (provider && seoDataMode !== 'none') {
-      const domainKwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k])); // map-dup-ok
+      const domainKwLookup = new Map(semrushDomainData.map(k => [normalizeKeyword(k.keyword), k])); // map-dup-ok
       const existingPkLookup = new Map(
         listPageKeywords(ws.id)
-          .filter(pk => pk.volume && pk.volume > 0)
-          .map(pk => [pk.primaryKeyword.toLowerCase(), pk])
+          .filter(pk => pk.volume && pk.volume > 0 && !isSuspiciousPlannerGroupedVolume(pk.primaryKeyword, pk.volume))
+          .map(pk => [normalizeKeyword(pk.primaryKeyword), pk])
       );
 
       // First pass: enrich from already-fetched data (no API calls)
       const needsApiLookup: string[] = [];
       let preEnriched = 0;
       for (const pm of allPageMappings) {
-        const kwLower = pm.primaryKeyword?.toLowerCase();
+        const kwLower = normalizeKeyword(pm.primaryKeyword ?? '');
         if (!kwLower) continue;
         // Check domain organic data (already fetched this run)
         const domainHit = domainKwLookup.get(kwLower);
@@ -583,15 +731,23 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
       // Second pass: fetch remaining from provider API
       if (needsApiLookup.length > 0) {
         try {
-          const uniqueNeeds = [...new Set(needsApiLookup.map(k => k.toLowerCase()))];
-          const metrics = await provider.getKeywordMetrics(uniqueNeeds.slice(0, 100), ws.id);
-          const metricMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m])); // map-dup-ok
+          const uniqueNeedsByKey = new Map<string, string>();
+          for (const keyword of needsApiLookup) {
+            const key = normalizeKeyword(keyword);
+            if (key && !uniqueNeedsByKey.has(key)) {
+              uniqueNeedsByKey.set(key, keyword);
+            }
+          }
+          const uniqueNeeds = [...uniqueNeedsByKey.values()];
+          const locationCode = resolveWorkspaceLocationCode(ws.id) ?? undefined;
+          const metrics = await provider.getKeywordMetrics(uniqueNeeds.slice(0, 100), ws.id, undefined, locationCode);
+          const metricMap = new Map(metrics.map(m => [normalizeKeyword(m.keyword), m])); // map-dup-ok
 
           let unvalidated = 0;
           for (const pm of allPageMappings) {
             if (pm.validated != null) continue; // already handled
-            const m = metricMap.get(pm.primaryKeyword.toLowerCase());
-            if (m && m.volume > 0) {
+            const m = metricMap.get(normalizeKeyword(pm.primaryKeyword));
+            if (m && m.volume > 0 && !isSuspiciousPlannerGroupedVolume(m.keyword, m.volume)) {
               pm.validated = true;
               pm.volume = m.volume;
               pm.difficulty = m.difficulty;
@@ -615,7 +771,8 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
     // Detect keyword conflicts from batch results (batches don't know about each other)
     const kwCount = new Map<string, string[]>();
     for (const pm of allPageMappings) {
-      const kw = pm.primaryKeyword.toLowerCase();
+      const kw = normalizeKeyword(pm.primaryKeyword);
+      if (!kw) continue;
       if (!kwCount.has(kw)) kwCount.set(kw, []);
       kwCount.get(kw)!.push(pm.pagePath);
     }
@@ -742,7 +899,8 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
       } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* non-critical */ }
     }
 
-    const hasSemrush = semrushContext.length > 0;
+    const hasProviderContext = sanitizedProviderKeywordLines > 0;
+    const hasKeywordGaps = eligibleKeywordGapCount > 0;
     const conflictNote = conflicts.length > 0
       ? `\n\nKEYWORD CONFLICTS to resolve (same keyword assigned to multiple pages):\n${conflicts.map(([kw, pages]) => `- "${kw}" → ${pages.join(', ')}`).join('\n')}\nFor each conflict, include a fix in "keywordFixes" — reassign one page to a different keyword.\n`
       : '';
@@ -752,11 +910,21 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
     try {
       const insights = strategyIntel.insights?.all ?? [];
       if (insights.length > 0) {
+        const strategyEligibleInsights = insights.filter(insight => {
+          if (insight.insightType !== 'competitor_gap') return true;
+          const gapInsight = insight as AnalyticsInsight<'competitor_gap'>;
+          return isEligibleStrategyPoolKeyword({
+            keyword: gapInsight.data.keyword,
+            volume: gapInsight.data.volume,
+            difficulty: gapInsight.data.difficulty,
+            source: `insight_gap:${gapInsight.data.competitorDomain}`,
+          });
+        });
         const keywordClusters = insights
           .filter((i): i is AnalyticsInsight<'keyword_cluster'> => i.insightType === 'keyword_cluster')
           .map(i => i.data)
           .sort((a, b) => b.totalImpressions - a.totalImpressions);
-        const competitorGaps = insights
+        const competitorGaps = strategyEligibleInsights
           .filter((i): i is AnalyticsInsight<'competitor_gap'> => i.insightType === 'competitor_gap')
           .map(i => i.data)
           .sort((a, b) => b.volume - a.volume);
@@ -804,7 +972,7 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
         });
 
         // Append feedback-loop signals to give the AI real performance context
-        const stratSignals = buildStrategySignals(insights);
+        const stratSignals = buildStrategySignals(strategyEligibleInsights, { keywordEvaluationContext: strategyKeywordEvaluationContext });
         if (stratSignals.length > 0) {
           intelligenceBlock += `\n\nSTRATEGY SIGNALS (analytics feedback loop — use to prioritize recommendations):\n${stratSignals.slice(0, 10).map(s => `- [${s.type}] ${s.detail}`).join('\n')}`;
         }
@@ -816,7 +984,7 @@ ${businessSection}
 Current keyword assignments (${allPageMappings.length} pages):
 ${kwSummary}
 ${conflictNote}${gscSummary}${ga4Context}${auditContext}
-${semrushContext}${intelligenceBlock}
+${sanitizedProviderContext}${intelligenceBlock}
 
 Return JSON with this EXACT structure (do NOT include a pageMap — it's already done):
 {
@@ -848,7 +1016,7 @@ Return JSON with this EXACT structure (do NOT include a pageMap — it's already
 
 Rules:
 - siteKeywords: 8-15 broad themes covering the full site
-- contentGaps: 6-10 NEW pages/posts to create that DO NOT overlap with existing pages listed above. CRITICAL: Every targetKeyword MUST come from SEO provider/GSC data above when available — do NOT invent keywords. ${hasSemrush ? 'PRIORITIZE keywords from COMPETITOR KEYWORD GAPS — these are keywords competitors rank for that this site doesn\'t. For each gap backed by competitor data, include competitorProof citing which competitor ranks and at what position. At least 50% of content gaps should come from competitor gap data.' : ''}${clientKeywordsAdded > 0 ? ` CLIENT-REQUESTED KEYWORDS get HIGH PRIORITY: if any client-requested keyword from the pool has no existing page covering it, it MUST appear as a content gap. The client specifically wants to rank for these terms.` : ''} Before suggesting a content gap, verify no current page already targets that keyword or covers that topic. If an existing page is thin or weak on a topic, suggest it as a quickWin improvement instead of creating a competing new page. Vary intent (informational, commercial, transactional). Mix high and medium priority
+- contentGaps: 6-10 NEW pages/posts to create that DO NOT overlap with existing pages listed above. CRITICAL: Every targetKeyword MUST come from SEO provider/GSC data above when available — do NOT invent keywords. ${hasKeywordGaps ? 'PRIORITIZE keywords from COMPETITOR KEYWORD GAPS — these are keywords competitors rank for that this site doesn\'t. For each gap backed by competitor data, include competitorProof citing which competitor ranks and at what position. At least 50% of content gaps should come from competitor gap data.' : ''}${clientKeywordsAdded > 0 ? ` CLIENT-REQUESTED KEYWORDS get HIGH PRIORITY: if any client-requested keyword from the pool has no existing page covering it, it MUST appear as a content gap. The client specifically wants to rank for these terms.` : ''} Before suggesting a content gap, verify no current page already targets that keyword or covers that topic. If an existing page is thin or weak on a topic, suggest it as a quickWin improvement instead of creating a competing new page. Vary intent (informational, commercial, transactional). Mix high and medium priority
 - suggestedPageType: Choose the best page type for each content gap. Use "blog" for informational articles, "landing" for conversion pages, "service" for service descriptions, "location" for local SEO, "product" for product pages, "pillar" for topic hubs, "resource" for guides/downloads.
 - quickWins: 3-5 existing pages where small changes boost rankings. Use GSC data if available (high impressions + poor position = opportunity).
 - If DEVICE BREAKDOWN shows mobile ranking gaps, include a mobile-optimization quick win.
@@ -859,7 +1027,7 @@ Rules:
 - If TOP CONVERTING PAGES data is available, mention specific conversion events in quickWin rationales (e.g., "this page drives 15 form_submissions — fixing its meta description could increase CTR").
 - If SEO AUDIT data shows high-traffic pages with errors, include them as quickWins with specific fix actions.
 - If COUNTRY data shows a dominant market, consider location-specific content gaps.
-${hasSemrush ? '- Use SEO provider data to inform priorities. KD < 40% = quick wins.' : ''}
+${hasProviderContext ? '- Use SEO provider data to inform priorities. KD < 40% = quick wins.' : ''}
 ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a competitor's brand name. Competitor domains are used to identify topic areas and intent gaps — NOT to recommend branded searches that funnel users to a competitor. Specifically, do NOT include keywords containing any of these brand tokens: ${[...new Set(competitorDomains.flatMap(d => extractBrandTokens(d)))].join(', ')}. If a keyword gap came from competitor data but contains a competitor brand name, skip it and find the next best non-branded gap.` : '- NEVER suggest branded competitor keywords — keywords containing a competitor\'s company or product name. Use competitor data to find topic areas, not to recommend searches that drive users to a competitor.'}
 - Return ONLY valid JSON, no markdown`;
 
@@ -887,11 +1055,21 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
     // Apply keyword conflict fixes from master
     if (masterData.keywordFixes?.length) {
       const fixMap = new Map(masterData.keywordFixes.map((f: { pagePath: string; newPrimaryKeyword: string }) => [f.pagePath, f.newPrimaryKeyword]));
+      let appliedFixes = 0;
+      let suppressedFixes = 0;
       for (const pm of allPageMappings) {
         const fix = fixMap.get(pm.pagePath);
-        if (fix) pm.primaryKeyword = fix as string;
+        if (fix && isEligibleGeneratedKeyword(fix as string)) {
+          pm.primaryKeyword = fix as string;
+          appliedFixes++;
+        } else if (fix) {
+          suppressedFixes++;
+        }
       }
-      log.info(`Applied ${masterData.keywordFixes.length} keyword conflict fixes`);
+      log.info(`Applied ${appliedFixes} keyword conflict fixes`);
+      if (suppressedFixes > 0) {
+        log.info(`Suppressed ${suppressedFixes} keyword conflict fixes via shared keyword intelligence`);
+      }
     }
 
     // Post-generation hard filter: remove declined keywords from siteKeywords.
@@ -899,11 +1077,19 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
     if (declinedKeywords.length > 0 && masterData.siteKeywords?.length) {
       const before = masterData.siteKeywords.length;
       masterData.siteKeywords = masterData.siteKeywords.filter(
-        (kw: string) => !declinedSet.has(kw.toLowerCase())
+        (kw: string) => !declinedSet.has(normalizeKeyword(kw))
       );
       const declinedSiteKwsRemoved = before - masterData.siteKeywords.length;
       if (declinedSiteKwsRemoved > 0) {
         log.info(`Stripped ${declinedSiteKwsRemoved} declined keywords from siteKeywords despite prompt instruction`);
+      }
+    }
+    if (masterData.siteKeywords?.length) {
+      const beforeSharedFilter = masterData.siteKeywords.length;
+      masterData.siteKeywords = masterData.siteKeywords.filter((kw: string) => isEligibleGeneratedKeyword(kw));
+      const sharedSiteKwsRemoved = beforeSharedFilter - masterData.siteKeywords.length;
+      if (sharedSiteKwsRemoved > 0) {
+        log.info(`Stripped ${sharedSiteKwsRemoved} site keywords via shared keyword intelligence`);
       }
     }
 
@@ -920,11 +1106,21 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
     if (declinedKeywords.length > 0 && cleanContentGaps.length > 0) {
       finalContentGaps = cleanContentGaps.filter(
         (cg: { targetKeyword?: string }) =>
-          !cg.targetKeyword || !declinedSet.has(cg.targetKeyword.toLowerCase())
+          !cg.targetKeyword || !declinedSet.has(normalizeKeyword(cg.targetKeyword))
       );
       const declinedGapsRemoved = cleanContentGaps.length - finalContentGaps.length;
       if (declinedGapsRemoved > 0) {
         log.info(`Stripped ${declinedGapsRemoved} declined content gaps despite prompt instruction`);
+      }
+    }
+    if (finalContentGaps.length > 0) {
+      const beforeSharedFilter = finalContentGaps.length;
+      finalContentGaps = finalContentGaps.filter((cg: { targetKeyword?: string }) =>
+        !cg.targetKeyword || isEligibleGeneratedKeyword(cg.targetKeyword)
+      );
+      const sharedFilterRemoved = beforeSharedFilter - finalContentGaps.length;
+      if (sharedFilterRemoved > 0) {
+        log.info(`Stripped ${sharedFilterRemoved} content gaps via shared keyword intelligence`);
       }
     }
 
@@ -939,17 +1135,248 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
     // Post-generation: hard filter declined keywords from pageMap assignments
     if (declinedKeywords.length > 0 && strategy.pageMap?.length) {
       for (const pm of strategy.pageMap) {
-        if (pm.primaryKeyword && declinedSet.has(pm.primaryKeyword.toLowerCase())) {
+        if (pm.primaryKeyword && declinedSet.has(normalizeKeyword(pm.primaryKeyword))) {
           pm.primaryKeyword = '';
         }
         if (pm.secondaryKeywords?.length) {
           pm.secondaryKeywords = pm.secondaryKeywords.filter(
-            (k: string) => !declinedSet.has(k.toLowerCase())
+            (k: string) => !declinedSet.has(normalizeKeyword(k))
           );
         }
       }
     }
     log.info(`Final strategy: ${strategy.pageMap?.length ?? 0} pages, ${strategy.siteKeywords?.length ?? 0} site keywords, ${strategy.contentGaps?.length ?? 0} content gaps, ${strategy.quickWins?.length ?? 0} quick wins`);
 
-  return { strategy, pagesToAnalyze, keywordPool, businessSection };
+  return { strategy, pagesToAnalyze, keywordPool, businessSection, keywordEvaluationContext: strategyKeywordEvaluationContext };
+}
+
+// ---------------------------------------------------------------------------
+// Pure helper functions — exported for unit testing
+// These are extracted data-transformation utilities with no AI/DB side-effects.
+// ---------------------------------------------------------------------------
+
+/**
+ * Render the keyword pool into a prompt reference block for batch page analysis.
+ * Returns an empty string when the pool is empty.
+ */
+export function buildKeywordPoolSection(
+  pool: Map<string, { volume: number; difficulty: number; source: string }>,
+  maxKeywords = 200,
+): string {
+  if (pool.size === 0) return '';
+  const poolList = [...pool.entries()]
+    .sort((a, b) => b[1].volume - a[1].volume)
+    .slice(0, maxKeywords)
+    .map(([kw, m]) => `"${kw}" (${m.volume}/mo${m.difficulty ? ` KD:${m.difficulty}%` : ''})`)
+    .join(', ');
+  const clientKws = [...pool.entries()]
+    .filter(([, m]) => m.source === 'client')
+    .map(([kw]) => `"${kw}"`);
+  const clientNote =
+    clientKws.length > 0
+      ? `\n\nCLIENT-REQUESTED KEYWORDS — The client specifically wants to target these keywords. Give them PRIORITY when assigning to relevant pages, and ensure they appear in content gap suggestions if no existing page covers them:\n${clientKws.join(', ')}`
+      : '';
+  return `\n\nKEYWORD POOL — VERIFIED search terms with real volume. You MUST pick primaryKeyword from this list when a reasonable match exists for the page topic. Only invent a new keyword if NONE of these are relevant:\n${poolList}${clientNote}`;
+}
+
+/**
+ * Detect primary keyword conflicts: multiple pages assigned the same keyword.
+ * Returns an array of [normalizedKeyword, pagePaths[]] pairs where len > 1.
+ */
+export function detectKeywordConflicts(
+  pageMappings: Array<{ pagePath: string; primaryKeyword: string }>,
+  normalize: (kw: string) => string,
+): Array<[string, string[]]> {
+  const kwCount = new Map<string, string[]>();
+  for (const pm of pageMappings) {
+    const kw = normalize(pm.primaryKeyword);
+    if (!kw) continue;
+    if (!kwCount.has(kw)) kwCount.set(kw, []);
+    kwCount.get(kw)!.push(pm.pagePath);
+  }
+  return [...kwCount.entries()].filter(([, pages]) => pages.length > 1);
+}
+
+/**
+ * Build the keyword conflict resolution note appended to the master prompt.
+ * Returns an empty string when there are no conflicts.
+ */
+export function buildConflictNote(conflicts: Array<[string, string[]]>): string {
+  if (conflicts.length === 0) return '';
+  return (
+    `\n\nKEYWORD CONFLICTS to resolve (same keyword assigned to multiple pages):\n` +
+    conflicts.map(([kw, pages]) => `- "${kw}" → ${pages.join(', ')}`).join('\n') +
+    `\nFor each conflict, include a fix in "keywordFixes" — reassign one page to a different keyword.\n`
+  );
+}
+
+/**
+ * Build a one-line keyword assignment summary entry for the master prompt.
+ */
+export function buildKeywordSummaryLine(pagePath: string, primaryKeyword: string): string {
+  return `${pagePath}: "${primaryKeyword}"`;
+}
+
+/**
+ * Build a fallback primary keyword from page identity (title or URL slug).
+ * Returns null when no non-empty string can be derived.
+ */
+export function buildFallbackKeywordFromPageIdentity(
+  pagePath: string,
+  page: { seoTitle?: string | null; title?: string | null } | undefined,
+  normalizer: (kw: string) => string,
+): string | null {
+  const titleFallback = page?.seoTitle || page?.title;
+  const slugFallback = pagePath.split('/').filter(Boolean).join(' ');
+  const fallback = normalizer(titleFallback || slugFallback);
+  return fallback || null;
+}
+
+/**
+ * Format a period comparison (last 28 days vs previous 28 days) into a prompt block.
+ * Returns an empty string when `periodComparison` is null/undefined.
+ */
+export function buildPeriodComparisonBlock(
+  periodComparison: {
+    change: { clicks: number; impressions: number; position: number };
+    changePercent: { clicks: number; impressions: number; position: number };
+  } | null | undefined,
+): string {
+  if (!periodComparison) return '';
+  const { change, changePercent } = periodComparison;
+  const posLabel =
+    change.position > 0 ? 'declining ⚠️' : change.position < 0 ? 'improving ✓' : 'stable';
+  return (
+    `\n\nPERIOD COMPARISON (last 28 days vs previous 28 days):\n` +
+    `- Clicks: ${change.clicks >= 0 ? '+' : ''}${change.clicks} (${changePercent.clicks >= 0 ? '+' : ''}${changePercent.clicks}%)\n` +
+    `- Impressions: ${change.impressions >= 0 ? '+' : ''}${change.impressions} (${changePercent.impressions >= 0 ? '+' : ''}${changePercent.impressions}%)\n` +
+    `- Avg Position: ${change.position >= 0 ? '+' : ''}${change.position} (${posLabel})`
+  );
+}
+
+/**
+ * Format top GSC queries into a prompt block (sorted by impressions descending, top 30).
+ * Returns an empty string when `gscRows` is empty.
+ */
+export function buildGscQueriesBlock(
+  gscRows: Array<{ page: string; query: string; position: number; clicks: number; impressions: number }>,
+): string {
+  if (gscRows.length === 0) return '';
+  const top = [...gscRows].sort((a, b) => b.impressions - a.impressions).slice(0, 30);
+  const lines = top.map(r => {
+    let pagePath: string;
+    try {
+      pagePath = new URL(r.page).pathname;
+    } catch { // catch-ok: invalid URL falls back to raw string
+      pagePath = r.page;
+    }
+    return `- "${r.query}" → ${pagePath} (pos: ${r.position.toFixed(1)}, clicks: ${r.clicks}, imp: ${r.impressions})`;
+  });
+  return `\n\nTop GSC queries (last 90 days):\n` + lines.join('\n');
+}
+
+/**
+ * Format the device breakdown section and optionally append a mobile-gap warning.
+ * Returns an empty string when `deviceBreakdown` is empty.
+ */
+export function buildDeviceBreakdownBlock(
+  deviceBreakdown: Array<{ device: string; clicks: number; impressions: number; ctr: number; position: number }>,
+): string {
+  if (deviceBreakdown.length === 0) return '';
+  let out =
+    `\n\nDEVICE BREAKDOWN (last 28 days):\n` +
+    deviceBreakdown
+      .map(d => `- ${d.device}: ${d.clicks} clicks, ${d.impressions} imp, CTR ${d.ctr}%, avg pos ${d.position}`)
+      .join('\n');
+  const mobile = deviceBreakdown.find(d => d.device === 'MOBILE');
+  const desktop = deviceBreakdown.find(d => d.device === 'DESKTOP');
+  if (
+    mobile &&
+    desktop &&
+    mobile.impressions > desktop.impressions &&
+    mobile.position > desktop.position + 2
+  ) {
+    out += `\n⚠️ MOBILE GAP: Mobile has ${mobile.impressions} imp vs desktop ${desktop.impressions} but avg position is ${mobile.position.toFixed(1)} vs ${desktop.position.toFixed(1)} — mobile optimization is critical.`;
+  }
+  return out;
+}
+
+/**
+ * Format the country breakdown section (top 5 countries by clicks).
+ * Returns an empty string when `countryBreakdown` is empty.
+ */
+export function buildCountryBreakdownBlock(
+  countryBreakdown: Array<{ country: string; clicks: number; impressions: number; position: number }>,
+): string {
+  if (countryBreakdown.length === 0) return '';
+  return (
+    `\n\nTOP COUNTRIES by clicks:\n` +
+    countryBreakdown
+      .slice(0, 5)
+      .map(c => `- ${c.country}: ${c.clicks} clicks, ${c.impressions} imp, pos ${c.position}`)
+      .join('\n')
+  );
+}
+
+/**
+ * Detect unmapped organic landing pages (pages with GA4 organic traffic but no page map entry).
+ */
+export function findUnmappedLandingPages<T extends { landingPage: string }>(
+  organicLandingPages: T[],
+  mappedPaths: Set<string>,
+): T[] {
+  return organicLandingPages.filter(lp => !mappedPaths.has(lp.landingPage));
+}
+
+/**
+ * Filter high-bounce organic landing pages (bounce > 70% AND sessions > 5).
+ */
+export function findHighBounceLandingPages<T extends { landingPage: string; bounceRate: number; sessions: number }>(
+  organicLandingPages: T[],
+): T[] {
+  return organicLandingPages.filter(lp => lp.bounceRate > 70 && lp.sessions > 5);
+}
+
+/**
+ * Filter declined keywords from a siteKeywords list using a pre-built declined set.
+ * Returns the filtered list (does not mutate the input array).
+ */
+export function filterDeclinedSiteKeywords(
+  siteKeywords: string[],
+  declinedSet: Set<string>,
+  normalize: (kw: string) => string,
+): string[] {
+  return siteKeywords.filter(kw => !declinedSet.has(normalize(kw)));
+}
+
+/**
+ * Filter declined keywords from content gap targets.
+ * Returns only content gaps whose `targetKeyword` is not in the declined set.
+ */
+export function filterDeclinedContentGaps<T extends { targetKeyword?: string }>(
+  contentGaps: T[],
+  declinedSet: Set<string>,
+  normalize: (kw: string) => string,
+): T[] {
+  return contentGaps.filter(cg => !cg.targetKeyword || !declinedSet.has(normalize(cg.targetKeyword)));
+}
+
+/**
+ * Find the top converting page for each path from a list of page+event records.
+ * Returns [pagePath, { events, topEvent }][] sorted by event count descending, limited to top N.
+ */
+export function buildTopConvertingPages(
+  ga4EventsByPage: Array<{ pagePath: string; eventName: string; eventCount: number }>,
+  limit = 8,
+): Array<[string, { events: number; topEvent: string }]> {
+  const pageEvents = new Map<string, { events: number; topEvent: string }>();
+  for (const ep of ga4EventsByPage) {
+    const existing = pageEvents.get(ep.pagePath);
+    if (!existing || ep.eventCount > existing.events) {
+      pageEvents.set(ep.pagePath, { events: ep.eventCount, topEvent: ep.eventName });
+    }
+  }
+  return [...pageEvents.entries()]
+    .sort((a, b) => b[1].events - a[1].events)
+    .slice(0, limit);
 }

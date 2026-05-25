@@ -23,6 +23,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { WebSocket } from 'ws';
 import { createTestContext } from './helpers.js';
+import { expectNoLocalSeoClientBoundaryFields } from '../helpers/local-seo-client-boundary.js';
 import {
   createWorkspace,
   updateWorkspace,
@@ -37,6 +38,7 @@ import { replaceAllTopicClusters, deleteAllTopicClusters } from '../../server/to
 import { replaceAllCannibalizationIssues, deleteAllCannibalizationIssues } from '../../server/cannibalization-issues.js';
 import { getTrackedKeywords } from '../../server/rank-tracking.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
+import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 import type { KeywordStrategy, ContentGap, QuickWin, PageKeywordMap, TopicCluster, CannibalizationItem } from '../../shared/types/workspace.js';
 
 // ── Port — unique across all integration tests ─────────────────────────────
@@ -360,6 +362,32 @@ describe('GET /api/public/seo-strategy — happy path', () => {
     expect(Array.isArray(body.contentGaps)).toBe(true);
     expect(Array.isArray(body.quickWins)).toBe(true);
     expect(Array.isArray(body.pageMap)).toBe(true);
+  });
+
+  it('response includes optional strategy UX explanations without raw competitor evidence', async () => {
+    const res = await api(`/api/public/seo-strategy/${strategyWsId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(body.strategyUx).toBeDefined();
+    expect(body.strategyUx.refreshSummary).toEqual(expect.objectContaining({
+      currentGeneratedAt: expect.any(String),
+      added: expect.any(Number),
+      newContentGaps: expect.any(Number),
+    }));
+    expect(Array.isArray(body.strategyUx.explanations)).toBe(true);
+    expect(body.strategyUx.explanations.length).toBeGreaterThan(0);
+    expect(body.strategyUx.explanations.filter((explanation: { rawEvidenceOnly?: boolean }) => explanation.rawEvidenceOnly)).toEqual([]);
+    expect(body.strategyUx.explanations.some((explanation: { role?: string }) => explanation.role === 'competitor_gap')).toBe(false);
+    expect(body.strategyUx.rawEvidenceNote).toBeUndefined();
+    expect(body.strategyUx.explanations[0]).toEqual(expect.objectContaining({
+      keyword: expect.any(String),
+      normalizedKeyword: expect.any(String),
+      nextAction: expect.objectContaining({
+        type: expect.any(String),
+        label: expect.any(String),
+      }),
+    }));
   });
 
   it('siteKeywords array is non-empty and preserves seeded values', async () => {
@@ -710,6 +738,17 @@ describe('GET /api/public/seo-strategy — brand keyword filtering', () => {
     expect(body.decayingPages).toBeUndefined();
   });
 
+  it('response does not expose Local SEO internals while client rollout is deferred', async () => {
+    const res = await api(`/api/public/seo-strategy/${brandWsId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+
+    expectNoLocalSeoClientBoundaryFields(body, 'public strategy response');
+    if (body.strategyUx && typeof body.strategyUx === 'object') {
+      expectNoLocalSeoClientBoundaryFields(body.strategyUx as Record<string, unknown>, 'public strategy UX payload');
+    }
+  });
+
   it('response exposes competitorDomains field as businessContext only, not raw domains', async () => {
     const res = await api(`/api/public/seo-strategy/${brandWsId}`);
     expect(res.status).toBe(200);
@@ -937,13 +976,13 @@ describe('POST /api/public/keyword-feedback — submit feedback', () => {
 
   it('successfully approves a keyword and persists to DB', async () => {
     const res = await postJson(`/api/public/keyword-feedback/${feedbackWsId}`, {
-      keyword: 'seo audit tool',
+      keyword: 'SEO Audit Tool - Near-Me',
       status: 'approved',
       source: 'content_gap',
     });
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.keyword).toBe('seo audit tool');
+    expect(body.keyword).toBe('seo audit tool near me');
     expect(body.status).toBe('approved');
 
     // Verify persistence via GET
@@ -951,12 +990,12 @@ describe('POST /api/public/keyword-feedback — submit feedback', () => {
     expect(listRes.status).toBe(200);
     const list = await listRes.json();
     expect(list.length).toBeGreaterThan(0);
-    const stored = list.find((r: { keyword: string }) => r.keyword === 'seo audit tool');
+    const stored = list.find((r: { keyword: string }) => r.keyword === 'seo audit tool near me');
     expect(stored).toBeDefined();
     expect(stored.status).toBe('approved');
 
     const tracked = getTrackedKeywords(feedbackWsId);
-    expect(tracked.some(item => item.query === 'seo audit tool')).toBe(true);
+    expect(tracked.some(item => item.query === 'SEO Audit Tool - Near-Me')).toBe(true);
   });
 
   it('successfully declines a keyword with a reason', async () => {
@@ -986,7 +1025,7 @@ describe('POST /api/public/keyword-feedback — submit feedback', () => {
   });
 
   it('upserts on conflict — second submission for same keyword updates status', async () => {
-    const keyword = 'upsert-test-keyword-' + Date.now();
+    const keyword = 'Upsert Test Keyword - Near-Me ' + Date.now();
 
     // First submission: approve
     const first = await postJson(`/api/public/keyword-feedback/${feedbackWsId}`, {
@@ -1008,7 +1047,7 @@ describe('POST /api/public/keyword-feedback — submit feedback', () => {
     // Verify only one row exists (no duplicates)
     const listRes = await api(`/api/public/keyword-feedback/${feedbackWsId}`);
     const list = await listRes.json();
-    const matches = list.filter((r: { keyword: string }) => r.keyword === keyword.toLowerCase());
+    const matches = list.filter((r: { keyword: string }) => r.keyword === keywordComparisonKey(keyword));
     expect(matches.length).toBe(1);
     expect(matches[0].status).toBe('declined');
   });
@@ -1104,7 +1143,7 @@ describe('POST /api/public/keyword-feedback/bulk — batch feedback', () => {
   it('persists all valid keywords in the batch', async () => {
     const res = await postJson(`/api/public/keyword-feedback/${bulkWsId}/bulk`, {
       keywords: [
-        { keyword: 'bulk keyword alpha', status: 'approved', source: 'content_gap' },
+        { keyword: 'Bulk Keyword Alpha - Near-Me', status: 'approved', source: 'content_gap' },
         { keyword: 'bulk keyword beta', status: 'declined', reason: 'Off-brand', source: 'content_gap' },
         { keyword: 'bulk keyword gamma', status: 'requested', source: 'page_map' },
       ],
@@ -1118,7 +1157,7 @@ describe('POST /api/public/keyword-feedback/bulk — batch feedback', () => {
     const list = await listRes.json();
     expect(list.length).toBeGreaterThan(0);
 
-    const alphaRow = list.find((r: { keyword: string }) => r.keyword === 'bulk keyword alpha');
+    const alphaRow = list.find((r: { keyword: string }) => r.keyword === 'bulk keyword alpha near me');
     const betaRow = list.find((r: { keyword: string }) => r.keyword === 'bulk keyword beta');
     const gammaRow = list.find((r: { keyword: string }) => r.keyword === 'bulk keyword gamma');
 
@@ -1132,7 +1171,7 @@ describe('POST /api/public/keyword-feedback/bulk — batch feedback', () => {
     expect(gammaRow.status).toBe('requested');
 
     const tracked = getTrackedKeywords(bulkWsId);
-    expect(tracked.some(item => item.query === 'bulk keyword alpha')).toBe(true);
+    expect(tracked.some(item => item.query === 'Bulk Keyword Alpha - Near-Me')).toBe(true);
     expect(tracked.some(item => item.query === 'bulk keyword beta')).toBe(false);
     expect(tracked.some(item => item.query === 'bulk keyword gamma')).toBe(false);
   });

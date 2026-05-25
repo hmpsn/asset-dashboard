@@ -3,6 +3,7 @@ import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import {
   getPageKeyword,
   listPageKeywords,
+  upsertAndCleanPageKeywords,
   upsertPageKeyword,
 } from '../../server/page-keywords.js';
 import { METRICS_SOURCE } from '../../shared/types/keywords.js';
@@ -57,6 +58,107 @@ describe('Page Intelligence strategy blend — upsertPageKeywordsBatch safety', 
     // Strategy fields also present
     expect(result!.metricsSource).toBe(METRICS_SOURCE.BULK_LOOKUP);
     expect(result!.volume).toBe(1200);
+  });
+
+  it('updates strategy freshness during same-keyword refresh while preserving Page Intelligence fields', () => {
+    upsertPageKeyword(wsId, {
+      pagePath: '/services/same-keyword-refresh',
+      pageTitle: 'Same Keyword Refresh',
+      primaryKeyword: 'same keyword',
+      secondaryKeywords: [],
+      optimizationScore: 84,
+      optimizationIssues: ['Old issue'],
+      analysisGeneratedAt: '2026-04-03T10:00:00Z',
+    });
+
+    upsertPageKeyword(wsId, {
+      pagePath: '/services/same-keyword-refresh',
+      pageTitle: 'Same Keyword Refresh',
+      primaryKeyword: 'same keyword',
+      secondaryKeywords: [],
+      metricsSource: METRICS_SOURCE.BULK_LOOKUP,
+      volume: 1400,
+      difficulty: 37,
+      analysisGeneratedAt: '2026-05-19T10:00:00Z',
+    });
+
+    const result = getPageKeyword(wsId, '/services/same-keyword-refresh');
+    expect(result?.optimizationScore).toBe(84);
+    expect(result?.optimizationIssues).toEqual(['Old issue']);
+    expect(result?.analysisGeneratedAt).toBe('2026-05-19T10:00:00Z');
+    expect(result?.volume).toBe(1400);
+  });
+
+  it('clears persisted Page Intelligence fields when strategy changes the primary keyword', () => {
+    upsertPageKeyword(wsId, {
+      pagePath: '/services/changed-keyword',
+      pageTitle: 'Changed Keyword',
+      primaryKeyword: 'old service keyword',
+      secondaryKeywords: [],
+      optimizationScore: 88,
+      analysisGeneratedAt: '2026-04-02T10:00:00Z',
+    });
+
+    upsertPageKeyword(wsId, {
+      pagePath: '/services/changed-keyword',
+      pageTitle: 'Changed Keyword',
+      primaryKeyword: 'old service keyword',
+      secondaryKeywords: [],
+      optimizationScore: 82,
+      optimizationIssues: ['Old keyword title mismatch'],
+      recommendations: ['Rewrite around old keyword'],
+      contentGaps: ['Old supporting topic'],
+      analysisGeneratedAt: '2026-04-01T10:00:00Z',
+      serpFeatures: ['featured_snippet'],
+    });
+
+    upsertPageKeyword(wsId, {
+      pagePath: '/services/changed-keyword',
+      pageTitle: 'Changed Keyword',
+      primaryKeyword: 'new service keyword',
+      secondaryKeywords: [],
+      metricsSource: METRICS_SOURCE.BULK_LOOKUP,
+      volume: 900,
+      difficulty: 32,
+    });
+
+    const result = getPageKeyword(wsId, '/services/changed-keyword');
+    expect(result?.primaryKeyword).toBe('new service keyword');
+    expect(result?.optimizationScore).toBeUndefined();
+    expect(result?.optimizationIssues).toBeUndefined();
+    expect(result?.recommendations).toBeUndefined();
+    expect(result?.contentGaps).toBeUndefined();
+    expect(result?.analysisGeneratedAt).toBeUndefined();
+    expect(result?.serpFeatures).toBeUndefined();
+    expect(result?.optimizationScoreHistory).toBeUndefined();
+  });
+
+  it('clears score history when a full strategy cleanup removes all page mappings', () => {
+    const ws = createWorkspace('PI Empty Cleanup Test');
+    try {
+      upsertPageKeyword(ws.id, {
+        pagePath: '/services/empty-cleanup',
+        pageTitle: 'Empty Cleanup',
+        primaryKeyword: 'cleanup keyword',
+        secondaryKeywords: [],
+        optimizationScore: 91,
+        analysisGeneratedAt: '2026-04-04T10:00:00Z',
+      });
+
+      upsertAndCleanPageKeywords(ws.id, []);
+      upsertPageKeyword(ws.id, {
+        pagePath: '/services/empty-cleanup',
+        pageTitle: 'Empty Cleanup',
+        primaryKeyword: 'new cleanup keyword',
+        secondaryKeywords: [],
+      });
+
+      const result = getPageKeyword(ws.id, '/services/empty-cleanup');
+      expect(result?.primaryKeyword).toBe('new cleanup keyword');
+      expect(result?.optimizationScoreHistory).toBeUndefined();
+    } finally {
+      deleteWorkspace(ws.id);
+    }
   });
 
   it('metricsSource written by strategy is bulk_lookup (valid MetricsSource)', () => {

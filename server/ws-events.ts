@@ -125,6 +125,10 @@ export const WS_EVENTS = {
 
   // Keyword Strategy
   STRATEGY_UPDATED: 'strategy:updated',
+  RANK_TRACKING_UPDATED: 'rank-tracking:updated',
+
+  // Local SEO
+  LOCAL_SEO_UPDATED: 'local-seo:updated',
 } as const;
 
 export type WsEventName = typeof WS_EVENTS[keyof typeof WS_EVENTS];

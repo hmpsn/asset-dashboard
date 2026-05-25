@@ -24,6 +24,7 @@ import { assembleSiteHealth } from './intelligence/site-health-slice.js';
 import { assembleClientSignals } from './intelligence/client-signals-slice.js';
 import { assembleOperational } from './intelligence/operational-slice.js';
 import { assemblePageProfile } from './intelligence/page-profile-slice.js';
+import { assembleLocalSeo } from './intelligence/local-seo-slice.js';
 import { formatForPrompt } from './intelligence/formatters.js';
 export {
   formatForPrompt,
@@ -41,6 +42,7 @@ const INTELLIGENCE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const ALL_SLICES: IntelligenceSlice[] = [
   'seoContext', 'insights', 'learnings', 'pageProfile', 'pageElements',
   'siteInventory', 'contentPipeline', 'siteHealth', 'clientSignals', 'operational',
+  'localSeo',
 ];
 
 export async function buildWorkspaceIntelligence(
@@ -138,6 +140,9 @@ async function assembleSlice(
     case 'siteInventory':
       if (!opts?.siteId || !opts.siteBaseUrl) break;
       result.siteInventory = await assembleSiteInventory(workspaceId, opts.siteId, opts.siteBaseUrl, opts.webflowToken);
+      break;
+    case 'localSeo':
+      result.localSeo = await assembleLocalSeo(workspaceId);
       break;
   }
 }

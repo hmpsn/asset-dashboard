@@ -1,6 +1,9 @@
 import { createHash } from 'crypto';
+import { z } from 'zod';
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
+import { withActiveLocalSeoSlice } from './intelligence/generation-context-builders.js';
 import { callAI } from './ai.js';
+import { parseStructuredAIOutput, StructuredAIOutputError } from './ai-structured-output.js';
 import { buildSystemPrompt, getCustomPromptNotes } from './prompt-assembly.js';
 import { getMeetingBriefHash, upsertMeetingBrief } from './meeting-brief-store.js';
 import { broadcastToWorkspace } from './broadcast.js';
@@ -14,6 +17,28 @@ const log = createLogger('meeting-brief-generator');
 const BRIEF_SLICES: IntelligenceSlice[] = [
   'seoContext', 'insights', 'learnings', 'siteHealth', 'contentPipeline', 'clientSignals',
 ];
+
+const meetingBriefRecommendationSchema = z.object({
+  action: z.string().trim().min(1),
+  rationale: z.string().trim().min(1),
+});
+
+const meetingBriefAiOutputSchema = z.object({
+  situationSummary: z.string().trim().min(1),
+  wins: z.array(z.string().trim().min(1)),
+  attention: z.array(z.string().trim().min(1)),
+  recommendations: z.array(meetingBriefRecommendationSchema),
+  blueprintProgress: z.string().nullable().optional(),
+});
+
+function normalizeMeetingBriefAiOutput(
+  parsed: z.infer<typeof meetingBriefAiOutputSchema>,
+): MeetingBriefAIOutput {
+  return {
+    ...parsed,
+    blueprintProgress: parsed.blueprintProgress ?? null,
+  };
+}
 
 /** Assembles At-a-Glance metrics directly from intelligence slices — no AI involved. */
 export function assembleMeetingBriefMetrics(intel: WorkspaceIntelligence): MeetingBriefMetrics {
@@ -42,6 +67,9 @@ export function buildBriefPrompt(intel: WorkspaceIntelligence): string {
   const priorities = intel.clientSignals?.businessPriorities ?? [];
   const pipeline = intel.contentPipeline;
   const strategy = intel.seoContext?.strategy;
+  const localSeoBlock = intel.localSeo?.enabled && intel.localSeo.effectiveLocalSeoBlock
+    ? `\nLOCAL SEO:\n${intel.localSeo.effectiveLocalSeoBlock}\n`
+    : '';
 
   const insightLines = top.map(i =>
     `- [${i.severity.toUpperCase()}] ${i.insightType}: ${i.pageTitle ?? i.pageId ?? 'workspace'} — ${JSON.stringify(i.data).slice(0, 200)}`
@@ -65,6 +93,7 @@ SITE CONTEXT:
 PIPELINE:
 - Briefs in progress: ${pipeline?.briefs.total ?? 0}
 - Posts: ${pipeline?.posts.total ?? 0}
+${localSeoBlock}
 
 TOP INSIGHTS (ordered by impact):
 ${insightLines || '(no open insights)'}
@@ -87,6 +116,7 @@ Return a JSON object with exactly these keys:
 Rules:
 - Never use admin jargon (no 'insight', 'severity', 'impact score', 'bridge')
 - Be specific: name pages, queries, percentages
+- If Local SEO context is present, use conservative language such as "visible in local results" or "possible business match"; never call it verified local rank unless evidence explicitly says so
 - Wins first — the meeting should feel constructive
 - 3-5 items per list maximum
 - blueprintProgress is always null in this version (Phase 1)
@@ -112,6 +142,13 @@ function buildPromptHash(intel: WorkspaceIntelligence, customPromptNotes: string
     rankingOpportunities: intel.insights?.byType.ranking_opportunity?.length,
     priorities: intel.clientSignals?.businessPriorities ?? [],
     siteKeywords: intel.seoContext?.strategy?.siteKeywords?.slice(0, 5) ?? [],
+    localSeo: intel.localSeo ? {
+      enabled: intel.localSeo.enabled,
+      activeMarkets: intel.localSeo.markets.filter(m => m.status === 'active').map(m => m.label),
+      visibility: intel.localSeo.visibility,
+      latestSnapshotAt: intel.localSeo.latestSnapshotAt,
+      promptBlock: intel.localSeo.effectiveLocalSeoBlock,
+    } : null,
     customPromptNotes,
   };
   return createHash('sha256').update(JSON.stringify(relevant)).digest('hex');
@@ -122,7 +159,8 @@ function buildPromptHash(intel: WorkspaceIntelligence, customPromptNotes: string
  * Skips AI call if intelligence data hash matches the stored brief.
  */
 export async function generateMeetingBrief(workspaceId: string): Promise<MeetingBrief> {
-  const intel = await buildWorkspaceIntelligence(workspaceId, { slices: BRIEF_SLICES });
+  const slices = await withActiveLocalSeoSlice(workspaceId, BRIEF_SLICES);
+  const intel = await buildWorkspaceIntelligence(workspaceId, { slices });
   const customPromptNotes = getCustomPromptNotes(workspaceId);
   const hash = buildPromptHash(intel, customPromptNotes);
   const cachedHash = getMeetingBriefHash(workspaceId);
@@ -152,21 +190,21 @@ Avoid: "Your site health score is 78. You have 12 open insights."
   ];
 
   const result = await callAI({
-    model: 'gpt-5.4',
+    operation: 'meeting-brief',
     system: systemPrompt,
     messages,
     maxTokens: 2000,
     temperature: 0.3,
-    responseFormat: { type: 'json_object' },
-    feature: 'meeting-brief',
     workspaceId,
   });
 
   let parsed: MeetingBriefAIOutput;
   try {
-    parsed = JSON.parse(result.text) as MeetingBriefAIOutput;
+    parsed = normalizeMeetingBriefAiOutput(
+      parseStructuredAIOutput(result.text, meetingBriefAiOutputSchema, 'meeting-brief'),
+    );
   } catch (err) {
-    log.debug({ err }, 'meeting-brief-generator: AI returned invalid JSON — retrying');
+    log.debug({ err, issues: err instanceof StructuredAIOutputError ? err.issues : undefined }, 'meeting-brief-generator: AI returned invalid structured output — retrying');
     // Retry once — ask the model to fix its own JSON
     const retryMessages: typeof messages = [
       ...messages,
@@ -174,20 +212,20 @@ Avoid: "Your site health score is 78. You have 12 open insights."
       { role: 'user', content: 'Your response was not valid JSON. Return only the JSON object, no explanation.' },
     ];
     const retryResult = await callAI({
-      model: 'gpt-5.4',
+      operation: 'meeting-brief',
       system: systemPrompt,
       messages: retryMessages,
       maxTokens: 2000,
       temperature: 0.1,
-      responseFormat: { type: 'json_object' },
-      feature: 'meeting-brief',
       workspaceId,
     });
     try {
-      parsed = JSON.parse(retryResult.text) as MeetingBriefAIOutput;
+      parsed = normalizeMeetingBriefAiOutput(
+        parseStructuredAIOutput(retryResult.text, meetingBriefAiOutputSchema, 'meeting-brief'),
+      );
     } catch (err) {
-      log.error({ err, workspaceId, rawRetry: retryResult.text.slice(0, 500) }, 'Meeting brief AI returned invalid JSON after retry');
-      throw new Error('Meeting brief AI returned invalid JSON after retry');
+      log.error({ err, issues: err instanceof StructuredAIOutputError ? err.issues : undefined, workspaceId, rawRetry: retryResult.text.slice(0, 500) }, 'Meeting brief AI returned invalid structured output after retry');
+      throw new Error('Meeting brief AI returned invalid structured output after retry');
     }
   }
 

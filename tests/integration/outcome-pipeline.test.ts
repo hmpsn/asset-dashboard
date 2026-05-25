@@ -170,6 +170,33 @@ describe('Outcome actions — idempotency guard', () => {
       deleteWorkspace(ws2Id);
     }
   });
+
+  it('concurrent requests with same source collapse to one action', async () => {
+    const payload = {
+      actionType: 'meta_updated',
+      sourceType: 'idem-concurrent',
+      sourceId: `idem-concurrent-${RUN_ID}`,
+      pageUrl: 'https://example.com/concurrent',
+      baselineSnapshot: { position: 7.0, clicks: 12, impressions: 140 },
+    };
+
+    const [resA, resB] = await Promise.all([
+      postJson(`/api/outcomes/${testWsId}/actions`, payload),
+      postJson(`/api/outcomes/${testWsId}/actions`, payload),
+    ]);
+    expect(resA.status).toBe(200);
+    expect(resB.status).toBe(200);
+
+    const bodyA = await resA.json();
+    const bodyB = await resB.json();
+    expect(bodyA.action.id).toBe(bodyB.action.id);
+
+    const listRes = await api(`/api/outcomes/${testWsId}/actions?type=meta_updated`);
+    expect(listRes.status).toBe(200);
+    const actions = await listRes.json() as Array<{ id: string; sourceType: string; sourceId?: string }>;
+    const matching = actions.filter(a => a.sourceType === payload.sourceType && a.sourceId === payload.sourceId);
+    expect(matching).toHaveLength(1);
+  });
 });
 
 // ── Attribution validation ──

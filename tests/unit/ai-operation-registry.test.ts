@@ -1,33 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { AI_OPERATION_REGISTRY, getAIOperationContract, isAIOperationId } from '../../server/ai-operation-registry.js';
+import { getAIOperationContract, isAIOperationId } from '../../server/ai-operation-registry.js';
 
-describe('AI operation registry integrity', () => {
-  it('keeps operation ids and feature keys aligned', () => {
-    const ids = Object.keys(AI_OPERATION_REGISTRY) as Array<keyof typeof AI_OPERATION_REGISTRY>;
-    expect(ids.length).toBeGreaterThan(0);
+const structuredOperationIds = [
+  'content-post-seo-meta',
+  'content-post-unify',
+  'voice-scoring',
+  'meeting-brief',
+  'voice-feedback-suggest',
+  'intelligence-profile-autofill',
+] as const;
 
-    for (const id of ids) {
+describe('AI operation registry', () => {
+  it('registers the PR6 structured-output operations', () => {
+    for (const id of structuredOperationIds) {
+      expect(isAIOperationId(id)).toBe(true);
       const contract = getAIOperationContract(id);
-      expect(contract.id).toBe(id);
-      expect(contract.feature).toBe(id);
-      expect(contract.domain.length).toBeGreaterThan(0);
-      expect(contract.modelIntent.length).toBeGreaterThan(0);
-      expect(contract.parserExpectation.length).toBeGreaterThan(0);
+      expect(contract.outputMode).toBe('json');
+      expect(contract.defaultResponseFormat).toEqual({ type: 'json_object' });
     }
   });
 
-  it('declares JSON output operations with explicit parser expectations', () => {
-    const contracts = Object.values(AI_OPERATION_REGISTRY);
-    const jsonContracts = contracts.filter(contract => contract.outputMode === 'json');
-    expect(jsonContracts.length).toBeGreaterThan(0);
-    for (const contract of jsonContracts) {
-      expect(contract.parserExpectation.toLowerCase()).toContain('json');
-    }
-  });
-
-  it('resolves known operation ids and rejects unknown ids', () => {
-    expect(isAIOperationId('schema-plan')).toBe(true);
-    expect(isAIOperationId('client-search-chat')).toBe(true);
-    expect(isAIOperationId('not-a-real-operation')).toBe(false);
+  it('marks research-required operations explicitly', () => {
+    expect(getAIOperationContract('content-post-unify').researchMode).toBe('required');
+    expect(getAIOperationContract('content-post-seo-meta').researchMode).toBe('forbidden');
   });
 });

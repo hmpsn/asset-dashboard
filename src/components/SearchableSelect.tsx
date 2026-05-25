@@ -64,7 +64,7 @@ export default function SearchableSelect({
         iconPosition="right"
         variant="secondary"
         size="sm"
-        className={`flex items-center gap-1.5 w-full bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] text-left text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] transition-colors focus:outline-none focus:border-teal-500 ${
+        className={`flex items-center gap-1.5 w-full bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] text-left text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500 ${
           isSm ? 'px-2 py-1 t-caption-sm' : 'px-2.5 py-1.5 t-caption'
         }`}
       >

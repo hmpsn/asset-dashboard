@@ -21,4 +21,13 @@ describe('client StrategyTab business priorities split', () => {
     expect(sectionSrc).toContain('addPriority();');
     expect(sectionSrc).toContain('Maximum 10 priorities reached');
   });
+
+  it('flags invalid regressions where StrategyTab inlines business-priority panel implementation details', () => {
+    const strategyTabSrc = readFileSync('src/components/client/StrategyTab.tsx', 'utf-8'); // readFile-ok - regression guard against reinlining business-priority form logic.
+
+    expect(strategyTabSrc).not.toContain('priorityCategoryClass');
+    expect(strategyTabSrc).not.toContain('savePriorities([...priorities');
+    expect(strategyTabSrc).not.toContain('Maximum 10 priorities reached');
+    expect(strategyTabSrc).toContain('<StrategyBusinessPrioritiesSection');
+  });
 });

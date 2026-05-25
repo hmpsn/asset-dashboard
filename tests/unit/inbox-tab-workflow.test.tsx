@@ -230,6 +230,29 @@ describe('InboxTab workflow routing (new inbox IA)', () => {
     expect(screen.getByText('Refresh service page')).toBeInTheDocument();
   });
 
+  it('renders note-bearing client actions in conversations and counts them', () => {
+    const now = new Date().toISOString();
+    const action: ClientAction = {
+      id: 'ca_convo_1',
+      workspaceId: 'ws_test',
+      sourceType: 'content_decay',
+      title: 'Discuss content update',
+      summary: 'Needs conversation context',
+      payload: { targetKeyword: 'conversation keyword' },
+      status: 'pending',
+      priority: 'medium',
+      clientNote: 'Please align this with campaign timing',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    renderInboxTab('/client/ws_test/inbox?tab=conversations', { clientActions: [action] });
+
+    expect(screen.getByLabelText('Conversations')).toBeInTheDocument();
+    expect(screen.getByText('Discuss content update')).toBeInTheDocument();
+    expect(screen.getByText('1 active')).toBeInTheDocument();
+  });
+
   it('shows completed-mode empty state after switching modes', () => {
     renderInboxTab('/client/ws_test/inbox?tab=decisions');
     fireEvent.click(screen.getByRole('button', { name: 'Completed' }));

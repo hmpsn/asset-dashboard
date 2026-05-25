@@ -95,6 +95,51 @@ describe('Incremental strategy mode — request validation', () => {
     expect(res.status).not.toBe(422);
     expect([400, 429, 500].includes(res.status)).toBe(true);
   });
+
+  it('accepts maxPages=0 as the All pages sentinel', async () => {
+    const res = await ctx.postJson(`/api/webflow/keyword-strategy/${workspaceId}`, {
+      mode: 'incremental',
+      maxPages: 0,
+    });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'No Webflow site linked' });
+  });
+
+  it('accepts the UI default maxPages=500', async () => {
+    const res = await ctx.postJson(`/api/webflow/keyword-strategy/${workspaceId}`, {
+      mode: 'incremental',
+      maxPages: 500,
+    });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'No Webflow site linked' });
+  });
+
+  it('rejects negative maxPages', async () => {
+    const res = await ctx.postJson(`/api/webflow/keyword-strategy/${workspaceId}`, {
+      mode: 'incremental',
+      maxPages: -1,
+    });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'maxPages must be a non-negative integer' });
+  });
+
+  it('rejects maxPages above the supported cap', async () => {
+    const res = await ctx.postJson(`/api/webflow/keyword-strategy/${workspaceId}`, {
+      mode: 'incremental',
+      maxPages: 2001,
+    });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'maxPages must be between 0 and 2000' });
+  });
+
+  it('rejects non-integer maxPages', async () => {
+    const res = await ctx.postJson(`/api/webflow/keyword-strategy/${workspaceId}`, {
+      mode: 'incremental',
+      maxPages: 3.5,
+    });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'maxPages must be a non-negative integer' });
+  });
 });
 
 describe('Incremental strategy mode — page filtering logic', () => {
@@ -218,7 +263,7 @@ describe('DB-layer: analysisGeneratedAt written on upsert', () => {
     expect(row?.analysis_generated_at).toBe(now);
   });
 
-  it('upsertPageKeywordsBatch with null analysisGeneratedAt preserves existing value via COALESCE', () => {
+  it('upsertPageKeywordsBatch with null analysisGeneratedAt preserves existing value for the same primary keyword', () => {
     const original = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
     // Seed with a timestamp
     upsertPageKeywordsBatch(workspaceId, [
@@ -226,10 +271,22 @@ describe('DB-layer: analysisGeneratedAt written on upsert', () => {
     ]);
     // Upsert without a timestamp — COALESCE should preserve the existing value
     upsertPageKeywordsBatch(workspaceId, [
-      { pagePath: '/coalesce-test', pageTitle: 'Coalesce Test', primaryKeyword: 'updated', secondaryKeywords: [], searchIntent: 'informational' } as PageKeywordMap,
+      { pagePath: '/coalesce-test', pageTitle: 'Coalesce Test', primaryKeyword: 'original', secondaryKeywords: [], searchIntent: 'informational' } as PageKeywordMap,
     ]);
     const row = getPageKeyword('/coalesce-test');
     expect(row?.analysis_generated_at).toBe(original); // preserved, not overwritten to NULL
+  });
+
+  it('upsertPageKeywordsBatch clears stale analysisGeneratedAt when the primary keyword changes', () => {
+    const original = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+    upsertPageKeywordsBatch(workspaceId, [
+      { pagePath: '/coalesce-changed-keyword-test', pageTitle: 'Coalesce Changed Keyword Test', primaryKeyword: 'original', secondaryKeywords: [], searchIntent: 'informational', analysisGeneratedAt: original } as PageKeywordMap,
+    ]);
+    upsertPageKeywordsBatch(workspaceId, [
+      { pagePath: '/coalesce-changed-keyword-test', pageTitle: 'Coalesce Changed Keyword Test', primaryKeyword: 'updated', secondaryKeywords: [], searchIntent: 'informational' } as PageKeywordMap,
+    ]);
+    const row = getPageKeyword('/coalesce-changed-keyword-test');
+    expect(row?.analysis_generated_at).toBeNull();
   });
 });
 

@@ -170,7 +170,7 @@ export function BrandTab({
                     value={form.phone ?? ''}
                     onChange={value => setForm(p => ({ ...p, phone: value }))}
                     placeholder={industry ? `e.g. +1 (555) 000-0000` : '+1 (555) 000-0000'}
-                    className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
+                    className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
                   />
                 </div>
                 <div>
@@ -180,7 +180,7 @@ export function BrandTab({
                     value={form.email ?? ''}
                     onChange={value => setForm(p => ({ ...p, email: value }))}
                     placeholder="hello@yourbusiness.com"
-                    className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
+                    className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
                   />
                 </div>
               </div>
@@ -192,7 +192,7 @@ export function BrandTab({
                   value={form.address?.street ?? ''}
                   onChange={value => updateAddress('street', value)}
                   placeholder="123 Main St"
-                  className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
+                  className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
                 />
               </div>
 
@@ -204,7 +204,7 @@ export function BrandTab({
                     value={form.address?.city ?? ''}
                     onChange={value => updateAddress('city', value)}
                     placeholder="City"
-                    className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
+                    className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
                   />
                 </div>
                 <div>
@@ -214,7 +214,7 @@ export function BrandTab({
                     value={form.address?.state ?? ''}
                     onChange={value => updateAddress('state', value)}
                     placeholder="CA"
-                    className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
+                    className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
                   />
                 </div>
                 <div>
@@ -224,7 +224,7 @@ export function BrandTab({
                     value={form.address?.zip ?? ''}
                     onChange={value => updateAddress('zip', value)}
                     placeholder="90210"
-                    className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
+                    className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
                   />
                 </div>
               </div>
@@ -237,7 +237,7 @@ export function BrandTab({
                     value={form.address?.country ?? ''}
                     onChange={value => updateAddress('country', value)}
                     placeholder="United States"
-                    className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
+                    className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
                   />
                 </div>
                 <div>
@@ -247,7 +247,7 @@ export function BrandTab({
                     value={form.openingHours ?? ''}
                     onChange={value => setForm(p => ({ ...p, openingHours: value }))}
                     placeholder="Mon-Fri 9am–5pm"
-                    className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
+                    className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
                   />
                 </div>
               </div>

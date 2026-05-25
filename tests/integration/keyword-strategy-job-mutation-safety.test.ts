@@ -7,7 +7,7 @@ const broadcastState = vi.hoisted(() => ({
 }));
 
 const strategyState = vi.hoisted(() => ({
-  mode: 'success' as 'success' | 'upToDate' | 'error',
+  mode: 'success' as 'success' | 'upToDate' | 'upToDateNeedsCleanup' | 'upToDateKeywordGapOnly' | 'dropsAnalyzedPage' | 'error',
 }));
 
 const seoDataState = vi.hoisted(() => ({
@@ -73,6 +73,67 @@ vi.mock('../../server/keyword-strategy-ai-synthesis.js', async importOriginal =>
   return {
     ...original,
     synthesizeKeywordStrategy: vi.fn(async () => {
+      if (strategyState.mode === 'upToDateKeywordGapOnly') {
+        return {
+          strategy: {
+            siteKeywords: ['local seo'],
+            opportunities: [],
+            contentGaps: [],
+            quickWins: [],
+            pageMap: [
+              {
+                pagePath: '/services/local-seo',
+                pageTitle: 'Local SEO Services',
+                primaryKeyword: 'local seo',
+                secondaryKeywords: [],
+              },
+            ],
+          },
+          pagesToAnalyze: [],
+          keywordPool: new Map([
+            ['local seo', { volume: 1200, difficulty: 42, source: 'mock' }],
+            ['paper tiger', { volume: 9000, difficulty: 10, source: 'keyword_gap' }],
+          ]),
+          businessSection: 'Existing strategy is still fresh but has stale table-backed gaps.',
+          upToDate: true,
+          freshPageCount: 1,
+          keywordEvaluationContext: {
+            businessTerms: ['local', 'seo'],
+            strictBusinessFit: false,
+          },
+        };
+      }
+
+      if (strategyState.mode === 'upToDateNeedsCleanup') {
+        return {
+          strategy: {
+            siteKeywords: ['paper tiger', 'local seo'],
+            opportunities: [],
+            contentGaps: [],
+            quickWins: [],
+            pageMap: [
+              {
+                pagePath: '/services/local-seo',
+                pageTitle: 'Local SEO Services',
+                primaryKeyword: 'paper tiger',
+                secondaryKeywords: ['local seo'],
+              },
+            ],
+          },
+          pagesToAnalyze: [],
+          keywordPool: new Map([
+            ['local seo', { volume: 1200, difficulty: 42, source: 'mock' }],
+          ]),
+          businessSection: 'Existing strategy is still fresh but needs cleanup.',
+          upToDate: true,
+          freshPageCount: 1,
+          keywordEvaluationContext: {
+            businessTerms: ['local', 'seo'],
+            strictBusinessFit: false,
+          },
+        };
+      }
+
       if (strategyState.mode === 'upToDate') {
         return {
           strategy: null,
@@ -81,6 +142,42 @@ vi.mock('../../server/keyword-strategy-ai-synthesis.js', async importOriginal =>
           businessSection: 'Existing strategy is still fresh.',
           upToDate: true,
           freshPageCount: 1,
+        };
+      }
+
+      if (strategyState.mode === 'dropsAnalyzedPage') {
+        return {
+          strategy: {
+            siteKeywords: ['local seo'],
+            opportunities: [],
+            contentGaps: [],
+            quickWins: [],
+            pageMap: [
+              {
+                pagePath: '/services/local-seo',
+                pageTitle: 'Local SEO Services',
+                primaryKeyword: 'local seo',
+                secondaryKeywords: [],
+              },
+            ],
+          },
+          pagesToAnalyze: [
+            {
+              path: '/stale-dropped',
+              title: 'Stale Dropped',
+              seoTitle: 'Stale Dropped',
+              seoDesc: 'Old noisy page assignment.',
+              contentSnippet: 'Old noisy page assignment.',
+            },
+          ],
+          keywordPool: new Map([
+            ['local seo', { volume: 1200, difficulty: 42, source: 'mock' }],
+          ]),
+          businessSection: 'A stale analyzed page was dropped by final strategy sanitation.',
+          keywordEvaluationContext: {
+            businessTerms: ['local', 'seo'],
+            strictBusinessFit: false,
+          },
         };
       }
 
@@ -165,12 +262,16 @@ vi.mock('../../server/keyword-strategy-follow-ons.js', async importOriginal => {
 
 import db from '../../server/db/index.js';
 import { createJob, clearCompletedJobs, listJobs } from '../../server/jobs.js';
+import { discoverKeywordStrategyPages } from '../../server/keyword-strategy-pages.js';
 import { getUsageCount } from '../../server/usage-tracking.js';
-import { getWorkspace, deleteWorkspace } from '../../server/workspaces.js';
-import { listPageKeywords } from '../../server/page-keywords.js';
-import { getTrackedKeywords } from '../../server/rank-tracking.js';
+import { getWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
+import { listPageKeywords, upsertPageKeyword } from '../../server/page-keywords.js';
+import { addTrackedKeyword, getTrackedKeywords } from '../../server/rank-tracking.js';
+import { replaceAllContentGaps } from '../../server/content-gaps.js';
+import { listKeywordGaps, replaceAllKeywordGaps } from '../../server/keyword-gaps.js';
 import { getActionBySource } from '../../server/outcome-tracking.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
+import { TRACKED_KEYWORD_SOURCE, TRACKED_KEYWORD_STATUS } from '../../shared/types/rank-tracking.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 
@@ -274,6 +375,7 @@ beforeAll(async () => {
 }, 30_000);
 
 beforeEach(() => {
+  vi.mocked(discoverKeywordStrategyPages).mockClear();
   workspace = seedWorkspace({ tier: 'premium' });
   otherWorkspace = seedWorkspace({ tier: 'premium' });
   broadcastState.calls = [];
@@ -315,15 +417,14 @@ describe('keyword strategy job mutation safety', () => {
       type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
       status: 'done',
       result: expect.objectContaining({
-        siteKeywords: ['Local SEO', 'SEO Agency'],
-        pageMap: [
-          expect.objectContaining({
-            pagePath: '/services/local-seo',
-            primaryKeyword: 'local seo',
-          }),
-        ],
+        persisted: true,
+        pageCount: 1,
+        siteKeywordCount: 2,
+        contentGapCount: 0,
+        quickWinCount: 0,
       }),
     });
+    expect((job.result as { pageMap?: unknown }).pageMap).toBeUndefined();
 
     const storedWorkspace = getWorkspace(workspace.workspaceId);
     expect(storedWorkspace?.keywordStrategy).toMatchObject({
@@ -344,7 +445,7 @@ describe('keyword strategy job mutation safety', () => {
     expect(activityTitles(workspace.workspaceId, 'strategy_generated')).toContain('Keyword strategy generated');
     expect(getTrackedKeywords(workspace.workspaceId).map(keyword => keyword.query)).toEqual([
       'local seo',
-      'seo agency',
+      'SEO Agency',
     ]);
     expect(getUsageCount(workspace.workspaceId, 'strategy_generations')).toBe(1);
     expect(getActionBySource('strategy', workspace.workspaceId)).not.toBeNull();
@@ -400,6 +501,196 @@ describe('keyword strategy job mutation safety', () => {
     expect(getUsageCount(workspace.workspaceId, 'strategy_generations')).toBe(0);
     expect(getActionBySource('strategy', workspace.workspaceId)).toBeNull();
     expect(broadcastState.calls).toHaveLength(0);
+  });
+
+  it('sanitizes all-fresh incremental cleanup and reconciles strategy-owned rank tracking', async () => {
+    strategyState.mode = 'upToDateNeedsCleanup';
+    const generatedAt = '2026-05-01T00:00:00.000Z';
+    updateWorkspace(workspace.workspaceId, {
+      keywordStrategy: {
+        siteKeywords: ['paper tiger', 'local seo'],
+        opportunities: [],
+        generatedAt,
+      },
+    });
+    upsertPageKeyword(workspace.workspaceId, {
+      pagePath: '/services/local-seo',
+      pageTitle: 'Local SEO Services',
+      primaryKeyword: 'paper tiger',
+      secondaryKeywords: ['local seo'],
+      analysisGeneratedAt: generatedAt,
+    });
+    replaceAllContentGaps(workspace.workspaceId, [{
+      topic: 'Paper Tiger Guide',
+      targetKeyword: 'paper tiger',
+      intent: 'informational',
+      priority: 'high',
+      rationale: 'Stale competitor-gap artifact that should not survive cleanup.',
+    }]);
+    addTrackedKeyword(workspace.workspaceId, 'paper tiger', {
+      source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
+      pagePath: '/services/local-seo',
+      strategyGeneratedAt: generatedAt,
+      lastStrategySeenAt: generatedAt,
+    });
+
+    const startRes = await postJson('/api/jobs', {
+      type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
+      params: {
+        workspaceId: workspace.workspaceId,
+        mode: 'incremental',
+      },
+    });
+    expect(startRes.status).toBe(200);
+    const started = await startRes.json() as { jobId: string };
+
+    const job = await waitForJob(started.jobId);
+    expect(job).toMatchObject({
+      workspaceId: workspace.workspaceId,
+      type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
+      status: 'done',
+      result: expect.objectContaining({
+        persisted: true,
+        pageCount: 1,
+        siteKeywordCount: 1,
+      }),
+    });
+
+    expect(countRows('content_gaps', workspace.workspaceId)).toBe(0);
+    const activeTracked = getTrackedKeywords(workspace.workspaceId).map(keyword => keyword.query);
+    expect(activeTracked).toContain('local seo');
+    expect(activeTracked).not.toContain('paper tiger');
+    expect(getTrackedKeywords(workspace.workspaceId, { includeInactive: true })).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        query: 'paper tiger',
+        status: TRACKED_KEYWORD_STATUS.REPLACED,
+        replacedBy: 'local seo',
+      }),
+    ]));
+    expect(broadcastState.calls).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        workspaceId: workspace.workspaceId,
+        event: WS_EVENTS.RANK_TRACKING_UPDATED,
+      }),
+      expect.objectContaining({
+        workspaceId: workspace.workspaceId,
+        event: WS_EVENTS.STRATEGY_UPDATED,
+      }),
+    ]));
+  });
+
+  it('persists all-fresh incremental cleanup when only table-backed keyword gaps are stale', async () => {
+    strategyState.mode = 'upToDateKeywordGapOnly';
+    const generatedAt = '2026-05-01T00:00:00.000Z';
+    updateWorkspace(workspace.workspaceId, {
+      keywordStrategy: {
+        siteKeywords: ['local seo'],
+        opportunities: [],
+        generatedAt,
+      },
+    });
+    upsertPageKeyword(workspace.workspaceId, {
+      pagePath: '/services/local-seo',
+      pageTitle: 'Local SEO Services',
+      primaryKeyword: 'local seo',
+      secondaryKeywords: [],
+      analysisGeneratedAt: generatedAt,
+    });
+    replaceAllKeywordGaps(workspace.workspaceId, [
+      {
+        keyword: 'paper tiger',
+        volume: 9000,
+        difficulty: 10,
+        competitorDomain: 'rival.example',
+        competitorPosition: 2,
+      },
+    ]);
+
+    const startRes = await postJson('/api/jobs', {
+      type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
+      params: {
+        workspaceId: workspace.workspaceId,
+        mode: 'incremental',
+      },
+    });
+    expect(startRes.status).toBe(200);
+    const started = await startRes.json() as { jobId: string };
+
+    const job = await waitForJob(started.jobId);
+    expect(job).toMatchObject({
+      workspaceId: workspace.workspaceId,
+      type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
+      status: 'done',
+      result: expect.objectContaining({
+        persisted: true,
+        pageCount: 1,
+        siteKeywordCount: 1,
+      }),
+    });
+
+    expect(listKeywordGaps(workspace.workspaceId)).toEqual([]);
+    expect(broadcastState.calls).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        workspaceId: workspace.workspaceId,
+        event: WS_EVENTS.STRATEGY_UPDATED,
+      }),
+    ]));
+  });
+
+  it('retires stale page keywords when an analyzed page is absent from the sanitized incremental strategy', async () => {
+    strategyState.mode = 'dropsAnalyzedPage';
+    const generatedAt = '2026-05-01T00:00:00.000Z';
+    updateWorkspace(workspace.workspaceId, {
+      keywordStrategy: {
+        siteKeywords: ['paper tiger'],
+        opportunities: [],
+        generatedAt,
+      },
+    });
+    upsertPageKeyword(workspace.workspaceId, {
+      pagePath: '/stale-dropped',
+      pageTitle: 'Stale Dropped',
+      primaryKeyword: 'paper tiger',
+      secondaryKeywords: [],
+      analysisGeneratedAt: generatedAt,
+    });
+    addTrackedKeyword(workspace.workspaceId, 'paper tiger', {
+      source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
+      pagePath: '/stale-dropped',
+      strategyGeneratedAt: generatedAt,
+      lastStrategySeenAt: generatedAt,
+    });
+
+    const startRes = await postJson('/api/jobs', {
+      type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
+      params: {
+        workspaceId: workspace.workspaceId,
+        mode: 'incremental',
+      },
+    });
+    expect(startRes.status).toBe(200);
+    const started = await startRes.json() as { jobId: string };
+
+    const job = await waitForJob(started.jobId);
+    expect(job).toMatchObject({
+      workspaceId: workspace.workspaceId,
+      type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
+      status: 'done',
+      result: expect.objectContaining({
+        persisted: true,
+        pageCount: 1,
+        siteKeywordCount: 1,
+      }),
+    });
+
+    expect(listPageKeywords(workspace.workspaceId).map(page => page.pagePath)).not.toContain('/stale-dropped');
+    expect(getTrackedKeywords(workspace.workspaceId).map(keyword => keyword.query)).not.toContain('paper tiger');
+    expect(getTrackedKeywords(workspace.workspaceId, { includeInactive: true })).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        query: 'paper tiger',
+        status: TRACKED_KEYWORD_STATUS.DEPRECATED,
+      }),
+    ]));
   });
 
   it('marks the job failed and refunds usage when generation crashes after the job starts', async () => {
@@ -466,6 +757,118 @@ describe('keyword strategy job mutation safety', () => {
     expect(getActionBySource('strategy', workspace.workspaceId)).toBeNull();
     expect(broadcastState.calls).toHaveLength(0);
     expect(listJobs(workspace.workspaceId)).toHaveLength(1);
+  });
+
+  it('accepts the UI default maxPages=500 for keyword strategy jobs', async () => {
+    const startRes = await postJson('/api/jobs', {
+      type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
+      params: {
+        workspaceId: workspace.workspaceId,
+        maxPages: 500,
+      },
+    });
+
+    expect(startRes.status).toBe(200);
+    const started = await startRes.json() as { jobId: string };
+    const job = await waitForJob(started.jobId);
+    expect(job).toMatchObject({
+      workspaceId: workspace.workspaceId,
+      type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
+      status: 'done',
+    });
+    expect(discoverKeywordStrategyPages).toHaveBeenCalledWith(expect.objectContaining({ maxPagesParam: 500 }));
+  });
+
+  it('accepts maxPages=0 as the All pages sentinel for keyword strategy jobs', async () => {
+    const startRes = await postJson('/api/jobs', {
+      type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
+      params: {
+        workspaceId: workspace.workspaceId,
+        maxPages: 0,
+      },
+    });
+
+    expect(startRes.status).toBe(200);
+    const started = await startRes.json() as { jobId: string };
+    const job = await waitForJob(started.jobId);
+    expect(job).toMatchObject({
+      workspaceId: workspace.workspaceId,
+      type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
+      status: 'done',
+    });
+    expect(discoverKeywordStrategyPages).toHaveBeenCalledWith(expect.objectContaining({ maxPagesParam: 0 }));
+  });
+
+  it('rejects negative maxPages before creating a keyword strategy job', async () => {
+    const jobsBefore = listJobs(workspace.workspaceId).length;
+
+    const res = await postJson('/api/jobs', {
+      type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
+      params: {
+        workspaceId: workspace.workspaceId,
+        maxPages: -1,
+      },
+    });
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'maxPages must be a non-negative integer' });
+    expect(listJobs(workspace.workspaceId)).toHaveLength(jobsBefore);
+    expect(getWorkspace(workspace.workspaceId)?.keywordStrategy).toBeUndefined();
+    expect(countRows('page_keywords', workspace.workspaceId)).toBe(0);
+    expect(countRows('content_gaps', workspace.workspaceId)).toBe(0);
+    expect(countRows('quick_wins', workspace.workspaceId)).toBe(0);
+    expect(countRows('activity_log', workspace.workspaceId)).toBe(0);
+    expect(getTrackedKeywords(workspace.workspaceId)).toEqual([]);
+    expect(getActionBySource('strategy', workspace.workspaceId)).toBeNull();
+    expect(broadcastState.calls).toHaveLength(0);
+  });
+
+  it('rejects maxPages above the supported cap before creating a keyword strategy job', async () => {
+    const jobsBefore = listJobs(workspace.workspaceId).length;
+
+    const res = await postJson('/api/jobs', {
+      type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
+      params: {
+        workspaceId: workspace.workspaceId,
+        maxPages: 2001,
+      },
+    });
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'maxPages must be between 0 and 2000' });
+    expect(listJobs(workspace.workspaceId)).toHaveLength(jobsBefore);
+    expect(getWorkspace(workspace.workspaceId)?.keywordStrategy).toBeUndefined();
+    expect(countRows('page_keywords', workspace.workspaceId)).toBe(0);
+    expect(countRows('content_gaps', workspace.workspaceId)).toBe(0);
+    expect(countRows('quick_wins', workspace.workspaceId)).toBe(0);
+    expect(countRows('activity_log', workspace.workspaceId)).toBe(0);
+    expect(getTrackedKeywords(workspace.workspaceId)).toEqual([]);
+    expect(getActionBySource('strategy', workspace.workspaceId)).toBeNull();
+    expect(broadcastState.calls).toHaveLength(0);
+  });
+
+  it('rejects non-integer maxPages before creating a keyword strategy job', async () => {
+    const jobsBefore = listJobs(workspace.workspaceId).length;
+
+    const res = await postJson('/api/jobs', {
+      type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
+      params: {
+        workspaceId: workspace.workspaceId,
+        maxPages: 3.5,
+      },
+    });
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'maxPages must be a non-negative integer' });
+    expect(listJobs(workspace.workspaceId)).toHaveLength(jobsBefore);
+    expect(getWorkspace(workspace.workspaceId)?.keywordStrategy).toBeUndefined();
+    expect(countRows('page_keywords', workspace.workspaceId)).toBe(0);
+    expect(countRows('content_gaps', workspace.workspaceId)).toBe(0);
+    expect(countRows('quick_wins', workspace.workspaceId)).toBe(0);
+    expect(countRows('activity_log', workspace.workspaceId)).toBe(0);
+    expect(getTrackedKeywords(workspace.workspaceId)).toEqual([]);
+    expect(getActionBySource('strategy', workspace.workspaceId)).toBeNull();
+    expect(broadcastState.calls).toHaveLength(0);
   });
 
   it('rejects a duplicate active keyword strategy job without another write path starting', async () => {

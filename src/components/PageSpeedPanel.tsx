@@ -109,7 +109,7 @@ function VitalCard({ label, value, formatted, vitalKey }: { label: string; value
   return (
     <div className={`rounded-[var(--radius-lg)] border p-3 ${ratingBg(rating)}`}>
       <div className="t-caption-sm text-[var(--brand-text-muted)] uppercase tracking-wider mb-1">{label}</div>
-      <div className={`t-stat-sm tabular-nums ${ratingColor(rating)}`}>{formatted}</div>
+      <div className={`t-page font-semibold tabular-nums ${ratingColor(rating)}`}>{formatted}</div>
     </div>
   );
 }
@@ -520,7 +520,7 @@ export function PageSpeedPanel({ siteId, workspaceId, showHeader = true }: Props
                 className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-2)]/50"
               >
                 {isOpen ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)]" />}
-                <div className={`t-stat-sm tabular-nums w-10 ${scoreColor(page.score)}`}>{page.score}</div>
+                <div className={`t-page font-semibold tabular-nums w-10 ${scoreColor(page.score)}`}>{page.score}</div>
                 <div className="flex-1 min-w-0">
                   <div className="t-caption-sm text-[var(--brand-text-bright)] truncate">{page.page}</div>
                   <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{page.url}</div>

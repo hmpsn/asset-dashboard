@@ -48,8 +48,8 @@ export function toPublicWorkspaceView(
     nowMs?: number;
   },
 ): PublicWorkspaceView {
-  const effectiveTier = computeEffectiveTier(ws);
   const nowMs = opts.nowMs ?? Date.now();
+  const effectiveTier = computeEffectiveTier(ws, nowMs);
   return {
     id: ws.id,
     name: ws.name,

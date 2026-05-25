@@ -24,6 +24,7 @@ const ICON_MAP: Record<string, typeof Activity> = {
   schema_published: Code2,
   redirects_scanned: CornerDownRight,
   strategy_generated: Target,
+  rank_tracking_updated: TrendingUp,
   rank_snapshot: TrendingUp,
   anomaly_detected: AlertTriangle,
   anomaly_positive: TrendingDown,

@@ -16,6 +16,7 @@ import { resolveBaseUrl } from '../url-helpers.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 
 const log = createLogger('webflow-pagespeed');
+const MAX_PAGESPEED_PAGES = 25;
 
 function parseStrategy(value: unknown): 'mobile' | 'desktop' {
   return value === 'desktop' ? 'desktop' : 'mobile';
@@ -25,7 +26,15 @@ function parseStrategy(value: unknown): 'mobile' | 'desktop' {
 router.get('/api/webflow/pagespeed/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const strategy = parseStrategy(req.query.strategy);
-    const maxPages = parseInt(req.query.maxPages as string) || 5;
+    const rawMaxPages = req.query.maxPages;
+    const requestedMaxPages = rawMaxPages == null ? 5 : Number(rawMaxPages);
+    if (!Number.isInteger(requestedMaxPages) || requestedMaxPages <= 0) {
+      return res.status(400).json({ error: 'maxPages must be a positive integer' });
+    }
+    if (requestedMaxPages > MAX_PAGESPEED_PAGES) {
+      return res.status(400).json({ error: `maxPages must be between 1 and ${MAX_PAGESPEED_PAGES}` });
+    }
+    const maxPages = requestedMaxPages;
     const psWs = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
     const result = await runSiteSpeed(req.params.siteId, strategy, maxPages, psWs?.id);
     savePageSpeed(req.params.siteId, strategy, result);

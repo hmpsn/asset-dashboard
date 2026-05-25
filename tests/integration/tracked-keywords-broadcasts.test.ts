@@ -3,13 +3,13 @@ import http from 'http';
 import type { AddressInfo } from 'net';
 
 const broadcastState = vi.hoisted(() => ({
-  calls: [] as Array<{ workspaceId: string; event: string; payload: { keyword?: string; removed?: boolean } }>,
+  calls: [] as Array<{ workspaceId: string; event: string; payload: Record<string, unknown> }>,
 }));
 
 vi.mock('../../server/broadcast.js', () => ({
   setBroadcast: vi.fn(),
   broadcast: vi.fn(),
-  broadcastToWorkspace: vi.fn((workspaceId: string, event: string, payload: { keyword?: string; removed?: boolean }) => {
+  broadcastToWorkspace: vi.fn((workspaceId: string, event: string, payload: Record<string, unknown>) => {
     broadcastState.calls.push({ workspaceId, event, payload });
   }),
 }));
@@ -18,6 +18,7 @@ import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { getTrackedKeywords } from '../../server/rank-tracking.js';
 import db from '../../server/db/index.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
+import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
 
 let baseUrl = '';
 let server: http.Server | undefined;
@@ -61,8 +62,8 @@ async function deleteJson(path: string, body: unknown): Promise<Response> {
   });
 }
 
-function strategyBroadcasts() {
-  return broadcastState.calls.filter(call => call.event === WS_EVENTS.STRATEGY_UPDATED);
+function rankTrackingBroadcasts() {
+  return broadcastState.calls.filter(call => call.event === WS_EVENTS.RANK_TRACKING_UPDATED);
 }
 
 function countActivities(type: string, keyword: string): number {
@@ -71,8 +72,8 @@ function countActivities(type: string, keyword: string): number {
     FROM activity_log
     WHERE workspace_id = ?
       AND type = ?
-      AND title LIKE ?
-  `).get(wsId, type, `%"${keyword}"%`) as { count: number };
+      AND (title LIKE ? OR description LIKE ?)
+  `).get(wsId, type, `%"${keyword}"%`, `%"${keyword}"%`) as { count: number };
   return row.count;
 }
 
@@ -94,6 +95,50 @@ afterAll(async () => {
 });
 
 describe('public tracked keyword workflow broadcasts', () => {
+  it('rejects malformed admin keyword adds before mutating or broadcasting', async () => {
+    const whitespaceRes = await postJson(`/api/rank-tracking/${wsId}/keywords`, {
+      query: '   ',
+    });
+    expect(whitespaceRes.status).toBe(400);
+
+    const objectRes = await postJson(`/api/rank-tracking/${wsId}/keywords`, {
+      query: { text: 'object keyword' },
+    });
+    expect(objectRes.status).toBe(400);
+
+    expect(getTrackedKeywords(wsId).map(k => k.query)).not.toContain('');
+    expect(getTrackedKeywords(wsId).map(k => k.query)).not.toContain('[object object]');
+    expect(rankTrackingBroadcasts()).toHaveLength(0);
+  });
+
+  it('broadcasts rank-tracking updates when admin keyword feedback approves tracking', async () => {
+    const res = await postJson(`/api/webflow/keyword-feedback/${wsId}`, {
+      keyword: 'Feedback Approved Keyword',
+      status: 'approved',
+      source: 'content_gap',
+    });
+    expect(res.status).toBe(200);
+
+    expect(getTrackedKeywords(wsId)).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        query: 'Feedback Approved Keyword',
+        source: TRACKED_KEYWORD_SOURCE.CONTENT_GAP,
+      }),
+    ]));
+    expect(rankTrackingBroadcasts()).toEqual([
+      {
+          workspaceId: wsId,
+          event: WS_EVENTS.RANK_TRACKING_UPDATED,
+          payload: {
+          keyword: 'Feedback Approved Keyword',
+          action: 'feedback_approved',
+          source: 'admin_feedback',
+        },
+      },
+    ]);
+    expect(countActivities('rank_tracking_updated', 'Feedback Approved Keyword')).toBe(1);
+  });
+
   it('broadcasts and records activity once for a newly tracked keyword', async () => {
     const res = await postJson(`/api/public/tracked-keywords/${wsId}`, {
       keyword: 'Broadcast Strategy Keyword',
@@ -101,10 +146,10 @@ describe('public tracked keyword workflow broadcasts', () => {
     expect(res.status).toBe(200);
 
     expect(getTrackedKeywords(wsId).map(k => k.query)).toContain('broadcast strategy keyword');
-    expect(strategyBroadcasts()).toEqual([
+    expect(rankTrackingBroadcasts()).toEqual([
       {
         workspaceId: wsId,
-        event: WS_EVENTS.STRATEGY_UPDATED,
+        event: WS_EVENTS.RANK_TRACKING_UPDATED,
         payload: { keyword: 'broadcast strategy keyword' },
       },
     ]);
@@ -115,7 +160,7 @@ describe('public tracked keyword workflow broadcasts', () => {
       keyword: 'broadcast strategy keyword',
     });
     expect(duplicateRes.status).toBe(200);
-    expect(strategyBroadcasts()).toHaveLength(0);
+    expect(rankTrackingBroadcasts()).toHaveLength(0);
     expect(countActivities('client_keyword_tracked', 'broadcast strategy keyword')).toBe(1);
   });
 
@@ -132,10 +177,10 @@ describe('public tracked keyword workflow broadcasts', () => {
     expect(removeRes.status).toBe(200);
 
     expect(getTrackedKeywords(wsId).map(k => k.query)).not.toContain('remove strategy keyword');
-    expect(strategyBroadcasts()).toEqual([
+    expect(rankTrackingBroadcasts()).toEqual([
       {
         workspaceId: wsId,
-        event: WS_EVENTS.STRATEGY_UPDATED,
+        event: WS_EVENTS.RANK_TRACKING_UPDATED,
         payload: { keyword: 'remove strategy keyword', removed: true },
       },
     ]);
@@ -147,7 +192,7 @@ describe('public tracked keyword workflow broadcasts', () => {
       keyword: 'missing strategy keyword',
     });
     expect(removeRes.status).toBe(200);
-    expect(strategyBroadcasts()).toHaveLength(0);
+    expect(rankTrackingBroadcasts()).toHaveLength(0);
     expect(countActivities('client_keyword_removed', 'missing strategy keyword')).toBe(0);
   });
 
@@ -163,6 +208,6 @@ describe('public tracked keyword workflow broadcasts', () => {
     expect(emptyRemoveRes.status).toBe(400);
 
     expect(getTrackedKeywords(wsId).map(k => k.query)).not.toContain('x');
-    expect(strategyBroadcasts()).toHaveLength(0);
+    expect(rankTrackingBroadcasts()).toHaveLength(0);
   });
 });

@@ -128,10 +128,36 @@ describe('copy voice feedback loop', () => {
       suggestedGuardrail: 'Avoid corporate jargon in service copy.',
     });
     expect(callAI).toHaveBeenCalledWith(expect.objectContaining({
-      feature: 'voice-feedback-suggest',
-      responseFormat: { type: 'json_object' },
+      operation: 'voice-feedback-suggest',
       workspaceId: WORKSPACE_ID,
     }));
+  });
+
+  it('keeps a valid suggestion when reasoning is blank', async () => {
+    getVoiceProfile.mockReturnValue(profile());
+    callAI.mockResolvedValue(aiJson({
+      suggestedGuardrail: 'Avoid corporate jargon in service copy.',
+      suggestedModifier: null,
+      reasoning: '',
+    }));
+
+    const result = await suggestVoiceProfileUpdate(WORKSPACE_ID, ['Make this less corporate.']);
+    expect(result).toEqual({
+      sourceNotes: ['Make this less corporate.'],
+      suggestedGuardrail: 'Avoid corporate jargon in service copy.',
+    });
+  });
+
+  it('returns null when the suggestion payload fails structured validation', async () => {
+    getVoiceProfile.mockReturnValue(profile());
+    callAI.mockResolvedValue(aiJson({
+      suggestedGuardrail: 42,
+      suggestedModifier: null,
+      reasoning: 'Wrong type',
+    }));
+
+    const result = await suggestVoiceProfileUpdate(WORKSPACE_ID, ['Make this less corporate.']);
+    expect(result).toBeNull();
   });
 
   it('processes steering feedback and only asks for suggestions when voice notes exist', async () => {

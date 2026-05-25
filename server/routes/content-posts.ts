@@ -45,6 +45,9 @@ import { buildIntelPrompt } from '../workspace-intelligence.js';
 import { normalizePageUrl } from '../helpers.js';
 import { validate, z } from '../middleware/validate.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
+import {
+  buildClaimEvidenceLedger,
+} from '../content-review-evidence-ledger.js';
 import type { AIReviewMap, AiFixResult, ContentReviewEvidence, IssueKey, PostSection } from '../../shared/types/content.js';
 import { ISSUE_KEYS, PROVENANCE_SENSITIVE_REVIEW_KEYS } from '../../shared/types/content.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
@@ -76,17 +79,20 @@ const aiMetaFixResponseSchema = z.object({
 function markProvenanceItemsForHumanReview(
   review: AIReviewMap,
   claimsToVerify: string[] = [],
+  evidence?: ContentReviewEvidence,
 ): AIReviewMap {
   const next = { ...review };
   for (const key of PROVENANCE_SENSITIVE_REVIEW_KEYS) {
     const existing = next[key];
+    const normalizedClaims = existing?.claimsToVerify?.length ? existing.claimsToVerify : claimsToVerify;
     next[key] = {
       pass: false,
       reason: existing?.reason
         ? `${existing.reason} Human verification is required before this checklist item can be checked.`
         : 'Human verification is required before this checklist item can be checked.',
       humanReviewRequired: true,
-      claimsToVerify: existing?.claimsToVerify?.length ? existing.claimsToVerify : claimsToVerify,
+      claimsToVerify: normalizedClaims,
+      claimEvidence: buildClaimEvidenceLedger(normalizedClaims, evidence),
     };
   }
   return next;
@@ -114,10 +120,12 @@ function extractNumericClaims(text: string): string[] {
 
 function buildReviewEvidence(workspaceId: string, briefId: string): ContentReviewEvidence | undefined {
   const brief = getBrief(workspaceId, briefId);
+  const referenceUrls = brief?.referenceUrls?.filter(Boolean).slice(0, 8) ?? [];
   const peopleAlsoAsk = brief?.realPeopleAlsoAsk?.filter(Boolean).slice(0, 8) ?? [];
   const topResults = brief?.realTopResults?.filter(r => r.title && r.url).slice(0, 8) ?? [];
-  if (!peopleAlsoAsk.length && !topResults.length) return undefined;
+  if (!referenceUrls.length && !peopleAlsoAsk.length && !topResults.length) return undefined;
   return {
+    referenceUrls,
     peopleAlsoAsk,
     topResults,
     note: 'SERP evidence used for grounding support. Reviewers should verify important claims against the original sources before approving factual checklist items.',
@@ -556,10 +564,11 @@ Return ONLY valid JSON like:
       return res.status(500).json({ error: 'Failed to parse AI review response' });
     }
 
+    const evidence = buildReviewEvidence(req.params.workspaceId, post.briefId);
     log.info(`AI review completed for post ${post.id}`);
     res.json({
-      review: markProvenanceItemsForHumanReview(reviewResult.data, claimsToVerify),
-      evidence: buildReviewEvidence(req.params.workspaceId, post.briefId),
+      review: markProvenanceItemsForHumanReview(reviewResult.data, claimsToVerify, evidence),
+      evidence,
     });
   } catch (err) {
     log.error({ err }, 'AI review failed');

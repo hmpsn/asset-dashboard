@@ -9,8 +9,13 @@
  */
 import { createLogger } from './logger.js';
 import { listWorkspaces } from './workspaces.js';
-import { getSearchOverview } from './search-console.js';
+import { getSearchOverview, getSearchQueryObservations } from './search-console.js';
 import { storeRankSnapshot } from './rank-tracking.js';
+import {
+  detectLostVisibility,
+  upsertDiscoveredQueries,
+  type DiscoveredQueryObservation,
+} from './client-discovered-queries.js';
 
 const log = createLogger('rank-tracking-scheduler');
 
@@ -34,7 +39,10 @@ export async function runRankTrackingSnapshots(workspaceIds?: string[]): Promise
     if (!ws.gscPropertyUrl || !ws.webflowSiteId) continue;
 
     try {
-      const overview = await getSearchOverview(ws.webflowSiteId, ws.gscPropertyUrl, 7);
+      const [overview, observedQueries] = await Promise.all([
+        getSearchOverview(ws.webflowSiteId, ws.gscPropertyUrl, 28, { queryLimit: 5000 }),
+        getSearchQueryObservations(ws.webflowSiteId, ws.gscPropertyUrl, 28, { maxRows: 5000 }),
+      ]);
       const date = new Date().toISOString().split('T')[0];
       const queries = overview.topQueries.map(q => ({
         query: q.query,
@@ -44,6 +52,27 @@ export async function runRankTrackingSnapshots(workspaceIds?: string[]): Promise
         ctr: q.ctr,
       }));
       storeRankSnapshot(ws.id, date, queries);
+
+      // Group per-date observations and upsert each date separately so the
+      // idempotency CASE (last_snapshot_date = excluded.last_snapshot_date)
+      // prevents total_impressions from accumulating overlapping 28-day windows.
+      const byDate = new Map<string, DiscoveredQueryObservation[]>();
+      for (const row of observedQueries) {
+        const group = byDate.get(row.date) ?? [];
+        group.push({
+          query: row.query,
+          position: row.position,
+          clicks: row.clicks,
+          impressions: row.impressions,
+          ctr: row.ctr,
+          seenDate: row.date,
+        });
+        if (!byDate.has(row.date)) byDate.set(row.date, group);
+      }
+      for (const [snapshotDate, dateQueries] of [...byDate.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+        upsertDiscoveredQueries(ws.id, dateQueries, snapshotDate);
+      }
+      detectLostVisibility(ws.id, date);
       log.info({ workspaceId: ws.id, count: queries.length, date }, 'Rank snapshot captured');
     } catch (err) {
       log.warn({ err, workspaceId: ws.id }, 'Failed to capture rank snapshot — skipping workspace');

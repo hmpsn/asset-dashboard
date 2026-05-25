@@ -78,6 +78,10 @@ export function createTestContext(port: number): TestContext {
         NODE_ENV: 'test',
         APP_PASSWORD: '',
         DATA_DIR: dataDir,
+        // startServer watches stdout for the "running on" readiness line. The
+        // child stdout is not echoed, so this keeps readiness detection working
+        // without making Vitest output noisy.
+        LOG_LEVEL: 'info',
       },
       stdio: 'pipe',
     });

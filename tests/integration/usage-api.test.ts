@@ -26,4 +26,16 @@ describe('Usage / AI API', () => {
     // AI usage endpoint returns usage tracking data
     expect(body).toBeDefined();
   });
+
+  it('GET /api/ai/usage rejects non-positive days', async () => {
+    const res = await api('/api/ai/usage?days=0');
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('GET /api/ai/usage rejects non-integer days', async () => {
+    const res = await api('/api/ai/usage?days=7.5');
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
 });

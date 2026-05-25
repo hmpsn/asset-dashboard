@@ -42,6 +42,13 @@ import { requireAdminAuth } from '../middleware/admin-auth.js';
 
 const log = createLogger('google-auth');
 
+function parsePositiveIntQuery(rawValue: unknown, fallback: number): number | null {
+  if (rawValue == null) return fallback;
+  const parsed = Number(rawValue);
+  if (!Number.isInteger(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
 const requireWorkspaceGscPropertyAccess: RequestHandler = (req, res, next) => {
   const rawWorkspaceId = req.query.workspaceId;
   const workspaceId = Array.isArray(rawWorkspaceId) ? rawWorkspaceId[0] : rawWorkspaceId;
@@ -217,7 +224,8 @@ ${JSON.stringify(context, null, 2)}`;
 
 router.get('/api/google/search-overview/:siteId', requireWorkspaceSiteAccessFromQuery(), requireWorkspaceGscPropertyAccess, async (req, res) => {
   const gscSiteUrl = req.query.gscSiteUrl as string;
-  const days = parseInt(req.query.days as string) || 28;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
   if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
   try {
     const overview = await fetchSearchOverview(req.params.siteId, gscSiteUrl, days);
@@ -230,7 +238,8 @@ router.get('/api/google/search-overview/:siteId', requireWorkspaceSiteAccessFrom
 
 router.get('/api/google/performance-trend/:siteId', requireWorkspaceSiteAccessFromQuery(), requireWorkspaceGscPropertyAccess, async (req, res) => {
   const gscSiteUrl = req.query.gscSiteUrl as string;
-  const days = parseInt(req.query.days as string) || 28;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
   if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
   try {
     const trend = await fetchPerformanceTrend(req.params.siteId, gscSiteUrl, days);
@@ -243,7 +252,8 @@ router.get('/api/google/performance-trend/:siteId', requireWorkspaceSiteAccessFr
 
 router.get('/api/google/search-devices/:siteId', requireWorkspaceSiteAccessFromQuery(), requireWorkspaceGscPropertyAccess, async (req, res) => {
   const gscSiteUrl = req.query.gscSiteUrl as string;
-  const days = parseInt(req.query.days as string) || 28;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
   if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
   try {
     res.json(await fetchSearchDevices(req.params.siteId, gscSiteUrl, days));
@@ -254,8 +264,10 @@ router.get('/api/google/search-devices/:siteId', requireWorkspaceSiteAccessFromQ
 
 router.get('/api/google/search-countries/:siteId', requireWorkspaceSiteAccessFromQuery(), requireWorkspaceGscPropertyAccess, async (req, res) => {
   const gscSiteUrl = req.query.gscSiteUrl as string;
-  const days = parseInt(req.query.days as string) || 28;
-  const limit = parseInt(req.query.limit as string) || 20;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  const limit = parsePositiveIntQuery(req.query.limit, 20);
+  if (limit == null) return res.status(400).json({ error: 'limit must be a positive integer' });
   if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
   try {
     res.json(await fetchSearchCountries(req.params.siteId, gscSiteUrl, days, limit));
@@ -266,7 +278,8 @@ router.get('/api/google/search-countries/:siteId', requireWorkspaceSiteAccessFro
 
 router.get('/api/google/search-types/:siteId', requireWorkspaceSiteAccessFromQuery(), requireWorkspaceGscPropertyAccess, async (req, res) => {
   const gscSiteUrl = req.query.gscSiteUrl as string;
-  const days = parseInt(req.query.days as string) || 28;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
   if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
   try {
     res.json(await fetchSearchTypes(req.params.siteId, gscSiteUrl, days));
@@ -277,7 +290,8 @@ router.get('/api/google/search-types/:siteId', requireWorkspaceSiteAccessFromQue
 
 router.get('/api/google/search-comparison/:siteId', requireWorkspaceSiteAccessFromQuery(), requireWorkspaceGscPropertyAccess, async (req, res) => {
   const gscSiteUrl = req.query.gscSiteUrl as string;
-  const days = parseInt(req.query.days as string) || 28;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
   if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
   try {
     res.json(await fetchSearchComparison(req.params.siteId, gscSiteUrl, days));

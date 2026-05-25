@@ -22,7 +22,6 @@ import type { AuditSnapshot } from './reports.js';
 import { getAllGscPages } from './search-console.js';
 import { getGA4TopPages } from './google-analytics.js';
 import { loadDecayAnalysis } from './content-decay.js';
-import type { DecayingPage } from './content-decay.js';
 import { getDeclinedKeywords } from './keyword-feedback.js';
 import { listPageKeywords } from './page-keywords.js';
 import { listContentGaps } from './content-gaps.js';
@@ -33,12 +32,23 @@ import { getConfiguredProvider } from './seo-data-provider.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { normalizePageUrl } from './helpers.js';
+import { buildRecommendationStory } from './signal-story-registry.js';
+import { buildRecommendationGenerationContext } from './intelligence/generation-context-builders.js';
+import { applyOutcomeAdjustmentScore, buildOutcomeAdjustment } from './outcome-learning-default-path.js';
+import {
+  adjustKdImpactScore,
+  assessAuthorityFromBacklinks,
+  kdClassificationNote,
+} from './authority-context.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
 export type { RecPriority, RecType, RecStatus, RecActionType, Recommendation, RecommendationSet } from '../shared/types/recommendations.ts';
 import type { RecPriority, RecType, RecStatus, Recommendation, RecommendationSet } from '../shared/types/recommendations.ts';
 import type { ConversionAttributionData, CtrOpportunityData } from '../shared/types/analytics.js';
+import type { LearningsSlice } from '../shared/types/intelligence.js';
+import type { ActionType } from '../shared/types/outcome-tracking.js';
+import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('recommendations');
@@ -95,62 +105,36 @@ export function getRecoveryRate(checkName: string): RecoveryRate {
   return RECOVERY_RATES[checkName] || DEFAULT_RECOVERY;
 }
 
-/** Classification of a keyword's difficulty relative to a domain's authority.
- * Single source of truth for KD-gap boundaries — consumed by both
- * `adjustKdImpactScore` (score multiplier) and `kdClassificationNote`
- * (user-facing copy) so the boundaries can never drift.
- * @internal exported for unit testing
- */
-export type KdClassification = 'very-challenging' | 'challenging' | 'within-reach' | 'aligned';
+export {
+  adjustKdImpactScore,
+  classifyKdGap,
+  kdClassificationNote,
+} from './authority-context.js';
 
-/** Classifies a keyword's difficulty vs. a domain's authority bucket.
- * Returns `'aligned'` when domain strength is unknown (domainStrength === 0).
- * Boundaries are inclusive at both ends so callers never see off-by-one drift.
- * @internal exported for unit testing
- */
-export function classifyKdGap(difficulty: number, domainStrength: number): KdClassification {
-  if (!domainStrength) return 'aligned';
-  const kdGap = difficulty - domainStrength;
-  if (kdGap >= 30)  return 'very-challenging';
-  if (kdGap >= 15)  return 'challenging';
-  if (kdGap <= -20) return 'within-reach';
-  return 'aligned';
+/** @internal exported for unit testing */
+export function recommendationOutcomeActionType(type: RecType, source: string): ActionType {
+  if (type === 'content_refresh') return 'content_refreshed';
+  if (type === 'metadata') return 'meta_updated';
+  if (type === 'schema') return 'schema_deployed';
+  if (type === 'content') return 'content_published';
+  if (type === 'strategy' && source.startsWith('strategy:content-gap')) return 'content_published';
+  if (type === 'strategy') return 'insight_acted_on';
+  return 'audit_fix_applied';
 }
 
-/** Score multipliers per KD classification. Centralized so they stay in lockstep
- * with `classifyKdGap` boundaries and the user-facing copy.
- */
-const KD_SCORE_MULTIPLIER: Record<KdClassification, number> = {
-  'very-challenging': 0.6,
-  'challenging':      0.8,
-  'aligned':          1.0,
-  'within-reach':     1.2,
-};
-
-/** Adjusts a content-gap impact score based on keyword difficulty vs domain strength.
- * @internal exported for unit testing
- */
-export function adjustKdImpactScore(baseScore: number, difficulty: number, domainStrength: number): number {
-  const classification = classifyKdGap(difficulty, domainStrength);
-  const adjusted = Math.round(baseScore * KD_SCORE_MULTIPLIER[classification]);
-  return classification === 'within-reach' ? Math.min(100, adjusted) : adjusted;
-}
-
-/** Returns a user-facing KD note (prefixed with a leading space) matching the
- * classification, or an empty string when no note is warranted. Consumes the
- * same classifier as `adjustKdImpactScore` so note + score can never disagree.
- * @internal exported for unit testing
- */
-export function kdClassificationNote(difficulty: number, domainStrength: number): string {
-  switch (classifyKdGap(difficulty, domainStrength)) {
-    case 'very-challenging':
-    case 'challenging':
-      return ` (KD ${difficulty} may be challenging — consider building authority first)`;
-    case 'within-reach':
-      return ` (KD ${difficulty} is well within reach for your domain)`;
-    case 'aligned':
-      return '';
-  }
+function applyRecommendationOutcomeAdjustment(
+  baseScore: number,
+  type: RecType,
+  source: string,
+  learnings: LearningsSlice | null | undefined,
+  difficulty?: number | null,
+): number {
+  const adjustment = buildOutcomeAdjustment({
+    actionType: recommendationOutcomeActionType(type, source),
+    learnings,
+    difficulty,
+  });
+  return applyOutcomeAdjustmentScore(baseScore, adjustment);
 }
 
 // ─── Recommendation source keys ────────────────────────────────────
@@ -383,8 +367,10 @@ function getTrafficForSlug(traffic: TrafficMap, slug: string): { clicks: number;
   return { clicks: t.clicks, impressions: t.impressions };
 }
 
-/** Compute a 0–100 impact score for a recommendation */
-function computeImpactScore(
+/** Compute a 0–100 impact score for a recommendation
+ * @internal exported for unit testing
+ */
+export function computeImpactScore(
   severity: 'error' | 'warning' | 'info',
   isCritical: boolean,
   trafficScore: number,
@@ -401,8 +387,10 @@ function computeImpactScore(
   return Math.min(100, Math.round(sevBase + critBonus + trafficMultiplier));
 }
 
-/** Determine priority tier from impact score and severity */
-function determinePriority(
+/** Determine priority tier from impact score and severity
+ * @internal exported for unit testing
+ */
+export function determinePriority(
   impactScore: number,
   severity: 'error' | 'warning' | 'info',
   trafficScore: number,
@@ -419,7 +407,8 @@ function determinePriority(
  * Decay analysis also stores absolute URLs in some code paths.
  * All other callers pass relative paths (/foo or foo) — those work unchanged.
  */
-function toPageSlug(url: string): string {
+/** @internal exported for unit testing */
+export function toPageSlug(url: string): string {
   let path = url;
   if (url.startsWith('http')) {
     try { path = new URL(url).pathname; } catch { /* fall through */ }
@@ -444,7 +433,8 @@ const URL_SLUG_PREFIXES = ['insight:ctr_opportunity:', 'insight:freshness_alert:
  * which applies this function to the source portion and toPageSlug() to the
  * suffix portion separately.
  */
-function migrateSourceKey(source: string): string {
+/** @internal exported for unit testing */
+export function migrateSourceKey(source: string): string {
   for (const prefix of URL_SLUG_PREFIXES) {
     if (source.startsWith(prefix)) {
       const slug = source.slice(prefix.length);
@@ -462,15 +452,18 @@ function migrateSourceKey(source: string): string {
  * recs produce matching keys, preserving in_progress/dismissed status across
  * the one-time migration.
  */
-function buildMergeKey(rec: { source: string; affectedPages: string[]; title: string }): string {
+/** @internal exported for unit testing */
+export function buildMergeKey(rec: { source: string; affectedPages: string[]; title: string }): string {
   const source = migrateSourceKey(rec.source);
   if (!source.startsWith('strategy:')) return source;
   const page = rec.affectedPages[0] ? toPageSlug(rec.affectedPages[0]) : rec.title;
   return `${source}::${page}`;
 }
 
-/** Weight impact score based on page type (homepage/service pages matter more) */
-function pageImportanceMultiplier(slug: string): number {
+/** Weight impact score based on page type (homepage/service pages matter more)
+ * @internal exported for unit testing
+ */
+export function pageImportanceMultiplier(slug: string): number {
   const s = slug.toLowerCase().replace(/^\//, '');
   if (s === '' || s === 'index' || s === 'home') return 1.5;
   if (/(?:^|\/)services?|solutions?|products?|pricing|packages/.test(s)) return 1.2;
@@ -478,8 +471,10 @@ function pageImportanceMultiplier(slug: string): number {
   return 1.0;
 }
 
-/** Map check name to recommendation type */
-function checkToRecType(check: string, category?: string): RecType {
+/** Map check name to recommendation type
+ * @internal exported for unit testing
+ */
+export function checkToRecType(check: string, category?: string): RecType {
   const chk = check.toLowerCase();
   if (chk.startsWith('aeo-')) return 'aeo';
   if (chk.includes('meta') || chk.includes('title') || chk.includes('description')) return 'metadata';
@@ -490,8 +485,10 @@ function checkToRecType(check: string, category?: string): RecType {
   return 'technical';
 }
 
-/** Map issue type to purchasable product */
-function mapToProduct(recType: RecType, pageCount: number): { productType?: string; productPrice?: number } {
+/** Map issue type to purchasable product
+ * @internal exported for unit testing
+ */
+export function mapToProduct(recType: RecType, pageCount: number): { productType?: string; productPrice?: number } {
   switch (recType) {
     case 'metadata':
       return pageCount >= 10
@@ -518,8 +515,10 @@ function mapToProduct(recType: RecType, pageCount: number): { productType?: stri
 
 // ─── Insight Text Generators ──────────────────────────────────────
 
-/** Infer the most appropriate schema type(s) from a list of page slugs */
-function inferSchemaTypes(slugs: string[]): string {
+/** Infer the most appropriate schema type(s) from a list of page slugs
+ * @internal exported for unit testing
+ */
+export function inferSchemaTypes(slugs: string[]): string {
   const types = new Set<string>();
   for (const slug of slugs) {
     const s = slug.toLowerCase();
@@ -535,7 +534,7 @@ function inferSchemaTypes(slugs: string[]): string {
   return Array.from(types).join(', ');
 }
 
-function auditInsight(
+export function auditInsight(
   check: string,
   _severity: string,
   affectedCount: number,
@@ -564,7 +563,7 @@ function auditInsight(
   if (chk.includes('canonical')) {
     return `${affectedCount} pages have canonical tag issues. Without proper canonicals, Google may see duplicate content and dilute your rankings across multiple URLs.`;
   }
-  if (chk.includes('structured') || chk.includes('schema')) {
+  if ((chk.includes('structured') || chk.includes('schema')) && !chk.startsWith('aeo-')) {
     const schemaTypes = affectedSlugs && affectedSlugs.length > 0
       ? inferSchemaTypes(affectedSlugs)
       : null;
@@ -668,19 +667,6 @@ async function resolveDomainStrength(ws: Workspace, workspaceId: string): Promis
   }
 }
 
-function decayInsight(page: DecayingPage): string {
-  const decline = Math.abs(page.clickDeclinePct);
-  const clickDrop = page.previousClicks - page.currentClicks;
-  if (page.severity === 'critical') {
-    return `This page lost ${decline}% of its search clicks (${clickDrop} clicks/mo). ` +
-      `Position moved from ${page.previousPosition.toFixed(1)} to ${page.currentPosition.toFixed(1)}. ` +
-      `Refreshing the content — updating facts, improving structure, and targeting current search intent — can recover most of this traffic.`;
-  }
-  return `Search clicks declined ${decline}% (${clickDrop} fewer clicks/mo). ` +
-    `The page may be losing relevance as competitors update their content. ` +
-    `A targeted refresh addressing current search intent could reverse the trend.`;
-}
-
 // ─── Main Engine ──────────────────────────────────────────────────
 
 export async function generateRecommendations(workspaceId: string): Promise<RecommendationSet> {
@@ -704,6 +690,18 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   const audit: AuditSnapshot | null = ws.webflowSiteId ? getLatestSnapshot(ws.webflowSiteId) : null;
   const traffic = await fetchTrafficMap(ws);
   const strategy = ws.keywordStrategy;
+  const recommendationContext = await buildRecommendationGenerationContext(workspaceId, {
+    slices: ['learnings', 'seoContext'],
+    learningsDomain: 'all',
+    verbosity: 'standard',
+    tokenBudget: 800,
+    enrichWithBacklinks: true,
+  }).catch(err => {
+    log.warn({ err, workspaceId }, 'Recommendation learnings context unavailable — continuing without outcome adjustments');
+    return null;
+  });
+  const outcomeLearnings = recommendationContext?.intelligence.learnings;
+  const backlinkProfile = recommendationContext?.intelligence.seoContext?.backlinkProfile;
 
   // Fetch domain strength once per rec-gen cycle (cached at provider layer; see resolveDomainStrength).
   const domainStrength = await resolveDomainStrength(ws, workspaceId);
@@ -804,6 +802,12 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           ? `Fixing this could increase organic clicks by ${rate.perRec} on ${group.pages.length} affected page${group.pages.length !== 1 ? 's' : ''}`
           : `Improves SEO health score and search engine compatibility across ${group.pages.length} page${group.pages.length !== 1 ? 's' : ''}`;
 
+      const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
+        impactScore,
+        recType,
+        RecSource.audit(group.check),
+        outcomeLearnings,
+      );
       recs.push({
         id: `rec_${crypto.randomBytes(6).toString('hex')}`,
         workspaceId,
@@ -814,7 +818,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         insight: auditInsight(group.check, group.severity, group.pages.length, group.totalClicks, sortedPages.map(p => p.slug)),
         impact,
         effort,
-        impactScore,
+        impactScore: adjustedImpactScore,
         source: RecSource.audit(group.check),
         affectedPages: sortedPages.map(p => p.slug),
         trafficAtRisk: group.totalClicks,
@@ -850,6 +854,12 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         ? `Affects ${pages.length} page${pages.length !== 1 ? 's' : ''} on the site`
         : 'Affects the entire site';
 
+      const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
+        impactScore,
+        'technical',
+        RecSource.auditSiteWide(issue.check),
+        outcomeLearnings,
+      );
       recs.push({
         id: `rec_${crypto.randomBytes(6).toString('hex')}`,
         workspaceId,
@@ -860,7 +870,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         insight: issue.message,
         impact: isCrit ? 'high' : 'medium',
         effort: 'low',
-        impactScore,
+        impactScore: adjustedImpactScore,
         source: RecSource.auditSiteWide(issue.check),
         affectedPages: pages.map(p => p.replace(/^\//, '')),
         trafficAtRisk: pageTraffic,
@@ -878,7 +888,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   // ── 2. Strategy-based recommendations ──
   // Load declined keywords so we can skip suggestions the client has rejected (2C)
   const declinedKeywords = new Set(
-    getDeclinedKeywords(workspaceId).map(k => k.toLowerCase())
+    getDeclinedKeywords(workspaceId).map(k => keywordComparisonKey(k)).filter(Boolean)
   );
 
   if (strategy) {
@@ -888,18 +898,22 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     if (quickWins.length > 0) {
       for (const qw of quickWins) {
         // 2C: skip if the current keyword was declined
-        if (qw.currentKeyword && declinedKeywords.has(qw.currentKeyword.toLowerCase())) continue;
+        if (qw.currentKeyword && declinedKeywords.has(keywordComparisonKey(qw.currentKeyword))) continue;
 
         const t = getTrafficForSlug(traffic, qw.pagePath.replace(/^\//, ''));
         // 2E: demote zero-traffic quick wins — fixing meta on unvisited pages is not a "quick win"
         const hasTraffic = t.clicks > 0 || t.impressions > 0;
         const impactScore = qw.estimatedImpact === 'high' ? 75 : qw.estimatedImpact === 'medium' ? 55 : 35;
-        // 2D: apply page importance multiplier
         const pageMultiplier = pageImportanceMultiplier(qw.pagePath);
-        const adjustedScore = Math.min(100, Math.round(impactScore * pageMultiplier));
         const priority: RecPriority = !hasTraffic
           ? 'fix_later'
           : qw.estimatedImpact === 'high' ? 'fix_now' : 'fix_soon';
+        const adjustedScore = applyRecommendationOutcomeAdjustment(
+          Math.min(100, Math.round(impactScore * pageMultiplier)),
+          'strategy',
+          RecSource.strategyQuickWin(),
+          outcomeLearnings,
+        );
         recs.push({
           id: `rec_${crypto.randomBytes(6).toString('hex')}`,
           workspaceId,
@@ -932,7 +946,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     if (strategyContentGaps.length > 0) {
       for (const cg of strategyContentGaps) {
         // 2C: skip if the target keyword was declined by the client
-        if (cg.targetKeyword && declinedKeywords.has(cg.targetKeyword.toLowerCase())) continue;
+        if (cg.targetKeyword && declinedKeywords.has(keywordComparisonKey(cg.targetKeyword))) continue;
 
         let baseScore = cg.priority === 'high' ? 65 : cg.priority === 'medium' ? 45 : 25;
         // Apply authority-adjusted KD filtering
@@ -952,22 +966,39 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         // Use `!= null` (not truthy) so difficulty=0 (trivial keyword) is classified as
         // "within-reach" by kdClassificationNote, matching adjustKdImpactScore above.
         const kdNote = cg.difficulty != null ? kdClassificationNote(cg.difficulty, domainStrength) : '';
+        const authorityAssessment = assessAuthorityFromBacklinks(cg.difficulty ?? null, backlinkProfile);
+        const story = buildRecommendationStory('content_gap', {
+          topic: cg.topic,
+          targetKeyword: cg.targetKeyword,
+          rationale: cg.rationale,
+          suggestedPageType: cg.suggestedPageType,
+          intent: cg.intent,
+          kdNote,
+          authorityContext: authorityAssessment.note,
+        });
+        const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
+          impactScore,
+          'content',
+          RecSource.strategyContentGap(),
+          outcomeLearnings,
+          cg.difficulty ?? null,
+        );
         recs.push({
           id: `rec_${crypto.randomBytes(6).toString('hex')}`,
           workspaceId,
           priority: cg.priority === 'high' ? 'fix_soon' : 'ongoing',
           type: 'content',
-          title: `Content Gap: ${cg.topic}`,
-          description: cg.rationale,
-          insight: strategyInsight('content_gap', cg),
+          title: story.title,
+          description: story.description,
+          insight: story.insight,
           impact: cg.priority as 'high' | 'medium' | 'low',
           effort: 'high',
-          impactScore,
+          impactScore: adjustedImpactScore,
           source: RecSource.strategyContentGap(),
           affectedPages: [],
           trafficAtRisk: 0,
           impressionsAtRisk: 0,
-          estimatedGain: `New ${cg.suggestedPageType || 'page'} targeting "${cg.targetKeyword}" (${cg.intent} intent)${kdNote}`,
+          estimatedGain: story.estimatedGain,
           actionType: 'content_creation',
           status: 'pending',
           assignedTo,
@@ -983,31 +1014,44 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     if (pageKeywords.length > 0) {
       for (const pm of pageKeywords) {
         // 2C: skip if the primary keyword was declined
-        if (pm.primaryKeyword && declinedKeywords.has(pm.primaryKeyword.toLowerCase())) continue;
+        if (pm.primaryKeyword && declinedKeywords.has(keywordComparisonKey(pm.primaryKeyword))) continue;
 
         if (pm.currentPosition && pm.currentPosition > 3 && pm.currentPosition <= 20 && pm.impressions && pm.impressions > 100) {
           // Page ranking 4-20 with decent impressions — opportunity to push up
           // 2D: apply page importance multiplier
           const baseScore = pm.currentPosition <= 10 ? 60 : 40;
           const impactScore = Math.min(100, Math.round(baseScore * pageImportanceMultiplier(pm.pagePath)));
+          const authorityAssessment = assessAuthorityFromBacklinks(pm.difficulty ?? null, backlinkProfile);
+          const story = buildRecommendationStory('ranking_opportunity', {
+            keyword: pm.primaryKeyword,
+            pagePath: pm.pagePath,
+            currentPosition: pm.currentPosition,
+            impressions: pm.impressions,
+            authorityContext: authorityAssessment.note,
+          });
+          const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
+            impactScore,
+            'strategy',
+            RecSource.strategyRankingOpp(),
+            outcomeLearnings,
+            pm.difficulty ?? null,
+          );
           recs.push({
             id: `rec_${crypto.randomBytes(6).toString('hex')}`,
             workspaceId,
             priority: pm.currentPosition <= 10 ? 'fix_soon' : 'ongoing',
             type: 'strategy',
-            title: `Ranking Opportunity: "${pm.primaryKeyword}" (pos ${Math.round(pm.currentPosition)})`,
-            description: `${pm.pagePath} ranks #${Math.round(pm.currentPosition)} for "${pm.primaryKeyword}" with ${pm.impressions?.toLocaleString()} impressions. Optimizing this page could push it onto page 1 or into the top 3.`,
-            insight: pm.currentPosition <= 10
-              ? `This page is on page 1 but not in the top 3. Moving from position ${Math.round(pm.currentPosition)} to top 3 could 2-3x click-through rate.`
-              : `This page ranks on page 2 — just outside where most clicks happen. A focused optimization push could move it onto page 1.`,
+            title: story.title,
+            description: story.description,
+            insight: story.insight,
             impact: pm.currentPosition <= 10 ? 'high' : 'medium',
             effort: 'medium',
-            impactScore,
+            impactScore: adjustedImpactScore,
             source: RecSource.strategyRankingOpp(),
             affectedPages: [pm.pagePath.replace(/^\//, '')],
             trafficAtRisk: pm.clicks || 0,
             impressionsAtRisk: pm.impressions || 0,
-            estimatedGain: `Moving to top 3 could increase clicks by ${Math.round((pm.impressions || 0) * 0.15)} - ${Math.round((pm.impressions || 0) * 0.3)}/mo`,
+            estimatedGain: story.estimatedGain,
             actionType: 'manual',
             status: 'pending',
             assignedTo,
@@ -1034,6 +1078,12 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       if (!mismatch) continue;
       intentMismatchCount++;
       const pageSlug = toPageSlug(pk.pagePath);
+      const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
+        50,
+        'strategy',
+        RecSource.strategyIntentMismatch(pageSlug),
+        outcomeLearnings,
+      );
       recs.push({
         id: `rec_${crypto.randomBytes(6).toString('hex')}`,
         workspaceId,
@@ -1044,7 +1094,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         insight: `Pages rank better when page type matches search intent. ${reason}`,
         impact: 'medium',
         effort: 'medium',
-        impactScore: 50,
+        impactScore: adjustedImpactScore,
         source: RecSource.strategyIntentMismatch(pageSlug),
         affectedPages: [pageSlug],
         trafficAtRisk: 0,
@@ -1068,7 +1118,6 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
 
       for (const dp of actionableDecay) {
         const pageSlug = toPageSlug(dp.page);
-        const isHighTraffic = dp.previousClicks >= 100; // Was a meaningful traffic page
 
         const priority: RecPriority = dp.severity === 'critical' ? 'fix_now' : 'fix_soon';
         const impactScore = dp.severity === 'critical'
@@ -1076,27 +1125,40 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           : Math.min(70, 40 + Math.round(dp.previousClicks / 100));
 
         const product = mapToProduct('content_refresh', 1);
-        const clicksLost = dp.previousClicks - dp.currentClicks;
+        const story = buildRecommendationStory('content_decay', {
+          pagePath: dp.page,
+          title: dp.title,
+          clickDeclinePct: dp.clickDeclinePct,
+          refreshRecommendation: dp.refreshRecommendation,
+          severity: dp.severity,
+          previousClicks: dp.previousClicks,
+          currentClicks: dp.currentClicks,
+          previousPosition: dp.previousPosition,
+          currentPosition: dp.currentPosition,
+        });
 
+        const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
+          impactScore,
+          'content_refresh',
+          RecSource.decay(pageSlug),
+          outcomeLearnings,
+        );
         recs.push({
           id: `rec_${crypto.randomBytes(6).toString('hex')}`,
           workspaceId,
           priority,
           type: 'content_refresh',
-          title: `Content Decay: ${dp.title || dp.page} (${Math.abs(dp.clickDeclinePct)}% decline)`,
-          description: dp.refreshRecommendation
-            || `This page has lost ${Math.abs(dp.clickDeclinePct)}% of its search clicks. Refresh the content to recover traffic.`,
-          insight: decayInsight(dp),
+          title: story.title,
+          description: story.description,
+          insight: story.insight,
           impact: dp.severity === 'critical' ? 'high' : 'medium',
           effort: 'medium',
-          impactScore,
+          impactScore: adjustedImpactScore,
           source: RecSource.decay(pageSlug),
           affectedPages: [pageSlug],
           trafficAtRisk: dp.previousClicks,
           impressionsAtRisk: dp.previousImpressions,
-          estimatedGain: isHighTraffic
-            ? `Refreshing could recover ${Math.round(clicksLost * 0.5)} – ${clicksLost} clicks/mo`
-            : `Content refresh to reverse ${Math.abs(dp.clickDeclinePct)}% traffic decline`,
+          estimatedGain: story.estimatedGain,
           actionType: product.productType ? 'purchase' : 'manual',
           productType: product.productType,
           productPrice: product.productPrice,
@@ -1133,22 +1195,36 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       const gap = d.estimatedClickGap ?? 0;
       if (gap <= 0) continue;
       const product = mapToProduct('metadata', 1);
+      const story = buildRecommendationStory('ctr_opportunity', {
+        pageSlug,
+        actualCtr: d.actualCtr,
+        expectedCtr: d.expectedCtr,
+        impressions: d.impressions ?? 0,
+        position: d.position ?? 0,
+        gap,
+      });
+      const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
+        Math.min(90, 40 + Math.round(gap / 2)),
+        'metadata',
+        RecSource.ctrOpportunity(pageSlug),
+        outcomeLearnings,
+      );
       recs.push({
         id: `rec_${crypto.randomBytes(6).toString('hex')}`,
         workspaceId,
         priority: gap > 50 ? 'fix_now' : 'fix_soon',
         type: 'metadata',
-        title: `CTR Underperformance: /${pageSlug} (${d.actualCtr}% vs ${d.expectedCtr}% expected)`,
-        description: `This page gets ${d.impressions?.toLocaleString()} impressions/mo at position #${d.position?.toFixed(1)} but only ${d.actualCtr}% CTR (expected ~${d.expectedCtr}%). Improving the title and meta description could add ~${gap} clicks/mo.`,
-        insight: `CTR below expected for this position means the title/description isn't compelling enough to earn clicks. Target CTR for position ${d.position?.toFixed(1)} is ~${d.expectedCtr}%.`,
+        title: story.title,
+        description: story.description,
+        insight: story.insight,
         impact: gap > 100 ? 'high' : gap > 30 ? 'medium' : 'low',
         effort: 'low',
-        impactScore: Math.min(90, 40 + Math.round(gap / 2)),
+        impactScore: adjustedImpactScore,
         source: RecSource.ctrOpportunity(pageSlug),
         affectedPages: [pageSlug],
         trafficAtRisk: gap,
         impressionsAtRisk: d.impressions ?? 0,
-        estimatedGain: `Optimizing title/meta could recover ~${gap} clicks/mo`,
+        estimatedGain: story.estimatedGain,
         actionType: product.productType ? 'purchase' : 'manual',
         productType: product.productType,
         productPrice: product.productPrice,
@@ -1177,6 +1253,12 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       for (let actionIdx = 0; actionIdx < Math.min(report.remediationActions.length, 5); actionIdx++) {
         const action = report.remediationActions[actionIdx];
         const recType: RecType = action.owner === 'content' ? 'content' : 'technical';
+        const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
+          diagImpactMap[action.impact] ?? 55,
+          recType,
+          RecSource.diagnostic(report.id, actionIdx, action.title),
+          outcomeLearnings,
+        );
         recs.push({
           id: `rec_${crypto.randomBytes(6).toString('hex')}`,
           workspaceId,
@@ -1187,7 +1269,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           insight: `Identified by deep diagnostic investigation (report ${report.id.slice(0, 8)}). ${action.description}`,
           impact: action.impact,
           effort: action.effort,
-          impactScore: diagImpactMap[action.impact] ?? 55,
+          impactScore: adjustedImpactScore,
           source: RecSource.diagnostic(report.id, actionIdx, action.title),
           affectedPages: action.pageUrls?.map(toPageSlug) ?? [],
           trafficAtRisk: 0,
@@ -1219,22 +1301,33 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       const trafficAtRisk = d.impressions ?? 0;
       const impactScore = Math.min(Math.round(trafficAtRisk / 50), 80);
       const product = mapToProduct('content_refresh', 1);
+      const story = buildRecommendationStory('freshness_alert', {
+        pagePath: d.pagePath,
+        daysSinceLastAnalysis: d.daysSinceLastAnalysis,
+        trafficAtRisk,
+      });
+      const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
+        impactScore,
+        'content_refresh',
+        RecSource.freshnessAlert(toPageSlug(d.pagePath)),
+        outcomeLearnings,
+      );
       recs.push({
         id: `rec_${crypto.randomBytes(6).toString('hex')}`,
         workspaceId,
         priority: d.daysSinceLastAnalysis > 180 ? 'fix_now' : 'fix_soon',
         type: 'content_refresh',
-        title: `Stale Content: ${d.pagePath} (${d.daysSinceLastAnalysis} days since last update)`,
-        description: `This page hasn't been analyzed in ${d.daysSinceLastAnalysis} days${trafficAtRisk > 0 ? ` and still receives ~${trafficAtRisk.toLocaleString()} monthly impressions` : ''}. A content refresh can protect rankings before they decline.`,
-        insight: `Search engines favor recently-updated content. Pages stale for ${d.daysSinceLastAnalysis > 180 ? 'over 6 months' : 'over 3 months'} face elevated ranking risk.`,
+        title: story.title,
+        description: story.description,
+        insight: story.insight,
         impact: d.daysSinceLastAnalysis > 180 ? 'high' : 'medium',
         effort: 'medium',
-        impactScore,
+        impactScore: adjustedImpactScore,
         source: RecSource.freshnessAlert(toPageSlug(d.pagePath)),
         affectedPages: [toPageSlug(d.pagePath)],
         trafficAtRisk,
         impressionsAtRisk: trafficAtRisk,
-        estimatedGain: `Refreshing this page can protect ${trafficAtRisk.toLocaleString()} monthly impressions from ranking decline`,
+        estimatedGain: story.estimatedGain,
         actionType: product.productType ? 'purchase' : 'manual',
         productType: product.productType,
         productPrice: product.productPrice,

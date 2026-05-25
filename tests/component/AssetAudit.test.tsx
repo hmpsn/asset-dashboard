@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { AssetAudit } from '../../src/components/AssetAudit';
 
 const getMock = vi.fn();
@@ -62,5 +62,22 @@ describe('AssetAudit', () => {
     expect(screen.getByText('Oversized')).toBeInTheDocument();
 
     expect(getMock).toHaveBeenCalledWith('/api/webflow/audit/site-1?workspaceId=ws-1');
+  });
+
+  it('handles audit API error and does not render summary cards', async () => {
+    getMock.mockRejectedValueOnce(new Error('audit failed'));
+
+    render(<AssetAudit siteId="site-1" workspaceId="ws-1" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Run Asset Audit' }));
+
+    await waitFor(() => {
+      expect(getMock).toHaveBeenCalledWith('/api/webflow/audit/site-1?workspaceId=ws-1');
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText('Scanning published pages, CMS collections, CSS, and assets...')).not.toBeInTheDocument();
+    });
+    expect(screen.queryByText('Health Score')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Run Asset Audit' })).not.toBeInTheDocument();
   });
 });

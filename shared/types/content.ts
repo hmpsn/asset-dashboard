@@ -116,11 +116,33 @@ export interface AIReviewResult {
   reason: string;
   humanReviewRequired?: boolean;
   claimsToVerify?: string[];
+  claimEvidence?: ContentReviewClaimEvidence[];
 }
 
 export type AIReviewMap = Record<ReviewChecklistKey, AIReviewResult>;
 
+export type ContentReviewEvidenceSourceKind =
+  | 'reference_url'
+  | 'serp_top_result'
+  | 'paa'
+  | 'manual_unknown';
+
+export interface ContentReviewEvidenceCandidate {
+  kind: ContentReviewEvidenceSourceKind;
+  label: string;
+  url?: string;
+  position?: number;
+  confidence?: 'strong' | 'possible';
+  matchReason?: string;
+}
+
+export interface ContentReviewClaimEvidence {
+  claim: string;
+  sourceCandidates: ContentReviewEvidenceCandidate[];
+}
+
 export interface ContentReviewEvidence {
+  referenceUrls?: string[];
   peopleAlsoAsk: string[];
   topResults: { position: number; title: string; url: string }[];
   note: string;
@@ -318,6 +340,35 @@ export interface KeywordCandidate {
   cpc: number;
   source: 'pattern' | 'semrush_related' | 'ai_suggested' | 'gsc';
   isRecommended: boolean;
+  authorityAssessment?: {
+    posture: 'authority_unknown' | 'within_current_authority_range' | 'requires_authority_building';
+    note: string;
+    referringDomains?: number;
+  };
+}
+
+export interface KeywordRecommendationReasoningAlternative {
+  keyword: string;
+  reasons: string[];
+}
+
+export interface KeywordRecommendationReasoning {
+  recommendedReason: string;
+  alternatives: KeywordRecommendationReasoningAlternative[];
+}
+
+export interface KeywordRecommendationOptions {
+  useAI?: boolean;
+  maxCandidates?: number;
+  includeReasoning?: boolean;
+}
+
+export interface KeywordRecommendationResult {
+  seedKeyword: string;
+  candidates: KeywordCandidate[];
+  recommended: string | null;
+  message?: string;
+  reasoning?: KeywordRecommendationReasoning;
 }
 
 export interface StatusHistoryEntry {

@@ -14,7 +14,7 @@
  *  client-search → ['client-search', wsId, metric, days, dr] similarly
  */
 
-export type DateRange = { startDate: string; endDate: string };
+export type DateRange = AnalyticsDateRange;
 
 export const queryKeys = {
   // ── Admin ─────────────────────────────────────────────────────────
@@ -76,6 +76,15 @@ export const queryKeys = {
     seoSuggestions: (wsId: string) => ['seo-suggestions', wsId] as const,
     rewritePages: (wsId: string) => ['admin-rewrite-pages', wsId] as const,
     keywordStrategy: (wsId: string) => ['keyword-strategy', wsId] as const,
+    keywordCommandCenter: (wsId: string) => ['admin-keyword-command-center', wsId] as const,
+    keywordCommandCenterSummary: (wsId: string) => ['admin-keyword-command-center', wsId, 'summary'] as const,
+    keywordCommandCenterRows: (wsId: string, query: unknown) => ['admin-keyword-command-center', wsId, 'rows', query] as const,
+    keywordCommandCenterDetail: (wsId: string, keyword: string) => ['admin-keyword-command-center', wsId, 'detail', keyword] as const,
+    localSeo: (wsId: string) => ['admin-local-seo', wsId] as const,
+    localSeoLocations: (wsId: string) => ['admin-local-seo-locations', wsId] as const,
+    rankTrackingKeywords: (wsId: string) => ['admin-rank-tracking-keywords', wsId] as const,
+    rankTrackingLatest: (wsId: string) => ['admin-rank-tracking-latest', wsId] as const,
+    rankTrackingHistory: (wsId: string) => ['admin-rank-tracking-history', wsId] as const,
     anomalyAlerts: (wsId: string) => ['anomaly-alerts', wsId] as const,
     competitorIntel: (wsId: string, competitorKey: string) =>
       ['admin-competitive-intel', wsId, competitorKey] as const,
@@ -190,6 +199,7 @@ export const queryKeys = {
     schemaPlan: (wsId: string) => ['client-schema-plan', wsId] as const,
     schemaSnapshot: (wsId: string) => ['client-schema-snapshot', wsId] as const,
     strategy: (wsId: string) => ['client-strategy', wsId] as const,
+    keywordFeedback: (wsId: string) => ['client-keyword-feedback', wsId] as const,
     pricing: (wsId: string) => ['client-pricing', wsId] as const,
     contentSubscription: (wsId: string) => ['client-content-subscription', wsId] as const,
     contentPlan: (wsId: string) => ['client-content-plan', wsId] as const,
@@ -226,3 +236,4 @@ export const queryKeys = {
     featureFlags: () => ['feature-flags'] as const,
   },
 } as const;
+import type { AnalyticsDateRange } from '../../shared/types/analytics-contract.js';

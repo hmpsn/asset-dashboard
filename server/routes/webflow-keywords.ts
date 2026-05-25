@@ -16,6 +16,7 @@ import { WS_EVENTS } from '../ws-events.js';
 import { addActivity } from '../activity-log.js';
 import { requireWorkspaceAccessFromBody } from '../auth.js';
 import { getProviderMetricsForKeyword, resolvePersistedKeywordMetrics } from '../provider-keyword-metrics.js';
+import { resolveWorkspaceLocationCode } from '../local-seo.js';
 import { validate } from '../middleware/validate.js';
 import { keywordAnalysisPersistSchema, pageAnalysisAiResultSchema, type PageAnalysisAiResult } from '../schemas/page-analysis.js';
 
@@ -50,8 +51,9 @@ router.post('/api/webflow/keyword-analysis', requireWorkspaceAccessFromBody(), a
       const words = seedKeyword.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter((w: string) => w.length > 2);
       if (words.length > 0) {
         const phrase = words.slice(0, 5).join(' ');
+        const locationCode = resolveWorkspaceLocationCode(workspaceId) ?? undefined;
         const [metrics, related] = await Promise.all([
-          kwProvider.getKeywordMetrics([phrase], workspaceId).catch(() => []),
+          kwProvider.getKeywordMetrics([phrase], workspaceId, undefined, locationCode).catch(() => []),
           kwProvider.getRelatedKeywords(phrase, workspaceId, 10).catch(() => []),
         ]);
         if (metrics.length > 0) {

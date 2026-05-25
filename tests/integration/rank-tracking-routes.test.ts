@@ -15,6 +15,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 
 const ctx = createTestContext(13213);
 const { api, postJson, patchJson, del } = ctx;
@@ -83,6 +84,22 @@ describe('Rank Tracking — keywords CRUD', () => {
     );
     expect(res.status).toBe(200);
   });
+
+  it('POST dedupes canonical keyword variants', async () => {
+    const first = await postJson(`/api/rank-tracking/${testWsId}/keywords`, {
+      query: 'Emergency Dentist - Near-Me',
+    });
+    expect(first.status).toBe(200);
+
+    const second = await postJson(`/api/rank-tracking/${testWsId}/keywords`, {
+      query: ' emergency dentist near me ',
+    });
+    expect(second.status).toBe(200);
+    const body = await second.json();
+    const matches = body.filter((k: { query: string }) => keywordComparisonKey(k.query) === 'emergency dentist near me');
+    expect(matches).toHaveLength(1);
+    expect(matches[0].query).toBe('Emergency Dentist - Near-Me');
+  });
 });
 
 describe('Rank Tracking — history and latest', () => {
@@ -91,6 +108,18 @@ describe('Rank Tracking — history and latest', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(Array.isArray(body)).toBe(true);
+  });
+
+  it('GET /api/rank-tracking/:workspaceId/history rejects non-positive limit', async () => {
+    const res = await api(`/api/rank-tracking/${testWsId}/history?limit=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
+  });
+
+  it('GET /api/rank-tracking/:workspaceId/history rejects non-integer limit', async () => {
+    const res = await api(`/api/rank-tracking/${testWsId}/history?limit=1.5`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
   });
 
   it('GET /api/rank-tracking/:workspaceId/latest returns array', async () => {
@@ -116,6 +145,18 @@ describe('Rank Tracking — public endpoints', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(Array.isArray(body)).toBe(true);
+  });
+
+  it('GET /api/public/rank-tracking/:workspaceId/history rejects non-positive limit', async () => {
+    const res = await api(`/api/public/rank-tracking/${testWsId}/history?limit=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
+  });
+
+  it('GET /api/public/rank-tracking/:workspaceId/history rejects non-integer limit', async () => {
+    const res = await api(`/api/public/rank-tracking/${testWsId}/history?limit=2.5`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
   });
 
   it('GET /api/public/rank-tracking/:workspaceId/latest returns array', async () => {

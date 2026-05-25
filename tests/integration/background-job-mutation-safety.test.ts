@@ -38,6 +38,7 @@ vi.mock('../../server/workspace-intelligence.js', () => ({
     },
     pageProfile: null,
   })),
+  formatForPrompt: vi.fn(() => ''),
   formatKeywordsForPrompt: vi.fn(() => ''),
   formatPersonasForPrompt: vi.fn(() => ''),
   formatPageMapForPrompt: vi.fn(() => ''),

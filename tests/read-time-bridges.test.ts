@@ -13,9 +13,13 @@ describe('Bridge #8: content decay → repeat decay tagging', () => {
 });
 
 describe('Bridge #9: keyword recommendations → learnings weighting', () => {
-  it('keyword-recommendations.ts imports workspace-learnings for KD weighting', () => {
-    const src = readFileSync(resolve(serverDir, 'keyword-recommendations.ts'), 'utf-8'); // readFile-ok — bridge wiring guard: asserts Bridge #9 imports workspace-learnings for KD weighting via getWorkspaceLearnings.
-    expect(src).toContain('getWorkspaceLearnings');
+  it('keyword-recommendations.ts applies KD weighting through the shared outcome-learning helper', () => {
+    const src = readFileSync(resolve(serverDir, 'keyword-recommendations.ts'), 'utf-8'); // readFile-ok — bridge wiring guard: asserts Bridge #9 still applies KD-range learnings weighting, now via buildRecommendationGenerationContext() and learnings.summary.strategy.winRateByDifficultyRange.
+    const outcomeLearningSrc = readFileSync(resolve(serverDir, 'outcome-learning-default-path.ts'), 'utf-8'); // readFile-ok — bridge wiring guard: asserts Bridge #9's shared helper still reads strategy KD-range outcomes.
+    expect(src).toContain('buildRecommendationGenerationContext');
+    expect(src).toContain('buildOutcomeAdjustment');
+    expect(src).toContain('applyOutcomeAdjustmentScore');
+    expect(outcomeLearningSrc).toContain('winRateByDifficultyRange');
   });
 });
 

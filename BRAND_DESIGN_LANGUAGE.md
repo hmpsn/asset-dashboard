@@ -127,7 +127,7 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **TrendBadge** | `TrendBadge.tsx` | Positive: `text-emerald-400` + `TrendingUp`; Negative: `text-red-400` + `TrendingDown`; Zero (when `hideOnZero={false}`): `text-zinc-400` + `Minus` | Canonical directional delta indicator. Props: `value`, `suffix='%'`, `invert`, `showSign`, `label`, `size='sm'\|'md'`, `hideOnZero=true`. Replaces all hand-rolled `TrendingUp/Down + emerald/red` ternaries. Use `invert` when lower=better (positions, error counts). |
 | **PageHeader** | `PageHeader.tsx` | Title `.t-h2 text-[var(--brand-text-bright)]`; subtitle `.t-caption-sm text-[var(--brand-text-muted)]` | Title + optional subtitle + action slot |
 | **Badge** | `Badge.tsx` | 7 tones: `teal`, `blue`, `emerald`, `amber`, `red`, `orange`, `zinc`; variants `soft`, `outline`, `solid`; shapes `sm`, `pill` | Canonical category/metadata/counter pill. New code uses `tone`; legacy `color` remains as a compatibility alias during migration. Optional `icon`, `dot`, and `ariaLabel` replace hand-rolled dense-table pills. |
-| **StatusBadge** | `StatusBadge.tsx` | Central registry by domain: page-edit, content, approval, client-action, request, schema, matrix, integration, job, severity, priority | Canonical status/severity/priority badge. Unknown statuses hide by default; `fallback="neutral"` renders a zinc badge. |
+| **StatusBadge** | `StatusBadge.tsx` | Central registry by domain: page-edit, content, approval, client-action, request, schema, matrix, integration, job, keyword-command-center, severity, priority | Canonical status/severity/priority badge. Unknown statuses hide by default; `fallback="neutral"` renders a zinc badge. |
 | **TabBar** | `TabBar.tsx` | Active: `border-teal-500 text-teal-200` | Underline style, `border-b-2` |
 | **DateRangeSelector** | `DateRangeSelector.tsx` | Active: `bg-zinc-700 text-zinc-200` | Segmented control style |
 | **EmptyState** | `EmptyState.tsx` | Icon: `text-zinc-400` in `bg-zinc-800` container | Centered layout with optional CTA |
@@ -428,6 +428,26 @@ Two-zone flat list + slide-in detail drawer introduced in the May 2026 rebuild.
 - KD 75+ → "Highly competitive" (`text-red-400`)
 - Volume → audience size label (e.g. "~2.4K searches/mo")
 - Trend → "Interest growing / steady / declining"
+
+### Keyword Command Center (`KeywordCommandCenter.tsx`)
+
+The admin Keywords surface uses a full-width dense table with overlay detail, not a persistent side column.
+
+| Element | Color | Rationale |
+|---------|-------|-----------|
+| Row hover / selected tint | `bg-teal-500/5` | Teal = active interaction state |
+| Multi-select checkbox | `Checkbox` primitive (`--brand-mint`) | Teal action law; native checkbox accessibility preserved |
+| Bulk action bar | `bg-[var(--surface-2)] border-[var(--brand-border)]` with Button primitives | Operational control surface, not a marketing card |
+| Bulk add-to-strategy | Primary Button (`from-teal-600 to-emerald-600`) | Strategy action |
+| Bulk track | Secondary Button | Lifecycle action with lower emphasis than strategy add |
+| Bulk pause / retire | Ghost Button, destructive confirmation for retire | Pause is reversible; retire needs confirmation |
+| Bulk decline | Danger Button | Decline is a destructive strategy feedback action |
+| Lifecycle badges | `StatusBadge domain="keyword-command-center"` | Keeps keyword, local lifecycle, and feedback status semantics centralized |
+| Detail drawer | Fixed right slide-over desktop, bottom sheet mobile; `bg-[var(--surface-2)]`, token z-index, token shadow | Matches StrategyKeywordDrawer pattern while preserving table width |
+| Drawer mini-panels | `KeywordDetailPanel` local helper with tokenized surface/border variants | Prevents repeated hand-rolled panel classes inside the drawer |
+| Metric values | Blue for volume/CTR, neutral for rank | Blue = read-only demand/performance data |
+| Awaiting-data copy | Muted text inside tracking-state block | New tracking entries should not look like an error |
+| Source badges | Badge primitive, wrapping cluster | Prevents long source labels from overflowing the drawer |
 
 | Element | Color | Rationale |
 |---------|-------|-----------|

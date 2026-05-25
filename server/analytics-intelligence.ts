@@ -24,6 +24,7 @@ import type {
   SerpOpportunityData,
   FreshnessAlertData,
 } from '../shared/types/analytics.js';
+import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 import type { GA4LandingPage } from './google-analytics.js';
 import { getAllGscPages, getQueryPageData } from './search-console.js';
 import type { CustomDateRange } from './google-analytics.js';
@@ -55,7 +56,7 @@ interface ComputedInsight<T> {
 // (trailing slashes, query params, fragments). Normalize before
 // using as grouping keys or DB page_id values.
 
-function normalizePageUrl(url: string): string {
+export function normalizePageUrl(url: string): string {
   try {
     const u = new URL(url);
     // Strip query params & fragment — same page content
@@ -74,7 +75,7 @@ function normalizePageUrl(url: string): string {
  * Merges metrics for URL variants of the same page (sum clicks/impressions,
  * weighted-average position/CTR).
  */
-function deduplicatePages(pages: SearchPage[]): SearchPage[] {
+export function deduplicatePages(pages: SearchPage[]): SearchPage[] {
   const map = new Map<string, SearchPage>();
   for (const p of pages) {
     const key = normalizePageUrl(p.page);
@@ -100,7 +101,7 @@ function deduplicatePages(pages: SearchPage[]): SearchPage[] {
  * Clone + normalize + deduplicate QueryPageRow arrays.
  * Merges metrics for rows sharing the same (query, normalized page).
  */
-function deduplicateQueryPages(rows: QueryPageRow[]): QueryPageRow[] {
+export function deduplicateQueryPages(rows: QueryPageRow[]): QueryPageRow[] {
   const map = new Map<string, QueryPageRow>();
   for (const r of rows) {
     const normPage = normalizePageUrl(r.page);
@@ -130,7 +131,7 @@ const EXPECTED_CTR_BY_POSITION: Record<number, number> = {
   6: 0.05, 7: 0.04, 8: 0.035, 9: 0.03, 10: 0.025,
 };
 
-function expectedCtrForPosition(pos: number): number {
+export function expectedCtrForPosition(pos: number): number {
   const rounded = Math.max(1, Math.min(Math.round(pos), 10));
   return EXPECTED_CTR_BY_POSITION[rounded] ?? 0.02;
 }
@@ -518,7 +519,7 @@ export function computeCompetitorGapInsights(
  * Compute word-overlap similarity between two queries (Jaccard on word tokens).
  * Returns 0-1 where 1 = identical word sets.
  */
-function wordJaccard(a: string, b: string): number {
+export function wordJaccard(a: string, b: string): number {
   const setA = new Set(a.toLowerCase().split(/\s+/));
   const setB = new Set(b.toLowerCase().split(/\s+/));
   let intersection = 0;
@@ -863,7 +864,7 @@ const MAX_PER_TYPE = 5; // prevent any single insight type from dominating the f
  * then fill remaining slots by impact score. When a specific insightType
  * filter is requested, skip diversity (return up to PUBLIC_CAP of that type).
  */
-function capWithDiversity(insights: AnalyticsInsight[], typeFilter?: InsightType): AnalyticsInsight[] {
+export function capWithDiversity(insights: AnalyticsInsight[], typeFilter?: InsightType): AnalyticsInsight[] {
   if (typeFilter) return insights.slice(0, PUBLIC_CAP);
 
   // Already sorted by impact_score DESC from the DB query
@@ -1023,7 +1024,7 @@ const CONTRADICTION_PAIRS: ReadonlyArray<[InsightType, InsightType]> = [
  * Pick the weaker insight from a pair based on severity rank, then impactScore.
  * Returns the id of the insight to suppress, or null if they're equal.
  */
-function pickWeaker(a: AnalyticsInsight, b: AnalyticsInsight): string | null {
+export function pickWeaker(a: AnalyticsInsight, b: AnalyticsInsight): string | null {
   const rankA = SEVERITY_RANK[a.severity] ?? 0;
   const rankB = SEVERITY_RANK[b.severity] ?? 0;
   if (rankA !== rankB) return rankA < rankB ? a.id : b.id;
@@ -1441,7 +1442,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
         // A keyword can rank on multiple pages; keep the BEST (lowest) position so
         // currentPosition reflects our strongest ranking, not an arbitrary last-seen page.
         const gscLookup = normQueryPageData.reduce<Map<string, number>>((map, r) => {
-          const key = r.query.toLowerCase();
+          const key = keywordComparisonKey(r.query);
           const existing = map.get(key);
           if (existing === undefined || r.position < existing) map.set(key, r.position);
           return map;
@@ -1450,7 +1451,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
           kw => kw.volume >= 100 && isKeywordEmerging({ trend: kw.trend }),
         );
         for (const kw of emerging.slice(0, 10)) {
-          const currentPosition = gscLookup.get(kw.keyword.toLowerCase());
+          const currentPosition = gscLookup.get(keywordComparisonKey(kw.keyword));
           enrichAndUpsert({
             insightType: 'emerging_keyword',
             pageId: `emerging_keyword::${kw.keyword}`, // unique per keyword so each gets its own DB row

@@ -134,7 +134,7 @@ export function AIUsageSection() {
           <div className="rounded-[var(--radius-md)] bg-[var(--surface-3)]/50 border border-[var(--brand-border)] px-3 py-2.5">
             <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">SEMRush Credits</div>
             <div className="text-sm font-semibold text-blue-400">{data.semrush.totalCredits.toLocaleString()}</div>
-            <div className="t-caption-sm text-[var(--brand-text-dim)] mt-0.5">{data.semrush.totalCalls - data.semrush.cachedCalls} API / {data.semrush.cachedCalls} cached</div>
+            <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{data.semrush.totalCalls - data.semrush.cachedCalls} API / {data.semrush.cachedCalls} cached</div>
           </div>
         )}
       </div>

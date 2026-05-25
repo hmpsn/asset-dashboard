@@ -16,6 +16,7 @@ vi.mock('../server/reports.js', () => ({
   getLatestSnapshotBefore: vi.fn(),
   getSnapshot: vi.fn(),
   listSnapshots: vi.fn(),
+  listSnapshotsDetailed: vi.fn(),
 }));
 
 vi.mock('../server/performance-store.js', () => ({
@@ -180,6 +181,7 @@ describe('assembleSiteHealth', () => {
   let getLatestSnapshotBefore: ReturnType<typeof vi.fn>;
   let getSnapshot: ReturnType<typeof vi.fn>;
   let listSnapshots: ReturnType<typeof vi.fn>;
+  let listSnapshotsDetailed: ReturnType<typeof vi.fn>;
   let getPageSpeed: ReturnType<typeof vi.fn>;
   let getLinkCheck: ReturnType<typeof vi.fn>;
   let getRedirectSnapshot: ReturnType<typeof vi.fn>;
@@ -200,6 +202,7 @@ describe('assembleSiteHealth', () => {
     getLatestSnapshotBefore = reportsMod.getLatestSnapshotBefore as ReturnType<typeof vi.fn>;
     getSnapshot = reportsMod.getSnapshot as ReturnType<typeof vi.fn>;
     listSnapshots = reportsMod.listSnapshots as ReturnType<typeof vi.fn>;
+    listSnapshotsDetailed = reportsMod.listSnapshotsDetailed as ReturnType<typeof vi.fn>;
 
     const perfMod = await import('../server/performance-store.js');
     getPageSpeed = perfMod.getPageSpeed as ReturnType<typeof vi.fn>;
@@ -277,6 +280,7 @@ describe('assembleSiteHealth', () => {
       { id: 'snap-1', createdAt: new Date().toISOString(), siteScore: 85, totalPages: 1, errors: 1, warnings: 0, infos: 0 },
       { id: 'snap-0', createdAt: new Date(Date.now() - 86400000).toISOString(), siteScore: 70, totalPages: 1, errors: 1, warnings: 1, infos: 0 },
     ]);
+    listSnapshotsDetailed.mockReturnValue([currentSnapshot, previousSnapshot]);
     getPageSpeed.mockReturnValue(null);
     getLinkCheck.mockReturnValue(null);
     getRedirectSnapshot.mockReturnValue(null);

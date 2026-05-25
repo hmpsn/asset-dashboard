@@ -72,4 +72,20 @@ describe('FixRecommendations', () => {
 
     expect(addItemMock).toHaveBeenCalledTimes(1);
   });
+
+  it('returns null for invalid empty audit data with no recommendations', () => {
+    addItemMock.mockReset();
+    const emptyAuditDetail: AuditDetail = {
+      ...auditDetail,
+      audit: {
+        ...auditDetail.audit,
+        pages: [],
+        siteWideIssues: [],
+      },
+    };
+
+    const { container } = render(<FixRecommendations auditDetail={emptyAuditDetail} tier="growth" />);
+    expect(container.firstChild).toBeNull();
+    expect(screen.queryByText('Recommended Fixes')).not.toBeInTheDocument();
+  });
 });

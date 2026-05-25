@@ -12,6 +12,109 @@ import { createLogger } from './logger.js';
 const log = createLogger('search-console');
 const GSC_API = 'https://www.googleapis.com/webmasters/v3';
 
+/** Convert GSC decimal CTR to percentage, rounded to 1 decimal place. E.g. 0.063 → 6.3 */
+export function formatGscCtr(ctr: number): number {
+  return +(ctr * 100).toFixed(1);
+}
+
+/** Round GSC position to 1 decimal place. */
+export function formatGscPosition(position: number): number {
+  return +position.toFixed(1);
+}
+
+/**
+ * Compute percent change from previous to current value.
+ * Returns 100 when previous is 0 and current > 0, 0 when both are 0.
+ */
+export function computePercentChange(current: number, previous: number): number {
+  if (previous === 0) return current > 0 ? 100 : 0;
+  return +(((current - previous) / previous) * 100).toFixed(1);
+}
+
+/**
+ * Given a GSC page URL, extract its pathname.
+ * Returns the pathname for valid URLs, the raw value if it starts with '/', or null.
+ */
+export function extractGscPagePathname(pageUrl: string): string | null {
+  try {
+    return new URL(pageUrl).pathname;
+  } catch (err) { // catch-ok: expected failure for non-URL strings (e.g. plain slugs)
+    return pageUrl.startsWith('/') ? pageUrl : null;
+  }
+}
+
+/**
+ * Find the page with the largest absolute click drop between two period datasets.
+ * Returns the page URL with the highest drop (positive drop = clicks decreased).
+ * Also considers pages that vanished entirely (appeared in prev but not in cur).
+ * Returns null if no page had a drop.
+ */
+export function findTopDroppedPage(
+  curRows: Array<{ keys: string[]; clicks: number }>,
+  prevRows: Array<{ keys: string[]; clicks: number }>,
+): string | null {
+  if (!curRows.length && !prevRows.length) return null;
+
+  const prevByPage = new Map<string, number>();
+  for (const row of prevRows) {
+    prevByPage.set(row.keys[0], row.clicks);
+  }
+
+  let topPage: string | null = null;
+  let maxDrop = 0;
+
+  for (const row of curRows) {
+    const prev = prevByPage.get(row.keys[0]) ?? 0;
+    const drop = prev - row.clicks;
+    if (drop > maxDrop) {
+      maxDrop = drop;
+      topPage = row.keys[0];
+    }
+  }
+
+  // Also check pages that appeared in prev but not in cur (dropped to zero entirely)
+  const curPageKeys = new Set(curRows.map(r => r.keys[0]));
+  for (const [page, prevClicks] of prevByPage) {
+    if (!curPageKeys.has(page) && prevClicks > maxDrop) {
+      maxDrop = prevClicks;
+      topPage = page;
+    }
+  }
+
+  return topPage;
+}
+
+/**
+ * Find the page with the largest absolute click spike between two period datasets.
+ * Returns the page URL with the highest increase (positive spike = clicks increased).
+ * Returns null if no page had an increase.
+ */
+export function findTopSpikedPage(
+  curRows: Array<{ keys: string[]; clicks: number }>,
+  prevRows: Array<{ keys: string[]; clicks: number }>,
+): string | null {
+  if (!curRows.length) return null;
+
+  const prevByPage = new Map<string, number>();
+  for (const row of prevRows) {
+    prevByPage.set(row.keys[0], row.clicks);
+  }
+
+  let topPage: string | null = null;
+  let maxSpike = 0;
+
+  for (const row of curRows) {
+    const prev = prevByPage.get(row.keys[0]) ?? 0;
+    const spike = row.clicks - prev;
+    if (spike > maxSpike) {
+      maxSpike = spike;
+      topPage = row.keys[0];
+    }
+  }
+
+  return topPage;
+}
+
 interface SearchAnalyticsRow {
   keys: string[];
   clicks: number;
@@ -26,6 +129,10 @@ export interface SearchQuery {
   impressions: number;
   ctr: number;
   position: number;
+}
+
+export interface SearchQueryObservation extends SearchQuery {
+  date: string;
 }
 
 export interface SearchPage {
@@ -107,7 +214,7 @@ export async function getSearchOverview(
   const fmt = (d: Date) => d.toISOString().split('T')[0];
   const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
   const searchType = options.searchType || 'web';
-  const queryLimit = options.queryLimit || 500;
+  const maxQueryRows = options.queryLimit || 500;
   const pageLimit = options.pageLimit || 500;
   const startRow = options.startRow || 0;
 
@@ -128,19 +235,25 @@ export async function getSearchOverview(
   const avgCtr = totalsRow ? +(totalsRow.ctr * 100).toFixed(1) : 0;
   const avgPosition = totalsRow ? +totalsRow.position.toFixed(1) : 0;
 
-  // Fetch top queries
-  const queryData = await gscFetch(
-    `${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`,
-    token,
-    {
-      startDate: fmt(startDate),
-      endDate: fmt(endDate),
-      dimensions: ['query'],
-      rowLimit: queryLimit,
-      startRow,
-      type: searchType,
-    }
-  ) as { rows?: SearchAnalyticsRow[] };
+  // Fetch top queries with pagination so long-tail GSC variants are not capped at 500 rows.
+  const rawQueryRows = await paginateGscQuery(
+    async (pageStartRow, rowLimit) => {
+      const data = await gscFetch(
+        `${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`,
+        token,
+        {
+          startDate: fmt(startDate),
+          endDate: fmt(endDate),
+          dimensions: ['query'],
+          rowLimit,
+          startRow: pageStartRow + startRow,
+          type: searchType,
+        },
+      ) as { rows?: SearchAnalyticsRow[] };
+      return data.rows ?? [];
+    },
+    { maxRows: maxQueryRows, pageSize: 500 },
+  );
 
   // Fetch top pages
   const pageData = await gscFetch(
@@ -156,7 +269,7 @@ export async function getSearchOverview(
     }
   ) as { rows?: SearchAnalyticsRow[] };
 
-  const topQueries: SearchQuery[] = (queryData.rows || []).map(r => ({
+  const topQueries: SearchQuery[] = rawQueryRows.map(r => ({
     query: r.keys[0],
     clicks: r.clicks,
     impressions: r.impressions,
@@ -181,6 +294,60 @@ export async function getSearchOverview(
     topPages,
     dateRange: { start: fmt(startDate), end: fmt(endDate) },
   };
+}
+
+export async function getSearchQueryObservations(
+  siteId: string,
+  gscSiteUrl: string,
+  days: number = 28,
+  options: { maxRows?: number; searchType?: string } = {},
+  dateRange?: CustomDateRange,
+): Promise<SearchQueryObservation[]> {
+  const token = await getValidToken(siteId);
+  if (!token) throw new Error('Not connected to Google');
+
+  let endDate: Date, startDate: Date;
+  if (dateRange) {
+    startDate = new Date(dateRange.startDate);
+    endDate = new Date(dateRange.endDate);
+  } else {
+    endDate = new Date();
+    endDate.setDate(endDate.getDate() - 3);
+    startDate = new Date(endDate);
+    startDate.setDate(startDate.getDate() - days);
+  }
+
+  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
+  const searchType = options.searchType || 'web';
+
+  const rows = await paginateGscQuery(
+    async (startRow, rowLimit) => {
+      const data = await gscFetch(
+        `${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`,
+        token,
+        {
+          startDate: fmt(startDate),
+          endDate: fmt(endDate),
+          dimensions: ['query', 'date'],
+          rowLimit,
+          startRow,
+          type: searchType,
+        },
+      ) as { rows?: SearchAnalyticsRow[] };
+      return data.rows ?? [];
+    },
+    { maxRows: options.maxRows ?? 5000, pageSize: 500 },
+  );
+
+  return rows.map(row => ({
+    query: row.keys[0],
+    date: row.keys[1],
+    clicks: row.clicks,
+    impressions: row.impressions,
+    ctr: +(row.ctr * 100).toFixed(1),
+    position: +row.position.toFixed(1),
+  }));
 }
 
 export interface QueryPageRow {
@@ -552,7 +719,7 @@ export async function inspectUrlForRichResults(
 }
 
 /** Shared date range helper (GSC has ~3 day data delay) */
-function gscDateRange(days: number, dateRange?: CustomDateRange) {
+export function gscDateRange(days: number, dateRange?: CustomDateRange) {
   if (dateRange) return { startDate: dateRange.startDate, endDate: dateRange.endDate };
   const endDate = new Date();
   endDate.setDate(endDate.getDate() - 3);

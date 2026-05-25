@@ -282,3 +282,23 @@ const intel = await buildWorkspaceIntelligence(workspaceId, {
 - Bridge source tags
 
 The `compositeHealthScore` field flows from `WorkspaceIntelligence.clientSignals.compositeHealthScore` into `ClientIntelligence.compositeHealthScore` — the formula lives in `assembleClientSignals`, not in the client route.
+
+## `localSeo` Slice — Full Candidates for MCP, Sampled Prompt Block for AI
+
+The `localSeo` slice (added 2026-05-21) is the canonical source of local SEO context for AdminChat, content/recommendation generation, and external MCP consumers.
+
+**Two-layer design:**
+
+- `candidates: ReadonlyArray<...>` — the FULL bounded candidate universe. Capped only by `LOCAL_CANDIDATE_HARD_CAP = 1000` in `server/local-seo.ts`. MCP consumers (`get_workspace_intelligence`) receive this entire array so external agents can analyze the full set programmatically.
+- `effectiveLocalSeoBlock: string` — the pre-formatted prompt block. Stratified sample (top 8 per active market, capped at 50 total) so prompt tokens stay bounded even on hyper-local workspaces. **Per the authority-layered-fields rule, AI consumers inject this string directly** — never construct an alternate prompt block from `candidates`.
+
+**Per-consumer integration:**
+
+- **AdminChat** (`server/admin-chat-context.ts`) — slice included on `performance`/`general` question categories and when the question mentions local signals (local, near me, GBP, market, location, city).
+- **Content generation** (`buildContentGenerationContext`) — slice included when the workspace has at least one active local market (cheap active-markets check via `listLocalSeoMarkets`). Content paths can further narrow via `selectRelevantLocalCandidates(slice, targetKeyword, limit)` exported from `server/intelligence/local-seo-slice.ts`, which boosts token-overlap and market-match candidates above unrelated higher-score ones so per-piece prompts only see locally relevant context.
+- **Recommendation generation** (`buildRecommendationGenerationContext`) — same active-markets gate; uses the broader stratified sample (no relevance helper).
+- **MCP** (`server/mcp/tools/intelligence.ts`) — `localSeo` is part of the default ALL slices and is accepted via the explicit `slices` arg. Returns the full slice JSON including the entire `candidates` array.
+
+**Empty-but-valid baseline:** when the `local-seo-visibility` feature flag is off OR no markets are configured, the slice returns a typed object with empty arrays and a short explanatory `effectiveLocalSeoBlock`. Consumers never see `undefined`. Token cost on non-local workspaces is ~80 characters when the slice is requested.
+
+**Known limitation:** `LocalSeoKeywordCandidate` in `server/local-seo.ts` does not currently expose a `marketId` field. Until it does, the stratified sampler in `assembleLocalSeo` falls back to flat score-sorted top-N, and the relevance helper's market-bonus heuristic is a no-op. The follow-up is tracked in the slice file with a `TODO(local-seo-marketId-passthrough)` comment.

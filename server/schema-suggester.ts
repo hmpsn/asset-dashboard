@@ -4,7 +4,6 @@ import { listWorkspaces } from './workspaces.js';
 import { generateLeanSchema } from './schema/index.js';
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
 import type { ContentBrief } from '../shared/types/content.ts';
-import type { SchemaValidation } from './schema-validator.js';
 import { fetchPageMeta } from './seo-audit.js';
 import { fetchPublishedHtml, resolvePagePath } from './helpers.js';
 import { resolveBaseUrl } from './url-helpers.js';
@@ -570,10 +569,6 @@ export async function generateSchemaForPage(
   pageId: string,
   tokenOverride?: string,
   ctx: SchemaContext = {},
-  gscMap?: Map<string, { clicks: number; impressions: number; position: number; ctr: number }>,
-  ga4Map?: Map<string, { pageviews: number; users: number; avgEngagementTime: number }>,
-  queryPageData?: Array<{ query: string; page: string; impressions: number; position: number }>,
-  insightsMap?: Map<string, { healthScore?: number; healthTrend?: string; isQuickWin?: boolean }>,
 ): Promise<SchemaPageSuggestion | null> {
   const baseUrl = await resolveBaseUrl({ liveDomain: ctx.liveDomain, webflowSiteId: siteId }, tokenOverride);
   if (!baseUrl) return null;
@@ -775,11 +770,6 @@ export async function generateSchemaForPage(
     inactivePlanStatus: roleOverride.inactivePlanStatus,
   });
 
-  // Surface unused parameters to satisfy TS noUnusedParameters via void casts.
-  // These are kept in the signature for backwards compatibility with PR #354's
-  // intelligence wiring; the lean generator does not use them in MVP scope.
-  void gscMap; void ga4Map; void queryPageData; void insightsMap;
-
   return {
     ...leanToSuggestion(lean),
     savedPageType: getPageTypes(siteId)[pageId],
@@ -792,14 +782,7 @@ export async function generateSchemaSuggestions(
   ctx: SchemaContext = {},
   onProgress?: (partial: SchemaPageSuggestion[], done: boolean, message: string) => void,
   isCancelled?: () => boolean,
-  gscMap?: Map<string, { clicks: number; impressions: number; position: number; ctr: number }>,
-  ga4Map?: Map<string, { pageviews: number; users: number; avgEngagementTime: number }>,
-  queryPageData?: Array<{ query: string; page: string; impressions: number; position: number }>,
-  insightsMap?: Map<string, { healthScore?: number; healthTrend?: string; isQuickWin?: boolean }>,
-  validationsByPageId?: Map<string, SchemaValidation>,
 ): Promise<SchemaPageSuggestion[]> {
-  void gscMap; void ga4Map; void queryPageData; void insightsMap; void validationsByPageId;
-
   const baseUrl = await resolveBaseUrl({ liveDomain: ctx.liveDomain, webflowSiteId: siteId }, tokenOverride);
   if (!baseUrl) return [];
 

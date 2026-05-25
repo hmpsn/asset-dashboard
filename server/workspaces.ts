@@ -55,11 +55,11 @@ export type EffectiveTier = 'free' | 'growth' | 'premium';
  * Existing call sites: /api/public/workspace/:id, /api/public/tier/:id,
  * /api/public/briefing/:wsId.
  */
-export function computeEffectiveTier(ws: Pick<Workspace, 'tier' | 'trialEndsAt'>): EffectiveTier {
+export function computeEffectiveTier(ws: Pick<Workspace, 'tier' | 'trialEndsAt'>, nowMs = Date.now()): EffectiveTier {
   const base = (ws.tier as EffectiveTier | undefined) || 'free';
   if (base === 'free' && ws.trialEndsAt) {
     const trialEnd = new Date(ws.trialEndsAt);
-    if (!Number.isNaN(trialEnd.getTime()) && trialEnd > new Date()) return 'growth';
+    if (!Number.isNaN(trialEnd.getTime()) && trialEnd.getTime() > nowMs) return 'growth';
   }
   return base;
 }

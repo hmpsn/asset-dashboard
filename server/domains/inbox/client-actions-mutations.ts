@@ -9,6 +9,7 @@ import { invalidateIntelligenceCache } from '../../workspace-intelligence.js';
 import { WS_EVENTS } from '../../ws-events.js';
 import { InvalidTransitionError } from '../../state-machines.js';
 import type { ClientAction, ClientActionPayload, ClientActionSourceType } from '../../../shared/types/client-actions.js';
+import { applyClientActionFeedbackLoop } from './client-action-feedback-loop.js';
 
 type ClientActor = { id?: string; name?: string } | undefined;
 
@@ -89,7 +90,8 @@ export function updateAdminClientAction(
   actionId: string,
   updates: UpdateClientActionRequest,
 ): ClientAction {
-  return runWorkspaceMutation({
+  let feedbackStatus: 'approved' | 'completed' | null = null;
+  const updated = runWorkspaceMutation({
     workspaceId,
     defaultErrorMessage: 'Failed to update client action',
     readBeforeWrite: ({ workspaceId: currentWorkspaceId }) => getClientAction(currentWorkspaceId, actionId),
@@ -101,7 +103,11 @@ export function updateAdminClientAction(
     },
     onActivity: ({ workspaceId: currentWorkspaceId, existing, result }) => {
       if (!existing) return;
+      if (updates.status === 'approved' && existing.status !== 'approved') {
+        feedbackStatus = 'approved';
+      }
       if (updates.status === 'completed' && existing.status !== 'completed') {
+        feedbackStatus = 'completed';
         addActivity(
           currentWorkspaceId,
           'client_action_completed',
@@ -121,6 +127,10 @@ export function updateAdminClientAction(
       return null;
     },
   });
+  if (feedbackStatus) {
+    applyClientActionFeedbackLoop(workspaceId, updated, feedbackStatus);
+  }
+  return updated;
 }
 
 export function respondToPublicClientAction(
@@ -167,6 +177,7 @@ export function respondToPublicClientAction(
   });
 
   if (response.status === 'approved') {
+    applyClientActionFeedbackLoop(workspaceId, updated, 'approved');
     const ws = getWorkspace(workspaceId);
     notifyTeamActionApproved({
       workspaceId,

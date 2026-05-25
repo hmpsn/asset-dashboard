@@ -104,13 +104,13 @@ export interface QuickWin {
 export interface TopicCluster {
   topic: string;                 // cluster name (e.g. "dental implants")
   keywords: string[];            // all keywords in this cluster
-  ownedCount: number;            // keywords we rank for
+  ownedCount: number;            // keywords covered by ranking data or an explicit strategy/page match
   totalCount: number;            // total keywords in cluster
   coveragePercent: number;       // ownedCount / totalCount * 100
-  avgPosition?: number;          // average position for owned keywords
+  avgPosition?: number;          // average position for owned keywords with ranking data
   topCompetitor?: string;        // competitor with highest coverage in this cluster
   topCompetitorCoverage?: number;
-  gap: string[];                 // keywords in cluster we DON'T rank for
+  gap: string[];                 // keywords in cluster without ranking or strategy/page coverage
 }
 
 export interface CannibalizationItem {

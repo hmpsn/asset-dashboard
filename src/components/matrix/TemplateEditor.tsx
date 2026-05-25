@@ -125,7 +125,7 @@ function SectionItem({
               value={section.headingTemplate}
               onChange={value => onUpdate({ headingTemplate: value })}
               placeholder="e.g. {service} in {city}"
-              className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
+              className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 transition-colors"
             />
             <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
               Preview: {replaceVariables(section.headingTemplate, variables)}
@@ -138,7 +138,7 @@ function SectionItem({
               onChange={value => onUpdate({ guidance: value })}
               placeholder="AI guidance for this section..."
               rows={2}
-              className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] resize-none focus:border-teal-500/40 focus:outline-none transition-colors"
+              className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] resize-none focus:border-teal-500/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 transition-colors"
             />
           </div>
           <div className="flex items-center gap-3">
@@ -149,7 +149,7 @@ function SectionItem({
                 value={section.wordCountTarget}
                 onChange={value => onUpdate({ wordCountTarget: parseInt(value) || 0 })}
                 min={0}
-                className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] focus:border-teal-500/40 focus:outline-none transition-colors"
+                className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] focus:border-teal-500/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 transition-colors"
               />
             </div>
             <div className="flex-1">
@@ -159,7 +159,7 @@ function SectionItem({
                 value={section.cmsFieldSlug ?? ''}
                 onChange={value => onUpdate({ cmsFieldSlug: value || undefined })}
                 placeholder="hero_content"
-                className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
+                className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 transition-colors"
               />
             </div>
           </div>
@@ -345,7 +345,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
                 value: pt,
                 label: pt.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
               }))}
-              className="w-full mt-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] focus:border-teal-500/40 focus:outline-none transition-colors"
+              className="w-full mt-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] focus:border-teal-500/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 transition-colors"
             />
           </div>
         </div>

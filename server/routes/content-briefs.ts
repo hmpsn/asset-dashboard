@@ -39,14 +39,14 @@ import { createLogger } from '../logger.js';
 import { buildPipelineSignals } from '../insight-feedback.js';
 import { getInsights } from '../analytics-insights-store.js';
 import { recordAction } from '../outcome-tracking.js';
-import { getWorkspaceLearnings, formatLearningsForPrompt } from '../workspace-learnings.js';
-import { isFeatureEnabled } from '../feature-flags.js';
 import { isProgrammingError } from '../errors.js';
 import { validate, z } from '../middleware/validate.js';
+import { resolveWorkspaceLocationCode } from '../local-seo.js';
 import { listMatrices } from '../content-matrices.js';
 import { getTemplate } from '../content-templates.js';
 import { BRIEF_PAGE_TYPES } from '../../shared/types/content.js';
 import type { BriefPageType, BriefTemplateCrossrefMatch } from '../../shared/types/content.js';
+import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 
 const router = Router();
 const log = createLogger('content-briefs');
@@ -95,7 +95,7 @@ function notifyContentUpdated(workspaceId: string, payload: Record<string, unkno
 }
 
 function normalizeKeyword(value: string): string {
-  return value.trim().toLowerCase();
+  return keywordComparisonKey(value);
 }
 
 function toBriefPageType(value: string): BriefPageType | null {
@@ -236,8 +236,9 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
     const providerLabel = seoProvider ? getProviderDisplayName(seoProvider.name) : 'SEMRush';
     if (seoProvider) {
       try {
+        const locationCode = resolveWorkspaceLocationCode(req.params.workspaceId) ?? undefined;
         const [metrics, related] = await Promise.all([
-          seoProvider.getKeywordMetrics([targetKeyword], req.params.workspaceId),
+          seoProvider.getKeywordMetrics([targetKeyword], req.params.workspaceId, undefined, locationCode),
           seoProvider.getRelatedKeywords(targetKeyword, req.params.workspaceId, 15),
         ]);
         if (metrics.length > 0) keywordMetrics = metrics[0];
@@ -286,27 +287,9 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
     const matchedTemplatePageType = templateCrossref?.pageType;
     const resolvedPageType = bodyPageType ?? matchedTemplatePageType ?? undefined;
 
-    // Adaptive pipeline: inject workspace learnings into the brief prompt
-    let adaptedBusinessContext = businessContext || ws?.keywordStrategy?.businessContext;
-    if (isFeatureEnabled('outcome-ai-injection')) {
-      try {
-        const learnings = getWorkspaceLearnings(req.params.workspaceId);
-        if (learnings) {
-          const block = formatLearningsForPrompt(learnings, 'content');
-          if (block) {
-            adaptedBusinessContext = adaptedBusinessContext
-              ? `${adaptedBusinessContext}\n\n${block}`
-              : block;
-          }
-        }
-      } catch (err) {
-        log.warn({ err }, 'Failed to inject workspace learnings into brief prompt');
-      }
-    }
-
     const brief = await generateBrief(req.params.workspaceId, targetKeyword, {
       relatedQueries,
-      businessContext: adaptedBusinessContext,
+      businessContext: businessContext || ws?.keywordStrategy?.businessContext,
       existingPages,
       keywordMetrics,
       relatedKeywords,
@@ -512,7 +495,8 @@ router.post('/api/content-briefs/:workspaceId/validate-keyword', requireWorkspac
   }
 
   try {
-    const metrics = await kwProvider.getKeywordMetrics([keyword], req.params.workspaceId);
+    const locationCode = resolveWorkspaceLocationCode(req.params.workspaceId) ?? undefined;
+    const metrics = await kwProvider.getKeywordMetrics([keyword], req.params.workspaceId, undefined, locationCode);
     const kw = metrics[0];
 
     if (!kw) {
@@ -577,11 +561,12 @@ router.post('/api/content-briefs/:workspaceId/validate-keywords', requireWorkspa
   }
 
   try {
-    const metrics = await bulkProvider.getKeywordMetrics(keywords.slice(0, 50), req.params.workspaceId);
-    const metricsMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m])); // map-dup-ok
+    const locationCode = resolveWorkspaceLocationCode(req.params.workspaceId) ?? undefined;
+    const metrics = await bulkProvider.getKeywordMetrics(keywords.slice(0, 50), req.params.workspaceId, undefined, locationCode);
+    const metricsMap = new Map(metrics.map(m => [normalizeKeyword(m.keyword), m])); // map-dup-ok
 
     const results = keywords.slice(0, 50).map((kw: string) => {
-      const m = metricsMap.get(kw.toLowerCase());
+      const m = metricsMap.get(normalizeKeyword(kw));
       if (!m) {
         return { keyword: kw, valid: true, source: bulkProvider.name, metrics: null };
       }

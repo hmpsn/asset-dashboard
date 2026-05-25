@@ -151,7 +151,7 @@ function PopoverItem({
       role="menuitem"
       tabIndex={-1}
       onClick={handleClick}
-      className={cn(baseClass, 'px-3 py-1.5 text-sm w-full text-left focus:outline-none focus:bg-[var(--surface-3)]', className)}
+      className={cn(baseClass, 'px-3 py-1.5 text-sm w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:bg-[var(--surface-3)]', className)}
       {...rest}
     >
       {children}

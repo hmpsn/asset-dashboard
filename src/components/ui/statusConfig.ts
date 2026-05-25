@@ -11,6 +11,7 @@ export type StatusBadgeDomain =
   | 'matrix'
   | 'integration'
   | 'job'
+  | 'keyword-command-center'
   | 'severity'
   | 'priority';
 
@@ -142,6 +143,20 @@ export const STATUS_BADGE_REGISTRY: Record<StatusBadgeDomain, Record<string, Sta
     cancelled: { label: 'Cancelled', tone: 'zinc' },
     paused: { label: 'Paused', tone: 'zinc' },
     past_due: { label: 'Past Due', tone: 'red' },
+  },
+  'keyword-command-center': {
+    in_strategy: { label: 'In Strategy', tone: 'teal' },
+    tracked: { label: 'Tracked', tone: 'blue' },
+    needs_review: { label: 'Needs Review', tone: 'amber' },
+    raw_evidence: { label: 'Raw Evidence', tone: 'zinc' },
+    declined: { label: 'Declined', tone: 'red' },
+    retired: { label: 'Retired', tone: 'zinc' },
+    selected: { label: 'Selected', tone: 'teal' },
+    candidate: { label: 'Candidate', tone: 'amber' },
+    checked: { label: 'Checked', tone: 'blue' },
+    not_checked: { label: 'Not Checked', tone: 'zinc' },
+    approved: { label: 'Approved', tone: 'emerald' },
+    requested: { label: 'Requested', tone: 'amber' },
   },
   severity: {
     critical: { label: 'Critical', tone: 'red' },

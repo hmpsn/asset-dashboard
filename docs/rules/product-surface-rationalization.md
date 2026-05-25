@@ -37,7 +37,11 @@ When a new major surface is added or an existing one materially changes:
 5. Run:
    - `npm run verify:product-surface`
    - `npm run verify:product-surface -- --markdown`
+   - `npm run report:product-surface-audit`
    - `npx vitest run tests/unit/product-surface-map.test.ts`
+
+Machine-readable audit output is written to `data/product-surface-audit.json`.
+Human-reviewed prioritization notes for Wave 6 live in `docs/workflows/product-surface-audit-wave6.md`.
 
 For placement recommendations (`promote`, `keep`, `hide-behind-progressive-disclosure`, `deprecate-after-redirect-window`), include a maturity score using `docs/workflows/feature-maturity-scorecard.md` so first-class navigation decisions are evidence-backed.
 

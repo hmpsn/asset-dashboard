@@ -1,6 +1,6 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @import './tokens.css';
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 /* ─── D-DIN PRO (self-hosted) ─── */
 @font-face { font-family: 'DIN Pro'; src: url('/fonts/D-DIN-PRO-400-Regular.otf') format('opentype'); font-weight: 400; font-style: normal; font-display: swap; }
@@ -85,6 +85,95 @@ input::placeholder, textarea::placeholder {
 ::selection {
   background: rgba(46, 217, 195, 0.25);
   color: var(--brand-text-bright);
+}
+
+.page-rewrite-print-root {
+  display: none;
+}
+
+@media print {
+  @page {
+    margin: 0.75in;
+  }
+
+  body.page-rewrite-printing {
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  body.page-rewrite-printing > *:not(.page-rewrite-print-root) {
+    display: none !important;
+  }
+
+  body.page-rewrite-printing .page-rewrite-print-root {
+    display: block !important;
+  }
+
+  .page-rewrite-print-doc {
+    color: #111;
+    font: 11pt/1.55 Georgia, 'Times New Roman', serif;
+  }
+
+  .page-rewrite-print-doc h1,
+  .page-rewrite-print-doc h2,
+  .page-rewrite-print-doc h3,
+  .page-rewrite-print-doc h4 {
+    color: #111 !important;
+    font-family: Arial, Helvetica, sans-serif;
+    page-break-after: avoid;
+  }
+
+  .page-rewrite-print-doc h1 {
+    font-size: 24pt;
+    margin: 0 0 14pt;
+  }
+
+  .page-rewrite-print-doc h2 {
+    font-size: 16pt;
+    margin: 18pt 0 8pt;
+  }
+
+  .page-rewrite-print-doc h3,
+  .page-rewrite-print-doc h4 {
+    font-size: 12pt;
+    margin: 14pt 0 6pt;
+  }
+
+  .page-rewrite-print-doc p,
+  .page-rewrite-print-doc li {
+    color: #222 !important;
+    font-size: 11pt;
+  }
+
+  .page-rewrite-print-meta {
+    border-bottom: 1px solid #ddd;
+    color: #666 !important;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 9pt !important;
+    margin: 0 0 18pt;
+    padding-bottom: 8pt;
+  }
+
+  .page-rewrite-print-issues {
+    border: 1px solid #ddd;
+    margin: 0 0 18pt;
+    padding: 10pt 12pt;
+  }
+
+  .page-rewrite-print-issues h2 {
+    font-size: 12pt;
+    margin: 0 0 6pt;
+  }
+
+  .page-rewrite-print-issues ul {
+    margin: 0;
+    padding-left: 16pt;
+  }
+
+  .page-rewrite-print-body a {
+    color: #0f766e !important;
+    text-decoration: underline;
+  }
 }
 
 /* ─── Styleguide accent compatibility layer ────────────────────────────────
@@ -364,7 +453,7 @@ body::after {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 9999;
+  z-index: var(--z-toast);
   opacity: 0.02;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
   background-repeat: repeat;

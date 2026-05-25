@@ -21,6 +21,9 @@ router.get('/api/site-architecture/:workspaceId', requireWorkspaceAccess('worksp
     const result = await buildSiteArchitecture(req.params.workspaceId);
     res.json(result);
   } catch (err) {
+    if (err instanceof Error && err.message === 'Workspace not found') {
+      return res.status(404).json({ error: 'Workspace not found' });
+    }
     log.error({ err }, 'Failed to build site architecture');
     const msg = err instanceof Error ? err.message : 'Unknown error';
     res.status(500).json({ error: msg });

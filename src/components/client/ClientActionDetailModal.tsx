@@ -18,6 +18,7 @@ import type {
   AeoChangePayload,
   AeoChangeDiff,
 } from '../../../shared/types/client-actions';
+import { normalizeInternalLinkSuggestion } from '../../lib/internal-link-client-action';
 
 /** Allow only http/https URLs in rendered <a> tags — blocks javascript: and data: schemes. */
 function safeHref(url: string): string | undefined {
@@ -41,6 +42,7 @@ interface ClientActionDetailModalProps {
 
 function InternalLinkRenderer({ payload }: { payload: InternalLinkPayload }) {
   const suggestions: InternalLinkItem[] = payload.suggestions ?? [];
+  const normalizedSuggestions = suggestions.map(normalizeInternalLinkSuggestion);
   if (suggestions.length === 0) {
     return <p className="t-body text-[var(--brand-text-muted)]">No link suggestions in this batch.</p>;
   }
@@ -50,27 +52,35 @@ function InternalLinkRenderer({ payload }: { payload: InternalLinkPayload }) {
         <thead>
           <tr className="border-b border-[var(--brand-border)]">
             <th className="py-2 pr-4 t-caption-sm font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider">Anchor text</th>
+            <th className="py-2 pr-4 t-caption-sm font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider">Target title</th>
             <th className="py-2 pr-4 t-caption-sm font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider">Target URL</th>
-            <th className="py-2 pr-4 t-caption-sm font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider">Source page</th>
+            <th className="py-2 pr-4 t-caption-sm font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider">Source title</th>
+            <th className="py-2 pr-4 t-caption-sm font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider">Source URL</th>
             <th className="py-2 t-caption-sm font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider">Context</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-[var(--brand-border)]">
-          {suggestions.map((s, i) => (
+          {normalizedSuggestions.map((s, i) => (
             <tr key={i}>
               <td className="py-3 pr-4 t-ui font-medium text-[var(--brand-text-bright)] align-top">{s.anchorText}</td>
+              <td className="py-3 pr-4 t-caption text-[var(--brand-text-bright)] align-top">{s.targetTitle || '—'}</td>
               <td className="py-3 pr-4 align-top">
-                <a
-                  href={safeHref(s.targetUrl)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="t-caption text-accent-brand hover:underline flex items-center gap-1"
-                >
-                  {s.targetTitle || s.targetUrl}
-                  <ExternalLink className="w-3 h-3 flex-shrink-0" />
-                </a>
+                {safeHref(s.targetUrl) ? (
+                  <a
+                    href={safeHref(s.targetUrl)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="t-caption text-accent-brand hover:underline flex items-center gap-1"
+                  >
+                    {s.targetUrl}
+                    <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                  </a>
+                ) : (
+                  <span className="t-caption text-accent-brand">{s.targetUrl}</span>
+                )}
               </td>
-              <td className="py-3 pr-4 t-caption text-[var(--brand-text-muted)] align-top">{s.sourcePage || '—'}</td>
+              <td className="py-3 pr-4 t-caption text-[var(--brand-text-muted)] align-top">{s.sourcePageTitle || '—'}</td>
+              <td className="py-3 pr-4 t-caption text-[var(--brand-text-muted)] align-top">{s.sourcePageUrl || '—'}</td>
               <td className="py-3 t-caption text-[var(--brand-text-muted)] align-top max-w-xs">{s.contextSnippet || '—'}</td>
             </tr>
           ))}

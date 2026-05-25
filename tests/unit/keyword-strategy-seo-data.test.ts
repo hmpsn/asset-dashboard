@@ -77,4 +77,56 @@ describe('fetchAndCacheKeywordStrategySeoData provider status', () => {
     expect(result.seoDataStatus.fallbackProviderAvailable).toBe(true);
     expect(result.seoDataStatus.reasons).toContain('provider_returned_no_keyword_data');
   });
+
+  it('adds site discovery keywords when domain ranked keywords are thin', async () => {
+    const getKeywordsForKeywords = vi.fn(async () => [
+      {
+        keyword: 'planner grouped dental term',
+        volume: 1_000_000,
+        difficulty: 21,
+        cpc: 0,
+        provider: 'dataforseo',
+        sourceKind: 'google_ads_keywords_for_keywords' as const,
+        seed: 'dentist',
+      },
+    ]);
+    const provider = makeProvider('dataforseo', {
+      getKeywordsForSite: vi.fn(async () => [
+        {
+          keyword: 'austin dental implants',
+          volume: 900,
+          difficulty: 38,
+          cpc: 8,
+          provider: 'dataforseo',
+          sourceKind: 'keywords_for_site',
+          sourceTarget: 'example.com',
+          confidence: 'high',
+        },
+      ]),
+      getKeywordsForKeywords,
+    });
+
+    const result = await fetchAndCacheKeywordStrategySeoData({
+      ws: makeWorkspace(),
+      provider,
+      baseUrl: 'https://example.com',
+      strategyMode: 'full',
+      seoDataMode: 'full',
+      competitorDomains: [],
+      sendProgress: vi.fn(),
+    });
+
+    expect(result.discoveryKeywords).toEqual([
+      expect.objectContaining({
+        keyword: 'austin dental implants',
+        sourceKind: 'keywords_for_site',
+      }),
+    ]);
+    expect(result.seoContext).toContain('SEO PROVIDER DISCOVERY KEYWORDS');
+    expect(result.seoDataStatus.status).toBe('available');
+    expect(getKeywordsForKeywords).not.toHaveBeenCalled();
+    expect(result.discoveryKeywords).not.toContainEqual(expect.objectContaining({
+      sourceKind: 'google_ads_keywords_for_keywords',
+    }));
+  });
 });

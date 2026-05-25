@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { isCapabilityDisabled, clearCapabilityDisabled } from '../../server/seo-data-provider.js';
+import { isCapabilityDisabled, clearCapabilityDisabled, _resetRegistryForTest } from '../../server/seo-data-provider.js';
 
 // Mock fs so writeCache/readCache don't touch disk
 vi.mock('fs', async (importOriginal) => {
@@ -348,6 +348,32 @@ describe('DataForSeoProvider — keyword difficulty endpoint', () => {
     expect(results[0].difficulty).toBe(45); // falls back to competition_index
   });
 
+  it('uses the supplied geo location code for search volume and keyword difficulty payloads', async () => {
+    const provider = new DataForSeoProvider();
+
+    const fetchSpy = vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ tasks: [{ status_code: 20000, cost: 0.001, result: [
+          { keyword: 'teeth whitening', search_volume: 300, competition_index: 20, cpc: 1.5, competition: 0.2, monthly_searches: [] },
+        ]}] }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ tasks: [{ status_code: 20000, cost: 0.0005, result: [
+          { keyword: 'teeth whitening', keyword_difficulty: 48 },
+        ]}] }),
+      } as Response);
+
+    await provider.getKeywordMetrics(['teeth whitening'], 'ws-geo-test', 'us', 1022162);
+
+    const volumePayload = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string);
+    const difficultyPayload = JSON.parse((fetchSpy.mock.calls[1][1] as RequestInit).body as string);
+    expect(volumePayload[0].location_code).toBe(1022162);
+    expect(difficultyPayload[0].location_code).toBe(1022162);
+    expect(getCachedMetricsBatch).toHaveBeenCalledWith(['teeth whitening'], '1022162', expect.any(Number));
+  });
+
   it('uses keyword_difficulty from keyword_info in getRelatedKeywords', async () => {
     const provider = new DataForSeoProvider();
 
@@ -395,6 +421,29 @@ describe('DataForSeoProvider — L1 global SQLite cache', () => {
     expect(results[0].difficulty).toBe(42);
   });
 
+  it('falls back to legacy national L1 cache keys before making an API call', async () => {
+    vi.mocked(getCachedMetricsBatch).mockClear();
+    vi.mocked(getCachedMetricsBatch)
+      .mockReturnValueOnce(new Map())
+      .mockReturnValueOnce(new Map([
+        ['legacy keyword', { keyword: 'legacy keyword', volume: 1200, difficulty: 35, cpc: 1.1, competition: 0.2, results: 0, trend: [] }],
+      ]));
+
+    const fetchSpy = vi.spyOn(global, 'fetch');
+
+    const provider = new DataForSeoProvider();
+    const results = await provider.getKeywordMetrics(['legacy keyword'], 'ws-legacy-cache', 'us');
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(getCachedMetricsBatch).toHaveBeenNthCalledWith(1, ['legacy keyword'], '2840', expect.any(Number));
+    expect(getCachedMetricsBatch).toHaveBeenNthCalledWith(2, ['legacy keyword'], 'us', expect.any(Number));
+    expect(cacheMetricsBatch).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ keyword: 'legacy keyword', volume: 1200 })]),
+      '2840',
+    );
+    expect(results[0].volume).toBe(1200);
+  });
+
   it('writes API results to L1 cache after fetching', async () => {
     vi.spyOn(global, 'fetch')
       .mockResolvedValueOnce({
@@ -422,7 +471,7 @@ describe('DataForSeoProvider — L1 global SQLite cache', () => {
     expect(global.fetch).toHaveBeenCalled();
     expect(cacheSpy).toHaveBeenCalledWith(
       expect.arrayContaining([expect.objectContaining({ keyword: 'l1-write-test-kw', volume: 5000 })]),
-      'us'
+      '2840'
     );
   });
 });
@@ -444,6 +493,190 @@ describe('DataForSeoProvider — getDomainKeywords order_by contract', () => {
     const call = fetchSpy.mock.calls[0];
     const body = JSON.parse(call[1]!.body as string);
     expect(body[0].order_by).toEqual(['keyword_data.keyword_info.search_volume,desc']);
+  });
+});
+
+describe('DataForSeoProvider — keyword discovery endpoints', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('normalizes keyword_ideas results into source evidence', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => dfsTaskResponse([{
+        items: [{
+          keyword: 'best seo dashboard',
+          keyword_info: {
+            search_volume: 1200,
+            keyword_difficulty: 44,
+            competition: 0.32,
+            cpc: 5.25,
+            monthly_searches: [{ search_volume: 1000 }, { search_volume: 1200 }],
+          },
+          search_intent_info: { main_intent: 'commercial' },
+          serp_info: { serp_item_types: ['organic', 'people_also_ask'] },
+        }],
+      }]),
+    } as Response);
+
+    const results = await provider.getKeywordIdeas(['seo dashboard'], 'ws-discovery-ideas', 25, 'us');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(String(url)).toContain('dataforseo_labs/google/keyword_ideas/live');
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body[0]).toMatchObject({
+      keywords: ['seo dashboard'],
+      limit: 25,
+      language_code: 'en',
+    });
+    expect(body[0]).not.toHaveProperty('order_by');
+    expect(results).toEqual([
+      expect.objectContaining({
+        keyword: 'best seo dashboard',
+        volume: 1200,
+        difficulty: 44,
+        cpc: 5.25,
+        competition: 0.32,
+        provider: 'dataforseo',
+        sourceKind: 'keyword_ideas',
+        seed: 'seo dashboard',
+        intent: 'commercial',
+        serpFeatures: 'organic,people_also_ask',
+      }),
+    ]);
+    expect(results[0].trend).toEqual([1000, 1200]);
+  });
+
+  it('normalizes keywords_for_site results with source target evidence', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => dfsTaskResponse([{
+        items: [{
+          keyword: 'dental implants austin',
+          keyword_info: { search_volume: 900, keyword_difficulty: 38, competition: 0.4, cpc: 8 },
+        }],
+      }]),
+    } as Response);
+
+    const results = await provider.getKeywordsForSite('https://www.example.com/services', 'ws-site-discovery', 10, 'us');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(String(url)).toContain('dataforseo_labs/google/keywords_for_site/live');
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body[0]).toMatchObject({
+      target: 'example.com',
+      limit: 10,
+    });
+    expect(body[0]).not.toHaveProperty('order_by');
+    expect(results[0]).toEqual(expect.objectContaining({
+      keyword: 'dental implants austin',
+      sourceKind: 'keywords_for_site',
+      sourceTarget: 'example.com',
+      confidence: 'high',
+    }));
+  });
+
+  it('normalizes general keyword_suggestions without question filtering', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => dfsTaskResponse([{
+        items: [{
+          keyword_data: {
+            keyword: 'seo dashboard software',
+            keyword_info: { search_volume: 700, keyword_difficulty: 41, cpc: 4.5 },
+          },
+        }],
+      }]),
+    } as Response);
+
+    const results = await provider.getKeywordSuggestions('seo dashboard', 'ws-suggestions', 20, 'us');
+
+    const [, init] = fetchSpy.mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body[0]).not.toHaveProperty('filters');
+    expect(results[0]).toEqual(expect.objectContaining({
+      keyword: 'seo dashboard software',
+      sourceKind: 'keyword_suggestions',
+      seed: 'seo dashboard',
+    }));
+  });
+
+  it('normalizes Google Ads keywords_for_keywords results', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => dfsTaskResponse([
+        { keyword: 'seo rank tracking software', search_volume: 1300, competition_index: 52, cpc: 6.1, competition: 0.52, monthly_searches: [] },
+      ]),
+    } as Response);
+
+    const results = await provider.getKeywordsForKeywords(['rank tracking'], 'ws-google-ads', 50, 'us');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(String(url)).toContain('keywords_data/google_ads/keywords_for_keywords/live');
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body[0]).toMatchObject({ keywords: ['rank tracking'], sort_by: 'relevance' });
+    expect(body[0]).not.toHaveProperty('limit');
+    expect(results[0]).toEqual(expect.objectContaining({
+      keyword: 'seo rank tracking software',
+      difficulty: 52,
+      sourceKind: 'google_ads_keywords_for_keywords',
+      seed: 'rank tracking',
+    }));
+  });
+
+  it('returns cached discovery candidates without a provider call', async () => {
+    const cached = [{
+      keyword: 'cached discovery keyword',
+      volume: 500,
+      difficulty: 24,
+      cpc: 3.2,
+      provider: 'dataforseo',
+      sourceKind: 'keyword_ideas' as const,
+      seed: 'cached seed',
+      confidence: 'medium' as const,
+    }];
+    vi.spyOn(fs, 'existsSync').mockImplementation(pathLike => String(pathLike).includes('.dataforseo-cache'));
+    vi.spyOn(fs, 'mkdirSync').mockReturnValue(undefined as never);
+    vi.spyOn(fs, 'readFileSync').mockImplementation(() => JSON.stringify({
+      cachedAt: new Date().toISOString(),
+      data: cached,
+    }));
+    const fetchSpy = vi.spyOn(global, 'fetch');
+    const provider = new DataForSeoProvider();
+
+    const results = await provider.getKeywordIdeas(['cached seed'], 'ws-discovery-cache', 25, 'us');
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(results).toEqual(cached);
+  });
+
+  it('degrades malformed discovery payloads to an empty result', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => dfsTaskResponse([{ items: [{ keyword_info: { search_volume: 100 } }] }]),
+    } as Response);
+
+    await expect(provider.getKeywordsForSite('example.com', 'ws-malformed-discovery', 10, 'us')).resolves.toEqual([]);
+  });
+
+  it('returns an empty result when a discovery endpoint fails', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    vi.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('provider unavailable'));
+
+    await expect(provider.getKeywordSuggestions('seo dashboard', 'ws-discovery-failure', 20, 'us')).resolves.toEqual([]);
   });
 });
 
@@ -474,9 +707,13 @@ describe('DataForSeoProvider — getReferringDomains date normalization', () => 
 });
 
 describe('DataForSeoProvider — init() capability probe', () => {
+  beforeEach(() => {
+    _resetRegistryForTest();
+    reapplyFsMocks();
+  });
   afterEach(() => {
     vi.restoreAllMocks();
-    clearCapabilityDisabled('dataforseo', 'backlinks');
+    _resetRegistryForTest();
   });
 
   it('marks backlinks disabled when probe returns subscription error', async () => {
@@ -555,5 +792,232 @@ describe('DataForSeoProvider — init() capability probe', () => {
 
     expect(global.fetch).toHaveBeenCalledTimes(1);
     expect(isCapabilityDisabled('dataforseo', 'backlinks')).toBe(false);
+  });
+});
+
+describe('DataForSeoProvider — local visibility', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const market = {
+    id: 'market-austin',
+    workspaceId: 'ws-local-provider',
+    label: 'Austin, TX',
+    city: 'Austin',
+    stateOrRegion: 'TX',
+    country: 'US',
+    providerLocationCode: 1026201,
+    providerLocationName: 'Austin,Texas,United States',
+    source: 'admin_override' as const,
+    status: 'active' as const,
+    createdAt: '2026-05-20T00:00:00.000Z',
+    updatedAt: '2026-05-20T00:00:00.000Z',
+  };
+
+  it('resolves local SEO market input to a DataForSEO location code', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(dfsTaskResponse([{
+        location_code: 1026201,
+        location_name: 'Austin,Texas,United States',
+        country_iso_code: 'US',
+        location_type: 'City',
+      }, {
+        location_code: 21176,
+        location_name: 'Texas,United States',
+        country_iso_code: 'US',
+        location_type: 'State',
+      }])),
+    } as Response);
+
+    const result = await provider.resolveLocalSeoLocation({
+      city: 'Austin',
+      stateOrRegion: 'TX',
+      country: 'US',
+    }, 'ws-local-provider');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(String(fetchSpy.mock.calls[0][0])).toContain('serp/google/locations/us');
+    expect(result.status).toBe('matched');
+    expect(result.bestCandidate).toEqual(expect.objectContaining({
+      providerLocationCode: 1026201,
+      providerLocationName: 'Austin,Texas,United States',
+    }));
+  });
+
+  it('uses Google organic SERP local-pack payload guardrails', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(dfsTaskResponse([{ items: [] }])),
+    } as Response);
+
+    await provider.getLocalVisibility({
+      keyword: 'austin dentist',
+      market,
+      device: 'desktop',
+      languageCode: 'en',
+      maxResults: 10,
+    }, 'ws-local-provider');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(String(url)).toContain('serp/google/organic/live/advanced');
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body[0]).toEqual(expect.objectContaining({
+      keyword: 'austin dentist',
+      location_code: 1026201,
+      language_code: 'en',
+      device: 'desktop',
+    }));
+    expect(body[0]).not.toHaveProperty('location_name');
+    expect(body[0].depth).toBeGreaterThanOrEqual(10);
+  });
+
+  it('uses coordinates when no provider location code or name is available', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(dfsTaskResponse([{ items: [] }])),
+    } as Response);
+
+    await provider.getLocalVisibility({
+      keyword: 'austin dentist',
+      market: {
+        ...market,
+        providerLocationCode: undefined,
+        providerLocationName: undefined,
+        latitude: 30.2672,
+        longitude: -97.7431,
+      },
+      device: 'desktop',
+      languageCode: 'en',
+      maxResults: 10,
+    }, 'ws-local-provider');
+
+    const [, init] = fetchSpy.mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body[0]).toEqual(expect.objectContaining({
+      location_coordinate: '30.2672,-97.7431,200',
+    }));
+    expect(body[0]).not.toHaveProperty('location_code');
+    expect(body[0]).not.toHaveProperty('location_name');
+  });
+
+  it('separates local visibility cache keys by provider location identity', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(dfsTaskResponse([{ items: [] }])),
+    } as Response);
+
+    await provider.getLocalVisibility({
+      keyword: 'austin dentist',
+      market: {
+        ...market,
+        id: 'market-austin-name-a',
+        providerLocationCode: undefined,
+        providerLocationName: 'Austin,Texas,United States',
+      },
+      device: 'desktop',
+      languageCode: 'en',
+      maxResults: 10,
+    }, 'ws-local-provider');
+    await provider.getLocalVisibility({
+      keyword: 'austin dentist',
+      market: {
+        ...market,
+        id: 'market-austin-name-b',
+        providerLocationCode: undefined,
+        providerLocationName: 'Austin,Texas',
+      },
+      device: 'desktop',
+      languageCode: 'en',
+      maxResults: 10,
+    }, 'ws-local-provider');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    const firstBody = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string);
+    expect(firstBody[0]).toEqual(expect.objectContaining({
+      location_name: 'Austin,Texas,United States',
+    }));
+    expect(firstBody[0]).not.toHaveProperty('location_code');
+  });
+
+  it('normalizes nested local pack items into provider results', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    mockFetchOnce(dfsTaskResponse([{
+      items: [{
+        type: 'local_pack',
+        items: [
+          { title: 'Local Dental', rank_group: 1, domain: 'local-dental.example.com', phone: '(512) 555-0123', description: '123 Congress Ave, Austin, TX', cid: 'abc' },
+          { title: 'Other Dentist', rank_group: 2, url: 'https://other.example.com' },
+        ],
+      }],
+    }]));
+
+    const result = await provider.getLocalVisibility({
+      keyword: 'austin dentist',
+      market,
+      device: 'mobile',
+      languageCode: 'en',
+      maxResults: 10,
+    }, 'ws-local-provider');
+
+    expect(result.localPackPresent).toBe(true);
+    expect(result.sourceEndpoint).toBe('google_organic_serp');
+    expect(result.results).toEqual([
+      expect.objectContaining({ title: 'Local Dental', rank: 1, domain: 'local-dental.example.com', address: '123 Congress Ave, Austin, TX', cid: 'abc' }),
+      expect.objectContaining({ title: 'Other Dentist', rank: 2, domain: 'other.example.com' }),
+    ]);
+  });
+
+  it('normalizes multiple top-level local pack items into provider results', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    mockFetchOnce(dfsTaskResponse([{
+      items: [
+        { type: 'local_pack', title: 'Competitor Dental', rank_group: 1, domain: 'competitor.example.com' },
+        { type: 'local_pack', title: 'Local Dental', rank_group: 2, domain: 'local-dental.example.com' },
+      ],
+    }]));
+
+    const result = await provider.getLocalVisibility({
+      keyword: 'austin dentist',
+      market,
+      device: 'desktop',
+      languageCode: 'en',
+      maxResults: 10,
+    }, 'ws-local-provider');
+
+    expect(result.localPackPresent).toBe(true);
+    expect(result.results).toEqual([
+      expect.objectContaining({ title: 'Competitor Dental', rank: 1, domain: 'competitor.example.com' }),
+      expect.objectContaining({ title: 'Local Dental', rank: 2, domain: 'local-dental.example.com' }),
+    ]);
+  });
+
+  it('degrades provider failures into a typed provider_failed result', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    vi.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('network down'));
+
+    const result = await provider.getLocalVisibility({
+      keyword: 'austin dentist',
+      market,
+      device: 'desktop',
+      languageCode: 'en',
+      maxResults: 10,
+    }, 'ws-local-provider');
+
+    expect(result.status).toBe('provider_failed');
+    expect(result.localPackPresent).toBe(false);
+    expect(result.results).toEqual([]);
+    expect(result.degradedReason).toContain('Network error');
   });
 });

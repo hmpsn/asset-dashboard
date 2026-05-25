@@ -188,8 +188,8 @@ export async function publishSchemaToCmsField(opts: {
 router.get('/api/webflow/schema-suggestions/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
-    const { ctx, gscMap, ga4Map, queryPageData, insightsMap, validationsByPageId } = await prepareBulkSchemaGenerationContext(req.params.siteId);
-    const result = await generateSchemaSuggestions(req.params.siteId, token, ctx, undefined, undefined, gscMap, ga4Map, queryPageData, insightsMap, validationsByPageId);
+    const { ctx } = await prepareBulkSchemaGenerationContext(req.params.siteId);
+    const result = await generateSchemaSuggestions(req.params.siteId, token, ctx);
     res.json(result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -373,8 +373,8 @@ router.post('/api/webflow/schema-suggestions/:siteId/page', requireWorkspaceSite
   if (!pageId) return res.status(400).json({ error: 'pageId required' });
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
-    const { ctx, gscMap, ga4Map, queryPageData, insightsMap } = await prepareSinglePageSchemaGenerationContext(req.params.siteId, pageId, pageType);
-    const result = await generateSchemaForPage(req.params.siteId, pageId, token, ctx, gscMap, ga4Map, queryPageData, insightsMap);
+    const { ctx } = await prepareSinglePageSchemaGenerationContext(req.params.siteId, pageId, pageType);
+    const result = await generateSchemaForPage(req.params.siteId, pageId, token, ctx);
     if (!result) return res.status(404).json({ error: 'Page not found' });
     res.json(result);
   } catch (err) {

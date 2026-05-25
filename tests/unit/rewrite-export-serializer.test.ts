@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { JSDOM } from 'jsdom';
 import {
   buildDocHtml,
+  buildPrintableDocHtml,
   serializeDocToMarkdown,
 } from '../../src/components/page-rewrite-chat/pageRewriteChatDocument';
 import type { PageData } from '../../src/components/page-rewrite-chat/pageRewriteChatModel';
@@ -69,5 +70,25 @@ describe('rewrite export serializer', () => {
     const html = buildDocHtml(pageData);
     expect(html).toContain('margin-left:24px');
     expect(html).toContain('<p class="t-caption text-slate-500 leading-[1.7] mb-3" style="margin-left:24px">Nested body</p>');
+  });
+
+  it('builds print-ready HTML with escaped issue metadata and current editor content', () => {
+    const dom = new JSDOM('<div><h1>Title</h1><p>Edited body</p></div>');
+    const el = dom.window.document.querySelector('div');
+    const pageData = {
+      title: 'Title',
+      sections: [],
+      bodyText: '',
+      html: '',
+      slug: '/title',
+      issues: [{ severity: 'warning', message: 'Needs <meta> cleanup', check: 'meta' }],
+    } satisfies PageData;
+
+    const html = buildPrintableDocHtml(el as HTMLElement, pageData);
+
+    expect(html).toContain('page-rewrite-print-doc');
+    expect(html).toContain('/title');
+    expect(html).toContain('Needs &lt;meta&gt; cleanup');
+    expect(html).toContain('<p>Edited body</p>');
   });
 });

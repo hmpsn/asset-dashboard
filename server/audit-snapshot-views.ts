@@ -3,10 +3,10 @@ import { applySuppressionsToAudit, type AuditSuppression } from './helpers.js';
 import {
   getLatestSnapshot,
   getLatestSnapshotBefore,
-  getSnapshot,
+  listSnapshotsDetailed,
   listSnapshots,
-  type AuditSnapshot,
   type SnapshotSummary,
+  type AuditSnapshot,
 } from './reports.js';
 
 function hasSuppressions(suppressions: AuditSuppression[] | undefined): suppressions is AuditSuppression[] {
@@ -67,17 +67,18 @@ export function listEffectiveSnapshotSummaries(
   siteId: string,
   suppressions: AuditSuppression[] | undefined,
 ): SnapshotSummary[] {
-  const summaries = listSnapshots(siteId);
-  if (!hasSuppressions(suppressions)) return summaries;
-  return summaries.map(summary => {
-    const snapshot = getSnapshot(summary.id);
-    if (!snapshot) return summary;
+  if (!hasSuppressions(suppressions)) return listSnapshots(siteId);
+  const snapshots = listSnapshotsDetailed(siteId);
+  return snapshots.map((snapshot, idx) => {
     const audit = getEffectiveAudit(snapshot.audit, suppressions);
+    const previous = snapshots[idx + 1];
     return {
-      id: summary.id,
-      createdAt: summary.createdAt,
+      id: snapshot.id,
+      createdAt: snapshot.createdAt,
       siteScore: audit.siteScore,
-      previousScore: getEffectivePreviousScore(snapshot, suppressions),
+      previousScore: previous
+        ? getEffectiveAudit(previous.audit, suppressions).siteScore
+        : snapshot.previousScore,
       totalPages: audit.totalPages,
       errors: audit.errors,
       warnings: audit.warnings,

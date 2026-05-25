@@ -90,7 +90,7 @@ router.post(
   validate(createSignalSchema),
   async (req, res) => {
     const ws = getWorkspace(req.params.workspaceId);
-    if (!ws) return res.status(400).json({ error: 'Workspace not configured' });
+    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
     const { type, triggerMessage, chatContext } = req.body as z.infer<typeof createSignalSchema>;
 

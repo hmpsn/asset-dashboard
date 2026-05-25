@@ -79,6 +79,13 @@ describe('Page Intelligence + SEO Editor correctness contracts', () => {
     expect(invalidationSrc).toContain('queryKeys.admin.pageJoinPagesAll()');
   });
 
+  it('rejects invalid workspace-to-site writes before SEO mutation proceeds', () => {
+    const routeSrc = readFileSync('server/routes/webflow.ts', 'utf-8'); // readFile-ok - invalid workspace access guard for SEO writes.
+
+    expect(routeSrc).toContain('if (typeof workspaceId === \'string\' && (!explicitWs || explicitWs.webflowSiteId !== siteId))');
+    expect(routeSrc).toContain('return res.status(403).json({ error: \'You do not have access to this workspace\' })');
+  });
+
   it('broadcasts and logs bulk SEO apply writes', () => {
     const routeSrc = readFileSync('server/routes/webflow-seo-apply.ts', 'utf-8'); // readFile-ok — source contract for bulk SEO mutation data-flow
     const jobsSrc = readFileSync('server/routes/jobs.ts', 'utf-8'); // readFile-ok — source contract for background bulk SEO mutation data-flow

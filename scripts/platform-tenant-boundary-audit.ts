@@ -47,6 +47,7 @@ type WorkspaceGuardEvaluation = {
   scopedRoutes: number;
   unguardedAdminFiles: string[];
   unguardedPublicFiles: string[];
+  appLevelPublicGuardDetected: boolean;
 };
 
 type UploadGuardEvaluation = {
@@ -205,10 +206,17 @@ export function loadTenantBoundaryAuditInputsFromDisk(): TenantBoundaryAuditInpu
   };
 }
 
-function evaluateWorkspaceGuardCoverage(routeFiles: AuditSourceFile[]): WorkspaceGuardEvaluation {
+function hasAppLevelPublicGuard(appSource: string): boolean {
+  return appSource.includes("if (!req.path.startsWith('/api/public/')) return next();")
+    && appSource.includes('verifyClientSession(')
+    && appSource.includes('verifyClientUserTokenForWorkspace(');
+}
+
+function evaluateWorkspaceGuardCoverage(routeFiles: AuditSourceFile[], appSource: string): WorkspaceGuardEvaluation {
   const unguardedAdminFiles: string[] = [];
   const unguardedPublicFiles: string[] = [];
   let scopedRouteCount = 0;
+  const appLevelPublicGuardDetected = hasAppLevelPublicGuard(appSource);
 
   for (const file of routeFiles) {
     const routeCalls = extractRouteCalls(file.source);
@@ -229,7 +237,9 @@ function evaluateWorkspaceGuardCoverage(routeFiles: AuditSourceFile[]): Workspac
       if (inheritsPublicGuard) continue;
 
       const ref = `${file.path} (${call.path})`;
-      if (call.path.startsWith('/api/public/')) unguardedPublicFiles.push(ref);
+      if (call.path.startsWith('/api/public/')) {
+        if (!appLevelPublicGuardDetected) unguardedPublicFiles.push(ref);
+      }
       else unguardedAdminFiles.push(ref);
     }
   }
@@ -238,6 +248,7 @@ function evaluateWorkspaceGuardCoverage(routeFiles: AuditSourceFile[]): Workspac
     scopedRoutes: scopedRouteCount,
     unguardedAdminFiles: [...unguardedAdminFiles].sort((a, b) => a.localeCompare(b)),
     unguardedPublicFiles: [...unguardedPublicFiles].sort((a, b) => a.localeCompare(b)),
+    appLevelPublicGuardDetected,
   };
 }
 
@@ -336,7 +347,7 @@ function evaluateClientUsersWorkspaceGuard(clientUsersSource: string): ClientUse
 }
 
 export function buildTenantBoundaryAuditReport(inputs: TenantBoundaryAuditInputs): TenantBoundaryAuditReport {
-  const workspaceGuards = evaluateWorkspaceGuardCoverage(inputs.routeFiles);
+  const workspaceGuards = evaluateWorkspaceGuardCoverage(inputs.routeFiles, inputs.appSource);
   const uploadGuards = evaluateUploadGuardCoverage(inputs.routeFiles);
   const webhook = evaluateStripeWebhookTrustBoundary(inputs.appSource);
   const publicSerialization = evaluatePublicSerialization(inputs.publicPortalSource);
@@ -358,6 +369,9 @@ export function buildTenantBoundaryAuditReport(inputs: TenantBoundaryAuditInputs
       `Scoped routes scanned: ${workspaceGuards.scopedRoutes}.`,
       `Unguarded admin routes: ${workspaceGuards.unguardedAdminFiles.length}.`,
       `Unguarded public routes: ${workspaceGuards.unguardedPublicFiles.length}.`,
+      ...(workspaceGuards.appLevelPublicGuardDetected
+        ? ['App-level public auth/session guard detected in server/app.ts; public route-level guard warnings suppressed.']
+        : []),
       ...capDetails(
         workspaceGuards.unguardedAdminFiles,
         file => `Missing explicit workspace guard in admin route file: ${file}`,

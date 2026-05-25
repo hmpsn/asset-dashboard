@@ -215,7 +215,7 @@ const VALID_TRANSITIONS: Record<CopySectionStatus, CopySectionStatus[]> = {
   approved: [],
 };
 
-function isValidTransition(from: CopySectionStatus, to: CopySectionStatus): boolean {
+export function isValidTransition(from: CopySectionStatus, to: CopySectionStatus): boolean {
   return VALID_TRANSITIONS[from]?.includes(to) ?? false;
 }
 

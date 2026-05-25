@@ -326,7 +326,7 @@
       "fixtureRequirement": "tests/pr-check.test.ts before promotion",
       "metricKey": "focus_visible_ring_drift_count",
       "owner": "enforcement + shared-ui",
-      "status": "planned"
+      "status": "advisory"
     },
     {
       "id": "reduced-motion-global-contract",
@@ -365,7 +365,7 @@
       "fixtureRequirement": "drift metric + visual QA samples before promotion",
       "metricKey": "muted_text_tier_violation_count",
       "owner": "client + admin-editor + enforcement",
-      "status": "planned"
+      "status": "advisory"
     },
     {
       "id": "raw-z-index-inline-literal",
@@ -378,7 +378,7 @@
       "fixtureRequirement": "tests/pr-check.test.ts before promotion",
       "metricKey": "raw_z_index_inline_literal_count",
       "owner": "enforcement",
-      "status": "planned"
+      "status": "advisory"
     },
     {
       "id": "report-style-drift-metric-parity",
@@ -404,7 +404,7 @@
       "fixtureRequirement": "drift detail + fixtures before promotion",
       "metricKey": "stat_primitive_bypass_signal_count",
       "owner": "client + admin-editor + enforcement",
-      "status": "planned"
+      "status": "advisory"
     },
     {
       "id": "styleguide-specimen-bad-example-labeling",

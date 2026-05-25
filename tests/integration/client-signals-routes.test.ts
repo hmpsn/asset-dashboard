@@ -139,13 +139,14 @@ describe('POST /api/public/signal/:workspaceId', () => {
     expect(res.status).toBe(400);
   });
 
-  it('returns 400 for unknown workspace', async () => {
+  it('returns 404 for unknown workspace', async () => {
     const res = await postJson('/api/public/signal/nonexistent-workspace-xyz', {
       type: 'service_interest',
       triggerMessage: 'test',
       chatContext: [],
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(404);
+    await expect(res.json()).resolves.toEqual({ error: 'Workspace not found' });
   });
 });
 

@@ -64,6 +64,9 @@ router.post('/api/content-decay/:workspaceId/analyze', requireWorkspaceAccess('w
     res.json(analysis);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
+    if (msg === 'GSC not configured for this workspace') {
+      return res.status(400).json({ error: msg });
+    }
     res.status(500).json({ error: msg });
   }
 });
@@ -82,7 +85,15 @@ router.post('/api/content-decay/:workspaceId/recommendations', requireWorkspaceA
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });
     const existing = loadDecayAnalysis(req.params.workspaceId);
     if (!existing) return res.status(404).json({ error: 'Run decay analysis first' });
-    const maxPages = req.body.maxPages || 5;
+    const rawMaxPages = req.body?.maxPages;
+    const requestedMaxPages = rawMaxPages == null ? 5 : Number(rawMaxPages);
+    if (!Number.isInteger(requestedMaxPages) || requestedMaxPages < 1) {
+      return res.status(400).json({ error: 'maxPages must be a positive integer' });
+    }
+    if (requestedMaxPages > 25) {
+      return res.status(400).json({ error: 'maxPages must be between 1 and 25' });
+    }
+    const maxPages = Math.min(requestedMaxPages, 25);
     const updated = await generateBatchRecommendations(ws, existing, maxPages);
 
     try {

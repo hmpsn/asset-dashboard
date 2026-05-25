@@ -6,6 +6,7 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { RedirectManager } from './RedirectManager';
 import { InternalLinks } from './InternalLinks';
 import { Button, Icon, cn } from './ui';
+import { clearTabSearchParam, resolveTabSearchParam } from '../lib/tab-search-param';
 
 const LinkChecker = lazyWithRetry(() => import('./LinkChecker').then(m => ({ default: m.LinkChecker })));
 
@@ -25,16 +26,17 @@ type LinksTab = typeof TABS[number]['id'];
 export function LinksPanel({ siteId, workspaceId }: Props) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<LinksTab>(() => {
-    const param = searchParams.get('tab');
-    return TABS.some(t => t.id === param) ? (param as LinksTab) : 'redirects';
+    return resolveTabSearchParam<LinksTab>(searchParams.get('tab'), {
+      validValues: TABS.map(t => t.id),
+      fallback: 'redirects',
+    });
   });
 
   // Clear ?tab= from URL on manual tab change so refresh shows last selection
   const handleTabChange = (id: LinksTab) => {
     setActiveTab(id);
-    if (searchParams.has('tab')) {
-      const next = new URLSearchParams(searchParams);
-      next.delete('tab');
+    const next = clearTabSearchParam(searchParams);
+    if (next) {
       setSearchParams(next, { replace: true });
     }
   };
