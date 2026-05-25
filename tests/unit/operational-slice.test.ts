@@ -273,6 +273,6 @@ describe('assembleOperational', () => {
     const result = await assembleOperational('ws_1');
 
     expect(result.actionBacklog?.pendingMeasurement).toBe(1);
-    expect(Number.isNaN(result.actionBacklog?.oldestAge)).toBe(true);
+    expect(result.actionBacklog?.oldestAge).toBeNull();
   });
 });

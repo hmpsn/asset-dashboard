@@ -28,13 +28,18 @@ export async function assembleLearnings(
   let availability: LearningsSlice['availability'] = 'no_data';
   try {
     const { getWorkspaceLearnings } = await import('../workspace-learnings.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-    const { getPlaybooks } = await import('../outcome-playbooks.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
     summary = getWorkspaceLearnings(workspaceId, opts?.learningsDomain ?? 'all');
-    playbooks = getPlaybooks(workspaceId);
     availability = summary ? 'ready' : 'no_data';
   } catch (err) {
     availability = 'degraded';
     log.warn({ err, workspaceId }, 'assembleLearnings: core data load failed, degrading to empty learnings');
+  }
+
+  try {
+    const { getPlaybooks } = await import('../outcome-playbooks.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+    playbooks = getPlaybooks(workspaceId);
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleLearnings: playbooks optional, degrading gracefully');
   }
 
   // ROI attribution enrichment

@@ -39,6 +39,12 @@ describe('buildStoryFromInsight (competitor_alert)', () => {
     expect(buildStoryFromInsight(makeInsight({ competitorDomain: '   ' }), context)).toBeNull();
     expect(
       buildStoryFromInsight(
+        makeInsight({ snapshotDate: '   ' as unknown as CompetitorAlertData['snapshotDate'] }),
+        context,
+      ),
+    ).toBeNull();
+    expect(
+      buildStoryFromInsight(
         makeInsight({ alertType: 'unexpected' as unknown as CompetitorAlertData['alertType'] }),
         context,
       ),

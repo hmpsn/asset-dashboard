@@ -201,7 +201,7 @@ describe('assembleLearnings', () => {
     expect(result.topActionTypes).toEqual([]);
     expect(result.overallWinRate).toBe(0);
     expect(result.recentTrend).toBeNull();
-    expect(result.playbooks).toEqual([]);
+    expect(result.playbooks).toEqual([{ name: 'Refresh decaying pages' }]);
     expect(result.roiAttribution).toEqual([]);
     expect(result.topWins).toEqual([]);
     expect(result.weCalledIt).toEqual([]);
@@ -221,7 +221,7 @@ describe('assembleLearnings', () => {
 
     const result = await assembleLearnings('ws_no_data');
 
-    expect(result.availability).toBe('degraded');
+    expect(result.availability).toBe('no_data');
     expect(result.summary).toBeNull();
     expect(result.confidence).toBeNull();
     expect(result.playbooks).toEqual([]);
