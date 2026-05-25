@@ -30,12 +30,18 @@ export async function prepareSinglePageSchemaGenerationContext(
   if (pageType) ctx.pageType = pageType;
 
   if (ctx.workspaceId) {
-    const prior = getValidation(ctx.workspaceId, pageId);
-    if (Array.isArray(prior?.errors) && prior.errors.length > 0) {
-      const validErrors = prior.errors.filter(
-        (error): error is { message: string } => typeof (error as { message?: unknown })?.message === 'string',
-      );
-      if (validErrors.length > 0) ctx._existingErrors = validErrors;
+    try {
+      const prior = getValidation(ctx.workspaceId, pageId);
+      if (Array.isArray(prior?.errors) && prior.errors.length > 0) {
+        const validErrors = prior.errors.filter(
+          (error): error is { message: string } => typeof (error as { message?: unknown })?.message === 'string',
+        );
+        if (validErrors.length > 0) ctx._existingErrors = validErrors;
+      }
+    } catch (err) {
+      if (isProgrammingError(err)) {
+        log.warn({ err, workspaceId: ctx.workspaceId, pageId }, 'Schema generation validation context unavailable');
+      }
     }
     await attachArchitectureTree(ctx);
   }

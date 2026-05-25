@@ -1,62 +1,35 @@
-/**
- * Wave 25 — Unit tests for server/schema-generation-context.ts
- *
- * The module exports:
- *   - prepareBulkSchemaGenerationContext(siteId): calls buildSchemaContext, attaches architecture
- *   - prepareSinglePageSchemaGenerationContext(siteId, pageId, pageType?): also attaches prior validation errors
- *
- * Tests verify:
- *   - context is returned from buildSchemaContext
- *   - architecture tree is attached when workspaceId is present
- *   - architecture errors are swallowed when workspaceId is present but getCachedArchitecture throws
- *   - prior validation errors are attached for single-page context
- *   - pageType override is applied when provided
- *   - no architecture attachment when workspaceId is absent
- */
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-
-// ── Mocks ──────────────────────────────────────────────────────────────────────
-
-const mockBuildSchemaContext = vi.fn();
-const mockGetCachedArchitecture = vi.fn();
-const mockGetValidation = vi.fn();
+const mocks = vi.hoisted(() => ({
+  buildSchemaContext: vi.fn(),
+  getCachedArchitecture: vi.fn(),
+  getValidation: vi.fn(),
+  isProgrammingError: vi.fn(),
+  logWarn: vi.fn(),
+}));
 
 vi.mock('../../server/helpers.js', () => ({
-  buildSchemaContext: mockBuildSchemaContext,
+  buildSchemaContext: mocks.buildSchemaContext,
 }));
 
 vi.mock('../../server/site-architecture.js', () => ({
-  getCachedArchitecture: mockGetCachedArchitecture,
+  getCachedArchitecture: mocks.getCachedArchitecture,
 }));
 
 vi.mock('../../server/schema-validator.js', () => ({
-  getValidation: mockGetValidation,
+  getValidation: mocks.getValidation,
+}));
+
+vi.mock('../../server/errors.js', () => ({
+  isProgrammingError: mocks.isProgrammingError,
 }));
 
 vi.mock('../../server/logger.js', () => ({
-  createLogger: () => ({ warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn() }),
+  createLogger: () => ({ warn: mocks.logWarn, info: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }));
 
-// ── Lazy import after mocks ────────────────────────────────────────────────────
-
-let prepareBulkSchemaGenerationContext: (siteId: string) => Promise<unknown>;
-let prepareSinglePageSchemaGenerationContext: (
-  siteId: string,
-  pageId: string,
-  pageType?: string,
-) => Promise<unknown>;
-
-beforeEach(async () => {
-  vi.resetModules();
-  vi.clearAllMocks();
-
-  const mod = await import('../../server/schema-generation-context.js');
-  prepareBulkSchemaGenerationContext = mod.prepareBulkSchemaGenerationContext;
-  prepareSinglePageSchemaGenerationContext = mod.prepareSinglePageSchemaGenerationContext;
-});
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
+const { prepareBulkSchemaGenerationContext, prepareSinglePageSchemaGenerationContext } =
+  await import('../../server/schema-generation-context.js');
 
 function makeContextBundle(overrides: Partial<{ workspaceId: string; pageType: string }> = {}) {
   const ctx: Record<string, unknown> = {
@@ -68,122 +41,105 @@ function makeContextBundle(overrides: Partial<{ workspaceId: string; pageType: s
   return { ctx, siteId: 'site_test' };
 }
 
-// ── prepareBulkSchemaGenerationContext ─────────────────────────────────────────
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.isProgrammingError.mockReturnValue(false);
+  mocks.getValidation.mockReturnValue(null);
+  mocks.getCachedArchitecture.mockResolvedValue({ tree: { children: [] } });
+  mocks.buildSchemaContext.mockResolvedValue(makeContextBundle());
+});
 
 describe('prepareBulkSchemaGenerationContext', () => {
-  it('returns the bundle from buildSchemaContext', async () => {
+  it('returns context bundle from buildSchemaContext and requests analytics', async () => {
     const bundle = makeContextBundle();
-    mockBuildSchemaContext.mockResolvedValue(bundle);
-    mockGetCachedArchitecture.mockResolvedValue({ tree: { children: [] } });
+    mocks.buildSchemaContext.mockResolvedValue(bundle);
 
-    const result = await prepareBulkSchemaGenerationContext('site_test');
+    const result = await prepareBulkSchemaGenerationContext('site_abc');
+
     expect(result).toBe(bundle);
+    expect(mocks.buildSchemaContext).toHaveBeenCalledWith('site_abc', { includeAnalytics: true });
   });
 
-  it('calls buildSchemaContext with siteId and includeAnalytics: true', async () => {
-    const bundle = makeContextBundle();
-    mockBuildSchemaContext.mockResolvedValue(bundle);
-    mockGetCachedArchitecture.mockResolvedValue({ tree: {} });
-
-    await prepareBulkSchemaGenerationContext('site_abc');
-    expect(mockBuildSchemaContext).toHaveBeenCalledWith('site_abc', { includeAnalytics: true });
-  });
-
-  it('attaches architecture tree to ctx when workspaceId is present', async () => {
+  it('attaches architecture tree when workspaceId is present', async () => {
     const bundle = makeContextBundle();
     const tree = { children: [{ slug: '/about' }] };
-    mockBuildSchemaContext.mockResolvedValue(bundle);
-    mockGetCachedArchitecture.mockResolvedValue({ tree });
+    mocks.buildSchemaContext.mockResolvedValue(bundle);
+    mocks.getCachedArchitecture.mockResolvedValue({ tree });
 
     await prepareBulkSchemaGenerationContext('site_test');
+
     expect(bundle.ctx._architectureTree).toBe(tree);
   });
 
-  it('silently skips architecture when getCachedArchitecture throws a programming error', async () => {
-    const bundle = makeContextBundle();
-    mockBuildSchemaContext.mockResolvedValue(bundle);
-    // TypeError is treated as a programming error by isProgrammingError()
-    mockGetCachedArchitecture.mockRejectedValue(new TypeError('cannot read property'));
+  it('skips architecture lookup when workspaceId is missing', async () => {
+    const bundle = makeContextBundle({ workspaceId: '' });
+    bundle.ctx.workspaceId = undefined;
+    mocks.buildSchemaContext.mockResolvedValue(bundle);
 
-    // Should not throw
+    await prepareBulkSchemaGenerationContext('site_test');
+
+    expect(mocks.getCachedArchitecture).not.toHaveBeenCalled();
+  });
+
+  it('degrades gracefully when architecture lookup throws', async () => {
+    const bundle = makeContextBundle();
+    mocks.buildSchemaContext.mockResolvedValue(bundle);
+    mocks.getCachedArchitecture.mockRejectedValue(new Error('architecture unavailable'));
+
     await expect(prepareBulkSchemaGenerationContext('site_test')).resolves.toBeDefined();
     expect(bundle.ctx._architectureTree).toBeUndefined();
   });
-
-  it('does not call getCachedArchitecture when workspaceId is absent', async () => {
-    const bundle = makeContextBundle({ workspaceId: '' });
-    bundle.ctx.workspaceId = undefined; // simulate no workspace
-    mockBuildSchemaContext.mockResolvedValue(bundle);
-
-    await prepareBulkSchemaGenerationContext('site_test');
-    expect(mockGetCachedArchitecture).not.toHaveBeenCalled();
-  });
 });
 
-// ── prepareSinglePageSchemaGenerationContext ───────────────────────────────────
-
 describe('prepareSinglePageSchemaGenerationContext', () => {
-  it('returns the bundle from buildSchemaContext', async () => {
-    const bundle = makeContextBundle();
-    mockBuildSchemaContext.mockResolvedValue(bundle);
-    mockGetValidation.mockReturnValue(null);
-    mockGetCachedArchitecture.mockResolvedValue({ tree: {} });
-
-    const result = await prepareSinglePageSchemaGenerationContext('site_test', 'page_1');
-    expect(result).toBe(bundle);
-  });
-
-  it('applies pageType override when provided', async () => {
-    const bundle = makeContextBundle();
-    mockBuildSchemaContext.mockResolvedValue(bundle);
-    mockGetValidation.mockReturnValue(null);
-    mockGetCachedArchitecture.mockResolvedValue({ tree: {} });
-
-    await prepareSinglePageSchemaGenerationContext('site_test', 'page_1', 'blog');
-    expect(bundle.ctx.pageType).toBe('blog');
-  });
-
-  it('does not override pageType when not provided', async () => {
+  it('applies pageType override and attaches existing validation errors', async () => {
     const bundle = makeContextBundle({ pageType: 'homepage' });
-    mockBuildSchemaContext.mockResolvedValue(bundle);
-    mockGetValidation.mockReturnValue(null);
-    mockGetCachedArchitecture.mockResolvedValue({ tree: {} });
+    mocks.buildSchemaContext.mockResolvedValue(bundle);
+    mocks.getValidation.mockReturnValue({ errors: [{ message: 'Missing @type' }, { message: 'Invalid schema' }] });
+
+    const result = await prepareSinglePageSchemaGenerationContext('site_test', 'page_1', 'blog');
+
+    expect(result).toBe(bundle);
+    expect(bundle.ctx.pageType).toBe('blog');
+    expect(bundle.ctx._existingErrors).toEqual([{ message: 'Missing @type' }, { message: 'Invalid schema' }]);
+  });
+
+  it('filters malformed validation errors and leaves pageType untouched without override', async () => {
+    const bundle = makeContextBundle({ pageType: 'homepage' });
+    mocks.buildSchemaContext.mockResolvedValue(bundle);
+    mocks.getValidation.mockReturnValue({ errors: [{ message: 'Valid' }, { code: 123 }, null, { message: 42 }] });
 
     await prepareSinglePageSchemaGenerationContext('site_test', 'page_1');
-    // pageType should remain from context, not overwritten
+
     expect(bundle.ctx.pageType).toBe('homepage');
+    expect(bundle.ctx._existingErrors).toEqual([{ message: 'Valid' }]);
   });
 
-  it('attaches prior validation errors when present', async () => {
+  it('degrades gracefully when validation lookup throws runtime error (non-programming)', async () => {
     const bundle = makeContextBundle();
-    const errors = [{ message: 'Missing @type' }, { message: 'Invalid schema' }];
-    mockBuildSchemaContext.mockResolvedValue(bundle);
-    mockGetValidation.mockReturnValue({ errors });
-    mockGetCachedArchitecture.mockResolvedValue({ tree: {} });
+    mocks.buildSchemaContext.mockResolvedValue(bundle);
+    mocks.getValidation.mockImplementation(() => {
+      throw new Error('validation store unavailable');
+    });
+    mocks.isProgrammingError.mockReturnValue(false);
 
-    await prepareSinglePageSchemaGenerationContext('site_test', 'page_1');
-    expect(bundle.ctx._existingErrors).toEqual(errors);
-  });
-
-  it('does not attach _existingErrors when validation has no errors', async () => {
-    const bundle = makeContextBundle();
-    mockBuildSchemaContext.mockResolvedValue(bundle);
-    mockGetValidation.mockReturnValue({ errors: [] });
-    mockGetCachedArchitecture.mockResolvedValue({ tree: {} });
-
-    await prepareSinglePageSchemaGenerationContext('site_test', 'page_1');
+    await expect(prepareSinglePageSchemaGenerationContext('site_test', 'page_1')).resolves.toBeDefined();
     expect(bundle.ctx._existingErrors).toBeUndefined();
+    expect(mocks.logWarn).not.toHaveBeenCalled();
   });
 
-  it('filters out error objects missing a message string', async () => {
+  it('logs warning and continues when validation lookup throws programming error', async () => {
     const bundle = makeContextBundle();
-    // mix of valid and invalid error shapes
-    const errors = [{ message: 'Valid error' }, { code: 123 }, null, { message: 42 }];
-    mockBuildSchemaContext.mockResolvedValue(bundle);
-    mockGetValidation.mockReturnValue({ errors });
-    mockGetCachedArchitecture.mockResolvedValue({ tree: {} });
+    mocks.buildSchemaContext.mockResolvedValue(bundle);
+    mocks.getValidation.mockImplementation(() => {
+      throw new TypeError('cannot read property');
+    });
+    mocks.isProgrammingError.mockReturnValue(true);
 
-    await prepareSinglePageSchemaGenerationContext('site_test', 'page_1');
-    expect(bundle.ctx._existingErrors).toEqual([{ message: 'Valid error' }]);
+    await expect(prepareSinglePageSchemaGenerationContext('site_test', 'page_1')).resolves.toBeDefined();
+    expect(mocks.logWarn).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceId: 'ws_test', pageId: 'page_1' }),
+      'Schema generation validation context unavailable',
+    );
   });
 });
