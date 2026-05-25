@@ -6654,6 +6654,7 @@ export const CHECKS: Check[] = [
     customCheck: (files) => {
       const matches: { file: string; line: number; text: string }[] = [];
       const mutationFnRe = /\b(upsertBrief|savePost|upsertPageKeyword|notifyContentUpdated)\(/;
+      const broadcastRe = /\bbroadcastToWorkspace\(/;
       for (const file of files) {
         let text: string;
         try {
@@ -6662,20 +6663,35 @@ export const CHECKS: Check[] = [
           continue;
         }
         const lines = text.split('\n');
-        let firstMutationLine = -1;
-        let hasBroadcast = false;
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i];
-          if (/\bbroadcastToWorkspace\(/.test(line)) {
-            hasBroadcast = true;
+          if (!mutationFnRe.test(line)) continue;
+          if (hasHatch(lines, i, 'mcp-action-must-broadcast-ok')) continue;
+
+          // Require a broadcast in the same enclosing function scope as the
+          // mutation call. This prevents false-negatives where file A has one
+          // correctly-broadcasted mutation and another silent mutation in a
+          // different function.
+          let scopeStart = i;
+          while (scopeStart > 0 && !FUNC_BOUNDARY_RE.test(lines[scopeStart])) {
+            scopeStart--;
           }
-          if (firstMutationLine === -1 && mutationFnRe.test(line)) {
-            if (hasHatch(lines, i, 'mcp-action-must-broadcast-ok')) continue;
-            firstMutationLine = i + 1;
+
+          let scopeEnd = lines.length - 1;
+          for (let j = i + 1; j < lines.length; j++) {
+            if (FUNC_BOUNDARY_RE.test(lines[j])) {
+              scopeEnd = j - 1;
+              break;
+            }
           }
-        }
-        if (firstMutationLine !== -1 && !hasBroadcast) {
-          matches.push({ file, line: firstMutationLine, text: lines[firstMutationLine - 1].trim() });
+
+          const hasBroadcastInScope = lines
+            .slice(scopeStart, scopeEnd + 1)
+            .some(scopeLine => broadcastRe.test(scopeLine));
+
+          if (!hasBroadcastInScope) {
+            matches.push({ file, line: i + 1, text: line.trim() });
+          }
         }
       }
       return matches;

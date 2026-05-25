@@ -8537,6 +8537,25 @@ describe('Rule: mcp-action-must-broadcast', () => {
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
+  it('flags a second mutation function that omits broadcast even if another function in the file broadcasts', () => {
+    const file = write(
+      uniqPath('rule-mcp-broadcast', 'server/mcp/tools/mixed-actions.ts'),
+      lines(
+        'async function withBroadcast(workspaceId: string) {',
+        '  await upsertBrief(workspaceId, { id: "a1" });',
+        '  broadcastToWorkspace(workspaceId, "brief:updated", { id: "a1" });',
+        '}',
+        '',
+        'async function missingBroadcast(workspaceId: string) {',
+        '  await savePost(workspaceId, { id: "p1" });',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(7);
+  });
+
   it('respects inline // mcp-action-must-broadcast-ok hatch', () => {
     const file = write(
       uniqPath('rule-mcp-broadcast', 'server/mcp/tools/brief-actions.ts'),
