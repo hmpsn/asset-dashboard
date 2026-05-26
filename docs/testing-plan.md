@@ -613,7 +613,7 @@ These test multi-step workflows end-to-end, catching failures at the seams betwe
 | 24 | `tests/unit/strategy-enrichment.test.ts` | SERP features, trend direction, question keywords, cannibalization detection | FM-1 | M |
 | 25 | `tests/unit/admin-chat-question-routing.test.ts` | Question classification routes to correct data sources | FM-1 | M |
 | 26 | `tests/integration/content-brief-generation.test.ts` | Brief generation with all context sources, enrichment pipeline | FM-1, FM-2 | L |
-| 27 | `tests/unit/content-quality-rules.test.ts` | WRITING_QUALITY_RULES enforcement in AI prompts | FM-4 | S |
+| 27 | `tests/unit/content-quality-rules.test.ts` | Creative writing-rule enforcement and prose-rule de-duplication in AI prompts | FM-4 | S |
 
 ### Batch 6: Data Integrity & JSON Safety (Tier 2)
 

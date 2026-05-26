@@ -58,6 +58,7 @@ vi.mock('../../server/copy-intelligence.js', () => ({
 
 vi.mock('../../server/writing-quality.js', () => ({
   WRITING_QUALITY_RULES: 'MOCK WRITING QUALITY RULES',
+  CREATIVE_WRITING_RULES: 'MOCK CREATIVE WRITING RULES',
 }));
 
 vi.mock('../../server/db/json-validation.js', () => ({
@@ -645,9 +646,10 @@ describe('buildCopyGenerationContext — output structure', () => {
     expect(ctx).toContain('PAGE TYPE: Service Page');
   });
 
-  it('includes writing quality rules in generation layer', async () => {
+  it('includes lean creative writing rules in generation layer', async () => {
     const ctx = await buildCopyGenerationContext(WORKSPACE_ID, makeBlueprint(), makeEntry());
-    expect(ctx).toContain('MOCK WRITING QUALITY RULES');
+    expect(ctx).toContain('MOCK CREATIVE WRITING RULES');
+    expect(ctx).not.toContain('MOCK WRITING QUALITY RULES');
   });
 });
 

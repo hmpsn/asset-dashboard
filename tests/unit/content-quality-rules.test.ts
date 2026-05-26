@@ -1,5 +1,5 @@
 /**
- * Unit tests for WRITING_QUALITY_RULES enforcement in AI content generation prompts.
+ * Unit tests for CREATIVE_WRITING_RULES enforcement in AI content generation prompts.
  *
  * Strategy: mock callOpenAI / callAnthropic and isAnthropicConfigured so we can
  * capture the exact prompts passed to each generation function, then assert that
@@ -10,6 +10,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ContentBrief } from '../../shared/types/content.ts';
+import { CREATIVE_WRITING_RULES, PROSE_QUALITY_RULES } from '../../server/writing-quality.js';
 
 // ── Mocks must be declared before any import that transitively loads these modules ──
 
@@ -97,9 +98,9 @@ function lastPrompt(): string {
   return last.map(m => m.content).join('\n');
 }
 
-// ── WRITING_QUALITY_RULES presence ──
+// ── CREATIVE_WRITING_RULES presence ──
 
-describe('WRITING_QUALITY_RULES injection — generateIntroduction', () => {
+describe('CREATIVE_WRITING_RULES injection — generateIntroduction', () => {
   beforeEach(() => {
     capturedMessages.length = 0;
   });
@@ -107,32 +108,32 @@ describe('WRITING_QUALITY_RULES injection — generateIntroduction', () => {
   it('includes quality rules block in the prompt', async () => {
     await generateIntroduction(makeBrief(), '', 'ws_test');
     const prompt = lastPrompt();
-    expect(prompt).toContain('WRITING QUALITY RULES');
+    expect(prompt).toContain('CREATIVE WRITING RULES');
+    expect(prompt).toContain(CREATIVE_WRITING_RULES.trim());
   });
 
-  it('includes FORBIDDEN PHRASES section', async () => {
+  it('does not duplicate PROSE_QUALITY_RULES from buildSystemPrompt', async () => {
     await generateIntroduction(makeBrief(), '', 'ws_test');
     const prompt = lastPrompt();
-    expect(prompt).toContain('FORBIDDEN PHRASES');
+    expect(prompt).not.toContain(PROSE_QUALITY_RULES.trim());
   });
 
-  it('includes STRUCTURAL ANTI-PATTERNS section', async () => {
+  it('includes high-signal AI cliche guidance', async () => {
     await generateIntroduction(makeBrief(), '', 'ws_test');
     const prompt = lastPrompt();
-    expect(prompt).toContain('STRUCTURAL ANTI-PATTERNS');
+    expect(prompt).toContain('HIGH-SIGNAL AI CLICHES TO AVOID');
   });
 
-  it('includes FABRICATION RULES section', async () => {
+  it('includes FACTUAL SAFETY section', async () => {
     await generateIntroduction(makeBrief(), '', 'ws_test');
     const prompt = lastPrompt();
-    expect(prompt).toContain('FABRICATION RULES');
+    expect(prompt).toContain('FACTUAL SAFETY');
   });
 
-  it('includes AEO citation-worthy writing section', async () => {
+  it('includes OUTPUT DISCIPLINE section', async () => {
     await generateIntroduction(makeBrief(), '', 'ws_test');
     const prompt = lastPrompt();
-    expect(prompt).toContain('AEO');
-    expect(prompt).toContain('CITATION-WORTHY WRITING');
+    expect(prompt).toContain('OUTPUT DISCIPLINE');
   });
 
   it('explicitly bans "Did you know" opener', async () => {
@@ -178,7 +179,7 @@ describe('WRITING_QUALITY_RULES injection — generateIntroduction', () => {
   });
 });
 
-describe('WRITING_QUALITY_RULES injection — generateSection', () => {
+describe('CREATIVE_WRITING_RULES injection — generateSection', () => {
   beforeEach(() => {
     capturedMessages.length = 0;
   });
@@ -187,28 +188,28 @@ describe('WRITING_QUALITY_RULES injection — generateSection', () => {
     const brief = makeBrief();
     await generateSection(brief, brief.outline[0], 0, [], '', 'ws_test');
     const prompt = lastPrompt();
-    expect(prompt).toContain('WRITING QUALITY RULES');
+    expect(prompt).toContain('CREATIVE WRITING RULES');
   });
 
-  it('includes FORBIDDEN PHRASES in the section prompt', async () => {
+  it('does not duplicate PROSE_QUALITY_RULES in the section prompt', async () => {
     const brief = makeBrief();
     await generateSection(brief, brief.outline[0], 0, [], '', 'ws_test');
     const prompt = lastPrompt();
-    expect(prompt).toContain('FORBIDDEN PHRASES');
+    expect(prompt).not.toContain(PROSE_QUALITY_RULES.trim());
   });
 
-  it('includes FABRICATION RULES in the section prompt', async () => {
+  it('includes FACTUAL SAFETY in the section prompt', async () => {
     const brief = makeBrief();
     await generateSection(brief, brief.outline[0], 0, [], '', 'ws_test');
     const prompt = lastPrompt();
-    expect(prompt).toContain('FABRICATION RULES');
+    expect(prompt).toContain('FACTUAL SAFETY');
   });
 
-  it('includes AEO section in the section prompt', async () => {
+  it('includes provenance-sensitive topic guidance in the section prompt', async () => {
     const brief = makeBrief();
     await generateSection(brief, brief.outline[0], 0, [], '', 'ws_test');
     const prompt = lastPrompt();
-    expect(prompt).toContain('AEO');
+    expect(prompt).toContain('provenance-sensitive topics');
   });
 
   it('includes the section heading in the prompt', async () => {
@@ -241,7 +242,7 @@ describe('WRITING_QUALITY_RULES injection — generateSection', () => {
   });
 });
 
-describe('WRITING_QUALITY_RULES injection — generateConclusion', () => {
+describe('CREATIVE_WRITING_RULES injection — generateConclusion', () => {
   beforeEach(() => {
     capturedMessages.length = 0;
   });
@@ -249,19 +250,19 @@ describe('WRITING_QUALITY_RULES injection — generateConclusion', () => {
   it('includes quality rules block in the conclusion prompt', async () => {
     await generateConclusion(makeBrief(), '', 'ws_test');
     const prompt = lastPrompt();
-    expect(prompt).toContain('WRITING QUALITY RULES');
+    expect(prompt).toContain('CREATIVE WRITING RULES');
   });
 
-  it('includes FORBIDDEN PHRASES in the conclusion prompt', async () => {
+  it('does not duplicate PROSE_QUALITY_RULES in the conclusion prompt', async () => {
     await generateConclusion(makeBrief(), '', 'ws_test');
     const prompt = lastPrompt();
-    expect(prompt).toContain('FORBIDDEN PHRASES');
+    expect(prompt).not.toContain(PROSE_QUALITY_RULES.trim());
   });
 
-  it('includes FABRICATION RULES in the conclusion prompt', async () => {
+  it('includes FACTUAL SAFETY in the conclusion prompt', async () => {
     await generateConclusion(makeBrief(), '', 'ws_test');
     const prompt = lastPrompt();
-    expect(prompt).toContain('FABRICATION RULES');
+    expect(prompt).toContain('FACTUAL SAFETY');
   });
 
   it('bans "Conclusion" as a section heading', async () => {
@@ -534,16 +535,16 @@ describe('quality rule categories are individually addressable in prompts', () =
     capturedMessages.length = 0;
   });
 
-  it('readability guidance (vary sentence length) is present', async () => {
+  it('readability guidance (vary rhythm naturally) is present', async () => {
     await generateIntroduction(makeBrief(), '', 'ws_test');
     const prompt = lastPrompt();
-    expect(prompt).toContain('Vary sentence length');
+    expect(prompt).toContain('Vary rhythm naturally');
   });
 
-  it('SEO guidance (active voice) is present', async () => {
+  it('specificity guidance is present', async () => {
     await generateIntroduction(makeBrief(), '', 'ws_test');
     const prompt = lastPrompt();
-    expect(prompt).toContain('active voice');
+    expect(prompt).toContain('concrete examples');
   });
 
   it('brand voice guidance (knowledgeable colleague) is present', async () => {
@@ -552,22 +553,22 @@ describe('quality rule categories are individually addressable in prompts', () =
     expect(prompt).toContain('knowledgeable colleague');
   });
 
-  it('formatting guidance (paragraph variation) is present', async () => {
+  it('formatting guidance (paragraph/list variation) is present', async () => {
     await generateIntroduction(makeBrief(), '', 'ws_test');
     const prompt = lastPrompt();
-    expect(prompt).toContain('Vary paragraph structure');
+    expect(prompt).toContain('vary paragraph/list structure');
   });
 
-  it('depth-over-breadth instruction is present', async () => {
+  it('depth-over-breadth guidance is present', async () => {
     await generateSection(makeBrief(), makeBrief().outline[0], 0, [], '', 'ws_test');
     const prompt = lastPrompt();
-    expect(prompt).toContain('DEPTH OVER BREADTH');
+    expect(prompt).toContain('one strong idea developed well');
   });
 
-  it('AEO definition-block pattern instruction is present', async () => {
+  it('thin-evidence fallback instruction is present', async () => {
     await generateSection(makeBrief(), makeBrief().outline[0], 0, [], '', 'ws_test');
     const prompt = lastPrompt();
-    expect(prompt).toContain('DEFINITION BLOCKS');
+    expect(prompt).toContain('If source evidence is thin');
   });
 
   it('anchor text accuracy rule is present', async () => {
@@ -576,16 +577,16 @@ describe('quality rule categories are individually addressable in prompts', () =
     expect(prompt).toContain('ANCHOR TEXT ACCURACY');
   });
 
-  it('conclusion CTA link-count limit is present', async () => {
+  it('output format discipline is present', async () => {
     await generateConclusion(makeBrief(), '', 'ws_test');
     const prompt = lastPrompt();
-    expect(prompt).toContain('at most ONE linked call-to-action');
+    expect(prompt).toContain('Follow the requested output format exactly');
   });
 
-  it('brand mention frequency limit is present', async () => {
+  it('repetition control remains present', async () => {
     await generateSection(makeBrief(), makeBrief().outline[0], 0, [], '', 'ws_test');
     const prompt = lastPrompt();
-    expect(prompt).toContain('Do NOT mention the business/brand name in every section');
+    expect(prompt).toContain('Do not repeat the same example');
   });
 });
 

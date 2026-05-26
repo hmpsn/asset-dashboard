@@ -4,6 +4,10 @@
  * WRITING_QUALITY_RULES — full ruleset for long-form content (blog posts, page copy,
  *   content briefs). Injected directly into generation prompts.
  *
+ * CREATIVE_WRITING_RULES — lean ruleset for creative copy generation paths that
+ *   already receive page-type, voice, and format instructions. Keeps factual safety
+ *   strict while leaving the model more room for natural phrasing and rhythm.
+ *
  * PROSE_QUALITY_RULES — condensed universal ruleset injected via buildSystemPrompt()
  *   into every prose-generating feature (briefings, digests, brand narratives, etc.).
  */
@@ -82,6 +86,38 @@ AEO (ANSWER ENGINE OPTIMIZATION) — CITATION-WORTHY WRITING:
 - For medical/health content: adopt an encyclopedic neutral tone. Every factual medical claim should cite a specific source
 - DEFINITION BLOCKS: When introducing a technical term: define it in 1-2 sentences → note common misconceptions → list related terms
 - COMPARISON CONTENT: Use measurable fields (costs, percentages, timeframes) with stated units. Include "Data as of [date]" notes. Vague adjectives ("good", "excellent") are not citeable — use numbers
+`;
+
+// ── Lean creative ruleset ───────────────────────────────────────────────────
+
+export const CREATIVE_WRITING_RULES = `
+CREATIVE WRITING RULES (apply to generated copy without over-constraining voice):
+
+FACTUAL SAFETY:
+- NEVER invent statistics, case study results, percentages, quotes, testimonials, awards, certifications, or named source claims.
+- Use specific numbers only when they were provided in the brief, knowledge base, source pack, or live SERP context.
+- Never write "studies show", "research suggests", "experts agree", or "industry data shows" unless the specific source is named in the provided context.
+- If source evidence is thin, say what can be said responsibly and teach with practical steps, tradeoffs, or examples instead of making claims sound verified.
+- For health, finance, legal, or other provenance-sensitive topics, keep factual claims neutral and cite or reference only provided sources.
+
+VOICE AND STYLE:
+- Write like a knowledgeable colleague with a point of view, not a brochure being assembled from SEO notes.
+- Use concrete examples, named tools, realistic scenarios, thresholds, or process details when the brief supports them.
+- Prefer one strong idea developed well over a list of surface-level points.
+- Vary rhythm naturally: mix short sentences with fuller explanatory sentences, and vary paragraph/list structure across sections.
+- Let the workspace voice samples and guardrails win over generic SEO phrasing.
+
+HIGH-SIGNAL AI CLICHES TO AVOID:
+- Do not open with "Did you know...", "In today's digital world...", "Have you ever wondered...", "When it comes to...", or "Picture this..."
+- Do not use filler transitions such as "Let's dive in", "Let's explore", "Without further ado", "Here's what you need to know", or "Let's take a closer look".
+- Avoid hollow hype: "incredibly", "truly", "revolutionize", "game-changing", "cutting-edge", "world-class", "best-in-class", "next-level", "top-notch".
+- Avoid corporate filler when a plain verb works: "leverage", "utilize", "harness", "unlock the power of", "take your X to the next level".
+- No em dashes (—). Use a comma, colon, parentheses, or a new sentence instead.
+
+OUTPUT DISCIPLINE:
+- Follow the requested output format exactly: clean HTML when HTML is requested, raw JSON when JSON is requested, and no markdown unless explicitly requested.
+- ANCHOR TEXT ACCURACY: Keep links accurate. Anchor text must describe the linked page and internal links must use the exact provided URLs.
+- Do not repeat the same example, statistic, phrase, or structural move across sections unless the brief specifically requires it.
 `;
 
 // ── Condensed ruleset for buildSystemPrompt() ────────────────────────────────
