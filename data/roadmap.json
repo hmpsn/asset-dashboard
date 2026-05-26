@@ -133,9 +133,9 @@
           "source": "Voice Authority Sprint Plan 2026-05-26",
           "est": "4-6h",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "owner": "brand-engine",
-          "notes": "Follow-up after confirmed drift migration. Add fixture-driven prompt and output-format contracts for calibrated profiles, draft profiles with samples only, draft profiles with DNA/guardrails, legacy brand voice only, and no voice data. Keep subjective live-model scoring out of CI; add local/manual eval tooling only if it does not block the test suite."
+          "notes": "Completed in this PR. Added `tests/unit/voice-quality-contract-harness.test.ts` as the deterministic regression harness for calibrated profiles, draft profiles with samples only, draft profiles with DNA/guardrails, legacy brand voice only, and no voice data. The harness renders `buildSystemPrompt()` plus `buildEffectiveBrandVoiceBlock()` and verifies Layer 2 voice authority, no duplicate DNA/guardrail injection, legacy fallback behavior, no-voice degradation, universal prose-quality inclusion, and strict output-format instructions remaining first. Documented the harness in `docs/rules/brand-engine.md`; subjective live-model scoring remains out of CI."
         },
         {
           "id": "intel-quality-content-brief-decay-migration",
