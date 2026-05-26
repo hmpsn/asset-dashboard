@@ -6,7 +6,6 @@
 import { Router } from 'express';
 import { getWorkspace } from '../workspaces.js';
 import { callAI } from '../ai.js';
-import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatPersonasForPrompt, formatForPrompt, formatKnowledgeBaseForPrompt } from '../workspace-intelligence.js';
 import { getLatestSnapshot } from '../reports.js';
 import {
   addMessage,
@@ -19,6 +18,7 @@ import { createLogger } from '../logger.js';
 import type { SeoIssue, PageSeoResult } from '../seo-audit.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
 import { fetchPublicWebText, isExternalFetchError } from '../external-fetch.js';
+import { buildPageAssistContext } from '../intelligence/page-assist-context-builder.js';
 
 import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
@@ -237,19 +237,10 @@ router.post('/api/rewrite-chat/:workspaceId', requireWorkspaceAccess('workspaceI
       addMessage(ws.id, sessionId, 'admin', 'user', question);
     }
 
-    // Build workspace intelligence (seoContext + pageProfile + contentPipeline combined call)
-    const pagePath = pageUrl ? new URL(pageUrl).pathname : undefined;
-    const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext', 'pageProfile', 'contentPipeline'],
-      pagePath });
-    const seo = intel.seoContext;
-    const knowledgeBase = formatKnowledgeBaseForPrompt(seo?.knowledgeBase);
-
-    // Build rewriting playbook block from intelligence slice
-    let playbookBlock = '';
-    const playbookPatterns = intel.contentPipeline?.rewritePlaybook?.patterns;
-    if (playbookPatterns && playbookPatterns.length > 0) {
-      playbookBlock = `\n\nREWRITING PLAYBOOK (follow these instructions when suggesting rewrites):\n${playbookPatterns.join('\n')}`;
-    }
+    const pageAssist = await buildPageAssistContext(workspaceId, {
+      pageUrl,
+      includeContentPipeline: true,
+    });
 
     // Build page context block
     let pageContextBlock = '';
@@ -293,7 +284,7 @@ Answer Engine Optimization (AEO) principles:
 - Include citations and data points
 - Use definition-style sentences that AI systems can extract
 - Avoid hidden content, dark patterns, and clickbait
-${formatKeywordsForPrompt(seo)}${seo?.effectiveBrandVoiceBlock ?? ''}${formatPersonasForPrompt(seo?.personas ?? [])}${knowledgeBase}${formatForPrompt(intel, { verbosity: 'detailed', sections: ['pageProfile'] })}${playbookBlock}${pageContextBlock}${issuesBlock}${priorContext ? `\n\nPREVIOUS CONVERSATION SUMMARY:\n${priorContext}` : ''}`; // bip-ok: intel used for raw seo field access above — effectiveBrandVoiceBlock honors voice profile authority
+${pageAssist.blocks.keywordBlock}${pageAssist.blocks.brandVoiceBlock}${pageAssist.blocks.personasBlock}${pageAssist.blocks.knowledgeBlock}${pageAssist.blocks.pageProfileBlock}${pageAssist.blocks.playbookBlock}${pageContextBlock}${issuesBlock}${priorContext ? `\n\nPREVIOUS CONVERSATION SUMMARY:\n${priorContext}` : ''}`;
 
     const systemPrompt = buildSystemPrompt(workspaceId, baseInstructions);
 

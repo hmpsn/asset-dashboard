@@ -88,6 +88,26 @@
           "notes": "Completed in PR1. Added `server/intelligence/generation-context-builders.ts` with `buildContentGenerationContext()` and `buildRecommendationGenerationContext()`, both wrapping `buildWorkspaceIntelligence()` + `formatForPrompt()` with one shared `slices` source of truth. Builder defaults now encode canonical slices, `pagePath` behavior, `learningsDomain`, and verbosity without migrating production callers yet. Added `tests/unit/generation-context-builders.test.ts` to verify default slices, `pageProfile` inclusion, same-array slice/section parity, and override threading for `learningsDomain`, verbosity, and token budget."
         },
         {
+          "id": "workspace-intelligence-hybrid-consumer-cleanup",
+          "title": "Workspace intelligence hybrid consumer cleanup",
+          "source": "Workspace Intelligence Consolidation Master Plan follow-up",
+          "est": "4-7h",
+          "priority": "P0",
+          "status": "done",
+          "owner": "analytics-intelligence",
+          "notes": "Completed in this PR. Added dedicated admin chat and diagnostic intelligence builders so the two remaining hybrid consumers no longer own canonical slice selection, formatted workspace/learnings blocks, or direct insight-store reads. `admin-chat-context` now consumes `buildAdminChatIntelligenceContext()`, while `diagnostic-orchestrator` resolves anomaly and page-scoped insight context through the diagnostic builder. The consumer inventory now reports zero hybrid and zero legacy consumers."
+        },
+        {
+          "id": "workspace-intelligence-page-assist-builder",
+          "title": "Workspace intelligence page assist builder",
+          "source": "Workspace Intelligence Consolidation Master Plan follow-up",
+          "est": "5-9h",
+          "priority": "P0",
+          "status": "done",
+          "owner": "seo-health",
+          "notes": "Completed in this PR. Added `buildPageAssistContext()` as the canonical page-assist intelligence builder for rewrite chat, Webflow keyword analysis, single-page SEO rewrite/copy tools, bulk SEO rewrite, and the bulk rewrite background job. The builder owns keyword, voice, persona, knowledge, page profile, page element, local SEO, learnings, page insight, and rewrite-playbook context while routes keep caller-owned evidence such as scraped content, GSC query excerpts, sibling titles, Webflow write targets, and user instructions."
+        },
+        {
           "id": "intel-quality-content-brief-decay-migration",
           "title": "Migrate content briefs and content decay recommendations onto shared context",
           "source": "Platform insights + AI content audit discussion 2026-05-18",

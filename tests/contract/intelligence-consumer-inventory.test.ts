@@ -17,10 +17,10 @@ const FALSE_POSITIVE_FILES = new Set([
 const INVENTORY: Array<{
   file: string;
   classification: ConsumerClass;
-  targetPath: 'low-level' | 'content-builder' | 'recommendation-builder' | 'future-chat-builder' | 'future-briefing-builder' | 'future-page-assist-builder';
+  targetPath: 'low-level' | 'content-builder' | 'recommendation-builder' | 'chat-builder' | 'future-briefing-builder' | 'page-assist-builder';
 }> = [
   { file: 'server/aeo-page-review.ts', classification: 'native', targetPath: 'low-level' },
-  { file: 'server/admin-chat-context.ts', classification: 'hybrid', targetPath: 'future-chat-builder' },
+  { file: 'server/admin-chat-context.ts', classification: 'native', targetPath: 'chat-builder' },
   { file: 'server/blueprint-generator.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/brand-identity.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/brandscript.ts', classification: 'native', targetPath: 'low-level' },
@@ -28,7 +28,7 @@ const INVENTORY: Array<{
   { file: 'server/content-decay.ts', classification: 'native', targetPath: 'recommendation-builder' },
   { file: 'server/content-posts-ai.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/copy-generation.ts', classification: 'native', targetPath: 'low-level' },
-  { file: 'server/diagnostic-orchestrator.ts', classification: 'hybrid', targetPath: 'future-chat-builder' },
+  { file: 'server/diagnostic-orchestrator.ts', classification: 'native', targetPath: 'chat-builder' },
   { file: 'server/discovery-ingestion.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/internal-links.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/keyword-recommendations.ts', classification: 'native', targetPath: 'recommendation-builder' },
@@ -40,17 +40,17 @@ const INVENTORY: Array<{
   { file: 'server/routes/google.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/routes/jobs.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/routes/public-analytics.ts', classification: 'native', targetPath: 'low-level' },
-  { file: 'server/routes/rewrite-chat.ts', classification: 'native', targetPath: 'future-page-assist-builder' },
-  { file: 'server/routes/webflow-keywords.ts', classification: 'native', targetPath: 'future-page-assist-builder' },
-  { file: 'server/routes/webflow-seo-bulk-rewrite.ts', classification: 'native', targetPath: 'future-page-assist-builder' },
-  { file: 'server/routes/webflow-seo-page-tools.ts', classification: 'native', targetPath: 'future-page-assist-builder' },
-  { file: 'server/routes/webflow-seo-rewrite.ts', classification: 'native', targetPath: 'future-page-assist-builder' },
+  { file: 'server/routes/rewrite-chat.ts', classification: 'native', targetPath: 'page-assist-builder' },
+  { file: 'server/routes/webflow-keywords.ts', classification: 'native', targetPath: 'page-assist-builder' },
+  { file: 'server/routes/webflow-seo-bulk-rewrite.ts', classification: 'native', targetPath: 'page-assist-builder' },
+  { file: 'server/routes/webflow-seo-page-tools.ts', classification: 'native', targetPath: 'page-assist-builder' },
+  { file: 'server/routes/webflow-seo-rewrite.ts', classification: 'native', targetPath: 'page-assist-builder' },
   { file: 'server/routes/webflow-alt-text.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/routes/workspaces.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/seo-audit-ai-recs.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/voice-calibration.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/webflow-seo-bulk-analyze-job.ts', classification: 'native', targetPath: 'low-level' },
-  { file: 'server/webflow-seo-bulk-rewrite-job.ts', classification: 'native', targetPath: 'low-level' },
+  { file: 'server/webflow-seo-bulk-rewrite-job.ts', classification: 'native', targetPath: 'page-assist-builder' },
 ];
 
 function listTypeScriptFiles(dir: string): string[] {
@@ -70,7 +70,7 @@ function listTypeScriptFiles(dir: string): string[] {
 }
 
 function isGenerationConsumer(relPath: string, source: string): boolean {
-  const hasIntelligenceAccess = /buildWorkspaceIntelligence\(|buildIntelPrompt\(|formatForPrompt\(|buildContentGenerationContext\(|buildRecommendationGenerationContext\(|getWorkspaceLearnings\(|formatLearningsForPrompt\(|getInsights\(/.test(source);
+  const hasIntelligenceAccess = /buildWorkspaceIntelligence\(|buildIntelPrompt\(|formatForPrompt\(|buildContentGenerationContext\(|buildRecommendationGenerationContext\(|buildAdminChatIntelligenceContext\(|buildDiagnosticIntelligenceContext\(|resolveDiagnosticAnomalyInsight\(|buildPageAssistContext\(|getWorkspaceLearnings\(|formatLearningsForPrompt\(|getInsights\(/.test(source);
   const hasAiCall = /callAI\(|callCreativeAI\(|callAnthropic\(|callOpenAI\(|generateAltText\(/.test(source);
   return hasIntelligenceAccess && (hasAiCall || MANUAL_CONSUMERS.has(relPath));
 }
@@ -146,5 +146,29 @@ describe('intelligence consumer inventory', () => {
     const contentBrief = readFileSync(resolve(ROOT_DIR, 'server/content-brief.ts'), 'utf-8'); // readFile-ok — PR5 guard: content briefs use builder promptContext for SEO/voice/knowledge data.
     expect(contentBrief).toContain('buildContentGenerationContext');
     expect(contentBrief).not.toMatch(/formatKeywordsForPrompt|formatKnowledgeBaseForPrompt|formatPersonasForPrompt/);
+  });
+
+  it('keeps chat and page-assist consumers on dedicated context builders', () => {
+    const adminChat = readFileSync(resolve(ROOT_DIR, 'server/admin-chat-context.ts'), 'utf-8'); // readFile-ok — builder guard: admin chat should not own canonical intelligence assembly.
+    expect(adminChat).toContain('buildAdminChatIntelligenceContext');
+    expect(adminChat).not.toMatch(/buildWorkspaceIntelligence|formatForPrompt|formatPageMapForPrompt|getInsights\(/);
+
+    const diagnostics = readFileSync(resolve(ROOT_DIR, 'server/diagnostic-orchestrator.ts'), 'utf-8'); // readFile-ok — builder guard: diagnostics should resolve insight context through the diagnostic builder.
+    expect(diagnostics).toContain('buildDiagnosticIntelligenceContext');
+    expect(diagnostics).toContain('resolveDiagnosticAnomalyInsight');
+    expect(diagnostics).not.toMatch(/getInsights\(/);
+
+    for (const file of [
+      'server/routes/rewrite-chat.ts',
+      'server/routes/webflow-keywords.ts',
+      'server/routes/webflow-seo-bulk-rewrite.ts',
+      'server/routes/webflow-seo-page-tools.ts',
+      'server/routes/webflow-seo-rewrite.ts',
+      'server/webflow-seo-bulk-rewrite-job.ts',
+    ]) {
+      const source = readFileSync(resolve(ROOT_DIR, file), 'utf-8'); // readFile-ok — builder guard: page-assist consumers share one page-context builder.
+      expect(source).toContain('buildPageAssistContext');
+      expect(source).not.toMatch(/buildWorkspaceIntelligence|formatForPrompt|formatKeywordsForPrompt|formatKnowledgeBaseForPrompt|formatPersonasForPrompt|getInsights\(/);
+    }
   });
 });
