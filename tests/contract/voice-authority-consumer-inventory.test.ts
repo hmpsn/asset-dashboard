@@ -20,7 +20,7 @@ const VOICE_AUTHORITY_INVENTORY: Array<{
   classification: VoiceAuthorityClass;
 }> = [
   { file: 'server/aeo-page-review.ts', classification: 'builder-backed' },
-  { file: 'server/anomaly-detection.ts', classification: 'drift' },
+  { file: 'server/anomaly-detection.ts', classification: 'correct' },
   { file: 'server/blueprint-generator.ts', classification: 'documented-exception' },
   { file: 'server/brand-identity.ts', classification: 'correct' },
   { file: 'server/brandscript.ts', classification: 'correct' },
@@ -33,7 +33,7 @@ const VOICE_AUTHORITY_INVENTORY: Array<{
   { file: 'server/copy-intelligence.ts', classification: 'documented-exception' },
   { file: 'server/copy-refresh.ts', classification: 'documented-exception' },
   { file: 'server/copy-voice-feedback.ts', classification: 'correct' },
-  { file: 'server/diagnostic-orchestrator.ts', classification: 'drift' },
+  { file: 'server/diagnostic-orchestrator.ts', classification: 'correct' },
   { file: 'server/discovery-ingestion.ts', classification: 'documented-exception' },
   { file: 'server/internal-links.ts', classification: 'correct' },
   { file: 'server/keyword-recommendations.ts', classification: 'builder-backed' },
@@ -59,7 +59,7 @@ const VOICE_AUTHORITY_INVENTORY: Array<{
   { file: 'server/routes/rewrite-chat.ts', classification: 'builder-backed' },
   { file: 'server/routes/webflow-keywords.ts', classification: 'builder-backed' },
   { file: 'server/routes/webflow-seo-bulk-rewrite.ts', classification: 'correct' },
-  { file: 'server/routes/webflow-seo-page-tools.ts', classification: 'drift' },
+  { file: 'server/routes/webflow-seo-page-tools.ts', classification: 'correct' },
   { file: 'server/routes/webflow-seo-rewrite.ts', classification: 'correct' },
   { file: 'server/routes/workspaces.ts', classification: 'documented-exception' },
 ];
@@ -133,8 +133,21 @@ describe('voice authority consumer inventory', () => {
       .filter(entry => entry.classification === 'drift')
       .map(entry => entry.file);
 
+    expect(driftFiles).toHaveLength(0);
     for (const file of driftFiles) {
       expect(auditSource).toContain(`| \`${file}\` | drift |`);
+    }
+  });
+
+  it('keeps the PR2 migrated consumers on buildSystemPrompt authority', () => {
+    for (const file of [
+      'server/anomaly-detection.ts',
+      'server/diagnostic-orchestrator.ts',
+      'server/routes/webflow-seo-page-tools.ts',
+    ]) {
+      const source = readFileSync(resolve(ROOT_DIR, file), 'utf-8'); // readFile-ok - PR2 guard: migrated voice-authority consumers must stay on buildSystemPrompt.
+      expect(source).toContain('buildSystemPrompt');
+      expect(source).not.toMatch(/system:\s*['"`]You are/);
     }
   });
 

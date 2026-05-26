@@ -9,9 +9,9 @@ Secondary integrations: `analytics-intelligence`, `seo-health`, `content-pipelin
 
 This audit is the control artifact for the voice authority sprint. It classifies server-side AI consumers by how they receive workspace voice instructions.
 
-- `correct`: 18
+- `correct`: 21
 - `builder-backed`: 5
-- `drift`: 3
+- `drift`: 0
 - `documented-exception`: 17
 
 Authority rules:
@@ -21,13 +21,13 @@ Authority rules:
 - Raw `brandVoice` is for editing, diagnostics, or non-prompt scoring only; it must not become prompt authority.
 - Manual `VOICE DNA` / guardrail prompt blocks belong only in canonical brand-engine helpers that suppress them for calibrated profiles.
 
-## Drift To Migrate In PR 2
+## Drift Migrated In PR 2
 
 | File | Current issue | PR 2 target |
 | --- | --- | --- |
-| `server/anomaly-detection.ts` | Anomaly summaries use a hard-coded system prompt, so calibrated workspace voice/custom notes/prose rules do not apply. | Wrap the summary system prompt with `buildSystemPrompt(workspaceId, ...)`. |
-| `server/diagnostic-orchestrator.ts` | Diagnostic synthesis has builder-backed evidence but still uses a hard-coded system prompt for admin/client summary generation. | Use `buildSystemPrompt()` for the synthesis system prompt while preserving JSON response format. |
-| `server/routes/webflow-seo-page-tools.ts` | Page copy optimization includes builder-backed voice context in the user prompt but uses a hard-coded system prompt. | Use `buildSystemPrompt()` for the copywriter system prompt and assert no duplicate voice injection. |
+| `server/anomaly-detection.ts` | Anomaly summaries used a hard-coded system prompt, so calibrated workspace voice/custom notes/prose rules did not apply. | Migrated to `buildSystemPrompt(workspaceId, ...)`. |
+| `server/diagnostic-orchestrator.ts` | Diagnostic synthesis had builder-backed evidence but still used a hard-coded system prompt for admin/client summary generation. | Migrated to `buildSystemPrompt(workspaceId, ...)` while preserving JSON response format. |
+| `server/routes/webflow-seo-page-tools.ts` | Page copy optimization included builder-backed voice context in the user prompt but used a hard-coded system prompt. | Migrated to `buildSystemPrompt(workspaceId, ...)`. |
 
 ## Documented Exceptions
 
@@ -43,7 +43,7 @@ These consumers intentionally do not use client brand voice as writing authority
 | File | Classification | Authority path |
 | --- | --- | --- |
 | `server/aeo-page-review.ts` | builder-backed | Uses canonical intelligence prompt context. |
-| `server/anomaly-detection.ts` | drift | Hard-coded anomaly summary system prompt. |
+| `server/anomaly-detection.ts` | correct | Uses `buildSystemPrompt()` for anomaly summary generation. |
 | `server/blueprint-generator.ts` | documented-exception | Generates page plans from discovery/strategy context, not client-facing prose. |
 | `server/brand-identity.ts` | correct | Uses `buildSystemPrompt()` plus `buildVoiceCalibrationContext()`. |
 | `server/brandscript.ts` | correct | Uses `buildSystemPrompt()` for brand strategy generation. |
@@ -56,7 +56,7 @@ These consumers intentionally do not use client brand voice as writing authority
 | `server/copy-intelligence.ts` | documented-exception | Classifies copy patterns/feedback, not final client prose. |
 | `server/copy-refresh.ts` | documented-exception | Decides section refresh posture; it does not write client copy. |
 | `server/copy-voice-feedback.ts` | correct | Voice-feedback operations are operation-backed and system-prompted. |
-| `server/diagnostic-orchestrator.ts` | drift | Builder-backed evidence, hard-coded synthesis system prompt. |
+| `server/diagnostic-orchestrator.ts` | correct | Uses diagnostic builder evidence and `buildSystemPrompt()` for synthesis. |
 | `server/discovery-ingestion.ts` | documented-exception | Extracts source evidence for brand engine; no existing brand voice should bias extraction. |
 | `server/internal-links.ts` | correct | Uses `effectiveBrandVoiceBlock` and `buildSystemPrompt()`. |
 | `server/keyword-recommendations.ts` | builder-backed | Uses recommendation context; raw voice appears only as business-fit text. |
@@ -82,10 +82,10 @@ These consumers intentionally do not use client brand voice as writing authority
 | `server/routes/rewrite-chat.ts` | builder-backed | Uses page-assist builder and `buildSystemPrompt()`. |
 | `server/routes/webflow-keywords.ts` | builder-backed | Uses page-assist context for keyword analysis; no voice imitation needed. |
 | `server/routes/webflow-seo-bulk-rewrite.ts` | correct | Uses page-assist context and `buildSystemPrompt()`. |
-| `server/routes/webflow-seo-page-tools.ts` | drift | Builder-backed context, hard-coded copywriter system prompt. |
+| `server/routes/webflow-seo-page-tools.ts` | correct | Uses page-assist context and `buildSystemPrompt()`. |
 | `server/routes/webflow-seo-rewrite.ts` | correct | Uses page-assist context and `buildSystemPrompt()`. |
 | `server/routes/workspaces.ts` | documented-exception | Intelligence profile autofill is structured business inference. |
 
-## PR 2 Rule
+## PR 3 Rule
 
-PR 2 may only migrate files marked `drift` above unless it updates this audit and the contract test in the same commit with a clear reason.
+No known voice-authority drift remains in the server AI consumer inventory. PR 3 should add fixture-driven quality/output contracts for the migrated behavior instead of broad consumer migration.

@@ -10,6 +10,7 @@ import { parseJsonSafe } from '../db/json-validation.js';
 import { normalizePageUrl, sanitizeForPromptInjection, stripCodeFences, stripHtmlToText } from '../helpers.js';
 import { createLogger } from '../logger.js';
 import { callAI } from '../ai.js';
+import { buildSystemPrompt } from '../prompt-assembly.js';
 import { getPageKeyword, listPageKeywords } from '../page-keywords.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 import { getSiteSubdomain } from '../webflow.js';
@@ -198,7 +199,7 @@ Return ONLY valid JSON, no markdown fences.`;
   try {
     const aiResult = await callAI({
       model: 'gpt-5.4-mini',
-      system: 'You are an expert SEO copywriter who preserves brand voice while optimizing for search. Return valid JSON only.',
+      system: buildSystemPrompt(workspaceId, 'You are an expert SEO copywriter who preserves brand voice while optimizing for search. Return valid JSON only.'),
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 1500,
       temperature: 0.6,

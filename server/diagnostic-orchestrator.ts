@@ -19,6 +19,7 @@ import { scanRedirects } from './redirect-scanner.js';
 import { resolveFullPageUrl } from './outcome-measurement.js';
 import { stampDiagnosticReportId } from './analytics-insights-store.js';
 import { callAI } from './ai.js';
+import { buildSystemPrompt } from './prompt-assembly.js';
 import { probeCanonical, countInternalLinks } from './diagnostic-probe.js';
 import {
   completeDiagnosticReport,
@@ -130,7 +131,7 @@ export async function runDiagnostic(request: DiagnosticRequest, jobId: string): 
 
     // 4. AI synthesis
     updateJob(jobId, { status: 'running', message: 'Analyzing findings...' });
-    const synthesis = await synthesizeFindings(context, anomalyType);
+    const synthesis = await synthesizeFindings(context, anomalyType, workspaceId);
 
     // 5. Save completed report
     completeDiagnosticReport(reportId, {
@@ -420,8 +421,8 @@ interface SynthesisResult {
   clientSummary: string;
 }
 
-async function synthesizeFindings(context: DiagnosticContext, anomalyType: string): Promise<SynthesisResult> {
-  const systemPrompt = `You are an expert SEO diagnostician. You are given structured data from a deep investigation into why a website page experienced a significant anomaly (${anomalyType}). Your job is to:
+async function synthesizeFindings(context: DiagnosticContext, anomalyType: string, workspaceId: string): Promise<SynthesisResult> {
+  const systemPrompt = buildSystemPrompt(workspaceId, `You are an expert SEO diagnostician. You are given structured data from a deep investigation into why a website page experienced a significant anomaly (${anomalyType}). Your job is to:
 
 1. Identify the most likely root causes, ranked by confidence
 2. Propose specific remediation actions with priorities (P0 = ship this week, P1 = this sprint, P2 = backlog, P3 = nice to have)
@@ -448,7 +449,7 @@ Rules for remediation:
 - Each action must have exactly one owner: dev, content, or seo
 - P0 actions should be things that can be done in < 1 day
 - Include specific page URLs when relevant
-- Order by priority then impact`;
+- Order by priority then impact`);
 
   const result = await callAI({
     model: 'gpt-5.4',
@@ -458,6 +459,7 @@ Rules for remediation:
     temperature: 0.3,
     responseFormat: { type: 'json_object' },
     feature: 'deep-diagnostics',
+    workspaceId,
   });
 
   try {
