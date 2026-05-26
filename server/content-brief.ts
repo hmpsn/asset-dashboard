@@ -1,12 +1,6 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import {
-  formatForPrompt,
-  formatKeywordsForPrompt,
-  formatPersonasForPrompt,
-  formatPageMapForPrompt,
-  formatKnowledgeBaseForPrompt,
-} from './workspace-intelligence.js';
+import { formatPageMapForPrompt } from './workspace-intelligence.js';
 import { buildContentGenerationContext } from './intelligence/generation-context-builders.js';
 import type { KeywordMetrics, RelatedKeyword } from './seo-data-provider.js';
 import { callAI } from './ai.js';
@@ -27,8 +21,6 @@ import { z } from 'zod';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
 import { buildOutcomeLearningStatusNote } from './outcome-learning-default-path.js';
-import type { WorkspaceIntelligence } from '../shared/types/intelligence.js';
-
 
 const log = createLogger('content-brief');
 /** Strip markdown code fences and parse JSON from AI responses. Throws on invalid JSON. */
@@ -596,14 +588,12 @@ function hasMeaningfulBuilderPromptContext(promptContext: string): boolean {
   return /##\s/.test(promptContext);
 }
 
-function formatLocalSeoForContentPrompt(intelligence: WorkspaceIntelligence): string {
-  const block = formatForPrompt(intelligence, {
-    verbosity: 'standard',
-    sections: ['localSeo'],
-    tokenBudget: 1400,
-  });
-  if (!hasMeaningfulBuilderPromptContext(block)) return '';
-  return `\n\n${block}\nUse Local SEO evidence conservatively: shape local topic/page guidance when relevant, but do not claim verified local rank unless the evidence explicitly supports it.`;
+function formatContentGenerationPromptBlock(promptContext: string): string {
+  if (!hasMeaningfulBuilderPromptContext(promptContext)) return '';
+  const localGuidance = promptContext.includes('## Local SEO')
+    ? '\nUse Local SEO evidence conservatively: shape local topic/page guidance when relevant, but do not claim verified local rank unless the evidence explicitly supports it.'
+    : '';
+  return `\n\n${promptContext}${localGuidance}`;
 }
 
 function buildBriefIntelligenceBlockFromSlice(
@@ -642,15 +632,11 @@ export async function regenerateBrief(
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) throw new Error('OPENAI_API_KEY not configured');
 
-  const { intelligence } = await buildContentGenerationContext(workspaceId, {
+  const { promptContext } = await buildContentGenerationContext(workspaceId, {
     slices: ['seoContext'],
+    tokenBudget: 3200,
   });
-  const seo = intelligence.seoContext;
-  const keywordBlock = formatKeywordsForPrompt(seo);
-  const localSeoBlock = formatLocalSeoForContentPrompt(intelligence);
-  // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
-  const brandVoiceBlock = seo?.effectiveBrandVoiceBlock ?? '';
-  const knowledgeBlock = formatKnowledgeBaseForPrompt(seo?.knowledgeBase);
+  const workspaceContextBlock = formatContentGenerationPromptBlock(promptContext);
   const ptConfig = getPageTypeConfig(existingBrief.pageType);
 
   const previousBriefJson = JSON.stringify({
@@ -683,7 +669,7 @@ The user has reviewed this brief and wants you to regenerate it with the followi
 
 USER FEEDBACK:
 ${feedback}
-${keywordBlock}${brandVoiceBlock}${knowledgeBlock}${localSeoBlock}
+${workspaceContextBlock}
 
 Please regenerate the ENTIRE brief incorporating the user's feedback. Keep everything that was good, improve what the user requested, and maintain all required fields.
 
@@ -792,14 +778,11 @@ export async function regenerateOutline(
   const existingBrief = getBrief(workspaceId, briefId);
   if (!existingBrief) return null;
 
-  const { intelligence } = await buildContentGenerationContext(workspaceId, {
+  const { promptContext } = await buildContentGenerationContext(workspaceId, {
     slices: ['seoContext'],
+    tokenBudget: 3200,
   });
-  const seo = intelligence.seoContext;
-  const keywordBlock = formatKeywordsForPrompt(seo);
-  const localSeoBlock = formatLocalSeoForContentPrompt(intelligence);
-  // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
-  const brandVoiceBlock = seo?.effectiveBrandVoiceBlock ?? '';
+  const workspaceContextBlock = formatContentGenerationPromptBlock(promptContext);
   const ptConfig = getPageTypeConfig(existingBrief.pageType);
 
   const currentOutline = JSON.stringify(existingBrief.outline, null, 2);
@@ -813,7 +796,7 @@ Title: ${existingBrief.suggestedTitle}
 Word count target: ${existingBrief.wordCountTarget}
 Intent: ${existingBrief.intent}
 Audience: ${existingBrief.audience}
-${keywordBlock}${brandVoiceBlock}${localSeoBlock}
+${workspaceContextBlock}
 
 Current outline:
 ${currentOutline}
@@ -958,19 +941,14 @@ export async function generateBrief(
   const pagesStr = context.existingPages?.slice(0, 50).join('\n') || 'No existing pages provided';
 
   // Pull in keyword strategy context for alignment
-  const { intelligence: seoContextResult } = await buildContentGenerationContext(workspaceId, {
+  const { intelligence: seoContextResult, promptContext: seoPromptContext } = await buildContentGenerationContext(workspaceId, {
     slices: ['seoContext'],
+    tokenBudget: 3600,
   });
   const seo = seoContextResult.seoContext;
-  const keywordBlock = formatKeywordsForPrompt(seo);
-  const localSeoBlock = formatLocalSeoForContentPrompt(seoContextResult);
-  // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
-  const brandVoiceBlock = seo?.effectiveBrandVoiceBlock ?? '';
-  const stratBizCtx = seo?.businessContext ?? '';
-  const knowledgeBlock = formatKnowledgeBaseForPrompt(seo?.knowledgeBase);
-  const personasBlock = formatPersonasForPrompt(seo?.personas);
+  const workspaceContextBlock = formatContentGenerationPromptBlock(seoPromptContext);
   const kwMapContext = formatPageMapForPrompt(seo);
-  const bizCtx = context.businessContext || stratBizCtx;
+  const bizCtx = context.businessContext || '';
 
   // Find if any page in the strategy targets this keyword — inject its analysis data.
   // Use intel.seoContext.strategy.pageMap (populated from the live page_keywords table
@@ -1198,7 +1176,7 @@ Related search queries from Google Search Console:
 ${relatedStr}
 
 Existing pages on the site:
-${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${localSeoBlock}${providerMetricsBlock}${ga4Block}${pageAnalysisBlock}${decayBlock}${serpFeaturesDirectiveBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${strategyCardBlock}${intelligenceBlock}${learningsBlock}${learningsStatusBlock}
+${pagesStr}${workspaceContextBlock}${kwMapContext}${providerMetricsBlock}${ga4Block}${pageAnalysisBlock}${decayBlock}${serpFeaturesDirectiveBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${strategyCardBlock}${intelligenceBlock}${learningsBlock}${learningsStatusBlock}
 
 Generate a content brief in the following JSON format:
 {

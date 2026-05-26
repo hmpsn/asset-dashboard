@@ -13,6 +13,9 @@ const mocks = vi.hoisted(() => ({
   isFeatureEnabled: vi.fn(),
   getWorkspaceLearnings: vi.fn(),
   formatLearningsForPrompt: vi.fn(),
+  buildRecommendationGenerationContext: vi.fn(),
+  learningsPromptContext: '',
+  learningsTotal: undefined as number | undefined,
   buildSystemPrompt: vi.fn(),
   isProgrammingError: vi.fn(),
 }));
@@ -51,6 +54,10 @@ vi.mock('../../server/feature-flags.js', () => ({
 vi.mock('../../server/workspace-learnings.js', () => ({
   getWorkspaceLearnings: mocks.getWorkspaceLearnings,
   formatLearningsForPrompt: mocks.formatLearningsForPrompt,
+}));
+
+vi.mock('../../server/intelligence/generation-context-builders.js', () => ({
+  buildRecommendationGenerationContext: mocks.buildRecommendationGenerationContext,
 }));
 
 vi.mock('../../server/prompt-assembly.js', () => ({
@@ -106,6 +113,42 @@ beforeEach(() => {
   mocks.isFeatureEnabled.mockReturnValue(false);
   mocks.getWorkspaceLearnings.mockReturnValue(null);
   mocks.formatLearningsForPrompt.mockReturnValue('');
+  mocks.learningsPromptContext = '';
+  mocks.learningsTotal = undefined;
+  mocks.buildRecommendationGenerationContext.mockImplementation(async (_workspaceId: string, opts: { slices?: string[]; learningsDomain?: string } = {}) => {
+    const slices = opts.slices ?? [];
+    const fullInsights = mocks.getInsights();
+    const byType = fullInsights.reduce<Record<string, AnalyticsInsight[]>>((acc, insight: AnalyticsInsight) => {
+      acc[insight.insightType] = acc[insight.insightType] ?? [];
+      acc[insight.insightType].push(insight);
+      return acc;
+    }, {});
+    return {
+      intelligence: {
+        version: 1,
+        workspaceId: _workspaceId,
+        assembledAt: new Date().toISOString(),
+        insights: slices.includes('insights')
+          ? {
+              all: fullInsights.slice(0, 100),
+              byType,
+              bySeverity: { critical: 0, warning: 0, opportunity: 0, positive: 0 },
+              topByImpact: fullInsights.slice(0, 10),
+            }
+          : undefined,
+        learnings: slices.includes('learnings')
+          ? {
+              availability: 'ready',
+              summary: mocks.learningsTotal != null ? { totalScoredActions: mocks.learningsTotal } : null,
+            }
+          : undefined,
+      },
+      slices,
+      promptContext: slices.includes('learnings') ? mocks.learningsPromptContext : '',
+      learningsDomain: opts.learningsDomain ?? 'all',
+      learningsAvailability: slices.includes('learnings') ? 'ready' : 'not_requested',
+    };
+  });
   mocks.buildSystemPrompt.mockReturnValue('system prompt');
   mocks.isProgrammingError.mockReturnValue(true);
 });
@@ -158,12 +201,51 @@ describe('monthly-digest generation', () => {
     expect(mocks.logWarn).toHaveBeenCalled();
   });
 
+  it('uses full slice rollups for resolved items beyond the prompt-facing top-100 cap', async () => {
+    const ws = makeWorkspace({
+      id: 'ws_full_rollup',
+      webflowSiteId: undefined,
+      gscPropertyUrl: undefined,
+      ga4PropertyId: undefined,
+    });
+
+    const topCapped = Array.from({ length: 100 }, (_, i) =>
+      makeInsight({
+        id: `top_${i}`,
+        severity: 'positive',
+        impactScore: 200 - i,
+        pageTitle: `Top ${i}`,
+      }),
+    );
+    mocks.getInsights.mockReturnValue([
+      ...topCapped,
+      makeInsight({
+        id: 'resolved_beyond_cap',
+        insightType: 'page_health',
+        severity: 'warning',
+        impactScore: -1,
+        resolutionStatus: 'resolved',
+        resolutionNote: 'Fixed late issue',
+      }),
+    ]);
+
+    const result = await generateMonthlyDigest(ws, 'July 2026');
+
+    expect(result.metrics.pagesOptimized).toBe(1);
+    expect(result.issuesAddressed).toEqual([
+      expect.objectContaining({
+        insightId: 'resolved_beyond_cap',
+        detail: 'Fixed late issue',
+      }),
+    ]);
+  });
+
   it('injects summary contract + learnings context into AI prompt when feature is enabled', async () => {
     const ws = makeWorkspace({ id: 'ws_prompt_contract' });
 
     mocks.isFeatureEnabled.mockImplementation((flag: string) => flag === 'outcome-ai-injection');
-    mocks.getWorkspaceLearnings.mockReturnValue({ totalScoredActions: 7 });
-    mocks.formatLearningsForPrompt.mockReturnValue('Learning A: concise headlines improve CTR.');
+    mocks.learningsTotal = 7;
+    mocks.learningsPromptContext = '[Workspace Intelligence]\n## Outcome Learnings (7 tracked outcomes, high confidence)\nLearning A: concise headlines improve CTR.';
     mocks.getInsights.mockReturnValue([
       makeInsight({ id: 'pos_1', severity: 'positive', impactScore: 95, pageTitle: 'Pricing page' }),
       makeInsight({ id: 'pos_2', severity: 'positive', impactScore: 85, pageTitle: 'Services page' }),
@@ -215,9 +297,9 @@ describe('monthly-digest generation', () => {
     const first = generateMonthlyDigest(ws, 'June 2026');
     const second = generateMonthlyDigest(ws, 'June 2026');
 
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(mocks.callAI).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => {
+      expect(mocks.callAI).toHaveBeenCalledTimes(1);
+    });
 
     resolveAI?.({ text: 'Shared summary' });
 

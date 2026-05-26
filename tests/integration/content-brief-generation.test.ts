@@ -217,6 +217,7 @@ beforeEach(() => {
       ? ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline', 'pageProfile']
       : ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline']);
     const includesLearnings = slices.includes('learnings');
+    const defaultSeoPromptContext = '[Workspace Intelligence]\n## SEO Context\nBusiness: Digital agency specializing in SEO and web design\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\nProfessional but approachable. Data-driven.\nBUSINESS KNOWLEDGE BASE:\nWe serve small to mid-size businesses.\nSite target keywords: seo, web design, content marketing';
 
     return {
       intelligence: {
@@ -235,7 +236,7 @@ beforeEach(() => {
         pageProfile: slices.includes('pageProfile') ? mockBuilderPageProfile : null,
       },
       slices,
-      promptContext: includesLearnings ? mockBuilderPromptContext : '',
+      promptContext: mockBuilderPromptContext || (slices.includes('seoContext') ? defaultSeoPromptContext : ''),
       pagePath: opts.pagePath,
       learningsDomain: opts.learningsDomain ?? 'content',
       learningsAvailability: includesLearnings ? 'ready' : 'not_requested',
@@ -384,6 +385,22 @@ describe('generateBrief — happy path', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('generateBrief — prompt construction', () => {
+  it('uses the canonical content generation context once for SEO, voice, and knowledge data', async () => {
+    mockOpenAIJsonResponse('content-brief', makeMockBriefResponse());
+
+    await generateBrief(TEST_WS_ID, 'canonical context keyword', {});
+
+    const calls = getCapturedOpenAICalls();
+    const briefCall = calls.find(c => c.feature === 'content-brief');
+    expect(briefCall).toBeDefined();
+    const promptContent = (briefCall!.messages.find(m => m.role === 'user') ?? briefCall!.messages[0]).content;
+
+    expect(promptContent).toContain('[Workspace Intelligence]');
+    expect(promptContent.match(/BRAND VOICE & STYLE/g)).toHaveLength(1);
+    expect(promptContent.match(/BUSINESS KNOWLEDGE BASE/g)).toHaveLength(1);
+    expect(promptContent).not.toContain('KEYWORD STRATEGY (incorporate these naturally)');
+  });
+
   it('includes related queries in the prompt', async () => {
     mockOpenAIJsonResponse('content-brief', makeMockBriefResponse());
 

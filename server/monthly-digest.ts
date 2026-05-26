@@ -1,5 +1,4 @@
 import { createLogger } from './logger.js';
-import { getInsights } from './analytics-insights-store.js';
 import { getROIHighlights } from './roi-attribution.js';
 import { callAI } from './ai.js';
 import { getSearchPeriodComparison } from './search-console.js';
@@ -8,7 +7,8 @@ import type { MonthlyDigestData, DigestItem, ROIHighlight } from '../shared/type
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import type { Workspace } from './workspaces.js';
 import { isFeatureEnabled } from './feature-flags.js';
-import { getWorkspaceLearnings, formatLearningsForPrompt } from './workspace-learnings.js';
+import { buildRecommendationGenerationContext } from './intelligence/generation-context-builders.js';
+import { listAllInsightsFromSlice } from './intelligence/insights-slice.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { isProgrammingError } from './errors.js';
 
@@ -61,7 +61,11 @@ async function computeDigest(
   now: Date,
 ): Promise<MonthlyDigestData> {
   const cacheKey = `${ws.id}:${monthLabel}`;
-  const insights = getInsights(ws.id);
+  const { intelligence: insightContext } = await buildRecommendationGenerationContext(ws.id, {
+    slices: ['insights'],
+    includeLocalSeo: false,
+  });
+  const insights = insightContext.insights ? listAllInsightsFromSlice(insightContext.insights) : [];
   const roiHighlights = getROIHighlights(ws.id, 5);
 
   // Wins: positive severity or positive ranking mover
@@ -121,13 +125,16 @@ async function computeDigest(
   let learningsSummary: string | undefined;
   let recentOutcomesCount: number | undefined;
   if (isFeatureEnabled('outcome-ai-injection')) {
-    const learnings = getWorkspaceLearnings(ws.id);
-    if (learnings) {
-      const block = formatLearningsForPrompt(learnings, 'all');
-      if (block) {
-        learningsSummary = block;
-        recentOutcomesCount = learnings.totalScoredActions;
-      }
+    const { intelligence, promptContext } = await buildRecommendationGenerationContext(ws.id, {
+      slices: ['learnings'],
+      learningsDomain: 'all',
+      verbosity: 'detailed',
+      tokenBudget: 1800,
+      includeLocalSeo: false,
+    });
+    if (promptContext.includes('## Outcome Learnings')) {
+      learningsSummary = promptContext;
+      recentOutcomesCount = intelligence.learnings?.summary?.totalScoredActions;
     }
   }
 

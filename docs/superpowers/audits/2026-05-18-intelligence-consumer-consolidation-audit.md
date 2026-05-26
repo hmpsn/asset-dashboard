@@ -12,15 +12,17 @@ prompt assembly. Classify each consumer as:
 - `native` — already follows the intelligence facade cleanly
 - `hybrid` — uses the intelligence facade but still mixes in bespoke context assembly
 - `legacy` — still assembles workspace-derived prompt context outside the shared convention
+- `documented-exception` — intentionally outside the shared convention with an inline rationale
 
 This audit is the source of truth for PR1 guardrails and the follow-on migration
 plans.
 
 ## Findings Summary
 
-- `native`: 28
+- `native`: 30
 - `hybrid`: 2
-- `legacy`: 1
+- `legacy`: 0
+- `documented-exception`: 0
 
 Root pattern confirmed:
 
@@ -32,8 +34,8 @@ Root pattern confirmed:
 
 | File | Context owner | Class | Current pattern | Target path | Migration order |
 |---|---|---|---|---|---|
-| `server/aeo-page-review.ts` | `seo-health` | `native` | `buildWorkspaceIntelligence({ slices: ['seoContext'] })` for prompt context | keep low-level | later only if shared builder adds AEO-specific defaults |
-| `server/admin-chat-context.ts` | `analytics-intelligence` | `hybrid` | mixed slice assembly plus direct `getInsights()` / `formatLearningsForPrompt()` shaping | dedicated chat builder later, not PR1 | wave 3 |
+| `server/aeo-page-review.ts` | `seo-health` | `native` | `buildIntelPrompt(['seoContext'])` for prompt context | keep low-level | completed in PR5 |
+| `server/admin-chat-context.ts` | `analytics-intelligence` | `hybrid` | mixed slice assembly plus canonical `formatForPrompt()` blocks; still awaits a dedicated chat-context builder | dedicated chat builder later, not PR1 | partially migrated in PR5 |
 | `server/blueprint-generator.ts` | `content-pipeline` | `native` | slice-backed intelligence + `formatForPrompt()` | `buildContentGenerationContext()` later if it reduces local boilerplate | wave 4 |
 | `server/brand-identity.ts` | `brand-engine` | `native` | `buildIntelPrompt(['seoContext'])` | keep low-level | only revisit if multi-slice context needed |
 | `server/brandscript.ts` | `brand-engine` | `native` | `buildIntelPrompt(['seoContext'])` | keep low-level | only revisit if multi-slice context needed |
@@ -47,7 +49,7 @@ Root pattern confirmed:
 | `server/keyword-recommendations.ts` | `seo-health` | `native` | shared `buildRecommendationGenerationContext()` for ranking context plus deterministic strategic-fit scoring hooks (declines, cannibalization, client signals) | keep on recommendation builder path | completed in wave 2 |
 | `server/keyword-strategy-ai-synthesis.ts` | `analytics-intelligence` | `native` | rich slice-backed context with consistent `slices` usage | content/recommendation builder optional later | keep as reference implementation |
 | `server/meeting-brief-generator.ts` | `analytics-intelligence` | `native` | intelligence facade only | keep low-level | only revisit if a dedicated briefing builder is introduced |
-| `server/monthly-digest.ts` | `analytics-intelligence` | `legacy` | direct `getInsights()` + direct `getWorkspaceLearnings()` prompt enrichment | future digest/briefing builder | wave 3 |
+| `server/monthly-digest.ts` | `analytics-intelligence` | `native` | shared `buildRecommendationGenerationContext()` for insights/learnings-backed digest prompt enrichment | future digest/briefing builder | completed in PR5 |
 | `server/page-analysis-job.ts` | `seo-health` | `native` | consistent slice-backed prompt assembly | recommendation builder later if it simplifies page job boilerplate | wave 4 |
 | `server/routes/content-posts.ts` | `content-pipeline` | `native` | `buildIntelPrompt(['seoContext', 'learnings'])` for review flows | keep low-level | later only if raw slice access becomes necessary |
 | `server/routes/google.ts` | `client-portal` | `native` | aligned slices + formatted block for client search chat | keep low-level | later only if shared client-story builder is added |
@@ -58,6 +60,7 @@ Root pattern confirmed:
 | `server/routes/webflow-seo-bulk-rewrite.ts` | `seo-health` | `native` | workspace seoContext + per-page pageProfile slices | keep low-level | wave 4 |
 | `server/routes/webflow-seo-page-tools.ts` | `seo-health` | `native` | slice-backed page-scoped SEO assist context | future page-assist builder | wave 4 |
 | `server/routes/webflow-seo-rewrite.ts` | `seo-health` | `native` | workspace seoContext + per-page pageProfile slices | keep low-level | wave 4 |
+| `server/routes/webflow-alt-text.ts` | `seo-health` | `native` | `buildIntelPrompt(['seoContext'])` for compact alt-text context plus caller-owned page/image placement snippets | keep low-level | completed in PR5 |
 | `server/routes/workspaces.ts` | `workspace-command-center` | `native` | seoContext-backed AI helper path | keep low-level | revisit only if it needs multi-slice context |
 | `server/seo-audit-ai-recs.ts` | `seo-health` | `native` | slice-backed workspace + page prompt assembly | recommendation builder optional later | wave 2 |
 | `server/voice-calibration.ts` | `brand-engine` | `native` | `buildIntelPrompt(['seoContext'])` | keep low-level | only revisit if richer slices are added |
@@ -73,7 +76,6 @@ Wave 2:
 Wave 3:
 
 - `server/admin-chat-context.ts`
-- `server/monthly-digest.ts`
 
 Wave 4:
 

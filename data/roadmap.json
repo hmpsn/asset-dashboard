@@ -543,69 +543,6 @@
       ]
     },
     {
-      "id": "sprint-workspace-intelligence-consolidation",
-      "name": "Workspace Intelligence Consolidation",
-      "hours": "30-50",
-      "rationale": "Make workspace intelligence the canonical, fresh, tested source of truth for AI context, admin/client intelligence reads, schema planning, content generation, and operational summaries. This sprint captures the dedicated five-PR cleanup plan so follow-on agents do not drift into adjacent intelligence/local SEO backlog before freshness, slice correctness, schema/site-inventory consolidation, and AI consumer migrations are complete.",
-      "source": "docs/superpowers/plans/2026-05-26-workspace-intelligence-consolidation.md",
-      "items": [
-        {
-          "id": "workspace-intel-pr1-contract-guardrails",
-          "title": "PR 1 - Intelligence contract and guardrails",
-          "source": "docs/superpowers/plans/2026-05-26-workspace-intelligence-consolidation.md#pr-1-intelligence-contract--guardrails",
-          "est": "4-6h",
-          "priority": "P0",
-          "owner": "analytics-intelligence",
-          "status": "done",
-          "shippedAt": "2026-05-26",
-          "notes": "Completed in PR #932. Added the shared intelligence slice registry in `shared/types/intelligence.ts`, replaced stale slice allow-lists in the facade/routes/debug/MCP surfaces, handled option-scoped slices including `siteInventory`, updated `docs/rules/workspace-intelligence.md`, and added route/MCP/unit regression coverage. CI follow-up stabilized a brittle unrelated ContentCalendar assertion."
-        },
-        {
-          "id": "workspace-intel-pr2-freshness-invalidation",
-          "title": "PR 2 - Freshness and invalidation",
-          "source": "docs/superpowers/plans/2026-05-26-workspace-intelligence-consolidation.md#pr-2-freshness--invalidation",
-          "est": "6-10h",
-          "priority": "P0",
-          "owner": "analytics-intelligence",
-          "status": "done",
-          "shippedAt": "2026-05-26",
-          "notes": "Completed in this PR. Added `invalidateContentPipelineIntelligence()` as the shared freshness boundary for mutations that feed the canonical `contentPipeline` slice, then wired backend invalidation across content briefs/posts/matrices/publish, suggested briefs/content decay, content subscriptions, MCP content actions, copy pipeline generation/review/intelligence, public post edits, recommendations, Local SEO updates, and briefing publish paths. Expanded `useWsInvalidation()` so the corresponding workspace events refresh admin/client intelligence, content pipeline, recommendations/action queue, suggested briefs, copy pipeline, outcomes, work orders, and briefing query keys. Added helper, event-routing, route/cache regression, and source-wiring guard coverage."
-        },
-        {
-          "id": "workspace-intel-pr3-slice-correctness",
-          "title": "PR 3 - Slice correctness",
-          "source": "docs/superpowers/plans/2026-05-26-workspace-intelligence-consolidation.md#pr-3-slice-correctness",
-          "est": "6-10h",
-          "priority": "P0",
-          "owner": "analytics-intelligence",
-          "status": "done",
-          "shippedAt": "2026-05-26",
-          "notes": "Completed in this PR. Corrected slice assembly semantics for page-specific insight filtering before caps, content request and work-order buckets, published post lifecycle status, Local SEO per-market coverage and duplicate market visibility, client-originated engagement coverage, public learnings readiness, site-health dead-link fallbacks, and Core Web Vitals INP/LCP pass-rate formatting. Added focused regression coverage for the affected slices plus the public client intelligence read path."
-        },
-        {
-          "id": "workspace-intel-pr4-schema-site-inventory",
-          "title": "PR 4 - Schema and site inventory consolidation",
-          "source": "docs/superpowers/plans/2026-05-26-workspace-intelligence-consolidation.md#pr-4-schema--site-inventory-consolidation",
-          "est": "6-10h",
-          "priority": "P1",
-          "owner": "schema",
-          "status": "done",
-          "shippedAt": "2026-05-26",
-          "notes": "Completed in this PR. Added `buildSchemaIntelligence()` as the schema-owned wrapper over canonical workspace intelligence, routed schema planning through resolved `seoContext.strategy`, moved schema site inventory reads through the `siteInventory` slice, and threaded per-page `pageElements`/`pageKeywords` through the same wrapper. Consolidated site inventory freshness with sitemap-resolved static paths, removed the dormant schema analytics prompt block and unused backlink/health context fields, and kept backlink enrichment opt-in only for explicit consumers. Added wrapper, schema-context, generation-context, route contract, and existing schema workflow regression coverage."
-        },
-        {
-          "id": "workspace-intel-pr5-ai-consumer-migration",
-          "title": "PR 5 - AI consumer migration",
-          "source": "docs/superpowers/plans/2026-05-26-workspace-intelligence-consolidation.md#pr-5-ai-consumer-migration",
-          "est": "8-14h",
-          "priority": "P1",
-          "owner": "analytics-intelligence",
-          "status": "pending",
-          "notes": "Migration PR toward the central workspace intelligence engine: keep workflow-specific evidence caller-owned, but route workspace-derived AI context through canonical intelligence builders. Migrate monthly digest, admin chat, content brief generation, voice calibration, AEO review, and alt-text paths away from one-off context assembly. Use canonical builders (`buildContentGenerationContext`, `buildRecommendationGenerationContext`, `buildIntelPrompt`) or a dedicated builder where needed, remove duplicate SEO/business/voice/learnings prompt blocks, and preserve caller-owned add-ons only for workflow-specific evidence. Strengthen prompt/context contract tests and the intelligence consumer inventory guard."
-        }
-      ]
-    },
-    {
       "id": "sprint-roadmap-closeout-residuals",
       "name": "Roadmap Residual Closeout — Near-Finish Sprint Cleanup",
       "hours": "8-13",
@@ -1270,6 +1207,71 @@
         }
       ],
       "name": "Client Inbox IA — Phase 3 Deferred (3.1–3.4)"
+    },
+    {
+      "id": "sprint-workspace-intelligence-consolidation",
+      "name": "✅ SHIPPED — Workspace Intelligence Consolidation",
+      "hours": "30-50",
+      "rationale": "Make workspace intelligence the canonical, fresh, tested source of truth for AI context, admin/client intelligence reads, schema planning, content generation, and operational summaries. This sprint captures the dedicated five-PR cleanup plan so follow-on agents do not drift into adjacent intelligence/local SEO backlog before freshness, slice correctness, schema/site-inventory consolidation, and AI consumer migrations are complete.",
+      "source": "docs/superpowers/plans/2026-05-26-workspace-intelligence-consolidation.md",
+      "items": [
+        {
+          "id": "workspace-intel-pr1-contract-guardrails",
+          "title": "PR 1 - Intelligence contract and guardrails",
+          "source": "docs/superpowers/plans/2026-05-26-workspace-intelligence-consolidation.md#pr-1-intelligence-contract--guardrails",
+          "est": "4-6h",
+          "priority": "P0",
+          "owner": "analytics-intelligence",
+          "status": "done",
+          "shippedAt": "2026-05-26",
+          "notes": "Completed in PR #932. Added the shared intelligence slice registry in `shared/types/intelligence.ts`, replaced stale slice allow-lists in the facade/routes/debug/MCP surfaces, handled option-scoped slices including `siteInventory`, updated `docs/rules/workspace-intelligence.md`, and added route/MCP/unit regression coverage. CI follow-up stabilized a brittle unrelated ContentCalendar assertion."
+        },
+        {
+          "id": "workspace-intel-pr2-freshness-invalidation",
+          "title": "PR 2 - Freshness and invalidation",
+          "source": "docs/superpowers/plans/2026-05-26-workspace-intelligence-consolidation.md#pr-2-freshness--invalidation",
+          "est": "6-10h",
+          "priority": "P0",
+          "owner": "analytics-intelligence",
+          "status": "done",
+          "shippedAt": "2026-05-26",
+          "notes": "Completed in this PR. Added `invalidateContentPipelineIntelligence()` as the shared freshness boundary for mutations that feed the canonical `contentPipeline` slice, then wired backend invalidation across content briefs/posts/matrices/publish, suggested briefs/content decay, content subscriptions, MCP content actions, copy pipeline generation/review/intelligence, public post edits, recommendations, Local SEO updates, and briefing publish paths. Expanded `useWsInvalidation()` so the corresponding workspace events refresh admin/client intelligence, content pipeline, recommendations/action queue, suggested briefs, copy pipeline, outcomes, work orders, and briefing query keys. Added helper, event-routing, route/cache regression, and source-wiring guard coverage."
+        },
+        {
+          "id": "workspace-intel-pr3-slice-correctness",
+          "title": "PR 3 - Slice correctness",
+          "source": "docs/superpowers/plans/2026-05-26-workspace-intelligence-consolidation.md#pr-3-slice-correctness",
+          "est": "6-10h",
+          "priority": "P0",
+          "owner": "analytics-intelligence",
+          "status": "done",
+          "shippedAt": "2026-05-26",
+          "notes": "Completed in this PR. Corrected slice assembly semantics for page-specific insight filtering before caps, content request and work-order buckets, published post lifecycle status, Local SEO per-market coverage and duplicate market visibility, client-originated engagement coverage, public learnings readiness, site-health dead-link fallbacks, and Core Web Vitals INP/LCP pass-rate formatting. Added focused regression coverage for the affected slices plus the public client intelligence read path."
+        },
+        {
+          "id": "workspace-intel-pr4-schema-site-inventory",
+          "title": "PR 4 - Schema and site inventory consolidation",
+          "source": "docs/superpowers/plans/2026-05-26-workspace-intelligence-consolidation.md#pr-4-schema--site-inventory-consolidation",
+          "est": "6-10h",
+          "priority": "P1",
+          "owner": "schema",
+          "status": "done",
+          "shippedAt": "2026-05-26",
+          "notes": "Completed in this PR. Added `buildSchemaIntelligence()` as the schema-owned wrapper over canonical workspace intelligence, routed schema planning through resolved `seoContext.strategy`, moved schema site inventory reads through the `siteInventory` slice, and threaded per-page `pageElements`/`pageKeywords` through the same wrapper. Consolidated site inventory freshness with sitemap-resolved static paths, removed the dormant schema analytics prompt block and unused backlink/health context fields, and kept backlink enrichment opt-in only for explicit consumers. Added wrapper, schema-context, generation-context, route contract, and existing schema workflow regression coverage."
+        },
+        {
+          "id": "workspace-intel-pr5-ai-consumer-migration",
+          "title": "PR 5 - AI consumer migration",
+          "source": "docs/superpowers/plans/2026-05-26-workspace-intelligence-consolidation.md#pr-5-ai-consumer-migration",
+          "est": "8-14h",
+          "priority": "P1",
+          "owner": "analytics-intelligence",
+          "status": "done",
+          "shippedAt": "2026-05-26",
+          "notes": "Completed in this PR. Migrated monthly digest insights/learnings enrichment through `buildRecommendationGenerationContext`, AEO review and Webflow alt text through `buildIntelPrompt`, and content brief SEO/voice/knowledge context through `buildContentGenerationContext().promptContext`. Admin chat now uses canonical formatted SEO/learnings blocks and slice-backed insights while remaining classified as hybrid until a dedicated chat-context builder exists. Caller-owned evidence remains local for page/image snippets, SERP/reference/style/template blocks, page keyword maps, and decay query breakdowns. Strengthened the intelligence consumer inventory guard with `documented-exception` classification support and PR5 regression assertions."
+        }
+      ],
+      "shippedAt": "2026-05-26"
     },
     {
       "id": "sprint-local-seo-h",

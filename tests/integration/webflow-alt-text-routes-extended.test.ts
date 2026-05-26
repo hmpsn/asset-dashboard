@@ -89,12 +89,7 @@ vi.mock('../../server/workspace-intelligence.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../server/workspace-intelligence.js')>();
   return {
     ...actual,
-    buildWorkspaceIntelligence: vi.fn(async () => ({
-      seoContext: {
-        businessContext: 'Test business',
-        effectiveBrandVoiceBlock: '',
-      },
-    })),
+    buildIntelPrompt: vi.fn(async () => '[Workspace Intelligence]\n## SEO Context\nBusiness: Test business'),
   };
 });
 
