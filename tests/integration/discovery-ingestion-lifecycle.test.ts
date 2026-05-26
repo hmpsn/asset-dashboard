@@ -446,7 +446,8 @@ describe('GET /api/discovery/:workspaceId/sources/:id/extractions — by source'
     );
     expect(status).toBe(200);
     const list = body as Record<string, unknown>[];
-    expect(list.every((e) => e.sourceId === srcIdA)).toBe(true);
+    expect(list.length).toBeGreaterThan(0);
+    expect(list.every((e) => e.sourceId === srcIdA)).toBe(true); // every-ok: guarded by length check above
     expect(list.find((e) => e.id === extIdA)).toBeDefined();
 
     // Cleanup

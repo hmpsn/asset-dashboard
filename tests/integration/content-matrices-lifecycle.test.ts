@@ -428,7 +428,7 @@ describe('DELETE /api/content-matrices/:workspaceId/:matrixId', () => {
     const res = await getJson(`/api/content-matrices/${freshWs}`);
     expect(res.status).toBe(200);
     const list = await res.json();
-    expect(list.every((m: { id: string }) => m.id !== matrixId)).toBe(true);
+    expect(list.some((m: { id: string }) => m.id === matrixId)).toBe(false);
   });
 });
 
@@ -452,7 +452,7 @@ describe('Workspace isolation', () => {
     const res = await getJson(`/api/content-matrices/${wsB}`);
     expect(res.status).toBe(200);
     const list = await res.json();
-    expect(list.every((m: { id: string }) => m.id !== wsAMatrix)).toBe(true);
+    expect(list.some((m: { id: string }) => m.id === wsAMatrix)).toBe(false);
   });
 
   it('DELETE of wsA matrix fails (404) via wsB path', async () => {
