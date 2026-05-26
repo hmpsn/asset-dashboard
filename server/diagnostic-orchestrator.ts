@@ -6,9 +6,9 @@
  * All data comes from existing modules: GSC, GA4, workspace-intelligence (backlinks),
  * redirect-scanner, plus the new diagnostic-probe.
  *
- * NOTE: Backlinks data is fetched via buildWorkspaceIntelligence (enrichWithBacklinks: true)
- * rather than calling getBacklinksOverview directly, to respect the caching + rate-limit
- * enforcement in workspace-intelligence.ts (pr-check rule).
+ * NOTE: Backlinks data is fetched through the diagnostic intelligence builder with
+ * backlink enrichment enabled, rather than calling getBacklinksOverview directly,
+ * to respect the caching + rate-limit enforcement in workspace-intelligence.ts.
  */
 
 import { createLogger } from './logger.js';
@@ -17,8 +17,7 @@ import { getPageTrend, getQueryPageData, getSearchPeriodComparison, getAllGscPag
 import { getGA4LandingPages } from './google-analytics.js';
 import { scanRedirects } from './redirect-scanner.js';
 import { resolveFullPageUrl } from './outcome-measurement.js';
-import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
-import { getInsights, stampDiagnosticReportId } from './analytics-insights-store.js';
+import { stampDiagnosticReportId } from './analytics-insights-store.js';
 import { callAI } from './ai.js';
 import { probeCanonical, countInternalLinks } from './diagnostic-probe.js';
 import {
@@ -43,11 +42,13 @@ import type {
   BacklinksResult,
   SiteBaselines,
   ActivityEntry,
-  ConcurrentAnomaly,
-  ExistingInsightSummary,
   PeriodComparisonResult,
 } from '../shared/types/diagnostics.js';
 import type { AnalyticsInsight, AnomalyDigestData } from '../shared/types/analytics.js';
+import {
+  buildDiagnosticIntelligenceContext,
+  resolveDiagnosticAnomalyInsight,
+} from './intelligence/diagnostic-context-builder.js';
 
 const log = createLogger('diagnostic-orchestrator');
 
@@ -98,8 +99,7 @@ export async function runDiagnostic(request: DiagnosticRequest, jobId: string): 
 
   try {
     // 1. Resolve the anomaly insight to get anomaly data + affected pages
-    const insights = getInsights(workspaceId);
-    const anomalyInsight = insights.find((i) => i.id === insightId);
+    const { anomalyInsight } = await resolveDiagnosticAnomalyInsight(workspaceId, insightId);
     if (!anomalyInsight) {
       markDiagnosticFailed(reportId, 'Anomaly insight not found');
       updateJob(jobId, { status: 'error', message: 'Anomaly insight not found' });
@@ -278,11 +278,12 @@ async function gatherDiagnosticContext(
           : Promise.resolve({ count: 0, siteMedian: 0, topLinkingPages: [], deficit: 0 })),
 
     // Intelligence (existing insights, baselines, and backlink profile via enrichWithBacklinks)
-    buildWorkspaceIntelligence(workspaceId, { // bwi-all-ok: diagnostics needs seoContext (baselines, backlinks) + operational
-      pagePath: affectedPagePath ?? undefined,
-      enrichWithBacklinks: modules.includes('backlinks'),
+    buildDiagnosticIntelligenceContext(workspaceId, {
+      pagePath: affectedPagePath,
+      currentInsightId: insight.id,
+      includeBacklinks: modules.includes('backlinks'),
     }).catch((e) => {
-      log.warn({ err: e }, 'Intelligence assembly failed');
+      log.warn({ err: e }, 'Diagnostic intelligence assembly failed');
       return null;
     }),
   ]);
@@ -338,7 +339,9 @@ async function gatherDiagnosticContext(
   })();
 
   // Backlinks from intelligence backlinkProfile
-  const backlinkProfile = intelligence?.seoContext?.backlinkProfile;
+  const diagnosticIntel = intelligence as Awaited<ReturnType<typeof buildDiagnosticIntelligenceContext>> | null;
+  const workspaceIntel = diagnosticIntel?.intelligence ?? null;
+  const backlinkProfile = workspaceIntel?.seoContext?.backlinkProfile;
   const backlinks: BacklinksResult = {
     totalBacklinks: backlinkProfile?.totalBacklinks ?? 0,
     referringDomains: backlinkProfile?.referringDomains ?? 0,
@@ -352,12 +355,12 @@ async function gatherDiagnosticContext(
   // Site baselines from intelligence
   const siteBaselines: SiteBaselines = {
     avgInternalLinks: (internalLinks as InternalLinksResult).siteMedian,
-    medianPosition: intelligence?.seoContext?.rankTracking?.avgPosition ?? 0,
+    medianPosition: workspaceIntel?.seoContext?.rankTracking?.avgPosition ?? 0,
     totalBacklinks: backlinkProfile?.totalBacklinks ?? 0,
   };
 
   // Recent activity from intelligence
-  const recentActivity: ActivityEntry[] = (intelligence?.operational?.recentActivity ?? [])
+  const recentActivity: ActivityEntry[] = (workspaceIntel?.operational?.recentActivity ?? [])
     .slice(0, 20)
     .map((a: { date?: string; createdAt?: string; type?: string; action?: string; title?: string; description?: string; details?: string }) => ({
       date: a.date ?? a.createdAt ?? '',
@@ -366,25 +369,8 @@ async function gatherDiagnosticContext(
     }));
 
   // Concurrent anomalies
-  const allInsights = getInsights(workspaceId);
-  const concurrentAnomalies: ConcurrentAnomaly[] = allInsights
-    .filter((i) => i.insightType === 'anomaly_digest' && i.id !== insight.id)
-    .slice(0, 10)
-    .map((i) => ({
-      type: (i.data as unknown as AnomalyDigestData).anomalyType ?? 'unknown',
-      page: i.pageId ?? 'site-level',
-      severity: i.severity,
-    }));
-
-  // Existing insights for affected page
-  const existingInsights: ExistingInsightSummary[] = allInsights
-    .filter((i) => i.pageId === affectedPagePath && i.insightType !== 'anomaly_digest')
-    .slice(0, 10)
-    .map((i) => ({
-      type: i.insightType,
-      severity: i.severity,
-      summary: i.pageTitle ?? i.insightType,
-    }));
+  const concurrentAnomalies = diagnosticIntel?.concurrentAnomalies ?? [];
+  const existingInsights = diagnosticIntel?.existingInsights ?? [];
 
   // Period comparison
   type PeriodComparisonLike = {

@@ -18,10 +18,7 @@ const mocks = vi.hoisted(() => ({
   getQueryPageData: vi.fn(),
   saveSuggestion: vi.fn(),
   resolveBaseUrl: vi.fn(),
-  buildWorkspaceIntelligence: vi.fn(),
-  formatKeywordsForPrompt: vi.fn(() => '\nKEYWORDS'),
-  formatKnowledgeBaseForPrompt: vi.fn(() => '\nKNOWLEDGE'),
-  formatPersonasForPrompt: vi.fn(() => '\nPERSONAS'),
+  buildPageAssistContext: vi.fn(),
   getBrandName: vi.fn(() => 'Studio Brand'),
   getTokenForSite: vi.fn(() => 'token_1'),
 }));
@@ -31,7 +28,12 @@ vi.mock('../../server/broadcast.js', () => ({ broadcastToWorkspace: mocks.broadc
 vi.mock('../../server/content-posts-ai.js', () => ({ callCreativeAI: mocks.callCreativeAI }));
 vi.mock('../../server/errors.js', () => ({ isProgrammingError: mocks.isProgrammingError }));
 vi.mock('../../server/helpers.js', () => ({
-  findPageMapEntryForPage: vi.fn(() => ({ pagePath: '/services', primaryKeyword: 'seo services' })),
+  findPageMapEntryForPage: vi.fn(() => ({
+    pagePath: '/seo',
+    pageTitle: 'SEO Services',
+    primaryKeyword: 'seo services',
+    secondaryKeywords: [],
+  })),
   matchGscUrlToPath: vi.fn(() => false),
   sanitizeForPromptInjection: vi.fn((value: string) => `<untrusted_user_content>\n${value}\n</untrusted_user_content>`),
   sanitizeQueryForPrompt: vi.fn((value: string) => value),
@@ -49,11 +51,8 @@ vi.mock('../../server/prompt-assembly.js', () => ({ buildSystemPrompt: mocks.bui
 vi.mock('../../server/search-console.js', () => ({ getQueryPageData: mocks.getQueryPageData }));
 vi.mock('../../server/seo-suggestions.js', () => ({ saveSuggestion: mocks.saveSuggestion }));
 vi.mock('../../server/url-helpers.js', () => ({ resolveBaseUrl: mocks.resolveBaseUrl }));
-vi.mock('../../server/workspace-intelligence.js', () => ({
-  buildWorkspaceIntelligence: mocks.buildWorkspaceIntelligence,
-  formatKeywordsForPrompt: mocks.formatKeywordsForPrompt,
-  formatKnowledgeBaseForPrompt: mocks.formatKnowledgeBaseForPrompt,
-  formatPersonasForPrompt: mocks.formatPersonasForPrompt,
+vi.mock('../../server/intelligence/page-assist-context-builder.js', () => ({
+  buildPageAssistContext: mocks.buildPageAssistContext,
 }));
 vi.mock('../../server/workspaces.js', () => ({
   getBrandName: mocks.getBrandName,
@@ -83,12 +82,16 @@ describe('webflow SEO bulk rewrite job', () => {
     mocks.callCreativeAI.mockResolvedValue(JSON.stringify(['One improved title', 'Two improved title', 'Three improved title']));
     mocks.getQueryPageData.mockResolvedValue([]);
     mocks.resolveBaseUrl.mockResolvedValue('');
-    mocks.buildWorkspaceIntelligence.mockResolvedValue({
+    mocks.buildPageAssistContext.mockResolvedValue({
       seoContext: {
-        effectiveBrandVoiceBlock: '\nVOICE',
-        personas: [],
-        knowledgeBase: [],
-        strategy: { pageMap: [{ pagePath: '/services', primaryKeyword: 'seo services' }] },
+        strategy: { pageMap: [{ pagePath: '/seo', pageTitle: 'SEO Services', primaryKeyword: 'seo services', secondaryKeywords: [] }] },
+      },
+      blocks: {
+        keywordBlock: '\nKEYWORDS',
+        brandVoiceBlock: '\nVOICE',
+        personasBlock: '\nPERSONAS',
+        knowledgeBlock: '\nKNOWLEDGE',
+        pageProfileBlock: '\nPAGE PROFILE',
       },
     });
     mocks.saveSuggestion.mockImplementation((opts) => ({ id: `suggestion_${opts.pageId}_${opts.field}`, ...opts }));
