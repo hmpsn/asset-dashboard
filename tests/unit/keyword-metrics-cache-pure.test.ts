@@ -409,17 +409,17 @@ describe('cacheMetricsBatch', () => {
 // ── cleanupStaleEntries ───────────────────────────────────────────────────────
 
 describe('cleanupStaleEntries', () => {
-  it('returns 0 when there is nothing to clean', () => {
+  it('does not delete fresh entries', () => {
     // Insert a very recent entry — should survive cleanup
     const kwFresh = trackKw('fresh keyword cleanup test');
     cacheMetrics(makeMetrics(kwFresh), DB_US);
 
-    // Run cleanup with a 1-day window — 1-second-old entry must survive
+    // Run cleanup with a 1-day window — a 1-second-old entry must survive.
+    // The shared test DB may have stale entries from other runs so we can't
+    // assert deleted === 0, but the fresh entry must still be present after.
     const deleted = cleanupStaleEntries(1);
     expect(typeof deleted).toBe('number');
     expect(deleted).toBeGreaterThanOrEqual(0);
-
-    // Verify the fresh entry still exists
     expect(getCachedMetrics(kwFresh, DB_US)).not.toBeNull();
   });
 

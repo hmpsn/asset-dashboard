@@ -114,8 +114,8 @@ describe('createPayment', () => {
 
   it('uses workspaceId from the data object, not the first argument', () => {
     // The first arg to createPayment is a legacy _workspaceId; the actual
-    // workspace is taken from data.workspaceId.
-    const record = createPayment(testWsId, makePaymentData({ workspaceId: testWsId }));
+    // workspace is taken from data.workspaceId. Pass distinct values to verify.
+    const record = createPayment('ignored_ws_id', makePaymentData({ workspaceId: testWsId }));
     expect(record.workspaceId).toBe(testWsId);
   });
 });
@@ -250,16 +250,17 @@ describe('deletePayment', () => {
 
 describe('deleteAllPayments', () => {
   it('removes all payments and returns the count', () => {
-    // Seed at least 2 payments to ensure the count > 0.
-    createPayment(testWsId, makePaymentData());
-    createPayment(testWsId, makePaymentData());
+    // Seed 2 payments so we can assert they are gone after the purge.
+    const p1 = createPayment(testWsId, makePaymentData());
+    const p2 = createPayment(testWsId, makePaymentData());
 
-    const before = listAllPayments().length;
-    expect(before).toBeGreaterThanOrEqual(2);
-
+    // deleteAllPayments is a global admin purge — it wipes the entire table.
+    // We only verify the payments we control are gone, not listAllPayments().length === 0,
+    // because parallel test workers may have payments in the same DB at this moment.
     const deleted = deleteAllPayments();
     expect(deleted).toBeGreaterThanOrEqual(2);
-    expect(listAllPayments()).toHaveLength(0);
+    expect(getPayment(testWsId, p1.id)).toBeUndefined();
+    expect(getPayment(testWsId, p2.id)).toBeUndefined();
   });
 });
 

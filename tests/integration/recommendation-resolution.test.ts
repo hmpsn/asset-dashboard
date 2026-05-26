@@ -221,6 +221,7 @@ describe('Recommendations — list filtering by status', () => {
     expect(ids).toContain('rec_filter_pending');
     expect(ids).not.toContain('rec_filter_completed');
     expect(ids).not.toContain('rec_filter_dismissed');
+    expect(ids).not.toContain('rec_filter_in_progress');
   });
 
   it('?status=completed returns only completed recs', async () => {

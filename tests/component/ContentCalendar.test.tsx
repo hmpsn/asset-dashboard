@@ -227,28 +227,23 @@ describe('ContentCalendar', () => {
     renderContentCalendar();
     // Click the day cell that contains today's date number
     const todayDate = today.getDate().toString();
-    // The day cell contains date numbers — find any cell with today's date
-    // Today's number renders inside an amber span; regular days render directly
     const dayCells = screen.getAllByRole('button').filter(b =>
       b.textContent?.includes(todayDate) && b.className.includes('min-h'),
     );
-    if (dayCells.length > 0) {
-      fireEvent.click(dayCells[0]);
-      // Detail panel appears
-      // Detail panel appears — multiple elements may match /item/i (e.g. "0 items" badge + "No content items" message)
-      expect(screen.getAllByText(/item/i).length).toBeGreaterThan(0);
-    }
+    // Today must always render a clickable day cell in the current-month grid
+    expect(dayCells.length).toBeGreaterThan(0);
+    fireEvent.click(dayCells[0]);
+    // Detail panel shows an item count badge — /item/i matches on multiple nodes
+    expect(screen.getAllByText(/item/i).length).toBeGreaterThan(0);
   });
 
   it('shows item label in selected day detail panel', () => {
     renderContentCalendar();
     const dayCells = screen.getAllByRole('button').filter(b => b.className.includes('min-h'));
-    // Find a cell that contains our test item label
+    // Mock data places 'SEO Strategy Brief' on today — must find the cell
     const cellWithItem = dayCells.find(b => b.textContent?.includes('SEO Strategy Brief'));
-    if (cellWithItem) {
-      fireEvent.click(cellWithItem);
-      const panels = screen.getAllByText('SEO Strategy Brief');
-      expect(panels.length).toBeGreaterThan(0);
-    }
+    expect(cellWithItem).toBeDefined();
+    fireEvent.click(cellWithItem!);
+    expect(screen.getAllByText('SEO Strategy Brief').length).toBeGreaterThan(0);
   });
 });

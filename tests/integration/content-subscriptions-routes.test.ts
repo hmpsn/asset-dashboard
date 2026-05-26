@@ -17,7 +17,7 @@ import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import db from '../../server/db/index.js';
 import { CONTENT_SUB_PLANS } from '../../shared/types/content.js';
 
-const ctx = createTestContext(13561);
+const ctx = createTestContext(13570);
 const { api, postJson, patchJson, del } = ctx;
 
 // Admin-facing tests use a standard workspace (clientPassword is irrelevant for admin routes).

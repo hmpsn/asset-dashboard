@@ -197,6 +197,13 @@ describe('PATCH /api/suggested-briefs/:workspaceId/:briefId — update status', 
       db.prepare('DELETE FROM suggested_briefs WHERE id = ?').run(briefId);
     }
   });
+
+  it('returns 404 for a nonexistent briefId', async () => {
+    const res = await patchJson(`/api/suggested-briefs/${testWsId}/nonexistent-brief-id`, { status: 'accepted' });
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body).toHaveProperty('error');
+  });
 });
 
 describe('POST /api/suggested-briefs/:workspaceId/:briefId/snooze', () => {
@@ -229,6 +236,15 @@ describe('POST /api/suggested-briefs/:workspaceId/:briefId/snooze', () => {
       db.prepare('DELETE FROM suggested_briefs WHERE id = ?').run(briefId);
     }
   });
+
+  it('returns 404 for a nonexistent briefId', async () => {
+    const res = await postJson(`/api/suggested-briefs/${testWsId}/nonexistent-brief-id/snooze`, {
+      until: '2099-12-31',
+    });
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body).toHaveProperty('error');
+  });
 });
 
 describe('POST /api/suggested-briefs/:workspaceId/:briefId/dismiss', () => {
@@ -243,6 +259,13 @@ describe('POST /api/suggested-briefs/:workspaceId/:briefId/dismiss', () => {
     } finally {
       db.prepare('DELETE FROM suggested_briefs WHERE id = ?').run(briefId);
     }
+  });
+
+  it('returns 404 for a nonexistent briefId', async () => {
+    const res = await postJson(`/api/suggested-briefs/${testWsId}/nonexistent-brief-id/dismiss`, {});
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body).toHaveProperty('error');
   });
 
   it('subsequent GET list (no ?all) does not include the dismissed brief', async () => {

@@ -1,43 +1,16 @@
 /**
- * Unit tests for server/outcome-crons.ts — scheduling lifecycle and exported API.
+ * Unit tests for server/outcome-crons.ts — backlog threshold logic.
  *
  * outcome-crons.ts is almost entirely scheduling glue (dynamic imports + setInterval/setTimeout).
- * There are no pure data-transformation functions to test in isolation.
- * These tests verify the scheduling lifecycle: start idempotency, stop idempotency,
- * start/stop/restart cycles, and the module-level constants.
+ * Importing it triggers the full module dependency chain (DB open, logger init), so the
+ * scheduling lifecycle and module-level constants cannot be tested by importing the module.
  *
- * We mock the feature-flag check so startOutcomeCrons() actually runs even though
- * 'outcome-tracking' is not enabled in the test environment.
+ * These tests cover the backlog-alert threshold decision logic, extracted here as a pure
+ * function that mirrors the production closure in outcome-crons.ts. If the thresholds or
+ * algorithm change in production, update the replica below and its tests accordingly.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-
-// ── Constants ────────────────────────────────────────────────────────────────
-
-describe('outcome-crons module constants', () => {
-  it('DAILY_MS is 24 hours in milliseconds', () => {
-    const DAILY_MS = 24 * 60 * 60 * 1000;
-    expect(DAILY_MS).toBe(86_400_000);
-  });
-
-  it('WEEKLY_MS is 7× DAILY_MS', () => {
-    const DAILY_MS = 24 * 60 * 60 * 1000;
-    const WEEKLY_MS = 7 * DAILY_MS;
-    expect(WEEKLY_MS).toBe(604_800_000);
-  });
-
-  it('ACTION_BACKLOG_THRESHOLD is 20', () => {
-    // Validate the threshold documented in outcome-crons.ts — a sentinel value used
-    // by the backlog-alert logic; keep tests in sync if the constant changes.
-    const ACTION_BACKLOG_THRESHOLD = 20;
-    expect(ACTION_BACKLOG_THRESHOLD).toBe(20);
-  });
-
-  it('ACTION_AGE_THRESHOLD_DAYS is 14', () => {
-    const ACTION_AGE_THRESHOLD_DAYS = 14;
-    expect(ACTION_AGE_THRESHOLD_DAYS).toBe(14);
-  });
-});
+import { describe, it, expect } from 'vitest';
 
 // ── Backlog alert logic (inline-extracted pure functions) ────────────────────
 // The age and count threshold logic lives inside an async closure in outcome-crons.ts.

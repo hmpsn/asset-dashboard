@@ -210,13 +210,12 @@ describe('workspace isolation', () => {
     const pageId = `/page-count-${randomUUID().slice(0, 6)}`;
     saveSuggestion(makeSuggestionOpts(wsA, { pageId }));
 
+    // wsB is a fresh workspace — getSuggestionCounts must return 0 pending
     const countsB = getSuggestionCounts(wsB);
-    // wsB may have other suggestions from prior tests in this describe; just check
-    // the ws_isoA row is not counted in wsB
+    expect(countsB.pending).toBe(0);
+    // sanity: wsA actually has data
     const countsA = getSuggestionCounts(wsA);
     expect(countsA.pending).toBeGreaterThan(0);
-    // wsB's pending count should not include wsA's rows
-    expect(countsB.pending).toBeLessThan(countsA.pending + 1); // rough isolation check
   });
 });
 
@@ -269,13 +268,11 @@ describe('listPendingSuggestionsByIds', () => {
     expect(result.map(x => x.id)).not.toContain(sB.id);
   });
 
-  it('returns empty array for empty ids array', () => {
+  it('returns all pending (delegates to listSuggestions) when ids is empty array', () => {
     saveSuggestion(makeSuggestionOpts(wsId));
-    // empty array → no ids passed → falls through to listSuggestions
-    // (per implementation: if (!suggestionIds?.length) return listSuggestions(workspaceId))
+    // empty array → falls through to listSuggestions (returns all pending for workspace)
     const result = listPendingSuggestionsByIds(wsId, []);
-    // No ids: delegates to listSuggestions which returns all pending
-    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBeGreaterThan(0);
   });
 });
 
