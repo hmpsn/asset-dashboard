@@ -202,12 +202,55 @@ describe('computeContentPipelineSummary — briefs.byStatus', () => {
     insertedIds.push(id);
   }
 
+  function insertContentRequest(id: string, status: string): void {
+    const now = new Date().toISOString();
+    db.prepare(
+      `INSERT OR REPLACE INTO content_topic_requests
+         (id, workspace_id, topic, target_keyword, intent, priority, rationale, status, requested_at, updated_at)
+       VALUES
+         (@id, @workspace_id, @topic, @target_keyword, @intent, @priority, @rationale, @status, @requested_at, @updated_at)`,
+    ).run({
+      id,
+      workspace_id: TEST_WORKSPACE,
+      topic: 'Pipeline status test',
+      target_keyword: 'pipeline status',
+      intent: 'informational',
+      priority: 'medium',
+      rationale: 'Test request status bucketing',
+      status,
+      requested_at: now,
+      updated_at: now,
+    });
+  }
+
+  function insertWorkOrder(id: string, status: string): void {
+    const now = new Date().toISOString();
+    db.prepare(
+      `INSERT OR REPLACE INTO work_orders
+         (id, workspace_id, payment_id, product_type, status, page_ids, quantity, created_at, updated_at)
+       VALUES
+         (@id, @workspace_id, @payment_id, @product_type, @status, @page_ids, @quantity, @created_at, @updated_at)`,
+    ).run({
+      id,
+      workspace_id: TEST_WORKSPACE,
+      payment_id: `pay-${id}`,
+      product_type: 'fix_meta',
+      status,
+      page_ids: '[]',
+      quantity: 1,
+      created_at: now,
+      updated_at: now,
+    });
+  }
+
   afterAll(() => {
     if (insertedIds.length > 0) {
       db.prepare(
         `DELETE FROM content_briefs WHERE workspace_id = ?`,
       ).run(TEST_WORKSPACE);
     }
+    db.prepare(`DELETE FROM content_topic_requests WHERE workspace_id = ?`).run(TEST_WORKSPACE);
+    db.prepare(`DELETE FROM work_orders WHERE workspace_id = ?`).run(TEST_WORKSPACE);
     db.prepare(`DELETE FROM content_pipeline_cache WHERE workspace_id = ?`).run(TEST_WORKSPACE);
   });
 
@@ -235,5 +278,40 @@ describe('computeContentPipelineSummary — briefs.byStatus', () => {
       (sum, k) => sum + (summary.briefs.byStatus[k] ?? 0), 0,
     );
     expect(inProgress).toBeGreaterThan(0);
+  });
+
+  it('maps the full content request lifecycle into summary buckets', () => {
+    db.prepare(`DELETE FROM content_topic_requests WHERE workspace_id = ?`).run(TEST_WORKSPACE);
+    db.prepare(`DELETE FROM content_pipeline_cache WHERE workspace_id = ?`).run(TEST_WORKSPACE);
+    insertContentRequest('request-status-pending-payment', 'pending_payment');
+    insertContentRequest('request-status-requested', 'requested');
+    insertContentRequest('request-status-brief-generated', 'brief_generated');
+    insertContentRequest('request-status-client-review', 'client_review');
+    insertContentRequest('request-status-approved', 'approved');
+    insertContentRequest('request-status-changes-requested', 'changes_requested');
+    insertContentRequest('request-status-in-progress', 'in_progress');
+    insertContentRequest('request-status-post-review', 'post_review');
+    insertContentRequest('request-status-delivered', 'delivered');
+    insertContentRequest('request-status-published', 'published');
+    insertContentRequest('request-status-declined', 'declined');
+
+    invalidateContentPipelineCache(TEST_WORKSPACE);
+
+    const summary = getContentPipelineSummary(TEST_WORKSPACE);
+    expect(summary.requests).toEqual({ pending: 6, inProgress: 2, delivered: 2 });
+  });
+
+  it('excludes completed and cancelled work orders from active count', () => {
+    db.prepare(`DELETE FROM work_orders WHERE workspace_id = ?`).run(TEST_WORKSPACE);
+    db.prepare(`DELETE FROM content_pipeline_cache WHERE workspace_id = ?`).run(TEST_WORKSPACE);
+    insertWorkOrder('work-order-pending', 'pending');
+    insertWorkOrder('work-order-in-progress', 'in_progress');
+    insertWorkOrder('work-order-completed', 'completed');
+    insertWorkOrder('work-order-cancelled', 'cancelled');
+
+    invalidateContentPipelineCache(TEST_WORKSPACE);
+
+    const summary = getContentPipelineSummary(TEST_WORKSPACE);
+    expect(summary.workOrders.active).toBe(2);
   });
 });

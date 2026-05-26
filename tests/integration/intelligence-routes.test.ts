@@ -14,7 +14,8 @@
  *   4. Pagepath forwarding via ?pagePath= query param
  *   5. Unknown workspaceId still returns 200 (requireWorkspaceAccess passes
  *      through under HMAC auth; slices degrade gracefully to empty data)
- *   6. Invalid slice names are silently ignored (only valid ones applied)
+ *   6. Mixed valid/invalid slice names keep the valid slices
+ *   7. All-invalid slice requests return 400 instead of silently assembling all
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -146,6 +147,14 @@ describe('GET /api/intelligence/:workspaceId — known workspace', () => {
     );
     expect(status).toBe(200);
     expect(body as Record<string, unknown>).toHaveProperty('seoContext');
+  });
+
+  it('returns 400 when all requested slices are invalid', async () => {
+    const { status, body } = await getJson(
+      `/api/intelligence/${ws.workspaceId}?slices=bogusSlice,alsoBogus`,
+    );
+    expect(status).toBe(400);
+    expect((body as { error?: string }).error).toContain('slices');
   });
 
   it('pagePath query param is accepted without error', async () => {

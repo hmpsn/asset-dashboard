@@ -2,6 +2,8 @@ import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonSafeArray } from './db/json-validation.js';
 import { validateTransition, WORK_ORDER_TRANSITIONS } from './state-machines.js';
+import { invalidateContentPipelineCache } from './workspace-data.js';
+import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { z } from 'zod';
 
 // --- Types ---
@@ -125,6 +127,8 @@ export function createWorkOrder(
     updated_at: now,
   });
 
+  invalidateWorkOrderCaches(workspaceId);
+
   return order;
 }
 
@@ -156,5 +160,11 @@ export function updateWorkOrder(
     completed_at: order.completedAt ?? null,
     updated_at: order.updatedAt,
   });
+  invalidateWorkOrderCaches(workspaceId);
   return order;
+}
+
+function invalidateWorkOrderCaches(workspaceId: string): void {
+  invalidateContentPipelineCache(workspaceId);
+  invalidateIntelligenceCache(workspaceId);
 }

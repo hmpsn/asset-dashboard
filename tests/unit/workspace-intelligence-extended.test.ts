@@ -348,6 +348,24 @@ describe('buildWorkspaceIntelligence — insights capping and ordering', () => {
     expect(result.insights!.all.length).toBeLessThanOrEqual(100);
   });
 
+  it('keeps full insight rollups even when all is capped', async () => {
+    const manyInsights = Array.from({ length: 150 }, (_, i) => ({
+      id: `insight-${i}`,
+      insightType: i < 120 ? 'content_decay' : 'ranking_opportunity',
+      severity: i < 100 ? 'warning' : 'critical',
+      impactScore: 150 - i,
+      data: {},
+    }));
+    mockGetInsights.mockReturnValue(manyInsights as never);
+
+    const result = await buildWorkspaceIntelligence('ws-cap-rollups', { slices: ['insights'] });
+    expect(result.insights!.all).toHaveLength(100);
+    expect(result.insights!.bySeverity.warning).toBe(100);
+    expect(result.insights!.bySeverity.critical).toBe(50);
+    expect(result.insights!.byType.content_decay).toHaveLength(120);
+    expect(result.insights!.byType.ranking_opportunity).toHaveLength(30);
+  });
+
   it('sorts insights by impactScore descending (highest first)', async () => {
     const insights = [
       { id: 'low', insightType: 'content_decay', severity: 'warning', impactScore: 10, data: {} },

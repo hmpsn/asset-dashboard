@@ -2,6 +2,8 @@ import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { validateTransition, CONTENT_REQUEST_TRANSITIONS } from './state-machines.js';
+import { invalidateContentPipelineCache } from './workspace-data.js';
+import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 
 export type { ContentRequestComment, ContentTopicRequest } from '../shared/types/content.ts';
 import type { ContentTopicRequest } from '../shared/types/content.ts';
@@ -170,6 +172,8 @@ export function createContentRequest(
     updated_at: request.updatedAt,
   });
 
+  invalidateContentRequestCaches(workspaceId);
+
   return request;
 }
 
@@ -210,11 +214,13 @@ export function updateContentRequest(
     comments: JSON.stringify(existing.comments || []),
     updated_at: existing.updatedAt,
   });
+  invalidateContentRequestCaches(workspaceId);
   return existing;
 }
 
 export function deleteContentRequest(workspaceId: string, id: string): boolean {
   const info = stmts().deleteById.run(id, workspaceId);
+  if (info.changes > 0) invalidateContentRequestCaches(workspaceId);
   return info.changes > 0;
 }
 
@@ -252,5 +258,11 @@ export function addComment(
     comments: JSON.stringify(existing.comments),
     updated_at: existing.updatedAt,
   });
+  invalidateContentRequestCaches(workspaceId);
   return existing;
+}
+
+function invalidateContentRequestCaches(workspaceId: string): void {
+  invalidateContentPipelineCache(workspaceId);
+  invalidateIntelligenceCache(workspaceId);
 }

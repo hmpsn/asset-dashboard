@@ -17,13 +17,13 @@ export async function assembleInsights(
     log.warn({ err, workspaceId }, 'assembleInsights: getInsights failed, returning empty slice');
   }
 
-  // Cap at 100, sorted by impact score descending (§13)
+  // Keep prompt-facing payload bounded, but compute rollups from the full set.
   const sorted = [...all].sort((a, b) => (b.impactScore ?? 0) - (a.impactScore ?? 0));
   const capped = sorted.slice(0, 100);
 
   // Group by type
   const byType: Partial<Record<InsightType, AnalyticsInsight[]>> = {};
-  for (const insight of capped) {
+  for (const insight of sorted) {
     const list = byType[insight.insightType] ?? [];
     list.push(insight);
     byType[insight.insightType] = list;
@@ -33,17 +33,17 @@ export async function assembleInsights(
   const bySeverity: Record<InsightSeverity, number> = {
     critical: 0, warning: 0, opportunity: 0, positive: 0,
   };
-  for (const insight of capped) {
+  for (const insight of sorted) {
     bySeverity[insight.severity] = (bySeverity[insight.severity] ?? 0) + 1;
   }
 
   // Top 10 by impact
-  const topByImpact = capped.slice(0, 10);
+  const topByImpact = sorted.slice(0, 10);
 
   // Page-specific filtering
   let forPage: AnalyticsInsight[] | undefined;
   if (opts?.pagePath) {
-    forPage = capped.filter(i => i.pageId ? matchPageIdentity(i.pageId, opts.pagePath!) : false);
+    forPage = sorted.filter(i => i.pageId ? matchPageIdentity(i.pageId, opts.pagePath!) : false);
   }
 
   return { all: capped, byType, bySeverity, topByImpact, forPage };
