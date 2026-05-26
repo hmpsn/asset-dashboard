@@ -127,7 +127,7 @@ export function SettingsPanel() {
   const unlinked = workspaces.filter(w => !w.webflowSiteId);
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8">
+    <div className="max-w-5xl mx-auto space-y-8">
       <div>
         <h2 className="t-h2 text-[var(--brand-text-bright)]">Settings</h2>
         <p className="t-caption mt-0.5 text-[var(--brand-text-muted)]">Account-level connections and configuration</p>

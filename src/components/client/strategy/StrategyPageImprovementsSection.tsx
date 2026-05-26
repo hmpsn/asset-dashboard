@@ -79,7 +79,7 @@ export function StrategyPageImprovementsSection({
               <Icon as={Zap} size="md" className="text-accent-warning" />
             </div>
             <div className="text-left">
-              <div className="t-ui font-medium text-[var(--brand-text-bright)]">Improve Pages</div>
+              <div className="t-body font-medium text-[var(--brand-text-bright)]">Improve Pages</div>
               <div className="t-caption-sm text-[var(--brand-text-muted)]">{totalPageImprovements} improvements across your site</div>
             </div>
           </div>
@@ -141,7 +141,7 @@ export function StrategyPageImprovementsSection({
                     <div key={page.pagePath} className="rounded-[var(--radius-lg)] bg-[var(--surface-1)]/50 border border-[var(--brand-border)]/80 p-3 flex flex-col hover:border-blue-500/30 transition-all">
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex-1 min-w-0">
-                          <div className="t-ui font-medium text-[var(--brand-text-bright)] truncate">{page.pageTitle || page.pagePath}</div>
+                          <div className="t-body font-medium text-[var(--brand-text-bright)] truncate">{page.pageTitle || page.pagePath}</div>
                           <div className="t-caption-sm text-[var(--brand-text-muted)] font-mono truncate">{page.pagePath}</div>
                         </div>
                         {page.hasImpressions && (

@@ -113,7 +113,7 @@ export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, c
         <div className="flex items-center gap-3 py-6 justify-center">
           <Icon as={Target} size="lg" className="text-[var(--brand-text-muted)]" />
           <div>
-            <p className="t-ui text-[var(--brand-text)]">Competitive Intelligence requires an SEO data provider</p>
+            <p className="t-body text-[var(--brand-text)]">Competitive Intelligence requires an SEO data provider</p>
             <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">Configure SEMRush or DataForSEO in Settings to unlock this feature.</p>
           </div>
         </div>
@@ -127,7 +127,7 @@ export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, c
         <div className="flex items-center gap-3 py-6 justify-center">
           <Icon as={Globe} size="lg" className="text-[var(--brand-text-muted)]" />
           <div>
-            <p className="t-ui text-[var(--brand-text)]">Add competitor domains above</p>
+            <p className="t-body text-[var(--brand-text)]">Add competitor domains above</p>
             <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">Enter competitors in Strategy Settings → Competitor Domains, then generate a strategy.</p>
           </div>
         </div>
@@ -140,7 +140,7 @@ export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, c
       <SectionCard>
         <div className="flex flex-col items-center justify-center py-10 gap-2">
           <Icon as={Loader2} size="lg" className="animate-spin text-teal-400" />
-          <p className="t-ui text-[var(--brand-text)]">Fetching competitive intelligence...</p>
+          <p className="t-body text-[var(--brand-text)]">Fetching competitive intelligence...</p>
           <p className="t-caption-sm text-[var(--brand-text-muted)]">Comparing domain metrics, keywords, and backlinks</p>
         </div>
       </SectionCard>
@@ -155,7 +155,7 @@ export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, c
     return (
       <SectionCard>
         <div className="text-center py-6">
-          <p className="t-ui text-red-400">{errorMsg}</p>
+          <p className="t-body text-red-400">{errorMsg}</p>
           <Button onClick={() => refetch()} variant="ghost" size="sm" className="mt-2 t-caption text-teal-400 hover:underline">
             Retry
           </Button>
@@ -183,7 +183,7 @@ export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, c
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Icon as={Target} size="md" className="text-teal-400" />
-          <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Competitive Intelligence</h3>
+          <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">Competitive Intelligence</h3>
         </div>
         <Button
           onClick={() => { queryClient.invalidateQueries({ queryKey: queryKeys.admin.competitorIntelAll(workspaceId) }); }}
@@ -220,7 +220,7 @@ export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, c
             >
               <Icon as={isExpanded ? ChevronDown : ChevronRight} size="sm" className="text-[var(--brand-text-muted)]" />
               <Icon as={Globe} size="md" className="text-orange-400" />
-              <span className="t-ui font-medium text-[var(--brand-text-bright)] flex-1 text-left">{comp.domain}</span>
+              <span className="t-body font-medium text-[var(--brand-text-bright)] flex-1 text-left">{comp.domain}</span>
               {compOv && (
                 <div className="flex items-center gap-4 t-caption-sm text-[var(--brand-text-muted)]">
                   <span>{fmtNum(compOv.organicTraffic)} traffic</span>
@@ -277,7 +277,7 @@ export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, c
           >
             <Icon as={expanded.has('gaps') ? ChevronDown : ChevronRight} size="sm" className="text-[var(--brand-text-muted)]" />
             <Icon as={Target} size="md" className="text-amber-400" />
-            <span className="t-ui font-medium text-[var(--brand-text-bright)] flex-1 text-left">Keyword Gaps</span>
+            <span className="t-body font-medium text-[var(--brand-text-bright)] flex-1 text-left">Keyword Gaps</span>
             {usingFallbackGaps && <span className="t-micro text-amber-500/70 px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20">from strategy</span>}
             <span className="t-caption-sm text-[var(--brand-text-muted)]">{effectiveGaps.length} opportunities</span>
           </ClickableRow>

@@ -300,7 +300,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
 
   if (!workspaceId) {
     return (
-      <div className="text-center py-16 text-[var(--brand-text-muted)] t-ui">
+      <div className="text-center py-16 text-[var(--brand-text-muted)] t-body">
         No workspace selected. Link a workspace to generate a keyword strategy.
       </div>
     );
@@ -665,7 +665,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         <SectionCard noPadding>
           <div className="px-6 py-12 text-center">
             <Icon as={Target} size="2xl" className="text-[var(--brand-text-muted)] mx-auto mb-3" />
-            <p className="t-ui text-[var(--brand-text)] mb-1">No keyword strategy yet</p>
+            <p className="t-body text-[var(--brand-text)] mb-1">No keyword strategy yet</p>
             <p className="t-caption-sm text-[var(--brand-text-muted)] max-w-md mx-auto">
               Generate an AI-powered keyword strategy based on your site's pages and Google Search Console data.
               This will map target keywords to each page and guide all future AI rewrites.

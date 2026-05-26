@@ -165,7 +165,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8">
+    <div className="max-w-5xl mx-auto space-y-8">
       {/* Header with editable name */}
       <div>
         {editingName ? (

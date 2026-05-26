@@ -57,7 +57,7 @@ export function BacklinkProfile({ workspaceId }: Props) {
   if (loading) {
     return (
       <SectionCard noPadding>
-        <div className="px-4 py-6 flex items-center justify-center gap-2 text-[var(--brand-text-muted)] t-ui">
+        <div className="px-4 py-6 flex items-center justify-center gap-2 text-[var(--brand-text-muted)] t-body">
           <Icon as={Loader2} size="md" className="animate-spin" /> Loading backlink profile…
         </div>
       </SectionCard>
@@ -99,7 +99,7 @@ export function BacklinkProfile({ workspaceId }: Props) {
     <div className="space-y-6">
       <div className="flex items-center gap-2 mb-1">
         <Icon as={Link2} size="md" className="text-teal-400" />
-        <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Backlink Profile</h3>
+        <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">Backlink Profile</h3>
         <span className="t-caption-sm text-[var(--brand-text-muted)] ml-1">{domain}</span>
       </div>
 
@@ -117,7 +117,7 @@ export function BacklinkProfile({ workspaceId }: Props) {
       {referringDomains.length > 0 && (
         <SectionCard noPadding>
           <div className="px-4 py-3">
-            <div className="t-ui font-medium text-[var(--brand-text-bright)] mb-3">Top Referring Domains</div>
+            <div className="t-body font-medium text-[var(--brand-text-bright)] mb-3">Top Referring Domains</div>
             <div className="overflow-x-auto">
               <table className="w-full t-caption">
                 <thead>

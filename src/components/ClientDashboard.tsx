@@ -512,7 +512,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-[var(--surface-1)] text-[var(--brand-text)]">
+    <div className="client-typography min-h-screen bg-[var(--surface-1)] text-[var(--brand-text)]">
       <header className="border-b border-[var(--brand-border)]">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-4">
           <Skeleton className="h-6 w-24" />
@@ -529,7 +529,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     </div>
   );
   if (error || !ws) return (
-    <div className="min-h-screen bg-[var(--surface-1)] flex items-center justify-center">
+    <div className="client-typography min-h-screen bg-[var(--surface-1)] flex items-center justify-center">
       <div className="text-center">
         <p className="text-accent-danger t-body mb-3">{error || 'Dashboard not found'}</p>
         <Button onClick={() => window.location.reload()} variant="secondary" size="sm">Try Again</Button>
@@ -539,53 +539,57 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
   // Password gate — smart login with auth mode detection
   if ((ws.requiresPassword || authMode?.hasClientUsers) && !authenticated) return (
-    <ClientAuthGate
-      workspaceId={workspaceId}
-      ws={ws}
-      authLoading={authLoading}
-      authError={authError}
-      authMode={authMode}
-      loginTab={loginTab}
-      loginEmail={loginEmail}
-      loginPassword={loginPassword}
-      loginView={loginView}
-      forgotEmail={forgotEmail}
-      forgotSent={forgotSent}
-      resetToken={resetToken}
-      resetPassword={resetPassword}
-      resetConfirm={resetConfirm}
-      resetDone={resetDone}
-      passwordInput={passwordInput}
-      turnstileReset={turnstileReset}
-      tokenRef={turnstileTokenRef}
-      setLoginTab={setLoginTab}
-      setLoginEmail={setLoginEmail}
-      setLoginPassword={setLoginPassword}
-      setLoginView={setLoginView}
-      setForgotEmail={setForgotEmail}
-      setForgotSent={setForgotSent}
-      setResetPassword={setResetPassword}
-      setResetConfirm={setResetConfirm}
-      setResetDone={setResetDone}
-      setPasswordInput={setPasswordInput}
-      setAuthError={setAuthError}
-      setAuthLoading={setAuthLoading}
-      setTurnstileReset={setTurnstileReset}
-      handlePasswordSubmit={handlePasswordSubmit}
-      handleClientUserLogin={handleClientUserLogin}
-    />
+    <div className="client-typography">
+      <ClientAuthGate
+        workspaceId={workspaceId}
+        ws={ws}
+        authLoading={authLoading}
+        authError={authError}
+        authMode={authMode}
+        loginTab={loginTab}
+        loginEmail={loginEmail}
+        loginPassword={loginPassword}
+        loginView={loginView}
+        forgotEmail={forgotEmail}
+        forgotSent={forgotSent}
+        resetToken={resetToken}
+        resetPassword={resetPassword}
+        resetConfirm={resetConfirm}
+        resetDone={resetDone}
+        passwordInput={passwordInput}
+        turnstileReset={turnstileReset}
+        tokenRef={turnstileTokenRef}
+        setLoginTab={setLoginTab}
+        setLoginEmail={setLoginEmail}
+        setLoginPassword={setLoginPassword}
+        setLoginView={setLoginView}
+        setForgotEmail={setForgotEmail}
+        setForgotSent={setForgotSent}
+        setResetPassword={setResetPassword}
+        setResetConfirm={setResetConfirm}
+        setResetDone={setResetDone}
+        setPasswordInput={setPasswordInput}
+        setAuthError={setAuthError}
+        setAuthLoading={setAuthLoading}
+        setTurnstileReset={setTurnstileReset}
+        handlePasswordSubmit={handlePasswordSubmit}
+        handleClientUserLogin={handleClientUserLogin}
+      />
+    </div>
   );
 
   const insights = getInsights();
 
   // Email capture gate UI — shown after password auth, before dashboard
   if (emailGateOpen && authenticated && !clientUser) return (
-    <EmailCaptureGate
-      workspaceId={workspaceId}
-      ws={ws}
-      onComplete={() => setEmailGateOpen(false)}
-      onSkip={() => setEmailGateOpen(false)}
-    />
+    <div className="client-typography">
+      <EmailCaptureGate
+        workspaceId={workspaceId}
+        ws={ws}
+        onComplete={() => setEmailGateOpen(false)}
+        onSkip={() => setEmailGateOpen(false)}
+      />
+    </div>
   );
 
   const pendingApprovals = approvalBatches.reduce((sum, b) => sum + b.items.filter(i => i.status === 'pending').length, 0);
@@ -617,13 +621,22 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     audit,
     contentPlanSummary,
   });
-  const activeTabLabel = NAV.find(item => item.id === tab)?.label ?? 'Dashboard';
+  const activeNavItem = NAV.find(item => item.id === tab);
+  const activeTabLabel = activeNavItem?.label ?? 'Dashboard';
+  const ActiveTabIcon = activeNavItem?.icon ?? Sparkles;
+  const activeTabSubtitle = tab === 'health' && auditDetail
+    ? `${auditDetail.audit.totalPages} pages · Last scanned ${new Date(auditDetail.createdAt).toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    })}`
+    : ws.name;
 
   return (
     <ErrorBoundary label="Client Dashboard">
     <BetaProvider value={betaMode}>
     <CartProvider>
-    <div className={`min-h-screen overflow-x-hidden bg-[var(--surface-1)] text-[var(--brand-text)] ${theme === 'light' ? 'dashboard-light' : ''}`}>
+    <div className={`client-typography min-h-screen overflow-x-hidden bg-[var(--surface-1)] text-[var(--brand-text)] ${theme === 'light' ? 'dashboard-light' : ''}`}>
       {!betaMode && !isExternalBilling && <SeoCartDrawer workspaceId={workspaceId} tier={effectiveTier} />}
 
       <ClientHeader
@@ -662,8 +675,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         <div className="space-y-8">
         <PageHeader
           title={activeTabLabel}
-          subtitle={ws.name}
-          icon={<Sparkles className="w-5 h-5 text-accent-brand" />}
+          subtitle={activeTabSubtitle}
+          icon={<Icon as={ActiveTabIcon} size="lg" className="text-accent-brand" />}
         />
 
         {/* Trial countdown banner — shows at day 10 and under */}
