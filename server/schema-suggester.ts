@@ -2,7 +2,6 @@ import { discoverSitemapUrls, resolveStaticPagePathsFromSitemap } from './webflo
 import { getWorkspacePages } from './workspace-data.js';
 import { listWorkspaces } from './workspaces.js';
 import { generateLeanSchema } from './schema/index.js';
-import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
 import type { ContentBrief } from '../shared/types/content.ts';
 import { fetchPageMeta } from './seo-audit.js';
 import { fetchPublishedHtml, resolvePagePath } from './helpers.js';
@@ -10,13 +9,14 @@ import { resolveBaseUrl } from './url-helpers.js';
 import { createAiBudget } from './schema/extractors/page-elements/ai-budget.js';
 import type { AiBudget } from './schema/extractors/page-elements/ai-budget.js';
 import { isFeatureEnabled } from './feature-flags.js';
+import { buildSchemaIntelligence } from './schema-intelligence.js';
 import { assembleSiteContext } from './schema/site-context.js';
 import type { SiteContext } from './schema/site-context.js';
 import { getPageTypes, getSchemaPlan } from './schema-store.js';
 import type { PageKind } from './schema/classifier.js';
 import type { SchemaPageRole } from '../shared/types/schema-plan.js';
 import type { SchemaGenerationDiagnostics } from '../shared/types/schema-generation.js';
-import { buildSiteInventory, isUtilitySchemaPath } from './schema/site-inventory.js';
+import { isUtilitySchemaPath } from './schema/site-inventory.js';
 import type { SchemaCmsDeliveryStatus, SchemaCollectionIdentity, SiteInventoryCmsItem, SiteInventorySlice } from '../shared/types/site-inventory.js';
 import type { WebflowPage } from './webflow-pages.js';
 
@@ -189,6 +189,25 @@ function findPlanRole(plan: ReturnType<typeof getSchemaPlan>, pagePath: string) 
   return plan?.pageRoles.find(pr => pathMatchesRolePath(pr.pagePath, pagePath));
 }
 
+async function readSchemaPageIntelligence(
+  siteId: string,
+  baseUrl: string,
+  pagePath: string,
+  tokenOverride?: string,
+) {
+  try {
+    return await buildSchemaIntelligence({
+      siteId,
+      siteBaseUrl: baseUrl,
+      pagePath,
+      tokenOverride,
+      includePageElements: true,
+    });
+  } catch { // catch-ok: schema generation can proceed without optional page intelligence
+    return undefined;
+  }
+}
+
 function resolveRoleOverride(opts: {
   siteId: string;
   pagePath: string;
@@ -308,10 +327,6 @@ export interface SchemaContext {
   _personasBlock?: string;  // Internal: audience personas for richer schema targeting
   _gscPageData?: { clicks: number; impressions: number; position: number; ctr: number };  // Internal: GSC per-page metrics
   _ga4PageData?: { pageviews: number; users: number; avgEngagementTime: number };  // Internal: GA4 per-page metrics
-  _pageHealthScore?: number;  // Internal: 0-100 from analytics intelligence layer
-  _pageHealthTrend?: 'improving' | 'declining' | 'stable';  // Internal: trend direction
-  _quickWinStatus?: boolean;  // Internal: is this page a quick-win candidate?
-  _faqOpportunities?: Array<{ query: string; impressions: number; position: number }>;  // Internal: question queries from GSC
   _businessProfile?: {  // Internal: verified business data — bypasses page-content verification checks
     phone?: string;
     email?: string;
@@ -327,68 +342,8 @@ export interface SchemaContext {
    *  Source: Workspace.siteHasSearch DB column. PR1 always reads as undefined
    *  (DB column defaults to 0 / false); PR2 ships the admin toggle UI. */
   _siteHasSearch?: boolean;
-  /** Site-level SERP features from SEO data provider — used to steer schema type selection. */
-  _serpFeatures?: { featuredSnippets: number; peopleAlsoAsk: number; localPack: boolean; videoCarousel: number };
-  /** Referring-domain count from backlink profile — used to calibrate schema ambition. */
-  _backlinkReferringDomains?: number;
   /** Validation errors from the prior schema generation for this page — used to avoid repeating known mistakes. */
   _existingErrors?: Array<{ message: string }>;
-}
-
-// ── Analytics Intelligence helpers for prompt enrichment ────────────
-
-const QUESTION_PREFIXES = /^(how|what|why|when|where|which|can|do|does|is|are|should|will|would)\b/i;
-
-/**
- * Extract question-type queries from GSC data that target a specific page.
- * These are FAQ candidates — questions people search to find this page.
- */
-export function extractFaqOpportunities(
-  queryPageData: Array<{ query: string; page: string; impressions: number; position: number }>,
-  pageUrl: string,
-): Array<{ query: string; impressions: number; position: number }> {
-  return queryPageData
-    .filter(row => row.page === pageUrl && QUESTION_PREFIXES.test(row.query))
-    .map(({ query, impressions, position }) => ({ query, impressions, position }))
-    .sort((a, b) => b.impressions - a.impressions)
-    .slice(0, 10);
-}
-
-/**
- * Build the intelligence enrichment block for the schema generation prompt.
- * Returns empty string if no intelligence data is available.
- */
-export function buildSchemaIntelligenceBlock(ctx: SchemaContext): string {
-  const lines: string[] = [];
-
-  if (ctx._pageHealthScore != null) {
-    const trend = ctx._pageHealthTrend ? ` (${ctx._pageHealthTrend})` : '';
-    lines.push(`- Page Health Score: ${ctx._pageHealthScore}/100${trend}`);
-  }
-
-  if (ctx._quickWinStatus === true) {
-    lines.push(`- Quick Win: Yes — this page is close to page 1 and worth extra schema richness`);
-  }
-
-  const faqBlock: string[] = [];
-  if (ctx._faqOpportunities && ctx._faqOpportunities.length > 0) {
-    faqBlock.push(`\nFAQ OPPORTUNITIES (question queries people use to find this page — do NOT auto-generate FAQ schema from these; surface as insight only):`);
-    for (const opp of ctx._faqOpportunities) {
-      faqBlock.push(`- "${opp.query}" (${opp.impressions.toLocaleString()} impressions, pos ${Math.round(opp.position)})`);
-    }
-  }
-
-  if (lines.length === 0 && faqBlock.length === 0) return '';
-
-  const parts: string[] = [];
-  if (lines.length > 0) {
-    parts.push(`\nANALYTICS INTELLIGENCE:\n${lines.join('\n')}`);
-  }
-  if (faqBlock.length > 0) {
-    parts.push(faqBlock.join('\n'));
-  }
-
-  return parts.join('\n');
 }
 
 // ── E-E-A-T extraction from content briefs ─────────────────────────
@@ -577,16 +532,14 @@ export async function generateSchemaForPage(
   const rawPages = wsId ? await getWorkspacePages(wsId, siteId) : [];
   const sitemapUrls = rawPages.length > 0 ? await discoverSitemapUrls(baseUrl) : [];
   const allPages = resolveStaticPagePathsFromSitemap(rawPages, sitemapUrls, baseUrl);
-  let siteInventory: SiteInventorySlice | undefined;
-  if (wsId) {
-    siteInventory = await buildSiteInventory({
+  let siteInventory: SiteInventorySlice | undefined = wsId
+    ? (await buildSchemaIntelligence({
       siteId,
-      baseUrl,
-      pages: allPages,
+      siteBaseUrl: baseUrl,
       tokenOverride,
-      businessProfile: ctx._businessProfile ?? null,
-    });
-  }
+      includeSiteInventory: true,
+    })).siteInventory
+    : undefined;
 
   const cmsItem = siteInventory?.cmsItems.find(item => item.pageId === pageId);
   if (cmsItem) {
@@ -606,18 +559,9 @@ export async function generateSchemaForPage(
       collectionRoleSource: cmsItem.roleSource,
       isCmsItem: true,
     });
-    let pageKeywords: { primary: string; secondary: string[] } | undefined;
-    if (wsId) {
-      try {
-        const perPageIntel = await buildWorkspaceIntelligence(wsId, { slices: ['seoContext'], pagePath: cmsItem.path });
-        if (perPageIntel?.seoContext?.pageKeywords) {
-          pageKeywords = {
-            primary: perPageIntel.seoContext.pageKeywords.primaryKeyword || '',
-            secondary: perPageIntel.seoContext.pageKeywords.secondaryKeywords || [],
-          };
-        }
-      } catch { /* intelligence not ready — pageKeywords stays undefined */ } // catch-ok
-    }
+    const pageIntel = wsId
+      ? await readSchemaPageIntelligence(siteId, baseUrl, cmsItem.path, tokenOverride)
+      : undefined;
     const aiBudget = allocateElementAiBudget();
     const lean = await generateLeanSchema({
       pageId: cmsItem.pageId,
@@ -632,7 +576,8 @@ export async function generateSchemaForPage(
         cmsFieldTargets: cmsItem.fieldTargets,
         fieldEvidence: cmsItem.fieldEvidence,
         serviceProfile: cmsItem.itemServiceProfile,
-        pageKeywords,
+        pageKeywords: pageIntel?.pageKeywords,
+        elements: pageIntel?.pageElements,
         sourcePublishedAt: cmsItem.lastPublished ?? null,
       },
       html: itemHtml || '',
@@ -717,18 +662,9 @@ export async function generateSchemaForPage(
   // Per-page slice fetch for pageKeywords (Audit Correction 4: pageKeywords is a PageKeywordMap
   // populated only when buildWorkspaceIntelligence is called with opts.pagePath).
   // 5-min LRU + single-flight dedup makes this cheap — no local cache needed.
-  let pageKeywords: { primary: string; secondary: string[] } | undefined;
-  if (ctx.workspaceId) {
-    try {
-      const perPageIntel = await buildWorkspaceIntelligence(ctx.workspaceId, { slices: ['seoContext'], pagePath: publishedPath });
-      if (perPageIntel?.seoContext?.pageKeywords) {
-        pageKeywords = {
-          primary: perPageIntel.seoContext.pageKeywords.primaryKeyword || '',
-          secondary: perPageIntel.seoContext.pageKeywords.secondaryKeywords || [],
-        };
-      }
-    } catch { /* intelligence not ready — pageKeywords stays undefined */ } // catch-ok
-  }
+  const pageIntel = ctx.workspaceId
+    ? await readSchemaPageIntelligence(siteId, baseUrl, publishedPath, tokenOverride)
+    : undefined;
 
   const aiBudget = allocateElementAiBudget();
   const lean = await generateLeanSchema({
@@ -742,7 +678,8 @@ export async function generateSchemaForPage(
       // The Webflow API may return these even though the local PageMeta interface omits them.
       lastPublished: (meta as unknown as Record<string, unknown>).lastPublished as string | undefined,
       createdOn: (meta as unknown as Record<string, unknown>).createdOn as string | undefined,
-      pageKeywords,
+      pageKeywords: pageIntel?.pageKeywords,
+      elements: pageIntel?.pageElements,
       // Static pages can carry a Webflow `lastPublished` timestamp too — pass
       // it through so isCatalogStale can drive lazy refresh on republish.
       // Falls back to null when the Webflow response omits the field.
@@ -793,13 +730,12 @@ export async function generateSchemaSuggestions(
   const latestPlan = getSchemaPlan(siteId);
   const activePlan = latestPlan?.status === 'active' ? latestPlan : null;
   const siteInventory = wsId
-    ? await buildSiteInventory({
+    ? (await buildSchemaIntelligence({
         siteId,
-        baseUrl,
-        pages,
         tokenOverride,
-        businessProfile: ctx._businessProfile ?? null,
-      })
+        siteBaseUrl: baseUrl,
+        includeSiteInventory: true,
+      })).siteInventory
     : undefined;
   const savedPageTypes = getPageTypes(siteId);
 
@@ -834,19 +770,9 @@ export async function generateSchemaSuggestions(
       persistedPageType: savedPageTypes[page.id] as SchemaPageType | undefined,
     });
 
-    // Per-page slice fetch for pageKeywords (5-min LRU + single-flight dedup — cheap).
-    let pageKeywords: { primary: string; secondary: string[] } | undefined;
-    if (wsId) {
-      try {
-        const perPageIntel = await buildWorkspaceIntelligence(wsId, { slices: ['seoContext'], pagePath: publishedPath });
-        if (perPageIntel?.seoContext?.pageKeywords) {
-          pageKeywords = {
-            primary: perPageIntel.seoContext.pageKeywords.primaryKeyword || '',
-            secondary: perPageIntel.seoContext.pageKeywords.secondaryKeywords || [],
-          };
-        }
-      } catch { /* intelligence not ready — pageKeywords stays undefined */ } // catch-ok
-    }
+    const pageIntel = wsId
+      ? await readSchemaPageIntelligence(siteId, baseUrl, publishedPath, tokenOverride)
+      : undefined;
 
     const lean = await generateLeanSchema({
       pageId: page.id,
@@ -855,7 +781,8 @@ export async function generateSchemaSuggestions(
         slug,
         publishedPath,
         seo: page.seo,
-        pageKeywords,
+        pageKeywords: pageIntel?.pageKeywords,
+        elements: pageIntel?.pageElements,
         // Pass Webflow `lastPublished` through when available — drives
         // isCatalogStale-based refresh on static-page republish. The
         // WebflowPage interface uses [key: string]: unknown so we read
@@ -914,19 +841,9 @@ export async function generateSchemaSuggestions(
         collectionRoleSource: item.roleSource,
         isCmsItem: true,
       });
-      // Per-page slice fetch for CMS item pageKeywords.
-      let cmsPageKeywords: { primary: string; secondary: string[] } | undefined;
-      if (wsId) {
-        try {
-          const cmsPerPageIntel = await buildWorkspaceIntelligence(wsId, { slices: ['seoContext'], pagePath: item.path });
-          if (cmsPerPageIntel?.seoContext?.pageKeywords) {
-            cmsPageKeywords = {
-              primary: cmsPerPageIntel.seoContext.pageKeywords.primaryKeyword || '',
-              secondary: cmsPerPageIntel.seoContext.pageKeywords.secondaryKeywords || [],
-            };
-          }
-        } catch { /* intelligence not ready — cmsPageKeywords stays undefined */ } // catch-ok
-      }
+      const cmsPageIntel = wsId
+        ? await readSchemaPageIntelligence(siteId, baseUrl, item.path, tokenOverride)
+        : undefined;
 
       const itemLean = await generateLeanSchema({
         pageId: item.pageId,
@@ -941,7 +858,8 @@ export async function generateSchemaSuggestions(
           cmsFieldTargets: item.fieldTargets,
           fieldEvidence: item.fieldEvidence,
           serviceProfile: item.itemServiceProfile,
-          pageKeywords: cmsPageKeywords,
+          pageKeywords: cmsPageIntel?.pageKeywords,
+          elements: cmsPageIntel?.pageElements,
           sourcePublishedAt: item.lastPublished ?? null, // CMS items carry Webflow lastPublished
         },
         html: itemHtml || '',

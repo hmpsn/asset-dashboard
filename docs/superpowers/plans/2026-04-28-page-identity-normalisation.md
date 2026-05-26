@@ -992,14 +992,16 @@ git commit -m "fix: use toCmsPageId canonical helper in all CMS pageId generator
 
 ---
 
-### Task 10: Add `_existingErrors` to SchemaContext and wire into all three injection points
+### Task 10: Add `_existingErrors` to SchemaContext and wire into schema generation context
 
 **Files:**
 - Modify: `server/schema-suggester.ts`
 
-Three injection points in the same file:
+Historical note: this schema prompt-block path was retired by Workspace Intelligence Consolidation PR4. Do not reintroduce `buildSchemaIntelligenceBlock`; future FAQ-from-GSC work should use a slice-backed schema intelligence helper.
+
+Superseded original injection points in the same file:
 1. `SchemaContext` interface — add the field
-2. `buildSchemaIntelligenceBlock` — add the output line
+2. `buildSchemaIntelligenceBlock` — retired in Workspace Intelligence Consolidation PR4
 3. `generateSchemaSuggestions` — build lookup map + wire into both loops
 4. `generateSchemaForPage` — single targeted lookup
 
@@ -1013,7 +1015,7 @@ Find the `SchemaContext` interface. Add after `_siteId`:
   _planContext?: string;
 ```
 
-- [ ] **Step 10.2: Wire into buildSchemaIntelligenceBlock (~line 228)**
+- [ ] **Step 10.2: Superseded — old `buildSchemaIntelligenceBlock` wiring removed**
 
 Find the function body. Add at the end (after the faqBlock logic, before the `return` statement — look for the return that joins lines):
 

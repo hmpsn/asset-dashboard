@@ -30,7 +30,7 @@ The spec lists 8 unused `SchemaContext._*` fields for deletion. Audit Q3 found t
 | `_pageAnalysis` | **DELETE** | No write, no read | Delete in PR1 |
 | `_architectureTree` | **PRESERVE** | Written 3 times: `server/jobs.ts:645`, `server/routes/webflow-schema.ts:123` and one other site. Reads not found via grep but writers indicate intentional staging for future use. Defer cleanup to a separate audit. | Keep declaration; no action |
 | `_existingErrors` | **PRESERVE** | Written once in `server/routes/webflow-schema.ts:116`. Test fixture references in `tests/integration/page-identity-pr2.test.ts`. Likely staged for a planned validator-error-deduplication feature. | Keep declaration; no action |
-| `_faqOpportunities` | **PRESERVE** | **Actively consumed** in `server/schema-suggester.ts:188–190` (FAQ enrichment branch). Tests reference it 5 times in `schema-intelligence-enrichment.test.ts`. Cannot delete. | Keep declaration; no action |
+| `_faqOpportunities` | **RETIRED** | Superseded by Workspace Intelligence Consolidation PR4 after schema generation moved to deterministic slice-backed page keywords/page elements and the old prompt block was removed. | Do not reintroduce the old field; revive FAQ-from-GSC through a slice-backed helper if needed |
 
 ### Correction 2: Migration tracker slice paths
 

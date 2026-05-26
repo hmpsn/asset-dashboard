@@ -14,6 +14,7 @@ import { validate, z } from '../middleware/validate.js';
 import { buildSchemaContext, normalizePageUrl } from '../helpers.js';
 import { getCachedArchitecture } from '../site-architecture.js';
 import { prepareBulkSchemaGenerationContext, prepareSinglePageSchemaGenerationContext } from '../schema-generation-context.js';
+import { buildSchemaIntelligence } from '../schema-intelligence.js';
 import { getSchemaSnapshot, getSiteTemplate, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, updateSchemaPlanStatus, updateSchemaPlanRoles, deleteSchemaPlan, deleteSchemaSnapshot, removePageFromSnapshot, getPageTypes, savePageType, recordSchemaPublish, getSchemaPublishHistory, getSchemaPublishEntry, getPublishDatesForSite, getSchemaCmsFieldMappings, saveSchemaCmsFieldMapping } from '../schema-store.js';
 import { generateSchemaSuggestions, generateSchemaForPage } from '../schema-suggester.js';
 import { generateSchemaPlan } from '../schema-plan.js';
@@ -32,10 +33,9 @@ import {
   publishSchemaToPage,
   retractSchemaFromPage,
 } from '../webflow.js';
-import { buildSiteInventory, detectSchemaFieldTarget, getRecommendedSchemaFieldSlug } from '../schema/site-inventory.js';
+import { detectSchemaFieldTarget, getRecommendedSchemaFieldSlug } from '../schema/site-inventory.js';
 import type { SchemaCmsDeliveryStatus, SchemaFieldTarget } from '../../shared/types/site-inventory.ts';
 import { listWorkspaces, getTokenForSite, updatePageState, getWorkspace, getClientPortalUrl } from '../workspaces.js';
-import { getWorkspaceAllPages } from '../workspace-data.js';
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
@@ -229,21 +229,14 @@ router.get('/api/webflow/schema-site-inventory/:siteId', requireWorkspaceSiteAcc
   try {
     const siteId = req.params.siteId;
     const token = getTokenForSite(siteId) || undefined;
-    const { ctx } = await buildSchemaContext(siteId);
-    const ws = ctx.workspaceId ? getWorkspace(ctx.workspaceId) : listWorkspaces().find(w => w.webflowSiteId === siteId);
-    const pages = ws ? await getWorkspaceAllPages(ws.id, siteId) : [];
-    const baseUrl = ctx.liveDomain
-      ? (ctx.liveDomain.startsWith('http') ? ctx.liveDomain : `https://${ctx.liveDomain}`)
-      : '';
-    if (!baseUrl) return res.status(400).json({ error: 'No live domain configured' });
-    const inventory = await buildSiteInventory({
+    const schemaIntel = await buildSchemaIntelligence({
       siteId,
-      baseUrl,
-      pages,
       tokenOverride: token,
-      businessProfile: ctx._businessProfile ?? null,
+      includeSiteInventory: true,
     });
-    res.json(inventory);
+    if (!schemaIntel?.baseUrl) return res.status(400).json({ error: 'No live domain configured' });
+    if (!schemaIntel.siteInventory) return res.status(404).json({ error: 'No workspace found for this site' });
+    res.json(schemaIntel.siteInventory);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     log.error({ detail: msg, err }, 'Schema site inventory error');
@@ -601,9 +594,11 @@ router.patch('/api/webflow/schema-template/:siteId', requireWorkspaceSiteAccessF
 // POST: generate a new schema plan for the site
 router.post('/api/webflow/schema-plan/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
-    const { ctx } = await buildSchemaContext(req.params.siteId);
-    const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+    const siteId = req.params.siteId;
+    const { ctx } = await buildSchemaContext(siteId);
+    const ws = listWorkspaces().find(w => w.webflowSiteId === siteId);
     if (!ws) return res.status(404).json({ error: 'No workspace found for this site' });
+    const schemaIntel = await buildSchemaIntelligence({ siteId });
 
     // Load architecture tree to avoid duplicate Webflow API + sitemap calls
     let architectureResult;
@@ -620,12 +615,12 @@ router.post('/api/webflow/schema-plan/:siteId', requireWorkspaceSiteAccessFromQu
       : [];
 
     const plan = await generateSchemaPlan({
-      siteId: req.params.siteId,
+      siteId,
       workspaceId: ws.id,
-      siteUrl: ctx.liveDomain ? `https://${ctx.liveDomain}` : '',
+      siteUrl: schemaIntel?.baseUrl ?? (ctx.liveDomain ? `https://${ctx.liveDomain}` : ''),
       companyName: ctx.companyName,
       businessContext: ctx.businessContext,
-      strategy: ws.keywordStrategy,
+      strategy: schemaIntel?.seoContext?.strategy,
       architectureResult,
       competitorDomains: ws.competitorDomains,
       ourSchemaTypes,

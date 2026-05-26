@@ -5,8 +5,6 @@
  *   - isWeakCmsPlanRole
  *   - shouldCollectionRoleOverridePlan (all branches)
  *   - pageKindForRole (blog-index special case)
- *   - extractFaqOpportunities (filtering, sorting, slicing)
- *   - buildSchemaIntelligenceBlock (all branches)
  *   - extractEeatFromBrief (regex extraction, null path)
  *   - buildSiteContextPages (merge logic, dedup, CMS skip)
  */
@@ -93,12 +91,9 @@ import {
   isWeakCmsPlanRole,
   shouldCollectionRoleOverridePlan,
   pageKindForRole,
-  extractFaqOpportunities,
-  buildSchemaIntelligenceBlock,
   extractEeatFromBrief,
   buildSiteContextPages,
 } from '../../server/schema-suggester.js';
-import type { SchemaContext } from '../../server/schema-suggester.js';
 import type { ContentBrief } from '../../shared/types/content.ts';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -351,157 +346,6 @@ describe('pageKindForRole', () => {
   it('handles trailing slash on blog index path', () => {
     // /blog/ should normalize to /blog and be treated as index
     expect(pageKindForRole('blog', '/blog/')).toBeUndefined();
-  });
-});
-
-// ── extractFaqOpportunities ───────────────────────────────────────────────────
-
-describe('extractFaqOpportunities', () => {
-  const pageUrl = 'https://example.com/services';
-
-  it('returns only question queries for the given page', () => {
-    const result = extractFaqOpportunities([
-      { query: 'how to do seo', page: pageUrl, impressions: 100, position: 5 },
-      { query: 'seo tips', page: pageUrl, impressions: 200, position: 3 },
-      { query: 'what is seo', page: 'https://example.com/about', impressions: 50, position: 2 },
-    ], pageUrl);
-
-    expect(result).toHaveLength(1);
-    expect(result[0].query).toBe('how to do seo');
-  });
-
-  it('filters out non-question queries', () => {
-    const result = extractFaqOpportunities([
-      { query: 'seo services', page: pageUrl, impressions: 500, position: 1 },
-      { query: 'best seo agency', page: pageUrl, impressions: 300, position: 2 },
-    ], pageUrl);
-
-    expect(result).toHaveLength(0);
-  });
-
-  it('accepts all supported question prefixes (top 10 returned due to slice)', () => {
-    const prefixes = ['how', 'what', 'why', 'when', 'where', 'which', 'can', 'do', 'does', 'is', 'are', 'should', 'will', 'would'];
-    const rows = prefixes.map((p, i) => ({
-      query: `${p} does this work`,
-      page: pageUrl,
-      impressions: 100 - i,
-      position: i + 1,
-    }));
-    const result = extractFaqOpportunities(rows, pageUrl);
-    // All 14 prefixes are question-type, but the function slices to top 10
-    expect(result).toHaveLength(10);
-    // Verify the first few are the highest-impression ones
-    expect(result[0].query).toBe('how does this work');
-    expect(result[0].impressions).toBe(100);
-  });
-
-  it('sorts by impressions descending', () => {
-    const result = extractFaqOpportunities([
-      { query: 'how to start', page: pageUrl, impressions: 50, position: 5 },
-      { query: 'what is this', page: pageUrl, impressions: 200, position: 3 },
-      { query: 'why use it', page: pageUrl, impressions: 100, position: 4 },
-    ], pageUrl);
-
-    expect(result[0].query).toBe('what is this');
-    expect(result[1].query).toBe('why use it');
-    expect(result[2].query).toBe('how to start');
-  });
-
-  it('limits results to 10 entries', () => {
-    const rows = Array.from({ length: 15 }, (_, i) => ({
-      query: `how to do thing ${i}`,
-      page: pageUrl,
-      impressions: 100 - i,
-      position: i + 1,
-    }));
-    const result = extractFaqOpportunities(rows, pageUrl);
-    expect(result).toHaveLength(10);
-  });
-
-  it('returns empty array for empty input', () => {
-    expect(extractFaqOpportunities([], pageUrl)).toEqual([]);
-  });
-
-  it('maps only query, impressions, position (drops page field)', () => {
-    const result = extractFaqOpportunities([
-      { query: 'how does this work', page: pageUrl, impressions: 99, position: 7.3 },
-    ], pageUrl);
-    expect(result[0]).toEqual({ query: 'how does this work', impressions: 99, position: 7.3 });
-    expect(result[0]).not.toHaveProperty('page');
-  });
-});
-
-// ── buildSchemaIntelligenceBlock ──────────────────────────────────────────────
-
-describe('buildSchemaIntelligenceBlock', () => {
-  it('returns empty string when no intelligence data', () => {
-    const ctx: SchemaContext = {};
-    expect(buildSchemaIntelligenceBlock(ctx)).toBe('');
-  });
-
-  it('includes page health score when present', () => {
-    const ctx: SchemaContext = { _pageHealthScore: 75 };
-    const block = buildSchemaIntelligenceBlock(ctx);
-    expect(block).toContain('75/100');
-    expect(block).toContain('ANALYTICS INTELLIGENCE');
-  });
-
-  it('includes trend direction when both score and trend are present', () => {
-    const ctx: SchemaContext = { _pageHealthScore: 60, _pageHealthTrend: 'improving' };
-    const block = buildSchemaIntelligenceBlock(ctx);
-    expect(block).toContain('(improving)');
-  });
-
-  it('omits trend part when only score is present (no trend)', () => {
-    const ctx: SchemaContext = { _pageHealthScore: 55 };
-    const block = buildSchemaIntelligenceBlock(ctx);
-    expect(block).not.toContain('(improving)');
-    expect(block).not.toContain('(declining)');
-    expect(block).not.toContain('(stable)');
-  });
-
-  it('includes quick win message when _quickWinStatus is true', () => {
-    const ctx: SchemaContext = { _quickWinStatus: true };
-    const block = buildSchemaIntelligenceBlock(ctx);
-    expect(block).toContain('Quick Win');
-    expect(block).toContain('page 1');
-  });
-
-  it('does not include quick win message when _quickWinStatus is false', () => {
-    const ctx: SchemaContext = { _quickWinStatus: false };
-    const block = buildSchemaIntelligenceBlock(ctx);
-    expect(block).toBe('');
-  });
-
-  it('includes FAQ opportunities block when present', () => {
-    const ctx: SchemaContext = {
-      _faqOpportunities: [
-        { query: 'how does this work', impressions: 500, position: 3.2 },
-        { query: 'what is the cost', impressions: 200, position: 7.1 },
-      ],
-    };
-    const block = buildSchemaIntelligenceBlock(ctx);
-    expect(block).toContain('FAQ OPPORTUNITIES');
-    expect(block).toContain('how does this work');
-    expect(block).toContain('500');
-    expect(block).toContain('pos 3');
-  });
-
-  it('returns empty string when faqOpportunities is empty array', () => {
-    const ctx: SchemaContext = { _faqOpportunities: [] };
-    expect(buildSchemaIntelligenceBlock(ctx)).toBe('');
-  });
-
-  it('combines health score and FAQ opportunities in same block', () => {
-    const ctx: SchemaContext = {
-      _pageHealthScore: 82,
-      _faqOpportunities: [{ query: 'how to start', impressions: 100, position: 4 }],
-    };
-    const block = buildSchemaIntelligenceBlock(ctx);
-    expect(block).toContain('ANALYTICS INTELLIGENCE');
-    expect(block).toContain('82/100');
-    expect(block).toContain('FAQ OPPORTUNITIES');
-    expect(block).toContain('how to start');
   });
 });
 

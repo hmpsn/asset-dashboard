@@ -8,6 +8,8 @@ Goal: make workspace intelligence the canonical, fresh, tested source of truth f
 
 Ship as one cleanup sprint with 5 phased PRs. PRs 1-3 are the minimum sprint target; PRs 4-5 follow after contract and slice correctness are stable. Every PR must include regression tests for the drift it fixes.
 
+PRs 4-5 are migration PRs toward the central workspace intelligence engine. Domain modules still own raw storage, writes, mutations, and workflow-specific evidence. The intelligence engine owns normalized, typed, fresh read models and prompt-ready context. New schema/AI reads should go through `buildWorkspaceIntelligence()`, `buildIntelPrompt()`, or the generation context builders unless there is a documented exception.
+
 ## Key Changes
 
 ### PR 1: Intelligence Contract + Guardrails

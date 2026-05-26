@@ -589,8 +589,9 @@
           "est": "6-10h",
           "priority": "P1",
           "owner": "schema",
-          "status": "pending",
-          "notes": "Route schema planning through resolved `seoContext.strategy`, add a schema intelligence wrapper that resolves workspace/site identity once, wire or remove dead schema intelligence fields, pass `enrichWithBacklinks: true` only where consumed, and consolidate page element freshness so schema generation and intelligence reads do not diverge. Include schema route/context tests and a guard against reintroducing raw `ws.keywordStrategy` into schema planning."
+          "status": "done",
+          "shippedAt": "2026-05-26",
+          "notes": "Completed in this PR. Added `buildSchemaIntelligence()` as the schema-owned wrapper over canonical workspace intelligence, routed schema planning through resolved `seoContext.strategy`, moved schema site inventory reads through the `siteInventory` slice, and threaded per-page `pageElements`/`pageKeywords` through the same wrapper. Consolidated site inventory freshness with sitemap-resolved static paths, removed the dormant schema analytics prompt block and unused backlink/health context fields, and kept backlink enrichment opt-in only for explicit consumers. Added wrapper, schema-context, generation-context, route contract, and existing schema workflow regression coverage."
         },
         {
           "id": "workspace-intel-pr5-ai-consumer-migration",
@@ -600,7 +601,7 @@
           "priority": "P1",
           "owner": "analytics-intelligence",
           "status": "pending",
-          "notes": "Migrate monthly digest, admin chat, content brief generation, voice calibration, AEO review, and alt-text paths away from one-off context assembly. Use canonical builders (`buildContentGenerationContext`, `buildRecommendationGenerationContext`, `buildIntelPrompt`) or a dedicated builder where needed, remove duplicate SEO/business/voice/learnings prompt blocks, and preserve caller-owned add-ons only for workflow-specific evidence. Strengthen prompt/context contract tests and the intelligence consumer inventory guard."
+          "notes": "Migration PR toward the central workspace intelligence engine: keep workflow-specific evidence caller-owned, but route workspace-derived AI context through canonical intelligence builders. Migrate monthly digest, admin chat, content brief generation, voice calibration, AEO review, and alt-text paths away from one-off context assembly. Use canonical builders (`buildContentGenerationContext`, `buildRecommendationGenerationContext`, `buildIntelPrompt`) or a dedicated builder where needed, remove duplicate SEO/business/voice/learnings prompt blocks, and preserve caller-owned add-ons only for workflow-specific evidence. Strengthen prompt/context contract tests and the intelligence consumer inventory guard."
         }
       ]
     },
@@ -745,7 +746,7 @@
           "priority": "P1",
           "sprint": "I",
           "status": "pending",
-          "notes": "Follow-up to lean-schema-rewrite. Re-injects the platform's intelligence layer surgically into schema generation: (1) Healthcare type escalation — workspace businessContext → Dentist/Physician/Optician/Chiropractor/MedicalClinic/etc. when address+phone+hours are present, falls back to LocalBusiness otherwise. (2) FAQ enrichment from GSC question queries — extractFaqOpportunities (already exists in analytics-intelligence.ts) feeds FAQPage when ≥3 question queries match a page. (3) E-E-A-T author injection from content brief — extractEeatFromBrief (already exists) populates Article.author with Person.knowsAbout, sameAs from the brief's expert profile. (4) Service serviceType from voice profile + business profile. Reuses existing intelligence wiring; the lean rewrite kept the data flow intact, this task adds surgical injection points to the templates."
+          "notes": "Follow-up to lean-schema-rewrite. Re-injects the platform's intelligence layer surgically into schema generation after the current deterministic schema path is stable: (1) Healthcare type escalation through canonical seoContext/business profile signals, falling back to LocalBusiness only when evidence supports it. (2) FAQ enrichment from GSC question queries via a new slice-backed helper if this feature is revived; the old unused extractFaqOpportunities/schema prompt block was removed in Workspace Intelligence Consolidation PR4. (3) E-E-A-T author injection from content brief evidence into Article.author with Person.knowsAbout/sameAs. (4) Service serviceType from voice profile + business profile. Any revived intelligence enrichment must flow through buildSchemaIntelligence() or another documented central intelligence builder, not direct raw workspace reads."
         }
       ]
     },

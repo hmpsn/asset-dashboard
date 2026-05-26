@@ -9,7 +9,7 @@ const log = createLogger('schema-generation-context');
 
 type SchemaContextBundle = Awaited<ReturnType<typeof buildSchemaContext>>;
 export async function prepareBulkSchemaGenerationContext(siteId: string): Promise<SchemaContextBundle> {
-  const context = await buildSchemaContext(siteId, { includeAnalytics: true });
+  const context = await buildSchemaContext(siteId);
   const { ctx } = context;
 
   if (ctx.workspaceId) {
@@ -24,7 +24,7 @@ export async function prepareSinglePageSchemaGenerationContext(
   pageId: string,
   pageType?: SchemaContext['pageType'],
 ): Promise<SchemaContextBundle> {
-  const context = await buildSchemaContext(siteId, { includeAnalytics: true });
+  const context = await buildSchemaContext(siteId);
   const { ctx } = context;
 
   if (pageType) ctx.pageType = pageType;
