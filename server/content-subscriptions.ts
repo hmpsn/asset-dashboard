@@ -11,6 +11,7 @@ import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { addActivity } from './activity-log.js';
 import { CONTENT_SUB_TRANSITIONS, validateTransition } from './state-machines.js';
+import { invalidateContentPipelineIntelligence } from './intelligence-freshness.js';
 import type { ContentSubscription, ContentSubPlan } from '../shared/types/content.js';
 
 const log = createLogger('content-subscriptions');
@@ -131,6 +132,7 @@ export function createContentSubscription(
     updated_at: now,
   };
   stmts().insert.run(row);
+  invalidateContentPipelineIntelligence(workspaceId);
   log.info(`Created content subscription: workspace=${workspaceId} plan=${data.plan} id=${id}`);
   addActivity(workspaceId, 'content_subscription', `Content subscription created: ${data.plan}`, '', { subscriptionId: id });
   return rowToSub(row as SubRow);
@@ -213,27 +215,30 @@ export function updateContentSubscription(
   const sql = `UPDATE content_subscriptions SET ${sets.join(', ')} WHERE id = @id AND workspace_id = @workspace_id`;
   const result = db.prepare(sql).run(values);
   if (result.changes === 0) return null;
+  invalidateContentPipelineIntelligence(workspaceId);
   return getContentSubscriptionForWorkspace(workspaceId, id);
 }
 
 export function deleteContentSubscription(workspaceId: string, id: string): boolean {
   const result = stmts().deleteById.run(id, workspaceId);
+  if (result.changes > 0) invalidateContentPipelineIntelligence(workspaceId);
   return result.changes > 0;
 }
 
 // ── Period management ──
 
 export function incrementDeliveredPosts(workspaceId: string, id: string, count = 1): void {
-  db.prepare(
+  const result = db.prepare(
     `UPDATE content_subscriptions
      SET posts_delivered_this_period = posts_delivered_this_period + ?,
          updated_at = ?
      WHERE id = ? AND workspace_id = ?`,
   ).run(count, new Date().toISOString(), id, workspaceId);
+  if (result.changes > 0) invalidateContentPipelineIntelligence(workspaceId);
 }
 
 export function resetPeriod(workspaceId: string, id: string, periodStart: string, periodEnd: string): void {
-  db.prepare(
+  const result = db.prepare(
     `UPDATE content_subscriptions
      SET posts_delivered_this_period = 0,
          current_period_start = ?,
@@ -241,5 +246,6 @@ export function resetPeriod(workspaceId: string, id: string, periodStart: string
          updated_at = ?
      WHERE id = ? AND workspace_id = ?`,
   ).run(periodStart, periodEnd, new Date().toISOString(), id, workspaceId);
+  if (result.changes > 0) invalidateContentPipelineIntelligence(workspaceId);
   log.info(`Reset period for subscription ${id}: ${periodStart} → ${periodEnd}`);
 }

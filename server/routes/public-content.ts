@@ -15,6 +15,7 @@ import {
 } from '../content-requests.js';
 import { notifyTeamContentRequest, notifyTeamChangesRequested } from '../email.js';
 import { getPost, updatePostField, snapshotPostVersion, getMostRecentPostVersion } from '../content-posts.js';
+import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
 import { normalizePageUrl, sanitizeString, validateEnum } from '../helpers.js';
 import { sanitizeRichText, sanitizePlainText } from '../html-sanitize.js';
 import { countHtmlWords } from '../content-posts-ai.js';
@@ -790,6 +791,7 @@ router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', valid
   if (shouldSnapshot) {
     addActivity(req.params.workspaceId, 'post_client_edit', `${actor?.name || 'Client'} edited post content for "${post.targetKeyword}"`, '', { postId: post.id }, actor);
   }
+  invalidateContentPipelineIntelligence(req.params.workspaceId);
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: updated.id, status: updated.status });
   res.json(updated);
 });

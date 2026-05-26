@@ -17,6 +17,7 @@ import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
+import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
 import {
   mutationError,
   runWorkspaceMutation,
@@ -29,6 +30,7 @@ const log = createLogger('routes:content-matrices');
 const router = Router();
 
 function notifyContentPlanUpdated(workspaceId: string, payload: Record<string, unknown>) {
+  invalidateContentPipelineIntelligence(workspaceId);
   broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, { domain: 'content-plan', ...payload });
 }
 

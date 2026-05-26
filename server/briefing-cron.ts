@@ -41,6 +41,7 @@ import {
 } from './briefing-store.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
+import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { addActivity } from './activity-log.js';
 import { notifyClientBriefingReady } from './email.js';
 import { computeROI } from './roi.js';
@@ -545,6 +546,7 @@ async function runBriefingForWorkspaceInner(
         undefined,
         { briefingId: published.id },
       );
+      invalidateIntelligenceCache(workspaceId);
       broadcastToWorkspace(workspaceId, WS_EVENTS.BRIEFING_PUBLISHED, {
         briefingId: published.id,
         weekOf,

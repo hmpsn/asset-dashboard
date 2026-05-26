@@ -14,6 +14,7 @@ import { broadcastToWorkspace } from '../../broadcast.js';
 import { getBrief, upsertBrief } from '../../content-brief.js';
 import { createContentRequest, getContentRequest, updateContentRequest } from '../../content-requests.js';
 import { getPost, savePost } from '../../content-posts-db.js';
+import { invalidateContentPipelineIntelligence } from '../../intelligence-freshness.js';
 import { buildContentGenerationContext } from '../../intelligence/generation-context-builders.js';
 import { createLogger } from '../../logger.js';
 import { WS_EVENTS } from '../../ws-events.js';
@@ -175,6 +176,7 @@ async function handleSaveBrief(
 
   const brief = buildBriefEntity(workspaceId, content, payload);
   upsertBrief(workspaceId, brief);
+  invalidateContentPipelineIntelligence(workspaceId);
   broadcastToWorkspace(workspaceId, WS_EVENTS.BRIEF_UPDATED, {
     workspaceId,
     briefId: brief.id,
@@ -314,6 +316,7 @@ async function handleSavePost(
     );
   }
   savePost(workspaceId, post);
+  invalidateContentPipelineIntelligence(workspaceId);
   broadcastToWorkspace(workspaceId, WS_EVENTS.POST_UPDATED, {
     workspaceId,
     postId: post.id,
@@ -442,6 +445,7 @@ async function handleSendToClient(
       const requestEvent = requestId === payload.parentRequestId
         ? WS_EVENTS.CONTENT_REQUEST_UPDATE
         : WS_EVENTS.CONTENT_REQUEST_CREATED;
+      invalidateContentPipelineIntelligence(workspaceId);
       broadcastToWorkspace(workspaceId, requestEvent, { id: requestId });
       broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, {
         action: 'mcp_brief_sent_to_client',
@@ -489,6 +493,7 @@ async function handleSendToClient(
     const requestEvent = requestId === payload.parentRequestId
       ? WS_EVENTS.CONTENT_REQUEST_UPDATE
       : WS_EVENTS.CONTENT_REQUEST_CREATED;
+    invalidateContentPipelineIntelligence(workspaceId);
     broadcastToWorkspace(workspaceId, requestEvent, { id: requestId });
     broadcastToWorkspace(workspaceId, WS_EVENTS.POST_UPDATED, {
       action: 'mcp_post_sent_to_client',
