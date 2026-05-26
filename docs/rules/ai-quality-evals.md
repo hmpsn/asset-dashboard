@@ -10,6 +10,7 @@ This project already has an AI reliability harness for pipeline wiring, provider
 - Use `npm run verify:ai-quality` for the deterministic fixture report.
 - Hard quality fixtures are reserved for authority, output-format, and evidence-contract breaks. Subjective prose quality stays advisory until a human has validated the signal.
 - Voice checks must rely on `buildSystemPrompt()`, `buildEffectiveBrandVoiceBlock()`, and the voice quality harness. Do not recreate voice authority logic in eval scripts.
+- Creative-copy checks should stay contract-level in CI: verify the intended writing-rule tier is present, duplicate prose layers are absent, and factual-safety/output-format rules remain intact. Judge "more creative" or "better voice" with human review or opt-in local evals, not default CI.
 - Live model evals, when added, must be opt-in local/manual tooling and must not run in default CI.
 
 ## Current Quality Dimensions

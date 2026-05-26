@@ -13,8 +13,8 @@ import { z } from 'zod';
 import type { ContentBrief } from './content-brief.js';
 import type { GeneratedPost } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
-import { WRITING_QUALITY_RULES } from './writing-quality.js';
-export { WRITING_QUALITY_RULES } from './writing-quality.js';
+import { CREATIVE_WRITING_RULES } from './writing-quality.js';
+export { CREATIVE_WRITING_RULES, WRITING_QUALITY_RULES } from './writing-quality.js';
 
 const log = createLogger('content-posts-ai');
 
@@ -360,7 +360,7 @@ UNIVERSAL REQUIREMENTS:
 - Write for humans first, search engines second
 - Stay within 150-200 words — do not exceed 250 under any circumstances
 
-${WRITING_QUALITY_RULES}
+${CREATIVE_WRITING_RULES}
 
 Return ONLY the opening HTML. No headings, no labels, no meta-commentary, no markdown.`;
 
@@ -368,6 +368,8 @@ Return ONLY the opening HTML. No headings, no labels, no meta-commentary, no mar
   const systemPrompt = buildSystemPrompt(
     workspaceId,
     `${role} Return only clean HTML for the introduction field requested by the user prompt. No markdown.`,
+    undefined,
+    { skipProseRules: true },
   );
   return callCreativeAI({
     systemPrompt,
@@ -453,7 +455,7 @@ UNIVERSAL REQUIREMENTS:
 - BRAND MENTIONS: Do NOT mention the business/brand by name in this section unless the section heading specifically references the business (e.g., "How [Brand] Helps..."). Body sections should teach — use "your dentist", "your provider", "your agency" instead of the brand name. For FAQ sections, answers should feel like neutral expert advice, not sales copy — use "your dental office" or "your provider" instead of the brand name
 - IMPORTANT: Competitor word counts in the SERP data are for reference only — YOUR word count target is ${sectionTarget} words for this section. Do not write more because competitors wrote more.
 
-${WRITING_QUALITY_RULES}
+${CREATIVE_WRITING_RULES}
 
 Return ONLY the section content in clean HTML (starting with <h2>). No labels, no meta-commentary, no markdown.`;
 
@@ -461,6 +463,8 @@ Return ONLY the section content in clean HTML (starting with <h2>). No labels, n
   const systemPrompt = buildSystemPrompt(
     workspaceId,
     `${role} Return only clean HTML for the section field requested by the user prompt. No markdown.`,
+    undefined,
+    { skipProseRules: true },
   );
   return callCreativeAI({
     systemPrompt,
@@ -514,7 +518,7 @@ UNIVERSAL REQUIREMENTS:
 - Write for humans first, search engines second
 - Do NOT simply restate the introduction in different words — add NEW value: a fresh insight, a specific next step, or a forward-looking perspective
 
-${WRITING_QUALITY_RULES}
+${CREATIVE_WRITING_RULES}
 
 Return ONLY the closing section in clean HTML (starting with <h2>). No labels, no meta-commentary, no markdown.`;
 
@@ -522,6 +526,8 @@ Return ONLY the closing section in clean HTML (starting with <h2>). No labels, n
   const systemPrompt = buildSystemPrompt(
     workspaceId,
     `${role} Return only clean HTML for the conclusion field requested by the user prompt. No markdown.`,
+    undefined,
+    { skipProseRules: true },
   );
   return callCreativeAI({
     systemPrompt,
@@ -687,6 +693,8 @@ RULES:
 - KEYWORD DENSITY CAP: No keyword phrase should appear more than 4 times in the full article. Count occurrences of each keyword from the brief. Where any exceeds 4, replace the excess with a synonym or rephrase to refer to the concept implicitly — do not simply delete the passage.
 - STRUCTURAL VARIETY: Review how each section is shaped (opening sentence type, prose vs. bullet list, example-first vs. definition-first, etc.). If more than 2 consecutive sections follow the same pattern, rewrite the middle one using a different approach — straight prose, an example-first opening, a comparison, or a short Q&A exchange. Variety should feel natural, not forced.
 
+${CREATIVE_WRITING_RULES}
+
 Return valid JSON with this exact structure (${post.sections.length} items in the sections array):
 {
   "introduction": "refined intro HTML (<p> tags, no heading)",
@@ -707,6 +715,8 @@ Return ONLY valid JSON, no markdown fences, no comments.`;
     systemPrompt: buildSystemPrompt(
       workspaceId,
       'You are a senior editor performing a cohesion and word-count review. Return only valid JSON.',
+      undefined,
+      { skipProseRules: true },
     ),
     userPrompt: prompt,
     maxTokens,

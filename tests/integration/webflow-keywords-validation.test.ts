@@ -12,7 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createTestContext } from './helpers.js';
 
-const ctx = createTestContext(13470); // port-ok: assigned range 13470-13484
+const ctx = createTestContext(13470, { env: { OPENAI_API_KEY: '' } }); // port-ok: assigned range 13470-13484
 const { postJson } = ctx;
 
 let workspaceId = '';
@@ -61,13 +61,15 @@ describe('POST /api/webflow/keyword-analysis', () => {
 
   it('reaches OPENAI_API_KEY check when pageTitle is present (500 in test env)', async () => {
     // pageTitle present → passes field guard, then hits OPENAI_API_KEY check
-    // In test environment OPENAI_API_KEY is typically unset → 500
+    // createTestContext clears OPENAI_API_KEY for the child server so local
+    // developer env vars cannot make this validation test perform a real provider call.
     const res = await postJson('/api/webflow/keyword-analysis', {
       workspaceId,
       pageTitle: 'SEO Services',
     });
-    // Either 500 (key not configured) or 200 (if key is set) — not 400
-    expect(res.status).not.toBe(400);
+    expect(res.status).toBe(500);
+    const body = await res.json() as { error: string };
+    expect(body.error).toMatch(/OPENAI_API_KEY not configured/i);
   });
 });
 

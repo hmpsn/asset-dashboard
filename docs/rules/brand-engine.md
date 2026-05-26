@@ -87,6 +87,18 @@ Layer 2 is a no-op when no `voice_profiles` row exists or when `status !== 'cali
 
 Layer 4 appends the universal prose quality rules by default. Use `{ skipProseRules: true }` only when the caller already includes the same rules or intentionally supplies a complete style system, such as copy generation paths that own richer writing-quality instructions. Do not skip Layer 4 just to save tokens.
 
+## Writing Rule Selection
+
+**File:** `server/writing-quality.ts`
+
+Use the smallest ruleset that protects the output contract:
+
+- `PROSE_QUALITY_RULES` — default Layer 4 guardrails for general prose callers through `buildSystemPrompt()`.
+- `CREATIVE_WRITING_RULES` — lean creative-copy contract for content posts and copy pipeline generation. It keeps factual safety and output discipline strict while avoiding a long wall of phrase bans.
+- `WRITING_QUALITY_RULES` — full legacy ruleset for paths that deliberately need exhaustive writing constraints.
+
+Callers that inject either `CREATIVE_WRITING_RULES` or `WRITING_QUALITY_RULES` into their own task prompt must call `buildSystemPrompt(..., { skipProseRules: true })`. This avoids double-weighting anti-generic-writing instructions and preserves room for brand voice, page-type guidance, and approved samples to shape the final copy.
+
 ## Voice Quality Contract Harness
 
 **File:** `tests/unit/voice-quality-contract-harness.test.ts`

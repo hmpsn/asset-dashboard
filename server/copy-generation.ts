@@ -17,7 +17,7 @@ import {
   formatKnowledgeBaseForPrompt,
 } from './workspace-intelligence.js';
 import { getActivePatterns } from './copy-intelligence.js';
-import { WRITING_QUALITY_RULES } from './writing-quality.js';
+import { CREATIVE_WRITING_RULES } from './writing-quality.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import db from './db/index.js';
 import {
@@ -259,7 +259,7 @@ export function runQualityCheck(
 ): QualityFlag[] {
   const flags: QualityFlag[] = [];
 
-  // 1. Forbidden phrases (drawn from WRITING_QUALITY_RULES and common AI clichés)
+  // 1. Forbidden phrases (drawn from the writing quality rules and common AI clichés)
   const forbiddenPhrases = [
     'cutting-edge',
     'seamlessly',
@@ -537,7 +537,7 @@ export async function buildCopyGenerationContext(
   // ── Layer 8: Generation Rules ──
   const pageTypeConfig = getPageTypeConfig(entry.pageType);
   const generationRules: string[] = [
-    WRITING_QUALITY_RULES,
+    CREATIVE_WRITING_RULES,
     `PAGE-TYPE GUIDANCE (${entry.pageType}):`,
     `- Word count range: ${pageTypeConfig.wordCountRange}`,
     `- Content style: ${pageTypeConfig.contentStyle}`,
