@@ -225,18 +225,12 @@ describe('ContentCalendar', () => {
 
   it('shows selected day detail panel when a calendar day is clicked', () => {
     renderContentCalendar();
-    // Click the day cell that contains today's date number
-    const todayDate = today.getDate().toString();
-    // The day cell contains date numbers — find any cell with today's date
-    // Today's number renders inside an amber span; regular days render directly
-    const dayCells = screen.getAllByRole('button').filter(b =>
-      b.textContent?.includes(todayDate) && b.className.includes('min-h'),
-    );
-    if (dayCells.length > 0) {
-      fireEvent.click(dayCells[0]);
-      // Detail panel appears
-      expect(screen.getByText(/item/i)).toBeInTheDocument();
-    }
+    const dayCells = screen.getAllByRole('button').filter(b => b.className.includes('min-h'));
+    const cellWithItem = dayCells.find(b => b.textContent?.includes('SEO Strategy Brief'));
+    expect(cellWithItem).toBeDefined();
+
+    fireEvent.click(cellWithItem!);
+    expect(screen.getByText('4 items')).toBeInTheDocument();
   });
 
   it('shows item label in selected day detail panel', () => {
@@ -244,10 +238,10 @@ describe('ContentCalendar', () => {
     const dayCells = screen.getAllByRole('button').filter(b => b.className.includes('min-h'));
     // Find a cell that contains our test item label
     const cellWithItem = dayCells.find(b => b.textContent?.includes('SEO Strategy Brief'));
-    if (cellWithItem) {
-      fireEvent.click(cellWithItem);
-      const panels = screen.getAllByText('SEO Strategy Brief');
-      expect(panels.length).toBeGreaterThan(0);
-    }
+    expect(cellWithItem).toBeDefined();
+
+    fireEvent.click(cellWithItem!);
+    const panels = screen.getAllByText('SEO Strategy Brief');
+    expect(panels.length).toBeGreaterThan(0);
   });
 });
