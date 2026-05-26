@@ -190,7 +190,8 @@ describe('DELETE /api/discovery/:workspaceId/sources/:id', () => {
     // Confirm it is gone from the list
     const list = await api(`/api/discovery/${WS_ID}/sources`);
     const sources = await list.json();
-    expect(sources.every((s: { id: string }) => s.id !== srcId)).toBe(true);
+    const remainingIds = sources.map((s: { id: string }) => s.id);
+    expect(remainingIds).not.toContain(srcId);
   });
 });
 
