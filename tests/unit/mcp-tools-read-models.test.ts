@@ -291,16 +291,10 @@ describe('mcp read-model tools', () => {
     const ok = await handleIntelligenceTool('get_workspace_intelligence', {
       workspaceId: 'ws-1',
       slices: ['insights', 'invalid-slice'],
-      pagePath: '/services',
-      siteId: 'site-1',
-      siteBaseUrl: 'https://example.com',
     });
     expect(ok.isError).toBeUndefined();
     expect(h.buildWorkspaceIntelligence).toHaveBeenCalledWith('ws-1', {
       slices: ['insights'],
-      pagePath: '/services',
-      siteId: 'site-1',
-      siteBaseUrl: 'https://example.com',
     });
 
     const invalidSlices = await handleIntelligenceTool('get_workspace_intelligence', {

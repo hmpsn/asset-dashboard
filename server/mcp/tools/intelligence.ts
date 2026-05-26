@@ -58,6 +58,10 @@ export async function handleIntelligenceTool(
     ? (args.slices as string[]).filter((s): s is IntelligenceSlice => ALL_INTELLIGENCE_SLICES.includes(s as IntelligenceSlice))
     : ALL_INTELLIGENCE_SLICES;
 
+  if (requestedSlices.length === 0) {
+    return { isError: true, content: [{ type: 'text' as const, text: 'No valid intelligence slices specified' }] };
+  }
+
   try {
     const ws = getWorkspace(workspaceId);
     if (!ws) {
