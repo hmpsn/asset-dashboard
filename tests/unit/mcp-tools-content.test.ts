@@ -402,4 +402,568 @@ describe('mcp content action tools', () => {
       expect.objectContaining({ id: parentRequestId }),
     );
   });
+
+  it('returns validation/workspace errors and unknown tool errors', async () => {
+    const invalid = await handleContentActionTool('save_brief', {
+      workspace_id: 'ws-1',
+    });
+    expect(invalid.isError).toBe(true);
+    expect(invalid.content[0].text).toContain('Validation failed');
+
+    (getWorkspace as ReturnType<typeof vi.fn>).mockReturnValueOnce(undefined);
+    const noWorkspace = await handleContentActionTool('prepare_brief_context', {
+      workspace_id: 'ws-missing',
+      topic: 'HVAC tips',
+      layout: { type: 'outline', structure: { sections: [{ heading: { level: 1, text: 'Intro' } }] } },
+    });
+    expect(noWorkspace.isError).toBe(true);
+    expect(noWorkspace.content[0].text).toContain('Workspace not found');
+
+    const unknown = await handleContentActionTool('unknown_content_action', { workspace_id: 'ws-1' });
+    expect(unknown.isError).toBe(true);
+    expect(unknown.content[0].text).toContain('Unknown content action tool');
+  });
+
+  it('returns context-build errors in prepare flows', async () => {
+    (buildContentGenerationContext as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('context failed'));
+    const briefCtx = await handleContentActionTool('prepare_brief_context', {
+      workspace_id: 'ws-1',
+      topic: 'HVAC tips',
+      layout: { type: 'outline', structure: { sections: [{ heading: { level: 1, text: 'Intro' } }] } },
+    });
+    expect(briefCtx.isError).toBe(true);
+    expect(briefCtx.content[0].text).toContain('Failed to prepare brief context: context failed');
+
+    (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'brief_1',
+      workspaceId: 'ws-1',
+      targetKeyword: 'hvac',
+    });
+    (buildContentGenerationContext as ReturnType<typeof vi.fn>).mockRejectedValueOnce('boom');
+    const postCtx = await handleContentActionTool('prepare_post_context', {
+      workspace_id: 'ws-1',
+      brief_id: 'brief_1',
+    });
+    expect(postCtx.isError).toBe(true);
+    expect(postCtx.content[0].text).toContain('Failed to prepare post context: boom');
+  });
+
+  it('returns handle and parent-request update failures for save paths', async () => {
+    const badBriefHandle = await handleContentActionTool('save_brief', {
+      workspace_id: 'ws-1',
+      brief_request_handle: 'brief-request_00000000-0000-0000-0000-000000000000',
+      content: {
+        targetKeyword: 'hvac tips',
+        secondaryKeywords: ['ac maintenance'],
+        suggestedTitle: 'Best HVAC Tips',
+        suggestedMetaDesc: 'Meta',
+        outline: [{ heading: 'H2', notes: 'n' }],
+        wordCountTarget: 1200,
+        intent: 'informational',
+        audience: 'homeowners',
+        competitorInsights: 'none',
+        internalLinkSuggestions: ['/a'],
+      },
+    });
+    expect(badBriefHandle.isError).toBe(true);
+
+    const preparedBrief = await handleContentActionTool('prepare_brief_context', {
+      workspace_id: 'ws-1',
+      topic: 'HVAC tips',
+      layout: { type: 'outline', structure: { sections: [{ heading: { level: 1, text: 'Intro' } }] } },
+    });
+    const preparedBriefPayload = JSON.parse(preparedBrief.content[0].text) as { brief_request_handle: string };
+    (updateContentRequest as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+      throw new Error('request write failed');
+    });
+    const failedParentBrief = await handleContentActionTool('save_brief', {
+      workspace_id: 'ws-1',
+      brief_request_handle: preparedBriefPayload.brief_request_handle,
+      parent_request_id: 'cr_parent',
+      content: {
+        targetKeyword: 'hvac tips',
+        secondaryKeywords: ['ac maintenance'],
+        suggestedTitle: 'Best HVAC Tips',
+        suggestedMetaDesc: 'Meta',
+        outline: [{ heading: 'H2', notes: 'n' }],
+        wordCountTarget: 1200,
+        intent: 'informational',
+        audience: 'homeowners',
+        competitorInsights: 'none',
+        internalLinkSuggestions: ['/a'],
+      },
+    });
+    expect(failedParentBrief.isError).toBe(true);
+    expect(failedParentBrief.content[0].text).toContain('Brief saved but failed to update parent request');
+
+    (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'brief_1',
+      workspaceId: 'ws-1',
+      targetKeyword: 'hvac',
+    });
+    const preparedPost = await handleContentActionTool('prepare_post_context', {
+      workspace_id: 'ws-1',
+      brief_id: 'brief_1',
+    });
+    const preparedPostPayload = JSON.parse(preparedPost.content[0].text) as { post_request_handle: string };
+    (updateContentRequest as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+      throw new Error('post parent write failed');
+    });
+    const failedParentPost = await handleContentActionTool('save_post', {
+      workspace_id: 'ws-1',
+      post_request_handle: preparedPostPayload.post_request_handle,
+      parent_request_id: 'cr_parent_post',
+      content: {
+        briefId: 'brief_1',
+        targetKeyword: 'hvac',
+        title: 'Post title',
+        metaDescription: 'Meta',
+        introduction: '<p>Intro</p>',
+        sections: [
+          {
+            index: 0,
+            heading: 'H2',
+            content: '<p>Body</p>',
+            wordCount: 100,
+            targetWordCount: 120,
+            keywords: ['hvac'],
+            status: 'done',
+          },
+        ],
+        conclusion: '<p>End</p>',
+        totalWordCount: 1000,
+        targetWordCount: 1200,
+      },
+    });
+    expect(failedParentPost.isError).toBe(true);
+    expect(failedParentPost.content[0].text).toContain('Post saved but failed to update parent request');
+  });
+
+  it('returns send_to_client failures for missing entities and invalid handles', async () => {
+    const invalidHandle = await handleContentActionTool('send_to_client', {
+      workspace_id: 'ws-1',
+      brief_handle: 'brief_00000000-0000-0000-0000-000000000000',
+      note: 'Please review',
+    });
+    expect(invalidHandle.isError).toBe(true);
+
+    const prepared = await handleContentActionTool('prepare_brief_context', {
+      workspace_id: 'ws-1',
+      topic: 'HVAC tips',
+      layout: { type: 'outline', structure: { sections: [{ heading: { level: 1, text: 'Intro' } }] } },
+    });
+    const preparedPayload = JSON.parse(prepared.content[0].text) as { brief_request_handle: string };
+    const saved = await handleContentActionTool('save_brief', {
+      workspace_id: 'ws-1',
+      brief_request_handle: preparedPayload.brief_request_handle,
+      content: {
+        targetKeyword: 'hvac tips',
+        secondaryKeywords: ['ac maintenance'],
+        suggestedTitle: 'Best HVAC Tips',
+        suggestedMetaDesc: 'Meta',
+        outline: [{ heading: 'H2', notes: 'n' }],
+        wordCountTarget: 1200,
+        intent: 'informational',
+        audience: 'homeowners',
+        competitorInsights: 'none',
+        internalLinkSuggestions: ['/a'],
+      },
+    });
+    const savedPayload = JSON.parse(saved.content[0].text) as { brief_handle: string };
+    (getBrief as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
+    const missingBrief = await handleContentActionTool('send_to_client', {
+      workspace_id: 'ws-1',
+      brief_handle: savedPayload.brief_handle,
+      note: 'Please review',
+    });
+    expect(missingBrief.isError).toBe(true);
+    expect(missingBrief.content[0].text).toContain('Brief not found');
+
+    (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'brief_1',
+      workspaceId: 'ws-1',
+      targetKeyword: 'hvac',
+    });
+    const preparedPost = await handleContentActionTool('prepare_post_context', {
+      workspace_id: 'ws-1',
+      brief_id: 'brief_1',
+    });
+    const preparedPostPayload = JSON.parse(preparedPost.content[0].text) as { post_request_handle: string };
+
+    const savedPost = await handleContentActionTool('save_post', {
+      workspace_id: 'ws-1',
+      post_request_handle: preparedPostPayload.post_request_handle,
+      content: {
+        briefId: 'brief_1',
+        targetKeyword: 'hvac',
+        title: 'Post title',
+        metaDescription: 'Meta',
+        introduction: '<p>Intro</p>',
+        sections: [
+          {
+            index: 0,
+            heading: 'H2',
+            content: '<p>Body</p>',
+            wordCount: 100,
+            targetWordCount: 120,
+            keywords: ['hvac'],
+            status: 'done',
+          },
+        ],
+        conclusion: '<p>End</p>',
+        totalWordCount: 1000,
+        targetWordCount: 1200,
+      },
+    });
+    if (!savedPost.isError) {
+      const postPayload = JSON.parse(savedPost.content[0].text) as { post_handle: string };
+      (getPost as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
+      const missingPost = await handleContentActionTool('send_to_client', {
+        workspace_id: 'ws-1',
+        post_handle: postPayload.post_handle,
+      });
+      expect(missingPost.isError).toBe(true);
+      expect(missingPost.content[0].text).toContain('Post not found');
+    }
+  });
+
+  it('normalizes brief outline notes and handles non-Error throws in brief paths', async () => {
+    (buildContentGenerationContext as ReturnType<typeof vi.fn>).mockRejectedValueOnce('plain-failure');
+    const prepFailure = await handleContentActionTool('prepare_brief_context', {
+      workspace_id: 'ws-1',
+      topic: 'HVAC tips',
+      layout: { type: 'outline', structure: { sections: [{ heading: { level: 1, text: 'Intro' } }] } },
+    });
+    expect(prepFailure.isError).toBe(true);
+    expect(prepFailure.content[0].text).toContain('Failed to prepare brief context: plain-failure');
+
+    const prepared = await handleContentActionTool('prepare_brief_context', {
+      workspace_id: 'ws-1',
+      topic: 'HVAC tips',
+      layout: { type: 'outline', structure: { sections: [{ heading: { level: 1, text: 'Intro' } }] } },
+    });
+    const preparedPayload = JSON.parse(prepared.content[0].text) as { brief_request_handle: string };
+
+    await handleContentActionTool('save_brief', {
+      workspace_id: 'ws-1',
+      brief_request_handle: preparedPayload.brief_request_handle,
+      content: {
+        targetKeyword: 'hvac tips',
+        secondaryKeywords: ['ac maintenance'],
+        suggestedTitle: 'Best HVAC Tips',
+        suggestedMetaDesc: 'Meta',
+        outline: [{ heading: 'H2' }],
+        wordCountTarget: 1200,
+        intent: 'informational',
+        audience: 'homeowners',
+        competitorInsights: 'none',
+        internalLinkSuggestions: ['/a'],
+      },
+    });
+    const savedBrief = (upsertBrief as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[1] as { outline: Array<{ notes: string }> };
+    expect(savedBrief.outline[0]?.notes).toBe('');
+
+    const preparedForParent = await handleContentActionTool('prepare_brief_context', {
+      workspace_id: 'ws-1',
+      topic: 'HVAC tips',
+      layout: { type: 'outline', structure: { sections: [{ heading: { level: 1, text: 'Intro' } }] } },
+    });
+    const preparedForParentPayload = JSON.parse(preparedForParent.content[0].text) as { brief_request_handle: string };
+
+    (updateContentRequest as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+      throw 'brief-parent-failed';
+    });
+    const failedParent = await handleContentActionTool('save_brief', {
+      workspace_id: 'ws-1',
+      brief_request_handle: preparedForParentPayload.brief_request_handle,
+      parent_request_id: 'cr_parent',
+      content: {
+        targetKeyword: 'hvac tips',
+        secondaryKeywords: ['ac maintenance'],
+        suggestedTitle: 'Best HVAC Tips',
+        suggestedMetaDesc: 'Meta',
+        outline: [{ heading: 'H2', notes: 'x' }],
+        wordCountTarget: 1200,
+        intent: 'informational',
+        audience: 'homeowners',
+        competitorInsights: 'none',
+        internalLinkSuggestions: ['/a'],
+      },
+    });
+    expect(failedParent.isError).toBe(true);
+    expect(failedParent.content[0].text).toContain('brief-parent-failed');
+  });
+
+  it('covers validation/workspace and catch branches for post paths', async () => {
+    const invalidPrepare = await handleContentActionTool('prepare_post_context', { workspace_id: 'ws-1' });
+    expect(invalidPrepare.isError).toBe(true);
+
+    const invalidSave = await handleContentActionTool('save_post', { workspace_id: 'ws-1' });
+    expect(invalidSave.isError).toBe(true);
+
+    (getWorkspace as ReturnType<typeof vi.fn>).mockReturnValueOnce(undefined);
+    const noWorkspacePrepare = await handleContentActionTool('prepare_post_context', {
+      workspace_id: 'ws-missing',
+      brief_id: 'brief_1',
+    });
+    expect(noWorkspacePrepare.isError).toBe(true);
+
+    (getWorkspace as ReturnType<typeof vi.fn>).mockReturnValueOnce(undefined);
+    const noWorkspaceSave = await handleContentActionTool('save_post', {
+      workspace_id: 'ws-missing',
+      post_request_handle: 'post-request_00000000-0000-0000-0000-000000000000',
+      content: {
+        briefId: 'brief_1',
+        targetKeyword: 'hvac',
+        title: 'Post title',
+        metaDescription: 'Meta',
+        introduction: '<p>Intro</p>',
+        sections: [
+          {
+            index: 0,
+            heading: 'H2',
+            content: '<p>Body</p>',
+            wordCount: 100,
+            targetWordCount: 120,
+            keywords: ['hvac'],
+            status: 'done',
+          },
+        ],
+        conclusion: '<p>End</p>',
+        totalWordCount: 1000,
+        targetWordCount: 1200,
+      },
+    });
+    expect(noWorkspaceSave.isError).toBe(true);
+
+    const badHandle = await handleContentActionTool('save_post', {
+      workspace_id: 'ws-1',
+      post_request_handle: 'post-request_00000000-0000-0000-0000-000000000000',
+      content: {
+        briefId: 'brief_1',
+        targetKeyword: 'hvac',
+        title: 'Post title',
+        metaDescription: 'Meta',
+        introduction: '<p>Intro</p>',
+        sections: [
+          {
+            index: 0,
+            heading: 'H2',
+            content: '<p>Body</p>',
+            wordCount: 100,
+            targetWordCount: 120,
+            keywords: ['hvac'],
+            status: 'done',
+          },
+        ],
+        conclusion: '<p>End</p>',
+        totalWordCount: 1000,
+        targetWordCount: 1200,
+      },
+    });
+    expect(badHandle.isError).toBe(true);
+
+    (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'brief_1',
+      workspaceId: 'ws-1',
+      targetKeyword: 'hvac',
+    });
+    const preparedPost = await handleContentActionTool('prepare_post_context', {
+      workspace_id: 'ws-1',
+      brief_id: 'brief_1',
+    });
+    const preparedPostPayload = JSON.parse(preparedPost.content[0].text) as { post_request_handle: string };
+    (updateContentRequest as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+      throw 'post-parent-failed';
+    });
+    const failedParent = await handleContentActionTool('save_post', {
+      workspace_id: 'ws-1',
+      post_request_handle: preparedPostPayload.post_request_handle,
+      parent_request_id: 'cr_parent',
+      content: {
+        briefId: 'brief_1',
+        targetKeyword: 'hvac',
+        title: 'Post title',
+        metaDescription: 'Meta',
+        introduction: '<p>Intro</p>',
+        sections: [
+          {
+            index: 0,
+            heading: 'H2',
+            content: '<p>Body</p>',
+            wordCount: 100,
+            targetWordCount: 120,
+            keywords: ['hvac'],
+            status: 'done',
+          },
+        ],
+        conclusion: '<p>End</p>',
+        totalWordCount: 1000,
+        targetWordCount: 1200,
+      },
+    });
+    expect(failedParent.isError).toBe(true);
+    expect(failedParent.content[0].text).toContain('post-parent-failed');
+  });
+
+  it('covers send_to_client validation/workspace and post-create request branches', async () => {
+    const invalid = await handleContentActionTool('send_to_client', { workspace_id: 'ws-1' });
+    expect(invalid.isError).toBe(true);
+
+    const preparedBrief = await handleContentActionTool('prepare_brief_context', {
+      workspace_id: 'ws-1',
+      topic: 'HVAC tips',
+      layout: { type: 'outline', structure: { sections: [{ heading: { level: 1, text: 'Intro' } }] } },
+    });
+    const preparedBriefPayload = JSON.parse(preparedBrief.content[0].text) as { brief_request_handle: string };
+    const savedBrief = await handleContentActionTool('save_brief', {
+      workspace_id: 'ws-1',
+      brief_request_handle: preparedBriefPayload.brief_request_handle,
+      content: {
+        targetKeyword: 'hvac tips',
+        secondaryKeywords: ['ac maintenance'],
+        suggestedTitle: 'Best HVAC Tips',
+        suggestedMetaDesc: 'Meta',
+        outline: [{ heading: 'H2', notes: 'n' }],
+        wordCountTarget: 1200,
+        intent: 'informational',
+        audience: 'homeowners',
+        competitorInsights: 'none',
+        internalLinkSuggestions: ['/a'],
+      },
+    });
+    const savedBriefPayload = JSON.parse(savedBrief.content[0].text) as { brief_handle: string };
+
+    (getWorkspace as ReturnType<typeof vi.fn>).mockReturnValueOnce(undefined);
+    const noWorkspace = await handleContentActionTool('send_to_client', {
+      workspace_id: 'ws-missing',
+      brief_handle: savedBriefPayload.brief_handle,
+    });
+    expect(noWorkspace.isError).toBe(true);
+    (getWorkspace as ReturnType<typeof vi.fn>).mockReturnValue({ id: 'ws-1', name: 'Workspace' });
+
+    (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'brief_1',
+      workspaceId: 'ws-1',
+      targetKeyword: 'hvac',
+    });
+    const preparedPost = await handleContentActionTool('prepare_post_context', {
+      workspace_id: 'ws-1',
+      brief_id: 'brief_1',
+    });
+    const preparedPostPayload = JSON.parse(preparedPost.content[0].text) as { post_request_handle: string };
+    const savedPost = await handleContentActionTool('save_post', {
+      workspace_id: 'ws-1',
+      post_request_handle: preparedPostPayload.post_request_handle,
+      content: {
+        briefId: 'brief_1',
+        targetKeyword: 'hvac',
+        title: 'Post title',
+        metaDescription: 'Meta',
+        introduction: '<p>Intro</p>',
+        sections: [
+          {
+            index: 0,
+            heading: 'H2',
+            content: '<p>Body</p>',
+            wordCount: 100,
+            targetWordCount: 120,
+            keywords: ['hvac'],
+            status: 'done',
+          },
+        ],
+        conclusion: '<p>End</p>',
+        totalWordCount: 1000,
+        targetWordCount: 1200,
+      },
+    });
+    expect(savedPost.isError).toBeUndefined();
+    const savedPostPayload = JSON.parse(savedPost.content[0].text) as { post_id: string; post_handle: string };
+    (getPost as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: savedPostPayload.post_id,
+      workspaceId: 'ws-1',
+      briefId: 'brief_1',
+      targetKeyword: 'hvac',
+      title: 'Post title',
+    });
+    (getContentRequest as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
+    const sent = await handleContentActionTool('send_to_client', {
+      workspace_id: 'ws-1',
+      post_handle: savedPostPayload.post_handle,
+      note: 'Please review',
+    });
+    expect(sent.isError).toBeUndefined();
+    expect(createContentRequest).toHaveBeenCalled();
+    expect(broadcastToWorkspace).toHaveBeenCalledWith(
+      'ws-1',
+      'content-request:created',
+      expect.objectContaining({ id: 'cr_1' }),
+    );
+  });
+
+  it('covers remaining prepare/save validation and send_to_client catch fallback', async () => {
+    const invalidPrepareBrief = await handleContentActionTool('prepare_brief_context', {});
+    expect(invalidPrepareBrief.isError).toBe(true);
+
+    (getWorkspace as ReturnType<typeof vi.fn>).mockReturnValueOnce(undefined);
+    const saveBriefNoWorkspace = await handleContentActionTool('save_brief', {
+      workspace_id: 'ws-missing',
+      brief_request_handle: 'brief-request_00000000-0000-0000-0000-000000000000',
+      content: {
+        targetKeyword: 'hvac tips',
+        secondaryKeywords: ['ac maintenance'],
+        suggestedTitle: 'Best HVAC Tips',
+        suggestedMetaDesc: 'Meta',
+        outline: [{ heading: 'H2', notes: 'n' }],
+        wordCountTarget: 1200,
+        intent: 'informational',
+        audience: 'homeowners',
+        competitorInsights: 'none',
+        internalLinkSuggestions: ['/a'],
+      },
+    });
+    expect(saveBriefNoWorkspace.isError).toBe(true);
+
+    const preparedBrief = await handleContentActionTool('prepare_brief_context', {
+      workspace_id: 'ws-1',
+      topic: 'HVAC tips',
+      layout: { type: 'outline', structure: { sections: [{ heading: { level: 1, text: 'Intro' } }] } },
+    });
+    const preparedBriefPayload = JSON.parse(preparedBrief.content[0].text) as { brief_request_handle: string };
+    const savedBrief = await handleContentActionTool('save_brief', {
+      workspace_id: 'ws-1',
+      brief_request_handle: preparedBriefPayload.brief_request_handle,
+      content: {
+        targetKeyword: 'hvac tips',
+        secondaryKeywords: ['ac maintenance'],
+        suggestedTitle: 'Best HVAC Tips',
+        suggestedMetaDesc: 'Meta',
+        outline: [{ heading: 'H2', notes: 'n' }],
+        wordCountTarget: 1200,
+        intent: 'informational',
+        audience: 'homeowners',
+        competitorInsights: 'none',
+        internalLinkSuggestions: ['/a'],
+      },
+    });
+    const savedBriefPayload = JSON.parse(savedBrief.content[0].text) as { brief_handle: string };
+
+    (createContentRequest as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+      throw 'send-to-client-exploded';
+    });
+    (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'brief_1',
+      suggestedTitle: 'Best HVAC Tips',
+      targetKeyword: 'hvac tips',
+      intent: 'informational',
+      pageType: 'blog',
+    });
+    const sendFailure = await handleContentActionTool('send_to_client', {
+      workspace_id: 'ws-1',
+      brief_handle: savedBriefPayload.brief_handle,
+      note: 'Please review',
+    });
+    expect(sendFailure.isError).toBe(true);
+    expect(sendFailure.content[0].text).toContain('send-to-client-exploded');
+  });
 });
