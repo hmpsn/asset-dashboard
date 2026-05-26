@@ -21,6 +21,10 @@ import { z } from 'zod';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
 import { buildOutcomeLearningStatusNote } from './outcome-learning-default-path.js';
+import {
+  getPageTypeOutlineContract,
+  getPageTypeOutlineGuidance,
+} from './page-type-copy-contract.js';
 
 const log = createLogger('content-brief');
 /** Strip markdown code fences and parse JSON from AI responses. Throws on invalid JSON. */
@@ -388,7 +392,7 @@ export const PAGE_TYPE_CONFIGS: Record<string, PageTypeConfig> = {
 - Include the city/region name naturally in headings and body
 - Structure: Local intro → Services in [Location] → Local proof/expertise → FAQ or fit notes → single contact CTA
 - Reference local landmarks, neighborhoods, service areas, clients, or address/contact facts only when provided by context
-- Do not mention NAP consistency, schema, citation cleanup, Google Business Profile hygiene, directory listings, or other SEO operations in public-facing copy
+- Do not include citation/directory housekeeping, address/phone consistency advice, search profile upkeep, structured-data operations, or other SEO operations in public-facing copy
 - Schema: LocalBusiness, FAQPage`,
   },
 
@@ -586,6 +590,138 @@ export function getPageTypeConfig(pageType?: string): PageTypeConfig {
   return PAGE_TYPE_CONFIGS.blog;
 }
 
+type BriefOutlineItem = ContentBrief['outline'][number];
+
+const CTA_SECTION_RE = /\b(cta|call to action|book|booking|discovery|contact|consultation|get started|next step|next steps|conclusion|closing|close)\b/i;
+
+const LOCATION_SEO_OPERATION_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/\bNAP consistency\b/gi, 'provided contact details'],
+  [/\bNAP\b/gi, 'contact details'],
+  [/\bschema markup\b/gi, 'provided page details'],
+  [/\bschema\b/gi, 'provided page details'],
+  [/\bcitation cleanup\b/gi, 'provided local proof'],
+  [/\bcitations?\b/gi, 'provided local proof'],
+  [/\bGoogle Business Profile hygiene\b/gi, 'provided local proof'],
+  [/\bGoogle Business Profile\b/gi, 'provided local proof'],
+  [/\bdirectory listings?\b/gi, 'provided local proof'],
+  [/\blocal SEO mechanics\b/gi, 'local buyer context'],
+  [/\blocal SEO operations\b/gi, 'local buyer context'],
+];
+
+function isConversionOutlinePageType(pageType?: string): boolean {
+  return Boolean(getPageTypeOutlineContract(pageType));
+}
+
+function isClosingOutlineSection(item: BriefOutlineItem): boolean {
+  return CTA_SECTION_RE.test(`${item.heading} ${item.notes}`);
+}
+
+function sanitizeLocationOutlineText(text: string): string {
+  return LOCATION_SEO_OPERATION_REPLACEMENTS.reduce(
+    (next, [pattern, replacement]) => next.replace(pattern, replacement),
+    text,
+  );
+}
+
+function sanitizeOutlineTextForPageType(text: string, pageType?: string): string {
+  const trimmed = text.trim();
+  if (pageType === 'location') return sanitizeLocationOutlineText(trimmed);
+  return trimmed;
+}
+
+function normalizeOutlineItem(item: BriefOutlineItem, pageType?: string): BriefOutlineItem {
+  const heading = sanitizeOutlineTextForPageType(item.heading, pageType);
+  const notes = sanitizeOutlineTextForPageType(item.notes, pageType);
+  const subheadings = item.subheadings
+    ?.map(h => sanitizeOutlineTextForPageType(h, pageType))
+    .filter(Boolean) ?? [];
+  const keywords = item.keywords?.map(k => k.trim()).filter(Boolean) ?? [];
+  const wordCount = Number.isFinite(item.wordCount)
+    ? Math.max(80, Math.round(Number(item.wordCount)))
+    : undefined;
+
+  return { heading, notes, subheadings, keywords, wordCount };
+}
+
+function pruneDuplicateClosingSections(items: BriefOutlineItem[]): BriefOutlineItem[] {
+  const closingIndexes = items
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => isClosingOutlineSection(item))
+    .map(({ index }) => index);
+
+  if (closingIndexes.length <= 1) return items;
+
+  const keepClosingIndex = closingIndexes[closingIndexes.length - 1];
+  return items.filter((_, index) => !closingIndexes.includes(index) || index === keepClosingIndex);
+}
+
+function clampOutlineSectionCount(items: BriefOutlineItem[], pageType?: string): BriefOutlineItem[] {
+  const contract = getPageTypeOutlineContract(pageType);
+  if (!contract || items.length <= contract.maxSections) return items;
+
+  const closingIndex = items.findIndex(isClosingOutlineSection);
+  if (closingIndex === -1) return items.slice(0, contract.maxSections);
+
+  const closing = items[closingIndex];
+  const nonClosing = items.filter((_, index) => index !== closingIndex);
+  return [...nonClosing.slice(0, contract.maxSections - 1), closing];
+}
+
+function normalizeConversionSubheadings(items: BriefOutlineItem[], pageType?: string): BriefOutlineItem[] {
+  const contract = getPageTypeOutlineContract(pageType);
+  if (!contract) return items;
+
+  return items.map(item => {
+    const isShortOrClosing = isClosingOutlineSection(item) || (item.wordCount ?? contract.targetWords) <= 160;
+    return {
+      ...item,
+      subheadings: isShortOrClosing ? [] : (item.subheadings ?? []).slice(0, contract.maxSubheadings),
+    };
+  });
+}
+
+function scaleOutlineWordCounts(items: BriefOutlineItem[], pageType?: string): BriefOutlineItem[] {
+  const contract = getPageTypeOutlineContract(pageType);
+  if (!contract || items.length === 0) return items;
+
+  const target = contract.targetWords;
+  const rawCounts = items.map(item => item.wordCount && item.wordCount > 0 ? item.wordCount : Math.round(target / items.length));
+  const total = rawCounts.reduce((sum, count) => sum + count, 0);
+  if (total >= contract.minWords && total <= contract.maxWords) {
+    return items.map((item, index) => ({ ...item, wordCount: rawCounts[index] }));
+  }
+
+  const ratio = target / Math.max(total, 1);
+  const scaledCounts = rawCounts.map(count => Math.max(100, Math.round(count * ratio)));
+  const scaledTotal = scaledCounts.reduce((sum, count) => sum + count, 0);
+  const adjustment = target - scaledTotal;
+  scaledCounts[scaledCounts.length - 1] = Math.max(100, scaledCounts[scaledCounts.length - 1] + adjustment);
+
+  return items.map((item, index) => ({ ...item, wordCount: scaledCounts[index] }));
+}
+
+export function normalizeOutlineForPageType(
+  outline: ContentBrief['outline'],
+  pageType?: string,
+): ContentBrief['outline'] {
+  const normalized = outline
+    .map(item => normalizeOutlineItem(item, pageType))
+    .filter(item => item.heading && item.notes);
+
+  if (!isConversionOutlinePageType(pageType)) return normalized;
+
+  return scaleOutlineWordCounts(
+    normalizeConversionSubheadings(
+      clampOutlineSectionCount(
+        pruneDuplicateClosingSections(normalized),
+        pageType,
+      ),
+      pageType,
+    ),
+    pageType,
+  );
+}
+
 function hasMeaningfulBuilderPromptContext(promptContext: string): boolean {
   return /##\s/.test(promptContext);
 }
@@ -640,6 +776,7 @@ export async function regenerateBrief(
   });
   const workspaceContextBlock = formatContentGenerationPromptBlock(promptContext);
   const ptConfig = getPageTypeConfig(existingBrief.pageType);
+  const outlineGuidance = getPageTypeOutlineGuidance(existingBrief.pageType);
 
   const previousBriefJson = JSON.stringify({
     suggestedTitle: existingBrief.suggestedTitle,
@@ -674,6 +811,10 @@ ${feedback}
 ${workspaceContextBlock}
 
 Please regenerate the ENTIRE brief incorporating the user's feedback. Keep everything that was good, improve what the user requested, and maintain all required fields.
+
+${outlineGuidance}
+
+For conversion pages, page type and word budget outrank brand/context expansion. Use brand context to choose wording, proof, and positioning; do not add extra sections because more brand context is available.
 
 Return the complete brief as valid JSON with these fields:
 {
@@ -732,8 +873,10 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     secondaryKeywords: (parsed.secondaryKeywords as string[]) || existingBrief.secondaryKeywords,
     suggestedTitle: (parsed.suggestedTitle as string) || existingBrief.suggestedTitle,
     suggestedMetaDesc: (parsed.suggestedMetaDesc as string) || existingBrief.suggestedMetaDesc,
-    outline: (parsed.outline as ContentBrief['outline']) || existingBrief.outline,
-    wordCountTarget: (parsed.wordCountTarget as number) || existingBrief.wordCountTarget,
+    outline: normalizeOutlineForPageType((parsed.outline as ContentBrief['outline']) || existingBrief.outline, existingBrief.pageType),
+    wordCountTarget: getPageTypeOutlineContract(existingBrief.pageType)?.targetWords
+      ?? (parsed.wordCountTarget as number)
+      ?? existingBrief.wordCountTarget,
     intent: (parsed.intent as string) || existingBrief.intent,
     audience: (parsed.audience as string) || existingBrief.audience,
     competitorInsights: (parsed.competitorInsights as string) || existingBrief.competitorInsights,
@@ -786,6 +929,7 @@ export async function regenerateOutline(
   });
   const workspaceContextBlock = formatContentGenerationPromptBlock(promptContext);
   const ptConfig = getPageTypeConfig(existingBrief.pageType);
+  const outlineGuidance = getPageTypeOutlineGuidance(existingBrief.pageType);
 
   const currentOutline = JSON.stringify(existingBrief.outline, null, 2);
 
@@ -806,18 +950,23 @@ ${currentOutline}
 ${feedback ? `User feedback on the outline:\n${feedback}\n` : ''}
 Generate a new outline that ${feedback ? 'addresses the feedback above' : 'takes a fresh approach to the topic structure'}.
 
+${outlineGuidance}
+
+For conversion pages, page type and word budget outrank brand/context expansion. Use brand context to choose wording, proof, and positioning; do not add extra sections because more brand context is available.
+
 Return ONLY valid JSON — an array of section objects:
 [
-  { "heading": "H2 heading text", "subheadings": ["H3 subtopic 1", "H3 subtopic 2"], "notes": "Detailed guidance (3-5 sentences)", "wordCount": ${ptConfig.avgSectionWords}, "keywords": ["keywords for this section"] }
+  { "heading": "H2 heading text", "subheadings": ["Optional H3 subtopic only when useful"], "notes": "Focused guidance for this section", "wordCount": ${ptConfig.avgSectionWords}, "keywords": ["keywords for this section"] }
 ]
 
 Rules:
 - The FIRST section must directly answer the query (ANSWER-FIRST for AEO)
 - ${ptConfig.sectionRange} sections total
-- Each section should have 2-4 subheadings
+- Blog, pillar, and resource outlines may use 2-4 subheadings for deep sections
+- Service, location, landing, and product outlines should use 0-2 subheadings per substantive section; short proof, contact, FAQ, and CTA sections should usually have none
 - Include secondary keywords: ${existingBrief.secondaryKeywords.join(', ')}
 - Do NOT use generic headings like "Introduction" or "Conclusion" — those are handled separately
-- Vary section types (how-to steps, comparisons, data tables, case studies, FAQs)`;
+- Vary section types only when the page type supports it; conversion pages should stay compact and conversion-led`;
 
   const systemPrompt = buildSystemPrompt(
     workspaceId,
@@ -880,7 +1029,7 @@ Rules:
     };
   });
 
-  const newOutline: ContentBrief['outline'] = normalizedItems;
+  const newOutline = normalizeOutlineForPageType(normalizedItems, existingBrief.pageType);
 
   // Update only the outline field
   const updated = updateBrief(workspaceId, briefId, { outline: newOutline });
@@ -1123,8 +1272,9 @@ The outline sections MUST match the following template sections in order. You ma
 
   // Page-type-specific instructions and configuration
   const ptConfig = getPageTypeConfig(context.pageType);
+  const outlineGuidance = getPageTypeOutlineGuidance(context.pageType);
   const pageTypeBlock = context.pageType && PAGE_TYPE_CONFIGS[context.pageType]
-    ? `\n\n${ptConfig.prompt}\n\nCONTENT STYLE: ${ptConfig.contentStyle}\n\nTailor ALL aspects of the brief (outline structure, word count, CTA, schema, content format) to this page type. The wordCountTarget MUST be approximately ${ptConfig.wordCountTarget} (range: ${ptConfig.wordCountRange} words). Do NOT default to 1800 words unless this is a blog post.`
+    ? `\n\n${ptConfig.prompt}\n\nCONTENT STYLE: ${ptConfig.contentStyle}\n\n${outlineGuidance}\n\nTailor ALL aspects of the brief (outline structure, word count, CTA, schema, content format) to this page type. The wordCountTarget MUST be approximately ${ptConfig.wordCountTarget} (range: ${ptConfig.wordCountRange} words). Do NOT default to 1800 words unless this is a blog post. For conversion pages, use brand context to choose wording, proof, and positioning; do not add extra sections because more brand context is available.`
     : '';
 
   let intelligenceBlock = '';
@@ -1170,7 +1320,7 @@ The outline sections MUST match the following template sections in order. You ma
   // Decay context — injected when this brief targets a page with declining search traffic
   const decayBlock = context.decayQueryContext ? `\n\n${context.decayQueryContext}` : '';
 
-  const prompt = `Generate a comprehensive, production-ready content brief for a new piece of content targeting the keyword "${targetKeyword}".${pageTypeBlock}
+  const prompt = `Generate a right-sized, production-ready content brief for a new piece of content targeting the keyword "${targetKeyword}".${pageTypeBlock}
 
 ${bizCtx ? `Business context: ${bizCtx}` : ''}
 
@@ -1191,7 +1341,7 @@ Generate a content brief in the following JSON format:
   "contentFormat": "The recommended format: guide, listicle, how-to, comparison, FAQ, case-study, pillar-page, or landing-page",
   "toneAndStyle": "Specific tone and style guidance for the writer (e.g., authoritative but approachable, data-driven, conversational)",
   "outline": [
-    { "heading": "H2 heading text", "subheadings": ["H3 subtopic 1", "H3 subtopic 2"], "notes": "Detailed guidance for this section: what to cover, key points, data to include (3-5 sentences)", "wordCount": ${ptConfig.avgSectionWords}, "keywords": ["keywords to naturally include in this section"] }
+    { "heading": "H2 heading text", "subheadings": ["Optional H3 subtopic only when useful"], "notes": "Focused guidance for this section: what to cover, proof to use, and what to avoid", "wordCount": ${ptConfig.avgSectionWords}, "keywords": ["keywords to naturally include in this section"] }
   ],
   "wordCountTarget": ${ptConfig.wordCountTarget},
   "intent": "Search intent (informational/transactional/navigational/commercial)",
@@ -1229,11 +1379,14 @@ Generate a content brief in the following JSON format:
 
 Requirements:
 - The outline should have ${ptConfig.sectionRange} sections with H2 headings, each with specific wordCount targets that sum to the total wordCountTarget (${ptConfig.wordCountRange} words)
-- Each outline section MUST include 2-3 subheadings (H3 topics) that break the section into scannable subtopics. These guide the writer to create well-structured, scannable content. Every section with 200+ words should have at least 2 subheadings
+- Blog, pillar, and resource outlines may include 2-3 subheadings in deep sections when useful for scanning
+- Service, location, landing, and product outlines should use 0-2 subheadings per substantive section. Short proof, contact, FAQ, and CTA sections should usually have no subheadings
+- Conversion-page outlines must stay compact: no duplicate CTA/conclusion/contact sections, no blog-style teaching sprawl, and no extra sections added because brand, business, or SEO context is available
 - Each outline section must include keywords to weave naturally into that section
 - Secondary keywords: 6-8 naturally related terms including long-tail variations
 - People Also Ask: 5 real questions searchers ask about this topic
 - Topical entities: 8+ specific concepts, terms, or entities to cover for topical authority
+- For service, location, landing, and product pages, keep PAA, entities, E-E-A-T guidance, checklist items, and schema recommendations compact and directly useful; do not let them expand the outline into an article
 - SERP analysis should reflect realistic analysis of what ranks for this keyword
 - difficultyScore: 1-100 based on estimated keyword competition
 - Make every section actionable and specific — a copywriter or AI tool should be able to write directly from this brief
@@ -1250,8 +1403,8 @@ Requirements:
 AEO (ANSWER ENGINE OPTIMIZATION) RULES — make content citeable by AI systems:
 - ANSWER-FIRST LAYOUT: The first outline section MUST be a direct-answer summary (2-3 sentences answering the core question, then key bullets). This is what LLMs extract as the cited snippet. Do NOT open with generic intros like "Welcome to…" or "In this guide…"
 - CITATION TARGETS: Include a note in the content checklist about citation density. For medical/health content: 1 citation per ~200 words. For business content: 1 citation per ~400 words. Prefer primary sources: journals, .gov, .edu, professional associations
-- DEFINITION BLOCKS: For any content with technical or specialized terms, recommend definition blocks in the outline notes: Term → 1-2 sentence definition → Common misconceptions → Related terms. These become cited snippets
-- COMPARISON TABLES: Where applicable, recommend comparison tables with measurable fields (costs, percentages, timeframes), stated units, footnotes/citations per row, and a "Data as of [date]" note. Vague adjective tables ("good", "better") are useless — use numbers
+- DEFINITION BLOCKS: For educational page types, recommend definition blocks for technical or specialized terms. For conversion pages, define terms briefly only when needed for buyer clarity
+- COMPARISON TABLES: Where applicable and useful for the page type, recommend comparison tables with measurable fields (costs, percentages, timeframes), stated units, footnotes/citations per row, and a "Data as of [date]" note. Vague adjective tables ("good", "better") are useless — use numbers
 - FAQ QUALITY: FAQ answers should be 30-80 words each. Each answer should link to a deeper section. Write real questions patients/customers ask, not keyword-stuffed variations
 - AUTHOR & DATE: Include in content checklist: "Add author byline with credentials" and "Add visible 'Last updated: [date]' below the title"
 
@@ -1263,7 +1416,7 @@ LANGUAGE RULES for the brief itself:
 
 Return ONLY valid JSON, no markdown fences, no explanation.`;
 
-  const systemInstructions = 'You are an expert SEO content strategist. Generate a comprehensive content brief as a JSON object. Return ONLY valid JSON matching the expected schema — no markdown fences, no explanation.';
+  const systemInstructions = 'You are an expert SEO content strategist. Generate a right-sized content brief as a JSON object. Return ONLY valid JSON matching the expected schema — no markdown fences, no explanation.';
   const systemPrompt = buildSystemPrompt(workspaceId, systemInstructions);
 
   const aiResult = await callAI({
@@ -1288,8 +1441,10 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     secondaryKeywords: (parsed.secondaryKeywords as string[]) || [],
     suggestedTitle: (parsed.suggestedTitle as string) || '',
     suggestedMetaDesc: (parsed.suggestedMetaDesc as string) || '',
-    outline: (parsed.outline as ContentBrief['outline']) || [],
-    wordCountTarget: (parsed.wordCountTarget as number) || 1500,
+    outline: normalizeOutlineForPageType((parsed.outline as ContentBrief['outline']) || [], context.pageType),
+    wordCountTarget: getPageTypeOutlineContract(context.pageType)?.targetWords
+      ?? (parsed.wordCountTarget as number)
+      ?? 1500,
     intent: (parsed.intent as string) || 'informational',
     audience: (parsed.audience as string) || '',
     competitorInsights: (parsed.competitorInsights as string) || '',
