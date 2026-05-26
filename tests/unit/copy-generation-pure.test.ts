@@ -651,6 +651,20 @@ describe('buildCopyGenerationContext — output structure', () => {
     expect(ctx).toContain('MOCK CREATIVE WRITING RULES');
     expect(ctx).not.toContain('MOCK WRITING QUALITY RULES');
   });
+
+  it('includes the brand context priority hierarchy in generation rules', async () => {
+    const ctx = await buildCopyGenerationContext(WORKSPACE_ID, makeBlueprint(), makeEntry());
+    expect(ctx).toContain('BRAND CONTEXT PRIORITY');
+    expect(ctx).toContain('Page type, conversion goal, and word budget outrank style preferences');
+    expect(ctx).toContain('do not expand the page because more brand context is available');
+  });
+
+  it('includes service page density contract in generation rules', async () => {
+    const ctx = await buildCopyGenerationContext(WORKSPACE_ID, makeBlueprint(), makeEntry({ pageType: 'service' }));
+    expect(ctx).toContain('PAGE-TYPE COPY CONTRACT (service)');
+    expect(ctx).toContain('Conversion-dense service page, not a long educational article');
+    expect(ctx).toContain('Do not add duplicate booking/discovery sections');
+  });
 });
 
 // ── buildCopyGenerationContext — graceful degradation ────────────────────────

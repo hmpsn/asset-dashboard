@@ -54,6 +54,9 @@ function renderWithWrapper(ui: React.ReactElement) {
 
 // ── Shared fixtures ──────────────────────────────────────────────────────────
 
+// Midday UTC keeps locale-based date formatting stable in US time zones.
+const MAY_1_2026_ISO = '2026-05-01T12:00:00Z';
+
 const bulkDecision: NormalizedDecision = {
   id: 'ab-1',
   source: 'approval_batch',
@@ -64,7 +67,7 @@ const bulkDecision: NormalizedDecision = {
   itemCount: 3,
   isSingleAction: false,
   badge: 'SEO Editor',
-  createdAt: '2026-05-01T00:00:00Z',
+  createdAt: MAY_1_2026_ISO,
 };
 
 const highPriorityBulkDecision: NormalizedDecision = {
@@ -85,7 +88,7 @@ const singleDecision: NormalizedDecision = {
   itemCount: 1,
   isSingleAction: true,
   badge: 'Content Decay',
-  createdAt: '2026-05-01T00:00:00Z',
+  createdAt: MAY_1_2026_ISO,
 };
 
 const makeItem = (overrides: Partial<ApprovalItem> = {}): ApprovalItem => ({
@@ -97,8 +100,8 @@ const makeItem = (overrides: Partial<ApprovalItem> = {}): ApprovalItem => ({
   currentValue: 'Old Title',
   proposedValue: 'New Title',
   status: 'pending',
-  createdAt: '2026-05-01T00:00:00Z',
-  updatedAt: '2026-05-01T00:00:00Z',
+  createdAt: MAY_1_2026_ISO,
+  updatedAt: MAY_1_2026_ISO,
   ...overrides,
 });
 
@@ -113,8 +116,8 @@ const mockBatch: ApprovalBatch = {
     makeItem({ id: 'i2', pageId: 'p2', pageTitle: 'About', pageSlug: '/about', field: 'seoDescription', currentValue: 'Old desc', proposedValue: 'New desc' }),
     makeItem({ id: 'i3', pageId: 'p3', pageTitle: 'Services', pageSlug: '/services', field: 'seoTitle', currentValue: 'Old svc', proposedValue: 'New svc' }),
   ],
-  createdAt: '2026-05-01T00:00:00Z',
-  updatedAt: '2026-05-01T00:00:00Z',
+  createdAt: MAY_1_2026_ISO,
+  updatedAt: MAY_1_2026_ISO,
 };
 
 const aeoAction: ClientAction = {
@@ -130,8 +133,8 @@ const aeoAction: ClientAction = {
   },
   status: 'pending',
   priority: 'medium',
-  createdAt: '2026-05-01T00:00:00Z',
-  updatedAt: '2026-05-01T00:00:00Z',
+  createdAt: MAY_1_2026_ISO,
+  updatedAt: MAY_1_2026_ISO,
 };
 
 const internalLinkAction: ClientAction = {
@@ -147,8 +150,8 @@ const internalLinkAction: ClientAction = {
   },
   status: 'pending',
   priority: 'low',
-  createdAt: '2026-05-01T00:00:00Z',
-  updatedAt: '2026-05-01T00:00:00Z',
+  createdAt: MAY_1_2026_ISO,
+  updatedAt: MAY_1_2026_ISO,
 };
 
 const redirectAction: ClientAction = {
@@ -162,8 +165,8 @@ const redirectAction: ClientAction = {
   },
   status: 'pending',
   priority: 'low',
-  createdAt: '2026-05-01T00:00:00Z',
-  updatedAt: '2026-05-01T00:00:00Z',
+  createdAt: MAY_1_2026_ISO,
+  updatedAt: MAY_1_2026_ISO,
 };
 
 // ════════════════════════════════════════════════════════════════════════════

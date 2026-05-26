@@ -132,6 +132,30 @@ describe('unifyPost', () => {
     }));
   });
 
+  it('adds density review and SEO-mechanics removal rules for location pages', async () => {
+    const longPost = {
+      ...makePost(),
+      introduction: `<p>${'intro '.repeat(120)}</p>`,
+      sections: [{
+        ...makePost().sections[0],
+        content: `<h2>Section</h2><p>${'body '.repeat(260)}</p>`,
+        wordCount: 260,
+        targetWordCount: 280,
+      }],
+      conclusion: `<h2>Next Steps</h2><p>${'outro '.repeat(80)}</p>`,
+    };
+    callAIMock.mockResolvedValueOnce({
+      text: '{"introduction":"<p>Unified intro</p>","sections":["<h2>Section</h2><p>Unified body</p>"],"conclusion":"<h2>Next Steps</h2><p>Unified outro</p>"}',
+    });
+
+    await unifyPost(longPost, { ...makeBrief(), pageType: 'location' }, 'VOICE CONTEXT', 'ws_test');
+    const prompt = JSON.stringify(callAIMock.mock.calls[0]?.[0] ?? {});
+    expect(prompt).toContain('PAGE-TYPE DENSITY REVIEW REQUIRED');
+    expect(prompt).toContain('PAGE-TYPE COPY CONTRACT (location)');
+    expect(prompt).toContain('remove reader-facing SEO mechanics');
+    expect(prompt).toContain('NAP consistency');
+  });
+
   it('returns null when structured output has the wrong shape', async () => {
     const longPost = {
       ...makePost(),
