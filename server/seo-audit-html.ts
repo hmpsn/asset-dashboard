@@ -63,13 +63,17 @@ export function stripHiddenElements(html: string): string {
   }
 
   // Apply removals in reverse order to preserve offsets
-  if (removals.length === 0) return html;
   let result = html;
-  for (let i = removals.length - 1; i >= 0; i--) {
-    result = result.slice(0, removals[i][0]) + result.slice(removals[i][1]);
+  if (removals.length > 0) {
+    for (let i = removals.length - 1; i >= 0; i--) {
+      result = result.slice(0, removals[i][0]) + result.slice(removals[i][1]);
+    }
   }
 
-  // Also strip void elements (img, input, etc.) with hidden attributes
+  // Also strip void elements (img, input, etc.) with hidden attributes.
+  // This must run unconditionally — not guarded by removals.length — so that
+  // pages containing only hidden void elements (no block-level hidden elements)
+  // are still cleaned correctly.
   return result.replace(/<(?:img|input|hr|br)\b[^>]*(?:style\s*=\s*["'][^"']*display\s*:\s*none[^"']*["']|class\s*=\s*["'][^"']*w-condition-invisible[^"']*["'])[^>]*\/?>/gi, '');
 }
 
