@@ -11,6 +11,17 @@ export const AI_CRITICAL_PIPELINE_IDS = [
 
 export type AiCriticalPipelineId = (typeof AI_CRITICAL_PIPELINE_IDS)[number];
 
+export const AI_QUALITY_PIPELINE_IDS = [
+  'brand-voice-provenance',
+  'content-brief-review',
+  'seo-editor-assist',
+  'diagnostic-synthesis',
+  'admin-insights-chat',
+  'client-search-chat',
+] as const;
+
+export type AiQualityPipelineId = (typeof AI_QUALITY_PIPELINE_IDS)[number];
+
 export type AiReliabilityFailureClass =
   | 'invalid_output'
   | 'timeout'
@@ -61,6 +72,24 @@ export type AiReliabilityScenario = {
   pipelineId: AiCriticalPipelineId;
   title: string;
   failureClass: AiReliabilityFailureClass;
+  severity: AiScenarioSeverity;
+  evidenceFiles: string[];
+  assertions: AiReliabilityScenarioAssertion[];
+  notes: string;
+};
+
+export type AiQualityDimension =
+  | 'voice_authority'
+  | 'output_format'
+  | 'prose_quality'
+  | 'evidence_grounding'
+  | 'duplication_risk';
+
+export type AiQualityFixture = {
+  id: string;
+  pipelineId: AiQualityPipelineId;
+  title: string;
+  dimension: AiQualityDimension;
   severity: AiScenarioSeverity;
   evidenceFiles: string[];
   assertions: AiReliabilityScenarioAssertion[];

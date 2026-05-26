@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { AI_CRITICAL_PIPELINE_IDS } from '../../shared/types/ai-reliability.js';
 import {
   AI_CRITICAL_PIPELINE_TRACES,
+  AI_QUALITY_FIXTURES,
   AI_RELIABILITY_SCENARIOS,
 } from '../../scripts/ai-reliability-registry.js';
 import {
@@ -32,6 +33,13 @@ describe('ai reliability harness', () => {
     for (const score of report.pipelineScores) {
       expect(score.total, `${score.pipelineId} scenario total`).toBeGreaterThan(0);
     }
+  });
+
+  it('defines deterministic quality fixtures for the quality-targeted pipelines', () => {
+    expect(AI_QUALITY_FIXTURES.length).toBeGreaterThan(0);
+    expect(AI_QUALITY_FIXTURES.map(fixture => fixture.pipelineId)).toContain('brand-voice-provenance');
+    expect(AI_QUALITY_FIXTURES.map(fixture => fixture.dimension)).toContain('voice_authority');
+    expect(AI_QUALITY_FIXTURES.map(fixture => fixture.dimension)).toContain('output_format');
   });
 
   it('marks missing evidence as hard failures for hard scenarios', () => {
