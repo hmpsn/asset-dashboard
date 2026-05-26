@@ -362,8 +362,9 @@ describe('Batch list and read', () => {
     const publicList = await publicRes.json() as Array<{ id: string }>;
     const adminIds = new Set(adminList.map(b => b.id));
     const publicIds = new Set(publicList.map(b => b.id));
-    expect([...adminIds].every(id => publicIds.has(id))).toBe(true);
-    expect([...publicIds].every(id => adminIds.has(id))).toBe(true);
+    expect(adminIds.size).toBeGreaterThan(0);
+    expect([...adminIds].every(id => publicIds.has(id))).toBe(true); // every-ok
+    expect([...publicIds].every(id => adminIds.has(id))).toBe(true); // every-ok
   });
 
   it('public single-batch endpoint returns same data as admin single-batch endpoint', async () => {
@@ -732,8 +733,9 @@ describe('Bulk approve — broadcasts and side effects', () => {
       );
       expect(approveRes.status).toBe(200);
       const body = await approveRes.json() as { items: Array<{ status: string; clientNote?: string }> };
-      expect(body.items.every(i => i.status === 'approved')).toBe(true);
-      expect(body.items.every(i => i.clientNote === 'All good from client')).toBe(true);
+      expect(body.items.length).toBeGreaterThan(0);
+      expect(body.items.every(i => i.status === 'approved')).toBe(true); // every-ok
+      expect(body.items.every(i => i.clientNote === 'All good from client')).toBe(true); // every-ok
     } finally {
       db.prepare('DELETE FROM approval_batches WHERE id = ?').run(fresh.id);
     }
