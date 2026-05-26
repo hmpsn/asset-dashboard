@@ -12,6 +12,7 @@ This project already has an AI reliability harness for pipeline wiring, provider
 - Voice checks must rely on `buildSystemPrompt()`, `buildEffectiveBrandVoiceBlock()`, and the voice quality harness. Do not recreate voice authority logic in eval scripts.
 - Creative-copy checks should stay contract-level in CI: verify the intended writing-rule tier is present, duplicate prose layers are absent, and factual-safety/output-format rules remain intact. Judge "more creative" or "better voice" with human review or opt-in local evals, not default CI.
 - Page-type copy checks should stay deterministic: verify service/location/landing prompts include density contracts, brand-context hierarchy, single-CTA guidance, and public-copy bans for SEO mechanics. Human review remains the gate for whether the resulting prose feels sharper.
+- Outline-density checks should also stay deterministic: verify conversion-page briefs/outline regeneration carry compact section budgets, optional/capped H3 guidance, duplicate-close trimming, and no reader-facing local SEO operations. Human review remains the gate for whether the final page feels sufficiently complete.
 - Live model evals, when added, must be opt-in local/manual tooling and must not run in default CI.
 
 ## Current Quality Dimensions

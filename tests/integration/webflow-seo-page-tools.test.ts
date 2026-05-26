@@ -13,7 +13,7 @@ import { createTestContext } from './helpers.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 
 const PORT = 13702;
-const ctx = createTestContext(PORT);
+const ctx = createTestContext(PORT, { env: { OPENAI_API_KEY: '' } });
 const { api, postJson } = ctx;
 
 let workspace: SeededFullWorkspace;
@@ -114,24 +114,9 @@ describe('POST /api/webflow/seo-copy — with valid workspace, no OPENAI key', (
       currentSeoTitle: 'About Us | Test',
       currentDescription: 'Learn about our team.',
     });
-    // 500 = no OPENAI key in test env; 200 = key present and AI succeeded
-    expect([200, 500]).toContain(res.status);
-    if (res.status === 200) {
-      const body = await res.json() as {
-        seoTitle?: string;
-        metaDescription?: string;
-        h1?: string;
-        introParagraph?: string;
-        internalLinkSuggestions?: unknown[];
-        changes?: string[];
-      };
-      // If it somehow succeeded, response should have SEO copy fields
-      expect(typeof body).toBe('object');
-    }
-    if (res.status === 500) {
-      const body = await res.json() as { error: string };
-      expect(typeof body.error).toBe('string');
-    }
+    expect(res.status).toBe(500);
+    const body = await res.json() as { error: string };
+    expect(body.error).toContain('OPENAI_API_KEY');
   });
 
   it('does not return 404 for an existing workspace', async () => {

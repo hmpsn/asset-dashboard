@@ -1,5 +1,86 @@
 const CONVERSION_DENSE_PAGE_TYPES = new Set(['landing', 'service', 'location', 'homepage', 'product']);
 
+export interface PageTypeOutlineContract {
+  targetWords: number;
+  minWords: number;
+  maxWords: number;
+  minSections: number;
+  maxSections: number;
+  maxSubheadings: number;
+  guidance: string;
+}
+
+const PAGE_TYPE_OUTLINE_CONTRACTS: Record<string, PageTypeOutlineContract> = {
+  landing: {
+    targetWords: 900,
+    minWords: 800,
+    maxWords: 1200,
+    minSections: 4,
+    maxSections: 5,
+    maxSubheadings: 2,
+    guidance: `OUTLINE COMPRESSION CONTRACT (landing):
+- Build a short conversion page, not an article.
+- Use 4-5 useful H2 sections, one primary conversion path, and one closing CTA.
+- Subheadings are optional. Use 0-2 only when they improve scanning.`,
+  },
+  service: {
+    targetWords: 1000,
+    minWords: 800,
+    maxWords: 1100,
+    minSections: 4,
+    maxSections: 5,
+    maxSubheadings: 2,
+    guidance: `OUTLINE COMPRESSION CONTRACT (service):
+- Build a conversion-dense service page, not a long educational article.
+- Use 4-5 useful H2 sections and 800-1,100 total words.
+- Include one CTA close only; do not create duplicate "book a call", "next steps", contact, or conclusion sections.
+- Subheadings are optional. Use 0-2 only for substantive sections, and none for short CTA/proof/contact sections.`,
+  },
+  location: {
+    targetWords: 900,
+    minWords: 700,
+    maxWords: 1000,
+    minSections: 4,
+    maxSections: 5,
+    maxSubheadings: 2,
+    guidance: `OUTLINE COMPRESSION CONTRACT (location):
+- Build a compact location page, not a local SEO article.
+- Use 4-5 useful H2 sections and 700-1,000 total words.
+- Include local proof and relevance only when provided by context.
+- Never teach local SEO mechanics to the reader. Do not include citation/directory housekeeping, address/phone consistency advice, search profile upkeep, structured-data operations, or similar backend SEO tasks.
+- Include one local contact/CTA close only; do not repeat contact sections.`,
+  },
+  product: {
+    targetWords: 750,
+    minWords: 600,
+    maxWords: 1000,
+    minSections: 4,
+    maxSections: 5,
+    maxSubheadings: 2,
+    guidance: `OUTLINE COMPRESSION CONTRACT (product):
+- Build a concise buyer-decision page, not a product education article.
+- Use 4-5 useful H2 sections and one purchase path.
+- Subheadings are optional. Use 0-2 only when they help compare benefits, proof, or objections.`,
+  },
+  homepage: {
+    targetWords: 900,
+    minWords: 700,
+    maxWords: 1100,
+    minSections: 4,
+    maxSections: 5,
+    maxSubheadings: 2,
+    guidance: `OUTLINE COMPRESSION CONTRACT (homepage):
+- Build a short brand-led conversion page, not an article.
+- Use 4-5 useful H2 sections and one primary conversion path.
+- Subheadings are optional. Keep proof and CTA sections especially tight.`,
+  },
+};
+
+const DEFAULT_OUTLINE_CONTRACT = `OUTLINE COMPRESSION CONTRACT:
+- Right-size the outline for the page type.
+- Do not add sections merely because brand, SEO, or business context is available.
+- Brand voice should shape wording and positioning inside the chosen architecture.`;
+
 const PAGE_TYPE_COPY_CONTRACTS: Record<string, string> = {
   blog: `PAGE-TYPE COPY CONTRACT (blog):
 - Educational depth is appropriate, but keep examples concrete and avoid padding.
@@ -88,4 +169,12 @@ export function getPageTypeCopyContract(pageType?: string): string {
 
 export function requiresPageTypeDensityReview(pageType?: string): boolean {
   return CONVERSION_DENSE_PAGE_TYPES.has(pageType ?? '');
+}
+
+export function getPageTypeOutlineContract(pageType?: string): PageTypeOutlineContract | null {
+  return PAGE_TYPE_OUTLINE_CONTRACTS[pageType ?? ''] ?? null;
+}
+
+export function getPageTypeOutlineGuidance(pageType?: string): string {
+  return PAGE_TYPE_OUTLINE_CONTRACTS[pageType ?? '']?.guidance ?? DEFAULT_OUTLINE_CONTRACT;
 }

@@ -13,8 +13,10 @@ import {
   deleteBrief,
   buildStrategyCardBlock,
   getPageTypeConfig,
+  normalizeOutlineForPageType,
   type ContentBrief,
 } from '../../server/content-brief.js';
+import { getPageTypeOutlineGuidance } from '../../server/page-type-copy-contract.js';
 import type { StrategyCardContext } from '../../shared/types/content.js';
 
 // Helper to create a brief directly via SQLite (since createBrief requires OpenAI)
@@ -327,7 +329,82 @@ describe('getPageTypeConfig coverage', () => {
     const cfg = getPageTypeConfig('location');
     expect(cfg.wordCountTarget).toBeLessThanOrEqual(1000);
     expect(cfg.wordCountRange).toBe('700-1,000');
-    expect(cfg.prompt).toContain('Do not mention NAP consistency');
+    expect(cfg.prompt).not.toContain('NAP consistency');
+    expect(cfg.prompt).not.toContain('Google Business Profile');
     expect(cfg.prompt).toContain('public-facing copy');
+  });
+});
+
+// ── outline compression contracts ──
+
+describe('outline compression contracts', () => {
+  it('documents compact service outline rules without forcing every section to have H3s', () => {
+    const guidance = getPageTypeOutlineGuidance('service');
+    expect(guidance).toContain('OUTLINE COMPRESSION CONTRACT (service)');
+    expect(guidance).toContain('4-5 useful H2 sections');
+    expect(guidance).toContain('800-1,100 total words');
+    expect(guidance).toContain('Subheadings are optional');
+    expect(guidance).not.toContain('MUST include 2-3 subheadings');
+  });
+
+  it('documents compact location outline rules without reader-facing local SEO mechanics', () => {
+    const guidance = getPageTypeOutlineGuidance('location');
+    expect(guidance).toContain('OUTLINE COMPRESSION CONTRACT (location)');
+    expect(guidance).toContain('700-1,000 total words');
+    expect(guidance).toContain('Never teach local SEO mechanics');
+    expect(guidance).not.toContain('NAP consistency');
+    expect(guidance).not.toContain('Google Business Profile');
+  });
+
+  it('compresses service outlines by trimming duplicate closes, H3s, and total word count', () => {
+    const outline: ContentBrief['outline'] = [
+      { heading: 'What We Solve', notes: 'Answer the main buyer problem.', wordCount: 300, subheadings: ['A', 'B', 'C'], keywords: [] },
+      { heading: 'What Is Included', notes: 'Cover deliverables.', wordCount: 320, subheadings: ['A', 'B', 'C'], keywords: [] },
+      { heading: 'Our Process', notes: 'Explain the workflow.', wordCount: 320, subheadings: ['A', 'B'], keywords: [] },
+      { heading: 'Book a Call', notes: 'Invite the reader to book a call.', wordCount: 160, subheadings: ['A'], keywords: [] },
+      { heading: 'Proof and Fit', notes: 'Use selective proof.', wordCount: 280, subheadings: ['A', 'B', 'C'], keywords: [] },
+      { heading: 'Contact Us', notes: 'Repeat contact and discovery details.', wordCount: 160, subheadings: ['A'], keywords: [] },
+      { heading: 'Conclusion', notes: 'Close the article.', wordCount: 180, subheadings: ['A'], keywords: [] },
+    ];
+
+    const normalized = normalizeOutlineForPageType(outline, 'service');
+    const closingSections = normalized.filter(item => /book|contact|conclusion|next step/i.test(`${item.heading} ${item.notes}`));
+    const totalWords = normalized.reduce((sum, item) => sum + (item.wordCount ?? 0), 0);
+
+    expect(normalized).toHaveLength(5);
+    expect(closingSections).toHaveLength(1);
+    expect(totalWords).toBe(1000);
+    expect(normalized.every(item => (item.subheadings?.length ?? 0) <= 2)).toBe(true);
+    expect(normalized.at(-1)?.subheadings).toEqual([]);
+  });
+
+  it('sanitizes location outline SEO-operations language during normalization', () => {
+    const normalized = normalizeOutlineForPageType([
+      {
+        heading: 'Local SEO and NAP Consistency',
+        notes: 'Explain Google Business Profile hygiene, schema markup, citation cleanup, and directory listings.',
+        wordCount: 400,
+        subheadings: ['NAP cleanup', 'Schema markup', 'Google Business Profile'],
+        keywords: ['branding agency austin'],
+      },
+      { heading: 'Services in Austin', notes: 'Cover services and local proof.', wordCount: 350, subheadings: ['A', 'B', 'C'], keywords: [] },
+      { heading: 'Book a Discovery Call', notes: 'One local CTA close.', wordCount: 150, subheadings: ['A'], keywords: [] },
+    ], 'location');
+
+    const serialized = JSON.stringify(normalized);
+    expect(serialized).not.toMatch(/NAP/i);
+    expect(serialized).not.toContain('schema markup');
+    expect(serialized).not.toContain('Google Business Profile');
+    expect(serialized).not.toContain('directory listings');
+    expect(normalized.at(-1)?.subheadings).toEqual([]);
+  });
+
+  it('leaves blog outlines structurally deep', () => {
+    const outline: ContentBrief['outline'] = [
+      { heading: 'Deep Topic', notes: 'Teach the topic.', wordCount: 500, subheadings: ['A', 'B', 'C', 'D'], keywords: [] },
+      { heading: 'More Depth', notes: 'Keep useful educational depth.', wordCount: 500, subheadings: ['A', 'B', 'C'], keywords: [] },
+    ];
+
+    expect(normalizeOutlineForPageType(outline, 'blog')).toEqual(outline);
   });
 });
