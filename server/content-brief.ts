@@ -361,32 +361,34 @@ export const PAGE_TYPE_CONFIGS: Record<string, PageTypeConfig> = {
   },
 
   service: {
-    wordCountTarget: 1200,
-    wordCountRange: '1,000-1,500',
-    sectionRange: '5-8',
-    avgSectionWords: 180,
-    contentStyle: 'Professional and benefit-driven. Lead with outcomes, not features. Use confident language that builds trust. Balance detail with scannability.',
+    wordCountTarget: 1000,
+    wordCountRange: '800-1,100',
+    sectionRange: '4-6',
+    avgSectionWords: 160,
+    contentStyle: 'Professional, benefit-driven, and conversion-dense. Lead with outcomes, not features. Keep sections tight, avoid article-style teaching sprawl, and give the reader one clear next step.',
     prompt: `PAGE TYPE: Service Page
-- Format as a service description page (1,000-1,500 words)
+- Format as a conversion-dense service page (800-1,100 words)
 - Lead with what the service solves, not what it is
-- Structure: Overview → What's Included → Process → Benefits → Pricing Signals → FAQ → CTA
+- Structure: Overview → What's Included → Process → Proof/Fit → FAQ → single CTA
 - Include specific deliverables and outcomes
+- Use brand proof and differentiators selectively; do not add extra sections because more brand context is available
+- Avoid duplicate booking/discovery sections or multiple closing arguments
 - E-E-A-T emphasis: expertise and authority signals are critical
 - Schema: Service, FAQPage`,
   },
 
   location: {
-    wordCountTarget: 1000,
-    wordCountRange: '800-1,200',
-    sectionRange: '4-7',
-    avgSectionWords: 170,
-    contentStyle: 'Locally relevant and trustworthy. Weave in location-specific details naturally. Warm, community-oriented tone. Include proof of local expertise.',
+    wordCountTarget: 900,
+    wordCountRange: '700-1,000',
+    sectionRange: '4-6',
+    avgSectionWords: 150,
+    contentStyle: 'Locally relevant, trustworthy, and compact. Use local proof where available, but do not explain local SEO mechanics to the reader. Keep one clear contact or discovery action.',
     prompt: `PAGE TYPE: Location Page
-- Format as a local SEO page (800-1,200 words)
+- Format as a compact location page (700-1,000 words)
 - Include the city/region name naturally in headings and body
-- Structure: Local intro → Services in [Location] → Local expertise → Testimonials → Map/Directions → Contact CTA
-- Reference local landmarks, neighborhoods, or regional specifics
-- Include NAP (Name, Address, Phone) consistency guidance
+- Structure: Local intro → Services in [Location] → Local proof/expertise → FAQ or fit notes → single contact CTA
+- Reference local landmarks, neighborhoods, service areas, clients, or address/contact facts only when provided by context
+- Do not mention NAP consistency, schema, citation cleanup, Google Business Profile hygiene, directory listings, or other SEO operations in public-facing copy
 - Schema: LocalBusiness, FAQPage`,
   },
 

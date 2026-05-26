@@ -304,6 +304,22 @@ describe('page-type-specific prompt variation', () => {
     expect(prompt).toContain('service-industry copywriter');
   });
 
+  it('adds the brand context priority hierarchy to creative prompts', async () => {
+    await generateIntroduction(makeBrief({ pageType: 'service' }), '', 'ws_test');
+    const prompt = lastPrompt();
+    expect(prompt).toContain('BRAND CONTEXT PRIORITY');
+    expect(prompt).toContain('Page type, conversion goal, and word budget outrank style preferences');
+    expect(prompt).toContain('do not expand the page because more brand context is available');
+  });
+
+  it('adds the service page density contract to service prompts', async () => {
+    await generateSection(makeBrief({ pageType: 'service' }), makeBrief().outline[0], 0, [], '', 'ws_test');
+    const prompt = lastPrompt();
+    expect(prompt).toContain('PAGE-TYPE COPY CONTRACT (service)');
+    expect(prompt).toContain('Conversion-dense service page, not a long educational article');
+    expect(prompt).toContain('Do not add duplicate booking/discovery sections');
+  });
+
   it('uses product-specific writer role for product page type', async () => {
     await generateIntroduction(makeBrief({ pageType: 'product' }), '', 'ws_test');
     const prompt = lastPrompt();
@@ -314,6 +330,14 @@ describe('page-type-specific prompt variation', () => {
     await generateIntroduction(makeBrief({ pageType: 'location' }), '', 'ws_test');
     const prompt = lastPrompt();
     expect(prompt).toContain('local SEO copywriter');
+  });
+
+  it('adds the location public-copy contract and blocks SEO mechanics', async () => {
+    await generateConclusion(makeBrief({ pageType: 'location' }), '', 'ws_test');
+    const prompt = lastPrompt();
+    expect(prompt).toContain('PAGE-TYPE COPY CONTRACT (location)');
+    expect(prompt).toContain('do not teach local SEO mechanics to the reader');
+    expect(prompt).toContain('Never mention NAP consistency');
   });
 
   it('uses pillar-specific writer role for pillar page type', async () => {

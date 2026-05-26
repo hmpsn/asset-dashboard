@@ -6599,3 +6599,19 @@ Admins can set a market as primary from `LocalSeoMarketSetupDrawer`, and Keyword
 - **Service coverage gap detection** — `getLocalSeoServiceGaps()` compares active tracked keywords against `matchTerms` in the dental industry taxonomy (`server/service-taxonomy.ts`, 12 services). Uncovered services surface as an amber nudge section (`ServiceGapNudge`) in `LocalSeoMarketSetupDrawer` with copy-to-clipboard starter keyword suggestions. Taxonomy is industry-scoped: only fires for workspaces where the industry heuristic identifies dental practice context.
 
 **Files:** `server/local-seo.ts`; `server/service-taxonomy.ts`; `shared/types/local-seo.ts`; `src/components/local-seo/LocalSeoVisibilityPanel.tsx`; `src/components/local-seo/LocalSeoMarketSetupDrawer.tsx`; `tests/unit/local-seo.test.ts`; `tests/integration/local-seo-routes.test.ts`; `tests/component/LocalSeoVisibilityPanel.test.tsx`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+## AI Content Page-Type Rails and Brand Voice Containment
+
+**Status:** Shipped 2026-05-26
+
+**What it does:** Adds shared page-type copy contracts to content post generation and the copy pipeline so the prompt-diet creative gains do not let service, location, landing, homepage, or product copy sprawl into generic SEO articles. The new brand-context hierarchy keeps factual safety and output format first, page type and word budget second, voice/style third, and brand identity/business knowledge as selective support instead of a reason to add more sections or repeated CTAs.
+
+Service and location page brief defaults are now shorter and more conversion-dense. Location page prompting no longer asks for reader-facing NAP/local-SEO operations guidance; it asks for local proof, provided contact facts, and one local close. The content post unification pass now performs a density review for conversion pages even when the draft is technically within word-count range, trimming duplicate closes, repeated brand proof, SEO-mechanics leakage, and article-style padding.
+
+**Agency value:** Produces staging copy that keeps stronger voice while improving production readiness for service and location pages: shorter pages, clearer conversion paths, fewer repeated booking sections, and less SEO-operator language in public-facing content.
+
+**Client value:** Client deliverables should read more like focused website copy and less like long SEO essays, while still preserving factual grounding, brand voice, and approved positioning.
+
+**Boundaries:** No DB, route, UI, storage, WebSocket, React Query, model, token, or temperature changes. This is prompt-contract behavior only; subjective quality remains human-reviewed on staging.
+
+**Files:** `server/page-type-copy-contract.ts`; `server/content-posts-ai.ts`; `server/content-brief.ts`; `server/copy-generation.ts`; `tests/unit/content-quality-rules.test.ts`; `tests/unit/content-posts-ai.test.ts`; `tests/unit/copy-generation-pure.test.ts`; `tests/unit/content-brief.test.ts`; `docs/rules/brand-engine.md`; `docs/rules/ai-quality-evals.md`; `FEATURE_AUDIT.md`.

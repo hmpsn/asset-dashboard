@@ -99,6 +99,21 @@ Use the smallest ruleset that protects the output contract:
 
 Callers that inject either `CREATIVE_WRITING_RULES` or `WRITING_QUALITY_RULES` into their own task prompt must call `buildSystemPrompt(..., { skipProseRules: true })`. This avoids double-weighting anti-generic-writing instructions and preserves room for brand voice, page-type guidance, and approved samples to shape the final copy.
 
+## Page-Type and Brand Context Priority
+
+**File:** `server/page-type-copy-contract.ts`
+
+Creative generation callers that receive rich brand inputs must include the shared page-type copy contract. The contract keeps calibrated voice, business knowledge, personas, approved identity deliverables, and copy patterns from overpowering page architecture.
+
+Priority order for content posts and copy pipeline generation:
+
+1. Factual safety and output format.
+2. Page type, conversion goal, and word budget.
+3. Brand voice and tone.
+4. Brand identity, business knowledge, personas, and approved deliverables as selective support.
+
+Brand context should choose vocabulary, proof, positioning, and rhythm. It must not add extra sections, repeated CTAs, duplicated proof blocks, or longer copy simply because more brand context is present. Service, location, landing, homepage, and product pages are density-reviewed during unification; blogs, pillars, and resources retain permission for deeper educational structure.
+
 ## Voice Quality Contract Harness
 
 **File:** `tests/unit/voice-quality-contract-harness.test.ts`
