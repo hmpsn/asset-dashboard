@@ -1,7 +1,10 @@
 import {
   AI_CRITICAL_PIPELINE_IDS,
+  AI_QUALITY_PIPELINE_IDS,
   type AiCriticalPipelineId,
   type AiPipelineTraceDefinition,
+  type AiQualityFixture,
+  type AiQualityPipelineId,
   type AiReliabilityScenario,
   type AiReliabilityThresholds,
 } from '../shared/types/ai-reliability.js';
@@ -495,6 +498,123 @@ export const AI_RELIABILITY_SCENARIOS: AiReliabilityScenario[] = [
   },
 ];
 
+export const AI_QUALITY_FIXTURES: AiQualityFixture[] = [
+  {
+    id: 'brand-voice-authority-layering',
+    pipelineId: 'brand-voice-provenance',
+    title: 'Brand voice authority layers do not duplicate calibrated DNA or guardrails',
+    dimension: 'voice_authority',
+    severity: 'hard',
+    evidenceFiles: [
+      'docs/rules/brand-engine.md',
+      'tests/unit/voice-quality-contract-harness.test.ts',
+    ],
+    assertions: [
+      { allOf: ['Four-Layer Architecture', 'Voice Quality Contract Harness', 'strict output-format instructions remain first'] },
+      { allOf: ['Voice profile for this client:', 'Voice guardrails:', "not.toContain('VOICE DNA:')"] },
+    ],
+    notes: 'Pins the post-voice-sprint authority contract: calibrated voice lives in Layer 2 and prompt-facing context blocks do not duplicate DNA/guardrails.',
+  },
+  {
+    id: 'universal-prose-quality-layer',
+    pipelineId: 'brand-voice-provenance',
+    title: 'Universal prose quality rules remain attached to the layered prompt contract',
+    dimension: 'prose_quality',
+    severity: 'soft',
+    evidenceFiles: [
+      'docs/rules/brand-engine.md',
+      'server/writing-quality.ts',
+      'tests/unit/prompt-assembly.test.ts',
+    ],
+    assertions: [
+      { allOf: ['Layer 4', 'Universal prose quality rules', 'PROSE QUALITY'] },
+      { allOf: ['No em dashes', 'No concession-positive pattern', 'PROSE_QUALITY_RULES'] },
+    ],
+    notes: 'Keeps anti-generic-writing rules visible in the prompt assembly contract without making subjective live output scoring part of CI.',
+  },
+  {
+    id: 'content-review-format-and-provenance',
+    pipelineId: 'content-brief-review',
+    title: 'Content review keeps JSON output and human provenance gates',
+    dimension: 'evidence_grounding',
+    severity: 'hard',
+    evidenceFiles: [
+      'server/routes/content-posts.ts',
+      'tests/contract/factual-ai-output-contracts.test.ts',
+    ],
+    assertions: [
+      { allOf: ['Human source review required', 'Return ONLY valid JSON', 'researchMode: true'] },
+      { allOf: ["responseFormat: { type: 'json_object' }"], anyOf: ['parseAIJson', 'safeParse'] },
+    ],
+    notes: 'Protects the factual-review path from quietly treating provenance-sensitive checklist items as auto-verified.',
+  },
+  {
+    id: 'seo-editor-assist-format-sanitization',
+    pipelineId: 'seo-editor-assist',
+    title: 'SEO editor assist preserves insertion-safe rewrite and JSON contracts',
+    dimension: 'output_format',
+    severity: 'hard',
+    evidenceFiles: [
+      'server/routes/rewrite-chat.ts',
+      'server/routes/webflow-seo-page-tools.ts',
+    ],
+    assertions: [
+      { allOf: ['BEGIN_REWRITE', 'plain prose only', 'sanitizeForPromptInjection'] },
+      { allOf: ['Return ONLY valid JSON', "responseFormat: { type: 'json_object' }", 'researchMode: true'] },
+    ],
+    notes: 'Covers the prompt-rendering contract where rewrite delimiters feed a live editor and page SEO copy expects strict JSON.',
+  },
+  {
+    id: 'diagnostic-synthesis-json-evidence',
+    pipelineId: 'diagnostic-synthesis',
+    title: 'Diagnostic synthesis keeps JSON shape and evidence-first reasoning',
+    dimension: 'output_format',
+    severity: 'hard',
+    evidenceFiles: [
+      'server/diagnostic-orchestrator.ts',
+      'tests/unit/diagnostic-orchestrator-pure.test.ts',
+    ],
+    assertions: [
+      { allOf: ['Respond with ONLY valid JSON', 'Use the evidence from ALL data sources'] },
+      { allOf: ["responseFormat: { type: 'json_object' }", 'rootCauseSchema', 'remediationActionSchema'] },
+    ],
+    notes: 'Pins diagnostic output shape after the voice-authority migration wrapped diagnostic synthesis with buildSystemPrompt().',
+  },
+  {
+    id: 'admin-chat-layered-system-prompt',
+    pipelineId: 'admin-insights-chat',
+    title: 'Admin chat uses the layered prompt authority without duplicating prose rules',
+    dimension: 'duplication_risk',
+    severity: 'soft',
+    evidenceFiles: [
+      'server/admin-chat-context.ts',
+      'docs/rules/brand-engine.md',
+    ],
+    assertions: [
+      { allOf: ['buildLayeredSystemPrompt', 'skipProseRules: true'] },
+      { allOf: ['Prompt Layers Must Not Duplicate Content', 'buildSystemPrompt(workspaceId, baseInstructions, customNotes?, opts?)'] },
+    ],
+    notes: 'Documents the intentional admin-chat complete-style-system path so future quality checks do not double-inject prose rules.',
+  },
+  {
+    id: 'client-search-chat-clean-prose-and-intent-format',
+    pipelineId: 'client-search-chat',
+    title: 'Client search chat preserves intent JSON and clean client-facing prose',
+    dimension: 'output_format',
+    severity: 'hard',
+    evidenceFiles: [
+      'server/routes/public-analytics.ts',
+      'tests/integration/public-chat-routes.test.ts',
+      'tests/integration/public-analytics.test.ts',
+    ],
+    assertions: [
+      { allOf: ['Return ONLY valid JSON', 'classifyMessageIntent'] },
+      { allOf: ['NEVER include markdown links'], anyOf: ['parseJsonSafe', 'safeParse'] },
+    ],
+    notes: 'Pins the client-chat split between machine-readable intent classification and clean prose rendered with UI action buttons.',
+  },
+];
+
 export function findAiReliabilityRegistryGaps(
   traces: AiPipelineTraceDefinition[] = AI_CRITICAL_PIPELINE_TRACES,
   scenarios: AiReliabilityScenario[] = AI_RELIABILITY_SCENARIOS,
@@ -526,6 +646,40 @@ export function findAiReliabilityRegistryGaps(
     }
     if (scenario.assertions.length === 0) {
       gaps.push(`Scenario ${scenario.id} has no assertions`);
+    }
+  }
+
+  return gaps;
+}
+
+export function findAiQualityFixtureGaps(
+  fixtures: AiQualityFixture[] = AI_QUALITY_FIXTURES,
+  expectedPipelineIds: readonly AiQualityPipelineId[] = AI_QUALITY_PIPELINE_IDS,
+): string[] {
+  const gaps: string[] = [];
+
+  for (const pipelineId of expectedPipelineIds) {
+    const fixtureMatches = fixtures.filter(fixture => fixture.pipelineId === pipelineId);
+    if (fixtureMatches.length === 0) {
+      gaps.push(`Missing AI quality fixture for ${pipelineId}`);
+    }
+  }
+
+  const seenIds = new Set<string>();
+  for (const fixture of fixtures) {
+    if (seenIds.has(fixture.id)) {
+      gaps.push(`Duplicate AI quality fixture id ${fixture.id}`);
+    }
+    seenIds.add(fixture.id);
+
+    if (!AI_QUALITY_PIPELINE_IDS.includes(fixture.pipelineId)) {
+      gaps.push(`AI quality fixture ${fixture.id} references non-quality pipeline ${fixture.pipelineId}`);
+    }
+    if (fixture.evidenceFiles.length === 0) {
+      gaps.push(`AI quality fixture ${fixture.id} has no evidence files`);
+    }
+    if (fixture.assertions.length === 0) {
+      gaps.push(`AI quality fixture ${fixture.id} has no assertions`);
     }
   }
 
