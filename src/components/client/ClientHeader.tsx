@@ -217,7 +217,7 @@ export function ClientHeader({
             return (
               <Button key={t.id} variant="ghost" role="tab" aria-selected={active} tabIndex={active ? 0 : -1}
                 onClick={() => t.locked ? setShowUpgradeModal(true) : setTab(t.id)}
-                className={`flex items-center gap-1.5 px-4 py-3 t-ui font-medium border-b-2 transition-colors whitespace-nowrap ${
+                className={`flex items-center gap-1.5 px-4 py-3 rounded-none t-ui font-medium border-b-2 transition-colors whitespace-nowrap ${
                   t.locked ? 'border-transparent text-[var(--brand-text-muted)] cursor-default' :
                   active ? 'border-teal-500 text-accent-brand' :
                   'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:border-[var(--brand-border-strong)]'
