@@ -50,14 +50,14 @@ beforeEach(() => {
 });
 
 describe('prepareBulkSchemaGenerationContext', () => {
-  it('returns context bundle from buildSchemaContext and requests analytics', async () => {
+  it('returns context bundle from buildSchemaContext', async () => {
     const bundle = makeContextBundle();
     mocks.buildSchemaContext.mockResolvedValue(bundle);
 
     const result = await prepareBulkSchemaGenerationContext('site_abc');
 
     expect(result).toBe(bundle);
-    expect(mocks.buildSchemaContext).toHaveBeenCalledWith('site_abc', { includeAnalytics: true });
+    expect(mocks.buildSchemaContext).toHaveBeenCalledWith('site_abc');
   });
 
   it('attaches architecture tree when workspaceId is present', async () => {

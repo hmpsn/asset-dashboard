@@ -46,6 +46,23 @@ describe('SchemaSuggester CMS workflow extraction', () => {
     expect(seoApi).toContain("from './schema'");
   });
 
+  it('routes schema plan and inventory reads through schema intelligence instead of raw workspace strategy', () => {
+    const routes = readFileSync('server/routes/webflow-schema.ts', 'utf-8'); // readFile-ok — schema intelligence route contract guard
+    const planRouteStart = routes.indexOf("router.post('/api/webflow/schema-plan/:siteId'");
+    const planRouteEnd = routes.indexOf("// GET: retrieve the current plan for a site");
+    const planRoute = routes.slice(planRouteStart, planRouteEnd);
+    const inventoryRouteStart = routes.indexOf("router.get('/api/webflow/schema-site-inventory/:siteId'");
+    const inventoryRouteEnd = routes.indexOf("router.get('/api/webflow/schema-cms-field-mappings/:siteId'");
+    const inventoryRoute = routes.slice(inventoryRouteStart, inventoryRouteEnd);
+
+    expect(planRoute).toContain('buildSchemaIntelligence({ siteId })');
+    expect(planRoute).toContain('strategy: schemaIntel?.seoContext?.strategy');
+    expect(planRoute).not.toContain('strategy: ws.keywordStrategy');
+    expect(inventoryRoute).toContain('buildSchemaIntelligence({');
+    expect(inventoryRoute).toContain('includeSiteInventory: true');
+    expect(inventoryRoute).not.toContain('buildSiteInventory({');
+  });
+
   it('keeps saved page types below active schema plans in generation authority', () => {
     const source = readFileSync('server/schema-suggester.ts', 'utf-8'); // readFile-ok — authority-order contract guard
     const activePlanIndex = source.indexOf('if (planRole && !shouldCollectionBeatPlan)');

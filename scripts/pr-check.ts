@@ -6263,7 +6263,7 @@ export const CHECKS: Check[] = [
         // Concretely for `buildSchemaContext`:
         //   line 338: `export async function buildSchemaContext(`  → paren=1
         //   line 339: `  siteId: string,`                         → paren=1
-        //   line 340: `  options?: { includeAnalytics?: boolean },`→ paren=1 (inner {} ignored)
+        //   multi-line return type follows before the function body opens.
         //   line 341: `): Promise<{`                              → `)` paren→0; seenParams=true; `<` angle=1; `{` inside angle — skip
         //   line 342: `  ctx: SchemaContext;`                     → angle=1 still
         //   line 343: `  pageKeywordMap?: ...;`                   → angle=1 still

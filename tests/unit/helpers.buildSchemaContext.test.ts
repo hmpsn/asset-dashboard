@@ -183,6 +183,38 @@ describe('buildSchemaContext — slice migration (Pattern B starter)', () => {
     expect(ctx._businessProfile?.numberOfEmployees).toBe('10-50');
   });
 
+  it('does not request backlink enrichment for schema context when no schema consumer uses backlinks', async () => {
+    vi.mocked(buildWorkspaceIntelligence).mockResolvedValue({
+      seoContext: {
+        strategy: { siteKeywords: [] },
+        brandVoice: '',
+        effectiveBrandVoiceBlock: '',
+        businessContext: '',
+        knowledgeBase: '',
+        personas: [],
+        serpFeatures: { featuredSnippets: 1, peopleAlsoAsk: 2, localPack: false, videoCarousel: 0 },
+        backlinkProfile: { referringDomains: 42 },
+      } as never,
+    } as never);
+
+    const mockWs = {
+      id: 'ws_test',
+      name: 'Test',
+      webflowSiteId: 'site_test_123',
+      webflowToken: 'token-123',
+      keywordStrategy: { siteKeywords: [] },
+    } as never;
+    vi.mocked(listWorkspaces).mockReturnValue([mockWs]);
+
+    const { ctx } = await buildSchemaContext('site_test_123');
+
+    expect(ctx.workspaceId).toBe('ws_test');
+    expect(buildWorkspaceIntelligence).toHaveBeenCalledWith(
+      'ws_test',
+      expect.objectContaining({ enrichWithBacklinks: undefined }),
+    );
+  });
+
   it('does not read migrated-forbidden legacy workspace fields', async () => {
     vi.mocked(buildWorkspaceIntelligence).mockResolvedValue({
       seoContext: {

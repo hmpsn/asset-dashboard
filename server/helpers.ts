@@ -14,10 +14,10 @@ import { getDeclinedKeywords } from './keyword-feedback.js';
 import { listSites } from './webflow-pages.js';
 import { PAGE_ADDRESS_SOURCES } from '../shared/types/page-address.js';
 import type { PageAddress, PageAddressInput, ResolvePageAddressOptions } from '../shared/types/page-address.js';
-import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
 import { CRITICAL_CHECKS, MODERATE_CHECKS, computePageScore } from '../shared/scoring.js';
-import { buildWorkspaceIntelligence, formatPersonasForPrompt } from './workspace-intelligence.js';
+import { formatPersonasForPrompt } from './workspace-intelligence.js';
+import { buildSchemaIntelligence } from './schema-intelligence.js';
 
 
 const log = createLogger('helpers');
@@ -411,13 +411,7 @@ export function applySuppressionsToAudit(
 
 // ── Schema Context Builder ──
 
-// 5-minute TTL cache for schema intelligence signals used during generation.
-const analyticsCache: Record<string, {
-  serpFeatures?: { featuredSnippets: number; peopleAlsoAsk: number; localPack: boolean; videoCarousel: number };
-  backlinkReferringDomains?: number;
-  ts: number;
-}> = {};
-const ANALYTICS_CACHE_TTL_MS = 5 * 60 * 1000;
+const SCHEMA_CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000;
 
 // 5-minute TTL cache for listSites() — prevents an extra Webflow API round-trip on every
 // single-page schema generation request. Keyed by workspace token (or '' for global).
@@ -431,7 +425,7 @@ async function listSitesCached(
 ): Promise<Array<{ id: string; displayName: string; shortName: string; defaultLocale: string }>> {
   const key = tokenOverride ?? '';
   const cached = sitesCache[key];
-  if (cached && Date.now() - cached.ts < ANALYTICS_CACHE_TTL_MS) return cached.sites;
+  if (cached && Date.now() - cached.ts < SCHEMA_CONTEXT_CACHE_TTL_MS) return cached.sites;
   const sites = await listSites(tokenOverride);
   sitesCache[key] = { sites, ts: Date.now() };
   return sites;
@@ -439,22 +433,24 @@ async function listSitesCached(
 
 export async function buildSchemaContext(
   siteId: string,
-  options?: { includeAnalytics?: boolean },
 ): Promise<{
   ctx: SchemaContext;
 }> {
   const allWs = listWorkspaces();
   const ws = allWs.find(w => w.webflowSiteId === siteId);
   const ctx: SchemaContext = {};
+  let schemaIntel: Awaited<ReturnType<typeof buildSchemaIntelligence>> | null = null;
   if (ws) {
     ctx.companyName = ws.name;
     ctx.liveDomain = ws.liveDomain;
 
-    // Schema context now consumes SEO/business data from workspace intelligence.
-    // Remaining direct reads in this function are identity/analytics paths only.
-    let schemaIntel: Awaited<ReturnType<typeof buildWorkspaceIntelligence>> | null = null;
+    // Schema context consumes SEO/business data through the schema-owned
+    // intelligence wrapper. Domain modules still own writes/storage; schema
+    // reads normalized intelligence contracts.
     try {
-      schemaIntel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext'] });
+      schemaIntel = await buildSchemaIntelligence({
+        siteId,
+      });
     } catch (err) {
       log.warn({ err, workspaceId: ws.id, siteId }, 'buildSchemaContext: intelligence seoContext unavailable');
     } // catch-ok
@@ -510,44 +506,6 @@ export async function buildSchemaContext(
     ctx._siteHasSearch = ws.siteHasSearch === true;
 
   }
-  // Fetch schema intelligence signals when requested (for schema generation routes)
-  if (options?.includeAnalytics && ws) {
-    const cacheKey = ws.id;
-    const cached = analyticsCache[cacheKey];
-    if (cached && Date.now() - cached.ts < ANALYTICS_CACHE_TTL_MS) {
-      if (cached.serpFeatures) ctx._serpFeatures = cached.serpFeatures;
-      if (cached.backlinkReferringDomains != null) ctx._backlinkReferringDomains = cached.backlinkReferringDomains;
-    } else {
-      // Wire in SEO intelligence signals — cached to avoid per-request latency.
-      let cachedSerpFeatures: typeof ctx._serpFeatures | undefined;
-      let cachedBacklinkDomains: number | undefined;
-      try {
-        const intel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext'] });
-        if (intel.seoContext?.serpFeatures) {
-          cachedSerpFeatures = intel.seoContext.serpFeatures;
-          ctx._serpFeatures = cachedSerpFeatures;
-        }
-        if (intel.seoContext?.backlinkProfile?.referringDomains != null) {
-          cachedBacklinkDomains = intel.seoContext.backlinkProfile.referringDomains;
-          ctx._backlinkReferringDomains = cachedBacklinkDomains;
-        }
-      } catch (err) {
-        if (isProgrammingError(err)) {
-          log.warn({ err }, 'helpers/buildSchemaContext: intelligence layer error');
-        } else {
-          log.debug({ err }, 'helpers/buildSchemaContext: intelligence layer not ready — skipping SEO signals');
-        }
-      }
-
-      // Store in cache (even if empty — avoids repeated read work on sites with no connections)
-      analyticsCache[cacheKey] = {
-        serpFeatures: cachedSerpFeatures,
-        backlinkReferringDomains: cachedBacklinkDomains,
-        ts: Date.now(),
-      };
-    }
-  }
-
   return { ctx };
 }
 

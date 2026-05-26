@@ -15,6 +15,7 @@
 - `server/routes/client-intelligence.ts` — client portal intelligence API (`ClientIntelligence` shape)
 - `server/routes/intelligence.ts` — admin debug endpoint
 - 20+ content/SEO generation modules via `buildIntelPrompt()` (briefs, rewrites, audits, brandscript, etc.)
+- `server/schema-intelligence.ts` — schema-owned wrapper for schema planning, schema context, page elements, and site inventory reads
 - `server/routes/public-portal.ts` — public workspace context
 - `server/intelligence-crons.ts` — cache warming
 
@@ -105,6 +106,8 @@ intelligence:{workspaceId}:{sortedSlices}:{pagePath}:{learningsDomain}:site={sit
 ```
 
 The `site`, `base`, and `wf` segments isolate `siteInventory` calls by Webflow site identity and token fingerprint without storing raw Webflow tokens in cache keys. The `:bl` suffix is appended only when `opts.enrichWithBacklinks` is true — backlink data requires a network call and must not be served from a non-backlink-enriched cache entry.
+
+Schema consumers should use `buildSchemaIntelligence()` rather than calling slice assemblers or reading `ws.keywordStrategy` directly. That wrapper resolves workspace/site identity once, calls `buildWorkspaceIntelligence()` with schema-owned options, and exposes the resolved `seoContext.strategy`, `siteInventory`, `pageKeywords`, and `pageElements` surfaces.
 
 ### Single-flight deduplication
 

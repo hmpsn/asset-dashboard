@@ -28,6 +28,7 @@ vi.mock('../../server/outcome-tracking.js', () => ({
 }));
 vi.mock('../../server/workspace-data.js', () => ({
   getWorkspacePages: vi.fn(async () => []),
+  getWorkspaceAllPages: vi.fn(async () => []),
   getContentPipelineSummary: vi.fn(() => ({
     briefs: { total: 0, byStatus: {} },
     posts: { total: 0, byStatus: {} },
