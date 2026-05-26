@@ -7,6 +7,7 @@ This project already has an AI reliability harness for pipeline wiring, provider
 - Keep deterministic checks first. CI may inspect prompts, fixtures, source contracts, and saved evidence, but must not depend on live model judgment for normal PR gates.
 - Extend `scripts/ai-reliability-registry.ts`; do not create a disconnected eval registry for the same critical pipelines.
 - Use `AiQualityFixture` entries for prompt/output contracts that affect response quality.
+- Use `npm run verify:ai-quality` for the deterministic fixture report.
 - Hard quality fixtures are reserved for authority, output-format, and evidence-contract breaks. Subjective prose quality stays advisory until a human has validated the signal.
 - Voice checks must rely on `buildSystemPrompt()`, `buildEffectiveBrandVoiceBlock()`, and the voice quality harness. Do not recreate voice authority logic in eval scripts.
 - Live model evals, when added, must be opt-in local/manual tooling and must not run in default CI.
@@ -21,7 +22,7 @@ This project already has an AI reliability harness for pipeline wiring, provider
 
 ## PR Gate Policy
 
-PR 1 of the AI Quality Eval Sprint adds the registry and contract tests only. PR 2 may add a report and soft gate. The default policy is:
+`scripts/report-ai-quality.ts --soft-gate` follows this policy:
 
 - fail on missing fixture coverage, missing evidence files, or hard authority/format/evidence failures;
 - warn on quality-score regressions or soft fixture failures;

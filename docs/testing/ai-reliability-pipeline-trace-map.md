@@ -6,6 +6,7 @@ Use this map with:
 
 - `scripts/ai-reliability-registry.ts`
 - `scripts/report-ai-reliability.ts`
+- `scripts/report-ai-quality.ts`
 - `scripts/report-ai-pipeline-wiring.ts`
 - `tests/contract/ai-pipeline-trace-map.test.ts`
 - `tests/unit/ai-reliability-harness.test.ts`
@@ -39,3 +40,9 @@ Use this map with:
 
 - **Fail**: registry/trace hard gaps or hard-scenario failures.
 - **Warn**: quality regression (threshold drop) without blocking merge.
+
+`scripts/report-ai-quality.ts --soft-gate` behavior:
+
+- **Fail**: missing quality fixture coverage, missing evidence files, or hard authority/format/evidence fixture failures.
+- **Warn**: soft quality fixture failures or quality scores below the advisory threshold.
+- **Out of scope**: live model scoring; keep that opt-in/manual until the signal is validated.

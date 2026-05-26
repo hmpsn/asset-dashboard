@@ -96,6 +96,39 @@ export type AiQualityFixture = {
   notes: string;
 };
 
+export type AiQualityFixtureResult = {
+  fixtureId: string;
+  pipelineId: AiQualityPipelineId;
+  dimension: AiQualityDimension;
+  severity: AiScenarioSeverity;
+  passed: boolean;
+  score: number;
+  reasons: string[];
+  evidenceFiles: string[];
+};
+
+export type AiQualityPipelineScore = {
+  pipelineId: AiQualityPipelineId;
+  title: string;
+  score: number;
+  passed: number;
+  total: number;
+  dimensions: AiQualityDimension[];
+  failingFixtureIds: string[];
+};
+
+export type AiQualityReport = {
+  generatedBy: 'scripts/report-ai-quality.ts';
+  advisoryOnly: true;
+  generatedAt: string;
+  fixtures: AiQualityFixture[];
+  fixtureResults: AiQualityFixtureResult[];
+  pipelineScores: AiQualityPipelineScore[];
+  overallScore: number;
+  hardFailures: string[];
+  warnings: string[];
+};
+
 export type AiReliabilityThresholds = {
   minDomainScore: number;
   minOverallScore: number;
