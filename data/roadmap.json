@@ -807,6 +807,15 @@
           "priority": "P3",
           "notes": "Per-user email settings, digest frequency.\n[Audit 2026-04-22 partial] In-app notification feed shipped (NotificationBell + useNotifications); per-user email/digest frequency preferences are not built.",
           "status": "pending"
+        },
+        {
+          "id": "notification-client-email-surface-audit",
+          "title": "Audit every client-facing email trigger and content contract",
+          "source": "Post-merge notification gap review 2026-05-26",
+          "est": "2-4h",
+          "priority": "P1",
+          "notes": "Create a definitive matrix of client emails: trigger route/job, audience, throttle category, template/event type, required payload fields, and expected user-visible outcome. Verify gaps against real workflows (brief/post review lifecycle, request replies, approvals, billing, audit/recommendation sends), then document missing triggers and duplicates with fix recommendations.",
+          "status": "pending"
         }
       ]
     },

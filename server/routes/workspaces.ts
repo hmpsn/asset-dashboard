@@ -33,6 +33,7 @@ import { listWorkOrders } from '../work-orders.js';
 import { listMatrices } from '../content-matrices.js';
 import { listChurnSignals } from '../churn-signals.js';
 import { listClientSignals } from '../client-signals-store.js';
+import { summarizeClientActions } from '../client-actions.js';
 import {
   listWorkspaces,
   createWorkspace,
@@ -123,10 +124,14 @@ router.get('/api/workspace-overview', (req, res) => {
     // Approvals
     const batches = listBatches(ws.id);
     const pendingApprovals = batches.reduce((sum, b) => sum + b.items.filter((i: { status: string }) => i.status === 'pending').length, 0);
+    const approvedApprovals = batches.reduce((sum, b) => sum + b.items.filter((i: { status: string }) => i.status === 'approved').length, 0);
+    const requestedApprovalChanges = batches.reduce((sum, b) => sum + b.items.filter((i: { status: string }) => i.status === 'rejected').length, 0);
     const totalApprovalItems = batches.reduce((sum, b) => sum + b.items.length, 0);
     // Content requests (from client portal)
     const contentReqs = listContentRequests(ws.id);
     const pendingContentReqs = contentReqs.filter(r => r.status === 'requested').length;
+    const approvedContentReqs = contentReqs.filter(r => r.status === 'approved' || r.status === 'delivered').length;
+    const requestedContentChanges = contentReqs.filter(r => r.status === 'changes_requested').length;
     const inProgressContentReqs = contentReqs.filter(r => ['brief_generated', 'client_review', 'approved', 'in_progress', 'post_review'].includes(r.status)).length;
     const deliveredContentReqs = contentReqs.filter(r => r.status === 'delivered' || r.status === 'published').length;
 
@@ -164,6 +169,14 @@ router.get('/api/workspace-overview', (req, res) => {
     try {
       clientSignalsNew = listClientSignals(ws.id).filter(s => s.status === 'new').length;
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'workspaces: programming error'); /* non-critical */ }
+    // Client action queue summary (new inbox signal used by notification center)
+    let clientActionApproved = 0;
+    let clientActionChangesRequested = 0;
+    try {
+      const actionSummary = summarizeClientActions(ws.id);
+      clientActionApproved = actionSummary.approved;
+      clientActionChangesRequested = actionSummary.changesRequested;
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'workspaces: programming error'); /* non-critical */ }
 
     const trialEnd = ws.trialEndsAt ? new Date(ws.trialEndsAt) : null;
     const isTrial = trialEnd ? trialEnd > new Date() : false;
@@ -182,12 +195,28 @@ router.get('/api/workspace-overview', (req, res) => {
       trialDaysRemaining,
       audit,
       requests: { total: reqTotal, new: reqNew, active: reqActive, latestDate: latestReq?.updatedAt || null },
-      approvals: { pending: pendingApprovals, total: totalApprovalItems },
-      contentRequests: { pending: pendingContentReqs, inProgress: inProgressContentReqs, delivered: deliveredContentReqs, total: contentReqs.length },
+      approvals: {
+        pending: pendingApprovals,
+        approved: approvedApprovals,
+        changesRequested: requestedApprovalChanges,
+        total: totalApprovalItems,
+      },
+      contentRequests: {
+        pending: pendingContentReqs,
+        approved: approvedContentReqs,
+        changesRequested: requestedContentChanges,
+        inProgress: inProgressContentReqs,
+        delivered: deliveredContentReqs,
+        total: contentReqs.length,
+      },
       workOrders: { pending: pendingWorkOrders, total: workOrders.length },
       contentPlan: { review: reviewCells },
       churnSignals: { critical: churnCritical, warning: churnWarning },
       clientSignals: { new: clientSignalsNew },
+      clientActions: {
+        approved: clientActionApproved,
+        changesRequested: clientActionChangesRequested,
+      },
       pageStates,
     };
   });

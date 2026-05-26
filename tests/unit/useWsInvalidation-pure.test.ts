@@ -35,6 +35,7 @@ function buildHandlers(wsId: string) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.approvals(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.cmsEditorAll() });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
     },
     [WS_EVENTS.APPROVAL_APPLIED]: () => {
       if (!wsId) return;
@@ -43,18 +44,21 @@ function buildHandlers(wsId: string) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.seoEditorAll() });
       qc.invalidateQueries({ queryKey: queryKeys.admin.cmsEditorAll() });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
     },
     [WS_EVENTS.REQUEST_CREATED]: () => {
       if (!wsId) return;
       qc.invalidateQueries({ queryKey: queryKeys.client.requests(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.requests(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
     },
     [WS_EVENTS.REQUEST_UPDATE]: () => {
       if (!wsId) return;
       qc.invalidateQueries({ queryKey: queryKeys.client.requests(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.requests(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
     },
     [WS_EVENTS.CONTENT_REQUEST_CREATED]: () => {
       if (!wsId) return;
@@ -64,6 +68,7 @@ function buildHandlers(wsId: string) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.contentCalendar(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
     },
     [WS_EVENTS.CONTENT_REQUEST_UPDATE]: () => {
       if (!wsId) return;
@@ -73,6 +78,7 @@ function buildHandlers(wsId: string) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.contentCalendar(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
     },
     [WS_EVENTS.CONTENT_UPDATED]: () => {
       if (!wsId) return;
@@ -111,6 +117,7 @@ function buildHandlers(wsId: string) {
       if (!wsId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.anomalyAlerts(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.anomalies(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
     },
     [WS_EVENTS.WORKSPACE_UPDATED]: () => {
       if (!wsId) return;
@@ -305,6 +312,7 @@ describe('useWsInvalidation — event routing (pure)', () => {
     expect(invalidated).toContainEqual(queryKeys.admin.approvals(WS_ID));
     expect(invalidated).toContainEqual(queryKeys.admin.cmsEditorAll());
     expect(invalidated).toContainEqual(queryKeys.admin.workspaceHome(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.admin.notifications());
   });
 
   it('APPROVAL_APPLIED adds seoEditorAll invalidation on top of APPROVAL_UPDATE keys', () => {
@@ -373,6 +381,14 @@ describe('useWsInvalidation — event routing (pure)', () => {
     handlers[WS_EVENTS.CLIENT_SIGNAL_CREATED]();
 
     expect(invalidated).toContainEqual(queryKeys.admin.clientSignals(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.admin.notifications());
+  });
+
+  it('CONTENT_REQUEST_UPDATE also refreshes the notification bell', () => {
+    const { handlers, invalidated } = buildHandlers(WS_ID);
+    handlers[WS_EVENTS.CONTENT_REQUEST_UPDATE]();
+
+    expect(invalidated).toContainEqual(queryKeys.client.contentRequests(WS_ID));
     expect(invalidated).toContainEqual(queryKeys.admin.notifications());
   });
 

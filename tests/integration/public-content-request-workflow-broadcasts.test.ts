@@ -9,6 +9,7 @@ const broadcastState = vi.hoisted(() => ({
 const emailState = vi.hoisted(() => ({
   contentRequests: [] as unknown[],
   changesRequested: [] as unknown[],
+  actionApproved: [] as unknown[],
 }));
 
 vi.mock('../../server/broadcast.js', () => ({
@@ -25,6 +26,9 @@ vi.mock('../../server/email.js', () => ({
   }),
   notifyTeamChangesRequested: vi.fn((payload: unknown) => {
     emailState.changesRequested.push(payload);
+  }),
+  notifyTeamActionApproved: vi.fn((payload: unknown) => {
+    emailState.actionApproved.push(payload);
   }),
 }));
 
@@ -122,6 +126,7 @@ beforeEach(() => {
   broadcastState.calls = [];
   emailState.contentRequests = [];
   emailState.changesRequested = [];
+  emailState.actionApproved = [];
 });
 
 afterAll(async () => {
@@ -152,6 +157,7 @@ describe('public content request workflow broadcasts and side effects', () => {
       },
     ]);
     expect(countActivitiesForRequest(request.id, 'brief_approved')).toBe(1);
+    expect(emailState.actionApproved).toHaveLength(1);
   });
 
   it('broadcasts exactly once and notifies the team when a client requests brief changes', async () => {

@@ -5,12 +5,21 @@ import type { AddressInfo } from 'net';
 const broadcastState = vi.hoisted(() => ({
   calls: [] as Array<{ workspaceId: string; event: string; payload: { id?: string; status?: string } }>,
 }));
+const emailState = vi.hoisted(() => ({
+  actionApproved: [] as unknown[],
+}));
 
 vi.mock('../../server/broadcast.js', () => ({
   setBroadcast: vi.fn(),
   broadcast: vi.fn(),
   broadcastToWorkspace: vi.fn((workspaceId: string, event: string, payload: { id?: string; status?: string }) => {
     broadcastState.calls.push({ workspaceId, event, payload });
+  }),
+}));
+
+vi.mock('../../server/email.js', () => ({
+  notifyTeamActionApproved: vi.fn((payload: unknown) => {
+    emailState.actionApproved.push(payload);
   }),
 }));
 
@@ -128,6 +137,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   broadcastState.calls = [];
+  emailState.actionApproved = [];
 });
 
 afterAll(async () => {
@@ -160,6 +170,7 @@ describe('public post review broadcasts and workflow side effects', () => {
       },
     ]);
     expect(countActivitiesForRequest(requestId, 'post_approved')).toBe(1);
+    expect(emailState.actionApproved).toHaveLength(1);
   });
 
   it('does not broadcast or mutate when approve-post validation fails', async () => {

@@ -55,6 +55,22 @@ function processUploadedAttachments(files: Express.Multer.File[]): RequestAttach
   });
 }
 
+function notifyTeamRequestFollowup(
+  workspaceId: string,
+  requestTitle: string,
+  details: string,
+): void {
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return;
+  notifyTeamNewRequest({
+    workspaceName: ws.name,
+    workspaceId,
+    title: `Follow-up: ${requestTitle}`,
+    description: details,
+    category: 'other',
+  });
+}
+
 // --- Client Requests ---
 // Public: client creates a request
 router.post('/api/public/requests/:workspaceId', validate(createRequestSchema), (req, res) => {
@@ -98,6 +114,7 @@ router.post('/api/public/requests/:workspaceId/:requestId/notes', validate(addRe
   if (!updated) return res.status(404).json({ error: 'Request not found' });
   broadcast(ADMIN_EVENTS.REQUEST_UPDATED, updated);
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.REQUEST_UPDATE, { id: updated.id });
+  notifyTeamRequestFollowup(req.params.workspaceId, r.title, content);
   res.json(updated);
 });
 
@@ -112,6 +129,11 @@ router.post('/api/public/requests/:workspaceId/:requestId/attachments', upload.a
   if (!updated) return res.status(404).json({ error: 'Not found' });
   broadcast(ADMIN_EVENTS.REQUEST_UPDATED, updated);
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.REQUEST_UPDATE, { id: updated.id });
+  notifyTeamRequestFollowup(
+    req.params.workspaceId,
+    r.title,
+    `Client attached ${atts.length} file${atts.length === 1 ? '' : 's'}.`,
+  );
   res.json(updated);
 });
 
@@ -129,6 +151,10 @@ router.post('/api/public/requests/:workspaceId/:requestId/notes-with-files', upl
   if (!updated) return res.status(404).json({ error: 'Not found' });
   broadcast(ADMIN_EVENTS.REQUEST_UPDATED, updated);
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.REQUEST_UPDATE, { id: updated.id });
+  const attachmentsDetail = atts?.length
+    ? ` Attached ${atts.length} file${atts.length === 1 ? '' : 's'}.`
+    : '';
+  notifyTeamRequestFollowup(req.params.workspaceId, r.title, `${content || 'Client sent a file follow-up.'}${attachmentsDetail}`);
   res.json(updated);
 });
 
