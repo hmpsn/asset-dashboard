@@ -8,14 +8,10 @@ import { buildWorkspaceIntelligence, getIntelligenceCacheStats } from '../worksp
 import { getPageCacheStats } from '../workspace-data.js';
 import { createLogger } from '../logger.js';
 import { getBridgeFlags } from '../bridge-infrastructure.js';
-import type { IntelligenceSlice } from '../../shared/types/intelligence.js';
+import { isIntelligenceSlice } from '../../shared/types/intelligence.js';
+import type { IntelligenceOptions, IntelligenceSlice } from '../../shared/types/intelligence.js';
 
 const log = createLogger('intelligence-route');
-
-const VALID_SLICES: Set<string> = new Set([
-  'seoContext', 'insights', 'learnings', 'pageProfile',
-  'contentPipeline', 'siteHealth', 'clientSignals', 'operational',
-]);
 
 const router = Router();
 
@@ -41,21 +37,29 @@ router.get(
       const slicesParam = req.query.slices as string | undefined;
       const pagePath = req.query.pagePath as string | undefined;
       const learningsDomain = req.query.learningsDomain as 'content' | 'strategy' | 'technical' | 'all' | undefined;
+      const siteId = req.query.siteId as string | undefined;
+      const siteBaseUrl = req.query.siteBaseUrl as string | undefined;
 
       // Parse slices from comma-separated query param
       let slices: IntelligenceSlice[] | undefined;
       if (slicesParam) {
-        const requested = slicesParam.split(',').filter(s => VALID_SLICES.has(s));
+        const requested = slicesParam.split(',').map(s => s.trim()).filter(isIntelligenceSlice);
         if (requested.length > 0) {
-          slices = requested as IntelligenceSlice[];
+          slices = requested;
+        } else {
+          return res.status(400).json({ error: 'No valid intelligence slices specified' });
         }
       }
 
-      const intelligence = await buildWorkspaceIntelligence(workspaceId, { // bwi-all-ok: admin endpoint, intentionally assembles all slices when no param provided
+      const opts: IntelligenceOptions = {
         slices,
         pagePath: pagePath || undefined,
         learningsDomain: learningsDomain || undefined,
-      });
+        siteId: siteId || undefined,
+        siteBaseUrl: siteBaseUrl || undefined,
+      };
+
+      const intelligence = await buildWorkspaceIntelligence(workspaceId, opts); // bwi-all-ok: admin endpoint intentionally assembles all registered slices when no slices param is provided
 
       res.json(intelligence);
     } catch (err) {

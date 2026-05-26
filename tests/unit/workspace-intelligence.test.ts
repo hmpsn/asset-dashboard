@@ -65,10 +65,16 @@ vi.mock('../../server/intelligence-cache.js', () => {
 });
 
 import {
+  ALL_INTELLIGENCE_SLICES,
   buildWorkspaceIntelligence,
   buildIntelPrompt,
   formatForPrompt,
 } from '../../server/workspace-intelligence.js';
+import {
+  INTELLIGENCE_SLICES,
+  OPTION_SCOPED_INTELLIGENCE_SLICES,
+  PROMPT_FORMATTABLE_INTELLIGENCE_SLICES,
+} from '../../shared/types/intelligence.js';
 import { singleFlight } from '../../server/intelligence-cache.js';
 import { buildEffectiveBrandVoiceBlock } from '../../server/intelligence/seo-context-source.js';
 import { getInsights } from '../../server/analytics-insights-store.js';
@@ -108,6 +114,16 @@ describe('buildWorkspaceIntelligence', () => {
     const result = await buildWorkspaceIntelligence('ws-1');
     expect(result.seoContext).toBeDefined();
     expect(result.insights).toBeDefined();
+  });
+
+  it('uses the shared intelligence slice registry for facade defaults', () => {
+    expect(ALL_INTELLIGENCE_SLICES).toEqual(INTELLIGENCE_SLICES);
+    expect(PROMPT_FORMATTABLE_INTELLIGENCE_SLICES).not.toContain('siteInventory');
+    expect(PROMPT_FORMATTABLE_INTELLIGENCE_SLICES.length).toBeGreaterThan(0);
+    for (const slice of PROMPT_FORMATTABLE_INTELLIGENCE_SLICES) {
+      expect(INTELLIGENCE_SLICES).toContain(slice);
+    }
+    expect(OPTION_SCOPED_INTELLIGENCE_SLICES).toEqual(['pageProfile', 'pageElements', 'siteInventory']);
   });
 
   it('skips pageProfile and pageElements when pagePath is not provided', async () => {

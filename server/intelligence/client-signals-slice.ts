@@ -133,7 +133,7 @@ export async function assembleClientSignals(
     for (const batch of batches) {
       for (const item of batch.items ?? []) {
         total++;
-        if (item.status === 'approved') approved++;
+        if (item.status === 'approved' || item.status === 'applied') approved++;
       }
     }
 

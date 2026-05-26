@@ -20,18 +20,48 @@ import type {
 
 // ── Slice selection ─────────────────────────────────────────────────────
 
-export type IntelligenceSlice =
-  | 'seoContext'
-  | 'insights'
-  | 'learnings'
-  | 'pageProfile'
-  | 'contentPipeline'
-  | 'siteHealth'
-  | 'clientSignals'
-  | 'operational'
-  | 'pageElements'
-  | 'siteInventory'
-  | 'localSeo';
+export const INTELLIGENCE_SLICES = [
+  'seoContext',
+  'insights',
+  'learnings',
+  'pageProfile',
+  'contentPipeline',
+  'siteHealth',
+  'clientSignals',
+  'operational',
+  'pageElements',
+  'siteInventory',
+  'localSeo',
+] as const;
+
+export type IntelligenceSlice = typeof INTELLIGENCE_SLICES[number];
+
+export const OPTION_SCOPED_INTELLIGENCE_SLICES = [
+  'pageProfile',
+  'pageElements',
+  'siteInventory',
+] as const satisfies readonly IntelligenceSlice[];
+
+export const PROMPT_FORMATTABLE_INTELLIGENCE_SLICES = [
+  'seoContext',
+  'insights',
+  'learnings',
+  'pageProfile',
+  'contentPipeline',
+  'siteHealth',
+  'clientSignals',
+  'operational',
+  'pageElements',
+  'localSeo',
+] as const satisfies readonly IntelligenceSlice[];
+
+export function isIntelligenceSlice(value: string): value is IntelligenceSlice {
+  return (INTELLIGENCE_SLICES as readonly string[]).includes(value);
+}
+
+export function isPromptFormattableIntelligenceSlice(value: string): value is typeof PROMPT_FORMATTABLE_INTELLIGENCE_SLICES[number] {
+  return (PROMPT_FORMATTABLE_INTELLIGENCE_SLICES as readonly string[]).includes(value);
+}
 
 // ── Options ─────────────────────────────────────────────────────────────
 

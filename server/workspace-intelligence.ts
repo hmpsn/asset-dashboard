@@ -14,6 +14,7 @@ import type {
   IntelligenceSlice,
   PromptFormatOptions,
 } from '../shared/types/intelligence.js';
+import { INTELLIGENCE_SLICES } from '../shared/types/intelligence.js';
 import { assemblePageElements } from './intelligence/page-elements-slice.js';
 import { assembleSiteInventory } from './intelligence/site-inventory-slice.js';
 import { assembleSeoContext } from './intelligence/seo-context-slice.js';
@@ -39,11 +40,7 @@ const log = createLogger('workspace-intelligence');
 const intelligenceCache = new LRUCache<WorkspaceIntelligence>(200);
 const INTELLIGENCE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-const ALL_SLICES: IntelligenceSlice[] = [
-  'seoContext', 'insights', 'learnings', 'pageProfile', 'pageElements',
-  'siteInventory', 'contentPipeline', 'siteHealth', 'clientSignals', 'operational',
-  'localSeo',
-];
+export const ALL_INTELLIGENCE_SLICES: readonly IntelligenceSlice[] = INTELLIGENCE_SLICES;
 
 export async function buildWorkspaceIntelligence(
   workspaceId: string,
@@ -62,7 +59,7 @@ export async function buildWorkspaceIntelligence(
 
   return singleFlight(cacheKey, async () => {
     const start = Date.now();
-    const requestedSlices = opts?.slices ?? ALL_SLICES;
+    const requestedSlices = opts?.slices ?? ALL_INTELLIGENCE_SLICES;
 
     const result: WorkspaceIntelligence = {
       version: 1,
@@ -162,7 +159,7 @@ function tokenFingerprint(token: string | null | undefined): string {
 }
 
 function buildCacheKey(workspaceId: string, opts?: IntelligenceOptions): string {
-  const slices = [...(opts?.slices ?? ALL_SLICES)].sort().join(',');
+  const slices = [...(opts?.slices ?? ALL_INTELLIGENCE_SLICES)].sort().join(',');
   const page = opts?.pagePath ?? '';
   const domain = opts?.learningsDomain ?? 'all';
   const site = opts?.siteId ?? '';

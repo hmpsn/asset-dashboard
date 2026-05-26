@@ -47,6 +47,17 @@ Each slice is independently assembled. A failed assembler logs a warning and lea
 | `siteHealth` | `SiteHealthSlice` | Audit score + delta, dead links, redirect chains, orphan pages, CWV pass rates, schema errors, anomaly count, recent diagnostic reports, AEO readiness |
 | `clientSignals` | `ClientSignalsSlice` | Keyword feedback, content gap votes, business priorities, approval patterns, churn risk + signals, ROI, engagement metrics, intent signals, composite health score |
 | `operational` | `OperationalSlice` | Recent activity, annotations, pending jobs, approval queue, recommendation queue, action backlog, time saved, work orders, insight acceptance rate |
+| `pageElements` | `PageElementSlice` | Persisted per-page media, citations, CTAs, forms, schema hints — **only assembled when `opts.pagePath` is provided** |
+| `siteInventory` | `SiteInventorySlice` | Webflow page/CMS inventory for schema and site-aware workflows — **only assembled when `opts.siteId` and `opts.siteBaseUrl` are provided** |
+| `localSeo` | `LocalSeoSlice` | Local SEO markets, visibility snapshots, candidates, and sampled prompt block |
+
+`shared/types/intelligence.ts` owns the registry constants:
+
+- `INTELLIGENCE_SLICES` — every valid slice key. Facade defaults, API validation, and MCP validation must read from this.
+- `OPTION_SCOPED_INTELLIGENCE_SLICES` — slices that need additional options and intentionally return `undefined` without them.
+- `PROMPT_FORMATTABLE_INTELLIGENCE_SLICES` — slices accepted by `formatForPrompt()`/debug prompt output. `siteInventory` is intentionally excluded because it is structured data, not a prompt section.
+
+Do not add local `VALID_SLICES` arrays in routes, MCP tools, tests, or consumers. Add the slice to the shared registry, then update assembler, formatter, route/MCP contract tests, and option-scoped tests together.
 
 Requesting only the slices you need reduces assembly time:
 
@@ -90,10 +101,10 @@ Max staleness: 24 hours (entries older than 24 hours are evicted regardless of s
 Cache keys encode all options that affect the assembled result:
 
 ```
-intelligence:{workspaceId}:{sortedSlices}:{pagePath}:{learningsDomain}[:bl]
+intelligence:{workspaceId}:{sortedSlices}:{pagePath}:{learningsDomain}:site={siteId}:base={siteBaseUrl}:wf={tokenFingerprint}[:bl]
 ```
 
-The `:bl` suffix is appended only when `opts.enrichWithBacklinks` is true — backlink data requires a network call and must not be served from a non-backlink-enriched cache entry.
+The `site`, `base`, and `wf` segments isolate `siteInventory` calls by Webflow site identity and token fingerprint without storing raw Webflow tokens in cache keys. The `:bl` suffix is appended only when `opts.enrichWithBacklinks` is true — backlink data requires a network call and must not be served from a non-backlink-enriched cache entry.
 
 ### Single-flight deduplication
 

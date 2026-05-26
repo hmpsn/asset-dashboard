@@ -1,24 +1,11 @@
 import type { Tool } from '@modelcontextprotocol/sdk/types';
 import { buildWorkspaceIntelligence } from '../../workspace-intelligence.js';
 import { getWorkspace } from '../../workspaces.js';
-import type { IntelligenceSlice } from '../../../shared/types/intelligence.js';
+import { INTELLIGENCE_SLICES, isIntelligenceSlice } from '../../../shared/types/intelligence.js';
+import type { IntelligenceOptions } from '../../../shared/types/intelligence.js';
 import { createLogger } from '../../logger.js';
 
 const log = createLogger('mcp-tools-intelligence');
-
-const ALL_INTELLIGENCE_SLICES: IntelligenceSlice[] = [
-  'seoContext',
-  'insights',
-  'learnings',
-  'pageProfile',
-  'pageElements',
-  'siteInventory',
-  'contentPipeline',
-  'siteHealth',
-  'clientSignals',
-  'operational',
-  'localSeo',
-];
 
 export const intelligenceTools: Tool[] = [
   {
@@ -33,7 +20,19 @@ export const intelligenceTools: Tool[] = [
           type: 'array',
           items: { type: 'string' },
           description:
-            'Optional: limit to specific slices. Valid values: seoContext, insights, learnings, pageProfile, pageElements, siteInventory, contentPipeline, siteHealth, clientSignals, operational, localSeo. Omit for all slices. The localSeo slice carries the full bounded candidate universe (capped at 1000) plus a pre-formatted prompt block — external agents get the full data; internal AI prompts use the sampled block.',
+            `Optional: limit to specific slices. Valid values: ${INTELLIGENCE_SLICES.join(', ')}. Omit for all slices. The localSeo slice carries the full bounded candidate universe (capped at 1000) plus a pre-formatted prompt block — external agents get the full data; internal AI prompts use the sampled block.`,
+        },
+        pagePath: {
+          type: 'string',
+          description: 'Optional page path for page-scoped slices such as pageProfile and pageElements.',
+        },
+        siteId: {
+          type: 'string',
+          description: 'Optional Webflow site ID for siteInventory assembly.',
+        },
+        siteBaseUrl: {
+          type: 'string',
+          description: 'Optional resolved live base URL for siteInventory assembly.',
         },
       },
       required: ['workspaceId'],
@@ -55,8 +54,12 @@ export async function handleIntelligenceTool(
   }
 
   const requestedSlices = Array.isArray(args.slices)
-    ? (args.slices as string[]).filter((s): s is IntelligenceSlice => ALL_INTELLIGENCE_SLICES.includes(s as IntelligenceSlice))
-    : ALL_INTELLIGENCE_SLICES;
+    ? (args.slices as string[]).filter(isIntelligenceSlice)
+    : [...INTELLIGENCE_SLICES];
+
+  if (requestedSlices.length === 0) {
+    return { isError: true, content: [{ type: 'text' as const, text: 'No valid intelligence slices specified' }] };
+  }
 
   try {
     const ws = getWorkspace(workspaceId);
@@ -67,7 +70,16 @@ export async function handleIntelligenceTool(
       };
     }
 
-    const intel = await buildWorkspaceIntelligence(workspaceId, { slices: requestedSlices });
+    const pagePath = typeof args.pagePath === 'string' ? args.pagePath : undefined;
+    const siteId = typeof args.siteId === 'string' ? args.siteId : undefined;
+    const siteBaseUrl = typeof args.siteBaseUrl === 'string' ? args.siteBaseUrl : undefined;
+    const opts: IntelligenceOptions = {
+      slices: requestedSlices,
+      pagePath,
+      siteId,
+      siteBaseUrl,
+    };
+    const intel = await buildWorkspaceIntelligence(workspaceId, opts); // bwi-all-ok: MCP read model intentionally returns the full registered bundle when slices are omitted
     return { content: [{ type: 'text' as const, text: JSON.stringify(intel) }] };
   } catch (err) {
     log.error({ err, workspaceId, slices: requestedSlices }, 'Intelligence assembly failed');

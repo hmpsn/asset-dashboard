@@ -175,12 +175,30 @@ const pipelineStmts = createStmtCache(() => ({
   matricesTotal: db.prepare(`SELECT COUNT(*) as cnt FROM content_matrices WHERE workspace_id = ?`),
   matricesCells: db.prepare(`SELECT cells, stats FROM content_matrices WHERE workspace_id = ?`),
   requestsByStatus: db.prepare(`SELECT status, COUNT(*) as cnt FROM content_topic_requests WHERE workspace_id = ? GROUP BY status`),
-  workOrdersActive: db.prepare(`SELECT COUNT(*) as cnt FROM work_orders WHERE workspace_id = ? AND status != 'completed'`),
+  workOrdersActive: db.prepare(`SELECT COUNT(*) as cnt FROM work_orders WHERE workspace_id = ? AND status IN ('pending', 'in_progress')`),
   seoEditsByStatus: db.prepare(`SELECT status, COUNT(*) as cnt FROM seo_suggestions WHERE workspace_id = ? GROUP BY status`),
   getCache: db.prepare(`SELECT summary_json, cached_at, invalidated_at FROM content_pipeline_cache WHERE workspace_id = ?`),
   upsertCache: db.prepare(`INSERT INTO content_pipeline_cache (workspace_id, summary_json, cached_at, invalidated_at) VALUES (@workspace_id, @summary_json, @cached_at, @invalidated_at) ON CONFLICT(workspace_id) DO UPDATE SET summary_json = excluded.summary_json, cached_at = excluded.cached_at, invalidated_at = excluded.invalidated_at`),
   invalidateCache: db.prepare(`UPDATE content_pipeline_cache SET invalidated_at = datetime('now') WHERE workspace_id = ?`),
 }));
+
+const REQUEST_PENDING_STATUSES = [
+  'pending_payment',
+  'requested',
+  'brief_generated',
+  'client_review',
+  'approved',
+  'changes_requested',
+] as const;
+const REQUEST_IN_PROGRESS_STATUSES = ['in_progress', 'post_review'] as const;
+const REQUEST_DELIVERED_STATUSES = ['delivered', 'published'] as const;
+
+function sumStatusCounts(
+  counts: Record<string, number>,
+  statuses: readonly string[],
+): number {
+  return statuses.reduce((sum, status) => sum + (counts[status] ?? 0), 0);
+}
 
 /**
  * Get aggregated content pipeline counts for a workspace, with 5-minute persistent cache.
@@ -255,9 +273,9 @@ function computeContentPipelineSummary(workspaceId: string): ContentPipelineSumm
     posts: { total: postsRow?.cnt ?? 0, byStatus: postsByStatus },
     matrices: { total: matricesRow?.cnt ?? 0, cellsPlanned, cellsPublished },
     requests: {
-      pending: requestsMap['requested'] ?? 0,
-      inProgress: requestsMap['in_progress'] ?? 0,
-      delivered: requestsMap['delivered'] ?? 0,
+      pending: sumStatusCounts(requestsMap, REQUEST_PENDING_STATUSES),
+      inProgress: sumStatusCounts(requestsMap, REQUEST_IN_PROGRESS_STATUSES),
+      delivered: sumStatusCounts(requestsMap, REQUEST_DELIVERED_STATUSES),
     },
     workOrders: { active: woRow?.cnt ?? 0 },
     seoEdits: {
