@@ -21,6 +21,7 @@ import { WS_EVENTS } from '../ws-events.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
 import { requireWorkspaceAccess, requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
+import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
 
 const log = createLogger('content-publish');
 const router = Router();
@@ -141,6 +142,7 @@ router.post('/api/content-posts/:workspaceId/:postId/publish-to-webflow', requir
     );
 
     // Broadcast to workspace
+    invalidateContentPipelineIntelligence(workspaceId);
     broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_PUBLISHED, {
       postId,
       itemId,

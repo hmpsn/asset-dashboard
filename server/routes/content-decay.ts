@@ -13,6 +13,7 @@ import { fireBridge } from '../bridge-infrastructure.js';
 import { createSuggestedBrief } from '../suggested-briefs-store.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
+import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
 
 const router = Router();
 const log = createLogger('content-decay');
@@ -47,6 +48,7 @@ router.post('/api/content-decay/:workspaceId/analyze', requireWorkspaceAccess('w
         });
       }
       if (topDecaying.length > 0) {
+        invalidateContentPipelineIntelligence(ws.id);
         // This bridge dispatches a domain-specific SUGGESTED_BRIEF_UPDATED
         // event, not the generic INSIGHT_BRIDGE_UPDATED that
         // executeBridge() auto-broadcasts when a BridgeResult is returned.

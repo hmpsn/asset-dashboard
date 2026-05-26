@@ -18,6 +18,7 @@ import { DEFAULT_SEO_DATA_PROVIDER, getProvider, isCapabilityDisabled, type Prov
 import { getTaxonomyForIndustry } from './service-taxonomy.js';
 import { getWorkspace } from './workspaces.js';
 import { WS_EVENTS } from './ws-events.js';
+import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 import { buildDataForSeoLocationName } from '../shared/local-seo-location.js';
 import {
@@ -66,6 +67,14 @@ import type { Workspace } from '../shared/types/workspace.js';
 const log = createLogger('local-seo');
 
 export const LOCAL_SEO_MAX_MARKETS = 3;
+
+function notifyLocalSeoUpdated(workspaceId: string, payload: Record<string, unknown>): void {
+  invalidateIntelligenceCache(workspaceId);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.LOCAL_SEO_UPDATED, {
+    workspaceId,
+    ...payload,
+  });
+}
 /**
  * Deprecated alias — kept temporarily for downstream readers that haven't
  * migrated to the new per-workspace budget. New code should read
@@ -596,8 +605,7 @@ export function setPrimaryMarket(workspaceId: string, marketId: string): void {
     'Set primary market for keyword volume geo-targeting',
     { source: 'local_seo' },
   );
-  broadcastToWorkspace(workspaceId, WS_EVENTS.LOCAL_SEO_UPDATED, {
-    workspaceId,
+  notifyLocalSeoUpdated(workspaceId, {
     action: 'primary_market_updated',
     updatedAt: new Date().toISOString(),
   });
@@ -842,7 +850,7 @@ export function updateLocalSeoConfiguration(workspaceId: string, request: LocalS
   run();
 
   addActivity(workspace.id, 'local_seo_updated', 'Local SEO configuration updated', 'Updated local SEO posture or market setup', { source: 'local_seo' });
-  broadcastToWorkspace(workspace.id, WS_EVENTS.LOCAL_SEO_UPDATED, { workspaceId: workspace.id, action: 'configuration_updated', updatedAt: now });
+  notifyLocalSeoUpdated(workspace.id, { action: 'configuration_updated', updatedAt: now });
   return getLocalSeoReadModel(workspace.id, featureEnabled);
 }
 
@@ -2232,8 +2240,7 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
       && processed - lastProgressBroadcastAt >= LOCAL_SEO_REFRESH_PROGRESS_BROADCAST_INTERVAL
     ) {
       lastProgressBroadcastAt = processed;
-      broadcastToWorkspace(workspaceId, WS_EVENTS.LOCAL_SEO_UPDATED, {
-        workspaceId,
+      notifyLocalSeoUpdated(workspaceId, {
         action: 'refresh_progress',
         processed,
         total,
@@ -2256,7 +2263,7 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
     keywords: plan.keywords,
   };
   if (getJob(jobId)?.status === 'cancelled') return;
-  broadcastToWorkspace(workspaceId, WS_EVENTS.LOCAL_SEO_UPDATED, { workspaceId, action: 'refresh_completed', refreshed, failed, updatedAt: new Date().toISOString() });
+  notifyLocalSeoUpdated(workspaceId, { action: 'refresh_completed', refreshed, failed, updatedAt: new Date().toISOString() });
   addActivity(workspaceId, 'local_seo_updated', 'Local SEO visibility refreshed', `${refreshed} local visibility checks refreshed`, { source: 'local_seo', refreshed, failed });
   updateJob(jobId, { status: 'done', progress: total, total, message: `Local visibility refreshed — ${refreshed}/${total} checks`, result });
 }
@@ -2341,8 +2348,7 @@ export async function runLocationBackfillJob(jobId: string, workspaceId: string)
       && processed - lastProgressBroadcastAt >= LOCAL_SEO_LOCATION_BACKFILL_PROGRESS_BROADCAST_INTERVAL
     ) {
       lastProgressBroadcastAt = processed;
-      broadcastToWorkspace(workspaceId, WS_EVENTS.LOCAL_SEO_UPDATED, {
-        workspaceId,
+      notifyLocalSeoUpdated(workspaceId, {
         action: 'backfill_progress',
         processed,
         total,
@@ -2352,8 +2358,7 @@ export async function runLocationBackfillJob(jobId: string, workspaceId: string)
   }
 
   if (getJob(jobId)?.status === 'cancelled') return;
-  broadcastToWorkspace(workspaceId, WS_EVENTS.LOCAL_SEO_UPDATED, {
-    workspaceId,
+  notifyLocalSeoUpdated(workspaceId, {
     action: 'backfill_completed',
     updated: total,
     updatedAt: new Date().toISOString(),

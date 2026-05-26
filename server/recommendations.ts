@@ -31,6 +31,7 @@ import { listDiagnosticReports } from './diagnostic-store.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
+import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { normalizePageUrl } from './helpers.js';
 import { buildRecommendationStory } from './signal-story-registry.js';
 import { buildRecommendationGenerationContext } from './intelligence/generation-context-builders.js';
@@ -1488,6 +1489,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   };
 
   saveRecommendations(set);
+  invalidateIntelligenceCache(workspaceId);
   log.info(`Generated ${recs.length} recommendations for ${workspaceId}: ${summary.fixNow} fix-now, ${summary.fixSoon} fix-soon, ${summary.fixLater} fix-later, ${summary.ongoing} ongoing${autoResolved > 0 ? `, ${autoResolved} auto-resolved` : ''}`);
 
   broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { count: recs.length });

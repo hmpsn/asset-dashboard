@@ -13,6 +13,7 @@ import {
 } from '../suggested-briefs-store.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
+import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
 
 const router = Router();
 
@@ -50,6 +51,7 @@ router.patch(
   (req, res) => {
     const updated = updateSuggestedBrief(req.params.briefId, req.params.workspaceId, req.body.status);
     if (!updated) return res.status(404).json({ error: 'Suggested brief not found' });
+    invalidateContentPipelineIntelligence(req.params.workspaceId);
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.SUGGESTED_BRIEF_UPDATED, { id: updated.id, status: updated.status });
     res.json(updated);
   },
@@ -67,6 +69,7 @@ router.post(
   (req, res) => {
     const snoozed = snoozeSuggestedBrief(req.params.briefId, req.params.workspaceId, req.body.until);
     if (!snoozed) return res.status(404).json({ error: 'Suggested brief not found' });
+    invalidateContentPipelineIntelligence(req.params.workspaceId);
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.SUGGESTED_BRIEF_UPDATED, { id: snoozed.id, status: snoozed.status });
     res.json(snoozed);
   },
@@ -79,6 +82,7 @@ router.post(
   (req, res) => {
     const dismissed = dismissSuggestedBrief(req.params.briefId, req.params.workspaceId);
     if (!dismissed) return res.status(404).json({ error: 'Suggested brief not found' });
+    invalidateContentPipelineIntelligence(req.params.workspaceId);
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.SUGGESTED_BRIEF_UPDATED, { id: dismissed.id, status: dismissed.status });
     res.json(dismissed);
   },

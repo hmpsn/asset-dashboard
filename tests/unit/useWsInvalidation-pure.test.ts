@@ -137,11 +137,14 @@ function buildHandlers(wsId: string) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeTopWins(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.outcomeSummary(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.outcomeWins(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(wsId) });
     },
     [WS_EVENTS.OUTCOME_ACTION_RECORDED]: () => {
       if (!wsId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeActions(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeScorecard(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(wsId) });
     },
     [WS_EVENTS.OUTCOME_EXTERNAL_DETECTED]: () => {
       if (!wsId) return;
@@ -151,10 +154,57 @@ function buildHandlers(wsId: string) {
     [WS_EVENTS.OUTCOME_LEARNINGS_UPDATED]: () => {
       if (!wsId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeLearnings(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(wsId) });
     },
     [WS_EVENTS.OUTCOME_PLAYBOOK_DISCOVERED]: () => {
       if (!wsId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.outcomePlaybooks(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(wsId) });
+    },
+    [WS_EVENTS.SUGGESTED_BRIEF_UPDATED]: () => {
+      if (!wsId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.aiSuggestedBriefs(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(wsId) });
+    },
+    [WS_EVENTS.INTELLIGENCE_CACHE_UPDATED]: () => {
+      if (!wsId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligence(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(wsId) });
+    },
+    [WS_EVENTS.COPY_SECTION_UPDATED]: () => {
+      if (!wsId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copySectionsAll(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copyStatusAll(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(wsId) });
+    },
+    [WS_EVENTS.COPY_BATCH_COMPLETE]: () => {
+      if (!wsId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copyBatchAll(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copySectionsAll(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copyStatusAll(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(wsId) });
+    },
+    [WS_EVENTS.COPY_INTELLIGENCE_UPDATED]: () => {
+      if (!wsId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copyIntelligence(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copyPromotable(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(wsId) });
+    },
+    [WS_EVENTS.RECOMMENDATIONS_UPDATED]: () => {
+      if (!wsId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.shared.recommendations(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.actionQueue(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(wsId) });
     },
     [WS_EVENTS.CLIENT_SIGNAL_CREATED]: () => {
       if (!wsId) return;
@@ -230,6 +280,8 @@ function buildHandlers(wsId: string) {
       if (!wsId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.briefingDrafts(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.briefing(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(wsId) });
     },
   };
 
@@ -300,6 +352,8 @@ describe('useWsInvalidation — event routing (pure)', () => {
     expect(invalidated).toContainEqual(queryKeys.admin.outcomeTopWins(WS_ID));
     expect(invalidated).toContainEqual(queryKeys.client.outcomeSummary(WS_ID));
     expect(invalidated).toContainEqual(queryKeys.client.outcomeWins(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.admin.intelligenceAll(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.client.intelligence(WS_ID));
   });
 
   it('OUTCOME_EXTERNAL_DETECTED only invalidates outcomeActions + client outcomeWins (not scorecard)', () => {
@@ -393,6 +447,58 @@ describe('useWsInvalidation — event routing (pure)', () => {
 
     expect(invalidated).toContainEqual(queryKeys.admin.briefingDrafts(WS_ID));
     expect(invalidated).toContainEqual(queryKeys.client.briefing(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.admin.intelligenceAll(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.client.intelligence(WS_ID));
+  });
+
+  it('SUGGESTED_BRIEF_UPDATED refreshes suggested briefs, content pipeline, and intelligence', () => {
+    const { handlers, invalidated } = buildHandlers(WS_ID);
+    handlers[WS_EVENTS.SUGGESTED_BRIEF_UPDATED]();
+
+    expect(invalidated).toContainEqual(queryKeys.admin.aiSuggestedBriefs(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.admin.contentPipeline(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.admin.workspaceHome(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.admin.intelligenceAll(WS_ID));
+  });
+
+  it('COPY_SECTION_UPDATED refreshes copy review plus canonical content pipeline intelligence', () => {
+    const { handlers, invalidated } = buildHandlers(WS_ID);
+    handlers[WS_EVENTS.COPY_SECTION_UPDATED]();
+
+    expect(invalidated).toContainEqual(queryKeys.admin.copySectionsAll(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.admin.copyStatusAll(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.admin.contentPipeline(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.admin.intelligenceAll(WS_ID));
+  });
+
+  it('COPY_BATCH_COMPLETE refreshes batch, copy sections, content pipeline, and intelligence', () => {
+    const { handlers, invalidated } = buildHandlers(WS_ID);
+    handlers[WS_EVENTS.COPY_BATCH_COMPLETE]();
+
+    expect(invalidated).toContainEqual(queryKeys.admin.copyBatchAll(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.admin.copySectionsAll(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.admin.contentPipeline(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.admin.intelligenceAll(WS_ID));
+  });
+
+  it('RECOMMENDATIONS_UPDATED refreshes shared recommendations and operational intelligence', () => {
+    const { handlers, invalidated } = buildHandlers(WS_ID);
+    handlers[WS_EVENTS.RECOMMENDATIONS_UPDATED]();
+
+    expect(invalidated).toContainEqual(queryKeys.shared.recommendations(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.admin.actionQueue(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.admin.workspaceHome(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.admin.intelligenceAll(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.client.intelligence(WS_ID));
+  });
+
+  it('INTELLIGENCE_CACHE_UPDATED refreshes admin and client intelligence query roots', () => {
+    const { handlers, invalidated } = buildHandlers(WS_ID);
+    handlers[WS_EVENTS.INTELLIGENCE_CACHE_UPDATED]();
+
+    expect(invalidated).toContainEqual(queryKeys.admin.intelligence(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.admin.intelligenceAll(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.client.intelligence(WS_ID));
   });
 
   it('BRIEFING_GENERATED only invalidates admin drafts (not client briefing)', () => {

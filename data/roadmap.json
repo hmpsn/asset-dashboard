@@ -567,8 +567,9 @@
           "est": "6-10h",
           "priority": "P0",
           "owner": "analytics-intelligence",
-          "status": "pending",
-          "notes": "Fix backend cache invalidation for content pipeline, copy pipeline, recommendations, briefing publish, Local SEO updates, and other intelligence-backed mutations found during the audit. Ensure every workspace-scoped mutation has both halves of the feedback loop: `broadcastToWorkspace()` with `WS_EVENTS` constants and React Query invalidation through workspace event handlers. Add mutation/read-path, workspace-event, and cache regression tests."
+          "status": "done",
+          "shippedAt": "2026-05-26",
+          "notes": "Completed in this PR. Added `invalidateContentPipelineIntelligence()` as the shared freshness boundary for mutations that feed the canonical `contentPipeline` slice, then wired backend invalidation across content briefs/posts/matrices/publish, suggested briefs/content decay, content subscriptions, MCP content actions, copy pipeline generation/review/intelligence, public post edits, recommendations, Local SEO updates, and briefing publish paths. Expanded `useWsInvalidation()` so the corresponding workspace events refresh admin/client intelligence, content pipeline, recommendations/action queue, suggested briefs, copy pipeline, outcomes, work orders, and briefing query keys. Added helper, event-routing, route/cache regression, and source-wiring guard coverage."
         },
         {
           "id": "workspace-intel-pr3-slice-correctness",
