@@ -16,6 +16,7 @@ import { PostPreview } from './post-editor/PostPreview';
 import { VersionHistory } from './post-editor/VersionHistory';
 import { ReviewChecklist, CHECKLIST_ITEMS } from './post-editor/ReviewChecklist';
 import { FixDiffModal } from './post-editor/FixDiffModal';
+import { adminRichTextClass } from './post-editor/richTextStyles';
 import type { AiFixResult, ContentBrief, ContentReviewEvidence, IssueKey } from '../../shared/types/content';
 import { queryKeys } from '../lib/queryKeys';
 import { countWordsFromHtml } from '../lib/utils';
@@ -573,7 +574,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                   </div>
                 </div>
               ) : (
-                <div className="text-xs text-[var(--brand-text-bright)] leading-relaxed [&_p]:mb-2 [&_strong]:text-[var(--brand-text-bright)] [&_a]:text-teal-400" dangerouslySetInnerHTML={{ __html: post.introduction }} />
+                <div className={adminRichTextClass} dangerouslySetInnerHTML={{ __html: post.introduction }} />
               )}
             </div>
           </SectionCard>
@@ -645,7 +646,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                   </div>
                 </div>
               ) : (
-                <div className="text-xs text-[var(--brand-text-bright)] leading-relaxed [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:text-[var(--brand-text-bright)] [&_h2]:mb-2 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:text-[var(--brand-text-bright)] [&_p]:mb-2 [&_ul]:pl-4 [&_ul]:mb-2 [&_ol]:pl-4 [&_ol]:mb-2 [&_li]:mb-1 [&_strong]:text-[var(--brand-text-bright)] [&_a]:text-teal-400" dangerouslySetInnerHTML={{ __html: post.conclusion }} />
+                <div className={adminRichTextClass} dangerouslySetInnerHTML={{ __html: post.conclusion }} />
               )}
             </div>
           </SectionCard>

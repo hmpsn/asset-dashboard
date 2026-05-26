@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { SectionCard, Icon, Button, ClickableRow } from '../ui';
 import { RichTextEditor } from './RichTextEditor';
+import { adminRichTextClass } from './richTextStyles';
 
 interface PostSection {
   index: number;
@@ -116,7 +117,7 @@ export function SectionEditor({
             </div>
           ) : (
             <div>
-              <div className="text-xs text-[var(--brand-text)] leading-relaxed [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:text-[var(--brand-text-bright)] [&_h2]:mb-2 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:text-[var(--brand-text-bright)] [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:mb-2 [&_ul]:pl-4 [&_ul]:mb-2 [&_ol]:pl-4 [&_ol]:mb-2 [&_li]:mb-1 [&_strong]:text-[var(--brand-text-bright)] [&_a]:text-teal-400" dangerouslySetInnerHTML={{ __html: section.content }} />
+              <div className={adminRichTextClass} dangerouslySetInnerHTML={{ __html: section.content }} />
               <div className="flex items-center gap-2 mt-3 pt-2 border-t border-[var(--brand-border)]/50">
                 <Button
                   onClick={() => onStartEdit(section.index)}
