@@ -87,6 +87,22 @@ Layer 2 is a no-op when no `voice_profiles` row exists or when `status !== 'cali
 
 Layer 4 appends the universal prose quality rules by default. Use `{ skipProseRules: true }` only when the caller already includes the same rules or intentionally supplies a complete style system, such as copy generation paths that own richer writing-quality instructions. Do not skip Layer 4 just to save tokens.
 
+## Voice Quality Contract Harness
+
+**File:** `tests/unit/voice-quality-contract-harness.test.ts`
+
+This harness is the regression gate for the current voice-authority states:
+
+- calibrated profile
+- draft profile with samples only
+- draft profile with DNA/guardrails
+- legacy brand voice only
+- no voice data
+
+The test renders both `buildSystemPrompt()` and `buildEffectiveBrandVoiceBlock()` for each state. It verifies that calibrated DNA/guardrails live in Layer 2 without duplication, draft samples alone do not override legacy authority, draft DNA/guardrails remain prompt-visible before calibration, legacy voice still works, and no-voice workspaces still receive base instructions plus prose quality rules.
+
+It also verifies strict output-format instructions remain first in the final system prompt. Keep subjective live-model scoring out of CI; add offline/manual eval tooling only when it cannot block the deterministic test suite.
+
 ---
 
 ## buildVoiceCalibrationContext()
