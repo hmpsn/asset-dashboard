@@ -5,6 +5,19 @@ import { matchPageIdentity } from '../helpers.js';
 
 const log = createLogger('workspace-intelligence/insights');
 
+export function listAllInsightsFromSlice(insights: InsightsSlice): AnalyticsInsight[] {
+  const byId = new Map<string, AnalyticsInsight>();
+  for (const list of Object.values(insights.byType)) {
+    for (const insight of list ?? []) {
+      byId.set(insight.id, insight);
+    }
+  }
+  if (byId.size === 0) {
+    for (const insight of insights.all) byId.set(insight.id, insight);
+  }
+  return [...byId.values()].sort((a, b) => (b.impactScore ?? 0) - (a.impactScore ?? 0));
+}
+
 function insightPageIdentities(insight: AnalyticsInsight): string[] {
   const identities = new Set<string>();
   if (insight.pageId) identities.add(insight.pageId);
