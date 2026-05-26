@@ -121,7 +121,7 @@ beforeEach(() => {
     posts: { total: 4, byStatus: { scheduled: 2, published: 2 } },
     matrices: { total: 2, cellsPlanned: 30, cellsPublished: 11 },
     requests: { pending: 3, inProgress: 2, delivered: 1 },
-    workOrders: { active: 2 },
+    workOrders: { active: 2, pending: 1 },
     seoEdits: { pending: 1, applied: 8, inReview: 2 },
   });
 
@@ -229,7 +229,7 @@ describe('assembleContentPipeline', () => {
     expect(result.posts).toEqual({ total: 4, byStatus: { scheduled: 2, published: 2 } });
     expect(result.matrices).toEqual({ total: 2, cellsPlanned: 30, cellsPublished: 11 });
     expect(result.requests).toEqual({ pending: 3, inProgress: 2, delivered: 1 });
-    expect(result.workOrders).toEqual({ active: 2 });
+    expect(result.workOrders).toEqual({ active: 2, pending: 1 });
     expect(result.seoEdits).toEqual({ pending: 1, applied: 8, inReview: 2 });
 
     expect(result.coverageGaps).toEqual(['Technical SEO']);
@@ -327,7 +327,7 @@ describe('assembleContentPipeline', () => {
       posts: { total: 0, byStatus: {} },
       matrices: { total: 0, cellsPlanned: 0, cellsPublished: 0 },
       requests: { pending: 0, inProgress: 0, delivered: 0 },
-      workOrders: { active: 0 },
+      workOrders: { active: 0, pending: 0 },
       coverageGaps: [],
       seoEdits: { pending: 0, applied: 0, inReview: 0 },
       subscriptions: undefined,

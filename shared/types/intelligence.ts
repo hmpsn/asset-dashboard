@@ -220,7 +220,7 @@ export interface ContentPipelineSlice {
   posts: { total: number; byStatus: Record<string, number> };
   matrices: { total: number; cellsPlanned: number; cellsPublished: number };
   requests: { pending: number; inProgress: number; delivered: number };
-  workOrders: { active: number };
+  workOrders: { active: number; pending?: number };
   coverageGaps: string[];
   seoEdits: { pending: number; applied: number; inReview: number };
   // New in 3A
@@ -629,6 +629,8 @@ export interface SchemaValidationSummary {
 
 export interface PerformanceSummary {
   avgLcp: number | null;
+  /** Interaction to Next Paint in milliseconds. INP replaced FID as a Core Web Vital. */
+  avgInp?: number | null;
   avgFid: number | null;
   avgCls: number | null;
   score: number | null;
@@ -677,7 +679,7 @@ export interface ContentPipelineSummary {
   posts: { total: number; byStatus: Record<string, number> };
   matrices: { total: number; cellsPlanned: number; cellsPublished: number };
   requests: { pending: number; inProgress: number; delivered: number };
-  workOrders: { active: number };
+  workOrders: { active: number; pending?: number };
   seoEdits: { pending: number; applied: number; inReview: number };
 }
 

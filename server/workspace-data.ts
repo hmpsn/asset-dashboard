@@ -171,11 +171,14 @@ const pipelineStmts = createStmtCache(() => ({
   briefsTotal: db.prepare(`SELECT COUNT(*) as cnt FROM content_briefs WHERE workspace_id = ?`),
   briefsByStatus: db.prepare(`SELECT status, COUNT(*) as cnt FROM content_briefs WHERE workspace_id = ? GROUP BY status`),
   postsTotal: db.prepare(`SELECT COUNT(*) as cnt FROM content_posts WHERE workspace_id = ?`),
-  postsByStatus: db.prepare(`SELECT status, COUNT(*) as cnt FROM content_posts WHERE workspace_id = ? GROUP BY status`),
+  postsByStatus: db.prepare(
+    `SELECT CASE WHEN published_at IS NOT NULL THEN 'published' ELSE status END as status, COUNT(*) as cnt
+     FROM content_posts WHERE workspace_id = ? GROUP BY CASE WHEN published_at IS NOT NULL THEN 'published' ELSE status END`,
+  ),
   matricesTotal: db.prepare(`SELECT COUNT(*) as cnt FROM content_matrices WHERE workspace_id = ?`),
   matricesCells: db.prepare(`SELECT cells, stats FROM content_matrices WHERE workspace_id = ?`),
   requestsByStatus: db.prepare(`SELECT status, COUNT(*) as cnt FROM content_topic_requests WHERE workspace_id = ? GROUP BY status`),
-  workOrdersActive: db.prepare(`SELECT COUNT(*) as cnt FROM work_orders WHERE workspace_id = ? AND status IN ('pending', 'in_progress')`),
+  workOrdersByStatus: db.prepare(`SELECT status, COUNT(*) as cnt FROM work_orders WHERE workspace_id = ? GROUP BY status`),
   seoEditsByStatus: db.prepare(`SELECT status, COUNT(*) as cnt FROM seo_suggestions WHERE workspace_id = ? GROUP BY status`),
   getCache: db.prepare(`SELECT summary_json, cached_at, invalidated_at FROM content_pipeline_cache WHERE workspace_id = ?`),
   upsertCache: db.prepare(`INSERT INTO content_pipeline_cache (workspace_id, summary_json, cached_at, invalidated_at) VALUES (@workspace_id, @summary_json, @cached_at, @invalidated_at) ON CONFLICT(workspace_id) DO UPDATE SET summary_json = excluded.summary_json, cached_at = excluded.cached_at, invalidated_at = excluded.invalidated_at`),
@@ -187,10 +190,9 @@ const REQUEST_PENDING_STATUSES = [
   'requested',
   'brief_generated',
   'client_review',
-  'approved',
-  'changes_requested',
+  'post_review',
 ] as const;
-const REQUEST_IN_PROGRESS_STATUSES = ['in_progress', 'post_review'] as const;
+const REQUEST_IN_PROGRESS_STATUSES = ['approved', 'changes_requested', 'in_progress'] as const;
 const REQUEST_DELIVERED_STATUSES = ['delivered', 'published'] as const;
 
 function sumStatusCounts(
@@ -262,7 +264,9 @@ function computeContentPipelineSummary(workspaceId: string): ContentPipelineSumm
   const requestsMap: Record<string, number> = {};
   for (const r of requestsByStatusRows) requestsMap[r.status] = r.cnt;
 
-  const woRow = pipelineStmts().workOrdersActive.get(workspaceId) as { cnt: number } | undefined;
+  const workOrdersByStatusRows = pipelineStmts().workOrdersByStatus.all(workspaceId) as { status: string; cnt: number }[];
+  const workOrdersMap: Record<string, number> = {};
+  for (const r of workOrdersByStatusRows) workOrdersMap[r.status] = r.cnt;
 
   const seoRows = pipelineStmts().seoEditsByStatus.all(workspaceId) as { status: string; cnt: number }[];
   const seoMap: Record<string, number> = {};
@@ -277,7 +281,10 @@ function computeContentPipelineSummary(workspaceId: string): ContentPipelineSumm
       inProgress: sumStatusCounts(requestsMap, REQUEST_IN_PROGRESS_STATUSES),
       delivered: sumStatusCounts(requestsMap, REQUEST_DELIVERED_STATUSES),
     },
-    workOrders: { active: woRow?.cnt ?? 0 },
+    workOrders: {
+      active: (workOrdersMap.pending ?? 0) + (workOrdersMap.in_progress ?? 0),
+      pending: workOrdersMap.pending ?? 0,
+    },
     seoEdits: {
       pending: seoMap['pending'] ?? 0,
       applied: seoMap['applied'] ?? 0,

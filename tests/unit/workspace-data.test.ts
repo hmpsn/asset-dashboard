@@ -223,6 +223,30 @@ describe('computeContentPipelineSummary — briefs.byStatus', () => {
     });
   }
 
+  function insertContentPost(id: string, status: string, publishedAt: string | null = null): void {
+    const now = new Date().toISOString();
+    db.prepare(
+      `INSERT OR REPLACE INTO content_posts (
+         id, workspace_id, brief_id, target_keyword, title, meta_description,
+         introduction, sections, conclusion, total_word_count, target_word_count,
+         status, created_at, updated_at, published_at)
+       VALUES (
+         @id, @workspace_id, @brief_id, @target_keyword, @title, @meta_description,
+         '', '[]', '', 0, 1000, @status, @created_at, @updated_at, @published_at)`,
+    ).run({
+      id,
+      workspace_id: TEST_WORKSPACE,
+      brief_id: `brief-${id}`,
+      target_keyword: 'pipeline post',
+      title: 'Pipeline Post',
+      meta_description: 'Pipeline post meta',
+      status,
+      created_at: now,
+      updated_at: now,
+      published_at: publishedAt,
+    });
+  }
+
   function insertWorkOrder(id: string, status: string): void {
     const now = new Date().toISOString();
     db.prepare(
@@ -250,6 +274,7 @@ describe('computeContentPipelineSummary — briefs.byStatus', () => {
       ).run(TEST_WORKSPACE);
     }
     db.prepare(`DELETE FROM content_topic_requests WHERE workspace_id = ?`).run(TEST_WORKSPACE);
+    db.prepare(`DELETE FROM content_posts WHERE workspace_id = ?`).run(TEST_WORKSPACE);
     db.prepare(`DELETE FROM work_orders WHERE workspace_id = ?`).run(TEST_WORKSPACE);
     db.prepare(`DELETE FROM content_pipeline_cache WHERE workspace_id = ?`).run(TEST_WORKSPACE);
   });
@@ -298,10 +323,61 @@ describe('computeContentPipelineSummary — briefs.byStatus', () => {
     invalidateContentPipelineCache(TEST_WORKSPACE);
 
     const summary = getContentPipelineSummary(TEST_WORKSPACE);
-    expect(summary.requests).toEqual({ pending: 6, inProgress: 2, delivered: 2 });
+    expect(summary.requests).toEqual({ pending: 5, inProgress: 3, delivered: 2 });
   });
 
-  it('excludes completed and cancelled work orders from active count', () => {
+  it('maps each content request status to exactly one canonical summary bucket', () => {
+    db.prepare(`DELETE FROM content_topic_requests WHERE workspace_id = ?`).run(TEST_WORKSPACE);
+    db.prepare(`DELETE FROM content_pipeline_cache WHERE workspace_id = ?`).run(TEST_WORKSPACE);
+
+    const cases: Array<[string, keyof ReturnType<typeof getContentPipelineSummary>['requests'] | null]> = [
+      ['pending_payment', 'pending'],
+      ['requested', 'pending'],
+      ['brief_generated', 'pending'],
+      ['client_review', 'pending'],
+      ['post_review', 'pending'],
+      ['approved', 'inProgress'],
+      ['changes_requested', 'inProgress'],
+      ['in_progress', 'inProgress'],
+      ['delivered', 'delivered'],
+      ['published', 'delivered'],
+      ['declined', null],
+    ];
+
+    for (const [status] of cases) insertContentRequest(`request-bucket-${status}`, status);
+
+    invalidateContentPipelineCache(TEST_WORKSPACE);
+
+    const summary = getContentPipelineSummary(TEST_WORKSPACE);
+    const expected = cases.reduce(
+      (acc, [, bucket]) => {
+        if (bucket) acc[bucket]++;
+        return acc;
+      },
+      { pending: 0, inProgress: 0, delivered: 0 },
+    );
+    expect(summary.requests).toEqual(expected);
+  });
+
+  it('derives published post lifecycle from published_at instead of raw post status', () => {
+    db.prepare(`DELETE FROM content_posts WHERE workspace_id = ?`).run(TEST_WORKSPACE);
+    db.prepare(`DELETE FROM content_pipeline_cache WHERE workspace_id = ?`).run(TEST_WORKSPACE);
+    const publishedAt = '2026-05-26T12:00:00.000Z';
+    insertContentPost('post-published-from-draft', 'draft', publishedAt);
+    insertContentPost('post-published-from-review', 'review', publishedAt);
+    insertContentPost('post-published-from-approved', 'approved', publishedAt);
+    insertContentPost('post-active-draft', 'draft');
+
+    invalidateContentPipelineCache(TEST_WORKSPACE);
+
+    const summary = getContentPipelineSummary(TEST_WORKSPACE);
+    expect(summary.posts.byStatus.published).toBe(3);
+    expect(summary.posts.byStatus.draft).toBe(1);
+    expect(summary.posts.byStatus.review ?? 0).toBe(0);
+    expect(summary.posts.byStatus.approved ?? 0).toBe(0);
+  });
+
+  it('preserves active as outstanding work orders while exposing pending split', () => {
     db.prepare(`DELETE FROM work_orders WHERE workspace_id = ?`).run(TEST_WORKSPACE);
     db.prepare(`DELETE FROM content_pipeline_cache WHERE workspace_id = ?`).run(TEST_WORKSPACE);
     insertWorkOrder('work-order-pending', 'pending');
@@ -313,5 +389,6 @@ describe('computeContentPipelineSummary — briefs.byStatus', () => {
 
     const summary = getContentPipelineSummary(TEST_WORKSPACE);
     expect(summary.workOrders.active).toBe(2);
+    expect(summary.workOrders.pending).toBe(1);
   });
 });

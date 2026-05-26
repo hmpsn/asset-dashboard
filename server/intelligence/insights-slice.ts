@@ -5,6 +5,17 @@ import { matchPageIdentity } from '../helpers.js';
 
 const log = createLogger('workspace-intelligence/insights');
 
+function insightPageIdentities(insight: AnalyticsInsight): string[] {
+  const identities = new Set<string>();
+  if (insight.pageId) identities.add(insight.pageId);
+  const data = insight.data as Record<string, unknown>;
+  for (const key of ['pagePath', 'pageUrl', 'page', 'url', 'affectedPage']) {
+    const value = data[key];
+    if (typeof value === 'string' && value.trim()) identities.add(value);
+  }
+  return [...identities];
+}
+
 export async function assembleInsights(
   workspaceId: string,
   opts?: IntelligenceOptions,
@@ -43,7 +54,9 @@ export async function assembleInsights(
   // Page-specific filtering
   let forPage: AnalyticsInsight[] | undefined;
   if (opts?.pagePath) {
-    forPage = sorted.filter(i => i.pageId ? matchPageIdentity(i.pageId, opts.pagePath!) : false);
+    forPage = sorted.filter(i =>
+      insightPageIdentities(i).some(identity => matchPageIdentity(identity, opts.pagePath!)),
+    );
   }
 
   return { all: capped, byType, bySeverity, topByImpact, forPage };

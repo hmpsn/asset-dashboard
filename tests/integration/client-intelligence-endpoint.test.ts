@@ -23,6 +23,7 @@ import { createTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import db from '../../server/db/index.js';
+import { setFlagOverride } from '../../server/feature-flags.js';
 import { randomUUID } from 'crypto';
 
 const ctx = createTestContext(13366); // port-ok: next free after 13365
@@ -35,9 +36,14 @@ let premiumWs: SeededFullWorkspace;
 let trialWs: SeededFullWorkspace;
 // Workspace with known insight data for filtering math tests
 let insightWs: SeededFullWorkspace;
+let largeInsightWs: SeededFullWorkspace;
+let readyLearningsWs: SeededFullWorkspace;
 
 // IDs of rows we insert directly so afterAll can clean them up
 const insertedInsightIds: string[] = [];
+const insertedActionIds: string[] = [];
+const insertedOutcomeIds: string[] = [];
+const insertedLearningWorkspaceIds: string[] = [];
 
 function insertInsight(opts: {
   id?: string;
@@ -67,6 +73,7 @@ function insertInsight(opts: {
 }
 
 beforeAll(async () => {
+  setFlagOverride('outcome-ai-injection', true);
   await ctx.startServer();
 
   // clientPassword: '' lets public endpoints skip auth cookies (consistent
@@ -82,6 +89,8 @@ beforeAll(async () => {
 
   // Workspace for insight filtering math tests
   insightWs = seedWorkspace({ tier: 'free', clientPassword: '' });
+  largeInsightWs = seedWorkspace({ tier: 'free', clientPassword: '' });
+  readyLearningsWs = seedWorkspace({ tier: 'growth', clientPassword: '' });
 
   // Insert a known mix of insights into insightWs so we can assert exact counts.
   //
@@ -113,9 +122,100 @@ beforeAll(async () => {
   // Excluded: positive severity (2)
   insertInsight({ workspaceId: insightWs.workspaceId, insightType: 'page_health',        severity: 'positive',    impactScore: 2,  pageTitle: 'Hidden Pos 1', pageId: '/page-i' });
   insertInsight({ workspaceId: insightWs.workspaceId, insightType: 'ranking_opportunity', severity: 'positive',    impactScore: 1,  pageTitle: 'Hidden Pos 2', pageId: '/page-j' });
+
+  for (let index = 0; index < 105; index++) {
+    insertInsight({
+      workspaceId: largeInsightWs.workspaceId,
+      insightType: 'serp_opportunity',
+      severity: 'opportunity',
+      impactScore: 1000 - index,
+      pageTitle: `Large Insight ${index}`,
+      pageId: `/large-${index}`,
+    });
+  }
+
+  const learningId = `learn-${randomUUID()}`;
+  db.prepare(`
+    INSERT OR REPLACE INTO workspace_learnings (id, workspace_id, learnings, computed_at)
+    VALUES (?, ?, ?, datetime('now'))
+  `).run(learningId, readyLearningsWs.workspaceId, JSON.stringify({
+    confidence: 'medium',
+    totalScoredActions: 12,
+    content: null,
+    strategy: null,
+    technical: null,
+    overall: {
+      totalWinRate: 0.75,
+      strongWinRate: 0.25,
+      topActionTypes: [{ type: 'content_refreshed', winRate: 0.75, count: 4 }],
+      recentTrend: 'improving',
+    },
+  }));
+  insertedLearningWorkspaceIds.push(readyLearningsWs.workspaceId);
+
+  const actionId = `action-${randomUUID()}`;
+  db.prepare(`
+    INSERT INTO tracked_actions
+      (id, workspace_id, action_type, source_type, source_id, page_url, target_keyword,
+       baseline_snapshot, trailing_history, attribution, measurement_window,
+       measurement_complete, source_flag, baseline_confidence, context, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+  `).run(
+    actionId,
+    readyLearningsWs.workspaceId,
+    'content_refreshed',
+    'content',
+    'content-1',
+    '/ready-learnings',
+    null,
+    JSON.stringify({ captured_at: '2026-05-01T00:00:00.000Z', clicks: 100 }),
+    JSON.stringify({ metric: 'clicks', dataPoints: [] }),
+    'platform_executed',
+    90,
+    1,
+    'live',
+    'exact',
+    JSON.stringify({ notes: 'Ready learnings endpoint fixture' }),
+  );
+  insertedActionIds.push(actionId);
+
+  const outcomeId = `outcome-${randomUUID()}`;
+  db.prepare(`
+    INSERT INTO action_outcomes
+      (id, action_id, checkpoint_days, metrics_snapshot, score, early_signal,
+       delta_summary, competitor_context, measured_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+  `).run(
+    outcomeId,
+    actionId,
+    90,
+    JSON.stringify({ captured_at: '2026-05-20T00:00:00.000Z', clicks: 175 }),
+    'strong_win',
+    null,
+    JSON.stringify({
+      primary_metric: 'clicks',
+      baseline_value: 100,
+      current_value: 175,
+      delta_absolute: 75,
+      delta_percent: 75,
+      direction: 'improved',
+    }),
+    JSON.stringify({}),
+  );
+  insertedOutcomeIds.push(outcomeId);
 }, 25_000);
 
 afterAll(async () => {
+  setFlagOverride('outcome-ai-injection', null);
+  for (const id of insertedOutcomeIds) {
+    db.prepare('DELETE FROM action_outcomes WHERE id = ?').run(id);
+  }
+  for (const id of insertedActionIds) {
+    db.prepare('DELETE FROM tracked_actions WHERE id = ?').run(id);
+  }
+  for (const workspaceId of insertedLearningWorkspaceIds) {
+    db.prepare('DELETE FROM workspace_learnings WHERE workspace_id = ?').run(workspaceId);
+  }
   // Clean up inserted insight rows (FK cascade is OFF in tests)
   for (const id of insertedInsightIds) {
     db.prepare('DELETE FROM analytics_insights WHERE id = ?').run(id);
@@ -127,6 +227,8 @@ afterAll(async () => {
   tryCleanup(premiumWs);
   tryCleanup(trialWs);
   tryCleanup(insightWs);
+  tryCleanup(largeInsightWs);
+  tryCleanup(readyLearningsWs);
 
   await ctx.stopServer();
 });
@@ -269,6 +371,10 @@ describe('growth tier — correct fields present and absent', () => {
   // Growth+ fields must be present
   it('learningHighlights key is present (may be null)', () => {
     expect('learningHighlights' in body).toBe(true);
+  });
+
+  it('learningHighlights is null until outcome learnings are ready', () => {
+    expect(body.learningHighlights).toBeNull();
   });
 
   it('rankTrackingSummary key is present (may be null)', () => {
@@ -491,6 +597,17 @@ describe('summarizeInsightsForClient — filtering and count math', () => {
   });
 });
 
+describe('summarizeInsightsForClient — uncapped count math', () => {
+  it('counts client-visible insights from full rollups, not capped prompt payload', async () => {
+    const res = await api(`/api/public/intelligence/${largeInsightWs.workspaceId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(body.insightsSummary?.total).toBe(105);
+    expect(body.insightsSummary?.mediumPriority).toBe(105);
+  });
+});
+
 // ── strategy_alignment specifically excluded ────────────────────────────────────
 
 describe('summarizeInsightsForClient — strategy_alignment exclusion', () => {
@@ -641,6 +758,24 @@ describe('growth tier — learningHighlights shape', () => {
       // topActionType is string or null
       expect(lh.topActionType === null || typeof lh.topActionType === 'string').toBe(true);
     }
+  });
+
+  it('returns shaped learningHighlights and weCalledIt when learnings are ready', async () => {
+    const res = await api(`/api/public/intelligence/${readyLearningsWs.workspaceId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(body.learningHighlights).toEqual({
+      overallWinRate: 0.75,
+      topActionType: 'content_refreshed',
+      recentWins: 1,
+    });
+    expect(body.weCalledIt).toHaveLength(1);
+    expect(body.weCalledIt[0]).toMatchObject({
+      actionId: insertedActionIds[0],
+      score: 'strong_win',
+      pageUrl: '/ready-learnings',
+    });
   });
 });
 

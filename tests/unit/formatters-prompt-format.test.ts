@@ -512,7 +512,7 @@ describe('pct() helper via output', () => {
         aeoReadiness: { pagesChecked: 10, passingRate: 0 },
       },
     };
-    const result = formatForPrompt(intel, { verbosity: 'standard', sections: ['siteHealth'] });
+    const result = formatForPrompt(intel, { verbosity: 'detailed', sections: ['siteHealth'] });
     expect(result).toContain('0%');
   });
 
@@ -525,8 +525,25 @@ describe('pct() helper via output', () => {
         aeoReadiness: { pagesChecked: 20, passingRate: 0.73 },
       },
     };
-    const result = formatForPrompt(intel, { verbosity: 'standard', sections: ['siteHealth'] });
+    const result = formatForPrompt(intel, { verbosity: 'detailed', sections: ['siteHealth'] });
     expect(result).toContain('73%');
+  });
+
+  it('renders Core Web Vitals with INP and LCP milliseconds converted to seconds', () => {
+    const intel: WorkspaceIntelligence = {
+      ...BASE,
+      seoContext: SEO_WITH_CONTEXT,
+      siteHealth: {
+        ...MIN_SITE_HEALTH,
+        performanceSummary: { avgLcp: 3250, avgInp: 235, avgFid: 80, avgCls: 0.15, score: 85 },
+      },
+    };
+
+    const result = formatForPrompt(intel, { verbosity: 'detailed', sections: ['siteHealth'] });
+
+    expect(result).toContain('LCP: 3.3s');
+    expect(result).toContain('INP: 235ms');
+    expect(result).not.toContain('FID:');
   });
 
   it('renders n/a for null overallWinRate (via learnings summarize step)', () => {
