@@ -2,6 +2,8 @@
  * Unit tests for server/stripe-config.ts — encryption, config CRUD.
  */
 import { describe, it, expect, afterEach } from 'vitest';
+import fs from 'fs';
+import path from 'path';
 import {
   saveStripeKeys,
   getStripeConfig,
@@ -14,6 +16,7 @@ import {
   getStripePriceId,
   type StripeProductPrice,
 } from '../../server/stripe-config.js';
+import { getDataDir } from '../../server/data-dir.js';
 
 // Clean up after all tests
 afterEach(() => {
@@ -50,6 +53,26 @@ describe('saveStripeKeys / getStripeConfig', () => {
     const safe = getStripeConfigSafe();
     expect(safe.publishableKey).toBe('pk_test_plain');
   });
+
+  it('returns empty decrypted keys when ciphertext payload is corrupted', () => {
+    saveStripeKeys('sk_test_real', 'whsec_test_real', 'pk_test');
+
+    const cfgPath = path.join(getDataDir('config'), 'stripe.json');
+    const raw = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
+    raw.secretKey = 'not:a:valid:gcm:payload';
+    raw.webhookSecret = 'bad';
+    fs.writeFileSync(cfgPath, JSON.stringify(raw, null, 2));
+
+    const config = getStripeConfig();
+    expect(config).not.toBeNull();
+    expect(config!.secretKey).toBe('');
+    expect(config!.webhookSecret).toBe('');
+
+    const safe = getStripeConfigSafe();
+    expect(safe.configured).toBe(false);
+    expect(safe.hasSecretKey).toBe(false);
+    expect(safe.hasWebhookSecret).toBe(false);
+  });
 });
 
 // ── getStripeConfigSafe ──
@@ -76,7 +99,6 @@ describe('getStripeConfigSafe', () => {
     saveStripeKeys('sk_secret_key', 'whsec_secret');
 
     const safe = getStripeConfigSafe();
-    // The safe response should not contain the actual secret values
     expect(JSON.stringify(safe)).not.toContain('sk_secret_key');
     expect(JSON.stringify(safe)).not.toContain('whsec_secret');
   });
@@ -99,6 +121,19 @@ describe('saveStripeProducts', () => {
     expect(config!.products[0].productType).toBe('brief_blog');
     expect(config!.products[1].enabled).toBe(false);
   });
+
+  it('preserves existing key material when updating products', () => {
+    saveStripeKeys('sk_live_123', 'whsec_live_456', 'pk_live_789');
+    saveStripeProducts([
+      { productType: 'brief_blog', stripePriceId: 'price_live_blog', displayName: 'Blog', priceUsd: 125, enabled: true },
+    ]);
+
+    const config = getStripeConfig();
+    expect(config).not.toBeNull();
+    expect(config!.secretKey).toBe('sk_live_123');
+    expect(config!.webhookSecret).toBe('whsec_live_456');
+    expect(config!.publishableKey).toBe('pk_live_789');
+  });
 });
 
 // ── clearStripeConfig ──
@@ -113,10 +148,6 @@ describe('clearStripeConfig', () => {
   });
 
   it('is idempotent (no error when config already cleared)', () => {
-    // Two back-to-back clears on an already-empty config must not throw
-    // AND must leave getStripeConfig() observably null both times. The
-    // .not.toThrow() wrapper gives us a real assertion rather than a
-    // body that only tests "doesn't throw" implicitly.
     expect(() => clearStripeConfig()).not.toThrow();
     expect(getStripeConfig()).toBeNull();
     expect(() => clearStripeConfig()).not.toThrow();
@@ -136,15 +167,19 @@ describe('getStripePriceId', () => {
     expect(getStripePriceId('brief_blog', 'STRIPE_PRICE_BRIEF')).toBe('price_from_disk');
   });
 
-  it('skips disabled products', () => {
+  it('skips disabled products and falls back to env var', () => {
     saveStripeKeys('sk_test');
     saveStripeProducts([
       { productType: 'brief_blog', stripePriceId: 'price_disabled', displayName: 'Blog', priceUsd: 125, enabled: false },
     ]);
 
-    // Should fall back to env var (empty in test)
-    const result = getStripePriceId('brief_blog', 'STRIPE_PRICE_BRIEF_NONEXISTENT');
-    expect(result).toBe('');
+    const prior = process.env.STRIPE_PRICE_BRIEF_DISABLED;
+    process.env.STRIPE_PRICE_BRIEF_DISABLED = 'price_env_fallback';
+
+    expect(getStripePriceId('brief_blog', 'STRIPE_PRICE_BRIEF_DISABLED')).toBe('price_env_fallback');
+
+    if (prior !== undefined) process.env.STRIPE_PRICE_BRIEF_DISABLED = prior;
+    else delete process.env.STRIPE_PRICE_BRIEF_DISABLED;
   });
 
   it('falls back to env var when no on-disk config', () => {

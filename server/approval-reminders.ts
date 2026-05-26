@@ -53,8 +53,9 @@ export async function checkStaleApprovals() {
       if (pendingItems.length === 0) continue;
 
       const createdAt = new Date(batch.createdAt).getTime();
-      const staleDays = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
-      if (staleDays < STALE_DAYS) continue;
+      const ageMs = now - createdAt;
+      const staleDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+      if (ageMs < STALE_DAYS * 24 * 60 * 60 * 1000) continue;
 
       // Don't re-send reminder within 3 days
       const lastSentAt = getReminderSentAt(key);

@@ -6,6 +6,7 @@ import { Button } from '../ui';
 import type { FeedInsight } from '../../../shared/types/insights.js';
 import { useDiagnosticForInsight, useRunDiagnostic } from '../../hooks/admin/useDiagnostics.js';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag.js';
+import { adminPath } from '../../routes.js';
 
 const SEVERITY_CONFIG = {
   critical: { icon: TrendingDown, bg: 'bg-red-500/8', text: 'text-red-400/80', badge: 'Critical' },
@@ -22,7 +23,7 @@ function DiagnosticCTA({ workspaceId, insightId }: { workspaceId: string; insigh
   if (report?.status === 'completed') {
     return (
       <Link
-        to={`/ws/${workspaceId}/diagnostics?report=${report.id}`}
+        to={`${adminPath(workspaceId, 'diagnostics')}?report=${report.id}`}
         className="mt-3 inline-flex items-center gap-1.5 t-caption font-medium text-teal-400 hover:text-teal-300"
       >
         <Icon as={FileSearch} size="md" />

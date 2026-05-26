@@ -2,8 +2,9 @@
  * Layered system prompt assembly for all AI features.
  *
  * Layer 1 — base instructions (always present, feature-specific)
- * Layer 2 — voice DNA translation (no-op until Brandscript Task 5b adds it)
+ * Layer 2 — calibrated voice DNA + guardrails
  * Layer 3 — per-workspace custom notes (activates when custom_prompt_notes is non-empty)
+ * Layer 4 — universal prose quality rules (skippable only for complete style systems)
  *
  * Each layer activates automatically when its data exists — no code changes needed
  * when Brandscript or custom notes ship.
@@ -124,10 +125,13 @@ export function guardrailsToPromptInstructions(guardrails: VoiceGuardrails): str
 
 /**
  * Assembles a system prompt by layering workspace-specific context onto base instructions.
- * Safe to call before Brandscript ships — Layer 2 is a no-op until extended in Task 5b.
+ * Safe in workspaces without voice profiles — Layer 2 is a no-op unless a
+ * calibrated profile exists.
  *
  * @param customNotes - Optional pre-fetched custom_prompt_notes. When provided, skips the
  *   internal DB query (avoids a duplicate read if the caller already fetched it for hashing).
+ * @param opts.skipProseRules - Skip Layer 4 only when the caller already owns a complete
+ *   prose/style rule system.
  */
 export function buildSystemPrompt(
   workspaceId: string,
@@ -177,7 +181,8 @@ export function buildSystemPrompt(
   }
 
   // Layer 4: universal prose quality rules (anti-AI-writing patterns)
-  // Skipped when the caller already includes WRITING_QUALITY_RULES in baseInstructions (e.g. copy-generation).
+  // Skipped when the caller already owns a fuller style contract, such as
+  // WRITING_QUALITY_RULES or CREATIVE_WRITING_RULES in generation prompts.
   if (!opts?.skipProseRules) {
     parts.push(PROSE_QUALITY_RULES);
   }

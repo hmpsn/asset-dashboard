@@ -1,9 +1,9 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Sparkles, Check, Download, ChevronDown, ChevronUp } from 'lucide-react';
+import { Sparkles, Check, Download, Pencil, Save, X } from 'lucide-react';
 import { identity } from '../../api/brand-engine';
 import type { BrandDeliverable, DeliverableType, DeliverableTier } from '../../../shared/types/brand-engine';
-import { SectionCard, EmptyState, Skeleton, Icon, Button, cn, FormInput } from '../ui';
+import { SectionCard, EmptyState, Skeleton, Button, cn, FormInput, FormTextarea } from '../ui';
 import { useToast } from '../Toast';
 import { queryKeys } from '../../lib/queryKeys';
 
@@ -57,13 +57,15 @@ function DeliverableCard({ workspaceId, deliverableType, deliverable, onChanged 
   const [generating, setGenerating] = useState(false);
   const [refining, setRefining] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [refineInput, setRefineInput] = useState('');
-  const [expanded, setExpanded] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftContent, setDraftContent] = useState('');
 
   const label = DELIVERABLE_LABELS[deliverableType] ?? deliverableType;
   const hasContent = !!deliverable?.content;
   const isApproved = deliverable?.status === 'approved';
-  const isLoading = generating || refining || approving;
+  const isLoading = generating || refining || approving || savingEdit;
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -109,10 +111,36 @@ function DeliverableCard({ workspaceId, deliverableType, deliverable, onChanged 
     }
   };
 
-  const contentPreview = deliverable?.content ?? '';
-  const contentLines = contentPreview.split('\n');
-  const showToggle = contentLines.length > 3 || contentPreview.length > 240;
-  const displayContent = expanded ? contentPreview : contentLines.slice(0, 3).join('\n').slice(0, 240);
+  const handleStartEdit = () => {
+    if (!deliverable?.content) return;
+    setDraftContent(deliverable.content);
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setDraftContent(deliverable?.content ?? '');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!deliverable) return;
+    const nextContent = draftContent.trim();
+    if (!nextContent || nextContent === deliverable.content) {
+      setIsEditing(false);
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      await identity.updateContent(workspaceId, deliverable.id, nextContent);
+      toast(`${label} updated`);
+      setIsEditing(false);
+      onChanged();
+    } catch {
+      toast(`Failed to update ${label}`, 'error');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   return (
     <SectionCard
@@ -135,28 +163,28 @@ function DeliverableCard({ workspaceId, deliverableType, deliverable, onChanged 
       <div className="flex flex-col gap-4">
         {/* Content preview */}
         {hasContent && (
-          <div className="space-y-1">
-            <p className="text-sm text-[var(--brand-text)] whitespace-pre-wrap leading-relaxed">{displayContent}{!expanded && showToggle ? '…' : ''}</p>
-            {showToggle && (
-              <Button
-                type="button"
-                onClick={() => setExpanded(prev => !prev)}
-                variant="ghost"
-                size="sm"
-                className="gap-1 t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] px-0 py-0 bg-transparent hover:bg-transparent"
-              >
-                {expanded ? (
-                  <><Icon as={ChevronUp} size="md" /> Show less</>
-                ) : (
-                  <><Icon as={ChevronDown} size="md" /> Show more</>
-                )}
-              </Button>
+          <div className="space-y-2">
+            {isEditing ? (
+              <>
+                <label htmlFor={`edit-${deliverableType}`} className="sr-only">
+                  Edit {label}
+                </label>
+                <FormTextarea
+                  id={`edit-${deliverableType}`}
+                  value={draftContent}
+                  onChange={setDraftContent}
+                  rows={8}
+                  disabled={isLoading}
+                />
+              </>
+            ) : (
+              <p className="text-sm text-[var(--brand-text)] whitespace-pre-wrap leading-relaxed">{deliverable.content}</p>
             )}
           </div>
         )}
 
         {/* Refine form — only when content exists */}
-        {hasContent && (
+        {hasContent && !isEditing && (
           <form onSubmit={handleRefine} className="flex gap-2">
             <label htmlFor={`refine-${deliverableType}`} className="sr-only">
               Refine direction for {label}
@@ -199,29 +227,69 @@ function DeliverableCard({ workspaceId, deliverableType, deliverable, onChanged 
             </Button>
           ) : (
             <>
-              <Button
-                type="button"
-                onClick={handleGenerate}
-                disabled={isLoading}
-                variant="secondary"
-                size="sm"
-                icon={Sparkles}
-                loading={generating}
-              >
-                Regenerate
-              </Button>
-              <Button
-                type="button"
-                onClick={handleToggleApprove}
-                disabled={isLoading}
-                variant={isApproved ? 'ghost' : 'secondary'}
-                size="sm"
-                icon={Check}
-                loading={approving}
-                className={isApproved ? 'bg-teal-500/10 hover:bg-teal-500/20 text-teal-400' : ''}
-              >
-                {isApproved ? 'Approved' : 'Approve'}
-              </Button>
+              {isEditing ? (
+                <>
+                  <Button
+                    type="button"
+                    onClick={handleSaveEdit}
+                    disabled={!draftContent.trim() || draftContent.trim() === deliverable?.content || isLoading}
+                    variant="primary"
+                    size="sm"
+                    icon={Save}
+                    loading={savingEdit}
+                  >
+                    Save
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    disabled={isLoading}
+                    variant="ghost"
+                    size="sm"
+                    icon={X}
+                  >
+                    Cancel
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  type="button"
+                  onClick={handleStartEdit}
+                  disabled={isLoading}
+                  variant="secondary"
+                  size="sm"
+                  icon={Pencil}
+                >
+                  Edit
+                </Button>
+              )}
+              {!isEditing && (
+                <>
+                  <Button
+                    type="button"
+                    onClick={handleGenerate}
+                    disabled={isLoading}
+                    variant="secondary"
+                    size="sm"
+                    icon={Sparkles}
+                    loading={generating}
+                  >
+                    Regenerate
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleToggleApprove}
+                    disabled={isLoading}
+                    variant={isApproved ? 'ghost' : 'secondary'}
+                    size="sm"
+                    icon={Check}
+                    loading={approving}
+                    className={isApproved ? 'bg-teal-500/10 hover:bg-teal-500/20 text-teal-400' : ''}
+                  >
+                    {isApproved ? 'Approved' : 'Approve'}
+                  </Button>
+                </>
+              )}
             </>
           )}
         </div>
@@ -247,7 +315,7 @@ function TierSection({ tier, workspaceId, deliverableMap, onChanged }: TierSecti
       <h2 className="t-caption font-semibold uppercase tracking-wider text-[var(--brand-text-muted)]">
         {TIER_LABELS[tier]}
       </h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="space-y-4">
         {types.map(type => (
           <DeliverableCard
             key={type}
@@ -332,7 +400,7 @@ export function IdentityTab({ workspaceId }: { workspaceId: string }) {
         {TIER_ORDER.map(tier => (
           <div key={tier} className="space-y-3">
             <Skeleton className="h-4 w-24" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="space-y-4">
               {TIER_TYPES[tier].map(type => (
                 <Skeleton key={type} className="h-40 rounded-[var(--radius-xl)]" />
               ))}

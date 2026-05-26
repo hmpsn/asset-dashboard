@@ -30,6 +30,14 @@ function parseCsvQuery(rawValue: unknown): string[] {
 }
 
 // --- Competitive Intelligence Hub ---
+/**
+ * Synchronous competitive intelligence read. Currently NOT exposed via MCP — the
+ * MCP actions plan deferred this to roadmap because it's a sync endpoint, not a
+ * background job. To expose via MCP, first promote to a real background job:
+ * add COMPETITIVE_ANALYSIS to BACKGROUND_JOB_TYPES, write a runner that wraps
+ * this fetch + caches the result, then add an MCP start_* tool wrapper.
+ * TODO(mcp-actions): see docs/superpowers/specs/2026-05-25-mcp-actions-keyword-and-content-design.md
+ */
 router.get('/api/semrush/competitive-intel/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { workspaceId } = req.params;
   const competitors = parseCsvQuery(req.query.competitors);

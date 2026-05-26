@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
 import { adminPath } from '../routes';
-import { TabBar } from './ui';
+import { TabBar, LoadingState, ErrorState } from './ui';
 import { ErrorBoundary } from './ErrorBoundary';
 import { useKeywordStrategy, usePageJoin } from '../hooks/admin';
 import { useLocalSeo } from '../hooks/admin/useLocalSeo';
@@ -59,7 +58,12 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   const [activeTab, setActiveTab] = useState<'pages' | 'architecture' | 'guide'>('pages');
 
   // Unified page list (Webflow pages + strategy data)
-  const { pages: unifiedPages, isLoading: pagesLoading } = usePageJoin(workspaceId, siteId);
+  const {
+    pages: unifiedPages,
+    isLoading: pagesLoading,
+    error: pagesError,
+    refetch: refetchPages,
+  } = usePageJoin(workspaceId, siteId);
 
   const {
     analyses,
@@ -201,10 +205,18 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-6 h-6 animate-spin text-accent-brand" />
-        <span className="ml-3 t-body text-[var(--brand-text)]">Loading page intelligence...</span>
-      </div>
+      <LoadingState message="Loading page intelligence and strategy mappings..." size="lg" className="py-20" />
+    );
+  }
+
+  if (pagesError) {
+    return (
+      <ErrorState
+        title="Couldn't load page intelligence"
+        message="We couldn't load Webflow pages or strategy mappings. Try again."
+        action={{ label: 'Retry', onClick: refetchPages }}
+        type="data"
+      />
     );
   }
 

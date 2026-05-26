@@ -58,6 +58,7 @@ vi.mock('../../server/copy-intelligence.js', () => ({
 
 vi.mock('../../server/writing-quality.js', () => ({
   WRITING_QUALITY_RULES: 'MOCK WRITING QUALITY RULES',
+  CREATIVE_WRITING_RULES: 'MOCK CREATIVE WRITING RULES',
 }));
 
 vi.mock('../../server/db/json-validation.js', () => ({
@@ -645,9 +646,24 @@ describe('buildCopyGenerationContext — output structure', () => {
     expect(ctx).toContain('PAGE TYPE: Service Page');
   });
 
-  it('includes writing quality rules in generation layer', async () => {
+  it('includes lean creative writing rules in generation layer', async () => {
     const ctx = await buildCopyGenerationContext(WORKSPACE_ID, makeBlueprint(), makeEntry());
-    expect(ctx).toContain('MOCK WRITING QUALITY RULES');
+    expect(ctx).toContain('MOCK CREATIVE WRITING RULES');
+    expect(ctx).not.toContain('MOCK WRITING QUALITY RULES');
+  });
+
+  it('includes the brand context priority hierarchy in generation rules', async () => {
+    const ctx = await buildCopyGenerationContext(WORKSPACE_ID, makeBlueprint(), makeEntry());
+    expect(ctx).toContain('BRAND CONTEXT PRIORITY');
+    expect(ctx).toContain('Page type, conversion goal, and word budget outrank style preferences');
+    expect(ctx).toContain('do not expand the page because more brand context is available');
+  });
+
+  it('includes service page density contract in generation rules', async () => {
+    const ctx = await buildCopyGenerationContext(WORKSPACE_ID, makeBlueprint(), makeEntry({ pageType: 'service' }));
+    expect(ctx).toContain('PAGE-TYPE COPY CONTRACT (service)');
+    expect(ctx).toContain('Conversion-dense service page, not a long educational article');
+    expect(ctx).toContain('Do not add duplicate booking/discovery sections');
   });
 });
 

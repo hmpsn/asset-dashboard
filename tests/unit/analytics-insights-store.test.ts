@@ -373,6 +373,43 @@ describe('analytics insight secondary operations', () => {
     const afterWrongWorkspace = getInsightById(second.id, wsId);
     expect((afterWrongWorkspace?.data as AnomalyDigestData).diagnosticReportId).toBe('diag-123');
   });
+
+  it('does not stamp diagnostic report IDs onto non-anomaly insights', () => {
+    const wsId = makeWorkspaceId('ws_non_anomaly_stamp');
+    const pageHealth = upsertInsight({
+      workspaceId: wsId,
+      pageId: '/non-anomaly',
+      insightType: 'page_health',
+      data: pageHealthData,
+      severity: 'warning',
+    });
+
+    stampDiagnosticReportId(wsId, pageHealth.id, 'diag-should-not-apply');
+    const unchanged = getInsightById(pageHealth.id, wsId);
+
+    expect(unchanged?.insightType).toBe('page_health');
+    expect(unchanged?.data).toEqual(pageHealthData);
+    expect((unchanged?.data as Record<string, unknown>).diagnosticReportId).toBeUndefined();
+  });
+
+  it('falls back safely when stored insight data is corrupted JSON', () => {
+    const wsId = makeWorkspaceId('ws_corrupt_insight');
+    const created = upsertInsight({
+      workspaceId: wsId,
+      pageId: '/corrupt',
+      insightType: 'page_health',
+      data: pageHealthData,
+      severity: 'warning',
+    });
+
+    db.prepare('UPDATE analytics_insights SET data = ? WHERE id = ? AND workspace_id = ?')
+      .run('{"not-valid-json"', created.id, wsId);
+
+    const readBack = getInsightById(created.id, wsId);
+    expect(readBack).toBeDefined();
+    expect(readBack?.insightType).toBe('page_health');
+    expect(readBack?.data).toEqual({});
+  });
 });
 
 // Type-level smoke test — ensures AnalyticsInsight shape is exported correctly

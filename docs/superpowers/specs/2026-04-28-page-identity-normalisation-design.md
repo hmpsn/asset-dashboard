@@ -235,7 +235,7 @@ if (ctx.workspaceId) {
 }
 ```
 
-**`buildSchemaIntelligenceBlock`** — add after existing checks:
+**Superseded:** old `buildSchemaIntelligenceBlock` wiring was retired by Workspace Intelligence Consolidation PR4. Future validation-error or FAQ-from-GSC context should use schema generation context or a slice-backed schema intelligence helper.
 
 ```ts
 if (ctx._existingErrors && ctx._existingErrors.length > 0) {

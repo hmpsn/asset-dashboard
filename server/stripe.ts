@@ -11,7 +11,7 @@ import {
 import { getContentRequest, updateContentRequest } from './content-requests.js';
 import { addActivity } from './activity-log.js';
 import { getStripeSecretKey, getStripeWebhookSecret, getStripePriceId } from './stripe-config.js';
-import { getWorkspace, updateWorkspace, listWorkspaces } from './workspaces.js';
+import { getWorkspace, updateWorkspace } from './workspaces.js';
 import { createWorkOrder } from './work-orders.js';
 import { notifyTeamPaymentReceived } from './email.js';
 import { createLogger } from './logger.js';
@@ -364,18 +364,10 @@ export async function cancelSubscription(workspaceId: string): Promise<{ ok: boo
 export function clearTestModeCustomerIds(): number {
   const key = getStripeSecretKey();
   if (!key || !key.startsWith('sk_live_')) return 0;
-  const workspaces = listWorkspaces();
-  let cleared = 0;
-  for (const ws of workspaces) {
-    if (ws.stripeCustomerId) {
-      // Clear any stored customer ID when switching to live mode.
-      // The getOrCreateCustomer function will create a fresh live customer on next payment.
-      updateWorkspace(ws.id, { stripeCustomerId: '' });
-      cleared++;
-    }
-  }
-  if (cleared > 0) log.info(`Cleared ${cleared} stale test-mode customer ID(s) — live customers will be created on next payment`);
-  return cleared;
+  // Do not eagerly clear stored customer ids on startup.
+  // getOrCreateCustomer already verifies each stored id against Stripe and
+  // repairs stale/missing ids lazily without churning valid customer links.
+  return 0;
 }
 
 // --- Webhook Handler ---

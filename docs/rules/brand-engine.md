@@ -24,7 +24,7 @@ Workspace intelligence assembles the SEO context in `server/intelligence/seo-con
 
 This is the most consequential rule in the brand engine. Violating it sends contradictory or redundantly weighted voice instructions to the model, and the bug is invisible — the response just degrades.
 
-### Three-Layer Architecture
+### Four-Layer Architecture
 
 ```
 Layer 1 — Base task instructions
@@ -41,9 +41,14 @@ Layer 3 — Per-workspace custom notes
   Activates when: workspaces.custom_prompt_notes is non-empty
   What it injects: "Additional context for this client:\n{notes}"
   Function: buildSystemPrompt() in server/prompt-assembly.ts
+
+Layer 4 — Universal prose quality rules
+  Activates by default for every buildSystemPrompt() call
+  What it injects: anti-generic-writing rules from server/writing-quality.ts
+  Skip hatch: buildSystemPrompt(workspaceId, base, notes, { skipProseRules: true })
 ```
 
-`buildSystemPrompt(workspaceId, baseInstructions, customNotes?)` assembles all three layers into a single string joined by `\n\n`. Call it once per request, pass the result as the system prompt.
+`buildSystemPrompt(workspaceId, baseInstructions, customNotes?, opts?)` assembles all layers into a single string joined by `\n\n`. Call it once per request, pass the result as the system prompt.
 
 ### The No-Duplicate Contract
 
@@ -72,12 +77,58 @@ buildSystemPrompt(
   workspaceId: string,
   baseInstructions: string,
   customNotes?: string | null,
+  opts?: { skipProseRules?: boolean },
 ): string
 ```
 
 Reads `voice_profiles` and `workspaces.custom_prompt_notes` from the DB on each call. If `customNotes` is provided as an argument, the DB query for custom notes is skipped (avoids a duplicate read when the caller has already fetched it for hashing).
 
 Layer 2 is a no-op when no `voice_profiles` row exists or when `status !== 'calibrated'`. The function degrades gracefully when the `voice_profiles` table does not exist (test environments without migrations).
+
+Layer 4 appends the universal prose quality rules by default. Use `{ skipProseRules: true }` only when the caller already includes the same rules or intentionally supplies a complete style system, such as copy generation paths that own richer writing-quality instructions. Do not skip Layer 4 just to save tokens.
+
+## Writing Rule Selection
+
+**File:** `server/writing-quality.ts`
+
+Use the smallest ruleset that protects the output contract:
+
+- `PROSE_QUALITY_RULES` — default Layer 4 guardrails for general prose callers through `buildSystemPrompt()`.
+- `CREATIVE_WRITING_RULES` — lean creative-copy contract for content posts and copy pipeline generation. It keeps factual safety and output discipline strict while avoiding a long wall of phrase bans.
+- `WRITING_QUALITY_RULES` — full legacy ruleset for paths that deliberately need exhaustive writing constraints.
+
+Callers that inject either `CREATIVE_WRITING_RULES` or `WRITING_QUALITY_RULES` into their own task prompt must call `buildSystemPrompt(..., { skipProseRules: true })`. This avoids double-weighting anti-generic-writing instructions and preserves room for brand voice, page-type guidance, and approved samples to shape the final copy.
+
+## Page-Type and Brand Context Priority
+
+**File:** `server/page-type-copy-contract.ts`
+
+Creative generation callers that receive rich brand inputs must include the shared page-type copy contract. The contract keeps calibrated voice, business knowledge, personas, approved identity deliverables, and copy patterns from overpowering page architecture.
+
+Priority order for content posts and copy pipeline generation:
+
+1. Factual safety and output format.
+2. Page type, conversion goal, and word budget.
+3. Brand voice and tone.
+4. Brand identity, business knowledge, personas, and approved deliverables as selective support.
+
+Brand context should choose vocabulary, proof, positioning, and rhythm. It must not add extra sections, repeated CTAs, duplicated proof blocks, or longer copy simply because more brand context is present. Service, location, landing, homepage, and product pages are density-reviewed during unification; blogs, pillars, and resources retain permission for deeper educational structure.
+
+## Voice Quality Contract Harness
+
+**File:** `tests/unit/voice-quality-contract-harness.test.ts`
+
+This harness is the regression gate for the current voice-authority states:
+
+- calibrated profile
+- draft profile with samples only
+- draft profile with DNA/guardrails
+- legacy brand voice only
+- no voice data
+
+The test renders both `buildSystemPrompt()` and `buildEffectiveBrandVoiceBlock()` for each state. It verifies that calibrated DNA/guardrails live in Layer 2 without duplication, draft samples alone do not override legacy authority, draft DNA/guardrails remain prompt-visible before calibration, legacy voice still works, and no-voice workspaces still receive base instructions plus prose quality rules.
+
+It also verifies strict output-format instructions remain first in the final system prompt. Keep subjective live-model scoring out of CI; add offline/manual eval tooling only when it cannot block the deterministic test suite.
 
 ---
 

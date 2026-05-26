@@ -85,6 +85,8 @@ export const identity = {
     post<BrandDeliverable>(`/api/brand-identity/${wsId}/generate`, body),
   refine: (wsId: string, id: string, body: { direction: string }) =>
     post<BrandDeliverable>(`/api/brand-identity/${wsId}/${id}/refine`, body),
+  updateContent: (wsId: string, id: string, content: string) =>
+    patch<BrandDeliverable>(`/api/brand-identity/${wsId}/${id}`, { content }),
   updateStatus: (wsId: string, id: string, status: 'approved' | 'draft') =>
     patch<BrandDeliverable>(`/api/brand-identity/${wsId}/${id}`, { status }),
   /**

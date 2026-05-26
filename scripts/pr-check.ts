@@ -6263,7 +6263,7 @@ export const CHECKS: Check[] = [
         // Concretely for `buildSchemaContext`:
         //   line 338: `export async function buildSchemaContext(`  → paren=1
         //   line 339: `  siteId: string,`                         → paren=1
-        //   line 340: `  options?: { includeAnalytics?: boolean },`→ paren=1 (inner {} ignored)
+        //   multi-line return type follows before the function body opens.
         //   line 341: `): Promise<{`                              → `)` paren→0; seenParams=true; `<` angle=1; `{` inside angle — skip
         //   line 342: `  ctx: SchemaContext;`                     → angle=1 still
         //   line 343: `  pageKeywordMap?: ...;`                   → angle=1 still
@@ -6582,6 +6582,120 @@ export const CHECKS: Check[] = [
       "Prevents re-introduction of ActionQueueStrip into InboxTab.tsx after the inbox IA restructure removed it (§5.6 of IA spec).",
     claudeMdRef: '#code-conventions',
     excludeLines: ['inbox-action-queue-strip-ok'],
+  },
+  {
+    name: 'mcp-action-must-route-through-service',
+    pattern: 'stmts\\(\\)\\.[a-zA-Z_]+\\.run\\(',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/mcp/tools/',
+    message: 'MCP write tools must route persistence through service functions (e.g. upsertBrief, savePost, upsertPageKeyword). Do not call stmts().*.run() directly from server/mcp/tools/ - that bypasses broadcasts, activity logging, and state-machine guards.',
+    severity: 'error',
+    rationale: 'MCP write tools must go through service functions so broadcasts, activity logging, and state-machine guards all fire.',
+    claudeMdRef: '#mcp-actions',
+  },
+  {
+    name: 'mcp-action-must-tag-source',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/mcp/tools/',
+    message: 'MCP write tools must tag activity with { source: \'mcp-chat\' } in the metadata arg. Every addActivity() call from server/mcp/tools/ must include \"source: \'mcp-chat\'\" in its arguments.',
+    severity: 'error',
+    excludeLines: ['mcp-action-must-tag-source-ok'],
+    rationale: 'mcp-chat-tagged activity entries get a \"chat\" badge in the activity feed so operators can audit chat-driven mutations.',
+    claudeMdRef: '#mcp-actions',
+    customCheck: (files) => {
+      const matches: { file: string; line: number; text: string }[] = [];
+      for (const file of files) {
+        let text: string;
+        try {
+          text = readFileSync(file, 'utf8');
+        } catch {
+          continue;
+        }
+        const lines = text.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (!/\baddActivity\(/.test(line)) continue;
+          if (hasHatch(lines, i, 'mcp-action-must-tag-source-ok')) continue;
+          let depth = 0;
+          let foundCloseParen = false;
+          let foundSourceTag = false;
+          for (let j = i; j < Math.min(i + 20, lines.length); j++) {
+            const segment = lines[j];
+            for (const ch of segment) {
+              if (ch === '(') depth++;
+              else if (ch === ')') {
+                depth--;
+                if (depth === 0) {
+                  foundCloseParen = true;
+                  break;
+                }
+              }
+            }
+            if (/source\s*:\s*['"]mcp-chat['"]/.test(segment)) foundSourceTag = true;
+            if (foundCloseParen) break;
+          }
+          if (foundCloseParen && !foundSourceTag) {
+            matches.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+      return matches;
+    },
+  },
+  {
+    name: 'mcp-action-must-broadcast',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/mcp/tools/',
+    message: 'MCP write tool file calls a mutation service (upsertBrief / savePost / upsertPageKeyword / notifyContentUpdated) but never calls broadcastToWorkspace(). Every persistence path from server/mcp/tools/ must broadcast a workspace event so the frontend invalidates its caches.',
+    severity: 'error',
+    excludeLines: ['mcp-action-must-broadcast-ok'],
+    rationale: 'broadcast pairs every write so React Query caches stay fresh; MCP tools own this since the underlying service functions are unbroadcast.',
+    claudeMdRef: '#mcp-actions',
+    customCheck: (files) => {
+      const matches: { file: string; line: number; text: string }[] = [];
+      const mutationFnRe = /\b(upsertBrief|savePost|upsertPageKeyword|notifyContentUpdated)\(/;
+      const broadcastRe = /\bbroadcastToWorkspace\(/;
+      for (const file of files) {
+        let text: string;
+        try {
+          text = readFileSync(file, 'utf8');
+        } catch {
+          continue;
+        }
+        const lines = text.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (!mutationFnRe.test(line)) continue;
+          if (hasHatch(lines, i, 'mcp-action-must-broadcast-ok')) continue;
+
+          // Require a broadcast in the same enclosing function scope as the
+          // mutation call. This prevents false-negatives where file A has one
+          // correctly-broadcasted mutation and another silent mutation in a
+          // different function.
+          let scopeStart = i;
+          while (scopeStart > 0 && !FUNC_BOUNDARY_RE.test(lines[scopeStart])) {
+            scopeStart--;
+          }
+
+          let scopeEnd = lines.length - 1;
+          for (let j = i + 1; j < lines.length; j++) {
+            if (FUNC_BOUNDARY_RE.test(lines[j])) {
+              scopeEnd = j - 1;
+              break;
+            }
+          }
+
+          const hasBroadcastInScope = lines
+            .slice(scopeStart, scopeEnd + 1)
+            .some(scopeLine => broadcastRe.test(scopeLine));
+
+          if (!hasBroadcastInScope) {
+            matches.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+      return matches;
+    },
   },
 ];
 

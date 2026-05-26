@@ -35,7 +35,7 @@ export interface TestContext {
  * Create an isolated test context bound to a specific port.
  * Each test file should call this with a unique port number.
  */
-export function createTestContext(port: number): TestContext {
+export function createTestContext(port: number, options?: { env?: Record<string, string> }): TestContext {
   const BASE = `http://localhost:${port}`;
   const dataDir = process.env.DATA_DIR ?? ensureIsolatedTestDataDir();
   let proc: ChildProcess | null = null;
@@ -72,6 +72,7 @@ export function createTestContext(port: number): TestContext {
       cwd: ROOT,
       env: {
         ...process.env,
+        ...(options?.env ?? {}),
         PORT: String(port),
         // Use 'test' so the server skips file watchers (chokidar) that exhaust
         // open file descriptor limits when multiple test servers run concurrently.

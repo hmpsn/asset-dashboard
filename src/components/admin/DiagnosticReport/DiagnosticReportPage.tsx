@@ -1,11 +1,13 @@
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { Activity } from 'lucide-react';
+import { adminPath } from '../../../routes.js';
 import { SectionCard } from '../../ui/SectionCard.js';
 import { StatCard } from '../../ui/StatCard.js';
 import { Skeleton } from '../../ui/Skeleton.js';
 import { EmptyState } from '../../ui/EmptyState.js';
 import { PageHeader } from '../../ui/PageHeader.js';
 import { Badge } from '../../ui/Badge.js';
+import { Button } from '../../ui/Button.js';
 import { RootCauseCard } from './RootCauseCard.js';
 import { RemediationPlan } from './RemediationPlan.js';
 import { EvidenceAccordion } from './EvidenceAccordion.js';
@@ -125,7 +127,21 @@ const pageLabel = (pages: string[], fallback: string): string => {
   return p.replace(/^\//, '').replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || fallback;
 };
 
+const ANOMALY_TYPE_LABELS: Record<string, string> = {
+  traffic_drop: 'Traffic Drop',
+  ranking_loss: 'Ranking Loss',
+  ctr_drop: 'CTR Drop',
+  conversion_drop: 'Conversion Drop',
+};
+
+const anomalyTypeLabel = (value: string): string => {
+  const mapped = ANOMALY_TYPE_LABELS[value];
+  if (mapped) return mapped;
+  return value.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
+};
+
 function DiagnosticReportList({ workspaceId }: { workspaceId: string }) {
+  const navigate = useNavigate();
   const { data, isLoading } = useDiagnosticsList(workspaceId);
 
   if (isLoading) return <SectionCard><ReportSkeleton /></SectionCard>;
@@ -138,6 +154,14 @@ function DiagnosticReportList({ workspaceId }: { workspaceId: string }) {
           title="No diagnostics yet"
           description="Run a deep diagnostic from an anomaly insight to investigate root causes."
           icon={Activity}
+          action={(
+            <Button
+              size="sm"
+              onClick={() => navigate(`${adminPath(workspaceId, 'home')}?tab=overview`)}
+            >
+              Open Workspace Overview
+            </Button>
+          )}
         />
       </SectionCard>
     );
@@ -151,8 +175,8 @@ function DiagnosticReportList({ workspaceId }: { workspaceId: string }) {
           <SectionCard>
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="t-ui text-[var(--brand-text-bright)]">{pageLabel(r.affectedPages, r.anomalyType)}</h3>
-                <p className="t-caption-sm text-[var(--brand-text-muted)]">{r.anomalyType} - {new Date(r.createdAt).toLocaleDateString()}</p>
+                <h3 className="t-ui text-[var(--brand-text-bright)]">{pageLabel(r.affectedPages, anomalyTypeLabel(r.anomalyType))}</h3>
+                <p className="t-caption-sm text-[var(--brand-text-muted)]">{anomalyTypeLabel(r.anomalyType)} - {new Date(r.createdAt).toLocaleDateString()}</p>
               </div>
               <Badge
                 label={r.status}

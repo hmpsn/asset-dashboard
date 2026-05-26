@@ -22,6 +22,7 @@ const log = createLogger('rank-tracking-scheduler');
 const DAILY_MS = 24 * 60 * 60 * 1000;
 
 let rankInterval: ReturnType<typeof setInterval> | null = null;
+let rankStartupTimeout: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * Run a rank snapshot for each eligible workspace.
@@ -82,10 +83,11 @@ export async function runRankTrackingSnapshots(workspaceIds?: string[]): Promise
 
 /** Register the daily rank snapshot cron. Safe to call multiple times (idempotent). */
 export function startRankTrackingScheduler(): void {
-  if (rankInterval) return;
+  if (rankInterval || rankStartupTimeout) return;
 
   // Run 2 minutes after startup, then every 24 hours
-  setTimeout(() => {
+  rankStartupTimeout = setTimeout(() => {
+    rankStartupTimeout = null;
     runRankTrackingSnapshots().catch(err =>
       log.error({ err }, 'Rank tracking scheduler initial run error'),
     );
@@ -102,6 +104,10 @@ export function startRankTrackingScheduler(): void {
 
 /** Stop the rank tracking scheduler (used during graceful shutdown). */
 export function stopRankTrackingScheduler(): void {
+  if (rankStartupTimeout) {
+    clearTimeout(rankStartupTimeout);
+    rankStartupTimeout = null;
+  }
   if (rankInterval) {
     clearInterval(rankInterval);
     rankInterval = null;

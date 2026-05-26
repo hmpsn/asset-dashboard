@@ -64,6 +64,15 @@ interface Props {
   siteId?: string;
 }
 
+interface KeywordFeedbackRow {
+  keyword: string;
+  status: 'approved' | 'declined' | 'requested';
+  reason?: string | null;
+  source?: string | null;
+  declined_by?: string | null;
+  updated_at?: string;
+}
+
 export function KeywordStrategyPanel({ workspaceId }: Props) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -114,6 +123,13 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     enabled: !!workspaceId,
   });
   const trackedKeywords = trackedKeywordsData ?? new Set<string>();
+
+  const { data: keywordFeedbackRows = [] } = useQuery<KeywordFeedbackRow[]>({
+    queryKey: queryKeys.admin.keywordFeedback(workspaceId),
+    queryFn: () => keywords.feedback(workspaceId),
+    enabled: !!workspaceId,
+    staleTime: 60 * 1000,
+  });
 
   // Reset active provider when workspace changes so the init effect can re-fire with new workspace data
   useEffect(() => {
@@ -274,6 +290,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     acc[intent] = (acc[intent] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
+  const declinedFeedback = keywordFeedbackRows.filter(row => row.status === 'declined');
+  const requestedFeedback = keywordFeedbackRows.filter(row => row.status === 'requested');
+  const approvedFeedback = keywordFeedbackRows.filter(row => row.status === 'approved');
 
   if (loading) {
     return <LoadingState message="Loading keyword strategy..." />;
@@ -281,7 +300,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
 
   if (!workspaceId) {
     return (
-      <div className="text-center py-16 text-[var(--brand-text-muted)] t-ui">
+      <div className="text-center py-16 text-[var(--brand-text-muted)] t-body">
         No workspace selected. Link a workspace to generate a keyword strategy.
       </div>
     );
@@ -346,6 +365,57 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         mode="strategy"
         onOpenKeywords={() => navigate(adminPath(workspaceId, 'seo-keywords'))}
       />
+
+      <SectionCard
+        title="Client Keyword Feedback"
+        titleIcon={<Icon as={Users} size="md" className="text-accent-brand" />}
+        titleExtra={(
+          <span className="t-caption-sm text-[var(--brand-text-muted)]">
+            {declinedFeedback.length} declined · {requestedFeedback.length} requested · {approvedFeedback.length} approved
+          </span>
+        )}
+      >
+        {keywordFeedbackRows.length === 0 ? (
+          <p className="t-caption-sm text-[var(--brand-text-muted)]">
+            No client feedback submitted yet. Declined keywords and reasons will appear here.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {declinedFeedback.length > 0 ? (
+              declinedFeedback.slice(0, 12).map((item) => (
+                <div
+                  key={`declined-${item.keyword}`}
+                  className="rounded-[var(--radius-md)] border border-red-500/20 bg-red-500/5 px-3 py-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <Badge label="Declined" tone="red" size="sm" />
+                    <span className="t-caption-sm font-medium text-[var(--brand-text-bright)]">{item.keyword}</span>
+                    {item.updated_at && (
+                      <span className="t-caption-sm text-[var(--brand-text-muted)]">
+                        {new Date(item.updated_at).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
+                  {item.reason && (
+                    <p className="mt-1 t-caption-sm text-[var(--brand-text)]">
+                      {item.reason}
+                    </p>
+                  )}
+                </div>
+              ))
+            ) : (
+              <p className="t-caption-sm text-[var(--brand-text-muted)]">
+                No declined keywords right now.
+              </p>
+            )}
+            {declinedFeedback.length > 12 && (
+              <p className="t-caption-sm text-[var(--brand-text-muted)]">
+                Showing latest 12 declines ({declinedFeedback.length} total).
+              </p>
+            )}
+          </div>
+        )}
+      </SectionCard>
 
       {/* Settings Panel */}
       {/* pr-check-disable-next-line -- brand asymmetric signature on KeywordStrategy settings panel; intentional non-SectionCard chrome (collapsible, button-as-first-child) */}
@@ -595,7 +665,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         <SectionCard noPadding>
           <div className="px-6 py-12 text-center">
             <Icon as={Target} size="2xl" className="text-[var(--brand-text-muted)] mx-auto mb-3" />
-            <p className="t-ui text-[var(--brand-text)] mb-1">No keyword strategy yet</p>
+            <p className="t-body text-[var(--brand-text)] mb-1">No keyword strategy yet</p>
             <p className="t-caption-sm text-[var(--brand-text-muted)] max-w-md mx-auto">
               Generate an AI-powered keyword strategy based on your site's pages and Google Search Console data.
               This will map target keywords to each page and guide all future AI rewrites.

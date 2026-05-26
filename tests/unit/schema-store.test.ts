@@ -71,6 +71,19 @@ describe('schema-store', () => {
     expect(deleteSchemaSnapshot(SITE_ID)).toBe(false);
   });
 
+  it('normalizes corrupt snapshot results payload to empty array instead of leaking wrong shape', () => {
+    db.prepare(`
+      INSERT INTO schema_snapshots (id, site_id, workspace_id, created_at, results, page_count)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run('snap_bad', SITE_ID, WS_ID, '2026-05-01T00:00:00.000Z', '{"not":"an-array"}', 99);
+
+    const snapshot = getSchemaSnapshot(SITE_ID);
+
+    expect(snapshot).not.toBeNull();
+    expect(snapshot?.results).toEqual([]);
+    expect(snapshot?.pageCount).toBe(99);
+  });
+
   it('auto-seeds a site template from the homepage snapshot graph', () => {
     saveSchemaSnapshot(SITE_ID, WS_ID, [
       pageSuggestion('home', '/', {
@@ -148,6 +161,36 @@ describe('schema-store', () => {
     expect(getSchemaPlan(SITE_ID)).toBeNull();
   });
 
+  it('normalizes corrupt plan arrays to [] so role updates do not crash', () => {
+    db.prepare(`
+      INSERT INTO schema_site_plans
+        (id, site_id, workspace_id, site_url, canonical_entities, page_roles, status, client_preview_batch_id, generated_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      'plan_bad',
+      SITE_ID,
+      WS_ID,
+      'https://example.com',
+      '{"bad":"shape"}',
+      '"also-bad"',
+      'draft',
+      null,
+      '2026-05-05T00:00:00.000Z',
+      '2026-05-05T00:00:00.000Z',
+    );
+
+    const plan = getSchemaPlan(SITE_ID);
+
+    expect(plan).not.toBeNull();
+    expect(plan?.canonicalEntities).toEqual([]);
+    expect(plan?.pageRoles).toEqual([]);
+
+    const updated = updateSchemaPlanRoles(SITE_ID, [
+      { pagePath: '/', pageTitle: 'Home', role: 'homepage', primaryType: 'WebPage', entityRefs: [] },
+    ]);
+    expect(updated?.pageRoles).toHaveLength(1);
+  });
+
   it('persists page type selections and CMS field mappings', () => {
     savePageType(SITE_ID, 'home', 'homepage');
     savePageTypes(SITE_ID, { service: 'service', blog: 'blog' });
@@ -168,5 +211,27 @@ describe('schema-store', () => {
     expect(getSchemaCmsFieldMapping(SITE_ID, 'collection-1')?.fieldMappings?.title).toBe('name');
     expect(getSchemaCmsFieldMappings(SITE_ID)).toHaveLength(1);
     expect(getSchemaCmsFieldMapping(SITE_ID, 'missing')).toBeNull();
+  });
+
+  it('drops corrupt field_mappings JSON shape to undefined instead of returning invalid arrays', () => {
+    db.prepare(`
+      INSERT INTO schema_cms_field_mappings
+        (site_id, collection_id, collection_name, collection_slug, schema_field_slug, collection_role, field_mappings, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      SITE_ID,
+      'collection_bad',
+      'Broken Collection',
+      'broken-collection',
+      null,
+      null,
+      '["not","an","object"]',
+      '2026-05-03T00:00:00.000Z',
+    );
+
+    const mapping = getSchemaCmsFieldMapping(SITE_ID, 'collection_bad');
+
+    expect(mapping).not.toBeNull();
+    expect(mapping?.fieldMappings).toBeUndefined();
   });
 });

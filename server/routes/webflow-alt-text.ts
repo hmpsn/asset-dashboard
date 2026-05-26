@@ -11,7 +11,7 @@ import { requireWorkspaceAccess, requireWorkspaceSiteAccess } from '../auth.js';
 import { generateAltText } from '../alttext.js';
 import type { default as SharpConstructor } from 'sharp';
 import type * as SvgoMod from 'svgo';
-import { buildWorkspaceIntelligence } from '../workspace-intelligence.js';
+import { buildIntelPrompt } from '../workspace-intelligence.js';
 import {
   listSites,
   updateAsset,
@@ -99,20 +99,12 @@ router.post('/api/webflow/:workspaceId/generate-alt/:assetId', requireWorkspaceA
     let altText: string | null = null;
     try {
       {
-        const altIntel = await buildWorkspaceIntelligence(req.params.workspaceId, { slices: ['seoContext'] });
-        const altBizCtx = altIntel.seoContext?.businessContext ?? '';
-        // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
-        const bvBlock = altIntel.seoContext?.effectiveBrandVoiceBlock ?? '';
-        const kwParts: string[] = [];
-        if (altBizCtx) kwParts.push(`Business: ${altBizCtx}`);
-        if (ws?.keywordStrategy?.siteKeywords?.length) {
-          kwParts.push(`Site keywords: ${ws.keywordStrategy.siteKeywords.slice(0, 5).join(', ')}`);
-        }
-        if (kwParts.length > 0) {
-          context = context ? `${context}\n${kwParts.join('. ')}` : kwParts.join('. ');
-        }
-        if (bvBlock) {
-          context = context ? `${context}${bvBlock}` : bvBlock;
+        const altIntelContext = await buildIntelPrompt(req.params.workspaceId, ['seoContext'], {
+          verbosity: 'compact',
+          tokenBudget: 650,
+        });
+        if (altIntelContext) {
+          context = context ? `${context}\n${altIntelContext}` : altIntelContext;
         }
       }
 
@@ -172,20 +164,12 @@ router.post('/api/webflow/:workspaceId/bulk-generate-alt', requireWorkspaceAcces
   }
 
   {
-    const bulkIntel = await buildWorkspaceIntelligence(req.params.workspaceId, { slices: ['seoContext'] });
-    const bulkBizCtx = bulkIntel.seoContext?.businessContext ?? '';
-    // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
-    const bvBlock = bulkIntel.seoContext?.effectiveBrandVoiceBlock ?? '';
-    const kwParts: string[] = [];
-    if (bulkBizCtx) kwParts.push(`Business: ${bulkBizCtx}`);
-    if (bulkWs.keywordStrategy?.siteKeywords?.length) {
-      kwParts.push(`Site keywords: ${bulkWs.keywordStrategy.siteKeywords.slice(0, 5).join(', ')}`);
-    }
-    if (kwParts.length > 0) {
-      siteContext = siteContext ? `${siteContext}. ${kwParts.join('. ')}` : kwParts.join('. ');
-    }
-    if (bvBlock) {
-      siteContext = siteContext ? `${siteContext}${bvBlock}` : bvBlock;
+    const bulkIntelContext = await buildIntelPrompt(req.params.workspaceId, ['seoContext'], {
+      verbosity: 'compact',
+      tokenBudget: 650,
+    });
+    if (bulkIntelContext) {
+      siteContext = siteContext ? `${siteContext}\n${bulkIntelContext}` : bulkIntelContext;
     }
   }
 

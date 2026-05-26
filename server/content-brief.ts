@@ -1,12 +1,6 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import {
-  formatForPrompt,
-  formatKeywordsForPrompt,
-  formatPersonasForPrompt,
-  formatPageMapForPrompt,
-  formatKnowledgeBaseForPrompt,
-} from './workspace-intelligence.js';
+import { formatPageMapForPrompt } from './workspace-intelligence.js';
 import { buildContentGenerationContext } from './intelligence/generation-context-builders.js';
 import type { KeywordMetrics, RelatedKeyword } from './seo-data-provider.js';
 import { callAI } from './ai.js';
@@ -27,8 +21,6 @@ import { z } from 'zod';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
 import { buildOutcomeLearningStatusNote } from './outcome-learning-default-path.js';
-import type { WorkspaceIntelligence } from '../shared/types/intelligence.js';
-
 
 const log = createLogger('content-brief');
 /** Strip markdown code fences and parse JSON from AI responses. Throws on invalid JSON. */
@@ -265,6 +257,7 @@ function briefToParams(brief: ContentBrief): Record<string, unknown> {
     audience: brief.audience,
     competitor_insights: brief.competitorInsights,
     internal_link_suggestions: JSON.stringify(brief.internalLinkSuggestions),
+    created_at: brief.createdAt,
     executive_summary: brief.executiveSummary ?? null,
     content_format: brief.contentFormat ?? null,
     tone_and_style: brief.toneAndStyle ?? null,
@@ -288,6 +281,19 @@ function briefToParams(brief: ContentBrief): Record<string, unknown> {
     title_variants: brief.titleVariants ? JSON.stringify(brief.titleVariants) : null,
     meta_desc_variants: brief.metaDescVariants ? JSON.stringify(brief.metaDescVariants) : null,
   };
+}
+
+/**
+ * Canonical brief persistence. Used by regenerateBrief, generateBrief, and MCP tools.
+ * Note: the underlying prepared statement is plain INSERT, not INSERT OR REPLACE.
+ */
+export function upsertBrief(workspaceId: string, brief: ContentBrief): void {
+  if (brief.workspaceId !== workspaceId) {
+    throw new Error(
+      `upsertBrief: brief.workspaceId (${brief.workspaceId}) does not match workspaceId param (${workspaceId})`,
+    );
+  }
+  stmts().insert.run(briefToParams(brief));
 }
 
 export function listBriefs(workspaceId: string): ContentBrief[] {
@@ -355,32 +361,34 @@ export const PAGE_TYPE_CONFIGS: Record<string, PageTypeConfig> = {
   },
 
   service: {
-    wordCountTarget: 1200,
-    wordCountRange: '1,000-1,500',
-    sectionRange: '5-8',
-    avgSectionWords: 180,
-    contentStyle: 'Professional and benefit-driven. Lead with outcomes, not features. Use confident language that builds trust. Balance detail with scannability.',
+    wordCountTarget: 1000,
+    wordCountRange: '800-1,100',
+    sectionRange: '4-6',
+    avgSectionWords: 160,
+    contentStyle: 'Professional, benefit-driven, and conversion-dense. Lead with outcomes, not features. Keep sections tight, avoid article-style teaching sprawl, and give the reader one clear next step.',
     prompt: `PAGE TYPE: Service Page
-- Format as a service description page (1,000-1,500 words)
+- Format as a conversion-dense service page (800-1,100 words)
 - Lead with what the service solves, not what it is
-- Structure: Overview → What's Included → Process → Benefits → Pricing Signals → FAQ → CTA
+- Structure: Overview → What's Included → Process → Proof/Fit → FAQ → single CTA
 - Include specific deliverables and outcomes
+- Use brand proof and differentiators selectively; do not add extra sections because more brand context is available
+- Avoid duplicate booking/discovery sections or multiple closing arguments
 - E-E-A-T emphasis: expertise and authority signals are critical
 - Schema: Service, FAQPage`,
   },
 
   location: {
-    wordCountTarget: 1000,
-    wordCountRange: '800-1,200',
-    sectionRange: '4-7',
-    avgSectionWords: 170,
-    contentStyle: 'Locally relevant and trustworthy. Weave in location-specific details naturally. Warm, community-oriented tone. Include proof of local expertise.',
+    wordCountTarget: 900,
+    wordCountRange: '700-1,000',
+    sectionRange: '4-6',
+    avgSectionWords: 150,
+    contentStyle: 'Locally relevant, trustworthy, and compact. Use local proof where available, but do not explain local SEO mechanics to the reader. Keep one clear contact or discovery action.',
     prompt: `PAGE TYPE: Location Page
-- Format as a local SEO page (800-1,200 words)
+- Format as a compact location page (700-1,000 words)
 - Include the city/region name naturally in headings and body
-- Structure: Local intro → Services in [Location] → Local expertise → Testimonials → Map/Directions → Contact CTA
-- Reference local landmarks, neighborhoods, or regional specifics
-- Include NAP (Name, Address, Phone) consistency guidance
+- Structure: Local intro → Services in [Location] → Local proof/expertise → FAQ or fit notes → single contact CTA
+- Reference local landmarks, neighborhoods, service areas, clients, or address/contact facts only when provided by context
+- Do not mention NAP consistency, schema, citation cleanup, Google Business Profile hygiene, directory listings, or other SEO operations in public-facing copy
 - Schema: LocalBusiness, FAQPage`,
   },
 
@@ -582,14 +590,12 @@ function hasMeaningfulBuilderPromptContext(promptContext: string): boolean {
   return /##\s/.test(promptContext);
 }
 
-function formatLocalSeoForContentPrompt(intelligence: WorkspaceIntelligence): string {
-  const block = formatForPrompt(intelligence, {
-    verbosity: 'standard',
-    sections: ['localSeo'],
-    tokenBudget: 1400,
-  });
-  if (!hasMeaningfulBuilderPromptContext(block)) return '';
-  return `\n\n${block}\nUse Local SEO evidence conservatively: shape local topic/page guidance when relevant, but do not claim verified local rank unless the evidence explicitly supports it.`;
+function formatContentGenerationPromptBlock(promptContext: string): string {
+  if (!hasMeaningfulBuilderPromptContext(promptContext)) return '';
+  const localGuidance = promptContext.includes('## Local SEO')
+    ? '\nUse Local SEO evidence conservatively: shape local topic/page guidance when relevant, but do not claim verified local rank unless the evidence explicitly supports it.'
+    : '';
+  return `\n\n${promptContext}${localGuidance}`;
 }
 
 function buildBriefIntelligenceBlockFromSlice(
@@ -628,15 +634,11 @@ export async function regenerateBrief(
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) throw new Error('OPENAI_API_KEY not configured');
 
-  const { intelligence } = await buildContentGenerationContext(workspaceId, {
+  const { promptContext } = await buildContentGenerationContext(workspaceId, {
     slices: ['seoContext'],
+    tokenBudget: 3200,
   });
-  const seo = intelligence.seoContext;
-  const keywordBlock = formatKeywordsForPrompt(seo);
-  const localSeoBlock = formatLocalSeoForContentPrompt(intelligence);
-  // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
-  const brandVoiceBlock = seo?.effectiveBrandVoiceBlock ?? '';
-  const knowledgeBlock = formatKnowledgeBaseForPrompt(seo?.knowledgeBase);
+  const workspaceContextBlock = formatContentGenerationPromptBlock(promptContext);
   const ptConfig = getPageTypeConfig(existingBrief.pageType);
 
   const previousBriefJson = JSON.stringify({
@@ -669,7 +671,7 @@ The user has reviewed this brief and wants you to regenerate it with the followi
 
 USER FEEDBACK:
 ${feedback}
-${keywordBlock}${brandVoiceBlock}${knowledgeBlock}${localSeoBlock}
+${workspaceContextBlock}
 
 Please regenerate the ENTIRE brief incorporating the user's feedback. Keep everything that was good, improve what the user requested, and maintain all required fields.
 
@@ -761,43 +763,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     templateId: existingBrief.templateId,
   };
 
-  stmts().insert.run({
-    id: newBrief.id,
-    workspace_id: workspaceId,
-    target_keyword: newBrief.targetKeyword,
-    secondary_keywords: JSON.stringify(newBrief.secondaryKeywords),
-    suggested_title: newBrief.suggestedTitle,
-    suggested_meta_desc: newBrief.suggestedMetaDesc,
-    outline: JSON.stringify(newBrief.outline),
-    word_count_target: newBrief.wordCountTarget,
-    intent: newBrief.intent,
-    audience: newBrief.audience,
-    competitor_insights: newBrief.competitorInsights,
-    internal_link_suggestions: JSON.stringify(newBrief.internalLinkSuggestions),
-    created_at: newBrief.createdAt,
-    executive_summary: newBrief.executiveSummary ?? null,
-    content_format: newBrief.contentFormat ?? null,
-    tone_and_style: newBrief.toneAndStyle ?? null,
-    people_also_ask: newBrief.peopleAlsoAsk ? JSON.stringify(newBrief.peopleAlsoAsk) : null,
-    topical_entities: newBrief.topicalEntities ? JSON.stringify(newBrief.topicalEntities) : null,
-    serp_analysis: newBrief.serpAnalysis ? JSON.stringify(newBrief.serpAnalysis) : null,
-    difficulty_score: newBrief.difficultyScore ?? null,
-    traffic_potential: newBrief.trafficPotential ?? null,
-    cta_recommendations: newBrief.ctaRecommendations ? JSON.stringify(newBrief.ctaRecommendations) : null,
-    eeat_guidance: newBrief.eeatGuidance ? JSON.stringify(newBrief.eeatGuidance) : null,
-    content_checklist: newBrief.contentChecklist ? JSON.stringify(newBrief.contentChecklist) : null,
-    schema_recommendations: newBrief.schemaRecommendations ? JSON.stringify(newBrief.schemaRecommendations) : null,
-    page_type: newBrief.pageType ?? null,
-    reference_urls: newBrief.referenceUrls ? JSON.stringify(newBrief.referenceUrls) : null,
-    real_people_also_ask: newBrief.realPeopleAlsoAsk ? JSON.stringify(newBrief.realPeopleAlsoAsk) : null,
-    real_top_results: newBrief.realTopResults ? JSON.stringify(newBrief.realTopResults) : null,
-    keyword_locked: newBrief.keywordLocked ? 1 : 0,
-    keyword_source: newBrief.keywordSource ?? null,
-    keyword_validation: newBrief.keywordValidation ? JSON.stringify(newBrief.keywordValidation) : null,
-    template_id: newBrief.templateId ?? null,
-    title_variants: newBrief.titleVariants ? JSON.stringify(newBrief.titleVariants) : null,
-    meta_desc_variants: newBrief.metaDescVariants ? JSON.stringify(newBrief.metaDescVariants) : null,
-  });
+  upsertBrief(workspaceId, newBrief);
 
   return newBrief;
 }
@@ -814,14 +780,11 @@ export async function regenerateOutline(
   const existingBrief = getBrief(workspaceId, briefId);
   if (!existingBrief) return null;
 
-  const { intelligence } = await buildContentGenerationContext(workspaceId, {
+  const { promptContext } = await buildContentGenerationContext(workspaceId, {
     slices: ['seoContext'],
+    tokenBudget: 3200,
   });
-  const seo = intelligence.seoContext;
-  const keywordBlock = formatKeywordsForPrompt(seo);
-  const localSeoBlock = formatLocalSeoForContentPrompt(intelligence);
-  // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
-  const brandVoiceBlock = seo?.effectiveBrandVoiceBlock ?? '';
+  const workspaceContextBlock = formatContentGenerationPromptBlock(promptContext);
   const ptConfig = getPageTypeConfig(existingBrief.pageType);
 
   const currentOutline = JSON.stringify(existingBrief.outline, null, 2);
@@ -835,7 +798,7 @@ Title: ${existingBrief.suggestedTitle}
 Word count target: ${existingBrief.wordCountTarget}
 Intent: ${existingBrief.intent}
 Audience: ${existingBrief.audience}
-${keywordBlock}${brandVoiceBlock}${localSeoBlock}
+${workspaceContextBlock}
 
 Current outline:
 ${currentOutline}
@@ -980,19 +943,14 @@ export async function generateBrief(
   const pagesStr = context.existingPages?.slice(0, 50).join('\n') || 'No existing pages provided';
 
   // Pull in keyword strategy context for alignment
-  const { intelligence: seoContextResult } = await buildContentGenerationContext(workspaceId, {
+  const { intelligence: seoContextResult, promptContext: seoPromptContext } = await buildContentGenerationContext(workspaceId, {
     slices: ['seoContext'],
+    tokenBudget: 3600,
   });
   const seo = seoContextResult.seoContext;
-  const keywordBlock = formatKeywordsForPrompt(seo);
-  const localSeoBlock = formatLocalSeoForContentPrompt(seoContextResult);
-  // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
-  const brandVoiceBlock = seo?.effectiveBrandVoiceBlock ?? '';
-  const stratBizCtx = seo?.businessContext ?? '';
-  const knowledgeBlock = formatKnowledgeBaseForPrompt(seo?.knowledgeBase);
-  const personasBlock = formatPersonasForPrompt(seo?.personas);
+  const workspaceContextBlock = formatContentGenerationPromptBlock(seoPromptContext);
   const kwMapContext = formatPageMapForPrompt(seo);
-  const bizCtx = context.businessContext || stratBizCtx;
+  const bizCtx = context.businessContext || '';
 
   // Find if any page in the strategy targets this keyword — inject its analysis data.
   // Use intel.seoContext.strategy.pageMap (populated from the live page_keywords table
@@ -1220,7 +1178,7 @@ Related search queries from Google Search Console:
 ${relatedStr}
 
 Existing pages on the site:
-${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${localSeoBlock}${providerMetricsBlock}${ga4Block}${pageAnalysisBlock}${decayBlock}${serpFeaturesDirectiveBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${strategyCardBlock}${intelligenceBlock}${learningsBlock}${learningsStatusBlock}
+${pagesStr}${workspaceContextBlock}${kwMapContext}${providerMetricsBlock}${ga4Block}${pageAnalysisBlock}${decayBlock}${serpFeaturesDirectiveBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${strategyCardBlock}${intelligenceBlock}${learningsBlock}${learningsStatusBlock}
 
 Generate a content brief in the following JSON format:
 {
@@ -1366,43 +1324,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
   };
 
   if (options?.persist !== false) {
-    stmts().insert.run({
-      id: brief.id,
-      workspace_id: workspaceId,
-      target_keyword: brief.targetKeyword,
-      secondary_keywords: JSON.stringify(brief.secondaryKeywords),
-      suggested_title: brief.suggestedTitle,
-      suggested_meta_desc: brief.suggestedMetaDesc,
-      outline: JSON.stringify(brief.outline),
-      word_count_target: brief.wordCountTarget,
-      intent: brief.intent,
-      audience: brief.audience,
-      competitor_insights: brief.competitorInsights,
-      internal_link_suggestions: JSON.stringify(brief.internalLinkSuggestions),
-      created_at: brief.createdAt,
-      executive_summary: brief.executiveSummary ?? null,
-      content_format: brief.contentFormat ?? null,
-      tone_and_style: brief.toneAndStyle ?? null,
-      people_also_ask: brief.peopleAlsoAsk ? JSON.stringify(brief.peopleAlsoAsk) : null,
-      topical_entities: brief.topicalEntities ? JSON.stringify(brief.topicalEntities) : null,
-      serp_analysis: brief.serpAnalysis ? JSON.stringify(brief.serpAnalysis) : null,
-      difficulty_score: brief.difficultyScore ?? null,
-      traffic_potential: brief.trafficPotential ?? null,
-      cta_recommendations: brief.ctaRecommendations ? JSON.stringify(brief.ctaRecommendations) : null,
-      eeat_guidance: brief.eeatGuidance ? JSON.stringify(brief.eeatGuidance) : null,
-      content_checklist: brief.contentChecklist ? JSON.stringify(brief.contentChecklist) : null,
-      schema_recommendations: brief.schemaRecommendations ? JSON.stringify(brief.schemaRecommendations) : null,
-      page_type: brief.pageType ?? null,
-      reference_urls: brief.referenceUrls ? JSON.stringify(brief.referenceUrls) : null,
-      real_people_also_ask: brief.realPeopleAlsoAsk ? JSON.stringify(brief.realPeopleAlsoAsk) : null,
-      real_top_results: brief.realTopResults ? JSON.stringify(brief.realTopResults) : null,
-      keyword_locked: brief.keywordLocked ? 1 : 0,
-      keyword_source: brief.keywordSource ?? null,
-      keyword_validation: brief.keywordValidation ? JSON.stringify(brief.keywordValidation) : null,
-      template_id: brief.templateId ?? null,
-      title_variants: brief.titleVariants ? JSON.stringify(brief.titleVariants) : null,
-      meta_desc_variants: brief.metaDescVariants ? JSON.stringify(brief.metaDescVariants) : null,
-    });
+    upsertBrief(workspaceId, brief);
   }
 
   return brief;

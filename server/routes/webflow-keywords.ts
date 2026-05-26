@@ -10,7 +10,8 @@ import { createLogger } from '../logger.js';
 import { parseJsonFallback } from '../db/json-validation.js';
 import { applyBulkKeywordGuards, normalizePageUrl, sanitizeForPromptInjection, stripCodeFences } from '../helpers.js';
 import { debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
-import { buildWorkspaceIntelligence, formatForPrompt, formatPageMapForPrompt, invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { buildPageAssistContext } from '../intelligence/page-assist-context-builder.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { addActivity } from '../activity-log.js';
@@ -32,13 +33,14 @@ router.post('/api/webflow/keyword-analysis', requireWorkspaceAccessFromBody(), a
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
-  const slices = ['seoContext', 'learnings'] as const;
   // slug sent by KeywordAnalysis.tsx as resolvePagePath(page) — full path like /services/seo; guard handles legacy bare slugs
   const pagePath = slug ? normalizePageUrl(slug) : undefined;
-  const intel = workspaceId ? await buildWorkspaceIntelligence(workspaceId, { slices, pagePath }) : null;
-  const fullContext = intel ? formatForPrompt(intel, { verbosity: 'detailed', sections: slices }) : '';
+  const pageAssist = workspaceId
+    ? await buildPageAssistContext(workspaceId, { pagePath, includeLearnings: true })
+    : null;
+  const fullContext = pageAssist?.promptContext ?? '';
   // No pagePath filter — show full cross-page keyword map for cannibalization avoidance
-  const kwMapContext = intel ? formatPageMapForPrompt(intel.seoContext) : '';
+  const kwMapContext = pageAssist?.blocks.pageMapBlock ?? '';
 
   // Fetch real keyword data for accuracy
   let kwBlock = '';

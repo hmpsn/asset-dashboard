@@ -175,6 +175,24 @@ describe('get_workspace_intelligence', () => {
     const body = await res.json() as { result?: { isError?: boolean } };
     expect(body.result?.isError).toBe(true);
   });
+
+  it('returns an error when all requested intelligence slices are invalid', async () => {
+    const res = await mcpPost(
+      {
+        jsonrpc: '2.0',
+        method: 'tools/call',
+        params: {
+          name: 'get_workspace_intelligence',
+          arguments: { workspaceId: ws.workspaceId, slices: ['not-a-slice'] },
+        },
+        id: 4,
+      },
+      MCP_TEST_KEY,
+    );
+    const body = await res.json() as { result?: { isError?: boolean; content: Array<{ text: string }> } };
+    expect(body.result?.isError).toBe(true);
+    expect(body.result?.content[0].text).toContain('No valid intelligence slices');
+  });
 });
 
 describe('get_insights', () => {

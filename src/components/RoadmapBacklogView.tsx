@@ -100,6 +100,7 @@ export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatu
             const featureName = item.featureId != null ? featureMap.get(item.featureId) : undefined;
             const key = compoundKey(item.sprintId, item.id);
             const isExpanded = expandedKey === key;
+            const description = item.notes?.trim();
 
             return (
               <Fragment key={key}>
@@ -162,9 +163,10 @@ export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatu
                   <tr className="bg-[var(--surface-1)]">
                     <td colSpan={10} className="px-4 py-3">
                       <div className="space-y-1.5">
-                        {item.notes && (
-                          <p className="t-caption text-[var(--brand-text-bright)] leading-relaxed">{item.notes}</p>
-                        )}
+                        <p className="t-caption text-[var(--brand-text-bright)] leading-relaxed">
+                          <span className="t-caption-sm font-semibold uppercase tracking-wide text-[var(--brand-text-muted)]">Description:</span>{' '}
+                          {description || 'No description added yet.'}
+                        </p>
                         <div className="flex items-center gap-4 t-caption-sm text-[var(--brand-text-muted)]">
                           {item.source && <span>Source: {item.source}</span>}
                           {item.shippedAt && <span>Shipped: {item.shippedAt}</span>}

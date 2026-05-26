@@ -30,6 +30,7 @@
     "verify:organization": "tsx scripts/report-platform-organization.ts",
     "verify:coverage-baseline": "tsx scripts/report-critical-domain-coverage.ts",
     "verify:ai-reliability": "tsx scripts/report-ai-reliability.ts",
+    "verify:ai-quality": "tsx scripts/report-ai-quality.ts",
     "verify:ai-pipeline-wiring": "tsx scripts/report-ai-pipeline-wiring.ts",
     "verify:coverage-ratchet": "tsx scripts/report-coverage-ratchet.ts",
     "verify:domain-events": "tsx scripts/report-domain-event-definitions.ts",
@@ -113,7 +114,8 @@
     "typescript": "~5.9.3",
     "vite": "^8.0.0",
     "ws": "^8.19.0",
-    "zod": "^3.23.0"
+    "zod": "^3.23.0",
+    "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
     "@emnapi/core": "^1.10.0",

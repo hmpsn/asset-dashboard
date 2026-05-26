@@ -267,3 +267,171 @@ describe('formatLearningsForPrompt', () => {
     expect(result).toContain('content published');
   });
 });
+
+describe('getWorkspaceLearnings cache integrity', () => {
+  async function loadModuleForCacheTests() {
+    vi.resetModules();
+
+    const getCached = vi.fn();
+    const upsertRun = vi.fn();
+    const allWorkspaceIds = vi.fn(() => []);
+
+    const dbPrepare = vi.fn((sql: string) => {
+      if (sql.includes('SELECT * FROM workspace_learnings')) {
+        return { get: getCached };
+      }
+      if (sql.includes('INSERT OR REPLACE INTO workspace_learnings')) {
+        return { run: upsertRun };
+      }
+      if (sql.includes('SELECT DISTINCT workspace_id FROM tracked_actions')) {
+        return { all: allWorkspaceIds };
+      }
+      throw new Error(`Unexpected SQL in test: ${sql.slice(0, 60)}`);
+    });
+
+    const getActionsByWorkspace = vi.fn(() => []);
+    const getOutcomesForAction = vi.fn(() => []);
+    const rowToWorkspaceLearnings = vi.fn();
+
+    vi.doMock('../../server/logger.js', () => ({
+      createLogger: () => ({
+        warn: vi.fn(),
+        info: vi.fn(),
+        debug: vi.fn(),
+        error: vi.fn(),
+      }),
+    }));
+
+    vi.doMock('../../server/db/index.js', () => ({
+      default: { prepare: dbPrepare },
+    }));
+
+    vi.doMock('../../server/db/stmt-cache.js', () => ({
+      createStmtCache: (factory: () => unknown) => {
+        let cached: unknown;
+        return () => {
+          if (!cached) cached = factory();
+          return cached;
+        };
+      },
+    }));
+
+    vi.doMock('../../server/outcome-tracking.js', () => ({
+      getActionsByWorkspace,
+      getOutcomesForAction,
+    }));
+
+    vi.doMock('../../server/db/outcome-mappers.js', () => ({
+      rowToWorkspaceLearnings,
+    }));
+
+    vi.doMock('../../server/broadcast.js', () => ({
+      broadcastToWorkspace: vi.fn(),
+    }));
+
+    vi.doMock('../../server/ws-events.js', () => ({
+      WS_EVENTS: { OUTCOME_LEARNINGS_UPDATED: 'outcome-learnings:updated' },
+    }));
+
+    const mod = await import('../../server/workspace-learnings.js');
+    return {
+      mod,
+      mocks: {
+        getCached,
+        upsertRun,
+        getActionsByWorkspace,
+        getOutcomesForAction,
+        rowToWorkspaceLearnings,
+      },
+    };
+  }
+
+  it('returns fresh cached learnings without recompute when mapper succeeds', async () => {
+    const { mod, mocks } = await loadModuleForCacheTests();
+    const nowIso = new Date().toISOString();
+    const cachedRow = {
+      id: 'row-1',
+      workspace_id: 'ws-1',
+      learnings: '{"confidence":"high"}',
+      computed_at: nowIso,
+    };
+    const mapped = makeLearnings({ workspaceId: 'ws-1', computedAt: nowIso, confidence: 'high' });
+
+    mocks.getCached.mockReturnValue(cachedRow);
+    mocks.rowToWorkspaceLearnings.mockReturnValue(mapped);
+
+    const result = mod.getWorkspaceLearnings('ws-1');
+
+    expect(result).toEqual(mapped);
+    expect(mocks.getActionsByWorkspace).not.toHaveBeenCalled();
+    expect(mocks.upsertRun).not.toHaveBeenCalled();
+  });
+
+  it('recomputes when fresh cached row fails to map, instead of silent null return (regression)', async () => {
+    const { mod, mocks } = await loadModuleForCacheTests();
+    const nowIso = new Date().toISOString();
+    const cachedRow = {
+      id: 'row-bad',
+      workspace_id: 'ws-2',
+      learnings: '{"broken":true}',
+      computed_at: nowIso,
+    };
+    const staleFallback = makeLearnings({
+      workspaceId: 'ws-2',
+      computedAt: '2026-01-01T00:00:00.000Z',
+      confidence: 'medium',
+      totalScoredActions: 18,
+    });
+
+    mocks.getCached.mockReturnValue(cachedRow);
+    mocks.rowToWorkspaceLearnings
+      .mockReturnValueOnce(null) // fresh read parse fails
+      .mockReturnValueOnce(staleFallback); // stale fallback after recompute finds no new data
+    mocks.getActionsByWorkspace.mockReturnValue([]);
+
+    const result = mod.getWorkspaceLearnings('ws-2');
+
+    expect(result).toEqual(staleFallback);
+    expect(mocks.getActionsByWorkspace).toHaveBeenCalledWith('ws-2');
+    expect(mocks.upsertRun).toHaveBeenCalledTimes(1);
+    expect(mocks.upsertRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'row-bad',
+        workspace_id: 'ws-2',
+        learnings: '{"broken":true}',
+      }),
+    );
+  });
+
+  it('touches stale cache timestamp and returns stale learnings when recompute has zero scored actions', async () => {
+    const { mod, mocks } = await loadModuleForCacheTests();
+    const oldIso = '2025-01-01T00:00:00.000Z';
+    const cachedRow = {
+      id: 'row-stale',
+      workspace_id: 'ws-3',
+      learnings: '{"confidence":"medium","totalScoredActions":12}',
+      computed_at: oldIso,
+    };
+    const staleMapped = makeLearnings({
+      workspaceId: 'ws-3',
+      computedAt: oldIso,
+      confidence: 'medium',
+      totalScoredActions: 12,
+    });
+
+    mocks.getCached.mockReturnValue(cachedRow);
+    mocks.rowToWorkspaceLearnings.mockReturnValue(staleMapped);
+    mocks.getActionsByWorkspace.mockReturnValue([]);
+
+    const result = mod.getWorkspaceLearnings('ws-3');
+
+    expect(result).toEqual(staleMapped);
+    expect(mocks.upsertRun).toHaveBeenCalledTimes(1);
+    expect(mocks.upsertRun.mock.calls[0]?.[0]).toMatchObject({
+      id: 'row-stale',
+      workspace_id: 'ws-3',
+      learnings: '{"confidence":"medium","totalScoredActions":12}',
+    });
+    expect(typeof mocks.upsertRun.mock.calls[0]?.[0]?.computed_at).toBe('string');
+  });
+});

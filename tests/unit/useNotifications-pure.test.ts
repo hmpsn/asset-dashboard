@@ -83,11 +83,12 @@ interface WorkspaceSummary {
   id: string;
   name: string;
   requests: { new: number };
-  approvals: { pending: number };
-  contentRequests?: { pending: number };
+  approvals: { pending: number; approved?: number; changesRequested?: number };
+  contentRequests?: { pending: number; approved?: number; changesRequested?: number };
   workOrders?: { pending: number };
   contentPlan?: { review: number };
   clientSignals?: { new: number };
+  clientActions?: { approved?: number; changesRequested?: number };
 }
 
 interface AnomalySummary {
@@ -176,11 +177,53 @@ function buildNotifications(
         tab: 'seo-editor',
       });
     }
+    if ((ws.approvals.approved || 0) > 0) {
+      notifications.push({
+        id: `approvals-approved-${ws.id}`,
+        label: `${ws.approvals.approved} client-approved SEO change${ws.approvals.approved === 1 ? '' : 's'} ready to apply`,
+        sub: ws.name,
+        color: 'text-teal-400',
+        workspaceId: ws.id,
+        tab: 'seo-editor',
+      });
+    }
+    if ((ws.approvals.changesRequested || 0) > 0) {
+      notifications.push({
+        id: `approvals-changes-${ws.id}`,
+        label: `${ws.approvals.changesRequested} SEO change${ws.approvals.changesRequested === 1 ? '' : 's'} requested revision`,
+        sub: ws.name,
+        color: 'text-amber-400/80',
+        workspaceId: ws.id,
+        tab: 'seo-editor',
+      });
+    }
     if ((ws.contentRequests?.pending || 0) > 0) {
       const n = ws.contentRequests!.pending;
       notifications.push({
         id: `content-${ws.id}`,
         label: `${n} content brief${n > 1 ? 's' : ''} awaiting review`,
+        sub: ws.name,
+        color: 'text-amber-400/80',
+        workspaceId: ws.id,
+        tab: 'content-pipeline',
+      });
+    }
+    if ((ws.contentRequests?.approved || 0) > 0) {
+      const n = ws.contentRequests!.approved!;
+      notifications.push({
+        id: `content-approved-${ws.id}`,
+        label: `${n} approved brief/post decision${n === 1 ? '' : 's'} awaiting team follow-up`,
+        sub: ws.name,
+        color: 'text-teal-400',
+        workspaceId: ws.id,
+        tab: 'content-pipeline',
+      });
+    }
+    if ((ws.contentRequests?.changesRequested || 0) > 0) {
+      const n = ws.contentRequests!.changesRequested!;
+      notifications.push({
+        id: `content-changes-${ws.id}`,
+        label: `${n} content brief/post revision request${n === 1 ? '' : 's'}`,
         sub: ws.name,
         color: 'text-amber-400/80',
         workspaceId: ws.id,
@@ -216,6 +259,28 @@ function buildNotifications(
         label: `${n} new client signal${n > 1 ? 's' : ''}`,
         sub: ws.name,
         color: 'text-teal-400',
+        workspaceId: ws.id,
+        tab: 'requests',
+      });
+    }
+    if ((ws.clientActions?.approved || 0) > 0) {
+      const n = ws.clientActions!.approved!;
+      notifications.push({
+        id: `client-actions-approved-${ws.id}`,
+        label: `${n} approved client action${n === 1 ? '' : 's'} to execute`,
+        sub: ws.name,
+        color: 'text-teal-400',
+        workspaceId: ws.id,
+        tab: 'requests',
+      });
+    }
+    if ((ws.clientActions?.changesRequested || 0) > 0) {
+      const n = ws.clientActions!.changesRequested!;
+      notifications.push({
+        id: `client-actions-changes-${ws.id}`,
+        label: `${n} client action${n === 1 ? '' : 's'} requesting revisions`,
+        sub: ws.name,
+        color: 'text-amber-400/80',
         workspaceId: ws.id,
         tab: 'requests',
       });

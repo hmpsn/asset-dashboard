@@ -117,7 +117,7 @@ describe('webflow-keywords.ts migration contracts', () => {
   it('calls formatPageMapForPrompt WITHOUT a pagePath filter (full cross-page map for cannibalization)', () => {
     // The keyword map must show ALL pages so the AI can avoid keyword cannibalization.
     // Passing slug/pagePath as the second arg would filter to a single page — wrong here.
-    expect(src).toContain('formatPageMapForPrompt(intel.seoContext)');
+    expect(src).toContain('pageAssist?.blocks.pageMapBlock');
     expect(src).not.toMatch(/formatPageMapForPrompt\([^)]+,\s*(slug|pagePath)/);
   });
 });
@@ -128,6 +128,7 @@ describe('webflow SEO route N+1 prevention contracts', () => {
   const applySrc = readRoute('webflow-seo-apply.ts');
   const jobsSrc = readRoute('jobs.ts');
   const rewriteSrc = readRoute('webflow-seo-bulk-rewrite.ts');
+  const rewriteJobSrc = read('webflow-seo-bulk-rewrite-job.ts');
 
   it('bulk-fix job loop: seoContext assembled before the page loop (not inside it)', () => {
     // Pre-assembly must appear before the page loop.
@@ -149,19 +150,39 @@ describe('webflow SEO route N+1 prevention contracts', () => {
   });
 
   it('bulk-rewrite loop: seoContext assembled before the batch for-loop (not inside it)', () => {
-    // Pre-assembly must appear before `for (let i = 0; i < pages.length`.
+    // Canonical page-assist context hoists workspace-level seoContext before the loop.
     const loopIdx = rewriteSrc.indexOf('for (let i = 0; i < pages.length');
     expect(loopIdx).toBeGreaterThan(-1);
     const beforeLoop = rewriteSrc.slice(0, loopIdx);
-    expect(beforeLoop).toContain("slices: ['seoContext']");
+    const afterLoop = rewriteSrc.slice(loopIdx);
+    expect(beforeLoop).toContain('const basePageAssist = await buildPageAssistContext');
+    expect(afterLoop).toContain('baseSeoContext');
+  });
+
+  it('bulk-rewrite loop: preserves legacy nested-page keyword fallback', () => {
+    const loopIdx = rewriteSrc.indexOf('for (let i = 0; i < pages.length');
+    const afterLoop = rewriteSrc.slice(loopIdx);
+    expect(afterLoop).toContain('findPageMapEntryForPage(baseSeoContext.strategy.pageMap, page)');
+    expect(afterLoop).toContain('pageKeywords');
+  });
+
+  it('bulk-rewrite background job preserves hoisted seoContext and legacy page-map fallback', () => {
+    const loopIdx = rewriteJobSrc.indexOf('for (let i = 0; i < pages.length');
+    expect(loopIdx).toBeGreaterThan(-1);
+    const beforeLoop = rewriteJobSrc.slice(0, loopIdx);
+    const afterLoop = rewriteJobSrc.slice(loopIdx);
+    expect(beforeLoop).toContain('const basePageAssist = await buildPageAssistContext');
+    expect(afterLoop).toContain('baseSeoContext');
+    expect(afterLoop).toContain('findPageMapEntryForPage(baseSeoContext.strategy.pageMap, page)');
+    expect(afterLoop).toContain('pageKeywords');
   });
 
   it('bulk-rewrite loop: pageProfile still assembled per-page with pagePath inside loop', () => {
-    // pageProfile is page-specific (optimization issues + recommendations require pagePath).
-    // Must remain inside the per-page map callback, not hoisted.
+    // pageProfile is page-specific and is requested through the shared page-assist builder.
     const loopIdx = rewriteSrc.indexOf('for (let i = 0; i < pages.length');
     const afterLoop = rewriteSrc.slice(loopIdx);
-    expect(afterLoop).toContain("slices: ['pageProfile']");
+    expect(afterLoop).toContain('buildPageAssistContext');
+    expect(afterLoop).toContain('pagePath: rwPagePath');
   });
 });
 
@@ -306,7 +327,8 @@ describe('webflow-keywords.ts fullContext includes learnings', () => {
   const src = readRoute('webflow-keywords.ts');
 
   it('formats with seoContext + learnings sections for AI keyword analysis', () => {
-    expect(hasSectionsSeoContextLearnings(src)).toBe(true);
+    expect(src).toContain('buildPageAssistContext');
+    expect(src).toContain('includeLearnings: true');
   });
 });
 
@@ -315,18 +337,17 @@ describe('webflow-keywords.ts fullContext includes learnings', () => {
 describe('pageProfile-only callers intentionally omit learnings', () => {
   it('rewrite-chat.ts uses pageProfile section only (seoContext assembled manually above prompt)', () => {
     const src = readRoute('rewrite-chat.ts');
-    // rewrite-chat builds seoContext fields manually (brandVoice, keywords, personas).
-    // The formatForPrompt call is only for pageProfile — no seoContext or learnings section.
-    expect(src).toContain("sections: ['pageProfile']");
-    // Confirm it does NOT use formatForPrompt for seoContext (manual assembly only)
+    // rewrite-chat gets page profile + seoContext blocks through the page-assist builder.
+    expect(src).toContain('buildPageAssistContext');
+    expect(src).toContain('pageAssist.blocks.pageProfileBlock');
     expect(src).not.toContain("sections: ['seoContext'");
   });
 
   it('Webflow SEO rewrite handlers use pageProfile section only', () => {
     const src = `${readRoute('webflow-seo-rewrite.ts')}\n${readRoute('webflow-seo-bulk-rewrite.ts')}`;
-    // Both /seo-rewrite and /seo-bulk-rewrite handlers only use formatForPrompt for pageProfile.
-    // The keyword/brand voice blocks are assembled manually from seo.* fields.
-    expect(src).toContain("sections: ['pageProfile']");
+    // Both handlers get page profile + seoContext blocks through the page-assist builder.
+    expect(src).toContain('buildPageAssistContext');
+    expect(src).toContain('pageAssist.blocks.pageProfileBlock');
     expect(src).not.toContain("sections: ['seoContext'");
   });
 });
@@ -358,7 +379,6 @@ describe('slices/sections consistency — learnings section requires learnings s
     { label: 'routes/public-analytics.ts', src: readRoute('public-analytics.ts') },
     { label: 'routes/content-posts.ts', src: readRoute('content-posts.ts') },
     { label: 'routes/jobs.ts', src: readRoute('jobs.ts') },
-    { label: 'routes/webflow-keywords.ts', src: readRoute('webflow-keywords.ts') },
   ];
 
   for (const { label, src } of callerFiles) {

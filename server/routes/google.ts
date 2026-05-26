@@ -39,6 +39,8 @@ import { createAnnotation, getAnnotations, updateAnnotation, deleteAnnotation } 
 import { validate, z } from '../middleware/validate.js';
 import { requireWorkspaceAccess, requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery, sendWorkspaceAccessDenied } from '../auth.js';
 import { requireAdminAuth } from '../middleware/admin-auth.js';
+import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
 
 const log = createLogger('google-auth');
 
@@ -324,6 +326,10 @@ router.post('/api/google/annotations/:workspaceId', requireWorkspaceAccess('work
   const { date, label, category, createdBy, pageUrl } = req.body;
   try {
     const result = createAnnotation({ workspaceId: req.params.workspaceId, date, label, category, createdBy, pageUrl });
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.ANNOTATION_BRIDGE_CREATED, {
+      id: result.id,
+      action: 'created',
+    });
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
@@ -342,6 +348,10 @@ router.patch('/api/google/annotations/:workspaceId/:id', requireWorkspaceAccess(
   try {
     const updated = updateAnnotation(req.params.id, req.params.workspaceId, { label, date, category, pageUrl });
     if (!updated) return res.status(404).json({ error: 'Annotation not found' });
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.ANNOTATION_BRIDGE_CREATED, {
+      id: req.params.id,
+      action: 'updated',
+    });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
@@ -352,6 +362,10 @@ router.delete('/api/google/annotations/:workspaceId/:id', requireWorkspaceAccess
   try {
     const deleted = deleteAnnotation(req.params.id, req.params.workspaceId);
     if (!deleted) return res.status(404).json({ error: 'Annotation not found' });
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.ANNOTATION_BRIDGE_CREATED, {
+      id: req.params.id,
+      action: 'deleted',
+    });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });

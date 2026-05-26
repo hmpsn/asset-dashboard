@@ -10,15 +10,12 @@ import { parseJsonSafe } from '../db/json-validation.js';
 import { normalizePageUrl, sanitizeForPromptInjection, stripCodeFences, stripHtmlToText } from '../helpers.js';
 import { createLogger } from '../logger.js';
 import { callAI } from '../ai.js';
+import { buildSystemPrompt } from '../prompt-assembly.js';
 import { getPageKeyword, listPageKeywords } from '../page-keywords.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 import { getSiteSubdomain } from '../webflow.js';
 import { z } from '../middleware/validate.js';
-import {
-  buildWorkspaceIntelligence,
-  formatKeywordsForPrompt,
-  formatPageMapForPrompt,
-} from '../workspace-intelligence.js';
+import { buildPageAssistContext } from '../intelligence/page-assist-context-builder.js';
 import {
   getBrandName,
   getTokenForSite,
@@ -110,17 +107,14 @@ router.post('/api/webflow/seo-copy', requireWorkspaceAccessFromBody(), async (re
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
-  // Build full context: keywords + brand voice + keyword map
-  const copyIntel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'], pagePath });
-  const copySeo = copyIntel.seoContext;
-  const pageMapEntries = copySeo?.strategy?.pageMap?.length
-    ? copySeo.strategy.pageMap
+  const pageAssist = await buildPageAssistContext(workspaceId, { pagePath });
+  const pageMapEntries = pageAssist.seoContext?.strategy?.pageMap?.length
+    ? pageAssist.seoContext.strategy.pageMap
     : listPageKeywords(workspaceId);
-  const keywordBlock = formatKeywordsForPrompt(copySeo);
-  // Voice authority: effectiveBrandVoiceBlock already honors voice profile to legacy fallback.
-  const brandVoiceBlock = copySeo?.effectiveBrandVoiceBlock ?? '';
-  const kwMapContext = copySeo?.strategy?.pageMap?.length
-    ? formatPageMapForPrompt(copySeo)
+  const keywordBlock = pageAssist.blocks.keywordBlock;
+  const brandVoiceBlock = pageAssist.blocks.brandVoiceBlock;
+  const kwMapContext = pageAssist.seoContext?.strategy?.pageMap?.length
+    ? pageAssist.blocks.pageMapBlock
     : pageMapEntries.length
       ? `\n\nKNOWN PAGE MAP:\n${pageMapEntries.map(p => `- ${p.pagePath}: ${p.pageTitle || p.primaryKeyword || 'Untitled page'}`).join('\n')}`
       : '';
@@ -205,7 +199,7 @@ Return ONLY valid JSON, no markdown fences.`;
   try {
     const aiResult = await callAI({
       model: 'gpt-5.4-mini',
-      system: 'You are an expert SEO copywriter who preserves brand voice while optimizing for search. Return valid JSON only.',
+      system: buildSystemPrompt(workspaceId, 'You are an expert SEO copywriter who preserves brand voice while optimizing for search. Return valid JSON only.'),
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 1500,
       temperature: 0.6,

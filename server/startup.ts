@@ -15,7 +15,11 @@ import { startRankTrackingScheduler } from './rank-tracking-scheduler.js';
 import { startBriefingCron } from './briefing-cron.js';
 
 /** Start all background schedulers and queues. */
+let started = false;
+
 export function startSchedulers() {
+  if (started) return;
+  started = true;
   initEmailQueue();
   startThrottleCleanup();
   startScheduler();

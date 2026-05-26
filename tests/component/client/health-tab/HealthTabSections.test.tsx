@@ -226,14 +226,14 @@ describe('HealthHeaderSection', () => {
     expect(container).toBeTruthy();
   });
 
-  it('shows Site Health heading', () => {
+  it('does not render a duplicate Site Health heading', () => {
     renderWith(<HealthHeaderSection auditDetail={makeAuditDetail()} shell={makeHeaderShell()} />);
-    expect(screen.getByText('Site Health')).toBeInTheDocument();
+    expect(screen.queryByText('Site Health')).not.toBeInTheDocument();
   });
 
-  it('shows page count in subheading', () => {
+  it('does not render duplicate page metadata', () => {
     renderWith(<HealthHeaderSection auditDetail={makeAuditDetail()} shell={makeHeaderShell()} />);
-    expect(screen.getByText(/20 pages/i)).toBeInTheDocument();
+    expect(screen.queryByText(/20 pages/i)).not.toBeInTheDocument();
   });
 
   it('shows the Share Report button', () => {

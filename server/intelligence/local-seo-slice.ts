@@ -1,4 +1,6 @@
 import type { LocalSeoSlice } from '../../shared/types/intelligence.js';
+import type { LocalSeoKeywordVisibility, LocalSeoVisibilityPosture } from '../../shared/types/local-seo.js';
+import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 import { getClientLocations } from '../client-locations.js';
 import { createLogger } from '../logger.js';
 import { isFeatureEnabled } from '../feature-flags.js';
@@ -94,9 +96,11 @@ export async function assembleLocalSeo(workspaceId: string): Promise<LocalSeoSli
 
     const visibility = { visible: 0, possibleMatch: 0, notVisible: 0, notChecked: 0, providerDegraded: 0 };
     const visibilityByKey = buildLocalSeoKeywordVisibilitySummaryByKey(workspaceId);
+    const activeMarketIds = new Set(markets.filter(m => m.status === 'active').map(m => m.id));
     for (const summary of visibilityByKey.values()) {
       // Each summary's `markets` array contains per-market visibility entries.
-      for (const marketEntry of summary.markets) {
+      const bestByMarket = strongestVisibilityByMarket(summary.markets, activeMarketIds);
+      for (const marketEntry of bestByMarket.values()) {
         switch (marketEntry.posture) {
           case 'visible': visibility.visible++; break;
           case 'possible_match': visibility.possibleMatch++; break;
@@ -108,9 +112,17 @@ export async function assembleLocalSeo(workspaceId: string): Promise<LocalSeoSli
       }
     }
 
-    // notChecked count: keywords that have no snapshot for some active market.
-    // Cheap approximation: candidate count minus visibility-summary entries.
-    visibility.notChecked = Math.max(0, candidates.length - visibilityByKey.size);
+    // notChecked count: candidate/active-market pairs that have no latest snapshot.
+    // Count per market so multi-market workspaces do not look healthier than they are.
+    const candidateKeys = new Set(candidates.map(c => keywordComparisonKey(c.keyword)));
+    for (const key of candidateKeys) {
+      const checkedMarkets = new Set(
+        (visibilityByKey.get(key)?.markets ?? [])
+          .map(entry => entry.marketId)
+          .filter(marketId => activeMarketIds.has(marketId)),
+      );
+      visibility.notChecked += Math.max(0, activeMarketIds.size - checkedMarkets.size);
+    }
 
     let latestSnapshotAt: string | null = null;
     try {
@@ -264,6 +276,31 @@ export function selectRelevantLocalCandidates(
   });
   scored.sort((a, b) => b.relevance - a.relevance);
   return scored.slice(0, limit).map(s => s.candidate);
+}
+
+function strongestVisibilityByMarket(
+  entries: LocalSeoKeywordVisibility[],
+  activeMarketIds: Set<string>,
+): Map<string, LocalSeoKeywordVisibility> {
+  const byMarket = new Map<string, LocalSeoKeywordVisibility>();
+  for (const entry of entries) {
+    if (!activeMarketIds.has(entry.marketId)) continue;
+    const existing = byMarket.get(entry.marketId);
+    if (!existing || visibilityRank(entry.posture) > visibilityRank(existing.posture)) {
+      byMarket.set(entry.marketId, entry);
+    }
+  }
+  return byMarket;
+}
+
+function visibilityRank(posture: LocalSeoVisibilityPosture): number {
+  switch (posture) {
+    case 'visible': return 5;
+    case 'possible_match': return 4;
+    case 'local_pack_present': return 3;
+    case 'not_visible': return 2;
+    case 'provider_degraded': return 1;
+  }
 }
 
 // TODO(local-seo-marketId-passthrough): LocalSeoKeywordCandidate in server/local-seo.ts

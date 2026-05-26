@@ -13,12 +13,17 @@ export async function webflowFetch(endpoint: string, options: RequestInit = {}, 
   const token = tokenOverride || getToken();
   if (!token) throw new Error('WEBFLOW_API_TOKEN not configured');
 
+  const mergedHeaders = new Headers({
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  });
+  const incomingHeaders = new Headers(options.headers);
+  incomingHeaders.forEach((value, key) => {
+    mergedHeaders.set(key, value);
+  });
+
   return fetch(`${WEBFLOW_API}${endpoint}`, {
     ...options,
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
+    headers: mergedHeaders,
   });
 }

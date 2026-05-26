@@ -13,8 +13,9 @@ import {
   updateContentRequest,
   addComment,
 } from '../content-requests.js';
-import { notifyTeamContentRequest, notifyTeamChangesRequested } from '../email.js';
+import { notifyTeamActionApproved, notifyTeamContentRequest, notifyTeamChangesRequested } from '../email.js';
 import { getPost, updatePostField, snapshotPostVersion, getMostRecentPostVersion } from '../content-posts.js';
+import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
 import { normalizePageUrl, sanitizeString, validateEnum } from '../helpers.js';
 import { sanitizeRichText, sanitizePlainText } from '../html-sanitize.js';
 import { countHtmlWords } from '../content-posts-ai.js';
@@ -378,6 +379,14 @@ router.post('/api/public/content-request/:workspaceId/:id/approve', validate(app
   if (!updated) return res.status(404).json({ error: 'Request not found' });
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'brief_approved', `${actor?.name || 'Client'} approved brief for "${updated.topic}"`, '', { requestId: updated.id, briefId: updated.briefId }, actor);
+  const wsInfo = getWorkspace(req.params.workspaceId);
+  notifyTeamActionApproved({
+    workspaceId: req.params.workspaceId,
+    workspaceName: wsInfo?.name || req.params.workspaceId,
+    actionTitle: `Brief approved: ${updated.topic}`,
+    sourceType: 'content_brief',
+    actionSummary: `Keyword: ${updated.targetKeyword}`,
+  });
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
   res.json(updated);
 });
@@ -666,6 +675,14 @@ router.post('/api/public/content-request/:workspaceId/:id/approve-post', validat
   if (!updated) return res.status(404).json({ error: 'Request not found' });
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'post_approved', `${actor?.name || 'Client'} approved post for "${updated.topic}"`, '', { requestId: updated.id }, actor);
+  const wsInfo = getWorkspace(req.params.workspaceId);
+  notifyTeamActionApproved({
+    workspaceId: req.params.workspaceId,
+    workspaceName: wsInfo?.name || req.params.workspaceId,
+    actionTitle: `Post approved: ${updated.topic}`,
+    sourceType: 'content_post',
+    actionSummary: `Keyword: ${updated.targetKeyword}`,
+  });
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
   res.json(updated);
 });
@@ -790,6 +807,7 @@ router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', valid
   if (shouldSnapshot) {
     addActivity(req.params.workspaceId, 'post_client_edit', `${actor?.name || 'Client'} edited post content for "${post.targetKeyword}"`, '', { postId: post.id }, actor);
   }
+  invalidateContentPipelineIntelligence(req.params.workspaceId);
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: updated.id, status: updated.status });
   res.json(updated);
 });

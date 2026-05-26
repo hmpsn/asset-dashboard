@@ -228,7 +228,8 @@ export function Sidebar({
                 return (
                   <ClickableRow
                     key={item.id}
-                    onClick={() => !disabled && (isGlobal ? navigate('/' + item.id) : selected && navigate(adminPath(selected.id, item.id)))}
+                    onClick={() => !disabled && (isGlobal ? navigate(adminPath(selected?.id ?? '', item.id)) : selected && navigate(adminPath(selected.id, item.id)))}
+                    data-nav-active={active ? 'true' : 'false'}
                     title={item.desc}
                     className={cn(
                       'flex items-center gap-2.5 px-2.5 py-[5px] rounded-[var(--radius-lg)] t-caption font-medium transition-all',
@@ -265,7 +266,7 @@ export function Sidebar({
           workspaceId={selected?.id}
         />
         <IconButton
-          onClick={() => navigate('/revenue')}
+          onClick={() => navigate(adminPath(selected?.id ?? '', 'revenue'))}
           icon={DollarSign}
           label="Revenue"
           size="md"
@@ -278,7 +279,7 @@ export function Sidebar({
           )}
         />
         <IconButton
-          onClick={() => navigate('/settings')}
+          onClick={() => navigate(adminPath(selected?.id ?? '', 'settings'))}
           icon={Settings}
           label="Settings"
           size="md"

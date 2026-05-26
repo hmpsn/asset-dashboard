@@ -314,4 +314,20 @@ describe('getPageTypeConfig coverage', () => {
   it('landing config has wordCountTarget <= 1000', () => {
     expect(getPageTypeConfig('landing').wordCountTarget).toBeLessThanOrEqual(1000);
   });
+
+  it('service config is conversion dense and shorter than blog content', () => {
+    const cfg = getPageTypeConfig('service');
+    expect(cfg.wordCountTarget).toBeLessThanOrEqual(1100);
+    expect(cfg.wordCountRange).toBe('800-1,100');
+    expect(cfg.prompt).toContain('single CTA');
+    expect(cfg.prompt).toContain('do not add extra sections');
+  });
+
+  it('location config avoids reader-facing SEO operations guidance', () => {
+    const cfg = getPageTypeConfig('location');
+    expect(cfg.wordCountTarget).toBeLessThanOrEqual(1000);
+    expect(cfg.wordCountRange).toBe('700-1,000');
+    expect(cfg.prompt).toContain('Do not mention NAP consistency');
+    expect(cfg.prompt).toContain('public-facing copy');
+  });
 });

@@ -43,6 +43,10 @@ export function buildStoryFromInsight(
   if (!data.competitorDomain || data.competitorDomain.trim().length === 0) {
     return null;
   }
+  const snapshotDate = typeof data.snapshotDate === 'string' ? data.snapshotDate.trim() : '';
+  if (snapshotDate.length === 0) {
+    return null;
+  }
 
   const competitorDomain = data.competitorDomain.trim();
   // Truncated form for use in metric `label` (capped at 40 chars by
@@ -78,8 +82,8 @@ export function buildStoryFromInsight(
             : `${competitorDomain} previously ranked #${data.previousPosition} on "${keyword}" before this week's gain.`;
 
       const volumeSentence = hasVolume
-        ? `The keyword sees ${fmtNum(data.volume!)} searches/mo, snapshot dated ${data.snapshotDate}.`
-        : `Snapshot dated ${data.snapshotDate}.`;
+        ? `The keyword sees ${fmtNum(data.volume!)} searches/mo, snapshot dated ${snapshotDate}.`
+        : `Snapshot dated ${snapshotDate}.`;
 
       narrative = `${positionMovementSentence} ${volumeSentence}`;
 
@@ -112,8 +116,8 @@ export function buildStoryFromInsight(
             : `${competitorDomain} now ranks #${data.currentPosition} on "${keyword}" after losing position this week.`;
 
       const volumeSentence = hasVolume
-        ? `The keyword sees ${fmtNum(data.volume!)} searches/mo, snapshot dated ${data.snapshotDate}.`
-        : `Snapshot dated ${data.snapshotDate}.`;
+        ? `The keyword sees ${fmtNum(data.volume!)} searches/mo, snapshot dated ${snapshotDate}.`
+        : `Snapshot dated ${snapshotDate}.`;
 
       narrative = `${movementSentence} ${volumeSentence}`;
 
@@ -141,8 +145,8 @@ export function buildStoryFromInsight(
         : `${competitorDomain} entered the SERP for "${keyword}" in this week's snapshot.`;
 
       const volumeSentence = hasVolume
-        ? `The keyword sees ${fmtNum(data.volume!)} searches/mo, snapshot dated ${data.snapshotDate}.`
-        : `Snapshot dated ${data.snapshotDate}.`;
+        ? `The keyword sees ${fmtNum(data.volume!)} searches/mo, snapshot dated ${snapshotDate}.`
+        : `Snapshot dated ${snapshotDate}.`;
 
       narrative = `${rankSentence} ${volumeSentence}`;
 
@@ -168,7 +172,7 @@ export function buildStoryFromInsight(
 
       narrative =
         `${competitorDomain}'s overall authority ${direction} by ${magnitude} ` +
-        `in this week's snapshot dated ${data.snapshotDate}. ` +
+        `in this week's snapshot dated ${snapshotDate}. ` +
         `The shift affects every keyword we track against ${competitorDomain}.`;
 
       metrics.push({ value: changeStr, label: `${competitorDomainShort} authority` });
@@ -183,7 +187,7 @@ export function buildStoryFromInsight(
 
   const dataReceipt =
     `Source: weekly competitor monitoring (Monday cron). ` +
-    `Snapshot: ${data.snapshotDate}. Type: ${data.alertType}.`;
+    `Snapshot: ${snapshotDate}. Type: ${data.alertType}.`;
 
   return {
     id: `story-${insight.id}`,

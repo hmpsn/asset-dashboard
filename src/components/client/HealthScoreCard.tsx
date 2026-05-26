@@ -1,12 +1,19 @@
+import { useNavigate } from 'react-router-dom';
+import { Button } from '../ui';
 import { MetricRing } from '../ui/MetricRing';
 import { SectionCard } from '../ui/SectionCard';
 import { scoreColorClass } from '../ui/constants';
+import { clientPath } from '../../routes';
+import { useBetaMode } from './BetaContext';
 
 interface HealthScoreCardProps {
   score: number | null | undefined;
+  workspaceId: string;
 }
 
-export function HealthScoreCard({ score }: HealthScoreCardProps) {
+export function HealthScoreCard({ score, workspaceId }: HealthScoreCardProps) {
+  const navigate = useNavigate();
+  const betaMode = useBetaMode();
   if (score == null) return null;
   const rounded = Math.round(score);
 
@@ -43,6 +50,23 @@ export function HealthScoreCard({ score }: HealthScoreCardProps) {
               Below 60 Critical
             </span>
           </div>
+          {rounded < 80 && (
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <Button
+                size="sm"
+                onClick={() => navigate(`${clientPath(workspaceId, 'health', betaMode)}?severity=error`)}
+              >
+                View Priority Issues
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => navigate(`${clientPath(workspaceId, 'inbox', betaMode)}?tab=conversations`)}
+              >
+                Request SEO Help
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </SectionCard>

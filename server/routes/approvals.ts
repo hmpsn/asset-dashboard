@@ -19,7 +19,7 @@ import {
   deleteBatch,
 } from '../approvals.js';
 import { broadcastToWorkspace } from '../broadcast.js';
-import { notifyApprovalReady } from '../email.js';
+import { notifyApprovalReady, notifyTeamActionApproved, notifyTeamChangesRequested } from '../email.js';
 import { getClientActor, requireClientPortalAuth } from '../middleware.js';
 import {
   publishCollectionItems,
@@ -270,6 +270,15 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/approve', requireClien
     clientNote || undefined,
     { batchId },
     actorInfo);
+  const wsInfo = getWorkspace(workspaceId);
+  notifyTeamActionApproved({
+    workspaceId,
+    workspaceName: wsInfo?.name || workspaceId,
+    actionTitle: `SEO batch approved: ${batch.name}`,
+    sourceType: 'seo_approval',
+    actionSummary: `${pendingItems.length} approved change${pendingItems.length === 1 ? '' : 's'}`,
+    clientNote,
+  });
 
   broadcastToWorkspace(workspaceId, WS_EVENTS.APPROVAL_UPDATE, { batchId, status: 'approved' });
   res.json(updatedBatch);
@@ -322,12 +331,29 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClien
           item.proposedValue ? `New value: ${item.proposedValue.slice(0, 80)}` : undefined,
           { batchId: req.params.batchId, itemId: item.id, pageId: item.pageId },
           actorInfo);
+        const wsInfo = getWorkspace(req.params.workspaceId);
+        notifyTeamActionApproved({
+          workspaceId: req.params.workspaceId,
+          workspaceName: wsInfo?.name || req.params.workspaceId,
+          actionTitle: `SEO change approved: ${fieldLabel}`,
+          sourceType: 'seo_approval',
+          actionSummary: pageLabel,
+          clientNote,
+        });
       } else if (status === 'rejected' && statusChanged) {
         addActivity(req.params.workspaceId, 'changes_requested',
           `${actorName} requested changes to ${fieldLabel} for ${pageLabel}`,
           clientNote || undefined,
           { batchId: req.params.batchId, itemId: item.id, pageId: item.pageId },
           actorInfo);
+        const wsInfo = getWorkspace(req.params.workspaceId);
+        notifyTeamChangesRequested({
+          workspaceName: wsInfo?.name || req.params.workspaceId,
+          workspaceId: req.params.workspaceId,
+          topic: `SEO revision requested: ${fieldLabel}`,
+          targetKeyword: pageLabel,
+          feedback: clientNote || '',
+        });
       }
     }
   }

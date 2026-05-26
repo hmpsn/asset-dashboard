@@ -2560,9 +2560,9 @@ Keep:
 - `generateSchemaForPage`, `generateSchemaSuggestions` (now wrappers)
 - `generateCmsTemplateSchema` (unrelated CMS template path — leave for now)
 - `checkRichResultsEligibility` (still called by frontend through some routes)
-- `extractFaqOpportunities` (still used by analytics layer)
+- `extractFaqOpportunities` (retired by Workspace Intelligence Consolidation PR4; revive through a slice-backed helper if needed)
 - `extractEeatFromBrief` (still used by content brief flows)
-- `buildSchemaIntelligenceBlock` (still exported, even if dead — can be removed in a follow-up grep cleanup if no callers)
+- `buildSchemaIntelligenceBlock` (retired by Workspace Intelligence Consolidation PR4)
 
 - [ ] **Step 14.1: Identify the deletion ranges**
 
@@ -2621,12 +2621,12 @@ The verification pass identified one test file whose imports break after Step 14
 
 Two other tests import from `schema-suggester.ts` but ONLY the surviving symbols:
 - `tests/unit/schema-validation-pipeline.test.ts` — type imports (`RichResultEligibility`, `SchemaPageType`) + runtime `checkRichResultsEligibility` (all kept). **Do not delete.**
-- `tests/unit/schema-intelligence-enrichment.test.ts` — type-only import of `SchemaContext` (kept). **Do not delete.**
+- `tests/unit/schema-intelligence-enrichment.test.ts` — deleted in Workspace Intelligence Consolidation PR4 when the old schema prompt block was retired.
 
 Run a sanity check:
 
 ```bash
-grep -E "from '../../server/schema-suggester" tests/unit/schema-validation-pipeline.test.ts tests/unit/schema-intelligence-enrichment.test.ts
+grep -E "from '../../server/schema-suggester" tests/unit/schema-validation-pipeline.test.ts
 ```
 
 If those two files only show `import type { ... }` lines or `checkRichResultsEligibility`, leave them alone. Then delete the broken file:
@@ -2702,7 +2702,7 @@ In `data/roadmap.json`, append two items to the last sprint section (find `schem
   "priority": "P1",
   "sprint": "I",
   "status": "pending",
-  "notes": "Follow-up to lean-schema-rewrite. Re-injects the platform's intelligence layer surgically into schema generation: (1) Healthcare type escalation — workspace businessContext → Dentist/Physician/Optician/Chiropractor/MedicalClinic/etc. when address+phone+hours are present, falls back to LocalBusiness otherwise. (2) FAQ enrichment from GSC question queries — extractFaqOpportunities (already exists in analytics-intelligence.ts) feeds FAQPage when ≥3 question queries match a page. (3) E-E-A-T author injection from content brief — extractEeatFromBrief (already exists) populates Article.author with Person.knowsAbout, sameAs from the brief's expert profile. (4) Service serviceType from voice profile + business profile. Reuses existing intelligence wiring; the lean rewrite kept the data flow intact, this task adds surgical injection points to the templates."
+  "notes": "Follow-up to lean-schema-rewrite. Re-injects the platform's intelligence layer surgically into schema generation: (1) Healthcare type escalation — workspace businessContext → Dentist/Physician/Optician/Chiropractor/MedicalClinic/etc. when address+phone+hours are present, falls back to LocalBusiness otherwise. (2) FAQ enrichment from GSC question queries — revive through a slice-backed schema intelligence helper if this work returns. (3) E-E-A-T author injection from content brief — extractEeatFromBrief (already exists) populates Article.author with Person.knowsAbout, sameAs from the brief's expert profile. (4) Service serviceType from voice profile + business profile. Reuses existing intelligence wiring; the lean rewrite kept the data flow intact, this task adds surgical injection points to the templates."
 }
 ```
 

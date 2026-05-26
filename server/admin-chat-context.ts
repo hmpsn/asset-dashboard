@@ -9,7 +9,6 @@
 
 import type { Workspace } from './workspaces.js';
 import { getWorkspace, getBrandName } from './workspaces.js';
-import { formatLearningsForPrompt } from './workspace-learnings.js';
 import { getLatestSnapshot } from './reports.js';
 import { listBriefs } from './content-brief.js';
 import { listContentRequests } from './content-requests.js';
@@ -30,18 +29,20 @@ import { getGA4Overview, getGA4TopPages, getGA4TopSources, getGA4OrganicOverview
 import { isGlobalConnected } from './google-auth.js';
 import { applySuppressionsToAudit, findPageMapEntryByIdentity, getAuditTrafficForWorkspace, resolvePagePath, normalizePageUrl, normalizePath } from './helpers.js';
 import { RICH_BLOCKS_PROMPT } from './prompt-rich-blocks.js';
-import { buildWorkspaceIntelligence, formatPageMapForPrompt, formatKeywordsForPrompt, formatPersonasForPrompt, formatKnowledgeBaseForPrompt } from './workspace-intelligence.js';
 import { scrapeUrl } from './web-scraper.js';
 import { createLogger } from './logger.js';
-import { getInsights } from './analytics-insights-store.js';
 import { listBlueprints } from './page-strategy.js';
 import { getEntryCopyStatus } from './copy-review.js';
 import { getAllPatterns } from './copy-intelligence.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
-import type { IntelligenceSlice } from '../shared/types/intelligence.js';
 import { STUDIO_NAME } from './constants.js';
 import { isProgrammingError } from './errors.js';
 import { buildSystemPrompt as buildLayeredSystemPrompt } from './prompt-assembly.js';
+import { listAllInsightsFromSlice } from './intelligence/insights-slice.js';
+import {
+  buildAdminChatIntelligenceContext,
+  type AdminChatContextCategory,
+} from './intelligence/admin-chat-context-builder.js';
 
 const log = createLogger('admin-chat-context');
 
@@ -84,10 +85,10 @@ const CATEGORY_PATTERNS: Record<ContextCategory, RegExp[]> = {
   copy: [/copywriting/i, /copy\s+(blueprint|status|pipeline|section|review|generation|approved)/i, /blueprint\s+(status|section|deck|copy|entry|entries)/i, /approved\s+copy/i, /section\s+status/i, /generated?\s+copy/i, /copy\s+deck/i],
 };
 
-/** Context size for general queries is managed through selective slice inclusion, not
- *  through formatForPrompt() tokenBudget (which admin-chat-context does not call).
- *  General queries union operational+siteHealth+clientSignals; the section-building
- *  code below naturally limits output to relevant fields rather than full slice dumps. */
+/** Context size for general queries is managed through selective slice inclusion plus
+ *  bounded formatted SEO/learnings blocks. General queries union operational,
+ *  siteHealth, and clientSignals; the section-building code below still limits output
+ *  to relevant fields rather than full slice dumps. */
 
 /**
  * Classify which data categories a question needs.
@@ -360,48 +361,18 @@ export async function assembleAdminContext(
   let pageContext: AssembledContext['pageContext'] | undefined;
 
   // ── Always include: strategy, brand voice, knowledge base, personas ──
-  // Build slice list based on question categories (Task 8)
-  const intelSlices: string[] = ['seoContext', 'learnings'];
-  if (categories.has('activity') || categories.has('general')) intelSlices.push('operational');
-  if (categories.has('performance') || categories.has('general')) intelSlices.push('siteHealth');
-  if (categories.has('client') || categories.has('general')) intelSlices.push('clientSignals');
-  if (categories.has('approvals') && !intelSlices.includes('operational')) intelSlices.push('operational');
-  if (categories.has('copy') && !intelSlices.includes('contentPipeline')) intelSlices.push('contentPipeline');
-  // localSeo: include on performance/general questions and when the question itself mentions
-  // local signals. Workspaces with no active markets get the empty-but-valid baseline (~200
-  // chars), so the token cost is bounded for non-local workspaces.
-  const questionLower = question.toLowerCase();
-  const mentionsLocal = /\b(local|near me|near-me|gbp|google business|local pack|market|markets|location|city)\b/.test(questionLower);
-  if (categories.has('performance') || categories.has('general') || mentionsLocal) intelSlices.push('localSeo');
-
-  const intel = await buildWorkspaceIntelligence(workspaceId, { // bwi-all-ok — slices built dynamically above; general queries union operational+siteHealth+clientSignals
-    slices: intelSlices as IntelligenceSlice[],
-    learningsDomain: 'all',
-    enrichWithBacklinks: true, // admin AI advisor benefits from backlink data; one live call per cache window (LRU caches within session)
-  });
+  const chatIntel = await buildAdminChatIntelligenceContext(
+    workspaceId,
+    question,
+    categories as Set<AdminChatContextCategory>,
+  );
+  const intel = chatIntel.intelligence;
   const seoCtx = intel.seoContext;
-
-  const keywordBlock = formatKeywordsForPrompt(seoCtx);
   const strategy = seoCtx?.strategy;
-  // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
-  const brandVoiceBlock = seoCtx?.effectiveBrandVoiceBlock ?? '';
-  const bizCtx = seoCtx?.businessContext ?? '';
-  const kwMapContext = seoCtx ? formatPageMapForPrompt(seoCtx) : '';
-  const personasContext = formatPersonasForPrompt(seoCtx?.personas);
-  const knowledgeBase = formatKnowledgeBaseForPrompt(seoCtx?.knowledgeBase);
 
-  if (keywordBlock || kwMapContext || bizCtx) {
-    const stratParts = [keywordBlock, kwMapContext, bizCtx ? `\nBusiness: ${bizCtx}` : '', brandVoiceBlock].filter(Boolean);
-    sections.push(`KEYWORD STRATEGY CONTEXT:\n${stratParts.join('\n')}`);
-    dataSources.push('Keyword Strategy & Brand Voice');
-  }
-  if (personasContext) {
-    sections.push(personasContext);
-    dataSources.push('Audience Personas');
-  }
-  if (knowledgeBase) {
-    sections.push(knowledgeBase);
-    dataSources.push('Business Knowledge Base');
+  if (chatIntel.workspaceContextBlock) {
+    sections.push(chatIntel.workspaceContextBlock);
+    dataSources.push(...chatIntel.dataSources);
   }
 
   // ── Parallel fetch based on categories ──
@@ -645,7 +616,7 @@ export async function assembleAdminContext(
   // Analytics Intelligence (quick wins, decay, cannibalization, health scores)
   if (categories.has('insights') || categories.has('general') || categories.has('strategy')) {
     try {
-      const allInsights = getInsights(workspaceId);
+      const allInsights = intel.insights ? listAllInsightsFromSlice(intel.insights) : [];
       if (allInsights.length > 0) {
         const insightsBlock = buildInsightsContext(allInsights);
         if (insightsBlock) {
@@ -917,7 +888,11 @@ export async function assembleAdminContext(
         if (health.performanceSummary?.score != null)
           perfParts.push(`Performance score: ${health.performanceSummary.score}/100`);
         if (health.performanceSummary?.avgLcp != null)
-          perfParts.push(`LCP: ${health.performanceSummary.avgLcp.toFixed(1)}s`);
+          perfParts.push(`LCP: ${(health.performanceSummary.avgLcp / 1000).toFixed(1)}s`);
+        if (health.performanceSummary) {
+          const interactionMs = health.performanceSummary.avgInp ?? health.performanceSummary.avgFid;
+          if (interactionMs != null) perfParts.push(`INP: ${interactionMs.toFixed(0)}ms`);
+        }
         if (health.performanceSummary?.avgCls != null)
           perfParts.push(`CLS: ${health.performanceSummary.avgCls.toFixed(2)}`);
         if (health.cwvPassRate.mobile != null)
@@ -1019,12 +994,9 @@ export async function assembleAdminContext(
   }
 
   // ── Inject workspace learnings from intelligence layer ──
-  if (intel.learnings?.summary) {
-    const learningsBlock = formatLearningsForPrompt(intel.learnings.summary, 'all');
-    if (learningsBlock) {
-      sections.push(learningsBlock);
-      dataSources.push('Workspace Outcome Learnings');
-    }
+  if (chatIntel.learningsBlock) {
+    sections.push(chatIntel.learningsBlock);
+    dataSources.push('Workspace Outcome Learnings');
   }
 
   return { sections, dataSources, mode, pageContext };

@@ -15,6 +15,7 @@ export {
   useClientAuditSummary,
   useClientAuditDetail,
   useClientStrategy,
+  useClientROI,
   useClientPricing,
   useClientContentPlan,
   useClientPageKeywords,

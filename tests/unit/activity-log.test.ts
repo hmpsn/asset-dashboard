@@ -4,6 +4,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   addActivity,
+  getClientActivitySummary,
   listActivity,
   listClientActivity,
   initActivityBroadcast,
@@ -104,3 +105,27 @@ describe('listClientActivity', () => {
   });
 });
 
+// ── getClientActivitySummary ──
+
+describe('getClientActivitySummary', () => {
+  it('counts client-originated portal activity and excludes admin send events', () => {
+    const wsId = 'ws_client_summary_' + Date.now();
+    addActivity(wsId, 'client_action_sent', 'Admin sent action to client');
+    addActivity(wsId, 'portal_session', 'Client opened portal');
+    addActivity(wsId, 'post_client_edit', 'Client edited post');
+
+    const summary = getClientActivitySummary(wsId);
+
+    expect(summary).toEqual({
+      distinctDays: 1,
+      lastActive: expect.any(String),
+    });
+  });
+
+  it('returns null when a workspace only has admin-originated client send activity', () => {
+    const wsId = 'ws_admin_send_only_' + Date.now();
+    addActivity(wsId, 'client_action_sent', 'Admin sent action to client');
+
+    expect(getClientActivitySummary(wsId)).toBeNull();
+  });
+});

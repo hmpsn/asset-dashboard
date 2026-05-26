@@ -40,9 +40,12 @@ const LOWER_IS_BETTER_METRICS = new Set(['position']);
  */
 export function resolveFullPageUrl(pageUrl: string, ws: { liveDomain?: string; gscPropertyUrl?: string }): string {
   if (pageUrl.startsWith('http')) return pageUrl;
+  const gscUrlBase = ws.gscPropertyUrl?.startsWith('http')
+    ? ws.gscPropertyUrl.replace(/\/$/, '')
+    : '';
   const base = ws.liveDomain
     ? (ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`)
-    : ws.gscPropertyUrl?.replace(/\/$/, '') ?? '';
+    : gscUrlBase;
   if (!base) return pageUrl;
   return `${base}${pageUrl.startsWith('/') ? '' : '/'}${pageUrl}`;
 }

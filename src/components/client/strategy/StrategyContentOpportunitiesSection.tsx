@@ -120,7 +120,7 @@ function ContentGapCard({
   return (
     <div className="px-3 py-2.5 bg-[var(--surface-3)]/40 rounded-[var(--radius-lg)] border border-[var(--brand-border)] hover:border-teal-500/20 transition-colors">
       <div className="flex items-start justify-between gap-2 mb-1">
-        <span className="t-ui font-semibold text-[var(--brand-text-bright)]">
+        <span className="t-body font-semibold text-[var(--brand-text-bright)]">
           {gap.topic}
           {gap.opportunityScore != null && (
             <Badge label={`${gap.opportunityScore}/100`} tone="blue" shape="pill" className="ml-2" />
@@ -319,7 +319,7 @@ export function StrategyContentOpportunitiesSection({
                 <Icon as={FileText} size="md" className="text-accent-brand" />
               </div>
               <div className="text-left">
-                <div className="t-ui font-medium text-[var(--brand-text-bright)]">Create Content</div>
+                <div className="t-body font-medium text-[var(--brand-text-bright)]">Create Content</div>
                 <div className="t-caption-sm text-[var(--brand-text-muted)]">{contentGapsFound} strong ideas · {keywordGapCount} review candidates</div>
               </div>
             </div>

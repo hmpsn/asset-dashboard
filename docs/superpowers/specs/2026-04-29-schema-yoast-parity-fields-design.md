@@ -91,7 +91,7 @@ Delete the 5 unused leftover scaffolding fields confirmed dead by the pre-plan a
 **Preserve** these three (the architectural audit was incomplete; the pre-plan audit caught it):
 - `_architectureTree` — written 3 times in `server/jobs.ts` + `server/routes/webflow-schema.ts`; defer cleanup to a separate audit.
 - `_existingErrors` — written once + test fixture references; staged for planned validator-error-deduplication feature.
-- `_faqOpportunities` — **actively consumed** in `schema-suggester.ts:188-190` (FAQ enrichment branch).
+- `_faqOpportunities` — retired by Workspace Intelligence Consolidation PR4 after the schema generator moved to deterministic slice-backed generation; revived FAQ-from-GSC work must use a new slice-backed helper.
 
 Distinct from the §6 migration queue: these are dead-code deletions, not legacy patterns.
 

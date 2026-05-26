@@ -11,6 +11,17 @@ export const AI_CRITICAL_PIPELINE_IDS = [
 
 export type AiCriticalPipelineId = (typeof AI_CRITICAL_PIPELINE_IDS)[number];
 
+export const AI_QUALITY_PIPELINE_IDS = [
+  'brand-voice-provenance',
+  'content-brief-review',
+  'seo-editor-assist',
+  'diagnostic-synthesis',
+  'admin-insights-chat',
+  'client-search-chat',
+] as const;
+
+export type AiQualityPipelineId = (typeof AI_QUALITY_PIPELINE_IDS)[number];
+
 export type AiReliabilityFailureClass =
   | 'invalid_output'
   | 'timeout'
@@ -65,6 +76,57 @@ export type AiReliabilityScenario = {
   evidenceFiles: string[];
   assertions: AiReliabilityScenarioAssertion[];
   notes: string;
+};
+
+export type AiQualityDimension =
+  | 'voice_authority'
+  | 'output_format'
+  | 'prose_quality'
+  | 'evidence_grounding'
+  | 'duplication_risk';
+
+export type AiQualityFixture = {
+  id: string;
+  pipelineId: AiQualityPipelineId;
+  title: string;
+  dimension: AiQualityDimension;
+  severity: AiScenarioSeverity;
+  evidenceFiles: string[];
+  assertions: AiReliabilityScenarioAssertion[];
+  notes: string;
+};
+
+export type AiQualityFixtureResult = {
+  fixtureId: string;
+  pipelineId: AiQualityPipelineId;
+  dimension: AiQualityDimension;
+  severity: AiScenarioSeverity;
+  passed: boolean;
+  score: number;
+  reasons: string[];
+  evidenceFiles: string[];
+};
+
+export type AiQualityPipelineScore = {
+  pipelineId: AiQualityPipelineId;
+  title: string;
+  score: number;
+  passed: number;
+  total: number;
+  dimensions: AiQualityDimension[];
+  failingFixtureIds: string[];
+};
+
+export type AiQualityReport = {
+  generatedBy: 'scripts/report-ai-quality.ts';
+  advisoryOnly: true;
+  generatedAt: string;
+  fixtures: AiQualityFixture[];
+  fixtureResults: AiQualityFixtureResult[];
+  pipelineScores: AiQualityPipelineScore[];
+  overallScore: number;
+  hardFailures: string[];
+  warnings: string[];
 };
 
 export type AiReliabilityThresholds = {

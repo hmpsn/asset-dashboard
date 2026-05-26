@@ -9,7 +9,7 @@ const log = createLogger('schema-generation-context');
 
 type SchemaContextBundle = Awaited<ReturnType<typeof buildSchemaContext>>;
 export async function prepareBulkSchemaGenerationContext(siteId: string): Promise<SchemaContextBundle> {
-  const context = await buildSchemaContext(siteId, { includeAnalytics: true });
+  const context = await buildSchemaContext(siteId);
   const { ctx } = context;
 
   if (ctx.workspaceId) {
@@ -24,18 +24,24 @@ export async function prepareSinglePageSchemaGenerationContext(
   pageId: string,
   pageType?: SchemaContext['pageType'],
 ): Promise<SchemaContextBundle> {
-  const context = await buildSchemaContext(siteId, { includeAnalytics: true });
+  const context = await buildSchemaContext(siteId);
   const { ctx } = context;
 
   if (pageType) ctx.pageType = pageType;
 
   if (ctx.workspaceId) {
-    const prior = getValidation(ctx.workspaceId, pageId);
-    if (Array.isArray(prior?.errors) && prior.errors.length > 0) {
-      const validErrors = prior.errors.filter(
-        (error): error is { message: string } => typeof (error as { message?: unknown })?.message === 'string',
-      );
-      if (validErrors.length > 0) ctx._existingErrors = validErrors;
+    try {
+      const prior = getValidation(ctx.workspaceId, pageId);
+      if (Array.isArray(prior?.errors) && prior.errors.length > 0) {
+        const validErrors = prior.errors.filter(
+          (error): error is { message: string } => typeof (error as { message?: unknown })?.message === 'string',
+        );
+        if (validErrors.length > 0) ctx._existingErrors = validErrors;
+      }
+    } catch (err) {
+      if (isProgrammingError(err)) {
+        log.warn({ err, workspaceId: ctx.workspaceId, pageId }, 'Schema generation validation context unavailable');
+      }
     }
     await attachArchitectureTree(ctx);
   }

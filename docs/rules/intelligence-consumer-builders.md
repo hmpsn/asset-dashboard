@@ -42,6 +42,9 @@ Current builders:
 
 - `buildContentGenerationContext(workspaceId, opts?)`
 - `buildRecommendationGenerationContext(workspaceId, opts?)`
+- `buildAdminChatIntelligenceContext(workspaceId, question, categories)`
+- `buildDiagnosticIntelligenceContext(workspaceId, opts?)`
+- `buildPageAssistContext(workspaceId, opts?)`
 
 Each builder is responsible for:
 
@@ -49,6 +52,14 @@ Each builder is responsible for:
 - threading `pagePath`
 - threading `learningsDomain`
 - keeping one `slices` source of truth for assembly and formatting
+
+Admin chat and diagnostics use the chat/diagnostic builders so conversation
+surfaces do not own their own canonical slice selection. Page-assist SEO tools
+use `buildPageAssistContext()` for keyword, voice, personas, knowledge, page
+profile, page element, local SEO, learnings, and page-insight prompt blocks.
+Route-owned add-ons such as scraped page content, GSC query excerpts, selected
+text, Webflow write targets, and user rewrite instructions remain outside the
+builder.
 
 ## 3. Caller-owned add-on blocks
 

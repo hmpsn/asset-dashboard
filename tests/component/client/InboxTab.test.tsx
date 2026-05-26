@@ -174,7 +174,7 @@ beforeEach(() => {
 describe('InboxTab — basic rendering', () => {
   it('renders without crashing', () => {
     renderInbox();
-    expect(screen.getByText('Inbox')).toBeInTheDocument();
+    expect(screen.getByText(/SEO changes, requests, and content/i)).toBeInTheDocument();
   });
 
   it('shows the inbox description', () => {

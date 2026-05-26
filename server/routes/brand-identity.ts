@@ -7,7 +7,7 @@ import { WS_EVENTS } from '../ws-events.js';
 import {
   listDeliverables, getDeliverable,
   generateDeliverable, refineDeliverable,
-  setDeliverableStatus, exportDeliverables,
+  setDeliverableStatus, updateDeliverableContent, exportDeliverables,
 } from '../brand-identity.js';
 import type { DeliverableTier } from '../../shared/types/brand-engine.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
@@ -42,8 +42,12 @@ const refineDeliverableSchema = z.object({
 // the auto-sample side-effect only on the first draft→approved transition;
 // re-approvals and approved→draft reversions are no-ops for that side effect.
 const patchDeliverableSchema = z.object({
-  status: z.enum(['approved', 'draft']),
-});
+  status: z.enum(['approved', 'draft']).optional(),
+  content: z.string().trim().min(1).optional(),
+}).refine(
+  (data) => typeof data.status !== 'undefined' || typeof data.content !== 'undefined',
+  { message: 'Provide at least one field to update' },
+);
 
 // ── Routes ──────────────────────────────────────────────────────────────────
 
@@ -131,17 +135,32 @@ router.post('/api/brand-identity/:workspaceId/:id/refine', requireWorkspaceAcces
 
 // Update status (approve / revert to draft)
 router.patch('/api/brand-identity/:workspaceId/:id', requireWorkspaceAccess('workspaceId'), validate(patchDeliverableSchema), (req, res) => {
-  const { status } = req.body as { status: 'approved' | 'draft' };
-  const result = setDeliverableStatus(req.params.workspaceId, req.params.id, status);
-  if (!result) return res.status(404).json({ error: 'Not found' });
-  const typeLabel = result.deliverableType.replace(/_/g, ' ');
-  if (status === 'approved') {
-    addActivity(req.params.workspaceId, 'brand_deliverable_approved', `Approved ${typeLabel} deliverable`);
-  } else {
-    addActivity(req.params.workspaceId, 'brand_deliverable_reverted', `Reverted ${typeLabel} deliverable to draft`);
+  const { status, content } = req.body as { status?: 'approved' | 'draft'; content?: string };
+  const workspaceId = req.params.workspaceId;
+  const deliverableId = req.params.id;
+
+  let result = null;
+  if (typeof content !== 'undefined') {
+    result = updateDeliverableContent(workspaceId, deliverableId, content);
+    if (!result) return res.status(404).json({ error: 'Not found' });
+    const typeLabel = result.deliverableType.replace(/_/g, ' ');
+    addActivity(workspaceId, 'brand_deliverable_refined', `Edited ${typeLabel} deliverable`);
   }
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, { deliverableId: req.params.id, status });
-  invalidateIntelligenceCache(req.params.workspaceId);
+
+  if (typeof status !== 'undefined') {
+    result = setDeliverableStatus(workspaceId, deliverableId, status);
+    if (!result) return res.status(404).json({ error: 'Not found' });
+    const typeLabel = result.deliverableType.replace(/_/g, ' ');
+    if (status === 'approved') {
+      addActivity(workspaceId, 'brand_deliverable_approved', `Approved ${typeLabel} deliverable`);
+    } else {
+      addActivity(workspaceId, 'brand_deliverable_reverted', `Reverted ${typeLabel} deliverable to draft`);
+    }
+  }
+
+  if (!result) return res.status(404).json({ error: 'Not found' });
+  broadcastToWorkspace(workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, { deliverableId, status, contentUpdated: typeof content !== 'undefined' });
+  invalidateIntelligenceCache(workspaceId);
   res.json(result);
 });
 

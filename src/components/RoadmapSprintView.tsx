@@ -1,5 +1,6 @@
-import { CheckCircle2, FilterX } from 'lucide-react';
-import { Badge, Button, EmptyState, SectionCard } from './ui/index';
+import { Fragment, useState } from 'react';
+import { CheckCircle2, ChevronDown, ChevronRight, FilterX } from 'lucide-react';
+import { Badge, Button, EmptyState, IconButton, SectionCard } from './ui/index';
 import type { SprintData } from '../../shared/types/roadmap';
 import type { RoadmapFilters } from '../lib/roadmapFilters';
 import { matchesFilters } from '../lib/roadmapFilters';
@@ -12,7 +13,11 @@ interface Props {
   onToggleStatus: (itemId: number | string, sprintId: string) => void;
 }
 
+/** Compound identifier — item.id alone is not unique across sprints. */
+const compoundKey = (sprintId: string, itemId: number | string) => `${sprintId}::${itemId}`;
+
 export function RoadmapSprintView({ sprints, filters, featureMap, onToggleStatus }: Props) {
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const visibleSprints = sprints.filter(sprint =>
     sprint.items.some(item => matchesFilters(item, filters, sprint.id)),
   );
@@ -67,42 +72,69 @@ export function RoadmapSprintView({ sprints, filters, featureMap, onToggleStatus
               {filteredItems.map(item => {
                 const pb = priorityBadge(item.priority);
                 const featureName = item.featureId != null ? featureMap.get(item.featureId) : undefined;
+                const key = compoundKey(sprint.id, item.id);
+                const isExpanded = expandedKey === key;
+                const description = item.notes?.trim();
                 return (
-                  <div
-                    key={item.id}
-                    className="flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--surface-3)] transition-colors"
-                  >
-                    <span className="t-caption-sm font-mono text-[var(--brand-text-muted)] w-10 flex-shrink-0 text-right">
-                      #{item.id}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onToggleStatus(item.id, sprint.id)}
-                      className="flex-shrink-0 hover:scale-110 px-0 py-0 bg-transparent hover:bg-transparent"
-                      title={`Status: ${item.status} — click to cycle`}
-                    >
-                      {STATUS_ICON[item.status]}
-                    </Button>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span
-                          className={`text-xs font-medium ${
-                            item.status === 'done' ? 'text-[var(--brand-text-muted)] line-through' : 'text-[var(--brand-text-bright)]'
-                          }`}
-                        >
-                          {item.title}
-                        </span>
-                        <Badge label={pb.label} tone={pb.color} />
-                        {featureName && <FeatureChip>{featureName}</FeatureChip>}
-                        {item.tags?.map(tag => (
-                          <TagChip key={tag}>{tag}</TagChip>
-                        ))}
+                  <Fragment key={key}>
+                    <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--surface-3)] transition-colors">
+                      <span className="t-caption-sm font-mono text-[var(--brand-text-muted)] w-10 flex-shrink-0 text-right">
+                        #{item.id}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onToggleStatus(item.id, sprint.id)}
+                        className="flex-shrink-0 hover:scale-110 px-0 py-0 bg-transparent hover:bg-transparent"
+                        title={`Status: ${item.status} — click to cycle`}
+                      >
+                        {STATUS_ICON[item.status]}
+                      </Button>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className={`text-xs font-medium ${
+                              item.status === 'done' ? 'text-[var(--brand-text-muted)] line-through' : 'text-[var(--brand-text-bright)]'
+                            }`}
+                          >
+                            {item.title}
+                          </span>
+                          <Badge label={pb.label} tone={pb.color} />
+                          {featureName && <FeatureChip>{featureName}</FeatureChip>}
+                          {item.tags?.map(tag => (
+                            <TagChip key={tag}>{tag}</TagChip>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <div className="t-caption text-[var(--brand-text-muted)]">{item.est}</div>
+                        <IconButton
+                          onClick={() => setExpandedKey(isExpanded ? null : key)}
+                          aria-expanded={isExpanded}
+                          label={isExpanded ? `Collapse details for ${item.title}` : `Expand details for ${item.title}`}
+                          icon={isExpanded ? ChevronDown : ChevronRight}
+                          size="sm"
+                          variant="ghost"
+                          className={isExpanded ? 'text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)]'}
+                        />
                       </div>
                     </div>
-                    <div className="flex-shrink-0 t-caption text-[var(--brand-text-muted)]">{item.est}</div>
-                  </div>
+                    {isExpanded && (
+                      <div className="px-4 pb-3">
+                        <div className="rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-1)] px-3 py-2 space-y-1.5">
+                          <p className="t-caption text-[var(--brand-text-bright)] leading-relaxed">
+                            <span className="t-caption-sm font-semibold uppercase tracking-wide text-[var(--brand-text-muted)]">Description:</span>{' '}
+                            {description || 'No description added yet.'}
+                          </p>
+                          <div className="flex items-center gap-4 t-caption-sm text-[var(--brand-text-muted)]">
+                            {item.source && <span>Source: {item.source}</span>}
+                            {item.shippedAt && <span>Shipped: {item.shippedAt}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </Fragment>
                 );
               })}
               </div>

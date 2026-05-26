@@ -16,6 +16,7 @@ import { WS_EVENTS } from './ws-events.js';
 import { abortableDelay, isAbortSignalAborted, throwIfSignalAborted } from './abort-helpers.js';
 import { BACKGROUND_JOB_TYPES } from '../shared/types/background-jobs.js';
 import { sanitizePlainText, sanitizeRichText } from './html-sanitize.js';
+import { invalidateContentPipelineIntelligence } from './intelligence-freshness.js';
 
 // Re-export everything from sub-modules for backward compatibility
 export * from './content-posts-db.js';
@@ -67,6 +68,7 @@ interface GeneratePostOptions {
 }
 
 export function notifyContentUpdated(workspaceId: string, payload: Record<string, unknown>) {
+  invalidateContentPipelineIntelligence(workspaceId);
   broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, { domain: 'content-posts', ...payload });
 }
 

@@ -5,6 +5,30 @@ import { matchPageIdentity } from '../helpers.js';
 
 const log = createLogger('workspace-intelligence/insights');
 
+export function listAllInsightsFromSlice(insights: InsightsSlice): AnalyticsInsight[] {
+  const byId = new Map<string, AnalyticsInsight>();
+  for (const list of Object.values(insights.byType)) {
+    for (const insight of list ?? []) {
+      byId.set(insight.id, insight);
+    }
+  }
+  if (byId.size === 0) {
+    for (const insight of insights.all) byId.set(insight.id, insight);
+  }
+  return [...byId.values()].sort((a, b) => (b.impactScore ?? 0) - (a.impactScore ?? 0));
+}
+
+function insightPageIdentities(insight: AnalyticsInsight): string[] {
+  const identities = new Set<string>();
+  if (insight.pageId) identities.add(insight.pageId);
+  const data = insight.data as Record<string, unknown>;
+  for (const key of ['pagePath', 'pageUrl', 'page', 'url', 'affectedPage']) {
+    const value = data[key];
+    if (typeof value === 'string' && value.trim()) identities.add(value);
+  }
+  return [...identities];
+}
+
 export async function assembleInsights(
   workspaceId: string,
   opts?: IntelligenceOptions,
@@ -17,13 +41,13 @@ export async function assembleInsights(
     log.warn({ err, workspaceId }, 'assembleInsights: getInsights failed, returning empty slice');
   }
 
-  // Cap at 100, sorted by impact score descending (§13)
+  // Keep prompt-facing payload bounded, but compute rollups from the full set.
   const sorted = [...all].sort((a, b) => (b.impactScore ?? 0) - (a.impactScore ?? 0));
   const capped = sorted.slice(0, 100);
 
   // Group by type
   const byType: Partial<Record<InsightType, AnalyticsInsight[]>> = {};
-  for (const insight of capped) {
+  for (const insight of sorted) {
     const list = byType[insight.insightType] ?? [];
     list.push(insight);
     byType[insight.insightType] = list;
@@ -33,17 +57,19 @@ export async function assembleInsights(
   const bySeverity: Record<InsightSeverity, number> = {
     critical: 0, warning: 0, opportunity: 0, positive: 0,
   };
-  for (const insight of capped) {
+  for (const insight of sorted) {
     bySeverity[insight.severity] = (bySeverity[insight.severity] ?? 0) + 1;
   }
 
   // Top 10 by impact
-  const topByImpact = capped.slice(0, 10);
+  const topByImpact = sorted.slice(0, 10);
 
   // Page-specific filtering
   let forPage: AnalyticsInsight[] | undefined;
   if (opts?.pagePath) {
-    forPage = capped.filter(i => i.pageId ? matchPageIdentity(i.pageId, opts.pagePath!) : false);
+    forPage = sorted.filter(i =>
+      insightPageIdentities(i).some(identity => matchPageIdentity(identity, opts.pagePath!)),
+    );
   }
 
   return { all: capped, byType, bySeverity, topByImpact, forPage };

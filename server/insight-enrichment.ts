@@ -190,7 +190,10 @@ export function resolvePageTitle(
 
   // Exact match first (skip GA4 placeholder values like "(not set)")
   const exactTitle = titleMap.get(pageId);
-  if (exactTitle && !GA_PLACEHOLDER_RE.test(exactTitle)) return exactTitle;
+  if (typeof exactTitle === 'string') {
+    const trimmed = exactTitle.trim();
+    if (trimmed.length > 0 && !GA_PLACEHOLDER_RE.test(trimmed)) return exactTitle;
+  }
 
   // Try matching by pathname in case the stored key differs from the full URL
   let pathname = pageId;
@@ -203,7 +206,10 @@ export function resolvePageTitle(
   }
 
   const pathTitle = titleMap.get(pathname);
-  if (pathTitle && !GA_PLACEHOLDER_RE.test(pathTitle)) return pathTitle;
+  if (typeof pathTitle === 'string') {
+    const trimmed = pathTitle.trim();
+    if (trimmed.length > 0 && !GA_PLACEHOLDER_RE.test(trimmed)) return pathTitle;
+  }
 
   // Fall back to slug-derived title
   return cleanSlugToTitle(pageId);
@@ -309,6 +315,7 @@ export function checkPipelineStatus(
   // Check posts first (most complete)
   const matchingPost = posts.find((p) => {
     const kw = p.targetKeyword?.toLowerCase() ?? '';
+    if (!kw.trim()) return false;
     const pn = normalise(pathname);
     return pn.includes(kw.replace(/\s+/g, '-')) || kw === pn.replace(/^\//, '').replace(/-/g, ' ');
   });
@@ -320,6 +327,7 @@ export function checkPipelineStatus(
   // Check briefs
   const matchingBrief = briefs.find((b) => {
     const kw = b.targetKeyword?.toLowerCase() ?? '';
+    if (!kw.trim()) return false;
     const pn = normalise(pathname);
     return pn.includes(kw.replace(/\s+/g, '-')) || kw === pn.replace(/^\//, '').replace(/-/g, ' ');
   });

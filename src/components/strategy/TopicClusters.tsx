@@ -40,7 +40,7 @@ export function TopicClusters({ clusters }: TopicClustersProps) {
         {clusters.slice(0, 10).map((cluster, i) => (
           <div key={i} className="px-3 py-2.5 bg-[var(--surface-3)]/40 rounded-[var(--radius-lg)] border border-[var(--brand-border)]">
             <div className="flex items-center justify-between">
-              <span className="t-ui font-medium text-[var(--brand-text-bright)] capitalize">{cluster.topic}</span>
+              <span className="t-body font-medium text-[var(--brand-text-bright)] capitalize">{cluster.topic}</span>
               <div className="flex items-center gap-2">
                 <span className={`t-caption-sm font-medium px-1.5 py-0.5 rounded-[var(--radius-sm)] border ${coverageColor(cluster.coveragePercent)}`}>
                   {cluster.coveragePercent}% coverage

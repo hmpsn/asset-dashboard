@@ -10,7 +10,6 @@ import { callCreativeAI } from '../content-posts-ai.js';
 import { parseJsonFallback } from '../db/json-validation.js';
 import { getLatestSnapshot } from '../reports.js';
 import { getQueryPageData } from '../search-console.js';
-import { getInsights } from '../analytics-insights-store.js';
 import { isProgrammingError } from '../errors.js';
 import {
   matchGscUrlToPath,
@@ -24,14 +23,7 @@ import { createLogger } from '../logger.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 import { getBrandName, getTokenForSite, getWorkspace } from '../workspaces.js';
-import {
-  buildWorkspaceIntelligence,
-  formatForPrompt,
-  formatKeywordsForPrompt,
-  formatKnowledgeBaseForPrompt,
-  formatPageMapForPrompt,
-  formatPersonasForPrompt,
-} from '../workspace-intelligence.js';
+import { buildPageAssistContext } from '../intelligence/page-assist-context-builder.js';
 import {
   normalizeSeoRewritePairs,
   normalizeSeoRewriteVariations,
@@ -49,14 +41,10 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
-  // Build full context: keyword strategy + brand voice + personas + knowledge base
-  const rewriteIntel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext', 'pageProfile'], pagePath: normalizedPagePath });
-  const rewriteSeo = rewriteIntel.seoContext;
-  const keywordContext = formatKeywordsForPrompt(rewriteSeo);
-  // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
-  const brandVoiceBlock = rewriteSeo?.effectiveBrandVoiceBlock ?? '';
-  const personasBlock = formatPersonasForPrompt(rewriteSeo?.personas ?? []);
-  const knowledgeBlock = formatKnowledgeBaseForPrompt(rewriteSeo?.knowledgeBase);
+  const pageAssist = await buildPageAssistContext(workspaceId, {
+    pagePath: normalizedPagePath,
+    includeInsights: true,
+  });
 
   // Resolve explicit brand name so the AI doesn't guess from the domain
   let brandName = '';
@@ -162,51 +150,17 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
   }
 
   try {
-    // Persisted page analysis (optimizationIssues + recommendations from keyword analysis)
-    const pageAnalysisBlock = formatForPrompt(rewriteIntel, { verbosity: 'detailed', sections: ['pageProfile'] }); // bip-ok: rewriteIntel used for raw field access above
-
-    // Intelligence context: cannibalization + page health + content decay
-    let intelligenceBlock = '';
-    if (workspaceId && normalizedPagePath) {
-      try {
-        const allInsights = getInsights(workspaceId);
-        const pageInsights = allInsights.filter(i =>
-          i.pageId && normalizePageUrl(i.pageId) === normalizedPagePath
-        );
-
-        const cannibalization = pageInsights
-          .filter(i => i.insightType === 'cannibalization')
-          .slice(0, 2)
-          .map(i => `- Cannibalization: ${i.pageTitle ?? i.pageId ?? 'unknown page'}`);
-
-        const decay = pageInsights
-          .filter(i => i.insightType === 'content_decay')
-          .slice(0, 1)
-          .map(i => `- Content decay: ${i.pageTitle ?? i.pageId ?? 'unknown page'}`);
-
-        const health = pageInsights
-          .filter(i => i.insightType === 'page_health')
-          .slice(0, 1)
-          .map(i => `- Page health: ${i.pageTitle ?? i.pageId ?? 'unknown page'} (impact: ${i.impactScore ?? 'n/a'})`);
-
-        const lines = [...cannibalization, ...decay, ...health];
-        if (lines.length > 0) {
-          intelligenceBlock = `\n\nPAGE INTELLIGENCE:\n${lines.join('\n')}`;
-        }
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo: programming error'); /* intelligence not available — skip */ }
-    }
-
     // Assemble all context blocks
     const contextBlocks = [
-      keywordContext,
-      brandVoiceBlock,
-      personasBlock,
-      knowledgeBlock,
+      pageAssist.blocks.keywordBlock,
+      pageAssist.blocks.brandVoiceBlock,
+      pageAssist.blocks.personasBlock,
+      pageAssist.blocks.knowledgeBlock,
       gscBlock,
       auditBlock,
-      pageAnalysisBlock,
-      formatPageMapForPrompt(rewriteSeo),
-      intelligenceBlock,
+      pageAssist.blocks.pageProfileBlock,
+      pageAssist.blocks.pageMapBlock,
+      pageAssist.blocks.pageInsightsBlock,
     ].filter(Boolean).join('');
     const pageContentEvidence = resolvedPageContent ? sanitizeForPromptInjection(resolvedPageContent) : 'N/A';
     const pageMetadataEvidence = sanitizeForPromptInjection(JSON.stringify({

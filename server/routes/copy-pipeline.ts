@@ -43,12 +43,16 @@ import {
   extractPatterns,
 } from '../copy-intelligence.js';
 import { exportCsv, exportCopyDeck, exportToWebflow } from '../copy-export.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
 import { getBlueprint, getEntry } from '../page-strategy.js';
 import type { BatchJob } from '../../shared/types/copy-pipeline.js';
 
 const router = Router();
 const log = createLogger('copy-pipeline-routes');
+
+function notifyCopyPipelineUpdated(workspaceId: string): void {
+  invalidateContentPipelineIntelligence(workspaceId);
+}
 
 // ── Prepared statement cache for batch operations ───────────────────────────
 
@@ -132,6 +136,7 @@ router.post(
         entryId,
         accumulatedSteering,
       );
+      notifyCopyPipelineUpdated(workspaceId);
       broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_SECTION_UPDATED, {
         entryId,
         sectionCount: sections.length,
@@ -171,6 +176,7 @@ router.post(
         highlight,
       );
       if (!section) return res.status(404).json({ error: 'Section not found or regeneration failed' });
+      notifyCopyPipelineUpdated(workspaceId);
       broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_SECTION_UPDATED, { sectionId, status: section.status });
       addActivity(workspaceId, 'copy_generated', `Regenerated copy section`);
       return res.json(section);
@@ -231,6 +237,7 @@ router.patch(
     const { status } = req.body as { status: string };
     const section = updateSectionStatus(sectionId, workspaceId, status as Parameters<typeof updateSectionStatus>[2]);
     if (!section) return res.status(404).json({ error: 'Section not found or invalid status transition' });
+    notifyCopyPipelineUpdated(workspaceId);
     broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_SECTION_UPDATED, { sectionId, status: section.status });
     if (status === 'approved') {
       addActivity(workspaceId, 'copy_approved', `Approved copy section`);
@@ -249,6 +256,7 @@ router.patch(
     const { copy } = req.body as { copy: string };
     const section = updateCopyText(sectionId, workspaceId, copy);
     if (!section) return res.status(404).json({ error: 'Section not found' });
+    notifyCopyPipelineUpdated(workspaceId);
     broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_SECTION_UPDATED, { sectionId, status: section.status });
     addActivity(workspaceId, 'copy_section_edited', `Edited copy section text`);
     return res.json(section);
@@ -265,6 +273,7 @@ router.post(
     const { originalText, suggestedText } = req.body as { originalText: string; suggestedText: string };
     const section = addClientSuggestion(sectionId, workspaceId, { originalText, suggestedText });
     if (!section) return res.status(404).json({ error: 'Section not found' });
+    notifyCopyPipelineUpdated(workspaceId);
     broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_SECTION_UPDATED, { sectionId, status: section.status });
     addActivity(workspaceId, 'copy_suggestion_added', `Client suggestion added to section`);
     return res.json(section);
@@ -292,6 +301,7 @@ router.post(
       return count;
     });
     const sent = bulkTransition();
+    notifyCopyPipelineUpdated(workspaceId);
     broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_SECTION_UPDATED, { entryId, action: 'sent_to_client' });
     addActivity(workspaceId, 'copy_sent_to_client', `Sent ${sent} section${sent !== 1 ? 's' : ''} for client review`);
     return res.json({ sent });
@@ -324,6 +334,7 @@ router.post(
 
     try {
       batchStmts().insertJob.run(batchId, workspaceId, blueprintId, resolvedMode, JSON.stringify(entryIds), resolvedBatchSize, initialProgress, now, now);
+      notifyCopyPipelineUpdated(workspaceId);
     } catch (err) {
       log.error({ err, workspaceId, blueprintId }, 'Failed to create batch job record');
       return res.status(500).json({ error: 'Failed to start batch job' });
@@ -382,6 +393,7 @@ router.post(
 
       // status-ok: terminal state written after loop completion; no state-machine guard needed
       batchStmts().updateStatus.run(finalStatus, completedAt, batchId, workspaceId);
+      notifyCopyPipelineUpdated(workspaceId);
 
       broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_BATCH_COMPLETE, {
         batchId,
@@ -497,7 +509,7 @@ router.post(
     const { steeringNotes } = req.body as { steeringNotes: string[] };
     try {
       const patterns = await extractPatterns(workspaceId, steeringNotes);
-      invalidateIntelligenceCache(workspaceId);
+      notifyCopyPipelineUpdated(workspaceId);
       broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_INTELLIGENCE_UPDATED, {
         extracted: patterns.length,
       });
@@ -530,7 +542,7 @@ router.patch(
       } else if (pattern !== undefined || patternType !== undefined) {
         return res.status(400).json({ error: 'Both pattern and patternType are required to update pattern text' });
       }
-      invalidateIntelligenceCache(workspaceId);
+      notifyCopyPipelineUpdated(workspaceId);
       broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_INTELLIGENCE_UPDATED, { patternId });
       return res.json({ updated: true });
     } catch (err) {
@@ -548,7 +560,7 @@ router.delete(
     const { workspaceId, patternId } = req.params;
     try {
       removePattern(patternId, workspaceId);
-      invalidateIntelligenceCache(workspaceId);
+      notifyCopyPipelineUpdated(workspaceId);
       broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_INTELLIGENCE_UPDATED, { patternId, deleted: true });
       addActivity(workspaceId, 'copy_pattern_removed', `Removed copy intelligence pattern`);
       return res.status(204).send();

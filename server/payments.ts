@@ -132,7 +132,14 @@ export function updatePayment(
   if (!row) return null;
 
   const current = rowToRecord(row);
-  const merged = { ...current, ...updates };
+  // Immutable identity fields must never be overridden by partial updates.
+  const merged: PaymentRecord = {
+    ...current,
+    ...updates,
+    id: current.id,
+    workspaceId: current.workspaceId,
+    createdAt: current.createdAt,
+  };
 
   stmts().update.run({
     id: merged.id,

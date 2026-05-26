@@ -1,10 +1,10 @@
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Inbox, Flag, ExternalLink, Check, Shield,
+  Flag, ExternalLink, Check, Shield,
   ChevronDown, ChevronRight,
 } from 'lucide-react';
-import { Badge, Button, EmptyState, FormInput, FormTextarea, Icon, StatusBadge } from '../ui';
+import { Badge, Button, EmptyState, FormInput, FormTextarea, Icon, LoadingState, StatusBadge } from '../ui';
 import { ApprovalBatchCard } from './ApprovalBatchCard';
 import { ApprovalsTab } from './ApprovalsTab';
 import { RequestsTab } from './RequestsTab';
@@ -22,7 +22,7 @@ import { queryKeys } from '../../lib/queryKeys';
 import type { ClientAction } from '../../../shared/types/client-actions';
 import { DecisionCard } from './DecisionCard';
 import { DecisionDetailModal } from './DecisionDetailModal';
-import { normalizeClientAction } from '../../lib/decision-adapters';
+import { clientActionSourceLabel, normalizeClientAction } from '../../lib/decision-adapters';
 import type { FlaggedItem } from '../../../shared/types/decision';
 import { useInboxTabShell, type InboxMode } from './inbox/useInboxTabShell';
 import type { InboxFilter } from './inbox/inbox-filter';
@@ -259,20 +259,19 @@ export function InboxTab({
   const showSection1 = mode === 'active' && (filter === 'all' || filter === 'decisions' || filter === 'conversations');
   const showSection2 = mode === 'active' && (filter === 'all' || filter === 'decisions');
   const showSection3 = mode === 'active' && !betaMode && (filter === 'all' || filter === 'reviews');
+  const inboxLoading = mode === 'active'
+    && (approvalsLoading || requestsLoading)
+    && decisionsCount === 0
+    && reviewsCount === 0
+    && conversationsCount === 0;
 
   return (
     <div className="space-y-6">
-      {/* ── Page header + mode toggle ── */}
+      {/* ── Mode toggle (page title is rendered by ClientDashboard PageHeader) ── */}
       <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Icon as={Inbox} size="lg" className="text-accent-brand" />
-          <div>
-            <h2 className="t-h2 text-[var(--brand-text-bright)]">Inbox</h2>
-            <p className="t-body text-[var(--brand-text-muted)] mt-0.5">
-              {betaMode ? 'SEO changes and requests — all in one place.' : 'SEO changes, requests, and content — all in one place.'}
-            </p>
-          </div>
-        </div>
+        <p className="t-body text-[var(--brand-text-muted)] mt-0.5">
+          {betaMode ? 'SEO changes and requests — all in one place.' : 'SEO changes, requests, and content — all in one place.'}
+        </p>
         {/* Active / Completed toggle */}
         <div className="flex items-center gap-0.5 p-1 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border)]">
           {(['active', 'completed'] as InboxMode[]).map((m) => (
@@ -294,6 +293,10 @@ export function InboxTab({
         </div>
       </div>
 
+      {inboxLoading && (
+        <LoadingState message="Loading your inbox items..." size="lg" />
+      )}
+
       {newInboxIa ? (
         /* === NEW 3-SECTION LAYOUT (flag: new-inbox-ia) === */
         <NewInboxLayout
@@ -307,7 +310,7 @@ export function InboxTab({
           {mode === 'active' && (filter === 'all' || filter === 'decisions') && (
             <section aria-label="Decisions" className="space-y-4">
               <div className="flex items-center gap-2">
-                <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Decisions</h3>
+                <h3 className="t-page font-semibold text-[var(--brand-text-bright)]">Decisions</h3>
                 {decisionsCount > 0 && (
                   <Badge label={`${decisionsCount} pending`} tone="amber" variant="outline" shape="pill" />
                 )}
@@ -464,7 +467,7 @@ export function InboxTab({
           {mode === 'active' && !betaMode && (filter === 'all' || filter === 'reviews') && (
             <section aria-label="Reviews" className="space-y-4">
               <div className="flex items-center gap-2">
-                <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Reviews</h3>
+                <h3 className="t-page font-semibold text-[var(--brand-text-bright)]">Reviews</h3>
                 {reviewsCount > 0 && (
                   <Badge label={`${reviewsCount} needs review`} tone="blue" variant="outline" shape="pill" />
                 )}
@@ -482,7 +485,7 @@ export function InboxTab({
                           <StatusBadge status={schemaPlan.status} domain="schema" variant="outline" shape="pill" />
                         )}
                       </div>
-                      <h4 className="t-ui font-medium text-[var(--brand-text-bright)]">
+                      <h4 className="t-body font-semibold text-[var(--brand-text-bright)]">
                         Schema strategy — {schemaPlan.pageRoles.length} page{schemaPlan.pageRoles.length !== 1 ? 's' : ''}
                       </h4>
                       <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">
@@ -508,22 +511,19 @@ export function InboxTab({
               )}
 
               {/* Content pipeline */}
-              <div className="space-y-2">
-                <p className="t-caption-sm text-[var(--brand-text-muted)] uppercase font-semibold tracking-wider">Content Pipeline</p>
-                <ContentTab
-                  contentRequests={contentRequests}
-                  setContentRequests={setContentRequests}
-                  effectiveTier={effectiveTier}
-                  briefPrice={briefPrice}
-                  fullPostPrice={fullPostPrice}
-                  fmtPrice={fmtPrice}
-                  setPricingModal={setPricingModal}
-                  pricingConfirming={pricingConfirming}
-                  workspaceId={workspaceId}
-                  setToast={setToast}
-                  hidePrices={hidePrices}
-                />
-              </div>
+              <ContentTab
+                contentRequests={contentRequests}
+                setContentRequests={setContentRequests}
+                effectiveTier={effectiveTier}
+                briefPrice={briefPrice}
+                fullPostPrice={fullPostPrice}
+                fmtPrice={fmtPrice}
+                setPricingModal={setPricingModal}
+                pricingConfirming={pricingConfirming}
+                workspaceId={workspaceId}
+                setToast={setToast}
+                hidePrices={hidePrices}
+              />
             </section>
           )}
 
@@ -531,7 +531,7 @@ export function InboxTab({
           {mode === 'active' && (filter === 'all' || filter === 'conversations') && (
             <section aria-label="Conversations" className="space-y-4">
               <div className="flex items-center gap-2">
-                <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Conversations</h3>
+                <h3 className="t-page font-semibold text-[var(--brand-text-bright)]">Conversations</h3>
                 {conversationsCount > 0 && (
                   <Badge label={`${conversationsCount} active`} tone="teal" variant="outline" shape="pill" />
                 )}
@@ -568,7 +568,7 @@ export function InboxTab({
           {mode === 'completed' && (
             <div className="space-y-6">
               <div className="space-y-4">
-                <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Completed — SEO Changes</h3>
+                <h3 className="t-page font-semibold text-[var(--brand-text-bright)]">Completed — SEO Changes</h3>
                 {approvalBatches
                   .filter(b => b.items.length > 0 && b.items.every(i => i.status === 'applied'))
                   .map(batch => (
@@ -586,18 +586,18 @@ export function InboxTab({
               </div>
               {completedClientActions.length > 0 && (
                 <div className="space-y-4">
-                  <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Completed — Actions</h3>
+                  <h3 className="t-page font-semibold text-[var(--brand-text-bright)]">Completed — Actions</h3>
                   {completedClientActions.map(action => (
                     <div key={action.id} className="rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4 opacity-70">
                       <div className="flex items-center gap-2 mb-1">
-                        <Badge label={action.sourceType.replace(/_/g, ' ')} tone="zinc" variant="outline" shape="pill" className="capitalize" />
+                        <Badge label={clientActionSourceLabel(action.sourceType)} tone="zinc" variant="outline" shape="pill" />
                         {action.status === 'approved' || action.status === 'changes_requested' ? (
                           <StatusBadge status={action.status} domain="client-action" variant="outline" shape="pill" />
                         ) : (
                           <Badge label="Completed" tone="zinc" variant="outline" shape="pill" />
                         )}
                       </div>
-                      <h4 className="t-ui font-medium text-[var(--brand-text)]">{action.title}</h4>
+                      <h4 className="t-body font-semibold text-[var(--brand-text)]">{action.title}</h4>
                     </div>
                   ))}
                 </div>
@@ -625,7 +625,7 @@ export function InboxTab({
           {showSection1 && (
             <section aria-label="Needs Action & Requests" className="space-y-4">
               <div className="flex items-center gap-2">
-                <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Needs Action &amp; Requests</h3>
+                <h3 className="t-page font-semibold text-[var(--brand-text-bright)]">Needs Action &amp; Requests</h3>
                 {hasNeedsAction && (
                   <Badge label={`${pendingClientActions.length + requestReplies + planReviewCount} pending`} tone="amber" variant="outline" shape="pill" />
                 )}
@@ -640,13 +640,13 @@ export function InboxTab({
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <Badge label={action.sourceType.replace(/_/g, ' ')} tone="zinc" variant="outline" shape="pill" className="capitalize" />
+                            <Badge label={clientActionSourceLabel(action.sourceType)} tone="zinc" variant="outline" shape="pill" />
                             {action.priority === 'high' && (
                               <span className="t-caption-sm font-medium text-accent-warning">High priority</span>
                             )}
                           </div>
                           {/* duplicate-heading-ok -- repeated dynamic action title across queue/history sections */}
-                          <h4 className="t-ui font-medium text-[var(--brand-text-bright)]">{action.title}</h4>
+                          <h4 className="t-body font-semibold text-[var(--brand-text-bright)]">{action.title}</h4>
                           <p className="t-caption text-[var(--brand-text-muted)] mt-0.5 line-clamp-2">{action.summary}</p>
                         </div>
                       </div>
@@ -801,7 +801,7 @@ export function InboxTab({
                 aria-controls="seo-changes-content"
                 onClick={() => setSeoSectionExpanded(e => !e)}
               >
-                <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">SEO Changes</h3>
+                <h3 className="t-page font-semibold text-[var(--brand-text-bright)]">SEO Changes</h3>
                 {hasPendingSeoChanges && (
                   <Badge label={`${(pendingApprovals ?? 0) + (schemaPlanPending ? 1 : 0)} pending`} tone="teal" variant="outline" shape="pill" />
                 )}
@@ -841,7 +841,7 @@ export function InboxTab({
                             )}
                           </div>
                           {/* duplicate-heading-ok -- mirrored schema title across feature-flagged inbox layouts */}
-                          <h4 className="t-ui font-medium text-[var(--brand-text-bright)]">
+                          <h4 className="t-body font-semibold text-[var(--brand-text-bright)]">
                             Schema strategy — {schemaPlan.pageRoles.length} page{schemaPlan.pageRoles.length !== 1 ? 's' : ''}
                           </h4>
                           <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">
@@ -867,7 +867,7 @@ export function InboxTab({
           {showSection3 && (
             <section aria-label="Content" className="space-y-4">
               <div className="flex items-center gap-2">
-                <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Content</h3>
+                <h3 className="t-page font-semibold text-[var(--brand-text-bright)]">Content</h3>
                 {(contentReviews + copyReviewCount) > 0 && (
                   <Badge label={`${contentReviews + copyReviewCount} needs review`} tone="blue" variant="outline" shape="pill" />
                 )}
@@ -880,22 +880,19 @@ export function InboxTab({
                 </div>
               )}
 
-              <div className="space-y-2">
-                <p className="t-caption-sm text-[var(--brand-text-muted)] uppercase font-semibold tracking-wider">Pipeline</p>
-                <ContentTab
-                  contentRequests={contentRequests}
-                  setContentRequests={setContentRequests}
-                  effectiveTier={effectiveTier}
-                  briefPrice={briefPrice}
-                  fullPostPrice={fullPostPrice}
-                  fmtPrice={fmtPrice}
-                  setPricingModal={setPricingModal}
-                  pricingConfirming={pricingConfirming}
-                  workspaceId={workspaceId}
-                  setToast={setToast}
-                  hidePrices={hidePrices}
-                />
-              </div>
+              <ContentTab
+                contentRequests={contentRequests}
+                setContentRequests={setContentRequests}
+                effectiveTier={effectiveTier}
+                briefPrice={briefPrice}
+                fullPostPrice={fullPostPrice}
+                fmtPrice={fmtPrice}
+                setPricingModal={setPricingModal}
+                pricingConfirming={pricingConfirming}
+                workspaceId={workspaceId}
+                setToast={setToast}
+                hidePrices={hidePrices}
+              />
             </section>
           )}
 
@@ -904,7 +901,7 @@ export function InboxTab({
             <div className="space-y-6">
               <div className="space-y-4">
                 {/* duplicate-heading-ok -- intentionally duplicated with new inbox layout while flag migration remains live */}
-                <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Completed — SEO Changes</h3>
+                <h3 className="t-page font-semibold text-[var(--brand-text-bright)]">Completed — SEO Changes</h3>
                 <ApprovalsTab
                   workspaceId={workspaceId}
                   approvalBatches={approvalBatches.filter(b => b.items.length > 0 && b.items.every(i => i.status === 'applied'))}
@@ -920,11 +917,11 @@ export function InboxTab({
               {completedClientActions.length > 0 && (
                 <div className="space-y-4">
                   {/* duplicate-heading-ok -- intentionally duplicated with new inbox layout while flag migration remains live */}
-                  <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Completed — Actions</h3>
+                  <h3 className="t-page font-semibold text-[var(--brand-text-bright)]">Completed — Actions</h3>
                   {completedClientActions.map(action => (
                     <div key={action.id} className="rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4 opacity-70">
                       <div className="flex items-center gap-2 mb-1">
-                        <Badge label={action.sourceType.replace(/_/g, ' ')} tone="zinc" variant="outline" shape="pill" className="capitalize" />
+                        <Badge label={clientActionSourceLabel(action.sourceType)} tone="zinc" variant="outline" shape="pill" />
                         {action.status === 'approved' || action.status === 'changes_requested' ? (
                           <StatusBadge status={action.status} domain="client-action" variant="outline" shape="pill" />
                         ) : (
@@ -932,7 +929,7 @@ export function InboxTab({
                         )}
                       </div>
                       {/* duplicate-heading-ok -- repeated dynamic action title across queue/history sections */}
-                      <h4 className="t-ui font-medium text-[var(--brand-text)]">{action.title}</h4>
+                      <h4 className="t-body font-semibold text-[var(--brand-text)]">{action.title}</h4>
                     </div>
                   ))}
                 </div>

@@ -2,7 +2,7 @@ import {
   Activity, Globe, FileText, ClipboardCheck, MessageSquare,
   Pencil, Code2, CornerDownRight, Target, TrendingUp, TrendingDown, AlertTriangle,
 } from 'lucide-react';
-import { SectionCard, EmptyState, Icon } from '../ui';
+import { SectionCard, EmptyState, Icon, Badge } from '../ui';
 import { timeAgo } from '../../lib/timeAgo';
 
 interface ActivityEntry {
@@ -11,6 +11,7 @@ interface ActivityEntry {
   title: string;
   description?: string;
   createdAt: string;
+  metadata?: Record<string, unknown>;
 }
 
 const ICON_MAP: Record<string, typeof Activity> = {
@@ -51,7 +52,12 @@ export function ActivityFeed({ activity, className }: ActivityFeedProps) {
               <div key={entry.id} className="flex items-start gap-3 px-4 py-2.5">
                 <Icon as={EntryIcon} size="sm" className="mt-0.5 flex-shrink-0 text-teal-400" />
                 <div className="flex-1 min-w-0">
-                  <div className="t-caption text-[var(--brand-text-bright)]">{entry.title}</div>
+                  <div className="t-caption text-[var(--brand-text-bright)] flex items-center gap-1.5">
+                    <span>{entry.title}</span>
+                    {entry.metadata?.source === 'mcp-chat' && (
+                      <Badge tone="zinc" size="sm" variant="soft" label="chat" />
+                    )}
+                  </div>
                   {entry.description && <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{entry.description}</div>}
                 </div>
                 <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">{timeAgo(entry.createdAt)}</span>

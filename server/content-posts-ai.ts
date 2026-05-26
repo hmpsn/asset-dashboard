@@ -13,8 +13,9 @@ import { z } from 'zod';
 import type { ContentBrief } from './content-brief.js';
 import type { GeneratedPost } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
-import { WRITING_QUALITY_RULES } from './writing-quality.js';
-export { WRITING_QUALITY_RULES } from './writing-quality.js';
+import { CREATIVE_WRITING_RULES } from './writing-quality.js';
+import { BRAND_CONTEXT_HIERARCHY, getPageTypeCopyContract, requiresPageTypeDensityReview } from './page-type-copy-contract.js';
+export { CREATIVE_WRITING_RULES, WRITING_QUALITY_RULES } from './writing-quality.js';
 
 const log = createLogger('content-posts-ai');
 
@@ -327,6 +328,7 @@ export async function generateIntroduction(
   const role = PAGE_TYPE_WRITER_ROLE[pageType] || PAGE_TYPE_WRITER_ROLE.blog;
   const typeInstructions = PAGE_TYPE_INTRO_INSTRUCTIONS[pageType] || PAGE_TYPE_INTRO_INSTRUCTIONS.blog;
   const pageLabel = pageType === 'blog' ? 'blog post' : pageType === 'landing' ? 'landing page' : pageType === 'pillar' ? 'pillar page' : `${pageType} page`;
+  const pageTypeContract = getPageTypeCopyContract(pageType);
   const briefContext = buildBriefContextBlock(brief, siteDomain);
 
   const prompt = `${role}
@@ -342,6 +344,8 @@ AUDIENCE: ${brief.audience}
 INTENT: ${brief.intent}
 ${brief.contentFormat ? `FORMAT: ${brief.contentFormat}` : ''}
 ${brief.toneAndStyle ? `TONE & STYLE: ${brief.toneAndStyle}` : ''}
+${BRAND_CONTEXT_HIERARCHY}
+${pageTypeContract}
 ${voiceCtx}
 ${briefContext}
 
@@ -353,14 +357,14 @@ ${typeInstructions}
 
 UNIVERSAL REQUIREMENTS:
 - Naturally include the target keyword within the first 100 words
-- Match the specified tone and brand voice exactly
+- Match the specified tone and brand voice within the brand context priority above
 - Output clean HTML: use <p> for paragraphs, <strong> for emphasis, <a href="..."> for links
 - Do NOT include the title or any heading — just the opening paragraph(s)
 - Do NOT use markdown syntax (no ##, no **, no - lists). Output HTML tags only.
 - Write for humans first, search engines second
 - Stay within 150-200 words — do not exceed 250 under any circumstances
 
-${WRITING_QUALITY_RULES}
+${CREATIVE_WRITING_RULES}
 
 Return ONLY the opening HTML. No headings, no labels, no meta-commentary, no markdown.`;
 
@@ -368,6 +372,8 @@ Return ONLY the opening HTML. No headings, no labels, no meta-commentary, no mar
   const systemPrompt = buildSystemPrompt(
     workspaceId,
     `${role} Return only clean HTML for the introduction field requested by the user prompt. No markdown.`,
+    undefined,
+    { skipProseRules: true },
   );
   return callCreativeAI({
     systemPrompt,
@@ -397,6 +403,7 @@ export async function generateSection(
   const role = PAGE_TYPE_WRITER_ROLE[pageType] || PAGE_TYPE_WRITER_ROLE.blog;
   const typeInstructions = PAGE_TYPE_SECTION_INSTRUCTIONS[pageType] || PAGE_TYPE_SECTION_INSTRUCTIONS.blog;
   const pageLabel = pageType === 'blog' ? 'blog post' : pageType === 'landing' ? 'landing page' : pageType === 'pillar' ? 'pillar page' : `${pageType} page`;
+  const pageTypeContract = getPageTypeCopyContract(pageType);
   const briefContext = buildBriefContextBlock(brief, siteDomain);
 
   const prevContext = previousSections.length > 0
@@ -423,6 +430,8 @@ TARGET KEYWORD: "${brief.targetKeyword}"
 SECONDARY KEYWORDS: ${brief.secondaryKeywords.join(', ')}
 AUDIENCE: ${brief.audience}
 ${brief.toneAndStyle ? `TONE & STYLE: ${brief.toneAndStyle}` : ''}
+${BRAND_CONTEXT_HIERARCHY}
+${pageTypeContract}
 ${voiceCtx}
 ${briefContext}
 
@@ -447,13 +456,13 @@ UNIVERSAL REQUIREMENTS:
 - Use <ul>/<li> for bullet lists, <ol>/<li> for numbered lists, <strong> for bold emphasis
 - Use <p> tags for paragraphs — do NOT use markdown syntax (no ##, no **, no - lists)
 - Maintain continuity with previous sections (don't repeat points already covered)
-- Match the specified tone and brand voice exactly
+- Match the specified tone and brand voice within the brand context priority above
 - Include specific, actionable, expert-level advice — never generic filler
 - Write for humans first, search engines second
 - BRAND MENTIONS: Do NOT mention the business/brand by name in this section unless the section heading specifically references the business (e.g., "How [Brand] Helps..."). Body sections should teach — use "your dentist", "your provider", "your agency" instead of the brand name. For FAQ sections, answers should feel like neutral expert advice, not sales copy — use "your dental office" or "your provider" instead of the brand name
 - IMPORTANT: Competitor word counts in the SERP data are for reference only — YOUR word count target is ${sectionTarget} words for this section. Do not write more because competitors wrote more.
 
-${WRITING_QUALITY_RULES}
+${CREATIVE_WRITING_RULES}
 
 Return ONLY the section content in clean HTML (starting with <h2>). No labels, no meta-commentary, no markdown.`;
 
@@ -461,6 +470,8 @@ Return ONLY the section content in clean HTML (starting with <h2>). No labels, n
   const systemPrompt = buildSystemPrompt(
     workspaceId,
     `${role} Return only clean HTML for the section field requested by the user prompt. No markdown.`,
+    undefined,
+    { skipProseRules: true },
   );
   return callCreativeAI({
     systemPrompt,
@@ -485,6 +496,7 @@ export async function generateConclusion(
   const role = PAGE_TYPE_WRITER_ROLE[pageType] || PAGE_TYPE_WRITER_ROLE.blog;
   const typeInstructions = PAGE_TYPE_CONCLUSION_INSTRUCTIONS[pageType] || PAGE_TYPE_CONCLUSION_INSTRUCTIONS.blog;
   const pageLabel = pageType === 'blog' ? 'blog post' : pageType === 'landing' ? 'landing page' : pageType === 'pillar' ? 'pillar page' : `${pageType} page`;
+  const pageTypeContract = getPageTypeCopyContract(pageType);
   const briefContext = buildBriefContextBlock(brief, siteDomain);
 
   const prompt = `${role}
@@ -496,6 +508,8 @@ TARGET KEYWORD: "${brief.targetKeyword}"
 AUDIENCE: ${brief.audience}
 ${brief.toneAndStyle ? `TONE & STYLE: ${brief.toneAndStyle}` : ''}
 ${brief.ctaRecommendations?.length ? `CTA RECOMMENDATIONS:\n${brief.ctaRecommendations.map((c, i) => `${i === 0 ? '- PRIMARY' : '- Secondary'}: ${c}`).join('\n')}` : ''}
+${BRAND_CONTEXT_HIERARCHY}
+${pageTypeContract}
 ${voiceCtx}
 ${briefContext}
 
@@ -510,11 +524,11 @@ UNIVERSAL REQUIREMENTS:
 - Use <p> for paragraphs, <strong> for emphasis, <ul>/<li> or <ol>/<li> for lists
 - Do NOT use markdown syntax (no ##, no **, no - lists). Output HTML tags only.
 - Naturally include the target keyword one final time
-- Match the specified tone and brand voice exactly
+- Match the specified tone and brand voice within the brand context priority above
 - Write for humans first, search engines second
 - Do NOT simply restate the introduction in different words — add NEW value: a fresh insight, a specific next step, or a forward-looking perspective
 
-${WRITING_QUALITY_RULES}
+${CREATIVE_WRITING_RULES}
 
 Return ONLY the closing section in clean HTML (starting with <h2>). No labels, no meta-commentary, no markdown.`;
 
@@ -522,6 +536,8 @@ Return ONLY the closing section in clean HTML (starting with <h2>). No labels, n
   const systemPrompt = buildSystemPrompt(
     workspaceId,
     `${role} Return only clean HTML for the conclusion field requested by the user prompt. No markdown.`,
+    undefined,
+    { skipProseRules: true },
   );
   return callCreativeAI({
     systemPrompt,
@@ -634,6 +650,8 @@ export async function unifyPost(
   const pageType = brief.pageType || 'blog';
   const role = PAGE_TYPE_WRITER_ROLE[pageType] || PAGE_TYPE_WRITER_ROLE.blog;
   const targetTotal = brief.wordCountTarget || 1800;
+  const pageTypeContract = getPageTypeCopyContract(pageType);
+  const densityReview = requiresPageTypeDensityReview(pageType);
 
   // Assemble the full draft for review
   const fullDraft = [
@@ -649,7 +667,9 @@ export async function unifyPost(
   const overBudget = currentWords > targetTotal * 1.1;
   const wordBudgetInstruction = overBudget
     ? `\n\nWORD COUNT CORRECTION REQUIRED:\n- Current total: ~${currentWords} words\n- Target total: ${targetTotal} words (from the content brief)\n- You MUST trim each section proportionally to bring the total within ±5% of ${targetTotal} words.\n- Cut filler, redundant examples, verbose phrasing, and tangential points. Preserve core arguments and actionable advice.\n- Section word budget targets:\n  - Introduction: ~${Math.round(targetTotal * 0.08)} words\n${post.sections.map((s, i) => `  - Section ${i + 1} (${s.heading}): ~${s.targetWordCount} words`).join('\n')}\n  - Conclusion: ~${Math.round(targetTotal * 0.07)} words`
-    : `\n\nWORD COUNT: Current total (~${currentWords} words) is within the ${targetTotal}-word target. Preserve depth — do not inflate or significantly reduce.`;
+    : densityReview
+      ? `\n\nPAGE-TYPE DENSITY REVIEW REQUIRED:\n- Current total: ~${currentWords} words\n- Target total: ${targetTotal} words (from the content brief)\n- Even if the draft is within target, trim any duplicate CTA, repeated proof point, repeated brand mention, SEO-operational explanation, or section that reads like article padding.\n- Preserve useful specifics, proof, and conversion clarity; cut extra narrative created by brand context.\n- Section word budget targets remain ceilings, not minimums:\n  - Introduction: ~${Math.round(targetTotal * 0.08)} words\n${post.sections.map((s, i) => `  - Section ${i + 1} (${s.heading}): ~${s.targetWordCount} words`).join('\n')}\n  - Conclusion: ~${Math.round(targetTotal * 0.07)} words`
+      : `\n\nWORD COUNT: Current total (~${currentWords} words) is within the ${targetTotal}-word target. Preserve depth — do not inflate or significantly reduce.`;
 
   const prompt = `${role}
 
@@ -659,13 +679,16 @@ You are performing a UNIFICATION PASS on a fully written piece of content. Each 
 - Inconsistent tone or voice shifts between sections
 - Disconnected narrative — the intro promises one thing but sections deliver another
 ${overBudget ? '- WORD COUNT BLOAT — the article significantly exceeds its target word count' : ''}
+${densityReview ? '- PAGE-TYPE DENSITY RISK - conversion pages often drift into duplicate CTAs, salesy repetition, or article-style sprawl' : ''}
 
-YOUR TASK: Refine each section to create a cohesive, unified piece that reads as if written in a single sitting by one expert author.${overBudget ? ' You must also trim to the target word count.' : ''}
+YOUR TASK: Refine each section to create a cohesive, unified piece that reads as if written in a single sitting by one expert author.${overBudget ? ' You must also trim to the target word count.' : ''}${densityReview ? ' For this page type, trim duplicate or bloated material even when the current word count is technically within range.' : ''}
 
 TITLE: ${post.title}
 TARGET KEYWORD: "${brief.targetKeyword}"
 AUDIENCE: ${brief.audience}
 ${brief.toneAndStyle ? `TONE & STYLE: ${brief.toneAndStyle}` : ''}
+${BRAND_CONTEXT_HIERARCHY}
+${pageTypeContract}
 ${voiceCtx}
 ${wordBudgetInstruction}
 
@@ -677,6 +700,10 @@ RULES:
 - Remove repeated phrases, examples, or talking points that appear in multiple sections
 - Ensure the introduction's promises are fulfilled by the body sections
 - Ensure the conclusion ties back to the introduction's hook
+- Apply the page-type copy contract above before honoring brand voice flourish
+- Use brand context to preserve vocabulary, proof, and positioning; do not add extra sections or CTAs because more brand context is available
+- For service, location, landing, homepage, and product pages: keep one final CTA/close, remove duplicate booking/discovery/contact blocks, and avoid blog-style teaching sprawl
+- For location pages: remove reader-facing SEO mechanics such as NAP consistency, schema, Google Business Profile hygiene, directory listings, and citation cleanup unless the page is explicitly for SEO professionals
 - Keep all HTML formatting (<h2>, <h3>, <p>, <strong>, <ul>/<li>, <ol>/<li>, <a>)
 - Do NOT use markdown syntax (no ##, no **, no - lists) — output clean HTML only
 - Do NOT include section labels or the title heading — return clean HTML for each part
@@ -686,6 +713,8 @@ RULES:
 - KEYWORD COVERAGE CHECK: The following keywords from the brief MUST each appear at least once in the final article. If any are missing, weave them into the most relevant section naturally (do not force or stuff): ${[brief.targetKeyword, ...brief.secondaryKeywords].map(k => `"${k}"`).join(', ')}
 - KEYWORD DENSITY CAP: No keyword phrase should appear more than 4 times in the full article. Count occurrences of each keyword from the brief. Where any exceeds 4, replace the excess with a synonym or rephrase to refer to the concept implicitly — do not simply delete the passage.
 - STRUCTURAL VARIETY: Review how each section is shaped (opening sentence type, prose vs. bullet list, example-first vs. definition-first, etc.). If more than 2 consecutive sections follow the same pattern, rewrite the middle one using a different approach — straight prose, an example-first opening, a comparison, or a short Q&A exchange. Variety should feel natural, not forced.
+
+${CREATIVE_WRITING_RULES}
 
 Return valid JSON with this exact structure (${post.sections.length} items in the sections array):
 {
@@ -707,6 +736,8 @@ Return ONLY valid JSON, no markdown fences, no comments.`;
     systemPrompt: buildSystemPrompt(
       workspaceId,
       'You are a senior editor performing a cohesion and word-count review. Return only valid JSON.',
+      undefined,
+      { skipProseRules: true },
     ),
     userPrompt: prompt,
     maxTokens,

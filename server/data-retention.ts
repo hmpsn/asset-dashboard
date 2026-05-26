@@ -21,8 +21,11 @@ async function runRetention(): Promise<void> {
 }
 
 export function startDataRetentionCrons(): void {
-  if (retentionInterval) return;
-  startupTimeout = setTimeout(() => { void runRetention(); }, 2 * 60 * 1000);
+  if (retentionInterval || startupTimeout) return;
+  startupTimeout = setTimeout(() => {
+    startupTimeout = null;
+    void runRetention();
+  }, 2 * 60 * 1000);
   startupTimeout.unref?.();
   retentionInterval = setInterval(() => { void runRetention(); }, DAILY_MS);
   retentionInterval.unref?.();

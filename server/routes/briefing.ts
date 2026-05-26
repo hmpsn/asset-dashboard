@@ -30,6 +30,7 @@ import { notifyClientBriefingReady } from '../email.js';
 import { getWorkspace, getClientPortalUrl } from '../workspaces.js';
 import { isFeatureEnabled } from '../feature-flags.js';
 import { createLogger } from '../logger.js';
+import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 
 const log = createLogger('routes:briefing');
 const router = Router();
@@ -147,6 +148,7 @@ router.post(
         `${updated.stories.length} stories`,
         { briefingId: updated.id, weekOf: updated.weekOf, autoPublished: false },
       );
+      invalidateIntelligenceCache(req.params.workspaceId);
       broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRIEFING_PUBLISHED, {
         briefingId: updated.id,
         weekOf: updated.weekOf,

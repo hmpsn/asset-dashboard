@@ -10,7 +10,7 @@
  */
 
 import { callAI } from './ai.js';
-import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatKnowledgeBaseForPrompt, formatPersonasForPrompt } from './workspace-intelligence.js';
+import { buildIntelPrompt } from './workspace-intelligence.js';
 import type { SeoIssue } from './seo-audit.js';
 import { createLogger } from './logger.js';
 import { decodeEntities, stripHtmlToText, stripCodeFences } from './helpers.js';
@@ -164,14 +164,10 @@ export async function reviewPage(
 
   const pageStructure = extractPageStructure(html);
   const issueBlock = formatAuditIssues(auditIssues);
-  const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
-  const seo = intel.seoContext;
-  const keywordBlock = formatKeywordsForPrompt(seo);
-  // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
-  const brandVoiceBlock = seo?.effectiveBrandVoiceBlock ?? '';
-  const businessContext = seo?.businessContext ?? '';
-  const knowledgeBlock = formatKnowledgeBaseForPrompt(seo?.knowledgeBase);
-  const personasBlock = formatPersonasForPrompt(seo?.personas ?? []);
+  const workspaceIntelligence = await buildIntelPrompt(workspaceId, ['seoContext'], {
+    verbosity: 'detailed',
+    tokenBudget: 2600,
+  });
 
   const prompt = `You are an AEO (Answer Engine Optimization) expert reviewing an existing page for an agency team. Your job is to produce specific, actionable content change recommendations that will make this page more likely to be cited by AI answer engines (ChatGPT, Perplexity, Google AI Overviews, etc.).
 
@@ -185,7 +181,7 @@ ${pageStructure}
 AEO AUDIT ISSUES DETECTED:
 ${issueBlock}
 
-${businessContext ? `BUSINESS CONTEXT: ${businessContext}` : ''}${keywordBlock}${brandVoiceBlock}${knowledgeBlock}${personasBlock}
+${workspaceIntelligence ? `WORKSPACE INTELLIGENCE:\n${workspaceIntelligence}` : ''}
 
 Generate a JSON review with specific, implementable changes. Each change should tell the agency team EXACTLY what to do — not generic advice.
 
@@ -215,7 +211,7 @@ RULES:
 - Generate 3-10 changes depending on how many issues the page has
 - For "rewrite_intro" changes: write the ACTUAL replacement intro paragraph (2-3 sentences that directly answer the page's implied question, then 3-5 key bullets)
 - For "add_author" changes: if the knowledge base has staff info, suggest the specific person and their credentials. If not, describe what the byline should contain
-- For "add_citations" changes: only name a specific organization, journal, .gov resource, statistic, or claim when the page content, knowledge base, business context, or audit issue already contains supporting evidence. Put that exact evidence in verifiedSourceEvidence and set requiresSourceResearch=false.
+- For "add_citations" changes: only name a specific organization, journal, .gov resource, statistic, or claim when the page content, business context or knowledge base inside workspace intelligence, or audit issue already contains supporting evidence. Strategy keywords, personas, rankings, and other directional workspace intelligence are NOT verified source evidence for citations. Put the exact supporting evidence in verifiedSourceEvidence and set requiresSourceResearch=false.
 - If source evidence is not present in the provided context, do not invent a source. Set requiresSourceResearch=true and write suggestedChange as a research task for the agency team to verify authoritative sources before client handoff.
 - For "add_definition" changes: write the actual definition block content (term, definition, common misconceptions, related terms)
 - For "add_comparison" changes: specify the exact table columns, row headers, and what data types to include

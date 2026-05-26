@@ -6,6 +6,11 @@ import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import { Link as LinkIcon, Bold, Italic, Heading2, Heading3 } from 'lucide-react';
 import { Button, FormInput, IconButton } from '../ui';
+import {
+  prosemirrorAdminClass,
+  prosemirrorClientClass,
+  prosemirrorSharedClass,
+} from './richTextStyles';
 
 export interface RichTextEditorProps {
   initialValue: string;
@@ -190,14 +195,9 @@ export function RichTextEditor({ initialValue, onChange, className, variant = 'a
           variant === 'client' ? '[&_.ProseMirror]:px-4 [&_.ProseMirror]:py-3' : '[&_.ProseMirror]:px-3 [&_.ProseMirror]:py-2',
           '[&_.ProseMirror]:bg-[var(--surface-1)] [&_.ProseMirror]:border [&_.ProseMirror]:border-[var(--brand-border)]',
           '[&_.ProseMirror]:rounded-[var(--radius-lg)] [&_.ProseMirror]:text-[var(--brand-text)]',
-          variant === 'client' ? '[&_.ProseMirror]:text-sm [&_.ProseMirror]:leading-7' : '[&_.ProseMirror]:text-xs',
+          variant === 'client' ? prosemirrorClientClass : prosemirrorAdminClass,
           '[&_.ProseMirror]:focus:border-teal-500/50 [&_.ProseMirror]:focus:outline-none',
-          '[&_.ProseMirror_p]:mb-2 [&_.ProseMirror_strong]:text-[var(--brand-text-bright)]',
-          variant === 'client'
-            ? '[&_.ProseMirror_h2]:text-lg [&_.ProseMirror_h2]:font-semibold [&_.ProseMirror_h2]:text-[var(--brand-text-bright)] [&_.ProseMirror_h2]:mt-5 [&_.ProseMirror_h2]:mb-2 [&_.ProseMirror_h3]:text-base [&_.ProseMirror_h3]:font-semibold [&_.ProseMirror_h3]:text-[var(--brand-text-bright)] [&_.ProseMirror_h3]:mt-4 [&_.ProseMirror_h3]:mb-1.5'
-            : '[&_.ProseMirror_h2]:text-sm [&_.ProseMirror_h2]:font-semibold [&_.ProseMirror_h2]:text-[var(--brand-text-bright)] [&_.ProseMirror_h2]:mt-4 [&_.ProseMirror_h2]:mb-2 [&_.ProseMirror_h3]:text-xs [&_.ProseMirror_h3]:font-semibold [&_.ProseMirror_h3]:text-[var(--brand-text-bright)] [&_.ProseMirror_h3]:mt-3 [&_.ProseMirror_h3]:mb-1',
-          '[&_.ProseMirror_ul]:pl-4 [&_.ProseMirror_ul]:mb-2 [&_.ProseMirror_ol]:pl-4 [&_.ProseMirror_ol]:mb-2',
-          '[&_.ProseMirror_li]:mb-1 [&_.ProseMirror_a]:text-teal-400 [&_.ProseMirror_a]:underline',
+          prosemirrorSharedClass,
         ].join(' ')}
       />
     </div>

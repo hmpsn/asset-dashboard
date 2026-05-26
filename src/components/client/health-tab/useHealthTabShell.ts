@@ -59,6 +59,11 @@ export function useHealthTabShell({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const shareRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    if (!initialSeverity) return;
+    setSeverityFilter(initialSeverity);
+  }, [initialSeverity]);
+
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => {
       const next = new Set(prev);

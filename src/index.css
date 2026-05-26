@@ -414,8 +414,8 @@ aside[class*="border-r"] {
   box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
 }
 
-/* Active nav item: teal left accent bar */
-nav button[class*="bg-teal-500"] {
+/* Active nav item: accent bar */
+nav button[data-nav-active="true"] {
   box-shadow: -2px 0 0 0 rgba(45, 212, 191, 0.7);
 }
 
@@ -618,6 +618,16 @@ body::after {
 }
 
 } /* end @layer components — .t-* typography utilities */
+
+/* ─── Client typography calibration ───────────────────────────────────────────
+   Client portal content should feel less "UI chrome" heavy than admin views,
+   so map compact utility text back onto DIN Pro within the client shell. */
+.client-typography,
+.client-typography .t-page,
+.client-typography .t-ui,
+.client-typography .t-caption-sm {
+  font-family: 'DIN Pro', 'Inter', sans-serif;
+}
 
 /* ─── Client Dashboard Light Theme ─── */
 

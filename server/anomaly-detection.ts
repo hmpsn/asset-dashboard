@@ -23,6 +23,7 @@ import { getGA4PeriodComparison, getGA4Conversions, getTopDroppedGA4Page, getTop
 import { listSnapshots } from './reports.js';
 import { addActivity } from './activity-log.js';
 import { callAI } from './ai.js';
+import { buildSystemPrompt } from './prompt-assembly.js';
 import { notifyAnomalyAlert } from './email.js';
 import { createLogger } from './logger.js';
 import { upsertAnomalyDigestInsight, getInsight, getInsights, upsertInsight, cloneInsightParams } from './analytics-insights-store.js';
@@ -505,7 +506,7 @@ async function generateAiSummary(anomalies: Anomaly[], workspaceName: string, wo
 
     const result = await callAI({
       model: 'gpt-5.4-mini',
-      system: `You are an SEO analyst. Given the detected anomalies for a website, write a brief 2-3 sentence executive summary that highlights the most important changes and suggests what to investigate first. Be specific and actionable. Don't repeat every anomaly — focus on the story.`,
+      system: buildSystemPrompt(workspaceId, `You are an SEO analyst. Given the detected anomalies for a website, write a brief 2-3 sentence executive summary that highlights the most important changes and suggests what to investigate first. Be specific and actionable. Don't repeat every anomaly — focus on the story.`),
       messages: [
         {
           role: 'user',
