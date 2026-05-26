@@ -235,7 +235,8 @@ describe('ContentCalendar', () => {
     if (dayCells.length > 0) {
       fireEvent.click(dayCells[0]);
       // Detail panel appears
-      expect(screen.getByText(/item/i)).toBeInTheDocument();
+      // Detail panel appears — multiple elements may match /item/i (e.g. "0 items" badge + "No content items" message)
+      expect(screen.getAllByText(/item/i).length).toBeGreaterThan(0);
     }
   });
 
