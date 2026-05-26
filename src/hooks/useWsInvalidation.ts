@@ -24,6 +24,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.approvals(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.cmsEditorAll() });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
     },
     [WS_EVENTS.APPROVAL_APPLIED]: () => {
       if (!workspaceId) return;
@@ -32,18 +33,21 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.seoEditorAll() });
       qc.invalidateQueries({ queryKey: queryKeys.admin.cmsEditorAll() });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
     },
     [WS_EVENTS.REQUEST_CREATED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.client.requests(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.requests(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
     },
     [WS_EVENTS.REQUEST_UPDATE]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.client.requests(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.requests(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
     },
     [WS_EVENTS.CONTENT_REQUEST_CREATED]: () => {
       if (!workspaceId) return;
@@ -53,6 +57,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.contentCalendar(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
     },
     [WS_EVENTS.CONTENT_REQUEST_UPDATE]: () => {
       if (!workspaceId) return;
@@ -62,6 +67,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.contentCalendar(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
     },
     [WS_EVENTS.BRIEF_UPDATED]: () => {
       // Fired by MCP save_brief and any future brief-mutation paths. Keeps the
@@ -111,6 +117,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.anomalyAlerts(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.anomalies(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
     },
     [WS_EVENTS.WORKSPACE_UPDATED]: () => {
       if (!workspaceId) return;
@@ -173,6 +180,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.workOrders(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
     },
     [WS_EVENTS.INSIGHT_RESOLVED]: () => {
       if (!workspaceId) return;
@@ -280,6 +288,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligence(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
     },
     [WS_EVENTS.MEETING_BRIEF_GENERATED]: () => {
       if (!workspaceId) return;

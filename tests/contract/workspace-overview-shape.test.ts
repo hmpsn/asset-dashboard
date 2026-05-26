@@ -85,6 +85,7 @@ describe('response shape for fresh workspace', () => {
     expect(ws).toHaveProperty('contentPlan');
     expect(ws).toHaveProperty('churnSignals');
     expect(ws).toHaveProperty('clientSignals');
+    expect(ws).toHaveProperty('clientActions');
     expect(ws).toHaveProperty('pageStates');
   });
 });
@@ -105,6 +106,8 @@ describe('nested aggregate shapes', () => {
     const ws = await getOurWorkspace();
     const approvals = ws.approvals as Record<string, unknown>;
     expect(approvals).toHaveProperty('pending');
+    expect(approvals).toHaveProperty('approved');
+    expect(approvals).toHaveProperty('changesRequested');
     expect(approvals).toHaveProperty('total');
   });
 
@@ -112,6 +115,8 @@ describe('nested aggregate shapes', () => {
     const ws = await getOurWorkspace();
     const contentRequests = ws.contentRequests as Record<string, unknown>;
     expect(contentRequests).toHaveProperty('pending');
+    expect(contentRequests).toHaveProperty('approved');
+    expect(contentRequests).toHaveProperty('changesRequested');
     expect(contentRequests).toHaveProperty('inProgress');
     expect(contentRequests).toHaveProperty('delivered');
     expect(contentRequests).toHaveProperty('total');
@@ -141,6 +146,13 @@ describe('nested aggregate shapes', () => {
     const ws = await getOurWorkspace();
     const clientSignals = ws.clientSignals as Record<string, unknown>;
     expect(clientSignals).toHaveProperty('new');
+  });
+
+  it('clientActions has correct sub-fields', async () => {
+    const ws = await getOurWorkspace();
+    const clientActions = ws.clientActions as Record<string, unknown>;
+    expect(clientActions).toHaveProperty('approved');
+    expect(clientActions).toHaveProperty('changesRequested');
   });
 
   it('pageStates has correct sub-fields', async () => {
@@ -176,6 +188,8 @@ describe('default values for empty (freshly seeded) workspace', () => {
     const ws = await getOurWorkspace();
     const approvals = ws.approvals as Record<string, unknown>;
     expect(typeof approvals.pending).toBe('number');
+    expect(typeof approvals.approved).toBe('number');
+    expect(typeof approvals.changesRequested).toBe('number');
     expect(typeof approvals.total).toBe('number');
   });
 
@@ -190,6 +204,8 @@ describe('default values for empty (freshly seeded) workspace', () => {
     const ws = await getOurWorkspace();
     const cr = ws.contentRequests as Record<string, unknown>;
     expect(typeof cr.pending).toBe('number');
+    expect(typeof cr.approved).toBe('number');
+    expect(typeof cr.changesRequested).toBe('number');
     expect(typeof cr.inProgress).toBe('number');
     expect(typeof cr.delivered).toBe('number');
     expect(typeof cr.total).toBe('number');
@@ -221,6 +237,15 @@ describe('default values for empty (freshly seeded) workspace', () => {
     const ws = await getOurWorkspace();
     const cliSig = ws.clientSignals as Record<string, unknown>;
     expect(typeof cliSig.new).toBe('number');
+  });
+
+  it('clientActions counts are numbers and 0 for fresh workspace', async () => {
+    const ws = await getOurWorkspace();
+    const clientActions = ws.clientActions as Record<string, unknown>;
+    expect(typeof clientActions.approved).toBe('number');
+    expect(typeof clientActions.changesRequested).toBe('number');
+    expect(clientActions.approved).toBe(0);
+    expect(clientActions.changesRequested).toBe(0);
   });
 
   it('pageStates counts are numbers and total is 0 for fresh workspace', async () => {

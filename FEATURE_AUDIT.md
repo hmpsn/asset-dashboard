@@ -169,6 +169,8 @@ A comprehensive value assessment of every feature in the platform — **450 feat
 
 **What it does:** Merges the top-right notification drawer and the separate floating task panel into one unified hub. The drawer now presents categorized sections for Actions Needed, Alerts, and System Events, and includes in-place background task lifecycle controls (progress, cancel, dismiss, clear completed) scoped to the active workspace.
 
+**Follow-up (2026-05-26):** Expanded notification reliability wiring after a client-decision gap audit. Admin bell counts now include client-approved and client-revision decision states (SEO approvals, content review decisions, client actions), WebSocket invalidation now refreshes bell state on approval/request/content/anomaly/work-order/client-action updates, team emails now fire for client brief/post approvals and SEO approval rejections, and client request followups (notes/attachments/notes-with-files) now trigger team email notifications.
+
 **Agency value:** Reduces operator context-switching and duplicated “what needs attention now” surfaces during daily triage.
 
 **Client value:** Indirectly improves response time and consistency by making high-priority actions and system task outcomes visible in one canonical panel.

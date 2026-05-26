@@ -21,11 +21,12 @@ interface WorkspaceSummary {
   id: string;
   name: string;
   requests: { new: number };
-  approvals: { pending: number };
-  contentRequests?: { pending: number };
+  approvals: { pending: number; approved?: number; changesRequested?: number };
+  contentRequests?: { pending: number; approved?: number; changesRequested?: number };
   workOrders?: { pending: number };
   contentPlan?: { review: number };
   clientSignals?: { new: number };
+  clientActions?: { approved?: number; changesRequested?: number };
 }
 
 interface AnomalySummary {
@@ -119,10 +120,58 @@ async function fetchNotifications(): Promise<NotificationItem[]> {
         tab: 'seo-editor',
       });
     }
+    if ((ws.approvals.approved || 0) > 0) {
+      notifications.push({
+        id: `approvals-approved-${ws.id}`,
+        label: `${ws.approvals.approved} client-approved SEO change${ws.approvals.approved === 1 ? '' : 's'} ready to apply`,
+        sub: ws.name,
+        color: 'text-teal-400',
+        icon: ClipboardCheck,
+        workspaceId: ws.id,
+        workspaceName: ws.name,
+        tab: 'seo-editor',
+      });
+    }
+    if ((ws.approvals.changesRequested || 0) > 0) {
+      notifications.push({
+        id: `approvals-changes-${ws.id}`,
+        label: `${ws.approvals.changesRequested} SEO change${ws.approvals.changesRequested === 1 ? '' : 's'} requested revision`,
+        sub: ws.name,
+        color: 'text-amber-400/80',
+        icon: Clipboard,
+        workspaceId: ws.id,
+        workspaceName: ws.name,
+        tab: 'seo-editor',
+      });
+    }
     if ((ws.contentRequests?.pending || 0) > 0) {
       notifications.push({
         id: `content-${ws.id}`,
         label: `${ws.contentRequests!.pending} content brief${ws.contentRequests!.pending > 1 ? 's' : ''} awaiting review`,
+        sub: ws.name,
+        color: 'text-amber-400/80',
+        icon: Clipboard,
+        workspaceId: ws.id,
+        workspaceName: ws.name,
+        tab: 'content-pipeline',
+      });
+    }
+    if ((ws.contentRequests?.approved || 0) > 0) {
+      notifications.push({
+        id: `content-approved-${ws.id}`,
+        label: `${ws.contentRequests!.approved} approved brief/post decision${ws.contentRequests!.approved === 1 ? '' : 's'} awaiting team follow-up`,
+        sub: ws.name,
+        color: 'text-teal-400',
+        icon: ClipboardCheck,
+        workspaceId: ws.id,
+        workspaceName: ws.name,
+        tab: 'content-pipeline',
+      });
+    }
+    if ((ws.contentRequests?.changesRequested || 0) > 0) {
+      notifications.push({
+        id: `content-changes-${ws.id}`,
+        label: `${ws.contentRequests!.changesRequested} content brief/post revision request${ws.contentRequests!.changesRequested === 1 ? '' : 's'}`,
         sub: ws.name,
         color: 'text-amber-400/80',
         icon: Clipboard,
@@ -161,6 +210,30 @@ async function fetchNotifications(): Promise<NotificationItem[]> {
         label: `${ws.clientSignals!.new} new client signal${ws.clientSignals!.new > 1 ? 's' : ''}`,
         sub: ws.name,
         color: 'text-teal-400',
+        icon: MessageSquare,
+        workspaceId: ws.id,
+        workspaceName: ws.name,
+        tab: 'requests',
+      });
+    }
+    if ((ws.clientActions?.approved || 0) > 0) {
+      notifications.push({
+        id: `client-actions-approved-${ws.id}`,
+        label: `${ws.clientActions!.approved} approved client action${ws.clientActions!.approved === 1 ? '' : 's'} to execute`,
+        sub: ws.name,
+        color: 'text-teal-400',
+        icon: ClipboardCheck,
+        workspaceId: ws.id,
+        workspaceName: ws.name,
+        tab: 'requests',
+      });
+    }
+    if ((ws.clientActions?.changesRequested || 0) > 0) {
+      notifications.push({
+        id: `client-actions-changes-${ws.id}`,
+        label: `${ws.clientActions!.changesRequested} client action${ws.clientActions!.changesRequested === 1 ? '' : 's'} requesting revisions`,
+        sub: ws.name,
+        color: 'text-amber-400/80',
         icon: MessageSquare,
         workspaceId: ws.id,
         workspaceName: ws.name,

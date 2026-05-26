@@ -737,11 +737,19 @@ describe('GET /api/workspace-overview — content fields', () => {
     // Extended fields not verified by existing test
     expect(ours).toHaveProperty('contentRequests');
     expect(ours.contentRequests).toHaveProperty('pending');
+    expect(ours.contentRequests).toHaveProperty('approved');
+    expect(ours.contentRequests).toHaveProperty('changesRequested');
     expect(ours.contentRequests).toHaveProperty('total');
+    expect(ours).toHaveProperty('approvals');
+    expect(ours.approvals).toHaveProperty('approved');
+    expect(ours.approvals).toHaveProperty('changesRequested');
     expect(ours).toHaveProperty('workOrders');
     expect(ours).toHaveProperty('contentPlan');
     expect(ours).toHaveProperty('churnSignals');
     expect(ours).toHaveProperty('clientSignals');
+    expect(ours).toHaveProperty('clientActions');
+    expect(ours.clientActions).toHaveProperty('approved');
+    expect(ours.clientActions).toHaveProperty('changesRequested');
     expect(ours).toHaveProperty('hasGsc');
     expect(ours).toHaveProperty('hasGa4');
   });

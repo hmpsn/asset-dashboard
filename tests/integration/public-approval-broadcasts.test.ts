@@ -20,6 +20,10 @@ const webflowState = vi.hoisted(() => ({
   publishResult: { success: true } as { success: boolean; error?: string },
 }));
 
+const emailState = vi.hoisted(() => ({
+  changesRequested: [] as unknown[],
+}));
+
 vi.mock('../../server/broadcast.js', () => ({
   setBroadcast: vi.fn(),
   broadcast: vi.fn(),
@@ -48,6 +52,16 @@ vi.mock('../../server/webflow.js', async importOriginal => {
       webflowState.publishCalls.push({ collectionId, itemIds, token });
       return webflowState.publishResult;
     },
+  };
+});
+
+vi.mock('../../server/email.js', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../server/email.js')>();
+  return {
+    ...actual,
+    notifyTeamChangesRequested: vi.fn((payload: unknown) => {
+      emailState.changesRequested.push(payload);
+    }),
   };
 });
 
@@ -207,6 +221,7 @@ beforeEach(() => {
   webflowState.result = { success: true };
   webflowState.cmsResult = { success: true };
   webflowState.publishResult = { success: true };
+  emailState.changesRequested = [];
 });
 
 afterAll(async () => {
@@ -401,6 +416,7 @@ describe('public approval broadcasts and workflow side effects', () => {
     expect(latestActivityTitle('changes_requested', `%"itemId":"${item.id}"%`)).toBe(
       'Client requested changes to SEO title for Reject Revert Broadcast Page',
     );
+    expect(emailState.changesRequested).toHaveLength(1);
 
     broadcastState.calls = [];
 
