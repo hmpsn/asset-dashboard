@@ -158,6 +158,16 @@
           "notes": "Completed in this PR. Added `scripts/report-ai-quality.ts` and `npm run verify:ai-quality` to evaluate deterministic quality fixtures by pipeline and dimension, emit JSON/Markdown, hard-fail only on missing coverage/evidence or hard authority/format/evidence fixture failures, and warn on soft quality regressions. Updated the AI reliability trace map and `docs/rules/ai-quality-evals.md`; live model scoring remains out of normal CI."
         },
         {
+          "id": "content-blueprint-section-plan-compression",
+          "title": "Compress copy blueprint section plans for conversion pages",
+          "source": "Outline compression planning 2026-05-26",
+          "est": "3-5h",
+          "priority": "P1",
+          "status": "pending",
+          "owner": "brand-engine",
+          "notes": "Follow-up to audit `server/blueprint-generator.ts` service/location/landing section plans, remove old NAP/local SEO reader-facing guidance, align copy pipeline section counts and word budgets with the page-type copy contract, and add blueprint/copy-pipeline prompt tests."
+        },
+        {
           "id": "intel-quality-content-brief-decay-migration",
           "title": "Migrate content briefs and content decay recommendations onto shared context",
           "source": "Platform insights + AI content audit discussion 2026-05-18",

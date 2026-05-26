@@ -114,6 +114,8 @@ Priority order for content posts and copy pipeline generation:
 
 Brand context should choose vocabulary, proof, positioning, and rhythm. It must not add extra sections, repeated CTAs, duplicated proof blocks, or longer copy simply because more brand context is present. Service, location, landing, homepage, and product pages are density-reviewed during unification; blogs, pillars, and resources retain permission for deeper educational structure.
 
+Content brief and outline generation must apply the same priority before prose generation starts. Fresh briefs and outline regeneration should create right-sized skeletons for the page type: conversion pages get compact section counts, capped subheading density, one closing CTA path, and deterministic trimming of duplicate close/contact sections. Brand identity and voice can shape the outline's proof and positioning, but page architecture and word budget outrank any temptation to expand because richer brand context is available.
+
 ## Voice Quality Contract Harness
 
 **File:** `tests/unit/voice-quality-contract-harness.test.ts`
