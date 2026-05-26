@@ -201,6 +201,8 @@ function buildHandlers(wsId: string) {
     [WS_EVENTS.RECOMMENDATIONS_UPDATED]: () => {
       if (!wsId) return;
       qc.invalidateQueries({ queryKey: queryKeys.shared.recommendations(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.shared.pageEditStates(wsId, false) });
+      qc.invalidateQueries({ queryKey: queryKeys.shared.pageEditStates(wsId, true) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.actionQueue(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(wsId) });
@@ -486,6 +488,8 @@ describe('useWsInvalidation — event routing (pure)', () => {
     handlers[WS_EVENTS.RECOMMENDATIONS_UPDATED]();
 
     expect(invalidated).toContainEqual(queryKeys.shared.recommendations(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.shared.pageEditStates(WS_ID, false));
+    expect(invalidated).toContainEqual(queryKeys.shared.pageEditStates(WS_ID, true));
     expect(invalidated).toContainEqual(queryKeys.admin.actionQueue(WS_ID));
     expect(invalidated).toContainEqual(queryKeys.admin.workspaceHome(WS_ID));
     expect(invalidated).toContainEqual(queryKeys.admin.intelligenceAll(WS_ID));

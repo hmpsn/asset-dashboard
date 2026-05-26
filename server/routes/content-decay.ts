@@ -24,6 +24,7 @@ router.post('/api/content-decay/:workspaceId/analyze', requireWorkspaceAccess('w
     const ws = getWorkspace(req.params.workspaceId);
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });
     const analysis = await analyzeContentDecay(ws);
+    invalidateContentPipelineIntelligence(ws.id);
 
     // Refresh content_decay insights so the insights page reflects fresh data
     // immediately instead of waiting for the 24-hour staleness window.
@@ -97,6 +98,7 @@ router.post('/api/content-decay/:workspaceId/recommendations', requireWorkspaceA
     }
     const maxPages = Math.min(requestedMaxPages, 25);
     const updated = await generateBatchRecommendations(ws, existing, maxPages);
+    invalidateContentPipelineIntelligence(ws.id);
 
     try {
       for (const rec of updated.decayingPages?.slice(0, 3) ?? []) {

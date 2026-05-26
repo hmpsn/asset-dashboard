@@ -1361,6 +1361,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   // Preserve statuses from previous run and auto-resolve issues no longer detected
   const existing = loadRecommendations(workspaceId);
   let autoResolved = 0;
+  const autoResolvedPageStateIds: string[] = [];
 
   if (existing) {
     // Build lookup: source → existing rec (for audit-based and site-wide recs)
@@ -1438,6 +1439,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
             source: 'recommendation',
             recommendationId: oldRec.id,
           });
+          autoResolvedPageStateIds.push(resolvedPageId);
         }
       }
     }
@@ -1492,6 +1494,12 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   invalidateIntelligenceCache(workspaceId);
   log.info(`Generated ${recs.length} recommendations for ${workspaceId}: ${summary.fixNow} fix-now, ${summary.fixSoon} fix-soon, ${summary.fixLater} fix-later, ${summary.ongoing} ongoing${autoResolved > 0 ? `, ${autoResolved} auto-resolved` : ''}`);
 
+  if (autoResolvedPageStateIds.length > 0) {
+    broadcastToWorkspace(workspaceId, WS_EVENTS.PAGE_STATE_UPDATED, {
+      pageIds: autoResolvedPageStateIds,
+      source: 'recommendation',
+    });
+  }
   broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { count: recs.length });
 
   return set;

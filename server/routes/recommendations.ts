@@ -62,6 +62,7 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', requireClientPor
   }
   const rec = updateRecommendationStatus(workspaceId, recId, status);
   if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
+  const updatedPageStateIds: string[] = [];
   // When recommendation is completed, mark affected pages as live
   if (status === 'completed' && rec.affectedPages && rec.affectedPages.length > 0) {
     // Build slug→pageId map from audit snapshot
@@ -96,6 +97,7 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', requireClientPor
         source: 'recommendation',
         recommendationId: rec.id,
       });
+      updatedPageStateIds.push(resolvedPageId);
     }
     // Record for outcome tracking — idempotent
     try {
@@ -116,6 +118,13 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', requireClientPor
     }
   }
   invalidateIntelligenceCache(workspaceId);
+  if (updatedPageStateIds.length > 0) {
+    broadcastToWorkspace(workspaceId, WS_EVENTS.PAGE_STATE_UPDATED, {
+      pageIds: updatedPageStateIds,
+      source: 'recommendation',
+      recommendationId: rec.id,
+    });
+  }
   broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { recId, status });
   res.json(rec);
 });

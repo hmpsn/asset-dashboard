@@ -334,6 +334,8 @@ export function useWsInvalidation(workspaceId: string | undefined) {
     [WS_EVENTS.RECOMMENDATIONS_UPDATED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.shared.recommendations(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.shared.pageEditStates(workspaceId, false) });
+      qc.invalidateQueries({ queryKey: queryKeys.shared.pageEditStates(workspaceId, true) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.actionQueue(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });

@@ -44,4 +44,30 @@ describe('workspace intelligence freshness wiring', () => {
       expect(source(path), path).toContain('invalidateIntelligenceCache');
     }
   });
+
+  it('content decay invalidates when analysis and refresh recommendations mutate cached slice inputs', () => {
+    const route = source('server/routes/content-decay.ts');
+
+    expect(route.indexOf('const analysis = await analyzeContentDecay(ws);')).toBeGreaterThan(-1);
+    expect(route.indexOf('invalidateContentPipelineIntelligence(ws.id);')).toBeGreaterThan(
+      route.indexOf('const analysis = await analyzeContentDecay(ws);')
+    );
+    expect(route.indexOf('const updated = await generateBatchRecommendations(ws, existing, maxPages);')).toBeGreaterThan(-1);
+    expect(route.lastIndexOf('invalidateContentPipelineIntelligence(ws.id);')).toBeGreaterThan(
+      route.indexOf('const updated = await generateBatchRecommendations(ws, existing, maxPages);')
+    );
+  });
+
+  it('recommendation page-state writes broadcast page-state freshness', () => {
+    const route = source('server/routes/recommendations.ts');
+    const generator = source('server/recommendations.ts');
+    const invalidationHook = source('src/hooks/useWsInvalidation.ts');
+
+    expect(route).toContain('updatedPageStateIds.push(resolvedPageId)');
+    expect(route).toContain('WS_EVENTS.PAGE_STATE_UPDATED');
+    expect(generator).toContain('autoResolvedPageStateIds.push(resolvedPageId)');
+    expect(generator).toContain('WS_EVENTS.PAGE_STATE_UPDATED');
+    expect(invalidationHook).toContain('queryKeys.shared.pageEditStates(workspaceId, false)');
+    expect(invalidationHook).toContain('queryKeys.shared.pageEditStates(workspaceId, true)');
+  });
 });
