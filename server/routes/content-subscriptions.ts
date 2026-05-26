@@ -16,6 +16,7 @@ import { createLogger } from '../logger.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { requireWorkspaceAccess, requestUserCanAccessWorkspace, sendWorkspaceAccessDenied } from '../auth.js';
+import { InvalidTransitionError } from '../state-machines.js';
 
 const log = createLogger('routes:content-subscriptions');
 const router = Router();
@@ -117,6 +118,9 @@ router.patch('/api/content-subscription/:id', (req, res) => {
     });
     res.json(sub);
   } catch (err) {
+    if (err instanceof InvalidTransitionError) {
+      return res.status(400).json({ error: err.message });
+    }
     log.error({ err }, 'Failed to update content subscription');
     res.status(500).json({ error: 'Failed to update subscription' });
   }
