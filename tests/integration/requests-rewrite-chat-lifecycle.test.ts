@@ -27,7 +27,7 @@
  *     - POST /api/rewrite-chat/:workspaceId — null/undefined question, unknown ws
  *     - POST /api/rewrite-chat/:workspaceId/load-page — SSRF: private IP guarded
  *
- * Port: 13859 — port-ok: unique in integration suite
+ * Port: 13860 — port-ok: unique in integration suite
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -36,7 +36,7 @@ import db from '../../server/db/index.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createRequest, getRequest, listRequests } from '../../server/requests.js';
 
-const ctx = createTestContext(13859); // port-ok: unique in integration suite
+const ctx = createTestContext(13860); // port-ok: unique in integration suite
 const { api, postJson, patchJson, del } = ctx;
 
 let workspaceId = '';
