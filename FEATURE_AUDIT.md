@@ -1,8 +1,32 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **450 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **452 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 452. Content Generation Style Selector
+
+**What it does:** Adds an admin-only writing style selector for content brief and post generation. Operators can choose `standard`, `concise`, or `hybrid` when creating a brief, edit the selected style on the brief, and override it when starting full post generation. The selected style is persisted on both briefs and generated posts so future quality analysis can compare style choice against approvals, edits, and outcomes.
+
+**Agency value:** Gives operators a practical control for client taste and page-type fit without changing prompts globally or merging new experiments to staging. It supports live A/B-style workflow learning while keeping generation deterministic and auditable.
+
+**Client value:** Content can better match the client’s preferred density: fuller SEO depth, tighter conversion copy, or a hybrid of concise structure with stronger proof and voice.
+
+**Mutual:** Keeps brand voice enabled while making copy length and density an explicit, trackable choice rather than hidden prompt behavior.
+
+---
+
+### 451. Read-Only Content Generation Experiment Harness
+
+**What it does:** Adds `scripts/experiment-content-generation.ts`, a local/manual experiment harness for comparing content brief and draft variants without merging prompt changes to staging or saving generated content. The script calls MCP `prepare_brief_context` for live workspace context, generates candidate briefs locally with `callAI()`, validates the output against the existing MCP brief schema, scores outline density/CTA duplication/local-SEO-operation drift deterministically, and can optionally generate local draft HTML for quality scoring. Batch mode accepts a JSON experiment file, runs multiple topics/page types, and writes a rollup report with per-page-type winners. All artifacts are ignored under `artifacts/content-experiments/`. Persistence flags are rejected by design, and the harness never calls `save_brief`, `save_post`, or `send_to_client`.
+
+**Agency value:** Gives operators a faster way to trial prompt and brief-shape changes against real client context before committing product behavior.
+
+**Client value:** Indirectly improves client-facing content quality by making experimentation safer and more evidence-led before changes reach the content workflow.
+
+**Mutual:** Keeps the platform's deterministic AI quality posture intact while allowing opt-in live-model exploration outside CI and outside persistence paths.
 
 ---
 

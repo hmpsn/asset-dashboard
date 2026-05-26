@@ -88,6 +88,15 @@
           "notes": "Completed in PR1. Added `server/intelligence/generation-context-builders.ts` with `buildContentGenerationContext()` and `buildRecommendationGenerationContext()`, both wrapping `buildWorkspaceIntelligence()` + `formatForPrompt()` with one shared `slices` source of truth. Builder defaults now encode canonical slices, `pagePath` behavior, `learningsDomain`, and verbosity without migrating production callers yet. Added `tests/unit/generation-context-builders.test.ts` to verify default slices, `pageProfile` inclusion, same-array slice/section parity, and override threading for `learningsDomain`, verbosity, and token budget."
         },
         {
+          "id": "content-generation-style-variant-learning",
+          "title": "Generate content style variants and learn preferred defaults",
+          "source": "Content generation style selector planning 2026-05-26",
+          "est": "5-8h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Follow-up after the selector-only PR. Explore generating standard/concise/hybrid candidates for briefs and posts, storing the selected variant, measuring edit distance, approval outcomes, client/page-type preferences, and eventually recommending default styles per workspace or client. Keep live model quality scoring advisory and human-reviewed."
+        },
+        {
           "id": "workspace-intelligence-hybrid-consumer-cleanup",
           "title": "Workspace intelligence hybrid consumer cleanup",
           "source": "Workspace Intelligence Consolidation Master Plan follow-up",

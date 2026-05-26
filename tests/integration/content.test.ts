@@ -480,16 +480,27 @@ describe('Content Posts API', () => {
     expect(body.error).toBe('briefId required');
   });
 
+  it('POST /api/content-posts/:wsId/generate rejects invalid generationStyle', async () => {
+    const res = await postJson(`/api/content-posts/${testWsId}/generate`, {
+      briefId: 'brief-any',
+      generationStyle: 'verbose',
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBeDefined();
+  });
+
   it('POST /api/content-posts/:wsId/generate starts a background job and returns a post skeleton', async () => {
     const genBriefId = `brief_post_gen_${Date.now()}`;
     seedBrief(genBriefId);
 
-    const res = await postJson(`/api/content-posts/${testWsId}/generate`, { briefId: genBriefId });
+    const res = await postJson(`/api/content-posts/${testWsId}/generate`, { briefId: genBriefId, generationStyle: 'hybrid' });
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.id).toMatch(/^post_/);
     expect(body.briefId).toBe(genBriefId);
     expect(body.status).toBe('generating');
+    expect(body.generationStyle).toBe('hybrid');
     expect(typeof body.jobId).toBe('string');
 
     const jobRes = await api(`/api/jobs/${body.jobId}`);

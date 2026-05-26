@@ -1,11 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Loader2, Trash2, Download, Copy, Search,
   Target, MessageSquare, BarChart3, BookOpen, Users, TrendingUp,
   Pencil, Check, PenLine, RefreshCw, Send,
 } from 'lucide-react';
 import { Badge, Icon, Button, ClickableRow, FormInput, FormSelect, FormTextarea } from '../ui';
-import type { ContentBrief } from '../../../shared/types/content';
+import {
+  CONTENT_GENERATION_STYLE_LABELS,
+  CONTENT_GENERATION_STYLE_OPTIONS,
+  DEFAULT_CONTENT_GENERATION_STYLE,
+  type ContentBrief,
+  type ContentGenerationStyle,
+} from '../../../shared/types/content';
 
 interface BriefDetailProps {
   brief: ContentBrief;
@@ -15,7 +21,7 @@ interface BriefDetailProps {
   sendingToClient: string | null;
   onSaveBriefField: (briefId: string, updates: Partial<ContentBrief>) => void;
   onSetEditingBrief: (id: string | null) => void;
-  onGeneratePost: (briefId: string) => void | Promise<void>;
+  onGeneratePost: (briefId: string, generationStyle?: ContentGenerationStyle) => void | Promise<void>;
   onRegenerate: (briefId: string, feedback: string) => void;
   onRegenerateOutline?: (briefId: string, feedback?: string) => void;
   regeneratingOutline?: string | null;
@@ -39,16 +45,33 @@ export function BriefDetail({
   const [regenFeedback, setRegenFeedback] = useState(defaultFeedback ?? '');
   const [showOutlineRegen, setShowOutlineRegen] = useState(false);
   const [outlineRegenFeedback, setOutlineRegenFeedback] = useState('');
+  const [postGenerationStyle, setPostGenerationStyle] = useState<ContentGenerationStyle>(
+    brief.generationStyle ?? DEFAULT_CONTENT_GENERATION_STYLE,
+  );
+
+  useEffect(() => {
+    setPostGenerationStyle(brief.generationStyle ?? DEFAULT_CONTENT_GENERATION_STYLE);
+  }, [brief.id, brief.generationStyle]);
 
   return (
     <div className="px-4 pb-4 space-y-4 border-t border-[var(--brand-border)]">
       {/* Action buttons */}
       <div className="pt-3 flex items-center gap-2 flex-wrap">
         {!hideActions?.includes('generatePost') && (
-        <Button onClick={() => onGeneratePost(brief.id)} disabled={generatingPostFor === brief.id} variant="ghost" size="sm" className="rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50">
-          <Icon as={generatingPostFor === brief.id ? Loader2 : PenLine} size="sm" className={generatingPostFor === brief.id ? 'animate-spin' : ''} />
-          {generatingPostFor === brief.id ? 'Starting...' : 'Generate Full Post'}
-        </Button>
+          <div className="flex items-center gap-1.5 rounded-[var(--radius-lg)] bg-teal-600/10 border border-teal-500/25 px-1.5 py-1">
+            <FormSelect
+              value={postGenerationStyle}
+              onChange={value => setPostGenerationStyle(value as ContentGenerationStyle)}
+              options={CONTENT_GENERATION_STYLE_OPTIONS}
+              aria-label="Post writing style"
+              className="h-7 w-28 py-0 pl-2 pr-7 t-caption-sm bg-[var(--surface-2)] border-teal-500/25 cursor-pointer"
+              disabled={generatingPostFor === brief.id}
+            />
+            <Button onClick={() => onGeneratePost(brief.id, postGenerationStyle)} disabled={generatingPostFor === brief.id} variant="ghost" size="sm" className="rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50">
+              <Icon as={generatingPostFor === brief.id ? Loader2 : PenLine} size="sm" className={generatingPostFor === brief.id ? 'animate-spin' : ''} />
+              {generatingPostFor === brief.id ? 'Starting...' : 'Generate Full Post'}
+            </Button>
+          </div>
         )}
         <Button onClick={() => onSetEditingBrief(editingBrief === brief.id ? null : brief.id)} variant="ghost" size="sm" className={`rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors ${editingBrief === brief.id ? 'bg-amber-600/20 border border-amber-500/30 text-amber-300 hover:bg-amber-600/30' : 'bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] border border-[var(--brand-border)]'}`}>
           {editingBrief === brief.id ? <><Icon as={Check} size="sm" /> Done Editing</> : <><Icon as={Pencil} size="sm" /> Edit Brief</>}
@@ -186,6 +209,21 @@ export function BriefDetail({
             <FormInput type="text" value={brief.intent || ''} commitOnBlur onCommit={value => { if (value !== brief.intent) onSaveBriefField(brief.id, { intent: value }); }} className="w-full text-xs text-[var(--brand-text-bright)] capitalize font-medium" />
           ) : (
             <div className="text-xs text-[var(--brand-text-bright)] capitalize font-medium">{brief.intent}</div>
+          )}
+        </div>
+        <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">
+          <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Style</div>
+          {editingBrief === brief.id ? (
+            <FormSelect
+              value={brief.generationStyle ?? DEFAULT_CONTENT_GENERATION_STYLE}
+              onChange={value => onSaveBriefField(brief.id, { generationStyle: value as ContentGenerationStyle })}
+              options={CONTENT_GENERATION_STYLE_OPTIONS}
+              className="w-full text-xs text-[var(--brand-text-bright)] capitalize font-medium cursor-pointer"
+            />
+          ) : (
+            <div className="text-xs text-[var(--brand-text-bright)] capitalize font-medium">
+              {CONTENT_GENERATION_STYLE_LABELS[brief.generationStyle ?? DEFAULT_CONTENT_GENERATION_STYLE]}
+            </div>
           )}
         </div>
         {brief.contentFormat && (
