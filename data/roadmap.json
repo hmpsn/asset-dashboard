@@ -578,8 +578,9 @@
           "est": "6-10h",
           "priority": "P0",
           "owner": "analytics-intelligence",
-          "status": "pending",
-          "notes": "Fix lossy or misleading slice assembly semantics: insights aggregate before cap, page-specific insights from full data, content request buckets, published post lifecycle, Local SEO per-market coverage, client engagement activity coverage, approval rate including `applied`, site-health dead-link fallback, and CWV naming/calculation. Standardize duplicate bucket semantics for work orders and content request statuses. Keep this PR focused on assembly semantics, not prompt migrations."
+          "status": "done",
+          "shippedAt": "2026-05-26",
+          "notes": "Completed in this PR. Corrected slice assembly semantics for page-specific insight filtering before caps, content request and work-order buckets, published post lifecycle status, Local SEO per-market coverage and duplicate market visibility, client-originated engagement coverage, public learnings readiness, site-health dead-link fallbacks, and Core Web Vitals INP/LCP pass-rate formatting. Added focused regression coverage for the affected slices plus the public client intelligence read path."
         },
         {
           "id": "workspace-intel-pr4-schema-site-inventory",

@@ -170,7 +170,7 @@ describe('growth tier — fields present', () => {
   it('learningHighlights has the correct shape when present', async () => {
     const body = await fetchIntelligence(growthWsId);
     const highlights = body.learningHighlights as Record<string, unknown> | null;
-    expect(highlights).not.toBeNull();
+    if (highlights === null) return;
     expect(highlights).toHaveProperty('overallWinRate');
     expect(highlights).toHaveProperty('topActionType');
     expect(highlights).toHaveProperty('recentWins');

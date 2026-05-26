@@ -406,6 +406,61 @@ describe('assembleSiteHealth', () => {
     expect(health.cwvPassRate.desktop).toBe(1);
   });
 
+  it('falls back to latest audit dead-link details when no link-check snapshot exists', async () => {
+    getWorkspace.mockReturnValue(makeMockWorkspace({ id: 'ws-dead-link-fallback' }));
+    getLatestSnapshot.mockReturnValue({
+      ...makeMockSnapshot(82, 80),
+      audit: {
+        ...makeMockSnapshot(82, 80).audit,
+        deadLinkSummary: { total: 3, internal: 2, external: 1, redirects: 0 },
+        deadLinkDetails: [{ url: '/dead-1' }, { url: '/dead-2' }, { url: '/dead-3' }],
+      },
+    });
+    listSnapshots.mockReturnValue([]);
+    getLinkCheck.mockReturnValue(null);
+    getPageSpeed.mockReturnValue(null);
+    getRedirectSnapshot.mockReturnValue(null);
+    listAnomalies.mockReturnValue([]);
+    getSeoChanges.mockReturnValue([]);
+    getCachedArchitecture.mockResolvedValue(null);
+    flattenTree.mockReturnValue([]);
+    getValidations.mockReturnValue([]);
+
+    const intel = await buildWorkspaceIntelligence('ws-dead-link-fallback', { slices: ['siteHealth'] });
+
+    expect(intel.siteHealth?.deadLinks).toBe(3);
+  });
+
+  it('uses CWV metric thresholds instead of Lighthouse score for pass rate', async () => {
+    getWorkspace.mockReturnValue(makeMockWorkspace({ id: 'ws-cwv-thresholds' }));
+    getLatestSnapshot.mockReturnValue(makeMockSnapshot(88, 80));
+    listSnapshots.mockReturnValue([]);
+    getLinkCheck.mockReturnValue(null);
+    getPageSpeed.mockReturnValue({
+      siteId: 'site-abc',
+      createdAt: new Date().toISOString(),
+      result: {
+        pages: [
+          { score: 100, vitals: { LCP: 4200, INP: 350, CLS: 0.25 } },
+          { score: 70, vitals: { LCP: 2100, INP: 120, CLS: 0.05 } },
+        ],
+        averageScore: 85,
+        averageVitals: { LCP: 3150, INP: 235, FID: 80, CLS: 0.15 },
+      },
+    });
+    getRedirectSnapshot.mockReturnValue(null);
+    listAnomalies.mockReturnValue([]);
+    getSeoChanges.mockReturnValue([]);
+    getCachedArchitecture.mockResolvedValue(null);
+    flattenTree.mockReturnValue([]);
+    getValidations.mockReturnValue([]);
+
+    const intel = await buildWorkspaceIntelligence('ws-cwv-thresholds', { slices: ['siteHealth'] });
+
+    expect(intel.siteHealth?.cwvPassRate.mobile).toBe(0.5);
+    expect(intel.siteHealth?.performanceSummary?.avgInp).toBe(235);
+  });
+
   it('populates mobile and desktop CWV pass rates from strategy-specific PageSpeed snapshots', async () => {
     getWorkspace.mockReturnValue(makeMockWorkspace());
     getLatestSnapshot.mockReturnValue(makeMockSnapshot(90, 80));
@@ -429,7 +484,7 @@ describe('assembleSiteHealth', () => {
     expect(getPageSpeed).toHaveBeenCalledWith('site-abc', 'mobile');
     expect(getPageSpeed).toHaveBeenCalledWith('site-abc', 'desktop');
     expect(health.cwvPassRate.mobile).toBe(0.5);
-    expect(health.cwvPassRate.desktop).toBe(1);
+    expect(health.cwvPassRate.desktop).toBe(0.5);
   });
 
   // ── Test 2: Empty data defaults ──────────────────────────────────────────

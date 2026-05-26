@@ -44,7 +44,7 @@ export async function assembleContentPipeline(workspaceId: string): Promise<Cont
     posts: { total: 0, byStatus: {} },
     matrices: { total: 0, cellsPlanned: 0, cellsPublished: 0 },
     requests: { pending: 0, inProgress: 0, delivered: 0 },
-    workOrders: { active: 0 },
+    workOrders: { active: 0, pending: 0 },
     seoEdits: { pending: 0, applied: 0, inReview: 0 },
   };
   try {

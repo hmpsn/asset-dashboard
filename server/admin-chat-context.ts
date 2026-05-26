@@ -917,7 +917,11 @@ export async function assembleAdminContext(
         if (health.performanceSummary?.score != null)
           perfParts.push(`Performance score: ${health.performanceSummary.score}/100`);
         if (health.performanceSummary?.avgLcp != null)
-          perfParts.push(`LCP: ${health.performanceSummary.avgLcp.toFixed(1)}s`);
+          perfParts.push(`LCP: ${(health.performanceSummary.avgLcp / 1000).toFixed(1)}s`);
+        if (health.performanceSummary) {
+          const interactionMs = health.performanceSummary.avgInp ?? health.performanceSummary.avgFid;
+          if (interactionMs != null) perfParts.push(`INP: ${interactionMs.toFixed(0)}ms`);
+        }
         if (health.performanceSummary?.avgCls != null)
           perfParts.push(`CLS: ${health.performanceSummary.avgCls.toFixed(2)}`);
         if (health.cwvPassRate.mobile != null)

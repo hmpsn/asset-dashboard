@@ -630,8 +630,9 @@ function formatSiteHealthSection(health: SiteHealthSlice, verbosity: PromptVerbo
     }
     if (health.performanceSummary) {
       const perfParts: string[] = [];
-      if (health.performanceSummary.avgLcp != null) perfParts.push(`LCP: ${health.performanceSummary.avgLcp.toFixed(1)}s`);
-      if (health.performanceSummary.avgFid != null) perfParts.push(`FID: ${health.performanceSummary.avgFid}ms`);
+      if (health.performanceSummary.avgLcp != null) perfParts.push(`LCP: ${(health.performanceSummary.avgLcp / 1000).toFixed(1)}s`);
+      const interactionMs = health.performanceSummary.avgInp ?? health.performanceSummary.avgFid;
+      if (interactionMs != null) perfParts.push(`INP: ${Math.round(interactionMs)}ms`);
       if (health.performanceSummary.avgCls != null) perfParts.push(`CLS: ${health.performanceSummary.avgCls.toFixed(2)}`);
       if (perfParts.length > 0) lines.push(`Core Web Vitals: ${perfParts.join(', ')}`);
     }

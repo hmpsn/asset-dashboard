@@ -225,4 +225,25 @@ describe('assembleClientSignals', () => {
     result = await assembleClientSignals('ws-inactive');
     expect(result.engagement?.loginFrequency).toBe('inactive');
   });
+
+  it('maps client-originated approval and content review activity into portal feature usage', async () => {
+    mocks.getClientActivitySummary.mockReturnValue({
+      distinctDays: 3,
+      lastActive: '2026-05-25T10:00:00.000Z',
+    });
+    mocks.countActivityByType.mockImplementation((_workspaceId: string, type: string) => {
+      if (type === 'client_action_approved') return 1;
+      if (type === 'post_client_edit') return 1;
+      return 0;
+    });
+
+    const result = await assembleClientSignals('ws-client-engagement');
+
+    expect(result.engagement?.portalUsage?.featuresUsed).toEqual(['decisions', 'content_review']);
+    expect(mocks.countActivityByType).not.toHaveBeenCalledWith(
+      'ws-client-engagement',
+      'client_action_sent',
+      expect.any(Number),
+    );
+  });
 });
