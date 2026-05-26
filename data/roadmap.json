@@ -123,9 +123,9 @@
           "source": "Voice Authority Sprint Plan 2026-05-26",
           "est": "4-7h",
           "priority": "P0",
-          "status": "pending",
+          "status": "done",
           "owner": "brand-engine",
-          "notes": "Follow-up to `voice-authority-audit-guardrails`. Migrate only consumers marked `drift` in the voice authority audit unless the audit and contract inventory are updated in the same commit. Current PR2 targets are anomaly summary generation, diagnostic synthesis, and Webflow SEO page tools copy optimization. Preserve documented exceptions for neutral classifiers, factual extractors, client advisor persona, and non-prompt keyword scoring."
+          "notes": "Completed in this PR. Migrated the three consumers marked `drift` in `docs/superpowers/audits/2026-05-26-voice-authority-audit.md`: anomaly summary generation, diagnostic synthesis, and Webflow SEO page tools copy optimization. Each now routes its system prompt through `buildSystemPrompt(workspaceId, ...)`, preserving existing structured-output contracts and caller-owned evidence while enabling calibrated voice DNA, guardrails, custom prompt notes, and prose-quality rules. The voice-authority audit and contract inventory now report zero drift consumers."
         },
         {
           "id": "voice-quality-contract-harness",
