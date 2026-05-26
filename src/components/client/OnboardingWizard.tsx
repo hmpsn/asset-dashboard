@@ -25,6 +25,10 @@ interface OnboardingWizardProps {
 
 const STEPS = ['welcome', 'tour', 'actions'] as const;
 type Step = typeof STEPS[number];
+type WizardTarget = {
+  tab: string;
+  inboxTab?: 'decisions' | 'reviews' | 'conversations';
+};
 
 export function OnboardingWizard({
   workspaceName, tier, isTrial, trialDaysRemaining,
@@ -38,12 +42,17 @@ export function OnboardingWizard({
   const tierLabel = tier === 'premium' ? 'Premium' : tier === 'growth' ? 'Growth' : 'Starter';
   const tierBg = tier !== 'free' ? 'bg-teal-500/15 border-teal-500/30 text-accent-brand' : 'bg-[var(--surface-3)] border-[var(--brand-border)] text-[var(--brand-text)]';
 
-  const features = [
+  const features: Array<{
+    icon: typeof Shield;
+    label: string;
+    desc: string;
+    available: boolean;
+  } & WizardTarget> = [
     { icon: LineChart, label: 'Performance', desc: 'GA4 + Search Console data in one place', available: true, tab: 'performance' },
     { icon: Shield, label: 'Site Health', desc: 'Automated SEO audits with actionable fixes', available: true, tab: 'health' },
     { icon: Target, label: 'SEO Strategy', desc: 'Keyword mapping, content gaps, and quick wins', available: tier !== 'free', tab: 'strategy' },
     { icon: Sparkles, label: 'AI Advisor', desc: 'Ask questions about your traffic and strategy', available: true, tab: 'overview' },
-    ...(!betaMode ? [{ icon: FileText, label: 'Content Engine', desc: 'AI-generated briefs and content purchasing', available: tier !== 'free', tab: 'content' }] : []),
+    ...(!betaMode ? [{ icon: FileText, label: 'Content Engine', desc: 'AI-generated briefs and content purchasing', available: tier !== 'free', tab: 'inbox', inboxTab: 'reviews' as const }] : []),
     { icon: Trophy, label: 'ROI Dashboard', desc: 'Track the value of your organic traffic', available: tier !== 'free', tab: 'roi' },
   ];
 
@@ -52,7 +61,7 @@ export function OnboardingWizard({
     hasAudit && { icon: Shield, label: 'Check your site health score', desc: 'See how your website stacks up technically', tab: 'health', color: 'text-accent-success', bg: 'bg-emerald-500/10 border-emerald-500/20' },
     hasStrategy && tier !== 'free' && { icon: Target, label: 'Review your SEO strategy', desc: 'Keyword assignments, content gaps, and opportunities', tab: 'strategy', color: 'text-accent-brand', bg: 'bg-teal-500/10 border-teal-500/20' },
     { icon: Sparkles, label: 'Ask your AI advisor a question', desc: 'Try: "What should I focus on this month?"', tab: 'overview', color: 'text-accent-brand', bg: 'bg-teal-500/10 border-teal-500/20', action: 'chat' },
-  ].filter(Boolean) as { icon: typeof Shield; label: string; desc: string; tab: string; color: string; bg: string; action?: string }[];
+  ].filter(Boolean) as Array<{ icon: typeof Shield; label: string; desc: string; color: string; bg: string; action?: string } & WizardTarget>;
 
   const next = () => { if (stepIdx < STEPS.length - 1) setStep(STEPS[stepIdx + 1]); };
   const prev = () => { if (stepIdx > 0) setStep(STEPS[stepIdx - 1]); };
@@ -163,7 +172,12 @@ export function OnboardingWizard({
                 <Button
                   key={i}
                   variant="ghost"
-                  onClick={() => { onDismiss(); navigate(clientPath(workspaceId, a.tab, betaMode)); }}
+                  onClick={() => {
+                    onDismiss();
+                    const baseTarget = clientPath(workspaceId, a.tab, betaMode);
+                    const target = a.inboxTab ? `${baseTarget}?tab=${a.inboxTab}` : baseTarget;
+                    navigate(target);
+                  }}
                   className={`w-full justify-start gap-3 px-4 py-3 rounded-[var(--radius-xl)] border ${a.bg} hover:scale-[1.01] transition-all text-left group`}
                 >
                   <div className={`w-8 h-8 rounded-[var(--radius-lg)] bg-[var(--surface-2)]/50 flex items-center justify-center flex-shrink-0`}>

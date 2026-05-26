@@ -1,5 +1,6 @@
 import { FileText } from 'lucide-react';
 import { useAdminMeetingBrief } from '../../../hooks/admin/useAdminMeetingBrief';
+import { adminPath, type Page } from '../../../routes';
 import { SectionCard } from '../../ui/SectionCard';
 import { Skeleton } from '../../ui/Skeleton';
 import { EmptyState } from '../../ui/EmptyState';
@@ -13,6 +14,7 @@ import { BlueprintProgress } from './BlueprintProgress';
 
 interface Props {
   workspaceId: string;
+  onNavigate?: (to: string) => void;
 }
 
 function BriefSkeleton() {
@@ -34,8 +36,29 @@ function BriefSkeleton() {
   );
 }
 
-export function MeetingBriefPage({ workspaceId }: Props) {
+export function MeetingBriefPage({ workspaceId, onNavigate }: Props) {
   const { brief, isLoading, isError, refetch, generate, isGenerating, generateError } = useAdminMeetingBrief(workspaceId);
+
+  const openTab = (tab: Page) => {
+    const target = adminPath(workspaceId, tab);
+    if (onNavigate) {
+      onNavigate(target);
+      return;
+    }
+    window.location.assign(target);
+  };
+
+  const resolveTextRoute = (text: string): Page => {
+    const t = text.toLowerCase();
+    if (t.includes('blueprint')) return 'brief';
+    if (t.includes('rank') || t.includes('keyword') || t.includes('position')) return 'seo-ranks';
+    if (t.includes('pipeline') || t.includes('brief') || t.includes('content')) return 'content-pipeline';
+    if (t.includes('win rate') || t.includes('outcome') || t.includes('conversion')) return 'outcomes';
+    if (t.includes('traffic') || t.includes('session') || t.includes('click') || t.includes('impression')) return 'analytics-hub';
+    if (t.includes('strategy') || t.includes('opportunit')) return 'seo-strategy';
+    if (t.includes('issue') || t.includes('error') || t.includes('audit') || t.includes('technical')) return 'seo-audit';
+    return 'home';
+  };
 
   if (isLoading) {
     return (
@@ -128,11 +151,23 @@ export function MeetingBriefPage({ workspaceId }: Props) {
             <div className="mb-6">
               <p className="t-caption-sm text-[var(--brand-text-bright)] leading-relaxed">{brief.situationSummary}</p>
             </div>
-            <AtAGlanceStrip metrics={brief.metrics} />
-            <BriefSection title="Wins Since Last Review" items={brief.wins} />
-            <BriefSection title="What Needs Attention" items={brief.attention} />
-            <RecommendationsList items={brief.recommendations} />
-            <BlueprintProgress progress={brief.blueprintProgress} />
+            <AtAGlanceStrip metrics={brief.metrics} onOpenTab={openTab} />
+            <BriefSection
+              title="Wins Since Last Review"
+              items={brief.wins}
+              onOpenItem={(item) => openTab(resolveTextRoute(item))}
+            />
+            <BriefSection
+              title="What Needs Attention"
+              items={brief.attention}
+              onOpenItem={(item) => openTab(resolveTextRoute(item))}
+            />
+            <RecommendationsList
+              items={brief.recommendations}
+              onOpenRecommendation={openTab}
+              resolveRecommendationRoute={(item) => resolveTextRoute(`${item.action} ${item.rationale}`)}
+            />
+            <BlueprintProgress progress={brief.blueprintProgress} onOpenBlueprint={() => openTab('brief')} />
           </SectionCard>
         </ErrorBoundary>
       )}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeClientAction, normalizeApprovalBatch } from '../../src/lib/decision-adapters';
+import { clientActionSourceLabel, normalizeClientAction, normalizeApprovalBatch } from '../../src/lib/decision-adapters';
 import type { ClientAction } from '../../shared/types/client-actions';
 import type { ApprovalBatch } from '../../shared/types/approvals';
 
@@ -86,6 +86,10 @@ describe('normalizeClientAction', () => {
 
   it('sets priority from action', () => {
     expect(normalizeClientAction(baseAction).priority).toBe('high');
+  });
+
+  it('never leaks raw enum-like sourceType values to clients', () => {
+    expect(clientActionSourceLabel('keyword_opportunity')).toBe('SEO Update');
   });
 });
 

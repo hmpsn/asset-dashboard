@@ -13,6 +13,7 @@ import { Button, ClickableRow, MetricRingSvg, PageHeader, SectionCard, Badge, St
 import { themeColor } from './ui/constants';
 import { STUDIO_NAME } from '../constants';
 import { timeAgo } from '../lib/timeAgo';
+import { adminPath } from '../routes';
 
 // Types imported from useWorkspaceOverview hook
 
@@ -96,11 +97,11 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
         icon={<Icon as={Rocket} size="lg" className="text-accent-brand" />}
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" icon={FileSearch} onClick={() => navigate('/prospect')} className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]">Prospect</Button>
-            <Button variant="secondary" size="sm" icon={Map} onClick={() => navigate('/roadmap')} className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]">Roadmap</Button>
-            <Button variant="secondary" size="sm" icon={Zap} onClick={() => navigate('/ai-usage')} className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-accent-warning hover:text-accent-warning bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20">AI Usage</Button>
-            <Button variant="secondary" size="sm" icon={DollarSign} onClick={() => navigate('/revenue')} className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-accent-success hover:text-accent-success bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/20">Revenue</Button>
-            <Button variant="secondary" size="sm" icon={Layers} onClick={() => navigate('/features')} className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-accent-brand hover:text-accent-brand bg-teal-500/5 hover:bg-teal-500/10 border border-teal-500/20">Features</Button>
+            <Button variant="secondary" size="sm" icon={FileSearch} onClick={() => navigate(adminPath('', 'prospect'))} className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]">Prospect</Button>
+            <Button variant="secondary" size="sm" icon={Map} onClick={() => navigate(adminPath('', 'roadmap'))} className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]">Roadmap</Button>
+            <Button variant="secondary" size="sm" icon={Zap} onClick={() => navigate(adminPath('', 'ai-usage'))} className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-accent-warning hover:text-accent-warning bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20">AI Usage</Button>
+            <Button variant="secondary" size="sm" icon={DollarSign} onClick={() => navigate(adminPath('', 'revenue'))} className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-accent-success hover:text-accent-success bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/20">Revenue</Button>
+            <Button variant="secondary" size="sm" icon={Layers} onClick={() => navigate(adminPath('', 'features'))} className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-accent-brand hover:text-accent-brand bg-teal-500/5 hover:bg-teal-500/10 border border-teal-500/20">Features</Button>
           </div>
         }
       />

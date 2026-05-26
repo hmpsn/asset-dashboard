@@ -9,6 +9,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { randomUUID } from 'crypto';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
+import db from '../../server/db/index.js';
 import {
   monthKeys,
   getPublishedPostCountsByMonth,
@@ -274,6 +275,67 @@ describe('getPublishedPostCountsByMonth', () => {
     } finally {
       wsUnpub.cleanup();
     }
+  });
+});
+
+describe('savePost persistence integrity', () => {
+  let ws: SeededFullWorkspace;
+
+  beforeAll(() => {
+    ws = seedWorkspace();
+  });
+  afterAll(() => {
+    ws?.cleanup();
+  });
+
+  it('preserves published/webflow metadata on first insert', () => {
+    const postId = randomUUID();
+    const post = makePost(postId, ws.workspaceId, '2026-06-01T00:00:00Z', 'approved');
+    post.webflowItemId = 'wf-item-1';
+    post.webflowCollectionId = 'wf-col-1';
+    post.publishedSlug = '/published-first-pass';
+
+    savePost(ws.workspaceId, post);
+
+    const fromDb = getPost(ws.workspaceId, postId);
+    expect(fromDb).toBeDefined();
+    expect(fromDb?.publishedAt).toBe('2026-06-01T00:00:00Z');
+    expect(fromDb?.publishedSlug).toBe('/published-first-pass');
+    expect(fromDb?.webflowItemId).toBe('wf-item-1');
+    expect(fromDb?.webflowCollectionId).toBe('wf-col-1');
+  });
+
+  it('falls back safely when sections/review_checklist JSON is malformed', () => {
+    const postId = randomUUID();
+    const post = makePost(postId, ws.workspaceId, null, 'draft');
+    post.reviewChecklist = {
+      factual_accuracy: true,
+      brand_voice: true,
+      internal_links: true,
+      no_hallucinations: true,
+      meta_optimized: true,
+      word_count_target: true,
+    };
+    savePost(ws.workspaceId, post);
+
+    // Corrupt stored JSON directly to validate read-boundary fallback behavior.
+    db.prepare(`
+      UPDATE content_posts
+      SET sections = ?, review_checklist = ?
+      WHERE id = ? AND workspace_id = ?
+    `).run('{"broken"', '{"broken"', postId, ws.workspaceId);
+
+    const fromDb = getPost(ws.workspaceId, postId);
+    expect(fromDb).toBeDefined();
+    expect(fromDb?.sections).toEqual([]);
+    expect(fromDb?.reviewChecklist).toEqual({
+      factual_accuracy: false,
+      brand_voice: false,
+      internal_links: false,
+      no_hallucinations: false,
+      meta_optimized: false,
+      word_count_target: false,
+    });
   });
 });
 

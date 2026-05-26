@@ -1,4 +1,4 @@
-import type { ClientAction } from '../../shared/types/client-actions.js';
+import type { ClientAction, ClientActionSourceType } from '../../shared/types/client-actions.js';
 import type { ApprovalBatch } from '../../shared/types/approvals.js';
 import type { NormalizedDecision } from '../../shared/types/decision.js';
 
@@ -11,6 +11,10 @@ const CLIENT_ACTION_BADGES: Record<string, string> = {
   content_decay:     'Content',
   keyword_strategy:  'Keywords',   // deprecated; archived rows only
 };
+
+export function clientActionSourceLabel(sourceType: ClientActionSourceType | string): string {
+  return CLIENT_ACTION_BADGES[sourceType] ?? 'SEO Update';
+}
 
 /**
  * Infer a short human badge from an approval_batch name.
@@ -58,7 +62,7 @@ export function normalizeClientAction(action: ClientAction): NormalizedDecision 
     priority: action.priority,
     itemCount: itemCountForAction(action),
     isSingleAction: action.sourceType === 'content_decay',
-    badge: CLIENT_ACTION_BADGES[action.sourceType] ?? action.sourceType.replace(/_/g, ' '),
+    badge: clientActionSourceLabel(action.sourceType),
     createdAt: action.createdAt,
   };
 }

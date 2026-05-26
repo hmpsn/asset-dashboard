@@ -6,7 +6,7 @@ import {
   Loader2, Bell, FileText, AlertTriangle, ChevronDown,
   Globe, Clipboard, Flag, Clock, RefreshCw, Layers, DollarSign, Target,
 } from 'lucide-react';
-import { StatCard, SectionCard, PageHeader, MetricRing, TabBar, OnboardingChecklist, WorkspaceHealthBar, Icon, Button, ClickableRow, cn } from './ui';
+import { StatCard, SectionCard, PageHeader, MetricRing, TabBar, OnboardingChecklist, WorkspaceHealthBar, Icon, Button, ClickableRow, cn, LoadingState, ErrorState } from './ui';
 import { FeatureFlag } from './ui/FeatureFlag';
 import { themeColor } from './ui/constants';
 import { WorkspaceHealthBadge } from './admin/WorkspaceHealthBadge';
@@ -18,7 +18,7 @@ import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useAuditSummary } from '../hooks/useAuditSummary';
 import { AnomalyAlerts } from './AnomalyAlerts';
 import { SeoWorkStatus, ActivityFeed, RankingsSnapshot, ActiveRequestsAnnotations, SeoChangeImpact, WeeklyAccomplishments } from './workspace-home';
-import { type Page, adminPath } from '../routes';
+import { type Page, adminPath, clientPath } from '../routes';
 import { useWorkspaceHomeData, useAdminROI, useWorkspaceIntelligence } from '../hooks/admin';
 import { queryKeys } from '../lib/queryKeys';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
@@ -61,7 +61,15 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   const queryClient = useQueryClient();
   const { summary: seoStatus } = usePageEditStates(workspaceId);
   const { audit } = useAuditSummary(workspaceId);
-  const { data: homeData, isLoading: loading, isFetching: refreshing, dataUpdatedAt } = useWorkspaceHomeData(workspaceId);
+  const {
+    data: homeData,
+    isLoading: loading,
+    isFetching: refreshing,
+    isError: homeDataError,
+    error: homeDataErrorDetail,
+    refetch: refetchHomeData,
+    dataUpdatedAt,
+  } = useWorkspaceHomeData(workspaceId);
   const { data: roiData } = useAdminROI(workspaceId);
   const { data: intel } = useWorkspaceIntelligence(workspaceId, ['siteHealth', 'contentPipeline', 'clientSignals']);
   const [now, setNow] = useState(() => new Date());
@@ -121,10 +129,21 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   const lastFetched = dataUpdatedAt ? new Date(dataUpdatedAt) : null;
 
   if (loading) {
+    return <LoadingState message="Loading workspace summary, alerts, and activity..." size="lg" className="py-24" />;
+  }
+
+  if (homeDataError) {
+    const detail = homeDataErrorDetail instanceof Error ? homeDataErrorDetail.message : 'Unknown error';
     return (
-      <div className="flex items-center justify-center py-24">
-        <Icon as={Loader2} size="lg" className="animate-spin text-accent-brand" />
-      </div>
+      <ErrorState
+        title="Couldn't load workspace home"
+        message={`We couldn't load dashboard data for this workspace. ${detail}`}
+        actions={[
+          { label: 'Retry', onClick: refetchHomeData },
+          { label: 'Refresh page', onClick: () => window.location.reload(), variant: 'secondary' },
+        ]}
+        type="data"
+      />
     );
   }
 
@@ -319,7 +338,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       {activeTab === 'meeting-brief' ? (
         <ErrorBoundary label="Meeting Brief">
           <Suspense fallback={<div className="flex items-center justify-center py-24"><Icon as={Loader2} size="lg" className="animate-spin text-accent-brand" /></div>}>
-            <MeetingBriefPage workspaceId={workspaceId} />
+            <MeetingBriefPage workspaceId={workspaceId} onNavigate={navigate} />
           </Suspense>
         </ErrorBoundary>
       ) : (
@@ -423,7 +442,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             icon={DollarSign}
             iconColor="#22c55e"
             sub={`≈ $${fmt(roiData.adSpendEquivalent)} ad spend`}
-            onClick={() => navigate(`/client/${workspaceId}/roi`)}
+            onClick={() => navigate(clientPath(workspaceId, 'roi'))}
             size="hero"
             staggerIndex={4}
           />
@@ -480,7 +499,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             icon={Target}
             iconColor="#f59e0b"
             sub={`Strategy keywords without briefs`}
-            onClick={() => navigate(adminPath(workspaceId, 'content'))}
+            onClick={() => navigate(adminPath(workspaceId, 'seo-strategy'))}
             size="hero"
             staggerIndex={8}
           />

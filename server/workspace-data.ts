@@ -54,6 +54,9 @@ async function fetchAndCachePages(
   siteId: string,
 ): Promise<PageCacheEntry> {
   const key = `${workspaceId}:${siteId}`;
+  // Preserve a pre-fetch stale fallback before get() potentially deletes
+  // natural-TTL expired entries.
+  const staleFallback = pageCache.peek(key);
 
   // Check cache (LRU handles TTL expiry)
   const cached = pageCache.get(key);
@@ -89,10 +92,9 @@ async function fetchAndCachePages(
     } catch (err) {
       log.warn({ workspaceId, siteId, err }, 'Failed to fetch Webflow pages');
       // Return stale cache if available — preserve fallback-on-error behavior.
-      // Use peek() instead of get() because get() hard-deletes expired entries,
-      // making the fallback unreachable after TTL expiry.
-      const stale = pageCache.peek(key);
-      if (stale) return stale;
+      // Use the pre-fetched snapshot because get() may hard-delete naturally
+      // expired entries during this call.
+      if (staleFallback) return staleFallback;
       return { allPages: [], publishedPages: [], fetchedAt: 0 } as PageCacheEntry;
     }
   });
@@ -169,16 +171,36 @@ const pipelineStmts = createStmtCache(() => ({
   briefsTotal: db.prepare(`SELECT COUNT(*) as cnt FROM content_briefs WHERE workspace_id = ?`),
   briefsByStatus: db.prepare(`SELECT status, COUNT(*) as cnt FROM content_briefs WHERE workspace_id = ? GROUP BY status`),
   postsTotal: db.prepare(`SELECT COUNT(*) as cnt FROM content_posts WHERE workspace_id = ?`),
-  postsByStatus: db.prepare(`SELECT status, COUNT(*) as cnt FROM content_posts WHERE workspace_id = ? GROUP BY status`),
+  postsByStatus: db.prepare(
+    `SELECT CASE WHEN published_at IS NOT NULL THEN 'published' ELSE status END as status, COUNT(*) as cnt
+     FROM content_posts WHERE workspace_id = ? GROUP BY CASE WHEN published_at IS NOT NULL THEN 'published' ELSE status END`,
+  ),
   matricesTotal: db.prepare(`SELECT COUNT(*) as cnt FROM content_matrices WHERE workspace_id = ?`),
   matricesCells: db.prepare(`SELECT cells, stats FROM content_matrices WHERE workspace_id = ?`),
   requestsByStatus: db.prepare(`SELECT status, COUNT(*) as cnt FROM content_topic_requests WHERE workspace_id = ? GROUP BY status`),
-  workOrdersActive: db.prepare(`SELECT COUNT(*) as cnt FROM work_orders WHERE workspace_id = ? AND status != 'completed'`),
+  workOrdersByStatus: db.prepare(`SELECT status, COUNT(*) as cnt FROM work_orders WHERE workspace_id = ? GROUP BY status`),
   seoEditsByStatus: db.prepare(`SELECT status, COUNT(*) as cnt FROM seo_suggestions WHERE workspace_id = ? GROUP BY status`),
   getCache: db.prepare(`SELECT summary_json, cached_at, invalidated_at FROM content_pipeline_cache WHERE workspace_id = ?`),
   upsertCache: db.prepare(`INSERT INTO content_pipeline_cache (workspace_id, summary_json, cached_at, invalidated_at) VALUES (@workspace_id, @summary_json, @cached_at, @invalidated_at) ON CONFLICT(workspace_id) DO UPDATE SET summary_json = excluded.summary_json, cached_at = excluded.cached_at, invalidated_at = excluded.invalidated_at`),
   invalidateCache: db.prepare(`UPDATE content_pipeline_cache SET invalidated_at = datetime('now') WHERE workspace_id = ?`),
 }));
+
+const REQUEST_PENDING_STATUSES = [
+  'pending_payment',
+  'requested',
+  'brief_generated',
+  'client_review',
+  'post_review',
+] as const;
+const REQUEST_IN_PROGRESS_STATUSES = ['approved', 'changes_requested', 'in_progress'] as const;
+const REQUEST_DELIVERED_STATUSES = ['delivered', 'published'] as const;
+
+function sumStatusCounts(
+  counts: Record<string, number>,
+  statuses: readonly string[],
+): number {
+  return statuses.reduce((sum, status) => sum + (counts[status] ?? 0), 0);
+}
 
 /**
  * Get aggregated content pipeline counts for a workspace, with 5-minute persistent cache.
@@ -242,7 +264,9 @@ function computeContentPipelineSummary(workspaceId: string): ContentPipelineSumm
   const requestsMap: Record<string, number> = {};
   for (const r of requestsByStatusRows) requestsMap[r.status] = r.cnt;
 
-  const woRow = pipelineStmts().workOrdersActive.get(workspaceId) as { cnt: number } | undefined;
+  const workOrdersByStatusRows = pipelineStmts().workOrdersByStatus.all(workspaceId) as { status: string; cnt: number }[];
+  const workOrdersMap: Record<string, number> = {};
+  for (const r of workOrdersByStatusRows) workOrdersMap[r.status] = r.cnt;
 
   const seoRows = pipelineStmts().seoEditsByStatus.all(workspaceId) as { status: string; cnt: number }[];
   const seoMap: Record<string, number> = {};
@@ -253,11 +277,14 @@ function computeContentPipelineSummary(workspaceId: string): ContentPipelineSumm
     posts: { total: postsRow?.cnt ?? 0, byStatus: postsByStatus },
     matrices: { total: matricesRow?.cnt ?? 0, cellsPlanned, cellsPublished },
     requests: {
-      pending: requestsMap['requested'] ?? 0,
-      inProgress: requestsMap['in_progress'] ?? 0,
-      delivered: requestsMap['delivered'] ?? 0,
+      pending: sumStatusCounts(requestsMap, REQUEST_PENDING_STATUSES),
+      inProgress: sumStatusCounts(requestsMap, REQUEST_IN_PROGRESS_STATUSES),
+      delivered: sumStatusCounts(requestsMap, REQUEST_DELIVERED_STATUSES),
     },
-    workOrders: { active: woRow?.cnt ?? 0 },
+    workOrders: {
+      active: (workOrdersMap.pending ?? 0) + (workOrdersMap.in_progress ?? 0),
+      pending: workOrdersMap.pending ?? 0,
+    },
     seoEdits: {
       pending: seoMap['pending'] ?? 0,
       applied: seoMap['applied'] ?? 0,

@@ -10,6 +10,7 @@ import { Router } from 'express';
 import { computeEffectiveTier, getWorkspace } from '../workspaces.js';
 import { buildWorkspaceIntelligence } from '../workspace-intelligence.js';
 import { createLogger } from '../logger.js';
+import type { AnalyticsInsight } from '../../shared/types/analytics.js';
 import type {
   ClientIntelligence,
   ClientInsightsSummary,
@@ -37,7 +38,9 @@ function summarizeInsightsForClient(insights: InsightsSlice): ClientInsightsSumm
   // Exclude positive-severity insights: they aren't actionable priority items and
   // including them in 'total' would create a gap vs. highPriority + mediumPriority
   // that clients would have no way to explain.
-  const visible = insights.all.filter(
+  const fullInsightSet = Object.values(insights.byType).flat() as AnalyticsInsight[];
+  const countSource = fullInsightSet.length > 0 ? fullInsightSet : insights.all;
+  const visible = countSource.filter(
     i => !ADMIN_ONLY_INSIGHT_TYPES.has(i.insightType) && i.severity !== 'positive',
   );
   return {
@@ -156,11 +159,11 @@ router.get('/api/public/intelligence/:workspaceId', async (req, res) => {
       insightsSummary: intel.insights ? summarizeInsightsForClient(intel.insights) : null,
       pipelineStatus: intel.contentPipeline ? formatPipelineForClient(intel.contentPipeline) : null,
       ...(tier !== 'free' && {
-        learningHighlights: intel.learnings ? formatLearningsForClient(intel.learnings) : null,
+        learningHighlights: intel.learnings?.availability === 'ready' ? formatLearningsForClient(intel.learnings) : null,
         rankTrackingSummary: intel.seoContext ? formatRankTrackingForClient(intel.seoContext) : null,
         serpOpportunities: intel.seoContext ? countSerpOpportunities(intel.seoContext) : null,
         compositeHealthScore: intel.clientSignals?.compositeHealthScore ?? null,
-        weCalledIt: intel.learnings?.weCalledIt ?? [],
+        weCalledIt: intel.learnings?.availability === 'ready' ? (intel.learnings.weCalledIt ?? []) : [],
         copyPipelineStatus: intel.contentPipeline
           ? formatCopyPipelineForClient(intel.contentPipeline)
           : null,

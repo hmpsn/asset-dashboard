@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Shield } from 'lucide-react';
-import { Icon, MetricRing, SectionCard } from '../ui';
+import { Button, EmptyState, MetricRing, SectionCard } from '../ui';
 import { STUDIO_NAME } from '../../constants';
 import type { AuditDetail, AuditSummary } from './types';
 import {
@@ -93,15 +93,15 @@ export function HealthTab({
   }
 
   return (
-    <div className="text-center py-16">
-      <div className="w-16 h-16 rounded-[var(--radius-xl)] bg-[var(--surface-2)] border border-[var(--brand-border)] flex items-center justify-center mx-auto mb-4">
-        <Icon as={Shield} size="2xl" className="text-[var(--brand-text-faint)]" />
-      </div>
-      <p className="t-body font-medium text-[var(--brand-text-muted)]">Site Health Check Coming Soon</p>
-      <p className="t-caption text-[var(--brand-text-muted)] mt-1 max-w-sm mx-auto">
-        Once {STUDIO_NAME} runs a site audit, you'll see a detailed health score, page-by-page
-        issues, and recommendations to improve your site.
-      </p>
-    </div>
+    <EmptyState
+      icon={Shield}
+      title="Site health check coming soon"
+      description={`Once ${STUDIO_NAME} runs a site audit, you'll see a detailed health score, page-by-page issues, and recommendations to improve your site.`}
+      action={onContentRequested ? (
+        <Button variant="secondary" size="sm" onClick={onContentRequested}>
+          Request a health check
+        </Button>
+      ) : undefined}
+    />
   );
 }

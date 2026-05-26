@@ -5,12 +5,11 @@
 import { Router } from 'express';
 import { buildWorkspaceIntelligence, formatForPrompt } from '../workspace-intelligence.js';
 import { getWorkspace } from '../workspaces.js';
-import type { IntelligenceSlice, PromptFormatOptions } from '../../shared/types/intelligence.js';
-
-const VALID_SLICES: Set<string> = new Set([
-  'seoContext', 'insights', 'learnings', 'pageProfile',
-  'contentPipeline', 'siteHealth', 'clientSignals', 'operational',
-]);
+import {
+  PROMPT_FORMATTABLE_INTELLIGENCE_SLICES,
+  isPromptFormattableIntelligenceSlice,
+} from '../../shared/types/intelligence.js';
+import type { IntelligenceOptions, IntelligenceSlice, PromptFormatOptions } from '../../shared/types/intelligence.js';
 
 // Disabled when DISABLE_DEBUG_ENDPOINTS=true (set this in production, not staging)
 const DISABLED = process.env.DISABLE_DEBUG_ENDPOINTS === 'true';
@@ -33,7 +32,14 @@ router.get('/api/debug/prompt', async (req, res) => {
     return res.status(404).json({ error: 'Not found' });
   }
 
-  const { workspaceId, pagePath, verbosity, learningsDomain } = req.query as Record<string, string | undefined>;
+  const {
+    workspaceId,
+    pagePath,
+    verbosity,
+    learningsDomain,
+    siteId,
+    siteBaseUrl,
+  } = req.query as Record<string, string | undefined>;
 
   // Auth: all /api/ routes are protected by the global APP_PASSWORD gate in app.ts.
   // requireWorkspaceAccess() cannot be used here because workspaceId is a query param, not a route param.
@@ -47,18 +53,25 @@ router.get('/api/debug/prompt', async (req, res) => {
   // Parse slices param — default to all slices
   const rawSlices = req.query.slices as string | undefined;
   const slices: IntelligenceSlice[] = rawSlices
-    ? rawSlices.split(',').map(s => s.trim()).filter(s => VALID_SLICES.has(s)) as IntelligenceSlice[]
-    : [...VALID_SLICES] as IntelligenceSlice[];
+    ? rawSlices.split(',').map(s => s.trim()).filter(isPromptFormattableIntelligenceSlice)
+    : [...PROMPT_FORMATTABLE_INTELLIGENCE_SLICES];
 
   if (slices.length === 0) {
-    return res.status(400).json({ error: 'No valid slices specified' });
+    return res.status(400).json({ error: 'No prompt-formattable intelligence slices specified' });
   }
 
   const formatVerbosity = (['compact', 'standard', 'detailed'] as const).find(v => v === verbosity) ?? 'detailed';
   const formatDomain = (['content', 'strategy', 'technical', 'all'] as const).find(d => d === learningsDomain) ?? 'all';
 
   try {
-    const intel = await buildWorkspaceIntelligence(workspaceId, { slices, pagePath, learningsDomain: formatDomain });
+    const opts: IntelligenceOptions = {
+      slices,
+      pagePath: pagePath || undefined,
+      learningsDomain: formatDomain,
+      siteId: siteId || undefined,
+      siteBaseUrl: siteBaseUrl || undefined,
+    };
+    const intel = await buildWorkspaceIntelligence(workspaceId, opts); // bwi-all-ok: debug prompt endpoint intentionally defaults to all prompt-formattable slices
     const formatOpts: PromptFormatOptions = {
       verbosity: formatVerbosity,
       sections: slices,

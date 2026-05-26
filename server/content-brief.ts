@@ -265,6 +265,7 @@ function briefToParams(brief: ContentBrief): Record<string, unknown> {
     audience: brief.audience,
     competitor_insights: brief.competitorInsights,
     internal_link_suggestions: JSON.stringify(brief.internalLinkSuggestions),
+    created_at: brief.createdAt,
     executive_summary: brief.executiveSummary ?? null,
     content_format: brief.contentFormat ?? null,
     tone_and_style: brief.toneAndStyle ?? null,
@@ -288,6 +289,19 @@ function briefToParams(brief: ContentBrief): Record<string, unknown> {
     title_variants: brief.titleVariants ? JSON.stringify(brief.titleVariants) : null,
     meta_desc_variants: brief.metaDescVariants ? JSON.stringify(brief.metaDescVariants) : null,
   };
+}
+
+/**
+ * Canonical brief persistence. Used by regenerateBrief, generateBrief, and MCP tools.
+ * Note: the underlying prepared statement is plain INSERT, not INSERT OR REPLACE.
+ */
+export function upsertBrief(workspaceId: string, brief: ContentBrief): void {
+  if (brief.workspaceId !== workspaceId) {
+    throw new Error(
+      `upsertBrief: brief.workspaceId (${brief.workspaceId}) does not match workspaceId param (${workspaceId})`,
+    );
+  }
+  stmts().insert.run(briefToParams(brief));
 }
 
 export function listBriefs(workspaceId: string): ContentBrief[] {
@@ -761,43 +775,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     templateId: existingBrief.templateId,
   };
 
-  stmts().insert.run({
-    id: newBrief.id,
-    workspace_id: workspaceId,
-    target_keyword: newBrief.targetKeyword,
-    secondary_keywords: JSON.stringify(newBrief.secondaryKeywords),
-    suggested_title: newBrief.suggestedTitle,
-    suggested_meta_desc: newBrief.suggestedMetaDesc,
-    outline: JSON.stringify(newBrief.outline),
-    word_count_target: newBrief.wordCountTarget,
-    intent: newBrief.intent,
-    audience: newBrief.audience,
-    competitor_insights: newBrief.competitorInsights,
-    internal_link_suggestions: JSON.stringify(newBrief.internalLinkSuggestions),
-    created_at: newBrief.createdAt,
-    executive_summary: newBrief.executiveSummary ?? null,
-    content_format: newBrief.contentFormat ?? null,
-    tone_and_style: newBrief.toneAndStyle ?? null,
-    people_also_ask: newBrief.peopleAlsoAsk ? JSON.stringify(newBrief.peopleAlsoAsk) : null,
-    topical_entities: newBrief.topicalEntities ? JSON.stringify(newBrief.topicalEntities) : null,
-    serp_analysis: newBrief.serpAnalysis ? JSON.stringify(newBrief.serpAnalysis) : null,
-    difficulty_score: newBrief.difficultyScore ?? null,
-    traffic_potential: newBrief.trafficPotential ?? null,
-    cta_recommendations: newBrief.ctaRecommendations ? JSON.stringify(newBrief.ctaRecommendations) : null,
-    eeat_guidance: newBrief.eeatGuidance ? JSON.stringify(newBrief.eeatGuidance) : null,
-    content_checklist: newBrief.contentChecklist ? JSON.stringify(newBrief.contentChecklist) : null,
-    schema_recommendations: newBrief.schemaRecommendations ? JSON.stringify(newBrief.schemaRecommendations) : null,
-    page_type: newBrief.pageType ?? null,
-    reference_urls: newBrief.referenceUrls ? JSON.stringify(newBrief.referenceUrls) : null,
-    real_people_also_ask: newBrief.realPeopleAlsoAsk ? JSON.stringify(newBrief.realPeopleAlsoAsk) : null,
-    real_top_results: newBrief.realTopResults ? JSON.stringify(newBrief.realTopResults) : null,
-    keyword_locked: newBrief.keywordLocked ? 1 : 0,
-    keyword_source: newBrief.keywordSource ?? null,
-    keyword_validation: newBrief.keywordValidation ? JSON.stringify(newBrief.keywordValidation) : null,
-    template_id: newBrief.templateId ?? null,
-    title_variants: newBrief.titleVariants ? JSON.stringify(newBrief.titleVariants) : null,
-    meta_desc_variants: newBrief.metaDescVariants ? JSON.stringify(newBrief.metaDescVariants) : null,
-  });
+  upsertBrief(workspaceId, newBrief);
 
   return newBrief;
 }
@@ -1366,43 +1344,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
   };
 
   if (options?.persist !== false) {
-    stmts().insert.run({
-      id: brief.id,
-      workspace_id: workspaceId,
-      target_keyword: brief.targetKeyword,
-      secondary_keywords: JSON.stringify(brief.secondaryKeywords),
-      suggested_title: brief.suggestedTitle,
-      suggested_meta_desc: brief.suggestedMetaDesc,
-      outline: JSON.stringify(brief.outline),
-      word_count_target: brief.wordCountTarget,
-      intent: brief.intent,
-      audience: brief.audience,
-      competitor_insights: brief.competitorInsights,
-      internal_link_suggestions: JSON.stringify(brief.internalLinkSuggestions),
-      created_at: brief.createdAt,
-      executive_summary: brief.executiveSummary ?? null,
-      content_format: brief.contentFormat ?? null,
-      tone_and_style: brief.toneAndStyle ?? null,
-      people_also_ask: brief.peopleAlsoAsk ? JSON.stringify(brief.peopleAlsoAsk) : null,
-      topical_entities: brief.topicalEntities ? JSON.stringify(brief.topicalEntities) : null,
-      serp_analysis: brief.serpAnalysis ? JSON.stringify(brief.serpAnalysis) : null,
-      difficulty_score: brief.difficultyScore ?? null,
-      traffic_potential: brief.trafficPotential ?? null,
-      cta_recommendations: brief.ctaRecommendations ? JSON.stringify(brief.ctaRecommendations) : null,
-      eeat_guidance: brief.eeatGuidance ? JSON.stringify(brief.eeatGuidance) : null,
-      content_checklist: brief.contentChecklist ? JSON.stringify(brief.contentChecklist) : null,
-      schema_recommendations: brief.schemaRecommendations ? JSON.stringify(brief.schemaRecommendations) : null,
-      page_type: brief.pageType ?? null,
-      reference_urls: brief.referenceUrls ? JSON.stringify(brief.referenceUrls) : null,
-      real_people_also_ask: brief.realPeopleAlsoAsk ? JSON.stringify(brief.realPeopleAlsoAsk) : null,
-      real_top_results: brief.realTopResults ? JSON.stringify(brief.realTopResults) : null,
-      keyword_locked: brief.keywordLocked ? 1 : 0,
-      keyword_source: brief.keywordSource ?? null,
-      keyword_validation: brief.keywordValidation ? JSON.stringify(brief.keywordValidation) : null,
-      template_id: brief.templateId ?? null,
-      title_variants: brief.titleVariants ? JSON.stringify(brief.titleVariants) : null,
-      meta_desc_variants: brief.metaDescVariants ? JSON.stringify(brief.metaDescVariants) : null,
-    });
+    upsertBrief(workspaceId, brief);
   }
 
   return brief;

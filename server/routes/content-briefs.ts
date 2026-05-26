@@ -44,6 +44,7 @@ import { validate, z } from '../middleware/validate.js';
 import { resolveWorkspaceLocationCode } from '../local-seo.js';
 import { listMatrices } from '../content-matrices.js';
 import { getTemplate } from '../content-templates.js';
+import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
 import { BRIEF_PAGE_TYPES } from '../../shared/types/content.js';
 import type { BriefPageType, BriefTemplateCrossrefMatch } from '../../shared/types/content.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
@@ -91,6 +92,7 @@ const contentBriefPatchSchema = z.object({
 );
 
 function notifyContentUpdated(workspaceId: string, payload: Record<string, unknown>) {
+  invalidateContentPipelineIntelligence(workspaceId);
   broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, { domain: 'content-briefs', ...payload });
 }
 

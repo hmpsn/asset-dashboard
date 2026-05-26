@@ -29,7 +29,7 @@ interface UseClientWorkspaceBootstrapOptions {
 }
 
 function applyWorkspaceMetadata(data: WorkspaceInfo) {
-  const portalTitle = `${data.name} — Insights Engine`;
+  const portalTitle = `${data.name} — SEO Advisor`;
   const portalDesc = `Performance insights, SEO opportunities, and growth recommendations for ${data.name}.`;
   document.title = portalTitle;
   const setMeta = (attr: string, key: string, content: string) => {

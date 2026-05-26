@@ -89,9 +89,9 @@ describe('ClientHeader — workspace branding', () => {
     expect(logo.getAttribute('src')).toBe('/logo.svg');
   });
 
-  it('shows "Insights Engine" subtitle', () => {
+  it('shows "SEO insights dashboard" subtitle', () => {
     renderHeader();
-    expect(screen.getByText(/Insights Engine/i)).toBeInTheDocument();
+    expect(screen.getByText(/SEO insights dashboard/i)).toBeInTheDocument();
   });
 
   it('shows trial badge when workspace is on trial', () => {

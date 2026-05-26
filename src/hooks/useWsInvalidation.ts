@@ -63,6 +63,16 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
     },
+    [WS_EVENTS.BRIEF_UPDATED]: () => {
+      // Fired by MCP save_brief and any future brief-mutation paths. Keeps the
+      // admin briefs list, content pipeline, and activity feed fresh when a
+      // brief is saved from outside the admin UI (e.g. a Claude chat session
+      // via the MCP).
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.briefs(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+    },
     [WS_EVENTS.CONTENT_UPDATED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.briefs(workspaceId) });
@@ -75,6 +85,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.roi(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.contentRequests(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.contentPlan(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(workspaceId) });
@@ -127,6 +138,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.roi(workspaceId) });
     },
     [WS_EVENTS.CONTENT_SUBSCRIPTION_CREATED]: () => {
       if (!workspaceId) return;
@@ -135,6 +147,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.roi(workspaceId) });
     },
     [WS_EVENTS.CONTENT_SUBSCRIPTION_UPDATED]: () => {
       if (!workspaceId) return;
@@ -143,6 +156,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.roi(workspaceId) });
     },
     [WS_EVENTS.CONTENT_SUBSCRIPTION_RENEWED]: () => {
       if (!workspaceId) return;
@@ -151,16 +165,21 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.roi(workspaceId) });
     },
     [WS_EVENTS.WORK_ORDER_UPDATE]: () => {
       if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.workOrders(workspaceId) });
     },
     [WS_EVENTS.INSIGHT_RESOLVED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.actionQueue(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.clientInsights(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(workspaceId) });
     },
     [WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED]: () => {
       if (!workspaceId) return;
@@ -191,6 +210,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeActions(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeScorecard(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
     },
     [WS_EVENTS.OUTCOME_SCORED]: () => {
       if (!workspaceId) return;
@@ -200,6 +220,8 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeTopWins(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.outcomeSummary(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.outcomeWins(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(workspaceId) });
     },
     [WS_EVENTS.OUTCOME_EXTERNAL_DETECTED]: () => {
       if (!workspaceId) return;
@@ -209,14 +231,19 @@ export function useWsInvalidation(workspaceId: string | undefined) {
     [WS_EVENTS.OUTCOME_LEARNINGS_UPDATED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeLearnings(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
     },
     [WS_EVENTS.OUTCOME_PLAYBOOK_DISCOVERED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.outcomePlaybooks(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
     },
     [WS_EVENTS.SUGGESTED_BRIEF_UPDATED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.aiSuggestedBriefs(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
     },
     [WS_EVENTS.INSIGHT_BRIDGE_UPDATED]: () => {
       if (!workspaceId) return;
@@ -233,6 +260,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligence(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(workspaceId) });
     },
     [WS_EVENTS.CLIENT_SIGNAL_CREATED]: () => {
       if (!workspaceId) return;
@@ -261,6 +289,9 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.copySectionsAll(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.copyStatusAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
     },
     [WS_EVENTS.COPY_METADATA_UPDATED]: () => {
       if (!workspaceId) return;
@@ -275,11 +306,16 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.copyBatchAll(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.copySectionsAll(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.copyStatusAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
     },
     [WS_EVENTS.COPY_INTELLIGENCE_UPDATED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.copyIntelligence(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.copyPromotable(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
     },
     [WS_EVENTS.DIAGNOSTIC_COMPLETE]: () => {
       if (!workspaceId) return;
@@ -298,14 +334,24 @@ export function useWsInvalidation(workspaceId: string | undefined) {
     [WS_EVENTS.RECOMMENDATIONS_UPDATED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.shared.recommendations(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.shared.pageEditStates(workspaceId, false) });
+      qc.invalidateQueries({ queryKey: queryKeys.shared.pageEditStates(workspaceId, true) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.actionQueue(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(workspaceId) });
     },
     [WS_EVENTS.STRATEGY_UPDATED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.keywordFeedback(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywordRows(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingHistory(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.roi(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.strategy(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.pageKeywords(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.keywordFeedback(workspaceId) });
@@ -316,6 +362,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
     [WS_EVENTS.RANK_TRACKING_UPDATED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywordRows(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingHistory(workspaceId) });
@@ -393,6 +440,8 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.briefingDrafts(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.briefing(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(workspaceId) });
     },
   });
 }

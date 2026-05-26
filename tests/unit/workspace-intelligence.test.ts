@@ -28,6 +28,7 @@ vi.mock('../../server/outcome-tracking.js', () => ({
 }));
 vi.mock('../../server/workspace-data.js', () => ({
   getWorkspacePages: vi.fn(async () => []),
+  getWorkspaceAllPages: vi.fn(async () => []),
   getContentPipelineSummary: vi.fn(() => ({
     briefs: { total: 0, byStatus: {} },
     posts: { total: 0, byStatus: {} },
@@ -64,7 +65,17 @@ vi.mock('../../server/intelligence-cache.js', () => {
   };
 });
 
-import { buildWorkspaceIntelligence, formatForPrompt } from '../../server/workspace-intelligence.js';
+import {
+  ALL_INTELLIGENCE_SLICES,
+  buildWorkspaceIntelligence,
+  buildIntelPrompt,
+  formatForPrompt,
+} from '../../server/workspace-intelligence.js';
+import {
+  INTELLIGENCE_SLICES,
+  OPTION_SCOPED_INTELLIGENCE_SLICES,
+  PROMPT_FORMATTABLE_INTELLIGENCE_SLICES,
+} from '../../shared/types/intelligence.js';
 import { singleFlight } from '../../server/intelligence-cache.js';
 import { buildEffectiveBrandVoiceBlock } from '../../server/intelligence/seo-context-source.js';
 import { getInsights } from '../../server/analytics-insights-store.js';
@@ -104,6 +115,39 @@ describe('buildWorkspaceIntelligence', () => {
     const result = await buildWorkspaceIntelligence('ws-1');
     expect(result.seoContext).toBeDefined();
     expect(result.insights).toBeDefined();
+  });
+
+  it('uses the shared intelligence slice registry for facade defaults', () => {
+    expect(ALL_INTELLIGENCE_SLICES).toEqual(INTELLIGENCE_SLICES);
+    expect(PROMPT_FORMATTABLE_INTELLIGENCE_SLICES).not.toContain('siteInventory');
+    expect(PROMPT_FORMATTABLE_INTELLIGENCE_SLICES.length).toBeGreaterThan(0);
+    for (const slice of PROMPT_FORMATTABLE_INTELLIGENCE_SLICES) {
+      expect(INTELLIGENCE_SLICES).toContain(slice);
+    }
+    expect(OPTION_SCOPED_INTELLIGENCE_SLICES).toEqual(['pageProfile', 'pageElements', 'siteInventory']);
+  });
+
+  it('skips pageProfile and pageElements when pagePath is not provided', async () => {
+    const result = await buildWorkspaceIntelligence('ws-1', {
+      slices: ['pageProfile', 'pageElements'],
+    });
+
+    expect(result.pageProfile).toBeUndefined();
+    expect(result.pageElements).toBeUndefined();
+  });
+
+  it('skips siteInventory when site identity is incomplete', async () => {
+    const missingSiteId = await buildWorkspaceIntelligence('ws-1', {
+      slices: ['siteInventory'],
+      siteBaseUrl: 'https://example.com',
+    });
+    const missingBaseUrl = await buildWorkspaceIntelligence('ws-1', {
+      slices: ['siteInventory'],
+      siteId: 'site-1',
+    });
+
+    expect(missingSiteId.siteInventory).toBeUndefined();
+    expect(missingBaseUrl.siteInventory).toBeUndefined();
   });
 
   it('gracefully handles subsystem failure — returns partial data', async () => {
@@ -166,6 +210,7 @@ describe('buildWorkspaceIntelligence', () => {
     expect(keys.join('\n')).not.toContain('secret-token-beta');
     expect(keys.join('\n')).not.toContain('rotated-secret-token-alpha');
   });
+
 });
 
 describe('assembleSeoContext — voice profile authority on intelligence path', () => {
@@ -417,5 +462,17 @@ describe('formatForPrompt — formatter rendering', () => {
 
     const output = formatForPrompt(intelligence as any, { sections: ['siteHealth'], verbosity: 'standard' });
     expect(output).toContain('AEO readiness: 10 pages checked, 70% passing');
+  });
+});
+
+describe('buildIntelPrompt', () => {
+  it('buildIntelPrompt returns deterministic fallback text when requested sections are empty', async () => {
+    const prompt = await buildIntelPrompt('ws-prompt-1', ['seoContext'], {
+      verbosity: 'standard',
+    });
+
+    expect(prompt).toContain('[Workspace Intelligence]');
+    expect(prompt).toContain('newly onboarded');
+    expect(prompt).toContain('Limited data available');
   });
 });

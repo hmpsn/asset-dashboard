@@ -103,6 +103,16 @@ export const keywords = {
   saveCompetitors: (wsId: string, domains: string[]) =>
     post<{ competitors: string[] }>(`/api/semrush/competitors/${wsId}`, { domains }),
 
+  feedback: (wsId: string) =>
+    getSafe<Array<{
+      keyword: string;
+      status: 'approved' | 'declined' | 'requested';
+      reason?: string | null;
+      source?: string | null;
+      declined_by?: string | null;
+      updated_at?: string;
+    }>>(`/api/webflow/keyword-feedback/${wsId}`, []),
+
   seoCopy: (body: Record<string, unknown>) =>
     post<unknown>('/api/webflow/seo-copy', body),
 };

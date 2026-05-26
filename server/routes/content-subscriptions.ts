@@ -13,10 +13,23 @@ import {
 import { createCheckoutSession } from '../stripe.js';
 import { CONTENT_SUB_PLANS, type ContentSubPlan } from '../../shared/types/content.js';
 import { createLogger } from '../logger.js';
+import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
+import { requireWorkspaceAccess, requestUserCanAccessWorkspace, sendWorkspaceAccessDenied } from '../auth.js';
 
 const log = createLogger('routes:content-subscriptions');
-import { requireWorkspaceAccess, requestUserCanAccessWorkspace, sendWorkspaceAccessDenied } from '../auth.js';
 const router = Router();
+
+function notifyContentSubscriptionUpdated(
+  workspaceId: string,
+  event: typeof WS_EVENTS.CONTENT_SUBSCRIPTION_CREATED | typeof WS_EVENTS.CONTENT_SUBSCRIPTION_UPDATED,
+  payload: Record<string, unknown>,
+): void {
+  try {
+    broadcastToWorkspace(workspaceId, event, payload);
+  } catch { // catch-ok - route mutation should succeed in tests/older boot paths even if websocket broadcast is not initialized.
+  }
+}
 
 // ── Admin endpoints ──
 
@@ -62,6 +75,10 @@ router.post('/api/content-subscriptions/:workspaceId', requireWorkspaceAccess('w
       currentPeriodStart: new Date().toISOString(),
       currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     });
+    notifyContentSubscriptionUpdated(req.params.workspaceId, WS_EVENTS.CONTENT_SUBSCRIPTION_CREATED, {
+      id: sub.id,
+      plan: sub.plan,
+    });
     res.json(sub);
   } catch (err) {
     log.error({ err }, 'Failed to create content subscription');
@@ -94,6 +111,10 @@ router.patch('/api/content-subscription/:id', (req, res) => {
 
     const sub = updateContentSubscription(existing.workspaceId, req.params.id, updates);
     if (!sub) return res.status(404).json({ error: 'Subscription not found' });
+    notifyContentSubscriptionUpdated(existing.workspaceId, WS_EVENTS.CONTENT_SUBSCRIPTION_UPDATED, {
+      id: sub.id,
+      status: sub.status,
+    });
     res.json(sub);
   } catch (err) {
     log.error({ err }, 'Failed to update content subscription');
@@ -109,6 +130,10 @@ router.delete('/api/content-subscription/:id', (req, res) => {
     if (!requestUserCanAccessWorkspace(req, existing.workspaceId)) return sendWorkspaceAccessDenied(res);
     const ok = deleteContentSubscription(existing.workspaceId, req.params.id);
     if (!ok) return res.status(404).json({ error: 'Subscription not found' });
+    notifyContentSubscriptionUpdated(existing.workspaceId, WS_EVENTS.CONTENT_SUBSCRIPTION_UPDATED, {
+      id: existing.id,
+      deleted: true,
+    });
     res.json({ ok: true });
   } catch (err) {
     log.error({ err }, 'Failed to delete content subscription');
@@ -129,6 +154,10 @@ router.post('/api/content-subscription/:id/delivered', (req, res) => {
     }
     incrementDeliveredPosts(existing.workspaceId, req.params.id, count);
     const sub = getContentSubscription(req.params.id);
+    notifyContentSubscriptionUpdated(existing.workspaceId, WS_EVENTS.CONTENT_SUBSCRIPTION_UPDATED, {
+      id: existing.id,
+      deliveredCountChanged: count,
+    });
     res.json(sub);
   } catch (err) {
     log.error({ err }, 'Failed to increment delivered posts');

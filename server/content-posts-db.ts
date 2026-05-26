@@ -148,21 +148,22 @@ function rowToVersion(row: VersionRow): PostVersion {
 }
 
 const stmts = createStmtCache(() => ({
-  // Note: INSERT omits webflow_* / published_* columns intentionally.
-  // savePost() routes existing rows to UPDATE (which includes them).
-  // New posts never have publish data so omitting here is safe.
   insert: db.prepare(
     `INSERT INTO content_posts
            (id, workspace_id, brief_id, target_keyword, title, meta_description,
             introduction, sections, conclusion, seo_title, seo_meta_description,
             total_word_count, target_word_count, status, unification_status,
-            unification_note, review_checklist, voice_score, voice_feedback,
+            unification_note, review_checklist,
+            webflow_item_id, webflow_collection_id, published_at, published_slug,
+            voice_score, voice_feedback,
             created_at, updated_at)
          VALUES
            (@id, @workspace_id, @brief_id, @target_keyword, @title, @meta_description,
             @introduction, @sections, @conclusion, @seo_title, @seo_meta_description,
             @total_word_count, @target_word_count, @status, @unification_status,
-            @unification_note, @review_checklist, @voice_score, @voice_feedback,
+            @unification_note, @review_checklist,
+            @webflow_item_id, @webflow_collection_id, @published_at, @published_slug,
+            @voice_score, @voice_feedback,
             @created_at, @updated_at)`,
   ),
   selectByWorkspace: db.prepare(

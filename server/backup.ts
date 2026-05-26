@@ -23,6 +23,8 @@ const log = createLogger('backup');
 
 const BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const RETENTION_DAYS = parseInt(process.env.BACKUP_RETENTION_DAYS || '3', 10);
+let backupStartupTimeout: ReturnType<typeof setTimeout> | null = null;
+let backupInterval: ReturnType<typeof setInterval> | null = null;
 
 function getBackupRoot(): string {
   const dir = process.env.BACKUP_DIR || (DATA_BASE ? path.join(DATA_BASE, 'backups') : path.join(process.env.HOME || '', '.asset-dashboard', 'backups'));
@@ -223,6 +225,8 @@ function pruneOldBackups(): number {
 
 /** Start the daily backup scheduler. */
 export function startBackupScheduler(): void {
+  if (backupStartupTimeout || backupInterval) return;
+
   async function runBackupCycle() {
     try {
       const result = await runBackup();
@@ -234,10 +238,13 @@ export function startBackupScheduler(): void {
   }
 
   // Run first backup shortly after startup (30 seconds delay)
-  setTimeout(runBackupCycle, 30_000);
+  backupStartupTimeout = setTimeout(() => {
+    backupStartupTimeout = null;
+    void runBackupCycle();
+  }, 30_000);
 
   // Then run every 24 hours
-  setInterval(runBackupCycle, BACKUP_INTERVAL_MS);
+  backupInterval = setInterval(() => { void runBackupCycle(); }, BACKUP_INTERVAL_MS);
 
   log.info(`Backup scheduler started (every 24h, retain ${RETENTION_DAYS} days)`);
 }

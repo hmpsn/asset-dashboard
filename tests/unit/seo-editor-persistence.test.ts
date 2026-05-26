@@ -40,6 +40,18 @@ describe('seoEditorPersistence cached state readers', () => {
     expect(emptyData.edits).toEqual({});
   });
 
+  it('drops edits cache when payload is malformed JSON', () => {
+    const siteId = 'site-bad-json';
+    const result = readCachedSeoEdits(
+      siteId,
+      createReader({
+        [getSeoDraftKey(siteId, 'unused')]: '{"bad":',
+        'seo-editor-edits-site-bad-json': '{"oops"',
+      }),
+    );
+    expect(result).toEqual({ edits: {}, restoredFromCache: false });
+  });
+
   it('returns parsed expanded IDs and ignores non-array payloads', () => {
     const expanded = readCachedExpandedPages(
       'site-2',
@@ -58,6 +70,16 @@ describe('seoEditorPersistence cached state readers', () => {
     expect(Array.from(invalid)).toEqual([]);
   });
 
+  it('keeps only string page IDs in expanded cache payload', () => {
+    const expanded = readCachedExpandedPages(
+      'site-expanded',
+      createReader({
+        'seo-editor-expanded-site-expanded': JSON.stringify(['p1', 99, null, 'p2']),
+      }),
+    );
+    expect(Array.from(expanded)).toEqual(['p1', 'p2']);
+  });
+
   it('returns variation records and falls back to empty object when payload is invalid', () => {
     const variations = readCachedSeoVariations(
       'site-3',
@@ -74,6 +96,15 @@ describe('seoEditorPersistence cached state readers', () => {
 
     expect(variations.p1?.field).toBe('title');
     expect(invalid).toEqual({});
+  });
+
+  it('returns null job id when storage returns an empty string', () => {
+    const storage = createReader({
+      'seo-bulk-analyze-job-ws-empty': '',
+      'seo-bulk-rewrite-job-ws-empty': '',
+    });
+    expect(readCachedSeoBulkAnalyzeJobId('ws-empty', storage)).toBe('');
+    expect(readCachedSeoBulkRewriteJobId('ws-empty', storage)).toBe('');
   });
 
   it('reads workspace bulk job IDs from dedicated keys', () => {
@@ -124,6 +155,30 @@ describe('seoEditorPersistence draft hydration', () => {
     expect(editMap.p2).toEqual({
       seoTitle: 'About title',
       seoDescription: 'About desc',
+      dirty: false,
+    });
+  });
+
+  it('ignores malformed draft payloads and keeps page defaults', () => {
+    const storage = createReader({
+      [getSeoDraftKey('ws-2', 'p1')]: '{"seoTitle":',
+    });
+    const editMap = buildSeoEditsFromPages(pages, 'ws-2', storage);
+    expect(editMap.p1).toEqual({
+      seoTitle: 'Current title',
+      seoDescription: 'Current desc',
+      dirty: false,
+    });
+  });
+
+  it('ignores non-object draft payloads and keeps page defaults', () => {
+    const storage = createReader({
+      [getSeoDraftKey('ws-3', 'p1')]: JSON.stringify(['not-an-object']),
+    });
+    const editMap = buildSeoEditsFromPages(pages, 'ws-3', storage);
+    expect(editMap.p1).toEqual({
+      seoTitle: 'Current title',
+      seoDescription: 'Current desc',
       dirty: false,
     });
   });

@@ -5,6 +5,7 @@ import {
   classifyDomain,
   cleanSlugToTitle,
   checkStrategyAlignment,
+  checkPipelineStatus,
 } from '../../server/insight-enrichment.js';
 import type { PageKeywordMap } from '../../shared/types/workspace.js';
 
@@ -43,6 +44,11 @@ describe('insight-enrichment', () => {
     it('uses real title when available', () => {
       const titleMap = new Map([['/blog/my-post', 'My Great Post']]);
       expect(resolvePageTitle('/blog/my-post', titleMap)).toBe('My Great Post');
+    });
+
+    it('falls back when placeholder includes surrounding whitespace', () => {
+      const titleMap = new Map([['/blog/my-post', '  (Not Set)  ']]);
+      expect(resolvePageTitle('/blog/my-post', titleMap)).toBe('My Post');
     });
   });
 
@@ -135,6 +141,44 @@ describe('insight-enrichment', () => {
       const highTraffic = computeImpactScore('warning', { clicks: 10000 });
       const lowTraffic = computeImpactScore('warning', { clicks: 10 });
       expect(highTraffic).toBeGreaterThan(lowTraffic);
+    });
+  });
+
+  describe('checkPipelineStatus', () => {
+    it('returns null when posts and briefs contain empty target keywords', () => {
+      const status = checkPipelineStatus(
+        '/pricing',
+        [{ id: 'b1', targetKeyword: '' } as any],
+        [{ id: 'p1', targetKeyword: '', publishedAt: '2026-05-20T00:00:00.000Z' } as any],
+      );
+      expect(status).toBeNull();
+    });
+
+    it('returns published when a matching post is published', () => {
+      const status = checkPipelineStatus(
+        '/services/seo-audit',
+        [],
+        [{ id: 'p1', targetKeyword: 'seo audit', publishedAt: '2026-05-20T00:00:00.000Z' } as any],
+      );
+      expect(status).toBe('published');
+    });
+
+    it('returns in_progress when a matching post exists but is not published', () => {
+      const status = checkPipelineStatus(
+        '/services/seo-audit',
+        [],
+        [{ id: 'p1', targetKeyword: 'seo audit', publishedAt: null } as any],
+      );
+      expect(status).toBe('in_progress');
+    });
+
+    it('returns brief_exists when no matching post exists but a brief does', () => {
+      const status = checkPipelineStatus(
+        '/services/seo-audit',
+        [{ id: 'b1', targetKeyword: 'seo audit' } as any],
+        [],
+      );
+      expect(status).toBe('brief_exists');
     });
   });
 });

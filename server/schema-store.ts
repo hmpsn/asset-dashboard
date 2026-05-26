@@ -54,12 +54,15 @@ interface SchemaRow {
 }
 
 function rowToSnapshot(row: SchemaRow): SchemaSnapshot {
+  const parsedResults = parseJsonFallback<unknown>(row.results, []);
+  const normalizedResults = Array.isArray(parsedResults) ? parsedResults as SchemaPageSuggestion[] : [];
+
   return {
     id: row.id,
     siteId: row.site_id,
     workspaceId: row.workspace_id,
     createdAt: row.created_at,
-    results: parseJsonFallback(row.results, []),
+    results: normalizedResults,
     pageCount: row.page_count,
   };
 }
@@ -282,13 +285,22 @@ const planStmts = createStmtCache(() => ({
 }));
 
 function rowToPlan(row: PlanRow): SchemaSitePlan {
+  const parsedCanonicalEntities = parseJsonFallback<unknown>(row.canonical_entities, []);
+  const canonicalEntities = Array.isArray(parsedCanonicalEntities)
+    ? parsedCanonicalEntities as CanonicalEntity[]
+    : [];
+  const parsedPageRoles = parseJsonFallback<unknown>(row.page_roles, []);
+  const pageRoles = Array.isArray(parsedPageRoles)
+    ? parsedPageRoles as PageRoleAssignment[]
+    : [];
+
   return {
     id: row.id,
     siteId: row.site_id,
     workspaceId: row.workspace_id,
     siteUrl: row.site_url,
-    canonicalEntities: parseJsonFallback<CanonicalEntity[]>(row.canonical_entities, []),
-    pageRoles: parseJsonFallback<PageRoleAssignment[]>(row.page_roles, []),
+    canonicalEntities,
+    pageRoles,
     status: row.status as SchemaSitePlan['status'],
     clientPreviewBatchId: row.client_preview_batch_id || undefined,
     generatedAt: row.generated_at,
@@ -464,6 +476,11 @@ const cmsFieldMappingStmts = createStmtCache(() => ({
 }));
 
 function rowToCmsFieldMapping(row: CmsFieldMappingRow): CmsSchemaFieldMapping {
+  const parsedFieldMappings = parseJsonFallback<unknown>(row.field_mappings, undefined);
+  const fieldMappings = parsedFieldMappings && typeof parsedFieldMappings === 'object' && !Array.isArray(parsedFieldMappings)
+    ? parsedFieldMappings as Record<string, string>
+    : undefined;
+
   return {
     siteId: row.site_id,
     collectionId: row.collection_id,
@@ -471,7 +488,7 @@ function rowToCmsFieldMapping(row: CmsFieldMappingRow): CmsSchemaFieldMapping {
     collectionSlug: row.collection_slug,
     schemaFieldSlug: row.schema_field_slug || undefined,
     collectionRole: (row.collection_role || undefined) as CmsSchemaFieldMapping['collectionRole'],
-    fieldMappings: parseJsonFallback(row.field_mappings, undefined),
+    fieldMappings,
     updatedAt: row.updated_at,
   };
 }

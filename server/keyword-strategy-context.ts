@@ -1,5 +1,25 @@
 import type { ClientSignalsSlice, SeoContextSlice } from '../shared/types/intelligence.js';
-import type { KeywordEvaluationContext } from './keyword-intelligence/index.js';
+import type { PageKeywordMap } from '../shared/types/workspace.js';
+
+/**
+ * Evaluation context shape used by keyword intelligence rules.
+ * Inlined here since the keyword-intelligence module is not available in this branch.
+ */
+interface KeywordEvaluationContext {
+  workspaceId?: string;
+  businessTerms?: string[];
+  businessPriorities?: string[];
+  contentGapTopics?: string[];
+  recentChatTopics?: string[];
+  declinedKeywords?: string[];
+  requestedKeywords?: string[];
+  approvedKeywords?: string[];
+  rejectionReasons?: string[];
+  backlinkProfile?: SeoContextSlice['backlinkProfile'];
+  strictBusinessFit?: boolean;
+  seedKeyword?: string;
+  pageMap?: PageKeywordMap[];
+}
 
 export interface BuildStrategyKeywordEvaluationContextOptions {
   workspaceId: string;

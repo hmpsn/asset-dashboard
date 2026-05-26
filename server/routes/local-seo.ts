@@ -33,6 +33,7 @@ import { enqueueLocationBackfill } from '../local-seo-location-backfill-queue.js
 import { validate, z } from '../middleware/validate.js';
 import { getWorkspace } from '../workspaces.js';
 import { WS_EVENTS } from '../ws-events.js';
+import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import {
   LOCAL_SEO_DEVICE,
@@ -141,6 +142,7 @@ function recordLocationMutation(
   action: 'location_created' | 'location_updated' | 'location_deleted',
   locationName: string,
 ): void {
+  invalidateIntelligenceCache(workspaceId);
   broadcastToWorkspace(workspaceId, WS_EVENTS.LOCAL_SEO_UPDATED, {
     workspaceId,
     action,

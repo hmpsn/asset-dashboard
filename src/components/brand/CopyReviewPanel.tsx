@@ -85,6 +85,7 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
   const statusConfig = COPY_STATUS_BADGE[section.status];
   const hasFlags = section.qualityFlags && section.qualityFlags.length > 0;
   const hasErrors = section.qualityFlags?.some(f => f.severity === 'error');
+  const suggestions = section.clientSuggestions ?? [];
 
   // Friendly label from sectionPlanItemId — convert kebab-case to title case
   const sectionLabel = section.sectionPlanItemId
@@ -227,6 +228,49 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
             <div className="space-y-1.5" role="list" aria-label="Quality flags">
               {section.qualityFlags!.map((flag, i) => (
                 <QualityFlagRow key={i} flag={flag} />
+              ))}
+            </div>
+          )}
+
+          {/* Client Suggestions */}
+          {suggestions.length > 0 && (
+            <div className="space-y-2">
+              <p className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wide">
+                Client Suggestions
+              </p>
+              {suggestions.map((suggestion, i) => (
+                <div key={`${section.id}-suggestion-${i}`} className="rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-1)]/50 p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      label={suggestion.status.replace('_', ' ')}
+                      tone={
+                        suggestion.status === 'accepted'
+                          ? 'emerald'
+                          : suggestion.status === 'rejected'
+                            ? 'red'
+                            : suggestion.status === 'modified'
+                              ? 'blue'
+                              : 'amber'
+                      }
+                      variant="outline"
+                      shape="pill"
+                    />
+                    <span className="t-caption-sm text-[var(--brand-text-muted)]">
+                      {new Date(suggestion.timestamp).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="t-caption-sm text-[var(--brand-text-muted)]">
+                    <span className="text-[var(--brand-text)]">Original:</span> {suggestion.originalText}
+                  </div>
+                  <div className="t-caption-sm text-[var(--brand-text-muted)]">
+                    <span className="text-[var(--brand-text)]">Suggested:</span> {suggestion.suggestedText}
+                  </div>
+                  {suggestion.reviewNote && (
+                    <div className="t-caption-sm text-[var(--brand-text-muted)]">
+                      <span className="text-[var(--brand-text)]">Note:</span> {suggestion.reviewNote}
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           )}

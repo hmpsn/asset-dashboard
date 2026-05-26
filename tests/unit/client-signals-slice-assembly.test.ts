@@ -850,6 +850,25 @@ describe('assembleClientSignals — approvalPatterns', () => {
     expect(result.approvalPatterns.approvalRate).toBeCloseTo(2 / 3, 5);
   });
 
+  it('counts applied approval items as accepted in approvalRate', async () => {
+    const { listBatches } = await import('../../server/approvals.js');
+    vi.mocked(listBatches).mockReturnValueOnce([
+      {
+        id: 'b1-applied',
+        createdAt: null,
+        updatedAt: null,
+        items: [
+          { status: 'approved' },
+          { status: 'applied' },
+          { status: 'pending' },
+        ],
+      } as any,
+    ]);
+
+    const result = await assembleClientSignals(WS);
+    expect(result.approvalPatterns.approvalRate).toBeCloseTo(2 / 3, 5);
+  });
+
   it('computes avgResponseTime for fully resolved batches', async () => {
     const { listBatches } = await import('../../server/approvals.js');
     const createdAt = '2026-01-01T00:00:00.000Z';

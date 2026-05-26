@@ -133,7 +133,7 @@ export async function assembleClientSignals(
     for (const batch of batches) {
       for (const item of batch.items ?? []) {
         total++;
-        if (item.status === 'approved') approved++;
+        if (item.status === 'approved' || item.status === 'applied') approved++;
       }
     }
 
@@ -206,6 +206,13 @@ export async function assembleClientSignals(
         if (feedbackCount > 0) featuresUsed.push('dashboard');
         if (countActivityByType(workspaceId, 'client_priorities_updated', 30) > 0) featuresUsed.push('priorities');
         if (countActivityByType(workspaceId, 'client_onboarding_submitted', 30) > 0) featuresUsed.push('onboarding');
+        const clientActionCount = countActivityByType(workspaceId, 'client_action_approved', 30)
+          + countActivityByType(workspaceId, 'client_action_changes_requested', 30);
+        if (clientActionCount > 0) featuresUsed.push('decisions');
+        const contentReviewCount = countActivityByType(workspaceId, 'post_approved', 30)
+          + countActivityByType(workspaceId, 'post_changes_requested', 30)
+          + countActivityByType(workspaceId, 'post_client_edit', 30);
+        if (contentReviewCount > 0) featuresUsed.push('content_review');
         portalUsage = { pageViews: clientSummary.distinctDays, featuresUsed };
       }
     } catch (err) {

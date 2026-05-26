@@ -4,8 +4,6 @@
 import { Router } from 'express';
 
 import { requireWorkspaceAccess } from '../auth.js';
-const router = Router();
-
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { getBrief } from '../content-brief.js';
@@ -27,6 +25,7 @@ import {
   getMostRecentPostVersion,
 } from '../content-posts.js';
 import { scoreVoiceMatch, countHtmlWords } from '../content-posts-ai.js';
+import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
 import { renderPostHTML } from '../post-export-html.js';
 import { assemblePostHtml, generateSlug } from '../html-to-richtext.js';
 import {
@@ -54,6 +53,7 @@ import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import { getVoiceProfile, buildVoiceCalibrationContext } from '../voice-calibration.js';
 import { sanitizeRichText, sanitizePlainText } from '../html-sanitize.js';
 
+const router = Router();
 const log = createLogger('content-posts');
 
 const aiReviewResultSchema = z.object({
@@ -420,6 +420,7 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
             } catch (err) {
               log.warn({ err, postId: req.params.postId }, 'Failed to record outcome action for content publish');
             }
+            invalidateContentPipelineIntelligence(req.params.workspaceId);
             broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_PUBLISHED, {
               postId: req.params.postId, itemId: result.itemId, slug, title: updated.title });
           } else {
@@ -456,6 +457,7 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
       updated.totalWordCount = newTotal;
     }
   }
+  invalidateContentPipelineIntelligence(req.params.workspaceId);
   const hasNonContentChange = Object.keys(req.body).some(f => !contentFields.includes(f));
   if (!isContentEdit || !withinEditCoalesceWindow || hasNonContentChange) {
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: req.params.postId });
@@ -810,6 +812,7 @@ router.post('/api/content-posts/:workspaceId/:postId/score-voice', requireWorksp
     }
     const updated = updatePostField(req.params.workspaceId, req.params.postId, { voiceScore, voiceFeedback });
 
+    invalidateContentPipelineIntelligence(req.params.workspaceId);
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: req.params.postId });
     res.json(updated);
   } catch (err) {

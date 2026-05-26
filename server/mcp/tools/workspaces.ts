@@ -99,9 +99,9 @@ export async function handleWorkspaceTool(
   try {
     switch (name) {
       case 'list_workspaces':
-        return handleListWorkspaces();
+        return await handleListWorkspaces();
       case 'get_workspace_overview':
-        return handleGetWorkspaceOverview(args);
+        return await handleGetWorkspaceOverview(args);
       default:
         return { isError: true, content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }] };
     }

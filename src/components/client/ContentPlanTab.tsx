@@ -1,11 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { Loader2, Layers, Grid3X3, AlertTriangle } from 'lucide-react';
 import { SectionCard, Badge, EmptyState, Icon, Button, ClickableRow } from '../ui';
 import { MatrixProgressView } from './MatrixProgressView';
+import { clientPath } from '../../routes';
 import { contentPlanReview } from '../../api/content';
 import { queryKeys } from '../../lib/queryKeys';
 import type { ContentMatrix, MatrixCell } from '../matrix/types';
+import { useBetaMode } from './BetaContext';
 
 interface ContentPlanTabProps {
   workspaceId: string;
@@ -14,6 +17,8 @@ interface ContentPlanTabProps {
 
 export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const betaMode = useBetaMode();
   const [selectedMatrixId, setSelectedMatrixId] = useState<string | null>(null);
 
   const plansQuery = useQuery({
@@ -147,7 +152,17 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
                   {inReview > 0 && (
-                    <Badge label={`${inReview} needs review`} tone="blue" />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="px-0 py-0 hover:bg-transparent"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        navigate(`${clientPath(workspaceId, 'inbox', betaMode)}?tab=reviews`);
+                      }}
+                    >
+                      <Badge label={`${inReview} needs review`} tone="blue" />
+                    </Button>
                   )}
                   <div className="w-20 h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
                     <div className="h-full bg-teal-500/50 rounded-[var(--radius-pill)] transition-all" style={{ width: `${progress}%` }} />

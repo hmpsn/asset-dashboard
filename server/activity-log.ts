@@ -46,6 +46,7 @@ export type ActivityType =
   | 'schema_plan_sent'
   | 'redirects_scanned'
   | 'strategy_generated'
+  | 'keyword_added'
   | 'rank_tracking_updated'
   | 'rank_snapshot'
   | 'chat_session'
@@ -56,6 +57,7 @@ export type ActivityType =
   | 'anomaly_positive'
   | 'post_generated'
   | 'post_reverted'
+  | 'brief_sent_for_review'
   | 'post_sent_for_review'
   | 'content_published'
   | 'aeo_review'
@@ -176,9 +178,27 @@ const CLIENT_VISIBLE_TYPES: Set<ActivityType> = new Set([
   'content_declined', 'content_request_commented', 'brief_generated', 'brief_approved',
   'changes_requested', 'briefing_published', 'briefing_auto_published', 'content_upgraded', 'fix_completed',
   'content_published', 'copy_sent_to_client', 'post_approved', 'post_changes_requested',
-  'post_client_edit', 'post_sent_for_review', 'client_action_sent', 'client_action_approved',
+  'post_client_edit', 'brief_sent_for_review', 'post_sent_for_review', 'client_action_sent', 'client_action_approved',
   'client_action_changes_requested', 'client_action_completed',
 ]);
+
+const CLIENT_ENGAGEMENT_TYPES: ActivityType[] = [
+  'portal_session',
+  'client_profile_updated',
+  'client_onboarding_submitted',
+  'client_keyword_feedback',
+  'client_keyword_tracked',
+  'client_keyword_removed',
+  'client_priorities_updated',
+  'client_content_gap_vote',
+  'client_action_approved',
+  'client_action_changes_requested',
+  'copy_approved',
+  'copy_suggestion_added',
+  'post_approved',
+  'post_changes_requested',
+  'post_client_edit',
+];
 
 // --- Prepared statements (lazily initialized after migrations run) ---
 
@@ -211,7 +231,7 @@ const stmts = createStmtCache(() => ({
       MAX(created_at) AS last_active
     FROM activity_log
     WHERE workspace_id = ?
-      AND type LIKE 'client_%'
+      AND type IN (${CLIENT_ENGAGEMENT_TYPES.map(() => '?').join(',')})
       AND created_at > datetime('now', ? || ' days')
   `),
   // Global retention policy: prune the N oldest rows across all workspaces
@@ -292,15 +312,14 @@ export function countActivityByType(workspaceId: string, type: ActivityType, wit
 }
 
 /**
- * Summarise client portal activity (type LIKE 'client_%') within the last N days.
- * Returns the count of distinct calendar days with activity and the most recent
- * activity timestamp, or null if no client activity was found in the window.
+ * Summarise client-originated portal activity within the last N days.
+ * Admin-originated "sent to client" events are intentionally excluded.
  */
 export function getClientActivitySummary(
   workspaceId: string,
   withinDays: number = 30,
 ): { distinctDays: number; lastActive: string } | null {
-  const row = stmts().clientActivitySummary.get(workspaceId, `-${withinDays}`) as {
+  const row = stmts().clientActivitySummary.get(workspaceId, ...CLIENT_ENGAGEMENT_TYPES, `-${withinDays}`) as {
     distinct_days: number;
     last_active: string | null;
   };

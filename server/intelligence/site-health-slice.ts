@@ -73,6 +73,7 @@ export async function assembleSiteHealth(
   let anomalyTypes: string[] = [];
   let seoChangeVelocity = 0;
   let latestAuditCwvSummary: CwvSummary | undefined;
+  let auditDeadLinksFallback = 0;
 
   // ── Audit snapshot (reports.ts) ──────────────────────────────────────
   if (siteId) {
@@ -82,6 +83,7 @@ export async function assembleSiteHealth(
       if (latest) {
         auditScore = latest.audit.siteScore ?? null;
         latestAuditCwvSummary = latest.audit.cwvSummary;
+        auditDeadLinksFallback = auditDeadLinkCount(latest.audit);
         // Delta: compare with previous snapshot
         const summaries = listEffectiveSnapshotSummaries(siteId, workspace?.auditSuppressions);
         if (summaries.length >= 2) {
@@ -102,10 +104,12 @@ export async function assembleSiteHealth(
       const { getLinkCheck } = await import('../performance-store.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
       const linkSnap = getLinkCheck(siteId);
       if (linkSnap?.result) {
-        const result = linkSnap.result as { deadLinks?: unknown[] };
-        deadLinks = Array.isArray(result.deadLinks) ? result.deadLinks.length : 0;
+        deadLinks = deadLinkCount(linkSnap.result) ?? auditDeadLinksFallback;
+      } else {
+        deadLinks = auditDeadLinksFallback;
       }
     } catch (err) {
+      deadLinks = auditDeadLinksFallback;
       log.debug({ workspaceId, err }, 'siteHealth: link check failed — skipping');
     }
   }
@@ -117,15 +121,15 @@ export async function assembleSiteHealth(
       const readSiteSpeed = (strategy: 'mobile' | 'desktop') => {
         const speedSnap = getPageSpeed(siteId, strategy);
         return speedSnap?.result as {
-          pages?: Array<{ score?: number; vitals?: { LCP?: number | null; FID?: number | null; CLS?: number | null } }>;
+          pages?: Array<{ score?: number; vitals?: { LCP?: number | null; FID?: number | null; INP?: number | null; CLS?: number | null } }>;
           averageScore?: number;
-          averageVitals?: { LCP?: number | null; FID?: number | null; CLS?: number | null };
+          averageVitals?: { LCP?: number | null; FID?: number | null; INP?: number | null; CLS?: number | null };
         } | undefined;
       };
       const passRate = (siteSpeed: ReturnType<typeof readSiteSpeed>) => {
         const pages = siteSpeed?.pages ?? [];
         if (pages.length === 0) return null;
-        const passing = pages.filter(p => (p.score ?? 0) >= 90).length;
+        const passing = pages.filter(pagePassesCoreWebVitals).length;
         return passing / pages.length;
       };
 
@@ -136,9 +140,10 @@ export async function assembleSiteHealth(
 
       const summarySource = mobileSpeed ?? desktopSpeed;
       if (summarySource?.averageVitals) {
-        // CWV pass rate: % of pages with score >= 90
+        // CWV pass rate: pages that pass LCP, INP/FID fallback, and CLS thresholds.
         performanceSummary = {
           avgLcp: summarySource.averageVitals.LCP ?? null,
+          avgInp: summarySource.averageVitals.INP ?? null,
           avgFid: summarySource.averageVitals.FID ?? null,
           avgCls: summarySource.averageVitals.CLS ?? null,
           score: summarySource.averageScore ?? null,
@@ -307,4 +312,42 @@ export async function assembleSiteHealth(
     seoChangeVelocity,
     recentDiagnostics,
   };
+}
+
+function pagePassesCoreWebVitals(page: {
+  vitals?: { LCP?: number | null; FID?: number | null; INP?: number | null; CLS?: number | null };
+}): boolean {
+  const vitals = page.vitals;
+  if (!vitals) return false;
+  const interaction = vitals.INP ?? vitals.FID;
+  return (
+    typeof vitals.LCP === 'number'
+    && vitals.LCP <= 2500
+    && typeof interaction === 'number'
+    && interaction <= (vitals.INP == null ? 100 : 200)
+    && typeof vitals.CLS === 'number'
+    && vitals.CLS <= 0.1
+  );
+}
+
+function deadLinkCount(result: unknown): number | null {
+  if (!result || typeof result !== 'object') return null;
+  const data = result as {
+    deadLinks?: unknown;
+    brokenLinks?: unknown;
+  };
+  if (Array.isArray(data.deadLinks)) return data.deadLinks.length;
+  if (typeof data.deadLinks === 'number' && Number.isFinite(data.deadLinks)) return data.deadLinks;
+  if (Array.isArray(data.brokenLinks)) return data.brokenLinks.length;
+  if (typeof data.brokenLinks === 'number' && Number.isFinite(data.brokenLinks)) return data.brokenLinks;
+  return null;
+}
+
+function auditDeadLinkCount(audit: {
+  deadLinkDetails?: unknown;
+  deadLinkSummary?: { total?: unknown };
+}): number {
+  if (Array.isArray(audit.deadLinkDetails)) return audit.deadLinkDetails.length;
+  const total = audit.deadLinkSummary?.total;
+  return typeof total === 'number' && Number.isFinite(total) ? total : 0;
 }

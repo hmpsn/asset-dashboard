@@ -15,7 +15,11 @@ vi.mock('../../server/search-console.js', () => ({
   getSearchQueryObservations: vi.fn(),
 }));
 
-import { runRankTrackingSnapshots } from '../../server/rank-tracking-scheduler.js';
+import {
+  runRankTrackingSnapshots,
+  startRankTrackingScheduler,
+  stopRankTrackingScheduler,
+} from '../../server/rank-tracking-scheduler.js';
 import { getSearchOverview, getSearchQueryObservations } from '../../server/search-console.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { getLatestRanks, addTrackedKeyword } from '../../server/rank-tracking.js';
@@ -34,6 +38,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  stopRankTrackingScheduler();
+  vi.useRealTimers();
   if (testWsId) deleteWorkspace(testWsId);
   testWsId = '';
 });
@@ -136,5 +142,22 @@ describe('runRankTrackingSnapshots', () => {
 
     expect(mockGetSearchOverview).toHaveBeenCalledTimes(2);
     deleteWorkspace(ws2.id);
+  });
+
+  it('does not run startup snapshot after stop is called before initial timeout', async () => {
+    vi.useFakeTimers();
+    updateWorkspace(testWsId, {
+      gscPropertyUrl: 'sc-domain:example.com',
+      webflowSiteId: 'wf-site-abc123',
+    });
+    mockGetSearchOverview.mockResolvedValueOnce({ topQueries: [] });
+    mockGetSearchQueryObservations.mockResolvedValueOnce([]);
+
+    startRankTrackingScheduler();
+    stopRankTrackingScheduler();
+    await vi.advanceTimersByTimeAsync(2 * 60 * 1000);
+
+    expect(mockGetSearchOverview).not.toHaveBeenCalled();
+    expect(mockGetSearchQueryObservations).not.toHaveBeenCalled();
   });
 });

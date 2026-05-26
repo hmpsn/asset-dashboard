@@ -1,51 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   DollarSign, BarChart3, Target, TrendingUp,
   Lock, Shield, MousePointerClick, Eye, Layers,
 } from 'lucide-react';
-import { EmptyState, SectionCard, Button, StatCard } from '../ui';
+import { useNavigate } from 'react-router-dom';
+import { EmptyState, SectionCard, Button, StatCard, ErrorState, LoadingState } from '../ui';
 import { Icon } from '../ui/Icon';
 import { fmtMoney, fmtMoneyFull } from '../../utils/formatNumbers';
-import { get } from '../../api/client';
-import { LoadingState } from '../ui';
-
-interface PageROI {
-  pagePath: string;
-  pageTitle: string;
-  primaryKeyword: string;
-  clicks: number;
-  impressions: number;
-  cpc: number;
-  trafficValue: number;
-  position: number | null;
-}
-
-interface ContentItemROI {
-  requestId: string;
-  topic: string;
-  targetKeyword: string;
-  targetPageId: string;
-  targetPageSlug?: string;
-  status: string;
-  clicks: number;
-  impressions: number;
-  trafficValue: number;
-  source?: 'request' | 'matrix';
-}
-
-interface ROIData {
-  organicTrafficValue: number;
-  adSpendEquivalent: number;
-  growthPercent: number | null;
-  pageBreakdown: PageROI[];
-  totalClicks: number;
-  totalImpressions: number;
-  avgCPC: number;
-  trackedPages: number;
-  contentROI: { totalContentSpend: number; totalContentValue: number; roi: number; postsPublished: number } | null;
-  contentItems: ContentItemROI[];
-  computedAt: string;
-}
+import { useClientROI } from '../../hooks/client';
+import { useBetaMode } from './BetaContext';
+import { clientPath } from '../../routes';
 
 interface ROIDashboardProps {
   workspaceId: string;
@@ -53,17 +17,17 @@ interface ROIDashboardProps {
 }
 
 export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
-  const [data, setData] = useState<ROIData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const betaMode = useBetaMode();
   const [showAllPages, setShowAllPages] = useState(false);
-
-  useEffect(() => {
-    get<ROIData>(`/api/public/roi/${workspaceId}`)
-      .then(d => { setData(d); setError(null); })
-      .catch(e => setError(e instanceof Error ? e.message : 'Failed to load ROI data'))
-      .finally(() => setLoading(false));
-  }, [workspaceId]);
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isFetching,
+  } = useClientROI(workspaceId, !!workspaceId);
 
   // Gate for premium tier
   if (tier !== 'premium' && tier !== 'growth') {
@@ -83,7 +47,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
     );
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <SectionCard noPadding>
         <div className="p-8">
@@ -93,9 +57,39 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
     );
   }
 
-  if (error || !data) {
+  if (isError) {
+    const message = error instanceof Error ? error.message : 'Failed to load ROI data';
     return (
-      <EmptyState icon={DollarSign} title="ROI data unavailable" description={error || 'ROI data requires a keyword strategy with CPC data. Run a strategy with SEMRush enrichment to unlock this.'} />
+      <ErrorState
+        type="data"
+        title="Couldn’t load ROI data"
+        message={message}
+        action={{ label: 'Try again', onClick: () => void refetch() }}
+      />
+    );
+  }
+
+  if (!data) {
+    return (
+      <EmptyState
+        icon={DollarSign}
+        title="ROI data unavailable"
+        description="ROI appears once traffic and keyword cost data are available for this workspace."
+        action={(
+          <div className="flex items-center justify-center gap-2">
+            <Button variant="secondary" size="sm" onClick={() => void refetch()} disabled={isFetching}>
+              {isFetching ? 'Refreshing...' : 'Try again'}
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => navigate(clientPath(workspaceId, 'strategy', betaMode))}
+            >
+              Open Strategy
+            </Button>
+          </div>
+        )}
+      />
     );
   }
 
@@ -266,7 +260,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
 
       {/* Methodology note */}
       <div className="t-caption-sm text-[var(--brand-text-muted)] text-center px-4">
-        Values calculated from Google Search Console click data × SEMRush CPC estimates.
+        Values calculated from Google Search Console click data and keyword cost estimates.
         Actual value may vary based on conversion rates and business metrics.
       </div>
     </div>

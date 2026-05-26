@@ -528,6 +528,80 @@
           "priority": "P3",
           "status": "done",
           "notes": "Superseded and decomposed by the PR14 local SEO foundation audit. The original broad local SEO intelligence-layer concept is now split into execution-ready roadmap items: `intel-quality-local-pack-visibility-foundation`, `intel-quality-local-seo-reporting-strategy-integration`, `intel-quality-google-business-profile-health`, `intel-quality-google-reviews-local-reputation`, `intel-quality-local-geo-grid-tracking`, and `intel-quality-local-seo-recommendations`. Keeping this item marked done prevents duplicate roadmap selection while preserving the original intent: local SEO should remain posture-aware, optional for non-local workspaces, conservative about match confidence, and integrated through the keyword/intelligence operating loop rather than as one-off city-modifier logic."
+        },
+        {
+          "id": "superpowers-mcp-actions-phase-3-4-finalization",
+          "title": "MCP actions phases 3+4 integration verification closeout",
+          "source": "docs/superpowers/plans/2026-05-25-mcp-actions-phase-3-and-4-integration-and-verification.md",
+          "est": "3-5h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-05-25",
+          "shippedAt": "2026-05-25",
+          "notes": "Completed on 2026-05-25. Closed out MCP actions with end-to-end integration coverage for all 10 tools (`tests/integration/mcp-tools-{keyword,content,jobs}.test.ts`), corrected send-to-client activity typing to `brief_sent_for_review` / `post_sent_for_review`, removed the stale `brief:updated` pending-routes allowlist entry now that MCP save_brief broadcasts it, and fixed post send-to-client request lifecycle typing so creation supports `in_progress` before transitioning to `post_review`. Final verification gate passed: typecheck, pr-check, targeted MCP test suites, and full suite/build in this phase."
+        }
+      ]
+    },
+    {
+      "id": "sprint-workspace-intelligence-consolidation",
+      "name": "Workspace Intelligence Consolidation",
+      "hours": "30-50",
+      "rationale": "Make workspace intelligence the canonical, fresh, tested source of truth for AI context, admin/client intelligence reads, schema planning, content generation, and operational summaries. This sprint captures the dedicated five-PR cleanup plan so follow-on agents do not drift into adjacent intelligence/local SEO backlog before freshness, slice correctness, schema/site-inventory consolidation, and AI consumer migrations are complete.",
+      "source": "docs/superpowers/plans/2026-05-26-workspace-intelligence-consolidation.md",
+      "items": [
+        {
+          "id": "workspace-intel-pr1-contract-guardrails",
+          "title": "PR 1 - Intelligence contract and guardrails",
+          "source": "docs/superpowers/plans/2026-05-26-workspace-intelligence-consolidation.md#pr-1-intelligence-contract--guardrails",
+          "est": "4-6h",
+          "priority": "P0",
+          "owner": "analytics-intelligence",
+          "status": "done",
+          "shippedAt": "2026-05-26",
+          "notes": "Completed in PR #932. Added the shared intelligence slice registry in `shared/types/intelligence.ts`, replaced stale slice allow-lists in the facade/routes/debug/MCP surfaces, handled option-scoped slices including `siteInventory`, updated `docs/rules/workspace-intelligence.md`, and added route/MCP/unit regression coverage. CI follow-up stabilized a brittle unrelated ContentCalendar assertion."
+        },
+        {
+          "id": "workspace-intel-pr2-freshness-invalidation",
+          "title": "PR 2 - Freshness and invalidation",
+          "source": "docs/superpowers/plans/2026-05-26-workspace-intelligence-consolidation.md#pr-2-freshness--invalidation",
+          "est": "6-10h",
+          "priority": "P0",
+          "owner": "analytics-intelligence",
+          "status": "done",
+          "shippedAt": "2026-05-26",
+          "notes": "Completed in this PR. Added `invalidateContentPipelineIntelligence()` as the shared freshness boundary for mutations that feed the canonical `contentPipeline` slice, then wired backend invalidation across content briefs/posts/matrices/publish, suggested briefs/content decay, content subscriptions, MCP content actions, copy pipeline generation/review/intelligence, public post edits, recommendations, Local SEO updates, and briefing publish paths. Expanded `useWsInvalidation()` so the corresponding workspace events refresh admin/client intelligence, content pipeline, recommendations/action queue, suggested briefs, copy pipeline, outcomes, work orders, and briefing query keys. Added helper, event-routing, route/cache regression, and source-wiring guard coverage."
+        },
+        {
+          "id": "workspace-intel-pr3-slice-correctness",
+          "title": "PR 3 - Slice correctness",
+          "source": "docs/superpowers/plans/2026-05-26-workspace-intelligence-consolidation.md#pr-3-slice-correctness",
+          "est": "6-10h",
+          "priority": "P0",
+          "owner": "analytics-intelligence",
+          "status": "done",
+          "shippedAt": "2026-05-26",
+          "notes": "Completed in this PR. Corrected slice assembly semantics for page-specific insight filtering before caps, content request and work-order buckets, published post lifecycle status, Local SEO per-market coverage and duplicate market visibility, client-originated engagement coverage, public learnings readiness, site-health dead-link fallbacks, and Core Web Vitals INP/LCP pass-rate formatting. Added focused regression coverage for the affected slices plus the public client intelligence read path."
+        },
+        {
+          "id": "workspace-intel-pr4-schema-site-inventory",
+          "title": "PR 4 - Schema and site inventory consolidation",
+          "source": "docs/superpowers/plans/2026-05-26-workspace-intelligence-consolidation.md#pr-4-schema--site-inventory-consolidation",
+          "est": "6-10h",
+          "priority": "P1",
+          "owner": "schema",
+          "status": "done",
+          "shippedAt": "2026-05-26",
+          "notes": "Completed in this PR. Added `buildSchemaIntelligence()` as the schema-owned wrapper over canonical workspace intelligence, routed schema planning through resolved `seoContext.strategy`, moved schema site inventory reads through the `siteInventory` slice, and threaded per-page `pageElements`/`pageKeywords` through the same wrapper. Consolidated site inventory freshness with sitemap-resolved static paths, removed the dormant schema analytics prompt block and unused backlink/health context fields, and kept backlink enrichment opt-in only for explicit consumers. Added wrapper, schema-context, generation-context, route contract, and existing schema workflow regression coverage."
+        },
+        {
+          "id": "workspace-intel-pr5-ai-consumer-migration",
+          "title": "PR 5 - AI consumer migration",
+          "source": "docs/superpowers/plans/2026-05-26-workspace-intelligence-consolidation.md#pr-5-ai-consumer-migration",
+          "est": "8-14h",
+          "priority": "P1",
+          "owner": "analytics-intelligence",
+          "status": "pending",
+          "notes": "Migration PR toward the central workspace intelligence engine: keep workflow-specific evidence caller-owned, but route workspace-derived AI context through canonical intelligence builders. Migrate monthly digest, admin chat, content brief generation, voice calibration, AEO review, and alt-text paths away from one-off context assembly. Use canonical builders (`buildContentGenerationContext`, `buildRecommendationGenerationContext`, `buildIntelPrompt`) or a dedicated builder where needed, remove duplicate SEO/business/voice/learnings prompt blocks, and preserve caller-owned add-ons only for workflow-specific evidence. Strengthen prompt/context contract tests and the intelligence consumer inventory guard."
         }
       ]
     },
@@ -574,6 +648,16 @@
           "priority": "P2",
           "notes": "Current E-E-A-T guidance in content briefs is generic per-pillar text ('include case studies'). Gap: no inventory of what assets a client ACTUALLY has. Build: (1) Workspace-level E-E-A-T profile in settings — admin tags existing client assets: testimonials (with quotes + attribution), case studies (with URLs + metrics), certifications/credentials, before/after galleries, team bios/expertise, awards/recognition, data/research, client logos. (2) Content briefs inject specific asset recommendations: 'Add the Dr. Smith testimonial from /reviews' or 'Include the Acme Corp case study showing 40% conversion lift'. (3) Page Intelligence flags pages missing trust signals based on page type (service pages need testimonials, product pages need reviews, etc.). (4) Schema generator uses asset library for author/credential structured data. New DB table: eeat_assets (workspace_id, type, title, url, content, metadata JSON). New UI: settings tab or workspace profile section.",
           "status": "pending"
+        },
+        {
+          "id": 634,
+          "title": "Platform UX Audit 2026-05-19 — Quick Wins Batch",
+          "source": "docs/audits/2026-05-19-platform-ux-audit.md",
+          "est": "3-5h",
+          "priority": "P1",
+          "notes": "Target easiest high-impact fixes from the 54-finding platform UX audit without deep refactors.\nInitial quick-win scope:\n1) P0-6: Replace client ROI error copy to remove vendor references + add retry/next-step CTA.\n2) P0-7: Map internal Inbox action source enums to client-safe labels.\n3) P0-8/P3-10: Replace remaining hard-coded route strings with adminPath()/clientPath() helpers.\n4) P1-10: HealthTab no-audit raw div -> <EmptyState> with actionable CTA.\n5) P2-8: Replace generic \"Loading...\" fallbacks in ContentPipeline with contextual LoadingState copy.\n6) P2-13: Rename SearchTab \"Raw Data\" label to client-friendly wording.\n7) P2-9: Onboarding wizard CTA uses legacy tab alias content -> reviews deep-link.\n8) P3-11: Replace GA4 jargon in client Analytics tab labels.\nPreserve tab deep-link two-halves contract and run pr-check + typecheck + build after patch set.\n[Completed 2026-05-25 on codex/platform-ux-quickwins] Delivered the initial quick-win batch: removed vendor-facing ROI error copy, added retry CTA, mapped client action source badges to client-safe labels, replaced hard-coded admin route strings with adminPath(), converted HealthTab fallback to EmptyState + CTA, replaced generic ContentPipeline loading copy, renamed SearchTab Raw Data label, updated onboarding routing away from legacy content alias, and replaced GA4 jargon labels in client analytics.\n[Batch 2 follow-up 2026-05-25] Added explicit no-data fallback for Performance when both GSC+GA4 are unavailable, included copy-review availability in the Inbox nav badge count, replaced dynamic `grid-cols-${n}` construction with static responsive classes in Overview metrics, made Search Health Summary responsive on mobile, deep-linked Overview Generate Brief CTA to `/inbox?tab=reviews`, and redirected unknown admin tabs back to workspace Home instead of rendering a blank pane.\n[Batch 3 follow-up 2026-05-25] Replaced SEO Audit silent blank fallback with actionable ErrorState, surfaced active Inbox loading state from existing approvals/requests loading props, added Content Plan review-badge deep-link to Inbox Reviews, added admin toast confirmation/failure feedback for Content Brief \"Send to client\", added \"Show welcome tour\" entrypoint in the client header, upgraded Strategy no-data empty state with Inbox CTA, surfaced client copy suggestions in the admin Copy Review panel, and added annotation create/update/delete workspace broadcasts on both annotation route surfaces for real-time refresh.\n[Batch 4 follow-up 2026-05-25] Added Meeting Brief source-tab drill-ins (metrics, wins, attention, recommendations, blueprint), made Outcomes Overview rows open per-workspace Action Results with keyboard support and added a non-blank feature-flag-off fallback, wired Rank Tracker handoffs to Page Intelligence plus Strategy CTA from empty state, and standardized contextual LoadingState/ErrorState handling across RankTracker, PageIntelligence, ContentBriefs, InternalLinks, and WorkspaceHome.",
+          "status": "done",
+          "shippedAt": "2026-05-25"
         }
       ]
     },
@@ -662,7 +746,7 @@
           "priority": "P1",
           "sprint": "I",
           "status": "pending",
-          "notes": "Follow-up to lean-schema-rewrite. Re-injects the platform's intelligence layer surgically into schema generation: (1) Healthcare type escalation — workspace businessContext → Dentist/Physician/Optician/Chiropractor/MedicalClinic/etc. when address+phone+hours are present, falls back to LocalBusiness otherwise. (2) FAQ enrichment from GSC question queries — extractFaqOpportunities (already exists in analytics-intelligence.ts) feeds FAQPage when ≥3 question queries match a page. (3) E-E-A-T author injection from content brief — extractEeatFromBrief (already exists) populates Article.author with Person.knowsAbout, sameAs from the brief's expert profile. (4) Service serviceType from voice profile + business profile. Reuses existing intelligence wiring; the lean rewrite kept the data flow intact, this task adds surgical injection points to the templates."
+          "notes": "Follow-up to lean-schema-rewrite. Re-injects the platform's intelligence layer surgically into schema generation after the current deterministic schema path is stable: (1) Healthcare type escalation through canonical seoContext/business profile signals, falling back to LocalBusiness only when evidence supports it. (2) FAQ enrichment from GSC question queries via a new slice-backed helper if this feature is revived; the old unused extractFaqOpportunities/schema prompt block was removed in Workspace Intelligence Consolidation PR4. (3) E-E-A-T author injection from content brief evidence into Article.author with Person.knowsAbout/sameAs. (4) Service serviceType from voice profile + business profile. Any revived intelligence enrichment must flow through buildSchemaIntelligence() or another documented central intelligence builder, not direct raw workspace reads."
         }
       ]
     },

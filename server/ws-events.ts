@@ -35,6 +35,7 @@ export const WS_EVENTS = {
 
   // Content pipeline / planner
   CONTENT_UPDATED: 'content:updated',
+  BRIEF_UPDATED: 'brief:updated',
 
   // Activity feed (auto-broadcast via initActivityBroadcast)
   ACTIVITY_NEW: 'activity:new',

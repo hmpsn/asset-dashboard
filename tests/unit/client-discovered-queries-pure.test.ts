@@ -1,536 +1,241 @@
 /**
- * Unit tests for server/client-discovered-queries.ts
+ * Wave 24-A21 — Pure/integration unit tests for server/client-discovered-queries.ts
  *
- * Tests focus on the complex upsert merge logic:
- *   - best_position minimization (lower position = better rank)
- *   - best_impressions maximization
- *   - total_impressions accumulation vs same-snapshot dedup
- *   - detectLostVisibility qualification criteria
- *   - workspace isolation
+ * Covers functions not tested in discovered-queries-lost-visibility.test.ts:
+ *   - getLostVisibilityQueries (full row shape + ordering)
+ *   - upsertDiscoveredQueries with seenDate override
+ *   - edge cases: blank keyword skipping, best_position NULL handling
+ *
+ * Uses real SQLite DB (same pattern as discovered-queries-lost-visibility.test.ts).
  */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import db from '../../server/db/index.js';
+
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
-  upsertDiscoveredQueries,
-  detectLostVisibility,
-  getLostVisibilityKeys,
-  getLostVisibilityCount,
-  getDiscoveredQuerySummary,
   getLostVisibilityQueries,
+  upsertDiscoveredQueries,
 } from '../../server/client-discovered-queries.js';
-
-// ── helpers ────────────────────────────────────────────────────────────────
-
-const testWsId = `ws_dcq_${Date.now()}`;
-const testWsId2 = `ws_dcq2_${Date.now()}`;
-
-/** Read a single row directly from SQLite for assertions. */
-function readRow(workspaceId: string, query: string) {
-  return db.prepare(
-    `SELECT * FROM discovered_queries WHERE workspace_id = ? AND query = ?`,
-  ).get(workspaceId, query) as {
-    workspace_id: string;
-    query: string;
-    first_seen: string;
-    last_seen: string;
-    best_position: number | null;
-    best_impressions: number;
-    total_impressions: number;
-    snapshot_count: number;
-    last_snapshot_date: string | null;
-    last_snapshot_impressions: number;
-    status: string;
-  } | undefined;
-}
-
-/** Minimal LatestRank-compatible observation builder. */
-function obs(query: string, position: number | null, impressions: number) {
-  return {
-    query,
-    position: position as number, // actual column type allows null via REAL
-    clicks: 0,
-    impressions,
-    ctr: 0,
-  };
-}
-
-// ── lifecycle ───────────────────────────────────────────────────────────────
-
-beforeAll(() => {
-  db.prepare(
-    `INSERT OR IGNORE INTO workspaces (id, name, folder, created_at)
-     VALUES (?, ?, ?, ?)`,
-  ).run(testWsId, 'DCQ Test WS', testWsId, new Date().toISOString());
-
-  db.prepare(
-    `INSERT OR IGNORE INTO workspaces (id, name, folder, created_at)
-     VALUES (?, ?, ?, ?)`,
-  ).run(testWsId2, 'DCQ Test WS 2', testWsId2, new Date().toISOString());
-});
-
-afterAll(() => {
-  db.prepare(`DELETE FROM discovered_queries WHERE workspace_id IN (?, ?)`).run(testWsId, testWsId2);
-  db.prepare(`DELETE FROM workspaces WHERE id IN (?, ?)`).run(testWsId, testWsId2);
-});
-
-// ── upsertDiscoveredQueries — first insert ──────────────────────────────────
-
-describe('upsertDiscoveredQueries — first insert', () => {
-  it('inserts a new row with correct fields', () => {
-    const wsId = testWsId;
-    upsertDiscoveredQueries(wsId, [obs('first insert query', 5, 100)], '2026-01-01');
-
-    const row = readRow(wsId, 'first insert query');
-    expect(row).toBeDefined();
-    expect(row!.best_position).toBe(5);
-    expect(row!.best_impressions).toBe(100);
-    expect(row!.total_impressions).toBe(100);
-    expect(row!.snapshot_count).toBe(1);
-    expect(row!.status).toBe('active');
-    expect(row!.last_snapshot_date).toBe('2026-01-01');
-    expect(row!.last_snapshot_impressions).toBe(100);
-  });
-
-  it('sets first_seen and last_seen to the snapshot date', () => {
-    upsertDiscoveredQueries(testWsId, [obs('seen date query', 3, 50)], '2026-02-15');
-
-    const row = readRow(testWsId, 'seen date query');
-    expect(row!.first_seen).toBe('2026-02-15');
-    expect(row!.last_seen).toBe('2026-02-15');
-  });
-
-  it('skips observations whose query normalizes to an empty string', () => {
-    upsertDiscoveredQueries(testWsId, [obs('   ', 5, 100)], '2026-01-01');
-    // empty query normalizes to '' which is falsy → skipped
-    const count = (db.prepare(
-      `SELECT COUNT(*) as c FROM discovered_queries WHERE workspace_id = ? AND query = '   '`,
-    ).get(testWsId) as { c: number }).c;
-    expect(count).toBe(0);
-  });
-});
-
-// ── upsertDiscoveredQueries — best_position minimization ──────────────────
-
-describe('upsertDiscoveredQueries — best_position minimization', () => {
-  it('keeps the lower (better) position when an update has a smaller value', () => {
-    const q = 'position min query';
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 100)], '2026-03-01');
-    upsertDiscoveredQueries(testWsId, [obs(q, 3, 80)], '2026-03-02');
-
-    const row = readRow(testWsId, q);
-    expect(row!.best_position).toBe(3);
-  });
-
-  it('does not worsen best_position when an update has a larger value', () => {
-    const q = 'position no worsen query';
-    upsertDiscoveredQueries(testWsId, [obs(q, 3, 100)], '2026-03-01');
-    upsertDiscoveredQueries(testWsId, [obs(q, 8, 80)], '2026-03-02');
-
-    const row = readRow(testWsId, q);
-    expect(row!.best_position).toBe(3);
-  });
-
-  it('accepts a non-null position when existing best_position is null', () => {
-    const q = 'position from null query';
-    // Insert with null position: pass null cast to satisfy the type signature used by callers
-    upsertDiscoveredQueries(testWsId, [obs(q, null, 50)], '2026-03-01');
-
-    let row = readRow(testWsId, q);
-    expect(row!.best_position).toBeNull();
-
-    // Second upsert with a real position should fill in the null
-    upsertDiscoveredQueries(testWsId, [obs(q, 4, 60)], '2026-03-02');
-    row = readRow(testWsId, q);
-    expect(row!.best_position).toBe(4);
-  });
-
-  it('keeps null best_position when both inserts have null positions', () => {
-    const q = 'position stays null query';
-    upsertDiscoveredQueries(testWsId, [obs(q, null, 40)], '2026-03-01');
-    upsertDiscoveredQueries(testWsId, [obs(q, null, 40)], '2026-03-02');
-
-    const row = readRow(testWsId, q);
-    expect(row!.best_position).toBeNull();
-  });
-});
-
-// ── upsertDiscoveredQueries — best_impressions maximization ───────────────
-
-describe('upsertDiscoveredQueries — best_impressions maximization', () => {
-  it('keeps the higher best_impressions when an update has a smaller value', () => {
-    const q = 'impressions max query';
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 100)], '2026-04-01');
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 50)], '2026-04-02');
-
-    const row = readRow(testWsId, q);
-    expect(row!.best_impressions).toBe(100);
-  });
-
-  it('increases best_impressions when an update has a higher value', () => {
-    const q = 'impressions grows query';
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 100)], '2026-04-01');
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 250)], '2026-04-02');
-
-    const row = readRow(testWsId, q);
-    expect(row!.best_impressions).toBe(250);
-  });
-});
-
-// ── upsertDiscoveredQueries — total_impressions accumulation ──────────────
-
-describe('upsertDiscoveredQueries — total_impressions accumulation', () => {
-  it('accumulates total_impressions when snapshot dates differ', () => {
-    const q = 'total accum query';
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 100)], '2026-05-01');
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 200)], '2026-05-02');
-
-    const row = readRow(testWsId, q);
-    expect(row!.total_impressions).toBe(300);
-    expect(row!.snapshot_count).toBe(2);
-  });
-
-  it('does not double-count when the same snapshot date is re-upserted', () => {
-    const q = 'total dedup query';
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 100)], '2026-05-10');
-    // Same date — should replace the snapshot contribution, not add
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 100)], '2026-05-10');
-
-    const row = readRow(testWsId, q);
-    expect(row!.total_impressions).toBe(100);
-    expect(row!.snapshot_count).toBe(1);
-  });
-
-  it('replaces the same-snapshot contribution when re-upserted with a different impression count', () => {
-    // SQL: total_impressions = MAX(0, total - last_snapshot_impressions + new_impressions)
-    // This effectively replaces the previous snapshot contribution for the same date.
-    const q = 'total replace snapshot query';
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 100)], '2026-05-15');
-    // Same date but different impression value: should substitute 80 for 100
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 80)], '2026-05-15');
-
-    const row = readRow(testWsId, q);
-    expect(row!.total_impressions).toBe(80);
-    expect(row!.snapshot_count).toBe(1);
-  });
-
-  it('accumulates across three distinct snapshot dates', () => {
-    const q = 'total three snapshots query';
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 100)], '2026-06-01');
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 200)], '2026-06-02');
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 300)], '2026-06-03');
-
-    const row = readRow(testWsId, q);
-    expect(row!.total_impressions).toBe(600);
-    expect(row!.snapshot_count).toBe(3);
-  });
-});
-
-// ── upsertDiscoveredQueries — first_seen / last_seen ──────────────────────
-
-describe('upsertDiscoveredQueries — first_seen / last_seen tracking', () => {
-  it('preserves the earliest first_seen across updates', () => {
-    const q = 'first seen tracking query';
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 100)], '2026-07-10');
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 100)], '2026-07-20');
-
-    const row = readRow(testWsId, q);
-    // MIN(first_seen, excluded.first_seen)
-    expect(row!.first_seen).toBe('2026-07-10');
-    expect(row!.last_seen).toBe('2026-07-20');
-  });
-
-  it('updates last_seen to the newer snapshot date', () => {
-    const q = 'last seen update query';
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 100)], '2026-08-01');
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 100)], '2026-08-15');
-
-    const row = readRow(testWsId, q);
-    expect(row!.last_seen).toBe('2026-08-15');
-  });
-});
-
-// ── workspace isolation ────────────────────────────────────────────────────
-
-describe('workspace isolation', () => {
-  it('returns no summary data for a workspace that has no queries', () => {
-    const summary = getDiscoveredQuerySummary(testWsId2);
-    expect(summary.totalDiscovered).toBe(0);
-    expect(summary.lostVisibilityCount).toBe(0);
-    expect(summary.topLostQueries).toHaveLength(0);
-  });
-
-  it('does not return queries belonging to another workspace in getLostVisibilityKeys', () => {
-    const q = 'ws isolation query';
-    // Insert into workspace 1
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 100)], '2026-01-01');
-
-    // Workspace 2 should have no lost-visibility keys from workspace 1
-    const keys = getLostVisibilityKeys(testWsId2);
-    expect(keys.has(q)).toBe(false);
-  });
-});
-
-// ── detectLostVisibility ──────────────────────────────────────────────────
-
-describe('detectLostVisibility', () => {
-  it('marks qualifying queries as lost_visibility', () => {
-    const q = 'qualify for lost query';
-    // Insert with old date (>14 days ago) via two snapshot dates
-    // to satisfy: snapshot_count >= 2, total_impressions >= 10, last_seen >= 14 days ago
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 50)], '2024-01-01');
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 50)], '2024-01-05');
-
-    // "today" is well beyond 14 days from 2024-01-05
-    detectLostVisibility(testWsId, '2026-01-01');
-
-    const row = readRow(testWsId, q);
-    expect(row!.status).toBe('lost_visibility');
-  });
-
-  it('does not mark queries that are too recent (< 14 days since last_seen)', () => {
-    const q = 'too recent for lost query';
-    const recentDate = '2026-05-24'; // 2 days before 2026-05-26
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 50)], '2024-01-01');
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 50)], recentDate);
-
-    detectLostVisibility(testWsId, '2026-05-26');
-
-    const row = readRow(testWsId, q);
-    // last_seen is 2026-05-24 → 2 days ago → not >= 14 → stays active
-    expect(row!.status).toBe('active');
-  });
-
-  it('does not mark queries with snapshot_count < 2', () => {
-    const q = 'single snapshot lost query';
-    // Only one upsert → snapshot_count = 1
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 50)], '2024-01-01');
-
-    detectLostVisibility(testWsId, '2026-01-01');
-
-    const row = readRow(testWsId, q);
-    expect(row!.status).toBe('active');
-  });
-
-  it('does not mark queries with total_impressions < 10', () => {
-    const q = 'low impressions lost query';
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 4)], '2024-01-01');
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 4)], '2024-01-05');
-    // total_impressions = 8 → below 10 threshold
-
-    detectLostVisibility(testWsId, '2026-01-01');
-
-    const row = readRow(testWsId, q);
-    expect(row!.status).toBe('active');
-  });
-});
-
-// ── getLostVisibilityKeys ──────────────────────────────────────────────────
-
-describe('getLostVisibilityKeys', () => {
-  it('returns a Set containing normalized query keys for lost queries', () => {
-    const q = 'lost key query ABC';
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 50)], '2024-02-01');
-    upsertDiscoveredQueries(testWsId, [obs(q, 5, 50)], '2024-02-05');
-    detectLostVisibility(testWsId, '2026-01-01');
-
-    const keys = getLostVisibilityKeys(testWsId);
-    // keywordComparisonKey lowercases and strips punctuation
-    expect(keys.has('lost key query abc')).toBe(true);
-  });
-
-  it('returns an empty Set when no queries are lost', () => {
-    const keys = getLostVisibilityKeys(testWsId2);
-    expect(keys.size).toBe(0);
-  });
-});
-
-// ── getLostVisibilityCount ─────────────────────────────────────────────────
-
-describe('getLostVisibilityCount', () => {
-  it('returns 0 for a workspace with no lost queries', () => {
-    expect(getLostVisibilityCount(testWsId2)).toBe(0);
-  });
-
-  it('returns the correct count of lost queries', () => {
-    const beforeCount = getLostVisibilityCount(testWsId);
-
-    const qA = `count lost A ${Date.now()}`;
-    const qB = `count lost B ${Date.now()}`;
-    upsertDiscoveredQueries(testWsId, [obs(qA, 5, 50)], '2024-03-01');
-    upsertDiscoveredQueries(testWsId, [obs(qA, 5, 50)], '2024-03-05');
-    upsertDiscoveredQueries(testWsId, [obs(qB, 5, 50)], '2024-03-01');
-    upsertDiscoveredQueries(testWsId, [obs(qB, 5, 50)], '2024-03-05');
-    detectLostVisibility(testWsId, '2026-06-01');
-
-    const afterCount = getLostVisibilityCount(testWsId);
-    expect(afterCount).toBeGreaterThanOrEqual(beforeCount + 2);
-  });
-});
-
-// ── getDiscoveredQuerySummary ─────────────────────────────────────────────
-
-describe('getDiscoveredQuerySummary', () => {
-  it('returns zero counts for a workspace with no data', () => {
-    const summary = getDiscoveredQuerySummary(testWsId2);
-    expect(summary.totalDiscovered).toBe(0);
-    expect(summary.lostVisibilityCount).toBe(0);
-    expect(summary.topLostQueries).toEqual([]);
-  });
-
-  it('includes both active and lost queries in totalDiscovered', () => {
-    const isolatedWsId = `ws_dcq_summary_${Date.now()}`;
-    db.prepare(
-      `INSERT OR IGNORE INTO workspaces (id, name, folder, created_at) VALUES (?, ?, ?, ?)`,
-    ).run(isolatedWsId, 'Summary WS', isolatedWsId, new Date().toISOString());
-
+import db from '../../server/db/index.js';
+import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+
+let workspaceId = '';
+
+beforeEach(() => {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS discovered_queries (
+      workspace_id      TEXT NOT NULL,
+      query             TEXT NOT NULL,
+      first_seen        TEXT NOT NULL,
+      last_seen         TEXT NOT NULL,
+      best_position     REAL,
+      best_impressions  INTEGER NOT NULL DEFAULT 0,
+      total_impressions INTEGER NOT NULL DEFAULT 0,
+      snapshot_count    INTEGER NOT NULL DEFAULT 1,
+      last_snapshot_date TEXT,
+      last_snapshot_impressions INTEGER NOT NULL DEFAULT 0,
+      status            TEXT NOT NULL DEFAULT 'active',
+      PRIMARY KEY (workspace_id, query)
+    );
+  `);
+  for (const sql of [
+    'ALTER TABLE discovered_queries ADD COLUMN last_snapshot_date TEXT',
+    'ALTER TABLE discovered_queries ADD COLUMN last_snapshot_impressions INTEGER NOT NULL DEFAULT 0',
+  ]) {
     try {
-      upsertDiscoveredQueries(isolatedWsId, [obs('summary active query', 5, 100)], '2026-01-01');
-      upsertDiscoveredQueries(isolatedWsId, [obs('summary lost query', 5, 50)], '2024-04-01');
-      upsertDiscoveredQueries(isolatedWsId, [obs('summary lost query', 5, 50)], '2024-04-05');
-      detectLostVisibility(isolatedWsId, '2026-06-01');
-
-      const summary = getDiscoveredQuerySummary(isolatedWsId);
-      expect(summary.totalDiscovered).toBe(2);
-      expect(summary.lostVisibilityCount).toBe(1);
-      expect(summary.topLostQueries).toHaveLength(1);
-      expect(summary.topLostQueries[0].query).toBe('summary lost query');
-    } finally {
-      db.prepare(`DELETE FROM discovered_queries WHERE workspace_id = ?`).run(isolatedWsId);
-      db.prepare(`DELETE FROM workspaces WHERE id = ?`).run(isolatedWsId);
+      db.exec(sql);
+    } catch {
+      // Column already exists in migrated test databases.
     }
-  });
-
-  it('sorts topLostQueries by total_impressions descending', () => {
-    const isolatedWsId = `ws_dcq_topsort_${Date.now()}`;
-    db.prepare(
-      `INSERT OR IGNORE INTO workspaces (id, name, folder, created_at) VALUES (?, ?, ?, ?)`,
-    ).run(isolatedWsId, 'TopSort WS', isolatedWsId, new Date().toISOString());
-
-    try {
-      // Query A has lower impressions, Query B has higher
-      upsertDiscoveredQueries(isolatedWsId, [obs('query low impressions', 5, 20)], '2024-04-01');
-      upsertDiscoveredQueries(isolatedWsId, [obs('query low impressions', 5, 20)], '2024-04-05');
-      upsertDiscoveredQueries(isolatedWsId, [obs('query high impressions', 5, 500)], '2024-04-01');
-      upsertDiscoveredQueries(isolatedWsId, [obs('query high impressions', 5, 500)], '2024-04-05');
-      detectLostVisibility(isolatedWsId, '2026-06-01');
-
-      const summary = getDiscoveredQuerySummary(isolatedWsId);
-      expect(summary.topLostQueries[0].query).toBe('query high impressions');
-      expect(summary.topLostQueries[1].query).toBe('query low impressions');
-    } finally {
-      db.prepare(`DELETE FROM discovered_queries WHERE workspace_id = ?`).run(isolatedWsId);
-      db.prepare(`DELETE FROM workspaces WHERE id = ?`).run(isolatedWsId);
-    }
-  });
+  }
+  workspaceId = createWorkspace(`Discovered Query Pure Test ${Date.now()}`).id;
 });
 
-// ── getLostVisibilityQueries ──────────────────────────────────────────────
+afterEach(() => {
+  db.prepare('DELETE FROM discovered_queries WHERE workspace_id = ?').run(workspaceId);
+  deleteWorkspace(workspaceId);
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// getLostVisibilityQueries
+// ════════════════════════════════════════════════════════════════════════════
 
 describe('getLostVisibilityQueries', () => {
-  it('returns an empty array when no queries are lost', () => {
-    const result = getLostVisibilityQueries(testWsId2);
-    expect(result).toEqual([]);
+  function insertLostQuery(
+    query: string,
+    bestPosition: number | null,
+    lastSeen: string,
+    totalImpressions: number,
+  ) {
+    db.prepare(`
+      INSERT INTO discovered_queries
+        (workspace_id, query, first_seen, last_seen, best_position, snapshot_count, total_impressions, status)
+      VALUES (?, ?, '2026-01-01', ?, ?, 3, ?, 'lost_visibility')
+    `).run(workspaceId, query, lastSeen, bestPosition, totalImpressions);
+  }
+
+  it('returns empty array when no lost_visibility rows exist', () => {
+    const result = getLostVisibilityQueries(workspaceId);
+    expect(result).toHaveLength(0);
   });
 
-  it('returns lost queries with correct shape', () => {
-    const isolatedWsId = `ws_dcq_lostq_${Date.now()}`;
-    db.prepare(
-      `INSERT OR IGNORE INTO workspaces (id, name, folder, created_at) VALUES (?, ?, ?, ?)`,
-    ).run(isolatedWsId, 'LostQ WS', isolatedWsId, new Date().toISOString());
-
-    try {
-      upsertDiscoveredQueries(isolatedWsId, [obs('lostq shape query', 7, 300)], '2024-05-01');
-      upsertDiscoveredQueries(isolatedWsId, [obs('lostq shape query', 7, 300)], '2024-05-05');
-      detectLostVisibility(isolatedWsId, '2026-06-01');
-
-      const results = getLostVisibilityQueries(isolatedWsId);
-      expect(results).toHaveLength(1);
-      const item = results[0];
-      expect(item.query).toBe('lostq shape query');
-      expect(item.lastPosition).toBe(7);
-      expect(item.totalImpressions).toBe(600);
-      expect(item.lastSeen).toBeDefined();
-    } finally {
-      db.prepare(`DELETE FROM discovered_queries WHERE workspace_id = ?`).run(isolatedWsId);
-      db.prepare(`DELETE FROM workspaces WHERE id = ?`).run(isolatedWsId);
-    }
+  it('returns the correct shape for a lost query', () => {
+    insertLostQuery('local seo services', 12.5, '2026-04-01', 300);
+    const result = getLostVisibilityQueries(workspaceId);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual(
+      expect.objectContaining({
+        query: 'local seo services',
+        lastPosition: 12.5,
+        lastSeen: '2026-04-01',
+        totalImpressions: 300,
+      }),
+    );
   });
 
-  it('sorts results by total_impressions descending', () => {
-    const isolatedWsId = `ws_dcq_lostsort_${Date.now()}`;
-    db.prepare(
-      `INSERT OR IGNORE INTO workspaces (id, name, folder, created_at) VALUES (?, ?, ?, ?)`,
-    ).run(isolatedWsId, 'LostSort WS', isolatedWsId, new Date().toISOString());
+  it('returns null for lastPosition when best_position is NULL in DB', () => {
+    insertLostQuery('no position query', null, '2026-03-15', 100);
+    const result = getLostVisibilityQueries(workspaceId);
+    expect(result).toHaveLength(1);
+    expect(result[0].lastPosition).toBeNull();
+  });
 
+  it('orders results by total_impressions descending', () => {
+    insertLostQuery('low traffic query', 8.0, '2026-04-01', 50);
+    insertLostQuery('high traffic query', 3.2, '2026-04-02', 800);
+    insertLostQuery('medium traffic query', 5.5, '2026-04-03', 200);
+
+    const result = getLostVisibilityQueries(workspaceId);
+    expect(result).toHaveLength(3);
+    expect(result[0].query).toBe('high traffic query');
+    expect(result[0].totalImpressions).toBe(800);
+    expect(result[1].query).toBe('medium traffic query');
+    expect(result[1].totalImpressions).toBe(200);
+    expect(result[2].query).toBe('low traffic query');
+    expect(result[2].totalImpressions).toBe(50);
+  });
+
+  it('does not return active queries', () => {
+    insertLostQuery('lost query', 10.0, '2026-02-01', 400);
+    db.prepare(`
+      INSERT INTO discovered_queries
+        (workspace_id, query, first_seen, last_seen, best_position, snapshot_count, total_impressions, status)
+      VALUES (?, 'active query', '2026-01-01', '2026-05-22', 5.0, 10, 500, 'active')
+    `).run(workspaceId);
+
+    const result = getLostVisibilityQueries(workspaceId);
+    expect(result).toHaveLength(1);
+    expect(result[0].query).toBe('lost query');
+  });
+
+  it('is scoped to the correct workspace', () => {
+    const otherWorkspaceId = createWorkspace(`Other Workspace ${Date.now()}`).id;
     try {
-      upsertDiscoveredQueries(isolatedWsId, [obs('small lost', 5, 10)], '2024-05-01');
-      upsertDiscoveredQueries(isolatedWsId, [obs('small lost', 5, 10)], '2024-05-05');
-      upsertDiscoveredQueries(isolatedWsId, [obs('big lost', 5, 1000)], '2024-05-01');
-      upsertDiscoveredQueries(isolatedWsId, [obs('big lost', 5, 1000)], '2024-05-05');
-      detectLostVisibility(isolatedWsId, '2026-06-01');
+      insertLostQuery('owned lost query', 7.0, '2026-04-01', 150);
+      // Insert a lost query for the other workspace directly
+      db.prepare(`
+        INSERT INTO discovered_queries
+          (workspace_id, query, first_seen, last_seen, best_position, snapshot_count, total_impressions, status)
+        VALUES (?, 'other workspace query', '2026-01-01', '2026-04-01', 4.0, 3, 200, 'lost_visibility')
+      `).run(otherWorkspaceId);
 
-      const results = getLostVisibilityQueries(isolatedWsId);
-      expect(results[0].query).toBe('big lost');
-      expect(results[1].query).toBe('small lost');
+      const result = getLostVisibilityQueries(workspaceId);
+      expect(result).toHaveLength(1);
+      expect(result[0].query).toBe('owned lost query');
+
+      const otherResult = getLostVisibilityQueries(otherWorkspaceId);
+      expect(otherResult).toHaveLength(1);
+      expect(otherResult[0].query).toBe('other workspace query');
     } finally {
-      db.prepare(`DELETE FROM discovered_queries WHERE workspace_id = ?`).run(isolatedWsId);
-      db.prepare(`DELETE FROM workspaces WHERE id = ?`).run(isolatedWsId);
+      db.prepare('DELETE FROM discovered_queries WHERE workspace_id = ?').run(otherWorkspaceId);
+      deleteWorkspace(otherWorkspaceId);
     }
   });
 });
 
-// ── batch upsert ───────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════
+// upsertDiscoveredQueries — edge cases not in discovered-queries-lost-visibility.test.ts
+// ════════════════════════════════════════════════════════════════════════════
 
-describe('upsertDiscoveredQueries — batch', () => {
-  it('upserts multiple queries in a single call', () => {
-    const wsId = `ws_dcq_batch_${Date.now()}`;
-    db.prepare(
-      `INSERT OR IGNORE INTO workspaces (id, name, folder, created_at) VALUES (?, ?, ?, ?)`,
-    ).run(wsId, 'Batch WS', wsId, new Date().toISOString());
-
-    try {
-      upsertDiscoveredQueries(
-        wsId,
-        [
-          obs('batch query 1', 1, 500),
-          obs('batch query 2', 2, 300),
-          obs('batch query 3', 3, 100),
-        ],
-        '2026-01-01',
-      );
-
-      const r1 = readRow(wsId, 'batch query 1');
-      const r2 = readRow(wsId, 'batch query 2');
-      const r3 = readRow(wsId, 'batch query 3');
-
-      expect(r1!.best_position).toBe(1);
-      expect(r2!.best_position).toBe(2);
-      expect(r3!.best_position).toBe(3);
-    } finally {
-      db.prepare(`DELETE FROM discovered_queries WHERE workspace_id = ?`).run(wsId);
-      db.prepare(`DELETE FROM workspaces WHERE id = ?`).run(wsId);
-    }
+describe('upsertDiscoveredQueries — edge cases', () => {
+  it('skips blank/empty queries', () => {
+    upsertDiscoveredQueries(
+      workspaceId,
+      [
+        { query: '', position: 5.0, clicks: 1, impressions: 10, ctr: 10 },
+        { query: 'valid keyword', position: 4.0, clicks: 3, impressions: 50, ctr: 6 },
+      ],
+      '2026-05-22',
+    );
+    const all = db
+      .prepare('SELECT query FROM discovered_queries WHERE workspace_id = ?')
+      .all(workspaceId) as Array<{ query: string }>;
+    expect(all).toHaveLength(1);
+    expect(all[0].query).toBe('valid keyword');
   });
 
-  it('uses seenDate from observation when provided, overriding snapshotDate for first_seen/last_seen', () => {
-    const wsId = `ws_dcq_seendate_${Date.now()}`;
-    db.prepare(
-      `INSERT OR IGNORE INTO workspaces (id, name, folder, created_at) VALUES (?, ?, ?, ?)`,
-    ).run(wsId, 'SeenDate WS', wsId, new Date().toISOString());
+  it('handles null position gracefully (stores NULL for best_position)', () => {
+    upsertDiscoveredQueries(
+      workspaceId,
+      [{ query: 'no position keyword', position: null as unknown as number, clicks: 0, impressions: 20, ctr: 0 }],
+      '2026-05-22',
+    );
+    const row = db
+      .prepare('SELECT best_position FROM discovered_queries WHERE workspace_id = ? AND query = ?')
+      .get(workspaceId, 'no position keyword') as Record<string, unknown>;
+    expect(row).toBeTruthy();
+    expect(row.best_position).toBeNull();
+  });
 
-    try {
-      const observation = { ...obs('seen date obs query', 5, 100), seenDate: '2025-12-01' };
-      upsertDiscoveredQueries(wsId, [observation], '2026-01-01');
+  it('uses seenDate from observation when provided, overriding snapshotDate for first/last_seen', () => {
+    const overrideDate = '2026-05-10';
+    upsertDiscoveredQueries(
+      workspaceId,
+      [{ query: 'date override test', position: 8.0, clicks: 2, impressions: 40, ctr: 5, seenDate: overrideDate }],
+      '2026-05-22',
+    );
+    const row = db
+      .prepare('SELECT first_seen, last_seen FROM discovered_queries WHERE workspace_id = ? AND query = ?')
+      .get(workspaceId, 'date override test') as Record<string, unknown>;
+    expect(row.first_seen).toBe(overrideDate);
+    expect(row.last_seen).toBe(overrideDate);
+  });
 
-      const row = readRow(wsId, 'seen date obs query');
-      // seenDate on the observation overrides snapshotDate for first_seen/last_seen
-      expect(row!.first_seen).toBe('2025-12-01');
-      expect(row!.last_seen).toBe('2025-12-01');
-      // last_snapshot_date uses the snapshotDate argument
-      expect(row!.last_snapshot_date).toBe('2026-01-01');
-    } finally {
-      db.prepare(`DELETE FROM discovered_queries WHERE workspace_id = ?`).run(wsId);
-      db.prepare(`DELETE FROM workspaces WHERE id = ?`).run(wsId);
-    }
+  it('processes multiple queries in a single call (transaction)', () => {
+    upsertDiscoveredQueries(
+      workspaceId,
+      [
+        { query: 'keyword one', position: 3.0, clicks: 10, impressions: 100, ctr: 10 },
+        { query: 'keyword two', position: 7.0, clicks: 5, impressions: 60, ctr: 8.3 },
+        { query: 'keyword three', position: 12.0, clicks: 2, impressions: 30, ctr: 6.7 },
+      ],
+      '2026-05-22',
+    );
+    const count = (
+      db.prepare('SELECT COUNT(*) AS count FROM discovered_queries WHERE workspace_id = ?')
+        .get(workspaceId) as { count: number }
+    ).count;
+    expect(count).toBe(3);
+  });
+
+  it('keeps best (lowest) position across upserts', () => {
+    upsertDiscoveredQueries(
+      workspaceId,
+      [{ query: 'position tracking', position: 15.0, clicks: 1, impressions: 20, ctr: 5 }],
+      '2026-05-20',
+    );
+    upsertDiscoveredQueries(
+      workspaceId,
+      [{ query: 'position tracking', position: 8.0, clicks: 3, impressions: 50, ctr: 6 }],
+      '2026-05-22',
+    );
+    // Third upsert with worse position
+    upsertDiscoveredQueries(
+      workspaceId,
+      [{ query: 'position tracking', position: 20.0, clicks: 1, impressions: 15, ctr: 5 }],
+      '2026-05-23',
+    );
+    const row = db
+      .prepare('SELECT best_position FROM discovered_queries WHERE workspace_id = ? AND query = ?')
+      .get(workspaceId, 'position tracking') as Record<string, unknown>;
+    expect(row.best_position).toBeCloseTo(8.0);
   });
 });

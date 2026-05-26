@@ -204,7 +204,7 @@ export const RICH_SITE_HEALTH: SiteHealthSlice = {
     { url: '/legacy', target: '/old-page', chainDepth: 2, status: 301 },
   ],
   schemaValidation: { valid: 15, warnings: 4, errors: 3 },
-  performanceSummary: { avgLcp: 2.1, avgFid: 45, avgCls: 0.08, score: 76 },
+  performanceSummary: { avgLcp: 2100, avgInp: 180, avgFid: 45, avgCls: 0.08, score: 76 },
   anomalyCount: 2,
   anomalyTypes: ['traffic_spike', 'ranking_drop'],
   seoChangeVelocity: 14,

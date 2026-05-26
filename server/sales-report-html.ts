@@ -62,8 +62,10 @@ export function renderSalesReportHTML(report: SalesAuditResult & { id?: string }
   }
   const sortedIssues = Array.from(issuesByCheck.values())
     .sort((a, b) => {
-      const sev = { error: 0, warning: 1, info: 2 };
-      return (sev[a.issue.severity] || 2) - (sev[b.issue.severity] || 2);
+      const sev: Record<string, number> = { error: 0, warning: 1, info: 2 };
+      const ra = sev[a.issue.severity] ?? 2;
+      const rb = sev[b.issue.severity] ?? 2;
+      return ra - rb;
     });
 
   // --- DATA ANALYST ENHANCEMENTS (pre-computed) ---

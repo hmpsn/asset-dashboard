@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { getSafe, getOptional } from '../../api/client';
+import { ApiError, get, getSafe, getOptional } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
 import type { AnalyticsInsight } from '../../../shared/types/analytics';
 import type { ClientAction } from '../../../shared/types/client-actions';
@@ -11,6 +11,7 @@ import type {
 } from '../../components/client/types';
 import type { PricingData } from '../usePayments';
 import { keywordComparisonKey } from '../../../shared/keyword-normalization';
+import type { ROIData } from '../../../shared/types/roi';
 
 // ── Activity ──────────────────────────────────────────────────────
 export function useClientActivity(wsId: string, enabled: boolean) {
@@ -125,6 +126,23 @@ export function useClientStrategy(wsId: string, enabled: boolean) {
     queryKey: queryKeys.client.strategy(wsId),
     queryFn: () => getOptional<ClientKeywordStrategy>(`/api/public/seo-strategy/${wsId}`),
     enabled,
+  });
+}
+
+export function useClientROI(wsId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.client.roi(wsId),
+    queryFn: async () => {
+      try {
+        return await get<ROIData>(`/api/public/roi/${wsId}`);
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 404) return null;
+        throw err;
+      }
+    },
+    enabled,
+    staleTime: 10 * 60 * 1000,
+    retry: 2,
   });
 }
 

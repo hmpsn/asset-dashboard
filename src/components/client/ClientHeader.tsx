@@ -1,5 +1,5 @@
 import React from 'react';
-import { Lock, Sun, Moon, Calendar, LogOut } from 'lucide-react';
+import { Lock, Sun, Moon, Calendar, LogOut, Sparkles } from 'lucide-react';
 import { SeoCartButton } from './SeoCart';
 import { STUDIO_NAME } from '../../constants';
 import { Badge, Button, FormInput, Icon, IconButton } from '../ui';
@@ -29,9 +29,11 @@ interface ClientHeaderProps {
   customEndRef: React.RefObject<HTMLInputElement | null>;
   clientUser: { id?: string; name: string; email?: string; role?: string } | null;
   handleClientLogout: () => void;
+  onShowTour: () => void;
   setShowUpgradeModal: React.Dispatch<React.SetStateAction<boolean>>;
   pendingApprovals: number;
   unreadTeamNotes: number;
+  hasCopyEntries: boolean;
   contentPlanSummary: { reviewCells: number } | null;
   hasData: (tabId: ClientTab) => boolean;
   contentRequests: ClientContentRequest[];
@@ -58,9 +60,11 @@ export function ClientHeader({
   customEndRef,
   clientUser,
   handleClientLogout,
+  onShowTour,
   setShowUpgradeModal,
   pendingApprovals,
   unreadTeamNotes,
+  hasCopyEntries,
   contentPlanSummary,
   hasData,
   contentRequests,
@@ -92,7 +96,7 @@ export function ClientHeader({
                 </span>
               )}
             </div>
-            <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">Insights Engine{hasAnyData && <span className="ml-2 text-[var(--brand-text-muted)]">· Updated {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}</p>
+            <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">SEO insights dashboard{hasAnyData && <span className="ml-2 text-[var(--brand-text-muted)]">· Updated {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}</p>
           </div>
         </div>
         <div className="w-full sm:w-auto flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap sm:justify-end">
@@ -112,6 +116,12 @@ export function ClientHeader({
             label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             variant="solid"
             onClick={toggleTheme}
+          />
+          <IconButton
+            icon={Sparkles}
+            label="Show welcome tour"
+            variant="solid"
+            onClick={onShowTour}
           />
           {hasAnalytics && (
             // pr-check-disable-next-line -- Date-range segmented control toolbar; interactive control, not a content card
@@ -202,6 +212,8 @@ export function ClientHeader({
             const pendingReviews = contentRequests.filter(
               r => r.status === 'client_review' || r.status === 'post_review',
             ).length;
+            const copyReviewCount = hasCopyEntries ? 1 : 0;
+            const inboxCount = pendingApprovals + pendingReviews + unreadTeamNotes + copyReviewCount;
             return (
               <Button key={t.id} variant="ghost" role="tab" aria-selected={active} tabIndex={active ? 0 : -1}
                 onClick={() => t.locked ? setShowUpgradeModal(true) : setTab(t.id)}
@@ -212,9 +224,9 @@ export function ClientHeader({
                 }`}>
                 <Icon as={TabIcon} size="md" /> {t.label}
                 {t.locked && <Icon as={Lock} size="sm" className="ml-0.5 text-[var(--brand-text-muted)]" />}
-                {t.id === 'inbox' && (pendingApprovals + pendingReviews + unreadTeamNotes) > 0 && (
+                {t.id === 'inbox' && inboxCount > 0 && (
                   <Badge
-                    label={`${pendingApprovals + pendingReviews + unreadTeamNotes}`}
+                    label={`${inboxCount}`}
                     tone="teal"
                     variant="solid"
                     shape="pill"

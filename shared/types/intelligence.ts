@@ -20,18 +20,48 @@ import type {
 
 // ── Slice selection ─────────────────────────────────────────────────────
 
-export type IntelligenceSlice =
-  | 'seoContext'
-  | 'insights'
-  | 'learnings'
-  | 'pageProfile'
-  | 'contentPipeline'
-  | 'siteHealth'
-  | 'clientSignals'
-  | 'operational'
-  | 'pageElements'
-  | 'siteInventory'
-  | 'localSeo';
+export const INTELLIGENCE_SLICES = [
+  'seoContext',
+  'insights',
+  'learnings',
+  'pageProfile',
+  'contentPipeline',
+  'siteHealth',
+  'clientSignals',
+  'operational',
+  'pageElements',
+  'siteInventory',
+  'localSeo',
+] as const;
+
+export type IntelligenceSlice = typeof INTELLIGENCE_SLICES[number];
+
+export const OPTION_SCOPED_INTELLIGENCE_SLICES = [
+  'pageProfile',
+  'pageElements',
+  'siteInventory',
+] as const satisfies readonly IntelligenceSlice[];
+
+export const PROMPT_FORMATTABLE_INTELLIGENCE_SLICES = [
+  'seoContext',
+  'insights',
+  'learnings',
+  'pageProfile',
+  'contentPipeline',
+  'siteHealth',
+  'clientSignals',
+  'operational',
+  'pageElements',
+  'localSeo',
+] as const satisfies readonly IntelligenceSlice[];
+
+export function isIntelligenceSlice(value: string): value is IntelligenceSlice {
+  return (INTELLIGENCE_SLICES as readonly string[]).includes(value);
+}
+
+export function isPromptFormattableIntelligenceSlice(value: string): value is typeof PROMPT_FORMATTABLE_INTELLIGENCE_SLICES[number] {
+  return (PROMPT_FORMATTABLE_INTELLIGENCE_SLICES as readonly string[]).includes(value);
+}
 
 // ── Options ─────────────────────────────────────────────────────────────
 
@@ -190,7 +220,7 @@ export interface ContentPipelineSlice {
   posts: { total: number; byStatus: Record<string, number> };
   matrices: { total: number; cellsPlanned: number; cellsPublished: number };
   requests: { pending: number; inProgress: number; delivered: number };
-  workOrders: { active: number };
+  workOrders: { active: number; pending?: number };
   coverageGaps: string[];
   seoEdits: { pending: number; applied: number; inReview: number };
   // New in 3A
@@ -599,6 +629,8 @@ export interface SchemaValidationSummary {
 
 export interface PerformanceSummary {
   avgLcp: number | null;
+  /** Interaction to Next Paint in milliseconds. INP replaced FID as a Core Web Vital. */
+  avgInp?: number | null;
   avgFid: number | null;
   avgCls: number | null;
   score: number | null;
@@ -647,7 +679,7 @@ export interface ContentPipelineSummary {
   posts: { total: number; byStatus: Record<string, number> };
   matrices: { total: number; cellsPlanned: number; cellsPublished: number };
   requests: { pending: number; inProgress: number; delivered: number };
-  workOrders: { active: number };
+  workOrders: { active: number; pending?: number };
   seoEdits: { pending: number; applied: number; inReview: number };
 }
 
