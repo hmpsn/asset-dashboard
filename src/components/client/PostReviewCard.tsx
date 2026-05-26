@@ -9,6 +9,7 @@ import { queryKeys } from '../../lib/queryKeys';
 import { countWordsFromHtml } from '../../lib/utils';
 import { useClientPostPreview } from '../../hooks/client/useClientPostPreview';
 import { RichTextEditor } from '../post-editor/RichTextEditor';
+import { clientRichTextClass } from '../post-editor/richTextStyles';
 import { useAutoSave } from '../../hooks/useAutoSave';
 
 // Adapter: server returns the full ContentTopicRequest; the client portal
@@ -29,16 +30,6 @@ interface PostReviewCardProps {
   onUpdate: (updated: ClientContentRequest) => void;
   setToast: (t: { message: string; type: 'success' | 'error' } | null) => void;
 }
-
-const richTextPreviewClass = [
-  't-body text-[var(--brand-text)] leading-7 max-w-none',
-  '[&_p]:mb-3 [&_p:last-child]:mb-0',
-  '[&_a]:text-accent-brand [&_a]:underline [&_a]:underline-offset-2',
-  '[&_strong]:font-semibold [&_strong]:text-[var(--brand-text-bright)]',
-  '[&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-5',
-  '[&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-5',
-  '[&_li]:mb-1.5',
-].join(' ');
 
 export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: PostReviewCardProps) {
   // ALL hooks must be declared before any early returns (Rules of Hooks).
@@ -315,7 +306,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
           </div>
         ) : (
           <div
-            className={richTextPreviewClass}
+            className={clientRichTextClass}
             dangerouslySetInnerHTML={{ __html: post.introduction }}
           />
         )}
@@ -379,7 +370,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
             </div>
           ) : (
             <div
-              className={richTextPreviewClass}
+              className={clientRichTextClass}
               dangerouslySetInnerHTML={{ __html: section.content }}
             />
           )}
@@ -432,7 +423,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
           </div>
         ) : (
           <div
-            className={richTextPreviewClass}
+            className={clientRichTextClass}
             dangerouslySetInnerHTML={{ __html: post.conclusion }}
           />
         )}

@@ -288,6 +288,44 @@ Return only the refined content — no preamble.`;
   return doRefine.immediate();
 }
 
+export function updateDeliverableContent(
+  workspaceId: string,
+  id: string,
+  content: string,
+): BrandDeliverable | null {
+  const doUpdate = db.transaction((): BrandDeliverable | null => {
+    const existing = stmts().getById.get(id, workspaceId) as DeliverableRow | undefined;
+    if (!existing) return null;
+
+    if (existing.content === content) {
+      return rowToDeliverable(existing);
+    }
+
+    const now = new Date().toISOString();
+    const newVersion = existing.version + 1;
+    stmts().insertVersion.run({
+      id: `biv_${randomUUID().slice(0, 8)}`,
+      deliverable_id: id,
+      content: existing.content,
+      steering_notes: 'Manual edit',
+      version: existing.version,
+      created_at: now,
+    });
+    stmts().updateContent.run({
+      id,
+      workspace_id: workspaceId,
+      content,
+      status: 'draft',
+      version: newVersion,
+      tier: existing.tier,
+      updated_at: now,
+    });
+    return { ...rowToDeliverable(existing), content, status: 'draft', version: newVersion, updatedAt: now };
+  });
+
+  return doUpdate.immediate();
+}
+
 export function approveDeliverable(workspaceId: string, id: string): BrandDeliverable | null {
   return setDeliverableStatus(workspaceId, id, 'approved');
 }

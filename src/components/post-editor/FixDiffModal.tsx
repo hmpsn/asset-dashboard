@@ -2,6 +2,7 @@ import { Loader2, Check } from 'lucide-react';
 import type { AiFixResult } from '../../../shared/types/content';
 import { Button } from '../ui';
 import { Modal } from '../ui/overlay/Modal';
+import { diffRichTextClass } from './richTextStyles';
 
 interface FixDiffModalProps {
   issueLabel: string;
@@ -67,14 +68,14 @@ export function FixDiffModal({ issueLabel, result, loading, applying, onApply, o
                   <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1">Original</div>
                   {/* AI HTML output is sanitized server-side via sanitizeRichText() in /ai-fix endpoint */}
                   <div
-                    className="p-3 rounded-[var(--radius-lg)] bg-red-500/5 border border-red-500/20 text-xs text-[var(--brand-text)] leading-relaxed line-through decoration-red-500/40 [&_strong]:text-[var(--brand-text-bright)] [&_h2]:font-semibold [&_h2]:text-[var(--brand-text-bright)] [&_a]:text-teal-400 max-h-56 overflow-y-auto"
+                    className={`p-3 rounded-[var(--radius-lg)] bg-red-500/5 border border-red-500/20 line-through decoration-red-500/40 max-h-56 overflow-y-auto ${diffRichTextClass}`}
                     dangerouslySetInnerHTML={{ __html: result.originalText }}
                   />
                 </div>
                 <div>
                   <div className="t-caption-sm text-teal-300 mb-1">Suggested</div>
                   <div
-                    className="p-3 rounded-[var(--radius-lg)] bg-emerald-500/5 border border-emerald-500/20 text-xs text-[var(--brand-text)] leading-relaxed [&_strong]:text-[var(--brand-text-bright)] [&_h2]:font-semibold [&_h2]:text-[var(--brand-text-bright)] [&_a]:text-teal-400 max-h-56 overflow-y-auto"
+                    className={`p-3 rounded-[var(--radius-lg)] bg-emerald-500/5 border border-emerald-500/20 max-h-56 overflow-y-auto ${diffRichTextClass}`}
                     dangerouslySetInnerHTML={{ __html: result.suggestedText }}
                   />
                 </div>

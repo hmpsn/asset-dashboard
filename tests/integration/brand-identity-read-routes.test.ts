@@ -12,11 +12,27 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import db from '../../server/db/index.js';
 
 const ctx = createTestContext(13642); // port-ok: extending range to 13642
 const { api, patchJson } = ctx;
 
 let wsId = '';
+
+function seedDeliverable(
+  workspaceId: string,
+  id: string,
+  content: string,
+  status: 'draft' | 'approved' = 'draft',
+  deliverableType: 'mission' | 'vision' = 'mission',
+) {
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO brand_identity_deliverables
+    (id, workspace_id, deliverable_type, content, status, version, tier, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, workspaceId, deliverableType, content, status, 1, 'essentials', now, now);
+}
 
 beforeAll(async () => {
   await ctx.startServer();
@@ -117,5 +133,38 @@ describe('PATCH /api/brand-identity/:workspaceId/:id', () => {
     expect(res.status).toBe(400);
     const body = await res.json() as { error: string };
     expect(typeof body.error).toBe('string');
+  });
+
+  it('updates deliverable content and increments version', async () => {
+    const deliverableId = `bid_patch_content_${Date.now()}`;
+    seedDeliverable(wsId, deliverableId, 'Original mission copy.', 'approved');
+
+    const res = await patchJson(`/api/brand-identity/${wsId}/${deliverableId}`, {
+      content: 'Updated mission copy for manual edit.',
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { content: string; status: string; version: number };
+    expect(body.content).toBe('Updated mission copy for manual edit.');
+    expect(body.status).toBe('draft');
+    expect(body.version).toBe(2);
+
+    const row = db.prepare('SELECT content, status, version FROM brand_identity_deliverables WHERE id = ?').get(deliverableId) as {
+      content: string;
+      status: 'draft' | 'approved';
+      version: number;
+    };
+    expect(row.content).toBe('Updated mission copy for manual edit.');
+    expect(row.status).toBe('draft');
+    expect(row.version).toBe(2);
+  });
+
+  it('rejects empty content updates', async () => {
+    const deliverableId = `bid_patch_empty_${Date.now()}`;
+    seedDeliverable(wsId, deliverableId, 'Original content.', 'draft', 'vision');
+
+    const res = await patchJson(`/api/brand-identity/${wsId}/${deliverableId}`, {
+      content: '   ',
+    });
+    expect(res.status).toBe(400);
   });
 });
