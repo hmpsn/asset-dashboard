@@ -61,6 +61,10 @@ export async function handleIntelligenceTool(
     return { isError: true, content: [{ type: 'text' as const, text: 'No valid intelligence slices specified' }] };
   }
 
+  if (requestedSlices.length === 0) {
+    return { isError: true, content: [{ type: 'text' as const, text: 'No valid intelligence slices specified' }] };
+  }
+
   try {
     const ws = getWorkspace(workspaceId);
     if (!ws) {
