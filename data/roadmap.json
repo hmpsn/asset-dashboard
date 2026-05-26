@@ -108,6 +108,36 @@
           "notes": "Completed in this PR. Added `buildPageAssistContext()` as the canonical page-assist intelligence builder for rewrite chat, Webflow keyword analysis, single-page SEO rewrite/copy tools, bulk SEO rewrite, and the bulk rewrite background job. The builder owns keyword, voice, persona, knowledge, page profile, page element, local SEO, learnings, page insight, and rewrite-playbook context while routes keep caller-owned evidence such as scraped content, GSC query excerpts, sibling titles, Webflow write targets, and user instructions."
         },
         {
+          "id": "voice-authority-audit-guardrails",
+          "title": "Voice authority audit and guardrails",
+          "source": "Voice Authority Sprint Plan 2026-05-26",
+          "est": "3-5h",
+          "priority": "P0",
+          "status": "done",
+          "owner": "brand-engine",
+          "notes": "Completed in this PR. Added `docs/superpowers/audits/2026-05-26-voice-authority-audit.md` as the control artifact for the voice sprint, classifying server AI consumers as correct, builder-backed, drift, or documented exceptions. Updated `docs/rules/brand-engine.md` to reflect the current four-layer `buildSystemPrompt()` authority model, including universal prose-quality rules and the `skipProseRules` hatch. Added a voice-authority consumer inventory contract so new AI consumers must be classified and manual voice DNA/guardrail prompt assembly cannot reappear outside canonical helpers. No consumer migrations shipped in this control PR."
+        },
+        {
+          "id": "voice-authority-drift-migration",
+          "title": "Migrate confirmed voice-authority drift",
+          "source": "Voice Authority Sprint Plan 2026-05-26",
+          "est": "4-7h",
+          "priority": "P0",
+          "status": "pending",
+          "owner": "brand-engine",
+          "notes": "Follow-up to `voice-authority-audit-guardrails`. Migrate only consumers marked `drift` in the voice authority audit unless the audit and contract inventory are updated in the same commit. Current PR2 targets are anomaly summary generation, diagnostic synthesis, and Webflow SEO page tools copy optimization. Preserve documented exceptions for neutral classifiers, factual extractors, client advisor persona, and non-prompt keyword scoring."
+        },
+        {
+          "id": "voice-quality-contract-harness",
+          "title": "Voice quality prompt contract harness",
+          "source": "Voice Authority Sprint Plan 2026-05-26",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "pending",
+          "owner": "brand-engine",
+          "notes": "Follow-up after confirmed drift migration. Add fixture-driven prompt and output-format contracts for calibrated profiles, draft profiles with samples only, draft profiles with DNA/guardrails, legacy brand voice only, and no voice data. Keep subjective live-model scoring out of CI; add local/manual eval tooling only if it does not block the test suite."
+        },
+        {
           "id": "intel-quality-content-brief-decay-migration",
           "title": "Migrate content briefs and content decay recommendations onto shared context",
           "source": "Platform insights + AI content audit discussion 2026-05-18",

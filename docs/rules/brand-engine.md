@@ -24,7 +24,7 @@ Workspace intelligence assembles the SEO context in `server/intelligence/seo-con
 
 This is the most consequential rule in the brand engine. Violating it sends contradictory or redundantly weighted voice instructions to the model, and the bug is invisible — the response just degrades.
 
-### Three-Layer Architecture
+### Four-Layer Architecture
 
 ```
 Layer 1 — Base task instructions
@@ -41,9 +41,14 @@ Layer 3 — Per-workspace custom notes
   Activates when: workspaces.custom_prompt_notes is non-empty
   What it injects: "Additional context for this client:\n{notes}"
   Function: buildSystemPrompt() in server/prompt-assembly.ts
+
+Layer 4 — Universal prose quality rules
+  Activates by default for every buildSystemPrompt() call
+  What it injects: anti-generic-writing rules from server/writing-quality.ts
+  Skip hatch: buildSystemPrompt(workspaceId, base, notes, { skipProseRules: true })
 ```
 
-`buildSystemPrompt(workspaceId, baseInstructions, customNotes?)` assembles all three layers into a single string joined by `\n\n`. Call it once per request, pass the result as the system prompt.
+`buildSystemPrompt(workspaceId, baseInstructions, customNotes?, opts?)` assembles all layers into a single string joined by `\n\n`. Call it once per request, pass the result as the system prompt.
 
 ### The No-Duplicate Contract
 
@@ -72,12 +77,15 @@ buildSystemPrompt(
   workspaceId: string,
   baseInstructions: string,
   customNotes?: string | null,
+  opts?: { skipProseRules?: boolean },
 ): string
 ```
 
 Reads `voice_profiles` and `workspaces.custom_prompt_notes` from the DB on each call. If `customNotes` is provided as an argument, the DB query for custom notes is skipped (avoids a duplicate read when the caller has already fetched it for hashing).
 
 Layer 2 is a no-op when no `voice_profiles` row exists or when `status !== 'calibrated'`. The function degrades gracefully when the `voice_profiles` table does not exist (test environments without migrations).
+
+Layer 4 appends the universal prose quality rules by default. Use `{ skipProseRules: true }` only when the caller already includes the same rules or intentionally supplies a complete style system, such as copy generation paths that own richer writing-quality instructions. Do not skip Layer 4 just to save tokens.
 
 ---
 
