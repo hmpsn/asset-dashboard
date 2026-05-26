@@ -40,7 +40,7 @@ export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
       >
         <div className="flex items-center gap-2">
           <Icon as={RefreshCw} size="md" className="text-amber-400" />
-          <span className="t-ui font-semibold text-amber-300">What Changed</span>
+          <span className="t-body font-semibold text-amber-300">What Changed</span>
           <span className="t-caption-sm text-[var(--brand-text-muted)]">
             {totalChanges} strategy update{totalChanges !== 1 ? 's' : ''} since {new Date(diff.previousGeneratedAt).toLocaleDateString()}
           </span>

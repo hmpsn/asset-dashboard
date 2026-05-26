@@ -50,7 +50,7 @@ export function StrategyPageKeywordMapSection({
                 <Icon as={Layers} size="md" className="text-accent-info" />
               </div>
               <div className="text-left">
-                <div className="t-ui font-medium text-[var(--brand-text-bright)]">Page Keyword Map</div>
+                <div className="t-body font-medium text-[var(--brand-text-bright)]">Page Keyword Map</div>
                 <div className="t-caption-sm text-[var(--brand-text-muted)]">{pageMap.length} pages mapped · advanced page-to-keyword detail</div>
               </div>
             </div>

@@ -136,7 +136,7 @@ export function KeywordStrategyGuide() {
                 <div className="flex-1 min-w-0 space-y-2">
                   <div className="flex items-center gap-2">
                     <span className="t-micro font-bold text-[var(--brand-text-muted)] uppercase tracking-wider">Step {step.number}</span>
-                    <h3 className="t-ui font-medium text-[var(--brand-text-bright)]">{step.title}</h3>
+                    <h3 className="t-body font-medium text-[var(--brand-text-bright)]">{step.title}</h3>
                   </div>
                   <p className="t-caption text-[var(--brand-text)] leading-relaxed">{step.description}</p>
                   <ul className="space-y-1">

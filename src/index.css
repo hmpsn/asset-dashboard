@@ -619,6 +619,16 @@ body::after {
 
 } /* end @layer components — .t-* typography utilities */
 
+/* ─── Client typography calibration ───────────────────────────────────────────
+   Client portal content should feel less "UI chrome" heavy than admin views,
+   so map compact utility text back onto DIN Pro within the client shell. */
+.client-typography,
+.client-typography .t-page,
+.client-typography .t-ui,
+.client-typography .t-caption-sm {
+  font-family: 'DIN Pro', 'Inter', sans-serif;
+}
+
 /* ─── Client Dashboard Light Theme ─── */
 
 /* === Base ===

@@ -34,7 +34,7 @@ export function StrategyNextStepsSection({
                 <Icon as={FileText} size="lg" className="text-accent-brand" />
               </div>
               <div className="min-w-0">
-                <div className="t-ui font-medium text-[var(--brand-text-bright)]">Review new content ideas</div>
+                <div className="t-body font-medium text-[var(--brand-text-bright)]">Review new content ideas</div>
                 <div className="t-caption-sm text-[var(--brand-text-muted)]">{contentGapsFound} strongest content recommendations</div>
               </div>
             </div>
@@ -52,7 +52,7 @@ export function StrategyNextStepsSection({
                   <Icon as={Zap} size="lg" className="text-accent-warning" />
                 </div>
                 <div className="min-w-0">
-                  <div className="t-ui font-medium text-[var(--brand-text-bright)]">Improve existing pages</div>
+                  <div className="t-body font-medium text-[var(--brand-text-bright)]">Improve existing pages</div>
                   <div className="t-caption-sm text-[var(--brand-text-muted)]">{totalPageImprovements} page improvements to work through</div>
                 </div>
               </div>
@@ -70,7 +70,7 @@ export function StrategyNextStepsSection({
                 <Icon as={Target} size="lg" className="text-accent-info" />
               </div>
               <div className="min-w-0">
-                <div className="t-ui font-medium text-[var(--brand-text-bright)]">Guide strategy keywords</div>
+                <div className="t-body font-medium text-[var(--brand-text-bright)]">Guide strategy keywords</div>
                 <div className="t-caption-sm text-[var(--brand-text-muted)]">{strategyKeywordCount} keywords shaping the strategy</div>
               </div>
             </div>

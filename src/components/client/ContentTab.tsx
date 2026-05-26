@@ -92,6 +92,13 @@ export function ContentTab({
   } = useContentRequests({ workspaceId, setContentRequests, setToast });
 
   return (<>
+    <PageHeader
+      title="Content Pipeline"
+      subtitle="Track and manage your content requests"
+      actions={<Button onClick={() => setShowTopicForm(!showTopicForm)} icon={Plus} size="sm">Suggest a Topic</Button>}
+      className="mb-1"
+    />
+
     {/* Alert banner for items needing review */}
     {(() => {
       const reviewCount = contentRequests.filter(r => r.status === 'client_review').length;
@@ -157,13 +164,6 @@ export function ContentTab({
         </div>
       );
     })()}
-
-    <PageHeader
-      title="Content Pipeline"
-      subtitle="Track and manage your content requests"
-      actions={<Button onClick={() => setShowTopicForm(!showTopicForm)} icon={Plus} size="sm">Suggest a Topic</Button>}
-      className="mb-1"
-    />
 
     {/* Topic submission form */}
     {showTopicForm && (

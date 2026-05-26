@@ -27,27 +27,15 @@ import { buildFixTypeGroups, checkImpact } from './healthTabModel';
 import type { HealthTabShell } from './useHealthTabShell';
 
 interface HeaderSectionProps {
-  auditDetail: AuditDetail;
   shell: Pick<
     HealthTabShell,
     'shareOpen' | 'setShareOpen' | 'shareRef' | 'reports' | 'copiedId' | 'copyReportLink'
   >;
 }
 
-export function HealthHeaderSection({ auditDetail, shell }: HeaderSectionProps) {
+export function HealthHeaderSection({ shell }: HeaderSectionProps) {
   return (
-    <div className="flex items-start justify-between">
-      <div>
-        <h2 className="t-h2 text-[var(--brand-text-bright)]">Site Health</h2>
-        <p className="t-body text-[var(--brand-text-muted)] mt-1">
-          {auditDetail.audit.totalPages} pages · Last scanned{' '}
-          {new Date(auditDetail.createdAt).toLocaleDateString('en-US', {
-            month: 'long',
-            day: 'numeric',
-            year: 'numeric',
-          })}
-        </p>
-      </div>
+    <div className="flex items-start justify-end">
       <div className="relative" ref={shell.shareRef}>
         <Button
           variant="secondary"

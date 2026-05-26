@@ -32,7 +32,7 @@ export function StrategyDeclinedKeywordsSection({
             <Icon as={Ban} size="md" className="text-accent-danger" />
           </div>
           <div className="text-left">
-            <div className="t-ui font-medium text-[var(--brand-text-bright)]">Not Relevant Keywords</div>
+            <div className="t-body font-medium text-[var(--brand-text-bright)]">Not Relevant Keywords</div>
             <div className="t-caption-sm text-[var(--brand-text-muted)]">{declined.length} keywords excluded from future strategies</div>
           </div>
         </div>

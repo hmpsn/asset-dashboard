@@ -68,7 +68,7 @@ export function ContentGaps({ contentGaps, workspaceId }: ContentGapsProps) {
           return (
             <div key={i} className="px-3 py-2.5 bg-[var(--surface-3)]/40 rounded-[var(--radius-lg)] border border-[var(--brand-border)]">
               <div className="flex items-center justify-between">
-                <span className="t-ui font-medium text-[var(--brand-text-bright)]">{gap.topic}{gap.opportunityScore != null && (
+                <span className="t-body font-medium text-[var(--brand-text-bright)]">{gap.topic}{gap.opportunityScore != null && (
                   <Badge label={`${gap.opportunityScore}/100`} tone="blue" shape="pill" className="ml-2" />
                 )}</span>
                 <div className="flex items-center gap-2">

@@ -85,7 +85,7 @@ export function IntelligenceSignals({ workspaceId }: Props) {
               <Icon as={SignalIcon} size="sm" className={`mt-0.5 ${color} shrink-0`} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="t-ui font-medium text-[var(--brand-text-bright)] truncate">
+                  <span className="t-body font-medium text-[var(--brand-text-bright)] truncate">
                     {signal.keyword}
                   </span>
                   <Badge

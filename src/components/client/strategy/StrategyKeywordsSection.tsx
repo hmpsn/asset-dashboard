@@ -160,7 +160,7 @@ export function StrategyKeywordsSection({
                         }`}
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="t-ui font-medium text-[var(--brand-text-bright)] truncate">{row.label}</div>
+                        <div className="t-body font-medium text-[var(--brand-text-bright)] truncate">{row.label}</div>
                         <div className="t-caption text-[var(--brand-text-muted)] truncate">
                           {roleSubLabel(row)}{row.enrichmentStatus === 'unenriched' ? ' · data pending' : ''}
                         </div>
@@ -225,7 +225,7 @@ export function StrategyKeywordsSection({
                     style={{ opacity: Math.max(0.2, Math.min(1, (row.opportunityScore ?? 0) / 100)) }}
                   />
                   <div className="flex-1 min-w-0">
-                    <div className="t-ui font-medium text-[var(--brand-text-bright)] truncate">{row.label}</div>
+                    <div className="t-body font-medium text-[var(--brand-text-bright)] truncate">{row.label}</div>
                     {((row.volume != null && row.volume > 0) || (row.difficulty != null && row.difficulty > 0)) && (
                       <div className="t-caption text-[var(--brand-text-muted)] truncate">
                         {[

@@ -47,7 +47,7 @@ export function HealthTab({
   if (auditDetail) {
     return (
       <div className="space-y-8">
-        <HealthHeaderSection auditDetail={auditDetail} shell={shell} />
+        <HealthHeaderSection shell={shell} />
         <HealthScoreSummarySection auditDetail={auditDetail} shell={shell} />
         <HealthAuditDiffSection auditDetail={auditDetail} />
         <HealthPageSpeedSection auditDetail={auditDetail} />

@@ -62,7 +62,7 @@ export function StrategyBusinessPrioritiesSection({
               <Icon as={Briefcase} size="md" className="text-accent-brand" />
             </div>
             <div className="text-left">
-              <div className="t-ui font-medium text-[var(--brand-text-bright)]">Guide This Strategy</div>
+              <div className="t-body font-medium text-[var(--brand-text-bright)]">Guide This Strategy</div>
               <div className="t-caption-sm text-[var(--brand-text-muted)]">
                 {priorities.length > 0
                   ? `${priorities.length} business ${priorities.length === 1 ? 'priority' : 'priorities'} saved`

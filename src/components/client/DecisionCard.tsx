@@ -48,7 +48,7 @@ export function DecisionCard({
       </div>
 
       {/* Title + summary */}
-      <h4 className="t-ui font-medium text-[var(--brand-text-bright)]">{decision.title}</h4>
+      <h4 className="t-body font-semibold text-[var(--brand-text-bright)]">{decision.title}</h4>
       <p className="t-caption text-[var(--brand-text-muted)] mt-0.5 line-clamp-2">{decision.summary}</p>
 
       {/* Actions */}
