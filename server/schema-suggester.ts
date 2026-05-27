@@ -19,6 +19,8 @@ import type { SchemaGenerationDiagnostics } from '../shared/types/schema-generat
 import { isUtilitySchemaPath } from './schema/site-inventory.js';
 import type { SchemaCmsDeliveryStatus, SchemaCollectionIdentity, SiteInventoryCmsItem, SiteInventorySlice } from '../shared/types/site-inventory.js';
 import type { WebflowPage } from './webflow-pages.js';
+import { ENTITY_SURFACES } from '../shared/types/entity-resolution.js';
+import type { EntityResolutionSlice, ResolvedEntity } from '../shared/types/entity-resolution.js';
 
 /**
  * AI budget allocation for the page-element AI extractors.
@@ -202,10 +204,61 @@ async function readSchemaPageIntelligence(
       pagePath,
       tokenOverride,
       includePageElements: true,
+      includeEntityResolution: true,
     });
   } catch { // catch-ok: schema generation can proceed without optional page intelligence
     return undefined;
   }
+}
+
+function uniqueEntities(entities: ResolvedEntity[]): ResolvedEntity[] {
+  const byId = new Map<string, ResolvedEntity>();
+  for (const entity of entities) {
+    if (!byId.has(entity.id)) byId.set(entity.id, entity);
+  }
+  return Array.from(byId.values());
+}
+
+function entityResolutionForPage(
+  slice: EntityResolutionSlice | undefined,
+  pagePath: string,
+): {
+  knowsAbout?: ResolvedEntity[];
+  articleAbout?: ResolvedEntity;
+  articleMentions?: ResolvedEntity[];
+  areaServed?: ResolvedEntity;
+} {
+  if (!slice || slice.availability === 'no_data' || slice.availability === 'not_requested') {
+    return {};
+  }
+
+  const relevant = slice.entities;
+  const knowsAbout = uniqueEntities(relevant.filter(entity =>
+    entity.surfaces.includes(ENTITY_SURFACES.organizationKnowsAbout)
+      && entity.type === 'Thing',
+  ));
+  const pageScoped = (entity: ResolvedEntity) => !entity.pagePath || entity.pagePath === pagePath;
+  const articleAbout = relevant.find(entity =>
+    pageScoped(entity)
+      && entity.type === 'Thing'
+      && entity.surfaces.includes(ENTITY_SURFACES.articleAbout),
+  );
+  const articleMentions = uniqueEntities(relevant.filter(entity =>
+    pageScoped(entity)
+      && entity.type === 'Thing'
+      && entity.surfaces.includes(ENTITY_SURFACES.articleMentions),
+  ));
+  const areaServed = relevant.find(entity =>
+    entity.type === 'Place'
+      && entity.surfaces.includes(ENTITY_SURFACES.areaServed),
+  );
+
+  return {
+    knowsAbout: knowsAbout.length > 0 ? knowsAbout : undefined,
+    articleAbout,
+    articleMentions: articleMentions.length > 0 ? articleMentions : undefined,
+    areaServed,
+  };
 }
 
 function resolveRoleOverride(opts: {
@@ -562,6 +615,7 @@ export async function generateSchemaForPage(
     const pageIntel = wsId
       ? await readSchemaPageIntelligence(siteId, baseUrl, cmsItem.path, tokenOverride)
       : undefined;
+    const entities = entityResolutionForPage(pageIntel?.entityResolution, cmsItem.path);
     const aiBudget = allocateElementAiBudget();
     const lean = await generateLeanSchema({
       pageId: cmsItem.pageId,
@@ -579,6 +633,11 @@ export async function generateSchemaForPage(
         pageKeywords: pageIntel?.pageKeywords,
         elements: pageIntel?.pageElements,
         sourcePublishedAt: cmsItem.lastPublished ?? null,
+        entityResolution: {
+          articleAbout: entities.articleAbout,
+          articleMentions: entities.articleMentions,
+          areaServed: entities.areaServed,
+        },
       },
       html: itemHtml || '',
       baseUrl,
@@ -590,6 +649,7 @@ export async function generateSchemaForPage(
         defaultLocale: ctx._defaultLocale ?? 'en',
         siteKeywordsForKnowsAbout: ctx.siteKeywords,
         siteHasSearch: ctx._siteHasSearch ?? false,
+        entityResolution: { knowsAbout: entities.knowsAbout },
         industrySubtype: roleOverride.schemaRoleOverride?.industrySubtype,
       },
       aiBudget,
@@ -665,6 +725,7 @@ export async function generateSchemaForPage(
   const pageIntel = ctx.workspaceId
     ? await readSchemaPageIntelligence(siteId, baseUrl, publishedPath, tokenOverride)
     : undefined;
+  const entities = entityResolutionForPage(pageIntel?.entityResolution, publishedPath);
 
   const aiBudget = allocateElementAiBudget();
   const lean = await generateLeanSchema({
@@ -684,6 +745,11 @@ export async function generateSchemaForPage(
       // it through so isCatalogStale can drive lazy refresh on republish.
       // Falls back to null when the Webflow response omits the field.
       sourcePublishedAt: ((meta as unknown as Record<string, unknown>).lastPublished as string | undefined) ?? null,
+      entityResolution: {
+        articleAbout: entities.articleAbout,
+        articleMentions: entities.articleMentions,
+        areaServed: entities.areaServed,
+      },
     },
     html: html || '',
     baseUrl,
@@ -695,6 +761,7 @@ export async function generateSchemaForPage(
       defaultLocale: ctx._defaultLocale ?? 'en',
       siteKeywordsForKnowsAbout: ctx.siteKeywords, // NEW
       siteHasSearch: ctx._siteHasSearch ?? false, // NEW
+      entityResolution: { knowsAbout: entities.knowsAbout },
       industrySubtype: roleOverride.schemaRoleOverride?.industrySubtype,
     },
     aiBudget, // PR2: thread per-call budget so AI extractors can run within cap
@@ -773,6 +840,7 @@ export async function generateSchemaSuggestions(
     const pageIntel = wsId
       ? await readSchemaPageIntelligence(siteId, baseUrl, publishedPath, tokenOverride)
       : undefined;
+    const entities = entityResolutionForPage(pageIntel?.entityResolution, publishedPath);
 
     const lean = await generateLeanSchema({
       pageId: page.id,
@@ -793,6 +861,11 @@ export async function generateSchemaSuggestions(
         sourcePublishedAt: typeof (page as Record<string, unknown>).lastPublished === 'string'
           ? ((page as Record<string, unknown>).lastPublished as string)
           : null,
+        entityResolution: {
+          articleAbout: entities.articleAbout,
+          articleMentions: entities.articleMentions,
+          areaServed: entities.areaServed,
+        },
       },
       html: html || '',
       baseUrl,
@@ -804,6 +877,7 @@ export async function generateSchemaSuggestions(
         defaultLocale: ctx._defaultLocale ?? 'en',
         siteKeywordsForKnowsAbout: ctx.siteKeywords, // NEW
         siteHasSearch: ctx._siteHasSearch ?? false, // NEW
+        entityResolution: { knowsAbout: entities.knowsAbout },
         industrySubtype: roleOverride.schemaRoleOverride?.industrySubtype,
       },
       aiBudget, // PR2: shared budget — drains across all static pages in this run
@@ -844,6 +918,7 @@ export async function generateSchemaSuggestions(
       const cmsPageIntel = wsId
         ? await readSchemaPageIntelligence(siteId, baseUrl, item.path, tokenOverride)
         : undefined;
+      const entities = entityResolutionForPage(cmsPageIntel?.entityResolution, item.path);
 
       const itemLean = await generateLeanSchema({
         pageId: item.pageId,
@@ -861,6 +936,11 @@ export async function generateSchemaSuggestions(
           pageKeywords: cmsPageIntel?.pageKeywords,
           elements: cmsPageIntel?.pageElements,
           sourcePublishedAt: item.lastPublished ?? null, // CMS items carry Webflow lastPublished
+          entityResolution: {
+            articleAbout: entities.articleAbout,
+            articleMentions: entities.articleMentions,
+            areaServed: entities.areaServed,
+          },
         },
         html: itemHtml || '',
         baseUrl,
@@ -872,6 +952,7 @@ export async function generateSchemaSuggestions(
           defaultLocale: ctx._defaultLocale ?? 'en',
           siteKeywordsForKnowsAbout: ctx.siteKeywords, // NEW
           siteHasSearch: ctx._siteHasSearch ?? false, // NEW
+          entityResolution: { knowsAbout: entities.knowsAbout },
           industrySubtype: roleOverride.schemaRoleOverride?.industrySubtype,
         },
         aiBudget, // PR2: same shared budget — drains across CMS pages in same run

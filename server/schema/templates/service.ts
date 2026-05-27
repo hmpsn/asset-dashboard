@@ -4,7 +4,7 @@
  * Product never emits zero-price offers.
  */
 import type { PageData, BusinessProfile } from '../data-sources.js';
-import { dropUndefined, orgRef, localBusinessRef, withBreadcrumb, webSiteRef, breadcrumbRef, filterHttpUrls } from './helpers.js';
+import { dropUndefined, orgRef, localBusinessRef, withBreadcrumb, webSiteRef, breadcrumbRef, filterHttpUrls, resolvedEntityToThingNode } from './helpers.js';
 
 export interface ServiceInput {
   baseUrl: string;
@@ -76,7 +76,11 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
         }),
     'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
     'inLanguage': pageData.inLanguage,
-    'areaServed': safeAreaServed ? { '@type': 'Place' as const, name: safeAreaServed } : undefined,
+    'areaServed': pageData.areaServedEntity
+      ? resolvedEntityToThingNode(pageData.areaServedEntity)
+      : safeAreaServed
+        ? { '@type': 'Place' as const, name: safeAreaServed }
+        : undefined,
     'serviceType': pageData.serviceType,
     'offers': offers.length > 0
       ? offers.map((offer, idx) => dropUndefined({

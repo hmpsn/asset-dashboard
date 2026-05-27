@@ -114,4 +114,13 @@ describe('SchemaSuggester CMS workflow extraction', () => {
     expect(cmsBranch).toContain('siteContextForCms');
     expect(cmsBranch).not.toContain('assembleSiteContext(contextPages, baseUrl)');
   });
+
+  it('threads entity-resolution intelligence into schema generation inputs', () => {
+    const source = readFileSync('server/schema-suggester.ts', 'utf-8'); // readFile-ok — entity-resolution threading guard
+
+    expect(source).toContain('includeEntityResolution: true');
+    expect(source).toContain('const entities = entityResolutionForPage(');
+    expect(source).toContain('entityResolution: {');
+    expect(source).toContain('entityResolution: { knowsAbout: entities.knowsAbout }');
+  });
 });

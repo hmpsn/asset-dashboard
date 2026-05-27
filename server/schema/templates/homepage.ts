@@ -3,7 +3,7 @@
  * that all other pages reference via @id, never duplicating.
  */
 import type { PageData, BusinessProfile } from '../data-sources.js';
-import { breadcrumbRef, dropUndefined } from './helpers.js';
+import { breadcrumbRef, dropUndefined, resolvedEntityToThingNode } from './helpers.js';
 
 export interface HomepageInput {
   baseUrl: string;
@@ -19,6 +19,10 @@ export function buildHomepageSchema(input: HomepageInput): Record<string, unknow
   const safeSocialProfiles = businessProfile?.socialProfiles
     ?.map(url => url.trim())
     .filter(Boolean);
+  const organizationSameAs = Array.from(new Set([
+    ...(safeSocialProfiles ?? []),
+    ...(pageData.organizationSameAs ?? []),
+  ]));
 
   const organization = dropUndefined({
     '@type': 'Organization',
@@ -30,9 +34,13 @@ export function buildHomepageSchema(input: HomepageInput): Record<string, unknow
     'logo': pageData.publisher.logoUrl
       ? { '@type': 'ImageObject', 'url': pageData.publisher.logoUrl }
       : undefined,
-    'sameAs': safeSocialProfiles?.length ? safeSocialProfiles : undefined,
+    'sameAs': organizationSameAs.length > 0 ? organizationSameAs : undefined,
     'foundingDate': businessProfile?.foundedDate,
-    'knowsAbout': pageData.knowsAbout?.length ? pageData.knowsAbout : undefined,
+    'knowsAbout': pageData.knowsAboutEntities?.length
+      ? pageData.knowsAboutEntities.map(resolvedEntityToThingNode)
+      : pageData.knowsAbout?.length
+        ? pageData.knowsAbout
+        : undefined,
   });
 
   // NOTE: WebSite.potentialAction (sitelinks SearchAction) is gated on siteHasSearch.
