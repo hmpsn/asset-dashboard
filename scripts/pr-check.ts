@@ -6970,12 +6970,12 @@ export const CHECKS: Check[] = [
     // are not broken in a single PR.
     exclude: [
       'server/routes/public-portal.ts',
-      'server/routes/public-content.ts',
-      'server/routes/public-requests.ts',
-      'server/routes/recommendations.ts',
+      // public-content.ts and public-requests.ts use router.use() file-level
+      // portal auth — Pass 1 detects that, so no exclude needed.
       'server/routes/reports.ts',
-      'server/routes/stripe.ts',
       'server/routes/work-orders.ts',
+      // recommendations.ts and stripe.ts have mixed auth coverage — individual
+      // unprotected routes are hatched with // public-no-auth-ok inline.
     ],
     message:
       'New /api/public/<resource>/:workspaceId routes must call requireAuthenticatedClientPortalAuth() ' +

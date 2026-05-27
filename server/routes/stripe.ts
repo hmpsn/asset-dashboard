@@ -162,7 +162,7 @@ router.post('/api/stripe/cart-checkout', checkoutLimiter, async (req, res) => {
 });
 
 // Public: tier upgrade checkout (client-facing)
-router.post('/api/public/upgrade-checkout/:workspaceId', checkoutLimiter, async (req, res) => {
+router.post('/api/public/upgrade-checkout/:workspaceId', checkoutLimiter, async (req, res) => { // public-no-auth-ok: deferred to audit-drift-public-route-auth-sweep-followup
   if (!isStripeConfigured()) return res.status(503).json({ error: 'Stripe is not configured' });
   const wsId = req.params.workspaceId;
   const ws = getWorkspace(wsId);
@@ -220,7 +220,7 @@ router.get('/api/stripe/payments/:workspaceId/:paymentId', requireWorkspaceAcces
 });
 
 // --- ROI Dashboard ---
-router.get('/api/public/roi/:workspaceId', (req, res) => {
+router.get('/api/public/roi/:workspaceId', (req, res) => { // public-no-auth-ok: deferred to audit-drift-public-route-auth-sweep-followup
   const roi = computeROI(req.params.workspaceId);
   if (!roi) return res.status(404).json({ error: 'ROI data not available — requires keyword strategy with CPC data' });
   res.json(roi);

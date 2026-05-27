@@ -3,7 +3,7 @@
  */
 import { Router } from 'express';
 
-import { requireWorkspaceAccess, requestUserCanAccessWorkspace, sendWorkspaceAccessDenied } from '../auth.js';
+import { requireWorkspaceAccess, requestUserCanAccessWorkspace } from '../auth.js';
 import { requireAuthenticatedClientPortalAuth } from '../middleware.js';
 const router = Router();
 
@@ -38,7 +38,7 @@ router.get('/api/public/anomalies/:workspaceId', requireAuthenticatedClientPorta
 router.post('/api/anomalies/:anomalyId/dismiss', (req, res) => {
   const anomaly = getAnomalyById(req.params.anomalyId);
   if (!anomaly) return res.status(404).json({ error: 'Anomaly not found' });
-  if (!requestUserCanAccessWorkspace(req, anomaly.workspaceId)) return sendWorkspaceAccessDenied(res);
+  if (!requestUserCanAccessWorkspace(req, anomaly.workspaceId)) return res.status(404).json({ error: 'Anomaly not found' });
   const ok = dismissAnomaly(anomaly.workspaceId, req.params.anomalyId);
   if (!ok) return res.status(404).json({ error: 'Anomaly not found' });
   res.json({ dismissed: true });
@@ -47,7 +47,7 @@ router.post('/api/anomalies/:anomalyId/dismiss', (req, res) => {
 router.post('/api/anomalies/:anomalyId/acknowledge', (req, res) => {
   const anomaly = getAnomalyById(req.params.anomalyId);
   if (!anomaly) return res.status(404).json({ error: 'Anomaly not found' });
-  if (!requestUserCanAccessWorkspace(req, anomaly.workspaceId)) return sendWorkspaceAccessDenied(res);
+  if (!requestUserCanAccessWorkspace(req, anomaly.workspaceId)) return res.status(404).json({ error: 'Anomaly not found' });
   const ok = acknowledgeAnomaly(anomaly.workspaceId, req.params.anomalyId);
   if (!ok) return res.status(404).json({ error: 'Anomaly not found' });
   res.json({ acknowledged: true });

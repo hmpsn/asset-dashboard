@@ -130,20 +130,14 @@ describe('Public endpoint auth — cross-workspace session rejected', () => {
   }
 });
 
-describe('Anomaly admin-mutation guards (verification of existing behavior)', () => {
-  // Audit claimed `/api/anomalies/:anomalyId/dismiss` and `.../acknowledge`
-  // lacked a workspace guard. Verification shows both handlers load the
-  // anomaly inline and call `requestUserCanAccessWorkspace(req,
-  // anomaly.workspaceId)` before mutating. These tests document the
-  // existing protection so a future regression that removes the inline
-  // guard is caught.
+describe('Anomaly admin-mutation — nonexistent ID returns 404', () => {
+  // These confirm the handlers are reachable in the test environment and
+  // that the first guard (`getAnomalyById`) fires. They do NOT prove the
+  // cross-workspace `requestUserCanAccessWorkspace` guard works — that
+  // would require seeding a real anomaly in a different workspace.
   it('POST /api/anomalies/:anomalyId/dismiss with bogus id returns 404', async () => {
     clearCookies();
     const res = await postJson('/api/anomalies/anom_nonexistent_999/dismiss', {});
-    // Endpoint reaches the handler (no router-level auth blocks it in the
-    // test environment) and 404s because the anomaly doesn't exist —
-    // confirming the inline `getAnomalyById + access check` pattern is the
-    // sole guard path.
     expect(res.status).toBe(404);
   });
 
@@ -151,5 +145,19 @@ describe('Anomaly admin-mutation guards (verification of existing behavior)', ()
     clearCookies();
     const res = await postJson('/api/anomalies/anom_nonexistent_999/acknowledge', {});
     expect(res.status).toBe(404);
+  });
+});
+
+describe('Public endpoint auth — input validation on authenticated requests', () => {
+  it('GET rank-tracking history with invalid limit returns 400', async () => {
+    // Authenticate as wsB (unused in prior describes, avoids rate limiter
+    // bucket collision with wsA which already hit 3+ calls).
+    clearCookies();
+    const authRes = await postJson(`/api/public/auth/${wsBId}`, { password: wsBPassword });
+    expect(authRes.status).toBe(200);
+    const res = await api(`/api/public/rank-tracking/${wsBId}/history?limit=-1`);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toHaveProperty('error');
   });
 });
