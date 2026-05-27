@@ -8,8 +8,6 @@ import type { SeoAuditResult } from './seo-audit.js';
 import type { SchemaContext } from './schema-suggester.js';
 import type { CustomDateRange } from './google-analytics.js';
 import { listWorkspaces } from './workspaces.js';
-import { getAllGscPages } from './search-console.js';
-import { getGA4TopPages } from './google-analytics.js';
 import { getDeclinedKeywords } from './keyword-feedback.js';
 import { listSites } from './webflow-pages.js';
 import { PAGE_ADDRESS_SOURCES } from '../shared/types/page-address.js';
@@ -18,6 +16,11 @@ import { createLogger } from './logger.js';
 import { CRITICAL_CHECKS, MODERATE_CHECKS, computePageScore } from '../shared/scoring.js';
 import { formatPersonasForPrompt } from './workspace-intelligence.js';
 import { buildSchemaIntelligence } from './schema-intelligence.js';
+import {
+  getAuditTrafficForWorkspace as getWorkspaceAuditTraffic,
+  type AuditTrafficMap,
+  type AuditTrafficWorkspace,
+} from './audit-traffic.js';
 
 
 const log = createLogger('helpers');
@@ -509,42 +512,10 @@ export async function buildSchemaContext(
   return { ctx };
 }
 
-// ── Audit Traffic Cache ──
-
-const auditTrafficCache: Record<string, { data: Record<string, { clicks: number; impressions: number; sessions: number; pageviews: number }>; ts: number }> = {};
-
-export async function getAuditTrafficForWorkspace(ws: { id: string; webflowSiteId?: string; gscPropertyUrl?: string; ga4PropertyId?: string }): Promise<Record<string, { clicks: number; impressions: number; sessions: number; pageviews: number }>> {
-  if (!ws.webflowSiteId) return {};
-  const cacheKey = ws.id;
-  const cached = auditTrafficCache[cacheKey];
-  if (cached && Date.now() - cached.ts < 5 * 60 * 1000) return cached.data;
-  const trafficMap: Record<string, { clicks: number; impressions: number; sessions: number; pageviews: number }> = {};
-  if (ws.gscPropertyUrl) {
-    try {
-      const gscPages = await getAllGscPages(ws.id, ws.gscPropertyUrl, 28);
-      for (const p of gscPages) {
-        try {
-          const urlPath = normalizePageUrl(p.page);
-          if (!trafficMap[urlPath]) trafficMap[urlPath] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
-          trafficMap[urlPath].clicks += p.clicks;
-          trafficMap[urlPath].impressions += p.impressions;
-        } catch { /* skip malformed URLs */ }
-      }
-    } catch { /* GSC unavailable */ }
-  }
-  if (ws.ga4PropertyId) {
-    try {
-      const ga4Pages = await getGA4TopPages(ws.ga4PropertyId, 28, 500);
-      for (const p of ga4Pages) {
-        const urlPath = normalizePageUrl(p.path);
-        if (!trafficMap[urlPath]) trafficMap[urlPath] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
-        trafficMap[urlPath].pageviews += p.pageviews;
-        trafficMap[urlPath].sessions += p.users;
-      }
-    } catch { /* GA4 unavailable */ } // url-fetch-ok
-  }
-  auditTrafficCache[cacheKey] = { data: trafficMap, ts: Date.now() };
-  return trafficMap;
+export async function getAuditTrafficForWorkspace(
+  ws: AuditTrafficWorkspace,
+): Promise<AuditTrafficMap> {
+  return getWorkspaceAuditTraffic(ws);
 }
 
 // ── .env File Helpers ──

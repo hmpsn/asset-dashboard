@@ -603,11 +603,11 @@
           "title": "Client-facing Local SEO dashboard and advisor rollout",
           "source": "Focused local SEO wiring audit 2026-05-24",
           "est": "5-8h",
-          "priority": "P2",
+          "priority": "P1",
           "status": "pending",
           "plannedSprint": "deferred",
           "owner": "analytics-intelligence",
-          "notes": "Deferred until admin staging QA proves local visibility data quality and copy clarity. Public/client surfaces currently expose only legacy `local_pack` SERP-feature chips, not LocalSeoSlice data. Rollout should add a scrubbed client-safe local SEO summary to `/api/public/intelligence/:workspaceId`, the client Overview/Strategy surfaces, public AI advisor context, and briefing/recommendation surfaces only after conservative copy and tier gating are approved. Do not expose raw provider evidence, match internals, admin-only candidate state, or claim verified local rank unless the evidence explicitly supports it. Guardrails added on 2026-05-24 to pin the deferred boundary: public workspace bootstrap, public intelligence, and public strategy responses must not expose LocalSeoSlice, local visibility snapshots, candidate state, service/repeat-competitor internals, or prompt-only local SEO blocks until this rollout item is intentionally implemented."
+          "notes": "Deferred until admin staging QA proves local visibility data quality and copy clarity. Public/client surfaces currently expose only legacy `local_pack` SERP-feature chips, not LocalSeoSlice data. Rollout should add a scrubbed client-safe local SEO summary to `/api/public/intelligence/:workspaceId`, the client Overview/Strategy surfaces, public AI advisor context, and briefing/recommendation surfaces only after conservative copy and tier gating are approved. Do not expose raw provider evidence, match internals, admin-only candidate state, or claim verified local rank unless the evidence explicitly supports it. Guardrails added on 2026-05-24 to pin the deferred boundary: public workspace bootstrap, public intelligence, and public strategy responses must not expose LocalSeoSlice, local visibility snapshots, candidate state, service/repeat-competitor internals, or prompt-only local SEO blocks until this rollout item is intentionally implemented.\n[Platform health recommendation pass 2026-05-26: promoted priority because client surfaces still rely on legacy local_pack signaling while LocalSeoSlice is admin-only.]"
         },
         {
           "id": "intel-quality-local-seo-intelligence-layer",
@@ -739,10 +739,10 @@
           "title": "Schema entity grounding — typed Thing/Place entities + Wikidata sameAs disambiguation",
           "source": "Strategic landscape brainstorm 2026-04-29 (post-PR1 merge)",
           "est": "2-3w",
-          "priority": "P1",
+          "priority": "P0",
           "sprint": "future",
           "status": "pending",
-          "notes": "Tier-2 / biggest competitive moat. Replace string knowsAbout (currently ['brand strategy','webflow']) with typed Thing entities linked to Wikidata Q-numbers via sameAs. Same upgrade for Article.about (typed Thing — what is this article about?), Article.mentions[] (entities referenced in body), Place entities for areaServed (Austin, TX → Wikidata Q16559), Organization.sameAs extended with Wikidata identifier. Architecture: new EntityResolutionSlice on buildWorkspaceIntelligence, populated by a Cheerio-based extractor that runs entity recognition (likely via OpenAI structured-output prompt against curated entity types) + Wikidata SPARQL lookup for top candidates, cached per-entity. Most agencies don't do this; Google's knowledge graph rewards disambiguation heavily. Architectural prerequisite met by parity-fields PR1 Pattern B starter. Can ship after schema-page-element-catalog-v1 (the catalog feeds Article.mentions extraction)."
+          "notes": "Tier-2 / biggest competitive moat. Replace string knowsAbout (currently ['brand strategy','webflow']) with typed Thing entities linked to Wikidata Q-numbers via sameAs. Same upgrade for Article.about (typed Thing — what is this article about?), Article.mentions[] (entities referenced in body), Place entities for areaServed (Austin, TX → Wikidata Q16559), Organization.sameAs extended with Wikidata identifier. Architecture: new EntityResolutionSlice on buildWorkspaceIntelligence, populated by a Cheerio-based extractor that runs entity recognition (likely via OpenAI structured-output prompt against curated entity types) + Wikidata SPARQL lookup for top candidates, cached per-entity. Most agencies don't do this; Google's knowledge graph rewards disambiguation heavily. Architectural prerequisite met by parity-fields PR1 Pattern B starter. Can ship after schema-page-element-catalog-v1 (the catalog feeds Article.mentions extraction).\n[Platform health recommendation pass 2026-05-26: prioritized as the next emergent intelligence slice (EntityResolutionSlice) to prevent schema authority drift and duplicate ad hoc entity handling.]"
         },
         {
           "id": "schema-commerce-types",
@@ -796,8 +796,8 @@
           "title": "Permission-based feature access",
           "source": "AUTH_ROADMAP Phase 5",
           "est": "3-4h",
-          "priority": "P2",
-          "notes": "Fine-grained: client_member view-only on approvals, member can't delete workspaces.\n[Audit 2026-04-22 partial] Role enum (owner/admin/member, client_owner/client_member) and requireRole middleware shipped; per-action gating (client_member view-only on approvals, member-can't-delete-workspace) is not implemented in routes.",
+          "priority": "P1",
+          "notes": "Fine-grained: client_member view-only on approvals, member can't delete workspaces.\n[Audit 2026-04-22 partial] Role enum (owner/admin/member, client_owner/client_member) and requireRole middleware shipped; per-action gating (client_member view-only on approvals, member-can't-delete-workspace) is not implemented in routes.\n[Platform health recommendation pass 2026-05-26: promoted due to partial migration risk (roles exist, per-action route enforcement still incomplete).]",
           "status": "pending"
         },
         {
@@ -1277,10 +1277,10 @@
           "title": "InboxTab Phase 3.2 — Wins enrichment (more signal types in WinsSurface)",
           "source": "Session 2026-05-11 — Phase 3 planning",
           "est": "3-5h",
-          "priority": "P2",
+          "priority": "P1",
           "status": "pending",
           "createdAt": "2026-05-11",
-          "notes": "WinsSurface currently shows a narrow set of win signals. Enrich with: completed client actions (approval loop closed), published content posts, improved page health scores, and resolved anomalies. Requires wiring new signal types into ClientSignalsSlice in workspace-intelligence.ts."
+          "notes": "WinsSurface currently shows a narrow set of win signals. Enrich with: completed client actions (approval loop closed), published content posts, improved page health scores, and resolved anomalies. Requires wiring new signal types into ClientSignalsSlice in workspace-intelligence.ts.\n[Platform health recommendation pass 2026-05-26: promoted as the next ClientSignalsSlice expansion to avoid bespoke win-signal paths outside workspace intelligence.]"
         },
         {
           "id": "client-inbox-phase33-per-item-exclusion",
@@ -1305,6 +1305,50 @@
         }
       ],
       "name": "Client Inbox IA — Phase 3 Deferred (3.1–3.4)"
+    },
+    {
+      "id": "sprint-platform-health-wave7-drift-closure",
+      "name": "Platform Health Wave 7 — Drift Closure & Conventions Hardening",
+      "hours": "24-36",
+      "rationale": "Closes active convention drift where duplicate implementations, compatibility shims, and unenforced contracts can silently regress platform reliability.",
+      "items": [
+        {
+          "id": "platform-health-traffic-map-service-consolidation",
+          "title": "Consolidate audit-traffic assembly into one shared service",
+          "source": "Platform health recommendation pass 2026-05-26",
+          "est": "4-6h",
+          "priority": "P0",
+          "status": "done",
+          "notes": "Unify duplicated traffic-map logic currently split across helpers, recommendations, misc route, and public-portal route. Keep one canonical normalization/error/degrade path and route all consumers through it.\n[Completed in PR1 on 2026-05-26. Consolidated duplicate audit-traffic assembly into the shared service (`server/audit-traffic.ts`) and migrated misc/public/recommendation callsites to the single read path while preserving endpoint contracts.]"
+        },
+        {
+          "id": "platform-health-seo-data-mode-compat-retirement",
+          "title": "Retire remaining semrushMode compatibility seams",
+          "source": "Platform health recommendation pass 2026-05-26",
+          "est": "3-5h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Finish provider-neutral naming migration by removing semrushMode read/write fallback from route, generation options, and UI display fallbacks once legacy payload compatibility window is closed."
+        },
+        {
+          "id": "platform-health-inbox-alias-sunset-execution",
+          "title": "Execute inbox legacy alias sunset plan",
+          "source": "Platform health recommendation pass 2026-05-26",
+          "est": "3-5h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Complete deprecate-after-redirect-window workflow for legacy client inbox aliases and standalone schema-review redirects with measured traffic evidence and explicit sunset decision."
+        },
+        {
+          "id": "platform-health-intelligence-builder-prcheck-enforcement",
+          "title": "Hard-enforce intelligence consumer builder contracts in pr-check",
+          "source": "Platform health recommendation pass 2026-05-26",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "done",
+          "notes": "Promote docs/rules/intelligence-consumer-builders.md from soft guidance to mechanized enforcement now that hybrid/legacy consumer inventory is zero; block new direct prompt assembly drift.\n[Completed in PR1 on 2026-05-26. Added hard `pr-check` enforcement for builder-enforced intelligence consumers to block direct getInsights/getWorkspaceLearnings/formatLearningsForPrompt prompt-assembly drift, with fixture coverage and rule-doc sync.]"
+        }
+      ]
     },
     {
       "id": "sprint-workspace-intelligence-consolidation",

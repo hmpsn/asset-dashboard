@@ -4655,6 +4655,7 @@ describe('Meta: customCheck rule name registry', () => {
     'Public-portal mutation without addActivity',
     'broadcastToWorkspace inside bridge callback',
     'buildWorkspaceIntelligence() without slices (assembles all 8 slices)',
+    'Intelligence consumer direct learnings/insights prompt assembly',
     'Layout-driving state set in useEffect',
     'useGlobalAdminEvents import restriction',
     'Raw string literal in broadcastToWorkspace() event arg',
@@ -8577,6 +8578,69 @@ describe('Rule: mcp-action-must-broadcast', () => {
         '  await upsertBrief(workspaceId, { id: "b1" });',
         '}',
       )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: Intelligence consumer direct learnings/insights prompt assembly
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: Intelligence consumer direct learnings/insights prompt assembly', () => {
+  const RULE = 'Intelligence consumer direct learnings/insights prompt assembly';
+
+  it('flags direct getInsights() in a builder-enforced consumer file', () => {
+    const file = write(
+      uniqPath('rule-intel-builder', 'server/content-brief.ts'),
+      lines(
+        'export async function buildPrompt(workspaceId: string) {',
+        '  const insights = getInsights(workspaceId);',
+        '  return insights.length;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('respects inline // intel-builder-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-intel-builder', 'server/content-brief.ts'),
+      lines(
+        'export async function buildPrompt(workspaceId: string) {',
+        '  const insights = getInsights(workspaceId); // intel-builder-ok',
+        '  return insights.length;',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects above-line // intel-builder-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-intel-builder', 'server/content-brief.ts'),
+      lines(
+        'export async function buildPrompt(workspaceId: string) {',
+        '  // intel-builder-ok: temporary migration bridge',
+        '  const learnings = getWorkspaceLearnings(workspaceId);',
+        '  return !!learnings;',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag out-of-scope server files', () => {
+    const file = write(
+      uniqPath('rule-intel-builder', 'server/recommendations.ts'),
+      lines(
+        'export async function compute(workspaceId: string) {',
+        '  const insights = getInsights(workspaceId);',
+        '  return insights.length;',
+        '}',
+      ),
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
