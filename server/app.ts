@@ -223,7 +223,20 @@ export function createApp(): express.Express {
       if (req.path === '/api/health') return next();
       if (req.path === '/api/health/diag' && !IS_PROD) return next();
       const token = (req.headers['x-auth-token'] || req.cookies?.auth_token || '') as string;
-      if (verifyAdminToken(token)) return next();
+      if (verifyAdminToken(token)) {
+        // Keep cookie auth in sync with header auth so direct URL navigations
+        // (window.open/location.href downloads) remain authenticated.
+        const headerToken = req.headers['x-auth-token'];
+        if (typeof headerToken === 'string' && headerToken && req.cookies?.auth_token !== headerToken) {
+          res.cookie('auth_token', headerToken, {
+            httpOnly: true,
+            sameSite: 'lax',
+            maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+            secure: IS_PROD,
+          });
+        }
+        return next();
+      }
       // Also accept new JWT user tokens (from cookie or Authorization header)
       const jwtToken = req.cookies?.token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : '');
       if (jwtToken) {
