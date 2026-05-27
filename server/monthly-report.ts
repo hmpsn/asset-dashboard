@@ -180,7 +180,7 @@ export function generateReportHTML(data: MonthlyData): string {
     traffic: data.traffic,
     chatTopics: data.chatTopics,
     isTrial: trialState.isTrial,
-    trialDaysRemaining: trialState.trialDaysRemaining ?? undefined,
+    trialDaysRemaining: trialState.trialDaysRemaining,
   });
   return html;
 }
@@ -208,7 +208,7 @@ async function sendMonthlyReportEmail(ws: Workspace, data: MonthlyData) {
     traffic: data.traffic,
     chatTopics: data.chatTopics,
     isTrial: trialState.isTrial,
-    trialDaysRemaining: trialState.trialDaysRemaining ?? undefined,
+    trialDaysRemaining: trialState.trialDaysRemaining,
   });
   await sendEmail(ws.clientEmail, subject, html);
   recordSend(ws.clientEmail, 'report', 'monthly_report', ws.id, 1);

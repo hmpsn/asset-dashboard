@@ -75,7 +75,7 @@ export function toPublicWorkspaceView(
     tier: effectiveTier,
     baseTier: ws.tier || 'free',
     isTrial: trialState.isTrial,
-    trialDaysRemaining: trialState.trialDaysRemaining ?? 0,
+    trialDaysRemaining: trialState.trialDaysRemaining,
     trialEndsAt: ws.trialEndsAt || null,
     stripeEnabled: opts.stripeEnabled,
     billingMode: ws.billingMode || 'platform',

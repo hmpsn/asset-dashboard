@@ -26,13 +26,13 @@ describe('computeTrialState parity', () => {
   it('free + trialEndsAt in the past → not on trial', () => {
     const result = computeTrialState({ tier: 'free', trialEndsAt: pastDays(3) }, NOW);
     expect(result.isTrial).toBe(false);
-    expect(result.trialDaysRemaining).toBeNull();
+    expect(result.trialDaysRemaining).toBe(0);
   });
 
   it('free + trialEndsAt null → not on trial', () => {
     const result = computeTrialState({ tier: 'free', trialEndsAt: null }, NOW);
     expect(result.isTrial).toBe(false);
-    expect(result.trialDaysRemaining).toBeNull();
+    expect(result.trialDaysRemaining).toBe(0);
   });
 
   // ── Growth tier ──
@@ -40,13 +40,13 @@ describe('computeTrialState parity', () => {
   it('growth + trialEndsAt in the future → not on trial (already paid)', () => {
     const result = computeTrialState({ tier: 'growth', trialEndsAt: futureDays(10) }, NOW);
     expect(result.isTrial).toBe(false);
-    expect(result.trialDaysRemaining).toBeNull();
+    expect(result.trialDaysRemaining).toBe(0);
   });
 
   it('growth + trialEndsAt null → not on trial', () => {
     const result = computeTrialState({ tier: 'growth', trialEndsAt: null }, NOW);
     expect(result.isTrial).toBe(false);
-    expect(result.trialDaysRemaining).toBeNull();
+    expect(result.trialDaysRemaining).toBe(0);
   });
 
   // ── Premium tier ──
@@ -54,13 +54,13 @@ describe('computeTrialState parity', () => {
   it('premium + trialEndsAt in the future → not on trial', () => {
     const result = computeTrialState({ tier: 'premium', trialEndsAt: futureDays(5) }, NOW);
     expect(result.isTrial).toBe(false);
-    expect(result.trialDaysRemaining).toBeNull();
+    expect(result.trialDaysRemaining).toBe(0);
   });
 
   it('premium + trialEndsAt null → not on trial', () => {
     const result = computeTrialState({ tier: 'premium', trialEndsAt: null }, NOW);
     expect(result.isTrial).toBe(false);
-    expect(result.trialDaysRemaining).toBeNull();
+    expect(result.trialDaysRemaining).toBe(0);
   });
 
   // ── Edge cases ──
@@ -70,7 +70,7 @@ describe('computeTrialState parity', () => {
     const exactlyNow = new Date(NOW).toISOString();
     const result = computeTrialState({ tier: 'free', trialEndsAt: exactlyNow }, NOW);
     expect(result.isTrial).toBe(false);
-    expect(result.trialDaysRemaining).toBeNull();
+    expect(result.trialDaysRemaining).toBe(0);
   });
 
   it('free + trialEndsAt 1ms in the future → trial with 1 day remaining (ceil)', () => {

@@ -64,7 +64,7 @@ export function toAdminWorkspaceView(ws: Workspace, nowMs = Date.now()): AdminWo
     createdAt: ws.createdAt,
     hasPassword: !!ws.clientPassword,
     isTrial: trialState.isTrial,
-    trialDaysRemaining: trialState.trialDaysRemaining ?? 0,
+    trialDaysRemaining: trialState.trialDaysRemaining,
     effectiveTier,
   };
 }

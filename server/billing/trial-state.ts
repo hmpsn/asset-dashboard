@@ -15,7 +15,7 @@ import { computeEffectiveTier, type EffectiveTier } from '../workspaces.js';
 
 export interface TrialState {
   isTrial: boolean;
-  trialDaysRemaining: number | null;
+  trialDaysRemaining: number;
 }
 
 const MS_PER_DAY = 86_400_000;
@@ -28,7 +28,7 @@ const MS_PER_DAY = 86_400_000;
  * @param nowMs  Override for deterministic testing (default: Date.now()).
  * @returns `isTrial` is true when effectiveTier is 'growth' but baseTier is
  *          'free' (i.e. the workspace is on a Growth trial). `trialDaysRemaining`
- *          is the ceiling-rounded days left when on trial, or `null` otherwise.
+ *          is the ceiling-rounded days left when on trial, or 0 when not on trial.
  */
 export function computeTrialState(
   ws: { tier?: string | null; trialEndsAt?: string | null },
@@ -45,7 +45,7 @@ export function computeTrialState(
   const isTrial = effectiveTier === 'growth' && baseTier === 'free';
 
   if (!isTrial || !ws.trialEndsAt) {
-    return { isTrial: false, trialDaysRemaining: null };
+    return { isTrial: false, trialDaysRemaining: 0 };
   }
 
   const trialEndMs = new Date(ws.trialEndsAt).getTime();

@@ -254,7 +254,9 @@ router.get(
   '/api/briefing/:workspaceId/preview',
   requireWorkspaceAccess('workspaceId'),
   (req, res) => {
-    const briefing = buildBriefingClientView(req.params.workspaceId);
+    const ws = getWorkspace(req.params.workspaceId);
+    if (!ws) return res.status(404).json({ error: 'workspace not found' });
+    const briefing = buildBriefingClientView(ws.id);
     res.json({ briefing });
   },
 );
