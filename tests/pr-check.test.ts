@@ -5100,6 +5100,10 @@ describe('Meta: customCheck rule name registry', () => {
     // inline trial-state Date math and workspace spread-and-redact patterns.
     'Inline trial-state computation outside billing module',
     'Workspace object spread-and-redact in route handler',
+    // sprint-platform-health-wave8 Plan B Tasks 6+10 (2026-05-27) — AI JSON parse
+    // validation and broadcast completeness.
+    'Bare JSON.parse on AI text response without schema validation',
+    'Workspace mutation route missing broadcastToWorkspace',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -9271,6 +9275,114 @@ describe('Rule: Workspace object spread-and-redact in route handler', () => {
       lines(
         "import { toAdminWorkspaceView } from '../serializers/admin-workspace-view.js';",
         "res.json(toAdminWorkspaceView(ws));",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe("Rule: Bare JSON.parse on AI text response without schema validation", () => {
+  const RULE = 'Bare JSON.parse on AI text response without schema validation';
+
+  it('flags JSON.parse on AI response variables in AI-importing files', () => {
+    const file = write(
+      uniqPath('rule-ai-json-parse', 'server/my-ai-caller.ts'),
+      lines(
+        "import { callAI } from './ai.js';",
+        "const result = await callAI({ ... });",
+        "const parsed = JSON.parse(result.text);",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('does not flag when hatch comment is present', () => {
+    const file = write(
+      uniqPath('rule-ai-json-parse', 'server/my-ai-caller-hatched.ts'),
+      lines(
+        "import { callAI } from './ai.js';",
+        "const result = await callAI({ ... });",
+        "const parsed = JSON.parse(result.text); // ai-json-parse-ok: best-effort HTML extraction",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag JSON.parse in files that do not import AI modules', () => {
+    const file = write(
+      uniqPath('rule-ai-json-parse', 'server/non-ai.ts'),
+      lines(
+        "import { db } from './db.js';",
+        "const parsed = JSON.parse(rawFromDisk);",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag JSON.parse on non-AI variable names', () => {
+    const file = write(
+      uniqPath('rule-ai-json-parse', 'server/my-ai-caller-safe.ts'),
+      lines(
+        "import { callAI } from './ai.js';",
+        "const parsed = JSON.parse(dbColumn);",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe("Rule: Workspace mutation route missing broadcastToWorkspace", () => {
+  const RULE = 'Workspace mutation route missing broadcastToWorkspace';
+
+  it('flags a route file with mutations but no broadcast', () => {
+    const file = write(
+      uniqPath('rule-no-broadcast', 'server/routes/my-feature.ts'),
+      lines(
+        "router.post('/api/my-feature/:workspaceId', (req, res) => {",
+        "  stmts().run(req.params.workspaceId, req.body.value);",
+        "  res.json({ ok: true });",
+        "});",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('does not flag when broadcastToWorkspace is present', () => {
+    const file = write(
+      uniqPath('rule-no-broadcast', 'server/routes/my-feature-wired.ts'),
+      lines(
+        "router.post('/api/my-feature/:workspaceId', (req, res) => {",
+        "  stmts().run(req.params.workspaceId, req.body.value);",
+        "  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.SOMETHING, {});",
+        "  res.json({ ok: true });",
+        "});",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag when no-broadcast-ok hatch is present', () => {
+    const file = write(
+      uniqPath('rule-no-broadcast', 'server/routes/my-feature-hatched.ts'),
+      lines(
+        "// no-broadcast-ok: mutations delegated to domain module that already broadcasts",
+        "router.post('/api/my-feature/:workspaceId', (req, res) => {",
+        "  stmts().run(req.params.workspaceId, req.body.value);",
+        "  res.json({ ok: true });",
+        "});",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag a read-only route', () => {
+    const file = write(
+      uniqPath('rule-no-broadcast', 'server/routes/my-reads.ts'),
+      lines(
+        "router.get('/api/my-feature/:workspaceId', (req, res) => {",
+        "  const rows = stmts().all(req.params.workspaceId);",
+        "  res.json(rows);",
+        "});",
       ),
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
