@@ -69,6 +69,9 @@ interface PageKeywordLiteRow {
   page_title: string;
   primary_keyword: string;
   secondary_keywords: string;
+  current_position: number | null;
+  impressions: number | null;
+  clicks: number | null;
   volume: number | null;
   difficulty: number | null;
 }
@@ -249,6 +252,9 @@ const stmts = createStmtCache(() => ({
       page_title,
       primary_keyword,
       secondary_keywords,
+      current_position,
+      impressions,
+      clicks,
       volume,
       difficulty
     FROM page_keywords
@@ -460,6 +466,9 @@ function rowToLiteModel(row: PageKeywordLiteRow): PageKeywordMap {
     primaryKeyword: row.primary_keyword,
     secondaryKeywords: parseJsonSafeArray(row.secondary_keywords, z.string(), { table: 'page_keywords', field: 'secondary_keywords' }),
   };
+  if (row.current_position != null) model.currentPosition = row.current_position;
+  if (row.impressions != null) model.impressions = row.impressions;
+  if (row.clicks != null) model.clicks = row.clicks;
   if (row.volume != null) model.volume = row.volume;
   if (row.difficulty != null) model.difficulty = row.difficulty;
   return model;

@@ -217,6 +217,9 @@ describe('page-keywords integrity behavior', () => {
       pagePath: '/lite',
       primaryKeyword: 'lite keyword',
       secondaryKeywords: ['lite sibling'],
+      currentPosition: 8,
+      impressions: 510,
+      clicks: 18,
       volume: 1400,
       difficulty: 41,
       optimizationScore: 88,
@@ -230,6 +233,9 @@ describe('page-keywords integrity behavior', () => {
     expect(row.pagePath).toBe('/lite');
     expect(row.primaryKeyword).toBe('lite keyword');
     expect(row.secondaryKeywords).toEqual(['lite sibling']);
+    expect(row.currentPosition).toBe(8);
+    expect(row.impressions).toBe(510);
+    expect(row.clicks).toBe(18);
     expect(row.volume).toBe(1400);
     expect(row.difficulty).toBe(41);
     expect(row.optimizationScore).toBeUndefined();
