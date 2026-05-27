@@ -7097,6 +7097,86 @@ export const CHECKS: Check[] = [
       return hits;
     },
   },
+
+  // ── Plan A Task 2: trial-state centralization (2026-05-27) ──────────────
+  {
+    name: 'Inline trial-state computation outside billing module',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/billing/trial-state.ts', 'tests/'],
+    message:
+      'Trial status (isTrial / trialDaysRemaining) must be computed via computeTrialState() from ' +
+      'server/billing/trial-state.ts, not inline Date math. Suppress with // trial-state-ok if the ' +
+      'call site genuinely needs raw millisecond access (e.g. cron bucketing).',
+    severity: 'error',
+    excludeLines: ['trial-state-ok'],
+    rationale:
+      'Centralizes trial logic so tier changes (e.g. adding a grace period) are single-edit.',
+    claudeMdRef: '#billing-trial-state',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const dateRe = /new Date\(\s*(?:\w+\.)?trialEndsAt\b/;
+      const compareRe = /trialEndsAt\s*[><]|trialEndsAt\s*[!=]==/;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes('/server/')) continue;
+        if (file.includes('/server/billing/trial-state')) continue;
+        if (file.includes('/tests/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (/^\s*(\/\/|\*)/.test(line)) continue;
+          if (line.includes('trial-state-ok')) continue;
+          if (dateRe.test(line) || compareRe.test(line)) {
+            hits.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+      return hits;
+    },
+  },
+
+  // ── Plan A Task 3: workspace spread-and-redact (2026-05-27) ─────────────
+  {
+    name: 'Workspace object spread-and-redact in route handler',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    exclude: ['tests/'],
+    message:
+      'Use toAdminWorkspaceView(ws) from server/serializers/admin-workspace-view.ts instead of ' +
+      '{ ...ws, webflowToken: undefined }. The allow-list serializer prevents secret leakage when ' +
+      'new fields are added to the Workspace type. Suppress with // admin-view-ok if the spread ' +
+      'is intentional (e.g. internal-only broadcast payload).',
+    severity: 'error',
+    excludeLines: ['admin-view-ok'],
+    rationale:
+      'Spread-and-redact is deny-list based — new secrets leak by default.',
+    claudeMdRef: '#auth-conventions',
+    customCheck: (files) => {
+      const spreadRe = /\{\s*\.\.\.ws(?![.\w])|\{\s*\.\.\.workspace(?![.\w])/;
+      const redactRe = /webflowToken\s*:\s*undefined|clientPassword\s*:\s*undefined/;
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes('/server/routes/')) continue;
+        if (file.includes('/tests/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (/^\s*(\/\/|\*)/.test(line)) continue;
+          if (line.includes('admin-view-ok')) continue;
+          if (spreadRe.test(line) || redactRe.test(line)) {
+            hits.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+      return hits;
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

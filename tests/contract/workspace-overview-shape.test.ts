@@ -289,10 +289,10 @@ describe('tier and trial fields', () => {
     expect(ws.isTrial).toBe(false);
   });
 
-  it('trialDaysRemaining is undefined when isTrial is false', async () => {
+  it('trialDaysRemaining is 0 when isTrial is false', async () => {
     const ws = await getOurWorkspace();
     expect(ws.isTrial).toBe(false);
-    expect(ws.trialDaysRemaining).toBeUndefined();
+    expect(ws.trialDaysRemaining).toBe(0);
   });
 
   it('tier workspace seeded with "growth" reports tier "growth"', async () => {

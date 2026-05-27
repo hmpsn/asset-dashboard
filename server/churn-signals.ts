@@ -257,7 +257,7 @@ async function runChurnCheck() {
 
     // ── Trial Ending ──
     if (ws.trialEndsAt) {
-      const trialEnd = new Date(ws.trialEndsAt).getTime();
+      const trialEnd = new Date(ws.trialEndsAt).getTime(); // trial-state-ok — churn signal needs raw ms for days-left bucketing
       const daysLeft = Math.ceil((trialEnd - now) / (24 * 60 * 60 * 1000));
       if (daysLeft > 0 && daysLeft <= 3) {
         addSignal({

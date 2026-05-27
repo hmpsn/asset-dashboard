@@ -6792,3 +6792,19 @@ Service and location page brief defaults are now shorter and more conversion-den
 **Boundaries:** No post-scoped admin chat, no background job addition, no DB migration, and no publishing/workflow status changes.
 
 **Files:** `server/routes/content-posts.ts`; `server/ai-operation-registry.ts`; `shared/types/content.ts`; `src/api/content.ts`; `src/components/PostEditor.tsx`; `src/components/post-editor/SectionEditor.tsx`; `src/components/post-editor/FixDiffModal.tsx`; `tests/integration/content-posts-ai-fix.test.ts`; `tests/component/PostEditor.test.tsx`; `tests/unit/api-modules-b.test.ts`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+## Audit Drift Closure — Plan A: Security & Parity (Tasks 2-5)
+
+**Status:** Shipped 2026-05-27
+**Roadmap:** `audit-drift-trial-state-canonical`, `audit-drift-admin-workspace-view`, `audit-drift-briefing-admin-preview`, `audit-drift-p2-admin-client-parity`
+
+**What it does:** Closes four categories of admin/client divergence and data-leakage risk surfaced by the platform audit.
+
+- **A2 — Canonical trial-state computation:** Extracted `computeTrialState()` into `server/billing/trial-state.ts` as the single source of truth for `isTrial`, `trialDaysRemaining`, and `trialExpired`. Replaced 3 inline computation sites (admin dashboard, public portal, workspace settings). Added pr-check rule blocking inline `new Date(trialEndsAt)` comparisons outside the billing module.
+- **A3 — AdminWorkspaceView serializer:** Added `server/serializers/admin-workspace-view.ts` with `toAdminWorkspaceView(ws)` — an allow-list serializer (~55 fields) replacing spread-and-redact `{ ...ws, webflowToken: undefined }` patterns. Added `AdminWorkspaceView` interface to `shared/types/workspace.ts`. Added pr-check rule blocking `{ ...ws` spreads and `webflowToken: undefined` redactions in route handlers.
+- **A4 — Briefing client-preview extraction:** Extracted `buildBriefingClientView()` into `server/briefing-client-projection.ts` to ensure admin preview and client portal render identical briefing enrichment (issue summaries, recommendations with opportunity scores).
+- **A5 — Parity cluster:** Converged `opportunityScore` fallback to use `computeOpportunityScore()` from `server/keyword-strategy-helpers.ts` in both admin and client paths. Added `isVoiceProfileAuthoritative()` guard on onboarding brand-voice display to prevent showing uncalibrated voice profiles.
+
+**Tests:** 11 trial-state contract tests, 6 admin-workspace-view contract tests, 5 admin-client-parity-cluster contract tests, 5 briefing-client-preview integration tests, 63 client-strategy integration tests updated.
+
+**Files:** `server/billing/trial-state.ts`; `server/serializers/admin-workspace-view.ts`; `server/briefing-client-projection.ts`; `shared/types/workspace.ts`; `shared/types/briefing.ts`; `shared/types/keyword-feedback.ts`; `server/keyword-feedback.ts`; `server/routes/keyword-strategy.ts`; `server/routes/public-portal.ts`; `server/intelligence/client-signals-slice.ts`; `src/api/misc.ts`; `src/api/seo.ts`; `src/components/KeywordStrategy.tsx`; `src/components/client/strategy/useStrategyKeywordFeedback.ts`; `scripts/pr-check.ts`; `tests/pr-check.test.ts`; `tests/contract/trial-state-parity.test.ts`; `tests/contract/admin-workspace-view.test.ts`; `tests/contract/admin-client-parity-cluster.test.ts`; `tests/integration/briefing-client-preview.test.ts`; `tests/integration/client-strategy.test.ts`; `docs/rules/automated-rules.md`; `docs/rules/verified-clean-rules.md`; `FEATURE_AUDIT.md`; `data/roadmap.json`.

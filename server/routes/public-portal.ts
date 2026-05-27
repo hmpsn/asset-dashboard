@@ -13,14 +13,13 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { hasClientUsers, verifyClientToken } from '../client-users.js';
 import { requireAuthenticatedClientPortalAuth, verifyClientSession } from '../middleware.js';
+
 import { getLatestSnapshotBefore } from '../reports.js';
 import { getEffectiveAudit, getLatestEffectiveSnapshot, listEffectiveSnapshotSummaries } from '../audit-snapshot-views.js';
+import { getAuditTrafficForWorkspace } from '../audit-traffic.js';
 import { isStripeConfigured, listProducts } from '../stripe.js';
 import { updateWorkspace, getWorkspace, computeEffectiveTier } from '../workspaces.js';
-import { getLatestPublishedBriefing, countPublishedBriefingsThrough } from '../briefing-store.js';
-import { generateIssueSummary } from '../briefing-summary.js';
-import { computeOpportunityScore } from './keyword-strategy.js';
-import type { BriefingRecommendation } from '../../shared/types/briefing.js';
+import { buildBriefingClientView } from '../briefing-client-projection.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
 import { parseJsonSafeArray } from '../db/json-validation.js';
@@ -36,7 +35,6 @@ import {
   saveBulkKeywordFeedback,
   saveKeywordFeedback,
 } from '../keyword-feedback.js';
-import { listContentGaps } from '../content-gaps.js';
 import { getSection, getSectionsForEntry, getEntryCopyStatus, updateSectionStatus, addClientSuggestion } from '../copy-review.js';
 import {
   CLIENT_BUSINESS_PRIORITIES_MARKER,
@@ -54,9 +52,10 @@ import {
 } from '../schemas/keyword-feedback.js';
 import { isProgrammingError } from '../errors.js';
 import { normalizeSocialProfiles } from '../social-profiles.js';
+import { computeTrialState } from '../billing/trial-state.js';
 import { toPublicWorkspaceView } from '../serializers/client-safe.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
-import { getAuditTrafficForWorkspace } from '../helpers.js';
+import { getVoiceProfile } from '../voice-calibration.js';
 
 const log = createLogger('public-portal');
 
@@ -179,14 +178,23 @@ router.post('/api/public/onboarding/:id', async (req, res) => {
       }
     }
 
-    // 5. Update workspace
-    updateWorkspace(req.params.id, {
-      knowledgeBase: mergedKb,
-      brandVoice: mergedVoice,
+    // 5. Update workspace — route brand voice through authority chain
+    const voiceProfile = getVoiceProfile(req.params.id);
+    const voiceProfileIsAuthoritative = voiceProfile?.status === 'calibrated';
+    const updates: Record<string, unknown> = {
+      knowledgeBase: voiceProfileIsAuthoritative
+        ? `${mergedKb}\n\n--- Brand Voice (from onboarding) ---\n${onboardingVoice}`
+        : mergedKb,
       personas,
       competitorDomains: competitorDomains.length > 0 ? competitorDomains : ws.competitorDomains,
       onboardingCompleted: true,
-    });
+    };
+    if (!voiceProfileIsAuthoritative) {
+      updates.brandVoice = mergedVoice;
+    } else {
+      log.info({ workspaceId: req.params.id }, 'Voice profile is calibrated — onboarding brand voice data folded into knowledgeBase instead of brandVoice');
+    }
+    updateWorkspace(req.params.id, updates);
 
     // client-visibility-ok: onboarding completion is internal audit history, not client timeline content.
     addActivity(wsId, 'client_onboarding_submitted', 'Client completed onboarding questionnaire', 'Via client portal');
@@ -203,15 +211,13 @@ router.get('/api/public/tier/:id', (req, res) => {
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
   const effectiveTier = computeEffectiveTier(ws);
-  const trialDaysRemaining = ws.trialEndsAt
-    ? Math.max(0, Math.ceil((new Date(ws.trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-    : 0;
+  const trialState = computeTrialState(ws);
 
   res.json({
     tier: effectiveTier,
     baseTier: ws.tier || 'free',
-    isTrial: effectiveTier === 'growth' && (ws.tier || 'free') === 'free',
-    trialDaysRemaining,
+    isTrial: trialState.isTrial,
+    trialDaysRemaining: trialState.trialDaysRemaining,
     trialEndsAt: ws.trialEndsAt || null,
   });
 });
@@ -312,9 +318,9 @@ router.get('/api/public/audit-detail/:workspaceId', (req, res) => {
 router.get('/api/public/audit-traffic/:workspaceId', requireAuthenticatedClientPortalAuth(), async (req, res) => {
   try {
     const ws = getWorkspace(req.params.workspaceId);
-    if (!ws) return res.json({});
+    if (!ws) return res.status(404).json({ error: 'workspace not found' });
     const trafficMap = await getAuditTrafficForWorkspace(ws);
-    return res.json(trafficMap);
+    res.json(trafficMap);
   } catch (err) {
     if (isProgrammingError(err)) log.warn({ err }, 'public-portal: GET /api/public/audit-traffic/:workspaceId: programming error'); // url-fetch-ok
     else log.debug({ err }, 'public-portal: audit-traffic endpoint failed — degrading gracefully');
@@ -395,7 +401,7 @@ router.post('/api/public/keyword-feedback/:workspaceId/bulk', requireClientStrat
 });
 
 // Client: remove keyword feedback so a previously removed/restored keyword returns to neutral.
-// broadcast-ok: notifyPublicKeywordFeedbackChanged broadcasts strategy/signal invalidation after real feedback deletes.
+// broadcast-ok: notifyKeywordFeedbackChanged broadcasts strategy/signal invalidation after real feedback deletes.
 router.delete('/api/public/keyword-feedback/:workspaceId', (req, res) => {
   const wsId = req.params.workspaceId;
   const sessionToken = req.cookies?.[`client_session_${wsId}`];
@@ -428,7 +434,7 @@ router.delete('/api/public/keyword-feedback/:workspaceId', (req, res) => {
     source: result.source,
   });
   // client-visibility-ok: this activity is for internal audit history, not client timeline display.
-  addActivity(wsId, 'client_keyword_feedback', `Client removed keyword feedback: ${result.deleted} (was ${result.previousStatus})`, 'Via client portal');
+  addActivity(wsId, 'client_keyword_feedback', `Client removed keyword feedback: ${keyword} (was ${result.previousStatus})`, 'Via client portal');
   res.json(result);
 });
 
@@ -780,6 +786,7 @@ router.post('/api/public/copy/:workspaceId/section/:sectionId/suggest', requireC
 //
 // admin-only fields (sourceMetadata, adminNote) are intentionally stripped —
 // only weekOf, publishedAt, and the BriefingStory[] array reach the client.
+// Enrichment logic lives in server/briefing-client-projection.ts.
 router.get('/api/public/briefing/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -792,87 +799,8 @@ router.get('/api/public/briefing/:workspaceId', (req, res) => {
     return res.status(402).json({ error: 'Briefing requires Growth or Premium tier' });
   }
 
-  const latest = getLatestPublishedBriefing(ws.id);
-  if (!latest) return res.json({ briefing: null });
-
-  // Phase 2.5b — issueNumber is the count of published briefings ≤ this one's
-  // publishedAt. Always ≥1 once published; falls back to 1 defensively when
-  // publishedAt is unexpectedly null (shouldn't happen for status='published').
-  const issueNumber = latest.publishedAt
-    ? countPublishedBriefingsThrough(ws.id, latest.publishedAt)
-    : 1;
-
-  // Phase 2.5b — recommendations sourced live from current contentGaps.
-  // Score-fallback: when a gap is missing `opportunityScore` we compute it
-  // here using the same formula as keyword-strategy.ts so ranking is stable
-  // across stored vs newly-collected gaps. Top 5 by score are returned.
-  //
-  // Defense-in-depth: explicit field projection rather than spread. ContentGap
-  // is workspace-scoped strategy data with no admin-only fields TODAY, but a
-  // future field added there must NOT silently leak through `...gap`. Any
-  // change to the public projection now requires touching this list.
-  // Source contentGaps from the dedicated table (post-#365 normalization).
-  // The blob no longer carries them — listContentGaps is the only source of truth.
-  const gaps = listContentGaps(ws.id);
-  type GapMapped = BriefingRecommendation & { volume?: number; impressions?: number; opportunityScore?: number };
-  const recommendations: BriefingRecommendation[] = gaps
-    .map((gap): GapMapped => ({
-      topic: gap.topic,
-      targetKeyword: gap.targetKeyword,
-      intent: gap.intent,
-      priority: gap.priority,
-      rationale: gap.rationale,
-      suggestedPageType: gap.suggestedPageType,
-      volume: gap.volume,
-      difficulty: gap.difficulty,
-      trendDirection: gap.trendDirection,
-      serpFeatures: gap.serpFeatures,
-      impressions: gap.impressions,
-      competitorProof: gap.competitorProof,
-      questionKeywords: gap.questionKeywords,
-      serpTargeting: gap.serpTargeting,
-      opportunityScore: gap.opportunityScore ?? computeOpportunityScore(gap),
-    }))
-    .sort((a, b) => {
-      // Three-bucket sort (matches keyword-strategy.ts content gap ordering):
-      //   2 = Positive volume OR GSC-proven impressions — confirmed demand
-      //   1 = Unenriched (null/undefined) — not yet checked, potential
-      //   0 = Zero volume with no impressions — confirmed no demand
-      const getBundle = (g: typeof a) => {
-        if (g.volume == null) return { bucket: 1, vol: 0 };
-        if (g.volume > 0) return { bucket: 2, vol: g.volume };
-        if ((g.impressions ?? 0) > 0) return { bucket: 2, vol: g.impressions! };
-        return { bucket: 0, vol: 0 };
-      };
-      const ab = getBundle(a), bb = getBundle(b);
-      return bb.bucket - ab.bucket || bb.vol - ab.vol || (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0);
-    })
-    .slice(0, 5);
-
-  // The summary's "N opportunities to consider" reflects the FULL gap pool,
-  // not the post-cap render set. If 23 gaps exist, the summary still says
-  // "23 opportunities to consider" even though the briefing only renders 5.
-  const issueSummary = generateIssueSummary(latest.stories, gaps.length);
-
-  // Phase 2.5e — surface the AI-generated weekly opener when present.
-  // The rest of `sourceMetadata` (model, generationMs, ai timing, original
-  // hero headline) stays admin-only — only the opener string crosses the
-  // public boundary. Defensive: pull via optional chaining so older drafts
-  // without `aiPolish` round-trip cleanly.
-  const weeklyOpener = latest.sourceMetadata?.aiPolish?.weeklyOpener;
-  const briefing = {
-    weekOf: latest.weekOf,
-    publishedAt: latest.publishedAt,
-    stories: latest.stories,
-    issueSummary,
-    issueNumber,
-    recommendations,
-    weeklyOpener: weeklyOpener || undefined,
-  };
-
-  res.json({
-    briefing,
-  });
+  const briefing = buildBriefingClientView(ws.id);
+  res.json({ briefing });
 });
 
 export default router;

@@ -5096,6 +5096,10 @@ describe('Meta: customCheck rule name registry', () => {
     // portal-auth middleware, recognizing file-level router.use() coverage
     // and an allow-list of bootstrap routes.
     'Public route under /api/public/ missing client-portal auth middleware',
+    // sprint-platform-health-wave8 Plan A Tasks 2+3 (2026-05-27) — blocks
+    // inline trial-state Date math and workspace spread-and-redact patterns.
+    'Inline trial-state computation outside billing module',
+    'Workspace object spread-and-redact in route handler',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -9123,4 +9127,152 @@ describe('Rule: Public route under /api/public/ missing client-portal auth middl
   // exemption is verified end-to-end by running `npx tsx scripts/pr-check.ts`
   // against the committed routes (the seven listed files contain unprotected
   // public routes but pr-check passes because they sit in the exclude list).
+});
+
+// ── Plan A Task 2: trial-state centralization ─────────────────────────────
+describe('Rule: Inline trial-state computation outside billing module', () => {
+  const RULE = 'Inline trial-state computation outside billing module';
+
+  it('flags new Date(trialEndsAt) in a server file', () => {
+    const file = write(
+      uniqPath('rule-trial-state', 'server/routes/workspaces.ts'),
+      lines(
+        "const end = new Date(ws.trialEndsAt);",
+        "const isTrial = end > new Date();",
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('flags trialEndsAt > comparison in a server file', () => {
+    const file = write(
+      uniqPath('rule-trial-state', 'server/routes/billing.ts'),
+      lines(
+        "if (ws.trialEndsAt > new Date().toISOString()) {",
+        "  return 'trial';",
+        "}",
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('respects // trial-state-ok inline hatch', () => {
+    const file = write(
+      uniqPath('rule-trial-state', 'server/trial-reminders.ts'),
+      lines(
+        "const raw = new Date(ws.trialEndsAt).getTime(); // trial-state-ok: cron needs raw ms",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag the canonical billing module', () => {
+    const file = write(
+      uniqPath('rule-trial-state', 'server/billing/trial-state.ts'),
+      lines(
+        "const end = new Date(ws.trialEndsAt);",
+        "return end > now;",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag test files', () => {
+    const file = write(
+      uniqPath('rule-trial-state', 'tests/unit/trial.test.ts'),
+      lines(
+        "const end = new Date(ws.trialEndsAt);",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag computeTrialState usage (no Date math)', () => {
+    const file = write(
+      uniqPath('rule-trial-state', 'server/routes/overview.ts'),
+      lines(
+        "import { computeTrialState } from '../billing/trial-state.js';",
+        "const trial = computeTrialState(ws);",
+        "if (trial.isTrial) return 'trial';",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ── Plan A Task 3: workspace spread-and-redact ────────────────────────────
+describe('Rule: Workspace object spread-and-redact in route handler', () => {
+  const RULE = 'Workspace object spread-and-redact in route handler';
+
+  it('flags { ...ws } spread in a route handler', () => {
+    const file = write(
+      uniqPath('rule-ws-spread', 'server/routes/workspaces.ts'),
+      lines(
+        "const safe = { ...ws, webflowToken: undefined };",
+        "res.json(safe);",
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('flags standalone redact pattern', () => {
+    const file = write(
+      uniqPath('rule-ws-spread', 'server/routes/admin.ts'),
+      lines(
+        "const view = { name: ws.name, webflowToken: undefined };",
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('flags { ...workspace } variant', () => {
+    const file = write(
+      uniqPath('rule-ws-spread', 'server/routes/detail.ts'),
+      lines(
+        "res.json({ ...workspace, clientPassword: undefined });",
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('respects // admin-view-ok inline hatch', () => {
+    const file = write(
+      uniqPath('rule-ws-spread', 'server/routes/broadcast.ts'),
+      lines(
+        "const payload = { ...ws, webflowToken: undefined }; // admin-view-ok: internal broadcast",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag { ...ws.keywordStrategy } property-access spread', () => {
+    const file = write(
+      uniqPath('rule-ws-spread', 'server/routes/strategy.ts'),
+      lines(
+        "const merged = { ...ws.keywordStrategy, generatedAt: new Date().toISOString() };",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag toAdminWorkspaceView usage', () => {
+    const file = write(
+      uniqPath('rule-ws-spread', 'server/routes/clean.ts'),
+      lines(
+        "import { toAdminWorkspaceView } from '../serializers/admin-workspace-view.js';",
+        "res.json(toAdminWorkspaceView(ws));",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
 });

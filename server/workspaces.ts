@@ -58,7 +58,7 @@ export type EffectiveTier = 'free' | 'growth' | 'premium';
 export function computeEffectiveTier(ws: Pick<Workspace, 'tier' | 'trialEndsAt'>, nowMs = Date.now()): EffectiveTier {
   const base = (ws.tier as EffectiveTier | undefined) || 'free';
   if (base === 'free' && ws.trialEndsAt) {
-    const trialEnd = new Date(ws.trialEndsAt);
+    const trialEnd = new Date(ws.trialEndsAt); // trial-state-ok — this IS the canonical tier resolver
     if (!Number.isNaN(trialEnd.getTime()) && trialEnd.getTime() > nowMs) return 'growth';
   }
   return base;
