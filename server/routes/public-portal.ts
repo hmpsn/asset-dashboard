@@ -50,6 +50,7 @@ import { normalizeSocialProfiles } from '../social-profiles.js';
 import { computeTrialState } from '../billing/trial-state.js';
 import { toPublicWorkspaceView } from '../serializers/client-safe.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
+import { getVoiceProfile } from '../voice-calibration.js';
 
 const log = createLogger('public-portal');
 
@@ -172,14 +173,23 @@ router.post('/api/public/onboarding/:id', async (req, res) => {
       }
     }
 
-    // 5. Update workspace
-    updateWorkspace(req.params.id, {
-      knowledgeBase: mergedKb,
-      brandVoice: mergedVoice,
+    // 5. Update workspace — route brand voice through authority chain
+    const voiceProfile = getVoiceProfile(req.params.id);
+    const voiceProfileIsAuthoritative = voiceProfile?.status === 'calibrated';
+    const updates: Record<string, unknown> = {
+      knowledgeBase: voiceProfileIsAuthoritative
+        ? `${mergedKb}\n\n--- Brand Voice (from onboarding) ---\n${onboardingVoice}`
+        : mergedKb,
       personas,
       competitorDomains: competitorDomains.length > 0 ? competitorDomains : ws.competitorDomains,
       onboardingCompleted: true,
-    });
+    };
+    if (!voiceProfileIsAuthoritative) {
+      updates.brandVoice = mergedVoice;
+    } else {
+      log.info({ workspaceId: req.params.id }, 'Voice profile is calibrated — onboarding brand voice data folded into knowledgeBase instead of brandVoice');
+    }
+    updateWorkspace(req.params.id, updates);
 
     // client-visibility-ok: onboarding completion is internal audit history, not client timeline content.
     addActivity(wsId, 'client_onboarding_submitted', 'Client completed onboarding questionnaire', 'Via client portal');
