@@ -1059,9 +1059,11 @@ export const CHECKS: Check[] = [
     pathFilter: 'server/',
     exclude: [
       'server/db/json-validation.ts', 'server/content-posts-ai.ts', 'server/routes/keyword-strategy.ts',
-      'server/content-brief.ts', 'server/routes/aeo-review.ts', 'server/routes/jobs.ts',
-      'server/schema-plan.ts', 'server/schema-suggester.ts', 'server/seo-audit.ts',
-      'server/performance-store.ts', 'server/rank-tracking.ts', 'server/aeo-page-review.ts',
+      'server/routes/aeo-review.ts', 'server/routes/jobs.ts',
+      'server/aeo-page-review.ts', // HTML JSON-LD script tag parsing (existing page schema detection from HTML), not DB columns or AI text
+      'server/schemas/_parse-ai-json.ts', // lightweight AI response text parser — implements the wrapper, not a raw DB read
+      'server/schema-suggester.ts', 'server/seo-audit.ts',
+      'server/performance-store.ts', 'server/rank-tracking.ts',
       'server/processor.ts', // file-based metadata JSON, not DB columns
       'server/websocket.ts', // WebSocket message parsing, not DB columns
       'server/meeting-brief-generator.ts', // AI response text parser, not DB columns
@@ -1080,7 +1082,6 @@ export const CHECKS: Check[] = [
       'server/routes/roadmap.ts', // disk files: roadmap.json + runtime status files (not DB columns)
       'server/routes/content-publish.ts', // AI response text parser: parses Claude field-mapping suggestion (not DB columns)
       'server/stripe-config.ts', // disk file: AES-encrypted Stripe config file (not DB columns)
-      'server/diagnostic-orchestrator.ts', // AI response text parser (GPT-4.1 synthesis result), not DB columns
       'server/schema/generator.ts', // HTML JSON-LD script tag parsing (existing page schemas from HTML), not DB columns
       'server/briefing-cron.ts', // AI response text parser (Anthropic Sonnet briefing JSON), validated by briefingAIResponseSchema, not DB columns
       'server/schema/extractors/page-elements/image-ai-classifier.ts', // AI response text parser (vision API role JSON), not DB columns

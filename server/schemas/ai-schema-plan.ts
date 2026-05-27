@@ -6,7 +6,7 @@
  * `Array.isArray` guards. This module provides a typed parse wrapper.
  */
 import { z } from '../middleware/validate.js';
-import { parseAIJson } from '../openai-helpers.js';
+import { parseAIJsonRaw } from './_parse-ai-json.js';
 
 const schemaPageRoleValues = [
   'homepage', 'pillar', 'service', 'audience', 'lead-gen', 'blog', 'about', 'contact',
@@ -29,7 +29,7 @@ const pageRoleAssignmentSchema = z.object({
   primaryType: z.string().optional().default('WebPage'),
   entityRefs: z.array(z.string()).optional().default([]),
   notes: z.string().optional(),
-  industrySubtype: z.union([z.literal('medical'), z.literal('financial'), z.null()]).optional().default(null),
+  industrySubtype: z.union([z.literal('medical'), z.literal('financial'), z.null()]).catch(null).optional().default(null),
 }).passthrough();
 
 /**
@@ -48,6 +48,6 @@ export type AiSchemaPlan = z.infer<typeof aiSchemaPlanSchema>;
  * Throws if the response is missing the required arrays or has malformed JSON.
  */
 export function parseSchemaPlan(rawText: string): AiSchemaPlan {
-  const raw = parseAIJson<unknown>(rawText);
+  const raw = parseAIJsonRaw(rawText);
   return aiSchemaPlanSchema.parse(raw);
 }

@@ -13,7 +13,8 @@ import { callAI } from './ai.js';
 import { buildIntelPrompt } from './workspace-intelligence.js';
 import type { SeoIssue } from './seo-audit.js';
 import { createLogger } from './logger.js';
-import { decodeEntities, stripHtmlToText, stripCodeFences } from './helpers.js';
+import { decodeEntities, stripHtmlToText } from './helpers.js';
+import { parseAeoReview, type AiAeoReview } from './schemas/ai-aeo-review.js';
 import { z } from './middleware/validate.js';
 import type { AeoEffort, AeoPageReview, AeoSiteReview } from '../shared/types/aeo.js';
 import {
@@ -225,6 +226,7 @@ RULES:
 Return ONLY valid JSON, no markdown fences, no explanation.`;
 
   const aiResult = await callAI({
+    operation: 'aeo-page-review',
     model: 'gpt-5.4',
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 5000,
@@ -236,10 +238,9 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
   });
 
   const raw = aiResult.text || '{}';
-  let parsed: Record<string, unknown>;
+  let parsed: AiAeoReview;
   try {
-    const cleaned = stripCodeFences(raw);
-    parsed = JSON.parse(cleaned);
+    parsed = parseAeoReview(raw);
   } catch (err) {
     log.error({ err, detail: raw.slice(0, 200) }, 'Failed to parse AI response');
     throw new Error('Failed to parse AEO review response');

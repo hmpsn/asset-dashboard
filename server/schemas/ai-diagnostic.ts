@@ -7,7 +7,7 @@
  * that validates the full response object in one step.
  */
 import { z } from '../middleware/validate.js';
-import { parseAIJson } from '../openai-helpers.js';
+import { parseAIJsonRaw } from './_parse-ai-json.js';
 import { rootCauseSchema, remediationActionSchema } from './diagnostics-schemas.js';
 
 /**
@@ -28,6 +28,6 @@ export type AiRootCauseAnalysis = z.infer<typeof aiRootCauseAnalysisSchema>;
  * Throws on malformed JSON; tolerant of missing/empty fields.
  */
 export function parseDiagnosticRootCauses(rawText: string): AiRootCauseAnalysis {
-  const raw = parseAIJson<unknown>(rawText);
+  const raw = parseAIJsonRaw(rawText);
   return aiRootCauseAnalysisSchema.parse(raw);
 }

@@ -7,7 +7,7 @@
  * call in `reviewPage()` can be replaced with a typed path.
  */
 import { z } from '../middleware/validate.js';
-import { parseAIJson } from '../openai-helpers.js';
+import { parseAIJsonRaw } from './_parse-ai-json.js';
 import {
   AEO_CHANGE_TYPES,
   AEO_EFFORTS,
@@ -59,6 +59,6 @@ export type AiAeoReview = z.infer<typeof aiAeoReviewSchema>;
  * Throws on malformed JSON; tolerant of missing optional fields.
  */
 export function parseAeoReview(rawText: string): AiAeoReview {
-  const raw = parseAIJson<unknown>(rawText);
+  const raw = parseAIJsonRaw(rawText);
   return aiAeoReviewSchema.parse(raw);
 }

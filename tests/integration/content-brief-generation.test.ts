@@ -902,7 +902,7 @@ describe('regenerateOutline — outline-only regeneration', () => {
       },
     ];
 
-    mockOpenAIJsonResponse('content-brief-outline-regen', newOutline);
+    mockOpenAIJsonResponse('content-brief-outline', newOutline);
 
     const updated = await regenerateOutline(TEST_WS_ID, existingBriefId);
 
@@ -924,31 +924,32 @@ describe('regenerateOutline — outline-only regeneration', () => {
     const newOutline = [
       { heading: 'Feedback-informed section', subheadings: ['Sub 1'], notes: 'Addressing feedback.', wordCount: 300, keywords: ['test'] },
     ];
-    mockOpenAIJsonResponse('content-brief-outline-regen', newOutline);
+    mockOpenAIJsonResponse('content-brief-outline', newOutline);
 
     await regenerateOutline(TEST_WS_ID, existingBriefId, 'Add more how-to sections.');
 
     const calls = getCapturedOpenAICalls();
-    const outlineCall = calls.find(c => c.feature === 'content-brief-outline-regen');
+    const outlineCall = calls.find(c => c.feature === 'content-brief-outline');
     expect(outlineCall).toBeDefined();
     const promptContent = (outlineCall!.messages.find(m => m.role === 'user') ?? outlineCall!.messages[0]).content;
     expect(promptContent).toContain('Add more how-to sections.');
     expect(promptContent).toContain('addresses the feedback');
   });
 
-  it('handles { outline: [...] } wrapper from AI response', async () => {
-    // Some AI responses wrap the array in an object
+  it('rejects { outline: [...] } wrapper — prompt must return a bare array', async () => {
+    // The outline-regen prompt instructs the model to return a bare JSON array.
+    // If the model wraps it in { outline: [...] }, the parse fails (no silent fallback).
+    // This is a regression lock: the old guessed-field-name fallback was removed.
     const wrappedResponse = {
       outline: [
         { heading: 'Wrapped Section', subheadings: ['Sub'], notes: 'From wrapper.', wordCount: 250, keywords: ['test'] },
       ],
     };
-    mockOpenAIJsonResponse('content-brief-outline-regen', wrappedResponse);
+    mockOpenAIJsonResponse('content-brief-outline', wrappedResponse);
 
-    const updated = await regenerateOutline(TEST_WS_ID, existingBriefId);
-    expect(updated).not.toBeNull();
-    expect(updated!.outline.length).toBeGreaterThan(0);
-    expect(updated!.outline[0].heading).toBe('Wrapped Section');
+    await expect(
+      regenerateOutline(TEST_WS_ID, existingBriefId),
+    ).rejects.toThrow();
   });
 
   it('returns null for a non-existent brief', async () => {
@@ -957,7 +958,7 @@ describe('regenerateOutline — outline-only regeneration', () => {
   });
 
   it('throws when AI returns empty outline', async () => {
-    mockOpenAIJsonResponse('content-brief-outline-regen', []);
+    mockOpenAIJsonResponse('content-brief-outline', []);
 
     await expect(
       regenerateOutline(TEST_WS_ID, existingBriefId),
@@ -968,7 +969,7 @@ describe('regenerateOutline — outline-only regeneration', () => {
     const before = getBrief(TEST_WS_ID, existingBriefId);
     expect(before).toBeDefined();
 
-    mockOpenAIJsonResponse('content-brief-outline-regen', [
+    mockOpenAIJsonResponse('content-brief-outline', [
       {
         heading: 'Valid item',
         subheadings: ['A'],

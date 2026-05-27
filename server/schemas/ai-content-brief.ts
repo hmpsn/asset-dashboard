@@ -9,7 +9,7 @@
  * parseContentBriefSchema  — validates the full brief generation/regen response
  */
 import { z } from '../middleware/validate.js';
-import { parseAIJson } from '../openai-helpers.js';
+import { parseAIJsonRaw } from './_parse-ai-json.js';
 
 // ── Outline section (mirrors outlineItemSchema but strict) ──────────────────
 
@@ -37,7 +37,7 @@ export type AiContentBriefOutline = z.infer<typeof aiContentBriefOutlineSchema>;
  * Throws if the response is not a JSON array matching aiContentBriefOutlineSchema.
  */
 export function parseContentBriefOutline(rawText: string): AiContentBriefOutline {
-  const raw = parseAIJson<unknown>(rawText);
+  const raw = parseAIJsonRaw(rawText);
   return aiContentBriefOutlineSchema.parse(raw);
 }
 
@@ -101,6 +101,6 @@ export type AiContentBrief = z.infer<typeof aiContentBriefSchema>;
  * Throws if the response is not a JSON object matching aiContentBriefSchema.
  */
 export function parseContentBriefSchema(rawText: string): AiContentBrief {
-  const raw = parseAIJson<unknown>(rawText);
+  const raw = parseAIJsonRaw(rawText);
   return aiContentBriefSchema.parse(raw);
 }
