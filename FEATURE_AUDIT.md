@@ -1,12 +1,12 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **454 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **455 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
 ---
 
-### 454. Platform Health Wave 7 PR2 — `semrushMode` Compatibility Retirement
+### 455. Platform Health Wave 7 PR2 — `semrushMode` Compatibility Retirement
 
 **What it does:** Finishes the keyword-strategy provider-neutral naming migration by removing runtime `semrushMode` compatibility fallback seams across the keyword-strategy route, background job dispatch, generation service options, and admin display state hydration. `seoDataMode` is now the single active mode contract. A DB migration (`103-retire-semrush-mode.sql`) backfills legacy blobs by copying `semrushMode` into `seoDataMode` when needed and removing the legacy alias key from stored `keyword_strategy` JSON.
 
@@ -15,6 +15,16 @@ A comprehensive value assessment of every feature in the platform — **454 feat
 **Client value:** Keeps strategy generation behavior consistent and predictable across UI and background flows, with less risk of legacy payload edge cases producing unexpected mode selection.
 
 **Mutual:** Tightens a core platform contract to one canonical field (`seoDataMode`), which improves maintainability without changing the intended product outcome.
+
+### 454. Schema Intelligence Phase A — Entity Resolution Contracts + Guardrails
+
+**What it does:** Adds the first implementation phase for `schema-entity-grounding-wikidata` without changing runtime schema output. The platform now has shared typed contracts for entity grounding in `shared/types/entity-resolution.ts` (`Thing`/`Place` entities, Wikidata references, and explicit availability states), an explicit rule doc (`docs/rules/schema-entity-resolution.md`) defining the architecture boundary, and a new hard `pr-check` custom rule that blocks direct Wikidata/SPARQL references outside `server/intelligence/entity-resolution*` modules unless a documented hatch is used.
+
+**Agency value:** Creates a safe foundation for the higher-risk entity-grounding implementation work by preventing ad hoc lookups and duplicated disambiguation logic from leaking across schema routes/helpers.
+
+**Client value:** Improves future schema quality reliability by ensuring `sameAs`/entity disambiguation features are built on one consistent contract rather than fragmented feature-local heuristics.
+
+**Mutual:** Reduces drift risk before runtime rollout and keeps the schema intelligence roadmap phase-based, test-backed, and reviewable.
 
 ---
 

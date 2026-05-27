@@ -8,6 +8,7 @@ import type { KeywordStrategy, AudiencePersona, PageKeywordMap } from './workspa
 import type { BriefingSummary } from './briefing.js';
 import type { PageElementCatalog } from './page-elements.js';
 import type { SiteInventorySlice } from './site-inventory.js';
+import type { EntityResolutionSlice } from './entity-resolution.js';
 import type {
   TrackedAction,
   ActionOutcome,
@@ -110,6 +111,9 @@ export interface WorkspaceIntelligence {
   operational?: OperationalSlice;
   /** Local SEO posture, markets, full candidate list, and pre-formatted prompt block. */
   localSeo?: LocalSeoSlice;
+  /** Entity grounding for schema surfaces (Thing/Place + Wikidata disambiguation).
+   *  Always undefined until the EntityResolutionSlice assembler phase ships. */
+  entityResolution?: EntityResolutionSlice;
 }
 
 // ── Slice interfaces ────────────────────────────────────────────────────
