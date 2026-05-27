@@ -18,6 +18,10 @@ import { PostReviewCard } from './PostReviewCard';
 
 const POST_REVIEW_SEEN_STORAGE_KEY_PREFIX = 'client-post-review-seen';
 
+function postReviewSeenKey(req: Pick<ClientContentRequest, 'id' | 'updatedAt'>): string {
+  return `${req.id}:${req.updatedAt}`;
+}
+
 interface ContentPerfItem {
   requestId: string;
   daysSincePublish: number;
@@ -57,44 +61,45 @@ export function ContentTab({
 
   // ── Content performance data for published items ──
   const [contentPerf, setContentPerf] = useState<Record<string, ContentPerfItem>>({});
-  const [seenPostReviewIds, setSeenPostReviewIds] = useState<Set<string>>(new Set());
+  const [seenPostReviewKeys, setSeenPostReviewKeys] = useState<Set<string>>(new Set());
   const perfErrorToastShownRef = useRef(false);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(`${POST_REVIEW_SEEN_STORAGE_KEY_PREFIX}:${workspaceId}`);
       if (!raw) {
-        setSeenPostReviewIds(new Set());
+        setSeenPostReviewKeys(new Set());
         return;
       }
       const parsed = JSON.parse(raw) as unknown;
       if (!Array.isArray(parsed)) {
-        setSeenPostReviewIds(new Set());
+        setSeenPostReviewKeys(new Set());
         return;
       }
-      const ids = parsed.filter((v): v is string => typeof v === 'string');
-      setSeenPostReviewIds(new Set(ids));
+      const keys = parsed.filter((v): v is string => typeof v === 'string');
+      setSeenPostReviewKeys(new Set(keys));
     } catch {
-      setSeenPostReviewIds(new Set());
+      setSeenPostReviewKeys(new Set());
     }
   }, [workspaceId]);
 
   useEffect(() => {
     try {
-      localStorage.setItem(
-        `${POST_REVIEW_SEEN_STORAGE_KEY_PREFIX}:${workspaceId}`,
-        JSON.stringify(Array.from(seenPostReviewIds)),
-      );
+        localStorage.setItem(
+          `${POST_REVIEW_SEEN_STORAGE_KEY_PREFIX}:${workspaceId}`,
+          JSON.stringify(Array.from(seenPostReviewKeys)),
+        );
     } catch {
       // Ignore storage failures (private mode / disabled storage); UI still works in-memory.
     }
-  }, [workspaceId, seenPostReviewIds]);
+  }, [workspaceId, seenPostReviewKeys]);
 
-  const markPostReviewSeen = (requestId: string) => {
-    setSeenPostReviewIds((prev) => {
-      if (prev.has(requestId)) return prev;
+  const markPostReviewSeen = (req: ClientContentRequest) => {
+    const key = postReviewSeenKey(req);
+    setSeenPostReviewKeys((prev) => {
+      if (prev.has(key)) return prev;
       const next = new Set(prev);
-      next.add(requestId);
+      next.add(key);
       return next;
     });
   };
@@ -286,7 +291,7 @@ export function ContentTab({
             ? (steps as readonly string[]).indexOf('approved')
             : 0;
         const isExpanded = expandedContentReq === req.id;
-        const showNewPostReviewBadge = req.status === 'post_review' && !seenPostReviewIds.has(req.id);
+        const showNewPostReviewBadge = req.status === 'post_review' && !seenPostReviewKeys.has(postReviewSeenKey(req));
         const brief = req.briefId ? briefPreviews[req.briefId] : null;
         const canUpgrade = isBriefOnly && req.status === 'approved';
 
@@ -295,7 +300,7 @@ export function ContentTab({
             <ClickableRow onClick={() => {
               const next = isExpanded ? null : req.id;
               setExpandedContentReq(next);
-              if (next && req.status === 'post_review') markPostReviewSeen(req.id);
+              if (next && req.status === 'post_review') markPostReviewSeen(req);
               if (next && req.briefId) loadBriefPreview(req.briefId);
             }} className="px-5 py-4">
               <div className="flex items-center justify-between mb-3">

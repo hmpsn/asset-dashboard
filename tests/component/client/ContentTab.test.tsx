@@ -188,6 +188,33 @@ describe('ContentTab', () => {
     expect(screen.queryByText('New')).not.toBeInTheDocument();
   });
 
+  it('shows the new highlight again when the same post returns to review later', () => {
+    const firstReview = makeRequest({
+      id: 'req-returned-post',
+      status: 'post_review',
+      topic: 'Returned Post',
+      updatedAt: '2026-05-01T00:00:00.000Z',
+    });
+    const { rerender } = render(<ContentTab {...defaultProps} contentRequests={[firstReview]} />);
+
+    fireEvent.click(screen.getByText('Returned Post'));
+    expect(screen.queryByText('New')).not.toBeInTheDocument();
+
+    rerender(<ContentTab {...defaultProps} contentRequests={[{
+      ...firstReview,
+      status: 'changes_requested',
+      updatedAt: '2026-05-02T00:00:00.000Z',
+    }]} />);
+
+    rerender(<ContentTab {...defaultProps} contentRequests={[{
+      ...firstReview,
+      status: 'post_review',
+      updatedAt: '2026-05-03T00:00:00.000Z',
+    }]} />);
+
+    expect(screen.getByText('New')).toBeInTheDocument();
+  });
+
   it('renders declined items in a collapsed section', () => {
     const requests = [
       makeRequest({ status: 'requested' }),
