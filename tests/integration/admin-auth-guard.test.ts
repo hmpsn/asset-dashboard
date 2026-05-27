@@ -540,6 +540,16 @@ describe('Integration — APP_PASSWORD gate (gated server)', () => {
     expect(body.authenticated).toBe(true);
   });
 
+  it('GET /api/auth/check with valid x-auth-token refreshes auth_token cookie', async () => {
+    const res = await gatedFetch('/api/auth/check', {
+      extraHeaders: { 'x-auth-token': EXPECTED_HMAC_TOKEN },
+    });
+    expect(res.status).toBe(200);
+    const setCookie = res.headers.get('set-cookie') || '';
+    expect(setCookie).toContain('auth_token=');
+    expect(setCookie).toContain('HttpOnly');
+  });
+
   it('GET /api/auth/check with raw APP_PASSWORD reports authenticated=false', async () => {
     // Raw password no longer accepted — must use HMAC token from /api/auth/login
     const res = await gatedFetch('/api/auth/check', {
