@@ -490,6 +490,7 @@ describe('useKeywordStrategy', () => {
       { wrapper: makeWrapper() },
     );
     expect(result.current.isLoading).toBe(true);
+    expect(result.current.data).toBeUndefined();
   });
 
   it('returns keyword strategy data shape when API resolves', async () => {
@@ -503,6 +504,20 @@ describe('useKeywordStrategy', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.data?.seoDataAvailable).toBe(true);
     expect(result.current.data?.providers).toHaveLength(1);
+  });
+
+  it('does not block core strategy render while auxiliary metadata is still loading', async () => {
+    mockGet.mockResolvedValue({ targetKeywords: ['core-keyword'], pageMap: {} });
+    mockKeywordsProviderStatus.mockReturnValue(new Promise(() => {}));
+    mockWorkspacesGetById.mockResolvedValue({ competitorDomains: [], seoDataProvider: 'semrush' });
+    const { result } = renderHook(
+      () => useKeywordStrategy('ws-1'),
+      { wrapper: makeWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.data?.strategy).toEqual({ targetKeywords: ['core-keyword'], pageMap: {} });
+    expect(result.current.isAuxLoading).toBe(true);
   });
 });
 

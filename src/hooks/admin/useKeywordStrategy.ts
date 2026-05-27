@@ -22,28 +22,63 @@ interface KeywordStrategyData {
   workspaceData: WorkspaceData | null;
 }
 
+interface KeywordStrategyAuxData {
+  seoDataAvailable: boolean;
+  providers: Array<{ name: string; configured: boolean }>;
+  workspaceData: WorkspaceData | null;
+}
+
 export function useKeywordStrategy(workspaceId: string) {
-  return useQuery({
+  const strategyQuery = useQuery({
     queryKey: queryKeys.admin.keywordStrategy(workspaceId),
-    queryFn: async (): Promise<KeywordStrategyData> => {
-      const [strategyResponse, providerStatus, workspaceResponse] = await Promise.all([
-        workspaceId ? get<KeywordStrategy>(`/api/webflow/keyword-strategy/${workspaceId}`).catch(() => null) : Promise.resolve(null),
-        keywords.providerStatus().catch(() => ({ providers: [] })),
-        workspaceId ? workspaces.getById(workspaceId).catch(() => null) : Promise.resolve(null)
-      ]);
-
-      const rawProviders = (providerStatus as { providers?: Array<{ name: string; configured: boolean }> })?.providers ?? [];
-
-      return {
-        strategy: strategyResponse || null,
-        seoDataAvailable: Boolean(rawProviders.some(p => p.configured)),
-        providers: rawProviders,
-        workspaceData: workspaceResponse as WorkspaceData | null,
-      };
+    queryFn: async (): Promise<KeywordStrategy | null> => {
+      if (!workspaceId) return null;
+      return get<KeywordStrategy>(`/api/webflow/keyword-strategy/${workspaceId}`).catch(() => null);
     },
     staleTime: 10 * 60 * 1000, // 10 minutes
     enabled: !!workspaceId,
     retry: 2,
     refetchOnWindowFocus: false, // Don't refetch on window focus for this
   });
+
+  const auxQuery = useQuery({
+    queryKey: [...queryKeys.admin.keywordStrategy(workspaceId), 'aux'] as const,
+    queryFn: async (): Promise<KeywordStrategyAuxData> => {
+      const [providerStatus, workspaceResponse] = await Promise.all([
+        keywords.providerStatus().catch(() => ({ providers: [] })),
+        workspaceId ? workspaces.getById(workspaceId).catch(() => null) : Promise.resolve(null),
+      ]);
+      const rawProviders = (providerStatus as { providers?: Array<{ name: string; configured: boolean }> })?.providers ?? [];
+      return {
+        seoDataAvailable: Boolean(rawProviders.some(p => p.configured)),
+        providers: rawProviders,
+        workspaceData: workspaceResponse as WorkspaceData | null,
+      };
+    },
+    staleTime: 10 * 60 * 1000,
+    enabled: !!workspaceId,
+    retry: 2,
+    refetchOnWindowFocus: false,
+  });
+
+  const auxData: KeywordStrategyAuxData = auxQuery.data ?? {
+    seoDataAvailable: false,
+    providers: [],
+    workspaceData: null,
+  };
+  const strategyReady = strategyQuery.data !== undefined;
+  const data: KeywordStrategyData | undefined = workspaceId && strategyReady
+    ? {
+      strategy: strategyQuery.data ?? null,
+      seoDataAvailable: auxData.seoDataAvailable,
+      providers: auxData.providers,
+      workspaceData: auxData.workspaceData,
+    }
+    : undefined;
+
+  return {
+    ...strategyQuery,
+    data,
+    isAuxLoading: auxQuery.isLoading,
+  };
 }

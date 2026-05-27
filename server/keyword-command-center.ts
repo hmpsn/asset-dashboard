@@ -15,7 +15,7 @@ import {
   type LocalSeoKeywordCandidate,
 } from './local-seo.js';
 import { createLogger } from './logger.js';
-import { listPageKeywords } from './page-keywords.js';
+import { listPageKeywords, listPageKeywordsLite } from './page-keywords.js';
 import { isSuspiciousPlannerGroupedVolume } from './keyword-strategy-helpers.js';
 import {
   getLatestSnapshotRanks,
@@ -1137,7 +1137,9 @@ async function buildKeywordCommandCenterModel(
   if (!workspace) return null;
 
   const strategy = workspace.keywordStrategy;
-  const pageMap = listPageKeywords(workspace.id);
+  const pageMap = options.includeStrategyUx === false
+    ? listPageKeywordsLite(workspace.id)
+    : listPageKeywords(workspace.id);
   const contentGaps = listContentGaps(workspace.id);
   const keywordGaps = listKeywordGaps(workspace.id);
   const rawTrackedKeywords = getTrackedKeywords(workspace.id, { includeInactive: true });
@@ -1262,7 +1264,7 @@ export async function buildKeywordCommandCenterSummary(
   }
   for (const keyword of workspace.keywordStrategy?.siteKeywords ?? []) addKey(inStrategyKeys, keyword);
 
-  for (const page of listPageKeywords(workspace.id)) {
+  for (const page of listPageKeywordsLite(workspace.id)) {
     addKey(pageAssignedKeys, page.primaryKeyword);
     addKey(inStrategyKeys, page.primaryKeyword);
     markVolume(page.primaryKeyword, page.volume);
@@ -1864,7 +1866,7 @@ function buildFilteredBundle(input: {
   localVisibility: Map<string, LocalSeoKeywordVisibilitySummary>;
 }): CommandCenterSourceBundle & { keys: Set<string> | null } {
   const strategy = input.workspace.keywordStrategy;
-  const pageMap = listPageKeywords(input.workspace.id);
+  const pageMap = listPageKeywordsLite(input.workspace.id);
   const contentGaps = listContentGaps(input.workspace.id);
   const keywordGaps = listKeywordGaps(input.workspace.id);
   const trackedKeywords = getTrackedKeywords(input.workspace.id, { includeInactive: true });
