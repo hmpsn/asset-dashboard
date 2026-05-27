@@ -16,6 +16,7 @@ import crypto from 'crypto';
 import { getDataDir } from './data-dir.js';
 import { createLogger } from './logger.js';
 import { isProgrammingError } from './errors.js';
+import { computeTrialState } from './billing/trial-state.js';
 
 const log = createLogger('auto-report');
 
@@ -160,9 +161,7 @@ async function gatherMonthlyData(ws: Workspace): Promise<MonthlyData> {
 export function generateReportHTML(data: MonthlyData): string {
   const monthName = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const ws = data.workspace;
-  const trialEnd = ws.trialEndsAt ? new Date(ws.trialEndsAt) : null;
-  const isTrial = trialEnd ? trialEnd > new Date() : false;
-  const trialDaysRemaining = isTrial && trialEnd ? Math.max(0, Math.ceil((trialEnd.getTime() - Date.now()) / 86400000)) : undefined;
+  const trialState = computeTrialState(ws);
   const { html } = renderMonthlyReport({
     workspaceName: ws.name,
     monthName,
@@ -180,8 +179,8 @@ export function generateReportHTML(data: MonthlyData): string {
     topActivities: data.topActivities,
     traffic: data.traffic,
     chatTopics: data.chatTopics,
-    isTrial,
-    trialDaysRemaining,
+    isTrial: trialState.isTrial,
+    trialDaysRemaining: trialState.trialDaysRemaining,
   });
   return html;
 }
@@ -190,9 +189,7 @@ async function sendMonthlyReportEmail(ws: Workspace, data: MonthlyData) {
   if (!isEmailConfigured() || !ws.clientEmail) return;
 
   const monthName = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  const trialEnd = ws.trialEndsAt ? new Date(ws.trialEndsAt) : null;
-  const isTrial = trialEnd ? trialEnd > new Date() : false;
-  const trialDaysRemaining = isTrial && trialEnd ? Math.max(0, Math.ceil((trialEnd.getTime() - Date.now()) / 86400000)) : undefined;
+  const trialState = computeTrialState(ws);
   const { subject, html } = renderMonthlyReport({
     workspaceName: ws.name,
     monthName,
@@ -210,8 +207,8 @@ async function sendMonthlyReportEmail(ws: Workspace, data: MonthlyData) {
     topActivities: data.topActivities,
     traffic: data.traffic,
     chatTopics: data.chatTopics,
-    isTrial,
-    trialDaysRemaining,
+    isTrial: trialState.isTrial,
+    trialDaysRemaining: trialState.trialDaysRemaining,
   });
   await sendEmail(ws.clientEmail, subject, html);
   recordSend(ws.clientEmail, 'report', 'monthly_report', ws.id, 1);

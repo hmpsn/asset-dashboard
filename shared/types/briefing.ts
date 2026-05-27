@@ -153,6 +153,23 @@ export interface BriefingRecommendation {
   opportunityScore?: number;
 }
 
+/**
+ * The enriched client-facing briefing payload computed at serve-time.
+ * Returned by both the public endpoint (`/api/public/briefing/:wsId`)
+ * and the admin preview endpoint (`/api/briefing/:wsId/preview`).
+ * Extracted into `server/briefing-client-projection.ts` so admin can
+ * preview exactly what clients see.
+ */
+export interface BriefingClientView {
+  weekOf: string;
+  publishedAt: number | null;
+  stories: BriefingStory[];
+  issueSummary: string;
+  issueNumber: number;
+  recommendations: BriefingRecommendation[];
+  weeklyOpener?: string;
+}
+
 /** Wire shape returned from /api/public/briefing/:wsId */
 export interface PublishedBriefingResponse {
   weekOf: string;

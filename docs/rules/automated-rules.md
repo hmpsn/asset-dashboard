@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **148** — 133 error, 15 warn.
+Total rules: **150** — 135 error, 15 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -149,6 +149,8 @@ advisory but tracked.
 | 131 | mcp-action-must-tag-source | error | custom | `server/mcp/tools/` | `mcp-action-must-tag-source-ok` | mcp-chat-tagged activity entries get a "chat" badge in the activity feed so operators can audit chat-driven mutations. |
 | 132 | mcp-action-must-broadcast | error | custom | `server/mcp/tools/` | `mcp-action-must-broadcast-ok` | broadcast pairs every write so React Query caches stay fresh; MCP tools own this since the underlying service functions are unbroadcast. |
 | 133 | Public route under /api/public/ missing client-portal auth middleware | error | custom | `server/routes/` | `// public-no-auth-ok` | Without per-route portal auth, sensitive client data leaks from workspaces that have not yet had a clientPassword set (e.g. freshly-created accounts). |
+| 134 | Inline trial-state computation outside billing module | error | custom | `server/` | `trial-state-ok` | Centralizes trial logic so tier changes (e.g. adding a grace period) are single-edit. |
+| 135 | Workspace object spread-and-redact in route handler | error | custom | `server/routes/` | `admin-view-ok` | Spread-and-redact is deny-list based — new secrets leak by default. |
 
 ---
 

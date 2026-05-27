@@ -57,6 +57,8 @@ import {
   workspaceContextJobErrorResponse,
 } from '../workspace-context-generation-job.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
+import { computeTrialState } from '../billing/trial-state.js';
+import { toAdminWorkspaceView } from '../serializers/admin-workspace-view.js';
 import { addActivity } from '../activity-log.js';
 import { getLatestEffectiveSnapshot } from '../audit-snapshot-views.js';
 
@@ -91,7 +93,7 @@ function listVisibleWorkspaces(req: express.Request): Workspace[] {
 }
 
 router.get('/api/workspaces', (req, res) => {
-  const workspaces = listVisibleWorkspaces(req).map(ws => ({ ...ws, webflowToken: undefined, clientPassword: undefined, hasPassword: !!ws.clientPassword }));
+  const workspaces = listVisibleWorkspaces(req).map(ws => toAdminWorkspaceView(ws));
   res.json(workspaces);
 });
 
@@ -178,9 +180,7 @@ router.get('/api/workspace-overview', (req, res) => {
       clientActionChangesRequested = actionSummary.changesRequested;
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'workspaces: programming error'); /* non-critical */ }
 
-    const trialEnd = ws.trialEndsAt ? new Date(ws.trialEndsAt) : null;
-    const isTrial = trialEnd ? trialEnd > new Date() : false;
-    const trialDaysRemaining = isTrial && trialEnd ? Math.max(0, Math.ceil((trialEnd.getTime() - Date.now()) / 86400000)) : undefined;
+    const { isTrial, trialDaysRemaining } = computeTrialState(ws);
 
     return {
       id: ws.id,
@@ -226,8 +226,7 @@ router.get('/api/workspace-overview', (req, res) => {
 router.get('/api/workspaces/:id', requireWorkspaceAccess(), (req, res) => {
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Not found' });
-  const safe = { ...ws, webflowToken: undefined, clientPassword: undefined, hasPassword: !!ws.clientPassword };
-  res.json(safe);
+  res.json(toAdminWorkspaceView(ws));
 });
 
 const createWorkspaceSchema = z.object({
@@ -296,8 +295,7 @@ router.patch('/api/workspaces/:id', requireWorkspaceAccess(), async (req, res) =
     invalidatePageCache(req.params.id);
     invalidateSubCachePrefix(req.params.id, 'slice:'); // Invalidate ALL slice caches on settings change
   });
-  // Strip token from response to avoid leaking to frontend
-  const safe = { ...ws, webflowToken: undefined, clientPassword: undefined, hasPassword: !!ws.clientPassword };
+  const safe = toAdminWorkspaceView(ws);
   broadcast(WS_EVENTS.WORKSPACE_UPDATED, safe);
   broadcastToWorkspace(req.params.id, WS_EVENTS.WORKSPACE_UPDATED, safe);
   res.json(safe);

@@ -18,10 +18,14 @@ const mocks = vi.hoisted(() => ({
   getDataDir: vi.fn(),
 }));
 
-vi.mock('../../server/workspaces.js', () => ({
-  listWorkspaces: mocks.listWorkspaces,
-  getUploadRoot: mocks.getUploadRoot,
-}));
+vi.mock('../../server/workspaces.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../server/workspaces.js')>();
+  return {
+    ...actual,
+    listWorkspaces: mocks.listWorkspaces,
+    getUploadRoot: mocks.getUploadRoot,
+  };
+});
 vi.mock('../../server/helpers.js', () => ({
   applySuppressionsToAudit: mocks.applySuppressionsToAudit,
 }));
@@ -56,9 +60,13 @@ vi.mock('../../server/google-analytics.js', () => ({
 vi.mock('../../server/chat-memory.js', () => ({
   listSessions: mocks.listSessions,
 }));
-vi.mock('../../server/data-dir.js', () => ({
-  getDataDir: mocks.getDataDir,
-}));
+vi.mock('../../server/data-dir.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../server/data-dir.js')>();
+  return {
+    ...actual,
+    getDataDir: mocks.getDataDir,
+  };
+});
 vi.mock('../../server/logger.js', () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }));

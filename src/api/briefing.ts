@@ -5,10 +5,18 @@
 
 import { get, post, patch } from './client';
 import type {
+  BriefingClientView,
   BriefingDraft,
   BriefingStory,
   PublishedBriefingResponse,
 } from '../../shared/types/briefing';
+
+/** Standalone wrapper matching the task spec signature. */
+export function fetchBriefingPreview(workspaceId: string): Promise<BriefingClientView | null> {
+  return get<{ briefing: BriefingClientView | null }>(
+    `/api/briefing/${workspaceId}/preview`,
+  ).then(r => r.briefing);
+}
 
 export const briefingApi = {
   // ── Admin ────────────────────────────────────────────────────────────────
@@ -41,6 +49,12 @@ export const briefingApi = {
 
   generateNow: (workspaceId: string) =>
     post<{ accepted: boolean; reason?: string }>(`/api/briefing/${workspaceId}/generate-now`, {}),
+
+  /** Admin preview — returns the same enriched payload the client sees. */
+  fetchBriefingPreview: (workspaceId: string) =>
+    get<{ briefing: BriefingClientView | null }>(
+      `/api/briefing/${workspaceId}/preview`,
+    ).then(r => r.briefing),
 
   // ── Client (public, read-only) ───────────────────────────────────────────
   getPublished: (workspaceId: string) =>
