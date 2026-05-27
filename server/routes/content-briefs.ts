@@ -45,7 +45,7 @@ import { resolveWorkspaceLocationCode } from '../local-seo.js';
 import { listMatrices } from '../content-matrices.js';
 import { getTemplate } from '../content-templates.js';
 import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
-import { BRIEF_PAGE_TYPES } from '../../shared/types/content.js';
+import { BRIEF_PAGE_TYPES, CONTENT_GENERATION_STYLES } from '../../shared/types/content.js';
 import type { BriefPageType, BriefTemplateCrossrefMatch } from '../../shared/types/content.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 
@@ -86,6 +86,7 @@ const contentBriefPatchSchema = z.object({
   templateId: z.string().trim().max(100).optional(),
   titleVariants: z.array(z.string().trim().min(1).max(300)).optional(),
   metaDescVariants: z.array(z.string().trim().min(1).max(500)).optional(),
+  generationStyle: z.enum(CONTENT_GENERATION_STYLES).optional(),
 }).refine(
   (body) => Object.values(body).some((value) => value !== undefined),
   { message: 'At least one editable field required' },
@@ -209,8 +210,14 @@ router.patch('/api/content-briefs/:workspaceId/:briefId', requireWorkspaceAccess
 // Generate a new content brief
 router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   try {
-    const { targetKeyword, businessContext, pageType, referenceUrls, pageAnalysisContext } = req.body;
+    const { targetKeyword, businessContext, pageType, referenceUrls, pageAnalysisContext, generationStyle } = req.body;
     if (!targetKeyword) return res.status(400).json({ error: 'targetKeyword required' });
+    if (
+      generationStyle !== undefined
+      && (typeof generationStyle !== 'string' || !CONTENT_GENERATION_STYLES.includes(generationStyle as typeof CONTENT_GENERATION_STYLES[number]))
+    ) {
+      return res.status(400).json({ error: 'generationStyle must be one of standard, concise, hybrid' });
+    }
 
     const ws = getWorkspace(req.params.workspaceId);
     const templateCrossref = resolveBriefTemplateCrossref(req.params.workspaceId, targetKeyword);
@@ -309,6 +316,7 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
       templateMetaDescPattern: templateCrossref?.metaDescPattern,
       keywordLocked: templateCrossref ? true : undefined,
       keywordSource: templateCrossref ? 'template' : undefined,
+      generationStyle,
       referenceUrls: refUrlList.length > 0 ? refUrlList : undefined,
       scrapedReferences: scrapedRefs.length > 0 ? scrapedRefs : undefined,
       serpData: serpData ? { peopleAlsoAsk: serpData.peopleAlsoAsk, organicResults: serpData.organicResults } : undefined,

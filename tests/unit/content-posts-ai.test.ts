@@ -156,6 +156,30 @@ describe('unifyPost', () => {
     expect(prompt).toContain('NAP consistency');
   });
 
+  it('includes generation style guidance without removing page-type safety rules', async () => {
+    const longPost = {
+      ...makePost(),
+      introduction: `<p>${'intro '.repeat(120)}</p>`,
+      sections: [{
+        ...makePost().sections[0],
+        content: `<h2>Section</h2><p>${'body '.repeat(260)}</p>`,
+        wordCount: 260,
+        targetWordCount: 280,
+      }],
+      conclusion: `<h2>Next Steps</h2><p>${'outro '.repeat(80)}</p>`,
+    };
+    callAIMock.mockResolvedValueOnce({
+      text: '{"introduction":"<p>Unified intro</p>","sections":["<h2>Section</h2><p>Unified body</p>"],"conclusion":"<h2>Next Steps</h2><p>Unified outro</p>"}',
+    });
+
+    await unifyPost(longPost, { ...makeBrief(), pageType: 'service', generationStyle: 'concise' }, 'VOICE CONTEXT', 'ws_test');
+    const prompt = JSON.stringify(callAIMock.mock.calls[0]?.[0] ?? {});
+    expect(prompt).toContain('CONTENT GENERATION STYLE (concise)');
+    expect(prompt).toContain('GENERATION STYLE PRIORITY');
+    expect(prompt).toContain('PAGE-TYPE COPY CONTRACT (service)');
+    expect(prompt).toContain('factual safety');
+  });
+
   it('returns null when structured output has the wrong shape', async () => {
     const longPost = {
       ...makePost(),

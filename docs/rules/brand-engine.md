@@ -116,6 +116,19 @@ Brand context should choose vocabulary, proof, positioning, and rhythm. It must 
 
 Content brief and outline generation must apply the same priority before prose generation starts. Fresh briefs and outline regeneration should create right-sized skeletons for the page type: conversion pages get compact section counts, capped subheading density, one closing CTA path, and deterministic trimming of duplicate close/contact sections. Brand identity and voice can shape the outline's proof and positioning, but page architecture and word budget outrank any temptation to expand because richer brand context is available.
 
+## Content Generation Style Selector
+
+Content briefs and generated posts may carry a `generationStyle` value: `standard`, `concise`, or `hybrid`. The style selector is an admin-facing density and rhythm control, not a replacement for page type or brand voice.
+
+Priority order when a style is present:
+
+1. Factual safety and output format remain mandatory.
+2. Page type, conversion goal, and word budget still outrank the selected style.
+3. `generationStyle` shapes density, rhythm, and how much supporting detail to include.
+4. Brand voice/context chooses wording, proof, and positioning inside that density.
+
+`standard` keeps balanced SEO depth and brand voice. `concise` asks for the shortest complete version that still feels useful and trustworthy. `hybrid` keeps a compact skeleton but allows sharper POV, proof, and positioning where it earns its place. None of the styles may add duplicate CTAs, extra sections, or longer copy simply because richer brand context is available.
+
 ## Voice Quality Contract Harness
 
 **File:** `tests/unit/voice-quality-contract-harness.test.ts`

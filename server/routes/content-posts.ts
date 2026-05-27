@@ -48,7 +48,7 @@ import {
   buildClaimEvidenceLedger,
 } from '../content-review-evidence-ledger.js';
 import type { AIReviewMap, AiFixResult, ContentReviewEvidence, IssueKey, PostSection } from '../../shared/types/content.js';
-import { ISSUE_KEYS, PROVENANCE_SENSITIVE_REVIEW_KEYS } from '../../shared/types/content.js';
+import { CONTENT_GENERATION_STYLES, ISSUE_KEYS, PROVENANCE_SENSITIVE_REVIEW_KEYS } from '../../shared/types/content.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import { getVoiceProfile, buildVoiceCalibrationContext } from '../voice-calibration.js';
 import { sanitizeRichText, sanitizePlainText } from '../html-sanitize.js';
@@ -134,6 +134,7 @@ function buildReviewEvidence(workspaceId: string, briefId: string): ContentRevie
 
 const generatePostSchema = z.object({
   briefId: z.string({ required_error: 'briefId required' }).trim().min(1, 'briefId required'),
+  generationStyle: z.enum(CONTENT_GENERATION_STYLES).optional(),
 }).strict();
 
 const postSectionUpdateSchema = z.object({
@@ -225,7 +226,7 @@ router.get('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('wo
 
 // Generate a full post from a brief (async — returns immediately with skeleton, generates in background)
 router.post('/api/content-posts/:workspaceId/generate', requireWorkspaceAccess('workspaceId'), validate(generatePostSchema), async (req, res) => {
-  const { briefId } = req.body;
+  const { briefId, generationStyle } = req.body;
 
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -238,11 +239,11 @@ router.post('/api/content-posts/:workspaceId/generate', requireWorkspaceAccess('
   try {
     const activeJob = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION, req.params.workspaceId);
     if (activeJob) return res.status(409).json({ error: 'Content post generation is already running for this workspace', jobId: activeJob.id });
-    const started = createContentPostGenerationJob(req.params.workspaceId, brief);
+    const started = createContentPostGenerationJob(req.params.workspaceId, brief, generationStyle);
     res.json({ ...started.post, jobId: started.jobId });
     runContentPostGenerationJob({
       workspaceId: req.params.workspaceId,
-      brief,
+      brief: started.brief,
       postId: started.postId,
       jobId: started.jobId,
     });

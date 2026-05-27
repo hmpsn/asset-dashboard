@@ -2,13 +2,18 @@ import {
   Sparkles, ChevronDown, ChevronUp, ExternalLink,
 } from 'lucide-react';
 import { AIContextIndicator, Icon, Button, FormInput, FormSelect, FormTextarea } from '../ui';
-import type { BriefTemplateCrossrefMatch } from '../../../shared/types/content';
+import {
+  CONTENT_GENERATION_STYLE_OPTIONS,
+  type BriefTemplateCrossrefMatch,
+  type ContentGenerationStyle,
+} from '../../../shared/types/content';
 
 export interface BriefGeneratorProps {
   workspaceId: string;
   keyword: string;
   businessCtx: string;
   pageType: string;
+  generationStyle: ContentGenerationStyle;
   refUrls: string;
   showAdvanced: boolean;
   generating: boolean;
@@ -17,6 +22,7 @@ export interface BriefGeneratorProps {
   onKeywordChange: (value: string) => void;
   onBusinessCtxChange: (value: string) => void;
   onPageTypeChange: (value: string) => void;
+  onGenerationStyleChange: (value: ContentGenerationStyle) => void;
   onRefUrlsChange: (value: string) => void;
   onToggleAdvanced: () => void;
   onGenerate: () => void;
@@ -27,6 +33,7 @@ export function BriefGenerator({
   keyword,
   businessCtx,
   pageType,
+  generationStyle,
   refUrls,
   showAdvanced,
   generating,
@@ -35,6 +42,7 @@ export function BriefGenerator({
   onKeywordChange,
   onBusinessCtxChange,
   onPageTypeChange,
+  onGenerationStyleChange,
   onRefUrlsChange,
   onToggleAdvanced,
   onGenerate,
@@ -46,7 +54,7 @@ export function BriefGenerator({
         <span className="text-xs font-medium text-[var(--brand-text-bright)]">Generate AI Content Brief</span>
       </div>
       <div className="grid grid-cols-1 gap-2">
-        <div className="grid grid-cols-1 sm:grid-cols-[1fr_160px] gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_160px_150px] gap-2">
           <div>
             <label className="t-caption-sm text-[var(--brand-text-muted)] block mb-0.5">Target Keyword *</label>
             <FormInput
@@ -73,6 +81,15 @@ export function BriefGenerator({
                 { value: 'pillar', label: 'Pillar Page' },
                 { value: 'resource', label: 'Resource / Guide' },
               ]}
+              className="w-full cursor-pointer"
+            />
+          </div>
+          <div>
+            <label className="t-caption-sm text-[var(--brand-text-muted)] block mb-0.5">Writing Style</label>
+            <FormSelect
+              value={generationStyle}
+              onChange={value => onGenerationStyleChange(value as ContentGenerationStyle)}
+              options={CONTENT_GENERATION_STYLE_OPTIONS}
               className="w-full cursor-pointer"
             />
           </div>

@@ -35,3 +35,6 @@ dist-ssr
 # Coverage reports
 coverage/
 .claire/
+
+# Local experiment artifacts
+artifacts/

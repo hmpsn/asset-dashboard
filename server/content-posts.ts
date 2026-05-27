@@ -6,7 +6,7 @@
  */
 import { getWorkspace } from './workspaces.js';
 import type { ContentBrief } from './content-brief.js';
-import type { GeneratedPost } from '../shared/types/content.ts';
+import type { ContentGenerationStyle, GeneratedPost } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
 import db from './db/index.js';
 import { addActivity } from './activity-log.js';
@@ -17,6 +17,7 @@ import { abortableDelay, isAbortSignalAborted, throwIfSignalAborted } from './ab
 import { BACKGROUND_JOB_TYPES } from '../shared/types/background-jobs.js';
 import { sanitizePlainText, sanitizeRichText } from './html-sanitize.js';
 import { invalidateContentPipelineIntelligence } from './intelligence-freshness.js';
+import { resolveContentGenerationStyle } from './page-type-copy-contract.js';
 
 // Re-export everything from sub-modules for backward compatibility
 export * from './content-posts-db.js';
@@ -47,6 +48,7 @@ export interface ContentPostGenerationJobStart {
   jobId: string;
   postId: string;
   post: GeneratedPost;
+  brief: ContentBrief;
 }
 
 interface RunContentPostGenerationJobOptions {
@@ -100,6 +102,7 @@ export function createPostSkeleton(
     targetWordCount: brief.wordCountTarget || 1800,
     status: 'generating',
     unificationStatus: 'pending',
+    generationStyle: resolveContentGenerationStyle(brief.generationStyle),
     createdAt: now,
     updatedAt: now,
   };
@@ -113,6 +116,7 @@ function contentPostGenerationTotalSteps(brief: ContentBrief): number {
 export function createContentPostGenerationJob(
   workspaceId: string,
   brief: ContentBrief,
+  generationStyle?: ContentGenerationStyle,
 ): ContentPostGenerationJobStart {
   const activeJob = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION, workspaceId);
   if (activeJob) {
@@ -120,14 +124,15 @@ export function createContentPostGenerationJob(
   }
 
   const started = db.transaction(() => {
-    const skeleton = createPostSkeleton(workspaceId, brief);
+    const effectiveBrief = { ...brief, generationStyle: resolveContentGenerationStyle(generationStyle ?? brief.generationStyle) };
+    const skeleton = createPostSkeleton(workspaceId, effectiveBrief);
     savePost(workspaceId, skeleton);
     const job = createJob(BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION, {
       message: `Generating post for "${brief.targetKeyword}"...`,
       workspaceId,
-      total: contentPostGenerationTotalSteps(brief),
+      total: contentPostGenerationTotalSteps(effectiveBrief),
     });
-    return { jobId: job.id, postId: skeleton.id, post: skeleton };
+    return { jobId: job.id, postId: skeleton.id, post: skeleton, brief: effectiveBrief };
   })();
   notifyContentUpdated(workspaceId, {
     postId: started.postId,
@@ -321,6 +326,7 @@ export async function generatePost(
 
   const existingPost = getPost(workspaceId, postId);
   const post = existingPost ?? createPostSkeleton(workspaceId, brief, postId);
+  post.generationStyle = resolveContentGenerationStyle(post.generationStyle ?? brief.generationStyle);
   if (!existingPost) {
     savePost(workspaceId, post);
   }

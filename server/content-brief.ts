@@ -11,7 +11,7 @@ import { buildSystemPrompt } from './prompt-assembly.js';
 import { stripCodeFences, sanitizeQueryForPrompt } from './helpers.js';
 
 export type { ContentBrief } from '../shared/types/content.ts';
-import type { ContentBrief, StrategyCardContext } from '../shared/types/content.ts';
+import type { ContentBrief, ContentGenerationStyle, StrategyCardContext } from '../shared/types/content.ts';
 import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
 import {
   outlineItemSchema, serpAnalysisSchema, eeatGuidanceSchema,
@@ -22,8 +22,10 @@ import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
 import { buildOutcomeLearningStatusNote } from './outcome-learning-default-path.js';
 import {
+  getContentGenerationStyleContract,
   getPageTypeOutlineContract,
   getPageTypeOutlineGuidance,
+  resolveContentGenerationStyle,
 } from './page-type-copy-contract.js';
 
 const log = createLogger('content-brief');
@@ -141,6 +143,7 @@ interface BriefRow {
   template_id: string | null;
   title_variants: string | null;
   meta_desc_variants: string | null;
+  generation_style: string | null;
 }
 
 const stmts = createStmtCache(() => ({
@@ -154,7 +157,7 @@ const stmts = createStmtCache(() => ({
             cta_recommendations, eeat_guidance, content_checklist, schema_recommendations,
             page_type, reference_urls, real_people_also_ask, real_top_results,
             keyword_locked, keyword_source, keyword_validation, template_id,
-            title_variants, meta_desc_variants)
+            title_variants, meta_desc_variants, generation_style)
          VALUES
            (@id, @workspace_id, @target_keyword, @secondary_keywords, @suggested_title,
             @suggested_meta_desc, @outline, @word_count_target, @intent, @audience,
@@ -164,7 +167,7 @@ const stmts = createStmtCache(() => ({
             @cta_recommendations, @eeat_guidance, @content_checklist, @schema_recommendations,
             @page_type, @reference_urls, @real_people_also_ask, @real_top_results,
             @keyword_locked, @keyword_source, @keyword_validation, @template_id,
-            @title_variants, @meta_desc_variants)`,
+            @title_variants, @meta_desc_variants, @generation_style)`,
   ),
   selectByWorkspace: db.prepare(
     `SELECT * FROM content_briefs WHERE workspace_id = ? ORDER BY created_at DESC`,
@@ -189,7 +192,8 @@ const stmts = createStmtCache(() => ({
            real_people_also_ask = @real_people_also_ask, real_top_results = @real_top_results,
            keyword_locked = @keyword_locked, keyword_source = @keyword_source,
            keyword_validation = @keyword_validation, template_id = @template_id,
-           title_variants = @title_variants, meta_desc_variants = @meta_desc_variants
+           title_variants = @title_variants, meta_desc_variants = @meta_desc_variants,
+           generation_style = @generation_style
          WHERE id = @id AND workspace_id = @workspace_id`,
   ),
   deleteById: db.prepare(
@@ -244,6 +248,7 @@ function rowToBrief(row: BriefRow): ContentBrief {
     templateId: row.template_id ?? undefined,
     titleVariants: row.title_variants ? parseJsonSafeArray(row.title_variants, z.string(), { field: 'title_variants', table: 'content_briefs' }) : undefined,
     metaDescVariants: row.meta_desc_variants ? parseJsonSafeArray(row.meta_desc_variants, z.string(), { field: 'meta_desc_variants', table: 'content_briefs' }) : undefined,
+    generationStyle: resolveContentGenerationStyle(row.generation_style),
   };
 }
 
@@ -284,6 +289,7 @@ function briefToParams(brief: ContentBrief): Record<string, unknown> {
     template_id: brief.templateId ?? null,
     title_variants: brief.titleVariants ? JSON.stringify(brief.titleVariants) : null,
     meta_desc_variants: brief.metaDescVariants ? JSON.stringify(brief.metaDescVariants) : null,
+    generation_style: resolveContentGenerationStyle(brief.generationStyle),
   };
 }
 
@@ -777,8 +783,11 @@ export async function regenerateBrief(
   const workspaceContextBlock = formatContentGenerationPromptBlock(promptContext);
   const ptConfig = getPageTypeConfig(existingBrief.pageType);
   const outlineGuidance = getPageTypeOutlineGuidance(existingBrief.pageType);
+  const generationStyle = resolveContentGenerationStyle(existingBrief.generationStyle);
+  const generationStyleContract = getContentGenerationStyleContract(generationStyle);
 
   const previousBriefJson = JSON.stringify({
+    generationStyle,
     suggestedTitle: existingBrief.suggestedTitle,
     suggestedMetaDesc: existingBrief.suggestedMetaDesc,
     executiveSummary: existingBrief.executiveSummary,
@@ -813,6 +822,8 @@ ${workspaceContextBlock}
 Please regenerate the ENTIRE brief incorporating the user's feedback. Keep everything that was good, improve what the user requested, and maintain all required fields.
 
 ${outlineGuidance}
+
+${generationStyleContract}
 
 For conversion pages, page type and word budget outrank brand/context expansion. Use brand context to choose wording, proof, and positioning; do not add extra sections because more brand context is available.
 
@@ -904,6 +915,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     keywordSource: existingBrief.keywordSource,
     keywordValidation: existingBrief.keywordValidation,
     templateId: existingBrief.templateId,
+    generationStyle,
   };
 
   upsertBrief(workspaceId, newBrief);
@@ -930,6 +942,8 @@ export async function regenerateOutline(
   const workspaceContextBlock = formatContentGenerationPromptBlock(promptContext);
   const ptConfig = getPageTypeConfig(existingBrief.pageType);
   const outlineGuidance = getPageTypeOutlineGuidance(existingBrief.pageType);
+  const generationStyle = resolveContentGenerationStyle(existingBrief.generationStyle);
+  const generationStyleContract = getContentGenerationStyleContract(generationStyle);
 
   const currentOutline = JSON.stringify(existingBrief.outline, null, 2);
 
@@ -951,6 +965,8 @@ ${feedback ? `User feedback on the outline:\n${feedback}\n` : ''}
 Generate a new outline that ${feedback ? 'addresses the feedback above' : 'takes a fresh approach to the topic structure'}.
 
 ${outlineGuidance}
+
+${generationStyleContract}
 
 For conversion pages, page type and word budget outrank brand/context expansion. Use brand context to choose wording, proof, and positioning; do not add extra sections because more brand context is available.
 
@@ -1076,6 +1092,8 @@ export async function generateBrief(
     strategyCardContext?: StrategyCardContext;
     /** If this brief is being generated for a decaying page, the pre-formatted decay query breakdown block to inject into the prompt. */
     decayQueryContext?: string;
+    /** Admin-selected writing style for the brief and downstream post generation. */
+    generationStyle?: ContentGenerationStyle;
   },
   options?: {
     /** Persist generated brief row to content_briefs (default: true). */
@@ -1273,6 +1291,8 @@ The outline sections MUST match the following template sections in order. You ma
   // Page-type-specific instructions and configuration
   const ptConfig = getPageTypeConfig(context.pageType);
   const outlineGuidance = getPageTypeOutlineGuidance(context.pageType);
+  const generationStyle = resolveContentGenerationStyle(context.generationStyle);
+  const generationStyleContract = getContentGenerationStyleContract(generationStyle);
   const pageTypeBlock = context.pageType && PAGE_TYPE_CONFIGS[context.pageType]
     ? `\n\n${ptConfig.prompt}\n\nCONTENT STYLE: ${ptConfig.contentStyle}\n\n${outlineGuidance}\n\nTailor ALL aspects of the brief (outline structure, word count, CTA, schema, content format) to this page type. The wordCountTarget MUST be approximately ${ptConfig.wordCountTarget} (range: ${ptConfig.wordCountRange} words). Do NOT default to 1800 words unless this is a blog post. For conversion pages, use brand context to choose wording, proof, and positioning; do not add extra sections because more brand context is available.`
     : '';
@@ -1321,6 +1341,8 @@ The outline sections MUST match the following template sections in order. You ma
   const decayBlock = context.decayQueryContext ? `\n\n${context.decayQueryContext}` : '';
 
   const prompt = `Generate a right-sized, production-ready content brief for a new piece of content targeting the keyword "${targetKeyword}".${pageTypeBlock}
+
+${generationStyleContract}
 
 ${bizCtx ? `Business context: ${bizCtx}` : ''}
 
@@ -1476,6 +1498,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     keywordSource: context.keywordSource || undefined,
     keywordValidation: context.keywordValidation || undefined,
     templateId: context.templateId || undefined,
+    generationStyle,
   };
 
   if (options?.persist !== false) {
