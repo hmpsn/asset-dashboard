@@ -6,7 +6,7 @@
 import type { PageData, BusinessProfile } from '../data-sources.js';
 import type { SchemaIndustrySubtype } from '../../../shared/types/schema-plan.js';
 import type { SemanticPageData } from '../../../shared/types/page-elements.js';
-import { breadcrumbRef, dropUndefined, withBreadcrumb } from './helpers.js';
+import { breadcrumbRef, dropUndefined, resolvedEntityToThingNode, withBreadcrumb } from './helpers.js';
 
 export interface LocalBusinessInput {
   baseUrl: string;
@@ -82,6 +82,10 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
     ?.map(url => url.trim())
     .map(safeHttpUrl)
     .filter((url): url is string => Boolean(url))));
+  const organizationSameAs = Array.from(new Set([
+    ...safeSocialProfiles,
+    ...(pageData.organizationSameAs ?? []),
+  ]));
   const isHomepageUsage = pageData.canonicalUrl === baseUrl || pageData.canonicalUrl === `${baseUrl}/`;
   const lbId = isHomepageUsage
     ? `${baseUrl}/#localbusiness`
@@ -142,7 +146,12 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
     'logo': pageData.publisher.logoUrl
       ? { '@type': 'ImageObject', 'url': pageData.publisher.logoUrl }
       : undefined,
-    'knowsAbout': pageData.knowsAbout?.length ? pageData.knowsAbout : undefined,
+    'sameAs': organizationSameAs.length > 0 ? organizationSameAs : undefined,
+    'knowsAbout': pageData.knowsAboutEntities?.length
+      ? pageData.knowsAboutEntities.map(resolvedEntityToThingNode)
+      : pageData.knowsAbout?.length
+        ? pageData.knowsAbout
+        : undefined,
   });
 
   const localBusiness = dropUndefined({
@@ -163,7 +172,11 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
     'sameAs': safeSocialProfiles?.length ? safeSocialProfiles : undefined,
     'foundingDate': businessProfile?.foundedDate,
     'parentOrganization': { '@id': `${baseUrl}/#organization` },
-    'areaServed': safeText(pageData.areaServed) ? { '@type': 'Place' as const, name: safeText(pageData.areaServed) } : undefined,
+    'areaServed': pageData.areaServedEntity
+      ? resolvedEntityToThingNode(pageData.areaServedEntity)
+      : safeText(pageData.areaServed)
+        ? { '@type': 'Place' as const, name: safeText(pageData.areaServed) }
+        : undefined,
     'aggregateRating': aggregateRating,
   });
 

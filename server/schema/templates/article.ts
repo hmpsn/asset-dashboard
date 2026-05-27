@@ -5,7 +5,7 @@
  */
 import type { PageData } from '../data-sources.js';
 import { filterAuthorityCitations } from '../extractors/page-elements/citation.js';
-import { dropUndefined, withBreadcrumb, webSiteRef, breadcrumbRef, filterHttpUrls } from './helpers.js';
+import { dropUndefined, withBreadcrumb, webSiteRef, breadcrumbRef, filterHttpUrls, resolvedEntityToThingNode } from './helpers.js';
 
 export interface ArticleInput {
   baseUrl: string;
@@ -41,6 +41,12 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
     ? { '@type': 'Person', 'name': pageData.author }
     : { '@type': 'Organization', 'name': pageData.publisher.name };
   const citations = filterAuthorityCitations(pageData.elements?.citations ?? [], pageData.canonicalUrl);
+  const aboutEntity = pageData.articleAboutEntity
+    ? resolvedEntityToThingNode(pageData.articleAboutEntity)
+    : undefined;
+  const mentionEntities = pageData.articleMentionEntities?.length
+    ? pageData.articleMentionEntities.map(resolvedEntityToThingNode)
+    : undefined;
 
   const primary = dropUndefined({
     '@type': kind,
@@ -65,7 +71,8 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
     'articleSection': pageData.articleSection,
     'keywords': pageData.keywords,
     'wordCount': pageData.wordCount,
-    'about': kind === 'Article' ? 'Case study' : undefined,
+    'about': aboutEntity ?? (kind === 'Article' ? 'Case study' : undefined),
+    'mentions': mentionEntities,
     'citation': citations.length > 0
       ? citations.map(c => ({
           '@type': 'WebPage' as const,

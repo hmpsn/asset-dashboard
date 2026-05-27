@@ -53,7 +53,14 @@ Callers in schema routes/helpers/templates consume resolved results through inte
 - [x] Slice availability degrades safely on lookup errors (no hard failure).
 - [x] Unit coverage added for resolver/cache behavior.
 
+## Phase D Acceptance (Schema Emission Wiring)
+
+- [x] Schema generation threads entity-resolution intelligence into template inputs.
+- [x] `Organization.knowsAbout` supports typed Thing emission (with Wikidata `sameAs` when available).
+- [x] `Article.about`/`Article.mentions` consume typed entity grounding when available.
+- [x] `Service`/`LocalBusiness.areaServed` prefer typed Place emission from resolved entities.
+- [x] Unit/contract coverage added for schema emission and schema-suggester threading.
+
 ## Deferred to Implementation Phases
 
-- Schema template emission upgrades for typed entity arrays.
 - Confidence threshold tuning and fallback heuristics based on production telemetry.

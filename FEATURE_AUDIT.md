@@ -1,8 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **457 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **458 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 458. Schema Intelligence Phase D — Typed Entity Schema Emission
+
+**What it does:** Wires the resolved entity slice directly into schema output. Schema generation now threads page/workspace entity-resolution payloads into template builders so `Organization.knowsAbout`, `Article.about`, `Article.mentions`, and `Service`/`LocalBusiness.areaServed` can emit typed `Thing`/`Place` nodes with Wikidata-backed `sameAs` URLs when available. Organization `sameAs` now also merges entity-derived references with social-profile links.
+
+**Agency value:** Delivers the first customer-visible value from entity resolution by upgrading key schema fields from plain strings to disambiguated structured entities.
+
+**Client value:** Rich-result parsers receive clearer identity signals for topics and service geography, improving authority clarity and reducing ambiguous schema interpretation.
+
+**Mutual:** Completes the end-to-end contract from intelligence extraction through schema emission while preserving deterministic fallback behavior.
 
 ---
 

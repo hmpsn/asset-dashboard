@@ -10,6 +10,7 @@ import type { PageElementCatalog } from '../../shared/types/page-elements.js';
 import type { SchemaEvidenceSource, SchemaFieldEvidence, SchemaFieldTarget, SchemaServiceOffer, SchemaServiceProfile } from '../../shared/types/site-inventory.js';
 import type { BusinessProfileContact } from '../../shared/types/workspace.js';
 import type { SchemaIndustrySubtype } from '../../shared/types/schema-plan.js';
+import type { ResolvedEntity } from '../../shared/types/entity-resolution.js';
 
 export interface PageMetaInput {
   title: string;
@@ -38,6 +39,12 @@ export interface PageMetaInput {
   /** Webflow lastPublished at fetch time. Null for static (sitemap) pages.
    *  Drives stale-detection in the page-elements lazy refresh. */
   sourcePublishedAt?: string | null;
+  /** Page-scoped entity grounding resolved by the entityResolution intelligence slice. */
+  entityResolution?: {
+    articleAbout?: ResolvedEntity;
+    articleMentions?: ResolvedEntity[];
+    areaServed?: ResolvedEntity;
+  };
 }
 
 export interface WorkspaceSchemaInput {
@@ -55,6 +62,10 @@ export interface WorkspaceSchemaInput {
   siteHasSearch?: boolean;
   /** Active schema-plan local business specialization. */
   industrySubtype?: SchemaIndustrySubtype;
+  /** Workspace-level entity grounding resolved by the entityResolution intelligence slice. */
+  entityResolution?: {
+    knowsAbout?: ResolvedEntity[];
+  };
 }
 
 /** Re-export so schema templates can import from a single data-sources module. */
@@ -96,6 +107,16 @@ export interface PageData {
   offers?: SchemaServiceOffer[];
   /** Top-N siteKeywords for Organization.knowsAbout — passed through from workspace. */
   knowsAbout?: string[];
+  /** Typed entity grounding for Organization.knowsAbout. */
+  knowsAboutEntities?: ResolvedEntity[];
+  /** Optional sameAs references for Organization derived from resolved entities. */
+  organizationSameAs?: string[];
+  /** Typed entity grounding for Article.about. */
+  articleAboutEntity?: ResolvedEntity;
+  /** Typed entity grounding for Article.mentions. */
+  articleMentionEntities?: ResolvedEntity[];
+  /** Typed entity grounding for Service/LocalBusiness areaServed. */
+  areaServedEntity?: ResolvedEntity;
   /** Catalog of structural elements detected on the page (videos, HowTo
    *  lists, citations, etc.). Drives conditional schema enrichment. */
   elements?: PageElementCatalog;
@@ -436,6 +457,15 @@ export function extractPageData(input: ExtractInput): PageData {
   const serviceType = input.pageMeta.serviceProfile?.serviceType || derivedServiceLabel;
   const serviceName = input.pageMeta.serviceProfile?.serviceName || derivedServiceLabel;
   const serviceAreaServed = input.pageMeta.serviceProfile?.areaServed;
+  const resolvedAreaServed = input.pageMeta.entityResolution?.areaServed;
+  const knowsAboutEntities = input.workspace.entityResolution?.knowsAbout;
+  const organizationSameAs = Array.from(
+    new Set(
+      (knowsAboutEntities ?? [])
+        .map(entity => entity.wikidata?.sameAs?.trim())
+        .filter((url): url is string => !!url),
+    ),
+  );
 
   return {
     title,
@@ -455,11 +485,16 @@ export function extractPageData(input: ExtractInput): PageData {
     inLanguage,
     breadcrumbs: buildBreadcrumbs(input.pageMeta.publishedPath, cleanTitle, canonicalBaseUrl, canonicalUrl),
     keywords,
-    areaServed: serviceAreaServed || areaServed,
+    areaServed: serviceAreaServed || resolvedAreaServed?.label || areaServed,
+    areaServedEntity: resolvedAreaServed,
     serviceType,
     serviceName,
     offers: input.pageMeta.serviceProfile?.offers,
     knowsAbout: input.workspace.siteKeywordsForKnowsAbout?.slice(0, 5).map(s => s.toLowerCase()),
+    knowsAboutEntities,
+    organizationSameAs: organizationSameAs.length > 0 ? organizationSameAs : undefined,
+    articleAboutEntity: input.pageMeta.entityResolution?.articleAbout,
+    articleMentionEntities: input.pageMeta.entityResolution?.articleMentions,
     elements: input.pageMeta.elements,
     fieldEvidence,
     evidenceSources,
