@@ -8,6 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { isCheckableUrl } from '../../server/link-checker.js';
 import { normalizeUrl } from '../../server/sales-audit.js';
+import { extractLinks as extractHtmlLinks } from '../../server/html-analysis-utils.js';
 
 // ── isCheckableUrl ──
 
@@ -84,5 +85,36 @@ describe('normalizeUrl', () => {
 
   it('returns absolute URL for same-origin absolute link', () => {
     expect(normalizeUrl(base, 'https://swishsmiles.com/blog')).toBe('https://swishsmiles.com/blog');
+  });
+});
+
+describe('link-checker extraction mode', () => {
+  it('keeps rich onclick/form discovery with dedupe + checkable-url filtering', () => {
+    const html = `
+      <a href="/about">About</a>
+      <a href="/about">About Duplicate</a>
+      <button onclick="window.location.href='/contact'">Contact</button>
+      <form action="/book-now"></form>
+      <a href="mailto:test@example.com">Email</a>
+      <a href="#footer">Footer</a>
+    `;
+
+    const links = extractHtmlLinks(html, {
+      includeOnclickUrls: true,
+      includeFormActions: true,
+      dedupeByHref: true,
+      excludeHashAnchors: true,
+      requireNonEmptyHref: true,
+      filterHref: isCheckableUrl,
+      maxTextLength: 100,
+      onclickFallbackText: '[button/onclick]',
+      formActionText: '[form action]',
+    });
+
+    expect(links).toHaveLength(3);
+    expect(links[0]).toEqual({ href: '/about', text: 'About' });
+    expect(links[1].href).toBe('/contact');
+    expect(links[1].text.length).toBeGreaterThan(0);
+    expect(links[2]).toEqual({ href: '/book-now', text: '[form action]' });
   });
 });

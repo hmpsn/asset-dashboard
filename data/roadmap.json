@@ -1500,6 +1500,15 @@
           "notes": "Completed as full `normalizePath` sunset + page-address authority completion. Canonical cross-runtime implementations now live in `shared/page-address-utils.ts`; server/frontend facades route through shared authority; production `normalizePath` usage/export removed; remaining production call sites migrated to `normalizePageUrl` / `resolvePageAddress` / `resolvePagePath` / `tryResolvePagePath` / identity-match helpers. Added error-level pr-check guardrails blocking (1) retired `normalizePath` usage in production and (2) local `normalizePath`/`normalizePagePath` helper declarations outside tests, with fixture coverage."
         },
         {
+          "id": "audit-drift-html-extraction-utility-consolidation",
+          "title": "P1 HTML extraction utility consolidation",
+          "source": "Platform health consolidation follow-up 2026-05-27",
+          "est": "4-7h",
+          "priority": "P1",
+          "status": "done",
+          "notes": "Completed in this PR. Introduced canonical server authority `server/html-analysis-utils.ts` for tag/meta extraction, word counting, link extraction (including optional rel/onclick/form + dedupe/filter hooks), image extraction, inline style/script counting, and external resource counting. Migrated `server/seo-audit-html.ts` and `server/sales-audit.ts` helper clusters to wrapper delegates, preserving each surface's output shape. Migrated `server/link-checker.ts` rich link extraction onto canonical options while preserving checkable-url filtering and discovery semantics. Added canonical contract tests plus wrapper parity coverage and link-checker rich extraction tests. Added new error-level `pr-check` guardrail `Ad hoc HTML extraction helper outside canonical authority` with fixture coverage to prevent future mini-parser drift."
+        },
+        {
           "id": "audit-drift-score-color-adoption-sweep",
           "title": "Score-color adoption sweep + pr-check lock",
           "source": "Platform audit 2026-05-27",
