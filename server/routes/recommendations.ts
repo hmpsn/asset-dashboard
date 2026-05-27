@@ -24,7 +24,7 @@ const router = Router();
 
 // ─── Recommendation Engine ─────────────────────────────────────────
 // Generate (or re-generate) prioritized recommendations for a workspace
-router.post('/api/public/recommendations/:workspaceId/generate', async (req, res) => {
+router.post('/api/public/recommendations/:workspaceId/generate', async (req, res) => { // public-no-auth-ok: deferred to audit-drift-public-route-auth-sweep-followup
   try {
     const set = await generateRecommendations(req.params.workspaceId);
     res.json(set);
@@ -34,7 +34,7 @@ router.post('/api/public/recommendations/:workspaceId/generate', async (req, res
 });
 
 // List current recommendations (returns cached set, or generates if none exist)
-router.get('/api/public/recommendations/:workspaceId', async (req, res) => {
+router.get('/api/public/recommendations/:workspaceId', async (req, res) => { // public-no-auth-ok: deferred to audit-drift-public-route-auth-sweep-followup
   try {
     let set = loadRecommendations(req.params.workspaceId);
     if (!set) {

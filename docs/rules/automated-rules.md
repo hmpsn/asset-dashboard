@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **146** — 131 error, 15 warn.
+Total rules: **147** — 132 error, 15 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -147,6 +147,7 @@ advisory but tracked.
 | 129 | mcp-action-must-route-through-service | error | pattern | `server/mcp/tools/` | — | MCP write tools must go through service functions so broadcasts, activity logging, and state-machine guards all fire. |
 | 130 | mcp-action-must-tag-source | error | custom | `server/mcp/tools/` | `mcp-action-must-tag-source-ok` | mcp-chat-tagged activity entries get a "chat" badge in the activity feed so operators can audit chat-driven mutations. |
 | 131 | mcp-action-must-broadcast | error | custom | `server/mcp/tools/` | `mcp-action-must-broadcast-ok` | broadcast pairs every write so React Query caches stay fresh; MCP tools own this since the underlying service functions are unbroadcast. |
+| 132 | Public route under /api/public/ missing client-portal auth middleware | error | custom | `server/routes/` | `// public-no-auth-ok` | Without per-route portal auth, sensitive client data leaks from workspaces that have not yet had a clientPassword set (e.g. freshly-created accounts). |
 
 ---
 

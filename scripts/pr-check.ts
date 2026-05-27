@@ -6941,6 +6941,115 @@ export const CHECKS: Check[] = [
       return matches;
     },
   },
+  {
+    // Sprint wave 8: Plan A Task 1 — public endpoint auth lockdown.
+    //
+    // Every `/api/public/<resource>/:workspaceId/...` route that serves
+    // workspace-scoped data must apply either `requireClientPortalAuth()`
+    // (allows passwordless workspaces) or `requireAuthenticatedClientPortalAuth()`
+    // (rejects passwordless workspaces — preferred for sensitive data).
+    //
+    // The global app gate at server/app.ts:262 short-circuits to next() when
+    // `!ws.clientPassword`, which silently leaks data for any workspace whose
+    // dashboard has not been configured yet. The per-route middleware closes
+    // that hole.
+    //
+    // The PUBLIC_AUTH_ALLOWLIST below matches the path[3] values explicitly
+    // allowed by the global gate (server/app.ts:258): bootstrap/login flow
+    // endpoints that legitimately must accept unauthenticated callers.
+    name: 'Public route under /api/public/ missing client-portal auth middleware',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    excludeLines: ['// public-no-auth-ok'],
+    // Grandfather the 19 routes already shipped without per-route auth as of
+    // 2026-05-27 (audit-drift-closure Plan A Task 1). Tracked under roadmap
+    // item `audit-drift-public-route-auth-sweep-followup`; each file will be
+    // migrated route-by-route alongside test-fixture updates so existing
+    // integration tests (which create passwordless workspaces and expect 200s)
+    // are not broken in a single PR.
+    exclude: [
+      'server/routes/public-portal.ts',
+      // public-content.ts and public-requests.ts use router.use() file-level
+      // portal auth — Pass 1 detects that, so no exclude needed.
+      'server/routes/reports.ts',
+      'server/routes/work-orders.ts',
+      // recommendations.ts and stripe.ts have mixed auth coverage — individual
+      // unprotected routes are hatched with // public-no-auth-ok inline.
+    ],
+    message:
+      'New /api/public/<resource>/:workspaceId routes must call requireAuthenticatedClientPortalAuth() ' +
+      '(preferred — denies passwordless workspaces) or requireClientPortalAuth() (allows passwordless). ' +
+      'The global app gate alone is insufficient: it short-circuits on workspaces without clientPassword, ' +
+      'leaking data during the pre-setup window. Suppress with // public-no-auth-ok: <reason> if the ' +
+      'route is part of the bootstrap/login flow.',
+    severity: 'error',
+    rationale:
+      'Without per-route portal auth, sensitive client data leaks from workspaces that have not yet ' +
+      'had a clientPassword set (e.g. freshly-created accounts).',
+    claudeMdRef: '#auth-conventions',
+    customCheck: (files) => {
+      // path[3] values the global gate (server/app.ts:258) lets through
+      // without requiring a credential. Keep in lockstep with that file.
+      const PUBLIC_AUTH_ALLOWLIST = new Set([
+        'auth',
+        'workspace',
+        'client-login',
+        'client-logout',
+        'client-me',
+        'auth-mode',
+        'forgot-password',
+        'reset-password',
+      ]);
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes('/server/routes/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+
+        // Pass 1: detect file-level router.use() that applies portal auth to
+        // a path prefix. Routes nested under that prefix inherit the auth.
+        // Example: router.use('/api/public/:resource/:workspaceId',
+        // requireClientPortalAuth('workspaceId')).
+        const fileLevelAuthPrefixes: string[] = [];
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (/^\s*(\/\/|\*)/.test(line)) continue;
+          const useMatch = line.match(/router\.use\s*\(\s*['"`]([^'"`]+)['"`][^)]*(requireClientPortalAuth|requireAuthenticatedClientPortalAuth)\s*\(/);
+          if (!useMatch) continue;
+          // Normalize the path pattern by stripping Express :param tokens so a
+          // prefix like '/api/public/:resource/:workspaceId' matches any
+          // '/api/public/<actual-resource>/...' route.
+          const literalPrefix = useMatch[1].replace(/\/:.*$/, '');
+          fileLevelAuthPrefixes.push(literalPrefix);
+        }
+
+        // Pass 2: scan individual route handlers.
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (/^\s*(\/\/|\*)/.test(line)) continue;
+          const routeMatch = line.match(/router\.(get|post|patch|put|delete)\s*\(\s*['"`](\/api\/public\/([^/'"`]+)[^'"`]*)/);
+          if (!routeMatch) continue;
+          const fullPath = routeMatch[2];
+          const resource = routeMatch[3];
+          if (PUBLIC_AUTH_ALLOWLIST.has(resource)) continue;
+          if (hasHatch(lines, i, '// public-no-auth-ok')) continue;
+          // If a file-level router.use() already applied portal auth to a
+          // prefix covering this route, skip — auth is inherited.
+          if (fileLevelAuthPrefixes.some(prefix => fullPath.startsWith(prefix))) continue;
+          // Look forward up to 8 lines (covers multi-line router.METHOD(
+          // signatures) for either auth middleware.
+          const window = lines.slice(i, Math.min(i + 8, lines.length)).join('\n');
+          if (window.includes('requireClientPortalAuth(')) continue;
+          if (window.includes('requireAuthenticatedClientPortalAuth(')) continue;
+          hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

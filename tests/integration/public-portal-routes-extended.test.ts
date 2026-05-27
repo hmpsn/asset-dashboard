@@ -30,7 +30,7 @@ import { initializeSections, saveGeneratedCopy } from '../../server/copy-review.
 import { createBlueprint, addEntry } from '../../server/page-strategy.js';
 
 const ctx = createTestContext(13380); // port-ok: 13380
-const { api } = ctx;
+const { api, postJson, clearCookies } = ctx;
 
 // ── Test state ────────────────────────────────────────────────────────────────
 
@@ -247,33 +247,44 @@ describe('GET /api/public/audit-detail/:workspaceId', () => {
 // ── 4. GET /api/public/audit-traffic/:workspaceId ────────────────────────────
 
 describe('GET /api/public/audit-traffic/:workspaceId', () => {
-  it('returns empty object for unknown workspace (graceful degradation)', async () => {
-    // Per the implementation: if (!ws) return res.json({})
-    const res = await api('/api/public/audit-traffic/nonexistent-ws-traffic-99');
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(typeof body).toBe('object');
-    expect(body).not.toBeNull();
+  // Behavior change 2026-05-27 (sprint-platform-health-wave8 Plan A Task 1):
+  // endpoint now requires authenticated portal access. Auth runs before the
+  // handler's graceful-degradation logic, so an unknown workspace returns
+  // 404 from the middleware instead of the previous 200-with-empty-object.
+  // We add a shared password + session login on wsA so the body-shape
+  // assertions can still exercise the handler's GSC/GA4 fallback path.
+  beforeAll(async () => {
+    updateWorkspace(wsA.workspaceId, { clientPassword: 'audit-test-password' });
+    const authRes = await postJson(`/api/public/auth/${wsA.workspaceId}`, { password: 'audit-test-password' });
+    expect(authRes.status).toBe(200);
   });
 
-  it('returns an object for a workspace with no GSC or GA4 configured', async () => {
+  // Restore wsA to its passwordless seed state and drop the session so later
+  // describes (onboarding, etc.) see the same state they had before this
+  // block ran.
+  afterAll(() => {
+    updateWorkspace(wsA.workspaceId, { clientPassword: '' });
+    clearCookies();
+  });
+
+  it('returns 404 for unknown workspace (auth middleware short-circuits)', async () => {
+    const res = await api('/api/public/audit-traffic/nonexistent-ws-traffic-99');
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 401 for a workspace with no clientPassword set (authenticated-portal gate)', async () => {
     const noIntWs = seedWorkspace({ clientPassword: '', gscPropertyUrl: undefined, ga4PropertyId: undefined });
     try {
       const res = await api(`/api/public/audit-traffic/${noIntWs.workspaceId}`);
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(typeof body).toBe('object');
-      // No integrations → empty traffic map
-      expect(Object.keys(body as object)).toHaveLength(0);
+      expect(res.status).toBe(401);
     } finally {
       noIntWs.cleanup();
     }
   });
 
-  it('returns 200 for main workspace (may have empty traffic if GSC/GA4 not configured)', async () => {
+  it('returns 200 for authenticated main workspace (may have empty traffic if GSC/GA4 not configured)', async () => {
     const res = await api(`/api/public/audit-traffic/${wsA.workspaceId}`);
     expect([200, 500]).toContain(res.status);
-    // 200 → valid object; 500 → error shape
     if (res.status === 200) {
       const body = await res.json();
       expect(typeof body).toBe('object');
