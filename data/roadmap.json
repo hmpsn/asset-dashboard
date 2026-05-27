@@ -647,6 +647,17 @@
           "createdAt": "2026-05-25",
           "shippedAt": "2026-05-25",
           "notes": "Completed on 2026-05-25. Closed out MCP actions with end-to-end integration coverage for all 10 tools (`tests/integration/mcp-tools-{keyword,content,jobs}.test.ts`), corrected send-to-client activity typing to `brief_sent_for_review` / `post_sent_for_review`, removed the stale `brief:updated` pending-routes allowlist entry now that MCP save_brief broadcasts it, and fixed post send-to-client request lifecycle typing so creation supports `in_progress` before transitioning to `post_review`. Final verification gate passed: typecheck, pr-check, targeted MCP test suites, and full suite/build in this phase."
+        },
+        {
+          "id": "superpowers-mcp-content-edit-orchestration-followup",
+          "title": "MCP content edit orchestration (server-side iterative sessions)",
+          "source": "MCP iterative editing expansion follow-up (2026-05-27)",
+          "est": "6-10h",
+          "priority": "P2",
+          "status": "pending",
+          "plannedSprint": "deferred",
+          "owner": "content-pipeline",
+          "notes": "Deferred follow-up after MCP read/write iterative editing v1. Evaluate optional server-managed edit orchestration only if operational pain justifies it (high conflict rates, auditability gaps, repeated failed applies). Scope may include edit-session lifecycle, staged deltas, and optional server AI wrapper endpoints while preserving existing service-layer writes, activity provenance (`source: mcp-chat`), and broadcast invalidation contracts."
         }
       ]
     },

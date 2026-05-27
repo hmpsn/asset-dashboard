@@ -6944,7 +6944,7 @@ export const CHECKS: Check[] = [
     claudeMdRef: '#mcp-actions',
     customCheck: (files) => {
       const matches: { file: string; line: number; text: string }[] = [];
-      const mutationFnRe = /\b(upsertBrief|savePost|upsertPageKeyword|notifyContentUpdated)\(/;
+      const mutationFnRe = /\b(upsertBrief|updateBrief|savePost|updatePostField|upsertPageKeyword|notifyContentUpdated)\(/;
       const broadcastRe = /\bbroadcastToWorkspace\(/;
       for (const file of files) {
         let text: string;
