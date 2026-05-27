@@ -31,6 +31,7 @@ import { addActivity } from './activity-log.js';
 import { updateJob } from './jobs.js';
 import { parseJsonSafeArray } from './db/json-validation.js';
 import { rootCauseSchema, remediationActionSchema } from './schemas/diagnostics-schemas.js';
+import { parseDiagnosticRootCauses } from './schemas/ai-diagnostic.js';
 import type {
   DiagnosticContext,
   DiagnosticRequest,
@@ -452,6 +453,7 @@ Rules for remediation:
 - Order by priority then impact`);
 
   const result = await callAI({
+    operation: 'diagnostic-root-causes',
     model: 'gpt-5.4',
     system: systemPrompt,
     messages: [{ role: 'user', content: JSON.stringify(context) }],
@@ -463,11 +465,11 @@ Rules for remediation:
   });
 
   try {
-    const parsed = JSON.parse(result.text) as { rootCauses?: unknown; remediationActions?: unknown; adminReport?: unknown; clientSummary?: unknown };
-    const rootCauses = parseJsonSafeArray(JSON.stringify(parsed.rootCauses ?? []), rootCauseSchema, { field: 'rootCauses', table: 'diagnostic:synthesis' });
-    const remediationActions = parseJsonSafeArray(JSON.stringify(parsed.remediationActions ?? []), remediationActionSchema, { field: 'remediationActions', table: 'diagnostic:synthesis' });
-    const adminReport = typeof parsed.adminReport === 'string' ? parsed.adminReport : '';
-    const clientSummary = typeof parsed.clientSummary === 'string' ? parsed.clientSummary : '';
+    const parsed = parseDiagnosticRootCauses(result.text);
+    const rootCauses = parseJsonSafeArray(JSON.stringify(parsed.rootCauses), rootCauseSchema, { field: 'rootCauses', table: 'diagnostic:synthesis' });
+    const remediationActions = parseJsonSafeArray(JSON.stringify(parsed.remediationActions), remediationActionSchema, { field: 'remediationActions', table: 'diagnostic:synthesis' });
+    const adminReport = parsed.adminReport;
+    const clientSummary = parsed.clientSummary;
     if (rootCauses.length === 0 && remediationActions.length === 0 && !adminReport) {
       throw new Error('AI synthesis returned empty result');
     }

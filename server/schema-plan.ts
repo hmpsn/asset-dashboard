@@ -15,6 +15,7 @@ import { getWorkspacePages } from './workspace-data.js';
 import type { SiteArchitectureResult } from './site-architecture.js';
 import { flattenTree } from './site-architecture.js';
 import { crawlCompetitorSchemas, compareSchemas } from './competitor-schema.js';
+import { parseSchemaPlan } from './schemas/ai-schema-plan.js';
 
 const log = createLogger('schema-plan');
 
@@ -342,7 +343,7 @@ IMPORTANT:
 
   try {
     const result = await callAI({
-      operation: 'schema-plan',
+      operation: 'schema-plan-generate',
       model: 'gpt-5.4-mini',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 4000,
@@ -354,20 +355,7 @@ IMPORTANT:
 
     if (!result.text) return null;
 
-    const cleaned = result.text.replace(/```json?\s*/g, '').replace(/```\s*/g, '').trim();
-    const parsed = JSON.parse(cleaned);
-
-    if (!Array.isArray(parsed.canonicalEntities) || !Array.isArray(parsed.pageRoles)) {
-      log.warn('AI schema plan missing required arrays');
-      return null;
-    }
-
-    // Validate and normalize roles
-    const validRoles = new Set<string>([
-      'homepage', 'pillar', 'service', 'audience', 'lead-gen', 'blog', 'about', 'contact',
-      'location', 'product', 'partnership', 'faq', 'case-study', 'comparison', 'howto', 'video',
-      'job-posting', 'course', 'event', 'author', 'review', 'pricing', 'recipe', 'generic',
-    ]);
+    const parsed = parseSchemaPlan(result.text);
 
     const rawRoles: PageRoleAssignment[] = parsed.pageRoles.map((pr: Record<string, unknown>) => {
       const rawSubtype = typeof pr.industrySubtype === 'string'
@@ -387,7 +375,7 @@ IMPORTANT:
       return {
         pagePath: String(pr.pagePath || ''),
         pageTitle: String(pr.pageTitle || ''),
-        role: validRoles.has(String(pr.role)) ? String(pr.role) as SchemaPageRole : 'generic',
+        role: (typeof pr.role === 'string' ? pr.role : 'generic') as SchemaPageRole,
         primaryType: String(pr.primaryType || 'WebPage'),
         entityRefs: Array.isArray(pr.entityRefs) ? pr.entityRefs.map(String) : [],
         notes,

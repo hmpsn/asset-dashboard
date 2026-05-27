@@ -5,8 +5,9 @@ import { Router } from 'express';
 
 import { requireWorkspaceAccess, requestUserCanAccessWorkspace } from '../auth.js';
 import { requireAuthenticatedClientPortalAuth } from '../middleware.js';
-const router = Router();
-
+import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
+import { addActivity } from '../activity-log.js';
 import {
   listAnomalies,
   dismissAnomaly,
@@ -14,6 +15,8 @@ import {
   runAnomalyDetection,
   getAnomalyById,
 } from '../anomaly-detection.js';
+
+const router = Router();
 
 // --- Anomaly Detection ---
 router.get('/api/anomalies', (_req, res) => {
@@ -41,6 +44,8 @@ router.post('/api/anomalies/:anomalyId/dismiss', (req, res) => {
   if (!requestUserCanAccessWorkspace(req, anomaly.workspaceId)) return res.status(404).json({ error: 'Anomaly not found' });
   const ok = dismissAnomaly(anomaly.workspaceId, req.params.anomalyId);
   if (!ok) return res.status(404).json({ error: 'Anomaly not found' });
+  broadcastToWorkspace(anomaly.workspaceId, WS_EVENTS.ANOMALIES_UPDATE, { anomalyId: req.params.anomalyId, action: 'dismissed' });
+  addActivity(anomaly.workspaceId, 'anomaly_dismissed', `Anomaly dismissed: ${anomaly.title}`, anomaly.description);
   res.json({ dismissed: true });
 });
 
@@ -50,6 +55,8 @@ router.post('/api/anomalies/:anomalyId/acknowledge', (req, res) => {
   if (!requestUserCanAccessWorkspace(req, anomaly.workspaceId)) return res.status(404).json({ error: 'Anomaly not found' });
   const ok = acknowledgeAnomaly(anomaly.workspaceId, req.params.anomalyId);
   if (!ok) return res.status(404).json({ error: 'Anomaly not found' });
+  broadcastToWorkspace(anomaly.workspaceId, WS_EVENTS.ANOMALIES_UPDATE, { anomalyId: req.params.anomalyId, action: 'acknowledged' });
+  addActivity(anomaly.workspaceId, 'anomaly_acknowledged', `Anomaly acknowledged: ${anomaly.title}`, anomaly.description);
   res.json({ acknowledged: true });
 });
 

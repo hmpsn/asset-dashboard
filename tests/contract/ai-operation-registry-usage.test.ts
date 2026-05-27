@@ -5,7 +5,7 @@ describe('AI operation registry usage contracts', () => {
   it('keeps representative callAI paths wired to explicit operation ids', () => {
     const expectations: Array<{ path: string; operation: string }> = [
       { path: 'server/content-brief.ts', operation: "operation: 'content-brief-regenerate'" },
-      { path: 'server/schema-plan.ts', operation: "operation: 'schema-plan'" },
+      { path: 'server/schema-plan.ts', operation: "operation: 'schema-plan-generate'" },
       { path: 'server/routes/public-analytics.ts', operation: "operation: 'client-search-chat'" },
       { path: 'server/content-decay.ts', operation: "operation: 'content-decay'" },
       { path: 'server/keyword-strategy-ai-synthesis.ts', operation: "operation: 'keyword-strategy'" },

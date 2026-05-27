@@ -55,6 +55,8 @@ export type ActivityType =
   | 'fix_completed'
   | 'anomaly_detected'
   | 'anomaly_positive'
+  | 'anomaly_dismissed'
+  | 'anomaly_acknowledged'
   | 'post_generated'
   | 'post_reverted'
   | 'brief_sent_for_review'

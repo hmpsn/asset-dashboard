@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **150** — 135 error, 15 warn.
+Total rules: **152** — 136 error, 16 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -150,7 +150,8 @@ advisory but tracked.
 | 132 | mcp-action-must-broadcast | error | custom | `server/mcp/tools/` | `mcp-action-must-broadcast-ok` | broadcast pairs every write so React Query caches stay fresh; MCP tools own this since the underlying service functions are unbroadcast. |
 | 133 | Public route under /api/public/ missing client-portal auth middleware | error | custom | `server/routes/` | `// public-no-auth-ok` | Without per-route portal auth, sensitive client data leaks from workspaces that have not yet had a clientPassword set (e.g. freshly-created accounts). |
 | 134 | Inline trial-state computation outside billing module | error | custom | `server/` | `trial-state-ok` | Centralizes trial logic so tier changes (e.g. adding a grace period) are single-edit. |
-| 135 | Workspace object spread-and-redact in route handler | error | custom | `server/routes/` | `admin-view-ok` | Spread-and-redact is deny-list based — new secrets leak by default. |
+| 135 | Bare JSON.parse on AI text response without schema validation | error | custom | `server/` | `ai-json-parse-ok` | Unvalidated AI JSON silently propagates wrong shapes when prompts drift. |
+| 136 | Workspace object spread-and-redact in route handler | error | custom | `server/routes/` | `admin-view-ok` | Spread-and-redact is deny-list based — new secrets leak by default. |
 
 ---
 
@@ -173,6 +174,7 @@ advisory but tracked.
 | 13 | raw-z-index-inline-literal | warn | custom | `src/` | — | Inline numeric z-index values drift from the canonical token scale and make stacking behavior unpredictable across overlays, toasts, and modals. |
 | 14 | focus-visible-ring-contract | warn | custom | `src/components/` | — | Removing default focus outlines without an explicit focus-visible fallback risks keyboard-invisible controls and drifts from the styleguide focus ring contract. |
 | 15 | stat-primitive-bypass-signal | warn | custom | `src/components/` | — | Direct t-stat typography usage in feature shells often re-implements StatCard/CompactStatBar chrome and drifts from canonical spacing, labels, and responsive behavior. |
+| 16 | Workspace mutation route missing broadcastToWorkspace | warn | custom | `server/routes/` | `no-broadcast-ok` | Silent mutations mean UI never refreshes without a manual reload. |
 
 ---
 

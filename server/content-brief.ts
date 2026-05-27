@@ -8,7 +8,7 @@ import { buildReferenceContext, buildSerpContext, buildStyleExampleContext } fro
 import type { ScrapedPage } from './web-scraper.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
-import { stripCodeFences, sanitizeQueryForPrompt } from './helpers.js';
+import { sanitizeQueryForPrompt } from './helpers.js';
 
 export type { ContentBrief } from '../shared/types/content.ts';
 import type { ContentBrief, ContentGenerationStyle, StrategyCardContext } from '../shared/types/content.ts';
@@ -17,6 +17,10 @@ import {
   outlineItemSchema, serpAnalysisSchema, eeatGuidanceSchema,
   schemaRecommendationSchema, keywordValidationSchema, realTopResultSchema,
 } from './schemas/content-schemas.js';
+import {
+  parseContentBriefOutline,
+  parseContentBriefSchema,
+} from './schemas/ai-content-brief.js';
 import { z } from 'zod';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
@@ -31,16 +35,6 @@ import {
 import type { EeatAssetRecommendation } from '../shared/types/eeat-assets.js';
 
 const log = createLogger('content-brief');
-/** Strip markdown code fences and parse JSON from AI responses. Throws on invalid JSON. */
-function parseAiJson<T = Record<string, unknown>>(raw: string, context: string): T {
-  const cleaned = stripCodeFences(raw);
-  try {
-    return JSON.parse(cleaned) as T;
-  } catch (err) {
-    log.debug({ err }, 'content-brief/parseAiJson: expected error — degrading gracefully');
-    throw new Error(`Failed to parse AI response as JSON (${context})`);
-  }
-}
 
 // ── Analytics Intelligence for brief enrichment ──
 
@@ -886,7 +880,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
   });
 
   const raw = aiResult.text || '{}';
-  const parsed = parseAiJson(raw, 'brief-regenerate');
+  const parsed = parseContentBriefSchema(raw);
 
   // Create a new brief ID — preserves the old one for history
   const newBrief: ContentBrief = {
@@ -1002,26 +996,21 @@ Rules:
   );
 
   const aiResult = await callAI({
+    operation: 'content-brief-outline',
     model: 'gpt-5.4',
     system: systemPrompt,
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 4000,
     temperature: 0.6,
     researchMode: true,
-    feature: 'content-brief-outline-regen',
     workspaceId,
   });
 
-  // Parse the outline from the response
+  // Parse the outline from the response — must be a bare JSON array (see ai-content-brief.ts)
   const outlineRaw = aiResult.text || '[]';
-  const outlineParsed = parseAiJson<Record<string, unknown> | unknown[]>(outlineRaw, 'outline-regen');
-  const candidateItems = Array.isArray(outlineParsed)
-    ? outlineParsed
-    : ((outlineParsed as Record<string, unknown>).outline
-      ?? (outlineParsed as Record<string, unknown>).sections
-      ?? []);
+  const candidateItems = parseContentBriefOutline(outlineRaw);
 
-  if (!Array.isArray(candidateItems) || candidateItems.length === 0) {
+  if (candidateItems.length === 0) {
     throw new Error('Failed to parse regenerated outline');
   }
 
@@ -1477,7 +1466,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
   });
 
   const raw = aiResult.text || '{}';
-  const parsed = parseAiJson(raw, 'content-brief');
+  const parsed = parseContentBriefSchema(raw);
 
   const brief: ContentBrief = {
     id: `brief_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,

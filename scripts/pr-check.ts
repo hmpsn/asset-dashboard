@@ -1059,9 +1059,11 @@ export const CHECKS: Check[] = [
     pathFilter: 'server/',
     exclude: [
       'server/db/json-validation.ts', 'server/content-posts-ai.ts', 'server/routes/keyword-strategy.ts',
-      'server/content-brief.ts', 'server/routes/aeo-review.ts', 'server/routes/jobs.ts',
-      'server/schema-plan.ts', 'server/schema-suggester.ts', 'server/seo-audit.ts',
-      'server/performance-store.ts', 'server/rank-tracking.ts', 'server/aeo-page-review.ts',
+      'server/routes/aeo-review.ts', 'server/routes/jobs.ts',
+      'server/aeo-page-review.ts', // HTML JSON-LD script tag parsing (existing page schema detection from HTML), not DB columns or AI text
+      'server/schemas/_parse-ai-json.ts', // lightweight AI response text parser — implements the wrapper, not a raw DB read
+      'server/schema-suggester.ts', 'server/seo-audit.ts',
+      'server/performance-store.ts', 'server/rank-tracking.ts',
       'server/processor.ts', // file-based metadata JSON, not DB columns
       'server/websocket.ts', // WebSocket message parsing, not DB columns
       'server/meeting-brief-generator.ts', // AI response text parser, not DB columns
@@ -1080,7 +1082,6 @@ export const CHECKS: Check[] = [
       'server/routes/roadmap.ts', // disk files: roadmap.json + runtime status files (not DB columns)
       'server/routes/content-publish.ts', // AI response text parser: parses Claude field-mapping suggestion (not DB columns)
       'server/stripe-config.ts', // disk file: AES-encrypted Stripe config file (not DB columns)
-      'server/diagnostic-orchestrator.ts', // AI response text parser (GPT-4.1 synthesis result), not DB columns
       'server/schema/generator.ts', // HTML JSON-LD script tag parsing (existing page schemas from HTML), not DB columns
       'server/briefing-cron.ts', // AI response text parser (Anthropic Sonnet briefing JSON), validated by briefingAIResponseSchema, not DB columns
       'server/schema/extractors/page-elements/image-ai-classifier.ts', // AI response text parser (vision API role JSON), not DB columns
@@ -7138,6 +7139,56 @@ export const CHECKS: Check[] = [
     },
   },
 
+  // ── Plan B Task 6: AI JSON.parse without schema validation (2026-05-27) ──
+  {
+    name: 'Bare JSON.parse on AI text response without schema validation',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: [
+      'server/db/', 'server/schemas/', 'tests/', 'server/ai.ts',
+      'server/openai-helpers.ts', 'server/anthropic-helpers.ts',
+      'server/briefing-cron.ts',      // uses briefingAIResponseSchema — already validated
+      'server/meeting-brief-generator.ts', // comment-only exclusion, validated elsewhere
+      'server/routes/content-publish.ts', // field-mapping suggestion, not critical schema
+      'server/schema/extractors/', 'server/content-posts-ai.ts',
+    ],
+    message:
+      'AI text responses must be parsed through a Zod-validated wrapper ' +
+      '(e.g. parseContentBriefOutline(), parseAeoReview()) rather than bare JSON.parse(). ' +
+      'Register a named operation in server/ai-operation-registry.ts and pair it with a ' +
+      'schema in server/schemas/. Suppress with // ai-json-parse-ok: <reason> only if ' +
+      'the parse is not safety-critical (e.g. best-effort HTML JSON-LD extraction).',
+    severity: 'error',
+    excludeLines: ['ai-json-parse-ok'],
+    rationale: 'Unvalidated AI JSON silently propagates wrong shapes when prompts drift.',
+    claudeMdRef: '#ai-operation-contracts',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Matches JSON.parse( where the arg name suggests it's an AI response string.
+      // Also covers result?.text (optional chaining) and result.text.trim() style usages.
+      const aiParseRe = /JSON\.parse\(\s*(raw|response|aiText|completion|text|output|result\??\.text|rawText|cleaned)\b/;
+      const aiImportRe = /from ['"][^'"]*\/(?:ai|openai-helpers|anthropic-helpers|ai-operation-registry)\.js['"]/;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes('/server/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        // Only check files that actually import from AI modules
+        if (!aiImportRe.test(content)) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (/^\s*(\/\/|\*)/.test(line)) continue;
+          if (line.includes('ai-json-parse-ok')) continue;
+          if (aiParseRe.test(line)) {
+            hits.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+      return hits;
+    },
+  },
+
   // ── Plan A Task 3: workspace spread-and-redact (2026-05-27) ─────────────
   {
     name: 'Workspace object spread-and-redact in route handler',
@@ -7171,6 +7222,65 @@ export const CHECKS: Check[] = [
           if (line.includes('admin-view-ok')) continue;
           if (spreadRe.test(line) || redactRe.test(line)) {
             hits.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+      return hits;
+    },
+  },
+
+  // ── Plan B Task 10: mutation routes must broadcast + log (2026-05-27) ────
+  {
+    name: 'Workspace mutation route missing broadcastToWorkspace',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    exclude: [
+      'tests/',
+      // Routes where mutations are intentionally internal or already delegated:
+      'server/routes/auth.ts',         // auth only, no workspace data mutations
+      'server/routes/users.ts',        // user management, no workspace broadcasts needed
+      'server/routes/billing.ts',      // Stripe webhooks, activity logged via payment events
+      'server/routes/uploads.ts',      // file storage, no workspace data mutation
+      'server/routes/webflow-auth.ts', // OAuth handshake only
+      'server/routes/reports.ts',      // read-only report serving
+      'server/routes/jobs.ts',         // job infrastructure, broadcasts handled by job workers
+      'server/routes/roadmap.ts',      // admin-only disk file read/write, no client visibility
+      'server/routes/feature-flags.ts', // admin-only in-memory flags
+      'server/routes/admin.ts',        // admin config, no per-workspace mutation
+      'server/routes/public-portal.ts', // client-portal reads; mutations delegated to domain modules
+      'server/routes/mcp.ts',          // MCP proxy; domain modules handle broadcast
+    ],
+    message:
+      'Route files that perform workspace DB writes (stmts().run, db.transaction, upsert, insert) ' +
+      'must call broadcastToWorkspace() so the frontend invalidates affected React Query caches. ' +
+      'If broadcast is intentionally absent (e.g. internal-only job, delegated to a domain module ' +
+      'that already broadcasts), suppress with // no-broadcast-ok: <reason> on the same line.',
+    severity: 'warn',
+    excludeLines: ['no-broadcast-ok'],
+    rationale: 'Silent mutations mean UI never refreshes without a manual reload.',
+    claudeMdRef: '#data-flow-rules',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const mutationMethodRe = /router\.(post|patch|put|delete)\s*\(/;
+      const dbWriteRe = /\bstmts\(\)\.(?:run|upsert|insert)\b|db\.transaction\(|\.prepare\([^)]+\)\.run\(|runWorkspaceMutation\(/;
+      const broadcastRe = /broadcastToWorkspace\s*\(/;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes('/server/routes/')) continue;
+        if (file.includes('/tests/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        if (content.includes('no-broadcast-ok')) continue;
+        // Only flag route files that have mutation methods AND DB writes but no broadcast at all
+        if (!mutationMethodRe.test(content)) continue;
+        if (!dbWriteRe.test(content)) continue;
+        if (broadcastRe.test(content)) continue;
+        // Report at the first mutation method line
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (mutationMethodRe.test(lines[i])) {
+            hits.push({ file, line: i + 1, text: lines[i].trim() });
+            break; // one hit per file is enough
           }
         }
       }
