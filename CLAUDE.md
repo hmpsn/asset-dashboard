@@ -13,10 +13,11 @@
 
 Integrations: Webflow, Google Search Console, GA4, SEMRush, DataForSEO (both via `SeoDataProvider` interface in `server/seo-data-provider.ts`), Stripe, OpenAI (GPT-4.1), Anthropic (Claude for creative prose).
 
-- **Routing** — React Router DOM 7. `src/routes.ts` defines `Page` + `ClientTab` types, `adminPath()` + `clientPath()` helpers. Admin: `/ws/:workspaceId/:tab?`. Client: `/client/:workspaceId/:tab?` (betaMode variant: `/client/beta/:workspaceId/:tab?`). **Inbox sub-routing:** the Inbox tab uses `?tab=decisions|reviews|conversations` (`InboxFilter` values, not `ClientTab` values) — the `?tab=` deep-link two-halves contract applies here too. Legacy aliases still work: `approvals→decisions`, `requests→conversations`, `content→reviews`. **Retired tab:** `schema-review` was removed as a standalone `ClientTab` (old bookmarks redirect → `/inbox?tab=reviews`; `SchemaReviewModal` now mounts inside Inbox). **Added tab:** `content-plan`.
-- **API Client** — Typed fetch wrappers in `src/api/` (16 modules). No raw `fetch()` in components.
-- **Shared Types** — `shared/types/` (35 modules) shared between client and server.
-- **Storage** — SQLite (WAL mode, foreign keys ON) at `DATA_BASE/dashboard.db`. 93+ migrations in `server/db/migrations/`.
+- **Routing** — React Router DOM 7. `src/routes.ts` defines `Page` + `ClientTab` types, `adminPath()` + `clientPath()` helpers. Admin: `/ws/:workspaceId/:tab?`. Client: `/client/:workspaceId/:tab?` (betaMode variant: `/client/beta/:workspaceId/:tab?`). **Inbox sub-routing:** the Inbox tab uses `?tab=decisions|reviews|conversations` (`InboxFilter` values, not `ClientTab` values) — the `?tab=` deep-link two-halves contract applies here too. Legacy aliases still work: `approvals→decisions`, `requests→conversations`, `content→reviews`. **Retired tab:** `schema-review` was removed as a standalone `ClientTab` (old bookmarks redirect → `/inbox?tab=reviews`; `SchemaReviewModal` now mounts inside Inbox). **Current `ClientTab` values:** `overview`, `performance`, `search`, `health`, `strategy`, `analytics`, `inbox`, `plans`, `roi`, `content-plan`, `brand`. (`approvals`, `requests`, `content` are legacy `ClientInboxAlias` values, not real tabs.)
+- **API Client** — Typed fetch wrappers in `src/api/` (20 modules). No raw `fetch()` in components.
+- **Shared Types** — `shared/types/` (48 modules) shared between client and server.
+- **Storage** — SQLite (WAL mode, foreign keys ON) at `DATA_BASE/dashboard.db`. 101+ migrations in `server/db/migrations/`.
+- **MCP Server** — `server/mcp/` exposes an MCP-protocol action server (workspaces, insights, content, keywords, intelligence, job actions). Uses `mcpAuthMiddleware` + `handleMcpRequest`. New tool categories go in `server/mcp/tools/`.
 - **AI** — Unified dispatcher: `callAI()` in `server/ai.ts` routes to either provider — new code should use this. Direct helpers: OpenAI via `server/openai-helpers.ts` (`callOpenAI`), Anthropic via `server/anthropic-helpers.ts` (`callAnthropic`) for creative prose.
 - **Auth** — Dual: internal JWT (7-day, admin) + client JWT (24h, per-workspace). Turnstile CAPTCHA optional.
 - **Payments** — Stripe Checkout (not Payment Intents). Config encrypted on disk (AES-256-GCM).
@@ -36,7 +37,7 @@ Project rules live in three layers. Know which layer you're reading before copy-
 2. **[docs/rules/automated-rules.md](./docs/rules/automated-rules.md)** — every rule enforced by `scripts/pr-check.ts`. Auto-generated from the `CHECKS` array; do not hand-edit. CI fails if the committed file drifts from `npm run rules:generate`.
 3. **[docs/rules/*.md](./docs/rules/)** — deep-dive references for specific subsystems (data-flow, UI/UX, multi-agent coordination, analytics insights, AI dispatch patterns, etc.).
 
-When a CLAUDE.md rule becomes mechanizable, it moves to layer 2. The authoring guide for new pr-check rules is [docs/rules/pr-check-rule-authoring.md](./docs/rules/pr-check-rule-authoring.md).
+When a CLAUDE.md rule becomes mechanizable, it moves to layer 2. The authoring guide for new pr-check rules is [docs/rules/pr-check-rule-authoring.md](./docs/rules/pr-check-rule-authoring.md). The current rule count is **140** (125 error, 15 warn) — run `npm run rules:generate` if the committed file drifts.
 
 ---
 
@@ -44,6 +45,7 @@ When a CLAUDE.md rule becomes mechanizable, it moves to layer 2. The authoring g
 
 ### Before writing code
 
+0. **New environment?** — Run `npm run seed:demo` then `npm run smoke:core` to confirm local setup is healthy. See `docs/workflows/local-dev-onboarding.md`.
 1. **Check `data/roadmap.json`** — scan for `"status": "pending"` in current sprint. If user hasn't specified a task, suggest the next pending item.
 2. **Check `FEATURE_AUDIT.md`** — understand what exists. Don't build something that already exists.
 3. **If UI work** — read `BRAND_DESIGN_LANGUAGE.md` before writing any JSX.
@@ -90,6 +92,22 @@ Every completed task must include:
 | `npx playwright test` | E2E tests (requires server running) |
 | `npx tsx scripts/sort-roadmap.ts` | Auto-archive completed sprints |
 | `npx tsx scripts/pr-check.ts` | Automated pre-PR checklist (color violations, JSON.parse, hard-coded names) |
+| `npm run pr-check` | Alias for `npx tsx scripts/pr-check.ts` |
+| `npm run pr-check:all` | Run pr-check across all changed + unchanged files |
+| `npm run db:migrate` | Run pending SQLite migrations |
+| `npm run db:sync-staging` | Sync staging database to local |
+| `npm run seed:demo` | Seed fixture workspaces for local dev (blocked in production) |
+| `npm run smoke:core` | Fast core smoke coverage — use after seeding |
+| `npm run test:unit` | Unit tests only |
+| `npm run test:integration` | Integration tests only |
+| `npm run test:contract` | Contract tests only |
+| `npm run test:component` | Component tests only |
+| `npm run test:coverage` | Full test suite with coverage report |
+| `npm run verify:platform` | Full platform health verification suite |
+| `npm run verify:platform:quick` | Quick platform checks (skips slow verifiers) |
+| `npm run verify:feature-flags` | Validate feature flag catalog consistency |
+| `npm run verify:coverage-ratchet` | Fail if coverage has regressed below ratchet |
+| `npm run rules:generate` | Regenerate `docs/rules/automated-rules.md` from pr-check CHECKS array |
 
 **Always verify after changes:** `npm run typecheck && npx vite build`
 
@@ -159,7 +177,7 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
    - New filter/category values → use shared const objects (like `INSIGHT_FILTER_KEYS`), not string literals
    - Percentage vs decimal fields → add JSDoc: `/** Already a percentage (e.g., 6.3 for 6.3%). Do NOT multiply by 100. */`
    - Shared string enums between producer/consumer → single const object imported by both sides
-6. **Wire new data sources into the intelligence engine** — any new table or store that captures workspace activity must be surfaced in `server/intelligence/`. Each slice lives at `server/intelligence/<name>-slice.ts` and exports a single `assembleX(workspaceId, opts?)` function plus a typed interface. Add a field to the appropriate slice interface in `shared/types/intelligence.ts` AND implement the read inside the corresponding `assemble*` function. `server/workspace-intelligence.ts` is the public facade that orchestrates all slices — call `buildWorkspaceIntelligence()` from there; do not call slice functions directly from route handlers. The AI context and AdminChat are blind to data that isn't wired into a slice. The relevant slice for client-facing signals and engagement data is `ClientSignalsSlice`. See `docs/rules/workspace-intelligence.md`.
+6. **Wire new data sources into the intelligence engine** — any new table or store that captures workspace activity must be surfaced in `server/intelligence/`. Each slice lives at `server/intelligence/<name>-slice.ts` and exports a single `assembleX(workspaceId, opts?)` function plus a typed interface. Add a field to the appropriate slice interface in `shared/types/intelligence.ts` AND implement the read inside the corresponding `assemble*` function. `server/workspace-intelligence.ts` is the public facade that orchestrates all slices — call `buildWorkspaceIntelligence()` from there; do not call slice functions directly from route handlers. The AI context and AdminChat are blind to data that isn't wired into a slice. **Current slices:** `seoContext`, `insights`, `siteHealth`, `siteInventory`, `operational`, `learnings`, `clientSignals`, `pageProfile`, `pageElements`, `contentPipeline`, `localSeo`. The relevant slice for client-facing signals and engagement data is `ClientSignalsSlice`. See `docs/rules/workspace-intelligence.md`.
 
 ## UI/UX Rules (mandatory)
 
@@ -234,7 +252,7 @@ This project uses **two separate auth systems** that must never be mixed up:
 - **AI quality evals are deterministic-first** — prompt/output quality gates must extend the shared AI reliability registry with typed fixtures, not create disconnected live-model scoring paths. CI may hard-fail missing evidence, authority, output-format, or provenance contracts; subjective prose scoring stays advisory/manual until validated. See `docs/rules/ai-quality-evals.md`.
 - **Authority-layered fields — expose one resolved representation, never raw + format helper** — when a shared-type field has multiple authority sources (legacy column + override, global + workspace-specific, raw + computed), the single blessed representation is the pre-resolved form (e.g. `SeoContextSlice.effectiveBrandVoiceBlock`, which is pre-formatted by `buildSeoContext` with voice-profile authority applied). Callers inject that form DIRECTLY. Never ship a generic `format<Field>ForPrompt(raw)` helper alongside it — any caller who grabs the helper bypasses the authority chain, and the compiler cannot see the mistake because the raw field's type is still `string`. **Corollary:** when *adding* a new authority layer to an existing field, grep the repo for every format helper touching that field and delete them in the same commit. A helper that predates an authority layer cannot know about it. The reintroduction hazard is mechanized by the pr-check rule of the same name.
 - **Route removal checklist** — removing or renaming a `Page` union value touches seven files. The full list lives in [docs/rules/route-removal-checklist.md](./docs/rules/route-removal-checklist.md). Every entry must be updated in the same commit.
-- **Phase-per-PR** — multi-phase features ship as one PR per phase. Never open phase N+1 until phase N is merged and CI is green on `staging`. Use `<FeatureFlag flag="...">` to dark-launch incomplete phases so production never serves broken UI. Add the flag to `shared/types/feature-flags.ts` before the first commit of any new multi-phase feature. **Before touching a gated area, check `shared/types/feature-flags.ts` for active in-flight flags.** Currently active: `new-inbox-ia` (client inbox IA redesign, Phases 1–3), `client-wins-surface` (wins surface).
+- **Phase-per-PR** — multi-phase features ship as one PR per phase. Never open phase N+1 until phase N is merged and CI is green on `staging`. Use `<FeatureFlag flag="...">` to dark-launch incomplete phases so production never serves broken UI. Add the flag to `shared/types/feature-flags.ts` before the first commit of any new multi-phase feature. **Before touching a gated area, check `shared/types/feature-flags.ts` for active in-flight flags.** Currently active: `new-inbox-ia` (client inbox IA redesign), `local-seo-visibility` (local SEO visibility foundation), `client-briefing-v2` / `client-briefing-v2-ai-polish` (client briefing v2 layout), `schema-ai-element-classifier` (AI element role classifier), `smart-placeholders`, `client-brand-section`.
 - **Staging before main** — all PRs merge into `staging` first. After verifying on the staging deploy, merge `staging` → `main` to release to production. Never merge an unverified PR directly to `main`.
 - **String literal renames** — when renaming a discriminator value used across the codebase (insight type, status enum, filter key), grep the entire repo for the old literal and update ALL references in one commit. Never split a rename across multiple tasks or PRs.
 - **New insight type registration** — adding a value to `InsightType` requires all four of these in the same commit: (1) `InsightType` union in `shared/types/analytics.ts`, (2) typed `XData` interface + `InsightDataMap` entry — never `Record<string,unknown>`, (3) Zod schema in `server/schemas/`, (4) frontend renderer case. Missing any one fails silently. See `docs/rules/analytics-insights.md`.
@@ -320,6 +338,20 @@ This project uses **two separate auth systems** that must never be mixed up:
 | `docs/testing/platform-domain-smoke-matrix.md` | Fast smoke-test matrix by bounded context |
 | `docs/workflows/feature-class-definition-of-done.md` | Completion gates by feature class before PR closeout |
 | `docs/workflows/client-debug.md` | Debugging client-reported bugs — gather context, investigate data/UI/API/CMS issues |
+| `docs/workflows/local-dev-onboarding.md` | First-hour setup — env, `seed:demo`, `smoke:core`, fixture workspaces, demo client passwords |
+| `docs/workflows/codebase-overview.md` | Quick architecture orientation — bounded contexts, route module counts, forward-looking file placement |
+| `docs/workflows/adr-log.md` | Lightweight ADR workflow — when to write an ADR, how to verify `docs/adr/` log stays current |
+| `docs/workflows/platform-health-cadence.md` | Recurring 4–6 sprint platform health checkpoint contract and measurable dimensions |
+| `docs/workflows/release-safety.md` | Pre-release safety checklist — feature flag audit, coverage ratchet, staging merge integrity |
+| `docs/rules/deprecation-lifecycle.md` | Deprecation lifecycle taxonomy (`deprecated` → `hidden` → `migrated` → `removed`) and contract requirements |
+| `docs/rules/feature-flag-lifecycle.md` | Feature flag lifecycle — creation, rollout targets, stale audit cadence, removal conditions |
+| `docs/rules/keyword-command-center.md` | Keyword Command Center contracts — cheap vs Evaluated variant split, OOM guard |
+| `docs/rules/local-seo-visibility.md` | Local SEO visibility contracts — location backfill queue, keyword enrichment, market primary |
+| `docs/rules/evidence-ledger-mvp.md` | Content review evidence ledger — grounding provenance, freshness scoring, provenance flags |
+| `docs/testing/coverage-ratchet-ci.md` | Coverage ratchet CI contract — current baselines, how to update, how to investigate regressions |
+| `docs/testing/critical-domain-coverage-baseline.md` | Critical-domain coverage baseline — minimum acceptable percentages per bounded context |
+| `docs/testing/ai-reliability-pipeline-trace-map.md` | AI reliability pipeline — fixture registry, trace map, soft-gate policy |
+| `docs/adr/` | Architecture decision records — 0001 background jobs, 0002 intelligence slices, 0003 feature flags, 0004 client/admin split, 0005 unified AI dispatch, 0006 bounded context extraction |
 
 ---
 
@@ -348,3 +380,5 @@ Work is not done until ALL pass:
 - [ ] If multiple/parallel agents were used for any part of this work: invoke `scaled-code-review` skill before merging. Fix Critical/Important issues before proceeding. (Single-agent work on a single domain: `superpowers:requesting-code-review` is sufficient.)
 - [ ] All bugs surfaced during review are fixed — never dismiss a fixable bug as "pre-existing", "minor", or "out of scope". If a review agent or manual review finds it and it can be fixed, fix it in this PR.
 - [ ] If multi-phase feature: this PR covers exactly one phase. Phase N+1 is not started until phase N is merged and green.
+- [ ] `npm run verify:feature-flags` — no orphaned or ungrouped feature flag keys
+- [ ] `npm run verify:coverage-ratchet` — coverage has not regressed below ratchet baseline
