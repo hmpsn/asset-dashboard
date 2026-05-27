@@ -4,7 +4,7 @@ import {
   Lock, Shield, MousePointerClick, Eye, Layers,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { EmptyState, SectionCard, Button, StatCard, ErrorState, LoadingState } from '../ui';
+import { EmptyState, SectionCard, Button, StatCard, ErrorState, LoadingState, TierGate } from '../ui';
 import { Icon } from '../ui/Icon';
 import { fmtMoney, fmtMoneyFull } from '../../utils/formatNumbers';
 import { useClientROI } from '../../hooks/client';
@@ -29,21 +29,28 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
     isFetching,
   } = useClientROI(workspaceId, !!workspaceId);
 
-  // Gate for premium tier
-  if (tier !== 'premium' && tier !== 'growth') {
+  // Gate for paid tiers
+  if (tier === 'free') {
     return (
-      <SectionCard className="text-center" noPadding>
-        <div className="p-8">
-        <div className="w-12 h-12 rounded-[var(--radius-xl)] bg-[var(--surface-3)] flex items-center justify-center mx-auto mb-4">
-          <Icon as={Lock} size="xl" className="text-[var(--brand-text-dim)]" />
-        </div>
-        <h3 className="t-h2 text-[var(--brand-text-bright)] mb-2">ROI Dashboard</h3>
-        <p className="t-body text-[var(--brand-text-muted)] max-w-sm mx-auto">
-          See the dollar value of your organic traffic and how much you&apos;d pay for it in Google Ads.
-          Available on Growth and Premium plans.
-        </p>
-        </div>
-      </SectionCard>
+      <TierGate
+        tier={tier}
+        required="growth"
+        feature="ROI Dashboard"
+        teaser="See the dollar value of your organic traffic and content performance. Available on Growth and Premium."
+        onLearnMore={() => navigate(clientPath(workspaceId, 'plans', betaMode))}
+      >
+        <SectionCard className="text-center" noPadding>
+          <div className="p-8">
+            <div className="w-12 h-12 rounded-[var(--radius-xl)] bg-[var(--surface-3)] flex items-center justify-center mx-auto mb-4">
+              <Icon as={Lock} size="xl" className="text-[var(--brand-text-dim)]" />
+            </div>
+            <h3 className="t-h2 text-[var(--brand-text-bright)] mb-2">ROI Dashboard</h3>
+            <p className="t-body text-[var(--brand-text-muted)] max-w-sm mx-auto">
+              See the dollar value of your organic traffic and how much you&apos;d pay for it in Google Ads.
+            </p>
+          </div>
+        </SectionCard>
+      </TierGate>
     );
   }
 

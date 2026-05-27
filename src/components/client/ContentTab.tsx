@@ -16,6 +16,12 @@ import { useContentRequests } from '../../hooks/useContentRequests';
 import { contentPerformance } from '../../api';
 import { PostReviewCard } from './PostReviewCard';
 
+const POST_REVIEW_SEEN_STORAGE_KEY_PREFIX = 'client-post-review-seen';
+
+function postReviewSeenKey(req: Pick<ClientContentRequest, 'id' | 'updatedAt'>): string {
+  return `${req.id}:${req.updatedAt}`;
+}
+
 interface ContentPerfItem {
   requestId: string;
   daysSincePublish: number;
@@ -55,7 +61,49 @@ export function ContentTab({
 
   // ── Content performance data for published items ──
   const [contentPerf, setContentPerf] = useState<Record<string, ContentPerfItem>>({});
+  const [seenPostReviewKeys, setSeenPostReviewKeys] = useState<Set<string>>(new Set());
   const perfErrorToastShownRef = useRef(false);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(`${POST_REVIEW_SEEN_STORAGE_KEY_PREFIX}:${workspaceId}`);
+      if (!raw) {
+        setSeenPostReviewKeys(new Set());
+        return;
+      }
+      const parsed = JSON.parse(raw) as unknown;
+      if (!Array.isArray(parsed)) {
+        setSeenPostReviewKeys(new Set());
+        return;
+      }
+      const keys = parsed.filter((v): v is string => typeof v === 'string');
+      setSeenPostReviewKeys(new Set(keys));
+    } catch {
+      setSeenPostReviewKeys(new Set());
+    }
+  }, [workspaceId]);
+
+  useEffect(() => {
+    try {
+        localStorage.setItem(
+          `${POST_REVIEW_SEEN_STORAGE_KEY_PREFIX}:${workspaceId}`,
+          JSON.stringify(Array.from(seenPostReviewKeys)),
+        );
+    } catch {
+      // Ignore storage failures (private mode / disabled storage); UI still works in-memory.
+    }
+  }, [workspaceId, seenPostReviewKeys]);
+
+  const markPostReviewSeen = (req: ClientContentRequest) => {
+    const key = postReviewSeenKey(req);
+    setSeenPostReviewKeys((prev) => {
+      if (prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+  };
+
   useEffect(() => {
     const hasPublished = contentRequests.some(r => r.status === 'delivered' || r.status === 'published');
     if (!hasPublished) return;
@@ -243,6 +291,7 @@ export function ContentTab({
             ? (steps as readonly string[]).indexOf('approved')
             : 0;
         const isExpanded = expandedContentReq === req.id;
+        const showNewPostReviewBadge = req.status === 'post_review' && !seenPostReviewKeys.has(postReviewSeenKey(req));
         const brief = req.briefId ? briefPreviews[req.briefId] : null;
         const canUpgrade = isBriefOnly && req.status === 'approved';
 
@@ -251,6 +300,7 @@ export function ContentTab({
             <ClickableRow onClick={() => {
               const next = isExpanded ? null : req.id;
               setExpandedContentReq(next);
+              if (next && req.status === 'post_review') markPostReviewSeen(req);
               if (next && req.briefId) loadBriefPreview(req.briefId);
             }} className="px-5 py-4">
               <div className="flex items-center justify-between mb-3">
@@ -279,6 +329,9 @@ export function ContentTab({
                   )}
                   {(req.status === 'client_review' || req.status === 'post_review') && (
                     <StatusBadge status={req.status} domain="content" variant="outline" className="animate-pulse" />
+                  )}
+                  {showNewPostReviewBadge && (
+                    <Badge label="New" tone="blue" variant="outline" shape="pill" />
                   )}
                   {isExpanded ? <Icon as={ChevronUp} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" />}
                 </div>
