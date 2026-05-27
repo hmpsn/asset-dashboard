@@ -1,3 +1,5 @@
+import { normalizeDomainValue } from './domain-normalization.js';
+
 const GENERIC_DISCOVERY_DOMAINS = new Set([
   'facebook.com',
   'instagram.com',
@@ -16,13 +18,13 @@ const GENERIC_DISCOVERY_DOMAINS = new Set([
 ]);
 
 export function sanitizeCompetitorDomain(rawDomain: string): string {
-  return rawDomain
-    .trim()
-    .toLowerCase()
-    .replace(/^https?:\/\//, '')
-    .replace(/\/.*$/, '')
-    .replace(/:\d+$/, '')
-    .replace(/\.$/, '');
+  return normalizeDomainValue(rawDomain, {
+    stripWww: false,
+    lowercase: true,
+    stripPort: true,
+    trimTrailingDot: true,
+    allowMalformedFallback: true,
+  }) ?? '';
 }
 
 export function normalizeCompetitorDomain(rawDomain: string): string {

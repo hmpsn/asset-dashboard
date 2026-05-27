@@ -9,6 +9,7 @@ import {
   type EeatRecommendationSurface,
   type MissingTrustSignal,
 } from '../shared/types/eeat-assets.js';
+import { normalizePageUrl } from './helpers.js';
 
 interface TrustSignalRule {
   signal: string;
@@ -32,18 +33,13 @@ interface EvaluateTrustSignalsResult {
   eeatAssetRecommendations: EeatAssetRecommendation[];
 }
 
-function normalizePath(path: string): string {
-  const withLeading = path.startsWith('/') ? path : `/${path}`;
-  return withLeading.length > 1 && withLeading.endsWith('/') ? withLeading.slice(0, -1) : withLeading;
-}
-
 function includesAnyToken(value: string, tokens: readonly string[]): boolean {
   const lower = value.toLowerCase();
   return tokens.some(token => lower.includes(token));
 }
 
 export function deriveEeatPageType(pagePath: string, pageTitle?: string, searchIntent?: string): EeatPageType {
-  const normalizedPath = normalizePath(pagePath).toLowerCase();
+  const normalizedPath = normalizePageUrl(pagePath).toLowerCase();
   const title = (pageTitle || '').toLowerCase();
   const intent = (searchIntent || '').toLowerCase();
 
@@ -194,10 +190,10 @@ function candidateAssetsForRule(
   pagePath: string,
   assetsByType: Map<EeatAsset['type'], EeatAsset[]>,
 ): EeatAsset[] {
-  const normalizedPath = normalizePath(pagePath);
+  const normalizedPath = normalizePageUrl(pagePath);
   const candidates = rule.recommendedAssetTypes.flatMap(type => assetsByType.get(type) ?? []);
   const pathMatched = candidates.filter(asset =>
-    asset.metadata?.associatedPagePaths?.some(p => normalizePath(p) === normalizedPath),
+    asset.metadata?.associatedPagePaths?.some(p => normalizePageUrl(p) === normalizedPath),
   );
   return pathMatched.length > 0 ? pathMatched : candidates;
 }

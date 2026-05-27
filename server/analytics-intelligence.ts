@@ -40,7 +40,7 @@ import { extractBrandTokens, isBrandedQuery } from './competitor-brand-filter.js
 import { listPageKeywords } from './page-keywords.js';
 import { createLogger } from './logger.js';
 import { isProgrammingError } from './errors.js';
-import { toInsightPageId } from './helpers.js';
+import { normalizePageUrl as normalizePagePath, toInsightPageId } from './helpers.js';
 
 // ── Shared types for computation results ─────────────────────────
 
@@ -59,13 +59,10 @@ interface ComputedInsight<T> {
 export function normalizePageUrl(url: string): string {
   try {
     const u = new URL(url);
-    // Strip query params & fragment — same page content
-    let path = u.pathname;
-    // Strip trailing slash (keep root '/')
-    if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
-    return `${u.origin}${path}`;
+    const normalizedPath = normalizePagePath(u.pathname);
+    return normalizedPath === '/' ? `${u.origin}/` : `${u.origin}${normalizedPath}`;
   } catch (err) {
-    // Not a valid URL — strip trailing slash as best-effort
+    // Not a valid URL — preserve legacy best-effort behavior.
     return url.length > 1 && url.endsWith('/') ? url.slice(0, -1) : url;
   }
 }

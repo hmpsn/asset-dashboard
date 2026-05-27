@@ -14,6 +14,7 @@ import {
   formatPageMapForPrompt,
   formatPersonasForPrompt,
 } from '../workspace-intelligence.js';
+import { normalizePageUrl } from '../helpers.js';
 
 const PAGE_PROFILE_SECTIONS = ['pageProfile'] as const;
 
@@ -53,27 +54,14 @@ export interface PageAssistContext {
 }
 
 function resolvePagePath(opts: PageAssistContextOptions): string | undefined {
-  if (opts.pagePath) return normalizePagePath(opts.pagePath);
+  if (opts.pagePath) return normalizePageUrl(opts.pagePath);
   if (!opts.pageUrl) return undefined;
   try {
-    return normalizePagePath(new URL(opts.pageUrl).pathname);
+    return normalizePageUrl(new URL(opts.pageUrl).pathname);
   } catch (err) {
     void err;
-    return normalizePagePath(opts.pageUrl);
+    return normalizePageUrl(opts.pageUrl);
   }
-}
-
-function normalizePagePath(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) return '/';
-  let path = trimmed;
-  try {
-    if (/^https?:\/\//i.test(trimmed)) path = new URL(trimmed).pathname;
-  } catch (err) {
-    void err;
-  }
-  if (!path.startsWith('/')) path = `/${path}`;
-  return path.replace(/\/{2,}/g, '/');
 }
 
 function appendSlice(slices: IntelligenceSlice[], slice: IntelligenceSlice): void {

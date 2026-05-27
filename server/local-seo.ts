@@ -19,6 +19,7 @@ import { getTaxonomyForIndustry } from './service-taxonomy.js';
 import { getWorkspace } from './workspaces.js';
 import { WS_EVENTS } from './ws-events.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { normalizeDomainValue } from './domain-normalization.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 import { buildDataForSeoLocationName } from '../shared/local-seo-location.js';
 import {
@@ -1189,13 +1190,16 @@ function buildLocalSeoVisibilityMap(
 }
 
 export function cleanDomain(value: string | undefined): string | undefined {
-  if (!value) return undefined;
-  try {
-    return new URL(value.startsWith('http') ? value : `https://${value}`).hostname.replace(/^www\./, '').toLowerCase();
-  } catch (err) {
-    log.debug({ err, value }, 'local-seo cleanDomain: malformed domain value');
-    return value.replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '').toLowerCase();
+  const normalized = normalizeDomainValue(value, {
+    stripWww: true,
+    lowercase: true,
+    stripPort: true,
+    allowMalformedFallback: true,
+  });
+  if (!normalized && value) {
+    log.debug({ value }, 'local-seo cleanDomain: malformed domain value');
   }
+  return normalized;
 }
 
 export function normalizePhone(value: string | undefined): string | undefined {

@@ -12,6 +12,7 @@ import type { BusinessProfileContact } from '../../shared/types/workspace.js';
 import type { SchemaIndustrySubtype } from '../../shared/types/schema-plan.js';
 import type { ResolvedEntity } from '../../shared/types/entity-resolution.js';
 import { EEAT_ASSET_TYPE, type EeatAsset } from '../../shared/types/eeat-assets.js';
+import { normalizeDomainHost } from '../domain-normalization.js';
 
 export interface PageMetaInput {
   title: string;
@@ -172,16 +173,12 @@ function buildBreadcrumbs(publishedPath: string, leafName: string, baseUrl: stri
   return items;
 }
 
-function stripWww(hostname: string): string {
-  return hostname.replace(/^www\./i, '').toLowerCase();
-}
-
 function sameSiteUrl(candidate: string, baseUrl: string): string | undefined {
   try {
     const parsed = new URL(candidate);
     const base = new URL(baseUrl);
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return undefined;
-    if (stripWww(parsed.hostname) !== stripWww(base.hostname)) return undefined;
+    if (normalizeDomainHost(parsed.hostname) !== normalizeDomainHost(base.hostname)) return undefined;
     return parsed.href.replace(/\/$/, parsed.pathname === '/' ? '/' : '');
   } catch { // catch-ok: malformed or relative canonical URL falls back to configured base URL
     return undefined;

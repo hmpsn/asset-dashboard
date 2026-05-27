@@ -2,6 +2,7 @@ import { getGA4TopPages } from './google-analytics.js';
 import { getAllGscPages } from './search-console.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
+import { normalizePageUrl } from './helpers.js';
 
 const log = createLogger('audit-traffic');
 
@@ -25,25 +26,13 @@ export type AuditTrafficMap = Record<string, AuditTrafficMetrics>;
 
 const auditTrafficCache: Record<string, { data: AuditTrafficMap; ts: number }> = {};
 
-function normalizePath(raw: string): string {
-  if (raw === '') return '/';
-  const withLeadingSlash = raw.startsWith('/') ? raw : `/${raw}`;
-  return withLeadingSlash.length > 1 && withLeadingSlash.endsWith('/')
-    ? withLeadingSlash.slice(0, -1)
-    : withLeadingSlash;
-}
-
 function normalizeTrafficPath(value: string): string {
-  try {
-    return normalizePath(new URL(value).pathname);
-  } catch (_err) {
-    return normalizePath(value);
-  }
+  return normalizePageUrl(value);
 }
 
 function normalizeGscPagePath(value: string): string | null {
   try {
-    return normalizePath(new URL(value).pathname);
+    return normalizePageUrl(new URL(value).pathname);
   } catch (_err) {
     return null;
   }

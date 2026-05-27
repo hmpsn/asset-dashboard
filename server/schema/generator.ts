@@ -39,6 +39,7 @@ import type { SchemaCmsDeliveryStatus, SchemaCollectionIdentity, SchemaFieldEvid
 import type { SiteContext, SiteContextPage } from './site-context.js';
 import { validateForGoogleRichResults } from '../schema-validator.js';
 import { createLogger } from '../logger.js';
+import { normalizeDomainHost } from '../domain-normalization.js';
 
 const log = createLogger('schema/generator');
 
@@ -673,15 +674,11 @@ function formatAreaServed(address: { city?: string; state?: string } | undefined
   return city || state;
 }
 
-function stripWww(hostname: string): string {
-  return hostname.replace(/^www\./i, '').toLowerCase();
-}
-
 function sameSiteOrigin(url: string, baseUrl: string): string | undefined {
   try {
     const parsed = new URL(url);
     const base = new URL(baseUrl);
-    if (stripWww(parsed.hostname) !== stripWww(base.hostname)) return undefined;
+    if (normalizeDomainHost(parsed.hostname) !== normalizeDomainHost(base.hostname)) return undefined;
     return parsed.origin;
   } catch { // catch-ok: malformed canonical URL should not block schema generation
     return undefined;
