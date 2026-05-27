@@ -190,7 +190,7 @@ function clearActivityLog(wsId: string): void {
 
 beforeAll(async () => {
   await startTestServer();
-}, 30_000);
+}, 60_000);
 
 beforeEach(() => {
   state.reviewPageCalls = [];

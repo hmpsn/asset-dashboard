@@ -255,7 +255,7 @@ beforeAll(async () => {
       severity: 'critical',
     },
   ], 30);
-}, 25_000);
+}, 60_000);
 
 afterAll(async () => {
   for (const wsId of [wsA, wsB, wsEmpty, wsGsc]) {
