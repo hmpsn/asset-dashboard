@@ -7,6 +7,7 @@ import { post } from '../../api/client';
 import { Badge, SectionCard, Icon, Button, Checkbox, FormInput } from '../ui';
 import { useDeepLinkFocus } from '../../hooks/useDeepLinkFocus';
 import { formatDate } from '../../utils/formatDates';
+import { capitalize } from '../../utils/strings';
 
 interface WorkspaceData {
   tier?: 'free' | 'growth' | 'premium';
@@ -103,7 +104,7 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
                 }`}
               >
                 {t === 'premium' && <Icon as={Sparkles} size="xs" className="mr-1" />}
-                {t.charAt(0).toUpperCase() + t.slice(1)}
+                {capitalize(t)}
               </Button>
             ))}
           </div>
@@ -346,7 +347,7 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
                         ? 'bg-teal-500/15 text-teal-300 border border-teal-500/30'
                         : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)] hover:text-[var(--brand-text)]'
                     }`}>
-                    {freq.charAt(0).toUpperCase() + freq.slice(1)}
+                    {capitalize(freq)}
                   </Button>
                 ))}
               </div>

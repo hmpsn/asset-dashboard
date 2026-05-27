@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Badge, EmptyState, MetricRing, Icon, PageHeader, Button, IconButton, FormInput } from './ui';
 import { formatDate } from '../utils/formatDates';
+import { capitalize } from '../utils/strings';
 import {
   Loader2, FileText, PenLine, Clock, CheckCircle2, Eye, Send,
   Trash2, Download, Search, ArrowUpDown, Filter,
@@ -218,7 +219,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                 sortField === f ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
               }`}
             >
-              {f.charAt(0).toUpperCase() + f.slice(1)}
+              {capitalize(f)}
               {sortField === f && <Icon as={ArrowUpDown} size="sm" className="ml-0.5" />}
             </Button>
           ))}

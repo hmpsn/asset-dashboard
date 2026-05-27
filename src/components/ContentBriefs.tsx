@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Badge, Icon, IconButton, ClickableRow, FormInput, FormSelect, Button, Modal, PageHeader, LoadingState, ErrorState } from './ui';
 import { formatDate } from '../utils/formatDates';
+import { capitalize } from '../utils/strings';
 import type { FixContext } from '../App';
 import type { ContentBrief, ContentGenerationStyle, ContentTopicRequest, PostSummary } from '../../shared/types/content';
 import { DEFAULT_CONTENT_GENERATION_STYLE } from '../../shared/types/content';
@@ -476,7 +477,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <Badge
-                        label={post.status === 'generating' ? 'Generating...' : post.status.charAt(0).toUpperCase() + post.status.slice(1)}
+                        label={post.status === 'generating' ? 'Generating...' : capitalize(post.status)}
                         tone={post.status === 'generating' ? 'amber' : post.status === 'approved' ? 'emerald' : post.status === 'review' ? 'teal' : 'blue'}
                         variant="outline"
                       />

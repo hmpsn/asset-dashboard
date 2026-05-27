@@ -25,6 +25,7 @@ import { CAT_LABELS, SEV, type AuditDetail, type CwvStrategyResult } from '../ty
 import { hasContentIssues } from '../../../lib/health-tab-content-request';
 import { buildFixTypeGroups, checkImpact } from './healthTabModel';
 import type { HealthTabShell } from './useHealthTabShell';
+import { capitalize } from '../../../utils/strings';
 
 interface HeaderSectionProps {
   shell: Pick<
@@ -653,7 +654,7 @@ export function HealthAllPagesSection({ auditDetail, liveDomain, shell, workspac
                 onClick={() => shell.setSeverityFilter(severity)}
                 className={`min-h-[44px] rounded-[var(--radius-md)] ${shell.severityFilter === severity ? (severity === 'all' ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)]' : `${SEV[severity].bg} ${SEV[severity].text}`) : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}
               >
-                {severity === 'all' ? 'Issues' : severity.charAt(0).toUpperCase() + severity.slice(1)}
+                {severity === 'all' ? 'Issues' : capitalize(severity)}
               </Button>
             ))}
           </div>

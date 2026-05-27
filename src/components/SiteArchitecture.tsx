@@ -7,6 +7,7 @@ import {
 import { SectionCard, StatCard, Badge, EmptyState, PageHeader, FormInput, Icon, Button, ClickableRow } from './ui';
 import { siteArchitecture } from '../api/content';
 import { formatDateTime } from '../utils/formatDates';
+import { capitalize } from '../utils/strings';
 
 // ── Schema coverage types ──
 
@@ -420,7 +421,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
                       : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] border border-transparent'
                   }`}
                 >
-                  {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
+                  {f === 'all' ? 'All' : capitalize(f)}
                 </Button>
               ))}
             </div>
