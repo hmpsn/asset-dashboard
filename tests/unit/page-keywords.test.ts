@@ -5,6 +5,7 @@ import {
   countPageKeywords,
   getPageKeyword,
   listPageKeywords,
+  listPageKeywordsLite,
   upsertAndCleanPageKeywords,
   upsertPageKeyword,
 } from '../../server/page-keywords.js';
@@ -206,5 +207,35 @@ describe('page-keywords integrity behavior', () => {
     expect(row?.optimizationIssues).toEqual([]);
     expect(row?.recommendations).toEqual([]);
     expect(row?.serpFeatures).toEqual([]);
+  });
+
+  it('listPageKeywordsLite returns assignment + demand fields without analysis payloads', () => {
+    const ws = createWorkspace(`PK Lite ${Date.now()}`);
+    cleanupWorkspaceIds.add(ws.id);
+
+    upsertPageKeyword(ws.id, makePage({
+      pagePath: '/lite',
+      primaryKeyword: 'lite keyword',
+      secondaryKeywords: ['lite sibling'],
+      volume: 1400,
+      difficulty: 41,
+      optimizationScore: 88,
+      optimizationIssues: ['Issue A'],
+      recommendations: ['Recommendation A'],
+      analysisGeneratedAt: '2026-05-27T10:00:00.000Z',
+    }));
+
+    const [row] = listPageKeywordsLite(ws.id);
+    expect(row).toBeDefined();
+    expect(row.pagePath).toBe('/lite');
+    expect(row.primaryKeyword).toBe('lite keyword');
+    expect(row.secondaryKeywords).toEqual(['lite sibling']);
+    expect(row.volume).toBe(1400);
+    expect(row.difficulty).toBe(41);
+    expect(row.optimizationScore).toBeUndefined();
+    expect(row.optimizationIssues).toBeUndefined();
+    expect(row.recommendations).toBeUndefined();
+    expect(row.analysisGeneratedAt).toBeUndefined();
+    expect(row.optimizationScoreHistory).toBeUndefined();
   });
 });

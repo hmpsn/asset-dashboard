@@ -1226,6 +1226,38 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
     expect(keywords.has('client interested keyword')).toBe(false);
   });
 
+  it('summary filter counts stay aligned with rows totals across core filters', async () => {
+    seedStrategy();
+    addTrackedKeyword(workspaceId, 'cosmetic dentistry', {
+      source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
+      status: TRACKED_KEYWORD_STATUS.ACTIVE,
+    });
+    addTrackedKeyword(workspaceId, 'retired local keyword', {
+      source: TRACKED_KEYWORD_SOURCE.MANUAL,
+      status: TRACKED_KEYWORD_STATUS.DEPRECATED,
+      deprecatedAt: '2026-05-27T10:00:00.000Z',
+    });
+    seedFeedback('request-only keyword', 'requested');
+
+    const summary = await buildKeywordCommandCenterSummary(workspaceId);
+    const filtersToAssert = [
+      KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+      KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY,
+      KEYWORD_COMMAND_CENTER_FILTERS.TRACKED,
+      KEYWORD_COMMAND_CENTER_FILTERS.NEEDS_REVIEW,
+      KEYWORD_COMMAND_CENTER_FILTERS.RETIRED,
+      KEYWORD_COMMAND_CENTER_FILTERS.RAW_EVIDENCE,
+    ] as const;
+
+    for (const filter of filtersToAssert) {
+      const rows = await buildKeywordCommandCenterRows(workspaceId, { filter, pageSize: 500 });
+      expect(rows).not.toBeNull();
+      const summaryFilter = summary?.filters.find(item => item.id === filter);
+      expect(summaryFilter).toBeDefined();
+      expect(rows!.pageInfo.totalRows).toBe(summaryFilter!.count);
+    }
+  });
+
   it('drops DataForSEO planner-grouped sentinel volume (1M/21) and prefers real provider data', async () => {
     // Regression: DataForSEO Google Ads search-volume can return 1,000,000 as a
     // planner-grouped bucket sentinel paired with difficulty=21. On Swish staging,

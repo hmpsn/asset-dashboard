@@ -2084,7 +2084,7 @@ export async function buildKeywordCommandCenterDetail(
   if (!normalized) return null;
   const workspace = getWorkspace(workspaceId);
   if (!workspace) return null;
-  const pageMap = listPageKeywords(workspace.id).filter(page => pageMatchesKeyword(page, normalized));
+  const pageMap = listPageKeywordsLite(workspace.id).filter(page => pageMatchesKeyword(page, normalized));
   const contentGaps = listContentGaps(workspace.id).filter(gap => keywordComparisonKey(gap.targetKeyword) === normalized);
   const keywordGaps = listKeywordGaps(workspace.id).filter(gap => keywordComparisonKey(gap.keyword) === normalized);
   const rawTrackedKeywords = getTrackedKeywords(workspace.id, { includeInactive: true }).filter(entry => keywordComparisonKey(entry.query) === normalized);
