@@ -123,6 +123,16 @@ vi.mock('../../server/email.js', () => ({
   notifyClientActionReady: vi.fn(),
 }));
 
+// Bypass the checkout rate limiter (5 req/min) so error-path tests don't get
+// 429 after the checkout-session tests exhaust the window.
+vi.mock('../../server/middleware.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../server/middleware.js')>();
+  return {
+    ...original,
+    checkoutLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
+  };
+});
+
 // ---------------------------------------------------------------------------
 // Imports AFTER vi.mock declarations
 // ---------------------------------------------------------------------------
@@ -343,7 +353,7 @@ describe('3. Product/price configuration', () => {
   });
 
   it('GET /api/stripe/products lists all product types', async () => {
-    const res = await api('/api/stripe/products');
+    const res = await adminApi('/api/stripe/products');
     expect(res.status).toBe(200);
     const body = await res.json() as { configured: boolean; products: Array<Record<string, unknown>> };
     expect(Array.isArray(body.products)).toBe(true);
@@ -415,7 +425,7 @@ describe('4. Billing portal session creation', () => {
 describe('5. Checkout session creation', () => {
   it('POST /api/stripe/create-checkout without Stripe configured returns 503', async () => {
     currentWs = seedWorkspace();
-    const res = await postJson('/api/stripe/create-checkout', {
+    const res = await adminPostJson('/api/stripe/create-checkout', {
       workspaceId: currentWs.workspaceId,
       productType: 'brief_blog',
     });
@@ -425,7 +435,7 @@ describe('5. Checkout session creation', () => {
   it('POST /api/stripe/create-checkout with invalid productType returns 400', async () => {
     currentWs = seedWorkspace();
     stripeConfigStore.secretKey = 'sk_test_invalid_product';
-    const res = await postJson('/api/stripe/create-checkout', {
+    const res = await adminPostJson('/api/stripe/create-checkout', {
       workspaceId: currentWs.workspaceId,
       productType: 'not_a_real_product',
     });
@@ -435,7 +445,7 @@ describe('5. Checkout session creation', () => {
   });
 
   it('POST /api/stripe/create-checkout missing required fields returns 400', async () => {
-    const res = await postJson('/api/stripe/create-checkout', {});
+    const res = await adminPostJson('/api/stripe/create-checkout', {});
     expect(res.status).toBeGreaterThanOrEqual(400);
   });
 
@@ -444,7 +454,7 @@ describe('5. Checkout session creation', () => {
     // Force external billing mode on the workspace
     updateWorkspace(currentWs.workspaceId, { billingMode: 'external' });
     stripeConfigStore.secretKey = 'sk_test_external';
-    const res = await postJson('/api/stripe/create-checkout', {
+    const res = await adminPostJson('/api/stripe/create-checkout', {
       workspaceId: currentWs.workspaceId,
       productType: 'brief_blog',
     });
@@ -694,7 +704,7 @@ describe('8. Error paths — Stripe SDK throws', () => {
     stripeMockStubs.customersRetrieve.mockRejectedValue(new Error('No such customer'));
     stripeMockStubs.checkoutCreate.mockRejectedValue(new Error('Stripe API unavailable'));
 
-    const res = await postJson('/api/stripe/create-checkout', {
+    const res = await adminPostJson('/api/stripe/create-checkout', {
       workspaceId: currentWs.workspaceId,
       productType: 'brief_blog',
     });
@@ -705,7 +715,8 @@ describe('8. Error paths — Stripe SDK throws', () => {
   });
 
   it('POST /api/public/upgrade-checkout/:wsId when Stripe SDK throws returns 500', async () => {
-    currentWs = seedWorkspace();
+    // No clientPassword so the client-session gate doesn't block the request.
+    currentWs = seedWorkspace({ clientPassword: '' });
     stripeConfigStore.secretKey = 'sk_test_upgrade_error';
     stripeConfigStore.products = [
       { productType: 'plan_growth', stripePriceId: 'price_growth_001', displayName: 'Growth', priceUsd: 249, enabled: true },
@@ -745,7 +756,7 @@ describe('8. Error paths — Stripe SDK throws', () => {
 
   it('POST /api/stripe/create-checkout for nonexistent workspace returns 404', async () => {
     stripeConfigStore.secretKey = 'sk_test_404_ws';
-    const res = await postJson('/api/stripe/create-checkout', {
+    const res = await adminPostJson('/api/stripe/create-checkout', {
       workspaceId: 'ws_does_not_exist_xyz_9999',
       productType: 'brief_blog',
     });
@@ -761,7 +772,7 @@ describe('9. Config persistence across requests', () => {
   it('saving a publishable key is reflected in GET /api/stripe/publishable-key', async () => {
     await adminPostJson('/api/stripe/config/keys', { publishableKey: 'pk_test_persist_001' });
 
-    const res = await api('/api/stripe/publishable-key');
+    const res = await adminApi('/api/stripe/publishable-key');
     expect(res.status).toBe(200);
     const body = await res.json() as { publishableKey: string | null };
     expect(body.publishableKey).toBe('pk_test_persist_001');
