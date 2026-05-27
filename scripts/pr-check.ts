@@ -3490,6 +3490,41 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    name: 'keyword-feedback route writes must use shared service',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    excludeLines: ['// keyword-feedback-route-write-ok'],
+    message:
+      'Direct SQL writes to keyword_feedback are not allowed in route modules. ' +
+      'Use the shared keyword-feedback service (server/keyword-feedback.ts) for ' +
+      'CRUD + normalization + broadcast wiring. Add // keyword-feedback-route-write-ok only if intentionally bypassing.',
+    severity: 'error',
+    rationale:
+      'Duplicating keyword_feedback write SQL in route modules causes contract drift ' +
+      'between admin/public surfaces and intelligence assembly.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const sqlWriteRe = /\b(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+keyword_feedback\b/i;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes('/server/routes/') && !file.includes('\\server\\routes\\')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (!sqlWriteRe.test(line)) continue;
+          if (/^\s*\/\//.test(line)) continue;
+          if (hasHatch(lines, i, '// keyword-feedback-route-write-ok')) continue;
+          hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
     // Extends the existing "useGlobalAdminEvents import restriction" rule.
     // That rule catches *unauthorized imports*. This rule catches *wrong event
     // names* in the authorized call sites — i.e. passing a workspace-scoped

@@ -12,16 +12,11 @@ import { createStmtCache } from '../db/stmt-cache.js';
 import { parseJsonSafeArray } from '../db/json-validation.js';
 import { clientBusinessPrioritySchema, type ClientBusinessPriorityInput } from '../schemas/client-business-priorities.js';
 import { isProgrammingError } from '../errors.js';
+import { buildKeywordFeedbackSignals } from '../keyword-feedback.js';
 
 const log = createLogger('workspace-intelligence/client-signals');
 
 const stmts = createStmtCache(() => ({
-  keywordFeedbackApproved: db.prepare(
-    'SELECT keyword FROM keyword_feedback WHERE workspace_id = ? AND status = ?',
-  ),
-  keywordFeedbackDeclined: db.prepare(
-    'SELECT keyword, reason FROM keyword_feedback WHERE workspace_id = ? AND status = ?',
-  ),
   contentGapVotes: db.prepare(
     'SELECT keyword, COUNT(*) as cnt FROM content_gap_votes WHERE workspace_id = ? GROUP BY keyword ORDER BY cnt DESC',
   ),
@@ -44,24 +39,10 @@ export async function assembleClientSignals(
   workspaceId: string,
   _opts?: IntelligenceOptions,
 ): Promise<ClientSignalsSlice> {
-  // Keyword feedback (DB direct — no store module)
+  // Keyword feedback
   let keywordFeedback: ClientSignalsSlice['keywordFeedback'] = { approved: [], rejected: [], patterns: { approveRate: 0, topRejectionReasons: [] } };
   try {
-    const approvedRows = stmts().keywordFeedbackApproved.all(workspaceId, 'approved') as { keyword: string }[];
-    const rejectedRows = stmts().keywordFeedbackDeclined.all(workspaceId, 'declined') as { keyword: string; reason?: string }[];
-    const total = approvedRows.length + rejectedRows.length;
-    const reasons = rejectedRows.map(r => r.reason).filter(Boolean) as string[];
-    const reasonCounts = new Map<string, number>();
-    for (const r of reasons) reasonCounts.set(r, (reasonCounts.get(r) ?? 0) + 1);
-    const topRejectionReasons = [...reasonCounts.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([reason]) => reason);
-    keywordFeedback = {
-      approved: approvedRows.map(r => r.keyword),
-      rejected: rejectedRows.map(r => r.keyword),
-      patterns: { approveRate: total > 0 ? approvedRows.length / total : 0, topRejectionReasons },
-    };
+    keywordFeedback = buildKeywordFeedbackSignals(workspaceId);
   } catch (err) {
     log.debug({ workspaceId, err }, 'Keyword feedback table unavailable — skipping');
   }

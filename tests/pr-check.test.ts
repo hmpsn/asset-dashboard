@@ -3323,6 +3323,68 @@ describe('Rule: Admin route mutation without addActivity', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// P2 Rule: keyword-feedback route writes must use shared service
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: keyword-feedback route writes must use shared service', () => {
+  const RULE = 'keyword-feedback route writes must use shared service';
+
+  it('flags direct INSERT INTO keyword_feedback in a route file', () => {
+    const file = write(
+      uniqPath('rule-keyword-feedback-route-write', 'server/routes/public-portal.ts'),
+      lines(
+        "const router = Router();",
+        "router.post('/api/public/keyword-feedback/:workspaceId', (req, res) => {",
+        "  db.prepare(`INSERT INTO keyword_feedback (workspace_id, keyword) VALUES (?, ?)`).run(req.params.workspaceId, req.body.keyword);",
+        "  res.json({ ok: true });",
+        "});",
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  it('does not flag route code that calls shared keyword-feedback service helpers', () => {
+    const file = write(
+      uniqPath('rule-keyword-feedback-route-write', 'server/routes/public-portal.ts'),
+      lines(
+        "import { saveKeywordFeedback } from '../keyword-feedback.js';",
+        "const router = Router();",
+        "router.post('/api/public/keyword-feedback/:workspaceId', (req, res) => {",
+        "  const result = saveKeywordFeedback({ workspaceId: req.params.workspaceId, keyword: req.body.keyword, status: 'approved' });",
+        "  res.json(result.response);",
+        "});",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects inline hatch // keyword-feedback-route-write-ok', () => {
+    const file = write(
+      uniqPath('rule-keyword-feedback-route-write', 'server/routes/public-portal.ts'),
+      lines(
+        "const router = Router();",
+        "db.prepare(`DELETE FROM keyword_feedback WHERE workspace_id = ?`).run('ws_1'); // keyword-feedback-route-write-ok",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects preceding-line hatch // keyword-feedback-route-write-ok', () => {
+    const file = write(
+      uniqPath('rule-keyword-feedback-route-write', 'server/routes/public-portal.ts'),
+      lines(
+        "const router = Router();",
+        "// keyword-feedback-route-write-ok",
+        "db.prepare(`UPDATE keyword_feedback SET status = 'declined' WHERE workspace_id = ?`).run('ws_1');",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // P2 Rule: useGlobalAdminEvents called with workspace-scoped event name
 // Detects WS_EVENTS values (workspace-scoped) being passed as handler keys
 // to useGlobalAdminEvents(), which is dead code.
@@ -4688,6 +4750,7 @@ describe('Meta: customCheck rule name registry', () => {
     'Local SEO Evaluated candidates must be explicitly gated',
     // P2 expansion rules
     'Admin route mutation without addActivity',
+    'keyword-feedback route writes must use shared service',
     'useGlobalAdminEvents called with workspace-scoped event name',
     // P3 expansion rules
     'addActivity type not in CLIENT_VISIBLE_TYPES (public route)',
