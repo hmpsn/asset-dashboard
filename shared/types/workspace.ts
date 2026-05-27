@@ -168,8 +168,6 @@ export interface KeywordStrategy {
   businessContext?: string;      // user-provided context (locations, services, industry)
   seoDataMode?: SeoDataMode; // which SEO provider enrichment mode was used
   seoDataStatus?: SeoDataStatus; // whether provider grounding was available or degraded during generation
-  /** @deprecated use seoDataMode. Kept for strategies generated before provider-neutral naming. */
-  semrushMode?: SeoDataMode;
   /** Enriched search signals stored alongside strategy (not included in pageMap). */
   searchSignals?: {
     /** Matches DeviceBreakdown from server/search-console.ts */

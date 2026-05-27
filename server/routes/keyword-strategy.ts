@@ -54,8 +54,7 @@ const log = createLogger('keyword-strategy');
 
 function readSeoDataMode(body: unknown): string | undefined {
   if (!body || typeof body !== 'object') return undefined;
-  const candidate = (body as { seoDataMode?: unknown; semrushMode?: unknown }).seoDataMode
-    ?? (body as { seoDataMode?: unknown; semrushMode?: unknown }).semrushMode;
+  const candidate = (body as { seoDataMode?: unknown }).seoDataMode;
   return typeof candidate === 'string' ? candidate : undefined;
 }
 
@@ -75,23 +74,19 @@ function serializeKeywordStrategy(
   cannibalization: CannibalizationItem[],
   strategyUx?: Awaited<ReturnType<typeof buildKeywordStrategyUxPayload>>,
 ) {
-  // Strip any stale table-backed fields left in the blob in favor of
-  // the table-backed sources —
-  // the migration on startup removes it from the blob, but be defensive
-  // against callers that still mutate the blob in-memory.
-  const {
-    semrushMode,
-    seoDataStatus,
-    contentGaps: _staleGaps,
-    quickWins: _staleQuickWins,
-    keywordGaps: _staleKeywordGaps,
-    topicClusters: _staleTopicClusters,
-    cannibalization: _staleCannibalization,
-    ...rest
-  } = strategy;
+  // Strip any stale table-backed and legacy alias fields left in the blob
+  // in favor of canonical table-backed sources and provider-neutral naming.
+  const rest: Record<string, unknown> = { ...strategy };
+  delete rest.contentGaps;
+  delete rest.quickWins;
+  delete rest.keywordGaps;
+  delete rest.topicClusters;
+  delete rest.cannibalization;
+  delete rest.semrushMode;
+  const seoDataStatus = strategy.seoDataStatus;
   return {
     ...rest,
-    seoDataMode: strategy.seoDataMode ?? semrushMode ?? 'none',
+    seoDataMode: strategy.seoDataMode ?? 'none',
     seoDataStatus: seoDataStatus ? {
       mode: seoDataStatus.mode,
       provider: seoDataStatus.provider,

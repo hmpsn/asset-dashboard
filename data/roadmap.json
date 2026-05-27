@@ -1327,8 +1327,8 @@
           "source": "Platform health recommendation pass 2026-05-26",
           "est": "3-5h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "Finish provider-neutral naming migration by removing semrushMode read/write fallback from route, generation options, and UI display fallbacks once legacy payload compatibility window is closed."
+          "status": "done",
+          "notes": "Finish provider-neutral naming migration by removing semrushMode read/write fallback from route, generation options, and UI display fallbacks once legacy payload compatibility window is closed.\n[Completed in PR2 on 2026-05-27. Removed semrushMode compatibility seams from keyword-strategy route parsing, background job params, generation service options, and admin UI display state; added migration 103 to backfill seoDataMode from legacy semrushMode blobs and remove the alias key from persisted workspace keyword_strategy JSON.]"
         },
         {
           "id": "platform-health-inbox-alias-sunset-execution",

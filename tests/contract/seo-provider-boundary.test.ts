@@ -25,7 +25,7 @@ describe('SEO provider boundary', () => {
     expect(semrushRouteTest).toContain("from '../../server/seo-provider-signals.js'");
   });
 
-  it('uses provider-neutral keyword strategy job params while accepting legacy callers', () => {
+  it('uses provider-neutral keyword strategy job params with no legacy semrushMode fallback', () => {
     const component = readFileSync('src/components/KeywordStrategy.tsx', 'utf-8'); // readFile-ok: endpoint migration guard
     const route = readFileSync('server/routes/keyword-strategy.ts', 'utf-8'); // readFile-ok: endpoint migration guard
     const jobs = readFileSync('server/routes/jobs.ts', 'utf-8'); // readFile-ok: endpoint migration guard
@@ -33,8 +33,8 @@ describe('SEO provider boundary', () => {
     expect(component).toContain('seoDataMode: seoDataAvailable ? seoDataMode :');
     expect(component).not.toContain('semrushMode:');
     expect(route).toContain('seoDataMode: readSeoDataMode(req.body)');
-    expect(route).toContain('semrushMode?: unknown');
+    expect(route).not.toContain('semrushMode?: unknown');
     expect(jobs).toContain('params.seoDataMode');
-    expect(jobs).toContain('params.semrushMode');
+    expect(jobs).not.toContain('params.semrushMode');
   });
 });

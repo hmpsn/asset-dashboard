@@ -50,8 +50,6 @@ export interface GenerateKeywordStrategyOptions {
   mode?: 'full' | 'incremental';
   seoDataMode?: 'quick' | 'full' | 'none' | string;
   seoDataProvider?: ProviderName | string;
-  /** @deprecated use seoDataMode. Preserved for legacy route/job callers. */
-  semrushMode?: 'quick' | 'full' | 'none' | string;
   competitorDomains?: string[];
   competitorDomainsProvided?: boolean;
   maxPages?: number;
@@ -121,7 +119,7 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
 
   const businessContext = options.businessContext || ws.keywordStrategy?.businessContext || '';
   const strategyMode = options.mode === 'incremental' ? 'incremental' : 'full'; // 'full' | 'incremental'
-  const seoDataMode = normalizeSeoDataMode(options.seoDataMode ?? options.semrushMode);
+  const seoDataMode = normalizeSeoDataMode(options.seoDataMode);
   const competitorDomains = options.competitorDomains ? [...options.competitorDomains] : [...(ws.competitorDomains || [])];
   const rawMaxPages = options.maxPages != null ? Number(options.maxPages) : 500;
   const maxPagesParam = rawMaxPages > 0 ? Math.min(rawMaxPages, KEYWORD_STRATEGY_MAX_PAGE_CAP) : 0; // 0 = no cap

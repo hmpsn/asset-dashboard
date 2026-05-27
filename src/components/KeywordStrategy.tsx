@@ -106,7 +106,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const activeStrategyJob = findActiveJob({ type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, workspaceId });
   const completedStartedJob = lastStartedJobId ? jobs.find(job => job.id === lastStartedJobId) : undefined;
   const generating = startingStrategyJob || Boolean(activeStrategyJob);
-  const displayedSeoDataMode = strategy?.seoDataMode ?? strategy?.semrushMode;
+  const displayedSeoDataMode = strategy?.seoDataMode;
   // Derive providerList before selectedSeoDataProvider so the computed value has access to it
   const providerList = keywordData?.providers ?? [];
   const selectedSeoDataProvider = activeProvider
@@ -165,7 +165,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     if (strategy?.businessContext && !businessContext) {
       setBusinessContext(strategy.businessContext);
     }
-    const savedSeoDataMode = strategy?.seoDataMode ?? strategy?.semrushMode;
+    const savedSeoDataMode = strategy?.seoDataMode;
     if (savedSeoDataMode && savedSeoDataMode !== 'none') {
       setSeoDataMode(savedSeoDataMode);
     }
