@@ -6378,6 +6378,39 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // Entity disambiguation (Wikidata/SPARQL) must stay in the dedicated
+    // intelligence slice boundary. Direct lookups from schema routes/helpers
+    // create duplicated caching + inconsistent sameAs resolution contracts.
+    name: 'Wikidata disambiguation outside entity-resolution intelligence modules',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    message:
+      'Wikidata/SPARQL entity disambiguation must live in server/intelligence/entity-resolution* modules and flow through intelligence slices. Do not call Wikidata directly from schema/routes/helpers. Escape hatch: // entity-resolution-ok',
+    severity: 'error',
+    rationale:
+      'Prevents ad hoc Wikidata lookups from bypassing the emerging EntityResolutionSlice contract, which would fragment caching, confidence scoring, and sameAs output semantics.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const wikidataRefRe = /(query\.wikidata\.org|wikidata\.org\/wiki\/(?:Q\d+|Special:EntityData\/Q\d+))/i;
+      for (const file of files) {
+        const normalized = file.replaceAll('\\', '/');
+        if (!normalized.includes('/server/')) continue;
+        if (normalized.includes('/server/intelligence/entity-resolution')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!wikidataRefRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// entity-resolution-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
     // Catches HTML-naive word-counting on TipTap content fields. Post intro/conclusion
     // and section.content are stored as rich-text HTML, so `countWords(post.introduction)`
     // or `post.introduction.split(/\s+/)` treats `<p>` and `</p>` as words and inflates

@@ -715,6 +715,17 @@
           "shippedAt": "2026-05-24"
         },
         {
+          "id": "schema-entity-grounding-phase-a-contract-guardrails",
+          "title": "Schema entity grounding Phase A — shared contracts + guardrails",
+          "source": "Platform health recommendation pass 2026-05-26",
+          "est": "2-4h",
+          "priority": "P0",
+          "sprint": "future",
+          "status": "done",
+          "notes": "Completed 2026-05-27 on `codex/schema-intel-prA-contract-guardrails`. Added `shared/types/entity-resolution.ts` typed contracts (Thing/Place entities, Wikidata references, availability states), added `docs/rules/schema-entity-resolution.md` as the feature guardrail document, and added pr-check custom rule `Wikidata disambiguation outside entity-resolution intelligence modules` with fixture coverage in `tests/pr-check.test.ts`. This phase intentionally ships no runtime schema behavior change; implementation wiring remains tracked under `schema-entity-grounding-wikidata` and `schema-intelligence-layer-v2`.",
+          "shippedAt": "2026-05-27"
+        },
+        {
           "id": "schema-engagement-signals",
           "title": "Schema engagement signals — wordCount, timeRequired, speakable, educationalLevel",
           "source": "Strategic landscape brainstorm 2026-04-29 (post-PR1 merge)",
@@ -742,7 +753,7 @@
           "priority": "P0",
           "sprint": "future",
           "status": "pending",
-          "notes": "Tier-2 / biggest competitive moat. Replace string knowsAbout (currently ['brand strategy','webflow']) with typed Thing entities linked to Wikidata Q-numbers via sameAs. Same upgrade for Article.about (typed Thing — what is this article about?), Article.mentions[] (entities referenced in body), Place entities for areaServed (Austin, TX → Wikidata Q16559), Organization.sameAs extended with Wikidata identifier. Architecture: new EntityResolutionSlice on buildWorkspaceIntelligence, populated by a Cheerio-based extractor that runs entity recognition (likely via OpenAI structured-output prompt against curated entity types) + Wikidata SPARQL lookup for top candidates, cached per-entity. Most agencies don't do this; Google's knowledge graph rewards disambiguation heavily. Architectural prerequisite met by parity-fields PR1 Pattern B starter. Can ship after schema-page-element-catalog-v1 (the catalog feeds Article.mentions extraction).\n[Platform health recommendation pass 2026-05-26: prioritized as the next emergent intelligence slice (EntityResolutionSlice) to prevent schema authority drift and duplicate ad hoc entity handling.]"
+          "notes": "Tier-2 / biggest competitive moat. Replace string knowsAbout (currently ['brand strategy','webflow']) with typed Thing entities linked to Wikidata Q-numbers via sameAs. Same upgrade for Article.about (typed Thing — what is this article about?), Article.mentions[] (entities referenced in body), Place entities for areaServed (Austin, TX → Wikidata Q16559), Organization.sameAs extended with Wikidata identifier. Architecture: new EntityResolutionSlice on buildWorkspaceIntelligence, populated by a Cheerio-based extractor that runs entity recognition (likely via OpenAI structured-output prompt against curated entity types) + Wikidata SPARQL lookup for top candidates, cached per-entity. Most agencies don't do this; Google's knowledge graph rewards disambiguation heavily. Architectural prerequisite met by parity-fields PR1 Pattern B starter. Can ship after schema-page-element-catalog-v1 (the catalog feeds Article.mentions extraction).\n[Platform health recommendation pass 2026-05-26: prioritized as the next emergent intelligence slice (EntityResolutionSlice) to prevent schema authority drift and duplicate ad hoc entity handling.]\n[Phase A completed 2026-05-27: contracts + guardrails shipped in roadmap item `schema-entity-grounding-phase-a-contract-guardrails`; runtime slice implementation remains pending.]"
         },
         {
           "id": "schema-commerce-types",

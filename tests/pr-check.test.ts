@@ -4764,6 +4764,8 @@ describe('Meta: customCheck rule name registry', () => {
     // Fires on any new direct ws.* read in buildSchemaContext outside the 6
     // identity-field allow-list. Grandfathered legacy reads carry inline hatches.
     'schema-context-direct-read-not-on-allowlist',
+    // Schema entity-resolution Phase A guardrail (2026-05-27)
+    'Wikidata disambiguation outside entity-resolution intelligence modules',
     // 2026-05-08 inbox redesign — retired InboxFilter literals
     'inbox-legacy-filter-literal',
     // PR 1.5 Phase 1 IA prevention rules (2026-05-10)
@@ -7940,6 +7942,65 @@ describe('Rule: schema-context-direct-read-not-on-allowlist', () => {
     const hits = runRule(RULE, [file]);
     expect(hits.length).toBeGreaterThanOrEqual(1);
     expect(hits[0].text).toContain('ws.businessProfile');
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: Wikidata disambiguation outside entity-resolution intelligence modules
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: Wikidata disambiguation outside entity-resolution intelligence modules', () => {
+  const RULE = 'Wikidata disambiguation outside entity-resolution intelligence modules';
+
+  it('flags Wikidata/SPARQL references outside server/intelligence/entity-resolution*', () => {
+    const file = write(
+      uniqPath('rule-entity-resolution', 'server/schema/data-sources.ts'),
+      lines(
+        'export async function resolveEntity() {',
+        "  return fetch('https://query.wikidata.org/sparql?query=SELECT%20*%20WHERE%20{?s%20?p%20?o}');",
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('respects inline // entity-resolution-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-entity-resolution', 'server/schema/data-sources.ts'),
+      lines(
+        'export async function resolveEntity() {',
+        "  return fetch('https://query.wikidata.org/sparql?query=SELECT%20*%20WHERE%20{?s%20?p%20?o}'); // entity-resolution-ok",
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // entity-resolution-ok hatch on the preceding line', () => {
+    const file = write(
+      uniqPath('rule-entity-resolution', 'server/schema/data-sources.ts'),
+      lines(
+        'export async function resolveEntity() {',
+        '  // entity-resolution-ok — temporary migration shim',
+        "  return fetch('https://query.wikidata.org/sparql?query=SELECT%20*%20WHERE%20{?s%20?p%20?o}');",
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag references inside server/intelligence/entity-resolution* modules', () => {
+    const file = write(
+      uniqPath('rule-entity-resolution', 'server/intelligence/entity-resolution-slice.ts'),
+      lines(
+        'export async function resolveEntity() {',
+        "  return fetch('https://query.wikidata.org/sparql?query=SELECT%20*%20WHERE%20{?s%20?p%20?o}');",
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
   });
 });
 
