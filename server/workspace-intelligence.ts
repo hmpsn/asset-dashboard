@@ -26,6 +26,7 @@ import { assembleClientSignals } from './intelligence/client-signals-slice.js';
 import { assembleOperational } from './intelligence/operational-slice.js';
 import { assemblePageProfile } from './intelligence/page-profile-slice.js';
 import { assembleLocalSeo } from './intelligence/local-seo-slice.js';
+import { assembleEntityResolution } from './intelligence/entity-resolution-slice.js';
 import { formatForPrompt } from './intelligence/formatters.js';
 export {
   formatForPrompt,
@@ -140,6 +141,9 @@ async function assembleSlice(
       break;
     case 'localSeo':
       result.localSeo = await assembleLocalSeo(workspaceId);
+      break;
+    case 'entityResolution':
+      result.entityResolution = await assembleEntityResolution(workspaceId, opts);
       break;
   }
 }

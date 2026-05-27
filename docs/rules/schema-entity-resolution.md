@@ -39,9 +39,16 @@ Callers in schema routes/helpers/templates consume resolved results through inte
 - [x] pr-check guardrail rule + fixture coverage added.
 - [x] No runtime schema behavior change required in this phase.
 
+## Phase B Acceptance (Slice Wiring)
+
+- [x] `entityResolution` registered in intelligence slice registry/facade.
+- [x] `assembleEntityResolution()` implemented with deterministic candidate assembly.
+- [x] `buildSchemaIntelligence()` can request/return the entity-resolution slice.
+- [x] Unit coverage added for slice assembly + schema wrapper wiring.
+
 ## Deferred to Implementation Phases
 
-- Assembler implementation (`assembleEntityResolution`) and slice wiring.
+- Wikidata/SPARQL disambiguation (`sameAs` resolution and confidence selection).
 - Cache strategy for repeated entity candidates.
 - Confidence threshold tuning and fallback heuristics.
 - Schema template emission upgrades for typed entity arrays.

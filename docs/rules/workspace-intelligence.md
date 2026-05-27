@@ -51,6 +51,7 @@ Each slice is independently assembled. A failed assembler logs a warning and lea
 | `pageElements` | `PageElementSlice` | Persisted per-page media, citations, CTAs, forms, schema hints — **only assembled when `opts.pagePath` is provided** |
 | `siteInventory` | `SiteInventorySlice` | Webflow page/CMS inventory for schema and site-aware workflows — **only assembled when `opts.siteId` and `opts.siteBaseUrl` are provided** |
 | `localSeo` | `LocalSeoSlice` | Local SEO markets, visibility snapshots, candidates, and sampled prompt block |
+| `entityResolution` | `EntityResolutionSlice` | Typed entity grounding candidates/results for schema surfaces (`knowsAbout`, `about`, `mentions`, `areaServed`) |
 
 `shared/types/intelligence.ts` owns the registry constants:
 
@@ -107,7 +108,7 @@ intelligence:{workspaceId}:{sortedSlices}:{pagePath}:{learningsDomain}:site={sit
 
 The `site`, `base`, and `wf` segments isolate `siteInventory` calls by Webflow site identity and token fingerprint without storing raw Webflow tokens in cache keys. The `:bl` suffix is appended only when `opts.enrichWithBacklinks` is true — backlink data requires a network call and must not be served from a non-backlink-enriched cache entry.
 
-Schema consumers should use `buildSchemaIntelligence()` rather than calling slice assemblers or reading `ws.keywordStrategy` directly. That wrapper resolves workspace/site identity once, calls `buildWorkspaceIntelligence()` with schema-owned options, and exposes the resolved `seoContext.strategy`, `siteInventory`, `pageKeywords`, and `pageElements` surfaces.
+Schema consumers should use `buildSchemaIntelligence()` rather than calling slice assemblers or reading `ws.keywordStrategy` directly. That wrapper resolves workspace/site identity once, calls `buildWorkspaceIntelligence()` with schema-owned options, and exposes the resolved `seoContext.strategy`, `siteInventory`, `pageKeywords`, `pageElements`, and optional `entityResolution` surfaces.
 
 ### Single-flight deduplication
 

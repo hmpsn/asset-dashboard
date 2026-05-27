@@ -89,6 +89,18 @@ describe('buildSchemaIntelligence', () => {
     );
   });
 
+  it('includes entityResolution slice only when requested', async () => {
+    await buildSchemaIntelligence({
+      siteId: 'site-schema',
+      includeEntityResolution: true,
+    });
+
+    expect(mocks.buildWorkspaceIntelligence).toHaveBeenCalledWith(
+      'ws-schema',
+      expect.objectContaining({ slices: ['seoContext', 'entityResolution'] }),
+    );
+  });
+
   it('does not assemble workspace intelligence when the site has no workspace', async () => {
     mocks.listWorkspaces.mockReturnValue([]);
 
