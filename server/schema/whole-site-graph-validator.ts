@@ -6,6 +6,7 @@ import type {
   WholeSiteSchemaGraphNode,
   WholeSiteSchemaGraphValidationResult,
 } from '../../shared/types/schema-validation.js';
+import { normalizePageUrl } from '../helpers.js';
 
 export interface WholeSiteSchemaGraphInput {
   pages: SchemaPageSuggestion[];
@@ -38,22 +39,9 @@ const COMPATIBLE_ROLES: Record<string, Set<string>> = {
   partnership: new Set(['blog']),
 };
 
-function normalizePath(path: string | undefined): string {
-  if (!path) return '/';
-  const trimmed = path.trim();
-  if (!trimmed || trimmed === '/') return '/';
-  try {
-    const parsed = new URL(trimmed);
-    return normalizePath(parsed.pathname);
-  } catch { // catch-ok: relative or malformed page paths fall through to path-only normalization
-    const withSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-    return withSlash.replace(/\/+$/, '') || '/';
-  }
-}
-
 function suggestionPath(page: SchemaPageSuggestion): string {
-  if (page.url) return normalizePath(page.url);
-  return normalizePath(page.slug);
+  if (page.url) return normalizePageUrl(page.url);
+  return normalizePageUrl(page.slug);
 }
 
 function nodeTypes(node: Record<string, unknown>): string[] {
@@ -380,7 +368,7 @@ export function validateWholeSiteSchemaGraph(
 
     const pagesByPath = new Map(input.pages.map(page => [suggestionPath(page), page]));
     for (const role of activePlan.pageRoles) {
-      const pagePath = normalizePath(role.pagePath);
+      const pagePath = normalizePageUrl(role.pagePath);
       const page = pagesByPath.get(pagePath);
       if (!page) continue;
       const emittedTypes = new Set(graphNodes(primarySchema(page)).flatMap(node => nodeTypes(node)));

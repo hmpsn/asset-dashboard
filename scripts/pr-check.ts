@@ -3766,6 +3766,97 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // ── Ad hoc domain normalization helper reintroduction ──
+    //
+    // Domain normalization has a canonical server authority in
+    // `server/domain-normalization.ts`. Route-local helpers named
+    // `cleanDomain` / `stripWww` historically drifted in behavior
+    // (strip-port, lowercase, fallback parsing).
+    //
+    // Allow wrappers that delegate to normalizeDomainValue/normalizeDomainHost.
+    // Flag implementations that define these helper names but do not delegate.
+    name: 'Ad hoc domain normalization helper outside canonical authority',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    message:
+      'Use server/domain-normalization.ts (normalizeDomainValue/normalizeDomainHost) instead of ad hoc ' +
+      'cleanDomain/stripWww helper implementations. Add // domain-normalization-ok only for justified wrappers.',
+    severity: 'error',
+    rationale:
+      'Divergent domain-cleanup helpers drift silently (www/port/lowercase/malformed fallbacks) and cause ' +
+      'cross-surface comparison bugs.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const helperDefRe = /^\s*(?:export\s+)?function\s+(cleanDomain|stripWww)\s*\(/;
+      for (const file of files) {
+        if (!file.endsWith('.ts') || !file.includes('server/')) continue;
+        if (file.endsWith('server/domain-normalization.ts')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const match = lines[i].match(helperDefRe);
+          if (!match) continue;
+          if (hasHatch(lines, i, '// domain-normalization-ok')) continue;
+          let delegates = false;
+          for (let j = i; j < Math.min(i + 18, lines.length); j++) {
+            if (lines[j].includes('normalizeDomainValue(') || lines[j].includes('normalizeDomainHost(')) {
+              delegates = true;
+              break;
+            }
+            if (lines[j].includes('}')) break;
+          }
+          if (delegates) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // ── Local page/path mini-normalizers in consolidation hotspots ──
+    //
+    // These modules should use canonical Page Address helpers from
+    // server/helpers.ts (normalizePageUrl / resolvePagePath / resolvePageAddress)
+    // instead of local normalizePath/normalizePagePath implementations.
+    name: 'Local page/path normalizer helper in consolidation hotspots',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    message:
+      'Use canonical Page Address helpers from server/helpers.ts instead of local normalizePath/normalizePagePath helpers in consolidation hotspots. ' +
+      'Add // page-normalizer-ok only for documented exceptions.',
+    severity: 'warn',
+    rationale:
+      'Prevents reintroduction of drift-prone local path normalizers in page identity joins and read paths.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const hotspotFiles = [
+        'server/audit-traffic.ts',
+        'server/eeat-trust-signals.ts',
+        'server/copy-refresh.ts',
+        'server/intelligence/page-assist-context-builder.ts',
+        'server/schema/whole-site-graph-validator.ts',
+      ];
+      const helperRe = /^\s*function\s+normalize(?:Page)?Path\s*\(/;
+      for (const file of files) {
+        if (!hotspotFiles.some(hotspot => file.endsWith(hotspot))) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!helperRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// page-normalizer-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
     // Slug-path hardening sprint (2026-04-21).
     //
     // Webflow nested pages have a `publishedPath` like `/services/seo` and a

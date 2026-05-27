@@ -1404,6 +1404,158 @@
       ]
     },
     {
+      "id": "sprint-platform-health-wave8-audit-drift-closure",
+      "name": "Platform Health Wave 8 — Audit Drift Closure (May 2026)",
+      "hours": "40-60",
+      "rationale": "Close the drift and duplication findings surfaced by the 2026-05-27 four-agent platform audit. Highest-priority items are two unauthenticated public endpoints and a set of admin/client divergence bugs where the same concept is computed twice with different formulas. Bulk of the sprint is mechanical adoption sweeps to migrate ~150 frontend call sites onto existing shared primitives (scoreColor, fmtNum, fmtMoney, useToggleSet, plus new formatBytes/formatDate helpers) and lock each sweep in with a pr-check rule so the drift cannot reopen.",
+      "items": [
+        {
+          "id": "audit-drift-public-endpoint-auth",
+          "title": "Add portal auth to public rank-tracking and audit-traffic endpoints",
+          "source": "Platform audit 2026-05-27",
+          "est": "1-2h",
+          "priority": "P0",
+          "status": "pending",
+          "notes": "Security finding. `server/routes/rank-tracking.ts:125,133` and `server/routes/public-portal.ts:310` (audit-traffic) lack `requireClientPortalAuth`. Admin equivalents (`rank-tracking.ts:112,120`) use `requireWorkspaceAccess`. Ranking data and GA/GSC page metrics currently leak to anyone with a known workspaceId. [Expanded 2026-05-27 during plan verification] `server/routes/anomalies.ts:27` (public GET) also lacks auth, and admin mutations `anomalies.ts:34,43` (dismiss/acknowledge) have no workspace guard at all. Bundle all six fixes plus a pr-check rule that flags new routes mounted on the `/api/public/` prefix without an explicit auth middleware or a documented `// public-no-auth-ok` hatch."
+        },
+        {
+          "id": "audit-drift-trial-state-canonical",
+          "title": "Canonicalize isTrial / trialDaysRemaining via computeEffectiveTier",
+          "source": "Platform audit 2026-05-27",
+          "est": "2-3h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Admin (`server/routes/workspaces.ts:182-183`) computes `isTrial` from `trialEnd > now`; client (`server/serializers/client-safe.ts:75-78`) requires `effectiveTier === 'growth' && baseTier === 'free'`. A paid Growth workspace with a leftover `trialEndsAt` value shows different trial state to each side. Route both through one helper that wraps `computeEffectiveTier()`; export from `server/billing/trial-state.ts`; replace both call sites; add contract test asserting identical output for the same workspace row."
+        },
+        {
+          "id": "audit-drift-admin-workspace-view",
+          "title": "AdminWorkspaceView serializer to mirror client-safe allow-list",
+          "source": "Platform audit 2026-05-27",
+          "est": "3-4h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "`server/routes/workspaces.ts:94` returns `{ ...ws, webflowToken: undefined, clientPassword: undefined }` — a lossy spread that auto-leaks every new column. Client side uses an explicit allow-list in `server/serializers/client-safe.ts`. Add `AdminWorkspaceView` interface in `shared/types/` and a mirror serializer; replace the spread; add a pr-check rule that flags `{ ...ws, ... }` spreads in route handlers that return workspaces."
+        },
+        {
+          "id": "audit-drift-briefing-admin-preview",
+          "title": "Admin briefing client-preview endpoint",
+          "source": "Platform audit 2026-05-27",
+          "est": "3-5h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "`server/routes/public-portal.ts:781-873` enriches briefing payloads with synthesized `issueSummary`, top-5 `recommendations` (re-sorted via `computeOpportunityScore`), and `weeklyOpener`. Admin has no parallel endpoint, so admins ship blind. Extract the enrichment into `server/briefing-client-projection.ts`; expose `GET /api/admin/workspaces/:id/briefing/preview` that returns the same shape; refactor `public-portal.ts` to call the shared projection."
+        },
+        {
+          "id": "audit-drift-route-broadcast-activity-wiring",
+          "title": "Wire missing broadcastToWorkspace + addActivity in three route files",
+          "source": "Platform audit 2026-05-27",
+          "est": "2-3h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Three workspace-scoped mutation routes silently skip both halves of the feedback loop: `server/routes/client-actions.ts:49,67,84` (create, admin update, public respond); `server/routes/keyword-command-center.ts:123,137` (single + bulk); `server/routes/anomalies.ts:34,43` (dismiss + acknowledge). Add WS event constants in `server/ws-events.ts` if missing; call `broadcastToWorkspace()` and `addActivity()` after each successful mutation; wire `useWorkspaceEvents` invalidations on the frontend; add contract tests asserting both calls fire."
+        },
+        {
+          "id": "audit-drift-ai-json-parse-zod-validation",
+          "title": "Zod-validate AI structured outputs (4 callers)",
+          "source": "Platform audit 2026-05-27",
+          "est": "3-5h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Bare `JSON.parse` on AI output, no shape validation — silent runtime garbage if prompt drifts. Files: `server/content-brief.ts:38,1017` (includes the `outlineParsed.outline ?? outlineParsed.sections` guessed-field-name anti-pattern at 1020-1021); `server/aeo-page-review.ts:63,242`; `server/diagnostic-orchestrator.ts:466`; `server/schema-plan.ts:358`. Register each as a named AI operation in `server/ai-operation-registry.ts`, route through `callAI({ operation })`, and validate parsed output with Zod. See `docs/rules/ai-operation-contracts.md`."
+        },
+        {
+          "id": "audit-drift-server-slugify-dedupe-consolidation",
+          "title": "Canonicalize slugify + dedupeBy family in server",
+          "source": "Platform audit 2026-05-27",
+          "est": "2-3h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Two divergent `slugify` regexes (`server/intelligence/entity-resolution-slice.ts:13` uses `[^a-z0-9\\s-]`; `server/mcp/tools/keyword-actions.ts:49` uses `[^a-z0-9]+`) — same name, different output. Move canonical to `server/helpers.ts`; migrate both callers. Then consolidate `dedupeByKeyword`/`dedupeByTopic`/`dedupeStrings`/`dedupeCandidates` across `server/cannibalization-issues.ts:131`, `server/keyword-gaps.ts:74`, `server/topic-clusters.ts:102`, `server/keyword-strategy-sanitizer.ts:103`, `server/keyword-recommendations.ts:137` into `dedupeBy<T>(items, keyFn)` and `dedupeByNormalizedKeyword` in a shared module."
+        },
+        {
+          "id": "audit-drift-domain-normalization-helper-migration-sweep",
+          "title": "P1 Domain normalization helper migration sweep",
+          "source": "Platform health consolidation follow-up 2026-05-27",
+          "est": "3-5h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Create a canonical server domain-normalization helper contract (stripWww/lowercase/port + malformed fallback options), then migrate duplicated domain cleanup logic in `server/local-seo.ts`, `server/providers/dataforseo-provider.ts`, schema same-site comparators, and competitor-domain filtering wrappers. Preserve security-specific hostname normalization in `server/external-fetch.ts` as a separate safety boundary."
+        },
+        {
+          "id": "audit-drift-page-path-address-helper-consolidation",
+          "title": "P1 Page path/address helper consolidation",
+          "source": "Platform health consolidation follow-up 2026-05-27",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Consolidate remaining server-local page/path normalizers into the canonical page-address helpers (`normalizePageUrl`, `resolvePageAddress`, `resolvePagePath`, `findPageMapEntry*`) across audit traffic joins, E-E-A-T trust-signal matching, copy refresh URL/path matching, whole-site schema graph normalization, and page-assist context path resolution. Preserve analytics-intelligence absolute-URL dedupe semantics while routing through shared normalization authority."
+        },
+        {
+          "id": "audit-drift-score-color-adoption-sweep",
+          "title": "Score-color adoption sweep + pr-check lock",
+          "source": "Platform audit 2026-05-27",
+          "est": "3-4h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "~15 components hand-roll score-color thresholds instead of using `scoreColor`/`scoreColorClass`/`scoreBgClass` from `src/components/ui/constants.ts`. Sites: `AssetAudit.tsx:263`, `MetricRing.tsx:21,22`, `audit/AuditReportExport.tsx:79,132`, `page-intelligence/PageIntelligencePagesHeader.tsx:163-164`, `briefs/BriefDetail.tsx:242`, `briefs/BriefList.tsx:110`, `audit/CwvSummaryCard.tsx:53`, `strategy/TopicClusters.tsx:21-22`, `WorkspaceOverview.tsx:133`, `SiteArchitecture.tsx:342`, `TrafficDetail.tsx:477`, `ui/AIContextIndicator.tsx:92,98`, `hooks/useChat.ts:250`, `PageSpeedPanel.tsx:63` (local `scoreColor` shadow). Migrate then add pr-check rule flagging inline `score >= 80 ? 'text-emerald'` patterns outside `ui/constants.ts`."
+        },
+        {
+          "id": "audit-drift-fmt-num-formatbytes-adoption",
+          "title": "fmtNum adoption sweep + formatBytes helper",
+          "source": "Platform audit 2026-05-27",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "~78 sites call `.toLocaleString()` directly instead of `fmtNum` from `src/utils/formatNumbers.ts`. Largest call-site clusters: `ContentPerformance.tsx`, `TrafficDetail.tsx`, `SearchDetail.tsx`, `KeywordStrategy.tsx`, `RankTracker.tsx`, `AIUsageSection.tsx`. Local `fmtNum`/`fmtTokens` reimplementations at `WorkspaceHome.tsx:46-47` and `AIUsageSection.tsx:70`. Add `formatBytes(bytes)` to `utils/formatNumbers.ts` and migrate the 3 copy-paste sites: `AssetBrowser.tsx:40-41`, `AssetAudit.tsx:38-39`, `PageWeight.tsx:35-36`. Add pr-check rule flagging `.toLocaleString()` on plain numbers in `src/components/` (allow on dates)."
+        },
+        {
+          "id": "audit-drift-fmt-money-format-date-adoption",
+          "title": "fmtMoney sweep + formatDate/formatDateTime helpers + adoption",
+          "source": "Platform audit 2026-05-27",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Inline `Intl.NumberFormat` USD: `client/InsightsEngine.tsx:44`, `client/FixRecommendations.tsx:13`, `client/SeoCart.tsx:8`, `ClientDashboard.tsx:601` — migrate to `fmtMoney`. Then create `formatDate`/`formatDateShort`/`formatDateTime` in `src/utils/formatDates.ts` and migrate ~25 sites of raw `new Date(x).toLocaleDateString()` (`AdminChat.tsx:249`, `RevenueDashboard.tsx:231`, `ContentManager.tsx:291`, `KeywordStrategy.tsx:315,387`, `PostEditor.tsx:398`, `ContentDecay.tsx:140`, `ContentSubscriptions.tsx:258,307`, `ContentBriefs.tsx:482`, `settings/FeaturesTab.tsx:114`, plus ~14 more). Add pr-check rule flagging inline `Intl.NumberFormat` and raw `toLocaleDateString` outside the formatters utility."
+        },
+        {
+          "id": "audit-drift-use-toggle-set-adoption",
+          "title": "useToggleSet adoption sweep + pr-check lock",
+          "source": "Platform audit 2026-05-27",
+          "est": "5-7h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "~30 components hand-roll `useState<Set<X>>` + add/delete handlers instead of using existing `src/hooks/useToggleSet.ts` (only 3 sites currently adopt it). Largest call sites: `client/InsightsEngine.tsx:113,114,161,164`, `client/FixRecommendations.tsx:364,400`, `SeoAudit.tsx:69,85`, `AeoReview.tsx:69,70`, `KeywordCommandCenter.tsx:126`, `client/PageKeywordMapContent.tsx:84,85`, `client/StrategyTab.tsx:92`, `client/ApprovalsTab.tsx:35`, `client/ApprovalBatchCard.tsx:39`, `client/health-tab/useHealthTabShell.ts:46,50`, `cms-editor/useCmsEditorShellState.ts:11,20,55,58`, `editor/useSeoEditorSessionState.ts:36,42`, `layout/Sidebar.tsx:121`, plus ~16 more. Migrate then add pr-check rule flagging `useState<Set<` in components."
+        },
+        {
+          "id": "audit-drift-p2-admin-client-parity",
+          "title": "P2 admin/client parity reconciliation",
+          "source": "Platform audit 2026-05-27",
+          "est": "4-6h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Cluster of smaller admin/client drift items: (a) reconcile insight shape parallelism between `server/routes/insights.ts:17` (raw rows) and `server/routes/public-analytics.ts:131` (`buildClientInsights` narrative) — single source via slice + projection; (b) content-gap `opportunityScore` fallback consistency between `keyword-strategy.ts:211` and `public-content.ts:214` + `public-portal.ts:832`; (c) `pendingApprovals` count alignment in `workspaces.ts:126` to match client-visible filter; (d) brand-voice authority enforcement on onboarding writes in `public-portal.ts:135,185` (must not bypass voice-profile chain). [Audit suppressions item dropped 2026-05-27 — `webflow-audit.ts` does not exist and `getLatestSnapshot` has zero callers outside `server/reports.ts`; no real divergence.]"
+        },
+        {
+          "id": "audit-drift-p2-helper-tail",
+          "title": "P2 helper consolidation tail",
+          "source": "Platform audit 2026-05-27",
+          "est": "4-6h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "(a) Migrate 4 custom relative-time formatters onto `src/lib/timeAgo.ts` (`LlmsTxtGenerator.tsx:25`, `WorkspaceHome.tsx:207`, `client/Briefing/WinsSurface.tsx:30`, `admin/MeetingBrief/BriefHeader.tsx:10`); (b) move status→badge ternaries into `<Badge>`/`<StatusBadge>` or `lib/copyStatusConfig.ts` (`PendingApprovals.tsx:186`, `RankTracker.tsx:507`, `ContentBriefs.tsx:479`, `cms-editor/CmsEditorShellPanels.tsx:163-164`, `brand/BatchGenerationPanel.tsx:98`, `workspace-home/SeoWorkStatus.tsx:40,46`); (c) consolidate `uniq`/`uniqueStrings`/`uniqueSeoTexts`/`uniqueEntities` into `uniqStrings(values, opts)`; (d) collapse `sanitizeForPrompt` duplicates between `briefing-prompt.ts:169` and `helpers.ts:278,294`; (e) introduce typed shape in `shared/types/` for `matchedPage`/`meta` to replace the 8+ `(matchedPage as Record<string, unknown>)` ladder in `server/schema-suggester.ts:692-876`; (f) Lock `callAI()` adoption: delete the stale `// callAnthropic` comment at `server/copy-generation.ts:116` (actual call at line 106 already uses `callAI()`) and add a pr-check rule blocking new direct imports of `callOpenAI`/`callAnthropic` outside `server/ai.ts`. [Rescoped 2026-05-27 — originally proposed as a migration based on stale audit + stale CLAUDE.md note; re-verification confirmed full adoption is already complete, so item now mechanizes the invariant rather than migrating to it.]"
+        },
+        {
+          "id": "audit-drift-p3-residuals",
+          "title": "P3 residual consolidation",
+          "source": "Platform audit 2026-05-27",
+          "est": "3-5h",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "(a) Retire `server/db/json-column.ts` parseJsonColumn in favor of `parseJsonFallback` from `server/db/json-validation.ts`; (b) collapse `titleCaseWord`/`capitalize`/`capitalizeSlugSegment` (`server/insight-enrichment.ts:37`, `server/schema/data-sources.ts:146,324`) into one `capitalizeWord`; (c) collapse two `compact()` siblings in `keyword-strategy-context.ts:36` + `keyword-strategy-ux.ts:85`; (d) add `useDebouncedValue` hook and migrate inline `setTimeout` debounces (`KeywordCommandCenter.tsx:116`, `useAutoSave.ts`, `ui/overlay/Tooltip.tsx:110`); (e) add `daysSince(iso)` to `lib/timeAgo.ts` and migrate `schema/SchemaPageCard.tsx:95`, `client/Briefing/WinsSurface.tsx:32`; (f) parity-fix `quickWins` shape between `keyword-strategy.ts:259` (full row) and `public-content.ts:216-221` (4 fields); (g) promote `sleep(ms)` from `server/local-seo.ts:156` into `server/helpers.ts`."
+        }
+      ]
+    },
+    {
       "id": "sprint-workspace-intelligence-consolidation",
       "name": "✅ SHIPPED — Workspace Intelligence Consolidation",
       "hours": "30-50",

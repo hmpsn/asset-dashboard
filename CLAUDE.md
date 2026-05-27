@@ -18,7 +18,7 @@ Integrations: Webflow, Google Search Console, GA4, SEMRush, DataForSEO (both via
 - **Shared Types** — `shared/types/` (48 modules) shared between client and server.
 - **Storage** — SQLite (WAL mode, foreign keys ON) at `DATA_BASE/dashboard.db`. 101+ migrations in `server/db/migrations/`.
 - **MCP Server** — `server/mcp/` exposes an MCP-protocol action server (workspaces, insights, content, keywords, intelligence, job actions). Uses `mcpAuthMiddleware` + `handleMcpRequest`. New tool categories go in `server/mcp/tools/`.
-- **AI** — Unified dispatcher: `callAI()` in `server/ai.ts` routes to either provider — new code should use this. Direct helpers: OpenAI via `server/openai-helpers.ts` (`callOpenAI`), Anthropic via `server/anthropic-helpers.ts` (`callAnthropic`) for creative prose.
+- **AI** — Unified dispatcher: `callAI()` in `server/ai.ts` is the single entry point for all server-side AI calls (zero direct `callOpenAI`/`callAnthropic` callers as of 2026-05-27; ~50 `callAI()` sites). For creative prose with Claude-preferred + OpenAI fallback semantics, use `callCreativeAI()` in `server/content-posts-ai.ts` — itself a thin wrapper over `callAI({ provider: 'anthropic', ... })`. The provider-specific helpers (`server/openai-helpers.ts:callOpenAI`, `server/anthropic-helpers.ts:callAnthropic`) are implementation details consumed only by the dispatcher; new code must not import them directly.
 - **Auth** — Dual: internal JWT (7-day, admin) + client JWT (24h, per-workspace). Turnstile CAPTCHA optional.
 - **Payments** — Stripe Checkout (not Payment Intents). Config encrypted on disk (AES-256-GCM).
 - **Validation** — Zod v3 via `server/middleware/validate.ts`. Import as `import { validate, z } from '../middleware/validate.js'`.

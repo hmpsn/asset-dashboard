@@ -15,7 +15,7 @@ import { parseAIJson } from './openai-helpers.js';
 import { createLogger } from './logger.js';
 import { getWorkspace } from './workspaces.js';
 import { getQueryPageData } from './search-console.js';
-import { sanitizeQueryForPrompt } from './helpers.js';
+import { normalizePageUrl, sanitizeQueryForPrompt } from './helpers.js';
 import type { BlueprintEntry } from '../shared/types/page-strategy.js';
 import type { CopySection } from '../shared/types/copy-pipeline.js';
 const log = createLogger('copy-refresh');
@@ -58,29 +58,6 @@ export interface BatchRefreshResult {
 // ── URL normalization ──
 
 /**
- * Normalize a URL or path for comparison: strip protocol, host, trailing slashes,
- * lowercase, and return just the pathname.
- */
-function normalizePath(raw: string): string {
-  let path = raw.trim().toLowerCase();
-
-  // If it looks like a full URL, extract the pathname
-  try {
-    const url = new URL(path, 'https://placeholder.com');
-    path = url.pathname;
-  } catch (err) {
-    // Already a path segment — use as-is
-  }
-
-  // Strip trailing slash (but preserve root '/')
-  if (path.length > 1 && path.endsWith('/')) {
-    path = path.slice(0, -1);
-  }
-
-  return path;
-}
-
-/**
  * Convert an entry name to a slug for URL matching.
  * "About Us" → "about-us", "Our Services — Web Design" → "our-services-web-design"
  */
@@ -105,7 +82,7 @@ export function matchDecayToEntry(
   decayUrl: string,
 ): DecayEntryMatch | null {
   const blueprints = listBlueprints(workspaceId);
-  const normalizedDecay = normalizePath(decayUrl);
+  const normalizedDecay = normalizePageUrl(decayUrl).toLowerCase();
   // Extract the last path segment for slug matching
   const decaySegments = normalizedDecay.split('/').filter(Boolean);
   const decayLastSegment = decaySegments[decaySegments.length - 1] ?? '';

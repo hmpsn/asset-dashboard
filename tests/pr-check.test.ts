@@ -4011,6 +4011,140 @@ describe('Rule: Raw provider date passed to new Date()', () => {
   });
 });
 
+describe('Rule: Ad hoc domain normalization helper outside canonical authority', () => {
+  const RULE = 'Ad hoc domain normalization helper outside canonical authority';
+
+  it('flags cleanDomain helper implementations that do not delegate', () => {
+    const file = write(
+      uniqPath('rule-domain-normalization', 'server/some-route.ts'),
+      lines(
+        'function cleanDomain(value: string): string {',
+        "  return value.replace(/^https?:\\/\\//, '').replace(/^www\\./, '').toLowerCase();",
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('flags stripWww helper implementations that do not delegate', () => {
+    const file = write(
+      uniqPath('rule-domain-normalization', 'server/schema/something.ts'),
+      lines(
+        'function stripWww(hostname: string): string {',
+        "  return hostname.replace(/^www\\./i, '').toLowerCase();",
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('does not flag wrappers that delegate to canonical helpers', () => {
+    const file = write(
+      uniqPath('rule-domain-normalization', 'server/local-seo.ts'),
+      lines(
+        "import { normalizeDomainValue } from './domain-normalization.js';",
+        'export function cleanDomain(value: string): string | undefined {',
+        '  return normalizeDomainValue(value);',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag server/domain-normalization.ts', () => {
+    const file = write(
+      uniqPath('rule-domain-normalization', 'server/domain-normalization.ts'),
+      lines(
+        'export function normalizeDomainValue(value: string): string | undefined {',
+        '  return value || undefined;',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with // domain-normalization-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-domain-normalization', 'server/some-legacy.ts'),
+      lines(
+        '// domain-normalization-ok — legacy compatibility shim',
+        'function cleanDomain(value: string): string {',
+        "  return value.replace(/^https?:\\/\\//, '');",
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: Local page/path normalizer helper in consolidation hotspots', () => {
+  const RULE = 'Local page/path normalizer helper in consolidation hotspots';
+
+  it('flags local normalizePath helper in hotspot files', () => {
+    const file = write(
+      uniqPath('rule-page-normalizer-hotspot', 'server/audit-traffic.ts'),
+      lines(
+        'function normalizePath(value: string): string {',
+        "  return value.startsWith('/') ? value : `/${value}`;",
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('flags local normalizePagePath helper in hotspot files', () => {
+    const file = write(
+      uniqPath('rule-page-normalizer-hotspot', 'server/intelligence/page-assist-context-builder.ts'),
+      lines(
+        'function normalizePagePath(value: string): string {',
+        "  return value.startsWith('/') ? value : `/${value}`;",
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('does not flag hotspot file that only uses shared helpers', () => {
+    const file = write(
+      uniqPath('rule-page-normalizer-hotspot', 'server/copy-refresh.ts'),
+      lines(
+        "import { normalizePageUrl } from './helpers.js';",
+        "const v = normalizePageUrl('/services/seo');",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag non-hotspot files', () => {
+    const file = write(
+      uniqPath('rule-page-normalizer-hotspot', 'server/schema/classifier.ts'),
+      lines(
+        'function normalizePath(value: string): string {',
+        '  return value;',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with // page-normalizer-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-page-normalizer-hotspot', 'server/eeat-trust-signals.ts'),
+      lines(
+        '// page-normalizer-ok — intentional compatibility shim',
+        'function normalizePath(value: string): string {',
+        '  return value;',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
 describe('Rule: Bare slug used in pagePath construction — use resolvePagePath(page)', () => {
   const RULE = 'Bare slug used in pagePath construction — use resolvePagePath(page)';
 
@@ -4711,6 +4845,7 @@ describe('Meta: customCheck rule name registry', () => {
     'Global keydown missing isContentEditable guard',
     'Multi-step DB writes outside db.transaction()',
     'AI call before db.prepare without transaction guard',
+    'Ad hoc domain normalization helper outside canonical authority',
     'UPDATE/DELETE missing workspace_id scope',
     'getOrCreate* function returns nullable',
     'Hand-rolled card div (use SectionCard)',
@@ -4748,6 +4883,7 @@ describe('Meta: customCheck rule name registry', () => {
     // Keyword Command Center crash-hardening follow-up
     'Keyword Command Center summary/detail must not use full model',
     'Local SEO Evaluated candidates must be explicitly gated',
+    'Local page/path normalizer helper in consolidation hotspots',
     // P2 expansion rules
     'Admin route mutation without addActivity',
     'keyword-feedback route writes must use shared service',
