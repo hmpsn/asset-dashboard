@@ -316,7 +316,9 @@ export function ApprovalsTab({
                               <div key={item.id} className="px-5 py-3 ml-4 border-l-2 border-[var(--brand-border)]">
                                 <div className="flex flex-wrap items-center gap-2 mb-2">
                                   <span className="t-caption-sm font-medium text-[var(--brand-text-muted)]">{fieldLabel}</span>
-                                  <StatusBadge status={item.status || 'pending'} domain="approval" variant="outline" />
+                                  <span title={item.status === 'applied' ? 'Applied means this change is now live on your site.' : undefined}>
+                                    <StatusBadge status={item.status || 'pending'} domain="approval" variant="outline" />
+                                  </span>
                                   {isSchema && schemaTypes.length > 0 && schemaTypes.map(t => (
                                     <Badge key={t} label={t} tone="teal" variant="outline" />
                                   ))}

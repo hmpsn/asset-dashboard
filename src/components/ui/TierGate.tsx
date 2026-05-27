@@ -28,9 +28,21 @@ interface TierGateProps {
   compact?: boolean;
   roiValue?: number | null;
   onGateHit?: (feature: string, requiredTier: string) => void;
+  onLearnMore?: () => void;
 }
 
-export function TierGate({ tier, required, feature, teaser, children, className, compact, roiValue, onGateHit }: TierGateProps) {
+export function TierGate({
+  tier,
+  required,
+  feature,
+  teaser,
+  children,
+  className,
+  compact,
+  roiValue,
+  onGateHit,
+  onLearnMore,
+}: TierGateProps) {
   const hasAccess = TIER_LEVEL[tier] >= TIER_LEVEL[required];
 
   // Store callback in ref so callers don't need to memoize it
@@ -102,6 +114,10 @@ export function TierGate({ tier, required, feature, teaser, children, className,
           {/* CTA */}
           <button
             onClick={() => {
+              if (onLearnMore) {
+                onLearnMore();
+                return;
+              }
               // Dispatch a custom event so the parent can handle upgrade navigation
               window.dispatchEvent(new CustomEvent('tier-upgrade', { detail: { required, feature } }));
             }}

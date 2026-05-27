@@ -244,7 +244,7 @@
 - **Area:** Admin Tab UX / Empty States
 - **Files:** Various
 - **Issue:** `<LoadingState>` (correct), raw `<Loader2>` in flex div (incorrect), CSS border-animation spinners (incorrect), custom `<BriefSkeleton>` (not shared). Admin tabs have no consistent loading experience.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -272,7 +272,7 @@
   - `ROIDashboard` uses a hand-rolled `if (tier !== 'premium')` block instead of `<TierGate>` — no upgrade CTA
   - `PerformanceTab` has no tier gate at all — all trend charts visible at Free tier
   - `OnboardingWizard` shows locked features with no upgrade CTA within the wizard
-- [ ] Fixed
+- [x] Fixed
 
 ---
 

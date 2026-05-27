@@ -508,19 +508,22 @@ export function InboxTab({
               )}
 
               {/* Content pipeline */}
-              <ContentTab
-                contentRequests={contentRequests}
-                setContentRequests={setContentRequests}
-                effectiveTier={effectiveTier}
-                briefPrice={briefPrice}
-                fullPostPrice={fullPostPrice}
-                fmtPrice={fmtPrice}
-                setPricingModal={setPricingModal}
-                pricingConfirming={pricingConfirming}
-                workspaceId={workspaceId}
-                setToast={setToast}
-                hidePrices={hidePrices}
-              />
+              <div className="space-y-2">
+                <p className="t-caption-sm text-[var(--brand-text-muted)] uppercase font-semibold tracking-wider">Content Briefs &amp; Posts</p>
+                <ContentTab
+                  contentRequests={contentRequests}
+                  setContentRequests={setContentRequests}
+                  effectiveTier={effectiveTier}
+                  briefPrice={briefPrice}
+                  fullPostPrice={fullPostPrice}
+                  fmtPrice={fmtPrice}
+                  setPricingModal={setPricingModal}
+                  pricingConfirming={pricingConfirming}
+                  workspaceId={workspaceId}
+                  setToast={setToast}
+                  hidePrices={hidePrices}
+                />
+              </div>
             </section>
           )}
 
@@ -877,19 +880,22 @@ export function InboxTab({
                 </div>
               )}
 
-              <ContentTab
-                contentRequests={contentRequests}
-                setContentRequests={setContentRequests}
-                effectiveTier={effectiveTier}
-                briefPrice={briefPrice}
-                fullPostPrice={fullPostPrice}
-                fmtPrice={fmtPrice}
-                setPricingModal={setPricingModal}
-                pricingConfirming={pricingConfirming}
-                workspaceId={workspaceId}
-                setToast={setToast}
-                hidePrices={hidePrices}
-              />
+              <div className="space-y-2">
+                <p className="t-caption-sm text-[var(--brand-text-muted)] uppercase font-semibold tracking-wider">Content Briefs &amp; Posts</p>
+                <ContentTab
+                  contentRequests={contentRequests}
+                  setContentRequests={setContentRequests}
+                  effectiveTier={effectiveTier}
+                  briefPrice={briefPrice}
+                  fullPostPrice={fullPostPrice}
+                  fmtPrice={fmtPrice}
+                  setPricingModal={setPricingModal}
+                  pricingConfirming={pricingConfirming}
+                  workspaceId={workspaceId}
+                  setToast={setToast}
+                  hidePrices={hidePrices}
+                />
+              </div>
             </section>
           )}
 
