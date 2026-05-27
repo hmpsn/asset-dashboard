@@ -1,8 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **455 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **456 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 456. Schema Intelligence Phase B — Entity Resolution Slice Wiring
+
+**What it does:** Wires the new entity-resolution contract into the workspace intelligence assembly path without changing schema template output yet. `entityResolution` is now a first-class `IntelligenceSlice`, `server/workspace-intelligence.ts` can assemble it through `assembleEntityResolution()`, and `buildSchemaIntelligence()` can request/return it via `includeEntityResolution`. The initial assembler deterministically constructs typed Thing/Place candidates from workspace strategy keywords, page-level keyword focus, and business-profile location context.
+
+**Agency value:** Converts entity grounding from a “future doc idea” into executable platform plumbing, so later Wikidata disambiguation and template emission work has a stable, test-backed seam.
+
+**Client value:** Indirectly improves reliability for future schema authority features by ensuring candidate extraction and schema read wiring are centralized before rollout.
+
+**Mutual:** Reduces implementation risk for high-impact entity grounding by landing data contracts and orchestration in production before behavior-changing template updates.
 
 ---
 

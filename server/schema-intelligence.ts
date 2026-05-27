@@ -8,6 +8,7 @@ import type {
 } from '../shared/types/intelligence.js';
 import type { SiteInventorySlice } from '../shared/types/site-inventory.js';
 import type { PageElementCatalog } from '../shared/types/page-elements.js';
+import type { EntityResolutionSlice } from '../shared/types/entity-resolution.js';
 
 type SchemaWorkspace = ReturnType<typeof listWorkspaces>[number];
 
@@ -19,6 +20,7 @@ export interface SchemaIntelligenceOptions {
   includeSiteInventory?: boolean;
   includePageElements?: boolean;
   includeBacklinks?: boolean;
+  includeEntityResolution?: boolean;
 }
 
 export interface SchemaIntelligenceResult {
@@ -30,6 +32,7 @@ export interface SchemaIntelligenceResult {
   siteInventory: SiteInventorySlice | undefined;
   pageKeywords: { primary: string; secondary: string[] } | undefined;
   pageElements: PageElementCatalog | undefined;
+  entityResolution: EntityResolutionSlice | undefined;
 }
 
 function pageKeywordsFromSeoContext(
@@ -61,12 +64,14 @@ export async function buildSchemaIntelligence(
       siteInventory: undefined,
       pageKeywords: undefined,
       pageElements: undefined,
+      entityResolution: undefined,
     };
   }
 
   const slices: IntelligenceSlice[] = ['seoContext'];
   if (opts.includeSiteInventory && baseUrl) slices.push('siteInventory');
   if (opts.includePageElements && opts.pagePath) slices.push('pageElements');
+  if (opts.includeEntityResolution) slices.push('entityResolution');
 
   const intelligence = await buildWorkspaceIntelligence(workspace.id, {
     slices,
@@ -86,5 +91,6 @@ export async function buildSchemaIntelligence(
     siteInventory: intelligence.siteInventory,
     pageKeywords: pageKeywordsFromSeoContext(intelligence.seoContext),
     pageElements: intelligence.pageElements?.catalog,
+    entityResolution: intelligence.entityResolution,
   };
 }

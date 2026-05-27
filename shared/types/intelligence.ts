@@ -33,6 +33,7 @@ export const INTELLIGENCE_SLICES = [
   'pageElements',
   'siteInventory',
   'localSeo',
+  'entityResolution',
 ] as const;
 
 export type IntelligenceSlice = typeof INTELLIGENCE_SLICES[number];
