@@ -54,8 +54,7 @@ describe('html-analysis-utils', () => {
     });
     expect(links).toHaveLength(3);
     expect(links[0]).toEqual({ href: '/about', text: 'About', rel: 'nofollow' });
-    expect(links[1].href).toBe('/contact');
-    expect(links[1].text.length).toBeGreaterThan(0);
+    expect(links[1]).toEqual({ href: '/contact', text: 'Contact Us', rel: undefined });
     expect(links[2]).toEqual({ href: '/subscribe', text: '[form action]', rel: undefined });
   });
 

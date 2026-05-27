@@ -113,8 +113,7 @@ describe('link-checker extraction mode', () => {
 
     expect(links).toHaveLength(3);
     expect(links[0]).toEqual({ href: '/about', text: 'About' });
-    expect(links[1].href).toBe('/contact');
-    expect(links[1].text.length).toBeGreaterThan(0);
+    expect(links[1]).toEqual({ href: '/contact', text: 'Contact' });
     expect(links[2]).toEqual({ href: '/book-now', text: '[form action]' });
   });
 });

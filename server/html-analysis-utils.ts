@@ -63,6 +63,7 @@ export function extractLinks(html: string, opts: HtmlLinkExtractionOptions = {})
 
   const links: HtmlLink[] = [];
   const seen = dedupeByHref ? new Set<string>() : null;
+  const VOID_HTML_TAGS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr']);
 
   const addLink = (href: string, text: string, rel?: string) => {
     const trimmedHref = href.trim();
@@ -96,12 +97,37 @@ export function extractLinks(html: string, opts: HtmlLinkExtractionOptions = {})
   }
 
   if (includeOnclickUrls) {
+    const extractOnclickElementText = (onclickIndex: number): string => {
+      const openTagStart = html.lastIndexOf('<', onclickIndex);
+      if (openTagStart < 0) return onclickFallbackText;
+      const openTagEnd = html.indexOf('>', onclickIndex);
+      if (openTagEnd < 0) return onclickFallbackText;
+
+      const openTag = html.slice(openTagStart, openTagEnd + 1);
+      const tagNameMatch = openTag.match(/^<\s*([a-z0-9:-]+)/i);
+      if (!tagNameMatch) return onclickFallbackText;
+
+      const valueText = openTag.match(/\bvalue=["']([^"']*)["']/i)?.[1]?.trim();
+      if (valueText) return valueText;
+
+      const tagName = tagNameMatch[1].toLowerCase();
+      if (openTag.endsWith('/>') || VOID_HTML_TAGS.has(tagName)) return onclickFallbackText;
+
+      const closeTag = `</${tagName}>`;
+      const closeTagStart = html.indexOf(closeTag, openTagEnd + 1);
+      if (closeTagStart < 0) return onclickFallbackText;
+
+      const innerText = html
+        .slice(openTagEnd + 1, closeTagStart)
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      return innerText || onclickFallbackText;
+    };
+
     const onclickRegex = /onclick=["'][^"']*(?:window\.(?:location(?:\.href)?|open)\s*[=(]\s*['"])([^'"]+)['"]/gi;
     while ((match = onclickRegex.exec(html)) !== null) {
-      const pos = match.index;
-      const surrounding = html.slice(Math.max(0, pos - 200), pos + match[0].length + 200);
-      const textMatch = surrounding.match(/>([^<]{1,100})</);
-      addLink(match[1], textMatch ? textMatch[1].trim() : onclickFallbackText);
+      addLink(match[1], extractOnclickElementText(match.index));
     }
   }
 
