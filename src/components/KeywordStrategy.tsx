@@ -1,6 +1,7 @@
 import { useCallback, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { MetricsSource } from '../../shared/types/keywords.js';
+import type { AdminKeywordFeedbackListRow } from '../../shared/types/keyword-feedback';
 import {
   Loader2, Target, ChevronDown, ChevronRight, RefreshCw,
   Sparkles, Briefcase,
@@ -64,15 +65,6 @@ interface Props {
   siteId?: string;
 }
 
-interface KeywordFeedbackRow {
-  keyword: string;
-  status: 'approved' | 'declined' | 'requested';
-  reason?: string | null;
-  source?: string | null;
-  declined_by?: string | null;
-  updated_at?: string;
-}
-
 export function KeywordStrategyPanel({ workspaceId }: Props) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -124,7 +116,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   });
   const trackedKeywords = trackedKeywordsData ?? new Set<string>();
 
-  const { data: keywordFeedbackRows = [] } = useQuery<KeywordFeedbackRow[]>({
+  const { data: keywordFeedbackRows = [] } = useQuery<AdminKeywordFeedbackListRow[]>({
     queryKey: queryKeys.admin.keywordFeedback(workspaceId),
     queryFn: () => keywords.feedback(workspaceId),
     enabled: !!workspaceId,

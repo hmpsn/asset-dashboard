@@ -1,6 +1,7 @@
 // ── Miscellaneous API endpoints ────────────────────────────────────
 import { get, post, patch, del, getSafe, getOptional, getText, postForm } from './client';
 import type { ContentSubscription, ContentSubscriptionPlanConfig } from '../../shared/types/content';
+import type { KeywordFeedbackDeleteResponse, KeywordFeedbackListRow, KeywordFeedbackMutationResponse } from '../../shared/types/keyword-feedback';
 import type { TrackedKeyword } from '../../shared/types/rank-tracking';
 export {
   jobs,
@@ -275,13 +276,13 @@ export const auth = {
 // ── Public: keyword feedback ─────────────────────────────────
 export const keywordFeedback = {
   get: (wsId: string) =>
-    getSafe<unknown[]>(`/api/public/keyword-feedback/${wsId}`, []),
+    getSafe<KeywordFeedbackListRow[]>(`/api/public/keyword-feedback/${wsId}`, []),
 
   submit: (wsId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/public/keyword-feedback/${wsId}`, body),
+    post<KeywordFeedbackMutationResponse>(`/api/public/keyword-feedback/${wsId}`, body),
 
   remove: (wsId: string, keyword: string) =>
-    del<{ deleted: string; existed?: boolean }>(
+    del<KeywordFeedbackDeleteResponse>(
       `/api/public/keyword-feedback/${wsId}?keyword=${encodeURIComponent(keyword)}`,
     ),
 };
