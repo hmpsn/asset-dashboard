@@ -6,6 +6,7 @@ import { useAuditSchedule } from '../../hooks/admin';
 import type { AuditSchedule } from '../../hooks/admin/useAdminSeo';
 import { queryKeys } from '../../lib/queryKeys';
 import { FormSelect, Icon, SectionCard, Button } from '../ui';
+import { formatDate } from '../../utils/formatDates';
 
 interface ScheduledAuditSettingsProps {
   workspaceId: string;
@@ -53,7 +54,7 @@ export function ScheduledAuditSettings({ workspaceId }: ScheduledAuditSettingsPr
             <span className="t-caption-sm px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Active</span>
           )}
           {schedule?.lastRunAt && (
-            <span className="t-caption-sm text-[var(--brand-text-muted)]">Last: {new Date(schedule.lastRunAt).toLocaleDateString()}</span>
+            <span className="t-caption-sm text-[var(--brand-text-muted)]">Last: {formatDate(schedule.lastRunAt)}</span>
           )}
         </div>
         <Button

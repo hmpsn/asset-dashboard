@@ -13,6 +13,7 @@ import { RemediationPlan } from './RemediationPlan.js';
 import { EvidenceAccordion } from './EvidenceAccordion.js';
 import { useDiagnosticReport, useDiagnosticsList } from '../../../hooks/admin/useDiagnostics.js';
 import type { DiagnosticReport } from '../../../../shared/types/diagnostics.js';
+import { formatDate } from '../../../utils/formatDates.js';
 
 interface Props {
   workspaceId: string;
@@ -39,7 +40,7 @@ function ReportDetail({ report }: { report: DiagnosticReport }) {
     <div className="space-y-6">
       <PageHeader
         title={`Deep Diagnostic: ${report.affectedPages[0] ?? report.anomalyType}`}
-        subtitle={`Completed ${new Date(report.completedAt ?? report.createdAt).toLocaleDateString()}`}
+        subtitle={`Completed ${formatDate(report.completedAt ?? report.createdAt)}`}
         icon={<Activity className="w-5 h-5 text-accent-brand" />}
       />
 
@@ -176,7 +177,7 @@ function DiagnosticReportList({ workspaceId }: { workspaceId: string }) {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="t-ui text-[var(--brand-text-bright)]">{pageLabel(r.affectedPages, anomalyTypeLabel(r.anomalyType))}</h3>
-                <p className="t-caption-sm text-[var(--brand-text-muted)]">{anomalyTypeLabel(r.anomalyType)} - {new Date(r.createdAt).toLocaleDateString()}</p>
+                <p className="t-caption-sm text-[var(--brand-text-muted)]">{anomalyTypeLabel(r.anomalyType)} - {formatDate(r.createdAt)}</p>
               </div>
               <Badge
                 label={r.status}

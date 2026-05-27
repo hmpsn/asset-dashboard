@@ -7312,6 +7312,24 @@ export const CHECKS: Check[] = [
       return hits;
     },
   },
+
+  // ── Plan C C5: inline-toLocaleDateString (2026-05-27) ────────────────────
+  {
+    name: 'inline-toLocaleDateString',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    exclude: [
+      // Date utility is the implementation — bare toLocaleDateString is expected here
+      'src/utils/formatDates.ts',
+    ],
+    message: 'Use formatDate() / formatDateShort() / formatDateTime() from src/utils/formatDates.ts instead of inline new Date(...).toLocaleDateString(). Add a comment if a bespoke locale format is intentionally required.',
+    severity: 'warn',
+    rationale: 'Scattered toLocaleDateString() calls produce inconsistent date formatting and break in non-en-US locales. Shared helpers ensure uniform output.',
+    claudeMdRef: '#code-conventions',
+    // hatch: // format-date-inline-ok: <reason>
+    pattern: 'new Date\\([^)]*\\)\\.toLocaleDateString\\(\\)',
+    excludeLines: ['format-date-inline-ok'],
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

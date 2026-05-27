@@ -12,6 +12,7 @@ import {
   type ContentTopicRequest,
   type PostSummary,
 } from '../../../shared/types/content';
+import { formatDate } from '../../utils/formatDates';
 
 // Subset of PostSummary that RequestList needs. Pick keeps it in lock-step with the
 // canonical type — if PostSummary changes, TypeScript catches mismatches here.
@@ -142,7 +143,7 @@ export function RequestList({
                     <div className="t-caption-sm text-teal-400 mt-0.5">"{req.targetKeyword}"</div>
                     <div className="flex items-center gap-3 mt-1">
                       <span className="t-caption-sm text-[var(--brand-text-muted)] uppercase">{req.intent} · {req.priority}</span>
-                      <span className="t-caption-sm text-[var(--brand-text-muted)]">{new Date(req.requestedAt).toLocaleDateString()}</span>
+                      <span className="t-caption-sm text-[var(--brand-text-muted)]">{formatDate(req.requestedAt)}</span>
                       {req.comments && req.comments.length > 0 && <span className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text-muted)]"><Icon as={MessageSquare} size="sm" />{req.comments.length}</span>}
                     </div>
                   </div>

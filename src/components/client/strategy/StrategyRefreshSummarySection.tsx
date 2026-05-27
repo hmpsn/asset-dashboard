@@ -1,6 +1,7 @@
 import { RefreshCw } from 'lucide-react';
 import { Badge, Icon, SectionCard } from '../../ui';
 import type { KeywordStrategyRefreshSummary } from '../../../../shared/types/keyword-strategy-ux.js';
+import { formatDate } from '../../../utils/formatDates';
 
 interface StrategyRefreshSummarySectionProps {
   summary: KeywordStrategyRefreshSummary;
@@ -18,7 +19,7 @@ export function StrategyRefreshSummarySection({ summary }: StrategyRefreshSummar
       titleIcon={<Icon as={RefreshCw} size="md" className="text-accent-brand" />}
       titleExtra={summary.currentGeneratedAt ? (
         <span className="t-caption-sm text-[var(--brand-text-muted)]">
-          Refreshed {new Date(summary.currentGeneratedAt).toLocaleDateString()}
+          Refreshed {formatDate(summary.currentGeneratedAt)}
         </span>
       ) : undefined}
     >

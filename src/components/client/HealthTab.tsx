@@ -14,6 +14,7 @@ import {
   HealthTopFixesSection,
 } from './health-tab/HealthTabSections';
 import { useHealthTabShell } from './health-tab/useHealthTabShell';
+import { formatDate } from '../../utils/formatDates';
 
 const ScoreRing = MetricRing;
 
@@ -79,7 +80,7 @@ export function HealthTab({
             <div>
               <div className="t-ui font-medium text-[var(--brand-text-bright)]">Site Health Score</div>
               <div className="t-caption text-[var(--brand-text-muted)]">
-                {audit.totalPages} pages • {new Date(audit.createdAt).toLocaleDateString()}
+                {audit.totalPages} pages • {formatDate(audit.createdAt)}
               </div>
               <div className="flex gap-3 mt-2">
                 <span className="t-caption text-accent-danger">{audit.errors} errors</span>

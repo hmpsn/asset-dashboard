@@ -11,6 +11,7 @@ import { schemaPlan } from '../../api/schema';
 import type { SchemaSitePlan, SchemaPageRole } from '../../../shared/types/schema-plan';
 import { SCHEMA_ROLE_LABELS, SCHEMA_ROLE_INDEX, SCHEMA_ROLE_PRIMARY_TYPE, SCHEMA_ROLES_THAT_REFERENCE_CANONICAL_ENTITIES } from '../../../shared/types/schema-plan';
 import { Badge, FormSelect, Icon, cn, Button, StatusBadge, type BadgeTone } from '../ui';
+import { formatDate } from '../../utils/formatDates';
 
 interface Props {
   siteId: string;
@@ -490,9 +491,9 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
 
           {/* Metadata */}
           <div className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-3">
-            <span>Generated {new Date(plan.generatedAt).toLocaleDateString()}</span>
+            <span>Generated {formatDate(plan.generatedAt)}</span>
             {plan.updatedAt !== plan.generatedAt && (
-              <span>Updated {new Date(plan.updatedAt).toLocaleDateString()}</span>
+              <span>Updated {formatDate(plan.updatedAt)}</span>
             )}
           </div>
         </div>

@@ -174,7 +174,7 @@ describe('PageIntelligencePageList rendering', () => {
       />,
     );
 
-    expect(screen.getByText(/Analysis on file \(run 4\/3\/2026\)/i)).toBeTruthy();
+    expect(screen.getByText(/Analysis on file \(run Apr 3, 2026\)/i)).toBeTruthy();
   });
 
   it('delegates SEO copy generation and copy actions through the list boundary', () => {
