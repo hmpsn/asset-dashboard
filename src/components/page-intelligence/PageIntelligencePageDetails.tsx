@@ -33,7 +33,6 @@ interface Props {
   onOpenSeoEditor: (page: UnifiedPage) => void;
   onCreateBrief: (page: UnifiedPage, analysis?: KeywordData) => void;
   onAddSchema: (page: UnifiedPage) => void;
-  onViewFullAnalysis: () => void;
 }
 
 export function PageIntelligencePageDetails({
@@ -60,7 +59,6 @@ export function PageIntelligencePageDetails({
   onOpenSeoEditor,
   onCreateBrief,
   onAddSchema,
-  onViewFullAnalysis,
 }: Props) {
   const sp = page.strategy;
   const hasSchemaIssue =
@@ -139,7 +137,6 @@ export function PageIntelligencePageDetails({
         onOpenSeoEditor={onOpenSeoEditor}
         onCreateBrief={onCreateBrief}
         onAddSchema={onAddSchema}
-        onViewFullAnalysis={onViewFullAnalysis}
       />
     </div>
   );

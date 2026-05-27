@@ -30,7 +30,6 @@ interface Props {
   onOpenSeoEditor: (page: UnifiedPage) => void;
   onCreateBrief: (page: UnifiedPage, analysis?: KeywordData) => void;
   onAddSchema: (page: UnifiedPage) => void;
-  onViewFullAnalysis: () => void;
 }
 
 export function PageIntelligencePageList({
@@ -60,7 +59,6 @@ export function PageIntelligencePageList({
   onOpenSeoEditor,
   onCreateBrief,
   onAddSchema,
-  onViewFullAnalysis,
 }: Props) {
   return (
     // pr-check-disable-next-line -- brand asymmetric signature on page list outer card; intentional non-SectionCard chrome
@@ -93,7 +91,6 @@ export function PageIntelligencePageList({
           onOpenSeoEditor={onOpenSeoEditor}
           onCreateBrief={onCreateBrief}
           onAddSchema={onAddSchema}
-          onViewFullAnalysis={onViewFullAnalysis}
         />
       ))}
 
