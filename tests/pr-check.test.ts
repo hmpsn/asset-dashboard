@@ -4845,6 +4845,7 @@ describe('Meta: customCheck rule name registry', () => {
     'Global keydown missing isContentEditable guard',
     'Multi-step DB writes outside db.transaction()',
     'AI call before db.prepare without transaction guard',
+    'Ad hoc domain normalization helper outside canonical authority',
     'UPDATE/DELETE missing workspace_id scope',
     'getOrCreate* function returns nullable',
     'Hand-rolled card div (use SectionCard)',
@@ -4882,6 +4883,7 @@ describe('Meta: customCheck rule name registry', () => {
     // Keyword Command Center crash-hardening follow-up
     'Keyword Command Center summary/detail must not use full model',
     'Local SEO Evaluated candidates must be explicitly gated',
+    'Local page/path normalizer helper in consolidation hotspots',
     // P2 expansion rules
     'Admin route mutation without addActivity',
     'keyword-feedback route writes must use shared service',
