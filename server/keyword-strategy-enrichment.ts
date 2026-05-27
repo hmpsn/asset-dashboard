@@ -1,7 +1,7 @@
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { isProgrammingError } from './errors.js';
-import { normalizePath } from './helpers.js';
+import { normalizePageUrl } from './helpers.js';
 import { resolveWorkspaceLocationCode } from './local-seo.js';
 import { trendDirection, hasSerpOpportunity } from './seo-provider-signals.js';
 import type { SeoDataProvider, DomainKeyword } from './seo-data-provider.js';
@@ -138,7 +138,7 @@ export function _removePageCoveredContentGaps(
 export function _resolvePageUrl(baseUrl: string, pagePath: string): string | null {
   if (!baseUrl || !pagePath) return null;
   try {
-    return new URL(normalizePath(pagePath), baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`).toString();
+    return new URL(normalizePageUrl(pagePath), baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`).toString();
   } catch { // catch-ok: workspace URL/page path can be malformed; URL-level enrichment degrades safely.
     return null;
   }

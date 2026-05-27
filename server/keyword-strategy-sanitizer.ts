@@ -1,5 +1,5 @@
 import { createLogger } from './logger.js';
-import { normalizePath } from './helpers.js';
+import { normalizePageUrl } from './helpers.js';
 import type { KeywordEvaluationContext } from './keyword-intelligence/index.js';
 import { isStrategyPoolEligibleKeyword, normalizeKeyword } from './keyword-intelligence/index.js';
 import { isTopicKeywordCoveredByPageMap, type KeywordStrategyCannibalizationIssue, type KeywordStrategyTopicCluster } from './keyword-strategy-enrichment.js';
@@ -121,7 +121,7 @@ function sanitizePageMap(
   const seenPaths = new Set<string>();
 
   for (const page of pageMap) {
-    const normalizedPagePath = page.pagePath ? normalizePath(page.pagePath) : '';
+    const normalizedPagePath = page.pagePath ? normalizePageUrl(page.pagePath) : '';
     if (!normalizedPagePath || seenPaths.has(normalizedPagePath)) continue;
     seenPaths.add(normalizedPagePath);
 
@@ -238,9 +238,9 @@ function sanitizeQuickWins(
   pageMap: StrategyPageMapEntry[],
   result: SanitizeKeywordStrategyResult,
 ): StrategyOutput['quickWins'] {
-  const survivingPagePaths = new Set(pageMap.map(page => normalizePath(page.pagePath)));
+  const survivingPagePaths = new Set(pageMap.map(page => normalizePageUrl(page.pagePath)));
   return (quickWins ?? []).filter((quickWin) => {
-    if (survivingPagePaths.has(normalizePath(quickWin.pagePath))) return true;
+    if (survivingPagePaths.has(normalizePageUrl(quickWin.pagePath))) return true;
     result.removed.quickWins.push(quickWin.pagePath);
     return false;
   });

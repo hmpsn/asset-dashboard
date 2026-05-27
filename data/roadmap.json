@@ -1487,8 +1487,8 @@
           "source": "Platform health consolidation follow-up 2026-05-27",
           "est": "4-6h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "Consolidate remaining server-local page/path normalizers into the canonical page-address helpers (`normalizePageUrl`, `resolvePageAddress`, `resolvePagePath`, `findPageMapEntry*`) across audit traffic joins, E-E-A-T trust-signal matching, copy refresh URL/path matching, whole-site schema graph normalization, and page-assist context path resolution. Preserve analytics-intelligence absolute-URL dedupe semantics while routing through shared normalization authority."
+          "status": "done",
+          "notes": "Completed as full `normalizePath` sunset + page-address authority completion. Canonical cross-runtime implementations now live in `shared/page-address-utils.ts`; server/frontend facades route through shared authority; production `normalizePath` usage/export removed; remaining production call sites migrated to `normalizePageUrl` / `resolvePageAddress` / `resolvePagePath` / `tryResolvePagePath` / identity-match helpers. Added error-level pr-check guardrails blocking (1) retired `normalizePath` usage in production and (2) local `normalizePath`/`normalizePagePath` helper declarations outside tests, with fixture coverage."
         },
         {
           "id": "audit-drift-score-color-adoption-sweep",

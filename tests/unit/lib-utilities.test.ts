@@ -188,14 +188,14 @@ describe('decision-adapters — normalizeApprovalBatch summary', () => {
 // src/lib/pathUtils.ts — additional edge cases
 // ════════════════════════════════════════════════════════════════════════════
 import {
-  normalizePath,
-  matchPagePath,
   normalizePageUrl,
+  matchPagePath,
   findPageMapEntry,
   findPageMapEntryBySlug,
   resolvePageAddress,
   tryResolvePagePath,
 } from '../../src/lib/pathUtils';
+const normalizePath = normalizePageUrl;
 
 describe('pathUtils — normalizePath edge cases', () => {
   it('double leading slashes are preserved (only trailing slash stripped)', () => {

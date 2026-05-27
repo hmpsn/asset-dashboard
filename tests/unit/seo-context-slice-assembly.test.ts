@@ -73,7 +73,7 @@ vi.mock('../../server/intelligence/seo-context-source.js', () => ({
 const mockFindPageMapEntry = vi.fn(() => undefined as PageKeywordMap | undefined);
 vi.mock('../../server/helpers.js', () => ({
   findPageMapEntry: (...args: unknown[]) => mockFindPageMapEntry(...args),
-  normalizePath: (p: string) => p,
+  normalizePageUrl: (p: string) => p,
 }));
 
 vi.mock('../../server/social-profiles.js', () => ({

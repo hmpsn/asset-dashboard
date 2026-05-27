@@ -4079,12 +4079,76 @@ describe('Rule: Ad hoc domain normalization helper outside canonical authority',
   });
 });
 
-describe('Rule: Local page/path normalizer helper in consolidation hotspots', () => {
-  const RULE = 'Local page/path normalizer helper in consolidation hotspots';
+describe('Rule: Retired normalizePath usage in production code', () => {
+  const RULE = 'Retired normalizePath usage in production code';
 
-  it('flags local normalizePath helper in hotspot files', () => {
+  it('flags normalizePath import from shared helpers', () => {
     const file = write(
-      uniqPath('rule-page-normalizer-hotspot', 'server/audit-traffic.ts'),
+      uniqPath('rule-retired-normalize-path', 'server/some-module.ts'),
+      lines(
+        "import { normalizePath, normalizePageUrl } from './helpers.js';",
+        "const p = normalizePageUrl('/ok');",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('flags normalizePath call sites in production files', () => {
+    const file = write(
+      uniqPath('rule-retired-normalize-path', 'src/hooks/useSomething.ts'),
+      lines(
+        'export function x(input: string) {',
+        '  return normalizePath(input);',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('does not flag canonical normalizePageUrl usage', () => {
+    const file = write(
+      uniqPath('rule-retired-normalize-path', 'server/safe-module.ts'),
+      lines(
+        "import { normalizePageUrl } from './helpers.js';",
+        "const p = normalizePageUrl('/services/seo');",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag test fixtures', () => {
+    const file = write(
+      uniqPath('rule-retired-normalize-path', 'tests/unit/something.test.ts'),
+      lines(
+        'const normalizePath = (v: string) => v;',
+        "expect(normalizePath('/a')).toBe('/a');",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with // normalize-path-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-retired-normalize-path', 'server/legacy-shim.ts'),
+      lines(
+        '// normalize-path-ok — temporary compat shim',
+        'const p = normalizePath(value);',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: Local page/path normalizer helper outside tests', () => {
+  const RULE = 'Local page/path normalizer helper outside tests';
+
+  it('flags local normalizePath helper declarations in production files', () => {
+    const file = write(
+      uniqPath('rule-page-normalizer-broad', 'server/audit-traffic.ts'),
       lines(
         'function normalizePath(value: string): string {',
         "  return value.startsWith('/') ? value : `/${value}`;",
@@ -4096,32 +4160,21 @@ describe('Rule: Local page/path normalizer helper in consolidation hotspots', ()
     expect(hits[0].line).toBe(1);
   });
 
-  it('flags local normalizePagePath helper in hotspot files', () => {
+  it('flags local normalizePagePath helper declarations in production files', () => {
     const file = write(
-      uniqPath('rule-page-normalizer-hotspot', 'server/intelligence/page-assist-context-builder.ts'),
+      uniqPath('rule-page-normalizer-broad', 'src/lib/something.ts'),
       lines(
-        'function normalizePagePath(value: string): string {',
+        'const normalizePagePath = (value: string): string => {',
         "  return value.startsWith('/') ? value : `/${value}`;",
-        '}',
+        '};',
       )
     );
     expect(runRule(RULE, [file])).toHaveLength(1);
   });
 
-  it('does not flag hotspot file that only uses shared helpers', () => {
+  it('does not flag tests that define local helpers', () => {
     const file = write(
-      uniqPath('rule-page-normalizer-hotspot', 'server/copy-refresh.ts'),
-      lines(
-        "import { normalizePageUrl } from './helpers.js';",
-        "const v = normalizePageUrl('/services/seo');",
-      )
-    );
-    expect(runRule(RULE, [file])).toHaveLength(0);
-  });
-
-  it('does not flag non-hotspot files', () => {
-    const file = write(
-      uniqPath('rule-page-normalizer-hotspot', 'server/schema/classifier.ts'),
+      uniqPath('rule-page-normalizer-broad', 'tests/unit/path-helper.test.ts'),
       lines(
         'function normalizePath(value: string): string {',
         '  return value;',
@@ -4131,11 +4184,11 @@ describe('Rule: Local page/path normalizer helper in consolidation hotspots', ()
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
-  it('suppresses with // page-normalizer-ok hatch', () => {
+  it('suppresses with // page-path-normalizer-ok hatch', () => {
     const file = write(
-      uniqPath('rule-page-normalizer-hotspot', 'server/eeat-trust-signals.ts'),
+      uniqPath('rule-page-normalizer-broad', 'server/legacy.ts'),
       lines(
-        '// page-normalizer-ok — intentional compatibility shim',
+        '// page-path-normalizer-ok — intentional compatibility wrapper',
         'function normalizePath(value: string): string {',
         '  return value;',
         '}',
@@ -4883,7 +4936,8 @@ describe('Meta: customCheck rule name registry', () => {
     // Keyword Command Center crash-hardening follow-up
     'Keyword Command Center summary/detail must not use full model',
     'Local SEO Evaluated candidates must be explicitly gated',
-    'Local page/path normalizer helper in consolidation hotspots',
+    'Retired normalizePath usage in production code',
+    'Local page/path normalizer helper outside tests',
     // P2 expansion rules
     'Admin route mutation without addActivity',
     'keyword-feedback route writes must use shared service',

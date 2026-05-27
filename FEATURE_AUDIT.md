@@ -6733,3 +6733,22 @@ Service and location page brief defaults are now shorter and more conversion-den
 **Client value:** Improves output specificity and credibility. Content and schema recommendations can reference real available proof, making deliverables more actionable and better aligned with E-E-A-T expectations.
 
 **Files:** `shared/types/eeat-assets.ts`; `server/db/migrations/105-eeat-assets.sql`; `server/schemas/eeat-assets.ts`; `server/eeat-assets.ts`; `server/routes/eeat-assets.ts`; `server/ws-events.ts`; `src/lib/wsEvents.ts`; `shared/types/intelligence.ts`; `server/intelligence/eeat-assets-slice.ts`; `server/workspace-intelligence.ts`; `server/intelligence/formatters.ts`; `server/intelligence/generation-context-builders.ts`; `server/eeat-trust-signals.ts`; `server/page-keywords.ts`; `server/page-analysis-job.ts`; `server/routes/webflow-keywords.ts`; `server/schemas/page-analysis.ts`; `server/schemas/workspace-schemas.ts`; `src/api/eeatAssets.ts`; `src/hooks/admin/useEeatAssets.ts`; `src/components/settings/EeatAssetsTab.tsx`; `src/components/WorkspaceSettings.tsx`; `src/hooks/useWsInvalidation.ts`; `src/components/page-intelligence/pageIntelligenceTypes.ts`; `src/components/page-intelligence/pageIntelligenceData.ts`; `src/components/page-intelligence/PageIntelligenceAnalysisSection.tsx`; `src/components/page-intelligence/usePageIntelligenceAnalysis.ts`; `server/schema-intelligence.ts`; `server/helpers.ts`; `server/schema-suggester.ts`; `server/schema/data-sources.ts`; `server/schema/templates/article.ts`; `docs/rules/eeat-asset-library.md`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+## Full `normalizePath` Sunset + Page-Address Authority Completion
+
+**Status:** Shipped 2026-05-27
+**Roadmap:** `audit-drift-page-path-address-helper-consolidation`
+
+**What it does:** Completes the one-shot retirement of `normalizePath` as a production primitive and converges server + frontend onto one shared page-address authority.
+
+- Added `shared/page-address-utils.ts` as the cross-runtime canonical implementation for `normalizePageUrl`, `resolvePageAddress`, `resolvePagePath`, `tryResolvePagePath`, `matchPageIdentity`, `matchPagePath`, and `findPageMapEntry*`.
+- Migrated `server/helpers.ts` and `src/lib/pathUtils.ts` to delegate to that shared authority and removed public `normalizePath` exports from both facades.
+- Migrated remaining production call sites to canonical APIs (string boundaries via `normalizePageUrl`; object boundaries via `resolvePageAddress` / `resolvePagePath` / `tryResolvePagePath`), including schema classifier path prep and multiple keyword-strategy/SEO matching paths.
+- Added error-level anti-drift guardrails:
+  - `Retired normalizePath usage in production code`
+  - `Local page/path normalizer helper outside tests`
+  with fixture coverage in `tests/pr-check.test.ts`.
+
+**Behavior contract:** Path semantics are preserved (leading slash enforcement, trailing slash normalization, URL pathname extraction). No HTTP endpoint, auth, or wire-shape changes.
+
+**Files:** `shared/page-address-utils.ts`; `server/helpers.ts`; `src/lib/pathUtils.ts`; `server/admin-chat-context.ts`; `server/page-keywords.ts`; `server/keyword-strategy-sanitizer.ts`; `server/keyword-strategy-ai-synthesis.ts`; `server/keyword-strategy-enrichment.ts`; `server/keyword-strategy-generation.ts`; `server/keyword-strategy-persistence.ts`; `server/seo-change-tracker.ts`; `server/schema/classifier.ts`; `src/hooks/admin/usePageJoin.ts`; `scripts/pr-check.ts`; `tests/pr-check.test.ts`; `tests/unit/helpers-page-address.test.ts`; `tests/unit/pathUtils-pure.test.ts`; `tests/unit/page-address-helpers-pure.test.ts`; `tests/unit/seo-context-builder-pure.test.ts`; `tests/unit/seo-audit-site-checks-pure.test.ts`; `tests/unit/src-lib-utils-pure.test.ts`; `tests/unit/lib-utilities.test.ts`; `tests/unit/seo-context-slice-assembly.test.ts`; `tests/unit/keyword-strategy-persistence.test.ts`; `docs/rules/verified-clean-rules.md`; `FEATURE_AUDIT.md`; `data/roadmap.json`.

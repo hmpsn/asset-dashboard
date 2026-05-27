@@ -27,7 +27,7 @@ import type { DeadLink } from './link-checker.js';
 import { getSearchOverview, getSearchDeviceBreakdown, getSearchCountryBreakdown, getSearchPeriodComparison } from './search-console.js';
 import { getGA4Overview, getGA4TopPages, getGA4TopSources, getGA4OrganicOverview, getGA4NewVsReturning, getGA4Conversions, getGA4LandingPages, getGA4PeriodComparison } from './google-analytics.js';
 import { isGlobalConnected } from './google-auth.js';
-import { applySuppressionsToAudit, findPageMapEntryByIdentity, getAuditTrafficForWorkspace, resolvePagePath, normalizePageUrl, normalizePath } from './helpers.js';
+import { applySuppressionsToAudit, findPageMapEntryByIdentity, getAuditTrafficForWorkspace, resolvePagePath, normalizePageUrl } from './helpers.js';
 import { RICH_BLOCKS_PROMPT } from './prompt-rich-blocks.js';
 import { scrapeUrl } from './web-scraper.js';
 import { createLogger } from './logger.js';
@@ -590,7 +590,7 @@ export async function assembleAdminContext(
           if (pageContext) {
             const targetSlug = normalizePageUrl(pageContext.url);
             const pageAudit = pages?.find((p) => {
-              const pSlug = p.url ? normalizePageUrl(p.url) : normalizePath(resolvePagePath(p));
+              const pSlug = p.url ? normalizePageUrl(p.url) : normalizePageUrl(resolvePagePath(p));
               return pSlug.toLowerCase() === targetSlug.toLowerCase();
             });
             if (pageAudit) {

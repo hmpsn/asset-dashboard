@@ -3816,40 +3816,78 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // ── Local page/path mini-normalizers in consolidation hotspots ──
+    // ── normalizePath production usage reintroduction ──
     //
-    // These modules should use canonical Page Address helpers from
-    // server/helpers.ts (normalizePageUrl / resolvePagePath / resolvePageAddress)
-    // instead of local normalizePath/normalizePagePath implementations.
-    name: 'Local page/path normalizer helper in consolidation hotspots',
+    // `normalizePath` is a retired primitive. Production server/frontend code
+    // must use canonical page-address helpers (`normalizePageUrl`,
+    // `resolvePageAddress`, `resolvePagePath`, `tryResolvePagePath`,
+    // `matchPageIdentity`, `matchPagePath`) instead.
+    name: 'Retired normalizePath usage in production code',
     pattern: '',
-    fileGlobs: ['*.ts'],
-    pathFilter: 'server/',
+    fileGlobs: ['*.ts', '*.tsx'],
     message:
-      'Use canonical Page Address helpers from server/helpers.ts instead of local normalizePath/normalizePagePath helpers in consolidation hotspots. ' +
-      'Add // page-normalizer-ok only for documented exceptions.',
-    severity: 'warn',
+      'normalizePath is retired. Use canonical page-address helpers (normalizePageUrl / resolvePageAddress / resolvePagePath / tryResolvePagePath / matchPageIdentity / matchPagePath). ' +
+      'Add // normalize-path-ok only for rare compatibility shims.',
+    severity: 'error',
     rationale:
-      'Prevents reintroduction of drift-prone local path normalizers in page identity joins and read paths.',
+      'Prevents reintroduction of legacy normalizePath calls/imports that bypass shared page-address authority.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
-      const hotspotFiles = [
-        'server/audit-traffic.ts',
-        'server/eeat-trust-signals.ts',
-        'server/copy-refresh.ts',
-        'server/intelligence/page-assist-context-builder.ts',
-        'server/schema/whole-site-graph-validator.ts',
-      ];
-      const helperRe = /^\s*function\s+normalize(?:Page)?Path\s*\(/;
+      const helperDefRe =
+        /^\s*(?:export\s+)?(?:async\s+)?function\s+(?:normalizePath|normalizePagePath)\s*\(|^\s*(?:export\s+)?(?:const|let|var)\s+(?:normalizePath|normalizePagePath)\s*[:=]/;
+      const importOrExportRe = /\b(?:import|export)\s*{[^}]*\bnormalizePath\b[^}]*}\s*from\b/;
+      const callRe = /\bnormalizePath\s*\(/;
       for (const file of files) {
-        if (!hotspotFiles.some(hotspot => file.endsWith(hotspot))) continue;
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        if (!file.includes('/server/') && !file.includes('/src/')) continue;
+        if (file.includes('/tests/')) continue;
         const content = readFileOrEmpty(file);
         if (!content) continue;
         const lines = content.split('\n');
         for (let i = 0; i < lines.length; i++) {
-          if (!helperRe.test(lines[i])) continue;
-          if (hasHatch(lines, i, '// page-normalizer-ok')) continue;
+          const line = lines[i];
+          if (!line.includes('normalizePath')) continue;
+          if (line.trimStart().startsWith('//')) continue;
+          if (hasHatch(lines, i, '// normalize-path-ok')) continue;
+          if (helperDefRe.test(line)) continue;
+          if (importOrExportRe.test(line) || callRe.test(line)) {
+            hits.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // ── Local page/path mini-normalizers outside canonical authority ──
+    //
+    // Production code should not declare local normalizePath/normalizePagePath
+    // helpers. Use shared page-address helpers instead.
+    name: 'Local page/path normalizer helper outside tests',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    message:
+      'Do not declare local normalizePath/normalizePagePath helpers in production code. Use canonical page-address helpers. ' +
+      'Add // page-path-normalizer-ok only for explicit, documented compatibility wrappers.',
+    severity: 'error',
+    rationale:
+      'Prevents drift from duplicated mini-normalizers by enforcing one shared page-address authority across production modules.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const helperDefRe =
+        /^\s*(?:export\s+)?(?:async\s+)?function\s+(?:normalizePath|normalizePagePath)\s*\(|^\s*(?:export\s+)?(?:const|let|var)\s+(?:normalizePath|normalizePagePath)\s*[:=]/;
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        if (!file.includes('/server/') && !file.includes('/src/')) continue;
+        if (file.includes('/tests/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!helperDefRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// page-path-normalizer-ok') || hasHatch(lines, i, '// page-normalizer-ok')) continue;
           hits.push({ file, line: i + 1, text: lines[i].trim() });
         }
       }

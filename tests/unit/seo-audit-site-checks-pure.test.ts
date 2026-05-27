@@ -23,7 +23,8 @@
 import { describe, it, expect } from 'vitest';
 import { computePageScore, CRITICAL_CHECKS, MODERATE_CHECKS } from '../../shared/scoring.js';
 import { isContentPage, CHECK_CATEGORY } from '../../server/audit-page.js';
-import { decodeEntities, normalizePath, matchPagePath } from '../../server/helpers.js';
+import { decodeEntities, normalizePageUrl, matchPagePath } from '../../server/helpers.js';
+const normalizePath = normalizePageUrl;
 import {
   extractTag,
   extractMetaContent,

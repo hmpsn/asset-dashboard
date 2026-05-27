@@ -9,7 +9,7 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { getValidToken } from './google-auth.js';
 import { createLogger } from './logger.js';
-import { normalizePath } from './helpers.js';
+import { normalizePageUrl } from './helpers.js';
 
 const log = createLogger('seo-change-tracker');
 
@@ -198,9 +198,9 @@ function fmt(d: Date): string {
 }
 
 function matchPage(gscUrl: string, slug: string): boolean {
-  const normalizedSlug = normalizePath(slug).toLowerCase();
+  const normalizedSlug = normalizePageUrl(slug).toLowerCase();
   try {
-    const pathname = normalizePath(new URL(gscUrl).pathname).toLowerCase();
+    const pathname = normalizePageUrl(new URL(gscUrl).pathname).toLowerCase();
     return pathname === normalizedSlug;
   } catch { // catch-ok — malformed URL fallback
     const gscLower = gscUrl.toLowerCase();
