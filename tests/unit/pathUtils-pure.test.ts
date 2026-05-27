@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-  normalizePath,
   matchPagePath,
   normalizePageUrl,
   matchPageIdentity,
@@ -12,6 +11,7 @@ import {
   findPageMapEntryBySlug,
   tryResolvePagePath,
 } from '../../src/lib/pathUtils.js';
+const normalizePath = normalizePageUrl;
 
 // ── normalizePath ─────────────────────────────────────────────────────────────
 

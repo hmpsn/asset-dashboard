@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  normalizePath,
+  normalizePageUrl,
   matchPagePath,
   findPageMapEntry,
   findPageMapEntryForPage,
@@ -15,6 +15,7 @@ import {
   toInsightPageId,
   toAuditFindingPageId,
 } from '../../server/helpers.js';
+const normalizePath = normalizePageUrl;
 
 // ── normalizePath ──
 

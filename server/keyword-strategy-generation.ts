@@ -25,7 +25,7 @@ import { listQuickWins } from './quick-wins.js';
 import { listKeywordGaps } from './keyword-gaps.js';
 import { listTopicClusters } from './topic-clusters.js';
 import { listCannibalizationIssues } from './cannibalization-issues.js';
-import { normalizePath } from './helpers.js';
+import { normalizePageUrl } from './helpers.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 
 // Re-exported for backward compatibility with existing callers.
@@ -418,9 +418,9 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
     });
 
     if (strategyMode === 'incremental') {
-      const finalPagePaths = new Set((strategy.pageMap ?? []).map(page => normalizePath(page.pagePath)));
+      const finalPagePaths = new Set((strategy.pageMap ?? []).map(page => normalizePageUrl(page.pagePath)));
       for (const page of pagesToAnalyze) {
-        const pagePath = normalizePath(page.path);
+        const pagePath = normalizePageUrl(page.path);
         if (!finalPagePaths.has(pagePath)) {
           sanitizedRemovedPagePaths.add(page.path);
         }

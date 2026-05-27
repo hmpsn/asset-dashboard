@@ -12,7 +12,7 @@ import { get } from '../../api/client';
 import { useKeywordStrategy } from './useKeywordStrategy';
 import {
   findPageMapEntryForPage,
-  normalizePath,
+  normalizePageUrl,
   resolvePagePath,
 } from '../../lib/pathUtils';
 import { queryKeys } from '../../lib/queryKeys';
@@ -70,7 +70,7 @@ export function usePageJoin(
     for (const page of webflowPages) {
       const strategyEntry = findPageMapEntryForPage(pageMap, page);
       if (strategyEntry) {
-        matchedStrategyPaths.add(normalizePath(strategyEntry.pagePath).toLowerCase());
+        matchedStrategyPaths.add(normalizePageUrl(strategyEntry.pagePath).toLowerCase());
       }
 
       const path = resolvePagePath(page);
@@ -90,11 +90,11 @@ export function usePageJoin(
 
     // Pass 2: emit strategy-only entries (pageMap entries not matched to a Webflow page)
     const resultPaths = new Set(
-      results.map(r => normalizePath(r.path).toLowerCase()),
+      results.map(r => normalizePageUrl(r.path).toLowerCase()),
     );
 
     for (const sp of pageMap) {
-      const norm = normalizePath(sp.pagePath).toLowerCase();
+      const norm = normalizePageUrl(sp.pagePath).toLowerCase();
       if (matchedStrategyPaths.has(norm) || resultPaths.has(norm)) {
         // Already matched to a Webflow page — skip
         continue;
@@ -102,7 +102,7 @@ export function usePageJoin(
       resultPaths.add(norm);
 
       results.push({
-        id: `strategy-${normalizePath(sp.pagePath).toLowerCase()}`,
+        id: `strategy-${normalizePageUrl(sp.pagePath).toLowerCase()}`,
         title: sp.pageTitle,
         path: sp.pagePath,
         slug: sp.pagePath.replace(/^\//, ''),

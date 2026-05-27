@@ -26,12 +26,11 @@ import { describe, it, expect } from 'vitest';
 
 import {
   decodeEntities,
-  normalizePath,
+  normalizePageUrl,
   matchPagePath,
   findPageMapEntry,
   matchGscUrlToPath,
   applyBulkKeywordGuards,
-  normalizePageUrl,
   matchPageIdentity,
   sanitizeString,
   sanitizeErrorMessage,
@@ -42,6 +41,7 @@ import {
   resolvePagePath,
   tryResolvePagePath,
 } from '../../server/helpers.js';
+const normalizePath = normalizePageUrl;
 
 // ── decodeEntities ────────────────────────────────────────────────────────────
 

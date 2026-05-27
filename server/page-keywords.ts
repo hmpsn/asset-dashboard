@@ -14,7 +14,7 @@ import {
   EEAT_RECOMMENDATION_SURFACE,
   TRUST_SIGNAL_SEVERITY,
 } from '../shared/types/eeat-assets.js';
-import { normalizePath } from './helpers.js';
+import { normalizePageUrl } from './helpers.js';
 import { createLogger } from './logger.js';
 import { parseJsonSafeArray, parseJsonFallback } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
@@ -201,7 +201,7 @@ function rowToModel(r: PageKeywordRow, optimizationScoreHistory: PageOptimizatio
 function modelToParams(workspaceId: string, m: PageKeywordMap, preserveAnalysisFields = false) {
   return {
     workspace_id: workspaceId,
-    page_path: normalizePath(m.pagePath),
+    page_path: normalizePageUrl(m.pagePath),
     page_title: m.pageTitle || '',
     primary_keyword: m.primaryKeyword || '',
     secondary_keywords: JSON.stringify(m.secondaryKeywords || []),
@@ -413,7 +413,7 @@ function groupScoreHistory(workspaceId: string): Map<string, PageOptimizationSco
   const rows = stmts().scoreHistoryByWs.all(workspaceId, SCORE_HISTORY_PER_PAGE_LIMIT) as PageKeywordScoreHistoryRow[];
   const grouped = new Map<string, PageOptimizationScoreSnapshot[]>();
   for (const row of rows) {
-    const key = normalizePath(row.page_path).toLowerCase();
+    const key = normalizePageUrl(row.page_path).toLowerCase();
     const existing = grouped.get(key) ?? [];
     existing.push(rowToScoreHistory(row));
     grouped.set(key, existing);
@@ -423,7 +423,7 @@ function groupScoreHistory(workspaceId: string): Map<string, PageOptimizationSco
 
 function maybeRecordScoreSnapshot(workspaceId: string, entry: PageKeywordMap): void {
   if (entry.optimizationScore == null) return;
-  const pagePath = normalizePath(entry.pagePath);
+  const pagePath = normalizePageUrl(entry.pagePath);
   const roundedScore = Math.round(entry.optimizationScore);
   const latest = stmts().latestScoreHistory.get(workspaceId, pagePath) as PageKeywordScoreHistoryRow | undefined;
   if (latest?.optimization_score === roundedScore) return;
@@ -443,7 +443,7 @@ function normalizedKeyword(value: string | undefined | null): string {
 }
 
 function preparePrimaryKeywordUpdate(workspaceId: string, entry: PageKeywordMap): boolean {
-  const pagePath = normalizePath(entry.pagePath);
+  const pagePath = normalizePageUrl(entry.pagePath);
   const existing = stmts().getOne.get(workspaceId, pagePath) as PageKeywordRow | undefined;
   if (!existing) return false;
   const preserveAnalysisFields = normalizedKeyword(existing.primary_keyword) === normalizedKeyword(entry.primaryKeyword);
@@ -456,7 +456,7 @@ function preparePrimaryKeywordUpdate(workspaceId: string, entry: PageKeywordMap)
 export function listPageKeywords(workspaceId: string): PageKeywordMap[] {
   const rows = stmts().listByWs.all(workspaceId) as PageKeywordRow[];
   const histories = groupScoreHistory(workspaceId);
-  return rows.map(row => rowToModel(row, histories.get(normalizePath(row.page_path).toLowerCase()) ?? []));
+  return rows.map(row => rowToModel(row, histories.get(normalizePageUrl(row.page_path).toLowerCase()) ?? []));
 }
 
 function rowToLiteModel(row: PageKeywordLiteRow): PageKeywordMap {
@@ -485,7 +485,7 @@ export function listPageKeywordsLite(workspaceId: string): PageKeywordMap[] {
 
 /** Get a single page's keywords by path (normalized). */
 export function getPageKeyword(workspaceId: string, pagePath: string): PageKeywordMap | undefined {
-  const normalized = normalizePath(pagePath);
+  const normalized = normalizePageUrl(pagePath);
   const row = stmts().getOne.get(workspaceId, normalized) as PageKeywordRow | undefined;
   const historyRows = stmts().scoreHistoryByPage.all(workspaceId, normalized, SCORE_HISTORY_PER_PAGE_LIMIT) as PageKeywordScoreHistoryRow[];
   return row ? rowToModel(row, historyRows.map(rowToScoreHistory)) : undefined;
@@ -533,7 +533,7 @@ export function upsertAndCleanPageKeywords(workspaceId: string, entries: PageKey
       stmts().deleteAllScoreHistory.run(workspaceId);
       return;
     }
-    const normalizedPaths = entries.map(e => normalizePath(e.pagePath));
+    const normalizedPaths = entries.map(e => normalizePageUrl(e.pagePath));
     const placeholders = normalizedPaths.map(() => '?').join(', ');
     db.prepare(
       `DELETE FROM page_keywords WHERE workspace_id = ? AND page_path NOT IN (${placeholders})`
@@ -562,7 +562,7 @@ export function replaceAllPageKeywords(workspaceId: string, entries: PageKeyword
 /** Delete a single page keyword entry. */
 export function deletePageKeyword(workspaceId: string, pagePath: string): void {
   const run = db.transaction(() => {
-    const normalized = normalizePath(pagePath);
+  const normalized = normalizePageUrl(pagePath);
     stmts().deleteOne.run(workspaceId, normalized);
     stmts().deleteScoreHistory.run(workspaceId, normalized);
   });
