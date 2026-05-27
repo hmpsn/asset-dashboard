@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import { pageWeight as pageWeightApi } from '../api/seo';
 import { EmptyState, Icon, Button, ClickableRow, FormInput, FormSelect } from './ui';
+import { formatBytes } from '../utils/formatNumbers';
 
 interface PageAsset {
   id: string;
@@ -28,12 +29,6 @@ interface PageWeightResult {
 interface Props {
   siteId: string;
   workspaceId?: string;
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function getSizeColor(bytes: number): string {
@@ -164,7 +159,7 @@ function PageWeight({ siteId, workspaceId }: Props) {
           <div className="text-xs text-[var(--brand-text-muted)] mt-1">Pages with Assets</div>
         </div>
         <div className="bg-[var(--surface-2)] p-5 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
-          <div className="text-3xl font-bold text-[var(--brand-text-bright)]">{formatSize(data.totalAssetSize)}</div>
+          <div className="text-3xl font-bold text-[var(--brand-text-bright)]">{formatBytes(data.totalAssetSize)}</div>
           <div className="text-xs text-[var(--brand-text-muted)] mt-1">Total Asset Size</div>
         </div>
         <div className="bg-[var(--surface-2)] p-5 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
@@ -173,7 +168,7 @@ function PageWeight({ siteId, workspaceId }: Props) {
         </div>
         <div className="bg-[var(--surface-2)] p-5 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
           <div className="text-3xl font-bold text-[var(--brand-text-bright)]">
-            {data.pages.length > 0 ? formatSize(Math.round(data.pages.reduce((s, p) => s + p.totalSize, 0) / data.pages.length)) : '0'}
+            {data.pages.length > 0 ? formatBytes(Math.round(data.pages.reduce((s, p) => s + p.totalSize, 0) / data.pages.length)) : '0'}
           </div>
           <div className="text-xs text-[var(--brand-text-muted)] mt-1">Avg Page Weight</div>
         </div>
@@ -238,7 +233,7 @@ function PageWeight({ siteId, workspaceId }: Props) {
               <div className="flex items-center gap-4 flex-shrink-0">
                 <span className="text-xs text-[var(--brand-text-muted)]">{page.assetCount} asset{page.assetCount !== 1 ? 's' : ''}</span>
                 <span className={`text-sm font-medium tabular-nums ${getSizeColor(page.totalSize)}`}>
-                  {formatSize(page.totalSize)}
+                  {formatBytes(page.totalSize)}
                 </span>
               </div>
             </ClickableRow>
@@ -250,7 +245,7 @@ function PageWeight({ siteId, workspaceId }: Props) {
                     <div className="flex-1 min-w-0 text-[var(--brand-text-muted)] truncate">{asset.name}</div>
                     <span className="text-[var(--brand-text-muted)] flex-shrink-0">{asset.contentType.split('/')[1] || ''}</span>
                     <span className={`tabular-nums flex-shrink-0 ${asset.size > 500 * 1024 ? 'text-accent-orange' : 'text-[var(--brand-text-muted)]'}`}>
-                      {formatSize(asset.size)}
+                      {formatBytes(asset.size)}
                     </span>
                   </div>
                 ))}

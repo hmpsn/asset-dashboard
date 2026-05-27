@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { get, post, del } from '../api/client';
 import { Button, ClickableRow, FormInput, FormSelect, Icon, IconButton, cn } from './ui';
+import { formatBytes } from '../utils/formatNumbers';
 
 interface AuditIssue {
   assetId: string;
@@ -31,12 +32,6 @@ interface AuditResult {
 interface Props {
   siteId: string;
   workspaceId: string;
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 const ISSUE_LABELS: Record<string, { label: string; color: string; bg: string; icon: typeof AlertTriangle }> = {
@@ -136,7 +131,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
       rows.push([
         issue.assetId,
         issue.fileName,
-        issue.fileSize ? formatSize(issue.fileSize) : '',
+        issue.fileSize ? formatBytes(issue.fileSize) : '',
         issue.issues.join('; '),
         issue.usedIn.join('; '),
         issue.url || '',
@@ -372,7 +367,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
             <div className="t-body text-blue-200">
               Compressing... {bulkCompressProgress.done}/{bulkCompressProgress.total}
               {bulkCompressProgress.saved > 0 && (
-                <span className="text-emerald-400 ml-2">({formatSize(bulkCompressProgress.saved)} saved)</span>
+                <span className="text-emerald-400 ml-2">({formatBytes(bulkCompressProgress.saved)} saved)</span>
               )}
             </div>
             <div className="mt-1.5 h-1.5 bg-blue-950 rounded-[var(--radius-pill)] overflow-hidden">
@@ -561,7 +556,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
                     );
                   })}
                   {issue.fileSize && issue.fileSize > 0 && (
-                    <span className="t-caption-sm text-[var(--brand-text-muted)]">{formatSize(issue.fileSize)}</span>
+                    <span className="t-caption-sm text-[var(--brand-text-muted)]">{formatBytes(issue.fileSize)}</span>
                   )}
                 </div>
               </div>
@@ -652,7 +647,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
                 <div className="flex items-center justify-between">
                   <div className="t-body font-medium text-[var(--brand-text-bright)] truncate">{lightboxIssue.fileName}</div>
                   {lightboxIssue.fileSize && lightboxIssue.fileSize > 0 && (
-                    <span className="t-caption text-[var(--brand-text-muted)] flex-shrink-0 ml-3">{formatSize(lightboxIssue.fileSize)}</span>
+                    <span className="t-caption text-[var(--brand-text-muted)] flex-shrink-0 ml-3">{formatBytes(lightboxIssue.fileSize)}</span>
                   )}
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap">

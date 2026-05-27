@@ -17,6 +17,7 @@ import { AssetFilters } from './assets/AssetFilters';
 import { AssetCard } from './assets/AssetCard';
 import { BulkActions } from './assets/BulkActions';
 import { CmsFieldSelector, buildDefaultSelectedFields } from './assets/CmsFieldSelector';
+import { formatBytes } from '../utils/formatNumbers';
 
 interface Asset {
   id: string;
@@ -33,12 +34,6 @@ interface Asset {
 interface Props {
   siteId: string;
   workspaceId: string;
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 type SortField = 'fileName' | 'fileSize' | 'createdOn';
@@ -297,7 +292,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
           displayName: data.newFileName,
         } : a));
         const cmsNote = data.cmsUpdates?.succeeded ? ` · ${data.cmsUpdates.succeeded} CMS ref${data.cmsUpdates.succeeded !== 1 ? 's' : ''} updated` : '';
-        setCompressResult(`Saved ${data.savingsPercent}% (${formatSize(data.savings ?? 0)})${cmsNote}`);
+        setCompressResult(`Saved ${data.savingsPercent}% (${formatBytes(data.savings ?? 0)})${cmsNote}`);
         setTimeout(() => setCompressResult(null), 4000);
       } else if (data.skipped) {
         setCompressResult(data.reason || 'Already optimized');
@@ -409,7 +404,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
       const result = job.result as { totalSaved?: number } | undefined;
       const saved = result?.totalSaved || 0;
       if (saved > 0) {
-        setCompressResult(`Bulk compressed: saved ${formatSize(saved)} total`);
+        setCompressResult(`Bulk compressed: saved ${formatBytes(saved)} total`);
         setTimeout(() => setCompressResult(null), 5000);
       }
       setBulkCompressProgress(null);
@@ -603,7 +598,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
           <div className="flex-1">
             <div className="text-sm text-orange-200">
               Compressing assets... {bulkCompressProgress.done}/{bulkCompressProgress.total}
-              {bulkCompressProgress.saved > 0 && <span className="text-orange-400 ml-2">({formatSize(bulkCompressProgress.saved)} saved)</span>}
+              {bulkCompressProgress.saved > 0 && <span className="text-orange-400 ml-2">({formatBytes(bulkCompressProgress.saved)} saved)</span>}
             </div>
             <div className="mt-1.5 h-1.5 bg-orange-950 rounded-[var(--radius-pill)] overflow-hidden">
               <div

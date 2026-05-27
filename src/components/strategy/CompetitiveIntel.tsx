@@ -7,6 +7,7 @@ import {
   Loader2, TrendingUp, Globe, Search, Link2,
   DollarSign, Target, ChevronDown, ChevronRight,
 } from 'lucide-react';
+import { fmtNum } from '../../utils/formatNumbers';
 
 interface DomainOverview {
   domain: string;
@@ -60,12 +61,6 @@ interface Props {
   seoDataAvailable: boolean;
   /** Keyword gaps from the stored strategy — used as fallback when the live API call fails or returns empty */
   cachedKeywordGaps?: KeywordGap[];
-}
-
-function fmtNum(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
 }
 
 function difficultyColor(kd: number): string {
