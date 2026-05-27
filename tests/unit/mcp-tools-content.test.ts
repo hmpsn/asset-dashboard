@@ -9,11 +9,15 @@ vi.mock('../../server/intelligence/generation-context-builders.js', () => ({
 }));
 vi.mock('../../server/content-brief.js', () => ({
   getBrief: vi.fn(),
+  listBriefs: vi.fn(),
+  updateBrief: vi.fn(),
   upsertBrief: vi.fn(),
 }));
 vi.mock('../../server/content-posts-db.js', () => ({
   getPost: vi.fn(),
+  listPosts: vi.fn(),
   savePost: vi.fn(),
+  updatePostField: vi.fn(),
 }));
 vi.mock('../../server/content-requests.js', () => ({
   createContentRequest: vi.fn(),
@@ -29,8 +33,8 @@ vi.mock('../../server/activity-log.js', () => ({
 
 import { getWorkspace } from '../../server/workspaces.js';
 import { buildContentGenerationContext } from '../../server/intelligence/generation-context-builders.js';
-import { getBrief, upsertBrief } from '../../server/content-brief.js';
-import { getPost, savePost } from '../../server/content-posts-db.js';
+import { getBrief, listBriefs, updateBrief, upsertBrief } from '../../server/content-brief.js';
+import { getPost, listPosts, savePost, updatePostField } from '../../server/content-posts-db.js';
 import { createContentRequest, getContentRequest, updateContentRequest } from '../../server/content-requests.js';
 import { broadcastToWorkspace } from '../../server/broadcast.js';
 import { addActivity } from '../../server/activity-log.js';
@@ -47,18 +51,212 @@ describe('mcp content action tools', () => {
     (buildContentGenerationContext as ReturnType<typeof vi.fn>).mockResolvedValue({
       promptContext: 'intel-context',
     });
+    (listBriefs as ReturnType<typeof vi.fn>).mockReturnValue([]);
+    (updateBrief as ReturnType<typeof vi.fn>).mockImplementation((_: string, __: string, updates: unknown) => ({
+      id: 'brief_1',
+      workspaceId: 'ws-1',
+      targetKeyword: 'kw',
+      secondaryKeywords: [],
+      suggestedTitle: 'Title',
+      suggestedMetaDesc: 'Meta',
+      outline: [],
+      wordCountTarget: 1000,
+      intent: 'informational',
+      audience: 'general',
+      competitorInsights: '',
+      internalLinkSuggestions: [],
+      createdAt: '2026-01-01T00:00:00.000Z',
+      ...updates as Record<string, unknown>,
+    }));
+    (listPosts as ReturnType<typeof vi.fn>).mockReturnValue([]);
+    (updatePostField as ReturnType<typeof vi.fn>).mockImplementation((_: string, postId: string, updates: unknown) => ({
+      id: postId,
+      workspaceId: 'ws-1',
+      briefId: 'brief_1',
+      targetKeyword: 'kw',
+      title: 'Post title',
+      metaDescription: 'Meta',
+      introduction: '<p>Intro</p>',
+      sections: [],
+      conclusion: '<p>End</p>',
+      totalWordCount: 100,
+      targetWordCount: 120,
+      status: 'draft',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      ...updates as Record<string, unknown>,
+    }));
     (createContentRequest as ReturnType<typeof vi.fn>).mockReturnValue({ id: 'cr_1' });
     (getContentRequest as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
   });
 
   it('registers content action tool names', () => {
     expect(contentActionTools.map(t => t.name)).toEqual([
+      'list_briefs',
+      'get_brief',
+      'update_brief',
+      'list_posts',
+      'get_post',
+      'update_post',
       'prepare_brief_context',
       'save_brief',
       'prepare_post_context',
       'save_post',
       'send_to_client',
     ]);
+  });
+
+  it('lists and fetches briefs with revision tokens', async () => {
+    const brief = {
+      id: 'brief_1',
+      workspaceId: 'ws-1',
+      targetKeyword: 'hvac tips',
+      secondaryKeywords: ['ac maintenance'],
+      suggestedTitle: 'Best HVAC Tips',
+      suggestedMetaDesc: 'Meta',
+      outline: [{ heading: 'H2', notes: 'n' }],
+      wordCountTarget: 1200,
+      intent: 'informational',
+      audience: 'homeowners',
+      competitorInsights: 'none',
+      internalLinkSuggestions: ['/a'],
+      createdAt: '2026-01-01T00:00:00.000Z',
+    };
+    (listBriefs as ReturnType<typeof vi.fn>).mockReturnValue([brief]);
+    (getBrief as ReturnType<typeof vi.fn>).mockReturnValue(brief);
+
+    const listed = await handleContentActionTool('list_briefs', { workspace_id: 'ws-1' });
+    expect(listed.isError).toBeUndefined();
+    const listedPayload = JSON.parse(listed.content[0].text) as { briefs: Array<{ brief_id: string; revision: string }> };
+    expect(listedPayload.briefs).toHaveLength(1);
+    expect(listedPayload.briefs[0].brief_id).toBe('brief_1');
+    expect(typeof listedPayload.briefs[0].revision).toBe('string');
+
+    const fetched = await handleContentActionTool('get_brief', { workspace_id: 'ws-1', brief_id: 'brief_1' });
+    expect(fetched.isError).toBeUndefined();
+    const fetchedPayload = JSON.parse(fetched.content[0].text) as { brief: { id: string }; revision: string };
+    expect(fetchedPayload.brief.id).toBe('brief_1');
+    expect(typeof fetchedPayload.revision).toBe('string');
+  });
+
+  it('updates brief in patch and replace modes with revision checks', async () => {
+    const baseBrief = {
+      id: 'brief_1',
+      workspaceId: 'ws-1',
+      targetKeyword: 'hvac tips',
+      secondaryKeywords: ['ac maintenance'],
+      suggestedTitle: 'Best HVAC Tips',
+      suggestedMetaDesc: 'Meta',
+      outline: [{ heading: 'H2', notes: 'n' }],
+      wordCountTarget: 1200,
+      intent: 'informational',
+      audience: 'homeowners',
+      competitorInsights: 'none',
+      internalLinkSuggestions: ['/a'],
+      createdAt: '2026-01-01T00:00:00.000Z',
+    };
+    (getBrief as ReturnType<typeof vi.fn>).mockReturnValue(baseBrief);
+
+    const fetched = await handleContentActionTool('get_brief', { workspace_id: 'ws-1', brief_id: 'brief_1' });
+    const revision = (JSON.parse(fetched.content[0].text) as { revision: string }).revision;
+
+    const patched = await handleContentActionTool('update_brief', {
+      workspace_id: 'ws-1',
+      brief_id: 'brief_1',
+      expected_revision: revision,
+      mode: 'patch',
+      updates: { suggestedTitle: 'Tighter HVAC Tips' },
+    });
+    expect(patched.isError).toBeUndefined();
+    expect(updateBrief).toHaveBeenCalledWith('ws-1', 'brief_1', expect.objectContaining({ suggestedTitle: 'Tighter HVAC Tips' }));
+    expect(broadcastToWorkspace).toHaveBeenCalledWith('ws-1', 'brief:updated', expect.objectContaining({ action: 'mcp_brief_updated' }));
+
+    const replaced = await handleContentActionTool('update_brief', {
+      workspace_id: 'ws-1',
+      brief_id: 'brief_1',
+      expected_revision: revision,
+      mode: 'replace',
+      content: {
+        targetKeyword: 'hvac checklist',
+        secondaryKeywords: ['ac tuneup'],
+        suggestedTitle: 'HVAC Checklist',
+        suggestedMetaDesc: 'Meta',
+        outline: [{ heading: 'H2', notes: 'n' }],
+        wordCountTarget: 1000,
+        intent: 'informational',
+        audience: 'homeowners',
+        competitorInsights: 'none',
+        internalLinkSuggestions: ['/a'],
+      },
+    });
+    expect(replaced.isError).toBeUndefined();
+
+    const conflicted = await handleContentActionTool('update_brief', {
+      workspace_id: 'ws-1',
+      brief_id: 'brief_1',
+      expected_revision: 'stale-revision',
+      mode: 'patch',
+      updates: { suggestedTitle: 'Should fail' },
+    });
+    expect(conflicted.isError).toBe(true);
+    expect(conflicted.content[0].text).toContain('Revision conflict');
+  });
+
+  it('lists, fetches, and updates posts with revision checks', async () => {
+    const basePost = {
+      id: 'post_1',
+      workspaceId: 'ws-1',
+      briefId: 'brief_1',
+      targetKeyword: 'hvac tips',
+      title: 'Post title',
+      metaDescription: 'Meta',
+      introduction: '<p>Intro</p>',
+      sections: [{
+        index: 0,
+        heading: 'H2',
+        content: '<p>Body</p>',
+        wordCount: 1,
+        targetWordCount: 120,
+        keywords: ['hvac'],
+        status: 'done' as const,
+      }],
+      conclusion: '<p>End</p>',
+      totalWordCount: 3,
+      targetWordCount: 1200,
+      status: 'draft' as const,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+    (listPosts as ReturnType<typeof vi.fn>).mockReturnValue([basePost]);
+    (getPost as ReturnType<typeof vi.fn>).mockReturnValue(basePost);
+
+    const listed = await handleContentActionTool('list_posts', { workspace_id: 'ws-1' });
+    expect(listed.isError).toBeUndefined();
+    const listedPayload = JSON.parse(listed.content[0].text) as { posts: Array<{ post_id: string; revision: string }> };
+    expect(listedPayload.posts[0].post_id).toBe('post_1');
+
+    const fetched = await handleContentActionTool('get_post', { workspace_id: 'ws-1', post_id: 'post_1' });
+    const revision = (JSON.parse(fetched.content[0].text) as { revision: string }).revision;
+
+    const patched = await handleContentActionTool('update_post', {
+      workspace_id: 'ws-1',
+      post_id: 'post_1',
+      expected_revision: revision,
+      mode: 'patch',
+      updates: { title: 'Updated title', sections: [{ index: 0, content: '<p>Updated body</p>' }] },
+    });
+    expect(patched.isError).toBeUndefined();
+    expect(updatePostField).toHaveBeenCalled();
+
+    const conflicted = await handleContentActionTool('update_post', {
+      workspace_id: 'ws-1',
+      post_id: 'post_1',
+      expected_revision: 'stale-revision',
+      mode: 'patch',
+      updates: { title: 'Should fail' },
+    });
+    expect(conflicted.isError).toBe(true);
+    expect(conflicted.content[0].text).toContain('Revision conflict');
   });
 
   it('prepare_brief_context returns a brief request handle', async () => {

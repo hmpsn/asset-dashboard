@@ -270,6 +270,208 @@ describe('MCP content tools (integration)', () => {
     expect(sentActivity?.metadata?.source).toBe('mcp-chat');
   });
 
+  it('supports list/get/update for existing briefs with revision conflict protection', async () => {
+    const prepared = await callMcpTool('prepare_brief_context', {
+      workspace_id: ws.workspaceId,
+      topic: 'best CRMs for solopreneurs',
+      layout: buildLayout(),
+    });
+    const preparedPayload = JSON.parse(prepared.content[0].text) as { brief_request_handle: string };
+    const saved = await callMcpTool('save_brief', {
+      workspace_id: ws.workspaceId,
+      brief_request_handle: preparedPayload.brief_request_handle,
+      content: buildBriefContent(),
+    });
+    const savedPayload = JSON.parse(saved.content[0].text) as { brief_id: string };
+
+    const listed = await callMcpTool('list_briefs', { workspace_id: ws.workspaceId });
+    expect(listed.isError).toBeFalsy();
+    const listPayload = JSON.parse(listed.content[0].text) as { briefs: Array<{ brief_id: string; revision: string }> };
+    const listedBrief = listPayload.briefs.find(item => item.brief_id === savedPayload.brief_id);
+    expect(listedBrief).toBeDefined();
+
+    const fetched = await callMcpTool('get_brief', {
+      workspace_id: ws.workspaceId,
+      brief_id: savedPayload.brief_id,
+    });
+    const fetchedPayload = JSON.parse(fetched.content[0].text) as { revision: string };
+    expect(typeof fetchedPayload.revision).toBe('string');
+
+    const patched = await callMcpTool('update_brief', {
+      workspace_id: ws.workspaceId,
+      brief_id: savedPayload.brief_id,
+      expected_revision: fetchedPayload.revision,
+      mode: 'patch',
+      updates: { suggestedTitle: 'Updated CRM Brief Title' },
+    });
+    expect(patched.isError).toBeFalsy();
+    const patchedPayload = JSON.parse(patched.content[0].text) as { revision: string };
+    expect(typeof patchedPayload.revision).toBe('string');
+
+    const replaced = await callMcpTool('update_brief', {
+      workspace_id: ws.workspaceId,
+      brief_id: savedPayload.brief_id,
+      expected_revision: patchedPayload.revision,
+      mode: 'replace',
+      content: {
+        ...buildBriefContent(),
+        suggestedTitle: 'Replaced CRM Brief Title',
+      },
+    });
+    expect(replaced.isError).toBeFalsy();
+
+    const conflict = await callMcpTool('update_brief', {
+      workspace_id: ws.workspaceId,
+      brief_id: savedPayload.brief_id,
+      expected_revision: fetchedPayload.revision,
+      mode: 'patch',
+      updates: { suggestedTitle: 'Should fail with stale revision' },
+    });
+    expect(conflict.isError).toBe(true);
+    expect(conflict.content[0].text).toContain('Revision conflict');
+
+    const invalidField = await callMcpTool('update_brief', {
+      workspace_id: ws.workspaceId,
+      brief_id: savedPayload.brief_id,
+      expected_revision: patchedPayload.revision,
+      mode: 'patch',
+      updates: {},
+    });
+    expect(invalidField.isError).toBe(true);
+
+    const wrongWorkspace = await callMcpTool('update_brief', {
+      workspace_id: 'missing-workspace',
+      brief_id: savedPayload.brief_id,
+      expected_revision: patchedPayload.revision,
+      mode: 'patch',
+      updates: { suggestedTitle: 'nope' },
+    });
+    expect(wrongWorkspace.isError).toBe(true);
+
+    const activityRes = await ctx.api(`/api/activity?workspaceId=${ws.workspaceId}`);
+    const activities = await activityRes.json() as Array<{
+      metadata?: { source?: string; action?: string };
+    }>;
+    const updateActivity = activities.find((entry) => entry.metadata?.action === 'mcp_brief_updated');
+    expect(updateActivity).toBeDefined();
+    expect(updateActivity?.metadata?.source).toBe('mcp-chat');
+  });
+
+  it('supports list/get/update for existing posts with revision conflict protection', async () => {
+    const preparedBrief = await callMcpTool('prepare_brief_context', {
+      workspace_id: ws.workspaceId,
+      topic: 'best CRMs for solopreneurs',
+      layout: buildLayout(),
+    });
+    const preparedBriefPayload = JSON.parse(preparedBrief.content[0].text) as { brief_request_handle: string };
+    const savedBrief = await callMcpTool('save_brief', {
+      workspace_id: ws.workspaceId,
+      brief_request_handle: preparedBriefPayload.brief_request_handle,
+      content: buildBriefContent(),
+    });
+    const savedBriefPayload = JSON.parse(savedBrief.content[0].text) as { brief_id: string };
+
+    const preparedPost = await callMcpTool('prepare_post_context', {
+      workspace_id: ws.workspaceId,
+      brief_id: savedBriefPayload.brief_id,
+    });
+    const preparedPostPayload = JSON.parse(preparedPost.content[0].text) as { post_request_handle: string };
+    const savedPost = await callMcpTool('save_post', {
+      workspace_id: ws.workspaceId,
+      post_request_handle: preparedPostPayload.post_request_handle,
+      content: buildPostContent(savedBriefPayload.brief_id),
+    });
+    const savedPostPayload = JSON.parse(savedPost.content[0].text) as { post_id: string };
+
+    const listed = await callMcpTool('list_posts', { workspace_id: ws.workspaceId });
+    expect(listed.isError).toBeFalsy();
+    const listPayload = JSON.parse(listed.content[0].text) as { posts: Array<{ post_id: string; revision: string }> };
+    const listedPost = listPayload.posts.find(item => item.post_id === savedPostPayload.post_id);
+    expect(listedPost).toBeDefined();
+
+    const fetched = await callMcpTool('get_post', {
+      workspace_id: ws.workspaceId,
+      post_id: savedPostPayload.post_id,
+    });
+    const fetchedPayload = JSON.parse(fetched.content[0].text) as { revision: string };
+    expect(typeof fetchedPayload.revision).toBe('string');
+
+    const patched = await callMcpTool('update_post', {
+      workspace_id: ws.workspaceId,
+      post_id: savedPostPayload.post_id,
+      expected_revision: fetchedPayload.revision,
+      mode: 'patch',
+      updates: {
+        title: 'Updated CRM Post Title',
+        sections: [{ index: 0, content: '<p>Updated first section.</p>' }],
+      },
+    });
+    expect(patched.isError).toBeFalsy();
+    const patchedPayload = JSON.parse(patched.content[0].text) as { revision: string };
+    expect(typeof patchedPayload.revision).toBe('string');
+
+    const replaced = await callMcpTool('update_post', {
+      workspace_id: ws.workspaceId,
+      post_id: savedPostPayload.post_id,
+      expected_revision: patchedPayload.revision,
+      mode: 'replace',
+      content: {
+        title: 'Replaced CRM Post Title',
+        metaDescription: 'Updated post description',
+        introduction: '<p>New intro.</p>',
+        sections: [
+          {
+            index: 0,
+            heading: 'New Section',
+            content: '<p>Rewritten body.</p>',
+            wordCount: 2,
+            targetWordCount: 140,
+            keywords: ['best crm for solopreneurs'],
+            status: 'done' as const,
+          },
+        ],
+        conclusion: '<p>New conclusion.</p>',
+      },
+    });
+    expect(replaced.isError, replaced.content[0]?.text).toBeFalsy();
+
+    const conflict = await callMcpTool('update_post', {
+      workspace_id: ws.workspaceId,
+      post_id: savedPostPayload.post_id,
+      expected_revision: fetchedPayload.revision,
+      mode: 'patch',
+      updates: { title: 'Should fail with stale revision' },
+    });
+    expect(conflict.isError).toBe(true);
+    expect(conflict.content[0].text).toContain('Revision conflict');
+
+    const invalidField = await callMcpTool('update_post', {
+      workspace_id: ws.workspaceId,
+      post_id: savedPostPayload.post_id,
+      expected_revision: patchedPayload.revision,
+      mode: 'patch',
+      updates: {},
+    });
+    expect(invalidField.isError).toBe(true);
+
+    const wrongWorkspace = await callMcpTool('update_post', {
+      workspace_id: 'missing-workspace',
+      post_id: savedPostPayload.post_id,
+      expected_revision: patchedPayload.revision,
+      mode: 'patch',
+      updates: { title: 'nope' },
+    });
+    expect(wrongWorkspace.isError).toBe(true);
+
+    const activityRes = await ctx.api(`/api/activity?workspaceId=${ws.workspaceId}`);
+    const activities = await activityRes.json() as Array<{
+      metadata?: { source?: string; action?: string };
+    }>;
+    const updateActivity = activities.find((entry) => entry.metadata?.action === 'mcp_post_updated');
+    expect(updateActivity).toBeDefined();
+    expect(updateActivity?.metadata?.source).toBe('mcp-chat');
+  });
+
   it('save_brief rejects unknown handles', async () => {
     const result = await callMcpTool('save_brief', {
       workspace_id: ws.workspaceId,

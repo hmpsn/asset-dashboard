@@ -1,8 +1,26 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **459 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **460 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 460. MCP Iterative Editing v1 — Existing Brief/Post Read + Safe Write-Back
+
+**What it does:** Extends the shipped MCP content action surface beyond create-only flows to support edit-existing workflows for briefs and posts from live Claude sessions. New MCP tools now expose workspace-scoped listing, entity fetch with revision tokens, and optimistic-concurrency updates:
+- `list_briefs`, `get_brief`, `update_brief`
+- `list_posts`, `get_post`, `update_post`
+
+Update tools support `mode: 'patch' | 'replace'` and require `expected_revision` to prevent stale overwrite collisions. Revisions are deterministic server-generated hashes from canonical editable payloads (no DB migration). All writes route through existing domain services (`updateBrief`, `updatePostField`), invalidate content-pipeline intelligence, broadcast workspace events, and log `addActivity(..., { source: 'mcp-chat' })` with explicit MCP update actions.
+
+The rollout remains intentionally orchestration-light: no server-side AI rewrite wrappers, no MCP edit-session persistence layer, and no hard-delete tools for briefs/posts in this phase. Content-level removal/reorder is supported through post section patch/replace payloads.
+
+**Agency value:** Gives operators a direct “read current draft → iterate in Claude → write back safely” loop without leaving chat or duplicating admin-side workflows.
+
+**Client value:** Faster content turnaround with fewer manual copy/paste steps, while preserving existing review/send workflows and real-time dashboard freshness.
+
+**Mutual:** Adds high-leverage MCP editing power while preserving platform safety contracts (service-layer writes, broadcast invalidation, activity provenance, and optimistic conflict prevention).
 
 ---
 
