@@ -1,8 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **456 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **457 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 457. Schema Intelligence Phase C — Wikidata Resolution + Cache
+
+**What it does:** Adds live entity disambiguation infrastructure behind the existing `entityResolution` slice. New intelligence-local modules now perform bounded Wikidata SPARQL lookups (`server/intelligence/entity-resolution-wikidata.ts`) and persist per-entity cache entries in SQLite (`entity_resolution_cache` via migration 104 + `server/intelligence/entity-resolution-cache.ts`). `assembleEntityResolution()` now supports opt-in live resolution through `IntelligenceOptions.resolveEntityReferences`; schema consumers enable this via `buildSchemaIntelligence({ includeEntityResolution: true })`.
+
+**Agency value:** Turns entity grounding from static candidate extraction into a reusable, cached intelligence capability with explicit degraded/unresolved states.
+
+**Client value:** Improves the quality and consistency of future `sameAs` and typed-entity schema output without making schema generation fragile when external lookups fail.
+
+**Mutual:** Reduces drift by centralizing disambiguation, confidence scoring, and caching in one intelligence-owned boundary.
 
 ---
 

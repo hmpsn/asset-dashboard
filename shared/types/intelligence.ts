@@ -88,6 +88,12 @@ export interface IntelligenceOptions {
    * Only enable for callers that actually surface backlink data (e.g. admin AI chat).
    */
   enrichWithBacklinks?: boolean;
+  /**
+   * Opt-in: run live Wikidata/SPARQL disambiguation for entityResolution candidates.
+   * OFF by default to avoid external lookup latency for callers that only need
+   * deterministic candidate extraction.
+   */
+  resolveEntityReferences?: boolean;
 }
 
 // ── Core return type ────────────────────────────────────────────────────

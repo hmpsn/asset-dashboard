@@ -737,6 +737,17 @@
           "shippedAt": "2026-05-27"
         },
         {
+          "id": "schema-entity-grounding-phase-c-wikidata-resolution",
+          "title": "Schema entity grounding Phase C — Wikidata resolution + cache",
+          "source": "Schema entity grounding rollout plan 2026-05-27",
+          "est": "4-6h",
+          "priority": "P0",
+          "sprint": "future",
+          "status": "done",
+          "notes": "Completed 2026-05-27 on `codex/schema-intel-prC-wikidata-resolution`. Added `entity_resolution_cache` persistence (migration 104 + `server/intelligence/entity-resolution-cache.ts`), added bounded SPARQL disambiguation with confidence scoring in `server/intelligence/entity-resolution-wikidata.ts`, and upgraded `assembleEntityResolution()` to merge resolved Wikidata references while preserving deterministic fallbacks and degraded availability on lookup failures. Added `IntelligenceOptions.resolveEntityReferences` opt-in and threaded schema-intelligence calls to enable live resolution only for explicit entity-resolution consumers.",
+          "shippedAt": "2026-05-27"
+        },
+        {
           "id": "schema-engagement-signals",
           "title": "Schema engagement signals — wordCount, timeRequired, speakable, educationalLevel",
           "source": "Strategic landscape brainstorm 2026-04-29 (post-PR1 merge)",
@@ -764,7 +775,7 @@
           "priority": "P0",
           "sprint": "future",
           "status": "pending",
-          "notes": "Tier-2 / biggest competitive moat. Replace string knowsAbout (currently ['brand strategy','webflow']) with typed Thing entities linked to Wikidata Q-numbers via sameAs. Same upgrade for Article.about (typed Thing — what is this article about?), Article.mentions[] (entities referenced in body), Place entities for areaServed (Austin, TX → Wikidata Q16559), Organization.sameAs extended with Wikidata identifier. Architecture: new EntityResolutionSlice on buildWorkspaceIntelligence, populated by a Cheerio-based extractor that runs entity recognition (likely via OpenAI structured-output prompt against curated entity types) + Wikidata SPARQL lookup for top candidates, cached per-entity. Most agencies don't do this; Google's knowledge graph rewards disambiguation heavily. Architectural prerequisite met by parity-fields PR1 Pattern B starter. Can ship after schema-page-element-catalog-v1 (the catalog feeds Article.mentions extraction).\n[Platform health recommendation pass 2026-05-26: prioritized as the next emergent intelligence slice (EntityResolutionSlice) to prevent schema authority drift and duplicate ad hoc entity handling.]\n[Phase A completed 2026-05-27: contracts + guardrails shipped in roadmap item `schema-entity-grounding-phase-a-contract-guardrails`.]\n[Phase B completed 2026-05-27: intelligence slice scaffolding + schema-intelligence wrapper wiring shipped in roadmap item `schema-entity-grounding-phase-b-slice-wiring`; Wikidata disambiguation and template emission remain pending.]"
+          "notes": "Tier-2 / biggest competitive moat. Replace string knowsAbout (currently ['brand strategy','webflow']) with typed Thing entities linked to Wikidata Q-numbers via sameAs. Same upgrade for Article.about (typed Thing — what is this article about?), Article.mentions[] (entities referenced in body), Place entities for areaServed (Austin, TX → Wikidata Q16559), Organization.sameAs extended with Wikidata identifier. Architecture: new EntityResolutionSlice on buildWorkspaceIntelligence, populated by a Cheerio-based extractor that runs entity recognition (likely via OpenAI structured-output prompt against curated entity types) + Wikidata SPARQL lookup for top candidates, cached per-entity. Most agencies don't do this; Google's knowledge graph rewards disambiguation heavily. Architectural prerequisite met by parity-fields PR1 Pattern B starter. Can ship after schema-page-element-catalog-v1 (the catalog feeds Article.mentions extraction).\n[Platform health recommendation pass 2026-05-26: prioritized as the next emergent intelligence slice (EntityResolutionSlice) to prevent schema authority drift and duplicate ad hoc entity handling.]\n[Phase A completed 2026-05-27: contracts + guardrails shipped in roadmap item `schema-entity-grounding-phase-a-contract-guardrails`.]\n[Phase B completed 2026-05-27: intelligence slice scaffolding + schema-intelligence wrapper wiring shipped in roadmap item `schema-entity-grounding-phase-b-slice-wiring`.]\n[Phase C completed 2026-05-27: Wikidata disambiguation + cache shipped in roadmap item `schema-entity-grounding-phase-c-wikidata-resolution`; schema template emission remains pending.]"
         },
         {
           "id": "schema-commerce-types",

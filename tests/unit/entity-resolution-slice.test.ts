@@ -2,10 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   getWorkspace: vi.fn(),
+  resolveCandidateWithWikidata: vi.fn(),
 }));
 
 vi.mock('../../server/workspaces.js', () => ({
   getWorkspace: mocks.getWorkspace,
+}));
+vi.mock('../../server/intelligence/entity-resolution-wikidata.js', () => ({
+  resolveCandidateWithWikidata: mocks.resolveCandidateWithWikidata,
 }));
 
 const { assembleEntityResolution } = await import('../../server/intelligence/entity-resolution-slice.js');
@@ -13,6 +17,10 @@ const { assembleEntityResolution } = await import('../../server/intelligence/ent
 describe('assembleEntityResolution', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.resolveCandidateWithWikidata.mockResolvedValue({
+      status: 'unresolved',
+      confidence: 0,
+    });
   });
 
   it('returns no_data when workspace is missing', async () => {
@@ -56,5 +64,42 @@ describe('assembleEntityResolution', () => {
     expect(result.entities.some(entity => entity.surfaces.includes('area_served'))).toBe(true);
     expect(result.unresolved.length).toBeGreaterThan(0);
     expect(result.generatedAt).toBeTruthy();
+  });
+
+  it('resolves candidates to Wikidata references when enabled', async () => {
+    mocks.getWorkspace.mockReturnValue({
+      id: 'ws-1',
+      keywordStrategy: {
+        siteKeywords: ['webflow'],
+      },
+    });
+    mocks.resolveCandidateWithWikidata.mockResolvedValue({
+      status: 'resolved',
+      confidence: 0.92,
+      reference: {
+        qid: 'Q170477',
+        label: 'Webflow',
+        sameAs: 'https://www.wikidata.org/wiki/Q170477',
+      },
+    });
+
+    const result = await assembleEntityResolution('ws-1', { resolveEntityReferences: true });
+
+    expect(mocks.resolveCandidateWithWikidata).toHaveBeenCalled();
+    expect(result.entities[0]?.id).toBe('wikidata:Q170477');
+    expect(result.entities[0]?.wikidata?.qid).toBe('Q170477');
+  });
+
+  it('does not call Wikidata resolver when opt-in is not set', async () => {
+    mocks.getWorkspace.mockReturnValue({
+      id: 'ws-1',
+      keywordStrategy: {
+        siteKeywords: ['technical SEO'],
+      },
+    });
+
+    await assembleEntityResolution('ws-1');
+
+    expect(mocks.resolveCandidateWithWikidata).not.toHaveBeenCalled();
   });
 });
