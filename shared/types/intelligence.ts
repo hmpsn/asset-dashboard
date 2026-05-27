@@ -9,6 +9,7 @@ import type { BriefingSummary } from './briefing.js';
 import type { PageElementCatalog } from './page-elements.js';
 import type { SiteInventorySlice } from './site-inventory.js';
 import type { EntityResolutionSlice } from './entity-resolution.js';
+import type { EeatAsset, EeatAssetType } from './eeat-assets.js';
 import type {
   TrackedAction,
   ActionOutcome,
@@ -34,6 +35,7 @@ export const INTELLIGENCE_SLICES = [
   'siteInventory',
   'localSeo',
   'entityResolution',
+  'eeatAssets',
 ] as const;
 
 export type IntelligenceSlice = typeof INTELLIGENCE_SLICES[number];
@@ -55,6 +57,7 @@ export const PROMPT_FORMATTABLE_INTELLIGENCE_SLICES = [
   'operational',
   'pageElements',
   'localSeo',
+  'eeatAssets',
 ] as const satisfies readonly IntelligenceSlice[];
 
 export function isIntelligenceSlice(value: string): value is IntelligenceSlice {
@@ -121,6 +124,8 @@ export interface WorkspaceIntelligence {
   /** Entity grounding for schema surfaces (Thing/Place + Wikidata disambiguation).
    *  Always undefined until the EntityResolutionSlice assembler phase ships. */
   entityResolution?: EntityResolutionSlice;
+  /** Workspace-scoped E-E-A-T trust-signal inventory. */
+  eeatAssets?: EeatAssetsSlice;
 }
 
 // ── Slice interfaces ────────────────────────────────────────────────────
@@ -410,6 +415,14 @@ export interface LocalSeoSlice {
   effectiveLocalSeoBlock: string;
   /** ISO timestamp of the latest visibility snapshot reflected here. */
   latestSnapshotAt: string | null;
+}
+
+export interface EeatAssetsSlice {
+  availability: 'ready' | 'no_data';
+  assets: EeatAsset[];
+  byType: Array<{ type: EeatAssetType; count: number }>;
+  /** Pre-formatted trust-signal block for prompt consumers. Inject directly. */
+  effectiveTrustSignalsBlock: string;
 }
 
 // ── Client Intelligence API types (Phase 4C) ────────────────────────────────

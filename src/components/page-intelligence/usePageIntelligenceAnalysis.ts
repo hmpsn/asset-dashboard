@@ -115,6 +115,8 @@ export function usePageIntelligenceAnalysis({
               topicCluster: kwData.topicCluster,
               searchIntentConfidence: kwData.searchIntentConfidence,
               hasProviderMetrics: kwData.hasProviderMetrics,
+              missingTrustSignals: kwData.missingTrustSignals,
+              eeatAssetRecommendations: kwData.eeatAssetRecommendations,
             },
           });
           // Invalidate strategy cache so persisted data shows up

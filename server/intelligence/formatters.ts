@@ -11,6 +11,7 @@ import type {
   OperationalSlice,
   PageProfileSlice,
   LocalSeoSlice,
+  EeatAssetsSlice,
 } from '../../shared/types/intelligence.js';
 import type { AudiencePersona } from '../../shared/types/workspace.js';
 import { matchPagePath } from '../helpers.js';
@@ -56,6 +57,7 @@ export function formatForPrompt(
       (include.has('contentPipeline') && intelligence.contentPipeline != null) ||
       (include.has('siteHealth') && intelligence.siteHealth != null) ||
       (include.has('localSeo') && intelligence.localSeo != null) ||
+      (include.has('eeatAssets') && intelligence.eeatAssets != null) ||
       // pageElements is page-scoped and only assembled when pagePath is supplied;
       // a section-filtered request for it implies the caller already knows the
       // slice should exist, so a populated slice should bypass cold-start.
@@ -130,6 +132,11 @@ export function formatForPrompt(
     sections.push(formatLocalSeoSection(intelligence.localSeo, verbosity));
   }
 
+  // E-E-A-T assets
+  if (intelligence.eeatAssets && (!include || include.has('eeatAssets'))) {
+    sections.push(formatEeatAssetsSection(intelligence.eeatAssets, verbosity));
+  }
+
   // Apply tokenBudget truncation if requested (§20 priority chain)
   const tokenBudget = opts?.tokenBudget;
   if (tokenBudget && tokenBudget > 0) {
@@ -196,6 +203,11 @@ function applyTokenBudget(
 
   // Step 4d: Drop contentPipeline
   current = current.filter(s => !s.startsWith('## Content Pipeline'));
+  output = current.join('\n\n');
+  if (estimateTokens(output) <= budget) return output;
+
+  // Step 4e: Drop eeatAssets
+  current = current.filter(s => !s.startsWith('## E-E-A-T Assets'));
   output = current.join('\n\n');
   if (estimateTokens(output) <= budget) return output;
 
@@ -782,6 +794,22 @@ function formatLocalSeoSection(slice: LocalSeoSlice, verbosity: PromptVerbosity)
     return `## Local SEO\n${activeMarkets} active markets. ${slice.visibility.visible} visible, ${slice.visibility.notVisible} not visible, ${slice.visibility.notChecked} not checked.`;
   }
   return `## Local SEO\n${slice.effectiveLocalSeoBlock}`;
+}
+
+function formatEeatAssetsSection(slice: EeatAssetsSlice, verbosity: PromptVerbosity): string {
+  const lines: string[] = ['## E-E-A-T Assets'];
+  if (slice.availability === 'no_data') {
+    lines.push('No trust-signal assets have been added yet.');
+    return lines.join('\n');
+  }
+  lines.push(`Inventory: ${slice.assets.length} assets across ${slice.byType.length} categories.`);
+  if (slice.byType.length > 0) {
+    lines.push(`By type: ${slice.byType.map(entry => `${entry.type} (${entry.count})`).join(', ')}`);
+  }
+  if (verbosity !== 'compact') {
+    lines.push(slice.effectiveTrustSignalsBlock);
+  }
+  return lines.join('\n');
 }
 
 function formatPageProfileSection(profile: PageProfileSlice, verbosity: PromptVerbosity): string {

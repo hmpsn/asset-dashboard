@@ -9,6 +9,7 @@ export {
   chat, recommendations, upload, settings, salesReport, redirects,
   stripe, auth, keywordFeedback, trackedKeywords, businessPriorities,
 } from './misc';
+export { eeatAssetsApi } from './eeatAssets';
 export {
   jobs, roadmap, features, notifications, workspaceOverview,
   workspaceHome, workspaceBadges, integrationHealth, observability,

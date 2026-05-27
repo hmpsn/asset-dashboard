@@ -196,6 +196,44 @@ export function PageIntelligenceAnalysisSection({
         </div>
       )}
 
+      {((analysis.missingTrustSignals?.length ?? 0) > 0 || (analysis.eeatAssetRecommendations?.length ?? 0) > 0) && (
+        <div className="space-y-3 pt-2 border-t border-[var(--brand-border)]">
+          <span className="t-label text-[var(--brand-text-muted)]">Trust Signals</span>
+          <div className="grid grid-cols-2 gap-3">
+            {(analysis.missingTrustSignals?.length ?? 0) > 0 && (
+              <div className="bg-[var(--surface-2)] p-3 border border-amber-500/20 rounded-[var(--radius-signature)]">
+                <div className="flex items-center gap-2 mb-2">
+                  <Icon as={AlertCircle} size="md" className="text-accent-warning" />
+                  <span className="t-caption font-medium text-[var(--brand-text-bright)]">Missing Trust Signals</span>
+                </div>
+                <ul className="space-y-1">
+                  {analysis.missingTrustSignals!.map((signal, index) => (
+                    <li key={`${signal.signal}-${index}`} className="t-caption-sm text-[var(--brand-text)]">
+                      {signal.signal}: {signal.rationale}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {(analysis.eeatAssetRecommendations?.length ?? 0) > 0 && (
+              <div className="bg-[var(--surface-2)] p-3 border border-teal-500/20 rounded-[var(--radius-signature)]">
+                <div className="flex items-center gap-2 mb-2">
+                  <Icon as={BookOpen} size="md" className="text-accent-brand" />
+                  <span className="t-caption font-medium text-[var(--brand-text-bright)]">Recommended E-E-A-T Assets</span>
+                </div>
+                <ul className="space-y-1">
+                  {analysis.eeatAssetRecommendations!.map((asset) => (
+                    <li key={asset.assetId} className="t-caption-sm text-[var(--brand-text)]">
+                      {asset.title}: {asset.reason}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {contentScore && (
         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
           <div className="flex items-center gap-2 mb-3">

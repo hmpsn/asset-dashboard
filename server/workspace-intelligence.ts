@@ -27,6 +27,7 @@ import { assembleOperational } from './intelligence/operational-slice.js';
 import { assemblePageProfile } from './intelligence/page-profile-slice.js';
 import { assembleLocalSeo } from './intelligence/local-seo-slice.js';
 import { assembleEntityResolution } from './intelligence/entity-resolution-slice.js';
+import { assembleEeatAssets } from './intelligence/eeat-assets-slice.js';
 import { formatForPrompt } from './intelligence/formatters.js';
 export {
   formatForPrompt,
@@ -144,6 +145,9 @@ async function assembleSlice(
       break;
     case 'entityResolution':
       result.entityResolution = await assembleEntityResolution(workspaceId, opts);
+      break;
+    case 'eeatAssets':
+      result.eeatAssets = await assembleEeatAssets(workspaceId);
       break;
   }
 }

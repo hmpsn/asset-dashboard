@@ -453,6 +453,7 @@ export async function buildSchemaContext(
     try {
       schemaIntel = await buildSchemaIntelligence({
         siteId,
+        includeEeatAssets: true,
       });
     } catch (err) {
       log.warn({ err, workspaceId: ws.id, siteId }, 'buildSchemaContext: intelligence seoContext unavailable');
@@ -504,6 +505,10 @@ export async function buildSchemaContext(
         foundedDate: profile.foundedDate,
         numberOfEmployees: profile.numberOfEmployees,
       };
+    }
+
+    if (schemaIntel?.eeatAssets?.length) {
+      ctx._eeatAssets = schemaIntel.eeatAssets;
     }
 
     ctx._siteHasSearch = ws.siteHasSearch === true;

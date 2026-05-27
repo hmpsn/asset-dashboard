@@ -19,7 +19,11 @@ declare global {
 ensureIsolatedTestDataDir();
 
 if (!globalThis.__assetDashboardDbSetupDone) {
-  const { default: db } = await import('../server/db/index.js');
+  const { default: db, runMigrations } = await import('../server/db/index.js');
+
+  // Worker-local DB files may persist across reruns; re-run migrations in-place
+  // so newly added columns are always present in full-suite execution.
+  runMigrations();
 
   db.pragma('foreign_keys = OFF');
   globalThis.__assetDashboardDbSetupDone = true;

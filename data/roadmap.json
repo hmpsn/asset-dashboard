@@ -672,8 +672,9 @@
           "source": "USER REQUEST",
           "est": "4-6h",
           "priority": "P2",
-          "notes": "Current E-E-A-T guidance in content briefs is generic per-pillar text ('include case studies'). Gap: no inventory of what assets a client ACTUALLY has. Build: (1) Workspace-level E-E-A-T profile in settings — admin tags existing client assets: testimonials (with quotes + attribution), case studies (with URLs + metrics), certifications/credentials, before/after galleries, team bios/expertise, awards/recognition, data/research, client logos. (2) Content briefs inject specific asset recommendations: 'Add the Dr. Smith testimonial from /reviews' or 'Include the Acme Corp case study showing 40% conversion lift'. (3) Page Intelligence flags pages missing trust signals based on page type (service pages need testimonials, product pages need reviews, etc.). (4) Schema generator uses asset library for author/credential structured data. New DB table: eeat_assets (workspace_id, type, title, url, content, metadata JSON). New UI: settings tab or workspace profile section.",
-          "status": "pending"
+          "notes": "Completed 2026-05-27 on `codex/schema-intel-final-review`. Added `eeat_assets` workspace storage (migration 105 + CRUD routes/store + admin settings tab), intelligence slice registration (`eeatAssets`) with prompt formatter support, and workspace/event/query-key wiring (`eeat-assets:updated`). Added deterministic trust-signal evaluation (`server/eeat-trust-signals.ts`) and threaded it into both single-page and bulk page analysis persistence so `page_keywords` now stores `missingTrustSignals` + `eeatAssetRecommendations` and clears them on re-analysis resets. Content brief generation now injects specific E-E-A-T asset recommendations (page-level first, workspace fallback) instead of generic trust guidance. Schema generation now receives workspace E-E-A-T inventory through schema context and enriches Article author structured data with job title, identity links, and credential nodes when available. Added guardrail documentation at `docs/rules/eeat-asset-library.md`.",
+          "status": "done",
+          "shippedAt": "2026-05-27"
         },
         {
           "id": 634,

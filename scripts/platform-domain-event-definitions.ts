@@ -218,6 +218,7 @@ const CONTEXT_BY_EVENT_KEY: Record<WsEventKey, BoundedContextId> = {
   STRATEGY_UPDATED: 'seo-health',
   RANK_TRACKING_UPDATED: 'seo-health',
   LOCAL_SEO_UPDATED: 'seo-health',
+  EEAT_ASSETS_UPDATED: 'analytics-intelligence',
 };
 
 const PAYLOAD_NOTE_BY_EVENT_KEY: Partial<Record<WsEventKey, string>> = {
@@ -232,6 +233,7 @@ const PAYLOAD_NOTE_BY_EVENT_KEY: Partial<Record<WsEventKey, string>> = {
   STRATEGY_UPDATED: 'Strategy keyword/score updates and related summary invalidation payload.',
   RANK_TRACKING_UPDATED: 'Rank-tracking keyword lifecycle, snapshot, and strategy reconciliation updates.',
   LOCAL_SEO_UPDATED: 'Local SEO market configuration and visibility refresh updates.',
+  EEAT_ASSETS_UPDATED: 'E-E-A-T workspace trust-asset inventory updates for content, schema, and page-analysis consumers.',
 };
 
 const INVALIDATION_OVERRIDES: Partial<Record<WsEventKey, string[]>> = {
@@ -246,6 +248,7 @@ const INVALIDATION_OVERRIDES: Partial<Record<WsEventKey, string[]>> = {
   STRATEGY_UPDATED: ['queryKeys.admin.keywordStrategy', 'queryKeys.client.strategy', 'queryKeys.admin.workspaceHome'],
   RANK_TRACKING_UPDATED: ['queryKeys.admin.rankTracking*', 'queryKeys.client.rankTracking*', 'queryKeys.admin.keywordStrategy', 'queryKeys.client.strategy', 'queryKeys.admin.pageKeywords', 'queryKeys.admin.intelligence'],
   LOCAL_SEO_UPDATED: ['queryKeys.admin.localSeo', 'queryKeys.admin.keywordCommandCenter', 'queryKeys.admin.keywordStrategy'],
+  EEAT_ASSETS_UPDATED: ['queryKeys.admin.eeatAssets', 'queryKeys.admin.intelligence', 'queryKeys.admin.keywordStrategy'],
 };
 
 const ACTIVITY_OVERRIDES: Partial<Record<WsEventKey, string[]>> = {
@@ -267,6 +270,7 @@ const ACTIVITY_OVERRIDES: Partial<Record<WsEventKey, string[]>> = {
   STRATEGY_UPDATED: ['client_keyword_feedback', 'client_keyword_tracked'],
   RANK_TRACKING_UPDATED: ['rank_tracking_updated', 'rank_snapshot'],
   LOCAL_SEO_UPDATED: ['local_seo_updated'],
+  EEAT_ASSETS_UPDATED: ['eeat_asset_created', 'eeat_asset_updated', 'eeat_asset_deleted'],
 };
 
 function collectTsFiles(dir: string): string[] {
