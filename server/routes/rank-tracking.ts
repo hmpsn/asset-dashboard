@@ -4,6 +4,7 @@
 import { Router } from 'express';
 
 import { requireWorkspaceAccess } from '../auth.js';
+import { requireAuthenticatedClientPortalAuth } from '../middleware.js';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import {
@@ -121,8 +122,11 @@ router.get('/api/rank-tracking/:workspaceId/latest', requireWorkspaceAccess('wor
   res.json(getLatestRanks(req.params.workspaceId));
 });
 
-// Public: client can view rank history
-router.get('/api/public/rank-tracking/:workspaceId/history', (req, res) => {
+// Public: client can view rank history. requireAuthenticatedClientPortalAuth
+// guarantees an authenticated session even on workspaces with no
+// clientPassword set — without it, the global app gate at server/app.ts:262
+// would short-circuit on passwordless workspaces and leak rank data.
+router.get('/api/public/rank-tracking/:workspaceId/history', requireAuthenticatedClientPortalAuth(), (req, res) => {
   const limit = parseHistoryLimit(req.query.limit);
   if (limit == null) return res.status(400).json({ error: 'limit must be a positive integer' });
   const queries = req.query.queries ? (req.query.queries as string).split(',') : undefined;
@@ -130,7 +134,7 @@ router.get('/api/public/rank-tracking/:workspaceId/history', (req, res) => {
 });
 
 // Public: client can view latest ranks
-router.get('/api/public/rank-tracking/:workspaceId/latest', (req, res) => {
+router.get('/api/public/rank-tracking/:workspaceId/latest', requireAuthenticatedClientPortalAuth(), (req, res) => {
   res.json(getLatestRanks(req.params.workspaceId));
 });
 

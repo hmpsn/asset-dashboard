@@ -511,24 +511,23 @@ describe('GET /api/rank-tracking/:workspaceId/history — edge cases', () => {
 // ─── Public endpoints — basic guard ──────────────────────────────────────────
 
 describe('Public rank-tracking endpoints — basic contract', () => {
-  it('GET /api/public/rank-tracking/:workspaceId/history returns 200 with array', async () => {
+  // Behavior change 2026-05-27 (sprint-platform-health-wave8 Plan A Task 1):
+  // both endpoints now require authenticated portal access. Auth runs before
+  // request validation, so even a 400-shaped request (negative limit) hits
+  // the 401 first. Full 200/401/cross-workspace coverage with a real session
+  // lives in tests/integration/public-endpoint-auth.test.ts.
+  it('GET /api/public/rank-tracking/:workspaceId/history without portal session returns 401', async () => {
     const res = await api(`/api/public/rank-tracking/${wsId}/history`);
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(Array.isArray(body)).toBe(true);
+    expect(res.status).toBe(401);
   });
 
-  it('GET /api/public/rank-tracking/:workspaceId/latest returns 200 with array', async () => {
+  it('GET /api/public/rank-tracking/:workspaceId/latest without portal session returns 401', async () => {
     const res = await api(`/api/public/rank-tracking/${wsId}/latest`);
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(Array.isArray(body)).toBe(true);
+    expect(res.status).toBe(401);
   });
 
-  it('GET /api/public/rank-tracking/:workspaceId/history negative limit returns 400', async () => {
+  it('GET /api/public/rank-tracking/:workspaceId/history without portal session also 401s on invalid limit (auth runs first)', async () => {
     const res = await api(`/api/public/rank-tracking/${wsId}/history?limit=-1`);
-    expect(res.status).toBe(400);
-    const body = await res.json() as { error: string };
-    expect(body.error).toBe('limit must be a positive integer');
+    expect(res.status).toBe(401);
   });
 });

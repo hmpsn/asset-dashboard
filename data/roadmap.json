@@ -1419,6 +1419,15 @@
           "notes": "Security finding. `server/routes/rank-tracking.ts:125,133` and `server/routes/public-portal.ts:310` (audit-traffic) lack `requireClientPortalAuth`. Admin equivalents (`rank-tracking.ts:112,120`) use `requireWorkspaceAccess`. Ranking data and GA/GSC page metrics currently leak to anyone with a known workspaceId. [Expanded 2026-05-27 during plan verification] `server/routes/anomalies.ts:27` (public GET) also lacks auth, and admin mutations `anomalies.ts:34,43` (dismiss/acknowledge) have no workspace guard at all. Bundle all six fixes plus a pr-check rule that flags new routes mounted on the `/api/public/` prefix without an explicit auth middleware or a documented `// public-no-auth-ok` hatch."
         },
         {
+          "id": "audit-drift-public-route-auth-sweep-followup",
+          "title": "Sweep remaining /api/public/ routes onto requireAuthenticatedClientPortalAuth + migrate tests",
+          "source": "Plan A Task 1 implementation discovery 2026-05-27",
+          "est": "8-14h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "While implementing the P0 endpoint-auth fix we found ~19 additional /api/public/<resource>/:workspaceId routes that rely on the global app gate (server/app.ts:262) without per-route portal auth. The global gate short-circuits on workspaces with no clientPassword, so each of these still leaks data during the pre-setup window. Files grandfathered in the pr-check rule's exclude list: public-portal.ts (12 routes), public-content.ts (mutations beyond the file-level router.use covered ones), public-requests.ts (6), recommendations.ts (2), reports.ts (3), stripe.ts (2), work-orders.ts (2). Migration is large because adding requireAuthenticatedClientPortalAuth() broke ~798 existing integration tests that seed workspaces without clientPassword and expect 200 on public endpoints. Sweep route-by-route, updating each integration-test file in the same PR to authenticate via /api/public/auth/:id before hitting data endpoints. When a file's routes are all migrated, remove that file from the pr-check rule's exclude list. Coordinate with the broader test-fixture refactor (consider a shared `authenticatePortal(ctx, wsId)` helper)."
+        },
+        {
           "id": "audit-drift-trial-state-canonical",
           "title": "Canonicalize isTrial / trialDaysRemaining via computeEffectiveTier",
           "source": "Platform audit 2026-05-27",

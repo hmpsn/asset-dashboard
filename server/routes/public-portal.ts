@@ -12,7 +12,7 @@ import { validate, z } from '../middleware/validate.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { hasClientUsers, verifyClientToken } from '../client-users.js';
-import { verifyClientSession } from '../middleware.js';
+import { requireAuthenticatedClientPortalAuth, verifyClientSession } from '../middleware.js';
 import { getLatestSnapshotBefore } from '../reports.js';
 import { getEffectiveAudit, getLatestEffectiveSnapshot, listEffectiveSnapshotSummaries } from '../audit-snapshot-views.js';
 import { isStripeConfigured, listProducts } from '../stripe.js';
@@ -306,8 +306,10 @@ router.get('/api/public/audit-detail/:workspaceId', (req, res) => {
 });
 
 // Client lists their fix orders (public, no auth needed — filtered to fix category only)
-// Client-facing audit traffic map (public, by workspaceId)
-router.get('/api/public/audit-traffic/:workspaceId', async (req, res) => {
+// Client-facing audit traffic map. requireAuthenticatedClientPortalAuth so
+// passwordless workspaces also require real auth — see global gate caveat
+// in server/app.ts:262.
+router.get('/api/public/audit-traffic/:workspaceId', requireAuthenticatedClientPortalAuth(), async (req, res) => {
   try {
     const ws = getWorkspace(req.params.workspaceId);
     if (!ws) return res.json({});

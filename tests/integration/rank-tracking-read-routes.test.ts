@@ -15,15 +15,20 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
-import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 
 const ctx = createTestContext(13610);
-const { api } = ctx;
+const { api, postJson } = ctx;
 let wsId = '';
 
 beforeAll(async () => {
   await ctx.startServer();
   wsId = createWorkspace('Rank Tracking Read WS 13610').id;
+  // Public rank-tracking endpoints now require authenticated portal access
+  // (sprint-platform-health-wave8 Plan A Task 1). Seed password + login.
+  updateWorkspace(wsId, { clientPassword: 'test-password' });
+  const authRes = await postJson(`/api/public/auth/${wsId}`, { password: 'test-password' });
+  expect(authRes.status).toBe(200);
 }, 25_000);
 
 afterAll(async () => {

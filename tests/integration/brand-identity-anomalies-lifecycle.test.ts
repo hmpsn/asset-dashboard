@@ -469,14 +469,16 @@ describe('POST /api/anomalies/:anomalyId/acknowledge', () => {
   });
 });
 
-describe('GET /api/public/anomalies/:workspaceId — no auth required', () => {
-  it('returns anomalies without authentication headers', async () => {
+describe('GET /api/public/anomalies/:workspaceId — requires portal auth', () => {
+  // Behavior change 2026-05-27 (sprint-platform-health-wave8 Plan A Task 1):
+  // the endpoint moved from "no auth required" to
+  // `requireAuthenticatedClientPortalAuth`, which rejects passwordless
+  // workspaces. This test now asserts the auth gate engages.
+  it('returns 401 without authentication headers', async () => {
     const id = seedAnomaly({ workspaceId: wsA });
     try {
       const res = await api(`/api/public/anomalies/${wsA}`);
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(Array.isArray(body)).toBe(true);
+      expect(res.status).toBe(401);
     } finally {
       db.prepare('DELETE FROM anomalies WHERE id = ?').run(id);
     }

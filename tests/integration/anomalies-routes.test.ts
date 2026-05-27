@@ -10,7 +10,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
-import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 
 const ctx = createTestContext(13216);
 const { api, postJson } = ctx;
@@ -21,6 +21,13 @@ beforeAll(async () => {
   await ctx.startServer();
   const ws = createWorkspace('Anomalies Test Workspace');
   testWsId = ws.id;
+  // Public anomaly endpoints now use requireAuthenticatedClientPortalAuth
+  // (see sprint-platform-health-wave8-audit-drift-closure Plan A Task 1).
+  // Seed a portal password and authenticate so the test client gets a session
+  // cookie. Without this the public GET returns 401 even on a fresh workspace.
+  updateWorkspace(testWsId, { clientPassword: 'test-password' });
+  const authRes = await postJson(`/api/public/auth/${testWsId}`, { password: 'test-password' });
+  expect(authRes.status).toBe(200);
 }, 25_000);
 
 afterAll(async () => {
