@@ -6738,6 +6738,40 @@ export const CHECKS: Check[] = [
       return matches;
     },
   },
+
+  // ── Workspace spread-and-redact guard (audit-drift sprint) ─────────────
+  {
+    name: 'Workspace object spread-and-redact in route handler',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    exclude: ['tests/'],
+    message: 'Use toAdminWorkspaceView(ws) from server/serializers/admin-workspace-view.ts instead of { ...ws, webflowToken: undefined }. Spread-and-redact silently leaks new fields added to Workspace.',
+    severity: 'error',
+    excludeLines: ['admin-view-ok'],
+    rationale: 'Allow-list serializer prevents secret leakage when new fields are added to the Workspace interface.',
+    claudeMdRef: '#admin-workspace-view-serializer',
+    customCheck: (files) => {
+      const matches: { file: string; line: number; text: string }[] = [];
+      const spreadRe = /\{\s*\.\.\.ws(?![.\w])|\{\s*\.\.\.workspace(?![.\w])/;
+      const redactRe = /webflowToken\s*:\s*undefined|clientPassword\s*:\s*undefined/;
+      for (const file of files) {
+        let text: string;
+        try {
+          text = readFileSync(file, 'utf8');
+        } catch {
+          continue;
+        }
+        const lines = text.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (!spreadRe.test(line) && !redactRe.test(line)) continue;
+          if (hasHatch(lines, i, 'admin-view-ok')) continue;
+          matches.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return matches;
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

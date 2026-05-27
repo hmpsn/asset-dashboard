@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **141** — 126 error, 15 warn.
+Total rules: **142** — 127 error, 15 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -142,6 +142,7 @@ advisory but tracked.
 | 124 | mcp-action-must-tag-source | error | custom | `server/mcp/tools/` | `mcp-action-must-tag-source-ok` | mcp-chat-tagged activity entries get a "chat" badge in the activity feed so operators can audit chat-driven mutations. |
 | 125 | mcp-action-must-broadcast | error | custom | `server/mcp/tools/` | `mcp-action-must-broadcast-ok` | broadcast pairs every write so React Query caches stay fresh; MCP tools own this since the underlying service functions are unbroadcast. |
 | 126 | Inline trial-state computation outside billing module | error | custom | `server/` | `trial-state-ok` | Centralizes trial logic in one function so admin and client serializers cannot drift. |
+| 127 | Workspace object spread-and-redact in route handler | error | custom | `server/routes/` | `admin-view-ok` | Allow-list serializer prevents secret leakage when new fields are added to the Workspace interface. |
 
 ---
 

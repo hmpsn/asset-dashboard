@@ -204,8 +204,9 @@ explicit justification.
 | focus-visible-ring-contract | customCheck-fixture | Styleguide parity ratchet Wave 19 (2026-05-17). Rule flags `focus:outline-none` usage without explicit `focus-visible:ring-*` or `focus-visible:outline-*` fallback and supports `// focus-ring-ok` for intentional exceptions. Existing fixture coverage in `tests/pr-check.test.ts` validates trigger, fallback negative, and hatch behavior. Full-repo scan reports ✓ after migrating remaining keyboard-focusable controls to include focus-visible ring affordances. |
 | stat-primitive-bypass-signal | customCheck-fixture | Styleguide parity ratchet Wave 19 (2026-05-17). Rule flags `t-stat*` typography use in non-primitive component files that do not compose `StatCard`, `CompactStatBar`, or `Stat`, with `// stat-primitive-ok` hatches for intentional exceptions. Existing fixture coverage in `tests/pr-check.test.ts` validates trigger, primitive-present negative, and hatch behavior. Full-repo scan reports ✓ after migrating remaining callsites to canonical typography hierarchy and stat primitives. |
 | Inline trial-state computation outside billing module | customCheck-fixture | Audit-drift sprint (2026-05-27). Rule flags inline `new Date(trialEndsAt)` and `trialEndsAt >` comparisons outside the canonical `server/billing/trial-state.ts` module. Existing uses carry `// trial-state-ok` hatches. Fixture coverage in `tests/pr-check.test.ts` validates trigger, canonical-file exclusion, import/comment skip, and inline/above-line hatch behavior. Full-repo scan reports ✓ after centralizing all trial computations. |
+| Workspace object spread-and-redact in route handler | customCheck-fixture | Audit-drift sprint (2026-05-27). Rule flags `{ ...ws,` / `{ ...workspace,` spreads and `webflowToken: undefined` / `clientPassword: undefined` redactions in `server/routes/`. All three sites in `workspaces.ts` migrated to `toAdminWorkspaceView(ws)`. Fixture coverage validates trigger for spread, standalone redact, serializer-based negative, and `// admin-view-ok` hatch. Full-repo scan reports ✓. |
 
-**Count: 135 verified-clean rules.**
+**Count: 136 verified-clean rules.**
 
 ---
 

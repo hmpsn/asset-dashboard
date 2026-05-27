@@ -4773,6 +4773,8 @@ describe('Meta: customCheck rule name registry', () => {
     'mcp-action-must-broadcast',
     // Audit-drift sprint — trial-state centralization
     'Inline trial-state computation outside billing module',
+    // Audit-drift sprint — admin workspace view serializer
+    'Workspace object spread-and-redact in route handler',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -8660,6 +8662,76 @@ describe('Rule: Inline trial-state computation outside billing module', () => {
         '  // trial-state-ok — canonical resolver',
         '  const trialEnd = new Date(ws.trialEndsAt);',
         '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: Workspace object spread-and-redact in route handler', () => {
+  const RULE = 'Workspace object spread-and-redact in route handler';
+
+  it('flags { ...ws, webflowToken: undefined } pattern', () => {
+    const file = write(
+      uniqPath('rule-ws-spread', 'server/routes/example.ts'),
+      lines(
+        'const safe = { ...ws, webflowToken: undefined, clientPassword: undefined };',
+        'res.json(safe);',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('flags { ...workspace, ... } spread', () => {
+    const file = write(
+      uniqPath('rule-ws-spread', 'server/routes/example2.ts'),
+      lines(
+        'const safe = { ...workspace, webflowToken: undefined };',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('flags standalone redact in object literal', () => {
+    const file = write(
+      uniqPath('rule-ws-spread', 'server/routes/example3.ts'),
+      lines(
+        'const obj = { webflowToken: undefined };',
+        'const obj2 = { clientPassword: undefined };',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(2);
+  });
+
+  it('does NOT flag toAdminWorkspaceView usage', () => {
+    const file = write(
+      uniqPath('rule-ws-spread', 'server/routes/example4.ts'),
+      lines(
+        'import { toAdminWorkspaceView } from "../serializers/admin-workspace-view.js";',
+        'const safe = toAdminWorkspaceView(ws);',
+        'res.json(safe);',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // admin-view-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-ws-spread', 'server/routes/example5.ts'),
+      lines(
+        'const safe = { ...ws, webflowToken: undefined }; // admin-view-ok — overview endpoint',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag property-access spread like { ...ws.keywordStrategy }', () => {
+    const file = write(
+      uniqPath('rule-ws-spread', 'server/routes/example6.ts'),
+      lines(
+        'updateWorkspace(wsId, { keywordStrategy: { ...ws.keywordStrategy, businessContext } });',
       )
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
