@@ -11,7 +11,7 @@
 import { z } from '../middleware/validate.js';
 import { parseAIJsonRaw } from './_parse-ai-json.js';
 
-// ── Outline section (mirrors outlineItemSchema but strict) ──────────────────
+// ── Outline section (mirrors outlineItemSchema) ────────────────────────────
 
 const outlineItemStrictSchema = z.object({
   heading: z.string(),
@@ -19,7 +19,7 @@ const outlineItemStrictSchema = z.object({
   notes: z.string(),
   wordCount: z.number().optional(),
   keywords: z.array(z.string()).optional(),
-}).strict();
+}).passthrough(); // AI output often includes extra fields; passthrough matches canonical outlineItemSchema
 
 /**
  * Schema for the outline-regeneration AI caller.

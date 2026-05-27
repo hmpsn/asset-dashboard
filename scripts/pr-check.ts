@@ -7164,8 +7164,9 @@ export const CHECKS: Check[] = [
     claudeMdRef: '#ai-operation-contracts',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
-      // Matches JSON.parse( where the arg name suggests it's an AI response string
-      const aiParseRe = /JSON\.parse\(\s*(raw|response|aiText|completion|text|output|result\.text|rawText|cleaned)\b/;
+      // Matches JSON.parse( where the arg name suggests it's an AI response string.
+      // Also covers result?.text (optional chaining) and result.text.trim() style usages.
+      const aiParseRe = /JSON\.parse\(\s*(raw|response|aiText|completion|text|output|result\??\.text|rawText|cleaned)\b/;
       const aiImportRe = /from ['"][^'"]*\/(?:ai|openai-helpers|anthropic-helpers|ai-operation-registry)\.js['"]/;
       for (const file of files) {
         if (!file.endsWith('.ts')) continue;
