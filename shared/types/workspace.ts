@@ -1,5 +1,6 @@
 // ── Workspace domain types ──────────────────────────────────────
 import type { MetricsSource, PageOptimizationScoreSnapshot, UrlLevelKeyword } from './keywords.ts';
+import type { EeatAssetRecommendation, MissingTrustSignal } from './eeat-assets.ts';
 
 export interface EventGroup {
   id: string;
@@ -46,6 +47,10 @@ export interface PageKeywordMap {
   contentGaps?: string[];
   optimizationScore?: number;
   analysisGeneratedAt?: string;
+  /** Deterministic trust-signal gaps derived from page type + available E-E-A-T assets. */
+  missingTrustSignals?: MissingTrustSignal[];
+  /** Top E-E-A-T assets recommended for this page's trust gaps. */
+  eeatAssetRecommendations?: EeatAssetRecommendation[];
   // Extended analysis fields (persisted for full report hydration)
   primaryKeywordPresence?: { inTitle: boolean; inMeta: boolean; inContent: boolean; inSlug: boolean };
   longTailKeywords?: string[];

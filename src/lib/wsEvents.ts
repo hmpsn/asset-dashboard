@@ -85,6 +85,9 @@ export const WS_EVENTS = {
   // Local SEO
   LOCAL_SEO_UPDATED: 'local-seo:updated',
 
+  // E-E-A-T assets
+  EEAT_ASSETS_UPDATED: 'eeat-assets:updated',
+
   // Client Briefing (weekly editorial)
   BRIEFING_GENERATED: 'briefing:generated',
   BRIEFING_PUBLISHED: 'briefing:published',

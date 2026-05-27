@@ -9,6 +9,11 @@ import { randomUUID } from 'crypto';
 import db from './db/index.js';
 import type { PageKeywordMap } from '../shared/types/workspace.ts';
 import type { MetricsSource, PageOptimizationScoreSnapshot, UrlLevelKeyword } from '../shared/types/keywords.js';
+import {
+  EEAT_ASSET_TYPE,
+  EEAT_RECOMMENDATION_SURFACE,
+  TRUST_SIGNAL_SEVERITY,
+} from '../shared/types/eeat-assets.js';
 import { normalizePath } from './helpers.js';
 import { createLogger } from './logger.js';
 import { parseJsonSafeArray, parseJsonFallback } from './db/json-validation.js';
@@ -54,6 +59,8 @@ interface PageKeywordRow {
   topic_cluster: string | null;
   search_intent_confidence: number | null;
   serp_features: string | null;
+  missing_trust_signals: string | null;
+  eeat_asset_recommendations: string | null;
 }
 
 interface PageKeywordScoreHistoryRow {
@@ -71,6 +78,48 @@ const urlLevelKeywordSchema = z.object({
   difficulty: z.number(),
   cpc: z.number(),
   traffic: z.number().optional(),
+  url: z.string().optional(),
+}).strip();
+
+const missingTrustSignalSchema = z.object({
+  signal: z.string(),
+  rationale: z.string(),
+  severity: z.enum([
+    TRUST_SIGNAL_SEVERITY.HIGH,
+    TRUST_SIGNAL_SEVERITY.MEDIUM,
+    TRUST_SIGNAL_SEVERITY.LOW,
+  ]),
+  recommendedAssetTypes: z.array(z.enum([
+    EEAT_ASSET_TYPE.TESTIMONIAL,
+    EEAT_ASSET_TYPE.CASE_STUDY,
+    EEAT_ASSET_TYPE.CREDENTIAL,
+    EEAT_ASSET_TYPE.BEFORE_AFTER_GALLERY,
+    EEAT_ASSET_TYPE.TEAM_BIO,
+    EEAT_ASSET_TYPE.AWARD,
+    EEAT_ASSET_TYPE.RESEARCH,
+    EEAT_ASSET_TYPE.CLIENT_LOGO,
+  ])),
+}).strip();
+
+const eeatAssetRecommendationSchema = z.object({
+  assetId: z.string(),
+  type: z.enum([
+    EEAT_ASSET_TYPE.TESTIMONIAL,
+    EEAT_ASSET_TYPE.CASE_STUDY,
+    EEAT_ASSET_TYPE.CREDENTIAL,
+    EEAT_ASSET_TYPE.BEFORE_AFTER_GALLERY,
+    EEAT_ASSET_TYPE.TEAM_BIO,
+    EEAT_ASSET_TYPE.AWARD,
+    EEAT_ASSET_TYPE.RESEARCH,
+    EEAT_ASSET_TYPE.CLIENT_LOGO,
+  ]),
+  title: z.string(),
+  reason: z.string(),
+  surface: z.enum([
+    EEAT_RECOMMENDATION_SURFACE.CONTENT_BRIEF,
+    EEAT_RECOMMENDATION_SURFACE.PAGE_INTELLIGENCE,
+    EEAT_RECOMMENDATION_SURFACE.SCHEMA,
+  ]),
   url: z.string().optional(),
 }).strip();
 
@@ -121,6 +170,18 @@ function rowToModel(r: PageKeywordRow, optimizationScoreHistory: PageOptimizatio
   if (r.topic_cluster) m.topicCluster = r.topic_cluster;
   if (r.search_intent_confidence != null) m.searchIntentConfidence = r.search_intent_confidence;
   if (r.serp_features) m.serpFeatures = parseJsonSafeArray(r.serp_features, z.string(), { table: 'page_keywords', field: 'serp_features' });
+  if (r.missing_trust_signals) {
+    m.missingTrustSignals = parseJsonSafeArray(r.missing_trust_signals, missingTrustSignalSchema, {
+      table: 'page_keywords',
+      field: 'missing_trust_signals',
+    });
+  }
+  if (r.eeat_asset_recommendations) {
+    m.eeatAssetRecommendations = parseJsonSafeArray(r.eeat_asset_recommendations, eeatAssetRecommendationSchema, {
+      table: 'page_keywords',
+      field: 'eeat_asset_recommendations',
+    });
+  }
   return m;
 }
 
@@ -159,6 +220,8 @@ function modelToParams(workspaceId: string, m: PageKeywordMap, preserveAnalysisF
     topic_cluster: m.topicCluster ?? null,
     search_intent_confidence: m.searchIntentConfidence ?? null,
     serp_features: m.serpFeatures ? JSON.stringify(m.serpFeatures) : null,
+    missing_trust_signals: m.missingTrustSignals ? JSON.stringify(m.missingTrustSignals) : null,
+    eeat_asset_recommendations: m.eeatAssetRecommendations ? JSON.stringify(m.eeatAssetRecommendations) : null,
     preserve_analysis_fields: preserveAnalysisFields ? 1 : 0,
   };
 }
@@ -181,7 +244,7 @@ const stmts = createStmtCache(() => ({
       optimization_score, analysis_generated_at, optimization_issues, recommendations,
       content_gaps, primary_keyword_presence, long_tail_keywords, competitor_keywords,
       estimated_difficulty, keyword_difficulty, monthly_volume, topic_cluster, search_intent_confidence,
-      serp_features
+      serp_features, missing_trust_signals, eeat_asset_recommendations
     ) VALUES (
       @workspace_id, @page_path, @page_title, @primary_keyword, @secondary_keywords,
       @search_intent, @current_position, @previous_position, @impressions, @clicks,
@@ -190,7 +253,7 @@ const stmts = createStmtCache(() => ({
       @optimization_score, @analysis_generated_at, @optimization_issues, @recommendations,
       @content_gaps, @primary_keyword_presence, @long_tail_keywords, @competitor_keywords,
       @estimated_difficulty, @keyword_difficulty, @monthly_volume, @topic_cluster, @search_intent_confidence,
-      @serp_features
+      @serp_features, @missing_trust_signals, @eeat_asset_recommendations
     )
     ON CONFLICT(workspace_id, page_path) DO UPDATE SET
       page_title = excluded.page_title,
@@ -223,7 +286,9 @@ const stmts = createStmtCache(() => ({
       monthly_volume = CASE WHEN @preserve_analysis_fields = 1 THEN COALESCE(excluded.monthly_volume, page_keywords.monthly_volume) ELSE excluded.monthly_volume END,
       topic_cluster = CASE WHEN @preserve_analysis_fields = 1 THEN COALESCE(excluded.topic_cluster, page_keywords.topic_cluster) ELSE excluded.topic_cluster END,
       search_intent_confidence = CASE WHEN @preserve_analysis_fields = 1 THEN COALESCE(excluded.search_intent_confidence, page_keywords.search_intent_confidence) ELSE excluded.search_intent_confidence END,
-      serp_features = CASE WHEN @preserve_analysis_fields = 1 THEN COALESCE(excluded.serp_features, page_keywords.serp_features) ELSE excluded.serp_features END
+      serp_features = CASE WHEN @preserve_analysis_fields = 1 THEN COALESCE(excluded.serp_features, page_keywords.serp_features) ELSE excluded.serp_features END,
+      missing_trust_signals = CASE WHEN @preserve_analysis_fields = 1 THEN COALESCE(excluded.missing_trust_signals, page_keywords.missing_trust_signals) ELSE excluded.missing_trust_signals END,
+      eeat_asset_recommendations = CASE WHEN @preserve_analysis_fields = 1 THEN COALESCE(excluded.eeat_asset_recommendations, page_keywords.eeat_asset_recommendations) ELSE excluded.eeat_asset_recommendations END
   `),
   deleteOne: db.prepare<[workspaceId: string, pagePath: string]>(
     'DELETE FROM page_keywords WHERE workspace_id = ? AND page_path = ?',
@@ -245,7 +310,9 @@ const stmts = createStmtCache(() => ({
       keyword_difficulty = NULL,
       monthly_volume = NULL,
       topic_cluster = NULL,
-      search_intent_confidence = NULL
+      search_intent_confidence = NULL,
+      missing_trust_signals = NULL,
+      eeat_asset_recommendations = NULL
     WHERE workspace_id = ?
   `),
   countByWs: db.prepare<[workspaceId: string]>(

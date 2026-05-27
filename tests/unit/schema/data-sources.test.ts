@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { extractPageData } from '../../../server/schema/data-sources.js';
+import { EEAT_ASSET_TYPE } from '../../../shared/types/eeat-assets.js';
 
 const baseUrl = 'https://example.com';
 
@@ -295,6 +296,126 @@ describe('extractPageData — article quality hardening', () => {
       html: '<article><p>Body.</p></article>',
     });
     expect(fallback.author).toBeUndefined();
+  });
+
+  it('does not attach E-E-A-T metadata when CMS author differs from E-E-A-T profile author', () => {
+    const data = extractPageData({
+      ...articleBaseInput,
+      pageMeta: {
+        title: 'CMS Author',
+        slug: 'cms-author-no-eeat-merge',
+        publishedPath: '/blog/cms-author-no-eeat-merge',
+        seo: {},
+        cmsFieldData: { author: 'CMS Person' },
+      },
+      html: '<article><p>Body.</p></article>',
+      workspace: {
+        ...articleBaseInput.workspace,
+        eeatAssets: [
+          {
+            id: 'bio-1',
+            workspaceId: 'ws',
+            type: EEAT_ASSET_TYPE.TEAM_BIO,
+            title: 'Principal Strategist',
+            metadata: {
+              attributionName: 'Jane Expert',
+              attributionRole: 'Founder',
+            },
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+          {
+            id: 'cred-1',
+            workspaceId: 'ws',
+            type: EEAT_ASSET_TYPE.CREDENTIAL,
+            title: 'Google Analytics Certification',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      },
+    });
+
+    expect(data.author).toBe('CMS Person');
+    expect(data.authorJobTitle).toBeUndefined();
+    expect(data.authorSameAs).toBeUndefined();
+    expect(data.authorCredentials).toBeUndefined();
+  });
+
+  it('applies E-E-A-T metadata when byline author matches E-E-A-T profile author', () => {
+    const data = extractPageData({
+      ...articleBaseInput,
+      pageMeta: {
+        title: 'Visible Author Match',
+        slug: 'visible-author-match',
+        publishedPath: '/blog/visible-author-match',
+        seo: {},
+      },
+      html: '<article><p class="byline">By Jane Expert</p><p>Body.</p></article>',
+      workspace: {
+        ...articleBaseInput.workspace,
+        eeatAssets: [
+          {
+            id: 'bio-1',
+            workspaceId: 'ws',
+            type: EEAT_ASSET_TYPE.TEAM_BIO,
+            title: 'Lead Strategist',
+            url: 'https://example.com/team/jane-expert',
+            metadata: {
+              attributionName: 'Jane Expert',
+              attributionRole: 'Founder',
+              sourceUrl: 'https://www.linkedin.com/in/jane-expert',
+            },
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+          {
+            id: 'cred-1',
+            workspaceId: 'ws',
+            type: EEAT_ASSET_TYPE.CREDENTIAL,
+            title: 'Google Analytics Certification',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      },
+    });
+
+    expect(data.author).toBe('Jane Expert');
+    expect(data.authorJobTitle).toBe('Founder');
+    expect(data.authorCredentials).toEqual(['Google Analytics Certification']);
+    expect(data.authorSameAs).toEqual([
+      'https://example.com/team/jane-expert',
+      'https://www.linkedin.com/in/jane-expert',
+    ]);
+  });
+
+  it('does not infer a person author from generic team-bio titles', () => {
+    const data = extractPageData({
+      ...articleBaseInput,
+      pageMeta: {
+        title: 'Generic Team Bio',
+        slug: 'generic-team-bio',
+        publishedPath: '/blog/generic-team-bio',
+        seo: {},
+      },
+      html: '<article><p>Body.</p></article>',
+      workspace: {
+        ...articleBaseInput.workspace,
+        eeatAssets: [
+          {
+            id: 'bio-1',
+            workspaceId: 'ws',
+            type: EEAT_ASSET_TYPE.TEAM_BIO,
+            title: 'Leadership Team',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      },
+    });
+
+    expect(data.author).toBeUndefined();
   });
 });
 

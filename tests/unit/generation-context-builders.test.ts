@@ -47,7 +47,7 @@ describe('generation context builders', () => {
 
     expect(buildWorkspaceIntelligence).toHaveBeenCalledTimes(1);
     expect(buildWorkspaceIntelligence).toHaveBeenCalledWith('ws-content', {
-      slices: ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline'],
+      slices: ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline', 'eeatAssets'],
       pagePath: undefined,
       learningsDomain: 'content',
       enrichWithBacklinks: undefined,
@@ -58,7 +58,7 @@ describe('generation context builders', () => {
       tokenBudget: undefined,
       learningsDomain: 'content',
     });
-    expect(result.slices).toEqual(['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline']);
+    expect(result.slices).toEqual(['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline', 'eeatAssets']);
     expect(result.promptContext).toBe('[Workspace Intelligence]');
     expect(result.learningsDomain).toBe('content');
     expect(result.learningsAvailability).toBe('ready');
@@ -77,7 +77,7 @@ describe('generation context builders', () => {
     const result = await buildContentGenerationContext('ws-page', { pagePath: '/pricing' });
 
     expect(buildWorkspaceIntelligence).toHaveBeenCalledWith('ws-page', {
-      slices: ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline', 'pageProfile'],
+      slices: ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline', 'eeatAssets', 'pageProfile'],
       pagePath: '/pricing',
       learningsDomain: 'content',
       enrichWithBacklinks: undefined,

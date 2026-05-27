@@ -669,6 +669,16 @@
       "tier": "growth",
       "impact": "medium",
       "clientFacing": true
+    },
+    {
+      "id": 68,
+      "title": "E-E-A-T Asset Library",
+      "oneLiner": "Central trust-evidence inventory that powers page-level trust-gap detection, specific brief recommendations, and author/credential schema enrichment",
+      "category": "content",
+      "painPoints": ["content-quality", "schema", "ai-seo"],
+      "tier": "growth",
+      "impact": "high",
+      "clientFacing": false
     }
   ]
 }

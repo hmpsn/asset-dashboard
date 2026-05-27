@@ -1,4 +1,5 @@
 import type { MetricsSource } from '../../../shared/types/keywords.js';
+import type { EeatAssetRecommendation, MissingTrustSignal } from '../../../shared/types/eeat-assets.js';
 
 export interface KeywordPresence {
   inTitle: boolean;
@@ -25,6 +26,8 @@ export interface KeywordData {
   topicCluster: string;
   metricsSource?: MetricsSource;
   hasProviderMetrics?: boolean;
+  missingTrustSignals?: MissingTrustSignal[];
+  eeatAssetRecommendations?: EeatAssetRecommendation[];
 }
 
 export interface ContentScore {

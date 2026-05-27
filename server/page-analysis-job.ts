@@ -23,6 +23,8 @@ import { buildStaticPathSet, discoverCmsUrls, getSiteSubdomain, toCmsPageId } fr
 import { getWorkspacePages } from './workspace-data.js';
 import { getWorkspace } from './workspaces.js';
 import { pageAnalysisAiResultSchema } from './schemas/page-analysis.js';
+import { listEeatAssets } from './eeat-assets.js';
+import { EEAT_RECOMMENDATION_SURFACE, evaluatePageTrustSignals } from './eeat-trust-signals.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 import {
   buildWorkspaceIntelligence,
@@ -220,6 +222,12 @@ export async function runPageAnalysisJob({
 
     const TOP_N_SEMRUSH = 10;
     const semrushCache = await prefetchSemrushForTopPages(workspaceId, TOP_N_SEMRUSH);
+    let eeatAssets = [] as ReturnType<typeof listEeatAssets>;
+    try {
+      eeatAssets = listEeatAssets(workspaceId);
+    } catch (err) {
+      log.debug({ err, workspaceId }, 'page-analysis-job: eeat asset inventory unavailable');
+    }
 
     for (let i = 0; i < toAnalyze.length; i += BATCH) {
       if (isJobCancelled(jobId)) break;
@@ -344,6 +352,14 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
           const resolvedPrimaryKeyword = (analysis.primaryKeyword as string) || existing?.primaryKeyword || '';
           const keywordMetrics = providerMetrics.get(resolvedPrimaryKeyword.toLowerCase());
           const guardedMetrics = resolvePersistedKeywordMetrics(existing, resolvedPrimaryKeyword, keywordMetrics);
+          const trustSignals = evaluatePageTrustSignals({
+            pagePath: normalized,
+            pageTitle: page.title,
+            searchIntent: (analysis.searchIntent as string) || existing?.searchIntent,
+            assets: eeatAssets,
+            surface: EEAT_RECOMMENDATION_SURFACE.PAGE_INTELLIGENCE,
+            maxRecommendations: 4,
+          });
           return {
             pagePath: normalized,
             pageTitle: page.title,
@@ -363,6 +379,8 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
             monthlyVolume: guardedMetrics.monthlyVolume,
             topicCluster: analysis.topicCluster as string,
             searchIntentConfidence: analysis.searchIntentConfidence as number,
+            missingTrustSignals: trustSignals.missingTrustSignals,
+            eeatAssetRecommendations: trustSignals.eeatAssetRecommendations,
             // Preserve enrichment fields from existing entry
             ...(existing?.currentPosition != null ? { currentPosition: existing.currentPosition } : {}),
             ...(existing?.impressions != null ? { impressions: existing.impressions } : {}),

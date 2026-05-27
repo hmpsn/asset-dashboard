@@ -21,6 +21,7 @@ import type { SchemaCmsDeliveryStatus, SchemaCollectionIdentity, SiteInventoryCm
 import type { WebflowPage } from './webflow-pages.js';
 import { ENTITY_SURFACES } from '../shared/types/entity-resolution.js';
 import type { EntityResolutionSlice, ResolvedEntity } from '../shared/types/entity-resolution.js';
+import type { EeatAsset } from '../shared/types/eeat-assets.js';
 
 /**
  * AI budget allocation for the page-element AI extractors.
@@ -407,6 +408,7 @@ export interface SchemaContext {
   _siteHasSearch?: boolean;
   /** Validation errors from the prior schema generation for this page — used to avoid repeating known mistakes. */
   _existingErrors?: Array<{ message: string }>;
+  _eeatAssets?: EeatAsset[];
 }
 
 // ── E-E-A-T extraction from content briefs ─────────────────────────
@@ -659,6 +661,7 @@ export async function generateSchemaForPage(
         defaultLocale: ctx._defaultLocale ?? 'en',
         siteKeywordsForKnowsAbout: ctx.siteKeywords,
         siteHasSearch: ctx._siteHasSearch ?? false,
+        eeatAssets: ctx._eeatAssets,
         entityResolution: { knowsAbout: entities.knowsAbout },
         industrySubtype: roleOverride.schemaRoleOverride?.industrySubtype,
       },
@@ -771,6 +774,7 @@ export async function generateSchemaForPage(
       defaultLocale: ctx._defaultLocale ?? 'en',
       siteKeywordsForKnowsAbout: ctx.siteKeywords, // NEW
       siteHasSearch: ctx._siteHasSearch ?? false, // NEW
+      eeatAssets: ctx._eeatAssets,
       entityResolution: { knowsAbout: entities.knowsAbout },
       industrySubtype: roleOverride.schemaRoleOverride?.industrySubtype,
     },
@@ -887,6 +891,7 @@ export async function generateSchemaSuggestions(
         defaultLocale: ctx._defaultLocale ?? 'en',
         siteKeywordsForKnowsAbout: ctx.siteKeywords, // NEW
         siteHasSearch: ctx._siteHasSearch ?? false, // NEW
+        eeatAssets: ctx._eeatAssets,
         entityResolution: { knowsAbout: entities.knowsAbout },
         industrySubtype: roleOverride.schemaRoleOverride?.industrySubtype,
       },
@@ -962,6 +967,7 @@ export async function generateSchemaSuggestions(
           defaultLocale: ctx._defaultLocale ?? 'en',
           siteKeywordsForKnowsAbout: ctx.siteKeywords, // NEW
           siteHasSearch: ctx._siteHasSearch ?? false, // NEW
+          eeatAssets: ctx._eeatAssets,
           entityResolution: { knowsAbout: entities.knowsAbout },
           industrySubtype: roleOverride.schemaRoleOverride?.industrySubtype,
         },

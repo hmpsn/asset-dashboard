@@ -6709,3 +6709,25 @@ Service and location page brief defaults are now shorter and more conversion-den
 **Boundaries:** No DB, route, UI, storage, WebSocket, React Query, model, token, or temperature changes. This is prompt-contract behavior only; subjective quality remains human-reviewed on staging.
 
 **Files:** `server/page-type-copy-contract.ts`; `server/content-posts-ai.ts`; `server/content-brief.ts`; `server/copy-generation.ts`; `tests/unit/content-quality-rules.test.ts`; `tests/unit/content-posts-ai.test.ts`; `tests/unit/copy-generation-pure.test.ts`; `tests/unit/content-brief.test.ts`; `docs/rules/brand-engine.md`; `docs/rules/ai-quality-evals.md`; `FEATURE_AUDIT.md`.
+
+## E-E-A-T Asset Library — Personalized Trust Signal Recommendations
+
+**Status:** Shipped 2026-05-27
+**Roadmap:** `#356`
+
+**What it does:** Adds a workspace-level E-E-A-T asset library and threads it through the intelligence, content, Page Intelligence, and schema paths so trust guidance is no longer generic.
+
+- Added a new admin settings surface for E-E-A-T asset inventory management (`testimonial`, `case_study`, `credential`, `before_after_gallery`, `team_bio`, `award`, `research`, `client_logo`) backed by `eeat_assets` storage.
+- Added intelligence slice `eeatAssets` with a prompt-ready trust-signal block and cache/broadcast wiring (`eeat-assets:updated`).
+- Added deterministic trust-signal evaluation (`server/eeat-trust-signals.ts`) used by single-page and bulk page analysis persistence to store per-page:
+  - `missingTrustSignals`
+  - `eeatAssetRecommendations`
+- Extended `page_keywords` persistence/mapping to store and rehydrate those fields, including clear/reset behavior on re-analysis.
+- Content brief generation now injects concrete asset recommendations from page-level analysis (or workspace fallback) so briefs can call for specific proof assets instead of generic E-E-A-T advice.
+- Schema generation now consumes workspace E-E-A-T assets through schema context and enriches Article author identity with job title, sameAs corroboration links, and credential nodes when available.
+
+**Agency value:** Gives operators one canonical place to register trust evidence and see it reused automatically across strategy, briefs, and schema output instead of re-describing proof assets in every workflow.
+
+**Client value:** Improves output specificity and credibility. Content and schema recommendations can reference real available proof, making deliverables more actionable and better aligned with E-E-A-T expectations.
+
+**Files:** `shared/types/eeat-assets.ts`; `server/db/migrations/105-eeat-assets.sql`; `server/schemas/eeat-assets.ts`; `server/eeat-assets.ts`; `server/routes/eeat-assets.ts`; `server/ws-events.ts`; `src/lib/wsEvents.ts`; `shared/types/intelligence.ts`; `server/intelligence/eeat-assets-slice.ts`; `server/workspace-intelligence.ts`; `server/intelligence/formatters.ts`; `server/intelligence/generation-context-builders.ts`; `server/eeat-trust-signals.ts`; `server/page-keywords.ts`; `server/page-analysis-job.ts`; `server/routes/webflow-keywords.ts`; `server/schemas/page-analysis.ts`; `server/schemas/workspace-schemas.ts`; `src/api/eeatAssets.ts`; `src/hooks/admin/useEeatAssets.ts`; `src/components/settings/EeatAssetsTab.tsx`; `src/components/WorkspaceSettings.tsx`; `src/hooks/useWsInvalidation.ts`; `src/components/page-intelligence/pageIntelligenceTypes.ts`; `src/components/page-intelligence/pageIntelligenceData.ts`; `src/components/page-intelligence/PageIntelligenceAnalysisSection.tsx`; `src/components/page-intelligence/usePageIntelligenceAnalysis.ts`; `server/schema-intelligence.ts`; `server/helpers.ts`; `server/schema-suggester.ts`; `server/schema/data-sources.ts`; `server/schema/templates/article.ts`; `docs/rules/eeat-asset-library.md`; `FEATURE_AUDIT.md`; `data/roadmap.json`.

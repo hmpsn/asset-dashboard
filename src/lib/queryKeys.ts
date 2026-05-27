@@ -83,6 +83,7 @@ export const queryKeys = {
     keywordCommandCenterDetail: (wsId: string, keyword: string) => ['admin-keyword-command-center', wsId, 'detail', keyword] as const,
     localSeo: (wsId: string) => ['admin-local-seo', wsId] as const,
     localSeoLocations: (wsId: string) => ['admin-local-seo-locations', wsId] as const,
+    eeatAssets: (wsId: string) => ['admin-eeat-assets', wsId] as const,
     rankTrackingKeywords: (wsId: string) => ['admin-rank-tracking-keywords', wsId] as const,
     rankTrackingKeywordRows: (wsId: string) => ['admin-rank-tracking-keyword-rows', wsId] as const,
     rankTrackingLatest: (wsId: string) => ['admin-rank-tracking-latest', wsId] as const,

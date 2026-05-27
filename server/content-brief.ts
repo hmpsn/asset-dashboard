@@ -21,12 +21,14 @@ import { z } from 'zod';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
 import { buildOutcomeLearningStatusNote } from './outcome-learning-default-path.js';
+import { formatEeatRecommendation } from './eeat-trust-signals.js';
 import {
   getContentGenerationStyleContract,
   getPageTypeOutlineContract,
   getPageTypeOutlineGuidance,
   resolveContentGenerationStyle,
 } from './page-type-copy-contract.js';
+import type { EeatAssetRecommendation } from '../shared/types/eeat-assets.js';
 
 const log = createLogger('content-brief');
 /** Strip markdown code fences and parse JSON from AI responses. Throws on invalid JSON. */
@@ -49,6 +51,16 @@ interface BriefIntelligenceInput {
   decayInsights?: Array<{ pageId: string; deltaPercent: number; baselineClicks: number; currentClicks: number }>;
   quickWins?: Array<{ pageUrl: string; query: string; currentPosition: number; estimatedTrafficGain: number }>;
   pageHealthScores?: Array<{ pageId: string; score: number; trend: string }>;
+}
+
+function buildEeatAssetBriefBlock(
+  pageRecommendations: EeatAssetRecommendation[] | undefined,
+  fallbackRecommendations: EeatAssetRecommendation[],
+): string {
+  const selected = (pageRecommendations?.length ? pageRecommendations : fallbackRecommendations).slice(0, 4);
+  if (selected.length === 0) return '';
+  const lines = selected.map((rec) => `- ${formatEeatRecommendation(rec)}`);
+  return `\n\nE-E-A-T ASSET RECOMMENDATIONS (use specific assets instead of generic trust advice):\n${lines.join('\n')}`;
 }
 
 /**
@@ -1111,12 +1123,22 @@ export async function generateBrief(
 
   // Pull in keyword strategy context for alignment
   const { intelligence: seoContextResult, promptContext: seoPromptContext } = await buildContentGenerationContext(workspaceId, {
-    slices: ['seoContext'],
+    slices: ['seoContext', 'eeatAssets'],
     tokenBudget: 3600,
   });
   const seo = seoContextResult.seoContext;
   const workspaceContextBlock = formatContentGenerationPromptBlock(seoPromptContext);
   const kwMapContext = formatPageMapForPrompt(seo);
+  const fallbackEeatRecommendations: EeatAssetRecommendation[] = (seoContextResult.eeatAssets?.assets ?? [])
+    .slice(0, 4)
+    .map(asset => ({
+      assetId: asset.id,
+      type: asset.type,
+      title: asset.title,
+      reason: 'Use this existing workspace asset as concrete trust evidence in the brief.',
+      surface: 'content_brief',
+      url: asset.url,
+    }));
   const bizCtx = context.businessContext || '';
 
   // Find if any page in the strategy targets this keyword — inject its analysis data.
@@ -1187,6 +1209,7 @@ export async function generateBrief(
       pageAnalysisBlock = `\n\nPAGE ANALYSIS CONTEXT (from prior Page Intelligence analysis — address these specific issues in the brief):\n${parts.join('\n')}`;
     }
   }
+  const eeatAssetBlock = buildEeatAssetBriefBlock(matchedPage?.eeatAssetRecommendations, fallbackEeatRecommendations);
 
   // Build providerLabel early — used in SERP features block and keyword metrics block below.
   const providerLabel = context.providerLabel ?? 'SEMRush';
@@ -1350,7 +1373,7 @@ Related search queries from Google Search Console:
 ${relatedStr}
 
 Existing pages on the site:
-${pagesStr}${workspaceContextBlock}${kwMapContext}${providerMetricsBlock}${ga4Block}${pageAnalysisBlock}${decayBlock}${serpFeaturesDirectiveBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${strategyCardBlock}${intelligenceBlock}${learningsBlock}${learningsStatusBlock}
+${pagesStr}${workspaceContextBlock}${kwMapContext}${providerMetricsBlock}${ga4Block}${pageAnalysisBlock}${eeatAssetBlock}${decayBlock}${serpFeaturesDirectiveBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${strategyCardBlock}${intelligenceBlock}${learningsBlock}${learningsStatusBlock}
 
 Generate a content brief in the following JSON format:
 {
