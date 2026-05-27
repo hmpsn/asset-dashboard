@@ -49,7 +49,6 @@ interface Props {
   onOpenSeoEditor: (page: UnifiedPage) => void;
   onCreateBrief: (page: UnifiedPage, analysis?: KeywordData) => void;
   onAddSchema: (page: UnifiedPage) => void;
-  onViewFullAnalysis: () => void;
 }
 
 export function PageIntelligencePageRow({
@@ -78,7 +77,6 @@ export function PageIntelligencePageRow({
   onOpenSeoEditor,
   onCreateBrief,
   onAddSchema,
-  onViewFullAnalysis,
 }: Props) {
   const strategy = page.strategy;
   const primaryKeywordTracked = strategy?.primaryKeyword
@@ -205,7 +203,6 @@ export function PageIntelligencePageRow({
           onOpenSeoEditor={onOpenSeoEditor}
           onCreateBrief={onCreateBrief}
           onAddSchema={onAddSchema}
-          onViewFullAnalysis={onViewFullAnalysis}
         />
       )}
     </div>
