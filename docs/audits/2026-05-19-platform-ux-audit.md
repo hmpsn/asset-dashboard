@@ -283,7 +283,7 @@
   - Admin calls it "Content Briefs"; client sees "Content Pipeline" — the word "brief" never appears in the client inbox
   - Status `applied` shown to clients as badge "Applied" with no tooltip explaining what it means
   - Admin creates "Annotations"; client sees chart overlays with no management UI
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -291,7 +291,7 @@
 - **Area:** Admin→Client Handoff
 - **Files:** `src/components/client/InboxTab.tsx:206 vs 221`
 - **Issue:** Legacy layout adds `schemaPlanPending` to the decisions count. The `new-inbox-ia` flag layout does not. Same workspace shows different badge totals depending on active flag.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 
@@ -371,7 +371,7 @@
 - **Area:** Admin→Client Handoff
 - **Files:** `src/components/ClientDashboard.tsx:387`
 - **Issue:** When admin marks a post back as `client_review`, the badge updates but there is no "new" indicator or highlight on the specific content item to draw the client's attention.
-- [ ] Fixed
+- [x] Fixed
 
 ---
 

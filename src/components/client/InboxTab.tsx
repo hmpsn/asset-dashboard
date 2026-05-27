@@ -100,7 +100,7 @@ export function InboxTab({
   const [searchParams] = useSearchParams();
   const betaMode = useBetaMode();
 
-  // Schema plan summary — drives SEO Changes card + priority strip item
+  // Schema plan summary — drives Reviews card + priority strip item
   const schemaPlanQuery = useQuery({
     queryKey: queryKeys.client.schemaPlan(workspaceId),
     queryFn: () => getOptional<SchemaSitePlan>(`/api/public/schema-plan/${workspaceId}`),
@@ -123,7 +123,9 @@ export function InboxTab({
   const completedClientActions = clientActions.filter(a => a.status !== 'pending');
 
   const hasPendingApprovals = (pendingApprovals ?? 0) > 0;
-  const hasPendingSeoChanges = hasPendingApprovals || schemaPlanPending;
+  const betaSchemaDecisionCount = betaMode && schemaPlanPending ? 1 : 0;
+  const schemaReviewCount = !betaMode && schemaPlanPending ? 1 : 0;
+  const hasPendingSeoChanges = hasPendingApprovals || betaSchemaDecisionCount > 0;
   const hasNeedsAction = pendingClientActions.length > 0 || requestReplies > 0 || planReviewCount > 0;
   const copyReviewCount = hasCopyEntries ? 1 : 0;
 
@@ -203,8 +205,8 @@ export function InboxTab({
     .map(action => normalizeClientAction(action));
 
   // Filter chip counts
-  const decisionsCount = decisionItems.length + planReviewCount + approvalsForDecisions.length;
-  const reviewsCount = contentReviews + copyReviewCount + (!betaMode && schemaPlanPending ? 1 : 0);
+  const decisionsCount = decisionItems.length + planReviewCount + approvalsForDecisions.length + betaSchemaDecisionCount;
+  const reviewsCount = contentReviews + copyReviewCount + schemaReviewCount;
   const conversationsCount = requestReplies + approvalsForConversations.length + conversationItems.length;
 
   const newInboxFilterChips: { id: InboxFilter; label: string; count?: number }[] = [
@@ -261,6 +263,34 @@ export function InboxTab({
     && decisionsCount === 0
     && reviewsCount === 0
     && conversationsCount === 0;
+  const schemaPlanReviewCard = schemaPlan ? (
+    <div className="rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <Icon as={Shield} size="sm" className="text-accent-brand" />
+            <span className="t-caption-sm font-medium text-accent-brand">Schema Strategy</span>
+            {schemaPlanPending && (
+              <StatusBadge status={schemaPlan.status} domain="schema" variant="outline" shape="pill" />
+            )}
+          </div>
+          <h4 className="t-ui font-medium text-[var(--brand-text-bright)]">
+            Schema strategy — {schemaPlan.pageRoles.length} page{schemaPlan.pageRoles.length !== 1 ? 's' : ''}
+          </h4>
+          <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">
+            {schemaPlanPending
+              ? 'Your schema strategy is ready for your review and approval.'
+              : schemaPlan.status === 'client_approved' ? 'Approved — implementation in progress.'
+              : schemaPlan.status === 'active' ? 'Active schema strategy.'
+              : 'Schema strategy on file.'}
+          </p>
+        </div>
+        <Button size="sm" variant={schemaPlanPending ? 'primary' : 'ghost'} onClick={() => setSchemaModalOpen(true)}>
+          Review schema plan →
+        </Button>
+      </div>
+    </div>
+  ) : null;
 
   return (
     <div className="space-y-6">
@@ -471,34 +501,7 @@ export function InboxTab({
               </div>
 
               {/* Schema plan */}
-              {schemaPlan && (
-                <div className="rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Icon as={Shield} size="sm" className="text-accent-brand" />
-                        <span className="t-caption-sm font-medium text-accent-brand">Schema Strategy</span>
-                        {schemaPlanPending && (
-                          <StatusBadge status={schemaPlan.status} domain="schema" variant="outline" shape="pill" />
-                        )}
-                      </div>
-                      <h4 className="t-body font-semibold text-[var(--brand-text-bright)]">
-                        Schema strategy — {schemaPlan.pageRoles.length} page{schemaPlan.pageRoles.length !== 1 ? 's' : ''}
-                      </h4>
-                      <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">
-                        {schemaPlanPending
-                          ? 'Your schema strategy is ready for your review and approval.'
-                          : schemaPlan.status === 'client_approved' ? 'Approved — implementation in progress.'
-                          : schemaPlan.status === 'active' ? 'Active schema strategy.'
-                          : 'Schema strategy on file.'}
-                      </p>
-                    </div>
-                    <Button size="sm" variant={schemaPlanPending ? 'primary' : 'ghost'} onClick={() => setSchemaModalOpen(true)}>
-                      Review schema plan →
-                    </Button>
-                  </div>
-                </div>
-              )}
+              {schemaPlanReviewCard}
               {/* Copy review */}
               {hasCopyEntries && (
                 <div className="space-y-2">
@@ -803,7 +806,7 @@ export function InboxTab({
               >
                 <h3 className="t-page font-semibold text-[var(--brand-text-bright)]">SEO Changes</h3>
                 {hasPendingSeoChanges && (
-                  <Badge label={`${(pendingApprovals ?? 0) + (schemaPlanPending ? 1 : 0)} pending`} tone="teal" variant="outline" shape="pill" />
+                  <Badge label={`${(pendingApprovals ?? 0) + betaSchemaDecisionCount} pending`} tone="teal" variant="outline" shape="pill" />
                 )}
                 {!hasPendingSeoChanges && (
                   <span className="t-caption text-[var(--brand-text-muted)]">Nothing pending</span>
@@ -829,7 +832,7 @@ export function InboxTab({
                     pageMap={pageMap}
                   />
 
-                  {schemaPlan && (
+                  {betaMode && schemaPlan && (
                     <div className="rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
@@ -868,10 +871,13 @@ export function InboxTab({
             <section aria-label="Content" className="space-y-4">
               <div className="flex items-center gap-2">
                 <h3 className="t-page font-semibold text-[var(--brand-text-bright)]">Content</h3>
-                {(contentReviews + copyReviewCount) > 0 && (
-                  <Badge label={`${contentReviews + copyReviewCount} needs review`} tone="blue" variant="outline" shape="pill" />
+                {reviewsCount > 0 && (
+                  <Badge label={`${reviewsCount} needs review`} tone="blue" variant="outline" shape="pill" />
                 )}
               </div>
+
+              {/* Schema plan */}
+              {schemaPlanReviewCard}
 
               {hasCopyEntries && (
                 <div className="space-y-2">
