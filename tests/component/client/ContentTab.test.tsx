@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { ContentTab } from '../../../src/components/client/ContentTab';
 import type { ClientContentRequest } from '../../../src/components/client/types';
 
@@ -96,6 +96,7 @@ const defaultProps = {
 describe('ContentTab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
   });
 
   it('renders without crashing when content requests are empty', () => {
@@ -176,6 +177,15 @@ describe('ContentTab', () => {
     const requests = [makeRequest({ status: 'post_review' })];
     render(<ContentTab {...defaultProps} contentRequests={requests} />);
     expect(screen.getByText(/post.*ready for your review/i)).toBeInTheDocument();
+  });
+
+  it('highlights newly returned post_review items until opened', () => {
+    const requests = [makeRequest({ status: 'post_review', topic: 'Needs Final Review' })];
+    render(<ContentTab {...defaultProps} contentRequests={requests} />);
+    expect(screen.getByText('New')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Needs Final Review'));
+    expect(screen.queryByText('New')).not.toBeInTheDocument();
   });
 
   it('renders declined items in a collapsed section', () => {

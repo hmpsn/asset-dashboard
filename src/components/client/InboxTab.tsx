@@ -217,12 +217,9 @@ export function InboxTab({
   // Filter chips (hidden in completed mode)
   const legacyFilterChips: { id: InboxFilter; label: string; count?: number }[] = [
     { id: 'all', label: 'All' },
-    { id: 'decisions', label: 'Decisions',
-      count: (decisionItems.length + planReviewCount + approvalsForDecisions.length + (schemaPlanPending ? 1 : 0)) || undefined },
-    { id: 'conversations', label: 'Conversations',
-      count: (requestReplies + approvalsForConversations.length) || undefined },
-    ...(!betaMode ? [{ id: 'reviews' as InboxFilter, label: 'Reviews',
-      count: (contentReviews + copyReviewCount) || undefined }] : []),
+    { id: 'decisions', label: 'Decisions', count: decisionsCount || undefined },
+    { id: 'conversations', label: 'Conversations', count: conversationsCount || undefined },
+    ...(!betaMode ? [{ id: 'reviews' as InboxFilter, label: 'Reviews', count: reviewsCount || undefined }] : []),
   ];
 
 
