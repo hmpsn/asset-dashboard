@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **152** — 136 error, 16 warn.
+Total rules: **153** — 136 error, 17 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -175,6 +175,7 @@ advisory but tracked.
 | 14 | focus-visible-ring-contract | warn | custom | `src/components/` | — | Removing default focus outlines without an explicit focus-visible fallback risks keyboard-invisible controls and drifts from the styleguide focus ring contract. |
 | 15 | stat-primitive-bypass-signal | warn | custom | `src/components/` | — | Direct t-stat typography usage in feature shells often re-implements StatCard/CompactStatBar chrome and drifts from canonical spacing, labels, and responsive behavior. |
 | 16 | Workspace mutation route missing broadcastToWorkspace | warn | custom | `server/routes/` | `no-broadcast-ok` | Silent mutations mean UI never refreshes without a manual reload. |
+| 17 | inline-score-color-ternary | warn | pattern | `src/` | `score-color-inline-ok` | Inline score ternaries using the standard 80/60 thresholds duplicate the canonical Law-03 logic and drift when the palette changes. |
 
 ---
 

@@ -260,7 +260,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
   if (!audit) return null;
 
   const score = Math.max(0, Math.round(100 - (audit.issueCount / Math.max(audit.totalAssets, 1)) * 100));
-  const scoreColor = score >= 80 ? 'text-emerald-400' : score >= 50 ? 'text-amber-400' : 'text-red-400';
+  const scoreColor = score >= 80 ? 'text-emerald-400' : score >= 50 ? 'text-amber-400' : 'text-red-400'; // score-color-inline-ok: asset health uses >=50 mid-tier (not >=60)
 
   return (
     <div className="space-y-8">

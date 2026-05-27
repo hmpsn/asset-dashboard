@@ -6375,6 +6375,31 @@ export const CHECKS: Check[] = [
     claudeMdRef: '#design-system--the-four-laws-of-color',
   },
   {
+    // Flags inline score-color ternaries that should use scoreColor() /
+    // scoreColorClass() from ui/constants.ts. Specifically catches the standard
+    // >=80/>=60 two-step ternary outputting text-* Tailwind classes or hex colors.
+    // Does NOT flag custom-threshold ternaries (>=50, >=90, >=70, etc.) because
+    // those are intentional domain-specific scales.
+    name: 'inline-score-color-ternary',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    exclude: [
+      'src/components/ui/constants.ts',
+      'src/components/ui/constants.js',
+      // AuditReportExport generates a printable HTML/PDF document — it uses
+      // light-mode hex colors (#22c55e, #f59e0b) appropriate for paper/screen
+      // print, not the dark-mode scoreColor() palette.
+      'src/components/audit/AuditReportExport.tsx',
+    ],
+    message: 'Use scoreColor() or scoreColorClass() from src/components/ui/constants.ts instead of hand-rolling >= 80 / >= 60 color ternaries. Add an inline comment if the threshold or class set intentionally differs.',
+    severity: 'warn',
+    rationale: 'Inline score ternaries using the standard 80/60 thresholds duplicate the canonical Law-03 logic and drift when the palette changes.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+    // hatch: // score-color-inline-ok: <reason>
+    pattern: '>= 80 \\? [\'"](?:text-emerald|text-green|#34d399|#22c55e)',
+    excludeLines: ['score-color-inline-ok'],
+  },
+  {
     // Verifies that scoreColorClass() in src/components/ui/constants.ts uses
     // emerald/amber/red (Law 03: emerald for success, never green). This is a
     // structural check — it reads the function body and asserts no `green-` colors.
