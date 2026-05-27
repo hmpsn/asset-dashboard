@@ -5,6 +5,7 @@ import type { SchemaPageSuggestion } from '../schema-suggester.js';
 import type { SchemaSnapshot } from '../schema-store.js';
 import type { Workspace } from '../workspaces.js';
 import { computeEffectiveTier } from '../workspaces.js';
+import { computeTrialState } from '../billing/trial-state.js';
 
 export interface PublicWorkspaceView {
   id: string;
@@ -50,6 +51,7 @@ export function toPublicWorkspaceView(
 ): PublicWorkspaceView {
   const nowMs = opts.nowMs ?? Date.now();
   const effectiveTier = computeEffectiveTier(ws, nowMs);
+  const trialState = computeTrialState(ws, nowMs);
   return {
     id: ws.id,
     name: ws.name,
@@ -72,10 +74,8 @@ export function toPublicWorkspaceView(
     contentPricing: ws.contentPricing || null,
     tier: effectiveTier,
     baseTier: ws.tier || 'free',
-    isTrial: effectiveTier === 'growth' && (ws.tier || 'free') === 'free',
-    trialDaysRemaining: ws.trialEndsAt
-      ? Math.max(0, Math.ceil((new Date(ws.trialEndsAt).getTime() - nowMs) / (1000 * 60 * 60 * 24)))
-      : 0,
+    isTrial: trialState.isTrial,
+    trialDaysRemaining: trialState.trialDaysRemaining ?? 0,
     trialEndsAt: ws.trialEndsAt || null,
     stripeEnabled: opts.stripeEnabled,
     billingMode: ws.billingMode || 'platform',

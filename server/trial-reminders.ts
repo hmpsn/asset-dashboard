@@ -31,7 +31,7 @@ async function checkTrialExpiry() {
   for (const ws of workspaces) {
     if (!ws.trialEndsAt || !ws.clientEmail) continue;
 
-    const trialEnd = new Date(ws.trialEndsAt).getTime();
+    const trialEnd = new Date(ws.trialEndsAt).getTime(); // trial-state-ok — cron needs raw ms for reminder-day bucketing
     const msRemaining = trialEnd - now;
     if (msRemaining <= 0) continue; // already expired
 

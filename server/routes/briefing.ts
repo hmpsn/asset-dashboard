@@ -31,6 +31,7 @@ import { getWorkspace, getClientPortalUrl } from '../workspaces.js';
 import { isFeatureEnabled } from '../feature-flags.js';
 import { createLogger } from '../logger.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { buildBriefingClientView } from '../briefing-client-projection.js';
 
 const log = createLogger('routes:briefing');
 const router = Router();
@@ -241,6 +242,20 @@ router.post(
         log.error({ err, workspaceId: req.params.workspaceId }, 'manual briefing run failed'),
       );
     return res.status(202).json({ accepted: true });
+  },
+);
+
+// ── GET /api/briefing/:workspaceId/preview ──────────────────────────────────
+// Admin preview — returns the exact same enriched payload the client sees at
+// /api/public/briefing/:workspaceId. Lets admins verify the briefing before
+// publishing without switching to the client portal.
+
+router.get(
+  '/api/briefing/:workspaceId/preview',
+  requireWorkspaceAccess('workspaceId'),
+  (req, res) => {
+    const briefing = buildBriefingClientView(req.params.workspaceId);
+    res.json({ briefing });
   },
 );
 

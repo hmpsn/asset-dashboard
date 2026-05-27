@@ -57,6 +57,7 @@ import {
   workspaceContextJobErrorResponse,
 } from '../workspace-context-generation-job.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
+import { computeTrialState } from '../billing/trial-state.js';
 import { addActivity } from '../activity-log.js';
 import { getLatestEffectiveSnapshot } from '../audit-snapshot-views.js';
 
@@ -178,9 +179,7 @@ router.get('/api/workspace-overview', (req, res) => {
       clientActionChangesRequested = actionSummary.changesRequested;
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'workspaces: programming error'); /* non-critical */ }
 
-    const trialEnd = ws.trialEndsAt ? new Date(ws.trialEndsAt) : null;
-    const isTrial = trialEnd ? trialEnd > new Date() : false;
-    const trialDaysRemaining = isTrial && trialEnd ? Math.max(0, Math.ceil((trialEnd.getTime() - Date.now()) / 86400000)) : undefined;
+    const { isTrial, trialDaysRemaining } = computeTrialState(ws);
 
     return {
       id: ws.id,
