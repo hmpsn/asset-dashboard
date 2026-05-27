@@ -895,6 +895,21 @@ const BACKGROUND_GENERATION_SITE_ALLOWLIST = new Set([
   "server/routes/webflow-schema.ts::queueLlmsTxtRegeneration::if (llmsWs) queueLlmsTxtRegeneration(llmsWs.id, 'schema_published');",
 ]);
 
+const INTELLIGENCE_BUILDER_ENFORCED_CONSUMERS = new Set([
+  'server/content-brief.ts',
+  'server/content-decay.ts',
+  'server/keyword-recommendations.ts',
+  'server/admin-chat-context.ts',
+  'server/diagnostic-orchestrator.ts',
+  'server/routes/rewrite-chat.ts',
+  'server/routes/webflow-keywords.ts',
+  'server/routes/webflow-seo-rewrite.ts',
+  'server/routes/webflow-seo-page-tools.ts',
+  'server/routes/webflow-seo-bulk-rewrite.ts',
+  'server/webflow-seo-bulk-rewrite-job.ts',
+  'server/mcp/tools/content-actions.ts',
+]);
+
 function backgroundGenerationRoutePath(file: string): string {
   const normalized = file.split(path.sep).join('/');
   const routeIdx = normalized.lastIndexOf('server/routes/');
@@ -1382,6 +1397,33 @@ export const CHECKS: Check[] = [
     excludeLines: ['// bip-ok'],
     message: 'Use buildIntelPrompt(id, slices) when only the formatted string is needed. When raw intel is also needed: const slices = [...]; formatForPrompt(intel, { sections: slices }). Add `// bip-ok` for intentional exceptions.',
     severity: 'error',
+  },
+  {
+    name: 'Intelligence consumer direct learnings/insights prompt assembly',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    message: 'Builder-enforced intelligence consumers must not call getInsights(), getWorkspaceLearnings(), or formatLearningsForPrompt() directly. Use shared context builders (buildContentGenerationContext/buildRecommendationGenerationContext/buildAdminChatIntelligenceContext/buildDiagnosticIntelligenceContext/buildPageAssistContext). Add // intel-builder-ok only for a documented exception.',
+    severity: 'error',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const directCall = /\b(getInsights|getWorkspaceLearnings|formatLearningsForPrompt)\s*\(/;
+      const enforcedTargets = [...INTELLIGENCE_BUILDER_ENFORCED_CONSUMERS];
+      for (const file of files) {
+        const rel = path.relative(ROOT, file).split(path.sep).join('/');
+        const isTarget = enforcedTargets.some(target => rel === target || rel.endsWith(`/${target}`));
+        if (!isTarget) continue;
+        const lines = readFileOrEmpty(file).split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (!directCall.test(line)) continue;
+          if (line.includes('import ')) continue;
+          if (hasHatch(lines, i, 'intel-builder-ok')) continue;
+          hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
   },
   {
     name: 'Unguarded recordAction() call',
@@ -3448,6 +3490,41 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    name: 'keyword-feedback route writes must use shared service',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    excludeLines: ['// keyword-feedback-route-write-ok'],
+    message:
+      'Direct SQL writes to keyword_feedback are not allowed in route modules. ' +
+      'Use the shared keyword-feedback service (server/keyword-feedback.ts) for ' +
+      'CRUD + normalization + broadcast wiring. Add // keyword-feedback-route-write-ok only if intentionally bypassing.',
+    severity: 'error',
+    rationale:
+      'Duplicating keyword_feedback write SQL in route modules causes contract drift ' +
+      'between admin/public surfaces and intelligence assembly.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const sqlWriteRe = /\b(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+keyword_feedback\b/i;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes('/server/routes/') && !file.includes('\\server\\routes\\')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (!sqlWriteRe.test(line)) continue;
+          if (/^\s*\/\//.test(line)) continue;
+          if (hasHatch(lines, i, '// keyword-feedback-route-write-ok')) continue;
+          hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
     // Extends the existing "useGlobalAdminEvents import restriction" rule.
     // That rule catches *unauthorized imports*. This rule catches *wrong event
     // names* in the authorized call sites — i.e. passing a workspace-scoped
@@ -3683,6 +3760,182 @@ export const CHECKS: Check[] = [
             if (hasHatch(lines, i, hatch)) continue;
             hits.push({ file, line: i + 1, text: lines[i].trim() });
           }
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // ── Ad hoc domain normalization helper reintroduction ──
+    //
+    // Domain normalization has a canonical server authority in
+    // `server/domain-normalization.ts`. Route-local helpers named
+    // `cleanDomain` / `stripWww` historically drifted in behavior
+    // (strip-port, lowercase, fallback parsing).
+    //
+    // Allow wrappers that delegate to normalizeDomainValue/normalizeDomainHost.
+    // Flag implementations that define these helper names but do not delegate.
+    name: 'Ad hoc domain normalization helper outside canonical authority',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    message:
+      'Use server/domain-normalization.ts (normalizeDomainValue/normalizeDomainHost) instead of ad hoc ' +
+      'cleanDomain/stripWww helper implementations. Add // domain-normalization-ok only for justified wrappers.',
+    severity: 'error',
+    rationale:
+      'Divergent domain-cleanup helpers drift silently (www/port/lowercase/malformed fallbacks) and cause ' +
+      'cross-surface comparison bugs.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const helperDefRe = /^\s*(?:export\s+)?function\s+(cleanDomain|stripWww)\s*\(/;
+      for (const file of files) {
+        if (!file.endsWith('.ts') || !file.includes('server/')) continue;
+        if (file.endsWith('server/domain-normalization.ts')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const match = lines[i].match(helperDefRe);
+          if (!match) continue;
+          if (hasHatch(lines, i, '// domain-normalization-ok')) continue;
+          let delegates = false;
+          for (let j = i; j < Math.min(i + 18, lines.length); j++) {
+            if (lines[j].includes('normalizeDomainValue(') || lines[j].includes('normalizeDomainHost(')) {
+              delegates = true;
+              break;
+            }
+            if (lines[j].includes('}')) break;
+          }
+          if (delegates) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // ── Ad hoc HTML extraction helpers outside canonical authority ──
+    //
+    // HTML extraction primitives (extractLinks/img/script/style/resource counts)
+    // must live in `server/html-analysis-utils.ts`. Only approved compatibility
+    // wrappers may re-export behavior (`server/seo-audit-html.ts`,
+    // `server/sales-audit.ts`).
+    name: 'Ad hoc HTML extraction helper outside canonical authority',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    message:
+      'Use server/html-analysis-utils.ts for HTML extraction helpers. Do not declare local HTML parsers ' +
+      '(extractLinks/extractImgTags/extractStyleBlocks/extractInlineScripts/countExternalResources/extractTag/extractMetaContent/countWords(html)). ' +
+      'Add // html-extraction-ok only for explicitly approved compatibility wrappers.',
+    severity: 'error',
+    rationale:
+      'Prevents parser drift and duplicated HTML extraction logic across SEO/sales/link-check surfaces.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const helperDefRe =
+        /^\s*(?:export\s+)?(?:async\s+)?function\s+(extractTag|extractMetaContent|extractLinks|extractImgTags|extractStyleBlocks|extractInlineScripts|countExternalResources)\s*\(|^\s*(?:export\s+)?(?:async\s+)?function\s+countWords\s*\(\s*html\s*:\s*string/;
+      const allowedFiles = new Set([
+        'server/html-analysis-utils.ts',
+        'server/seo-audit-html.ts',
+        'server/sales-audit.ts',
+      ]);
+      for (const file of files) {
+        if (!file.endsWith('.ts') || !file.includes('server/')) continue;
+        const normalized = file.replace(/\\/g, '/');
+        const relFromServer = normalized.includes('/server/')
+          ? `server/${normalized.split('/server/')[1]}`
+          : normalized;
+        if (allowedFiles.has(relFromServer)) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!helperDefRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// html-extraction-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // ── normalizePath production usage reintroduction ──
+    //
+    // `normalizePath` is a retired primitive. Production server/frontend code
+    // must use canonical page-address helpers (`normalizePageUrl`,
+    // `resolvePageAddress`, `resolvePagePath`, `tryResolvePagePath`,
+    // `matchPageIdentity`, `matchPagePath`) instead.
+    name: 'Retired normalizePath usage in production code',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    message:
+      'normalizePath is retired. Use canonical page-address helpers (normalizePageUrl / resolvePageAddress / resolvePagePath / tryResolvePagePath / matchPageIdentity / matchPagePath). ' +
+      'Add // normalize-path-ok only for rare compatibility shims.',
+    severity: 'error',
+    rationale:
+      'Prevents reintroduction of legacy normalizePath calls/imports that bypass shared page-address authority.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const helperDefRe =
+        /^\s*(?:export\s+)?(?:async\s+)?function\s+(?:normalizePath|normalizePagePath)\s*\(|^\s*(?:export\s+)?(?:const|let|var)\s+(?:normalizePath|normalizePagePath)\s*[:=]/;
+      const importOrExportRe = /\b(?:import|export)\s*{[^}]*\bnormalizePath\b[^}]*}\s*from\b/;
+      const callRe = /\bnormalizePath\s*\(/;
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        if (!file.includes('/server/') && !file.includes('/src/')) continue;
+        if (file.includes('/tests/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (!line.includes('normalizePath')) continue;
+          if (line.trimStart().startsWith('//')) continue;
+          if (hasHatch(lines, i, '// normalize-path-ok')) continue;
+          if (helperDefRe.test(line)) continue;
+          if (importOrExportRe.test(line) || callRe.test(line)) {
+            hits.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // ── Local page/path mini-normalizers outside canonical authority ──
+    //
+    // Production code should not declare local normalizePath/normalizePagePath
+    // helpers. Use shared page-address helpers instead.
+    name: 'Local page/path normalizer helper outside tests',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    message:
+      'Do not declare local normalizePath/normalizePagePath helpers in production code. Use canonical page-address helpers. ' +
+      'Add // page-path-normalizer-ok only for explicit, documented compatibility wrappers.',
+    severity: 'error',
+    rationale:
+      'Prevents drift from duplicated mini-normalizers by enforcing one shared page-address authority across production modules.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const helperDefRe =
+        /^\s*(?:export\s+)?(?:async\s+)?function\s+(?:normalizePath|normalizePagePath)\s*\(|^\s*(?:export\s+)?(?:const|let|var)\s+(?:normalizePath|normalizePagePath)\s*[:=]/;
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        if (!file.includes('/server/') && !file.includes('/src/')) continue;
+        if (file.includes('/tests/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!helperDefRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// page-path-normalizer-ok') || hasHatch(lines, i, '// page-normalizer-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
         }
       }
       return hits;
@@ -6336,6 +6589,44 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // Entity disambiguation (Wikidata/SPARQL) must stay in the dedicated
+    // intelligence slice boundary. Direct lookups from schema routes/helpers
+    // create duplicated caching + inconsistent sameAs resolution contracts.
+    name: 'Wikidata disambiguation outside entity-resolution intelligence modules',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    excludeLines: ['// entity-resolution-ok'],
+    message:
+      'Wikidata/SPARQL entity disambiguation must live in server/intelligence/entity-resolution* modules and flow through intelligence slices. Do not call Wikidata directly from schema/routes/helpers. Escape hatch: // entity-resolution-ok',
+    severity: 'error',
+    rationale:
+      'Prevents ad hoc Wikidata lookups from bypassing the emerging EntityResolutionSlice contract, which would fragment caching, confidence scoring, and sameAs output semantics.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Covers SPARQL endpoint, MediaWiki action API, EntityData (incl. non-QID),
+      // /entity/Q linked-data endpoint, and /wiki/Q browser URLs.
+      const wikidataRefRe = /(query\.wikidata\.org|wikidata\.org\/w\/api\.php|wikidata\.org\/wiki\/(?:Q\d+|Special:EntityData(?:\/[^\s"']+)?)|wikidata\.org\/entity\/Q\d+)/i;
+      for (const file of files) {
+        const normalized = file.replaceAll('\\', '/');
+        if (!normalized.includes('/server/')) continue;
+        if (normalized.includes('/server/intelligence/entity-resolution')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          // Skip pure comment lines (// or * inside block comments) so doc/URL references don't trip the rule.
+          if (/^\s*(\/\/|\*)/.test(lines[i])) continue;
+          if (!wikidataRefRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// entity-resolution-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
     // Catches HTML-naive word-counting on TipTap content fields. Post intro/conclusion
     // and section.content are stored as rich-text HTML, so `countWords(post.introduction)`
     // or `post.introduction.split(/\s+/)` treats `<p>` and `</p>` as words and inflates
@@ -6697,79 +6988,193 @@ export const CHECKS: Check[] = [
       return matches;
     },
   },
-  // ── Trial-state centralization guard (audit-drift sprint) ──────────────
+  {
+    // Sprint wave 8: Plan A Task 1 — public endpoint auth lockdown.
+    //
+    // Every `/api/public/<resource>/:workspaceId/...` route that serves
+    // workspace-scoped data must apply either `requireClientPortalAuth()`
+    // (allows passwordless workspaces) or `requireAuthenticatedClientPortalAuth()`
+    // (rejects passwordless workspaces — preferred for sensitive data).
+    //
+    // The global app gate at server/app.ts:262 short-circuits to next() when
+    // `!ws.clientPassword`, which silently leaks data for any workspace whose
+    // dashboard has not been configured yet. The per-route middleware closes
+    // that hole.
+    //
+    // The PUBLIC_AUTH_ALLOWLIST below matches the path[3] values explicitly
+    // allowed by the global gate (server/app.ts:258): bootstrap/login flow
+    // endpoints that legitimately must accept unauthenticated callers.
+    name: 'Public route under /api/public/ missing client-portal auth middleware',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    excludeLines: ['// public-no-auth-ok'],
+    // Grandfather the 19 routes already shipped without per-route auth as of
+    // 2026-05-27 (audit-drift-closure Plan A Task 1). Tracked under roadmap
+    // item `audit-drift-public-route-auth-sweep-followup`; each file will be
+    // migrated route-by-route alongside test-fixture updates so existing
+    // integration tests (which create passwordless workspaces and expect 200s)
+    // are not broken in a single PR.
+    exclude: [
+      'server/routes/public-portal.ts',
+      // public-content.ts and public-requests.ts use router.use() file-level
+      // portal auth — Pass 1 detects that, so no exclude needed.
+      'server/routes/reports.ts',
+      'server/routes/work-orders.ts',
+      // recommendations.ts and stripe.ts have mixed auth coverage — individual
+      // unprotected routes are hatched with // public-no-auth-ok inline.
+    ],
+    message:
+      'New /api/public/<resource>/:workspaceId routes must call requireAuthenticatedClientPortalAuth() ' +
+      '(preferred — denies passwordless workspaces) or requireClientPortalAuth() (allows passwordless). ' +
+      'The global app gate alone is insufficient: it short-circuits on workspaces without clientPassword, ' +
+      'leaking data during the pre-setup window. Suppress with // public-no-auth-ok: <reason> if the ' +
+      'route is part of the bootstrap/login flow.',
+    severity: 'error',
+    rationale:
+      'Without per-route portal auth, sensitive client data leaks from workspaces that have not yet ' +
+      'had a clientPassword set (e.g. freshly-created accounts).',
+    claudeMdRef: '#auth-conventions',
+    customCheck: (files) => {
+      // path[3] values the global gate (server/app.ts:258) lets through
+      // without requiring a credential. Keep in lockstep with that file.
+      const PUBLIC_AUTH_ALLOWLIST = new Set([
+        'auth',
+        'workspace',
+        'client-login',
+        'client-logout',
+        'client-me',
+        'auth-mode',
+        'forgot-password',
+        'reset-password',
+      ]);
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes('/server/routes/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+
+        // Pass 1: detect file-level router.use() that applies portal auth to
+        // a path prefix. Routes nested under that prefix inherit the auth.
+        // Example: router.use('/api/public/:resource/:workspaceId',
+        // requireClientPortalAuth('workspaceId')).
+        const fileLevelAuthPrefixes: string[] = [];
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (/^\s*(\/\/|\*)/.test(line)) continue;
+          const useMatch = line.match(/router\.use\s*\(\s*['"`]([^'"`]+)['"`][^)]*(requireClientPortalAuth|requireAuthenticatedClientPortalAuth)\s*\(/);
+          if (!useMatch) continue;
+          // Normalize the path pattern by stripping Express :param tokens so a
+          // prefix like '/api/public/:resource/:workspaceId' matches any
+          // '/api/public/<actual-resource>/...' route.
+          const literalPrefix = useMatch[1].replace(/\/:.*$/, '');
+          fileLevelAuthPrefixes.push(literalPrefix);
+        }
+
+        // Pass 2: scan individual route handlers.
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (/^\s*(\/\/|\*)/.test(line)) continue;
+          const routeMatch = line.match(/router\.(get|post|patch|put|delete)\s*\(\s*['"`](\/api\/public\/([^/'"`]+)[^'"`]*)/);
+          if (!routeMatch) continue;
+          const fullPath = routeMatch[2];
+          const resource = routeMatch[3];
+          if (PUBLIC_AUTH_ALLOWLIST.has(resource)) continue;
+          if (hasHatch(lines, i, '// public-no-auth-ok')) continue;
+          // If a file-level router.use() already applied portal auth to a
+          // prefix covering this route, skip — auth is inherited.
+          if (fileLevelAuthPrefixes.some(prefix => fullPath.startsWith(prefix))) continue;
+          // Look forward up to 8 lines (covers multi-line router.METHOD(
+          // signatures) for either auth middleware.
+          const window = lines.slice(i, Math.min(i + 8, lines.length)).join('\n');
+          if (window.includes('requireClientPortalAuth(')) continue;
+          if (window.includes('requireAuthenticatedClientPortalAuth(')) continue;
+          hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
+  },
+
+  // ── Plan A Task 2: trial-state centralization (2026-05-27) ──────────────
   {
     name: 'Inline trial-state computation outside billing module',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
     exclude: ['server/billing/trial-state.ts', 'tests/'],
-    message: 'Trial status (isTrial / trialDaysRemaining) must be computed via computeTrialState() from server/billing/trial-state.ts. Inline trialEndsAt date comparisons drift between admin and client paths.',
+    message:
+      'Trial status (isTrial / trialDaysRemaining) must be computed via computeTrialState() from ' +
+      'server/billing/trial-state.ts, not inline Date math. Suppress with // trial-state-ok if the ' +
+      'call site genuinely needs raw millisecond access (e.g. cron bucketing).',
     severity: 'error',
     excludeLines: ['trial-state-ok'],
-    rationale: 'Centralizes trial logic in one function so admin and client serializers cannot drift.',
+    rationale:
+      'Centralizes trial logic so tier changes (e.g. adding a grace period) are single-edit.',
     claudeMdRef: '#billing-trial-state',
     customCheck: (files) => {
-      const matches: { file: string; line: number; text: string }[] = [];
-      // Match patterns like: new Date(trialEndsAt), trialEndsAt >, trialEndsAt <
-      // but NOT import statements or type annotations
-      const trialDateRe = /\bnew Date\([^)]*trialEndsAt[^)]*\)|trialEndsAt\s*[><!]=?\s*/;
-      const importRe = /^\s*(import\b|\/\/|\/\*|\*)/;
-      // The canonical module is excluded via Check.exclude in the CLI runner,
-      // but customCheck is also called directly from the test harness without
-      // the runner's file filtering, so guard here too.
-      const CANONICAL = 'server/billing/trial-state.ts';
+      const hits: CustomCheckMatch[] = [];
+      const dateRe = /new Date\(\s*(?:\w+\.)?trialEndsAt\b/;
+      const compareRe = /trialEndsAt\s*[><]|trialEndsAt\s*[!=]==/;
       for (const file of files) {
-        if (file.includes(CANONICAL)) continue;
-        let text: string;
-        try {
-          text = readFileSync(file, 'utf8');
-        } catch {
-          continue;
-        }
-        const lines = text.split('\n');
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes('/server/')) continue;
+        if (file.includes('/server/billing/trial-state')) continue;
+        if (file.includes('/tests/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i];
-          if (importRe.test(line)) continue;
-          if (!trialDateRe.test(line)) continue;
-          if (hasHatch(lines, i, 'trial-state-ok')) continue;
-          matches.push({ file, line: i + 1, text: line.trim() });
+          if (/^\s*(\/\/|\*)/.test(line)) continue;
+          if (line.includes('trial-state-ok')) continue;
+          if (dateRe.test(line) || compareRe.test(line)) {
+            hits.push({ file, line: i + 1, text: line.trim() });
+          }
         }
       }
-      return matches;
+      return hits;
     },
   },
 
-  // ── Workspace spread-and-redact guard (audit-drift sprint) ─────────────
+  // ── Plan A Task 3: workspace spread-and-redact (2026-05-27) ─────────────
   {
     name: 'Workspace object spread-and-redact in route handler',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/routes/',
     exclude: ['tests/'],
-    message: 'Use toAdminWorkspaceView(ws) from server/serializers/admin-workspace-view.ts instead of { ...ws, webflowToken: undefined }. Spread-and-redact silently leaks new fields added to Workspace.',
+    message:
+      'Use toAdminWorkspaceView(ws) from server/serializers/admin-workspace-view.ts instead of ' +
+      '{ ...ws, webflowToken: undefined }. The allow-list serializer prevents secret leakage when ' +
+      'new fields are added to the Workspace type. Suppress with // admin-view-ok if the spread ' +
+      'is intentional (e.g. internal-only broadcast payload).',
     severity: 'error',
     excludeLines: ['admin-view-ok'],
-    rationale: 'Allow-list serializer prevents secret leakage when new fields are added to the Workspace interface.',
-    claudeMdRef: '#admin-workspace-view-serializer',
+    rationale:
+      'Spread-and-redact is deny-list based — new secrets leak by default.',
+    claudeMdRef: '#auth-conventions',
     customCheck: (files) => {
-      const matches: { file: string; line: number; text: string }[] = [];
       const spreadRe = /\{\s*\.\.\.ws(?![.\w])|\{\s*\.\.\.workspace(?![.\w])/;
       const redactRe = /webflowToken\s*:\s*undefined|clientPassword\s*:\s*undefined/;
+      const hits: CustomCheckMatch[] = [];
       for (const file of files) {
-        let text: string;
-        try {
-          text = readFileSync(file, 'utf8');
-        } catch {
-          continue;
-        }
-        const lines = text.split('\n');
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes('/server/routes/')) continue;
+        if (file.includes('/tests/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i];
-          if (!spreadRe.test(line) && !redactRe.test(line)) continue;
-          if (hasHatch(lines, i, 'admin-view-ok')) continue;
-          matches.push({ file, line: i + 1, text: line.trim() });
+          if (/^\s*(\/\/|\*)/.test(line)) continue;
+          if (line.includes('admin-view-ok')) continue;
+          if (spreadRe.test(line) || redactRe.test(line)) {
+            hits.push({ file, line: i + 1, text: line.trim() });
+          }
         }
       }
-      return matches;
+      return hits;
     },
   },
 ];

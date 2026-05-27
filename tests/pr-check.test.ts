@@ -3323,6 +3323,68 @@ describe('Rule: Admin route mutation without addActivity', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// P2 Rule: keyword-feedback route writes must use shared service
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: keyword-feedback route writes must use shared service', () => {
+  const RULE = 'keyword-feedback route writes must use shared service';
+
+  it('flags direct INSERT INTO keyword_feedback in a route file', () => {
+    const file = write(
+      uniqPath('rule-keyword-feedback-route-write', 'server/routes/public-portal.ts'),
+      lines(
+        "const router = Router();",
+        "router.post('/api/public/keyword-feedback/:workspaceId', (req, res) => {",
+        "  db.prepare(`INSERT INTO keyword_feedback (workspace_id, keyword) VALUES (?, ?)`).run(req.params.workspaceId, req.body.keyword);",
+        "  res.json({ ok: true });",
+        "});",
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  it('does not flag route code that calls shared keyword-feedback service helpers', () => {
+    const file = write(
+      uniqPath('rule-keyword-feedback-route-write', 'server/routes/public-portal.ts'),
+      lines(
+        "import { saveKeywordFeedback } from '../keyword-feedback.js';",
+        "const router = Router();",
+        "router.post('/api/public/keyword-feedback/:workspaceId', (req, res) => {",
+        "  const result = saveKeywordFeedback({ workspaceId: req.params.workspaceId, keyword: req.body.keyword, status: 'approved' });",
+        "  res.json(result.response);",
+        "});",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects inline hatch // keyword-feedback-route-write-ok', () => {
+    const file = write(
+      uniqPath('rule-keyword-feedback-route-write', 'server/routes/public-portal.ts'),
+      lines(
+        "const router = Router();",
+        "db.prepare(`DELETE FROM keyword_feedback WHERE workspace_id = ?`).run('ws_1'); // keyword-feedback-route-write-ok",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects preceding-line hatch // keyword-feedback-route-write-ok', () => {
+    const file = write(
+      uniqPath('rule-keyword-feedback-route-write', 'server/routes/public-portal.ts'),
+      lines(
+        "const router = Router();",
+        "// keyword-feedback-route-write-ok",
+        "db.prepare(`UPDATE keyword_feedback SET status = 'declined' WHERE workspace_id = ?`).run('ws_1');",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // P2 Rule: useGlobalAdminEvents called with workspace-scoped event name
 // Detects WS_EVENTS values (workspace-scoped) being passed as handler keys
 // to useGlobalAdminEvents(), which is dead code.
@@ -3946,6 +4008,256 @@ describe('Rule: Raw provider date passed to new Date()', () => {
 
   it('excludes server/seo-data-provider.ts (the normalizer definition site)', () => {
     expect(RULE.exclude).toContain('server/seo-data-provider.ts');
+  });
+});
+
+describe('Rule: Ad hoc domain normalization helper outside canonical authority', () => {
+  const RULE = 'Ad hoc domain normalization helper outside canonical authority';
+
+  it('flags cleanDomain helper implementations that do not delegate', () => {
+    const file = write(
+      uniqPath('rule-domain-normalization', 'server/some-route.ts'),
+      lines(
+        'function cleanDomain(value: string): string {',
+        "  return value.replace(/^https?:\\/\\//, '').replace(/^www\\./, '').toLowerCase();",
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('flags stripWww helper implementations that do not delegate', () => {
+    const file = write(
+      uniqPath('rule-domain-normalization', 'server/schema/something.ts'),
+      lines(
+        'function stripWww(hostname: string): string {',
+        "  return hostname.replace(/^www\\./i, '').toLowerCase();",
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('does not flag wrappers that delegate to canonical helpers', () => {
+    const file = write(
+      uniqPath('rule-domain-normalization', 'server/local-seo.ts'),
+      lines(
+        "import { normalizeDomainValue } from './domain-normalization.js';",
+        'export function cleanDomain(value: string): string | undefined {',
+        '  return normalizeDomainValue(value);',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag server/domain-normalization.ts', () => {
+    const file = write(
+      uniqPath('rule-domain-normalization', 'server/domain-normalization.ts'),
+      lines(
+        'export function normalizeDomainValue(value: string): string | undefined {',
+        '  return value || undefined;',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with // domain-normalization-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-domain-normalization', 'server/some-legacy.ts'),
+      lines(
+        '// domain-normalization-ok — legacy compatibility shim',
+        'function cleanDomain(value: string): string {',
+        "  return value.replace(/^https?:\\/\\//, '');",
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: Retired normalizePath usage in production code', () => {
+  const RULE = 'Retired normalizePath usage in production code';
+
+  it('flags normalizePath import from shared helpers', () => {
+    const file = write(
+      uniqPath('rule-retired-normalize-path', 'server/some-module.ts'),
+      lines(
+        "import { normalizePath, normalizePageUrl } from './helpers.js';",
+        "const p = normalizePageUrl('/ok');",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('flags normalizePath call sites in production files', () => {
+    const file = write(
+      uniqPath('rule-retired-normalize-path', 'src/hooks/useSomething.ts'),
+      lines(
+        'export function x(input: string) {',
+        '  return normalizePath(input);',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('does not flag canonical normalizePageUrl usage', () => {
+    const file = write(
+      uniqPath('rule-retired-normalize-path', 'server/safe-module.ts'),
+      lines(
+        "import { normalizePageUrl } from './helpers.js';",
+        "const p = normalizePageUrl('/services/seo');",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag test fixtures', () => {
+    const file = write(
+      uniqPath('rule-retired-normalize-path', 'tests/unit/something.test.ts'),
+      lines(
+        'const normalizePath = (v: string) => v;',
+        "expect(normalizePath('/a')).toBe('/a');",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with // normalize-path-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-retired-normalize-path', 'server/legacy-shim.ts'),
+      lines(
+        '// normalize-path-ok — temporary compat shim',
+        'const p = normalizePath(value);',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: Ad hoc HTML extraction helper outside canonical authority', () => {
+  const RULE = 'Ad hoc HTML extraction helper outside canonical authority';
+
+  it('flags local extractLinks helper declarations in non-authority server files', () => {
+    const file = write(
+      uniqPath('rule-html-extraction-authority', 'server/link-foo.ts'),
+      lines(
+        'export function extractLinks(html: string): { href: string; text: string }[] {',
+        '  return [];',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('flags countWords(html) helper declarations outside authority modules', () => {
+    const file = write(
+      uniqPath('rule-html-extraction-authority', 'server/another.ts'),
+      lines(
+        'function countWords(html: string): number {',
+        '  return html.split(/\\s+/).length;',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('does not flag approved wrapper modules', () => {
+    const seoWrapper = write(
+      uniqPath('rule-html-extraction-authority', 'server/seo-audit-html.ts'),
+      lines(
+        'export function extractLinks(html: string): { href: string; text: string; rel?: string }[] {',
+        '  return [];',
+        '}',
+      )
+    );
+    const salesWrapper = write(
+      uniqPath('rule-html-extraction-authority', 'server/sales-audit.ts'),
+      lines(
+        'export function extractImgTags(html: string): { src: string; alt: string }[] {',
+        '  return [];',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [seoWrapper, salesWrapper])).toHaveLength(0);
+  });
+
+  it('suppresses with // html-extraction-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-html-extraction-authority', 'server/legacy-parser.ts'),
+      lines(
+        '// html-extraction-ok — compatibility shim pending migration',
+        'export function extractInlineScripts(html: string): number {',
+        '  return 0;',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: Local page/path normalizer helper outside tests', () => {
+  const RULE = 'Local page/path normalizer helper outside tests';
+
+  it('flags local normalizePath helper declarations in production files', () => {
+    const file = write(
+      uniqPath('rule-page-normalizer-broad', 'server/audit-traffic.ts'),
+      lines(
+        'function normalizePath(value: string): string {',
+        "  return value.startsWith('/') ? value : `/${value}`;",
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('flags local normalizePagePath helper declarations in production files', () => {
+    const file = write(
+      uniqPath('rule-page-normalizer-broad', 'src/lib/something.ts'),
+      lines(
+        'const normalizePagePath = (value: string): string => {',
+        "  return value.startsWith('/') ? value : `/${value}`;",
+        '};',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('does not flag tests that define local helpers', () => {
+    const file = write(
+      uniqPath('rule-page-normalizer-broad', 'tests/unit/path-helper.test.ts'),
+      lines(
+        'function normalizePath(value: string): string {',
+        '  return value;',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with // page-path-normalizer-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-page-normalizer-broad', 'server/legacy.ts'),
+      lines(
+        '// page-path-normalizer-ok — intentional compatibility wrapper',
+        'function normalizePath(value: string): string {',
+        '  return value;',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
   });
 });
 
@@ -4649,12 +4961,15 @@ describe('Meta: customCheck rule name registry', () => {
     'Global keydown missing isContentEditable guard',
     'Multi-step DB writes outside db.transaction()',
     'AI call before db.prepare without transaction guard',
+    'Ad hoc domain normalization helper outside canonical authority',
+    'Ad hoc HTML extraction helper outside canonical authority',
     'UPDATE/DELETE missing workspace_id scope',
     'getOrCreate* function returns nullable',
     'Hand-rolled card div (use SectionCard)',
     'Public-portal mutation without addActivity',
     'broadcastToWorkspace inside bridge callback',
     'buildWorkspaceIntelligence() without slices (assembles all 8 slices)',
+    'Intelligence consumer direct learnings/insights prompt assembly',
     'Layout-driving state set in useEffect',
     'useGlobalAdminEvents import restriction',
     'Raw string literal in broadcastToWorkspace() event arg',
@@ -4685,8 +5000,11 @@ describe('Meta: customCheck rule name registry', () => {
     // Keyword Command Center crash-hardening follow-up
     'Keyword Command Center summary/detail must not use full model',
     'Local SEO Evaluated candidates must be explicitly gated',
+    'Retired normalizePath usage in production code',
+    'Local page/path normalizer helper outside tests',
     // P2 expansion rules
     'Admin route mutation without addActivity',
+    'keyword-feedback route writes must use shared service',
     'useGlobalAdminEvents called with workspace-scoped event name',
     // P3 expansion rules
     'addActivity type not in CLIENT_VISIBLE_TYPES (public route)',
@@ -4763,6 +5081,8 @@ describe('Meta: customCheck rule name registry', () => {
     // Fires on any new direct ws.* read in buildSchemaContext outside the 6
     // identity-field allow-list. Grandfathered legacy reads carry inline hatches.
     'schema-context-direct-read-not-on-allowlist',
+    // Schema entity-resolution Phase A guardrail (2026-05-27)
+    'Wikidata disambiguation outside entity-resolution intelligence modules',
     // 2026-05-08 inbox redesign — retired InboxFilter literals
     'inbox-legacy-filter-literal',
     // PR 1.5 Phase 1 IA prevention rules (2026-05-10)
@@ -4771,9 +5091,14 @@ describe('Meta: customCheck rule name registry', () => {
     // MCP actions Phase 1 (2026-05-25)
     'mcp-action-must-tag-source',
     'mcp-action-must-broadcast',
-    // Audit-drift sprint — trial-state centralization
+    // sprint-platform-health-wave8 Plan A Task 1 (2026-05-27) — blocks new
+    // /api/public/<resource>/:workspaceId routes that ship without explicit
+    // portal-auth middleware, recognizing file-level router.use() coverage
+    // and an allow-list of bootstrap routes.
+    'Public route under /api/public/ missing client-portal auth middleware',
+    // sprint-platform-health-wave8 Plan A Tasks 2+3 (2026-05-27) — blocks
+    // inline trial-state Date math and workspace spread-and-redact patterns.
     'Inline trial-state computation outside billing module',
-    // Audit-drift sprint — admin workspace view serializer
     'Workspace object spread-and-redact in route handler',
   ].sort();
 
@@ -7947,6 +8272,65 @@ describe('Rule: schema-context-direct-read-not-on-allowlist', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// Rule: Wikidata disambiguation outside entity-resolution intelligence modules
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: Wikidata disambiguation outside entity-resolution intelligence modules', () => {
+  const RULE = 'Wikidata disambiguation outside entity-resolution intelligence modules';
+
+  it('flags Wikidata/SPARQL references outside server/intelligence/entity-resolution*', () => {
+    const file = write(
+      uniqPath('rule-entity-resolution', 'server/schema/data-sources.ts'),
+      lines(
+        'export async function resolveEntity() {',
+        "  return fetch('https://query.wikidata.org/sparql?query=SELECT%20*%20WHERE%20{?s%20?p%20?o}');",
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('respects inline // entity-resolution-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-entity-resolution', 'server/schema/data-sources.ts'),
+      lines(
+        'export async function resolveEntity() {',
+        "  return fetch('https://query.wikidata.org/sparql?query=SELECT%20*%20WHERE%20{?s%20?p%20?o}'); // entity-resolution-ok",
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // entity-resolution-ok hatch on the preceding line', () => {
+    const file = write(
+      uniqPath('rule-entity-resolution', 'server/schema/data-sources.ts'),
+      lines(
+        'export async function resolveEntity() {',
+        '  // entity-resolution-ok — temporary migration shim',
+        "  return fetch('https://query.wikidata.org/sparql?query=SELECT%20*%20WHERE%20{?s%20?p%20?o}');",
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag references inside server/intelligence/entity-resolution* modules', () => {
+    const file = write(
+      uniqPath('rule-entity-resolution', 'server/intelligence/entity-resolution-slice.ts'),
+      lines(
+        'export async function resolveEntity() {',
+        "  return fetch('https://query.wikidata.org/sparql?query=SELECT%20*%20WHERE%20{?s%20?p%20?o}');",
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // Rule: inbox-legacy-filter-literal
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -8586,153 +8970,308 @@ describe('Rule: mcp-action-must-broadcast', () => {
   });
 });
 
-describe('Rule: Inline trial-state computation outside billing module', () => {
-  const RULE = 'Inline trial-state computation outside billing module';
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: Intelligence consumer direct learnings/insights prompt assembly
+// ════════════════════════════════════════════════════════════════════════════
 
-  it('flags new Date(trialEndsAt) in server files', () => {
+describe('Rule: Intelligence consumer direct learnings/insights prompt assembly', () => {
+  const RULE = 'Intelligence consumer direct learnings/insights prompt assembly';
+
+  it('flags direct getInsights() in a builder-enforced consumer file', () => {
     const file = write(
-      uniqPath('rule-trial-state', 'server/routes/example.ts'),
+      uniqPath('rule-intel-builder', 'server/content-brief.ts'),
       lines(
-        'function getTier(ws: any) {',
-        '  const trialEnd = new Date(ws.trialEndsAt);',
-        '  return trialEnd > new Date();',
+        'export async function buildPrompt(workspaceId: string) {',
+        '  const insights = getInsights(workspaceId);',
+        '  return insights.length;',
         '}',
-      )
+      ),
     );
     const hits = runRule(RULE, [file]);
     expect(hits).toHaveLength(1);
     expect(hits[0].line).toBe(2);
   });
 
-  it('flags trialEndsAt > comparison', () => {
+  it('respects inline // intel-builder-ok hatch', () => {
     const file = write(
-      uniqPath('rule-trial-state', 'server/routes/example2.ts'),
+      uniqPath('rule-intel-builder', 'server/content-brief.ts'),
       lines(
-        'function check(ws: any) {',
-        '  if (ws.trialEndsAt > new Date().toISOString()) return true;',
+        'export async function buildPrompt(workspaceId: string) {',
+        '  const insights = getInsights(workspaceId); // intel-builder-ok',
+        '  return insights.length;',
         '}',
-      )
-    );
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-  });
-
-  it('does NOT flag files in server/billing/trial-state.ts', () => {
-    const file = write(
-      uniqPath('rule-trial-state', 'server/billing/trial-state.ts'),
-      lines(
-        'function compute(ws: any) {',
-        '  const trialEnd = new Date(ws.trialEndsAt);',
-        '  return trialEnd > new Date();',
-        '}',
-      )
+      ),
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
-  it('does NOT flag import or comment lines', () => {
+  it('respects above-line // intel-builder-ok hatch', () => {
     const file = write(
-      uniqPath('rule-trial-state', 'server/routes/example3.ts'),
+      uniqPath('rule-intel-builder', 'server/content-brief.ts'),
       lines(
-        'import { computeTrialState } from "../billing/trial-state.js";',
-        '// const trialEnd = new Date(ws.trialEndsAt);',
-        '/* trialEndsAt > comparison */',
-      )
+        'export async function buildPrompt(workspaceId: string) {',
+        '  // intel-builder-ok: temporary migration bridge',
+        '  const learnings = getWorkspaceLearnings(workspaceId);',
+        '  return !!learnings;',
+        '}',
+      ),
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
-  it('respects // trial-state-ok hatch', () => {
+  it('does not flag out-of-scope server files', () => {
     const file = write(
-      uniqPath('rule-trial-state', 'server/routes/example4.ts'),
+      uniqPath('rule-intel-builder', 'server/recommendations.ts'),
       lines(
-        'function compute(ws: any) {',
-        '  const trialEnd = new Date(ws.trialEndsAt); // trial-state-ok — canonical resolver',
+        'export async function compute(workspaceId: string) {',
+        '  const insights = getInsights(workspaceId);',
+        '  return insights.length;',
         '}',
-      )
-    );
-    expect(runRule(RULE, [file])).toHaveLength(0);
-  });
-
-  it('respects above-line // trial-state-ok hatch', () => {
-    const file = write(
-      uniqPath('rule-trial-state', 'server/routes/example5.ts'),
-      lines(
-        'function compute(ws: any) {',
-        '  // trial-state-ok — canonical resolver',
-        '  const trialEnd = new Date(ws.trialEndsAt);',
-        '}',
-      )
+      ),
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 });
 
-describe('Rule: Workspace object spread-and-redact in route handler', () => {
-  const RULE = 'Workspace object spread-and-redact in route handler';
+describe('Rule: Public route under /api/public/ missing client-portal auth middleware', () => {
+  const RULE = 'Public route under /api/public/ missing client-portal auth middleware';
 
-  it('flags { ...ws, webflowToken: undefined } pattern', () => {
-    const file = write(
-      uniqPath('rule-ws-spread', 'server/routes/example.ts'),
+  function writeRoute(subdir: string, body: string): string {
+    return write(`${subdir}/server/routes/widget.ts`, body);
+  }
+
+  it('flags a public workspace-scoped route with no portal auth middleware', () => {
+    const file = writeRoute(
+      uniqPath('rule-public-auth', 'trigger'),
       lines(
-        'const safe = { ...ws, webflowToken: undefined, clientPassword: undefined };',
-        'res.json(safe);',
-      )
+        "import { router } from './router.js';",
+        "router.get('/api/public/widget/:workspaceId', (req, res) => {",
+        "  res.json({ ok: true });",
+        "});",
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('does not flag a route that uses requireClientPortalAuth inline', () => {
+    const file = writeRoute(
+      uniqPath('rule-public-auth', 'inline-portal'),
+      lines(
+        "import { router } from './router.js';",
+        "router.get('/api/public/widget/:workspaceId', requireClientPortalAuth(), (req, res) => {",
+        "  res.json({ ok: true });",
+        "});",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag a route that uses requireAuthenticatedClientPortalAuth inline', () => {
+    const file = writeRoute(
+      uniqPath('rule-public-auth', 'inline-authenticated'),
+      lines(
+        "import { router } from './router.js';",
+        "router.get('/api/public/widget/:workspaceId', requireAuthenticatedClientPortalAuth(), (req, res) => {",
+        "  res.json({ ok: true });",
+        "});",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag routes covered by a file-level router.use() portal auth', () => {
+    const file = writeRoute(
+      uniqPath('rule-public-auth', 'file-level-use'),
+      lines(
+        "import { router } from './router.js';",
+        "router.use('/api/public/:resource/:workspaceId', requireClientPortalAuth('workspaceId'));",
+        "router.get('/api/public/widget/:workspaceId', (req, res) => {",
+        "  res.json({ ok: true });",
+        "});",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag bootstrap/login allow-list resources', () => {
+    const file = writeRoute(
+      uniqPath('rule-public-auth', 'allowlist'),
+      lines(
+        "import { router } from './router.js';",
+        "router.post('/api/public/auth/:id', (req, res) => res.json({ ok: true }));",
+        "router.get('/api/public/auth-mode/:id', (req, res) => res.json({}));",
+        "router.post('/api/public/forgot-password/:id', (req, res) => res.json({ ok: true }));",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // public-no-auth-ok inline hatch', () => {
+    const file = writeRoute(
+      uniqPath('rule-public-auth', 'hatch'),
+      lines(
+        "import { router } from './router.js';",
+        "router.get('/api/public/widget/:workspaceId', (req, res) => { // public-no-auth-ok: share-link",
+        "  res.json({ ok: true });",
+        "});",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  // Note: the rule's `exclude` list (file-level grandfathering) is enforced
+  // by the pr-check runner outside the customCheck function, so it cannot be
+  // exercised via the unit-level runRule() helper used here. The grandfather
+  // exemption is verified end-to-end by running `npx tsx scripts/pr-check.ts`
+  // against the committed routes (the seven listed files contain unprotected
+  // public routes but pr-check passes because they sit in the exclude list).
+});
+
+// ── Plan A Task 2: trial-state centralization ─────────────────────────────
+describe('Rule: Inline trial-state computation outside billing module', () => {
+  const RULE = 'Inline trial-state computation outside billing module';
+
+  it('flags new Date(trialEndsAt) in a server file', () => {
+    const file = write(
+      uniqPath('rule-trial-state', 'server/routes/workspaces.ts'),
+      lines(
+        "const end = new Date(ws.trialEndsAt);",
+        "const isTrial = end > new Date();",
+      ),
     );
     const hits = runRule(RULE, [file]);
     expect(hits).toHaveLength(1);
     expect(hits[0].line).toBe(1);
   });
 
-  it('flags { ...workspace, ... } spread', () => {
+  it('flags trialEndsAt > comparison in a server file', () => {
     const file = write(
-      uniqPath('rule-ws-spread', 'server/routes/example2.ts'),
+      uniqPath('rule-trial-state', 'server/routes/billing.ts'),
       lines(
-        'const safe = { ...workspace, webflowToken: undefined };',
-      )
+        "if (ws.trialEndsAt > new Date().toISOString()) {",
+        "  return 'trial';",
+        "}",
+      ),
     );
-    expect(runRule(RULE, [file])).toHaveLength(1);
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
   });
 
-  it('flags standalone redact in object literal', () => {
+  it('respects // trial-state-ok inline hatch', () => {
     const file = write(
-      uniqPath('rule-ws-spread', 'server/routes/example3.ts'),
+      uniqPath('rule-trial-state', 'server/trial-reminders.ts'),
       lines(
-        'const obj = { webflowToken: undefined };',
-        'const obj2 = { clientPassword: undefined };',
-      )
-    );
-    expect(runRule(RULE, [file])).toHaveLength(2);
-  });
-
-  it('does NOT flag toAdminWorkspaceView usage', () => {
-    const file = write(
-      uniqPath('rule-ws-spread', 'server/routes/example4.ts'),
-      lines(
-        'import { toAdminWorkspaceView } from "../serializers/admin-workspace-view.js";',
-        'const safe = toAdminWorkspaceView(ws);',
-        'res.json(safe);',
-      )
+        "const raw = new Date(ws.trialEndsAt).getTime(); // trial-state-ok: cron needs raw ms",
+      ),
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
-  it('respects // admin-view-ok hatch', () => {
+  it('does not flag the canonical billing module', () => {
     const file = write(
-      uniqPath('rule-ws-spread', 'server/routes/example5.ts'),
+      uniqPath('rule-trial-state', 'server/billing/trial-state.ts'),
       lines(
-        'const safe = { ...ws, webflowToken: undefined }; // admin-view-ok — overview endpoint',
-      )
+        "const end = new Date(ws.trialEndsAt);",
+        "return end > now;",
+      ),
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
-  it('does NOT flag property-access spread like { ...ws.keywordStrategy }', () => {
+  it('does not flag test files', () => {
     const file = write(
-      uniqPath('rule-ws-spread', 'server/routes/example6.ts'),
+      uniqPath('rule-trial-state', 'tests/unit/trial.test.ts'),
       lines(
-        'updateWorkspace(wsId, { keywordStrategy: { ...ws.keywordStrategy, businessContext } });',
-      )
+        "const end = new Date(ws.trialEndsAt);",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag computeTrialState usage (no Date math)', () => {
+    const file = write(
+      uniqPath('rule-trial-state', 'server/routes/overview.ts'),
+      lines(
+        "import { computeTrialState } from '../billing/trial-state.js';",
+        "const trial = computeTrialState(ws);",
+        "if (trial.isTrial) return 'trial';",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ── Plan A Task 3: workspace spread-and-redact ────────────────────────────
+describe('Rule: Workspace object spread-and-redact in route handler', () => {
+  const RULE = 'Workspace object spread-and-redact in route handler';
+
+  it('flags { ...ws } spread in a route handler', () => {
+    const file = write(
+      uniqPath('rule-ws-spread', 'server/routes/workspaces.ts'),
+      lines(
+        "const safe = { ...ws, webflowToken: undefined };",
+        "res.json(safe);",
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('flags standalone redact pattern', () => {
+    const file = write(
+      uniqPath('rule-ws-spread', 'server/routes/admin.ts'),
+      lines(
+        "const view = { name: ws.name, webflowToken: undefined };",
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('flags { ...workspace } variant', () => {
+    const file = write(
+      uniqPath('rule-ws-spread', 'server/routes/detail.ts'),
+      lines(
+        "res.json({ ...workspace, clientPassword: undefined });",
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('respects // admin-view-ok inline hatch', () => {
+    const file = write(
+      uniqPath('rule-ws-spread', 'server/routes/broadcast.ts'),
+      lines(
+        "const payload = { ...ws, webflowToken: undefined }; // admin-view-ok: internal broadcast",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag { ...ws.keywordStrategy } property-access spread', () => {
+    const file = write(
+      uniqPath('rule-ws-spread', 'server/routes/strategy.ts'),
+      lines(
+        "const merged = { ...ws.keywordStrategy, generatedAt: new Date().toISOString() };",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag toAdminWorkspaceView usage', () => {
+    const file = write(
+      uniqPath('rule-ws-spread', 'server/routes/clean.ts'),
+      lines(
+        "import { toAdminWorkspaceView } from '../serializers/admin-workspace-view.js';",
+        "res.json(toAdminWorkspaceView(ws));",
+      ),
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
