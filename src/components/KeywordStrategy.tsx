@@ -30,6 +30,7 @@ import { keywordTrackingKey } from '../lib/keywordTracking';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
 import { adminPath } from '../routes';
+import { formatDate } from '../utils/formatDates';
 
 /** Minimum monthly search volume to display a strategy card. Cards below this are noise. */
 const VOLUME_THRESHOLD = 10;
@@ -312,7 +313,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         title="Keyword Strategy"
         subtitle={
           isRealStrategy
-            ? `Generated ${new Date(strategy.generatedAt).toLocaleDateString()} · ${strategy.pageMap?.length ?? 0} pages mapped`
+            ? `Generated ${formatDate(strategy.generatedAt)} · ${strategy.pageMap?.length ?? 0} pages mapped`
             : 'AI-powered keyword mapping for your entire site'
         }
         icon={<Icon as={Target} size="lg" className="text-accent-brand" />}
@@ -384,7 +385,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                     <span className="t-caption-sm font-medium text-[var(--brand-text-bright)]">{item.keyword}</span>
                     {item.updated_at && (
                       <span className="t-caption-sm text-[var(--brand-text-muted)]">
-                        {new Date(item.updated_at).toLocaleDateString()}
+                        {formatDate(item.updated_at)}
                       </span>
                     )}
                   </div>

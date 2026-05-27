@@ -14,6 +14,7 @@ import { STUDIO_NAME } from '../../constants';
 import { get, post, patch, del } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
 import { Button } from '../ui/Button';
+import { fmtMoneyFull } from '../../utils/formatNumbers';
 import { Icon } from '../ui/Icon';
 
 // ─── Props ────────────────────────────────────────────────────────
@@ -40,8 +41,7 @@ const REC_TYPE_TAB: Record<RecType, string> = {
 
 // ─── Helpers ──────────────────────────────────────────────────────
 
-const fmt = (usd: number) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(usd);
+const fmt = fmtMoneyFull;
 
 const num = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString();
 

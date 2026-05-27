@@ -3,9 +3,9 @@ import { X, ShoppingCart, Minus, Plus, Trash2, Loader2, Lock, Sparkles, Crown } 
 import { useCart } from './useCart';
 import { post } from '../../api/client';
 import { Button, IconButton } from '../ui';
+import { fmtMoneyFull } from '../../utils/formatNumbers';
 
-const fmt = (usd: number) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(usd);
+const fmt = fmtMoneyFull;
 
 interface SeoCartProps {
   workspaceId: string;

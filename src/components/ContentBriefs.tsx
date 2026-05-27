@@ -5,6 +5,7 @@ import {
   Trash2, AlertTriangle, PenLine, Clipboard, Search, X, ArrowUpDown,
 } from 'lucide-react';
 import { Badge, Icon, IconButton, ClickableRow, FormInput, FormSelect, Button, Modal, PageHeader, LoadingState, ErrorState } from './ui';
+import { formatDate } from '../utils/formatDates';
 import type { FixContext } from '../App';
 import type { ContentBrief, ContentGenerationStyle, ContentTopicRequest, PostSummary } from '../../shared/types/content';
 import { DEFAULT_CONTENT_GENERATION_STYLE } from '../../shared/types/content';
@@ -479,7 +480,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
                         tone={post.status === 'generating' ? 'amber' : post.status === 'approved' ? 'emerald' : post.status === 'review' ? 'teal' : 'blue'}
                         variant="outline"
                       />
-                      <span className="t-caption-sm text-[var(--brand-text-muted)]">{new Date(post.createdAt).toLocaleDateString()}</span>
+                      <span className="t-caption-sm text-[var(--brand-text-muted)]">{formatDate(post.createdAt)}</span>
                     </div>
                   </div>
                 </ClickableRow>

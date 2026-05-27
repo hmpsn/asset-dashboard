@@ -14,6 +14,7 @@ import {
 import { Badge, Button, CharacterCounter, Checkbox, ClickableRow, FormInput, FormTextarea, Icon, IconButton, SectionCard, SerpPreview, SocialPreview, type BadgeTone } from '../ui';
 import { StatusBadge } from '../ui/StatusBadge';
 import { statusBorderClass } from '../ui/statusConfig';
+import { formatDate } from '../../utils/formatDates';
 import type { PageEditState } from '../../hooks/usePageEditStates';
 import {
   filterAndRankCollectionItems,
@@ -419,7 +420,7 @@ export function CmsEditorCollections({
                                     <Icon as={Clock} size="sm" className="text-[var(--brand-text-muted)]" />
                                     <span className="t-caption-sm font-medium text-[var(--brand-text)]">Latest: {latest.batchName}</span>
                                     <Badge label={latest.status} tone={APPROVAL_STATUS_TONES[latest.status] ?? 'zinc'} variant="outline" shape="sm" size="sm" />
-                                    <span className="t-micro text-[var(--brand-text-muted)]/60 ml-auto">{new Date(latest.updatedAt).toLocaleDateString()}</span>
+                                    <span className="t-micro text-[var(--brand-text-muted)]/60 ml-auto">{formatDate(latest.updatedAt)}</span>
                                   </div>
                                   <div className="flex items-center gap-2 t-caption-sm">
                                     <span className="text-[var(--brand-text-muted)] font-medium">{latest.field}</span>
@@ -447,7 +448,7 @@ export function CmsEditorCollections({
                                             <div className="flex items-center gap-2 mb-0.5">
                                               <span className="text-[var(--brand-text-muted)]">{approval.batchName}</span>
                                               <Badge label={approval.status} tone={APPROVAL_STATUS_TONES[approval.status] ?? 'zinc'} variant="outline" shape="sm" size="sm" />
-                                              <span className="t-micro text-[var(--brand-text-muted)]/60 ml-auto">{new Date(approval.updatedAt).toLocaleDateString()}</span>
+                                              <span className="t-micro text-[var(--brand-text-muted)]/60 ml-auto">{formatDate(approval.updatedAt)}</span>
                                             </div>
                                             <div className="flex items-center gap-1.5">
                                               <span className="text-[var(--brand-text-muted)] font-medium">{approval.field}:</span>

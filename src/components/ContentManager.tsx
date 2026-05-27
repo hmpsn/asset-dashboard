@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Badge, EmptyState, MetricRing, Icon, PageHeader, Button, IconButton, FormInput } from './ui';
+import { formatDate } from '../utils/formatDates';
 import {
   Loader2, FileText, PenLine, Clock, CheckCircle2, Eye, Send,
   Trash2, Download, Search, ArrowUpDown, Filter,
@@ -288,7 +289,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                       )}
                       <span className="t-caption-sm text-[var(--brand-text-muted)]">·</span>
                       <span className="t-caption-sm text-[var(--brand-text-muted)]">
-                        {new Date(post.createdAt).toLocaleDateString()}
+                        {formatDate(post.createdAt)}
                       </span>
                       {/* Voice score inline */}
                       {post.voiceScore != null && (

@@ -4,6 +4,7 @@ import { Loader2, Download, RefreshCw, FileText, Copy, Check, Bot, Eye, EyeOff, 
 import { SectionCard, StatCard, EmptyState, PageHeader, Button, Icon, cn } from './ui';
 import { llmsTxt } from '../api/content';
 import { queryKeys } from '../lib/queryKeys';
+import { formatDateTime } from '../utils/formatDates';
 import { STALE_TIMES } from '../lib/queryClient';
 
 interface LlmsTxtResult {
@@ -120,7 +121,7 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
         title="LLMs.txt Generator"
         subtitle={
           <span className="flex items-center gap-2">
-            <span>{data ? `${data.pageCount} pages · Generated ${new Date(data.generatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'Generating…'}</span>
+            <span>{data ? `${data.pageCount} pages · Generated ${formatDateTime(data.generatedAt)}` : 'Generating…'}</span>
             <span className={`flex items-center gap-1 text-xs ${freshness.color}`}>
               <Icon as={Clock} size="sm" />{freshness.label}
             </span>

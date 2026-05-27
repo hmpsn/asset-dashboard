@@ -12,6 +12,7 @@ import { cn } from '../lib/utils';
 import { chartGridColor, chartAxisColor, CHART_SERIES_COLORS } from './ui/constants';
 import { queryKeys } from '../lib/queryKeys';
 import { adminPath } from '../routes';
+import { formatDateShort } from '../utils/formatDates';
 import type { LatestRank } from '../../shared/types/rank-tracking';
 
 // ── Trend colors (blue/teal/green family per design system — no violet/indigo) ──
@@ -35,7 +36,7 @@ function PositionSparkline({ data }: { data: { date: string; position: number }[
   const last = pts[pts.length - 1];
   const first = data[0], latest = data[data.length - 1];
   const improved = latest.position < first.position;
-  const dateRange = `${new Date(first.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${new Date(latest.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+  const dateRange = `${formatDateShort(first.date)} – ${formatDateShort(latest.date)}`;
 
   return (
     <div className="flex items-center gap-4">
@@ -130,7 +131,7 @@ function TrendsChart({ data, keywords }: { data: HistoryPoint[]; keywords: strin
         {/* X-axis date labels */}
         {xLabels.map(({ idx, date }) => (
           <text key={idx} x={toX(idx)} y={H - 6} textAnchor="middle" fill={chartAxisColor()} fontSize="9">
-            {new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            {formatDateShort(date)}
           </text>
         ))}
       </svg>

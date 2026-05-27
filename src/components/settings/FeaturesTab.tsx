@@ -6,6 +6,7 @@ import {
 import { post } from '../../api/client';
 import { Badge, SectionCard, Icon, Button, Checkbox, FormInput } from '../ui';
 import { useDeepLinkFocus } from '../../hooks/useDeepLinkFocus';
+import { formatDate } from '../../utils/formatDates';
 
 interface WorkspaceData {
   tier?: 'free' | 'growth' | 'premium';
@@ -111,7 +112,7 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
           </p>
           {ws?.trialEndsAt && (
             <div className="t-caption-sm text-teal-400/80 bg-teal-500/5 border border-teal-500/15 rounded-[var(--radius-lg)] px-3 py-2">
-              Trial active — expires {new Date(ws.trialEndsAt).toLocaleDateString()}
+              Trial active — expires {formatDate(ws.trialEndsAt)}
             </div>
           )}
         </div>

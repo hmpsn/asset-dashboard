@@ -8,9 +8,9 @@ import { useBetaMode } from './BetaContext';
 import type { ProductType } from '../../../server/payments';
 import { getOptional, getSafe } from '../../api/client';
 import { normalizePageUrl } from '../../lib/pathUtils';
+import { fmtMoneyFull } from '../../utils/formatNumbers';
 
-const fmt = (usd: number) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(usd);
+const fmt = fmtMoneyFull;
 
 const num = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString();
 

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { SectionCard, StatCard, Badge, EmptyState, PageHeader, FormInput, Icon, Button, ClickableRow } from './ui';
 import { siteArchitecture } from '../api/content';
+import { formatDateTime } from '../utils/formatDates';
 
 // ── Schema coverage types ──
 
@@ -303,7 +304,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
     <div className="space-y-8">
       <PageHeader
         title="Site Architecture"
-        subtitle={`${data.totalPages} pages · Analyzed ${new Date(data.analyzedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`}
+        subtitle={`${data.totalPages} pages · Analyzed ${formatDateTime(data.analyzedAt)}`}
         icon={<Map className="w-5 h-5 text-teal-400" />}
         actions={
           <Button
