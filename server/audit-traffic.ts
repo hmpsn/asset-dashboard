@@ -1,0 +1,99 @@
+import { getGA4TopPages } from './google-analytics.js';
+import { getAllGscPages } from './search-console.js';
+import { isProgrammingError } from './errors.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('audit-traffic');
+
+const AUDIT_TRAFFIC_CACHE_TTL_MS = 5 * 60 * 1000;
+
+export interface AuditTrafficWorkspace {
+  id: string;
+  webflowSiteId?: string;
+  gscPropertyUrl?: string;
+  ga4PropertyId?: string;
+}
+
+export interface AuditTrafficMetrics {
+  clicks: number;
+  impressions: number;
+  sessions: number;
+  pageviews: number;
+}
+
+export type AuditTrafficMap = Record<string, AuditTrafficMetrics>;
+
+const auditTrafficCache: Record<string, { data: AuditTrafficMap; ts: number }> = {};
+
+function normalizePath(raw: string): string {
+  if (raw === '') return '/';
+  const withLeadingSlash = raw.startsWith('/') ? raw : `/${raw}`;
+  return withLeadingSlash.length > 1 && withLeadingSlash.endsWith('/')
+    ? withLeadingSlash.slice(0, -1)
+    : withLeadingSlash;
+}
+
+function normalizeTrafficPath(value: string): string {
+  try {
+    return normalizePath(new URL(value).pathname);
+  } catch (_err) {
+    return normalizePath(value);
+  }
+}
+
+function normalizeGscPagePath(value: string): string | null {
+  try {
+    return normalizePath(new URL(value).pathname);
+  } catch (_err) {
+    return null;
+  }
+}
+
+export function clearAuditTrafficCache(): void {
+  for (const key of Object.keys(auditTrafficCache)) delete auditTrafficCache[key];
+}
+
+export async function getAuditTrafficForWorkspace(
+  ws: AuditTrafficWorkspace,
+): Promise<AuditTrafficMap> {
+  if (!ws.gscPropertyUrl && !ws.ga4PropertyId) return {};
+  const cacheKey = ws.id;
+  const cached = auditTrafficCache[cacheKey];
+  if (cached && Date.now() - cached.ts < AUDIT_TRAFFIC_CACHE_TTL_MS) return cached.data;
+
+  const trafficMap: AuditTrafficMap = {};
+
+  if (ws.gscPropertyUrl) {
+    try {
+      const gscPages = await getAllGscPages(ws.id, ws.gscPropertyUrl, 28);
+      for (const p of gscPages) {
+        const pagePath = normalizeGscPagePath(p.page);
+        if (!pagePath) continue;
+        if (!trafficMap[pagePath]) trafficMap[pagePath] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
+        trafficMap[pagePath].clicks += p.clicks;
+        trafficMap[pagePath].impressions += p.impressions;
+      }
+    } catch (err) {
+      if (isProgrammingError(err)) log.warn({ err, workspaceId: ws.id }, 'audit-traffic: GSC programming error');
+      else log.debug({ err, workspaceId: ws.id }, 'audit-traffic: GSC unavailable — degrading gracefully');
+    }
+  }
+
+  if (ws.ga4PropertyId) {
+    try {
+      const ga4Pages = await getGA4TopPages(ws.ga4PropertyId, 28, 500);
+      for (const p of ga4Pages) {
+        const pagePath = normalizeTrafficPath(p.path);
+        if (!trafficMap[pagePath]) trafficMap[pagePath] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
+        trafficMap[pagePath].pageviews += p.pageviews;
+        trafficMap[pagePath].sessions += p.users;
+      }
+    } catch (err) {
+      if (isProgrammingError(err)) log.warn({ err, workspaceId: ws.id }, 'audit-traffic: GA4 programming error');
+      else log.debug({ err, workspaceId: ws.id }, 'audit-traffic: GA4 unavailable — degrading gracefully');
+    }
+  }
+
+  auditTrafficCache[cacheKey] = { data: trafficMap, ts: Date.now() };
+  return trafficMap;
+}

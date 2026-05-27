@@ -12,10 +12,9 @@ import type * as OpenAIMod from 'openai';
 import type { default as SharpConstructor } from 'sharp';
 import type { execFileSync as ExecFileSyncFn } from 'child_process';
 import { getUploadRoot } from '../data-dir.js';
-import { getGA4TopPages } from '../google-analytics.js';
+import { getAuditTrafficForWorkspace } from '../helpers.js';
 import { upload, moveUploadedFiles } from '../middleware.js';
 import { triggerOptimize } from '../processor.js';
-import { getAllGscPages } from '../search-console.js';
 import { listSites, getPageDom } from '../webflow.js';
 import {
   listWorkspaces,
@@ -80,38 +79,8 @@ router.get('/api/audit-traffic/:siteId', requireWorkspaceSiteAccessFromQuery(), 
     const allWs = listWorkspaces();
     const ws = allWs.find(w => w.webflowSiteId === req.params.siteId);
     if (!ws) return res.json({});
-
-    const trafficMap: Record<string, { clicks: number; impressions: number; sessions: number; pageviews: number }> = {};
-
-    // Fetch GSC page-level data
-    if (ws.gscPropertyUrl) {
-      try {
-        const gscPages = await getAllGscPages(ws.id, ws.gscPropertyUrl, 28);
-        for (const p of gscPages) {
-          try {
-            const path = new URL(p.page).pathname;
-            if (!trafficMap[path]) trafficMap[path] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
-            trafficMap[path].clicks += p.clicks;
-            trafficMap[path].impressions += p.impressions;
-          } catch { /* skip malformed URLs */ }
-        }
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'misc: GET /api/audit-traffic/:siteId: programming error'); /* GSC unavailable */ } // url-fetch-ok
-    }
-
-    // Fetch GA4 top pages
-    if (ws.ga4PropertyId) {
-      try {
-        const ga4Pages = await getGA4TopPages(ws.ga4PropertyId, 28, 500);
-        for (const p of ga4Pages) {
-          const path = p.path.startsWith('/') ? p.path : `/${p.path}`;
-          if (!trafficMap[path]) trafficMap[path] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
-          trafficMap[path].pageviews += p.pageviews;
-          trafficMap[path].sessions += p.users; // users as proxy for sessions at page level
-        }
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'misc: programming error'); /* GA4 unavailable */ }
-    }
-
-    res.json(trafficMap);
+    const trafficMap = await getAuditTrafficForWorkspace(ws);
+    return res.json(trafficMap);
   } catch (err) {
     if (isProgrammingError(err)) log.warn({ err }, 'misc: GET /api/audit-traffic/:siteId: top-level programming error'); // url-fetch-ok
     else log.debug({ err }, 'misc: audit-traffic endpoint failed — degrading gracefully');

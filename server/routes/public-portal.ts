@@ -12,11 +12,9 @@ import { validate, z } from '../middleware/validate.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { hasClientUsers, verifyClientToken } from '../client-users.js';
-import { getGA4TopPages } from '../google-analytics.js';
 import { verifyClientSession } from '../middleware.js';
 import { getLatestSnapshotBefore } from '../reports.js';
 import { getEffectiveAudit, getLatestEffectiveSnapshot, listEffectiveSnapshotSummaries } from '../audit-snapshot-views.js';
-import { getAllGscPages } from '../search-console.js';
 import { isStripeConfigured, listProducts } from '../stripe.js';
 import { updateWorkspace, getWorkspace, computeEffectiveTier } from '../workspaces.js';
 import { getLatestPublishedBriefing, countPublishedBriefingsThrough } from '../briefing-store.js';
@@ -53,6 +51,7 @@ import { isProgrammingError } from '../errors.js';
 import { normalizeSocialProfiles } from '../social-profiles.js';
 import { toPublicWorkspaceView } from '../serializers/client-safe.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
+import { getAuditTrafficForWorkspace } from '../helpers.js';
 
 const log = createLogger('public-portal');
 
@@ -307,36 +306,8 @@ router.get('/api/public/audit-traffic/:workspaceId', async (req, res) => {
   try {
     const ws = getWorkspace(req.params.workspaceId);
     if (!ws) return res.json({});
-
-    const trafficMap: Record<string, { clicks: number; impressions: number; sessions: number; pageviews: number }> = {};
-
-    if (ws.gscPropertyUrl) {
-      try {
-        const gscPages = await getAllGscPages(ws.id, ws.gscPropertyUrl, 28);
-        for (const p of gscPages) {
-          try {
-            const pagePath = new URL(p.page).pathname;
-            if (!trafficMap[pagePath]) trafficMap[pagePath] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
-            trafficMap[pagePath].clicks += p.clicks;
-            trafficMap[pagePath].impressions += p.impressions;
-          } catch { /* skip malformed URLs */ } // catch-ok
-        }
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'public-portal: GET /api/public/audit-traffic/:workspaceId: programming error'); /* GSC unavailable */ } // url-fetch-ok
-    }
-
-    if (ws.ga4PropertyId) {
-      try {
-        const ga4Pages = await getGA4TopPages(ws.ga4PropertyId, 28, 500);
-        for (const p of ga4Pages) {
-          const pagePath = p.path.startsWith('/') ? p.path : `/${p.path}`;
-          if (!trafficMap[pagePath]) trafficMap[pagePath] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
-          trafficMap[pagePath].pageviews += p.pageviews;
-          trafficMap[pagePath].sessions += p.users;
-        }
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'public-portal: programming error'); /* GA4 unavailable */ }
-    }
-
-    res.json(trafficMap);
+    const trafficMap = await getAuditTrafficForWorkspace(ws);
+    return res.json(trafficMap);
   } catch (err) {
     if (isProgrammingError(err)) log.warn({ err }, 'public-portal: GET /api/public/audit-traffic/:workspaceId: programming error'); // url-fetch-ok
     else log.debug({ err }, 'public-portal: audit-traffic endpoint failed — degrading gracefully');

@@ -96,13 +96,13 @@ If the required signal is not yet available from the right intelligence slice:
 
 Do not widen the shared builder API with ad hoc direct workspace reads.
 
-## PR1 Status
+## Enforcement Status
 
-This phase is intentionally soft-guardrail only:
+`pr-check` now enforces this contract for builder-enforced server AI/
+recommendation consumers. Direct calls to `getInsights()`,
+`getWorkspaceLearnings()`, or `formatLearningsForPrompt()` in those consumers
+are blocked unless a documented `// intel-builder-ok` exception is present.
 
-- audit artifact
-- rules doc
-- inventory/contract tests
-
-Hard `pr-check` enforcement is deferred until the first migration wave reduces
-the legacy caller surface.
+Scope is intentionally narrow to high-value consumer paths so we catch real
+prompt-assembly drift without flagging store-layer or deterministic analytics
+usage.

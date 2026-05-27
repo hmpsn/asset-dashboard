@@ -1,8 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **452 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **453 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 453. Platform Health Wave 7 PR1 — Audit-Traffic Consolidation + Intelligence Builder Guardrail
+
+**What it does:** Consolidates audit-traffic read assembly into a single shared service (`server/audit-traffic.ts`) and migrates admin/public/recommendation consumers onto that canonical path. This removes duplicated GSC+GA4 merge logic that had diverged across `misc` routes, public-portal routes, and recommendation assembly. In the same PR, a new hard `pr-check` rule now blocks direct `getInsights()`, `getWorkspaceLearnings()`, and `formatLearningsForPrompt()` prompt-assembly drift in builder-enforced AI/recommendation consumers, requiring shared intelligence builders unless an explicit documented hatch is used.
+
+**Agency value:** Reduces maintenance drag and silent data-shape drift in a core decision-support read path while preventing regression to hand-rolled AI context assembly patterns that are costly to debug later.
+
+**Client value:** Keeps traffic-driven prioritization more consistent across surfaces (audit, recommendations, and client/public read paths) and improves reliability of AI-generated recommendations by enforcing stable context-building contracts.
+
+**Mutual:** Establishes a cleaner platform baseline: one source of truth for audit-traffic aggregation and one enforceable contract for high-value intelligence consumers.
 
 ---
 

@@ -895,6 +895,21 @@ const BACKGROUND_GENERATION_SITE_ALLOWLIST = new Set([
   "server/routes/webflow-schema.ts::queueLlmsTxtRegeneration::if (llmsWs) queueLlmsTxtRegeneration(llmsWs.id, 'schema_published');",
 ]);
 
+const INTELLIGENCE_BUILDER_ENFORCED_CONSUMERS = new Set([
+  'server/content-brief.ts',
+  'server/content-decay.ts',
+  'server/keyword-recommendations.ts',
+  'server/admin-chat-context.ts',
+  'server/diagnostic-orchestrator.ts',
+  'server/routes/rewrite-chat.ts',
+  'server/routes/webflow-keywords.ts',
+  'server/routes/webflow-seo-rewrite.ts',
+  'server/routes/webflow-seo-page-tools.ts',
+  'server/routes/webflow-seo-bulk-rewrite.ts',
+  'server/webflow-seo-bulk-rewrite-job.ts',
+  'server/mcp/tools/content-actions.ts',
+]);
+
 function backgroundGenerationRoutePath(file: string): string {
   const normalized = file.split(path.sep).join('/');
   const routeIdx = normalized.lastIndexOf('server/routes/');
@@ -1382,6 +1397,33 @@ export const CHECKS: Check[] = [
     excludeLines: ['// bip-ok'],
     message: 'Use buildIntelPrompt(id, slices) when only the formatted string is needed. When raw intel is also needed: const slices = [...]; formatForPrompt(intel, { sections: slices }). Add `// bip-ok` for intentional exceptions.',
     severity: 'error',
+  },
+  {
+    name: 'Intelligence consumer direct learnings/insights prompt assembly',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    message: 'Builder-enforced intelligence consumers must not call getInsights(), getWorkspaceLearnings(), or formatLearningsForPrompt() directly. Use shared context builders (buildContentGenerationContext/buildRecommendationGenerationContext/buildAdminChatIntelligenceContext/buildDiagnosticIntelligenceContext/buildPageAssistContext). Add // intel-builder-ok only for a documented exception.',
+    severity: 'error',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const directCall = /\b(getInsights|getWorkspaceLearnings|formatLearningsForPrompt)\s*\(/;
+      const enforcedTargets = [...INTELLIGENCE_BUILDER_ENFORCED_CONSUMERS];
+      for (const file of files) {
+        const rel = path.relative(ROOT, file).split(path.sep).join('/');
+        const isTarget = enforcedTargets.some(target => rel === target || rel.endsWith(`/${target}`));
+        if (!isTarget) continue;
+        const lines = readFileOrEmpty(file).split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (!directCall.test(line)) continue;
+          if (line.includes('import ')) continue;
+          if (hasHatch(lines, i, 'intel-builder-ok')) continue;
+          hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
   },
   {
     name: 'Unguarded recordAction() call',
