@@ -55,10 +55,10 @@
         {
           "id": 224,
           "title": "API documentation (OpenAPI/Swagger spec)",
-          "source": "Market prep analysis Mar 2026",
-          "est": "3-4h",
+          "source": "Market prep analysis Mar 2026; revised May 2026 post-review",
+          "est": "8-15h",
           "priority": "P2",
-          "notes": "48 route files with no formal API docs beyond the code itself. If you bring on another developer or a client asks for API access, this becomes a blocker. Auto-generate OpenAPI spec from route definitions using tsoa or swagger-jsdoc. Host interactive docs at /api/docs. Document auth requirements, request/response schemas, and error codes for all public and admin endpoints.",
+          "notes": "91 route files in server/routes/ with no formal API spec. Triggers to pull forward: (a) first external API consumer signed (paid agency white-label, Zapier, contractor onboarding), (b) committing to migrate response validation to Zod for other reasons (OpenAPI becomes a free byproduct), (c) hitting 'I don't know what this endpoint returns' friction during builds. Implementation: use @asteasolutions/zod-to-openapi — NOT tsoa (requires controller-class refactor incompatible with Express+middleware style) or swagger-jsdoc (hand-maintained doc blocks rot immediately). Prerequisites before start: (1) response schemas must be migrated from shared/types/ TS interfaces to Zod (currently only request schemas are Zod via validate() middleware) — this is the bulk of the work, not the spec emission, (2) per-route security tagging for the dual auth model (HMAC x-auth-token admin vs JWT client vs public token), (3) pr-check rule asserting every Express route has a registered OpenAPI entry to prevent drift (zod-to-openapi does NOT introspect the route table — registration is opt-in per route). Out of scope: WebSocket broadcasts (would need separate AsyncAPI spec). Deliverables: registered request+response schemas per route, /api/docs Swagger UI gated to authenticated admins only, generated spec in CI artifact, drift-detection test.",
           "status": "pending"
         }
       ]

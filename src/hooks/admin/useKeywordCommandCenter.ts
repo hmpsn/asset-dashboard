@@ -7,11 +7,15 @@ import type {
   KeywordCommandCenterRowsQuery,
 } from '../../../shared/types/keyword-command-center';
 
-export function useKeywordCommandCenterSummary(workspaceId: string) {
+export function useKeywordCommandCenterSummary(
+  workspaceId: string,
+  options: { enabled?: boolean } = {},
+) {
+  const enabled = options.enabled ?? true;
   return useQuery({
     queryKey: queryKeys.admin.keywordCommandCenterSummary(workspaceId),
     queryFn: () => keywordCommandCenter.summary(workspaceId),
-    enabled: !!workspaceId,
+    enabled: !!workspaceId && enabled,
     staleTime: 5 * 60 * 1000,
   });
 }

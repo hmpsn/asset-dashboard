@@ -56,6 +56,16 @@ interface PageKeywordRow {
   serp_features: string | null;
 }
 
+interface PageKeywordLiteRow {
+  workspace_id: string;
+  page_path: string;
+  page_title: string;
+  primary_keyword: string;
+  secondary_keywords: string;
+  volume: number | null;
+  difficulty: number | null;
+}
+
 interface PageKeywordScoreHistoryRow {
   workspace_id: string;
   page_path: string;
@@ -169,6 +179,18 @@ const stmts = createStmtCache(() => ({
   listByWs: db.prepare<[workspaceId: string]>(
     'SELECT * FROM page_keywords WHERE workspace_id = ?',
   ),
+  listLiteByWs: db.prepare<[workspaceId: string]>(`
+    SELECT
+      workspace_id,
+      page_path,
+      page_title,
+      primary_keyword,
+      secondary_keywords,
+      volume,
+      difficulty
+    FROM page_keywords
+    WHERE workspace_id = ?
+  `),
   getOne: db.prepare<[workspaceId: string, pagePath: string]>(
     'SELECT * FROM page_keywords WHERE workspace_id = ? AND page_path = ?',
   ),
@@ -362,6 +384,27 @@ export function listPageKeywords(workspaceId: string): PageKeywordMap[] {
   const rows = stmts().listByWs.all(workspaceId) as PageKeywordRow[];
   const histories = groupScoreHistory(workspaceId);
   return rows.map(row => rowToModel(row, histories.get(normalizePath(row.page_path).toLowerCase()) ?? []));
+}
+
+function rowToLiteModel(row: PageKeywordLiteRow): PageKeywordMap {
+  const model: PageKeywordMap = {
+    pagePath: row.page_path,
+    pageTitle: row.page_title,
+    primaryKeyword: row.primary_keyword,
+    secondaryKeywords: parseJsonSafeArray(row.secondary_keywords, z.string(), { table: 'page_keywords', field: 'secondary_keywords' }),
+  };
+  if (row.volume != null) model.volume = row.volume;
+  if (row.difficulty != null) model.difficulty = row.difficulty;
+  return model;
+}
+
+/**
+ * Lightweight page keyword read for consumers that only need assignment and demand data.
+ * Skips per-page score history assembly and unrelated JSON column parsing.
+ */
+export function listPageKeywordsLite(workspaceId: string): PageKeywordMap[] {
+  const rows = stmts().listLiteByWs.all(workspaceId) as PageKeywordLiteRow[];
+  return rows.map(rowToLiteModel);
 }
 
 /** Get a single page's keywords by path (normalized). */
