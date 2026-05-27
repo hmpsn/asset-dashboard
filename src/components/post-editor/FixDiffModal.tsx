@@ -18,11 +18,44 @@ function tryParseMeta(s: string): { seoTitle: string; seoMetaDescription: string
   catch { return null; }
 }
 
+interface PostFixPayload {
+  introduction: string;
+  sections: Array<{ index: number; content: string }>;
+  conclusion: string;
+}
+
+function tryParsePostPayload(s: string): PostFixPayload | null {
+  try {
+    const parsed = JSON.parse(s) as unknown;
+    if (!parsed || typeof parsed !== 'object') return null;
+    const candidate = parsed as Partial<PostFixPayload>;
+    if (typeof candidate.introduction !== 'string') return null;
+    if (!Array.isArray(candidate.sections)) return null;
+    if (typeof candidate.conclusion !== 'string') return null;
+    const validSections = candidate.sections.every(section =>
+      section
+      && typeof section === 'object'
+      && typeof section.index === 'number'
+      && Number.isInteger(section.index)
+      && typeof section.content === 'string');
+    if (!validSections) return null;
+    return {
+      introduction: candidate.introduction,
+      sections: candidate.sections as Array<{ index: number; content: string }>,
+      conclusion: candidate.conclusion,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function FixDiffModal({ issueLabel, result, loading, applying, onApply, onDismiss }: FixDiffModalProps) {
   const open = loading || result !== null;
 
   const parsedMeta = result?.field === 'meta' ? tryParseMeta(result.suggestedText) : null;
   const parsedMetaOriginal = result?.field === 'meta' ? tryParseMeta(result.originalText) : null;
+  const parsedPost = result?.field === 'post' ? tryParsePostPayload(result.suggestedText) : null;
+  const parsedPostOriginal = result?.field === 'post' ? tryParsePostPayload(result.originalText) : null;
 
   return (
     <Modal open={open} onClose={onDismiss} size="lg">
@@ -59,6 +92,58 @@ export function FixDiffModal({ issueLabel, result, loading, applying, onApply, o
                   <div className="t-caption-sm text-teal-300 mb-1">Suggested Meta Description</div>
                   <div className="p-2 rounded-[var(--radius-md)] bg-emerald-500/5 border border-emerald-500/20 text-xs text-emerald-300/80">
                     {parsedMeta.seoMetaDescription}
+                  </div>
+                </div>
+              </div>
+            ) : result.field === 'post' && parsedPost && parsedPostOriginal ? (
+              <div className="space-y-3">
+                <div>
+                  <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1">Introduction</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div
+                      className={`p-3 rounded-[var(--radius-lg)] bg-red-500/5 border border-red-500/20 line-through decoration-red-500/40 max-h-40 overflow-y-auto ${diffRichTextClass}`}
+                      dangerouslySetInnerHTML={{ __html: parsedPostOriginal.introduction }}
+                    />
+                    <div
+                      className={`p-3 rounded-[var(--radius-lg)] bg-emerald-500/5 border border-emerald-500/20 max-h-40 overflow-y-auto ${diffRichTextClass}`}
+                      dangerouslySetInnerHTML={{ __html: parsedPost.introduction }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1">Sections</div>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {parsedPost.sections.map((section) => {
+                      const originalSection = parsedPostOriginal.sections.find(item => item.index === section.index);
+                      return (
+                        <div key={section.index} className="rounded-[var(--radius-md)] border border-[var(--brand-border)]/60 p-2">
+                          <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1">Section {section.index + 1}</div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div
+                              className={`p-2 rounded-[var(--radius-md)] bg-red-500/5 border border-red-500/20 line-through decoration-red-500/40 max-h-32 overflow-y-auto ${diffRichTextClass}`}
+                              dangerouslySetInnerHTML={{ __html: originalSection?.content ?? '' }}
+                            />
+                            <div
+                              className={`p-2 rounded-[var(--radius-md)] bg-emerald-500/5 border border-emerald-500/20 max-h-32 overflow-y-auto ${diffRichTextClass}`}
+                              dangerouslySetInnerHTML={{ __html: section.content }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1">Conclusion</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div
+                      className={`p-3 rounded-[var(--radius-lg)] bg-red-500/5 border border-red-500/20 line-through decoration-red-500/40 max-h-40 overflow-y-auto ${diffRichTextClass}`}
+                      dangerouslySetInnerHTML={{ __html: parsedPostOriginal.conclusion }}
+                    />
+                    <div
+                      className={`p-3 rounded-[var(--radius-lg)] bg-emerald-500/5 border border-emerald-500/20 max-h-40 overflow-y-auto ${diffRichTextClass}`}
+                      dangerouslySetInnerHTML={{ __html: parsedPost.conclusion }}
+                    />
                   </div>
                 </div>
               </div>

@@ -6764,3 +6764,31 @@ Service and location page brief defaults are now shorter and more conversion-den
 **Behavior contract:** Path semantics are preserved (leading slash enforcement, trailing slash normalization, URL pathname extraction). No HTTP endpoint, auth, or wire-shape changes.
 
 **Files:** `shared/page-address-utils.ts`; `server/helpers.ts`; `src/lib/pathUtils.ts`; `server/admin-chat-context.ts`; `server/page-keywords.ts`; `server/keyword-strategy-sanitizer.ts`; `server/keyword-strategy-ai-synthesis.ts`; `server/keyword-strategy-enrichment.ts`; `server/keyword-strategy-generation.ts`; `server/keyword-strategy-persistence.ts`; `server/seo-change-tracker.ts`; `server/schema/classifier.ts`; `src/hooks/admin/usePageJoin.ts`; `scripts/pr-check.ts`; `tests/pr-check.test.ts`; `tests/unit/helpers-page-address.test.ts`; `tests/unit/pathUtils-pure.test.ts`; `tests/unit/page-address-helpers-pure.test.ts`; `tests/unit/seo-context-builder-pure.test.ts`; `tests/unit/seo-audit-site-checks-pure.test.ts`; `tests/unit/src-lib-utils-pure.test.ts`; `tests/unit/lib-utilities.test.ts`; `tests/unit/seo-context-slice-assembly.test.ts`; `tests/unit/keyword-strategy-persistence.test.ts`; `docs/rules/verified-clean-rules.md`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+## Content Post Feedback Editing MVP (AI Fix Flow Extension)
+
+**Status:** Shipped 2026-05-27
+**Roadmap:** `content-post-feedback-editing-mvp`
+
+**What it does:** Extends the existing admin content-post AI fix flow (`POST /api/content-posts/:workspaceId/:postId/ai-fix`) to support feedback-driven edits without introducing a second suggest/apply system.
+
+- Added backward-compatible request modes:
+  - checklist mode (existing): `{ issueKey, reason }`
+  - feedback mode (new): `{ mode: 'feedback', target: 'section' | 'post' | 'meta', feedback, sectionIndex? }`
+- Added strict validation for feedback mode, including required `sectionIndex` when `target='section'`.
+- Extended `AiFixResult.field` with `post` and introduced structured full-post diff payloads (`introduction`, `sections[{index,content}]`, `conclusion`) returned in `originalText`/`suggestedText`.
+- Reused existing preview-then-apply UX:
+  - section-level “Generate with feedback”
+  - full-post “Generate full post with feedback”
+  - SEO metadata “Generate SEO with feedback”
+- Extended `FixDiffModal` to render sectioned post diffs (intro/sections/conclusion) while preserving existing meta and section views.
+- Kept mutation path unchanged: accepted suggestions apply through existing post PATCH save flow, preserving snapshot/coalesce, activity logging, and workspace broadcast invalidation behavior.
+- Added named AI operation contracts for feedback edit generation (`content-post-feedback-fix`, `content-post-feedback-fix-structured`) and schema-validated structured output handling for meta/post targets.
+
+**Agency value:** Editors can give direct steering feedback at section, full-post, or SEO metadata scope and get a safe diff preview before applying changes, reducing rewrite loops and copy/paste iteration.
+
+**Client value:** No client-facing UI/API behavior changes. Improves admin draft quality and turnaround before client review.
+
+**Boundaries:** No post-scoped admin chat, no background job addition, no DB migration, and no publishing/workflow status changes.
+
+**Files:** `server/routes/content-posts.ts`; `server/ai-operation-registry.ts`; `shared/types/content.ts`; `src/api/content.ts`; `src/components/PostEditor.tsx`; `src/components/post-editor/SectionEditor.tsx`; `src/components/post-editor/FixDiffModal.tsx`; `tests/integration/content-posts-ai-fix.test.ts`; `tests/component/PostEditor.test.tsx`; `tests/unit/api-modules-b.test.ts`; `FEATURE_AUDIT.md`; `data/roadmap.json`.

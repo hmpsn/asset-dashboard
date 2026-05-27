@@ -447,6 +447,80 @@ describe('PostEditor', () => {
     expect(screen.getByText('A comprehensive guide to SEO best practices for modern websites.')).toBeInTheDocument();
   });
 
+  it('opens feedback modal from full post and requests AI preview in feedback mode', async () => {
+    mocks.contentPosts.aifix.mockResolvedValue({
+      field: 'post',
+      originalText: JSON.stringify({
+        introduction: '<p>SEO is essential for modern websites.</p>',
+        sections: [{ index: 0, content: '<p>SEO drives organic traffic.</p>' }],
+        conclusion: '<p>Implement these tips today.</p>',
+      }),
+      suggestedText: JSON.stringify({
+        introduction: '<p>Rewritten introduction.</p>',
+        sections: [{ index: 0, content: '<p>Rewritten section.</p>' }],
+        conclusion: '<p>Rewritten conclusion.</p>',
+      }),
+      explanation: 'AI revised the post.',
+    });
+
+    renderEditor();
+    fireEvent.click(screen.getByRole('button', { name: /generate full post with feedback/i }));
+    expect(screen.getByText(/generate with feedback: full post/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText(/examples: make this more direct/i), {
+      target: { value: 'Please tighten the full post and improve flow.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /generate preview/i }));
+
+    await waitFor(() => {
+      expect(mocks.contentPosts.aifix).toHaveBeenCalledWith(
+        'ws-1',
+        'post-1',
+        {
+          mode: 'feedback',
+          target: 'post',
+          feedback: 'Please tighten the full post and improve flow.',
+        },
+      );
+    });
+  });
+
+  it('opens feedback modal from SEO block and requests AI preview in meta feedback mode', async () => {
+    mocks.contentPosts.aifix.mockResolvedValue({
+      field: 'meta',
+      originalText: JSON.stringify({
+        seoTitle: 'SEO Best Practices Guide | hmpsn.studio',
+        seoMetaDescription: 'A comprehensive guide to SEO best practices for modern websites.',
+      }),
+      suggestedText: JSON.stringify({
+        seoTitle: 'Better SEO Title',
+        seoMetaDescription: 'Better SEO description for the post.',
+      }),
+      explanation: 'AI revised metadata.',
+    });
+
+    renderEditor();
+    fireEvent.click(screen.getByRole('button', { name: /generate seo with feedback/i }));
+    expect(screen.getByText(/generate with feedback: seo title \+ meta description/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText(/examples: make this more direct/i), {
+      target: { value: 'Make this metadata more compelling and benefit-led.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /generate preview/i }));
+
+    await waitFor(() => {
+      expect(mocks.contentPosts.aifix).toHaveBeenCalledWith(
+        'ws-1',
+        'post-1',
+        {
+          mode: 'feedback',
+          target: 'meta',
+          feedback: 'Make this metadata more compelling and benefit-led.',
+        },
+      );
+    });
+  });
+
   // Target keyword and word count
   it('renders target keyword and word count in the header metadata', () => {
     renderEditor();
