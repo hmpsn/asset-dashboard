@@ -86,7 +86,8 @@ describe('assembleEntityResolution', () => {
     const result = await assembleEntityResolution('ws-1', { resolveEntityReferences: true });
 
     expect(mocks.resolveCandidateWithWikidata).toHaveBeenCalled();
-    expect(result.entities[0]?.id).toBe('wikidata:Q170477');
+    // ID format includes type bucket so Thing/Place resolutions to the same QID stay separate.
+    expect(result.entities[0]?.id).toBe('wikidata:thing:Q170477');
     expect(result.entities[0]?.wikidata?.qid).toBe('Q170477');
   });
 

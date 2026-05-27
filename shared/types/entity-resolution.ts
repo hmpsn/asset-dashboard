@@ -34,6 +34,12 @@ export interface EntityReference {
 }
 
 export interface ResolvedEntity {
+  /**
+   * Internal entity ID, stable within a single intelligence-slice assembly.
+   * Format: `entity:<slug>:<type>` for unresolved candidates, or
+   * `wikidata:<type>:<qid>` once a Wikidata reference is attached. NOT a
+   * Wikidata QID — use `wikidata.qid` for that. Not persisted to DB.
+   */
   id: string;
   label: string;
   type: ResolvedEntityType;

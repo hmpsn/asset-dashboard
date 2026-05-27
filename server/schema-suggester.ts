@@ -196,6 +196,14 @@ async function readSchemaPageIntelligence(
   baseUrl: string,
   pagePath: string,
   tokenOverride?: string,
+  /**
+   * When true, the entityResolution slice performs blocking Wikidata fetches
+   * (up to 8 × 2.5s timeout each) to resolve entity references. Default false
+   * to keep foreground schema generation fast — the bulk background path
+   * (generateSchemaSuggestions) opts in so a single warm pass populates the
+   * shared 30-day cache for later foreground calls.
+   */
+  resolveEntities: boolean = false,
 ) {
   try {
     return await buildSchemaIntelligence({
@@ -204,7 +212,7 @@ async function readSchemaPageIntelligence(
       pagePath,
       tokenOverride,
       includePageElements: true,
-      includeEntityResolution: true,
+      includeEntityResolution: resolveEntities,
     });
   } catch { // catch-ok: schema generation can proceed without optional page intelligence
     return undefined;
@@ -228,7 +236,9 @@ function entityResolutionForPage(
   articleMentions?: ResolvedEntity[];
   areaServed?: ResolvedEntity;
 } {
-  if (!slice || slice.availability === 'no_data' || slice.availability === 'not_requested') {
+  // Allow-list pattern: only 'ready' and 'degraded' surface usable entities.
+  // 'disabled', 'no_data', 'not_requested' all return empty.
+  if (!slice || (slice.availability !== 'ready' && slice.availability !== 'degraded')) {
     return {};
   }
 
@@ -838,7 +848,7 @@ export async function generateSchemaSuggestions(
     });
 
     const pageIntel = wsId
-      ? await readSchemaPageIntelligence(siteId, baseUrl, publishedPath, tokenOverride)
+      ? await readSchemaPageIntelligence(siteId, baseUrl, publishedPath, tokenOverride, true)
       : undefined;
     const entities = entityResolutionForPage(pageIntel?.entityResolution, publishedPath);
 
@@ -916,7 +926,7 @@ export async function generateSchemaSuggestions(
         isCmsItem: true,
       });
       const cmsPageIntel = wsId
-        ? await readSchemaPageIntelligence(siteId, baseUrl, item.path, tokenOverride)
+        ? await readSchemaPageIntelligence(siteId, baseUrl, item.path, tokenOverride, true)
         : undefined;
       const entities = entityResolutionForPage(cmsPageIntel?.entityResolution, item.path);
 

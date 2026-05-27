@@ -170,7 +170,11 @@ function buildCacheKey(workspaceId: string, opts?: IntelligenceOptions): string 
   const baseUrl = opts?.siteBaseUrl ?? '';
   const token = tokenFingerprint(opts?.webflowToken);
   const backlinks = opts?.enrichWithBacklinks ? ':bl' : '';
-  return `intelligence:${workspaceId}:${slices}:${page}:${domain}:site=${encodeURIComponent(site)}:base=${encodeURIComponent(baseUrl)}:wf=${token}${backlinks}`;
+  // resolveEntityReferences flips the entityResolution slice between cached labels-only
+  // mode and the Wikidata-enriched mode. Without :er in the key, an unenriched cache
+  // entry written by a non-schema caller would silently defeat schema enrichment for 5min.
+  const entityRes = opts?.resolveEntityReferences ? ':er' : '';
+  return `intelligence:${workspaceId}:${slices}:${page}:${domain}:site=${encodeURIComponent(site)}:base=${encodeURIComponent(baseUrl)}:wf=${token}${backlinks}${entityRes}`;
 }
 
 /** Invalidate all cached intelligence for a workspace */
