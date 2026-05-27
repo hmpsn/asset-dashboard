@@ -1,8 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **453 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **454 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 454. Platform Health Wave 7 PR2 — `semrushMode` Compatibility Retirement
+
+**What it does:** Finishes the keyword-strategy provider-neutral naming migration by removing runtime `semrushMode` compatibility fallback seams across the keyword-strategy route, background job dispatch, generation service options, and admin display state hydration. `seoDataMode` is now the single active mode contract. A DB migration (`103-retire-semrush-mode.sql`) backfills legacy blobs by copying `semrushMode` into `seoDataMode` when needed and removing the legacy alias key from stored `keyword_strategy` JSON.
+
+**Agency value:** Reduces hidden dual-path behavior and future drift risk in one of the platform’s highest-change subsystems (strategy generation + jobs + UI), making failures easier to reason about and debug.
+
+**Client value:** Keeps strategy generation behavior consistent and predictable across UI and background flows, with less risk of legacy payload edge cases producing unexpected mode selection.
+
+**Mutual:** Tightens a core platform contract to one canonical field (`seoDataMode`), which improves maintainability without changing the intended product outcome.
 
 ---
 
