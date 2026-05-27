@@ -1,4 +1,4 @@
-import { isProgrammingError } from '../errors.js';
+import { STUDIO_URL } from '../constants.js';
 import { createLogger } from '../logger.js';
 import { getCachedEntityResolution, upsertEntityResolutionCache } from './entity-resolution-cache.js';
 import type { EntityCandidate, EntityReference } from '../../shared/types/entity-resolution.js';
@@ -7,6 +7,9 @@ const log = createLogger('entity-resolution-wikidata');
 
 const WIKIDATA_SPARQL_ENDPOINT = 'https://query.wikidata.org/sparql';
 const WIKIDATA_REQUEST_TIMEOUT_MS = 2500;
+// Wikimedia User-Agent policy (https://meta.wikimedia.org/wiki/User-Agent_policy)
+// requires a descriptive UA; default Node fetch UA may be rate-limited or blocked.
+const WIKIDATA_USER_AGENT = `HmpsnStudioEntityResolver/1.0 (+${STUDIO_URL})`;
 const CACHE_TTL_RESOLVED_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
 const CACHE_TTL_UNRESOLVED_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
 const CACHE_TTL_ERROR_MS = 1000 * 60 * 60 * 24; // 1 day
@@ -63,7 +66,7 @@ function escapeSparqlLiteral(value: string): string {
   return value
     .replace(/\\/g, '\\\\')
     .replace(/"/g, '\\"')
-    .replace(/\n/g, ' ')
+    .replace(/[\n\r\t]/g, ' ')
     .trim();
 }
 
@@ -219,6 +222,7 @@ export async function resolveCandidateWithWikidata(
     const response = await fetch(url, {
       headers: {
         Accept: 'application/sparql-results+json',
+        'User-Agent': WIKIDATA_USER_AGENT,
       },
       signal: AbortSignal.timeout(WIKIDATA_REQUEST_TIMEOUT_MS),
     });
@@ -252,9 +256,10 @@ export async function resolveCandidateWithWikidata(
     upsertEntityResolutionCache(toCacheRecord(cacheKey, candidate, resolved, nowIso, nowMs));
     return resolved;
   } catch (err) {
-    if (isProgrammingError(err)) { // url-fetch-ok
-      log.warn({ err, candidate: candidate.label }, 'entity-resolution-wikidata: programming error');
-    }
+    // External fetch failures (TypeError from network, SyntaxError from malformed JSON,
+    // AbortError from timeout) are expected degradation, not programming errors.
+    // See server/errors.ts for the contract.
+    log.debug({ err, candidate: candidate.label }, 'entity-resolution-wikidata: request failed (cached as error)');
     const failed: WikidataResolutionResult = {
       status: 'error',
       confidence: 0,

@@ -161,9 +161,11 @@ export async function assembleEntityResolution(
     const lookup = await resolveCandidateWithWikidata(candidate);
     if (lookup.status === 'error') degraded = true;
     if (lookup.status === 'resolved' && lookup.reference) {
+      // Include type in the merge key so a Thing-typed and Place-typed candidate that
+      // resolve to the same QID stay separate (e.g. areaServed must filter on type === 'Place').
       mergeResolvedEntity(resolvedMap, {
         ...resolvedBase,
-        id: `wikidata:${lookup.reference.qid}`,
+        id: `wikidata:${candidate.type.toLowerCase()}:${lookup.reference.qid}`,
         label: lookup.reference.label || candidate.label,
         confidence: Math.max(candidate.confidence, lookup.confidence),
         wikidata: lookup.reference,

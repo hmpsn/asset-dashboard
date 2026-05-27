@@ -109,8 +109,6 @@ export interface PageData {
   knowsAbout?: string[];
   /** Typed entity grounding for Organization.knowsAbout. */
   knowsAboutEntities?: ResolvedEntity[];
-  /** Optional sameAs references for Organization derived from resolved entities. */
-  organizationSameAs?: string[];
   /** Typed entity grounding for Article.about. */
   articleAboutEntity?: ResolvedEntity;
   /** Typed entity grounding for Article.mentions. */
@@ -459,13 +457,10 @@ export function extractPageData(input: ExtractInput): PageData {
   const serviceAreaServed = input.pageMeta.serviceProfile?.areaServed;
   const resolvedAreaServed = input.pageMeta.entityResolution?.areaServed;
   const knowsAboutEntities = input.workspace.entityResolution?.knowsAbout;
-  const organizationSameAs = Array.from(
-    new Set(
-      (knowsAboutEntities ?? [])
-        .map(entity => entity.wikidata?.sameAs?.trim())
-        .filter((url): url is string => !!url),
-    ),
-  );
+  // NOTE: Wikidata URIs for knowsAbout entities are emitted as `sameAs` on the
+  // embedded Thing nodes inside `knowsAbout` (via resolvedEntityToThingNode in
+  // helpers.ts). They MUST NOT be aggregated onto Organization.sameAs — that
+  // would falsely assert the customer Org is identical to those topic entities.
 
   return {
     title,
@@ -492,7 +487,6 @@ export function extractPageData(input: ExtractInput): PageData {
     offers: input.pageMeta.serviceProfile?.offers,
     knowsAbout: input.workspace.siteKeywordsForKnowsAbout?.slice(0, 5).map(s => s.toLowerCase()),
     knowsAboutEntities,
-    organizationSameAs: organizationSameAs.length > 0 ? organizationSameAs : undefined,
     articleAboutEntity: input.pageMeta.entityResolution?.articleAbout,
     articleMentionEntities: input.pageMeta.entityResolution?.articleMentions,
     elements: input.pageMeta.elements,

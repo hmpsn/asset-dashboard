@@ -1069,17 +1069,34 @@ describe('buildHomepageSchema', () => {
     expect(org.foundingDate).toBe('2020-01-01');
   });
 
-  it('Organization merges entity-derived sameAs URLs with social profiles', () => {
+  it('Organization.sameAs MUST NOT include Wikidata URIs from knowsAbout entities (schema.org sameAs asserts identity)', () => {
     const schema = buildHomepageSchema({
       ...homepageInput,
       pageData: {
         ...homepageInput.pageData,
-        organizationSameAs: ['https://www.wikidata.org/wiki/Q170477'],
+        knowsAboutEntities: [
+          {
+            id: 'wikidata:thing:Q170477',
+            label: 'Web design',
+            type: 'Thing',
+            surfaces: ['organization_knows_about'],
+            confidence: 0.9,
+            source: 'workspace',
+            wikidata: {
+              qid: 'Q170477',
+              sameAs: 'https://www.wikidata.org/wiki/Q170477',
+              label: 'Web design',
+            },
+          },
+        ],
       },
       businessProfile: { socialProfiles: ['https://twitter.com/acme'] },
     });
     const org = (schema['@graph'] as Array<Record<string, unknown>>)[0];
-    expect(org.sameAs).toEqual(['https://twitter.com/acme', 'https://www.wikidata.org/wiki/Q170477']);
+    expect(org.sameAs).toEqual(['https://twitter.com/acme']);
+    // Wikidata URI for the topic appears on the embedded Thing node inside knowsAbout, not on Organization.
+    const knowsAbout = org.knowsAbout as Array<Record<string, unknown>>;
+    expect(knowsAbout[0]).toMatchObject({ '@type': 'Thing', sameAs: 'https://www.wikidata.org/wiki/Q170477' });
   });
 
   it('Organization omits empty sameAs values from business profile', () => {
@@ -1128,6 +1145,27 @@ describe('buildHomepageSchema', () => {
     });
     const org = (schema['@graph'] as Array<Record<string, unknown>>)[0];
     expect(org.knowsAbout).toEqual([{ '@type': 'Thing', name: 'Webflow', sameAs: 'https://www.wikidata.org/wiki/Q170477' }]);
+  });
+
+  it('Organization knowsAbout omits sameAs for partially-resolved entities (no wikidata reference)', () => {
+    const schema = buildHomepageSchema({
+      ...homepageInput,
+      pageData: {
+        ...homepageInput.pageData,
+        knowsAboutEntities: [{
+          id: 'entity:web-design:thing',
+          label: 'Web design',
+          type: 'Thing',
+          surfaces: ['organization_knows_about'],
+          confidence: 0.6,
+          source: 'workspace',
+          // wikidata intentionally undefined — candidate scored below resolution threshold.
+        }],
+      },
+    });
+    const org = (schema['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(org.knowsAbout).toEqual([{ '@type': 'Thing', name: 'Web design' }]);
+    expect((org.knowsAbout as Array<Record<string, unknown>>)[0].sameAs).toBeUndefined();
   });
 
   it('Organization omits knowsAbout when knowsAbout is undefined or empty', () => {

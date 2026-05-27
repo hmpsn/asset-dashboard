@@ -6385,6 +6385,7 @@ export const CHECKS: Check[] = [
     pattern: '',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
+    excludeLines: ['// entity-resolution-ok'],
     message:
       'Wikidata/SPARQL entity disambiguation must live in server/intelligence/entity-resolution* modules and flow through intelligence slices. Do not call Wikidata directly from schema/routes/helpers. Escape hatch: // entity-resolution-ok',
     severity: 'error',
@@ -6393,7 +6394,9 @@ export const CHECKS: Check[] = [
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
-      const wikidataRefRe = /(query\.wikidata\.org|wikidata\.org\/wiki\/(?:Q\d+|Special:EntityData\/Q\d+))/i;
+      // Covers SPARQL endpoint, MediaWiki action API, EntityData (incl. non-QID),
+      // /entity/Q linked-data endpoint, and /wiki/Q browser URLs.
+      const wikidataRefRe = /(query\.wikidata\.org|wikidata\.org\/w\/api\.php|wikidata\.org\/wiki\/(?:Q\d+|Special:EntityData(?:\/[^\s"']+)?)|wikidata\.org\/entity\/Q\d+)/i;
       for (const file of files) {
         const normalized = file.replaceAll('\\', '/');
         if (!normalized.includes('/server/')) continue;
@@ -6402,6 +6405,8 @@ export const CHECKS: Check[] = [
         if (!content) continue;
         const lines = content.split('\n');
         for (let i = 0; i < lines.length; i++) {
+          // Skip pure comment lines (// or * inside block comments) so doc/URL references don't trip the rule.
+          if (/^\s*(\/\/|\*)/.test(lines[i])) continue;
           if (!wikidataRefRe.test(lines[i])) continue;
           if (hasHatch(lines, i, '// entity-resolution-ok')) continue;
           hits.push({ file, line: i + 1, text: lines[i].trim() });

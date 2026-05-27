@@ -19,10 +19,6 @@ export function buildHomepageSchema(input: HomepageInput): Record<string, unknow
   const safeSocialProfiles = businessProfile?.socialProfiles
     ?.map(url => url.trim())
     .filter(Boolean);
-  const organizationSameAs = Array.from(new Set([
-    ...(safeSocialProfiles ?? []),
-    ...(pageData.organizationSameAs ?? []),
-  ]));
 
   const organization = dropUndefined({
     '@type': 'Organization',
@@ -34,7 +30,7 @@ export function buildHomepageSchema(input: HomepageInput): Record<string, unknow
     'logo': pageData.publisher.logoUrl
       ? { '@type': 'ImageObject', 'url': pageData.publisher.logoUrl }
       : undefined,
-    'sameAs': organizationSameAs.length > 0 ? organizationSameAs : undefined,
+    'sameAs': safeSocialProfiles?.length ? safeSocialProfiles : undefined,
     'foundingDate': businessProfile?.foundedDate,
     'knowsAbout': pageData.knowsAboutEntities?.length
       ? pageData.knowsAboutEntities.map(resolvedEntityToThingNode)

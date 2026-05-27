@@ -82,10 +82,6 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
     ?.map(url => url.trim())
     .map(safeHttpUrl)
     .filter((url): url is string => Boolean(url))));
-  const organizationSameAs = Array.from(new Set([
-    ...safeSocialProfiles,
-    ...(pageData.organizationSameAs ?? []),
-  ]));
   const isHomepageUsage = pageData.canonicalUrl === baseUrl || pageData.canonicalUrl === `${baseUrl}/`;
   const lbId = isHomepageUsage
     ? `${baseUrl}/#localbusiness`
@@ -146,7 +142,7 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
     'logo': pageData.publisher.logoUrl
       ? { '@type': 'ImageObject', 'url': pageData.publisher.logoUrl }
       : undefined,
-    'sameAs': organizationSameAs.length > 0 ? organizationSameAs : undefined,
+    'sameAs': safeSocialProfiles?.length ? safeSocialProfiles : undefined,
     'knowsAbout': pageData.knowsAboutEntities?.length
       ? pageData.knowsAboutEntities.map(resolvedEntityToThingNode)
       : pageData.knowsAbout?.length
