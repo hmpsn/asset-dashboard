@@ -46,9 +46,14 @@ Callers in schema routes/helpers/templates consume resolved results through inte
 - [x] `buildSchemaIntelligence()` can request/return the entity-resolution slice.
 - [x] Unit coverage added for slice assembly + schema wrapper wiring.
 
+## Phase C Acceptance (Wikidata Resolution + Cache)
+
+- [x] Wikidata/SPARQL disambiguation implemented under `server/intelligence/entity-resolution*`.
+- [x] Per-entity cache strategy implemented to avoid repeated lookups.
+- [x] Slice availability degrades safely on lookup errors (no hard failure).
+- [x] Unit coverage added for resolver/cache behavior.
+
 ## Deferred to Implementation Phases
 
-- Wikidata/SPARQL disambiguation (`sameAs` resolution and confidence selection).
-- Cache strategy for repeated entity candidates.
-- Confidence threshold tuning and fallback heuristics.
 - Schema template emission upgrades for typed entity arrays.
+- Confidence threshold tuning and fallback heuristics based on production telemetry.

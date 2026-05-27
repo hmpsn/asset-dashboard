@@ -80,6 +80,7 @@ export async function buildSchemaIntelligence(
     siteBaseUrl: baseUrl,
     webflowToken: token,
     enrichWithBacklinks: opts.includeBacklinks,
+    resolveEntityReferences: opts.includeEntityResolution,
   });
 
   return {
