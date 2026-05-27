@@ -7330,6 +7330,49 @@ export const CHECKS: Check[] = [
     pattern: 'new Date\\([^)]*\\)\\.toLocaleDateString\\(\\)',
     excludeLines: ['format-date-inline-ok'],
   },
+
+  // ── Plan C Task 7: callAI dispatcher lock (2026-05-27) ───────────────────
+  {
+    name: 'Direct callOpenAI/callAnthropic import outside dispatcher',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: [
+      'server/ai.ts',             // the dispatcher itself
+      'server/openai-helpers.ts', // the provider implementation
+      'server/anthropic-helpers.ts', // the provider implementation
+      'tests/',
+    ],
+    message:
+      'Import { callOpenAI } or { callAnthropic } directly only inside server/ai.ts (the unified dispatcher). ' +
+      'All other server-side AI callers must use callAI() from server/ai.ts. ' +
+      'If a justified exception exists, suppress with // direct-ai-helper-ok: <reason>.',
+    severity: 'error',
+    excludeLines: ['direct-ai-helper-ok'],
+    rationale: 'callAI() is the single entry point for all AI calls (~50 sites as of 2026-05-27). Direct imports bypass provider routing, retry logic, and operation registry.',
+    claudeMdRef: '#ai-dispatch-patterns',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const directImportRe = /import\s*\{[^}]*\b(callOpenAI|callAnthropic)\b[^}]*\}\s*from\s*['"][^'"]*\/(openai-helpers|anthropic-helpers)\.js['"]/;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes('/server/')) continue;
+        if (file.includes('/tests/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        if (!directImportRe.test(content)) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (line.includes('direct-ai-helper-ok')) continue;
+          if (directImportRe.test(line)) {
+            hits.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+      return hits;
+    },
+  },
+
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

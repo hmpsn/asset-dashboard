@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **154** — 136 error, 18 warn.
+Total rules: **155** — 137 error, 18 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -152,6 +152,7 @@ advisory but tracked.
 | 134 | Inline trial-state computation outside billing module | error | custom | `server/` | `trial-state-ok` | Centralizes trial logic so tier changes (e.g. adding a grace period) are single-edit. |
 | 135 | Bare JSON.parse on AI text response without schema validation | error | custom | `server/` | `ai-json-parse-ok` | Unvalidated AI JSON silently propagates wrong shapes when prompts drift. |
 | 136 | Workspace object spread-and-redact in route handler | error | custom | `server/routes/` | `admin-view-ok` | Spread-and-redact is deny-list based — new secrets leak by default. |
+| 137 | Direct callOpenAI/callAnthropic import outside dispatcher | error | custom | `server/` | `direct-ai-helper-ok` | callAI() is the single entry point for all AI calls (~50 sites as of 2026-05-27). Direct imports bypass provider routing, retry logic, and operation registry. |
 
 ---
 

@@ -5104,6 +5104,10 @@ describe('Meta: customCheck rule name registry', () => {
     // validation and broadcast completeness.
     'Bare JSON.parse on AI text response without schema validation',
     'Workspace mutation route missing broadcastToWorkspace',
+    // sprint-platform-health-wave8 Plan C Task 7 (2026-05-27) — locks the
+    // callAI() dispatcher invariant; prevents direct callOpenAI/callAnthropic
+    // imports outside server/ai.ts and provider helpers.
+    'Direct callOpenAI/callAnthropic import outside dispatcher',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -9383,6 +9387,67 @@ describe("Rule: Workspace mutation route missing broadcastToWorkspace", () => {
         "  const rows = stmts().all(req.params.workspaceId);",
         "  res.json(rows);",
         "});",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: Direct callOpenAI/callAnthropic import outside dispatcher', () => {
+  const RULE = 'Direct callOpenAI/callAnthropic import outside dispatcher';
+
+  it('flags direct callOpenAI import in a non-dispatcher server file', () => {
+    const file = write(
+      uniqPath('rule-ai-dispatcher', 'server/routes/content.ts'),
+      lines(
+        "import { callOpenAI } from '../openai-helpers.js';",
+        "const result = await callOpenAI({ prompt: 'hello' });",
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('flags direct callAnthropic import in a non-dispatcher server file', () => {
+    const file = write(
+      uniqPath('rule-ai-dispatcher', 'server/diagnostic.ts'),
+      lines(
+        "import { callAnthropic } from '../anthropic-helpers.js';",
+        "const result = await callAnthropic({ prompt: 'hello' });",
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('respects // direct-ai-helper-ok inline hatch', () => {
+    const file = write(
+      uniqPath('rule-ai-dispatcher', 'server/routes/special.ts'),
+      lines(
+        "import { callOpenAI } from '../openai-helpers.js'; // direct-ai-helper-ok: special streaming path",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag files outside server/', () => {
+    const file = write(
+      uniqPath('rule-ai-dispatcher', 'scripts/migrate.ts'),
+      lines(
+        "import { callOpenAI } from '../server/openai-helpers.js';",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag callAI usage (the unified dispatcher)', () => {
+    const file = write(
+      uniqPath('rule-ai-dispatcher', 'server/routes/brief.ts'),
+      lines(
+        "import { callAI } from '../ai.js';",
+        "const result = await callAI({ model: 'gpt-5.4-mini', prompt: 'hello' });",
       ),
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
