@@ -504,12 +504,30 @@ export interface PageTypeBriefConfig {
 }
 
 export interface AiFixResult {
-  field: 'introduction' | 'section' | 'conclusion' | 'meta';
+  field: 'introduction' | 'section' | 'conclusion' | 'meta' | 'post';
   sectionIndex?: number;
   originalText: string;
   suggestedText: string;
   explanation: string;
 }
+
+export const AI_FEEDBACK_TARGETS = ['section', 'post', 'meta'] as const;
+export type AiFeedbackTarget = typeof AI_FEEDBACK_TARGETS[number];
+
+export interface AiFixChecklistRequest {
+  mode?: 'checklist';
+  issueKey: IssueKey;
+  reason: string;
+}
+
+export interface AiFixFeedbackRequest {
+  mode: 'feedback';
+  target: AiFeedbackTarget;
+  feedback: string;
+  sectionIndex?: number;
+}
+
+export type AiFixRequest = AiFixChecklistRequest | AiFixFeedbackRequest;
 
 export const ISSUE_KEYS = ['factual_accuracy', 'brand_voice', 'internal_links', 'no_hallucinations', 'meta_optimized', 'word_count_target'] as const;
 export type IssueKey = typeof ISSUE_KEYS[number];

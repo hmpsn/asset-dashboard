@@ -24,7 +24,7 @@ import {
   revertToVersion,
   getMostRecentPostVersion,
 } from '../content-posts.js';
-import { scoreVoiceMatch, countHtmlWords } from '../content-posts-ai.js';
+import { callCreativeAI, scoreVoiceMatch, countHtmlWords } from '../content-posts-ai.js';
 import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
 import { renderPostHTML } from '../post-export-html.js';
 import { assemblePostHtml, generateSlug } from '../html-to-richtext.js';
@@ -47,8 +47,8 @@ import { buildSystemPrompt } from '../prompt-assembly.js';
 import {
   buildClaimEvidenceLedger,
 } from '../content-review-evidence-ledger.js';
-import type { AIReviewMap, AiFixResult, ContentReviewEvidence, IssueKey, PostSection } from '../../shared/types/content.js';
-import { CONTENT_GENERATION_STYLES, ISSUE_KEYS, PROVENANCE_SENSITIVE_REVIEW_KEYS } from '../../shared/types/content.js';
+import type { AIReviewMap, AiFixRequest, AiFixResult, ContentReviewEvidence, IssueKey, PostSection } from '../../shared/types/content.js';
+import { AI_FEEDBACK_TARGETS, CONTENT_GENERATION_STYLES, ISSUE_KEYS, PROVENANCE_SENSITIVE_REVIEW_KEYS } from '../../shared/types/content.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import { getVoiceProfile, buildVoiceCalibrationContext } from '../voice-calibration.js';
 import { sanitizeRichText, sanitizePlainText } from '../html-sanitize.js';
@@ -74,6 +74,15 @@ const aiReviewResponseSchema = z.object({
 const aiMetaFixResponseSchema = z.object({
   seoTitle: z.string().trim().min(1),
   seoMetaDescription: z.string().trim().min(1),
+}).strip();
+
+const aiPostFeedbackResponseSchema = z.object({
+  introduction: z.string().trim().min(1),
+  sections: z.array(z.object({
+    index: z.number().int().nonnegative(),
+    content: z.string().trim().min(1),
+  })).min(1),
+  conclusion: z.string().trim().min(1),
 }).strip();
 
 function markProvenanceItemsForHumanReview(
@@ -580,50 +589,157 @@ Return ONLY valid JSON like:
   }
 });
 
-// AI fix — generates a targeted fix for a specific failed review item
-router.post('/api/content-posts/:workspaceId/:postId/ai-fix',
-  requireWorkspaceAccess('workspaceId'),
-  validate(z.object({
-    issueKey: z.enum([...ISSUE_KEYS] as [string, ...string[]]),
-    reason: z.string().min(1).max(500),
-  })),
-  async (req, res) => {
-    const { issueKey, reason } = req.body as { issueKey: IssueKey; reason: string };
-    const post = getPost(req.params.workspaceId, req.params.postId);
-    if (!post) return res.status(404).json({ error: 'Post not found' });
+const aiFixChecklistSchema = z.object({
+  mode: z.literal('checklist').optional(),
+  issueKey: z.enum([...ISSUE_KEYS] as [IssueKey, ...IssueKey[]]),
+  reason: z.string().min(1).max(500),
+}).strict();
 
-    let field: AiFixResult['field'];
-    let sectionIndex: number | undefined;
-    let originalText: string;
-    let userPrompt: string;
+const aiFixFeedbackSchema = z.object({
+  mode: z.literal('feedback'),
+  target: z.enum(AI_FEEDBACK_TARGETS),
+  feedback: z.string().trim().min(1).max(2000),
+  sectionIndex: z.number().int().min(0).optional(),
+}).strict().superRefine((value, ctx) => {
+  if (value.target === 'section' && value.sectionIndex === undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'sectionIndex required when target=section',
+      path: ['sectionIndex'],
+    });
+  }
+});
 
-    switch (issueKey) {
-      case 'internal_links': {
-        const targetSection = post.sections.find(s => !s.content.includes('<a href'))
-          ?? post.sections[0];
-        if (!targetSection) return res.status(422).json({ error: 'No sections available' });
-        const brief = getBrief(req.params.workspaceId, post.briefId);
-        const suggestions = brief?.internalLinkSuggestions ?? [];
-        field = 'section';
-        sectionIndex = targetSection.index;
-        originalText = targetSection.content;
-        userPrompt = `Rewrite ONE sentence in this HTML section to include a relevant internal link using <a href="URL">anchor text</a>.
+const aiFixRequestSchema = z.union([aiFixChecklistSchema, aiFixFeedbackSchema]);
+
+function aiFixPromptAndTarget(
+  workspaceId: string,
+  post: NonNullable<ReturnType<typeof getPost>>,
+  body: AiFixRequest,
+): { field: AiFixResult['field']; sectionIndex?: number; originalText: string; userPrompt: string; researchMode: boolean } | { error: string } {
+  if (body.mode === 'feedback') {
+    const feedback = body.feedback;
+    const voiceProfile = getVoiceProfile(workspaceId);
+    const voiceCtx = voiceProfile ? buildVoiceCalibrationContext(voiceProfile) : null;
+    const voiceBlock = voiceCtx
+      ? [voiceCtx.samplesText, voiceCtx.dnaText, voiceCtx.guardrailsText].filter(Boolean).join('\n')
+      : '';
+
+    if (body.target === 'section') {
+      const targetSection = post.sections.find(s => s.index === body.sectionIndex);
+      if (!targetSection) return { error: 'Section not found' };
+      return {
+        field: 'section',
+        sectionIndex: targetSection.index,
+        originalText: targetSection.content,
+        userPrompt: `Revise this HTML section based on admin feedback.
+Return the FULL SECTION HTML only.
+
+Target keyword: "${post.targetKeyword}"
+Section heading: "${targetSection.heading}"
+Admin feedback:
+${feedback}
+${voiceBlock ? `\nVoice guidelines:\n${voiceBlock}` : ''}
+
+Section HTML:
+${targetSection.content}`,
+        researchMode: false,
+      };
+    }
+
+    if (body.target === 'meta') {
+      const originalMeta = {
+        seoTitle: post.seoTitle || post.title,
+        seoMetaDescription: post.seoMetaDescription || post.metaDescription,
+      };
+      return {
+        field: 'meta',
+        originalText: JSON.stringify(originalMeta),
+        userPrompt: `Rewrite the SEO title and meta description for this post based on admin feedback.
+Target keyword: "${post.targetKeyword}"
+Current title: "${originalMeta.seoTitle}"
+Current description: "${originalMeta.seoMetaDescription}"
+
+Admin feedback:
+${feedback}
+
+Hard constraints:
+- Title should be 50-60 characters
+- Description should be 150-160 characters
+- Include target keyword naturally
+
+Return ONLY valid JSON:
+{ "seoTitle": "...", "seoMetaDescription": "..." }`,
+        researchMode: false,
+      };
+    }
+
+    return {
+      field: 'post',
+      originalText: JSON.stringify({
+        introduction: post.introduction,
+        sections: post.sections.map(section => ({ index: section.index, content: section.content })),
+        conclusion: post.conclusion,
+      }),
+      userPrompt: `Revise this entire draft post based on admin feedback.
+Keep the same overall structure and section order. Improve clarity, flow, tone, and specificity.
+Return ONLY valid JSON in this exact shape:
+{
+  "introduction": "<p>...</p>",
+  "sections": [{"index": 0, "content": "<p>...</p>"}],
+  "conclusion": "<p>...</p>"
+}
+
+Target keyword: "${post.targetKeyword}"
+Current total words: ${post.totalWordCount}
+Target words: ${post.targetWordCount}
+Admin feedback:
+${feedback}
+${voiceBlock ? `\nVoice guidelines:\n${voiceBlock}` : ''}
+
+Current introduction HTML:
+${post.introduction}
+
+Current sections:
+${post.sections.map(section => `Index ${section.index} (${section.heading}):\n${section.content}`).join('\n\n')}
+
+Current conclusion HTML:
+${post.conclusion}`,
+      researchMode: false,
+    };
+  }
+
+  const { issueKey, reason } = body;
+  switch (issueKey) {
+    case 'internal_links': {
+      const targetSection = post.sections.find(s => !s.content.includes('<a href'))
+        ?? post.sections[0];
+      if (!targetSection) return { error: 'No sections available' };
+      const brief = getBrief(workspaceId, post.briefId);
+      const suggestions = brief?.internalLinkSuggestions ?? [];
+      return {
+        field: 'section',
+        sectionIndex: targetSection.index,
+        originalText: targetSection.content,
+        userPrompt: `Rewrite ONE sentence in this HTML section to include a relevant internal link using <a href="URL">anchor text</a>.
 Available internal link suggestions: ${suggestions.length > 0 ? suggestions.join(', ') : 'Use a plausible internal link like /blog or /services'}.
 Return the FULL SECTION HTML with exactly one new <a href="..."> tag added. Do not change any other content.
 
 Issue reason: ${reason}
 
 Section HTML:
-${originalText}`;
-        break;
-      }
-      case 'meta_optimized': {
-        field = 'meta';
-        originalText = JSON.stringify({
+${targetSection.content}`,
+        researchMode: false,
+      };
+    }
+    case 'meta_optimized': {
+      return {
+        field: 'meta',
+        originalText: JSON.stringify({
           seoTitle: post.seoTitle || post.title,
           seoMetaDescription: post.seoMetaDescription || post.metaDescription,
-        });
-        userPrompt = `Rewrite the SEO meta title and meta description for this blog post.
+        }),
+        userPrompt: `Rewrite the SEO meta title and meta description for this blog post.
 Target keyword: "${post.targetKeyword}"
 Current title: "${post.seoTitle || post.title}"
 Current description: "${post.seoMetaDescription || post.metaDescription}"
@@ -632,18 +748,20 @@ Requirements: Title 50-60 characters, description 150-160 characters, both inclu
 Issue reason: ${reason}
 
 Return ONLY valid JSON with no surrounding text:
-{ "seoTitle": "...", "seoMetaDescription": "..." }`;
-        break;
-      }
-      case 'word_count_target': {
-        const doneSections = post.sections.filter(s => s.status === 'done');
-        const candidates = doneSections.length > 0 ? doneSections : post.sections;
-        if (candidates.length === 0) return res.status(422).json({ error: 'No sections available' });
-        const targetSection = candidates.reduce((a, b) => a.wordCount < b.wordCount ? a : b);
-        field = 'section';
-        sectionIndex = targetSection.index;
-        originalText = targetSection.content;
-        userPrompt = `Expand this HTML section by approximately 20% to increase the post's overall word count.
+{ "seoTitle": "...", "seoMetaDescription": "..." }`,
+        researchMode: false,
+      };
+    }
+    case 'word_count_target': {
+      const doneSections = post.sections.filter(s => s.status === 'done');
+      const candidates = doneSections.length > 0 ? doneSections : post.sections;
+      if (candidates.length === 0) return { error: 'No sections available' };
+      const targetSection = candidates.reduce((a, b) => a.wordCount < b.wordCount ? a : b);
+      return {
+        field: 'section',
+        sectionIndex: targetSection.index,
+        originalText: targetSection.content,
+        userPrompt: `Expand this HTML section by approximately 20% to increase the post's overall word count.
 Add meaningful, relevant content — not filler. Maintain the same HTML structure and tone.
 Return the FULL EXPANDED SECTION HTML only.
 
@@ -651,65 +769,97 @@ Post word count: ${post.totalWordCount} (target: ${post.targetWordCount})
 Issue reason: ${reason}
 
 Section HTML:
-${originalText}`;
-        break;
-      }
-      case 'brand_voice': {
-        field = 'introduction';
-        originalText = post.introduction;
-        const voiceProfile = getVoiceProfile(req.params.workspaceId);
-        const voiceCtx = voiceProfile ? buildVoiceCalibrationContext(voiceProfile) : null;
-        const voiceBlock = voiceCtx
-          ? [voiceCtx.samplesText, voiceCtx.dnaText, voiceCtx.guardrailsText].filter(Boolean).join('\n')
-          : '';
-        userPrompt = `Rewrite this blog post introduction to better match the workspace's brand voice.
+${targetSection.content}`,
+        researchMode: false,
+      };
+    }
+    case 'brand_voice': {
+      const voiceProfile = getVoiceProfile(workspaceId);
+      const voiceCtx = voiceProfile ? buildVoiceCalibrationContext(voiceProfile) : null;
+      const voiceBlock = voiceCtx
+        ? [voiceCtx.samplesText, voiceCtx.dnaText, voiceCtx.guardrailsText].filter(Boolean).join('\n')
+        : '';
+      return {
+        field: 'introduction',
+        originalText: post.introduction,
+        userPrompt: `Rewrite this blog post introduction to better match the workspace's brand voice.
 Keep the same topic, key points, and approximate length. Return the FULL INTRODUCTION HTML only.
 
 Issue reason: ${reason}${voiceBlock ? `\n\nVoice guidelines:\n${voiceBlock}` : ''}
 
 Introduction HTML:
-${originalText}`;
-        break;
-      }
-      case 'factual_accuracy':
-      case 'no_hallucinations': {
-        const targetSection = post.sections[0];
-        if (!targetSection) return res.status(422).json({ error: 'No sections available' });
-        field = 'section';
-        sectionIndex = targetSection.index;
-        originalText = targetSection.content;
-        userPrompt = `Review this HTML section and rewrite any potentially inaccurate or unverifiable claims conservatively.
+${post.introduction}`,
+        researchMode: false,
+      };
+    }
+    case 'factual_accuracy':
+    case 'no_hallucinations': {
+      const targetSection = post.sections[0];
+      if (!targetSection) return { error: 'No sections available' };
+      return {
+        field: 'section',
+        sectionIndex: targetSection.index,
+        originalText: targetSection.content,
+        userPrompt: `Review this HTML section and rewrite any potentially inaccurate or unverifiable claims conservatively.
 Replace suspicious statistics or quotes with general, verifiable statements. Do NOT add new statistics.
 Return the FULL SECTION HTML with conservative rewrites applied.
 
 Issue reason: ${reason}
 
 Section HTML:
-${originalText}`;
-        break;
-      }
-      default:
-        return res.status(400).json({ error: 'Unknown issue key' });
+${targetSection.content}`,
+        researchMode: true,
+      };
+    }
+    default:
+      return { error: 'Unknown issue key' };
+  }
+}
+
+// AI fix — generates a targeted fix for a specific failed review item
+router.post('/api/content-posts/:workspaceId/:postId/ai-fix',
+  requireWorkspaceAccess('workspaceId'),
+  validate(aiFixRequestSchema),
+  async (req, res) => {
+    const body = req.body as AiFixRequest;
+    const post = getPost(req.params.workspaceId, req.params.postId);
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+
+    const promptTarget = aiFixPromptAndTarget(req.params.workspaceId, post, body);
+    if ('error' in promptTarget) {
+      return res.status(promptTarget.error === 'Unknown issue key' ? 400 : 422).json({ error: promptTarget.error });
     }
 
+    const { field, sectionIndex, originalText, userPrompt, researchMode } = promptTarget;
+    const requestReason = body.mode === 'feedback' ? body.feedback : body.reason;
+
     try {
-      const researchMode = issueKey === 'factual_accuracy' || issueKey === 'no_hallucinations';
       const systemPrompt = buildSystemPrompt(
         req.params.workspaceId,
         'You are an SEO content editor. Follow the requested field constraints exactly and return only the requested output format.',
       );
-      const aiResult = await callAI({
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }],
-        feature: 'content-fix',
-        workspaceId: req.params.workspaceId,
-        maxTokens: 2000,
-        temperature: 0.3,
-        researchMode,
-        ...(field === 'meta' ? { responseFormat: { type: 'json_object' as const } } : {}),
-      });
-
-      const rawSuggested = aiResult.text.trim();
+      const rawSuggested = field === 'meta'
+        ? (await callAI({
+          operation: 'content-post-feedback-fix-structured',
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }],
+          workspaceId: req.params.workspaceId,
+          maxTokens: 2000,
+          temperature: 0.3,
+          researchMode,
+        })).text.trim()
+        : (await callCreativeAI({
+          operation: field === 'post'
+            ? 'content-post-feedback-fix-structured'
+            : 'content-post-feedback-fix',
+          systemPrompt,
+          userPrompt,
+          workspaceId: req.params.workspaceId,
+          maxTokens: field === 'post' ? 8000 : 2000,
+          temperature: 0.3,
+          researchMode,
+          ...(field === 'post' ? { json: true } : {}),
+        })).trim();
       let suggestedText: string;
 
       if (field === 'meta') {
@@ -728,14 +878,45 @@ ${originalText}`;
           seoTitle: sanitizePlainText(parsedResult.data.seoTitle),
           seoMetaDescription: sanitizePlainText(parsedResult.data.seoMetaDescription),
         };
-        // Sanitization can strip all-tag payloads down to empty strings; keep the
-        // same non-empty contract after sanitizing.
         const sanitizedResult = aiMetaFixResponseSchema.safeParse(sanitizedMeta);
         if (!sanitizedResult.success) {
           log.warn({ issues: sanitizedResult.error.issues }, 'AI meta fix response sanitized to invalid fields');
           return res.status(500).json({ error: 'Failed to parse AI meta response' });
         }
         suggestedText = JSON.stringify(sanitizedResult.data);
+      } else if (field === 'post') {
+        let parsed: unknown;
+        try {
+          parsed = parseAIJson<unknown>(rawSuggested);
+        } catch { // catch-ok: SyntaxError from malformed AI JSON — expected failure path
+          return res.status(500).json({ error: 'Failed to parse AI post response' });
+        }
+        const parsedResult = aiPostFeedbackResponseSchema.safeParse(parsed);
+        if (!parsedResult.success) {
+          log.warn({ issues: parsedResult.error.issues }, 'AI post feedback response failed schema validation');
+          return res.status(500).json({ error: 'Failed to parse AI post response' });
+        }
+        const receivedIndices = parsedResult.data.sections.map(section => section.index);
+        const uniqueReceivedIndices = new Set(receivedIndices);
+        const sameShape = parsedResult.data.sections.length === post.sections.length
+          && uniqueReceivedIndices.size === post.sections.length
+          && post.sections.every(section => uniqueReceivedIndices.has(section.index));
+        if (!sameShape) {
+          return res.status(500).json({ error: 'Failed to parse AI post response' });
+        }
+        const sanitizedPost = {
+          introduction: sanitizeRichText(parsedResult.data.introduction),
+          sections: parsedResult.data.sections
+            .map(section => ({ index: section.index, content: sanitizeRichText(section.content) }))
+            .sort((a, b) => a.index - b.index),
+          conclusion: sanitizeRichText(parsedResult.data.conclusion),
+        };
+        const reparsed = aiPostFeedbackResponseSchema.safeParse(sanitizedPost);
+        if (!reparsed.success) {
+          log.warn({ issues: reparsed.error.issues }, 'AI post feedback response sanitized to invalid fields');
+          return res.status(500).json({ error: 'Failed to parse AI post response' });
+        }
+        suggestedText = JSON.stringify(reparsed.data);
       } else {
         suggestedText = sanitizeRichText(rawSuggested);
       }
@@ -744,7 +925,7 @@ ${originalText}`;
         ? post.sections.find(s => s.index === sectionIndex)
         : undefined;
       const sectionLabel = targetSection ? `section "${targetSection.heading}"` : field;
-      const explanation = `AI revised the ${sectionLabel} to address: ${sanitizePlainText(reason).slice(0, 100)}`;
+      const explanation = `AI revised the ${sectionLabel} to address: ${sanitizePlainText(requestReason).slice(0, 120)}`;
 
       const result: AiFixResult = { field, sectionIndex, originalText, suggestedText, explanation };
       res.json(result);

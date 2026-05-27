@@ -3,7 +3,7 @@
  * Extracted from PostEditor.tsx body sections rendering.
  */
 import {
-  Loader2, RefreshCw, Check, ChevronDown, ChevronUp, Pencil, Clock, AlertTriangle,
+  Loader2, RefreshCw, Check, ChevronDown, ChevronUp, Pencil, Clock, AlertTriangle, Sparkles,
 } from 'lucide-react';
 import { SectionCard, Icon, Button, ClickableRow } from '../ui';
 import { RichTextEditor } from './RichTextEditor';
@@ -40,11 +40,12 @@ export interface SectionEditorProps {
   onChange: (html: string) => void;
   onDone: () => Promise<void>;
   onRegenerate: (index: number) => void;
+  onGenerateWithFeedback: (index: number) => void;
 }
 
 export function SectionEditor({
   section, expanded, editing, regenerating, isGenerating, saveStatus,
-  onToggleExpand, onStartEdit, onChange, onDone, onRegenerate,
+  onToggleExpand, onStartEdit, onChange, onDone, onRegenerate, onGenerateWithFeedback,
 }: SectionEditorProps) {
   return (
     <SectionCard noPadding className={`overflow-hidden ${section.status === 'error' ? '!border-red-500/30' : section.status === 'generating' ? '!border-amber-500/20' : ''}`}>
@@ -138,6 +139,15 @@ export function SectionEditor({
                   className="h-auto px-0 py-0 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-300 hover:bg-transparent"
                 >
                   Regenerate
+                </Button>
+                <Button
+                  onClick={() => onGenerateWithFeedback(section.index)}
+                  icon={Sparkles}
+                  size="sm"
+                  variant="ghost"
+                  className="h-auto px-0 py-0 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-300 hover:bg-transparent"
+                >
+                  Generate with feedback
                 </Button>
               </div>
             </div>

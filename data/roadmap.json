@@ -97,6 +97,17 @@
           "notes": "Follow-up after the selector-only PR. Explore generating standard/concise/hybrid candidates for briefs and posts, storing the selected variant, measuring edit distance, approval outcomes, client/page-type preferences, and eventually recommending default styles per workspace or client. Keep live model quality scoring advisory and human-reviewed."
         },
         {
+          "id": "content-post-feedback-editing-mvp",
+          "title": "Content post feedback editing MVP (extend AI fix flow)",
+          "source": "Admin content generation feedback planning 2026-05-27",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "done",
+          "owner": "content-pipeline",
+          "shippedAt": "2026-05-27",
+          "notes": "Completed in this PR. Extended POST /api/content-posts/:workspaceId/:postId/ai-fix with a backward-compatible discriminated request contract so admins can request feedback-driven AI edits for section, full-post, and SEO metadata targets while preserving existing checklist-mode behavior. Reused existing preview-then-apply architecture (FixDiffModal + PostEditor apply pipeline) instead of creating a second suggest/apply endpoint, and added strict schema validation + sanitization for structured meta/post responses. Added named AI operation contracts (`content-post-feedback-fix`, `content-post-feedback-fix-structured`), updated shared/API types (`AiFixResult.field` includes `post`), wired PostEditor entry points, and added integration/component/unit coverage."
+        },
+        {
           "id": "workspace-intelligence-hybrid-consumer-cleanup",
           "title": "Workspace intelligence hybrid consumer cleanup",
           "source": "Workspace Intelligence Consolidation Master Plan follow-up",
