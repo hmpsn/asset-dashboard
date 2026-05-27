@@ -1,6 +1,16 @@
 import { createLogger } from './logger.js';
 import { decodeEntities } from './helpers.js';
 import { fetchPublicWeb, fetchPublicWebText, isExternalFetchError } from './external-fetch.js';
+import {
+  extractTag as extractHtmlTag,
+  extractMetaContent as extractHtmlMetaContent,
+  countWords as countHtmlWords,
+  extractLinks as extractHtmlLinks,
+  extractImgTags as extractHtmlImgTags,
+  extractStyleBlocks as extractHtmlStyleBlocks,
+  extractInlineScripts as extractHtmlInlineScripts,
+  countExternalResources as countHtmlExternalResources,
+} from './html-analysis-utils.js';
 const log = createLogger('sales-audit');
 
 /**
@@ -61,18 +71,11 @@ export interface SalesAuditResult {
 // --- HTML parsing helpers ---
 
 export function extractTag(html: string, tag: string): string[] {
-  const regex = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, 'gi');
-  const matches: string[] = [];
-  let m;
-  while ((m = regex.exec(html)) !== null) matches.push(m[1].trim());
-  return matches;
+  return extractHtmlTag(html, tag);
 }
 
 export function extractMetaContent(html: string, nameOrProp: string): string | null {
-  const r1 = new RegExp(`<meta[^>]*(?:name|property)=["']${nameOrProp}["'][^>]*content=["']([^"']*)["']`, 'i');
-  const r2 = new RegExp(`<meta[^>]*content=["']([^"']*)["'][^>]*(?:name|property)=["']${nameOrProp}["']`, 'i');
-  const m = html.match(r1) || html.match(r2);
-  return m ? m[1] : null;
+  return extractHtmlMetaContent(html, nameOrProp);
 }
 
 export function extractTitle(html: string): string {
@@ -85,68 +88,33 @@ export function extractMetaDescription(html: string): string {
 }
 
 export function countWords(html: string): number {
-  const text = html.replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ').trim();
-  return text.split(/\s+/).filter(w => w.length > 0).length;
+  return countHtmlWords(html);
 }
 
 export function extractLinks(html: string): { href: string; text: string }[] {
-  const links: { href: string; text: string }[] = [];
-  const regex = /<a\s+([^>]*)>([\s\S]*?)<\/a>/gi;
-  let m;
-  while ((m = regex.exec(html)) !== null) {
-    const attrs = m[1];
-    const text = m[2].replace(/<[^>]+>/g, '').trim();
-    const hrefMatch = attrs.match(/href=["']([^"']*)["']/);
-    if (hrefMatch) links.push({ href: hrefMatch[1], text });
-  }
-  return links;
+  return extractHtmlLinks(html).map(link => ({ href: link.href, text: link.text }));
 }
 
 export function extractImgTags(html: string): { src: string; alt: string; loading?: string; hasWidth: boolean; hasHeight: boolean }[] {
-  const imgs: { src: string; alt: string; loading?: string; hasWidth: boolean; hasHeight: boolean }[] = [];
-  const regex = /<img\s+([^>]*)>/gi;
-  let m;
-  while ((m = regex.exec(html)) !== null) {
-    const attrs = m[1];
-    const src = attrs.match(/src=["']([^"']*)["']/)?.[1] || '';
-    const alt = attrs.match(/alt=["']([^"']*)["']/)?.[1] || '';
-    const loading = attrs.match(/loading=["']([^"']*)["']/)?.[1];
-    const hasWidth = /width\s*=/.test(attrs);
-    const hasHeight = /height\s*=/.test(attrs);
-    imgs.push({ src, alt, loading, hasWidth, hasHeight });
-  }
-  return imgs;
+  return extractHtmlImgTags(html).map(img => ({
+    src: img.src,
+    alt: img.alt,
+    loading: img.loading,
+    hasWidth: img.hasWidth,
+    hasHeight: img.hasHeight,
+  }));
 }
 
 export function extractStyleBlocks(html: string): number {
-  const regex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
-  let total = 0;
-  let m;
-  while ((m = regex.exec(html)) !== null) total += m[1].length;
-  return total;
+  return extractHtmlStyleBlocks(html);
 }
 
 export function extractInlineScripts(html: string): number {
-  const regex = /<script(?![^>]*\bsrc\b)[^>]*>([\s\S]*?)<\/script>/gi;
-  let total = 0;
-  let m;
-  while ((m = regex.exec(html)) !== null) {
-    if (m[0].includes('application/ld+json')) continue;
-    total += m[1].length;
-  }
-  return total;
+  return extractHtmlInlineScripts(html);
 }
 
 export function countExternalResources(html: string): { stylesheets: number; scripts: number } {
-  const cssRegex = /<link[^>]*rel=["']stylesheet["'][^>]*>/gi;
-  const jsRegex = /<script[^>]*src=["'][^"']+["'][^>]*>/gi;
-  let stylesheets = 0, scripts = 0;
-  while (cssRegex.exec(html)) stylesheets++;
-  while (jsRegex.exec(html)) scripts++;
-  return { stylesheets, scripts };
+  return countHtmlExternalResources(html);
 }
 
 // --- Page discovery ---

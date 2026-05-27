@@ -4143,6 +4143,69 @@ describe('Rule: Retired normalizePath usage in production code', () => {
   });
 });
 
+describe('Rule: Ad hoc HTML extraction helper outside canonical authority', () => {
+  const RULE = 'Ad hoc HTML extraction helper outside canonical authority';
+
+  it('flags local extractLinks helper declarations in non-authority server files', () => {
+    const file = write(
+      uniqPath('rule-html-extraction-authority', 'server/link-foo.ts'),
+      lines(
+        'export function extractLinks(html: string): { href: string; text: string }[] {',
+        '  return [];',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('flags countWords(html) helper declarations outside authority modules', () => {
+    const file = write(
+      uniqPath('rule-html-extraction-authority', 'server/another.ts'),
+      lines(
+        'function countWords(html: string): number {',
+        '  return html.split(/\\s+/).length;',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('does not flag approved wrapper modules', () => {
+    const seoWrapper = write(
+      uniqPath('rule-html-extraction-authority', 'server/seo-audit-html.ts'),
+      lines(
+        'export function extractLinks(html: string): { href: string; text: string; rel?: string }[] {',
+        '  return [];',
+        '}',
+      )
+    );
+    const salesWrapper = write(
+      uniqPath('rule-html-extraction-authority', 'server/sales-audit.ts'),
+      lines(
+        'export function extractImgTags(html: string): { src: string; alt: string }[] {',
+        '  return [];',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [seoWrapper, salesWrapper])).toHaveLength(0);
+  });
+
+  it('suppresses with // html-extraction-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-html-extraction-authority', 'server/legacy-parser.ts'),
+      lines(
+        '// html-extraction-ok — compatibility shim pending migration',
+        'export function extractInlineScripts(html: string): number {',
+        '  return 0;',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
 describe('Rule: Local page/path normalizer helper outside tests', () => {
   const RULE = 'Local page/path normalizer helper outside tests';
 
@@ -4899,6 +4962,7 @@ describe('Meta: customCheck rule name registry', () => {
     'Multi-step DB writes outside db.transaction()',
     'AI call before db.prepare without transaction guard',
     'Ad hoc domain normalization helper outside canonical authority',
+    'Ad hoc HTML extraction helper outside canonical authority',
     'UPDATE/DELETE missing workspace_id scope',
     'getOrCreate* function returns nullable',
     'Hand-rolled card div (use SectionCard)',

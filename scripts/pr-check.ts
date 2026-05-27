@@ -3816,6 +3816,53 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // ── Ad hoc HTML extraction helpers outside canonical authority ──
+    //
+    // HTML extraction primitives (extractLinks/img/script/style/resource counts)
+    // must live in `server/html-analysis-utils.ts`. Only approved compatibility
+    // wrappers may re-export behavior (`server/seo-audit-html.ts`,
+    // `server/sales-audit.ts`).
+    name: 'Ad hoc HTML extraction helper outside canonical authority',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    message:
+      'Use server/html-analysis-utils.ts for HTML extraction helpers. Do not declare local HTML parsers ' +
+      '(extractLinks/extractImgTags/extractStyleBlocks/extractInlineScripts/countExternalResources/extractTag/extractMetaContent/countWords(html)). ' +
+      'Add // html-extraction-ok only for explicitly approved compatibility wrappers.',
+    severity: 'error',
+    rationale:
+      'Prevents parser drift and duplicated HTML extraction logic across SEO/sales/link-check surfaces.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const helperDefRe =
+        /^\s*(?:export\s+)?(?:async\s+)?function\s+(extractTag|extractMetaContent|extractLinks|extractImgTags|extractStyleBlocks|extractInlineScripts|countExternalResources)\s*\(|^\s*(?:export\s+)?(?:async\s+)?function\s+countWords\s*\(\s*html\s*:\s*string/;
+      const allowedFiles = new Set([
+        'server/html-analysis-utils.ts',
+        'server/seo-audit-html.ts',
+        'server/sales-audit.ts',
+      ]);
+      for (const file of files) {
+        if (!file.endsWith('.ts') || !file.includes('server/')) continue;
+        const normalized = file.replace(/\\/g, '/');
+        const relFromServer = normalized.includes('/server/')
+          ? `server/${normalized.split('/server/')[1]}`
+          : normalized;
+        if (allowedFiles.has(relFromServer)) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!helperDefRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// html-extraction-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
     // ── normalizePath production usage reintroduction ──
     //
     // `normalizePath` is a retired primitive. Production server/frontend code

@@ -1,8 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **458 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **459 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 459. HTML Analysis Utility Consolidation + Anti-Drift Guardrail
+
+**What it does:** Consolidates duplicated server-side HTML extraction helpers into a single canonical authority at `server/html-analysis-utils.ts`, covering tag/meta extraction, HTML word counting, link extraction (including optional `rel`, onclick URL, form action, dedupe, and filter hooks), image extraction, inline style/script byte counting, and external resource counts. `server/seo-audit-html.ts` and `server/sales-audit.ts` now act as compatibility wrappers that preserve their existing output shapes, while `server/link-checker.ts` now uses the canonical optioned extractor for richer crawl discovery behavior. A new error-level `pr-check` rule (`Ad hoc HTML extraction helper outside canonical authority`) prevents local mini-parser reintroduction outside approved authority modules/wrappers.
+
+**Agency value:** Reduces duplicated parser logic and maintenance overhead in high-change audit/check surfaces, making bug fixes and extraction improvements land once and propagate consistently.
+
+**Client value:** Improves consistency of SEO/sales/link analysis outputs by reducing hidden parser drift that can make similar pages score differently across surfaces.
+
+**Mutual:** Keeps behavior stable while shrinking long-term bug surface, and adds enforceable guardrails so consolidation stays durable instead of regressing in future PRs.
 
 ---
 
