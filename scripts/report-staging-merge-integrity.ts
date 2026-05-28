@@ -15,6 +15,7 @@
  * Usage:
  *   npx tsx scripts/report-staging-merge-integrity.ts
  *   npx tsx scripts/report-staging-merge-integrity.ts --since-days 180 --limit 300
+ *   npx tsx scripts/report-staging-merge-integrity.ts --blocking-merged-since 2026-05-28
  *   npx tsx scripts/report-staging-merge-integrity.ts --soft-gate
  */
 
@@ -158,10 +159,24 @@ function isReleasePr(base: string, head: string): boolean {
   return base === 'main' && head === 'staging';
 }
 
+function parseDateOnlyToUtcMillis(raw: string): number {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    throw new Error(`Invalid --blocking-merged-since date format: ${raw} (expected YYYY-MM-DD)`);
+  }
+  const parsed = Date.parse(`${raw}T00:00:00.000Z`);
+  if (Number.isNaN(parsed)) {
+    throw new Error(`Invalid --blocking-merged-since date: ${raw}`);
+  }
+  return parsed;
+}
+
 function main(): void {
   const args = parseArgs(process.argv.slice(2));
   const limit = Number(args.get('--limit') ?? 250);
   const sinceDays = Number(args.get('--since-days') ?? 180);
+  const blockingMergedSinceRaw = String(
+    args.get('--blocking-merged-since') ?? process.env.STAGING_MERGE_INTEGRITY_BLOCKING_MERGED_SINCE ?? '',
+  ).trim();
   const softGate = Boolean(args.get('--soft-gate'));
   const jsonOut = Boolean(args.get('--json'));
 
@@ -171,6 +186,7 @@ function main(): void {
   if (Number.isNaN(sinceDays) || sinceDays < 1) {
     throw new Error(`Invalid --since-days: ${String(args.get('--since-days'))}`);
   }
+  const blockingMergedSinceMs = blockingMergedSinceRaw ? parseDateOnlyToUtcMillis(blockingMergedSinceRaw) : null;
 
   // Ensure we have enough history locally for ancestry checks.
   ensureFullHistoryForIntegrityChecks();
@@ -255,7 +271,13 @@ function main(): void {
     }
   }
 
-  const blocking = issues.filter(issue => !issue.excepted);
+  const nonExcepted = issues.filter(issue => !issue.excepted);
+  const legacyNonBlocking = blockingMergedSinceMs === null
+    ? []
+    : nonExcepted.filter(issue => new Date(issue.mergedAt).getTime() < blockingMergedSinceMs);
+  const blocking = blockingMergedSinceMs === null
+    ? nonExcepted
+    : nonExcepted.filter(issue => new Date(issue.mergedAt).getTime() >= blockingMergedSinceMs);
   const exceptedIssues = issues.filter(issue => issue.excepted);
 
   const summary = {
@@ -267,7 +289,9 @@ function main(): void {
     releaseBased,
     issueCount: issues.length,
     blockingIssueCount: blocking.length,
+    legacyIssueCount: legacyNonBlocking.length,
     exceptedIssueCount: exceptedIssues.length,
+    blockingMergedSince: blockingMergedSinceRaw || null,
   };
 
   if (jsonOut) {
@@ -276,6 +300,7 @@ function main(): void {
         {
           summary,
           blocking,
+          legacyNonBlocking,
           excepted: exceptedIssues,
         },
         null,
@@ -301,6 +326,17 @@ function main(): void {
           console.log(
             `- #${issue.pr} (${issue.base} <- ${issue.head}) ${issue.commit?.slice(0, 12) ?? 'no-merge-commit'} :: ${issue.message}`,
           );
+          console.log(`  ${issue.url}`);
+        }
+        console.log('');
+      }
+      if (legacyNonBlocking.length > 0) {
+        console.log('## Legacy Issues (non-blocking pre-cutoff)');
+        for (const issue of legacyNonBlocking) {
+          console.log(
+            `- #${issue.pr} (${issue.base} <- ${issue.head}) ${issue.commit?.slice(0, 12) ?? 'no-merge-commit'} :: ${issue.message}`,
+          );
+          console.log(`  mergedAt=${issue.mergedAt}`);
           console.log(`  ${issue.url}`);
         }
         console.log('');
