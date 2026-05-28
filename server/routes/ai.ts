@@ -25,13 +25,7 @@ import { getWorkspace } from '../workspaces.js';
 import { checkAIContext } from '../ai-context-check.js';
 import { aiLimiter } from '../middleware.js';
 import { assembleAdminContext, buildSystemPrompt } from '../admin-chat-context.js';
-
-function parsePositiveIntQuery(rawValue: unknown, fallback: number): number | null {
-  if (rawValue == null) return fallback;
-  const parsed = Number(rawValue);
-  if (!Number.isInteger(parsed) || parsed <= 0) return null;
-  return parsed;
-}
+import { parsePositiveIntQuery } from '../query-param-parsers.js';
 
 function parseBoundedPositiveIntBody(rawValue: unknown, fallback: number, max: number): number | null {
   if (rawValue == null) return fallback;

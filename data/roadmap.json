@@ -52,8 +52,9 @@
           "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
           "est": "3-5h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "File clusters: server/routes/{ai,google,health,public-analytics,webflow-cms,workspace-home}.ts. Risk: parser behavior drift causes inconsistent pagination/default bounds by endpoint. Done when: shared parsePositiveIntQuery helper is adopted and legacy inline copies are removed with route-level tests."
+          "status": "done",
+          "notes": "File clusters: server/routes/{ai,google,health,public-analytics,webflow-cms,workspace-home}.ts. Risk: parser behavior drift causes inconsistent pagination/default bounds by endpoint. Done when: shared parsePositiveIntQuery helper is adopted and legacy inline copies are removed with route-level tests.\n\nCompleted 2026-05-28 via shared `server/query-param-parsers.ts` adoption in all six target routes, including shared non-negative parser usage for Webflow CMS offsets. Added parser contract coverage at `tests/unit/query-param-parsers.test.ts`; preserved existing integration error contracts in `tests/integration/misc-endpoints.test.ts`.",
+          "shippedAt": "2026-05-28"
         },
         {
           "id": "dup-mutation-feedback-loop-helperization",

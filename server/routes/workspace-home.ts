@@ -17,17 +17,11 @@ import { listTemplates } from '../content-templates.js';
 import { loadDecayAnalysis } from '../content-decay.js';
 import { getContentVelocityTrend } from '../content-posts.js';
 import { createLogger } from '../logger.js';
+import { parsePositiveIntQuery } from '../query-param-parsers.js';
 
 const log = createLogger('workspace-home');
 import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
-
-function parsePositiveIntQuery(rawValue: unknown, fallback: number): number | null {
-  if (rawValue == null) return fallback;
-  const parsed = Number(rawValue);
-  if (!Number.isInteger(parsed) || parsed <= 0) return null;
-  return parsed;
-}
 
 /**
  * GET /api/workspace-home/:id
