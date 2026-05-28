@@ -32,6 +32,7 @@ import {
   SchemaGeneratorHero,
   SchemaInitialPageTypePicker,
 } from './schema/SchemaGeneratorSetup';
+import { formatDateShort } from '../utils/formatDates';
 
 type SchemaSubTab = 'generator' | 'guide';
 
@@ -370,7 +371,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
         <div className="flex items-center gap-2">
           <span className="t-caption text-[var(--brand-text-muted)]">
             {data.length} pages · {resultStats.totalTypes} schema types generated{loading ? ' (so far)' : ''}
-            {snapshotDate && !loading && <span className="text-[var(--brand-text-muted)]"> · saved {new Date(snapshotDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
+            {snapshotDate && !loading && <span className="text-[var(--brand-text-muted)]"> · saved {formatDateShort(snapshotDate)}</span>}
           </span>
         </div>
         <div className="flex items-center gap-2">

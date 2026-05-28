@@ -3,6 +3,7 @@ import { Badge, ClickableRow, Icon } from '../ui';
 import { RefreshCw, Plus, Minus, ArrowRight, ChevronDown, Eye, Lightbulb } from 'lucide-react';
 import { keywords } from '../../api/seo';
 import type { StrategyDiff as StrategyDiffType } from '../../api/seo';
+import { formatDate } from '../../utils/formatDates';
 
 export interface StrategyDiffProps {
   workspaceId: string;
@@ -42,7 +43,7 @@ export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
           <Icon as={RefreshCw} size="md" className="text-amber-400" />
           <span className="t-body font-semibold text-amber-300">What Changed</span>
           <span className="t-caption-sm text-[var(--brand-text-muted)]">
-            {totalChanges} strategy update{totalChanges !== 1 ? 's' : ''} since {new Date(diff.previousGeneratedAt).toLocaleDateString()}
+            {totalChanges} strategy update{totalChanges !== 1 ? 's' : ''} since {formatDate(diff.previousGeneratedAt)}
           </span>
         </div>
         <Icon as={ChevronDown} size="md" className={`text-[var(--brand-text-muted)] transition-transform ${expanded ? '' : '-rotate-90'}`} />

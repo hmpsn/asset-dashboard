@@ -568,3 +568,28 @@ export function toAuditFindingPageId(page: { slug: string; url: string; pageId: 
   if (page.slug) return `/${page.slug.replace(/^\/+/, '')}`;
   return page.pageId;
 }
+
+// ── String Utilities ──
+
+/**
+ * Canonical server-side slugify.
+ *
+ * Default (no opts): replaces all non-alphanumeric chars (except hyphens) with
+ * hyphens, collapses multiple hyphens, lowercases, trims edge hyphens.
+ * Matches the pattern used in entity-resolution-slice.ts:13 — chosen as the
+ * canonical form because it produces clean URL slugs from arbitrary strings.
+ *
+ * `keepWhitespace: true` — preserves spaces in the output (useful when the
+ * caller needs a human-readable label rather than a URL slug).
+ */
+export function slugify(value: string, opts?: { keepWhitespace?: boolean }): string {
+  const keepWs = opts?.keepWhitespace ?? false;
+  let s = value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, keepWs ? ' ' : '-')
+    .replace(/\s+/g, keepWs ? ' ' : '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  if (keepWs) s = s.trim();
+  return s;
+}

@@ -10,6 +10,7 @@ import { Explainer } from './SeoGlossary';
 import type {
   SearchOverview, PerformanceTrend, SearchComparison, SortKey,
 } from './types';
+import { capitalize } from '../../utils/strings';
 
 interface SearchInsights {
   lowHanging: { query: string; position: number; impressions: number; clicks: number; ctr: number }[];
@@ -203,7 +204,7 @@ export function SearchTab({
                     onClick={() => handleSort(key)}
                     className="ml-auto px-0 py-0 hover:bg-transparent hover:text-[var(--brand-text)]"
                   >
-                    {key === 'ctr' ? 'CTR' : key.charAt(0).toUpperCase() + key.slice(1)}
+                    {key === 'ctr' ? 'CTR' : capitalize(key)}
                     <Explainer term={key === 'ctr' ? 'ctr' : key} />
                     {sortKey === key && <Icon as={ArrowUpDown} size="sm" />}
                   </Button>

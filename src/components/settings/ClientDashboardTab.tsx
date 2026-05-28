@@ -8,6 +8,7 @@ import SearchableSelect from '../SearchableSelect';
 import { get, post, patch, del, getSafe } from '../../api/client';
 import { SectionCard, Icon, Button, IconButton, FormInput, FormSelect, Checkbox } from '../ui';
 import { CHART_SERIES_COLORS } from '../ui/constants';
+import { formatDate } from '../../utils/formatDates';
 
 import type { SafeClientUser as ClientUserSafe } from '../../../shared/types/users.ts';
 import type { EventGroup, EventDisplayConfig } from '../../../shared/types/workspace.ts';
@@ -463,7 +464,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="t-caption-sm text-[var(--brand-text-muted)] truncate">{user.email}</span>
                           {user.lastLoginAt && (
-                            <span className="t-caption-sm text-[var(--brand-text-muted)]">Last login {new Date(user.lastLoginAt).toLocaleDateString()}</span>
+                            <span className="t-caption-sm text-[var(--brand-text-muted)]">Last login {formatDate(user.lastLoginAt)}</span>
                           )}
                         </div>
                       </div>

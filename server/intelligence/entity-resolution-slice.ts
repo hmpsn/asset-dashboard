@@ -1,6 +1,7 @@
 import type { EntityCandidate, EntityResolutionSlice, EntitySurface } from '../../shared/types/entity-resolution.js';
 import type { IntelligenceOptions } from '../../shared/types/intelligence.js';
 import { getWorkspace } from '../workspaces.js';
+import { slugify } from '../helpers.js';
 import { resolveCandidateWithWikidata } from './entity-resolution-wikidata.js';
 
 const MAX_ENTITY_CANDIDATES = 20;
@@ -8,15 +9,6 @@ const MAX_WIKIDATA_LOOKUPS = 8;
 
 function normalizeLabel(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
-}
-
-function slugify(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, ' ')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
 }
 
 function addCandidate(

@@ -6375,6 +6375,31 @@ export const CHECKS: Check[] = [
     claudeMdRef: '#design-system--the-four-laws-of-color',
   },
   {
+    // Flags inline score-color ternaries that should use scoreColor() /
+    // scoreColorClass() from ui/constants.ts. Specifically catches the standard
+    // >=80/>=60 two-step ternary outputting text-* Tailwind classes or hex colors.
+    // Does NOT flag custom-threshold ternaries (>=50, >=90, >=70, etc.) because
+    // those are intentional domain-specific scales.
+    name: 'inline-score-color-ternary',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    exclude: [
+      'src/components/ui/constants.ts',
+      'src/components/ui/constants.js',
+      // AuditReportExport generates a printable HTML/PDF document — it uses
+      // light-mode hex colors (#22c55e, #f59e0b) appropriate for paper/screen
+      // print, not the dark-mode scoreColor() palette.
+      'src/components/audit/AuditReportExport.tsx',
+    ],
+    message: 'Use scoreColor() or scoreColorClass() from src/components/ui/constants.ts instead of hand-rolling >= 80 / >= 60 color ternaries. Add an inline comment if the threshold or class set intentionally differs.',
+    severity: 'warn',
+    rationale: 'Inline score ternaries using the standard 80/60 thresholds duplicate the canonical Law-03 logic and drift when the palette changes.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+    // hatch: // score-color-inline-ok: <reason>
+    pattern: '>= 80 \\? [\'"](?:text-emerald|text-green|#34d399|#22c55e)',
+    excludeLines: ['score-color-inline-ok'],
+  },
+  {
     // Verifies that scoreColorClass() in src/components/ui/constants.ts uses
     // emerald/amber/red (Law 03: emerald for success, never green). This is a
     // structural check — it reads the function body and asserts no `green-` colors.
@@ -7287,6 +7312,67 @@ export const CHECKS: Check[] = [
       return hits;
     },
   },
+
+  // ── Plan C C5: inline-toLocaleDateString (2026-05-27) ────────────────────
+  {
+    name: 'inline-toLocaleDateString',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    exclude: [
+      // Date utility is the implementation — bare toLocaleDateString is expected here
+      'src/utils/formatDates.ts',
+    ],
+    message: 'Use formatDate() / formatDateShort() / formatDateTime() from src/utils/formatDates.ts instead of inline new Date(...).toLocaleDateString(). Add a comment if a bespoke locale format is intentionally required.',
+    severity: 'warn',
+    rationale: 'Scattered toLocaleDateString() calls produce inconsistent date formatting and break in non-en-US locales. Shared helpers ensure uniform output.',
+    claudeMdRef: '#code-conventions',
+    // hatch: // format-date-inline-ok: <reason>
+    pattern: 'new Date\\([^)]*\\)\\.toLocaleDateString\\(\\)',
+    excludeLines: ['format-date-inline-ok'],
+  },
+
+  // ── Plan C Task 7: callAI dispatcher lock (2026-05-27) ───────────────────
+  {
+    name: 'Direct callOpenAI/callAnthropic import outside dispatcher',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: [
+      'server/ai.ts',             // the dispatcher itself
+      'server/openai-helpers.ts', // the provider implementation
+      'server/anthropic-helpers.ts', // the provider implementation
+      'tests/',
+    ],
+    message:
+      'Import { callOpenAI } or { callAnthropic } directly only inside server/ai.ts (the unified dispatcher). ' +
+      'All other server-side AI callers must use callAI() from server/ai.ts. ' +
+      'If a justified exception exists, suppress with // direct-ai-helper-ok: <reason>.',
+    severity: 'error',
+    excludeLines: ['direct-ai-helper-ok'],
+    rationale: 'callAI() is the single entry point for all AI calls (~50 sites as of 2026-05-27). Direct imports bypass provider routing, retry logic, and operation registry.',
+    claudeMdRef: '#ai-dispatch-patterns',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const directImportRe = /import\s*\{[^}]*\b(callOpenAI|callAnthropic)\b[^}]*\}\s*from\s*['"][^'"]*\/(openai-helpers|anthropic-helpers)\.js['"]/;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes('/server/')) continue;
+        if (file.includes('/tests/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        if (!directImportRe.test(content)) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (line.includes('direct-ai-helper-ok')) continue;
+          if (directImportRe.test(line)) {
+            hits.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+      return hits;
+    },
+  },
+
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import type { ChatMessage } from './ChatPanel';
 import { chat } from '../api/misc';
 import { useSmartPlaceholder } from '../hooks/useSmartPlaceholder';
 import { Icon, Button, IconButton, ClickableRow, cn } from './ui';
+import { formatDate } from '../utils/formatDates';
 
 const ADMIN_QUICK_QUESTIONS = [
   'Give me a full status report on this site',
@@ -246,7 +247,7 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
                       : 'bg-[var(--surface-3)]/50 border-[var(--brand-border)] text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)]'
                   )}>
                   <div className="t-caption font-medium truncate">{s.title}</div>
-                  <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{s.messageCount} messages · {new Date(s.updatedAt).toLocaleDateString()}</div>
+                  <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{s.messageCount} messages · {formatDate(s.updatedAt)}</div>
                 </ClickableRow>
               ))}
             </div>

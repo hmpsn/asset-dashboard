@@ -23,6 +23,7 @@ import {
   LoadingState,
   ErrorState,
 } from '../ui';
+import { formatDate } from '../../utils/formatDates';
 
 interface EeatAssetsTabProps {
   workspaceId: string;
@@ -316,7 +317,7 @@ export function EeatAssetsTab({ workspaceId, toast }: EeatAssetsTabProps) {
                     </div>
 
                     <div className="flex justify-between items-center pt-1">
-                      <span className="t-caption-sm text-[var(--brand-text-muted)]">Updated {new Date(asset.updatedAt).toLocaleDateString()}</span>
+                      <span className="t-caption-sm text-[var(--brand-text-muted)]">Updated {formatDate(asset.updatedAt)}</span>
                       <div className="flex items-center gap-2">
                         {!editing ? (
                           <Button variant="secondary" size="sm" onClick={() => startEdit(asset)} disabled={isSaving}>Edit</Button>

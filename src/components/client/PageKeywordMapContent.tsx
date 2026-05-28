@@ -5,6 +5,7 @@ import type { MetricsSource } from '../../../shared/types/keywords.js';
 import type { KeywordStrategyExplanation } from '../../../shared/types/keyword-strategy-ux.js';
 import { post } from '../../api';
 import { normalizeKeyword } from './strategy/strategyKeywordDisplay';
+import { capitalize } from '../../utils/strings';
 
 interface GscKeyword {
   query: string;
@@ -62,7 +63,7 @@ function getPageFolder(path: string): string {
          parts[0] === 'products' ? 'Products' :
          parts[0] === 'about' ? 'About' :
          parts[0] === 'contact' ? 'Contact' :
-         parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+         capitalize(parts[0]);
 }
 
 function positionColor(pos: number): string {

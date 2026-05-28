@@ -3,6 +3,7 @@ import { RefreshCw, AlertTriangle, AlertCircle, Eye, Sparkles, ArrowDown, ArrowU
 import { contentDecay } from '../api/content';
 import { clientActions } from '../api/clientActions';
 import { EmptyState, Icon, Button, ClickableRow, FormTextarea } from './ui';
+import { formatDate } from '../utils/formatDates';
 
 interface DecayingPage {
   page: string;
@@ -137,7 +138,7 @@ export default function ContentDecay({ workspaceId }: Props) {
             Content Decay Monitor
           </h3>
           <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
-            {analysis ? `Last analyzed ${new Date(analysis.analyzedAt).toLocaleDateString()} · ${analysis.totalPages} pages tracked` : 'Detect declining content and get AI refresh recommendations'}
+            {analysis ? `Last analyzed ${formatDate(analysis.analyzedAt)} · ${analysis.totalPages} pages tracked` : 'Detect declining content and get AI refresh recommendations'}
           </p>
         </div>
         <Button

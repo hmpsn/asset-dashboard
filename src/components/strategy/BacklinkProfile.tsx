@@ -3,6 +3,8 @@ import { Icon } from '../ui';
 import { Link2, Globe, ExternalLink, Loader2, Shield, AlertTriangle } from 'lucide-react';
 import { SectionCard, StatCard, EmptyState } from '../ui';
 import { backlinks } from '../../api';
+import { fmtNum } from '../../utils/formatNumbers';
+import { formatDate } from '../../utils/formatDates';
 
 interface BacklinksOverview {
   totalBacklinks: number;
@@ -32,11 +34,7 @@ interface Props {
   workspaceId: string;
 }
 
-function fmtNum(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
-}
+
 
 export function BacklinkProfile({ workspaceId }: Props) {
   const [data, setData] = useState<BacklinkData | null>(null);
@@ -143,8 +141,8 @@ export function BacklinkProfile({ workspaceId }: Props) {
                         </a>
                       </td>
                       <td className="py-2 text-[var(--brand-text-bright)] text-right font-medium">{fmtNum(rd.backlinksCount)}</td>
-                      <td className="py-2 text-[var(--brand-text-muted)] text-right">{rd.firstSeen ? new Date(rd.firstSeen).toLocaleDateString() : '—'}</td>
-                      <td className="py-2 text-[var(--brand-text-muted)] text-right">{rd.lastSeen ? new Date(rd.lastSeen).toLocaleDateString() : '—'}</td>
+                      <td className="py-2 text-[var(--brand-text-muted)] text-right">{rd.firstSeen ? formatDate(rd.firstSeen) : '—'}</td>
+                      <td className="py-2 text-[var(--brand-text-muted)] text-right">{rd.lastSeen ? formatDate(rd.lastSeen) : '—'}</td>
                     </tr>
                   ))}
                 </tbody>

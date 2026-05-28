@@ -4,6 +4,7 @@ import {
 import { BriefDetail } from './BriefDetail';
 import { EmptyState, Button, IconButton } from '../ui';
 import type { ContentBrief, ContentGenerationStyle } from '../../../shared/types/content';
+import { formatDate } from '../../utils/formatDates';
 
 interface ContentTopicRequest {
   id: string;
@@ -149,7 +150,7 @@ export function BriefList({
                   />
                 </div>
                 {/* Date + expand */}
-                <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">{new Date(brief.createdAt).toLocaleDateString()}</span>
+                <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">{formatDate(brief.createdAt)}</span>
                 <IconButton
                   icon={expanded === brief.id ? ChevronUp : ChevronDown}
                   label={expanded === brief.id ? 'Collapse brief' : 'Expand brief'}

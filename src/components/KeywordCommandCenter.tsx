@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useNavigate } from 'react-router-dom';
 import {
   Archive,
@@ -113,7 +114,7 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
   const localRefresh = useLocalSeoRefresh(workspaceId);
   const [filter, setFilter] = useState<KeywordCommandCenterFilter>(KEYWORD_COMMAND_CENTER_FILTERS.ALL);
   const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
   const [page, setPage] = useState(1);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [selectedBulkKeys, setSelectedBulkKeys] = useState<Set<string>>(new Set());
@@ -126,11 +127,6 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
   const [expandedVariants, setExpandedVariants] = useState<Set<string>>(new Set());
   const [summaryEnabled, setSummaryEnabled] = useState(false);
   const [localPanelEnabled, setLocalPanelEnabled] = useState(false);
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
-    return () => window.clearTimeout(timeout);
-  }, [searchTerm]);
 
   useEffect(() => {
     setPage(1);

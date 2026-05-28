@@ -10,6 +10,7 @@ import { createLogger } from './logger.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
+import { dedupeByLast } from './utils/collections.js';
 
 const log = createLogger('keyword-gaps');
 
@@ -71,13 +72,6 @@ function modelToParams(workspaceId: string, gap: KeywordGapItem) {
   };
 }
 
-function dedupeByKeyword(gaps: KeywordGapItem[]): KeywordGapItem[] {
-  const byKeyword = new Map<string, KeywordGapItem>();
-  for (const gap of gaps) {
-    byKeyword.set(keywordComparisonKey(gap.keyword), gap);
-  }
-  return [...byKeyword.values()];
-}
 
 const stmts = createStmtCache(() => ({
   listByWs: db.prepare<[workspaceId: string]>(
@@ -112,7 +106,7 @@ export function replaceAllKeywordGaps(workspaceId: string, gaps: KeywordGapItem[
     if (normalized.length !== gaps.length) {
       log.warn({ workspaceId, total: gaps.length, kept: normalized.length }, 'Skipping invalid keyword-gap payload(s)');
     }
-    const normalizedGaps = dedupeByKeyword(normalized);
+    const normalizedGaps = dedupeByLast(normalized, g => keywordComparisonKey(g.keyword));
     const stmt = stmts().insert;
     for (const gap of normalizedGaps) {
       stmt.run(modelToParams(workspaceId, gap));
@@ -149,9 +143,12 @@ export function migrateFromJsonBlob(): void {
       const keywordGaps = strategy.keywordGaps;
       if (!Array.isArray(keywordGaps) || keywordGaps.length === 0) continue;
 
-      const normalized = dedupeByKeyword(keywordGaps
-        .map((gap) => normalizeKeywordGap(gap))
-        .filter((gap): gap is KeywordGapItem => gap != null));
+      const normalized = dedupeByLast(
+        keywordGaps
+          .map((gap) => normalizeKeywordGap(gap))
+          .filter((gap): gap is KeywordGapItem => gap != null),
+        g => keywordComparisonKey(g.keyword),
+      );
       if (normalized.length === 0) continue;
 
       delete strategy.keywordGaps;

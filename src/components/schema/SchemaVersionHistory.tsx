@@ -3,6 +3,7 @@
  * Fetches history on mount and handles rollback via the server.
  */
 import { useState, useEffect } from 'react';
+import { formatDateTime } from '../../utils/formatDates';
 import { getSafe, post } from '../../api/client';
 import { Loader2, RotateCcw, ChevronDown, ChevronRight, CheckCircle } from 'lucide-react';
 import { Icon, Button } from '../ui';
@@ -94,7 +95,7 @@ export function SchemaVersionHistory({ siteId, pageId, workspaceId, onRestore }:
                   ? <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                   : <Icon as={ChevronRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />}
                 <span className="t-caption-sm text-[var(--brand-text)]">
-                  {date.toLocaleDateString()} {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {formatDateTime(date)}
                 </span>
                 {isLatest && (
                   <span className="t-caption-sm px-1.5 py-0.5 rounded bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">

@@ -20,6 +20,7 @@ import { adminRichTextClass } from './post-editor/richTextStyles';
 import type { AiFeedbackTarget, AiFixRequest, AiFixResult, ContentBrief, ContentReviewEvidence, IssueKey } from '../../shared/types/content';
 import { queryKeys } from '../lib/queryKeys';
 import { countWordsFromHtml } from '../lib/utils';
+import { formatDate } from '../utils/formatDates';
 
 interface PostSection {
   index: number;
@@ -502,7 +503,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                 {post.unificationStatus === 'success' ? 'Unified' : post.unificationStatus === 'failed' ? 'Unify Failed' : 'Unify Skipped'}
               </span>
             )}
-            <span className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-1"><Icon as={Clock} size="sm" />{new Date(post.updatedAt).toLocaleDateString()}</span>
+            <span className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-1"><Icon as={Clock} size="sm" />{formatDate(post.updatedAt)}</span>
           </div>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">

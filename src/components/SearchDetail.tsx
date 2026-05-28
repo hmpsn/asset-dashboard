@@ -11,6 +11,7 @@ import { InsightFeed } from './insights';
 import { AnnotatedTrendChart } from './charts/AnnotatedTrendChart';
 import type { TrendLine, ChartCallout } from './charts/AnnotatedTrendChart';
 import { fmtNum } from '../utils/formatNumbers';
+import { capitalize } from '../utils/strings';
 
 interface Props {
   siteId: string;
@@ -292,7 +293,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                           onClick={() => handleSort(key)}
                           className="gap-1 ml-auto px-0 py-0 rounded-none bg-transparent hover:bg-transparent hover:text-[var(--brand-text-bright)]"
                         >
-                          {key === 'ctr' ? 'CTR' : key.charAt(0).toUpperCase() + key.slice(1)}
+                          {key === 'ctr' ? 'CTR' : capitalize(key)}
                           {sortKey === key && <Icon as={ArrowUpDown} size="sm" />}
                         </Button>
                       </th>

@@ -15,6 +15,7 @@ import { STUDIO_NAME } from '../../constants';
 import { useContentRequests } from '../../hooks/useContentRequests';
 import { contentPerformance } from '../../api';
 import { PostReviewCard } from './PostReviewCard';
+import { formatDate } from '../../utils/formatDates';
 
 const POST_REVIEW_SEEN_STORAGE_KEY_PREFIX = 'client-post-review-seen';
 
@@ -750,7 +751,7 @@ export function ContentTab({
                         <div key={c.id} className={`t-caption px-3 py-2 rounded-[var(--radius-lg)] ${c.author === 'client' ? 'bg-blue-500/10 border border-blue-500/15 text-accent-info ml-6' : 'bg-[var(--surface-3)]/60 border border-[var(--brand-border)] text-[var(--brand-text-muted)] mr-6'}`}>
                           <div className="flex items-center justify-between mb-0.5">
                             <span className="font-medium t-caption-sm">{c.author === 'client' ? 'You' : 'Team'}</span>
-                            <span className="t-caption-sm text-[var(--brand-text-muted)]">{new Date(c.createdAt).toLocaleDateString()}</span>
+                            <span className="t-caption-sm text-[var(--brand-text-muted)]">{formatDate(c.createdAt)}</span>
                           </div>
                           {c.content}
                         </div>

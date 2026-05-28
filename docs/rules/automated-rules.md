@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **152** — 136 error, 16 warn.
+Total rules: **155** — 137 error, 18 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -152,6 +152,7 @@ advisory but tracked.
 | 134 | Inline trial-state computation outside billing module | error | custom | `server/` | `trial-state-ok` | Centralizes trial logic so tier changes (e.g. adding a grace period) are single-edit. |
 | 135 | Bare JSON.parse on AI text response without schema validation | error | custom | `server/` | `ai-json-parse-ok` | Unvalidated AI JSON silently propagates wrong shapes when prompts drift. |
 | 136 | Workspace object spread-and-redact in route handler | error | custom | `server/routes/` | `admin-view-ok` | Spread-and-redact is deny-list based — new secrets leak by default. |
+| 137 | Direct callOpenAI/callAnthropic import outside dispatcher | error | custom | `server/` | `direct-ai-helper-ok` | callAI() is the single entry point for all AI calls (~50 sites as of 2026-05-27). Direct imports bypass provider routing, retry logic, and operation registry. |
 
 ---
 
@@ -174,7 +175,9 @@ advisory but tracked.
 | 13 | raw-z-index-inline-literal | warn | custom | `src/` | — | Inline numeric z-index values drift from the canonical token scale and make stacking behavior unpredictable across overlays, toasts, and modals. |
 | 14 | focus-visible-ring-contract | warn | custom | `src/components/` | — | Removing default focus outlines without an explicit focus-visible fallback risks keyboard-invisible controls and drifts from the styleguide focus ring contract. |
 | 15 | stat-primitive-bypass-signal | warn | custom | `src/components/` | — | Direct t-stat typography usage in feature shells often re-implements StatCard/CompactStatBar chrome and drifts from canonical spacing, labels, and responsive behavior. |
-| 16 | Workspace mutation route missing broadcastToWorkspace | warn | custom | `server/routes/` | `no-broadcast-ok` | Silent mutations mean UI never refreshes without a manual reload. |
+| 16 | inline-score-color-ternary | warn | pattern | `src/` | `score-color-inline-ok` | Inline score ternaries using the standard 80/60 thresholds duplicate the canonical Law-03 logic and drift when the palette changes. |
+| 17 | Workspace mutation route missing broadcastToWorkspace | warn | custom | `server/routes/` | `no-broadcast-ok` | Silent mutations mean UI never refreshes without a manual reload. |
+| 18 | inline-toLocaleDateString | warn | pattern | `src/` | `format-date-inline-ok` | Scattered toLocaleDateString() calls produce inconsistent date formatting and break in non-en-US locales. Shared helpers ensure uniform output. |
 
 ---
 

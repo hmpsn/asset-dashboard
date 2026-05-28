@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { contentSubscriptions } from '../api/misc';
 import { PageHeader, SectionCard, Badge, EmptyState, Icon, Button, IconButton, ClickableRow, FormSelect, FormTextarea } from './ui';
+import { formatDate } from '../utils/formatDates';
 import type { ContentSubscription, ContentSubPlan } from '../../shared/types/content';
 import { CONTENT_SUB_PLANS } from '../../shared/types/content';
 
@@ -255,7 +256,7 @@ export function ContentSubscriptions({ workspaceId }: Props) {
             </div>
             {activeSub.currentPeriodEnd && (
               <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">
-                Period ends: {new Date(activeSub.currentPeriodEnd).toLocaleDateString()}
+                Period ends: {formatDate(activeSub.currentPeriodEnd)}
               </p>
             )}
           </div>
@@ -304,7 +305,7 @@ export function ContentSubscriptions({ workspaceId }: Props) {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="t-caption-sm text-[var(--brand-text-muted)]">
-                      {new Date(sub.createdAt).toLocaleDateString()}
+                      {formatDate(sub.createdAt)}
                     </span>
                     <Badge
                       label={cfg?.label || sub.status}

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { patch, post, del, getSafe, postForm } from '../api/client';
 import { Icon, Button, IconButton, ClickableRow, FormInput, FormSelect, cn } from './ui';
 import { inlineMarkdownToHtml } from '../lib/inline-markdown';
+import { formatDateShort, formatDateTime } from '../utils/formatDates';
 import {
   MessageSquare, Send, Loader2, ChevronDown, ChevronUp,
   Trash2, ExternalLink, Clock, CheckCircle2, AlertTriangle,
@@ -391,7 +392,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                             {CAT_LABELS[req.category] || req.category}
                           </span>
                           {req.submittedBy && <span className="text-[var(--brand-text-bright)]">by {req.submittedBy}</span>}
-                          <span><Clock className="w-2.5 h-2.5 inline mr-0.5" />{new Date(req.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                          <span><Clock className="w-2.5 h-2.5 inline mr-0.5" />{formatDateShort(req.createdAt)}</span>
                           {unreadTeam > 0 && <span className="text-accent-brand">{unreadTeam} client note{unreadTeam !== 1 ? 's' : ''}</span>}
                           {req.pageUrl && (
                             <span className="flex items-center gap-0.5 truncate max-w-[140px]">
@@ -484,7 +485,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                                     {note.author === 'team' ? 'You (Team)' : 'Client'}
                                   </span>
                                   <span className="t-caption text-[var(--brand-text-muted)]">
-                                    {new Date(note.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                    {formatDateTime(note.createdAt)}
                                   </span>
                                 </div>
                                 {note.content && <SimpleMarkdown text={note.content} />}
