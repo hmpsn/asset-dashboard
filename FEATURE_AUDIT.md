@@ -1,8 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **461 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **462 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 462. Schema Text Sanitizer Authority Consolidation
+
+**What it does:** Extracts a single schema-safe text sanitizer authority at `server/schema/schema-text-sanitizer.ts` and migrates the schema generator, LocalBusiness/Service templates, and JSON-LD page-element extractors to use it. This unifies whitespace normalization, zero-width character cleanup, and opaque ID rejection behavior across previously duplicated implementations (`safeText`, `safePublicText`, `cleanPublicText`, local `isOpaqueIdentifier`). A dedicated unit suite (`tests/unit/schema/schema-text-sanitizer.test.ts`) now locks the shared behavior.
+
+**Agency value:** Reduces one-off sanitization drift and makes future schema text hardening a one-location change instead of a multi-file chase.
+
+**Client value:** Improves consistency of emitted schema text fields by applying the same cleanup and opaque-token filtering rules everywhere.
+
+**Mutual:** Shrinks maintenance surface area and lowers silent-regression risk for schema quality work.
 
 ---
 

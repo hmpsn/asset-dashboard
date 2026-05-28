@@ -69,8 +69,9 @@
           "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
           "est": "3-4h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "File clusters: server/schema/generator.ts, server/schema/templates/{service,local-business}.ts, server/schema/extractors/page-elements.ts. Risk: inconsistent sanitizer behavior can produce malformed or overly-stripped schema text. Done when: one shared schema-safe text sanitizer is adopted by generator/templates/extractors with fixture coverage for opaque IDs and empty text."
+          "status": "done",
+          "shippedAt": "2026-05-27",
+          "notes": "Completed on codex/schema-unification-roadmap-capture via canonical sanitizer extraction at server/schema/schema-text-sanitizer.ts and adoption in server/schema/generator.ts, server/schema/templates/service.ts, server/schema/templates/local-business.ts, and server/schema/extractors/page-elements.ts. Fixture lock added at tests/unit/schema/schema-text-sanitizer.test.ts. Outcome: one shared authority now controls whitespace cleanup + opaque identifier filtering semantics."
         },
         {
           "id": "dup-schema-role-type-registry-consolidation",

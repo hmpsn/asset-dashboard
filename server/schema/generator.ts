@@ -40,6 +40,7 @@ import type { SiteContext, SiteContextPage } from './site-context.js';
 import { validateForGoogleRichResults } from '../schema-validator.js';
 import { createLogger } from '../logger.js';
 import { normalizeDomainHost } from '../domain-normalization.js';
+import { cleanSchemaPublicText } from './schema-text-sanitizer.js';
 
 const log = createLogger('schema/generator');
 
@@ -655,17 +656,7 @@ function applyCanonicalEntityGraph(input: {
   if (referenceTarget) addCanonicalReferencesToNode(referenceTarget, refs);
 }
 
-function isOpaqueIdentifier(value: string): boolean {
-  const trimmed = value.trim();
-  return /^[a-f0-9]{24}$/i.test(trimmed) || /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed);
-}
-
-function safePublicText(value: string | undefined): string | undefined {
-  if (!value) return undefined;
-  const cleaned = value.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, ' ').trim();
-  if (!cleaned || isOpaqueIdentifier(cleaned)) return undefined;
-  return cleaned;
-}
+const safePublicText = cleanSchemaPublicText;
 
 function formatAreaServed(address: { city?: string; state?: string } | undefined): string | undefined {
   const city = safePublicText(address?.city);
