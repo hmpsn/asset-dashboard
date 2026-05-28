@@ -13,7 +13,8 @@
 #   LOCAL_STATE_FILE   default: $LOCAL_BACKUP_ROOT/.last-db-export-sha256
 #   KEEP_LOCAL         default: 7
 #   FORCE_PULL         default: 0  (1 = keep file even if hash unchanged)
-#   LOCAL_DEV_DB_PATH  default: "" (if set, copy latest DB into this path)
+#   LOCAL_DEV_DB_PATH  default: $HOME/.asset-dashboard/dashboard.db
+#   AUTO_APPLY_LOCAL_DB default: 1 (set to 0 for download-only mode)
 #   AUTH_TOKEN         default: "" (if set, skips login step)
 #
 set -euo pipefail
@@ -24,7 +25,8 @@ LOCAL_BACKUP_ROOT="${LOCAL_BACKUP_ROOT:-$HOME/.asset-dashboard/render-backups}"
 LOCAL_STATE_FILE="${LOCAL_STATE_FILE:-$LOCAL_BACKUP_ROOT/.last-db-export-sha256}"
 KEEP_LOCAL="${KEEP_LOCAL:-7}"
 FORCE_PULL="${FORCE_PULL:-0}"
-LOCAL_DEV_DB_PATH="${LOCAL_DEV_DB_PATH:-}"
+LOCAL_DEV_DB_PATH="${LOCAL_DEV_DB_PATH:-$HOME/.asset-dashboard/dashboard.db}"
+AUTO_APPLY_LOCAL_DB="${AUTO_APPLY_LOCAL_DB:-1}"
 AUTH_TOKEN="${AUTH_TOKEN:-}"
 
 if [[ -z "$APP_PASSWORD" ]]; then
@@ -108,10 +110,12 @@ mv "$tmp_file" "$final_file"
 echo "$sha256" > "$LOCAL_STATE_FILE"
 echo "Saved: $final_file"
 
-if [[ -n "$LOCAL_DEV_DB_PATH" ]]; then
+if [[ "$AUTO_APPLY_LOCAL_DB" == "1" ]] && [[ -n "$LOCAL_DEV_DB_PATH" ]]; then
   mkdir -p "$(dirname "$LOCAL_DEV_DB_PATH")"
   cp "$final_file" "$LOCAL_DEV_DB_PATH"
+  rm -f "${LOCAL_DEV_DB_PATH}-wal" "${LOCAL_DEV_DB_PATH}-shm"
   echo "Updated local dev DB at '$LOCAL_DEV_DB_PATH'."
+  echo "Note: restart local server if it is currently running."
 fi
 
 if [[ "$KEEP_LOCAL" =~ ^[0-9]+$ ]] && (( KEEP_LOCAL > 0 )); then
