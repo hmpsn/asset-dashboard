@@ -1,8 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **462 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **463 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 463. Schema Role/Type Registry Consolidation Authority
+
+**What it does:** Introduces a centralized schema role/type registry at `server/schema/role-type-registry.ts` and migrates both schema suggestion and generation callers to consume it. The registry now owns `PAGE_TYPE_LABELS`, `PAGE_TYPE_SCHEMA_MAP`, `SCHEMA_ROLE_TO_PAGE_KIND`, and diagnostics-type mapping (`schemaDiagnosticsTypeForRole`) so `server/schema-suggester.ts` and `server/schema/generator.ts` no longer maintain parallel maps. `schema-suggester` keeps compatibility by re-exporting the shared constants/types for existing callers/tests.
+
+**Agency value:** Reduces schema-role drift risk by collapsing multiple independently-edited maps into one typed authority.
+
+**Client value:** Improves consistency of suggested schema types and fallback diagnostics across schema tooling surfaces.
+
+**Mutual:** Lowers maintenance cost and bug probability while preserving current contracts and response shapes.
 
 ---
 

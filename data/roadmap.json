@@ -79,8 +79,9 @@
           "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
           "est": "4-6h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "File clusters: shared/types/schema-plan.ts, server/schema-suggester.ts, server/schema/generator.ts. Risk: role/type drift breaks diagnostics and emitted schema expectations. Done when: one typed registry drives planner/suggester/generator mappings and duplicate maps are retired. Cross-reference: complements schema-intelligence sprint items in sprint-platform-value-schema-intelligence-next."
+          "status": "done",
+          "shippedAt": "2026-05-27",
+          "notes": "Completed on codex/schema-unification-roadmap-capture via centralized role/type registry module at server/schema/role-type-registry.ts. File clusters delivered: server/schema/role-type-registry.ts, server/schema-suggester.ts, server/schema/generator.ts. Outcome: PAGE_TYPE_SCHEMA_MAP, PAGE_TYPE_LABELS, SCHEMA_ROLE_TO_PAGE_KIND, and diagnostics-type mapping now share one authority and are re-exported for compatibility."
         },
         {
           "id": "dup-html-analysis-helper-consolidation",

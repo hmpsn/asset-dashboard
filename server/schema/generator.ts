@@ -41,6 +41,7 @@ import { validateForGoogleRichResults } from '../schema-validator.js';
 import { createLogger } from '../logger.js';
 import { normalizeDomainHost } from '../domain-normalization.js';
 import { cleanSchemaPublicText } from './schema-text-sanitizer.js';
+import { schemaDiagnosticsTypeForRole } from './role-type-registry.js';
 
 const log = createLogger('schema/generator');
 
@@ -448,23 +449,6 @@ function validationStatus(findings: ValidationFinding[]): 'valid' | 'warnings' |
   if (findings.some(f => f.severity === 'error')) return 'errors';
   if (findings.some(f => f.severity === 'warning')) return 'warnings';
   return 'valid';
-}
-
-function roleToDiagnosticsType(role: SchemaPageRole): string | null {
-  const map: Partial<Record<SchemaPageRole, string>> = {
-    product: 'Product',
-    faq: 'FAQPage',
-    howto: 'HowTo',
-    video: 'VideoObject',
-    pricing: 'Offer',
-    author: 'ProfilePage',
-    'job-posting': 'JobPosting',
-    course: 'Course',
-    event: 'Event',
-    review: 'Review',
-    recipe: 'Recipe',
-  };
-  return map[role] ?? null;
 }
 
 function normalizeSchemaUrlPath(url: string | undefined): string | null {
@@ -952,7 +936,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     reason = 'Video role — Article base; VideoObject is emitted only when required video fields are verified.';
   } else if (role === 'job-posting' || role === 'course' || role === 'event') {
     schema = buildWebPageSchema({ baseUrl: schemaBaseUrl, pageData });
-    const type = roleToDiagnosticsType(role)!;
+    const type = schemaDiagnosticsTypeForRole(role)!;
     reason = `${type} role — WebPage fallback because required rich-result fields were not fully verified.`;
     skippedSchemaTypes.push({
       type,
@@ -960,7 +944,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     });
   } else if (role === 'review' || role === 'recipe') {
     schema = buildWebPageSchema({ baseUrl: schemaBaseUrl, pageData });
-    const type = roleToDiagnosticsType(role)!;
+    const type = schemaDiagnosticsTypeForRole(role)!;
     reason = `${type} role — WebPage fallback because required rich-result fields were not fully verified.`;
     skippedSchemaTypes.push({
       type,
