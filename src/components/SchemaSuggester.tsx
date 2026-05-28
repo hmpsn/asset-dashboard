@@ -497,7 +497,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
               getEffectiveSchema={getEffectiveSchema}
               siteId={siteId}
               onRestore={restoreSchema}
-              validationStatus={validationStatusByPageId.get(page.pageId)}
+              validationStatus={validationStatusByPageId.get(page.pageId) ?? page.generationDiagnostics?.validationStatus}
             />
           );
         })}

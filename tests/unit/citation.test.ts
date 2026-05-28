@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio';
 import { describe, expect, it } from 'vitest';
 import {
+  citationDisplayName,
   extractCitations,
   filterAuthorityCitations,
 } from '../../server/schema/extractors/page-elements/citation.js';
@@ -37,6 +38,63 @@ describe('citation extractor', () => {
     expect(filtered).toHaveLength(5);
   });
 
+  it('keeps branded-anchor citations for trusted technical authority hosts', () => {
+    const filtered = filterAuthorityCitations(
+      [
+        {
+          url: 'https://www.langchain.com/blog/improving-deep-agents-with-harness-engineering',
+          text: 'LangChain',
+          isExternal: true,
+        },
+      ],
+      'https://www.faros.ai/blog/harness-engineering',
+    );
+
+    expect(filtered).toEqual([
+      {
+        url: 'https://www.langchain.com/blog/improving-deep-agents-with-harness-engineering',
+        text: 'LangChain',
+        isExternal: true,
+      },
+    ]);
+  });
+
+  it('keeps branded-anchor citations for cross-industry reference hosts when brand aligns with domain', () => {
+    const filtered = filterAuthorityCitations(
+      [
+        {
+          url: 'https://www.invisalign.com/provider/the-invisalign-system',
+          text: 'Invisalign',
+          isExternal: true,
+        },
+      ],
+      'https://www.example-dental.com/blog/invisalign-faq',
+    );
+
+    expect(filtered).toEqual([
+      {
+        url: 'https://www.invisalign.com/provider/the-invisalign-system',
+        text: 'Invisalign',
+        isExternal: true,
+      },
+    ]);
+  });
+
+  it('rejects branded anchors for social/profile hosts in branded fallback mode', () => {
+    const filtered = filterAuthorityCitations(
+      [
+        {
+          url: 'https://www.linkedin.com/company/langchain',
+          text: 'LinkedIn',
+          isExternal: true,
+        },
+      ],
+      'https://www.example.com/blog/agent-research',
+    );
+
+    expect(filtered).toEqual([]);
+  });
+
   it('extractCitations collects links from content scope and filters non-authority/unsupported links', () => {
     const html = `
       <html><body>
@@ -59,5 +117,26 @@ describe('citation extractor', () => {
         isExternal: true,
       },
     ]);
+  });
+
+  it('uses URL-derived fallback display names for generic anchor labels', () => {
+    expect(citationDisplayName({
+      url: 'https://www.anthropic.com/engineering/harness-design-long-running-apps',
+      text: 'research',
+    })).toBe('Harness Design Long Running Apps');
+  });
+
+  it('preserves meaningful non-generic anchor labels for display names', () => {
+    expect(citationDisplayName({
+      url: 'https://www.langchain.com/blog/improving-deep-agents-with-harness-engineering',
+      text: 'LangChain',
+    })).toBe('LangChain');
+  });
+
+  it('does not throw on malformed percent-encoded citation paths', () => {
+    expect(citationDisplayName({
+      url: 'https://example.com/%zz/resource',
+      text: 'research',
+    })).toBe('Resource');
   });
 });

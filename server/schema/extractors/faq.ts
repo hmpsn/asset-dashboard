@@ -22,6 +22,14 @@ function cleanText(text: string): string {
   return text.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, ' ').trim();
 }
 
+function normalizeFaqAnswerText(text: string): string {
+  return text
+    .replace(/\\(["\\])/g, '$1')
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'")
+    .trim();
+}
+
 function cleanQuestion(text: string, opts: { explicit?: boolean } = {}): string | undefined {
   const cleaned = cleanText(text).replace(/^Q[:.)]\s*/i, '');
   if (!cleaned || cleaned.length > MAX_QUESTION_LENGTH) return undefined;
@@ -31,7 +39,9 @@ function cleanQuestion(text: string, opts: { explicit?: boolean } = {}): string 
 }
 
 function cleanAnswer(text: string): string | undefined {
-  const cleaned = cleanText(text).replace(/^A[:.)]\s*/i, '');
+  let cleaned = normalizeFaqAnswerText(cleanText(text)).replace(/^A[:.)]\s*/i, '');
+  // Some builders inline the quoted question before the answer; drop it.
+  cleaned = cleaned.replace(/^"[^"]+\?"\s*/i, '');
   if (!cleaned || cleaned.length > MAX_ANSWER_LENGTH) return undefined;
   return cleaned;
 }

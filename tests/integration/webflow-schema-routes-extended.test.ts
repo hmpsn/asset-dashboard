@@ -242,7 +242,7 @@ describe('Site Template endpoints', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toHaveProperty('organizationNode');
-    expect(body.organizationNode).toMatchObject({ '@type': 'Organization', name: 'Test Org' });
+    expect(body.organizationNode).toMatchObject({ '@type': 'Organization', name: 'Schema Extended Test WS' });
   });
 
   it('PATCH /api/webflow/schema-template/:siteId — returns 404 when no template exists to patch', async () => {
@@ -262,7 +262,8 @@ describe('Site Template endpoints', () => {
     });
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.organizationNode.name).toBe('Patched Org');
+    expect(body.organizationNode.name).toBe('Schema Extended Test WS');
+    expect(body.organizationNode.url).toBe('https://test.org');
   });
 });
 

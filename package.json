@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "dev:server": "tsx server/index.ts",
+    "dev:server:render-snapshot": "DATA_DIR=/Users/joshuahampson/.asset-dashboard-render-snapshot-2026-05-28/asset-dashboard tsx server/index.ts",
     "dev:all": "concurrently -n server,ui -c blue,green \"npm run dev:server\" \"npm run dev\"",
+    "dev:all:render-snapshot": "concurrently -n server,ui -c blue,green \"npm run dev:server:render-snapshot\" \"npm run dev\"",
     "seed:demo": "tsx scripts/seed-demo-workspaces.ts",
     "smoke:core": "vitest run tests/smoke.test.ts tests/unit/platform-domain-smoke-matrix.test.ts tests/unit/performance-budgets.test.ts",
     "build": "vite build",

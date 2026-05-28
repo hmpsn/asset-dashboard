@@ -119,9 +119,18 @@ vi.mock('../../src/hooks/usePageEditStates', () => ({
 
 // ── Sub-component stubs ───────────────────────────────────────────────────────
 vi.mock('../../src/components/schema/SchemaPageCard', () => ({
-  SchemaPageCard: ({ page, onToggleExpand }: { page: SchemaPageSuggestion; onToggleExpand: (id: string) => void }) => (
+  SchemaPageCard: ({
+    page,
+    onToggleExpand,
+    validationStatus,
+  }: {
+    page: SchemaPageSuggestion;
+    onToggleExpand: (id: string) => void;
+    validationStatus?: 'valid' | 'warnings' | 'errors';
+  }) => (
     <div data-testid={`schema-page-card-${page.pageId}`}>
       <span>{page.pageTitle}</span>
+      <span data-testid={`schema-page-card-validation-${page.pageId}`}>{validationStatus || 'none'}</span>
       <button onClick={() => onToggleExpand(page.pageId)}>Toggle {page.pageId}</button>
     </div>
   ),
@@ -362,6 +371,25 @@ describe('SchemaSuggester', () => {
     expect(screen.getByTestId('schema-page-card-page-2')).toBeInTheDocument();
     expect(screen.getByText('Home Page')).toBeInTheDocument();
     expect(screen.getByText('About Page')).toBeInTheDocument();
+  });
+
+  it('falls back to generation diagnostics validation status when validation table has no record', async () => {
+    const pages = [makePage({
+      pageId: 'page-with-diagnostics',
+      generationDiagnostics: {
+        roleSource: 'auto-detect',
+        emittedTypes: ['WebPage'],
+        skippedSchemaTypes: [],
+        richResultsEligibility: [],
+        validationStatus: 'valid',
+      },
+    })];
+    const genMod = await import('../../src/components/schema/useSchemaSuggesterGeneration');
+    vi.mocked(genMod.useSchemaSuggesterGeneration).mockReturnValue(
+      makeGenerationHook({ started: true, loading: false, data: pages }) as ReturnType<typeof genMod.useSchemaSuggesterGeneration>,
+    );
+    render(<SchemaSuggester siteId="site-1" workspaceId="ws-1" />, { wrapper: makeWrapper() });
+    expect(screen.getByTestId('schema-page-card-validation-page-with-diagnostics').textContent).toBe('valid');
   });
 
   it('shows page count and schema type count in header', async () => {

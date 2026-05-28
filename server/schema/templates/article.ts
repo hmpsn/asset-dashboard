@@ -4,7 +4,7 @@
  * optional VideoObject + BreadcrumbList.
  */
 import type { PageData } from '../data-sources.js';
-import { filterAuthorityCitations } from '../extractors/page-elements/citation.js';
+import { citationDisplayName, filterAuthorityCitations } from '../extractors/page-elements/citation.js';
 import { dropUndefined, withBreadcrumb, webSiteRef, breadcrumbRef, filterHttpUrls, resolvedEntityToThingNode, orgRef } from './helpers.js';
 
 export interface ArticleInput {
@@ -92,7 +92,7 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
       ? citations.map(c => ({
           '@type': 'WebPage' as const,
           'url': c.url,
-          'name': c.text || c.url,
+          'name': citationDisplayName(c),
         }))
       : undefined,
   });

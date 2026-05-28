@@ -259,7 +259,7 @@ describe('extractPageData — article quality hardening', () => {
     expect(data.wordCount).toBe(12);
   });
 
-  it('uses CMS author first, then visible byline, then leaves author undefined for Organization fallback', () => {
+  it('uses CMS author first, then JSON-LD article author, then visible byline, then leaves author undefined for Organization fallback', () => {
     const visible = extractPageData({
       ...articleBaseInput,
       pageMeta: {
@@ -271,6 +271,34 @@ describe('extractPageData — article quality hardening', () => {
       html: '<article><p class="byline">By Jane Doe on May 1, 2026</p><p>Body.</p></article>',
     });
     expect(visible.author).toBe('Jane Doe');
+
+    const jsonLd = extractPageData({
+      ...articleBaseInput,
+      pageMeta: {
+        title: 'JSON-LD Author',
+        slug: 'jsonld-author',
+        publishedPath: '/blog/jsonld-author',
+        seo: {},
+      },
+      html: `
+        <html>
+          <head>
+            <link rel="canonical" href="https://example.com/blog/jsonld-author" />
+            <script type="application/ld+json">
+              {
+                "@context": "https://schema.org",
+                "@type": "BlogPosting",
+                "url": "/blog/jsonld-author",
+                "author": { "@type": "Person", "name": "Neely Dunlap" }
+              }
+            </script>
+          </head>
+          <body><article><p>Body.</p></article></body>
+        </html>
+      `,
+    });
+    expect(jsonLd.author).toBe('Neely Dunlap');
+    expect(jsonLd.evidenceSources?.author).toBe('existing-json-ld');
 
     const cms = extractPageData({
       ...articleBaseInput,
@@ -340,6 +368,37 @@ describe('extractPageData — article quality hardening', () => {
     expect(data.authorJobTitle).toBeUndefined();
     expect(data.authorSameAs).toBeUndefined();
     expect(data.authorCredentials).toBeUndefined();
+  });
+
+  it('ignores Organization author in JSON-LD and falls back when no person byline exists', () => {
+    const data = extractPageData({
+      ...articleBaseInput,
+      pageMeta: {
+        title: 'Org Author JSON-LD',
+        slug: 'org-author-jsonld',
+        publishedPath: '/blog/org-author-jsonld',
+        seo: {},
+      },
+      html: `
+        <html>
+          <head>
+            <link rel="canonical" href="https://example.com/blog/org-author-jsonld" />
+            <script type="application/ld+json">
+              {
+                "@context": "https://schema.org",
+                "@type": "BlogPosting",
+                "url": "/blog/org-author-jsonld",
+                "author": { "@type": "Organization", "name": "Faros" }
+              }
+            </script>
+          </head>
+          <body><article><p>Body.</p></article></body>
+        </html>
+      `,
+    });
+
+    expect(data.author).toBeUndefined();
+    expect(data.evidenceSources?.author).toBeUndefined();
   });
 
   it('applies E-E-A-T metadata when byline author matches E-E-A-T profile author', () => {
