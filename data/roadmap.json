@@ -71,8 +71,9 @@
           "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
           "est": "5-7h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "File clusters: server routes/services with repeated addActivity + broadcastToWorkspace patterns (53-file fanout from audit). Risk: omitted or mismatched side effects create stale UI and audit gaps. Done when: shared mutation-side-effect helper/guardrails reduce repeated boilerplate and high-churn mutation families are migrated first."
+          "status": "done",
+          "notes": "File clusters: server routes/services with repeated addActivity + broadcastToWorkspace patterns (53-file fanout from audit). Risk: omitted or mismatched side effects create stale UI and audit gaps. Done when: shared mutation-side-effect helper/guardrails reduce repeated boilerplate and high-churn mutation families are migrated first.\n\nCompleted 2026-05-28 pilot expansion by adopting `runWorkspaceMutation` on blueprint CRUD in `server/routes/page-strategy.ts` and create/update/delete in `server/routes/eeat-assets.ts`, preserving route shapes/events while centralizing mutation guardrails. Extended helper adoption contract at `tests/contract/workspace-mutation-helper-adoption.test.ts`.",
+          "shippedAt": "2026-05-28"
         },
         {
           "id": "dup-schema-text-sanitizer-consolidation",

@@ -6,6 +6,11 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { createLogger } from '../logger.js';
 import {
+  mutationError,
+  runWorkspaceMutation,
+  WorkspaceMutationError,
+} from '../workspace-mutation-helper.js';
+import {
   listBlueprints,
   getBlueprint,
   createBlueprint,
@@ -162,18 +167,29 @@ router.post(
   (req, res) => {
     const { workspaceId } = req.params;
     try {
-      const blueprint = createBlueprint({
+      const blueprint = runWorkspaceMutation({
         workspaceId,
-        name: req.body.name,
-        status: req.body.status,
-        brandscriptId: req.body.brandscriptId,
-        industryType: req.body.industryType,
-        notes: req.body.notes,
+        defaultErrorMessage: 'Failed to create blueprint',
+        mutate: () => createBlueprint({
+          workspaceId,
+          name: req.body.name,
+          status: req.body.status,
+          brandscriptId: req.body.brandscriptId,
+          industryType: req.body.industryType,
+          notes: req.body.notes,
+        }),
+        onActivity: ({ workspaceId: wsId, result }) => {
+          addActivity(wsId, 'blueprint_created', `Created blueprint "${result.name}"`);
+        },
+        onBroadcast: ({ workspaceId: wsId, result }) => {
+          broadcastToWorkspace(wsId, WS_EVENTS.BLUEPRINT_UPDATED, { blueprint: result, action: 'created' });
+        },
       });
-      broadcastToWorkspace(workspaceId, WS_EVENTS.BLUEPRINT_UPDATED, { blueprint, action: 'created' });
-      addActivity(workspaceId, 'blueprint_created', `Created blueprint "${blueprint.name}"`);
       res.json(blueprint);
     } catch (err) {
+      if (err instanceof WorkspaceMutationError) {
+        return res.status(err.status).json({ error: err.message });
+      }
       log.error({ err, workspaceId }, 'Create blueprint failed');
       res.status(500).json({ error: 'Failed to create blueprint' });
     }
@@ -200,12 +216,26 @@ router.put(
   (req, res) => {
     const { workspaceId, blueprintId } = req.params;
     try {
-      const blueprint = updateBlueprint(workspaceId, blueprintId, req.body);
-      if (!blueprint) return res.status(404).json({ error: 'Not found' });
-      broadcastToWorkspace(workspaceId, WS_EVENTS.BLUEPRINT_UPDATED, { blueprint, action: 'updated' });
-      addActivity(workspaceId, 'blueprint_updated', `Updated blueprint "${blueprint.name}"`);
+      const blueprint = runWorkspaceMutation({
+        workspaceId,
+        defaultErrorMessage: 'Failed to update blueprint',
+        mutate: () => {
+          const next = updateBlueprint(workspaceId, blueprintId, req.body);
+          if (!next) throw mutationError(404, 'Not found');
+          return next;
+        },
+        onActivity: ({ workspaceId: wsId, result }) => {
+          addActivity(wsId, 'blueprint_updated', `Updated blueprint "${result.name}"`);
+        },
+        onBroadcast: ({ workspaceId: wsId, result }) => {
+          broadcastToWorkspace(wsId, WS_EVENTS.BLUEPRINT_UPDATED, { blueprint: result, action: 'updated' });
+        },
+      });
       res.json(blueprint);
     } catch (err) {
+      if (err instanceof WorkspaceMutationError) {
+        return res.status(err.status).json({ error: err.message });
+      }
       log.error({ err, workspaceId, blueprintId }, 'Update blueprint failed');
       res.status(500).json({ error: 'Failed to update blueprint' });
     }
@@ -219,18 +249,31 @@ router.delete(
   (req, res) => {
     const { workspaceId, blueprintId } = req.params;
     try {
-      // Read before delete for activity log context
-      const existing = getBlueprint(workspaceId, blueprintId);
-      const ok = deleteBlueprint(workspaceId, blueprintId);
-      if (!ok) return res.status(404).json({ error: 'Not found' });
-      broadcastToWorkspace(workspaceId, WS_EVENTS.BLUEPRINT_UPDATED, { blueprintId, deleted: true });
-      addActivity(
+      runWorkspaceMutation({
         workspaceId,
-        'blueprint_deleted',
-        existing ? `Deleted blueprint "${existing.name}"` : 'Deleted blueprint',
-      );
+        defaultErrorMessage: 'Failed to delete blueprint',
+        readBeforeWrite: () => getBlueprint(workspaceId, blueprintId),
+        mutate: ({ existing }) => {
+          const ok = deleteBlueprint(workspaceId, blueprintId);
+          if (!ok) throw mutationError(404, 'Not found');
+          return { existingName: existing?.name ?? null };
+        },
+        onActivity: ({ workspaceId: wsId, result }) => {
+          addActivity(
+            wsId,
+            'blueprint_deleted',
+            result.existingName ? `Deleted blueprint "${result.existingName}"` : 'Deleted blueprint',
+          );
+        },
+        onBroadcast: ({ workspaceId: wsId }) => {
+          broadcastToWorkspace(wsId, WS_EVENTS.BLUEPRINT_UPDATED, { blueprintId, deleted: true });
+        },
+      });
       res.status(204).send();
     } catch (err) {
+      if (err instanceof WorkspaceMutationError) {
+        return res.status(err.status).json({ error: err.message });
+      }
       log.error({ err, workspaceId, blueprintId }, 'Delete blueprint failed');
       res.status(500).json({ error: 'Failed to delete blueprint' });
     }
