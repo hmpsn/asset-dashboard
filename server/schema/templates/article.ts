@@ -163,6 +163,7 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
     'url': pageData.canonicalUrl,
     'name': pageData.cleanTitle,
     'description': pageData.description,
+    'dateModified': pageData.dateModified || pageData.datePublished,
     'isPartOf': webSiteRef(input.baseUrl),
     'about': { '@id': `${pageData.canonicalUrl}#article` },
     'inLanguage': pageData.inLanguage,

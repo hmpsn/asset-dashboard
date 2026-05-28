@@ -28,6 +28,7 @@ export function buildPricingPageSchema(input: {
     '@id': `${pageData.canonicalUrl}#webpage`,
     'name': pageData.cleanTitle,
     'description': pageData.description,
+    'dateModified': pageData.dateModified || pageData.datePublished,
     'url': pageData.canonicalUrl,
     'mainEntity': offerNodes.length > 0
       ? {

@@ -65,6 +65,7 @@ export function buildHomepageSchema(input: HomepageInput): Record<string, unknow
     'url': baseUrl,
     'name': pageData.cleanTitle,
     'description': pageData.description,
+    'dateModified': pageData.dateModified || pageData.datePublished,
     'isPartOf': { '@id': `${baseUrl}/#website` },
     'about': { '@id': `${baseUrl}/#organization` },
     'inLanguage': pageData.inLanguage,

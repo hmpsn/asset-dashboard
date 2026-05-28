@@ -213,6 +213,7 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
     'url': pageData.canonicalUrl,
     'name': pageData.cleanTitle,
     'description': pageData.description,
+    'dateModified': pageData.dateModified || pageData.datePublished,
     'isPartOf': { '@id': `${baseUrl}/#website` },
     'about': { '@id': lbId },
     'inLanguage': pageData.inLanguage,

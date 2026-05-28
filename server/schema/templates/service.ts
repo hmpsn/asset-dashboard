@@ -129,6 +129,7 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
     'url': pageData.canonicalUrl,
     'name': pageData.cleanTitle,
     'description': pageData.description,
+    'dateModified': pageData.dateModified || pageData.datePublished,
     'isPartOf': webSiteRef(baseUrl),
     'about': { '@id': serviceId },
     'inLanguage': pageData.inLanguage,

@@ -219,6 +219,18 @@ function firstVisibleText($: cheerio.CheerioAPI, selectors: string[]): string | 
   return undefined;
 }
 
+function fallbackDescriptionFromVisibleContent($: cheerio.CheerioAPI): string | undefined {
+  const scope = contentScope($);
+  const root = (scope.length > 0 ? scope : $('body')).clone();
+  root.find('script,style,noscript,nav,footer,form,aside').remove();
+  const raw = root.text().replace(/\s+/g, ' ').trim();
+  if (!raw) return undefined;
+  const normalized = raw.replace(/^\W+/, '').trim();
+  if (!normalized) return undefined;
+  // Keep fallback concise and snippet-like for schema descriptions.
+  return normalized.length > 220 ? `${normalized.slice(0, 217).trimEnd()}...` : normalized;
+}
+
 function cleanAuthorName(raw: string | undefined): string | undefined {
   if (!raw) return undefined;
   const cleaned = raw
@@ -420,7 +432,7 @@ export function extractPageData(input: ExtractInput): PageData {
   const seoDesc = input.pageMeta.seo?.description?.trim();
   const metaDesc = metaContent($, 'meta[name="description"]');
   const ogDesc = metaContent($, 'meta[property="og:description"]');
-  const description = seoDesc || metaDesc || ogDesc;
+  const description = seoDesc || metaDesc || ogDesc || fallbackDescriptionFromVisibleContent($);
 
   const ogImage = metaContent($, 'meta[property="og:image"]');
   const twitterImage = metaContent($, 'meta[name="twitter:image"]');
@@ -458,6 +470,7 @@ export function extractPageData(input: ExtractInput): PageData {
   const dateModified = $('time[itemprop="dateModified"]').attr('datetime')
     || dateModifiedCms?.value
     || input.pageMeta.lastPublished
+    || datePublished
     || undefined;
 
   const author = authorCms?.value ?? visibleAuthor ?? eeatAuthorSignals.author;
