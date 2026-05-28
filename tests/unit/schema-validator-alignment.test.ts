@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { validateForGoogleRichResults } from '../../server/schema-validator.js';
 import { checkRichResultsEligibility } from '../../server/schema/rich-results.js';
-import { evaluateGoogleSchema } from '../../server/schema/schema-validation-core.js';
+import {
+  evaluateGoogleSchema,
+  hasReviewRatingOrDate,
+  hasSchemaField,
+  isImageObjectWithUrl,
+} from '../../server/schema/schema-validation-core.js';
 import { validateLeanSchema } from '../../server/schema/validator.js';
 
 function eligibilityFor(schema: Record<string, unknown>, type: string) {
@@ -9,6 +14,46 @@ function eligibilityFor(schema: Record<string, unknown>, type: string) {
 }
 
 describe('schema validator alignment', () => {
+  it('uses shared helper semantics for opening hours alias and PostalAddress completeness', () => {
+    const withOpeningHoursSpec = {
+      '@type': 'LocalBusiness',
+      openingHoursSpecification: [{ '@type': 'OpeningHoursSpecification', dayOfWeek: 'Monday' }],
+    } as Record<string, unknown>;
+    const withCompletePostalAddress = {
+      '@type': 'LocalBusiness',
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: '123 Main St',
+        addressLocality: 'Austin',
+        addressRegion: 'TX',
+      },
+    } as Record<string, unknown>;
+    const withIncompletePostalAddress = {
+      '@type': 'LocalBusiness',
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: '123 Main St',
+        addressLocality: 'Austin',
+      },
+    } as Record<string, unknown>;
+
+    expect(hasSchemaField(withOpeningHoursSpec, 'openingHours')).toBe(true);
+    expect(hasSchemaField(withCompletePostalAddress, 'address')).toBe(true);
+    expect(hasSchemaField(withIncompletePostalAddress, 'address')).toBe(false);
+  });
+
+  it('uses shared helper semantics for review fallback and ImageObject URL validation', () => {
+    const reviewWithDateOnly = {
+      '@type': 'Review',
+      datePublished: '2026-05-20',
+    } as Record<string, unknown>;
+
+    expect(hasReviewRatingOrDate(reviewWithDateOnly)).toBe(true);
+    expect(isImageObjectWithUrl({ '@type': 'ImageObject', url: 'https://example.com/image.png' })).toBe(true);
+    expect(isImageObjectWithUrl({ '@type': 'ImageObject' })).toBe(false);
+    expect(isImageObjectWithUrl('https://example.com/image.png')).toBe(false);
+  });
+
   it('keeps LocalBusiness eligibility aligned with publish validation', () => {
     const schema = {
       '@context': 'https://schema.org',
