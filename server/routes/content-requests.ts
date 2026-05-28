@@ -317,7 +317,7 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
           // Fall back to a fresh fetch only if the earlier call failed (cachedGscRows === null).
           const qpRows = cachedGscRows ?? await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90, { maxRows: 500 });
           const pageQueries = qpRows
-            .filter(r => { try { return new URL(r.page).pathname === decayPage.page; } catch { return false; } })
+            .filter(r => normalizePageUrl(r.page) === decayPage.page)
             .sort((a, b) => b.impressions - a.impressions)
             .slice(0, 15);
           if (pageQueries.length > 0) {

@@ -1,6 +1,5 @@
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
-import { isProgrammingError } from './errors.js';
 import { normalizePageUrl } from './helpers.js';
 import { resolveWorkspaceLocationCode } from './local-seo.js';
 import { trendDirection, hasSerpOpportunity } from './seo-provider-signals.js';
@@ -239,9 +238,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
   sendProgress('enrichment', 'Enriching strategy with ranking data...', 0.90);
   if (gscData.length > 0) {
     for (const pm of strategy.pageMap ?? []) {
-      const matchingRows = gscData.filter(r => {
-        try { return new URL(r.page).pathname === pm.pagePath; } catch { return false; }
-      });
+      const matchingRows = gscData.filter(r => normalizePageUrl(r.page) === pm.pagePath);
       if (matchingRows.length > 0) {
         const primaryKeyword = keywordComparisonKey(pm.primaryKeyword);
         if (primaryKeyword) {
@@ -539,9 +536,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
       for (const r of gscData) {
         const q = keywordComparisonKey(r.query);
         if (!gscByQuery.has(q)) gscByQuery.set(q, []);
-        try {
-          gscByQuery.get(q)!.push({ page: new URL(r.page).pathname, position: r.position, impressions: r.impressions, clicks: r.clicks });
-        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* skip */ } // url-fetch-ok
+        gscByQuery.get(q)!.push({ page: normalizePageUrl(r.page), position: r.position, impressions: r.impressions, clicks: r.clicks });
       }
       for (const [query, pages] of gscByQuery) {
         if (pages.length >= 2 && pages.some(p => p.impressions > 10)) {

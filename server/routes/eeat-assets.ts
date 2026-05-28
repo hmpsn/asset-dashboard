@@ -23,6 +23,11 @@ import {
 } from '../schemas/eeat-assets.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import {
+  mutationError,
+  runWorkspaceMutation,
+  WorkspaceMutationError,
+} from '../workspace-mutation-helper.js';
 
 const router = Router();
 
@@ -42,21 +47,36 @@ router.post(
   validate(createEeatAssetSchema),
   (req, res) => {
     const workspaceId = req.params.workspaceId;
-    const asset = createEeatAsset(workspaceId, req.body);
-    addActivity(
-      workspaceId,
-      'eeat_asset_created',
-      `E-E-A-T asset added: ${asset.title}`,
-      `${asset.type}`,
-      { assetId: asset.id, type: asset.type },
-    );
-    invalidateIntelligenceCache(workspaceId);
-    broadcastToWorkspace(workspaceId, WS_EVENTS.EEAT_ASSETS_UPDATED, {
-      workspaceId,
-      assetId: asset.id,
-      action: 'created',
-    });
-    res.status(201).json(asset);
+    try {
+      const asset = runWorkspaceMutation({
+        workspaceId,
+        defaultErrorMessage: 'Failed to create E-E-A-T asset',
+        mutate: () => createEeatAsset(workspaceId, req.body),
+        onActivity: ({ workspaceId: wsId, result }) => {
+          addActivity(
+            wsId,
+            'eeat_asset_created',
+            `E-E-A-T asset added: ${result.title}`,
+            `${result.type}`,
+            { assetId: result.id, type: result.type },
+          );
+        },
+        onBroadcast: ({ workspaceId: wsId, result }) => {
+          invalidateIntelligenceCache(wsId);
+          broadcastToWorkspace(wsId, WS_EVENTS.EEAT_ASSETS_UPDATED, {
+            workspaceId: wsId,
+            assetId: result.id,
+            action: 'created',
+          });
+        },
+      });
+      res.status(201).json(asset);
+    } catch (err) {
+      if (err instanceof WorkspaceMutationError) {
+        return res.status(err.status).json({ error: err.message });
+      }
+      return res.status(500).json({ error: 'Failed to create E-E-A-T asset' });
+    }
   },
 );
 
@@ -66,45 +86,81 @@ router.patch(
   validate(updateEeatAssetSchema),
   (req, res) => {
     const workspaceId = req.params.workspaceId;
-    const updated = updateEeatAsset(workspaceId, req.params.assetId, req.body);
-    if (!updated) return res.status(404).json({ error: 'E-E-A-T asset not found' });
-    addActivity(
-      workspaceId,
-      'eeat_asset_updated',
-      `E-E-A-T asset updated: ${updated.title}`,
-      `${updated.type}`,
-      { assetId: updated.id, type: updated.type },
-    );
-    invalidateIntelligenceCache(workspaceId);
-    broadcastToWorkspace(workspaceId, WS_EVENTS.EEAT_ASSETS_UPDATED, {
-      workspaceId,
-      assetId: updated.id,
-      action: 'updated',
-    });
-    res.json(updated);
+    try {
+      const updated = runWorkspaceMutation({
+        workspaceId,
+        defaultErrorMessage: 'Failed to update E-E-A-T asset',
+        mutate: () => {
+          const next = updateEeatAsset(workspaceId, req.params.assetId, req.body);
+          if (!next) throw mutationError(404, 'E-E-A-T asset not found');
+          return next;
+        },
+        onActivity: ({ workspaceId: wsId, result }) => {
+          addActivity(
+            wsId,
+            'eeat_asset_updated',
+            `E-E-A-T asset updated: ${result.title}`,
+            `${result.type}`,
+            { assetId: result.id, type: result.type },
+          );
+        },
+        onBroadcast: ({ workspaceId: wsId, result }) => {
+          invalidateIntelligenceCache(wsId);
+          broadcastToWorkspace(wsId, WS_EVENTS.EEAT_ASSETS_UPDATED, {
+            workspaceId: wsId,
+            assetId: result.id,
+            action: 'updated',
+          });
+        },
+      });
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof WorkspaceMutationError) {
+        return res.status(err.status).json({ error: err.message });
+      }
+      return res.status(500).json({ error: 'Failed to update E-E-A-T asset' });
+    }
   },
 );
 
 router.delete('/api/workspaces/:workspaceId/eeat-assets/:assetId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const workspaceId = req.params.workspaceId;
-  const existing = getEeatAsset(workspaceId, req.params.assetId);
-  if (!existing) return res.status(404).json({ error: 'E-E-A-T asset not found' });
-  const deleted = deleteEeatAsset(workspaceId, req.params.assetId);
-  if (!deleted) return res.status(500).json({ error: 'Failed to delete E-E-A-T asset' });
-  addActivity(
-    workspaceId,
-    'eeat_asset_deleted',
-    `E-E-A-T asset deleted: ${existing.title}`,
-    `${existing.type}`,
-    { assetId: existing.id, type: existing.type },
-  );
-  invalidateIntelligenceCache(workspaceId);
-  broadcastToWorkspace(workspaceId, WS_EVENTS.EEAT_ASSETS_UPDATED, {
-    workspaceId,
-    assetId: existing.id,
-    action: 'deleted',
-  });
-  res.json({ ok: true });
+  try {
+    runWorkspaceMutation({
+      workspaceId,
+      defaultErrorMessage: 'Failed to delete E-E-A-T asset',
+      readBeforeWrite: () => getEeatAsset(workspaceId, req.params.assetId),
+      mutate: ({ existing }) => {
+        if (!existing) throw mutationError(404, 'E-E-A-T asset not found');
+        const deleted = deleteEeatAsset(workspaceId, req.params.assetId);
+        if (!deleted) throw mutationError(500, 'Failed to delete E-E-A-T asset');
+        return existing;
+      },
+      onActivity: ({ workspaceId: wsId, result }) => {
+        addActivity(
+          wsId,
+          'eeat_asset_deleted',
+          `E-E-A-T asset deleted: ${result.title}`,
+          `${result.type}`,
+          { assetId: result.id, type: result.type },
+        );
+      },
+      onBroadcast: ({ workspaceId: wsId, result }) => {
+        invalidateIntelligenceCache(wsId);
+        broadcastToWorkspace(wsId, WS_EVENTS.EEAT_ASSETS_UPDATED, {
+          workspaceId: wsId,
+          assetId: result.id,
+          action: 'deleted',
+        });
+      },
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    if (err instanceof WorkspaceMutationError) {
+      return res.status(err.status).json({ error: err.message });
+    }
+    return res.status(500).json({ error: 'Failed to delete E-E-A-T asset' });
+  }
 });
 
 export default router;

@@ -62,17 +62,11 @@ import { notifyTeamClientSignal } from '../email.js';
 import { getBookingUrl } from '../studio-config.js';
 import { parseJsonSafe } from '../db/json-validation.js';
 import { isProgrammingError } from '../errors.js';
+import { parsePositiveIntQuery } from '../query-param-parsers.js';
 
 const log = createLogger('public-analytics');
 
 const router = Router();
-
-function parsePositiveIntQuery(rawValue: unknown, fallback: number): number | null {
-  if (rawValue == null) return fallback;
-  const parsed = Number(rawValue);
-  if (!Number.isInteger(parsed) || parsed <= 0) return null;
-  return parsed;
-}
 
 router.use('/api/public/:resource/:workspaceId', requireClientPortalAuth('workspaceId'));
 

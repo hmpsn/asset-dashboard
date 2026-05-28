@@ -347,11 +347,9 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
     // Build per-page GSC context lookup
     const gscByPath = new Map<string, Array<{ query: string; position: number; clicks: number; impressions: number }>>();
     for (const r of gscData) {
-      try {
-        const p = new URL(r.page).pathname;
-        if (!gscByPath.has(p)) gscByPath.set(p, []);
-        gscByPath.get(p)!.push({ query: r.query, position: r.position, clicks: r.clicks, impressions: r.impressions });
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* skip */ } // url-fetch-ok
+      const p = normalizePageUrl(r.page);
+      if (!gscByPath.has(p)) gscByPath.set(p, []);
+      gscByPath.get(p)!.push({ query: r.query, position: r.position, clicks: r.clicks, impressions: r.impressions });
     }
 
     // Build provider keyword reference for batch prompts — give the AI real search terms to pick from
@@ -407,11 +405,9 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
       for (const k of semrushDomainData) {
         const eligible = isEligibleStrategyPoolKeyword({ keyword: k.keyword, volume: k.volume, difficulty: k.difficulty, source: provider?.name ?? 'seo-provider' });
         if (!eligible) continue;
-        try {
-          const p = new URL(k.url).pathname;
-          if (!semrushByPath.has(p)) semrushByPath.set(p, []);
-          semrushByPath.get(p)!.push(k);
-        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* skip */ } // url-fetch-ok
+        const p = normalizePageUrl(k.url);
+        if (!semrushByPath.has(p)) semrushByPath.set(p, []);
+        semrushByPath.get(p)!.push(k);
         upsertKeywordPoolCandidate(keywordPool, k.keyword, { volume: k.volume, difficulty: k.difficulty, source: provider?.name ?? 'seo-provider' });
       }
     }
@@ -790,8 +786,7 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
       const topGsc = [...gscData].sort((a, b) => b.impressions - a.impressions).slice(0, 30);
       gscSummary = `\n\nTop GSC queries (last 90 days):\n` +
         topGsc.map(r => {
-          let pagePath: string;
-          try { pagePath = new URL(r.page).pathname; } catch { pagePath = r.page; }
+          const pagePath = normalizePageUrl(r.page);
           return `- "${r.query}" → ${pagePath} (pos: ${r.position.toFixed(1)}, clicks: ${r.clicks}, imp: ${r.impressions})`;
         }).join('\n');
     }
@@ -1264,12 +1259,7 @@ export function buildGscQueriesBlock(
   if (gscRows.length === 0) return '';
   const top = [...gscRows].sort((a, b) => b.impressions - a.impressions).slice(0, 30);
   const lines = top.map(r => {
-    let pagePath: string;
-    try {
-      pagePath = new URL(r.page).pathname;
-    } catch { // catch-ok: invalid URL falls back to raw string
-      pagePath = r.page;
-    }
+    const pagePath = normalizePageUrl(r.page);
     return `- "${r.query}" → ${pagePath} (pos: ${r.position.toFixed(1)}, clicks: ${r.clicks}, imp: ${r.impressions})`;
   });
   return `\n\nTop GSC queries (last 90 days):\n` + lines.join('\n');

@@ -236,12 +236,7 @@ export function computePageHealthScores(
 
   return significantPages.map(page => {
     // Extract path from full URL for GA4 matching
-    let pagePath: string;
-    try {
-      pagePath = new URL(page.page).pathname;
-    } catch (err) {
-      pagePath = page.page;
-    }
+    const pagePath = normalizePagePath(page.page);
 
     const ga4 = ga4Map.get(pagePath);
     const pageviews = ga4?.pageviews ?? 0;
@@ -814,12 +809,7 @@ export function computeSerpOpportunities(
     if (page.impressions < SERP_OPPORTUNITY_MIN_IMPRESSIONS) continue;
 
     // Normalise URL to pathname for schema lookup
-    let pathname: string;
-    try {
-      pathname = new URL(page.page).pathname;
-    } catch (err) {
-      pathname = page.page;
-    }
+    const pathname = normalizePagePath(page.page);
 
     if (pagesWithSchema.has(pathname) || pagesWithSchema.has(page.page)) continue;
 
