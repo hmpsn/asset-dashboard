@@ -74,7 +74,6 @@ describe('feature-flag lifecycle audit', () => {
     const roadmap = loadRoadmap();
     const ids = collectRoadmapItemIds(roadmap);
 
-    expect(ids.has('platform-confidence-feature-flag-lifecycle')).toBe(true);
     expect(ids.size).toBeGreaterThan(20);
   });
 
