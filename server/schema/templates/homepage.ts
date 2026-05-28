@@ -3,7 +3,7 @@
  * that all other pages reference via @id, never duplicating.
  */
 import type { PageData, BusinessProfile } from '../data-sources.js';
-import { breadcrumbRef, dropUndefined } from './helpers.js';
+import { breadcrumbRef, dropUndefined, resolvedEntityToThingNode } from './helpers.js';
 
 export interface HomepageInput {
   baseUrl: string;
@@ -32,7 +32,11 @@ export function buildHomepageSchema(input: HomepageInput): Record<string, unknow
       : undefined,
     'sameAs': safeSocialProfiles?.length ? safeSocialProfiles : undefined,
     'foundingDate': businessProfile?.foundedDate,
-    'knowsAbout': pageData.knowsAbout?.length ? pageData.knowsAbout : undefined,
+    'knowsAbout': pageData.knowsAboutEntities?.length
+      ? pageData.knowsAboutEntities.map(resolvedEntityToThingNode)
+      : pageData.knowsAbout?.length
+        ? pageData.knowsAbout
+        : undefined,
   });
 
   // NOTE: WebSite.potentialAction (sitelinks SearchAction) is gated on siteHasSearch.
@@ -61,6 +65,7 @@ export function buildHomepageSchema(input: HomepageInput): Record<string, unknow
     'url': baseUrl,
     'name': pageData.cleanTitle,
     'description': pageData.description,
+    'dateModified': pageData.dateModified || pageData.datePublished,
     'isPartOf': { '@id': `${baseUrl}/#website` },
     'about': { '@id': `${baseUrl}/#organization` },
     'inLanguage': pageData.inLanguage,

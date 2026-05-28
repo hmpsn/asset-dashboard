@@ -23,6 +23,7 @@ import type { AiBudget } from './page-elements/ai-budget.js';
 import { contentScope } from './page-elements/content-scope.js';
 import { createLogger } from '../../logger.js';
 import { parseJsonFallback } from '../../db/json-validation.js';
+import { cleanSchemaPublicText, normalizeSchemaText } from '../schema-text-sanitizer.js';
 
 const log = createLogger('schema/extractors/page-elements');
 
@@ -69,25 +70,10 @@ function emptyCatalog(opts: ExtractPageElementsOpts, errorMarker: 1 | 0 = 0): Pa
   };
 }
 
-function cleanSemanticText(value: unknown): string | undefined {
-  if (typeof value !== 'string') return undefined;
-  const cleaned = value.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, ' ').trim();
-  return cleaned || undefined;
-}
-
-function isOpaqueIdentifier(value: string): boolean {
-  const trimmed = value.trim();
-  return /^[a-f0-9]{24}$/i.test(trimmed) || /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed);
-}
-
-function cleanPublicText(value: unknown): string | undefined {
-  const cleaned = cleanSemanticText(value);
-  if (!cleaned || isOpaqueIdentifier(cleaned)) return undefined;
-  return cleaned;
-}
+const cleanPublicText = cleanSchemaPublicText;
 
 function cleanHttpUrl(value: unknown): string | undefined {
-  const cleaned = cleanSemanticText(value);
+  const cleaned = normalizeSchemaText(value);
   if (!cleaned) return undefined;
   try {
     const parsed = new URL(cleaned);
@@ -110,8 +96,8 @@ function safePageOrigin(pageUrl: string | undefined): string | undefined {
 }
 
 function resolveSafeUrl(value: unknown, pageUrl: string | undefined): string | undefined {
-  const cleaned = cleanSemanticText(value);
-  if (!cleaned || isOpaqueIdentifier(cleaned)) return undefined;
+  const cleaned = cleanPublicText(value);
+  if (!cleaned) return undefined;
   if (/^(?:data|javascript|file):/i.test(cleaned)) return undefined;
 
   const pageOrigin = safePageOrigin(pageUrl);
@@ -183,7 +169,7 @@ function objectUrlCandidates(value: unknown): string[] {
 }
 
 function normalizePhone(value: unknown): string | undefined {
-  const cleaned = cleanSemanticText(value);
+  const cleaned = normalizeSchemaText(value);
   if (!cleaned) return undefined;
   const stripped = cleaned.replace(/^tel:/i, '').trim();
   const digitCount = stripped.replace(/\D/g, '').length;
@@ -191,7 +177,7 @@ function normalizePhone(value: unknown): string | undefined {
 }
 
 function normalizeEmail(value: unknown): string | undefined {
-  const cleaned = cleanSemanticText(value);
+  const cleaned = normalizeSchemaText(value);
   if (!cleaned) return undefined;
   const stripped = cleaned.replace(/^mailto:/i, '').split('?')[0].trim();
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(stripped) ? stripped : undefined;
@@ -517,7 +503,7 @@ function semanticAddressFromObject(value: unknown): SemanticPageData['address'] 
 function firstItemprop($: cheerio.CheerioAPI, prop: string): string | undefined {
   const el = $(`[itemprop="${prop}"]`).first();
   if (!el.length) return undefined;
-  return cleanSemanticText(el.attr('content') || el.attr('datetime') || el.text());
+  return normalizeSchemaText(el.attr('content') || el.attr('datetime') || el.text());
 }
 
 function currentPageUrl($: cheerio.CheerioAPI, opts: ExtractPageElementsOpts): string | undefined {
@@ -560,7 +546,7 @@ function extractSemantics($: cheerio.CheerioAPI, opts: ExtractPageElementsOpts):
   });
   const sameAsRaw = businessNode?.sameAs;
   const sameAs = Array.isArray(sameAsRaw)
-    ? sameAsRaw.map(v => cleanSemanticText(v)).filter((v): v is string => !!v && /^https?:\/\//.test(v))
+    ? sameAsRaw.map(v => normalizeSchemaText(v)).filter((v): v is string => !!v && /^https?:\/\//.test(v))
     : undefined;
   const geo = semanticGeoFromObject(businessNode?.geo);
   const primaryImage = firstHttpUrl(businessNode?.image);

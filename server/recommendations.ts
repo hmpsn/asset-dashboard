@@ -19,8 +19,6 @@ import { getWorkspace, updatePageState, getPageIdBySlug } from './workspaces.js'
 import type { Workspace, QuickWin, ContentGap } from './workspaces.js';
 import { getLatestSnapshot } from './reports.js';
 import type { AuditSnapshot } from './reports.js';
-import { getAllGscPages } from './search-console.js';
-import { getGA4TopPages } from './google-analytics.js';
 import { loadDecayAnalysis } from './content-decay.js';
 import { getDeclinedKeywords } from './keyword-feedback.js';
 import { listPageKeywords } from './page-keywords.js';
@@ -36,6 +34,7 @@ import { normalizePageUrl } from './helpers.js';
 import { buildRecommendationStory } from './signal-story-registry.js';
 import { buildRecommendationGenerationContext } from './intelligence/generation-context-builders.js';
 import { applyOutcomeAdjustmentScore, buildOutcomeAdjustment } from './outcome-learning-default-path.js';
+import { getAuditTrafficForWorkspace } from './audit-traffic.js';
 import {
   adjustKdImpactScore,
   assessAuthorityFromBacklinks,
@@ -301,40 +300,6 @@ export function updateRecommendationStatus(
 
 export function dismissRecommendation(workspaceId: string, recId: string): boolean {
   return updateRecommendationStatus(workspaceId, recId, 'dismissed') !== null;
-}
-
-// ─── Traffic Fetching ─────────────────────────────────────────────
-
-async function fetchTrafficMap(ws: Workspace): Promise<TrafficMap> {
-  const trafficMap: TrafficMap = {};
-
-  if (ws.gscPropertyUrl) {
-    try {
-      const gscPages = await getAllGscPages(ws.id, ws.gscPropertyUrl, 28);
-      for (const p of gscPages) {
-        try {
-          const pagePath = new URL(p.page).pathname;
-          if (!trafficMap[pagePath]) trafficMap[pagePath] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
-          trafficMap[pagePath].clicks += p.clicks;
-          trafficMap[pagePath].impressions += p.impressions;
-        } catch { /* skip malformed URLs */ }
-      }
-    } catch { /* GSC unavailable */ } // url-fetch-ok
-  }
-
-  if (ws.ga4PropertyId) {
-    try {
-      const ga4Pages = await getGA4TopPages(ws.ga4PropertyId, 28, 500);
-      for (const p of ga4Pages) {
-        const pagePath = p.path.startsWith('/') ? p.path : `/${p.path}`;
-        if (!trafficMap[pagePath]) trafficMap[pagePath] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
-        trafficMap[pagePath].pageviews += p.pageviews;
-        trafficMap[pagePath].sessions += p.users;
-      }
-    } catch { /* GA4 unavailable */ } // url-fetch-ok
-  }
-
-  return trafficMap;
 }
 
 // ─── Scoring Helpers ──────────────────────────────────────────────
@@ -689,7 +654,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
 
   // ── Fetch data sources ──
   const audit: AuditSnapshot | null = ws.webflowSiteId ? getLatestSnapshot(ws.webflowSiteId) : null;
-  const traffic = await fetchTrafficMap(ws);
+  const traffic = await getAuditTrafficForWorkspace(ws);
   const strategy = ws.keywordStrategy;
   const recommendationContext = await buildRecommendationGenerationContext(workspaceId, {
     slices: ['learnings', 'seoContext'],

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { DollarSign, BarChart3, Users, Package, Trash2, AlertTriangle } from 'lucide-react';
 import { get, del } from '../api/client';
 import { SectionCard, EmptyState, TrendBadge, Icon, cn, PageHeader, Button, IconButton } from './ui';
+import { formatDate } from '../utils/formatDates';
 
 interface RevenueSummary {
   totalRevenue: number;
@@ -228,7 +229,7 @@ export function RevenueDashboard() {
                     <td className="py-2 text-[var(--brand-text)]">{tx.workspaceName}</td>
                     <td className="py-2 text-[var(--brand-text-muted)]">{fmtProductType(tx.productType)}</td>
                     <td className="py-2 text-accent-brand font-medium text-right">{fmtCents(tx.amount)}</td>
-                    <td className="py-2 text-[var(--brand-text-muted)] text-right">{new Date(tx.paidAt).toLocaleDateString()}</td>
+                    <td className="py-2 text-[var(--brand-text-muted)] text-right">{formatDate(tx.paidAt)}</td>
                     <td className="py-2 text-right">
                       <IconButton
                         icon={Trash2}

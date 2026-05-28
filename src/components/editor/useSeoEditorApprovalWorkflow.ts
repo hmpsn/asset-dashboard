@@ -6,6 +6,7 @@ import {
   buildSeoApprovalItemsForSelection,
 } from './seoEditorDerived';
 import type { SeoEditState, SeoEditorPage } from './seoEditorTypes';
+import { formatDate } from '../../utils/formatDates';
 
 interface UseSeoEditorApprovalWorkflowArgs {
   workspaceId?: string;
@@ -107,7 +108,7 @@ export function useSeoEditorApprovalWorkflow({
       }
       await post(`/api/approvals/${workspaceId}`, {
         siteId,
-        name: `SEO Changes — ${new Date().toLocaleDateString()}`,
+        name: `SEO Changes — ${formatDate(new Date())}`,
         items,
       });
       setApprovalSent(true);

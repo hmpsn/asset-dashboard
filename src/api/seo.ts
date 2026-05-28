@@ -2,6 +2,7 @@
 import { ApiError, get, post, put, patch, del, getSafe, getOptional } from './client';
 import type { LatestRank, RankHistoryEntry, TrackedKeyword } from '../../shared/types/rank-tracking';
 import type { KeywordStrategyDiff as StrategyDiff } from '../../shared/types/keyword-strategy-ux';
+import type { AdminKeywordFeedbackListRow } from '../../shared/types/keyword-feedback';
 import { readNdjsonStream } from './streamUtils';
 export {
   schema,
@@ -104,14 +105,7 @@ export const keywords = {
     post<{ competitors: string[] }>(`/api/semrush/competitors/${wsId}`, { domains }),
 
   feedback: (wsId: string) =>
-    getSafe<Array<{
-      keyword: string;
-      status: 'approved' | 'declined' | 'requested';
-      reason?: string | null;
-      source?: string | null;
-      declined_by?: string | null;
-      updated_at?: string;
-    }>>(`/api/webflow/keyword-feedback/${wsId}`, []),
+    getSafe<AdminKeywordFeedbackListRow[]>(`/api/webflow/keyword-feedback/${wsId}`, []),
 
   seoCopy: (body: Record<string, unknown>) =>
     post<unknown>('/api/webflow/seo-copy', body),

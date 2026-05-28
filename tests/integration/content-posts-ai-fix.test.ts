@@ -177,7 +177,7 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
   });
 
   it('returns 404 for unknown post', async () => {
-    mockOpenAIResponse('content-fix', '<p>Fixed</p>');
+    mockOpenAIResponse('content-post-feedback-fix', '<p>Fixed</p>');
     const res = await postJson(`/api/content-posts/${wsId}/not_a_real_post/ai-fix`, {
       issueKey: 'brand_voice',
       reason: 'voice mismatch',
@@ -187,7 +187,7 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
 
   it('brand_voice — returns AiFixResult targeting introduction', async () => {
     const before = getPost(wsId, postId);
-    mockOpenAIResponse('content-fix', '<p>Improved introduction.</p>');
+    mockOpenAIResponse('content-post-feedback-fix', '<p>Improved introduction.</p>');
     const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
       issueKey: 'brand_voice',
       reason: 'Brand voice too informal',
@@ -206,7 +206,7 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
   });
 
   it('word_count_target — returns AiFixResult targeting a section', async () => {
-    mockOpenAIResponse('content-fix', '<p>Expanded section content here with more words.</p>');
+    mockOpenAIResponse('content-post-feedback-fix', '<p>Expanded section content here with more words.</p>');
     const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
       issueKey: 'word_count_target',
       reason: 'Word count too low',
@@ -220,7 +220,7 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
 
   it('meta_optimized — returns AiFixResult with JSON suggestedText', async () => {
     const before = getPost(wsId, postId);
-    mockOpenAIJsonResponse('content-fix', {
+    mockOpenAIJsonResponse('content-post-feedback-fix-structured', {
       seoTitle: 'Optimized Test Post Title',
       seoMetaDescription: 'An optimized meta description for the test post that is 150 characters long and includes the keyword.',
       reasoning: 'Extra model commentary should not break the response.',
@@ -246,7 +246,7 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
 
   it('meta_optimized — rejects malformed AI meta JSON without mutating or broadcasting', async () => {
     const before = getPost(wsId, postId);
-    mockOpenAIJsonResponse('content-fix', {
+    mockOpenAIJsonResponse('content-post-feedback-fix-structured', {
       seoTitle: 'Optimized Test Post Title',
       seoMetaDescription: 42,
     });
@@ -265,7 +265,7 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
 
   it('meta_optimized — rejects blank AI meta fields without mutating or broadcasting', async () => {
     const before = getPost(wsId, postId);
-    mockOpenAIJsonResponse('content-fix', {
+    mockOpenAIJsonResponse('content-post-feedback-fix-structured', {
       seoTitle: '   ',
       seoMetaDescription: 'An optimized meta description for the test post that is 150 characters long and includes the keyword.',
     });
@@ -284,7 +284,7 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
 
   it('meta_optimized — rejects AI meta fields that sanitize to blank without mutating or broadcasting', async () => {
     const before = getPost(wsId, postId);
-    mockOpenAIJsonResponse('content-fix', {
+    mockOpenAIJsonResponse('content-post-feedback-fix-structured', {
       seoTitle: '<script></script>',
       seoMetaDescription: 'An optimized meta description for the test post that is 150 characters long and includes the keyword.',
     });
@@ -304,7 +304,7 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
   // FM-2: external API failure must produce 500 + { error: string }, not silent success
   it('returns 500 with error shape when AI call fails', async () => {
     const before = getPost(wsId, postId);
-    mockOpenAIError('content-fix', 'OpenAI rate limit exceeded');
+    mockOpenAIError('content-post-feedback-fix', 'OpenAI rate limit exceeded');
     const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
       issueKey: 'brand_voice',
       reason: 'test',
@@ -335,7 +335,7 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
 
   // XSS hardening: AI-returned <script> tags must be stripped server-side
   it('sanitizes <script> tags out of AI suggestedText', async () => {
-    mockOpenAIResponse('content-fix', '<p>Improved.</p><script>alert(1)</script><a href="javascript:void(0)">x</a>');
+    mockOpenAIResponse('content-post-feedback-fix', '<p>Improved.</p><script>alert(1)</script><a href="javascript:void(0)">x</a>');
     const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
       issueKey: 'brand_voice',
       reason: 'sanitize probe',
@@ -345,6 +345,95 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
     expect(body.suggestedText).not.toContain('<script');
     expect(body.suggestedText).not.toContain('javascript:');
     expect(body.suggestedText).toContain('<p>Improved.</p>');
+  });
+
+  it('feedback mode section target — returns AiFixResult targeting the requested section', async () => {
+    mockOpenAIResponse('content-post-feedback-fix', '<p>Updated section with sharper messaging.</p>');
+    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
+      mode: 'feedback',
+      target: 'section',
+      sectionIndex: 0,
+      feedback: 'Make this section more concise and executive.',
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.field).toBe('section');
+    expect(body.sectionIndex).toBe(0);
+    expect(body.suggestedText).toContain('Updated section');
+  });
+
+  it('feedback mode section target — returns 400 when sectionIndex is missing', async () => {
+    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
+      mode: 'feedback',
+      target: 'section',
+      feedback: 'Please improve this section.',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('feedback mode post target — returns structured post payload', async () => {
+    mockOpenAIJsonResponse('content-post-feedback-fix-structured', {
+      introduction: '<p>New intro</p>',
+      sections: [{ index: 0, content: '<p>Rewritten section body.</p>' }],
+      conclusion: '<p>New conclusion</p>',
+    });
+    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
+      mode: 'feedback',
+      target: 'post',
+      feedback: 'Improve flow and tighten repetition across the full post.',
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.field).toBe('post');
+    const parsed = JSON.parse(body.suggestedText);
+    expect(parsed.introduction).toContain('New intro');
+    expect(parsed.sections[0].index).toBe(0);
+    expect(parsed.conclusion).toContain('New conclusion');
+  });
+
+  it('feedback mode post target — rejects duplicate section indices', async () => {
+    const before = getPost(wsId, postId);
+    mockOpenAIJsonResponse('content-post-feedback-fix-structured', {
+      introduction: '<p>New intro</p>',
+      sections: [{ index: 0, content: '<p>First rewrite.</p>' }, { index: 0, content: '<p>Duplicate index rewrite.</p>' }],
+      conclusion: '<p>New conclusion</p>',
+    });
+    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
+      mode: 'feedback',
+      target: 'post',
+      feedback: 'Improve flow and tighten repetition across the full post.',
+    });
+    expect(res.status).toBe(500);
+    expect(broadcastState.calls).toHaveLength(0);
+    const after = getPost(wsId, postId);
+    expect(after).toEqual(before);
+  });
+
+  it('feedback mode rejects blank feedback input', async () => {
+    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
+      mode: 'feedback',
+      target: 'meta',
+      feedback: '   ',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('feedback mode meta target — returns structured meta payload', async () => {
+    mockOpenAIJsonResponse('content-post-feedback-fix-structured', {
+      seoTitle: 'Better SEO Title for Test Post',
+      seoMetaDescription: 'A stronger meta description aligned with the admin feedback while keeping the keyword naturally included.',
+    });
+    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
+      mode: 'feedback',
+      target: 'meta',
+      feedback: 'Make the title more benefit-led and clarify the value proposition.',
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.field).toBe('meta');
+    const parsed = JSON.parse(body.suggestedText);
+    expect(parsed).toHaveProperty('seoTitle');
+    expect(parsed).toHaveProperty('seoMetaDescription');
   });
 });
 

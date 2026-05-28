@@ -258,6 +258,15 @@ describe('ContentBrief shape', () => {
     expect(fetched!.referenceUrls).toHaveLength(1);
     expect(fetched!.realTopResults![0].position).toBe(1);
   });
+
+  it('defaults and updates generationStyle', () => {
+    seedBrief(wsId, makeBrief('brief_style_default', wsId));
+    expect(getBrief(wsId, 'brief_style_default')!.generationStyle).toBe('standard');
+
+    const updated = updateBrief(wsId, 'brief_style_default', { generationStyle: 'concise' });
+    expect(updated!.generationStyle).toBe('concise');
+    expect(getBrief(wsId, 'brief_style_default')!.generationStyle).toBe('concise');
+  });
 });
 
 // ── buildStrategyCardBlock ──

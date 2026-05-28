@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useNavigate } from 'react-router-dom';
 import {
   Archive,
@@ -24,6 +25,7 @@ import {
 } from './ui';
 import {
   KEYWORD_COMMAND_CENTER_FILTERS,
+  type KeywordCommandCenterFeedbackState,
   type KeywordCommandCenterBulkActionResult,
   type KeywordCommandCenterBulkActionType,
   type KeywordCommandCenterFilter,
@@ -60,6 +62,51 @@ interface KeywordCommandCenterProps {
   workspaceId: string;
 }
 
+function feedbackStatus(feedback: KeywordCommandCenterFeedbackState | undefined): string | undefined {
+  return feedback?.status;
+}
+
+function placeholderRowMatchesFilter(row: KeywordCommandCenterRow, filterId: KeywordCommandCenterFilter): boolean {
+  switch (filterId) {
+    case KEYWORD_COMMAND_CENTER_FILTERS.ALL:
+      return true;
+    case KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY:
+      return row.lifecycleStatus === 'in_strategy';
+    case KEYWORD_COMMAND_CENTER_FILTERS.TRACKED:
+      return row.tracking.status === 'active';
+    case KEYWORD_COMMAND_CENTER_FILTERS.NEEDS_REVIEW:
+      return row.lifecycleStatus === 'needs_review';
+    case KEYWORD_COMMAND_CENTER_FILTERS.CONTENT:
+      return row.assignment?.role === 'content_gap';
+    case KEYWORD_COMMAND_CENTER_FILTERS.PAGE_ASSIGNED:
+      return row.assignment?.role === 'page_keyword';
+    case KEYWORD_COMMAND_CENTER_FILTERS.RAW_EVIDENCE:
+      return row.lifecycleStatus === 'raw_evidence';
+    case KEYWORD_COMMAND_CENTER_FILTERS.LOCAL:
+      return Boolean(row.localSeo || row.localSeoState);
+    case KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES:
+      return row.localSeoState?.lifecycle === 'candidate';
+    case KEYWORD_COMMAND_CENTER_FILTERS.VISIBLE_LOCALLY:
+      return row.localSeo?.posture === 'visible';
+    case KEYWORD_COMMAND_CENTER_FILTERS.POSSIBLE_MATCH:
+      return row.localSeo?.posture === 'possible_match';
+    case KEYWORD_COMMAND_CENTER_FILTERS.NOT_VISIBLE:
+      return row.localSeo?.posture === 'not_visible' || row.localSeo?.posture === 'local_pack_present';
+    case KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED:
+      return row.localSeoState?.lifecycle === 'not_checked';
+    case KEYWORD_COMMAND_CENTER_FILTERS.PROVIDER_DEGRADED:
+      return row.localSeo?.posture === 'provider_degraded';
+    case KEYWORD_COMMAND_CENTER_FILTERS.REQUESTED:
+      return feedbackStatus(row.feedback) === 'requested';
+    case KEYWORD_COMMAND_CENTER_FILTERS.DECLINED:
+      return row.lifecycleStatus === 'declined' || feedbackStatus(row.feedback) === 'declined';
+    case KEYWORD_COMMAND_CENTER_FILTERS.RETIRED:
+      return row.lifecycleStatus === 'retired';
+    case KEYWORD_COMMAND_CENTER_FILTERS.LOST_VISIBILITY:
+      return Boolean(row.isLostVisibility);
+  }
+}
+
 export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps) {
   const navigate = useNavigate();
   const actionMutation = useKeywordCommandCenterAction(workspaceId);
@@ -67,7 +114,7 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
   const localRefresh = useLocalSeoRefresh(workspaceId);
   const [filter, setFilter] = useState<KeywordCommandCenterFilter>(KEYWORD_COMMAND_CENTER_FILTERS.ALL);
   const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
   const [page, setPage] = useState(1);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [selectedBulkKeys, setSelectedBulkKeys] = useState<Set<string>>(new Set());
@@ -78,11 +125,8 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
   const [pendingBulkAction, setPendingBulkAction] = useState<KeywordBulkActionSummary | null>(null);
   const [bulkActionResult, setBulkActionResult] = useState<KeywordCommandCenterBulkActionResult | null>(null);
   const [expandedVariants, setExpandedVariants] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
-    return () => window.clearTimeout(timeout);
-  }, [searchTerm]);
+  const [summaryEnabled, setSummaryEnabled] = useState(false);
+  const [localPanelEnabled, setLocalPanelEnabled] = useState(false);
 
   useEffect(() => {
     setPage(1);
@@ -101,10 +145,72 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
     pageSize: 50,
   }), [debouncedSearchTerm, filter, page]);
 
-  const summary = useKeywordCommandCenterSummary(workspaceId);
+  const summary = useKeywordCommandCenterSummary(workspaceId, { enabled: summaryEnabled });
   const rowsResult = useKeywordCommandCenterRows(workspaceId, rowsQuery);
   const detail = useKeywordCommandCenterDetail(workspaceId, selectedKey);
   const rows = rowsResult.data?.rows ?? [];
+  const summaryData = summary.data;
+  const summaryErrorMessage = summary.error instanceof Error
+    ? summary.error.message
+    : summary.error
+      ? 'Keyword summary metrics could not load. Row data remains available.'
+      : null;
+  const placeholderFilters = useMemo(() => {
+    const placeholderCount = (id: KeywordCommandCenterFilter) => {
+      if (id === KEYWORD_COMMAND_CENTER_FILTERS.ALL) return rowsResult.data?.pageInfo.totalRows ?? rows.length;
+      return rows.filter(row => placeholderRowMatchesFilter(row, id)).length;
+    };
+    return [
+      { id: KEYWORD_COMMAND_CENTER_FILTERS.ALL, label: 'All', count: placeholderCount(KEYWORD_COMMAND_CENTER_FILTERS.ALL) },
+      { id: KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY, label: 'In Strategy', count: placeholderCount(KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY) },
+      { id: KEYWORD_COMMAND_CENTER_FILTERS.TRACKED, label: 'Tracked', count: placeholderCount(KEYWORD_COMMAND_CENTER_FILTERS.TRACKED) },
+      { id: KEYWORD_COMMAND_CENTER_FILTERS.NEEDS_REVIEW, label: 'Needs Review', count: placeholderCount(KEYWORD_COMMAND_CENTER_FILTERS.NEEDS_REVIEW) },
+      { id: KEYWORD_COMMAND_CENTER_FILTERS.CONTENT, label: 'Content', count: placeholderCount(KEYWORD_COMMAND_CENTER_FILTERS.CONTENT) },
+      { id: KEYWORD_COMMAND_CENTER_FILTERS.PAGE_ASSIGNED, label: 'Page Assigned', count: placeholderCount(KEYWORD_COMMAND_CENTER_FILTERS.PAGE_ASSIGNED) },
+      { id: KEYWORD_COMMAND_CENTER_FILTERS.RAW_EVIDENCE, label: 'Raw Evidence', count: placeholderCount(KEYWORD_COMMAND_CENTER_FILTERS.RAW_EVIDENCE) },
+      { id: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL, label: 'Local', count: placeholderCount(KEYWORD_COMMAND_CENTER_FILTERS.LOCAL) },
+      { id: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES, label: 'Local Candidates', count: placeholderCount(KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES) },
+      { id: KEYWORD_COMMAND_CENTER_FILTERS.VISIBLE_LOCALLY, label: 'Visible Locally', count: placeholderCount(KEYWORD_COMMAND_CENTER_FILTERS.VISIBLE_LOCALLY) },
+      { id: KEYWORD_COMMAND_CENTER_FILTERS.POSSIBLE_MATCH, label: 'Possible Match', count: placeholderCount(KEYWORD_COMMAND_CENTER_FILTERS.POSSIBLE_MATCH) },
+      { id: KEYWORD_COMMAND_CENTER_FILTERS.NOT_VISIBLE, label: 'Not Visible', count: placeholderCount(KEYWORD_COMMAND_CENTER_FILTERS.NOT_VISIBLE) },
+      { id: KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED, label: 'Not Checked', count: placeholderCount(KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED) },
+      { id: KEYWORD_COMMAND_CENTER_FILTERS.PROVIDER_DEGRADED, label: 'Provider Degraded', count: placeholderCount(KEYWORD_COMMAND_CENTER_FILTERS.PROVIDER_DEGRADED) },
+      { id: KEYWORD_COMMAND_CENTER_FILTERS.REQUESTED, label: 'Requested', count: placeholderCount(KEYWORD_COMMAND_CENTER_FILTERS.REQUESTED) },
+      { id: KEYWORD_COMMAND_CENTER_FILTERS.DECLINED, label: 'Declined', count: placeholderCount(KEYWORD_COMMAND_CENTER_FILTERS.DECLINED) },
+      { id: KEYWORD_COMMAND_CENTER_FILTERS.RETIRED, label: 'Retired', count: placeholderCount(KEYWORD_COMMAND_CENTER_FILTERS.RETIRED) },
+      { id: KEYWORD_COMMAND_CENTER_FILTERS.LOST_VISIBILITY, label: 'Lost Visibility', count: placeholderCount(KEYWORD_COMMAND_CENTER_FILTERS.LOST_VISIBILITY) },
+    ];
+  }, [rows, rowsResult.data?.pageInfo.totalRows]);
+
+  useEffect(() => {
+    setSummaryEnabled(false);
+    setLocalPanelEnabled(false);
+  }, [workspaceId]);
+
+  useEffect(() => {
+    if (summaryEnabled) return;
+    const timer = window.setTimeout(() => setSummaryEnabled(true), 150);
+    return () => window.clearTimeout(timer);
+  }, [summaryEnabled]);
+
+  useEffect(() => {
+    if (!rowsResult.data) return;
+    setSummaryEnabled(true);
+    if (localPanelEnabled) return;
+    const idle = 'requestIdleCallback' in window
+      ? (window as Window & {
+        requestIdleCallback: (callback: IdleRequestCallback, opts?: IdleRequestOptions) => number;
+        cancelIdleCallback: (id: number) => void;
+      })
+      : null;
+    if (idle) {
+      const id = idle.requestIdleCallback(() => setLocalPanelEnabled(true), { timeout: 400 });
+      return () => idle.cancelIdleCallback(id);
+    }
+    const timer = window.setTimeout(() => setLocalPanelEnabled(true), 0);
+    return () => window.clearTimeout(timer);
+  }, [localPanelEnabled, rowsResult.data]);
+
   const selectedBulkRows = useMemo(
     () => rows.filter(row => selectedBulkKeys.has(row.normalizedKeyword)),
     [rows, selectedBulkKeys],
@@ -229,24 +335,23 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
     runBulkAction(bulkSummary, false);
   };
 
-  if (summary.isLoading || (!summary.data && rowsResult.isLoading)) {
+  if (rowsResult.isLoading && !rowsResult.data) {
     return (
       <div className="space-y-5">
         <PageHeader title="Keywords" subtitle="Building the keyword operating layer..." />
-        <SectionCard>
+        <SectionCard title="Keyword Universe">
           <TableSkeleton rows={8} columns={6} />
         </SectionCard>
       </div>
     );
   }
 
-  const loadError = summary.error ?? rowsResult.error;
-  if (loadError) {
+  if (rowsResult.error) {
     return (
       <EmptyState
         icon={Search}
         title="Keyword Command Center could not load"
-        description={loadError instanceof Error ? loadError.message : 'Try refreshing the page. Your keyword data was not changed.'}
+        description={rowsResult.error instanceof Error ? rowsResult.error.message : 'Try refreshing the page. Your keyword data was not changed.'}
       />
     );
   }
@@ -263,23 +368,40 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
         }
       />
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <SummaryMetric label="In Strategy" value={summary.data?.counts.inStrategy ?? 0} icon={Target} tone="teal" />
-        <SummaryMetric label="Tracked" value={summary.data?.counts.tracked ?? 0} icon={TrendingUp} tone="blue" />
-        <SummaryMetric label="Local" value={summary.data?.counts.local ?? 0} icon={MapPin} tone="blue" />
-        <SummaryMetric label="Needs Review" value={summary.data?.counts.needsReview ?? 0} icon={Eye} tone="amber" />
-        <SummaryMetric label="Retired" value={summary.data?.counts.retired ?? 0} icon={Archive} tone="zinc" />
-      </div>
+      {summaryData ? (
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          <SummaryMetric label="In Strategy" value={summaryData.counts.inStrategy ?? 0} icon={Target} tone="teal" />
+          <SummaryMetric label="Tracked" value={summaryData.counts.tracked ?? 0} icon={TrendingUp} tone="blue" />
+          <SummaryMetric label="Local" value={summaryData.counts.local ?? 0} icon={MapPin} tone="blue" />
+          <SummaryMetric label="Needs Review" value={summaryData.counts.needsReview ?? 0} icon={Eye} tone="amber" />
+          <SummaryMetric label="Retired" value={summaryData.counts.retired ?? 0} icon={Archive} tone="zinc" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <div key={index} className="h-[88px] rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-3)]/30 animate-pulse" />
+          ))}
+        </div>
+      )}
 
-      <LocalSeoVisibilityPanel
-        workspaceId={workspaceId}
-        mode="keywords"
-        onOpenKeywords={() => {
-          setFilter(KEYWORD_COMMAND_CENTER_FILTERS.LOCAL);
-          setPage(1);
-          document.getElementById('keyword-universe')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }}
-      />
+      {localPanelEnabled ? (
+        <LocalSeoVisibilityPanel
+          workspaceId={workspaceId}
+          mode="keywords"
+          onOpenKeywords={() => {
+            setFilter(KEYWORD_COMMAND_CENTER_FILTERS.LOCAL);
+            setPage(1);
+            document.getElementById('keyword-universe')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }}
+        />
+      ) : (
+        <SectionCard title="Local Keyword Visibility" variant="subtle">
+          <div className="flex items-center gap-2 text-[var(--brand-text-muted)] t-caption">
+            <span className="inline-block h-2 w-2 rounded-[var(--radius-sm)] bg-blue-400 animate-pulse" />
+            Local visibility summary will load after the keyword rows are ready.
+          </div>
+        </SectionCard>
+      )}
 
       {actionErrorMessage && (
         <div
@@ -287,6 +409,15 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
           className="rounded-[var(--radius-xl)] border border-red-500/25 bg-red-500/8 px-4 py-3 text-red-400 t-caption"
         >
           {actionErrorMessage}
+        </div>
+      )}
+
+      {summaryErrorMessage && (
+        <div
+          role="status"
+          className="rounded-[var(--radius-xl)] border border-amber-500/25 bg-amber-500/8 px-4 py-3 text-amber-300 t-caption"
+        >
+          {summaryErrorMessage}
         </div>
       )}
 
@@ -311,20 +442,20 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
         titleExtra={
           <div className="flex items-center gap-2 flex-wrap">
             <Badge label={`${rowsResult.data?.pageInfo.totalRows ?? rows.length} visible`} tone="blue" variant="soft" shape="pill" />
-            {summary.data?.counts.missingVolume != null
-              && summary.data.counts.missingVolume > 0
-              && summary.data.counts.total > 0
-              && summary.data.counts.missingVolume / summary.data.counts.total > 0.05 && (
+            {summaryData?.counts.missingVolume != null
+              && summaryData.counts.missingVolume > 0
+              && summaryData.counts.total > 0
+              && summaryData.counts.missingVolume / summaryData.counts.total > 0.05 && (
               <Badge
-                label={`${summary.data.counts.missingVolume} missing demand`}
+                label={`${summaryData.counts.missingVolume} missing demand`}
                 tone="amber"
                 variant="soft"
                 shape="pill"
               />
             )}
-            {summary.data?.counts.lostVisibility != null && summary.data.counts.lostVisibility > 0 && (
+            {summaryData?.counts.lostVisibility != null && summaryData.counts.lostVisibility > 0 && (
               <Badge
-                label={`${summary.data.counts.lostVisibility} lost visibility`}
+                label={`${summaryData.counts.lostVisibility} lost visibility`}
                 tone="amber"
                 variant="outline"
                 shape="pill"
@@ -346,7 +477,7 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
         variant="subtle"
       >
         <div className="px-3 py-3 border-b border-[var(--brand-border)] flex flex-wrap gap-2">
-          {(summary.data?.filters ?? []).map(item => {
+          {(summaryData?.filters ?? placeholderFilters).map(item => {
             const IconComponent = FILTER_ICONS[item.id];
             return (
               <Button
@@ -378,9 +509,9 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
               <p className="t-label uppercase tracking-wider text-[var(--brand-text-muted)]">Local</p>
               <p className="t-label uppercase tracking-wider text-[var(--brand-text-muted)]">
                 <span>Demand</span>
-                {summary.data?.geoLabel && (
+                {summaryData?.geoLabel && (
                   <span className="ml-1 normal-case t-caption-sm text-[var(--brand-text-muted)]">
-                    - {summary.data.geoLabel}
+                    - {summaryData.geoLabel}
                   </span>
                 )}
               </p>
@@ -426,10 +557,10 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
           </div>
         </div>
 
-        {summary.data && summary.data.rawEvidenceTotal > summary.data.rawEvidenceReturned && (
+        {summaryData && summaryData.rawEvidenceTotal > summaryData.rawEvidenceReturned && (
           <div className="px-4 py-3 border-t border-[var(--brand-border)] bg-[var(--surface-3)]/20">
             <p className="t-caption-sm text-[var(--brand-text-muted)]">
-              Showing {summary.data.rawEvidenceReturned} of {summary.data.rawEvidenceTotal} raw-evidence-only terms. Selected strategy, feedback, and tracked terms are never capped.
+              Showing {summaryData.rawEvidenceReturned} of {summaryData.rawEvidenceTotal} raw-evidence-only terms. Selected strategy, feedback, and tracked terms are never capped.
             </p>
           </div>
         )}

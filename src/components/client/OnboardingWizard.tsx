@@ -62,6 +62,7 @@ export function OnboardingWizard({
     hasStrategy && tier !== 'free' && { icon: Target, label: 'Review your SEO strategy', desc: 'Keyword assignments, content gaps, and opportunities', tab: 'strategy', color: 'text-accent-brand', bg: 'bg-teal-500/10 border-teal-500/20' },
     { icon: Sparkles, label: 'Ask your AI advisor a question', desc: 'Try: "What should I focus on this month?"', tab: 'overview', color: 'text-accent-brand', bg: 'bg-teal-500/10 border-teal-500/20', action: 'chat' },
   ].filter(Boolean) as Array<{ icon: typeof Shield; label: string; desc: string; color: string; bg: string; action?: string } & WizardTarget>;
+  const lockedFeatureCount = features.filter((f) => !f.available).length;
 
   const next = () => { if (stepIdx < STEPS.length - 1) setStep(STEPS[stepIdx + 1]); };
   const prev = () => { if (stepIdx > 0) setStep(STEPS[stepIdx - 1]); };
@@ -152,6 +153,25 @@ export function OnboardingWizard({
                   </div>
                 ))}
               </div>
+              {!betaMode && lockedFeatureCount > 0 && (
+                <div className="mt-3 rounded-[var(--radius-lg)] border border-amber-500/20 bg-amber-500/8 px-3 py-2.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="t-caption-sm text-[var(--brand-text)]">
+                      {lockedFeatureCount} feature{lockedFeatureCount !== 1 ? 's are' : ' is'} locked on your current plan.
+                    </p>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        onDismiss();
+                        navigate(clientPath(workspaceId, 'plans', betaMode));
+                      }}
+                    >
+                      View plans
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </>
         )}

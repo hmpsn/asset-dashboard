@@ -1,4 +1,4 @@
-import { applySuppressionsToAudit, getAuditTrafficForWorkspace, normalizePath, stripCodeFences } from './helpers.js';
+import { applySuppressionsToAudit, getAuditTrafficForWorkspace, normalizePageUrl, stripCodeFences } from './helpers.js';
 import { callAI } from './ai.js';
 import { getLatestSnapshot } from './reports.js';
 import { getTrackedKeywords } from './rank-tracking.js';
@@ -881,7 +881,7 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
           const pagesWithIssues = filteredAudit.pages
             .filter(p => p.issues.length > 0)
             .map(p => {
-              const slug = normalizePath(p.slug);
+              const slug = normalizePageUrl(p.slug);
               const traffic = trafficMap[slug] || trafficMap[p.slug];
               return { slug, issues: p.issues.length, score: p.score, traffic };
             })

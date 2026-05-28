@@ -11,6 +11,7 @@ import { getSafe } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
 import { STALE_TIMES } from '../../lib/queryClient';
 import { fmtNum } from '../../utils/formatNumbers';
+import { capitalize } from '../../utils/strings';
 import { INSIGHT_FILTER_KEYS, type AnalyticsInsight } from '../../../shared/types/analytics.js';
 import type { FeedInsight, SummaryCount } from '../../../shared/types/insights.js';
 
@@ -22,7 +23,7 @@ const ACRONYMS = new Set(['ai', 'ui', 'ux', 'seo', 'ctr', 'gsc', 'ga4', 'api', '
 function titleCaseWord(word: string): string {
   return ACRONYMS.has(word.toLowerCase())
     ? word.toUpperCase()
-    : word.charAt(0).toUpperCase() + word.slice(1);
+    : capitalize(word);
 }
 
 /** GA4/GSC placeholder values that should be treated as missing (no real title). */

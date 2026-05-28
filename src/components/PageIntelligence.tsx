@@ -302,7 +302,6 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
         onOpenSeoEditor={openSeoEditorForPage}
         onCreateBrief={createBriefForPage}
         onAddSchema={openSchemaForPage}
-        onViewFullAnalysis={() => navigate(adminPath(workspaceId, 'page-intelligence'))}
       />
       </div>
       )}

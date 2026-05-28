@@ -10,7 +10,7 @@ import type {
   KeywordRecommendationResult,
   AiFixResult,
   AIReviewResponse,
-  IssueKey,
+  AiFixRequest,
   BriefTemplateCrossrefMatch,
 } from '../../shared/types/content';
 import type { ClientContentRequest } from '../components/client/types';
@@ -89,7 +89,7 @@ export const contentPosts = {
   scoreVoice: (wsId: string, postId: string) =>
     post<GeneratedPost>(`/api/content-posts/${wsId}/${postId}/score-voice`, {}),
 
-  aifix: (wsId: string, postId: string, body: { issueKey: IssueKey; reason: string }) =>
+  aifix: (wsId: string, postId: string, body: AiFixRequest) =>
     post<AiFixResult>(`/api/content-posts/${wsId}/${postId}/ai-fix`, body),
 };
 

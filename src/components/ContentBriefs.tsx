@@ -5,8 +5,11 @@ import {
   Trash2, AlertTriangle, PenLine, Clipboard, Search, X, ArrowUpDown,
 } from 'lucide-react';
 import { Badge, Icon, IconButton, ClickableRow, FormInput, FormSelect, Button, Modal, PageHeader, LoadingState, ErrorState } from './ui';
+import { formatDate } from '../utils/formatDates';
+import { capitalize } from '../utils/strings';
 import type { FixContext } from '../App';
-import type { ContentBrief, ContentTopicRequest, PostSummary } from '../../shared/types/content';
+import type { ContentBrief, ContentGenerationStyle, ContentTopicRequest, PostSummary } from '../../shared/types/content';
+import { DEFAULT_CONTENT_GENERATION_STYLE } from '../../shared/types/content';
 import { PostEditor } from './PostEditor';
 import { BriefGenerator } from './briefs/BriefGenerator';
 import { RequestList } from './briefs/RequestList';
@@ -56,6 +59,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
   const [generating, setGenerating] = useState(false);
   const [generatingBriefFor, setGeneratingBriefFor] = useState<string | null>(null);
   const [businessCtx, setBusinessCtx] = useState('');
+  const [generationStyle, setGenerationStyle] = useState<ContentGenerationStyle>(DEFAULT_CONTENT_GENERATION_STYLE);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
   const [loadingBrief, setLoadingBrief] = useState<string | null>(null);
@@ -270,10 +274,12 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
   };
 
 
-  const handleGenerateBriefForRequest = async (req: ContentTopicRequest) => {
+  const handleGenerateBriefForRequest = async (req: ContentTopicRequest, selectedGenerationStyle?: ContentGenerationStyle) => {
     setGeneratingBriefFor(req.id);
     try {
-      const brief = await post<ContentBrief>(`/api/content-requests/${workspaceId}/${req.id}/generate-brief`);
+      const brief = await post<ContentBrief>(`/api/content-requests/${workspaceId}/${req.id}/generate-brief`, {
+        generationStyle: selectedGenerationStyle ?? generationStyle,
+      });
       queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), old => [brief, ...(old ?? [])]);
       queryClient.setQueryData<ContentTopicRequest[]>(queryKeys.admin.requests(workspaceId), old => (old ?? []).map(r => r.id === req.id ? { ...r, status: 'brief_generated' as const, briefId: brief.id } : r));
       setExpandedRequest(req.id);
@@ -281,10 +287,13 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
     setGeneratingBriefFor(null);
   };
 
-  const handleGeneratePost = async (briefId: string): Promise<boolean> => {
+  const handleGeneratePost = async (briefId: string, selectedGenerationStyle?: ContentGenerationStyle): Promise<boolean> => {
     setGeneratingPostFor(briefId);
     try {
-      const skeleton = await post<PostSummary & { jobId?: string }>(`/api/content-posts/${workspaceId}/generate`, { briefId });
+      const skeleton = await post<PostSummary & { jobId?: string }>(`/api/content-posts/${workspaceId}/generate`, {
+        briefId,
+        generationStyle: selectedGenerationStyle,
+      });
       if (skeleton.jobId) {
         attachTrackedJob({ trackJob }, BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION, skeleton.jobId, { workspaceId });
       }
@@ -319,6 +328,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
         targetPageId: fixContextRef.current?.pageId,
         targetPageSlug: fixContextRef.current?.pageSlug,
         pageType: pageType || undefined,
+        generationStyle,
         referenceUrls: refUrls.trim() ? refUrls.split('\n').map(u => u.trim()).filter(u => u.startsWith('http')) : undefined,
         pageAnalysisContext: fixContextRef.current?.optimizationIssues || fixContextRef.current?.recommendations || fixContextRef.current?.contentGaps
           ? {
@@ -467,11 +477,11 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <Badge
-                        label={post.status === 'generating' ? 'Generating...' : post.status.charAt(0).toUpperCase() + post.status.slice(1)}
+                        label={post.status === 'generating' ? 'Generating...' : capitalize(post.status)}
                         tone={post.status === 'generating' ? 'amber' : post.status === 'approved' ? 'emerald' : post.status === 'review' ? 'teal' : 'blue'}
                         variant="outline"
                       />
-                      <span className="t-caption-sm text-[var(--brand-text-muted)]">{new Date(post.createdAt).toLocaleDateString()}</span>
+                      <span className="t-caption-sm text-[var(--brand-text-muted)]">{formatDate(post.createdAt)}</span>
                     </div>
                   </div>
                 </ClickableRow>
@@ -494,6 +504,8 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
         getBriefById={getBriefById}
         onToggleRequestBrief={toggleRequestBrief}
         onGenerateBriefForRequest={handleGenerateBriefForRequest}
+        generationStyle={generationStyle}
+        onGenerationStyleChange={setGenerationStyle}
         onUpdateRequestStatus={handleUpdateRequestStatus}
         onConfirmDeleteRequest={confirmDeleteRequest}
         onSetDeliveringReqId={setDeliveringReqId}
@@ -561,6 +573,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
         keyword={keyword}
         businessCtx={businessCtx}
         pageType={pageType}
+        generationStyle={generationStyle}
         refUrls={refUrls}
         showAdvanced={showAdvanced}
         generating={generating}
@@ -569,6 +582,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
         onKeywordChange={setKeyword}
         onBusinessCtxChange={setBusinessCtx}
         onPageTypeChange={setPageType}
+        onGenerationStyleChange={setGenerationStyle}
         onRefUrlsChange={setRefUrls}
         onToggleAdvanced={() => setShowAdvanced(v => !v)}
         onGenerate={handleGenerate}

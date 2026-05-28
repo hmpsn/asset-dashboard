@@ -6,14 +6,6 @@ import { queryKeys } from '../../../lib/queryKeys';
 
 export type KeywordFeedbackStatus = 'approved' | 'declined' | 'requested';
 
-export interface KeywordFeedback {
-  keyword: string;
-  status: KeywordFeedbackStatus;
-  reason?: string;
-  source?: string;
-  created_at?: string;
-}
-
 interface UseStrategyKeywordFeedbackOptions {
   workspaceId?: string;
   setToast?: (msg: string) => void;
@@ -34,7 +26,7 @@ export function useStrategyKeywordFeedback({ workspaceId, setToast }: UseStrateg
     queryFn: async () => {
       const items = await kwFeedbackApi.get(workspaceId!);
       const map = new Map<string, KeywordFeedbackStatus>();
-      for (const item of items as KeywordFeedback[]) map.set(keywordComparisonKey(item.keyword), item.status);
+      for (const item of items) map.set(keywordComparisonKey(item.keyword), item.status);
       return map;
     },
     enabled: !!workspaceId,

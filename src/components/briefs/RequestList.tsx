@@ -4,13 +4,20 @@ import {
   Check, ExternalLink, Link2, PenLine, Eye, Send, MessageSquare,
 } from 'lucide-react';
 import { BriefDetail } from './BriefDetail';
-import { SectionCard, Icon, Button, FormInput, FormTextarea } from '../ui';
-import type { ContentBrief, ContentTopicRequest, PostSummary } from '../../../shared/types/content';
+import { SectionCard, Icon, Button, FormInput, FormSelect, FormTextarea } from '../ui';
+import {
+  CONTENT_GENERATION_STYLE_OPTIONS,
+  type ContentBrief,
+  type ContentGenerationStyle,
+  type ContentTopicRequest,
+  type PostSummary,
+} from '../../../shared/types/content';
+import { formatDate } from '../../utils/formatDates';
 
 // Subset of PostSummary that RequestList needs. Pick keeps it in lock-step with the
 // canonical type — if PostSummary changes, TypeScript catches mismatches here.
 // (PostSummary import is at top of file with other imports.)
-export type RequestPostSummary = Pick<PostSummary, 'id' | 'briefId' | 'status' | 'totalWordCount'>;
+export type RequestPostSummary = Pick<PostSummary, 'id' | 'briefId' | 'status' | 'totalWordCount' | 'generationStyle'>;
 
 export interface RequestListProps {
   clientRequests: ContentTopicRequest[];
@@ -23,7 +30,9 @@ export interface RequestListProps {
   deliveryNotes: string;
   getBriefById: (briefId: string) => ContentBrief | undefined;
   onToggleRequestBrief: (reqId: string, briefId: string) => void;
-  onGenerateBriefForRequest: (req: ContentTopicRequest) => void;
+  onGenerateBriefForRequest: (req: ContentTopicRequest, generationStyle?: ContentGenerationStyle) => void;
+  generationStyle: ContentGenerationStyle;
+  onGenerationStyleChange: (value: ContentGenerationStyle) => void;
   onUpdateRequestStatus: (reqId: string, status: ContentTopicRequest['status'] | undefined, extra?: { deliveryUrl?: string; deliveryNotes?: string; briefId?: string; clientFeedback?: string; serviceType?: 'brief_only' | 'full_post'; upgradedAt?: string }) => void;
   onConfirmDeleteRequest: (req: ContentTopicRequest) => void;
   onSetDeliveringReqId: (reqId: string | null) => void;
@@ -47,7 +56,7 @@ export interface RequestListProps {
   generatingPostFor?: string | null;
   /** Returns true on success, false on failure. Caller must check before advancing
    *  request status, otherwise a generation failure leaves the request stuck. */
-  onGeneratePost?: (briefId: string) => Promise<boolean>;
+  onGeneratePost?: (briefId: string, generationStyle?: ContentGenerationStyle) => Promise<boolean>;
   onOpenPost?: (postId: string) => void;
 }
 
@@ -63,6 +72,8 @@ export function RequestList({
   getBriefById,
   onToggleRequestBrief,
   onGenerateBriefForRequest,
+  generationStyle,
+  onGenerationStyleChange,
   onUpdateRequestStatus,
   onConfirmDeleteRequest,
   onSetDeliveringReqId,
@@ -132,7 +143,7 @@ export function RequestList({
                     <div className="t-caption-sm text-teal-400 mt-0.5">"{req.targetKeyword}"</div>
                     <div className="flex items-center gap-3 mt-1">
                       <span className="t-caption-sm text-[var(--brand-text-muted)] uppercase">{req.intent} · {req.priority}</span>
-                      <span className="t-caption-sm text-[var(--brand-text-muted)]">{new Date(req.requestedAt).toLocaleDateString()}</span>
+                      <span className="t-caption-sm text-[var(--brand-text-muted)]">{formatDate(req.requestedAt)}</span>
                       {req.comments && req.comments.length > 0 && <span className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text-muted)]"><Icon as={MessageSquare} size="sm" />{req.comments.length}</span>}
                     </div>
                   </div>
@@ -146,10 +157,20 @@ export function RequestList({
                       )}
                       {req.status === 'requested' && (
                         <>
-                          <Button disabled={isGenerating} onClick={() => onGenerateBriefForRequest(req)} variant="ghost" size="sm" className="rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50">
-                            <Icon as={isGenerating ? Loader2 : Sparkles} size="sm" className={isGenerating ? 'animate-spin' : ''} />
-                            {isGenerating ? 'Generating...' : 'Generate Brief'}
-                          </Button>
+                          <div className="flex items-center gap-1.5 rounded-[var(--radius-lg)] bg-teal-600/10 border border-teal-500/25 px-1.5 py-1">
+                            <FormSelect
+                              value={generationStyle}
+                              onChange={value => onGenerationStyleChange(value as ContentGenerationStyle)}
+                              options={CONTENT_GENERATION_STYLE_OPTIONS}
+                              aria-label="Request brief writing style"
+                              className="h-7 w-28 py-0 pl-2 pr-7 t-caption-sm bg-[var(--surface-2)] border-teal-500/25 cursor-pointer"
+                              disabled={isGenerating}
+                            />
+                            <Button disabled={isGenerating} onClick={() => onGenerateBriefForRequest(req, generationStyle)} variant="ghost" size="sm" className="rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50">
+                              <Icon as={isGenerating ? Loader2 : Sparkles} size="sm" className={isGenerating ? 'animate-spin' : ''} />
+                              {isGenerating ? 'Generating...' : 'Generate Brief'}
+                            </Button>
+                          </div>
                           <Button onClick={() => onUpdateRequestStatus(req.id, 'declined')} variant="ghost" size="sm" className="rounded bg-[var(--surface-3)] t-caption-sm text-[var(--brand-text-muted)] hover:text-red-400 transition-colors">Decline</Button>
                         </>
                       )}
@@ -281,7 +302,7 @@ export function RequestList({
                     <Icon as={XCircle} size="md" className="flex-shrink-0" />
                     <span>{briefError}</span>
                   </div>
-                  <Button onClick={() => { onGenerateBriefForRequest(req); onSetBriefError(null); onSetExpandedRequest(null); }} variant="ghost" size="sm" className="mt-2 rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors">
+                  <Button onClick={() => { onGenerateBriefForRequest(req, generationStyle); onSetBriefError(null); onSetExpandedRequest(null); }} variant="ghost" size="sm" className="mt-2 rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors">
                     <Icon as={Sparkles} size="sm" /> Regenerate Brief
                   </Button>
                 </div>
@@ -296,9 +317,9 @@ export function RequestList({
                   sendingToClient={sendingToClient ?? null}
                   onSaveBriefField={onSaveBriefField}
                   onSetEditingBrief={onSetEditingBrief}
-                  onGeneratePost={async (briefId) => {
+                  onGeneratePost={async (briefId, generationStyle) => {
                     if (!onGeneratePost) return;
-                    const ok = await onGeneratePost(briefId);
+                    const ok = await onGeneratePost(briefId, generationStyle);
                     if (!ok) return;
                     if ((req.serviceType || 'brief_only') === 'brief_only') {
                       await onUpdateRequestStatus(req.id, undefined, { serviceType: 'full_post', upgradedAt: new Date().toISOString() });

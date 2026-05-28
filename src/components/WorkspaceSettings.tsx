@@ -8,6 +8,7 @@ import { ClientDashboardTab } from './settings/ClientDashboardTab';
 import { BusinessProfileTab } from './settings/BusinessProfileTab';
 import { IntelligenceProfileTab } from './settings/IntelligenceProfileTab';
 import { LocationsTab } from './settings/LocationsTab';
+import { EeatAssetsTab } from './settings/EeatAssetsTab';
 import { PublishSettings } from './PublishSettings';
 import { SectionCard, Icon, Button, IconButton, FormInput } from './ui';
 import { get, patch, post } from '../api/client';
@@ -71,14 +72,15 @@ interface Props {
   onUpdate?: (patch: Record<string, unknown>) => void;
 }
 
-type SectionTab = 'connections' | 'features' | 'dashboard' | 'publishing' | 'business-profile' | 'intelligence-profile' | 'export' | 'llms-txt' | 'locations';
-const BASE_SECTION_TABS: readonly SectionTab[] = ['connections', 'features', 'dashboard', 'publishing', 'business-profile', 'intelligence-profile', 'export', 'llms-txt'];
+type SectionTab = 'connections' | 'features' | 'dashboard' | 'publishing' | 'business-profile' | 'eeat-assets' | 'intelligence-profile' | 'export' | 'llms-txt' | 'locations';
+const BASE_SECTION_TABS: readonly SectionTab[] = ['connections', 'features', 'dashboard', 'publishing', 'business-profile', 'eeat-assets', 'intelligence-profile', 'export', 'llms-txt'];
 const VALID_SECTION_TABS: readonly SectionTab[] = [...BASE_SECTION_TABS, 'locations'];
 const SECTION_TAB_ITEMS: readonly [SectionTab, string][] = [
   ['connections', 'Connections'],
   ['features', 'Features'],
   ['publishing', 'Publishing'],
   ['business-profile', 'Business Profile'],
+  ['eeat-assets', 'E-E-A-T Assets'],
   ['intelligence-profile', 'Intelligence Profile'],
   ['dashboard', 'Client Dashboard'],
   ['export', 'Data Export'],
@@ -306,6 +308,13 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
           siteHasSearch={ws?.siteHasSearch}
           toast={toast}
           onSave={(profile) => setWs(w => w ? { ...w, businessProfile: profile } : w)}
+        />
+      )}
+
+      {tab === 'eeat-assets' && (
+        <EeatAssetsTab
+          workspaceId={workspaceId}
+          toast={toast}
         />
       )}
 

@@ -9,7 +9,12 @@ import { randomUUID } from 'crypto';
 import db from './db/index.js';
 import type { PageKeywordMap } from '../shared/types/workspace.ts';
 import type { MetricsSource, PageOptimizationScoreSnapshot, UrlLevelKeyword } from '../shared/types/keywords.js';
-import { normalizePath } from './helpers.js';
+import {
+  EEAT_ASSET_TYPE,
+  EEAT_RECOMMENDATION_SURFACE,
+  TRUST_SIGNAL_SEVERITY,
+} from '../shared/types/eeat-assets.js';
+import { normalizePageUrl } from './helpers.js';
 import { createLogger } from './logger.js';
 import { parseJsonSafeArray, parseJsonFallback } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
@@ -54,6 +59,21 @@ interface PageKeywordRow {
   topic_cluster: string | null;
   search_intent_confidence: number | null;
   serp_features: string | null;
+  missing_trust_signals: string | null;
+  eeat_asset_recommendations: string | null;
+}
+
+interface PageKeywordLiteRow {
+  workspace_id: string;
+  page_path: string;
+  page_title: string;
+  primary_keyword: string;
+  secondary_keywords: string;
+  current_position: number | null;
+  impressions: number | null;
+  clicks: number | null;
+  volume: number | null;
+  difficulty: number | null;
 }
 
 interface PageKeywordScoreHistoryRow {
@@ -71,6 +91,48 @@ const urlLevelKeywordSchema = z.object({
   difficulty: z.number(),
   cpc: z.number(),
   traffic: z.number().optional(),
+  url: z.string().optional(),
+}).strip();
+
+const missingTrustSignalSchema = z.object({
+  signal: z.string(),
+  rationale: z.string(),
+  severity: z.enum([
+    TRUST_SIGNAL_SEVERITY.HIGH,
+    TRUST_SIGNAL_SEVERITY.MEDIUM,
+    TRUST_SIGNAL_SEVERITY.LOW,
+  ]),
+  recommendedAssetTypes: z.array(z.enum([
+    EEAT_ASSET_TYPE.TESTIMONIAL,
+    EEAT_ASSET_TYPE.CASE_STUDY,
+    EEAT_ASSET_TYPE.CREDENTIAL,
+    EEAT_ASSET_TYPE.BEFORE_AFTER_GALLERY,
+    EEAT_ASSET_TYPE.TEAM_BIO,
+    EEAT_ASSET_TYPE.AWARD,
+    EEAT_ASSET_TYPE.RESEARCH,
+    EEAT_ASSET_TYPE.CLIENT_LOGO,
+  ])),
+}).strip();
+
+const eeatAssetRecommendationSchema = z.object({
+  assetId: z.string(),
+  type: z.enum([
+    EEAT_ASSET_TYPE.TESTIMONIAL,
+    EEAT_ASSET_TYPE.CASE_STUDY,
+    EEAT_ASSET_TYPE.CREDENTIAL,
+    EEAT_ASSET_TYPE.BEFORE_AFTER_GALLERY,
+    EEAT_ASSET_TYPE.TEAM_BIO,
+    EEAT_ASSET_TYPE.AWARD,
+    EEAT_ASSET_TYPE.RESEARCH,
+    EEAT_ASSET_TYPE.CLIENT_LOGO,
+  ]),
+  title: z.string(),
+  reason: z.string(),
+  surface: z.enum([
+    EEAT_RECOMMENDATION_SURFACE.CONTENT_BRIEF,
+    EEAT_RECOMMENDATION_SURFACE.PAGE_INTELLIGENCE,
+    EEAT_RECOMMENDATION_SURFACE.SCHEMA,
+  ]),
   url: z.string().optional(),
 }).strip();
 
@@ -121,13 +183,25 @@ function rowToModel(r: PageKeywordRow, optimizationScoreHistory: PageOptimizatio
   if (r.topic_cluster) m.topicCluster = r.topic_cluster;
   if (r.search_intent_confidence != null) m.searchIntentConfidence = r.search_intent_confidence;
   if (r.serp_features) m.serpFeatures = parseJsonSafeArray(r.serp_features, z.string(), { table: 'page_keywords', field: 'serp_features' });
+  if (r.missing_trust_signals) {
+    m.missingTrustSignals = parseJsonSafeArray(r.missing_trust_signals, missingTrustSignalSchema, {
+      table: 'page_keywords',
+      field: 'missing_trust_signals',
+    });
+  }
+  if (r.eeat_asset_recommendations) {
+    m.eeatAssetRecommendations = parseJsonSafeArray(r.eeat_asset_recommendations, eeatAssetRecommendationSchema, {
+      table: 'page_keywords',
+      field: 'eeat_asset_recommendations',
+    });
+  }
   return m;
 }
 
 function modelToParams(workspaceId: string, m: PageKeywordMap, preserveAnalysisFields = false) {
   return {
     workspace_id: workspaceId,
-    page_path: normalizePath(m.pagePath),
+    page_path: normalizePageUrl(m.pagePath),
     page_title: m.pageTitle || '',
     primary_keyword: m.primaryKeyword || '',
     secondary_keywords: JSON.stringify(m.secondaryKeywords || []),
@@ -159,6 +233,8 @@ function modelToParams(workspaceId: string, m: PageKeywordMap, preserveAnalysisF
     topic_cluster: m.topicCluster ?? null,
     search_intent_confidence: m.searchIntentConfidence ?? null,
     serp_features: m.serpFeatures ? JSON.stringify(m.serpFeatures) : null,
+    missing_trust_signals: m.missingTrustSignals ? JSON.stringify(m.missingTrustSignals) : null,
+    eeat_asset_recommendations: m.eeatAssetRecommendations ? JSON.stringify(m.eeatAssetRecommendations) : null,
     preserve_analysis_fields: preserveAnalysisFields ? 1 : 0,
   };
 }
@@ -169,6 +245,21 @@ const stmts = createStmtCache(() => ({
   listByWs: db.prepare<[workspaceId: string]>(
     'SELECT * FROM page_keywords WHERE workspace_id = ?',
   ),
+  listLiteByWs: db.prepare<[workspaceId: string]>(`
+    SELECT
+      workspace_id,
+      page_path,
+      page_title,
+      primary_keyword,
+      secondary_keywords,
+      current_position,
+      impressions,
+      clicks,
+      volume,
+      difficulty
+    FROM page_keywords
+    WHERE workspace_id = ?
+  `),
   getOne: db.prepare<[workspaceId: string, pagePath: string]>(
     'SELECT * FROM page_keywords WHERE workspace_id = ? AND page_path = ?',
   ),
@@ -181,7 +272,7 @@ const stmts = createStmtCache(() => ({
       optimization_score, analysis_generated_at, optimization_issues, recommendations,
       content_gaps, primary_keyword_presence, long_tail_keywords, competitor_keywords,
       estimated_difficulty, keyword_difficulty, monthly_volume, topic_cluster, search_intent_confidence,
-      serp_features
+      serp_features, missing_trust_signals, eeat_asset_recommendations
     ) VALUES (
       @workspace_id, @page_path, @page_title, @primary_keyword, @secondary_keywords,
       @search_intent, @current_position, @previous_position, @impressions, @clicks,
@@ -190,7 +281,7 @@ const stmts = createStmtCache(() => ({
       @optimization_score, @analysis_generated_at, @optimization_issues, @recommendations,
       @content_gaps, @primary_keyword_presence, @long_tail_keywords, @competitor_keywords,
       @estimated_difficulty, @keyword_difficulty, @monthly_volume, @topic_cluster, @search_intent_confidence,
-      @serp_features
+      @serp_features, @missing_trust_signals, @eeat_asset_recommendations
     )
     ON CONFLICT(workspace_id, page_path) DO UPDATE SET
       page_title = excluded.page_title,
@@ -223,7 +314,9 @@ const stmts = createStmtCache(() => ({
       monthly_volume = CASE WHEN @preserve_analysis_fields = 1 THEN COALESCE(excluded.monthly_volume, page_keywords.monthly_volume) ELSE excluded.monthly_volume END,
       topic_cluster = CASE WHEN @preserve_analysis_fields = 1 THEN COALESCE(excluded.topic_cluster, page_keywords.topic_cluster) ELSE excluded.topic_cluster END,
       search_intent_confidence = CASE WHEN @preserve_analysis_fields = 1 THEN COALESCE(excluded.search_intent_confidence, page_keywords.search_intent_confidence) ELSE excluded.search_intent_confidence END,
-      serp_features = CASE WHEN @preserve_analysis_fields = 1 THEN COALESCE(excluded.serp_features, page_keywords.serp_features) ELSE excluded.serp_features END
+      serp_features = CASE WHEN @preserve_analysis_fields = 1 THEN COALESCE(excluded.serp_features, page_keywords.serp_features) ELSE excluded.serp_features END,
+      missing_trust_signals = CASE WHEN @preserve_analysis_fields = 1 THEN COALESCE(excluded.missing_trust_signals, page_keywords.missing_trust_signals) ELSE excluded.missing_trust_signals END,
+      eeat_asset_recommendations = CASE WHEN @preserve_analysis_fields = 1 THEN COALESCE(excluded.eeat_asset_recommendations, page_keywords.eeat_asset_recommendations) ELSE excluded.eeat_asset_recommendations END
   `),
   deleteOne: db.prepare<[workspaceId: string, pagePath: string]>(
     'DELETE FROM page_keywords WHERE workspace_id = ? AND page_path = ?',
@@ -245,7 +338,9 @@ const stmts = createStmtCache(() => ({
       keyword_difficulty = NULL,
       monthly_volume = NULL,
       topic_cluster = NULL,
-      search_intent_confidence = NULL
+      search_intent_confidence = NULL,
+      missing_trust_signals = NULL,
+      eeat_asset_recommendations = NULL
     WHERE workspace_id = ?
   `),
   countByWs: db.prepare<[workspaceId: string]>(
@@ -318,7 +413,7 @@ function groupScoreHistory(workspaceId: string): Map<string, PageOptimizationSco
   const rows = stmts().scoreHistoryByWs.all(workspaceId, SCORE_HISTORY_PER_PAGE_LIMIT) as PageKeywordScoreHistoryRow[];
   const grouped = new Map<string, PageOptimizationScoreSnapshot[]>();
   for (const row of rows) {
-    const key = normalizePath(row.page_path).toLowerCase();
+    const key = normalizePageUrl(row.page_path).toLowerCase();
     const existing = grouped.get(key) ?? [];
     existing.push(rowToScoreHistory(row));
     grouped.set(key, existing);
@@ -328,7 +423,7 @@ function groupScoreHistory(workspaceId: string): Map<string, PageOptimizationSco
 
 function maybeRecordScoreSnapshot(workspaceId: string, entry: PageKeywordMap): void {
   if (entry.optimizationScore == null) return;
-  const pagePath = normalizePath(entry.pagePath);
+  const pagePath = normalizePageUrl(entry.pagePath);
   const roundedScore = Math.round(entry.optimizationScore);
   const latest = stmts().latestScoreHistory.get(workspaceId, pagePath) as PageKeywordScoreHistoryRow | undefined;
   if (latest?.optimization_score === roundedScore) return;
@@ -348,7 +443,7 @@ function normalizedKeyword(value: string | undefined | null): string {
 }
 
 function preparePrimaryKeywordUpdate(workspaceId: string, entry: PageKeywordMap): boolean {
-  const pagePath = normalizePath(entry.pagePath);
+  const pagePath = normalizePageUrl(entry.pagePath);
   const existing = stmts().getOne.get(workspaceId, pagePath) as PageKeywordRow | undefined;
   if (!existing) return false;
   const preserveAnalysisFields = normalizedKeyword(existing.primary_keyword) === normalizedKeyword(entry.primaryKeyword);
@@ -361,12 +456,36 @@ function preparePrimaryKeywordUpdate(workspaceId: string, entry: PageKeywordMap)
 export function listPageKeywords(workspaceId: string): PageKeywordMap[] {
   const rows = stmts().listByWs.all(workspaceId) as PageKeywordRow[];
   const histories = groupScoreHistory(workspaceId);
-  return rows.map(row => rowToModel(row, histories.get(normalizePath(row.page_path).toLowerCase()) ?? []));
+  return rows.map(row => rowToModel(row, histories.get(normalizePageUrl(row.page_path).toLowerCase()) ?? []));
+}
+
+function rowToLiteModel(row: PageKeywordLiteRow): PageKeywordMap {
+  const model: PageKeywordMap = {
+    pagePath: row.page_path,
+    pageTitle: row.page_title,
+    primaryKeyword: row.primary_keyword,
+    secondaryKeywords: parseJsonSafeArray(row.secondary_keywords, z.string(), { table: 'page_keywords', field: 'secondary_keywords' }),
+  };
+  if (row.current_position != null) model.currentPosition = row.current_position;
+  if (row.impressions != null) model.impressions = row.impressions;
+  if (row.clicks != null) model.clicks = row.clicks;
+  if (row.volume != null) model.volume = row.volume;
+  if (row.difficulty != null) model.difficulty = row.difficulty;
+  return model;
+}
+
+/**
+ * Lightweight page keyword read for consumers that only need assignment and demand data.
+ * Skips per-page score history assembly and unrelated JSON column parsing.
+ */
+export function listPageKeywordsLite(workspaceId: string): PageKeywordMap[] {
+  const rows = stmts().listLiteByWs.all(workspaceId) as PageKeywordLiteRow[];
+  return rows.map(rowToLiteModel);
 }
 
 /** Get a single page's keywords by path (normalized). */
 export function getPageKeyword(workspaceId: string, pagePath: string): PageKeywordMap | undefined {
-  const normalized = normalizePath(pagePath);
+  const normalized = normalizePageUrl(pagePath);
   const row = stmts().getOne.get(workspaceId, normalized) as PageKeywordRow | undefined;
   const historyRows = stmts().scoreHistoryByPage.all(workspaceId, normalized, SCORE_HISTORY_PER_PAGE_LIMIT) as PageKeywordScoreHistoryRow[];
   return row ? rowToModel(row, historyRows.map(rowToScoreHistory)) : undefined;
@@ -414,7 +533,7 @@ export function upsertAndCleanPageKeywords(workspaceId: string, entries: PageKey
       stmts().deleteAllScoreHistory.run(workspaceId);
       return;
     }
-    const normalizedPaths = entries.map(e => normalizePath(e.pagePath));
+    const normalizedPaths = entries.map(e => normalizePageUrl(e.pagePath));
     const placeholders = normalizedPaths.map(() => '?').join(', ');
     db.prepare(
       `DELETE FROM page_keywords WHERE workspace_id = ? AND page_path NOT IN (${placeholders})`
@@ -443,7 +562,7 @@ export function replaceAllPageKeywords(workspaceId: string, entries: PageKeyword
 /** Delete a single page keyword entry. */
 export function deletePageKeyword(workspaceId: string, pagePath: string): void {
   const run = db.transaction(() => {
-    const normalized = normalizePath(pagePath);
+  const normalized = normalizePageUrl(pagePath);
     stmts().deleteOne.run(workspaceId, normalized);
     stmts().deleteScoreHistory.run(workspaceId, normalized);
   });

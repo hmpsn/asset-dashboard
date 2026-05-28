@@ -260,10 +260,28 @@ describe('contentPosts.scoreVoice', () => {
 
 describe('contentPosts.aifix', () => {
   it('calls post on ai-fix subpath with issue body', async () => {
-    await contentPosts.aifix('ws-1', 'post-1', { issueKey: 'seo-title' as never, reason: 'Title too short' });
+    await contentPosts.aifix('ws-1', 'post-1', { issueKey: 'brand_voice', reason: 'Voice too casual' });
     expect(mockPost).toHaveBeenCalledWith(
       '/api/content-posts/ws-1/post-1/ai-fix',
-      { issueKey: 'seo-title', reason: 'Title too short' },
+      { issueKey: 'brand_voice', reason: 'Voice too casual' },
+    );
+  });
+
+  it('supports feedback mode payloads', async () => {
+    await contentPosts.aifix('ws-1', 'post-1', {
+      mode: 'feedback',
+      target: 'section',
+      feedback: 'Tighten this section and make it more direct.',
+      sectionIndex: 0,
+    });
+    expect(mockPost).toHaveBeenCalledWith(
+      '/api/content-posts/ws-1/post-1/ai-fix',
+      {
+        mode: 'feedback',
+        target: 'section',
+        feedback: 'Tighten this section and make it more direct.',
+        sectionIndex: 0,
+      },
     );
   });
 });

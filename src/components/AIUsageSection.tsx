@@ -4,6 +4,7 @@ import { Zap } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import { SectionCard, Icon, cn, Button } from './ui';
 import { chartAxisColor } from './ui/constants';
+import { fmtNum } from '../utils/formatNumbers';
 
 interface DailyUsage {
   date: string;
@@ -67,7 +68,6 @@ export function AIUsageSection() {
   const chartDays = data.daily.slice(-days);
 
   const fmtCost = (v: number) => v < 0.01 ? '<$0.01' : `$${v.toFixed(2)}`;
-  const fmtTokens = (v: number) => v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(1)}K` : String(v);
 
   const FEATURE_LABELS: Record<string, string> = {
     'content-post-intro': 'Post: Intro',
@@ -164,7 +164,7 @@ export function AIUsageSection() {
                     <div className="flex justify-between t-caption-sm"><div className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-emerald-500" />OpenAI</div><span className="text-emerald-400">{fmtCost(row.openaiCost)}</span></div>
                     <div className="flex justify-between t-caption-sm"><div className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-orange-500" />Anthropic</div><span className="text-orange-400">{fmtCost(row.anthropicCost)}</span></div>
                     <div className="flex justify-between t-caption-sm"><span className="text-[var(--brand-text-muted)]">Calls</span><span className="text-[var(--brand-text)]">{row.calls}</span></div>
-                    <div className="flex justify-between t-caption-sm"><span className="text-[var(--brand-text-muted)]">Tokens</span><span className="text-[var(--brand-text)]">{fmtTokens(row.totalTokens)}</span></div>
+                    <div className="flex justify-between t-caption-sm"><span className="text-[var(--brand-text-muted)]">Tokens</span><span className="text-[var(--brand-text)]">{fmtNum(row.totalTokens)}</span></div>
                   </div>
                 </div>
               );

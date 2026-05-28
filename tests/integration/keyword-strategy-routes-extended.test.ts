@@ -202,15 +202,16 @@ describe('GET /api/webflow/keyword-strategy — serialization and edge cases', (
     });
   });
 
-  it('strips semrushMode from serialized output and exposes it as seoDataMode fallback', async () => {
-    // Seed a workspace whose blob contains the legacy semrushMode field but no seoDataMode
+  it('strips semrushMode from serialized output without using it as seoDataMode fallback', async () => {
+    // Seed a workspace whose blob contains the legacy semrushMode field but no seoDataMode.
+    // Route serialization must not honor the stale alias.
     const wsId = freshWs('GET strip semrushMode field');
     const legacyStrategy = {
       siteKeywords: ['clean keyword'],
       opportunities: [],
       generatedAt: '2026-04-01T00:00:00.000Z',
       semrushMode: 'full' as const,  // stale alias — should be stripped from root output
-      // seoDataMode intentionally absent to trigger the fallback path
+      // seoDataMode intentionally absent to ensure no compatibility fallback occurs
     };
     updateWorkspace(wsId, { keywordStrategy: legacyStrategy as unknown as KeywordStrategy });
 
@@ -219,8 +220,8 @@ describe('GET /api/webflow/keyword-strategy — serialization and edge cases', (
     const body = await res.json();
     // semrushMode must NOT appear at root of response — serializeKeywordStrategy strips it
     expect(Object.prototype.hasOwnProperty.call(body, 'semrushMode')).toBe(false);
-    // seoDataMode should resolve via semrushMode fallback → 'full'
-    expect(body.seoDataMode).toBe('full');
+    // seoDataMode now derives only from canonical field; absent values normalize to none
+    expect(body.seoDataMode).toBe('none');
     // siteKeywords should be intact
     expect(body.siteKeywords).toEqual(['clean keyword']);
   });

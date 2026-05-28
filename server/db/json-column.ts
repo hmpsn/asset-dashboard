@@ -5,6 +5,12 @@
 /**
  * Parse a JSON column value from SQLite, returning `fallback` if the value is
  * null/undefined or if JSON.parse throws.
+ *
+ * @deprecated Use `parseJsonSafe` / `parseJsonSafeArray` / `parseJsonFallback`
+ * from `server/db/json-validation.ts` instead. Those helpers add Zod schema
+ * validation, per-item resilience for arrays, and structured warning logs.
+ * This function is retained only because removing it would break the
+ * json-column-helpers-pure test suite.
  */
 export function parseJsonColumn<T>(val: string | null | undefined, fallback: T): T {
   if (val == null) return fallback;

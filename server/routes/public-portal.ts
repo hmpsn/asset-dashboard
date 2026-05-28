@@ -12,17 +12,14 @@ import { validate, z } from '../middleware/validate.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { hasClientUsers, verifyClientToken } from '../client-users.js';
-import { getGA4TopPages } from '../google-analytics.js';
-import { verifyClientSession } from '../middleware.js';
+import { requireAuthenticatedClientPortalAuth, verifyClientSession } from '../middleware.js';
+
 import { getLatestSnapshotBefore } from '../reports.js';
 import { getEffectiveAudit, getLatestEffectiveSnapshot, listEffectiveSnapshotSummaries } from '../audit-snapshot-views.js';
-import { getAllGscPages } from '../search-console.js';
+import { getAuditTrafficForWorkspace } from '../audit-traffic.js';
 import { isStripeConfigured, listProducts } from '../stripe.js';
 import { updateWorkspace, getWorkspace, computeEffectiveTier } from '../workspaces.js';
-import { getLatestPublishedBriefing, countPublishedBriefingsThrough } from '../briefing-store.js';
-import { generateIssueSummary } from '../briefing-summary.js';
-import { computeOpportunityScore } from './keyword-strategy.js';
-import type { BriefingRecommendation } from '../../shared/types/briefing.js';
+import { buildBriefingClientView } from '../briefing-client-projection.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
 import { parseJsonSafeArray } from '../db/json-validation.js';
@@ -31,9 +28,13 @@ import { debouncedStrategyInvalidate, invalidateSubCachePrefix } from '../bridge
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { getBookingUrl } from '../studio-config.js';
 import { listBlueprints } from '../page-strategy.js';
-import { addTrackedKeyword, addTrackedKeywords } from '../rank-tracking.js';
-import { trackedKeywordSourceForFeedback } from '../keyword-feedback-tracking.js';
-import { listContentGaps } from '../content-gaps.js';
+import {
+  clearKeywordFeedback,
+  listPublicKeywordFeedback,
+  notifyKeywordFeedbackChanged,
+  saveBulkKeywordFeedback,
+  saveKeywordFeedback,
+} from '../keyword-feedback.js';
 import { getSection, getSectionsForEntry, getEntryCopyStatus, updateSectionStatus, addClientSuggestion } from '../copy-review.js';
 import {
   CLIENT_BUSINESS_PRIORITIES_MARKER,
@@ -51,8 +52,10 @@ import {
 } from '../schemas/keyword-feedback.js';
 import { isProgrammingError } from '../errors.js';
 import { normalizeSocialProfiles } from '../social-profiles.js';
+import { computeTrialState } from '../billing/trial-state.js';
 import { toPublicWorkspaceView } from '../serializers/client-safe.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
+import { getVoiceProfile } from '../voice-calibration.js';
 
 const log = createLogger('public-portal');
 
@@ -175,14 +178,23 @@ router.post('/api/public/onboarding/:id', async (req, res) => {
       }
     }
 
-    // 5. Update workspace
-    updateWorkspace(req.params.id, {
-      knowledgeBase: mergedKb,
-      brandVoice: mergedVoice,
+    // 5. Update workspace — route brand voice through authority chain
+    const voiceProfile = getVoiceProfile(req.params.id);
+    const voiceProfileIsAuthoritative = voiceProfile?.status === 'calibrated';
+    const updates: Record<string, unknown> = {
+      knowledgeBase: voiceProfileIsAuthoritative
+        ? `${mergedKb}\n\n--- Brand Voice (from onboarding) ---\n${onboardingVoice}`
+        : mergedKb,
       personas,
       competitorDomains: competitorDomains.length > 0 ? competitorDomains : ws.competitorDomains,
       onboardingCompleted: true,
-    });
+    };
+    if (!voiceProfileIsAuthoritative) {
+      updates.brandVoice = mergedVoice;
+    } else {
+      log.info({ workspaceId: req.params.id }, 'Voice profile is calibrated — onboarding brand voice data folded into knowledgeBase instead of brandVoice');
+    }
+    updateWorkspace(req.params.id, updates);
 
     // client-visibility-ok: onboarding completion is internal audit history, not client timeline content.
     addActivity(wsId, 'client_onboarding_submitted', 'Client completed onboarding questionnaire', 'Via client portal');
@@ -199,15 +211,13 @@ router.get('/api/public/tier/:id', (req, res) => {
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
   const effectiveTier = computeEffectiveTier(ws);
-  const trialDaysRemaining = ws.trialEndsAt
-    ? Math.max(0, Math.ceil((new Date(ws.trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-    : 0;
+  const trialState = computeTrialState(ws);
 
   res.json({
     tier: effectiveTier,
     baseTier: ws.tier || 'free',
-    isTrial: effectiveTier === 'growth' && (ws.tier || 'free') === 'free',
-    trialDaysRemaining,
+    isTrial: trialState.isTrial,
+    trialDaysRemaining: trialState.trialDaysRemaining,
     trialEndsAt: ws.trialEndsAt || null,
   });
 });
@@ -302,40 +312,14 @@ router.get('/api/public/audit-detail/:workspaceId', (req, res) => {
 });
 
 // Client lists their fix orders (public, no auth needed — filtered to fix category only)
-// Client-facing audit traffic map (public, by workspaceId)
-router.get('/api/public/audit-traffic/:workspaceId', async (req, res) => {
+// Client-facing audit traffic map. requireAuthenticatedClientPortalAuth so
+// passwordless workspaces also require real auth — see global gate caveat
+// in server/app.ts:262.
+router.get('/api/public/audit-traffic/:workspaceId', requireAuthenticatedClientPortalAuth(), async (req, res) => {
   try {
     const ws = getWorkspace(req.params.workspaceId);
-    if (!ws) return res.json({});
-
-    const trafficMap: Record<string, { clicks: number; impressions: number; sessions: number; pageviews: number }> = {};
-
-    if (ws.gscPropertyUrl) {
-      try {
-        const gscPages = await getAllGscPages(ws.id, ws.gscPropertyUrl, 28);
-        for (const p of gscPages) {
-          try {
-            const pagePath = new URL(p.page).pathname;
-            if (!trafficMap[pagePath]) trafficMap[pagePath] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
-            trafficMap[pagePath].clicks += p.clicks;
-            trafficMap[pagePath].impressions += p.impressions;
-          } catch { /* skip malformed URLs */ } // catch-ok
-        }
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'public-portal: GET /api/public/audit-traffic/:workspaceId: programming error'); /* GSC unavailable */ } // url-fetch-ok
-    }
-
-    if (ws.ga4PropertyId) {
-      try {
-        const ga4Pages = await getGA4TopPages(ws.ga4PropertyId, 28, 500);
-        for (const p of ga4Pages) {
-          const pagePath = p.path.startsWith('/') ? p.path : `/${p.path}`;
-          if (!trafficMap[pagePath]) trafficMap[pagePath] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
-          trafficMap[pagePath].pageviews += p.pageviews;
-          trafficMap[pagePath].sessions += p.users;
-        }
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'public-portal: programming error'); /* GA4 unavailable */ }
-    }
-
+    if (!ws) return res.status(404).json({ error: 'workspace not found' });
+    const trafficMap = await getAuditTrafficForWorkspace(ws);
     res.json(trafficMap);
   } catch (err) {
     if (isProgrammingError(err)) log.warn({ err }, 'public-portal: GET /api/public/audit-traffic/:workspaceId: programming error'); // url-fetch-ok
@@ -346,22 +330,11 @@ router.get('/api/public/audit-traffic/:workspaceId', async (req, res) => {
 
 // ── Client Keyword Feedback ──────────────────────────
 
-function notifyPublicKeywordFeedbackChanged(workspaceId: string, payload: Record<string, unknown>): void {
-  invalidateIntelligenceCache(workspaceId);
-  broadcastToWorkspace(workspaceId, WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED, {
-    workspaceId,
-    reason: 'keyword_feedback',
-    updatedAt: new Date().toISOString(),
-  });
-  broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_UPDATED, payload);
-}
-
 // Client: list their keyword feedback
 router.get('/api/public/keyword-feedback/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const rows = db.prepare('SELECT keyword, status, reason, source, created_at, updated_at FROM keyword_feedback WHERE workspace_id = ? ORDER BY updated_at DESC').all(ws.id);
-  res.json(rows);
+  res.json(listPublicKeywordFeedback(ws.id));
 });
 
 // Client: submit keyword feedback (approve/decline)
@@ -370,30 +343,34 @@ router.post('/api/public/keyword-feedback/:workspaceId', requireClientStrategyMu
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const { keyword, status, reason, source } = req.body as KeywordFeedbackBody;
-  const kw = keywordComparisonKey(keyword);
-  const displayKeyword = keyword.trim();
   const declinedBy = typeof res.locals.clientEmail === 'string' ? res.locals.clientEmail : 'client';
 
-  db.prepare(`
-    INSERT INTO keyword_feedback (workspace_id, keyword, status, reason, source, declined_by)
-    VALUES (?, ?, ?, ?, ?, ?)
-    ON CONFLICT(workspace_id, keyword) DO UPDATE SET
-      status = excluded.status,
-      reason = excluded.reason,
-      declined_by = excluded.declined_by,
-      updated_at = datetime('now')
-  `).run(ws.id, kw, status, reason || null, source, declinedBy);
+  const { response, trackedKeyword } = saveKeywordFeedback({
+    workspaceId: ws.id,
+    keyword,
+    status,
+    reason,
+    source,
+    declinedBy,
+  });
 
-  if (status === 'approved') {
-    addTrackedKeyword(ws.id, displayKeyword, { source: trackedKeywordSourceForFeedback(source) });
-    broadcastToWorkspace(ws.id, WS_EVENTS.RANK_TRACKING_UPDATED, { keyword: displayKeyword, action: 'feedback_approved', source: 'client_feedback' });
+  if (trackedKeyword) {
+    broadcastToWorkspace(ws.id, WS_EVENTS.RANK_TRACKING_UPDATED, {
+      keyword: trackedKeyword,
+      action: 'feedback_approved',
+      source: 'client_feedback',
+    });
   }
 
-  log.info(`Client keyword feedback: "${kw}" → ${status} for workspace ${ws.id}`);
-  notifyPublicKeywordFeedbackChanged(ws.id, { keyword: kw, status, source });
+  log.info(`Client keyword feedback: "${response.keyword}" → ${status} for workspace ${ws.id}`);
+  notifyKeywordFeedbackChanged(ws.id, {
+    keyword: response.keyword,
+    status: response.status,
+    source: response.source,
+  });
   // client-visibility-ok: this activity is for internal audit history, not client timeline display.
-  addActivity(wsId, 'client_keyword_feedback', `Client gave ${status} feedback on keyword: ${kw}`, 'Via client portal');
-  res.json({ keyword: kw, status, reason: reason || null });
+  addActivity(wsId, 'client_keyword_feedback', `Client gave ${status} feedback on keyword: ${response.keyword}`, 'Via client portal');
+  res.json(response);
 });
 
 // Client: bulk feedback
@@ -403,50 +380,28 @@ router.post('/api/public/keyword-feedback/:workspaceId/bulk', requireClientStrat
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const { keywords } = req.body as BulkKeywordFeedbackBody;
   const declinedBy = typeof res.locals.clientEmail === 'string' ? res.locals.clientEmail : 'client';
-
-  const stmt = db.prepare(`
-    INSERT INTO keyword_feedback (workspace_id, keyword, status, reason, source, declined_by)
-    VALUES (?, ?, ?, ?, ?, ?)
-    ON CONFLICT(workspace_id, keyword) DO UPDATE SET
-      status = excluded.status,
-      reason = excluded.reason,
-      declined_by = excluded.declined_by,
-      updated_at = datetime('now')
-  `);
-
-  const approvedKeywordEntries: Parameters<typeof addTrackedKeywords>[1] = [];
-  const insert = db.transaction((items: KeywordFeedbackBody[]) => {
-    for (const item of items) {
-      const kw = keywordComparisonKey(item.keyword);
-      stmt.run(ws.id, kw, item.status, item.reason || null, item.source, declinedBy);
-      if (item.status === 'approved') {
-        approvedKeywordEntries.push({
-          query: item.keyword.trim(),
-          options: { source: trackedKeywordSourceForFeedback(item.source) },
-        });
-      }
-    }
-    if (approvedKeywordEntries.length > 0) addTrackedKeywords(ws.id, approvedKeywordEntries);
+  const { response, trackedKeywords } = saveBulkKeywordFeedback({
+    workspaceId: ws.id,
+    keywords,
+    declinedBy,
   });
-  insert(keywords);
-  const approvedKeywords = approvedKeywordEntries.map(entry => entry.query);
   log.info(`Client bulk keyword feedback: ${keywords.length} keywords for workspace ${ws.id}`);
-  notifyPublicKeywordFeedbackChanged(ws.id, { updated: keywords.length });
-  if (approvedKeywords.length > 0) {
+  notifyKeywordFeedbackChanged(ws.id, { updated: response.updated });
+  if (trackedKeywords.length > 0) {
     broadcastToWorkspace(ws.id, WS_EVENTS.RANK_TRACKING_UPDATED, {
       action: 'feedback_bulk_approved',
       source: 'client_feedback',
-      keywords: approvedKeywords,
-      count: approvedKeywords.length,
+      keywords: trackedKeywords,
+      count: trackedKeywords.length,
     });
   }
   // client-visibility-ok: this activity is for internal audit history, not client timeline display.
   addActivity(wsId, 'client_keyword_feedback', `Client gave bulk keyword feedback (${keywords.length} keywords)`, 'Via client portal');
-  res.json({ updated: keywords.length });
+  res.json(response);
 });
 
 // Client: remove keyword feedback so a previously removed/restored keyword returns to neutral.
-// broadcast-ok: notifyPublicKeywordFeedbackChanged broadcasts strategy/signal invalidation after real feedback deletes.
+// broadcast-ok: notifyKeywordFeedbackChanged broadcasts strategy/signal invalidation after real feedback deletes.
 router.delete('/api/public/keyword-feedback/:workspaceId', (req, res) => {
   const wsId = req.params.workspaceId;
   const sessionToken = req.cookies?.[`client_session_${wsId}`];
@@ -468,32 +423,19 @@ router.delete('/api/public/keyword-feedback/:workspaceId', (req, res) => {
         : '';
   const keyword = keywordComparisonKey(rawKeyword);
   if (!keyword) return res.status(400).json({ error: 'keyword required' });
+  const result = clearKeywordFeedback(ws.id, keyword);
+  if (!result.existed) return res.json(result);
 
-  const removeFeedback = db.transaction(() => {
-    const existing = db.prepare('SELECT status, source FROM keyword_feedback WHERE workspace_id = ? AND keyword = ?').get(ws.id, keyword) as { status: string; source: string | null } | undefined;
-    if (!existing) {
-      return { existing: undefined, deleted: false };
-    }
-
-    const result = db.prepare('DELETE FROM keyword_feedback WHERE workspace_id = ? AND keyword = ?').run(ws.id, keyword);
-    return { existing, deleted: result.changes > 0 };
-  });
-  const { existing, deleted } = removeFeedback();
-
-  if (!existing || !deleted) {
-    return res.json({ deleted: keyword, existed: false });
-  }
-
-  log.info(`Client keyword feedback removed: "${keyword}" for workspace ${ws.id} (was ${existing.status})`);
-  notifyPublicKeywordFeedbackChanged(ws.id, {
-    keyword,
+  log.info(`Client keyword feedback removed: "${keyword}" for workspace ${ws.id} (was ${result.previousStatus})`);
+  notifyKeywordFeedbackChanged(ws.id, {
+    keyword: result.deleted,
     status: 'cleared',
-    previousStatus: existing.status,
-    source: existing.source,
+    previousStatus: result.previousStatus,
+    source: result.source,
   });
   // client-visibility-ok: this activity is for internal audit history, not client timeline display.
-  addActivity(wsId, 'client_keyword_feedback', `Client removed keyword feedback: ${keyword} (was ${existing.status})`, 'Via client portal');
-  res.json({ deleted: keyword, existed: true });
+  addActivity(wsId, 'client_keyword_feedback', `Client removed keyword feedback: ${keyword} (was ${result.previousStatus})`, 'Via client portal');
+  res.json(result);
 });
 
 // ── Client Business Priorities ──────────────────────────
@@ -844,6 +786,7 @@ router.post('/api/public/copy/:workspaceId/section/:sectionId/suggest', requireC
 //
 // admin-only fields (sourceMetadata, adminNote) are intentionally stripped —
 // only weekOf, publishedAt, and the BriefingStory[] array reach the client.
+// Enrichment logic lives in server/briefing-client-projection.ts.
 router.get('/api/public/briefing/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -856,87 +799,8 @@ router.get('/api/public/briefing/:workspaceId', (req, res) => {
     return res.status(402).json({ error: 'Briefing requires Growth or Premium tier' });
   }
 
-  const latest = getLatestPublishedBriefing(ws.id);
-  if (!latest) return res.json({ briefing: null });
-
-  // Phase 2.5b — issueNumber is the count of published briefings ≤ this one's
-  // publishedAt. Always ≥1 once published; falls back to 1 defensively when
-  // publishedAt is unexpectedly null (shouldn't happen for status='published').
-  const issueNumber = latest.publishedAt
-    ? countPublishedBriefingsThrough(ws.id, latest.publishedAt)
-    : 1;
-
-  // Phase 2.5b — recommendations sourced live from current contentGaps.
-  // Score-fallback: when a gap is missing `opportunityScore` we compute it
-  // here using the same formula as keyword-strategy.ts so ranking is stable
-  // across stored vs newly-collected gaps. Top 5 by score are returned.
-  //
-  // Defense-in-depth: explicit field projection rather than spread. ContentGap
-  // is workspace-scoped strategy data with no admin-only fields TODAY, but a
-  // future field added there must NOT silently leak through `...gap`. Any
-  // change to the public projection now requires touching this list.
-  // Source contentGaps from the dedicated table (post-#365 normalization).
-  // The blob no longer carries them — listContentGaps is the only source of truth.
-  const gaps = listContentGaps(ws.id);
-  type GapMapped = BriefingRecommendation & { volume?: number; impressions?: number; opportunityScore?: number };
-  const recommendations: BriefingRecommendation[] = gaps
-    .map((gap): GapMapped => ({
-      topic: gap.topic,
-      targetKeyword: gap.targetKeyword,
-      intent: gap.intent,
-      priority: gap.priority,
-      rationale: gap.rationale,
-      suggestedPageType: gap.suggestedPageType,
-      volume: gap.volume,
-      difficulty: gap.difficulty,
-      trendDirection: gap.trendDirection,
-      serpFeatures: gap.serpFeatures,
-      impressions: gap.impressions,
-      competitorProof: gap.competitorProof,
-      questionKeywords: gap.questionKeywords,
-      serpTargeting: gap.serpTargeting,
-      opportunityScore: gap.opportunityScore ?? computeOpportunityScore(gap),
-    }))
-    .sort((a, b) => {
-      // Three-bucket sort (matches keyword-strategy.ts content gap ordering):
-      //   2 = Positive volume OR GSC-proven impressions — confirmed demand
-      //   1 = Unenriched (null/undefined) — not yet checked, potential
-      //   0 = Zero volume with no impressions — confirmed no demand
-      const getBundle = (g: typeof a) => {
-        if (g.volume == null) return { bucket: 1, vol: 0 };
-        if (g.volume > 0) return { bucket: 2, vol: g.volume };
-        if ((g.impressions ?? 0) > 0) return { bucket: 2, vol: g.impressions! };
-        return { bucket: 0, vol: 0 };
-      };
-      const ab = getBundle(a), bb = getBundle(b);
-      return bb.bucket - ab.bucket || bb.vol - ab.vol || (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0);
-    })
-    .slice(0, 5);
-
-  // The summary's "N opportunities to consider" reflects the FULL gap pool,
-  // not the post-cap render set. If 23 gaps exist, the summary still says
-  // "23 opportunities to consider" even though the briefing only renders 5.
-  const issueSummary = generateIssueSummary(latest.stories, gaps.length);
-
-  // Phase 2.5e — surface the AI-generated weekly opener when present.
-  // The rest of `sourceMetadata` (model, generationMs, ai timing, original
-  // hero headline) stays admin-only — only the opener string crosses the
-  // public boundary. Defensive: pull via optional chaining so older drafts
-  // without `aiPolish` round-trip cleanly.
-  const weeklyOpener = latest.sourceMetadata?.aiPolish?.weeklyOpener;
-  const briefing = {
-    weekOf: latest.weekOf,
-    publishedAt: latest.publishedAt,
-    stories: latest.stories,
-    issueSummary,
-    issueNumber,
-    recommendations,
-    weeklyOpener: weeklyOpener || undefined,
-  };
-
-  res.json({
-    briefing,
-  });
+  const briefing = buildBriefingClientView(ws.id);
+  res.json({ briefing });
 });
 
 export default router;

@@ -28,6 +28,7 @@ export { useNotifications, type NotificationItem } from './useNotifications';
 export { useAdminMeetingBrief } from './useAdminMeetingBrief';
 export { useLocalSeo, useLocalSeoLocationLookup, useLocalSeoRefresh, useLocalSeoUpdate, useSetPrimaryMarket } from './useLocalSeo';
 export { useLocalSeoLocations, useCreateLocation, useUpdateLocation, useDeleteLocation } from './useLocalSeoLocations';
+export { useEeatAssets, useCreateEeatAsset, useUpdateEeatAsset, useDeleteEeatAsset } from './useEeatAssets';
 export { useBlueprints, useBlueprint, useBlueprintVersions } from './useBlueprints';
 export * from './useCopyPipeline';
 export { usePageJoin } from './usePageJoin';

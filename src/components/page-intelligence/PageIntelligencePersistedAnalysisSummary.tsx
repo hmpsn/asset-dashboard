@@ -1,6 +1,7 @@
 import { Sparkles } from 'lucide-react';
 import type { UnifiedPage } from '../../../shared/types/page-join';
 import { Button, scoreColorClass } from '../ui';
+import { formatDate } from '../../utils/formatDates';
 
 interface Props {
   page: UnifiedPage;
@@ -18,7 +19,7 @@ export function PageIntelligencePersistedAnalysisSummary({
   return (
     <div className="pt-2 border-t border-[var(--brand-border)]">
       <div className="flex items-center justify-between">
-        <span className="t-caption-sm text-accent-success">Analysis on file (run {new Date(analysisRunAt).toLocaleDateString()})</span>
+        <span className="t-caption-sm text-accent-success">Analysis on file (run {formatDate(analysisRunAt)})</span>
         <Button
           onClick={() => onAnalyzePage(page)}
           variant="ghost"

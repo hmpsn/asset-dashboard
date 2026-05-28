@@ -1077,7 +1077,12 @@ describe('POST /api/public/keyword-feedback — submit feedback', () => {
       });
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body).toEqual({ deleted: keyword, existed: true });
+      expect(body).toEqual({
+        deleted: keyword,
+        existed: true,
+        previousStatus: 'declined',
+        source: 'content_gap',
+      });
     });
 
     expect(payload).toEqual({

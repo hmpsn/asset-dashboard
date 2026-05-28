@@ -1,3 +1,8 @@
+import {
+  DEFAULT_CONTENT_GENERATION_STYLE,
+  type ContentGenerationStyle,
+} from '../shared/types/content.js';
+
 const CONVERSION_DENSE_PAGE_TYPES = new Set(['landing', 'service', 'location', 'homepage', 'product']);
 
 export interface PageTypeOutlineContract {
@@ -156,6 +161,27 @@ const DEFAULT_COPY_CONTRACT = `PAGE-TYPE COPY CONTRACT:
 - Use brand context selectively; do not expand the page just because more context is available.
 - Include one clear closing CTA path unless the brief explicitly asks for more.`;
 
+const CONTENT_GENERATION_STYLE_CONTRACTS: Record<ContentGenerationStyle, string> = {
+  standard: `CONTENT GENERATION STYLE (standard):
+- Balanced SEO depth, reader usefulness, and brand voice.
+- Preserve the page-type word budget and structure; do not add sections to sound more complete.
+- Use enough explanation to be credible, but cut filler, repeated proof, and generic setup.`,
+  concise: `CONTENT GENERATION STYLE (concise):
+- Write the shortest complete version that still feels useful and trustworthy.
+- Prefer fewer subpoints, tighter paragraphs, concrete examples, and direct buyer/reader language.
+- Treat section word counts as ceilings. Remove article-style teaching sprawl, repeated CTAs, and extra brand narrative.
+- For blogs/resources, keep necessary educational depth but compress examples and transitions.`,
+  hybrid: `CONTENT GENERATION STYLE (hybrid):
+- Blend concise structure with stronger POV, proof, and brand-specific positioning.
+- Keep the skeleton compact like concise mode, but allow one richer example, sharper differentiator, or more memorable framing where it earns its place.
+- Do not expand the page because brand context is available; express the brand in denser, more specific language.`,
+};
+
+export const GENERATION_STYLE_PRIORITY = `GENERATION STYLE PRIORITY:
+- The selected generation style shapes density, rhythm, and level of detail.
+- It never outranks factual safety, output format, page type, conversion goal, or word budget.
+- Brand voice remains active, but style selection controls how much room brand context gets.`;
+
 export const BRAND_CONTEXT_HIERARCHY = `BRAND CONTEXT PRIORITY:
 1. Factual safety and output format are mandatory.
 2. Page type, conversion goal, and word budget outrank style preferences.
@@ -165,6 +191,16 @@ export const BRAND_CONTEXT_HIERARCHY = `BRAND CONTEXT PRIORITY:
 
 export function getPageTypeCopyContract(pageType?: string): string {
   return PAGE_TYPE_COPY_CONTRACTS[pageType ?? ''] ?? DEFAULT_COPY_CONTRACT;
+}
+
+export function resolveContentGenerationStyle(style?: string | null): ContentGenerationStyle {
+  if (style === 'concise' || style === 'hybrid' || style === 'standard') return style;
+  return DEFAULT_CONTENT_GENERATION_STYLE;
+}
+
+export function getContentGenerationStyleContract(style?: string | null): string {
+  const resolved = resolveContentGenerationStyle(style);
+  return `${GENERATION_STYLE_PRIORITY}\n${CONTENT_GENERATION_STYLE_CONTRACTS[resolved]}`;
 }
 
 export function requiresPageTypeDensityReview(pageType?: string): boolean {

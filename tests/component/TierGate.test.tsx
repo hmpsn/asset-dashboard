@@ -76,6 +76,24 @@ describe('TierGate', () => {
     window.removeEventListener('tier-upgrade', handler as EventListener);
   });
 
+  it('calls onLearnMore when provided instead of dispatching tier-upgrade event', () => {
+    const handler = vi.fn();
+    const onLearnMore = vi.fn();
+    window.addEventListener('tier-upgrade', handler as EventListener);
+
+    render(
+      <TierGate tier="free" required="growth" feature="Performance Insights" onLearnMore={onLearnMore}>
+        <p>Locked</p>
+      </TierGate>
+    );
+
+    fireEvent.click(screen.getByText('Learn More'));
+    expect(onLearnMore).toHaveBeenCalledOnce();
+    expect(handler).not.toHaveBeenCalled();
+
+    window.removeEventListener('tier-upgrade', handler as EventListener);
+  });
+
   it('renders compact variant with lock icon message', () => {
     render(
       <TierGate tier="free" required="growth" feature="Chat" compact>

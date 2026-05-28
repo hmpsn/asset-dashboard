@@ -11,6 +11,7 @@ import { createLogger } from './logger.js';
 import { parseJsonFallback, parseJsonSafeArray } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
+import { dedupeByLast } from './utils/collections.js';
 
 const log = createLogger('cannibalization-issues');
 
@@ -128,13 +129,6 @@ function modelToParams(workspaceId: string, issue: CannibalizationItem) {
   };
 }
 
-function dedupeByKeyword(issues: CannibalizationItem[]): CannibalizationItem[] {
-  const byKeyword = new Map<string, CannibalizationItem>();
-  for (const issue of issues) {
-    byKeyword.set(keywordComparisonKey(issue.keyword), issue);
-  }
-  return [...byKeyword.values()];
-}
 
 const stmts = createStmtCache(() => ({
   listByWs: db.prepare<[workspaceId: string]>(
@@ -177,7 +171,7 @@ export function replaceAllCannibalizationIssues(workspaceId: string, issues: Can
     if (normalized.length !== issues.length) {
       log.warn({ workspaceId, total: issues.length, kept: normalized.length }, 'Skipping invalid cannibalization payload(s)');
     }
-    const deduped = dedupeByKeyword(normalized);
+    const deduped = dedupeByLast(normalized, i => keywordComparisonKey(i.keyword));
     const insert = stmts().insert;
     for (const issue of deduped) {
       insert.run(modelToParams(workspaceId, issue));
@@ -216,10 +210,11 @@ export function migrateFromJsonBlob(): void {
       const cannibalization = strategy.cannibalization;
       if (!Array.isArray(cannibalization) || cannibalization.length === 0) continue;
 
-      const normalized = dedupeByKeyword(
+      const normalized = dedupeByLast(
         cannibalization
           .map(issue => normalizeCannibalizationIssue(issue))
           .filter((issue): issue is CannibalizationItem => issue != null),
+        i => keywordComparisonKey(i.keyword),
       );
       if (normalized.length === 0) continue;
 

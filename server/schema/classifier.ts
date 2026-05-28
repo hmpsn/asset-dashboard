@@ -1,3 +1,5 @@
+import { normalizePageUrl } from '../helpers.js';
+
 /**
  * Deterministic URL → schema.org @type classifier.
  * Pure function. No AI, no DB.
@@ -35,22 +37,18 @@ export interface ClassifiedPage {
   pagePath: string;
 }
 
-function normalizePath(url: string, baseUrl: string): string {
-  let path: string;
+function normalizeClassifiedPath(url: string, baseUrl: string): string {
+  let path = url;
   try {
-    const u = new URL(url);
-    path = u.pathname;
+    path = new URL(url).pathname;
   } catch { // catch-ok: malformed URL falls back to string replacement
-    path = url.replace(baseUrl, '') || '/';
+    path = (url.replace(baseUrl, '') || '/').split('?')[0].split('#')[0];
   }
-  // Strip query and fragment (URL.pathname already does), then trailing slash (keep '/' for root)
-  path = path.split('?')[0].split('#')[0];
-  if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
-  return path.toLowerCase();
+  return normalizePageUrl(path).toLowerCase();
 }
 
 export function classifyPage(url: string, baseUrl: string, opts: ClassifyOpts = {}): ClassifiedPage {
-  const path = normalizePath(url, baseUrl);
+  const path = normalizeClassifiedPath(url, baseUrl);
 
   if (path === '' || path === '/') {
     const primaryType = opts.businessKind === 'local' ? 'LocalBusiness' : 'Organization';

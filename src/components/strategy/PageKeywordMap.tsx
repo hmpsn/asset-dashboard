@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import type { MetricsSource } from '../../../shared/types/keywords.js';
 import { SeoCopyPanel } from './SeoCopyPanel';
+import { capitalize } from '../../utils/strings';
 
 interface PageKeywordMap {
   pagePath: string;
@@ -121,7 +122,7 @@ export function PageKeywordMapPanel({
                   sortBy === s ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)]'
                 }`}
               >
-                {s === 'opportunity' ? 'Priority' : s.charAt(0).toUpperCase() + s.slice(1)}
+                {s === 'opportunity' ? 'Priority' : capitalize(s)}
                 {sortBy === s && (sortDir === 'desc' ? <Icon as={ArrowDown} size="sm" /> : <Icon as={ArrowUp} size="sm" />)}
               </Button>
             ))}

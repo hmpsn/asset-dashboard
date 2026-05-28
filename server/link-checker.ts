@@ -5,6 +5,7 @@ import { getWorkspacePages } from './workspace-data.js';
 import { listWorkspaces, getWorkspace } from './workspaces.js';
 import { webflowFetch } from './webflow-client.js';
 import { fetchPublishedHtml } from './helpers.js';
+import { extractLinks as extractHtmlLinks } from './html-analysis-utils.js';
 
 const log = createLogger('link-checker');
 
@@ -64,43 +65,17 @@ export function isCheckableUrl(href: string): boolean {
     && !href.includes('/cdn-cgi/'); // Cloudflare email/phone protection URLs
 }
 
-function extractLinks(html: string): Array<{ href: string; text: string }> {
-  const links: Array<{ href: string; text: string }> = [];
-  const seen = new Set<string>();
-
-  const addLink = (href: string, text: string) => {
-    const trimmed = href.trim();
-    if (isCheckableUrl(trimmed) && !seen.has(trimmed)) {
-      seen.add(trimmed);
-      links.push({ href: trimmed, text: text.slice(0, 100) });
-    }
-  };
-
-  // 1. Standard <a href="..."> links
-  const aRegex = /<a\s[^>]*href=["']([^"'#][^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
-  let match;
-  while ((match = aRegex.exec(html)) !== null) {
-    addLink(match[1], match[2].replace(/<[^>]*>/g, '').trim());
-  }
-
-  // 2. onclick navigation: window.location, window.location.href, location.href, window.open
-  const onclickRegex = /onclick=["'][^"']*(?:window\.(?:location(?:\.href)?|open)\s*[=(]\s*['"])([^'"]+)['"]/gi;
-  while ((match = onclickRegex.exec(html)) !== null) {
-    // Extract surrounding element text for context
-    const pos = match.index;
-    const surrounding = html.slice(Math.max(0, pos - 200), pos + match[0].length + 200);
-    const textMatch = surrounding.match(/>([^<]{1,100})</);
-    addLink(match[1], textMatch ? textMatch[1].trim() : '[button/onclick]');
-  }
-
-  // 3. <form action="..."> URLs
-  const formRegex = /<form\s[^>]*action=["']([^"'#][^"']*)["']/gi;
-  while ((match = formRegex.exec(html)) !== null) {
-    addLink(match[1], '[form action]');
-  }
-
-  return links;
-}
+const LINK_CHECKER_EXTRACTION_OPTIONS = {
+  includeOnclickUrls: true,
+  includeFormActions: true,
+  dedupeByHref: true,
+  excludeHashAnchors: true,
+  requireNonEmptyHref: true,
+  filterHref: isCheckableUrl,
+  maxTextLength: 100,
+  onclickFallbackText: '[button/onclick]',
+  formActionText: '[form action]',
+} as const;
 
 async function checkUrl(url: string, timeout = 10000): Promise<{ status: number | 'timeout' | 'error'; statusText: string; redirected: boolean; finalUrl?: string }> {
   const controller = new AbortController();
@@ -172,7 +147,7 @@ export async function checkSiteLinks(siteId: string, workspaceId?: string, domai
     );
     for (let j = 0; j < chunk.length; j++) {
       if (!htmls[j]) continue;
-      const links = extractLinks(htmls[j]!);
+      const links = extractHtmlLinks(htmls[j]!, LINK_CHECKER_EXTRACTION_OPTIONS);
       for (const link of links) {
         allLinks.push({ href: link.href, text: link.text, page: chunk[j].title, pageSlug: chunk[j].slug });
       }
@@ -204,7 +179,7 @@ export async function checkSiteLinks(siteId: string, workspaceId?: string, domai
       const htmls = await Promise.all(chunk.map(item => fetchPublishedHtml(item.url)));
       for (let j = 0; j < chunk.length; j++) {
         if (!htmls[j]) continue;
-        const links = extractLinks(htmls[j]!);
+        const links = extractHtmlLinks(htmls[j]!, LINK_CHECKER_EXTRACTION_OPTIONS);
         for (const link of links) {
           const cmsPageSlug = chunk[j].path.replace(/^\//, '');
           allLinks.push({ href: link.href, text: link.text, page: chunk[j].pageName, pageSlug: cmsPageSlug });

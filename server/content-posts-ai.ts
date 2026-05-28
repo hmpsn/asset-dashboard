@@ -14,7 +14,12 @@ import type { ContentBrief } from './content-brief.js';
 import type { GeneratedPost } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
 import { CREATIVE_WRITING_RULES } from './writing-quality.js';
-import { BRAND_CONTEXT_HIERARCHY, getPageTypeCopyContract, requiresPageTypeDensityReview } from './page-type-copy-contract.js';
+import {
+  BRAND_CONTEXT_HIERARCHY,
+  getContentGenerationStyleContract,
+  getPageTypeCopyContract,
+  requiresPageTypeDensityReview,
+} from './page-type-copy-contract.js';
 export { CREATIVE_WRITING_RULES, WRITING_QUALITY_RULES } from './writing-quality.js';
 
 const log = createLogger('content-posts-ai');
@@ -329,6 +334,7 @@ export async function generateIntroduction(
   const typeInstructions = PAGE_TYPE_INTRO_INSTRUCTIONS[pageType] || PAGE_TYPE_INTRO_INSTRUCTIONS.blog;
   const pageLabel = pageType === 'blog' ? 'blog post' : pageType === 'landing' ? 'landing page' : pageType === 'pillar' ? 'pillar page' : `${pageType} page`;
   const pageTypeContract = getPageTypeCopyContract(pageType);
+  const generationStyleContract = getContentGenerationStyleContract(brief.generationStyle);
   const briefContext = buildBriefContextBlock(brief, siteDomain);
 
   const prompt = `${role}
@@ -346,6 +352,7 @@ ${brief.contentFormat ? `FORMAT: ${brief.contentFormat}` : ''}
 ${brief.toneAndStyle ? `TONE & STYLE: ${brief.toneAndStyle}` : ''}
 ${BRAND_CONTEXT_HIERARCHY}
 ${pageTypeContract}
+${generationStyleContract}
 ${voiceCtx}
 ${briefContext}
 
@@ -404,6 +411,7 @@ export async function generateSection(
   const typeInstructions = PAGE_TYPE_SECTION_INSTRUCTIONS[pageType] || PAGE_TYPE_SECTION_INSTRUCTIONS.blog;
   const pageLabel = pageType === 'blog' ? 'blog post' : pageType === 'landing' ? 'landing page' : pageType === 'pillar' ? 'pillar page' : `${pageType} page`;
   const pageTypeContract = getPageTypeCopyContract(pageType);
+  const generationStyleContract = getContentGenerationStyleContract(brief.generationStyle);
   const briefContext = buildBriefContextBlock(brief, siteDomain);
 
   const prevContext = previousSections.length > 0
@@ -432,6 +440,7 @@ AUDIENCE: ${brief.audience}
 ${brief.toneAndStyle ? `TONE & STYLE: ${brief.toneAndStyle}` : ''}
 ${BRAND_CONTEXT_HIERARCHY}
 ${pageTypeContract}
+${generationStyleContract}
 ${voiceCtx}
 ${briefContext}
 
@@ -497,6 +506,7 @@ export async function generateConclusion(
   const typeInstructions = PAGE_TYPE_CONCLUSION_INSTRUCTIONS[pageType] || PAGE_TYPE_CONCLUSION_INSTRUCTIONS.blog;
   const pageLabel = pageType === 'blog' ? 'blog post' : pageType === 'landing' ? 'landing page' : pageType === 'pillar' ? 'pillar page' : `${pageType} page`;
   const pageTypeContract = getPageTypeCopyContract(pageType);
+  const generationStyleContract = getContentGenerationStyleContract(brief.generationStyle);
   const briefContext = buildBriefContextBlock(brief, siteDomain);
 
   const prompt = `${role}
@@ -510,6 +520,7 @@ ${brief.toneAndStyle ? `TONE & STYLE: ${brief.toneAndStyle}` : ''}
 ${brief.ctaRecommendations?.length ? `CTA RECOMMENDATIONS:\n${brief.ctaRecommendations.map((c, i) => `${i === 0 ? '- PRIMARY' : '- Secondary'}: ${c}`).join('\n')}` : ''}
 ${BRAND_CONTEXT_HIERARCHY}
 ${pageTypeContract}
+${generationStyleContract}
 ${voiceCtx}
 ${briefContext}
 
@@ -651,6 +662,7 @@ export async function unifyPost(
   const role = PAGE_TYPE_WRITER_ROLE[pageType] || PAGE_TYPE_WRITER_ROLE.blog;
   const targetTotal = brief.wordCountTarget || 1800;
   const pageTypeContract = getPageTypeCopyContract(pageType);
+  const generationStyleContract = getContentGenerationStyleContract(brief.generationStyle);
   const densityReview = requiresPageTypeDensityReview(pageType);
 
   // Assemble the full draft for review
@@ -689,6 +701,7 @@ AUDIENCE: ${brief.audience}
 ${brief.toneAndStyle ? `TONE & STYLE: ${brief.toneAndStyle}` : ''}
 ${BRAND_CONTEXT_HIERARCHY}
 ${pageTypeContract}
+${generationStyleContract}
 ${voiceCtx}
 ${wordBudgetInstruction}
 
@@ -701,6 +714,7 @@ RULES:
 - Ensure the introduction's promises are fulfilled by the body sections
 - Ensure the conclusion ties back to the introduction's hook
 - Apply the page-type copy contract above before honoring brand voice flourish
+- Apply the generation style above inside the page-type budget; never let the selected style override factual safety, HTML/JSON output format, or page-type density
 - Use brand context to preserve vocabulary, proof, and positioning; do not add extra sections or CTAs because more brand context is available
 - For service, location, landing, homepage, and product pages: keep one final CTA/close, remove duplicate booking/discovery/contact blocks, and avoid blog-style teaching sprawl
 - For location pages: remove reader-facing SEO mechanics such as NAP consistency, schema, Google Business Profile hygiene, directory listings, and citation cleanup unless the page is explicitly for SEO professionals

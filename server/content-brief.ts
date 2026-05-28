@@ -8,35 +8,33 @@ import { buildReferenceContext, buildSerpContext, buildStyleExampleContext } fro
 import type { ScrapedPage } from './web-scraper.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
-import { stripCodeFences, sanitizeQueryForPrompt } from './helpers.js';
+import { sanitizeQueryForPrompt } from './helpers.js';
 
 export type { ContentBrief } from '../shared/types/content.ts';
-import type { ContentBrief, StrategyCardContext } from '../shared/types/content.ts';
+import type { ContentBrief, ContentGenerationStyle, StrategyCardContext } from '../shared/types/content.ts';
 import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
 import {
   outlineItemSchema, serpAnalysisSchema, eeatGuidanceSchema,
   schemaRecommendationSchema, keywordValidationSchema, realTopResultSchema,
 } from './schemas/content-schemas.js';
+import {
+  parseContentBriefOutline,
+  parseContentBriefSchema,
+} from './schemas/ai-content-brief.js';
 import { z } from 'zod';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
 import { buildOutcomeLearningStatusNote } from './outcome-learning-default-path.js';
+import { formatEeatRecommendation } from './eeat-trust-signals.js';
 import {
+  getContentGenerationStyleContract,
   getPageTypeOutlineContract,
   getPageTypeOutlineGuidance,
+  resolveContentGenerationStyle,
 } from './page-type-copy-contract.js';
+import type { EeatAssetRecommendation } from '../shared/types/eeat-assets.js';
 
 const log = createLogger('content-brief');
-/** Strip markdown code fences and parse JSON from AI responses. Throws on invalid JSON. */
-function parseAiJson<T = Record<string, unknown>>(raw: string, context: string): T {
-  const cleaned = stripCodeFences(raw);
-  try {
-    return JSON.parse(cleaned) as T;
-  } catch (err) {
-    log.debug({ err }, 'content-brief/parseAiJson: expected error — degrading gracefully');
-    throw new Error(`Failed to parse AI response as JSON (${context})`);
-  }
-}
 
 // ── Analytics Intelligence for brief enrichment ──
 
@@ -47,6 +45,16 @@ interface BriefIntelligenceInput {
   decayInsights?: Array<{ pageId: string; deltaPercent: number; baselineClicks: number; currentClicks: number }>;
   quickWins?: Array<{ pageUrl: string; query: string; currentPosition: number; estimatedTrafficGain: number }>;
   pageHealthScores?: Array<{ pageId: string; score: number; trend: string }>;
+}
+
+function buildEeatAssetBriefBlock(
+  pageRecommendations: EeatAssetRecommendation[] | undefined,
+  fallbackRecommendations: EeatAssetRecommendation[],
+): string {
+  const selected = (pageRecommendations?.length ? pageRecommendations : fallbackRecommendations).slice(0, 4);
+  if (selected.length === 0) return '';
+  const lines = selected.map((rec) => `- ${formatEeatRecommendation(rec)}`);
+  return `\n\nE-E-A-T ASSET RECOMMENDATIONS (use specific assets instead of generic trust advice):\n${lines.join('\n')}`;
 }
 
 /**
@@ -141,6 +149,7 @@ interface BriefRow {
   template_id: string | null;
   title_variants: string | null;
   meta_desc_variants: string | null;
+  generation_style: string | null;
 }
 
 const stmts = createStmtCache(() => ({
@@ -154,7 +163,7 @@ const stmts = createStmtCache(() => ({
             cta_recommendations, eeat_guidance, content_checklist, schema_recommendations,
             page_type, reference_urls, real_people_also_ask, real_top_results,
             keyword_locked, keyword_source, keyword_validation, template_id,
-            title_variants, meta_desc_variants)
+            title_variants, meta_desc_variants, generation_style)
          VALUES
            (@id, @workspace_id, @target_keyword, @secondary_keywords, @suggested_title,
             @suggested_meta_desc, @outline, @word_count_target, @intent, @audience,
@@ -164,7 +173,7 @@ const stmts = createStmtCache(() => ({
             @cta_recommendations, @eeat_guidance, @content_checklist, @schema_recommendations,
             @page_type, @reference_urls, @real_people_also_ask, @real_top_results,
             @keyword_locked, @keyword_source, @keyword_validation, @template_id,
-            @title_variants, @meta_desc_variants)`,
+            @title_variants, @meta_desc_variants, @generation_style)`,
   ),
   selectByWorkspace: db.prepare(
     `SELECT * FROM content_briefs WHERE workspace_id = ? ORDER BY created_at DESC`,
@@ -189,7 +198,8 @@ const stmts = createStmtCache(() => ({
            real_people_also_ask = @real_people_also_ask, real_top_results = @real_top_results,
            keyword_locked = @keyword_locked, keyword_source = @keyword_source,
            keyword_validation = @keyword_validation, template_id = @template_id,
-           title_variants = @title_variants, meta_desc_variants = @meta_desc_variants
+           title_variants = @title_variants, meta_desc_variants = @meta_desc_variants,
+           generation_style = @generation_style
          WHERE id = @id AND workspace_id = @workspace_id`,
   ),
   deleteById: db.prepare(
@@ -244,6 +254,7 @@ function rowToBrief(row: BriefRow): ContentBrief {
     templateId: row.template_id ?? undefined,
     titleVariants: row.title_variants ? parseJsonSafeArray(row.title_variants, z.string(), { field: 'title_variants', table: 'content_briefs' }) : undefined,
     metaDescVariants: row.meta_desc_variants ? parseJsonSafeArray(row.meta_desc_variants, z.string(), { field: 'meta_desc_variants', table: 'content_briefs' }) : undefined,
+    generationStyle: resolveContentGenerationStyle(row.generation_style),
   };
 }
 
@@ -284,6 +295,7 @@ function briefToParams(brief: ContentBrief): Record<string, unknown> {
     template_id: brief.templateId ?? null,
     title_variants: brief.titleVariants ? JSON.stringify(brief.titleVariants) : null,
     meta_desc_variants: brief.metaDescVariants ? JSON.stringify(brief.metaDescVariants) : null,
+    generation_style: resolveContentGenerationStyle(brief.generationStyle),
   };
 }
 
@@ -777,8 +789,11 @@ export async function regenerateBrief(
   const workspaceContextBlock = formatContentGenerationPromptBlock(promptContext);
   const ptConfig = getPageTypeConfig(existingBrief.pageType);
   const outlineGuidance = getPageTypeOutlineGuidance(existingBrief.pageType);
+  const generationStyle = resolveContentGenerationStyle(existingBrief.generationStyle);
+  const generationStyleContract = getContentGenerationStyleContract(generationStyle);
 
   const previousBriefJson = JSON.stringify({
+    generationStyle,
     suggestedTitle: existingBrief.suggestedTitle,
     suggestedMetaDesc: existingBrief.suggestedMetaDesc,
     executiveSummary: existingBrief.executiveSummary,
@@ -813,6 +828,8 @@ ${workspaceContextBlock}
 Please regenerate the ENTIRE brief incorporating the user's feedback. Keep everything that was good, improve what the user requested, and maintain all required fields.
 
 ${outlineGuidance}
+
+${generationStyleContract}
 
 For conversion pages, page type and word budget outrank brand/context expansion. Use brand context to choose wording, proof, and positioning; do not add extra sections because more brand context is available.
 
@@ -863,7 +880,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
   });
 
   const raw = aiResult.text || '{}';
-  const parsed = parseAiJson(raw, 'brief-regenerate');
+  const parsed = parseContentBriefSchema(raw);
 
   // Create a new brief ID — preserves the old one for history
   const newBrief: ContentBrief = {
@@ -904,6 +921,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     keywordSource: existingBrief.keywordSource,
     keywordValidation: existingBrief.keywordValidation,
     templateId: existingBrief.templateId,
+    generationStyle,
   };
 
   upsertBrief(workspaceId, newBrief);
@@ -930,6 +948,8 @@ export async function regenerateOutline(
   const workspaceContextBlock = formatContentGenerationPromptBlock(promptContext);
   const ptConfig = getPageTypeConfig(existingBrief.pageType);
   const outlineGuidance = getPageTypeOutlineGuidance(existingBrief.pageType);
+  const generationStyle = resolveContentGenerationStyle(existingBrief.generationStyle);
+  const generationStyleContract = getContentGenerationStyleContract(generationStyle);
 
   const currentOutline = JSON.stringify(existingBrief.outline, null, 2);
 
@@ -951,6 +971,8 @@ ${feedback ? `User feedback on the outline:\n${feedback}\n` : ''}
 Generate a new outline that ${feedback ? 'addresses the feedback above' : 'takes a fresh approach to the topic structure'}.
 
 ${outlineGuidance}
+
+${generationStyleContract}
 
 For conversion pages, page type and word budget outrank brand/context expansion. Use brand context to choose wording, proof, and positioning; do not add extra sections because more brand context is available.
 
@@ -974,26 +996,21 @@ Rules:
   );
 
   const aiResult = await callAI({
+    operation: 'content-brief-outline',
     model: 'gpt-5.4',
     system: systemPrompt,
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 4000,
     temperature: 0.6,
     researchMode: true,
-    feature: 'content-brief-outline-regen',
     workspaceId,
   });
 
-  // Parse the outline from the response
+  // Parse the outline from the response — must be a bare JSON array (see ai-content-brief.ts)
   const outlineRaw = aiResult.text || '[]';
-  const outlineParsed = parseAiJson<Record<string, unknown> | unknown[]>(outlineRaw, 'outline-regen');
-  const candidateItems = Array.isArray(outlineParsed)
-    ? outlineParsed
-    : ((outlineParsed as Record<string, unknown>).outline
-      ?? (outlineParsed as Record<string, unknown>).sections
-      ?? []);
+  const candidateItems = parseContentBriefOutline(outlineRaw);
 
-  if (!Array.isArray(candidateItems) || candidateItems.length === 0) {
+  if (candidateItems.length === 0) {
     throw new Error('Failed to parse regenerated outline');
   }
 
@@ -1076,6 +1093,8 @@ export async function generateBrief(
     strategyCardContext?: StrategyCardContext;
     /** If this brief is being generated for a decaying page, the pre-formatted decay query breakdown block to inject into the prompt. */
     decayQueryContext?: string;
+    /** Admin-selected writing style for the brief and downstream post generation. */
+    generationStyle?: ContentGenerationStyle;
   },
   options?: {
     /** Persist generated brief row to content_briefs (default: true). */
@@ -1093,12 +1112,22 @@ export async function generateBrief(
 
   // Pull in keyword strategy context for alignment
   const { intelligence: seoContextResult, promptContext: seoPromptContext } = await buildContentGenerationContext(workspaceId, {
-    slices: ['seoContext'],
+    slices: ['seoContext', 'eeatAssets'],
     tokenBudget: 3600,
   });
   const seo = seoContextResult.seoContext;
   const workspaceContextBlock = formatContentGenerationPromptBlock(seoPromptContext);
   const kwMapContext = formatPageMapForPrompt(seo);
+  const fallbackEeatRecommendations: EeatAssetRecommendation[] = (seoContextResult.eeatAssets?.assets ?? [])
+    .slice(0, 4)
+    .map(asset => ({
+      assetId: asset.id,
+      type: asset.type,
+      title: asset.title,
+      reason: 'Use this existing workspace asset as concrete trust evidence in the brief.',
+      surface: 'content_brief',
+      url: asset.url,
+    }));
   const bizCtx = context.businessContext || '';
 
   // Find if any page in the strategy targets this keyword — inject its analysis data.
@@ -1169,6 +1198,7 @@ export async function generateBrief(
       pageAnalysisBlock = `\n\nPAGE ANALYSIS CONTEXT (from prior Page Intelligence analysis — address these specific issues in the brief):\n${parts.join('\n')}`;
     }
   }
+  const eeatAssetBlock = buildEeatAssetBriefBlock(matchedPage?.eeatAssetRecommendations, fallbackEeatRecommendations);
 
   // Build providerLabel early — used in SERP features block and keyword metrics block below.
   const providerLabel = context.providerLabel ?? 'SEMRush';
@@ -1273,6 +1303,8 @@ The outline sections MUST match the following template sections in order. You ma
   // Page-type-specific instructions and configuration
   const ptConfig = getPageTypeConfig(context.pageType);
   const outlineGuidance = getPageTypeOutlineGuidance(context.pageType);
+  const generationStyle = resolveContentGenerationStyle(context.generationStyle);
+  const generationStyleContract = getContentGenerationStyleContract(generationStyle);
   const pageTypeBlock = context.pageType && PAGE_TYPE_CONFIGS[context.pageType]
     ? `\n\n${ptConfig.prompt}\n\nCONTENT STYLE: ${ptConfig.contentStyle}\n\n${outlineGuidance}\n\nTailor ALL aspects of the brief (outline structure, word count, CTA, schema, content format) to this page type. The wordCountTarget MUST be approximately ${ptConfig.wordCountTarget} (range: ${ptConfig.wordCountRange} words). Do NOT default to 1800 words unless this is a blog post. For conversion pages, use brand context to choose wording, proof, and positioning; do not add extra sections because more brand context is available.`
     : '';
@@ -1322,13 +1354,15 @@ The outline sections MUST match the following template sections in order. You ma
 
   const prompt = `Generate a right-sized, production-ready content brief for a new piece of content targeting the keyword "${targetKeyword}".${pageTypeBlock}
 
+${generationStyleContract}
+
 ${bizCtx ? `Business context: ${bizCtx}` : ''}
 
 Related search queries from Google Search Console:
 ${relatedStr}
 
 Existing pages on the site:
-${pagesStr}${workspaceContextBlock}${kwMapContext}${providerMetricsBlock}${ga4Block}${pageAnalysisBlock}${decayBlock}${serpFeaturesDirectiveBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${strategyCardBlock}${intelligenceBlock}${learningsBlock}${learningsStatusBlock}
+${pagesStr}${workspaceContextBlock}${kwMapContext}${providerMetricsBlock}${ga4Block}${pageAnalysisBlock}${eeatAssetBlock}${decayBlock}${serpFeaturesDirectiveBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${strategyCardBlock}${intelligenceBlock}${learningsBlock}${learningsStatusBlock}
 
 Generate a content brief in the following JSON format:
 {
@@ -1432,7 +1466,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
   });
 
   const raw = aiResult.text || '{}';
-  const parsed = parseAiJson(raw, 'content-brief');
+  const parsed = parseContentBriefSchema(raw);
 
   const brief: ContentBrief = {
     id: `brief_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -1476,6 +1510,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     keywordSource: context.keywordSource || undefined,
     keywordValidation: context.keywordValidation || undefined,
     templateId: context.templateId || undefined,
+    generationStyle,
   };
 
   if (options?.persist !== false) {

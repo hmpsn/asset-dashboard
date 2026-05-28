@@ -69,9 +69,11 @@ vi.mock('../../src/components/PostEditor', () => ({
 }));
 
 vi.mock('../../src/components/briefs/BriefGenerator', () => ({
-  BriefGenerator: ({ keyword, onKeywordChange, onGenerate, generating, error }: {
+  BriefGenerator: ({ keyword, generationStyle, onKeywordChange, onGenerationStyleChange, onGenerate, generating, error }: {
     keyword: string;
+    generationStyle: string;
     onKeywordChange: (v: string) => void;
+    onGenerationStyleChange: (v: 'standard' | 'concise' | 'hybrid') => void;
     onGenerate: () => void;
     generating: boolean;
     error: string;
@@ -83,6 +85,15 @@ vi.mock('../../src/components/briefs/BriefGenerator', () => ({
         onChange={e => onKeywordChange(e.target.value)}
         placeholder="Target keyword"
       />
+      <select
+        data-testid="generation-style-select"
+        value={generationStyle}
+        onChange={e => onGenerationStyleChange(e.target.value as 'standard' | 'concise' | 'hybrid')}
+      >
+        <option value="standard">Standard</option>
+        <option value="concise">Concise</option>
+        <option value="hybrid">Hybrid</option>
+      </select>
       <button data-testid="generate-btn" onClick={onGenerate} disabled={generating}>
         {generating ? 'Generating...' : 'Generate Brief'}
       </button>
@@ -92,10 +103,37 @@ vi.mock('../../src/components/briefs/BriefGenerator', () => ({
 }));
 
 vi.mock('../../src/components/briefs/RequestList', () => ({
-  RequestList: ({ clientRequests }: { clientRequests: ContentTopicRequest[] }) => (
+  RequestList: ({
+    clientRequests,
+    generationStyle,
+    onGenerationStyleChange,
+    onGenerateBriefForRequest,
+  }: {
+    clientRequests: ContentTopicRequest[];
+    generationStyle: 'standard' | 'concise' | 'hybrid';
+    onGenerationStyleChange: (v: 'standard' | 'concise' | 'hybrid') => void;
+    onGenerateBriefForRequest: (req: ContentTopicRequest, style?: 'standard' | 'concise' | 'hybrid') => void;
+  }) => (
     <div data-testid="request-list">
       {clientRequests.map(r => (
-        <div key={r.id} data-testid={`request-${r.id}`}>{r.topic}</div>
+        <div key={r.id} data-testid={`request-${r.id}`}>
+          {r.topic}
+          <select
+            data-testid={`request-style-${r.id}`}
+            value={generationStyle}
+            onChange={e => onGenerationStyleChange(e.target.value as 'standard' | 'concise' | 'hybrid')}
+          >
+            <option value="standard">Standard</option>
+            <option value="concise">Concise</option>
+            <option value="hybrid">Hybrid</option>
+          </select>
+          <button
+            data-testid={`request-generate-${r.id}`}
+            onClick={() => onGenerateBriefForRequest(r, generationStyle)}
+          >
+            Generate Request Brief
+          </button>
+        </div>
       ))}
     </div>
   ),
@@ -383,12 +421,14 @@ describe('ContentBriefs', () => {
     renderComponent();
     const keywordInput = screen.getByTestId('keyword-input');
     await act(async () => { fireEvent.change(keywordInput, { target: { value: 'new keyword' } }); });
+    const styleSelect = screen.getByTestId('generation-style-select');
+    await act(async () => { fireEvent.change(styleSelect, { target: { value: 'concise' } }); });
     const generateBtn = screen.getByTestId('generate-btn');
     await act(async () => { fireEvent.click(generateBtn); });
     await waitFor(() => {
       expect(mocks.postFn).toHaveBeenCalledWith(
         expect.stringContaining('/api/content-briefs/ws-1/generate'),
-        expect.objectContaining({ targetKeyword: 'new keyword' })
+        expect.objectContaining({ targetKeyword: 'new keyword', generationStyle: 'concise' })
       );
     });
   });
@@ -412,6 +452,27 @@ describe('ContentBriefs', () => {
     renderComponent();
     expect(screen.getByTestId('request-list')).toBeInTheDocument();
     expect(screen.getByTestId(`request-${req.id}`)).toHaveTextContent('SEO Best Practices');
+  });
+
+  it('sends selected writing style when generating a brief from a request', async () => {
+    const req = makeRequest();
+    mocks.postFn.mockResolvedValue(makeBrief({ id: 'brief-from-request', generationStyle: 'hybrid' }));
+    setHooks({ requests: [req] });
+    renderComponent();
+
+    await act(async () => {
+      fireEvent.change(screen.getByTestId(`request-style-${req.id}`), { target: { value: 'hybrid' } });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId(`request-generate-${req.id}`));
+    });
+
+    await waitFor(() => {
+      expect(mocks.postFn).toHaveBeenCalledWith(
+        expect.stringContaining(`/api/content-requests/ws-1/${req.id}/generate-brief`),
+        expect.objectContaining({ generationStyle: 'hybrid' }),
+      );
+    });
   });
 
   // 13. onRequestCountChange is called with pending count

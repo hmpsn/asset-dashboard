@@ -11,13 +11,14 @@
 
 **hmpsn.studio** is an SEO/web analytics agency platform. React 19 + Vite 8 + TailwindCSS 4 + React Router DOM 7 (frontend), Express + TypeScript (backend), SQLite via better-sqlite3 (storage).
 
-Integrations: Webflow, Google Search Console, GA4, SEMRush, DataForSEO (both via `SeoDataProvider` interface in `server/seo-data-provider.ts`), Stripe, OpenAI (GPT-4.1), Anthropic (Claude for creative prose).
+Integrations: Webflow, Google Search Console, GA4, SEMRush, DataForSEO (both via `SeoDataProvider` interface in `server/seo-data-provider.ts`), Stripe, OpenAI (GPT-5.4 family, default `gpt-5.4-mini`; `gpt-5.4` for higher-quality ops; `gpt-5.4-nano` for bulk/cheap ops; `gpt-5.5` for complex cross-context), Anthropic (Claude for creative prose).
 
-- **Routing** — React Router DOM 7. `src/routes.ts` defines `Page` + `ClientTab` types, `adminPath()` + `clientPath()` helpers. Admin: `/ws/:workspaceId/:tab?`. Client: `/client/:workspaceId/:tab?` (betaMode variant: `/client/beta/:workspaceId/:tab?`). **Inbox sub-routing:** the Inbox tab uses `?tab=decisions|reviews|conversations` (`InboxFilter` values, not `ClientTab` values) — the `?tab=` deep-link two-halves contract applies here too. Legacy aliases still work: `approvals→decisions`, `requests→conversations`, `content→reviews`. **Retired tab:** `schema-review` was removed as a standalone `ClientTab` (old bookmarks redirect → `/inbox?tab=reviews`; `SchemaReviewModal` now mounts inside Inbox). **Added tab:** `content-plan`.
-- **API Client** — Typed fetch wrappers in `src/api/` (16 modules). No raw `fetch()` in components.
-- **Shared Types** — `shared/types/` (35 modules) shared between client and server.
-- **Storage** — SQLite (WAL mode, foreign keys ON) at `DATA_BASE/dashboard.db`. 93+ migrations in `server/db/migrations/`.
-- **AI** — Unified dispatcher: `callAI()` in `server/ai.ts` routes to either provider — new code should use this. Direct helpers: OpenAI via `server/openai-helpers.ts` (`callOpenAI`), Anthropic via `server/anthropic-helpers.ts` (`callAnthropic`) for creative prose.
+- **Routing** — React Router DOM 7. `src/routes.ts` defines `Page` + `ClientTab` types, `adminPath()` + `clientPath()` helpers. Admin: `/ws/:workspaceId/:tab?`. Client: `/client/:workspaceId/:tab?` (betaMode variant: `/client/beta/:workspaceId/:tab?`). **Inbox sub-routing:** the Inbox tab uses `?tab=decisions|reviews|conversations` (`InboxFilter` values, not `ClientTab` values) — the `?tab=` deep-link two-halves contract applies here too. Legacy aliases still work: `approvals→decisions`, `requests→conversations`, `content→reviews`. **Retired tab:** `schema-review` was removed as a standalone `ClientTab` (old bookmarks redirect → `/inbox?tab=reviews`; `SchemaReviewModal` now mounts inside Inbox). **Current `ClientTab` values:** `overview`, `performance`, `search`, `health`, `strategy`, `analytics`, `inbox`, `plans`, `roi`, `content-plan`, `brand`. (`approvals`, `requests`, `content` are legacy `ClientInboxAlias` values, not real tabs.)
+- **API Client** — Typed fetch wrappers in `src/api/` (20 modules). No raw `fetch()` in components.
+- **Shared Types** — `shared/types/` (48 modules) shared between client and server.
+- **Storage** — SQLite (WAL mode, foreign keys ON) at `DATA_BASE/dashboard.db`. 101+ migrations in `server/db/migrations/`.
+- **MCP Server** — `server/mcp/` exposes an MCP-protocol action server (workspaces, insights, content, keywords, intelligence, job actions). Uses `mcpAuthMiddleware` + `handleMcpRequest`. New tool categories go in `server/mcp/tools/`.
+- **AI** — Unified dispatcher: `callAI()` in `server/ai.ts` is the single entry point for all server-side AI calls (zero direct `callOpenAI`/`callAnthropic` callers as of 2026-05-27; ~50 `callAI()` sites). For creative prose with Claude-preferred + OpenAI fallback semantics, use `callCreativeAI()` in `server/content-posts-ai.ts` — itself a thin wrapper over `callAI({ provider: 'anthropic', ... })`. The provider-specific helpers (`server/openai-helpers.ts:callOpenAI`, `server/anthropic-helpers.ts:callAnthropic`) are implementation details consumed only by the dispatcher; new code must not import them directly.
 - **Auth** — Dual: internal JWT (7-day, admin) + client JWT (24h, per-workspace). Turnstile CAPTCHA optional.
 - **Payments** — Stripe Checkout (not Payment Intents). Config encrypted on disk (AES-256-GCM).
 - **Validation** — Zod v3 via `server/middleware/validate.ts`. Import as `import { validate, z } from '../middleware/validate.js'`.
@@ -36,7 +37,7 @@ Project rules live in three layers. Know which layer you're reading before copy-
 2. **[docs/rules/automated-rules.md](./docs/rules/automated-rules.md)** — every rule enforced by `scripts/pr-check.ts`. Auto-generated from the `CHECKS` array; do not hand-edit. CI fails if the committed file drifts from `npm run rules:generate`.
 3. **[docs/rules/*.md](./docs/rules/)** — deep-dive references for specific subsystems (data-flow, UI/UX, multi-agent coordination, analytics insights, AI dispatch patterns, etc.).
 
-When a CLAUDE.md rule becomes mechanizable, it moves to layer 2. The authoring guide for new pr-check rules is [docs/rules/pr-check-rule-authoring.md](./docs/rules/pr-check-rule-authoring.md).
+When a CLAUDE.md rule becomes mechanizable, it moves to layer 2. The authoring guide for new pr-check rules is [docs/rules/pr-check-rule-authoring.md](./docs/rules/pr-check-rule-authoring.md). The current rule count is **155** (137 error, 18 warn) — run `npm run rules:generate` if the committed file drifts.
 
 ---
 
@@ -44,6 +45,7 @@ When a CLAUDE.md rule becomes mechanizable, it moves to layer 2. The authoring g
 
 ### Before writing code
 
+0. **New environment?** — Run `npm run seed:demo` then `npm run smoke:core` to confirm local setup is healthy. See `docs/workflows/local-dev-onboarding.md`.
 1. **Check `data/roadmap.json`** — scan for `"status": "pending"` in current sprint. If user hasn't specified a task, suggest the next pending item.
 2. **Check `FEATURE_AUDIT.md`** — understand what exists. Don't build something that already exists.
 3. **If UI work** — read `BRAND_DESIGN_LANGUAGE.md` before writing any JSX.
@@ -72,7 +74,7 @@ Every completed task must include:
 | Multiple directions (architecture, new feature) | Present 2-3 options with tradeoffs. |
 | Conflicts with existing patterns | Flag conflict, recommend pattern-consistent approach. |
 | Unsure if something exists | Search first, then proceed. |
-| Pre-existing lint errors | Check Known Issues below. If listed, ignore. If new, fix only if caused by your changes. |
+| Pre-existing lint errors | The 21 `eslint-disable react-hooks/exhaustive-deps` suppressions in `src/` are pre-existing and acknowledged (see Code Conventions). All other pre-existing lint errors: fix only if caused by your changes. |
 | Bug found during review (any origin) | Fix it in the current PR. Never defer a fixable bug — whether it's from your changes, pre-existing, or out-of-scope. Compounding unfixed bugs is worse than a slightly larger diff. If the fix is genuinely risky or large, flag it explicitly and offer to fix it. |
 
 ---
@@ -90,6 +92,22 @@ Every completed task must include:
 | `npx playwright test` | E2E tests (requires server running) |
 | `npx tsx scripts/sort-roadmap.ts` | Auto-archive completed sprints |
 | `npx tsx scripts/pr-check.ts` | Automated pre-PR checklist (color violations, JSON.parse, hard-coded names) |
+| `npm run pr-check` | Alias for `npx tsx scripts/pr-check.ts` |
+| `npm run pr-check:all` | Run pr-check across all changed + unchanged files |
+| `npm run db:migrate` | Run pending SQLite migrations |
+| `npm run db:sync-staging` | Sync staging database to local |
+| `npm run seed:demo` | Seed fixture workspaces for local dev (blocked in production) |
+| `npm run smoke:core` | Fast core smoke coverage — use after seeding |
+| `npm run test:unit` | Unit tests only |
+| `npm run test:integration` | Integration tests only |
+| `npm run test:contract` | Contract tests only |
+| `npm run test:component` | Component tests only |
+| `npm run test:coverage` | Full test suite with coverage report |
+| `npm run verify:platform` | Full platform health verification suite |
+| `npm run verify:platform:quick` | Quick platform checks (skips slow verifiers) |
+| `npm run verify:feature-flags` | Validate feature flag catalog consistency |
+| `npm run verify:coverage-ratchet` | Fail if coverage has regressed below ratchet |
+| `npm run rules:generate` | Regenerate `docs/rules/automated-rules.md` from pr-check CHECKS array |
 
 **Always verify after changes:** `npm run typecheck && npx vite build`
 
@@ -159,7 +177,7 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
    - New filter/category values → use shared const objects (like `INSIGHT_FILTER_KEYS`), not string literals
    - Percentage vs decimal fields → add JSDoc: `/** Already a percentage (e.g., 6.3 for 6.3%). Do NOT multiply by 100. */`
    - Shared string enums between producer/consumer → single const object imported by both sides
-6. **Wire new data sources into the intelligence engine** — any new table or store that captures workspace activity must be surfaced in `server/intelligence/`. Each slice lives at `server/intelligence/<name>-slice.ts` and exports a single `assembleX(workspaceId, opts?)` function plus a typed interface. Add a field to the appropriate slice interface in `shared/types/intelligence.ts` AND implement the read inside the corresponding `assemble*` function. `server/workspace-intelligence.ts` is the public facade that orchestrates all slices — call `buildWorkspaceIntelligence()` from there; do not call slice functions directly from route handlers. The AI context and AdminChat are blind to data that isn't wired into a slice. The relevant slice for client-facing signals and engagement data is `ClientSignalsSlice`. See `docs/rules/workspace-intelligence.md`.
+6. **Wire new data sources into the intelligence engine** — any new table or store that captures workspace activity must be surfaced in `server/intelligence/`. Each slice lives at `server/intelligence/<name>-slice.ts` and exports a single `assembleX(workspaceId, opts?)` function plus a typed interface. Add a field to the appropriate slice interface in `shared/types/intelligence.ts` AND implement the read inside the corresponding `assemble*` function. `server/workspace-intelligence.ts` is the public facade that orchestrates all slices — call `buildWorkspaceIntelligence()` from there; do not call slice functions directly from route handlers. The AI context and AdminChat are blind to data that isn't wired into a slice. **Current slices:** `seoContext`, `insights`, `siteHealth`, `siteInventory`, `operational`, `learnings`, `clientSignals`, `pageProfile`, `pageElements`, `contentPipeline`, `localSeo`, `entityResolution`. The relevant slice for client-facing signals and engagement data is `ClientSignalsSlice`. See `docs/rules/workspace-intelligence.md`.
 
 ## UI/UX Rules (mandatory)
 
@@ -216,6 +234,7 @@ This project uses **two separate auth systems** that must never be mixed up:
 - **Studio name**: use the `STUDIO_NAME` / `STUDIO_URL` constants from `src/constants.ts` (frontend) or `server/constants.ts` (backend). Never hard-code `"hmpsn.studio"` — enforced by pr-check.
 - **Route validation**: Zod schemas via `validate()` middleware, not hand-written checks
 - **Frontend data**: all hooks use `useQuery`/`useMutation`. No hand-rolled `useState`+`useEffect`+fetch patterns. Query keys: `admin-*` / `client-*` prefixes.
+- **`react-hooks/exhaustive-deps` suppressions** — never silence the linter to avoid fixing a dep array. The 21 pre-existing suppressions in `src/` are acknowledged technical debt. Any new suppression must include an inline justification comment on the same line explaining why the rule is wrong for that specific case (e.g., `// eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only recovery`, `// eslint-disable-next-line react-hooks/exhaustive-deps -- stable handler reference`). A bare suppression with no justification is a stale-closure bug waiting to happen.
 - **Imports**: always at top of file, grouped with existing imports. Never add imports mid-file next to the code that uses them — this breaks the oxc parser used by vitest/vite and violates code conventions. When adding code to an existing file, check existing imports first (`grep -n '^import' <file>`).
 - **DB patterns**: lazy prepared statements via `createStmtCache()`/`stmts()`, JSON columns as TEXT parsed at read boundary, `rowToX()` mappers, three-state booleans (0/1/NULL). Bare `JSON.parse` on DB columns, local `let stmt` caching, multi-step DB writes outside `db.transaction()`, AI-call-before-DB-writes without a transaction guard, `SUM()` without `COALESCE`, UPDATE/DELETE without `workspace_id` scoping, and `getOrCreate*` functions with nullable return types are **all enforced by pr-check**. See [automated-rules.md](./docs/rules/automated-rules.md). For detailed rationales see [docs/rules/ai-dispatch-patterns.md](./docs/rules/ai-dispatch-patterns.md).
 - **JSON column parsing — always use the three helpers from `server/db/json-validation.ts`**, never bare `JSON.parse`. Pick the right one: `parseJsonSafe<T, F>(raw, schema, fallback, context)` for single-object columns (pass `context` with `workspaceId`/`field`/`table` for rich warning logs), `parseJsonSafeArray(raw, itemSchema, context)` for array columns (validates items individually so one bad item doesn't drop all — never validate the whole array at once), `parseJsonFallback<T>(raw, fallback)` for schema-free fields. See `server/approvals.ts` `rowToBatch` for the array pattern.
@@ -232,11 +251,12 @@ This project uses **two separate auth systems** that must never be mixed up:
 - **Prompt assembly layers must not duplicate content** — `buildSystemPrompt` in `server/prompt-assembly.ts` injects voice DNA + guardrails into the system message when `profile.status === 'calibrated'` (Layer 2). Any user-prompt code that manually inlines the same DNA must guard on `profile.status !== 'calibrated'` to avoid redundant injection that wastes tokens and confuses the model. Use `buildVoiceCalibrationContext(profile)` from `server/voice-calibration.ts` rather than hand-rolling the guard inline.
 - **Structured AI output paths must use named operation contracts + schema validation** — when an AI caller expects JSON or another typed payload, register a named operation in `server/ai-operation-registry.ts` when the call is reusable/high-value, use `callAI({ operation: '...' })` where practical, and validate the parsed payload with Zod or an equivalent schema. `parseAIJson()` is boundary cleanup only; it is not a replacement for shape validation. See `docs/rules/ai-operation-contracts.md`.
 - **AI quality evals are deterministic-first** — prompt/output quality gates must extend the shared AI reliability registry with typed fixtures, not create disconnected live-model scoring paths. CI may hard-fail missing evidence, authority, output-format, or provenance contracts; subjective prose scoring stays advisory/manual until validated. See `docs/rules/ai-quality-evals.md`.
-- **Authority-layered fields — expose one resolved representation, never raw + format helper** — when a shared-type field has multiple authority sources (legacy column + override, global + workspace-specific, raw + computed), the single blessed representation is the pre-resolved form (e.g. `SeoContextSlice.effectiveBrandVoiceBlock`, which is pre-formatted by `buildSeoContext` with voice-profile authority applied). Callers inject that form DIRECTLY. Never ship a generic `format<Field>ForPrompt(raw)` helper alongside it — any caller who grabs the helper bypasses the authority chain, and the compiler cannot see the mistake because the raw field's type is still `string`. **Corollary:** when *adding* a new authority layer to an existing field, grep the repo for every format helper touching that field and delete them in the same commit. A helper that predates an authority layer cannot know about it. The reintroduction hazard is mechanized by the pr-check rule of the same name.
+- **Authority-layered fields — expose one resolved representation, never raw + format helper** — when a shared-type field has multiple authority sources (legacy column + override, global + workspace-specific, raw + computed), the single blessed representation is the pre-resolved form (e.g. `SeoContextSlice.effectiveBrandVoiceBlock`, which is pre-formatted by `buildEffectiveBrandVoiceBlock()` inside the seoContext slice assembler with voice-profile authority applied). Callers inject that form DIRECTLY. Never ship a generic `format<Field>ForPrompt(raw)` helper alongside it — any caller who grabs the helper bypasses the authority chain, and the compiler cannot see the mistake because the raw field's type is still `string`. **Corollary:** when *adding* a new authority layer to an existing field, grep the repo for every format helper touching that field and delete them in the same commit. A helper that predates an authority layer cannot know about it. The reintroduction hazard is mechanized by the pr-check rule of the same name.
 - **Route removal checklist** — removing or renaming a `Page` union value touches seven files. The full list lives in [docs/rules/route-removal-checklist.md](./docs/rules/route-removal-checklist.md). Every entry must be updated in the same commit.
-- **Phase-per-PR** — multi-phase features ship as one PR per phase. Never open phase N+1 until phase N is merged and CI is green on `staging`. Use `<FeatureFlag flag="...">` to dark-launch incomplete phases so production never serves broken UI. Add the flag to `shared/types/feature-flags.ts` before the first commit of any new multi-phase feature. **Before touching a gated area, check `shared/types/feature-flags.ts` for active in-flight flags.** Currently active: `new-inbox-ia` (client inbox IA redesign, Phases 1–3), `client-wins-surface` (wins surface).
+- **Phase-per-PR** — multi-phase features ship as one PR per phase. Never open phase N+1 until phase N is merged and CI is green on `staging`. Use `<FeatureFlag flag="...">` to dark-launch incomplete phases so production never serves broken UI. Add the flag to `shared/types/feature-flags.ts` before the first commit of any new multi-phase feature. **Before touching a gated area, read `shared/types/feature-flags.ts` directly** — look for flags with `lifecycle: 'active'` in `FEATURE_FLAG_CATALOG`. The CLAUDE.md does not maintain a static list; the file is the canonical source of truth.
 - **Staging before main** — all PRs merge into `staging` first. After verifying on the staging deploy, merge `staging` → `main` to release to production. Never merge an unverified PR directly to `main`.
 - **String literal renames** — when renaming a discriminator value used across the codebase (insight type, status enum, filter key), grep the entire repo for the old literal and update ALL references in one commit. Never split a rename across multiple tasks or PRs.
+- **Retiring or renaming a public function** — when a function is retired or renamed, grep `CLAUDE.md` and all `docs/rules/*.md` for the old name and update or remove those references in the same commit. Doc examples using stale function names silently mislead agents; the compiler cannot catch it.
 - **New insight type registration** — adding a value to `InsightType` requires all four of these in the same commit: (1) `InsightType` union in `shared/types/analytics.ts`, (2) typed `XData` interface + `InsightDataMap` entry — never `Record<string,unknown>`, (3) Zod schema in `server/schemas/`, (4) frontend renderer case. Missing any one fails silently. See `docs/rules/analytics-insights.md`.
 - **DB column + mapper lockstep** — adding columns to any table requires migration SQL, row interface, `rowToX()` mapper, write path (`upsertX()`), AND the public endpoint serialization list in `public-portal.ts` if the field is client-facing, all in the same commit. TypeScript will not catch a mapper that silently ignores a new column, and the public endpoint's explicit field list will silently omit it.
 - **Integration tests must cover the actual read path** — when a feature gates client-facing behavior on a field from `GET /api/public/workspace/:id`, the integration test must exercise that endpoint, not the admin GET. A test that only verifies the admin route gives false confidence; a regression in the public serialization goes undetected.
@@ -250,6 +270,7 @@ This project uses **two separate auth systems** that must never be mixed up:
 - **Feature toggle scope minimality** — feature toggles must gate the specific sub-feature, never a composite parent component. Pass the flag as a prop and gate inside the component at the narrowest point. Wrapping a composite component (e.g. `InsightsDigest` with 12+ card types) hides far more than the toggle intends.
 - **AI/recommendation generation consumers must use shared intelligence context builders.** For high-value server-side generation and recommendation paths that need both raw intelligence and a formatted prompt block, use `server/intelligence/generation-context-builders.ts` (`buildContentGenerationContext`, `buildRecommendationGenerationContext`) rather than hand-rolling direct `getInsights()` / `getWorkspaceLearnings()` prompt assembly. Use `buildIntelPrompt()` when only the formatted intelligence block is needed. Caller-owned add-on blocks are reserved for non-slice evidence (scraped references, live SERP excerpts, per-page provider breakdowns). If required data is not yet slice-backed, document the exception inline and in PR notes instead of normalizing a new direct-read path.
 - **`buildSchemaContext` reads must use intelligence slices.** New data sources for schema generation are read via `buildWorkspaceIntelligence({ slices: [...] })` inside `server/helpers.ts:buildSchemaContext`. Direct workspace reads (`ctx.X = ws.Y`) are reserved for identity fields (`name`, `id`, `liveDomain`, `brandLogoUrl`, `siteHasSearch`, plus `siteId`). All other fields must come from a slice. Four remaining direct reads (`businessContext`, `knowledgeBase`, `_businessProfile`, `_personasBlock`) are tracked in `data/roadmap.json:schema-context-builder-pattern-b-migration` for opportunistic migration when adjacent code is touched. Net-new direct reads outside the identity allow-list require an inline `// schema-context-direct-read-ok: <reason>` hatch. Enforced by pr-check rule `schema-context-direct-read-not-on-allowlist`.
+- **Schema entity disambiguation must stay inside intelligence boundaries.** Wikidata/SPARQL lookup logic belongs in `server/intelligence/entity-resolution*` modules and is consumed via shared contracts (`shared/types/entity-resolution.ts`). Do not add direct Wikidata calls in schema helpers/routes/templates; route through intelligence slices. Guarded by pr-check rule `Wikidata disambiguation outside entity-resolution intelligence modules`.
 - **Long-running admin generation must use the background job platform.** Admin routes that crawl many pages, process many records, call AI repeatedly, or continue after a response must use `server/jobs.ts` / `/api/jobs`, return `{ jobId }`, and surface progress through `useBackgroundTasks` + `TaskPanel`. Job labels and cancellation semantics live in `shared/types/background-jobs.ts`. New job types must be added to `BACKGROUND_JOB_TYPES` with `label`, `cancellable`, and `resultBehavior` (`'ephemeral'` | `'domain-store'` | `'domain-store-and-result'`); use helper functions (`getBackgroundJobLabel`, `isBackgroundJobCancellable`) for safe access. Short synchronous editor assists require an explicit rationale; post-response generation outside the job system is guarded by pr-check with `// background-generation-ok`. Full contract: [docs/rules/background-generation.md](./docs/rules/background-generation.md).
 - **Admin send convention** — all admin "send to client" surfaces use a single "Send to client" button + optional inline note field. Never add "Send for Review" or "Flag for Client" as separate buttons — enforced by pr-check rule `send-for-review-anti-pattern`. See `docs/workflows/ui-vocabulary.md` §Admin Send Convention.
 - **Inbox section routing** — client actions and approval batches without a note route to Decisions; with a note they route to Conversations. Reviews are static (content briefs, posts, copy pipeline). Full routing rules in `docs/rules/inbox-section-routing.md`. Enforced by pr-check rules `inbox-legacy-filter-literal` and `inbox-action-queue-strip`.
@@ -274,7 +295,7 @@ This project uses **two separate auth systems** that must never be mixed up:
 |-----|-------------|
 | `BRAND_DESIGN_LANGUAGE.md` | Any UI work — color rules, per-component color map |
 | `DESIGN_SYSTEM.md` | Component specs, typography, spacing, Tailwind classes |
-| `FEATURE_AUDIT.md` | Before building anything — 70+ feature inventory |
+| `FEATURE_AUDIT.md` | Before building anything — 500+ feature inventory |
 | `MONETIZATION.md` | Tiers, pricing, Stripe spec, UX soft-gating |
 | `ACTION_PLAN.md` | Execution roadmap, decision log |
 | `data/roadmap.json` | Sprint tracking — what's done/pending |
@@ -314,12 +335,27 @@ This project uses **two separate auth systems** that must never be mixed up:
 | `docs/rules/brand-engine.md` | Copy & Brand Engine contracts — voice profile, brandscript, prompt assembly patterns |
 | `docs/rules/intelligence-consumer-builders.md` | Allowed patterns for server-side AI/recommendation consumers of workspace intelligence |
 | `docs/rules/workspace-intelligence.md` | Intelligence slice architecture — `assemble*()` functions, slice interfaces, token budget |
+| `docs/rules/schema-entity-resolution.md` | Entity grounding contracts for schema (Thing/Place + Wikidata disambiguation boundary) |
 | `docs/rules/outcome-learning-default-path.md` | Outcome learnings availability + scoring contract for builder-backed recommendation/content paths |
 | `docs/rules/platform-organization.md` | Bounded-context ownership, route-to-service extraction, and safe organization/refactor rules |
 | `docs/rules/platform-integration-surfaces.md` | Integration surfaces by bounded context — external APIs, DB/storage, AI calls, jobs, events, query keys, endpoints, activity types |
 | `docs/testing/platform-domain-smoke-matrix.md` | Fast smoke-test matrix by bounded context |
 | `docs/workflows/feature-class-definition-of-done.md` | Completion gates by feature class before PR closeout |
 | `docs/workflows/client-debug.md` | Debugging client-reported bugs — gather context, investigate data/UI/API/CMS issues |
+| `docs/workflows/local-dev-onboarding.md` | First-hour setup — env, `seed:demo`, `smoke:core`, fixture workspaces, demo client passwords |
+| `docs/workflows/codebase-overview.md` | Quick architecture orientation — bounded contexts, route module counts, forward-looking file placement |
+| `docs/workflows/adr-log.md` | Lightweight ADR workflow — when to write an ADR, how to verify `docs/adr/` log stays current |
+| `docs/workflows/platform-health-cadence.md` | Recurring 4–6 sprint platform health checkpoint contract and measurable dimensions |
+| `docs/workflows/release-safety.md` | Pre-release safety checklist — feature flag audit, coverage ratchet, staging merge integrity |
+| `docs/rules/deprecation-lifecycle.md` | Deprecation lifecycle taxonomy (`deprecated` → `hidden` → `migrated` → `removed`) and contract requirements |
+| `docs/rules/feature-flag-lifecycle.md` | Feature flag lifecycle — creation, rollout targets, stale audit cadence, removal conditions |
+| `docs/rules/keyword-command-center.md` | Keyword Command Center contracts — cheap vs Evaluated variant split, OOM guard |
+| `docs/rules/local-seo-visibility.md` | Local SEO visibility contracts — location backfill queue, keyword enrichment, market primary |
+| `docs/rules/evidence-ledger-mvp.md` | Content review evidence ledger — grounding provenance, freshness scoring, provenance flags |
+| `docs/testing/coverage-ratchet-ci.md` | Coverage ratchet CI contract — current baselines, how to update, how to investigate regressions |
+| `docs/testing/critical-domain-coverage-baseline.md` | Critical-domain coverage baseline — minimum acceptable percentages per bounded context |
+| `docs/testing/ai-reliability-pipeline-trace-map.md` | AI reliability pipeline — fixture registry, trace map, soft-gate policy |
+| `docs/adr/` | Architecture decision records — 0001 background jobs, 0002 intelligence slices, 0003 feature flags, 0004 client/admin split, 0005 unified AI dispatch, 0006 bounded context extraction |
 
 ---
 
@@ -348,3 +384,5 @@ Work is not done until ALL pass:
 - [ ] If multiple/parallel agents were used for any part of this work: invoke `scaled-code-review` skill before merging. Fix Critical/Important issues before proceeding. (Single-agent work on a single domain: `superpowers:requesting-code-review` is sufficient.)
 - [ ] All bugs surfaced during review are fixed — never dismiss a fixable bug as "pre-existing", "minor", or "out of scope". If a review agent or manual review finds it and it can be fixed, fix it in this PR.
 - [ ] If multi-phase feature: this PR covers exactly one phase. Phase N+1 is not started until phase N is merged and green.
+- [ ] `npm run verify:feature-flags` — no orphaned or ungrouped feature flag keys
+- [ ] `npm run verify:coverage-ratchet` — coverage has not regressed below ratchet baseline

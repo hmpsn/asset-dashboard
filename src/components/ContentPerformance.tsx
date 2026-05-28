@@ -7,6 +7,7 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from 'rec
 import { Button, ClickableRow, PageHeader, SectionCard, EmptyState, Badge, Icon, StatCard } from './ui';
 import { CHART_SERIES_COLORS } from './ui/constants';
 import { contentPerformance } from '../api/seo';
+import { capitalize } from '../utils/strings';
 
 interface GscMetrics {
   clicks: number;
@@ -237,7 +238,7 @@ export function ContentPerformance({ workspaceId }: Props) {
                     : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
                 }`}
               >
-                {key === 'days' ? 'Age' : key.charAt(0).toUpperCase() + key.slice(1)}
+                {key === 'days' ? 'Age' : capitalize(key)}
               </Button>
             ))}
           </div>

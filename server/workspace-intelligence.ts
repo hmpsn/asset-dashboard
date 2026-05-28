@@ -26,6 +26,8 @@ import { assembleClientSignals } from './intelligence/client-signals-slice.js';
 import { assembleOperational } from './intelligence/operational-slice.js';
 import { assemblePageProfile } from './intelligence/page-profile-slice.js';
 import { assembleLocalSeo } from './intelligence/local-seo-slice.js';
+import { assembleEntityResolution } from './intelligence/entity-resolution-slice.js';
+import { assembleEeatAssets } from './intelligence/eeat-assets-slice.js';
 import { formatForPrompt } from './intelligence/formatters.js';
 export {
   formatForPrompt,
@@ -141,6 +143,12 @@ async function assembleSlice(
     case 'localSeo':
       result.localSeo = await assembleLocalSeo(workspaceId);
       break;
+    case 'entityResolution':
+      result.entityResolution = await assembleEntityResolution(workspaceId, opts);
+      break;
+    case 'eeatAssets':
+      result.eeatAssets = await assembleEeatAssets(workspaceId);
+      break;
   }
 }
 
@@ -166,7 +174,11 @@ function buildCacheKey(workspaceId: string, opts?: IntelligenceOptions): string 
   const baseUrl = opts?.siteBaseUrl ?? '';
   const token = tokenFingerprint(opts?.webflowToken);
   const backlinks = opts?.enrichWithBacklinks ? ':bl' : '';
-  return `intelligence:${workspaceId}:${slices}:${page}:${domain}:site=${encodeURIComponent(site)}:base=${encodeURIComponent(baseUrl)}:wf=${token}${backlinks}`;
+  // resolveEntityReferences flips the entityResolution slice between cached labels-only
+  // mode and the Wikidata-enriched mode. Without :er in the key, an unenriched cache
+  // entry written by a non-schema caller would silently defeat schema enrichment for 5min.
+  const entityRes = opts?.resolveEntityReferences ? ':er' : '';
+  return `intelligence:${workspaceId}:${slices}:${page}:${domain}:site=${encodeURIComponent(site)}:base=${encodeURIComponent(baseUrl)}:wf=${token}${backlinks}${entityRes}`;
 }
 
 /** Invalidate all cached intelligence for a workspace */

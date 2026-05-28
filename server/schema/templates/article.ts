@@ -5,7 +5,7 @@
  */
 import type { PageData } from '../data-sources.js';
 import { filterAuthorityCitations } from '../extractors/page-elements/citation.js';
-import { dropUndefined, withBreadcrumb, webSiteRef, breadcrumbRef, filterHttpUrls } from './helpers.js';
+import { dropUndefined, withBreadcrumb, webSiteRef, breadcrumbRef, filterHttpUrls, resolvedEntityToThingNode, orgRef } from './helpers.js';
 
 export interface ArticleInput {
   baseUrl: string;
@@ -38,9 +38,30 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
   const { pageData } = input;
 
   const author = pageData.author
-    ? { '@type': 'Person', 'name': pageData.author }
+    ? dropUndefined({
+        '@type': 'Person',
+        'name': pageData.author,
+        'jobTitle': pageData.authorJobTitle,
+        'worksFor': (pageData.authorJobTitle || (pageData.authorCredentials?.length ?? 0) > 0 || (pageData.authorSameAs?.length ?? 0) > 0)
+          ? { '@type': 'Organization', ...orgRef(input.baseUrl) }
+          : undefined,
+        'sameAs': pageData.authorSameAs?.length ? pageData.authorSameAs : undefined,
+        'hasCredential': pageData.authorCredentials?.length
+          ? pageData.authorCredentials.map((credential, idx) => ({
+              '@type': 'EducationalOccupationalCredential',
+              '@id': `${pageData.canonicalUrl}#author-credential-${idx}`,
+              'name': credential,
+            }))
+          : undefined,
+      })
     : { '@type': 'Organization', 'name': pageData.publisher.name };
   const citations = filterAuthorityCitations(pageData.elements?.citations ?? [], pageData.canonicalUrl);
+  const aboutEntity = pageData.articleAboutEntity
+    ? resolvedEntityToThingNode(pageData.articleAboutEntity)
+    : undefined;
+  const mentionEntities = pageData.articleMentionEntities?.length
+    ? pageData.articleMentionEntities.map(resolvedEntityToThingNode)
+    : undefined;
 
   const primary = dropUndefined({
     '@type': kind,
@@ -65,7 +86,8 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
     'articleSection': pageData.articleSection,
     'keywords': pageData.keywords,
     'wordCount': pageData.wordCount,
-    'about': kind === 'Article' ? 'Case study' : undefined,
+    'about': aboutEntity ?? (kind === 'Article' ? 'Case study' : undefined),
+    'mentions': mentionEntities,
     'citation': citations.length > 0
       ? citations.map(c => ({
           '@type': 'WebPage' as const,
@@ -141,6 +163,7 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
     'url': pageData.canonicalUrl,
     'name': pageData.cleanTitle,
     'description': pageData.description,
+    'dateModified': pageData.dateModified || pageData.datePublished,
     'isPartOf': webSiteRef(input.baseUrl),
     'about': { '@id': `${pageData.canonicalUrl}#article` },
     'inLanguage': pageData.inLanguage,

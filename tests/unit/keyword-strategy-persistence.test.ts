@@ -25,7 +25,7 @@ const mockRecordAction = vi.fn();
 const mockGetActionBySource = vi.fn<(sourceType: string, workspaceId: string) => unknown>(() => null);
 const mockBroadcastToWorkspace = vi.fn();
 const mockAddActivity = vi.fn();
-const mockNormalizePath = vi.fn((p: string) => p);
+const mockNormalizePageUrl = vi.fn((p: string) => p);
 
 // DB mock — transaction fn wraps and calls the callback
 const mockDbPrepare = vi.fn();
@@ -83,7 +83,7 @@ vi.mock('../../server/ws-events.js', () => ({
   WS_EVENTS: { STRATEGY_UPDATED: 'strategy:updated' },
 }));
 vi.mock('../../server/activity-log.js', () => ({ addActivity: mockAddActivity }));
-vi.mock('../../server/helpers.js', () => ({ normalizePath: mockNormalizePath }));
+vi.mock('../../server/helpers.js', () => ({ normalizePageUrl: mockNormalizePageUrl }));
 vi.mock('../../server/logger.js', () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn() }),
 }));
@@ -149,7 +149,7 @@ describe('persistKeywordStrategy', () => {
     // transaction mock: execute fn immediately and return it
     mockTransaction.mockImplementation((fn: () => void) => fn);
     mockDbPrepare.mockReturnValue({ run: mockRun });
-    mockNormalizePath.mockImplementation((p: string) => p);
+    mockNormalizePageUrl.mockImplementation((p: string) => p);
   });
 
   it('calls updateWorkspace with the assembled keywordStrategy', async () => {
@@ -460,7 +460,7 @@ describe('persistKeywordStrategy', () => {
   it('normalizes removedPagePaths before deleting page rows in incremental mode', async () => {
     const { persistKeywordStrategy } = await import('../../server/keyword-strategy-persistence.js');
 
-    mockNormalizePath.mockImplementation((p: string) => (p.startsWith('/') ? p : `/${p}`));
+    mockNormalizePageUrl.mockImplementation((p: string) => (p.startsWith('/') ? p : `/${p}`));
     const deletePageKeywordRun = vi.fn(() => ({ changes: 1 }));
     const deleteScoreHistoryRun = vi.fn(() => ({ changes: 1 }));
     mockDbPrepare.mockImplementation((sql: string) => {

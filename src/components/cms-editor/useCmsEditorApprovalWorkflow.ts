@@ -4,6 +4,7 @@ import {
   buildApprovalPayloadItems,
   type CmsCollection,
 } from './cmsEditorModel';
+import { formatDate } from '../../utils/formatDates';
 
 interface ApprovalErrorState {
   type: 'validation' | 'network';
@@ -80,7 +81,7 @@ export function useCmsEditorApprovalWorkflow({
 
       await post(`/api/approvals/${workspaceId}`, {
         siteId,
-        name: `CMS SEO Changes — ${new Date().toLocaleDateString()}`,
+        name: `CMS SEO Changes — ${formatDate(new Date())}`,
         items,
         ...(note?.trim() ? { note: note.trim() } : {}),
       });

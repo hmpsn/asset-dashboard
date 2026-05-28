@@ -4,6 +4,14 @@
  */
 
 import type { ValidationFinding } from '../../shared/types/schema-validation.js';
+import {
+  hasReviewRatingOrDate,
+  hasSchemaField,
+  isImageObjectWithUrl,
+  recommendedPropertyMissingMessage,
+  requiredPropertyMissingMessage,
+  REVIEW_RATING_OR_DATE_MISSING_MESSAGE,
+} from './schema-validation-core.js';
 
 interface RequiredFields {
   required: string[];
@@ -126,27 +134,6 @@ const REQUIRED_BY_TYPE: Record<string, RequiredFields> = {
   },
 };
 
-function hasSchemaField(node: Record<string, unknown>, field: string): boolean {
-  const value = field === 'openingHours'
-    ? node.openingHours ?? node.openingHoursSpecification
-    : node[field];
-  if (field === 'address') {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-    const address = value as Record<string, unknown>;
-    if (address['@type'] !== 'PostalAddress') return false;
-    return ['streetAddress', 'addressLocality', 'addressRegion'].every(addressField =>
-      typeof address[addressField] === 'string' && address[addressField].trim().length > 0);
-  }
-  if (value === undefined || value === null) return false;
-  if (typeof value === 'string') return value.trim().length > 0;
-  if (Array.isArray(value)) return value.length > 0;
-  return true;
-}
-
-function hasReviewRatingOrDate(node: Record<string, unknown>): boolean {
-  return hasSchemaField(node, 'reviewRating') || hasSchemaField(node, 'datePublished');
-}
-
 function validateBreadcrumb(node: Record<string, unknown>): ValidationFinding[] {
   const findings: ValidationFinding[] = [];
   const items = node.itemListElement as Array<Record<string, unknown>> | undefined;
@@ -244,7 +231,7 @@ function validateCrossRefs(node: Record<string, unknown>, allNodes: Record<strin
         type: t,
         field: 'breadcrumb',
         ruleId: 'required-field-missing',
-        message: `${t} missing required field: breadcrumb`,
+        message: requiredPropertyMissingMessage(t, 'breadcrumb'),
       });
     }
   }
@@ -268,13 +255,6 @@ function validateCrossRefs(node: Record<string, unknown>, allNodes: Record<strin
 }
 
 const ISO_8601_RE = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
-
-function isImageObjectWithUrl(v: unknown): boolean {
-  return typeof v === 'object' && v !== null
-    && (v as Record<string, unknown>)['@type'] === 'ImageObject'
-    && typeof (v as Record<string, unknown>).url === 'string'
-    && ((v as Record<string, unknown>).url as string).trim().length > 0;
-}
 
 function validateArticleShape(node: Record<string, unknown>): ValidationFinding[] {
   const findings: ValidationFinding[] = [];
@@ -596,7 +576,7 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
             type: t,
             field,
             ruleId: 'required-field-missing',
-            message: `${t} missing required field: ${field}`,
+            message: requiredPropertyMissingMessage(t, field),
           });
         }
       }
@@ -606,7 +586,7 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
           type: t,
           field: 'reviewRating',
           ruleId: 'review-rating-or-date-missing',
-          message: 'Review missing reviewRating or datePublished',
+          message: REVIEW_RATING_OR_DATE_MISSING_MESSAGE,
         });
       }
       for (const field of rules.recommended ?? []) {
@@ -616,7 +596,7 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
             type: t,
             field,
             ruleId: 'recommended-field-missing',
-            message: `${t} missing recommended field: ${field}`,
+            message: recommendedPropertyMissingMessage(t, field),
           });
         }
       }

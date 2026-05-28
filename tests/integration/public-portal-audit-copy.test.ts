@@ -23,7 +23,7 @@ import { createClientUser, deleteClientUser, signClientToken } from '../../serve
 import { updateWorkspace } from '../../server/workspaces.js';
 
 const ctx = createTestContext(13369); // port-ok: confirmed free
-const { api } = ctx;
+const { api, postJson, clearCookies } = ctx;
 
 // ── Test state ────────────────────────────────────────────────────────────────
 
@@ -227,17 +227,32 @@ describe('GET /api/public/audit-detail/:workspaceId — no site linked', () => {
 });
 
 describe('GET /api/public/audit-traffic/:workspaceId', () => {
-  it('returns empty object for unknown workspace (graceful — no 404)', async () => {
-    // Route: `if (!ws) return res.json({})` — not a 404
+  // Behavior change 2026-05-27 (sprint-platform-health-wave8 Plan A Task 1):
+  // endpoint now requires authenticated portal access. Auth runs before the
+  // handler's graceful-degradation logic, so an unknown workspace returns
+  // 404 from the middleware instead of the previous 200-with-empty-object.
+  // We add a shared password + session login so the body-shape assertions
+  // can still exercise the handler's GSC/GA4 fallback path.
+  beforeAll(async () => {
+    updateWorkspace(ws.workspaceId, { clientPassword: 'audit-test-password' });
+    const authRes = await postJson(`/api/public/auth/${ws.workspaceId}`, { password: 'audit-test-password' });
+    expect(authRes.status).toBe(200);
+  });
+
+  // Restore the workspace to its passwordless seed state and drop the session
+  // so later describes in this file (pricing, copy) see the same state they
+  // had before this block ran.
+  afterAll(() => {
+    updateWorkspace(ws.workspaceId, { clientPassword: '' });
+    clearCookies();
+  });
+
+  it('returns 404 for unknown workspace (auth middleware short-circuits)', async () => {
     const res = await api('/api/public/audit-traffic/nonexistent-ws-traffic-99');
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(typeof body).toBe('object');
-    expect(body).not.toBeNull();
+    expect(res.status).toBe(404);
   });
 
   it('returns an object for a valid workspace with no GSC/GA4 configured', async () => {
-    // ws has no gscPropertyUrl / ga4PropertyId — should return empty map, not 500
     const res = await api(`/api/public/audit-traffic/${ws.workspaceId}`);
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -248,8 +263,6 @@ describe('GET /api/public/audit-traffic/:workspaceId', () => {
   it('response is a flat object mapping paths to traffic data (or empty)', async () => {
     const res = await api(`/api/public/audit-traffic/${ws.workspaceId}`);
     const body = await res.json() as Record<string, unknown>;
-    // When no GSC/GA4 data exists the map is empty
-    // When it does, every key should start with '/'
     for (const key of Object.keys(body)) {
       expect(key.startsWith('/')).toBe(true);
     }

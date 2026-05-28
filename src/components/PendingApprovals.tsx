@@ -9,6 +9,7 @@ import { Button, Icon, IconButton, StatusBadge, cn } from './ui';
 import { approvals } from '../api/misc';
 import { queryKeys } from '../lib/queryKeys';
 import type { ApprovalBatch } from '../../shared/types/approvals';
+import { formatDateShort } from '../utils/formatDates';
 
 interface PendingApprovalsProps {
   workspaceId: string;
@@ -118,7 +119,7 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
                     {statusBadge(batch.status)}
                   </div>
                   <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
-                    {new Date(batch.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    {formatDateShort(batch.createdAt)}
                     {' · '}{batch.items.length} item{batch.items.length !== 1 ? 's' : ''}
                     {approvedCount > 0 && <span className="text-emerald-400"> · {approvedCount} approved</span>}
                     {rejectedCount > 0 && <span className="text-red-400"> · {rejectedCount} rejected</span>}

@@ -13,7 +13,7 @@ import type {
   BriefingDrillIn,
   BriefingSourceRef,
 } from '../shared/types/briefing.js';
-import type { ContentGap } from '../shared/types/workspace.js';
+import { computeOpportunityScore } from './keyword-strategy-helpers.js';
 
 const log = createLogger('briefing-candidates');
 
@@ -235,7 +235,7 @@ export function collectContentGapCandidates(workspaceId: string): Candidate[] {
   const out: Candidate[] = [];
   for (const gap of gaps) {
     if (!gap.targetKeyword) continue; // skip malformed entries
-    const impact = gap.opportunityScore ?? deriveOpportunityScore(gap);
+    const impact = gap.opportunityScore ?? computeOpportunityScore(gap) ?? 0;
     if (impact <= 0) continue;
     out.push({
       id: `gap-${gap.targetKeyword}`,
@@ -253,26 +253,6 @@ export function collectContentGapCandidates(workspaceId: string): Candidate[] {
   return out;
 }
 
-/**
- * Fallback opportunity-score computation for gaps missing the server-computed
- * `opportunityScore` field. Mirrors the admin <ContentGaps> sort ordering's
- * spirit: prefer high-volume, low-difficulty terms; small bonus for non-zero
- * impressions (proves real demand from the workspace's existing audience).
- *
- * Returns 0-100. Templates downstream cite the score as part of their
- * narrative when it materially drives the headline.
- */
-function deriveOpportunityScore(gap: ContentGap): number {
-  const vol = gap.volume ?? 0;
-  if (vol <= 0) return 0;
-  // Map volume to 0-60 (log scale: 100 → 20, 1000 → 40, 10k → 60)
-  const volScore = Math.min(60, Math.log10(vol + 1) * 15);
-  // Difficulty penalty: KD 0 → +30, KD 100 → 0
-  const kdScore = gap.difficulty != null ? Math.max(0, 30 - 0.3 * gap.difficulty) : 15;
-  // Impressions bonus: workspace already getting any impressions = +10
-  const imprScore = (gap.impressions ?? 0) > 0 ? 10 : 0;
-  return Math.round(volScore + kdScore + imprScore);
-}
 
 // ── Phase 2.5c: weCalledIt + milestone_attribution candidate collectors ──
 //

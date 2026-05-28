@@ -3,6 +3,7 @@ import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { Globe, Search, ExternalLink, ChevronDown, ChevronRight, AlertTriangle, CheckCircle, Info, Zap, FileText } from 'lucide-react';
 import { MetricRing, MetricRingSvg, Button, FormInput, IconButton } from './ui';
 import { salesReport as salesReportApi } from '../api/misc';
+import { formatDate } from '../utils/formatDates';
 
 interface SalesIssue {
   check: string;
@@ -212,7 +213,7 @@ export function SalesReport() {
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <div className="text-xs text-[var(--brand-text-muted)]">
-                      {new Date(h.generatedAt).toLocaleDateString()}
+                      {formatDate(h.generatedAt)}
                     </div>
                     <IconButton
                       onClick={(e) => { e.stopPropagation(); openHtmlReport(h.id); }}

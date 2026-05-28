@@ -9,6 +9,7 @@ import { createLogger } from './logger.js';
 import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
 import { postSectionSchema, reviewChecklistSchema } from './schemas/content-schemas.js';
 import { validateTransition, POST_STATUS_TRANSITIONS } from './state-machines.js';
+import { resolveContentGenerationStyle } from './page-type-copy-contract.js';
 
 const log = createLogger('content-posts-db');
 
@@ -38,6 +39,7 @@ interface PostRow {
   review_checklist: string | null;
   voice_score: number | null;
   voice_feedback: string | null;
+  generation_style: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -155,7 +157,7 @@ const stmts = createStmtCache(() => ({
             total_word_count, target_word_count, status, unification_status,
             unification_note, review_checklist,
             webflow_item_id, webflow_collection_id, published_at, published_slug,
-            voice_score, voice_feedback,
+            voice_score, voice_feedback, generation_style,
             created_at, updated_at)
          VALUES
            (@id, @workspace_id, @brief_id, @target_keyword, @title, @meta_description,
@@ -163,7 +165,7 @@ const stmts = createStmtCache(() => ({
             @total_word_count, @target_word_count, @status, @unification_status,
             @unification_note, @review_checklist,
             @webflow_item_id, @webflow_collection_id, @published_at, @published_slug,
-            @voice_score, @voice_feedback,
+            @voice_score, @voice_feedback, @generation_style,
             @created_at, @updated_at)`,
   ),
   selectByWorkspace: db.prepare(
@@ -183,6 +185,7 @@ const stmts = createStmtCache(() => ({
            webflow_item_id = @webflow_item_id, webflow_collection_id = @webflow_collection_id,
            published_at = @published_at, published_slug = @published_slug,
            voice_score = @voice_score, voice_feedback = @voice_feedback,
+           generation_style = @generation_style,
            updated_at = @updated_at
          WHERE id = @id AND workspace_id = @workspace_id`,
   ),
@@ -230,6 +233,7 @@ function rowToPost(row: PostRow): GeneratedPost {
       : undefined,
     voiceScore: row.voice_score ?? undefined,
     voiceFeedback: row.voice_feedback ?? undefined,
+    generationStyle: resolveContentGenerationStyle(row.generation_style),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -260,6 +264,7 @@ function postToParams(post: GeneratedPost): Record<string, unknown> {
     review_checklist: post.reviewChecklist ? JSON.stringify(post.reviewChecklist) : null,
     voice_score: post.voiceScore ?? null,
     voice_feedback: post.voiceFeedback ?? null,
+    generation_style: resolveContentGenerationStyle(post.generationStyle),
     created_at: post.createdAt,
     updated_at: post.updatedAt,
   };

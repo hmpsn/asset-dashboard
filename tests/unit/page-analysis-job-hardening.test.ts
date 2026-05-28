@@ -26,6 +26,12 @@ const mocks = vi.hoisted(() => ({
   formatForPrompt: vi.fn(() => ''),
   formatPageMapForPrompt: vi.fn(() => ''),
   invalidateIntelligenceCache: vi.fn(),
+  listEeatAssets: vi.fn(() => []),
+  evaluatePageTrustSignals: vi.fn(() => ({
+    pageType: 'other',
+    missingTrustSignals: [],
+    eeatAssetRecommendations: [],
+  })),
   logger: {
     debug: vi.fn(),
     error: vi.fn(),
@@ -84,6 +90,13 @@ vi.mock('../../server/workspace-intelligence.js', () => ({
   formatPageMapForPrompt: mocks.formatPageMapForPrompt,
   invalidateIntelligenceCache: mocks.invalidateIntelligenceCache,
 }));
+vi.mock('../../server/eeat-assets.js', () => ({
+  listEeatAssets: mocks.listEeatAssets,
+}));
+vi.mock('../../server/eeat-trust-signals.js', () => ({
+  EEAT_RECOMMENDATION_SURFACE: { PAGE_INTELLIGENCE: 'page_intelligence' },
+  evaluatePageTrustSignals: mocks.evaluatePageTrustSignals,
+}));
 
 const { runPageAnalysisJob } = await import('../../server/page-analysis-job.js');
 
@@ -99,6 +112,12 @@ describe('page-analysis job hardening', () => {
     mocks.discoverCmsUrls.mockResolvedValue({ cmsUrls: [] });
     mocks.getSiteSubdomain.mockResolvedValue(null);
     mocks.buildWorkspaceIntelligence.mockResolvedValue({ seoContext: {} });
+    mocks.listEeatAssets.mockReturnValue([]);
+    mocks.evaluatePageTrustSignals.mockReturnValue({
+      pageType: 'other',
+      missingTrustSignals: [],
+      eeatAssetRecommendations: [],
+    });
     mocks.callAI.mockResolvedValue({ text: '{}' });
     mocks.getConfiguredProvider.mockReturnValue(null);
     mocks.parseJsonSafe.mockReturnValue({

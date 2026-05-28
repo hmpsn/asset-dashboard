@@ -9,10 +9,10 @@ describe('ApprovalsTab keyword chips', () => {
   });
 
   it('slug-to-path lookup delegates to findPageMapEntryBySlug (handles nested pages)', () => {
-    // The slug-to-path conversion moved into findPageMapEntryBySlug in pathUtils.ts,
-    // which tries exact match then endsWith suffix fallback for nested pages.
+    // The slug-to-path conversion delegates through src/lib/pathUtils.ts into the
+    // shared page-address authority, which keeps exact + suffix fallback behavior.
     expect(src).toMatch(/findPageMapEntryBySlug/);
-    const helpers = readFileSync('src/lib/pathUtils.ts', 'utf-8'); // readFile-ok — contract guard: verifies findPageMapEntryBySlug implements suffix fallback for nested Webflow page slugs
+    const helpers = readFileSync('shared/page-address-utils.ts', 'utf-8'); // readFile-ok — contract guard: verifies findPageMapEntryBySlug implements suffix fallback for nested Webflow page slugs
     expect(helpers).toMatch(/endsWith/);
   });
 

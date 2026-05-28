@@ -1,8 +1,168 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **450 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **463 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 463. Schema Role/Type Registry Consolidation Authority
+
+**What it does:** Introduces a centralized schema role/type registry at `server/schema/role-type-registry.ts` and migrates both schema suggestion and generation callers to consume it. The registry now owns `PAGE_TYPE_LABELS`, `PAGE_TYPE_SCHEMA_MAP`, `SCHEMA_ROLE_TO_PAGE_KIND`, and diagnostics-type mapping (`schemaDiagnosticsTypeForRole`) so `server/schema-suggester.ts` and `server/schema/generator.ts` no longer maintain parallel maps. `schema-suggester` keeps compatibility by re-exporting the shared constants/types for existing callers/tests.
+
+**Agency value:** Reduces schema-role drift risk by collapsing multiple independently-edited maps into one typed authority.
+
+**Client value:** Improves consistency of suggested schema types and fallback diagnostics across schema tooling surfaces.
+
+**Mutual:** Lowers maintenance cost and bug probability while preserving current contracts and response shapes.
+
+---
+
+### 462. Schema Text Sanitizer Authority Consolidation
+
+**What it does:** Extracts a single schema-safe text sanitizer authority at `server/schema/schema-text-sanitizer.ts` and migrates the schema generator, LocalBusiness/Service templates, and JSON-LD page-element extractors to use it. This unifies whitespace normalization, zero-width character cleanup, and opaque ID rejection behavior across previously duplicated implementations (`safeText`, `safePublicText`, `cleanPublicText`, local `isOpaqueIdentifier`). A dedicated unit suite (`tests/unit/schema/schema-text-sanitizer.test.ts`) now locks the shared behavior.
+
+**Agency value:** Reduces one-off sanitization drift and makes future schema text hardening a one-location change instead of a multi-file chase.
+
+**Client value:** Improves consistency of emitted schema text fields by applying the same cleanup and opaque-token filtering rules everywhere.
+
+**Mutual:** Shrinks maintenance surface area and lowers silent-regression risk for schema quality work.
+
+---
+
+### 461. Schema Validation Core Unification + Contradiction Guardrail Harness
+
+**What it does:** Introduces a shared schema validation core at `server/schema/schema-validation-core.ts` and routes both publish validation (`validateForGoogleRichResults`) and eligibility checks (`checkRichResultsEligibility`) through the same rule evaluator (`evaluateGoogleSchema`). Lean validation now imports shared rule primitives (`hasSchemaField`, `hasReviewRatingOrDate`, `isImageObjectWithUrl`) instead of keeping local duplicates, reducing divergence risk while preserving lean-specific structural checks. Added a focused contradiction harness (`tests/unit/schema-validator-alignment.test.ts`) that exercises LocalBusiness address shape, Review rating/date semantics, and Article image-shape validation so a type cannot be marked eligible while publish validation reports errors for that same type.
+
+**Agency value:** Reduces one of the highest-risk drift surfaces in schema operations by collapsing duplicate rule implementations into shared authority logic.
+
+**Client value:** Improves reliability of schema readiness signals shown to teams by preventing contradictory eligibility/publish outcomes.
+
+**Mutual:** Creates a safer baseline for future schema strictness improvements by making validation contracts explicit and test-backed before broader rule expansion.
+
+---
+
+### 460. MCP Iterative Editing v1 — Existing Brief/Post Read + Safe Write-Back
+
+**What it does:** Extends the shipped MCP content action surface beyond create-only flows to support edit-existing workflows for briefs and posts from live Claude sessions. New MCP tools now expose workspace-scoped listing, entity fetch with revision tokens, and optimistic-concurrency updates:
+- `list_briefs`, `get_brief`, `update_brief`
+- `list_posts`, `get_post`, `update_post`
+
+Update tools support `mode: 'patch' | 'replace'` and require `expected_revision` to prevent stale overwrite collisions. Revisions are deterministic server-generated hashes from canonical editable payloads (no DB migration). All writes route through existing domain services (`updateBrief`, `updatePostField`), invalidate content-pipeline intelligence, broadcast workspace events, and log `addActivity(..., { source: 'mcp-chat' })` with explicit MCP update actions.
+
+The rollout remains intentionally orchestration-light: no server-side AI rewrite wrappers, no MCP edit-session persistence layer, and no hard-delete tools for briefs/posts in this phase. Content-level removal/reorder is supported through post section patch/replace payloads.
+
+**Agency value:** Gives operators a direct “read current draft → iterate in Claude → write back safely” loop without leaving chat or duplicating admin-side workflows.
+
+**Client value:** Faster content turnaround with fewer manual copy/paste steps, while preserving existing review/send workflows and real-time dashboard freshness.
+
+**Mutual:** Adds high-leverage MCP editing power while preserving platform safety contracts (service-layer writes, broadcast invalidation, activity provenance, and optimistic conflict prevention).
+
+---
+
+### 459. HTML Analysis Utility Consolidation + Anti-Drift Guardrail
+
+**What it does:** Consolidates duplicated server-side HTML extraction helpers into a single canonical authority at `server/html-analysis-utils.ts`, covering tag/meta extraction, HTML word counting, link extraction (including optional `rel`, onclick URL, form action, dedupe, and filter hooks), image extraction, inline style/script byte counting, and external resource counts. `server/seo-audit-html.ts` and `server/sales-audit.ts` now act as compatibility wrappers that preserve their existing output shapes, while `server/link-checker.ts` now uses the canonical optioned extractor for richer crawl discovery behavior. A new error-level `pr-check` rule (`Ad hoc HTML extraction helper outside canonical authority`) prevents local mini-parser reintroduction outside approved authority modules/wrappers.
+
+**Agency value:** Reduces duplicated parser logic and maintenance overhead in high-change audit/check surfaces, making bug fixes and extraction improvements land once and propagate consistently.
+
+**Client value:** Improves consistency of SEO/sales/link analysis outputs by reducing hidden parser drift that can make similar pages score differently across surfaces.
+
+**Mutual:** Keeps behavior stable while shrinking long-term bug surface, and adds enforceable guardrails so consolidation stays durable instead of regressing in future PRs.
+
+---
+
+### 458. Schema Intelligence Phase D — Typed Entity Schema Emission
+
+**What it does:** Wires the resolved entity slice directly into schema output. Schema generation now threads page/workspace entity-resolution payloads into template builders so `Organization.knowsAbout`, `Article.about`, `Article.mentions`, and `Service`/`LocalBusiness.areaServed` can emit typed `Thing`/`Place` nodes with Wikidata-backed `sameAs` URLs when available. Organization `sameAs` now also merges entity-derived references with social-profile links.
+
+**Agency value:** Delivers the first customer-visible value from entity resolution by upgrading key schema fields from plain strings to disambiguated structured entities.
+
+**Client value:** Rich-result parsers receive clearer identity signals for topics and service geography, improving authority clarity and reducing ambiguous schema interpretation.
+
+**Mutual:** Completes the end-to-end contract from intelligence extraction through schema emission while preserving deterministic fallback behavior.
+
+---
+
+### 457. Schema Intelligence Phase C — Wikidata Resolution + Cache
+
+**What it does:** Adds live entity disambiguation infrastructure behind the existing `entityResolution` slice. New intelligence-local modules now perform bounded Wikidata SPARQL lookups (`server/intelligence/entity-resolution-wikidata.ts`) and persist per-entity cache entries in SQLite (`entity_resolution_cache` via migration 104 + `server/intelligence/entity-resolution-cache.ts`). `assembleEntityResolution()` now supports opt-in live resolution through `IntelligenceOptions.resolveEntityReferences`; schema consumers enable this via `buildSchemaIntelligence({ includeEntityResolution: true })`.
+
+**Agency value:** Turns entity grounding from static candidate extraction into a reusable, cached intelligence capability with explicit degraded/unresolved states.
+
+**Client value:** Improves the quality and consistency of future `sameAs` and typed-entity schema output without making schema generation fragile when external lookups fail.
+
+**Mutual:** Reduces drift by centralizing disambiguation, confidence scoring, and caching in one intelligence-owned boundary.
+
+---
+
+### 456. Schema Intelligence Phase B — Entity Resolution Slice Wiring
+
+**What it does:** Wires the new entity-resolution contract into the workspace intelligence assembly path without changing schema template output yet. `entityResolution` is now a first-class `IntelligenceSlice`, `server/workspace-intelligence.ts` can assemble it through `assembleEntityResolution()`, and `buildSchemaIntelligence()` can request/return it via `includeEntityResolution`. The initial assembler deterministically constructs typed Thing/Place candidates from workspace strategy keywords, page-level keyword focus, and business-profile location context.
+
+**Agency value:** Converts entity grounding from a “future doc idea” into executable platform plumbing, so later Wikidata disambiguation and template emission work has a stable, test-backed seam.
+
+**Client value:** Indirectly improves reliability for future schema authority features by ensuring candidate extraction and schema read wiring are centralized before rollout.
+
+**Mutual:** Reduces implementation risk for high-impact entity grounding by landing data contracts and orchestration in production before behavior-changing template updates.
+
+---
+
+### 455. Platform Health Wave 7 PR2 — `semrushMode` Compatibility Retirement
+
+**What it does:** Finishes the keyword-strategy provider-neutral naming migration by removing runtime `semrushMode` compatibility fallback seams across the keyword-strategy route, background job dispatch, generation service options, and admin display state hydration. `seoDataMode` is now the single active mode contract. A DB migration (`103-retire-semrush-mode.sql`) backfills legacy blobs by copying `semrushMode` into `seoDataMode` when needed and removing the legacy alias key from stored `keyword_strategy` JSON.
+
+**Agency value:** Reduces hidden dual-path behavior and future drift risk in one of the platform’s highest-change subsystems (strategy generation + jobs + UI), making failures easier to reason about and debug.
+
+**Client value:** Keeps strategy generation behavior consistent and predictable across UI and background flows, with less risk of legacy payload edge cases producing unexpected mode selection.
+
+**Mutual:** Tightens a core platform contract to one canonical field (`seoDataMode`), which improves maintainability without changing the intended product outcome.
+
+### 454. Schema Intelligence Phase A — Entity Resolution Contracts + Guardrails
+
+**What it does:** Adds the first implementation phase for `schema-entity-grounding-wikidata` without changing runtime schema output. The platform now has shared typed contracts for entity grounding in `shared/types/entity-resolution.ts` (`Thing`/`Place` entities, Wikidata references, and explicit availability states), an explicit rule doc (`docs/rules/schema-entity-resolution.md`) defining the architecture boundary, and a new hard `pr-check` custom rule that blocks direct Wikidata/SPARQL references outside `server/intelligence/entity-resolution*` modules unless a documented hatch is used.
+
+**Agency value:** Creates a safe foundation for the higher-risk entity-grounding implementation work by preventing ad hoc lookups and duplicated disambiguation logic from leaking across schema routes/helpers.
+
+**Client value:** Improves future schema quality reliability by ensuring `sameAs`/entity disambiguation features are built on one consistent contract rather than fragmented feature-local heuristics.
+
+**Mutual:** Reduces drift risk before runtime rollout and keeps the schema intelligence roadmap phase-based, test-backed, and reviewable.
+
+---
+
+### 453. Platform Health Wave 7 PR1 — Audit-Traffic Consolidation + Intelligence Builder Guardrail
+
+**What it does:** Consolidates audit-traffic read assembly into a single shared service (`server/audit-traffic.ts`) and migrates admin/public/recommendation consumers onto that canonical path. This removes duplicated GSC+GA4 merge logic that had diverged across `misc` routes, public-portal routes, and recommendation assembly. In the same PR, a new hard `pr-check` rule now blocks direct `getInsights()`, `getWorkspaceLearnings()`, and `formatLearningsForPrompt()` prompt-assembly drift in builder-enforced AI/recommendation consumers, requiring shared intelligence builders unless an explicit documented hatch is used.
+
+**Agency value:** Reduces maintenance drag and silent data-shape drift in a core decision-support read path while preventing regression to hand-rolled AI context assembly patterns that are costly to debug later.
+
+**Client value:** Keeps traffic-driven prioritization more consistent across surfaces (audit, recommendations, and client/public read paths) and improves reliability of AI-generated recommendations by enforcing stable context-building contracts.
+
+**Mutual:** Establishes a cleaner platform baseline: one source of truth for audit-traffic aggregation and one enforceable contract for high-value intelligence consumers.
+
+---
+
+### 452. Content Generation Style Selector
+
+**What it does:** Adds an admin-only writing style selector for content brief and post generation. Operators can choose `standard`, `concise`, or `hybrid` when creating a brief, edit the selected style on the brief, and override it when starting full post generation. The selected style is persisted on both briefs and generated posts so future quality analysis can compare style choice against approvals, edits, and outcomes.
+
+**Agency value:** Gives operators a practical control for client taste and page-type fit without changing prompts globally or merging new experiments to staging. It supports live A/B-style workflow learning while keeping generation deterministic and auditable.
+
+**Client value:** Content can better match the client’s preferred density: fuller SEO depth, tighter conversion copy, or a hybrid of concise structure with stronger proof and voice.
+
+**Mutual:** Keeps brand voice enabled while making copy length and density an explicit, trackable choice rather than hidden prompt behavior.
+
+---
+
+### 451. Read-Only Content Generation Experiment Harness
+
+**What it does:** Adds `scripts/experiment-content-generation.ts`, a local/manual experiment harness for comparing content brief and draft variants without merging prompt changes to staging or saving generated content. The script calls MCP `prepare_brief_context` for live workspace context, generates candidate briefs locally with `callAI()`, validates the output against the existing MCP brief schema, scores outline density/CTA duplication/local-SEO-operation drift deterministically, and can optionally generate local draft HTML for quality scoring. Batch mode accepts a JSON experiment file, runs multiple topics/page types, and writes a rollup report with per-page-type winners. All artifacts are ignored under `artifacts/content-experiments/`. Persistence flags are rejected by design, and the harness never calls `save_brief`, `save_post`, or `send_to_client`.
+
+**Agency value:** Gives operators a faster way to trial prompt and brief-shape changes against real client context before committing product behavior.
+
+**Client value:** Indirectly improves client-facing content quality by making experimentation safer and more evidence-led before changes reach the content workflow.
+
+**Mutual:** Keeps the platform's deterministic AI quality posture intact while allowing opt-in live-model exploration outside CI and outside persistence paths.
 
 ---
 
@@ -6448,6 +6608,8 @@ Bug hardening included:
 
 **May 2026 UI/UX overhaul:** The admin Keywords surface now keeps the keyword table full-width and opens rich keyword detail in a true slide-over drawer on desktop / bottom sheet on mobile. The UI is split into `src/components/keyword-command-center/` modules for the drawer, table rows, variant rows, summary metrics, bulk action bar, confirmation dialog, drawer detail panels, and shared display/action helpers. Rows now support checkbox multi-select and a sticky bulk lifecycle bar for add-to-strategy, track, pause, retire, and decline. The new bulk API (`POST /api/webflow/keyword-command-center/:workspaceId/actions/bulk`) reuses the single-keyword transition/protection path per row, canonicalizes duplicate keyword variants, returns per-keyword applied/skipped/error outcomes, writes one summary activity entry, and emits one coalesced workspace broadcast per batch. Drawer polish includes wrapping source badges, `StatusBadge domain="keyword-command-center"` lifecycle semantics, softer awaiting-data copy for new tracked keywords, and clearer empty placeholders for missing metrics.
 
+**May 2026 latency hardening + Strategy aux split closeout:** Follow-up pass closed the remaining perceived-latency and read-path items for `/ws/:workspaceId/seo-keywords` without changing contracts. Frontend behavior keeps rows as first paint while summary and local-visibility surfaces stay explicitly deferred/skeleton-backed; Strategy analysis remains render-ready while auxiliary provider/workspace metadata loads. Backend read-path scope now consistently uses the lightweight page-keyword read helper for KCC summary/rows/detail assignment+demand needs (`listPageKeywordsLite`), avoiding unnecessary score-history assembly and unrelated JSON parsing in detail path reads. Added regression coverage for summary-vs-rows filter parity, lite-read output boundaries, and non-blocking Strategy aux-loading UI behavior.
+
 **May 2026 Local SEO refresh budget — default 100, per-workspace override 25–300:** The flat 50-keyword refresh budget was a conservative initial default with no signal-quality or cost analysis behind it. With the Tier 2 cheap/Evaluated split landing the same week, raised the global default to 100 (~$0.20/refresh per active market — still trivial) and added a per-workspace `keywordsPerRefresh` override in `local_seo_workspace_settings` (migration 098). Bounds: min 25, max 300, default 100. Local-first clients with broad service-area coverage can be bumped to 200–300; non-local clients can be dropped to 25 to save credits. Surfaced in the Local SEO setup drawer as a numeric input with live cost-estimate text (`keywords × active_markets × $0.002`). Wire-up: shared `LOCAL_SEO_MIN/DEFAULT/MAX_KEYWORDS_PER_REFRESH(_CAP)` constants, `getEffectiveKeywordsPerRefresh(workspaceId)` resolver that clamps + falls back, route validation in `keywordsPerRefresh` Zod field, KCC + LocalSeoVisibilityPanel `caps` payload now carries `keywordsPerRefreshMin/Max/Default` for the UI.
 
 **May 2026 Local SEO candidate architecture — Tier 2 cheap/Evaluated split:** The Strategy 'Refresh' button on local workspaces was killing the staging instance via OOM, and the KCC Local Candidates filter took 35–43s on Swish. Both shared one root cause: `buildLocalSeoKeywordCandidates` ran the eligibility evaluator + noise-pattern suppression per candidate while scanning pageMap × secondaries × markets. Refactor splits the function in two: `buildLocalSeoKeywordCandidates` is now the cheap default (no evaluator, empty reasons, no scoreDelta — safe for every current production caller: refresh path, KCC row enrichment, intelligence slice, AdminChat, MCP, content/recommendation gen) and `buildLocalSeoKeywordCandidatesEvaluated` is the opt-in slow variant. Shared `iterateLocalCandidateSignals` generator powers all three production code paths (cheap, Evaluated, count). `loadCandidateIterationContext` accepts `{ withEvaluationContext: true }` so the Evaluated path reuses the single `buildCandidateContext` read instead of calling it twice. No module-level cache — wall-clock TTL caches risk stale data after workspace mutations and unbounded memory growth; the cheap generator is fast enough on its own. pr-check rule retargeted to the Evaluated variant with new `local-candidates-evaluated-ok` hatch. Architecture scales for upcoming geo-grid tracking, local SEO recommendations, Google Business Profile health, Google reviews, and client local SEO module — all of which need cheap candidate enumeration, not the evaluator's suppression chain.
@@ -6615,3 +6777,88 @@ Service and location page brief defaults are now shorter and more conversion-den
 **Boundaries:** No DB, route, UI, storage, WebSocket, React Query, model, token, or temperature changes. This is prompt-contract behavior only; subjective quality remains human-reviewed on staging.
 
 **Files:** `server/page-type-copy-contract.ts`; `server/content-posts-ai.ts`; `server/content-brief.ts`; `server/copy-generation.ts`; `tests/unit/content-quality-rules.test.ts`; `tests/unit/content-posts-ai.test.ts`; `tests/unit/copy-generation-pure.test.ts`; `tests/unit/content-brief.test.ts`; `docs/rules/brand-engine.md`; `docs/rules/ai-quality-evals.md`; `FEATURE_AUDIT.md`.
+
+## E-E-A-T Asset Library — Personalized Trust Signal Recommendations
+
+**Status:** Shipped 2026-05-27
+**Roadmap:** `#356`
+
+**What it does:** Adds a workspace-level E-E-A-T asset library and threads it through the intelligence, content, Page Intelligence, and schema paths so trust guidance is no longer generic.
+
+- Added a new admin settings surface for E-E-A-T asset inventory management (`testimonial`, `case_study`, `credential`, `before_after_gallery`, `team_bio`, `award`, `research`, `client_logo`) backed by `eeat_assets` storage.
+- Added intelligence slice `eeatAssets` with a prompt-ready trust-signal block and cache/broadcast wiring (`eeat-assets:updated`).
+- Added deterministic trust-signal evaluation (`server/eeat-trust-signals.ts`) used by single-page and bulk page analysis persistence to store per-page:
+  - `missingTrustSignals`
+  - `eeatAssetRecommendations`
+- Extended `page_keywords` persistence/mapping to store and rehydrate those fields, including clear/reset behavior on re-analysis.
+- Content brief generation now injects concrete asset recommendations from page-level analysis (or workspace fallback) so briefs can call for specific proof assets instead of generic E-E-A-T advice.
+- Schema generation now consumes workspace E-E-A-T assets through schema context and enriches Article author identity with job title, sameAs corroboration links, and credential nodes when available.
+
+**Agency value:** Gives operators one canonical place to register trust evidence and see it reused automatically across strategy, briefs, and schema output instead of re-describing proof assets in every workflow.
+
+**Client value:** Improves output specificity and credibility. Content and schema recommendations can reference real available proof, making deliverables more actionable and better aligned with E-E-A-T expectations.
+
+**Files:** `shared/types/eeat-assets.ts`; `server/db/migrations/105-eeat-assets.sql`; `server/schemas/eeat-assets.ts`; `server/eeat-assets.ts`; `server/routes/eeat-assets.ts`; `server/ws-events.ts`; `src/lib/wsEvents.ts`; `shared/types/intelligence.ts`; `server/intelligence/eeat-assets-slice.ts`; `server/workspace-intelligence.ts`; `server/intelligence/formatters.ts`; `server/intelligence/generation-context-builders.ts`; `server/eeat-trust-signals.ts`; `server/page-keywords.ts`; `server/page-analysis-job.ts`; `server/routes/webflow-keywords.ts`; `server/schemas/page-analysis.ts`; `server/schemas/workspace-schemas.ts`; `src/api/eeatAssets.ts`; `src/hooks/admin/useEeatAssets.ts`; `src/components/settings/EeatAssetsTab.tsx`; `src/components/WorkspaceSettings.tsx`; `src/hooks/useWsInvalidation.ts`; `src/components/page-intelligence/pageIntelligenceTypes.ts`; `src/components/page-intelligence/pageIntelligenceData.ts`; `src/components/page-intelligence/PageIntelligenceAnalysisSection.tsx`; `src/components/page-intelligence/usePageIntelligenceAnalysis.ts`; `server/schema-intelligence.ts`; `server/helpers.ts`; `server/schema-suggester.ts`; `server/schema/data-sources.ts`; `server/schema/templates/article.ts`; `docs/rules/eeat-asset-library.md`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+## Full `normalizePath` Sunset + Page-Address Authority Completion
+
+**Status:** Shipped 2026-05-27
+**Roadmap:** `audit-drift-page-path-address-helper-consolidation`
+
+**What it does:** Completes the one-shot retirement of `normalizePath` as a production primitive and converges server + frontend onto one shared page-address authority.
+
+- Added `shared/page-address-utils.ts` as the cross-runtime canonical implementation for `normalizePageUrl`, `resolvePageAddress`, `resolvePagePath`, `tryResolvePagePath`, `matchPageIdentity`, `matchPagePath`, and `findPageMapEntry*`.
+- Migrated `server/helpers.ts` and `src/lib/pathUtils.ts` to delegate to that shared authority and removed public `normalizePath` exports from both facades.
+- Migrated remaining production call sites to canonical APIs (string boundaries via `normalizePageUrl`; object boundaries via `resolvePageAddress` / `resolvePagePath` / `tryResolvePagePath`), including schema classifier path prep and multiple keyword-strategy/SEO matching paths.
+- Added error-level anti-drift guardrails:
+  - `Retired normalizePath usage in production code`
+  - `Local page/path normalizer helper outside tests`
+  with fixture coverage in `tests/pr-check.test.ts`.
+
+**Behavior contract:** Path semantics are preserved (leading slash enforcement, trailing slash normalization, URL pathname extraction). No HTTP endpoint, auth, or wire-shape changes.
+
+**Files:** `shared/page-address-utils.ts`; `server/helpers.ts`; `src/lib/pathUtils.ts`; `server/admin-chat-context.ts`; `server/page-keywords.ts`; `server/keyword-strategy-sanitizer.ts`; `server/keyword-strategy-ai-synthesis.ts`; `server/keyword-strategy-enrichment.ts`; `server/keyword-strategy-generation.ts`; `server/keyword-strategy-persistence.ts`; `server/seo-change-tracker.ts`; `server/schema/classifier.ts`; `src/hooks/admin/usePageJoin.ts`; `scripts/pr-check.ts`; `tests/pr-check.test.ts`; `tests/unit/helpers-page-address.test.ts`; `tests/unit/pathUtils-pure.test.ts`; `tests/unit/page-address-helpers-pure.test.ts`; `tests/unit/seo-context-builder-pure.test.ts`; `tests/unit/seo-audit-site-checks-pure.test.ts`; `tests/unit/src-lib-utils-pure.test.ts`; `tests/unit/lib-utilities.test.ts`; `tests/unit/seo-context-slice-assembly.test.ts`; `tests/unit/keyword-strategy-persistence.test.ts`; `docs/rules/verified-clean-rules.md`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+## Content Post Feedback Editing MVP (AI Fix Flow Extension)
+
+**Status:** Shipped 2026-05-27
+**Roadmap:** `content-post-feedback-editing-mvp`
+
+**What it does:** Extends the existing admin content-post AI fix flow (`POST /api/content-posts/:workspaceId/:postId/ai-fix`) to support feedback-driven edits without introducing a second suggest/apply system.
+
+- Added backward-compatible request modes:
+  - checklist mode (existing): `{ issueKey, reason }`
+  - feedback mode (new): `{ mode: 'feedback', target: 'section' | 'post' | 'meta', feedback, sectionIndex? }`
+- Added strict validation for feedback mode, including required `sectionIndex` when `target='section'`.
+- Extended `AiFixResult.field` with `post` and introduced structured full-post diff payloads (`introduction`, `sections[{index,content}]`, `conclusion`) returned in `originalText`/`suggestedText`.
+- Reused existing preview-then-apply UX:
+  - section-level “Generate with feedback”
+  - full-post “Generate full post with feedback”
+  - SEO metadata “Generate SEO with feedback”
+- Extended `FixDiffModal` to render sectioned post diffs (intro/sections/conclusion) while preserving existing meta and section views.
+- Kept mutation path unchanged: accepted suggestions apply through existing post PATCH save flow, preserving snapshot/coalesce, activity logging, and workspace broadcast invalidation behavior.
+- Added named AI operation contracts for feedback edit generation (`content-post-feedback-fix`, `content-post-feedback-fix-structured`) and schema-validated structured output handling for meta/post targets.
+
+**Agency value:** Editors can give direct steering feedback at section, full-post, or SEO metadata scope and get a safe diff preview before applying changes, reducing rewrite loops and copy/paste iteration.
+
+**Client value:** No client-facing UI/API behavior changes. Improves admin draft quality and turnaround before client review.
+
+**Boundaries:** No post-scoped admin chat, no background job addition, no DB migration, and no publishing/workflow status changes.
+
+**Files:** `server/routes/content-posts.ts`; `server/ai-operation-registry.ts`; `shared/types/content.ts`; `src/api/content.ts`; `src/components/PostEditor.tsx`; `src/components/post-editor/SectionEditor.tsx`; `src/components/post-editor/FixDiffModal.tsx`; `tests/integration/content-posts-ai-fix.test.ts`; `tests/component/PostEditor.test.tsx`; `tests/unit/api-modules-b.test.ts`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+## Audit Drift Closure — Plan A: Security & Parity (Tasks 2-5)
+
+**Status:** Shipped 2026-05-27
+**Roadmap:** `audit-drift-trial-state-canonical`, `audit-drift-admin-workspace-view`, `audit-drift-briefing-admin-preview`, `audit-drift-p2-admin-client-parity`
+
+**What it does:** Closes four categories of admin/client divergence and data-leakage risk surfaced by the platform audit.
+
+- **A2 — Canonical trial-state computation:** Extracted `computeTrialState()` into `server/billing/trial-state.ts` as the single source of truth for `isTrial`, `trialDaysRemaining`, and `trialExpired`. Replaced 3 inline computation sites (admin dashboard, public portal, workspace settings). Added pr-check rule blocking inline `new Date(trialEndsAt)` comparisons outside the billing module.
+- **A3 — AdminWorkspaceView serializer:** Added `server/serializers/admin-workspace-view.ts` with `toAdminWorkspaceView(ws)` — an allow-list serializer (~55 fields) replacing spread-and-redact `{ ...ws, webflowToken: undefined }` patterns. Added `AdminWorkspaceView` interface to `shared/types/workspace.ts`. Added pr-check rule blocking `{ ...ws` spreads and `webflowToken: undefined` redactions in route handlers.
+- **A4 — Briefing client-preview extraction:** Extracted `buildBriefingClientView()` into `server/briefing-client-projection.ts` to ensure admin preview and client portal render identical briefing enrichment (issue summaries, recommendations with opportunity scores).
+- **A5 — Parity cluster:** Converged `opportunityScore` fallback to use `computeOpportunityScore()` from `server/keyword-strategy-helpers.ts` in both admin and client paths. Added `isVoiceProfileAuthoritative()` guard on onboarding brand-voice display to prevent showing uncalibrated voice profiles.
+
+**Tests:** 11 trial-state contract tests, 6 admin-workspace-view contract tests, 5 admin-client-parity-cluster contract tests, 5 briefing-client-preview integration tests, 63 client-strategy integration tests updated.
+
+**Files:** `server/billing/trial-state.ts`; `server/serializers/admin-workspace-view.ts`; `server/briefing-client-projection.ts`; `shared/types/workspace.ts`; `shared/types/briefing.ts`; `shared/types/keyword-feedback.ts`; `server/keyword-feedback.ts`; `server/routes/keyword-strategy.ts`; `server/routes/public-portal.ts`; `server/intelligence/client-signals-slice.ts`; `src/api/misc.ts`; `src/api/seo.ts`; `src/components/KeywordStrategy.tsx`; `src/components/client/strategy/useStrategyKeywordFeedback.ts`; `scripts/pr-check.ts`; `tests/pr-check.test.ts`; `tests/contract/trial-state-parity.test.ts`; `tests/contract/admin-workspace-view.test.ts`; `tests/contract/admin-client-parity-cluster.test.ts`; `tests/integration/briefing-client-preview.test.ts`; `tests/integration/client-strategy.test.ts`; `docs/rules/automated-rules.md`; `docs/rules/verified-clean-rules.md`; `FEATURE_AUDIT.md`; `data/roadmap.json`.

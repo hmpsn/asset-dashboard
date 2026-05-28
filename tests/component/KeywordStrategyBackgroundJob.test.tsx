@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   jobs: [] as BackgroundJob[],
   providerStatus: vi.fn(),
   getWorkspaceById: vi.fn(),
+  isAuxLoading: false,
   keywordStrategyData: {
     strategy: null,
     seoDataAvailable: true,
@@ -29,6 +30,7 @@ vi.mock('../../src/hooks/admin', () => ({
   useKeywordStrategy: () => ({
     data: mocks.keywordStrategyData,
     isLoading: false,
+    isAuxLoading: mocks.isAuxLoading,
   }),
   useLocalSeo: () => ({
     data: { featureEnabled: false },
@@ -105,6 +107,7 @@ describe('KeywordStrategyPanel background job wiring', () => {
     mocks.startJob.mockResolvedValue('job-keyword-1');
     mocks.providerStatus.mockResolvedValue({ providers: [{ name: 'semrush', configured: true }] });
     mocks.getWorkspaceById.mockResolvedValue({ seoDataProvider: 'semrush' });
+    mocks.isAuxLoading = false;
     mocks.keywordStrategyData = {
       strategy: null,
       seoDataAvailable: true,
@@ -175,6 +178,15 @@ describe('KeywordStrategyPanel background job wiring', () => {
         expect.objectContaining({ maxPages: 0 }),
       );
     });
+  });
+
+  it('keeps analysis visible while auxiliary strategy metadata is still loading', async () => {
+    mocks.isAuxLoading = true;
+    renderPanel();
+
+    expect(screen.getByText('Keyword Strategy')).toBeInTheDocument();
+    expect(screen.getByText('Loading provider and workspace strategy settings...')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /generate strategy/i })).toBeInTheDocument();
   });
 
   it('uses an active keyword strategy job as the generating state', () => {

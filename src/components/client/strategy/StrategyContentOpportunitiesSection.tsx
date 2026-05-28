@@ -307,7 +307,12 @@ export function StrategyContentOpportunitiesSection({
 }: StrategyContentOpportunitiesSectionProps) {
   return (
     <div ref={newContentRef}>
-      <TierGate tier={effectiveTier} required="growth" feature="Create Content" teaser={`${newContentTopicCount} content ideas identified - upgrade to unlock recommendations`}>
+      <TierGate
+        tier={effectiveTier}
+        required="growth"
+        feature="Create Content"
+        teaser={`${newContentTopicCount} content ideas identified. Upgrade to Growth to unlock Strategy Keywords and content recommendations.`}
+      >
         <SectionCard noPadding>
           <ClickableRow
             onClick={() => toggleSection('new-content')}

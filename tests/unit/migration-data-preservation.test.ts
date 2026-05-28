@@ -132,6 +132,18 @@ describe('schema integrity — analytics_insights', () => {
   });
 });
 
+// ── Schema integrity — content_briefs ──
+
+describe('schema integrity — content_briefs', () => {
+  it('has columns added by later migrations', () => {
+    const cols = columnNames('content_briefs');
+    const added = ['status', 'keyword_locked', 'title_variants', 'meta_desc_variants', 'generation_style'];
+    for (const col of added) {
+      expect(cols, `content_briefs.${col} should exist`).toContain(col);
+    }
+  });
+});
+
 // ── Schema integrity — content_posts ──
 
 describe('schema integrity — content_posts', () => {
@@ -148,8 +160,8 @@ describe('schema integrity — content_posts', () => {
 
   it('has columns added by later migrations', () => {
     const cols = columnNames('content_posts');
-    // 007: webflow publish columns; 010: review_checklist; 028: voice_score/voice_feedback
-    const added = ['webflow_item_id', 'published_at', 'review_checklist', 'voice_score', 'voice_feedback'];
+    // 007: webflow publish columns; 010: review_checklist; 028: voice_score/voice_feedback; 102: generation_style
+    const added = ['webflow_item_id', 'published_at', 'review_checklist', 'voice_score', 'voice_feedback', 'generation_style'];
     for (const col of added) {
       expect(cols, `content_posts.${col} should exist`).toContain(col);
     }
@@ -286,6 +298,46 @@ describe('CRUD preservation — approval_batches', () => {
   });
 });
 
+// ── CRUD preservation — content_briefs (raw INSERT + SELECT) ──
+
+describe('CRUD preservation — content_briefs', () => {
+  const briefId = 'brief-mig-style-test-' + Date.now();
+
+  afterAll(() => {
+    db.prepare('DELETE FROM content_briefs WHERE id = ?').run(briefId);
+  });
+
+  it('row inserted with base columns receives generation_style default', () => {
+    const now = new Date().toISOString();
+
+    db.prepare(`
+      INSERT INTO content_briefs
+        (id, workspace_id, target_keyword, suggested_title, suggested_meta_desc,
+         word_count_target, intent, audience, competitor_insights, created_at)
+      VALUES
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      briefId,
+      workspaceId,
+      'migration brief keyword',
+      'Migration Brief Title',
+      'Migration brief meta description.',
+      900,
+      'commercial',
+      'buyers',
+      'Competitors over-explain.',
+      now,
+    );
+
+    const row = db.prepare('SELECT * FROM content_briefs WHERE id = ?').get(briefId) as Record<string, unknown> | undefined;
+
+    expect(row).toBeDefined();
+    expect(row!['id']).toBe(briefId);
+    expect(row!['status']).toBe('draft');
+    expect(row!['generation_style']).toBe('standard');
+  });
+});
+
 // ── CRUD preservation — content_posts (raw INSERT + SELECT) ──
 
 describe('CRUD preservation — content_posts', () => {
@@ -340,6 +392,7 @@ describe('CRUD preservation — content_posts', () => {
     expect(row!['review_checklist']).toBeNull();
     expect(row!['webflow_item_id']).toBeNull();
     expect(row!['published_at']).toBeNull();
+    expect(row!['generation_style']).toBe('standard');
   });
 });
 

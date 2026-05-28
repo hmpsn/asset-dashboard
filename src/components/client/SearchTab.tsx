@@ -10,6 +10,7 @@ import { Explainer } from './SeoGlossary';
 import type {
   SearchOverview, PerformanceTrend, SearchComparison, SortKey,
 } from './types';
+import { capitalize } from '../../utils/strings';
 
 interface SearchInsights {
   lowHanging: { query: string; position: number; impressions: number; clicks: number; ctr: number }[];
@@ -147,9 +148,12 @@ export function SearchTab({
     {/* Rank Tracking */}
     <RankTrackingSection rankHistory={rankHistory} latestRanks={latestRanks} />
 
-    {/* Annotations (read-only, managed from admin) */}
+    {/* Timeline notes (read-only, managed by your team) */}
     {annotations.length > 0 && (
-      <SectionCard title="Timeline Annotations" titleIcon={<Icon as={Activity} size="md" className="text-[var(--brand-text-muted)]" />} titleExtra={<span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{annotations.length}</span>}>
+      <SectionCard title="Timeline Notes" titleIcon={<Icon as={Activity} size="md" className="text-[var(--brand-text-muted)]" />} titleExtra={<span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{annotations.length}</span>}>
+        <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">
+          Need to add or update a timeline note? Message your team in Inbox conversations.
+        </p>
         <div className="space-y-1.5">
           {annotations.map(ann => (
             <div key={ann.id} className="flex items-center gap-2 px-2 py-1.5 rounded-[var(--radius-lg)] bg-[var(--surface-1)]/50">
@@ -200,7 +204,7 @@ export function SearchTab({
                     onClick={() => handleSort(key)}
                     className="ml-auto px-0 py-0 hover:bg-transparent hover:text-[var(--brand-text)]"
                   >
-                    {key === 'ctr' ? 'CTR' : key.charAt(0).toUpperCase() + key.slice(1)}
+                    {key === 'ctr' ? 'CTR' : capitalize(key)}
                     <Explainer term={key === 'ctr' ? 'ctr' : key} />
                     {sortKey === key && <Icon as={ArrowUpDown} size="sm" />}
                   </Button>

@@ -8,6 +8,8 @@ import type { KeywordStrategy, AudiencePersona, PageKeywordMap } from './workspa
 import type { BriefingSummary } from './briefing.js';
 import type { PageElementCatalog } from './page-elements.js';
 import type { SiteInventorySlice } from './site-inventory.js';
+import type { EntityResolutionSlice } from './entity-resolution.js';
+import type { EeatAsset, EeatAssetType } from './eeat-assets.js';
 import type {
   TrackedAction,
   ActionOutcome,
@@ -32,6 +34,8 @@ export const INTELLIGENCE_SLICES = [
   'pageElements',
   'siteInventory',
   'localSeo',
+  'entityResolution',
+  'eeatAssets',
 ] as const;
 
 export type IntelligenceSlice = typeof INTELLIGENCE_SLICES[number];
@@ -53,6 +57,7 @@ export const PROMPT_FORMATTABLE_INTELLIGENCE_SLICES = [
   'operational',
   'pageElements',
   'localSeo',
+  'eeatAssets',
 ] as const satisfies readonly IntelligenceSlice[];
 
 export function isIntelligenceSlice(value: string): value is IntelligenceSlice {
@@ -86,6 +91,12 @@ export interface IntelligenceOptions {
    * Only enable for callers that actually surface backlink data (e.g. admin AI chat).
    */
   enrichWithBacklinks?: boolean;
+  /**
+   * Opt-in: run live Wikidata/SPARQL disambiguation for entityResolution candidates.
+   * OFF by default to avoid external lookup latency for callers that only need
+   * deterministic candidate extraction.
+   */
+  resolveEntityReferences?: boolean;
 }
 
 // ── Core return type ────────────────────────────────────────────────────
@@ -110,6 +121,11 @@ export interface WorkspaceIntelligence {
   operational?: OperationalSlice;
   /** Local SEO posture, markets, full candidate list, and pre-formatted prompt block. */
   localSeo?: LocalSeoSlice;
+  /** Entity grounding for schema surfaces (Thing/Place + Wikidata disambiguation).
+   *  Always undefined until the EntityResolutionSlice assembler phase ships. */
+  entityResolution?: EntityResolutionSlice;
+  /** Workspace-scoped E-E-A-T trust-signal inventory. */
+  eeatAssets?: EeatAssetsSlice;
 }
 
 // ── Slice interfaces ────────────────────────────────────────────────────
@@ -399,6 +415,14 @@ export interface LocalSeoSlice {
   effectiveLocalSeoBlock: string;
   /** ISO timestamp of the latest visibility snapshot reflected here. */
   latestSnapshotAt: string | null;
+}
+
+export interface EeatAssetsSlice {
+  availability: 'ready' | 'no_data';
+  assets: EeatAsset[];
+  byType: Array<{ type: EeatAssetType; count: number }>;
+  /** Pre-formatted trust-signal block for prompt consumers. Inject directly. */
+  effectiveTrustSignalsBlock: string;
 }
 
 // ── Client Intelligence API types (Phase 4C) ────────────────────────────────

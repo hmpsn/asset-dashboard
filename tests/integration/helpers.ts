@@ -35,7 +35,7 @@ export interface TestContext {
  * Create an isolated test context bound to a specific port.
  * Each test file should call this with a unique port number.
  */
-export function createTestContext(port: number, options?: { env?: Record<string, string> }): TestContext {
+export function createTestContext(port: number, options?: { env?: Record<string, string>; startupTimeoutMs?: number }): TestContext {
   const BASE = `http://localhost:${port}`;
   const dataDir = process.env.DATA_DIR ?? ensureIsolatedTestDataDir();
   let proc: ChildProcess | null = null;
@@ -89,10 +89,11 @@ export function createTestContext(port: number, options?: { env?: Record<string,
 
     proc.stderr?.on('data', (d: Buffer) => process.stderr.write(d));
 
+    const startupTimeoutMs = options?.startupTimeoutMs ?? 20_000;
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {
-        reject(new Error('Server did not start within 20 seconds'));
-      }, 20_000);
+        reject(new Error(`Server did not start within ${startupTimeoutMs / 1000} seconds`));
+      }, startupTimeoutMs);
 
       proc!.stdout?.on('data', (data: Buffer) => {
         const text = data.toString();

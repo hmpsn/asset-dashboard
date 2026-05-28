@@ -8,16 +8,29 @@ import type { SeoAuditResult } from './seo-audit.js';
 import type { SchemaContext } from './schema-suggester.js';
 import type { CustomDateRange } from './google-analytics.js';
 import { listWorkspaces } from './workspaces.js';
-import { getAllGscPages } from './search-console.js';
-import { getGA4TopPages } from './google-analytics.js';
 import { getDeclinedKeywords } from './keyword-feedback.js';
 import { listSites } from './webflow-pages.js';
-import { PAGE_ADDRESS_SOURCES } from '../shared/types/page-address.js';
 import type { PageAddress, PageAddressInput, ResolvePageAddressOptions } from '../shared/types/page-address.js';
+import {
+  findPageMapEntry as findPageMapEntryShared,
+  findPageMapEntryByIdentity as findPageMapEntryByIdentityShared,
+  findPageMapEntryForPage as findPageMapEntryForPageShared,
+  matchPageIdentity as matchPageIdentityShared,
+  matchPagePath as matchPagePathShared,
+  normalizePageUrl as normalizePageUrlShared,
+  resolvePageAddress as resolvePageAddressShared,
+  resolvePagePath as resolvePagePathShared,
+  tryResolvePagePath as tryResolvePagePathShared,
+} from '../shared/page-address-utils.js';
 import { createLogger } from './logger.js';
 import { CRITICAL_CHECKS, MODERATE_CHECKS, computePageScore } from '../shared/scoring.js';
 import { formatPersonasForPrompt } from './workspace-intelligence.js';
 import { buildSchemaIntelligence } from './schema-intelligence.js';
+import {
+  getAuditTrafficForWorkspace as getWorkspaceAuditTraffic,
+  type AuditTrafficMap,
+  type AuditTrafficWorkspace,
+} from './audit-traffic.js';
 
 
 const log = createLogger('helpers');
@@ -52,36 +65,12 @@ export function decodeEntities(text: string): string {
 
 // ── Page Path Utilities ──
 
-/** Normalize a page path: ensure leading slash, strip trailing slash (keep '/' as-is) */
-export function normalizePath(p: string): string {
-  const s = p.startsWith('/') ? p : `/${p}`;
-  return s.length > 1 && s.endsWith('/') ? s.slice(0, -1) : s;
-}
-
-function normalizePageAddressPath(value: string): string {
-  try {
-    if (value.startsWith('http')) return normalizePath(new URL(value).pathname);
-  } catch { // catch-ok: malformed URL string — fall through to path normalization
-  }
-  return normalizePath(value);
-}
-
-function buildCanonicalUrl(baseUrl: string | null | undefined, canonicalPath: string): string | undefined {
-  if (!baseUrl) return undefined;
-  const normalizedBase = baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`;
-  const trimmedBase = normalizedBase.replace(/\/+$/, '');
-  return `${trimmedBase}${canonicalPath === '/' ? '' : canonicalPath}`;
-}
-
 /** Exact path match with trailing-slash normalization (case-insensitive) */
-export function matchPagePath(a: string, b: string): boolean {
-  return normalizePath(a).toLowerCase() === normalizePath(b).toLowerCase();
-}
+export const matchPagePath = matchPagePathShared;
 
 /** Find a pageMap entry by path (exact match with normalization, case-insensitive) */
 export function findPageMapEntry<T extends { pagePath: string }>(pageMap: T[], path: string): T | undefined {
-  const norm = normalizePath(path).toLowerCase();
-  return pageMap.find(p => normalizePath(p.pagePath).toLowerCase() === norm);
+  return findPageMapEntryShared(pageMap, path);
 }
 
 /**
@@ -99,14 +88,7 @@ export function findPageMapEntryForPage<T extends { pagePath: string }>(
   pageMap: T[],
   page: { publishedPath?: string | null; slug?: string },
 ): T | undefined {
-  const address = resolvePageAddress(page);
-  const primary = findPageMapEntry(pageMap, address.canonicalPath);
-  if (primary) return primary;
-  // Legacy fallback: pre-hardening entries stored under `/${slug}` for nested pages.
-  if (address.legacyFallbackPath) {
-    return findPageMapEntry(pageMap, address.legacyFallbackPath);
-  }
-  return undefined;
+  return findPageMapEntryForPageShared(pageMap, page);
 }
 
 /** Resolve the full canonical page-address contract for Webflow/site page records. */
@@ -114,44 +96,12 @@ export function resolvePageAddress(
   page: PageAddressInput,
   options: ResolvePageAddressOptions = {},
 ): PageAddress {
-  const includeLegacyFallback = options.includeLegacyFallback !== false;
-  let canonicalPath = '/';
-  let source: PageAddress['source'] = PAGE_ADDRESS_SOURCES.fallback;
-
-  if (page.publishedPath !== undefined && page.publishedPath !== null) {
-    canonicalPath = normalizePageAddressPath(page.publishedPath);
-    source = PAGE_ADDRESS_SOURCES.publishedPath;
-  } else if (page.path !== undefined && page.path !== null) {
-    canonicalPath = normalizePageAddressPath(page.path);
-    source = PAGE_ADDRESS_SOURCES.path;
-  } else if (page.url !== undefined && page.url !== null) {
-    canonicalPath = normalizePageAddressPath(page.url);
-    source = PAGE_ADDRESS_SOURCES.url;
-  } else if (page.slug !== undefined && page.slug !== null) {
-    canonicalPath = normalizePageAddressPath(page.slug);
-    source = PAGE_ADDRESS_SOURCES.slug;
-  }
-
-  const address: PageAddress = {
-    canonicalPath,
-    canonicalUrl: buildCanonicalUrl(options.baseUrl, canonicalPath),
-    rawSlug: page.slug ?? null,
-    source,
-  };
-
-  if (includeLegacyFallback && page.slug !== undefined && page.slug !== null) {
-    const legacyFallbackPath = normalizePageAddressPath(page.slug);
-    if (legacyFallbackPath.toLowerCase() !== canonicalPath.toLowerCase()) {
-      address.legacyFallbackPath = legacyFallbackPath;
-    }
-  }
-
-  return address;
+  return resolvePageAddressShared(page, options);
 }
 
 /** Resolve a Webflow page's canonical path from publishedPath or slug */
 export function resolvePagePath(page: PageAddressInput): string {
-  return resolvePageAddress(page).canonicalPath;
+  return resolvePagePathShared(page);
 }
 
 /**
@@ -169,12 +119,7 @@ export function resolvePagePath(page: PageAddressInput): string {
  * Only pages with neither field (truly orphaned, no identifying path info) return `undefined`.
  */
 export function tryResolvePagePath(page: PageAddressInput): string | undefined {
-  const hasSlug = page.slug !== undefined && page.slug !== null;
-  const hasPublishedPath = page.publishedPath !== undefined && page.publishedPath !== null;
-  const hasPath = page.path !== undefined && page.path !== null;
-  const hasUrl = page.url !== undefined && page.url !== null;
-  if (!hasSlug && !hasPublishedPath && !hasPath && !hasUrl) return undefined;
-  return resolvePagePath(page);
+  return tryResolvePagePathShared(page);
 }
 
 /**
@@ -184,7 +129,7 @@ export function tryResolvePagePath(page: PageAddressInput): string | undefined {
 export function matchGscUrlToPath(gscUrl: string, resolvedPath: string): boolean {
   let rPath: string;
   try { rPath = new URL(gscUrl).pathname; } catch { rPath = gscUrl; }
-  rPath = normalizePath(rPath.startsWith('/') ? rPath : `/${rPath}`);
+  rPath = normalizePageUrlShared(rPath.startsWith('/') ? rPath : `/${rPath}`);
   return resolvedPath === '/' ? rPath === '/' || rPath === '' : rPath === resolvedPath;
 }
 
@@ -206,16 +151,16 @@ export function applyBulkKeywordGuards(
 /**
  * Normalize a URL or path for cross-referencing.
  * Accepts full URLs (https://...) or bare paths. Strips origin, query,
- * and hash; normalizes trailing slash via normalizePath.
+ * and hash; normalizes trailing slash via canonical page-address helpers.
  * Used for reliable ROI page_url ↔ insight page_id matching.
  */
 export function normalizePageUrl(url: string): string {
-  return normalizePageAddressPath(url);
+  return normalizePageUrlShared(url);
 }
 
 /** Exact match for page identity values that may be full URLs, paths, or bare slugs. */
 export function matchPageIdentity(a: string, b: string): boolean {
-  return normalizePageUrl(a).toLowerCase() === normalizePageUrl(b).toLowerCase();
+  return matchPageIdentityShared(a, b);
 }
 
 /** Find a pageMap entry from a full URL/path/bare slug using exact normalized page identity. */
@@ -223,7 +168,7 @@ export function findPageMapEntryByIdentity<T extends { pagePath: string }>(
   pageMap: T[],
   pageIdentity: string,
 ): T | undefined {
-  return findPageMapEntry(pageMap, normalizePageUrl(pageIdentity));
+  return findPageMapEntryByIdentityShared(pageMap, pageIdentity);
 }
 
 // ── Input Validation ──
@@ -450,6 +395,7 @@ export async function buildSchemaContext(
     try {
       schemaIntel = await buildSchemaIntelligence({
         siteId,
+        includeEeatAssets: true,
       });
     } catch (err) {
       log.warn({ err, workspaceId: ws.id, siteId }, 'buildSchemaContext: intelligence seoContext unavailable');
@@ -503,48 +449,20 @@ export async function buildSchemaContext(
       };
     }
 
+    if (schemaIntel?.eeatAssets?.length) {
+      ctx._eeatAssets = schemaIntel.eeatAssets;
+    }
+
     ctx._siteHasSearch = ws.siteHasSearch === true;
 
   }
   return { ctx };
 }
 
-// ── Audit Traffic Cache ──
-
-const auditTrafficCache: Record<string, { data: Record<string, { clicks: number; impressions: number; sessions: number; pageviews: number }>; ts: number }> = {};
-
-export async function getAuditTrafficForWorkspace(ws: { id: string; webflowSiteId?: string; gscPropertyUrl?: string; ga4PropertyId?: string }): Promise<Record<string, { clicks: number; impressions: number; sessions: number; pageviews: number }>> {
-  if (!ws.webflowSiteId) return {};
-  const cacheKey = ws.id;
-  const cached = auditTrafficCache[cacheKey];
-  if (cached && Date.now() - cached.ts < 5 * 60 * 1000) return cached.data;
-  const trafficMap: Record<string, { clicks: number; impressions: number; sessions: number; pageviews: number }> = {};
-  if (ws.gscPropertyUrl) {
-    try {
-      const gscPages = await getAllGscPages(ws.id, ws.gscPropertyUrl, 28);
-      for (const p of gscPages) {
-        try {
-          const urlPath = normalizePageUrl(p.page);
-          if (!trafficMap[urlPath]) trafficMap[urlPath] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
-          trafficMap[urlPath].clicks += p.clicks;
-          trafficMap[urlPath].impressions += p.impressions;
-        } catch { /* skip malformed URLs */ }
-      }
-    } catch { /* GSC unavailable */ }
-  }
-  if (ws.ga4PropertyId) {
-    try {
-      const ga4Pages = await getGA4TopPages(ws.ga4PropertyId, 28, 500);
-      for (const p of ga4Pages) {
-        const urlPath = normalizePageUrl(p.path);
-        if (!trafficMap[urlPath]) trafficMap[urlPath] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
-        trafficMap[urlPath].pageviews += p.pageviews;
-        trafficMap[urlPath].sessions += p.users;
-      }
-    } catch { /* GA4 unavailable */ } // url-fetch-ok
-  }
-  auditTrafficCache[cacheKey] = { data: trafficMap, ts: Date.now() };
-  return trafficMap;
+export async function getAuditTrafficForWorkspace(
+  ws: AuditTrafficWorkspace,
+): Promise<AuditTrafficMap> {
+  return getWorkspaceAuditTraffic(ws);
 }
 
 // ── .env File Helpers ──
@@ -649,4 +567,29 @@ export function toAuditFindingPageId(page: { slug: string; url: string; pageId: 
   try { if (page.url) return new URL(page.url).pathname; } catch { /* fall through */ }
   if (page.slug) return `/${page.slug.replace(/^\/+/, '')}`;
   return page.pageId;
+}
+
+// ── String Utilities ──
+
+/**
+ * Canonical server-side slugify.
+ *
+ * Default (no opts): replaces all non-alphanumeric chars (except hyphens) with
+ * hyphens, collapses multiple hyphens, lowercases, trims edge hyphens.
+ * Matches the pattern used in entity-resolution-slice.ts:13 — chosen as the
+ * canonical form because it produces clean URL slugs from arbitrary strings.
+ *
+ * `keepWhitespace: true` — preserves spaces in the output (useful when the
+ * caller needs a human-readable label rather than a URL slug).
+ */
+export function slugify(value: string, opts?: { keepWhitespace?: boolean }): string {
+  const keepWs = opts?.keepWhitespace ?? false;
+  let s = value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, keepWs ? ' ' : '-')
+    .replace(/\s+/g, keepWs ? ' ' : '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  if (keepWs) s = s.trim();
+  return s;
 }

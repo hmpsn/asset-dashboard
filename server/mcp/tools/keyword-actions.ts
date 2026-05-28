@@ -13,6 +13,7 @@ import type { ProviderName } from '../../seo-data-provider.js';
 import { invalidateIntelligenceCache } from '../../workspace-intelligence.js';
 import { WS_EVENTS } from '../../ws-events.js';
 import { consumeHandle, issueHandle } from '../handles.js';
+import { slugify } from '../../helpers.js';
 import { toMcpJsonSchema } from '../json-schema.js';
 import { recordPaidCall } from '../paid-call-counter.js';
 import {
@@ -44,13 +45,6 @@ function parseMarketLocationCode(raw: string | undefined): number | undefined {
   if (!raw) return undefined;
   const parsed = Number.parseInt(raw, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-}
-
-function slugify(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'page';
 }
 
 function pagePathFromUrl(url: string): string {
@@ -165,7 +159,7 @@ async function handleAddKeywordToStrategy(
     }
   } else {
     next = {
-      pagePath: `/planned/${slugify(target.topic)}`,
+      pagePath: `/planned/${slugify(target.topic) || 'page'}`,
       pageTitle: target.topic,
       primaryKeyword: resolvedTerm,
       secondaryKeywords: [],

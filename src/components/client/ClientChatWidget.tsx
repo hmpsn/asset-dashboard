@@ -12,6 +12,7 @@ import { RenderMarkdown } from './helpers';
 import { ServiceInterestCTA } from './ServiceInterestCTA';
 import { useChat, type ChatDeps } from '../../hooks/useChat';
 import { type WorkspaceInfo, QUICK_QUESTIONS, LEARN_SEO_QUESTIONS } from './types';
+import { formatDate } from '../../utils/formatDates';
 
 export interface ClientChatWidgetApi {
   openChat: () => void;
@@ -193,7 +194,7 @@ export function ClientChatWidget({
                   >
                     <div className="t-ui font-medium truncate">{s.title}</div>
                     <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
-                      {s.messageCount} messages · {new Date(s.updatedAt).toLocaleDateString()}
+                      {s.messageCount} messages · {formatDate(s.updatedAt)}
                     </div>
                   </ClickableRow>
                 ))}

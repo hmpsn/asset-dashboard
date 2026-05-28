@@ -347,6 +347,18 @@ describe('KeywordCommandCenter', () => {
     expect(screen.getAllByText('Visible #2').length).toBeGreaterThan(0);
   });
 
+  it('defers local visibility panel mount until after the first rows render', () => {
+    renderCommandCenter();
+    expect(screen.getByText('Local visibility summary will load after the keyword rows are ready.')).toBeInTheDocument();
+
+    act(() => {
+      vi.runOnlyPendingTimers();
+    });
+
+    expect(screen.queryByText('Local visibility summary will load after the keyword rows are ready.')).not.toBeInTheDocument();
+    expect(screen.getByText('Local Keyword Visibility')).toBeInTheDocument();
+  });
+
   it('keeps selection checkboxes outside row activation buttons', () => {
     renderCommandCenter();
 
@@ -381,6 +393,20 @@ describe('KeywordCommandCenter', () => {
     expect(screen.getByText('Keyword Universe')).toBeInTheDocument();
     expect(screen.queryByText('cosmetic dentistry')).not.toBeInTheDocument();
     expect(screen.queryByText('best teeth whitening strips')).not.toBeInTheDocument();
+  });
+
+  it('uses row-derived fallback filter counts when summary is unavailable', async () => {
+    const hooks = await import('../../src/hooks/admin/useKeywordCommandCenter');
+    vi.mocked(hooks.useKeywordCommandCenterSummary).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: new Error('summary unavailable'),
+    } as ReturnType<typeof hooks.useKeywordCommandCenterSummary>);
+
+    renderCommandCenter();
+
+    expect(screen.getByRole('button', { name: /^local candidates\s*1$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^page assigned\s*2$/i })).toBeInTheDocument();
   });
 
   it('filters local candidates and starts keyword-specific local refreshes', () => {

@@ -39,6 +39,7 @@ import type {
 } from '../seo-data-provider.js';
 import { markCapabilityDisabled, normalizeProviderDate } from '../seo-data-provider.js';
 import { fetchProviderJson, isExternalFetchError } from '../external-fetch.js';
+import { normalizeDomainValue } from '../domain-normalization.js';
 
 const log = createLogger('dataforseo');
 const UPLOAD_ROOT = getUploadRoot();
@@ -216,7 +217,12 @@ function writeCache(workspaceId: string, key: string, data: unknown): void {
 // ── API helpers ──
 
 function cleanDomain(domain: string): string {
-  return domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '');
+  return normalizeDomainValue(domain, {
+    stripWww: true,
+    lowercase: true,
+    stripPort: true,
+    allowMalformedFallback: true,
+  }) ?? '';
 }
 
 function cleanUrlTarget(url: string): string {

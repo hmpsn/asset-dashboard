@@ -529,13 +529,13 @@ describe('src/lib/roadmapFilters — deriveAllTags', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 import {
-  normalizePath,
-  matchPagePath,
   normalizePageUrl,
+  matchPagePath,
   findPageMapEntry,
   resolvePageAddress,
   tryResolvePagePath,
 } from '../../src/lib/pathUtils';
+const normalizePath = normalizePageUrl;
 
 describe('src/lib/pathUtils — normalizePath', () => {
   it('adds leading slash when missing', () => {

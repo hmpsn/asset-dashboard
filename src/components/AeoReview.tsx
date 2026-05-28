@@ -14,6 +14,7 @@ import { clientActions } from '../api/clientActions';
 import type { AeoChangeType, AeoEffort, AeoPageReview, AeoSiteReview } from '../../shared/types/aeo';
 import { countAeoQuickWins, estimateAeoChangesMinutes } from '../../shared/types/aeo';
 import { mapAeoEffortToClientEffort } from '../../shared/types/client-actions';
+import { capitalize } from '../utils/strings';
 
 interface Props {
   workspaceId: string;
@@ -332,7 +333,7 @@ export function AeoReview({ workspaceId }: Props) {
                     : 'border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text)]'
                 }`}
               >
-                {p === 'all' ? 'All' : p.charAt(0).toUpperCase() + p.slice(1)}
+                {p === 'all' ? 'All' : capitalize(p)}
               </Button>
             ))}
           </div>

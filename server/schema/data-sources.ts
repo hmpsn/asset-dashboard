@@ -10,6 +10,9 @@ import type { PageElementCatalog } from '../../shared/types/page-elements.js';
 import type { SchemaEvidenceSource, SchemaFieldEvidence, SchemaFieldTarget, SchemaServiceOffer, SchemaServiceProfile } from '../../shared/types/site-inventory.js';
 import type { BusinessProfileContact } from '../../shared/types/workspace.js';
 import type { SchemaIndustrySubtype } from '../../shared/types/schema-plan.js';
+import type { ResolvedEntity } from '../../shared/types/entity-resolution.js';
+import { EEAT_ASSET_TYPE, type EeatAsset } from '../../shared/types/eeat-assets.js';
+import { normalizeDomainHost } from '../domain-normalization.js';
 
 export interface PageMetaInput {
   title: string;
@@ -38,6 +41,12 @@ export interface PageMetaInput {
   /** Webflow lastPublished at fetch time. Null for static (sitemap) pages.
    *  Drives stale-detection in the page-elements lazy refresh. */
   sourcePublishedAt?: string | null;
+  /** Page-scoped entity grounding resolved by the entityResolution intelligence slice. */
+  entityResolution?: {
+    articleAbout?: ResolvedEntity;
+    articleMentions?: ResolvedEntity[];
+    areaServed?: ResolvedEntity;
+  };
 }
 
 export interface WorkspaceSchemaInput {
@@ -55,6 +64,12 @@ export interface WorkspaceSchemaInput {
   siteHasSearch?: boolean;
   /** Active schema-plan local business specialization. */
   industrySubtype?: SchemaIndustrySubtype;
+  /** Workspace-level entity grounding resolved by the entityResolution intelligence slice. */
+  entityResolution?: {
+    knowsAbout?: ResolvedEntity[];
+  };
+  /** Optional workspace E-E-A-T assets used for author/credential schema enrichment. */
+  eeatAssets?: EeatAsset[];
 }
 
 /** Re-export so schema templates can import from a single data-sources module. */
@@ -77,6 +92,12 @@ export interface PageData {
   dateModified?: string;
   /** Article author name when known (CMS field or workspace name). undefined → template emits Organization fallback. */
   author?: string;
+  /** Optional role/title for Person.author from E-E-A-T profile assets. */
+  authorJobTitle?: string;
+  /** Optional profile/corroboration URLs for Person.author.sameAs. */
+  authorSameAs?: string[];
+  /** Optional author credentials for Person.author.hasCredential. */
+  authorCredentials?: string[];
   /** Visible article/body word count. Additive Article signal; full articleBody is intentionally not emitted. */
   wordCount?: number;
   /** Section derived from URL path (e.g. "/blog/foo" → "Blog"). undefined for homepage and root pages. */
@@ -96,6 +117,14 @@ export interface PageData {
   offers?: SchemaServiceOffer[];
   /** Top-N siteKeywords for Organization.knowsAbout — passed through from workspace. */
   knowsAbout?: string[];
+  /** Typed entity grounding for Organization.knowsAbout. */
+  knowsAboutEntities?: ResolvedEntity[];
+  /** Typed entity grounding for Article.about. */
+  articleAboutEntity?: ResolvedEntity;
+  /** Typed entity grounding for Article.mentions. */
+  articleMentionEntities?: ResolvedEntity[];
+  /** Typed entity grounding for Service/LocalBusiness areaServed. */
+  areaServedEntity?: ResolvedEntity;
   /** Catalog of structural elements detected on the page (videos, HowTo
    *  lists, citations, etc.). Drives conditional schema enrichment. */
   elements?: PageElementCatalog;
@@ -144,16 +173,12 @@ function buildBreadcrumbs(publishedPath: string, leafName: string, baseUrl: stri
   return items;
 }
 
-function stripWww(hostname: string): string {
-  return hostname.replace(/^www\./i, '').toLowerCase();
-}
-
 function sameSiteUrl(candidate: string, baseUrl: string): string | undefined {
   try {
     const parsed = new URL(candidate);
     const base = new URL(baseUrl);
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return undefined;
-    if (stripWww(parsed.hostname) !== stripWww(base.hostname)) return undefined;
+    if (normalizeDomainHost(parsed.hostname) !== normalizeDomainHost(base.hostname)) return undefined;
     return parsed.href.replace(/\/$/, parsed.pathname === '/' ? '/' : '');
   } catch { // catch-ok: malformed or relative canonical URL falls back to configured base URL
     return undefined;
@@ -194,6 +219,18 @@ function firstVisibleText($: cheerio.CheerioAPI, selectors: string[]): string | 
   return undefined;
 }
 
+function fallbackDescriptionFromVisibleContent($: cheerio.CheerioAPI): string | undefined {
+  const scope = contentScope($);
+  const root = (scope.length > 0 ? scope : $('body')).clone();
+  root.find('script,style,noscript,nav,footer,form,aside').remove();
+  const raw = root.text().replace(/\s+/g, ' ').trim();
+  if (!raw) return undefined;
+  const normalized = raw.replace(/^\W+/, '').trim();
+  if (!normalized) return undefined;
+  // Keep fallback concise and snippet-like for schema descriptions.
+  return normalized.length > 220 ? `${normalized.slice(0, 217).trimEnd()}...` : normalized;
+}
+
 function cleanAuthorName(raw: string | undefined): string | undefined {
   if (!raw) return undefined;
   const cleaned = raw
@@ -222,6 +259,62 @@ function extractVisibleAuthor($: cheerio.CheerioAPI): string | undefined {
     if (text) return text;
   }
   return undefined;
+}
+
+function uniqueStrings(values: Array<string | undefined>): string[] {
+  return Array.from(new Set(values.map(v => v?.trim()).filter((v): v is string => !!v)));
+}
+
+function normalizeAuthorIdentity(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function looksLikePersonName(value: string): boolean {
+  if (!value) return false;
+  if (value.length > 80) return false;
+  if (/\d/.test(value)) return false;
+  const blockedTokens = [
+    'team',
+    'staff',
+    'company',
+    'agency',
+    'studio',
+    'group',
+    'clinic',
+    'office',
+    'department',
+    'editorial',
+    'leadership',
+  ];
+  const normalized = normalizeAuthorIdentity(value);
+  if (blockedTokens.some(token => normalized.includes(token))) return false;
+  const parts = normalized.split(' ').filter(Boolean);
+  return parts.length >= 2;
+}
+
+function deriveEeatAuthorSignals(
+  assets: EeatAsset[] | undefined,
+): Pick<PageData, 'author' | 'authorJobTitle' | 'authorSameAs' | 'authorCredentials'> {
+  if (!assets || assets.length === 0) return {};
+  const teamBios = assets.filter(asset => asset.type === EEAT_ASSET_TYPE.TEAM_BIO);
+  const credentials = assets.filter(asset => asset.type === EEAT_ASSET_TYPE.CREDENTIAL);
+  const leadBio = teamBios[0];
+  const attributedAuthor = cleanAuthorName(leadBio?.metadata?.attributionName);
+  const titleAuthor = cleanAuthorName(leadBio?.title);
+  const author = attributedAuthor || (titleAuthor && looksLikePersonName(titleAuthor) ? titleAuthor : undefined);
+  const authorJobTitle = leadBio?.metadata?.attributionRole;
+  const authorSameAs = uniqueStrings([leadBio?.url, leadBio?.metadata?.sourceUrl]);
+  const authorCredentials = uniqueStrings(credentials.map(asset => asset.title));
+  return {
+    author,
+    authorJobTitle: authorJobTitle || undefined,
+    authorSameAs: authorSameAs.length > 0 ? authorSameAs : undefined,
+    authorCredentials: authorCredentials.length > 0 ? authorCredentials : undefined,
+  };
 }
 
 function countVisibleWords($: cheerio.CheerioAPI): number | undefined {
@@ -339,7 +432,7 @@ export function extractPageData(input: ExtractInput): PageData {
   const seoDesc = input.pageMeta.seo?.description?.trim();
   const metaDesc = metaContent($, 'meta[name="description"]');
   const ogDesc = metaContent($, 'meta[property="og:description"]');
-  const description = seoDesc || metaDesc || ogDesc;
+  const description = seoDesc || metaDesc || ogDesc || fallbackDescriptionFromVisibleContent($);
 
   const ogImage = metaContent($, 'meta[property="og:image"]');
   const twitterImage = metaContent($, 'meta[name="twitter:image"]');
@@ -351,6 +444,7 @@ export function extractPageData(input: ExtractInput): PageData {
   const dateModifiedCms = pickCmsFieldWithSlug(cmsFieldData, ['updated-on', 'last-updated']);
   const authorCms = pickCmsFieldWithSlug(cmsFieldData, ['author-name', 'author', 'written-by']);
   const visibleAuthor = extractVisibleAuthor($);
+  const eeatAuthorSignals = deriveEeatAuthorSignals(input.workspace.eeatAssets);
   const wordCount = countVisibleWords($);
   const fieldEvidence: SchemaFieldEvidence[] = [...(input.pageMeta.fieldEvidence ?? [])];
   const evidenceSources: Partial<Record<string, SchemaEvidenceSource>> = {};
@@ -376,9 +470,15 @@ export function extractPageData(input: ExtractInput): PageData {
   const dateModified = $('time[itemprop="dateModified"]').attr('datetime')
     || dateModifiedCms?.value
     || input.pageMeta.lastPublished
+    || datePublished
     || undefined;
 
-  const author = authorCms?.value ?? visibleAuthor;
+  const author = authorCms?.value ?? visibleAuthor ?? eeatAuthorSignals.author;
+  const authorMatchesEeat = !!(
+    author
+    && eeatAuthorSignals.author
+    && normalizeAuthorIdentity(author) === normalizeAuthorIdentity(eeatAuthorSignals.author)
+  );
   if (datePublishedCms) {
     evidenceSources.datePublished = `cms-field:${datePublishedCms.slug}`;
     fieldEvidence.push({ field: 'datePublished', source: `cms-field:${datePublishedCms.slug}` });
@@ -393,6 +493,14 @@ export function extractPageData(input: ExtractInput): PageData {
   } else if (visibleAuthor) {
     evidenceSources.author = 'rendered-html';
     fieldEvidence.push({ field: 'author', source: 'rendered-html' });
+  } else if (eeatAuthorSignals.author) {
+    evidenceSources.author = 'workspace-intelligence';
+    fieldEvidence.push({
+      field: 'author',
+      source: 'workspace-intelligence',
+      status: 'resolved',
+      message: 'Author resolved from workspace E-E-A-T team bio inventory.',
+    });
   }
 
   const inLanguage = input.pageMeta.locale?.trim() || input.workspace.defaultLocale || 'en';
@@ -436,6 +544,12 @@ export function extractPageData(input: ExtractInput): PageData {
   const serviceType = input.pageMeta.serviceProfile?.serviceType || derivedServiceLabel;
   const serviceName = input.pageMeta.serviceProfile?.serviceName || derivedServiceLabel;
   const serviceAreaServed = input.pageMeta.serviceProfile?.areaServed;
+  const resolvedAreaServed = input.pageMeta.entityResolution?.areaServed;
+  const knowsAboutEntities = input.workspace.entityResolution?.knowsAbout;
+  // NOTE: Wikidata URIs for knowsAbout entities are emitted as `sameAs` on the
+  // embedded Thing nodes inside `knowsAbout` (via resolvedEntityToThingNode in
+  // helpers.ts). They MUST NOT be aggregated onto Organization.sameAs — that
+  // would falsely assert the customer Org is identical to those topic entities.
 
   return {
     title,
@@ -450,16 +564,23 @@ export function extractPageData(input: ExtractInput): PageData {
     datePublished,
     dateModified,
     author,
+    authorJobTitle: authorMatchesEeat ? eeatAuthorSignals.authorJobTitle : undefined,
+    authorSameAs: authorMatchesEeat ? eeatAuthorSignals.authorSameAs : undefined,
+    authorCredentials: authorMatchesEeat ? eeatAuthorSignals.authorCredentials : undefined,
     wordCount,
     articleSection,
     inLanguage,
     breadcrumbs: buildBreadcrumbs(input.pageMeta.publishedPath, cleanTitle, canonicalBaseUrl, canonicalUrl),
     keywords,
-    areaServed: serviceAreaServed || areaServed,
+    areaServed: serviceAreaServed || resolvedAreaServed?.label || areaServed,
+    areaServedEntity: resolvedAreaServed,
     serviceType,
     serviceName,
     offers: input.pageMeta.serviceProfile?.offers,
     knowsAbout: input.workspace.siteKeywordsForKnowsAbout?.slice(0, 5).map(s => s.toLowerCase()),
+    knowsAboutEntities,
+    articleAboutEntity: input.pageMeta.entityResolution?.articleAbout,
+    articleMentionEntities: input.pageMeta.entityResolution?.articleMentions,
     elements: input.pageMeta.elements,
     fieldEvidence,
     evidenceSources,

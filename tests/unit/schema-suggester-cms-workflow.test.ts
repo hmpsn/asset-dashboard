@@ -114,4 +114,16 @@ describe('SchemaSuggester CMS workflow extraction', () => {
     expect(cmsBranch).toContain('siteContextForCms');
     expect(cmsBranch).not.toContain('assembleSiteContext(contextPages, baseUrl)');
   });
+
+  it('threads entity-resolution intelligence into schema generation inputs', () => {
+    const source = readFileSync('server/schema-suggester.ts', 'utf-8'); // readFile-ok — entity-resolution threading guard
+
+    // readSchemaPageIntelligence forwards the resolveEntities flag through to includeEntityResolution.
+    expect(source).toContain('includeEntityResolution: resolveEntities');
+    // Bulk generateSchemaSuggestions paths opt in to Wikidata resolution (true), foreground stays default-false.
+    expect(source).toMatch(/readSchemaPageIntelligence\([^)]+,\s*true\)/);
+    expect(source).toContain('const entities = entityResolutionForPage(');
+    expect(source).toContain('entityResolution: {');
+    expect(source).toContain('entityResolution: { knowsAbout: entities.knowsAbout }');
+  });
 });

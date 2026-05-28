@@ -3,6 +3,7 @@ import { z } from 'zod';
 // --- Shared building blocks -------------------------------------------------
 
 const workspaceIdSchema = z.string().min(1, 'workspace_id is required');
+const revisionSchema = z.string().trim().min(1, 'expected_revision is required');
 
 const handleIdSchema = z.string().regex(
   /^(keyword-research|keyword-research-bulk|brief-request|brief|post-request|post)_[0-9a-f-]{36}$/,
@@ -130,6 +131,124 @@ export const savePostInputSchema = z.object({
   parent_request_id: z.string().optional(),
 });
 
+const briefPatchContentSchema = z.object({
+  targetKeyword: z.string().trim().min(1).max(200).optional(),
+  secondaryKeywords: z.array(z.string().trim().min(1).max(200)).optional(),
+  suggestedTitle: z.string().trim().min(1).max(300).optional(),
+  suggestedMetaDesc: z.string().trim().min(1).max(500).optional(),
+  outline: z.array(z.object({
+    heading: z.string(),
+    subheadings: z.array(z.string()).optional(),
+    notes: z.string().optional(),
+    wordCount: z.number().int().nonnegative().optional(),
+    keywords: z.array(z.string()).optional(),
+  })).optional(),
+  wordCountTarget: z.number().int().min(100).max(10000).optional(),
+  intent: z.string().trim().min(1).max(100).optional(),
+  audience: z.string().trim().min(1).max(1000).optional(),
+  competitorInsights: z.string().trim().max(10000).optional(),
+  internalLinkSuggestions: z.array(z.string().trim().min(1).max(500)).optional(),
+  pageType: z.enum(['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource']).optional(),
+  executiveSummary: z.string().trim().max(5000).optional(),
+}).strict().refine(
+  (body) => Object.values(body).some((value) => value !== undefined),
+  { message: 'At least one editable field required' },
+);
+
+const postPatchSectionSchema = z.object({
+  index: z.number().int().nonnegative(),
+  heading: z.string().optional(),
+  content: z.string().optional(),
+  targetWordCount: z.number().int().positive().optional(),
+  keywords: z.array(z.string()).optional(),
+});
+
+const postPatchContentSchema = z.object({
+  title: z.string().trim().min(1).max(500).optional(),
+  metaDescription: z.string().trim().min(1).max(500).optional(),
+  introduction: z.string().optional(),
+  sections: z.array(postPatchSectionSchema).optional(),
+  conclusion: z.string().optional(),
+  seoTitle: z.string().trim().min(1).max(200).optional(),
+  seoMetaDescription: z.string().trim().min(1).max(500).optional(),
+}).strict().refine(
+  (body) => Object.values(body).some((value) => value !== undefined),
+  { message: 'At least one editable field required' },
+);
+
+const postReplaceContentSchema = z.object({
+  title: z.string().trim().min(1).max(500),
+  metaDescription: z.string().trim().min(1).max(500),
+  introduction: z.string(),
+  sections: z.array(z.object({
+    index: z.number().int().nonnegative(),
+    heading: z.string(),
+    content: z.string(),
+    wordCount: z.number().int().nonnegative(),
+    targetWordCount: z.number().int().positive(),
+    keywords: z.array(z.string()),
+    status: z.enum(['pending', 'generating', 'done', 'error']),
+    error: z.string().optional(),
+  })).min(1),
+  conclusion: z.string(),
+  seoTitle: z.string().trim().min(1).max(200).optional(),
+  seoMetaDescription: z.string().trim().min(1).max(500).optional(),
+}).strict();
+
+export const listBriefsInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  limit: z.number().int().positive().max(200).optional(),
+});
+
+export const getBriefInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  brief_id: z.string().min(1),
+});
+
+export const updateBriefInputSchema = z.union([
+  z.object({
+    workspace_id: workspaceIdSchema,
+    brief_id: z.string().min(1),
+    expected_revision: revisionSchema,
+    mode: z.literal('patch'),
+    updates: briefPatchContentSchema,
+  }).strict(),
+  z.object({
+    workspace_id: workspaceIdSchema,
+    brief_id: z.string().min(1),
+    expected_revision: revisionSchema,
+    mode: z.literal('replace'),
+    content: briefContentSchema,
+  }).strict(),
+]);
+
+export const listPostsInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  limit: z.number().int().positive().max(200).optional(),
+});
+
+export const getPostInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  post_id: z.string().min(1),
+});
+
+export const updatePostInputSchema = z.union([
+  z.object({
+    workspace_id: workspaceIdSchema,
+    post_id: z.string().min(1),
+    expected_revision: revisionSchema,
+    mode: z.literal('patch'),
+    updates: postPatchContentSchema,
+  }).strict(),
+  z.object({
+    workspace_id: workspaceIdSchema,
+    post_id: z.string().min(1),
+    expected_revision: revisionSchema,
+    mode: z.literal('replace'),
+    content: postReplaceContentSchema,
+  }).strict(),
+]);
+
 export const sendToClientInputSchema = z.object({
   workspace_id: workspaceIdSchema,
   brief_handle: handleIdSchema.optional(),
@@ -173,6 +292,12 @@ export type PrepareBriefContextInput = z.infer<typeof prepareBriefContextInputSc
 export type SaveBriefInput = z.infer<typeof saveBriefInputSchema>;
 export type PreparePostContextInput = z.infer<typeof preparePostContextInputSchema>;
 export type SavePostInput = z.infer<typeof savePostInputSchema>;
+export type ListBriefsInput = z.infer<typeof listBriefsInputSchema>;
+export type GetBriefInput = z.infer<typeof getBriefInputSchema>;
+export type UpdateBriefInput = z.infer<typeof updateBriefInputSchema>;
+export type ListPostsInput = z.infer<typeof listPostsInputSchema>;
+export type GetPostInput = z.infer<typeof getPostInputSchema>;
+export type UpdatePostInput = z.infer<typeof updatePostInputSchema>;
 export type SendToClientInput = z.infer<typeof sendToClientInputSchema>;
 export type StartKeywordStrategyGenerationInput = z.infer<typeof startKeywordStrategyGenerationInputSchema>;
 export type StartSeoAuditInput = z.infer<typeof startSeoAuditInputSchema>;

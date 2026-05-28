@@ -27,6 +27,7 @@ import { getQueryPageData, getAllGscPages, getPageTrend } from '../search-consol
 import { getConfiguredProvider, getProviderDisplayName } from '../seo-data-provider.js';
 import type { KeywordMetrics, RelatedKeyword } from '../seo-data-provider.js';
 import type { StrategyCardContext, BriefJourneyStage } from '../../shared/types/content.js';
+import { CONTENT_GENERATION_STYLES } from '../../shared/types/content.js';
 import {
   getSiteSubdomain,
   discoverSitemapUrls,
@@ -53,6 +54,10 @@ const updateContentRequestSchema = z.object({
   upgradedAt: z.string().datetime().optional(),
   clientFeedback: z.string().max(2000).optional().or(z.literal('')),
 });
+
+const generateRequestBriefSchema = z.object({
+  generationStyle: z.enum(CONTENT_GENERATION_STYLES).optional(),
+}).strict();
 
 // --- Helper: Derive journey stage from intent ---
 function deriveJourneyStage(intent?: string): BriefJourneyStage | undefined {
@@ -242,11 +247,12 @@ export async function getAllSitePages(ws: { id: string; webflowSiteId?: string; 
 }
 
 // Generate a brief for a content request
-router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWorkspaceAccess('workspaceId'), validate(generateRequestBriefSchema), async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const request = getContentRequest(req.params.workspaceId, req.params.id);
   if (!request) return res.status(404).json({ error: 'Request not found' });
+  const { generationStyle } = req.body;
 
   try {
     // Gather GSC context if available (fetched once, reused for relatedQueries + decayQueryContext below)
@@ -335,6 +341,7 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
       ga4PagePerformance,
       strategyCardContext,
       decayQueryContext,
+      generationStyle,
     });
 
     // Link brief to request and update status

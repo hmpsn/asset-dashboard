@@ -93,7 +93,7 @@ export async function buildContentGenerationContext(
   workspaceId: string,
   opts: ContentGenerationContextOptions = {},
 ): Promise<GenerationContextResult> {
-  const baseSlices: IntelligenceSlice[] = ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline'];
+  const baseSlices: IntelligenceSlice[] = ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline', 'eeatAssets'];
   if (opts.pagePath) baseSlices.push('pageProfile');
   const slices = await withActiveLocalSeoSlice(workspaceId, opts.slices ?? baseSlices, opts.includeLocalSeo ?? true);
   return buildGenerationContext(workspaceId, slices, {

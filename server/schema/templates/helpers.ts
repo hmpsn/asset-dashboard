@@ -4,6 +4,7 @@
  */
 
 import type { BreadcrumbItem, PageData } from '../data-sources.js';
+import type { ResolvedEntity } from '../../../shared/types/entity-resolution.js';
 
 /**
  * Removes keys whose value is undefined. Schema.org templates only emit fields
@@ -168,4 +169,12 @@ export function scrubBrandSuffix(name: string, brand: string): string {
   const escaped = brand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const re = new RegExp(`\\s+[|\\-—·]\\s+${escaped}\\s*$`, 'i');
   return name.replace(re, '').trim() || name;
+}
+
+export function resolvedEntityToThingNode(entity: ResolvedEntity): Record<string, unknown> {
+  return dropUndefined({
+    '@type': entity.type,
+    'name': entity.label,
+    'sameAs': entity.wikidata?.sameAs,
+  });
 }

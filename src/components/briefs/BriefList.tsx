@@ -3,7 +3,8 @@ import {
 } from 'lucide-react';
 import { BriefDetail } from './BriefDetail';
 import { EmptyState, Button, IconButton } from '../ui';
-import type { ContentBrief } from '../../../shared/types/content';
+import type { ContentBrief, ContentGenerationStyle } from '../../../shared/types/content';
+import { formatDate } from '../../utils/formatDates';
 
 interface ContentTopicRequest {
   id: string;
@@ -30,7 +31,7 @@ export interface BriefListProps {
   onConfirmDeleteBrief: (brief: ContentBrief) => void;
   onSaveBriefField: (briefId: string, updates: Partial<ContentBrief>) => void;
   onSetEditingBrief: (id: string | null) => void;
-  onGeneratePost: (briefId: string) => void;
+  onGeneratePost: (briefId: string, generationStyle?: ContentGenerationStyle) => void;
   onRegenerateBrief: (briefId: string, feedback: string) => void;
   onRegenerateOutline?: (briefId: string, feedback?: string) => void;
   regeneratingOutline?: string | null;
@@ -149,7 +150,7 @@ export function BriefList({
                   />
                 </div>
                 {/* Date + expand */}
-                <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">{new Date(brief.createdAt).toLocaleDateString()}</span>
+                <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">{formatDate(brief.createdAt)}</span>
                 <IconButton
                   icon={expanded === brief.id ? ChevronUp : ChevronDown}
                   label={expanded === brief.id ? 'Collapse brief' : 'Expand brief'}

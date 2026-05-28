@@ -6,12 +6,14 @@ import { callAI } from '../ai.js';
 import { getConfiguredProvider, getProviderDisplayName } from '../seo-data-provider.js';
 import { getWorkspace } from '../workspaces.js';
 import { getPageKeyword, upsertPageKeyword } from '../page-keywords.js';
+import { listEeatAssets } from '../eeat-assets.js';
 import { createLogger } from '../logger.js';
 import { parseJsonFallback } from '../db/json-validation.js';
 import { applyBulkKeywordGuards, normalizePageUrl, sanitizeForPromptInjection, stripCodeFences } from '../helpers.js';
 import { debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { buildPageAssistContext } from '../intelligence/page-assist-context-builder.js';
+import { EEAT_RECOMMENDATION_SURFACE, evaluatePageTrustSignals } from '../eeat-trust-signals.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { addActivity } from '../activity-log.js';
@@ -135,6 +137,21 @@ Return ONLY valid JSON, no markdown, no explanation.`;
       guardedAnalysis.keywordDifficulty = responseMetrics?.difficulty ?? 0;
       guardedAnalysis.monthlyVolume = responseMetrics?.volume ?? 0;
       guardedAnalysis.hasProviderMetrics = !!responseMetrics;
+      try {
+        const eeatAssets = workspaceId ? listEeatAssets(workspaceId) : [];
+        const trustSignals = evaluatePageTrustSignals({
+          pagePath: pagePath || '/',
+          pageTitle,
+          searchIntent: guardedAnalysis.searchIntent as string | undefined,
+          assets: eeatAssets,
+          surface: EEAT_RECOMMENDATION_SURFACE.PAGE_INTELLIGENCE,
+          maxRecommendations: 4,
+        });
+        guardedAnalysis.missingTrustSignals = trustSignals.missingTrustSignals;
+        guardedAnalysis.eeatAssetRecommendations = trustSignals.eeatAssetRecommendations;
+      } catch (err) {
+        log.debug({ err, workspaceId, pagePath }, 'keyword-analysis: trust-signal evaluation unavailable');
+      }
       res.json(guardedAnalysis);
     } else {
       res.json({ error: 'Failed to parse AI response', raw: aiResult.text.slice(0, 500) });
@@ -170,6 +187,14 @@ router.post('/api/webflow/keyword-analysis/persist', requireWorkspaceAccessFromB
     const resolvedPrimaryKeyword = analysis.primaryKeyword || existing?.primaryKeyword || '';
     const providerMetrics = await getProviderMetricsForKeyword(workspaceId, resolvedPrimaryKeyword, 'single page analysis persist');
     const guardedMetrics = resolvePersistedKeywordMetrics(existing, resolvedPrimaryKeyword, providerMetrics);
+    const trustSignals = evaluatePageTrustSignals({
+      pagePath: normalized,
+      pageTitle: pageTitle || existing?.pageTitle || '',
+      searchIntent: analysis.searchIntent || existing?.searchIntent,
+      assets: listEeatAssets(workspaceId),
+      surface: EEAT_RECOMMENDATION_SURFACE.PAGE_INTELLIGENCE,
+      maxRecommendations: 4,
+    });
     upsertPageKeyword(workspaceId, {
       pagePath: normalized,
       pageTitle: pageTitle || existing?.pageTitle || '',
@@ -189,6 +214,8 @@ router.post('/api/webflow/keyword-analysis/persist', requireWorkspaceAccessFromB
       monthlyVolume: guardedMetrics.monthlyVolume,
       topicCluster: analysis.topicCluster,
       searchIntentConfidence: analysis.searchIntentConfidence,
+      missingTrustSignals: trustSignals.missingTrustSignals,
+      eeatAssetRecommendations: trustSignals.eeatAssetRecommendations,
       // Preserve enrichment fields from existing entry
       ...(existing?.currentPosition != null ? { currentPosition: existing.currentPosition } : {}),
       ...(existing?.impressions != null ? { impressions: existing.impressions } : {}),

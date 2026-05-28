@@ -7,6 +7,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { Button, ClickableRow, ErrorState, FormInput, Icon, NextStepsCard, ProgressIndicator } from '../ui';
+import { capitalize } from '../../utils/strings';
 import type { FixQueueItem } from './pageIntelligenceData';
 import type { BulkProgress, SortBy, SortDir } from './pageIntelligenceTypes';
 
@@ -195,7 +196,7 @@ export function PageIntelligencePagesHeader({
                 sortBy === option ? 'bg-teal-500/20 text-accent-brand border border-teal-500/30' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)] hover:text-[var(--brand-text-bright)]'
               }`}
             >
-              {option === 'priority' ? 'Priority' : option === 'score' ? 'Score' : option.charAt(0).toUpperCase() + option.slice(1)}
+              {option === 'priority' ? 'Priority' : option === 'score' ? 'Score' : capitalize(option)}
               {sortBy === option && (sortDir === 'desc' ? <ArrowDown className="w-2.5 h-2.5" /> : <ArrowUp className="w-2.5 h-2.5" />)}
             </Button>
           ))}

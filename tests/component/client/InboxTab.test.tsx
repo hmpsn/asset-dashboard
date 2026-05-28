@@ -20,9 +20,12 @@ vi.mock('../../../src/components/client/BetaContext', () => ({
 }));
 
 // ── Feature flags — new-inbox-ia off by default ───────────────────────────────
+let mockNewInboxIa = false;
 vi.mock('../../../src/hooks/useFeatureFlag', () => ({
-  useFeatureFlag: () => false,
+  useFeatureFlag: (key: string) => key === 'new-inbox-ia' ? mockNewInboxIa : false,
 }));
+
+let mockSchemaPlanQueryData: unknown = null;
 
 // ── API client ────────────────────────────────────────────────────────────────
 vi.mock('../../../src/api/client', () => ({
@@ -38,7 +41,7 @@ vi.mock('@tanstack/react-query', async () => {
   const actual = await vi.importActual<typeof import('@tanstack/react-query')>('@tanstack/react-query');
   return {
     ...actual,
-    useQuery: () => ({ data: null, isLoading: false }),
+    useQuery: () => ({ data: mockSchemaPlanQueryData, isLoading: false }),
     useQueryClient: () => ({ invalidateQueries: vi.fn() }),
   };
 });
@@ -167,6 +170,8 @@ function renderInbox(route = '/client/ws-1/inbox', props = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockNewInboxIa = false;
+  mockSchemaPlanQueryData = null;
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -216,6 +221,26 @@ describe('InboxTab — filter chips (legacy layout)', () => {
   it('renders Reviews filter chip (non-beta legacy layout)', () => {
     renderInbox();
     expect(screen.getByRole('button', { name: /Reviews/i })).toBeInTheDocument();
+  });
+
+  it('keeps Reviews count parity with new inbox layout when schema review is pending', () => {
+    mockSchemaPlanQueryData = {
+      status: 'sent_to_client',
+      pageRoles: [{ id: 'role-1' }],
+    } as never;
+
+    const legacy = renderInbox('/client/ws-1/inbox?tab=reviews');
+    const legacyChip = screen.getByRole('button', { name: /Reviews/i });
+    const legacyCount = legacyChip.querySelector('span')?.textContent;
+    legacy.unmount();
+
+    mockNewInboxIa = true;
+    renderInbox('/client/ws-1/inbox?tab=reviews');
+    const modernChip = screen.getByRole('button', { name: /Reviews/i });
+    const modernCount = modernChip.querySelector('span')?.textContent;
+
+    expect(legacyCount).toBe('1');
+    expect(modernCount).toBe('1');
   });
 });
 

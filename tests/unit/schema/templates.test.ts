@@ -64,6 +64,36 @@ describe('buildArticleSchema (BlogPosting)', () => {
     expect(node.about).toBe('Case study');
   });
 
+  it('emits typed about/mentions when entity grounding is present', () => {
+    const schema = buildArticleSchema({
+      ...baseInput,
+      pageData: {
+        ...baseInput.pageData,
+        articleAboutEntity: {
+          id: 'wikidata:Q170477',
+          label: 'Webflow',
+          type: 'Thing',
+          surfaces: ['article_about'],
+          confidence: 0.9,
+          source: 'page',
+          wikidata: { qid: 'Q170477', label: 'Webflow', sameAs: 'https://www.wikidata.org/wiki/Q170477' },
+        },
+        articleMentionEntities: [{
+          id: 'wikidata:Q1870',
+          label: 'Structured data',
+          type: 'Thing',
+          surfaces: ['article_mentions'],
+          confidence: 0.8,
+          source: 'page',
+          wikidata: { qid: 'Q1870', label: 'Structured data', sameAs: 'https://www.wikidata.org/wiki/Q1870' },
+        }],
+      },
+    }, 'BlogPosting');
+    const node = (schema['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.about).toEqual({ '@type': 'Thing', name: 'Webflow', sameAs: 'https://www.wikidata.org/wiki/Q170477' });
+    expect(node.mentions).toEqual([{ '@type': 'Thing', name: 'Structured data', sameAs: 'https://www.wikidata.org/wiki/Q1870' }]);
+  });
+
   it('emits @id for the primary node based on canonicalUrl', () => {
     const schema = buildArticleSchema(baseInput, 'BlogPosting');
     const node = (schema['@graph'] as Array<Record<string, unknown>>)[0];
@@ -246,6 +276,26 @@ describe('buildServiceSchema', () => {
     };
     const node = (buildServiceSchema(withArea)['@graph'] as Array<Record<string, unknown>>)[0];
     expect(node.areaServed).toEqual({ '@type': 'Place', name: 'Austin, TX' });
+  });
+
+  it('Service prefers typed areaServed entity when available', () => {
+    const withEntity = {
+      ...serviceInput,
+      pageData: {
+        ...serviceInput.pageData,
+        areaServedEntity: {
+          id: 'wikidata:Q16559',
+          label: 'Austin',
+          type: 'Place',
+          surfaces: ['area_served'],
+          confidence: 0.95,
+          source: 'workspace',
+          wikidata: { qid: 'Q16559', label: 'Austin', sameAs: 'https://www.wikidata.org/wiki/Q16559' },
+        },
+      },
+    };
+    const node = (buildServiceSchema(withEntity)['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.areaServed).toEqual({ '@type': 'Place', name: 'Austin', sameAs: 'https://www.wikidata.org/wiki/Q16559' });
   });
 
   it('Service omits areaServed when undefined', () => {
@@ -530,6 +580,26 @@ describe('buildLocalBusinessSchema', () => {
     const schema = buildLocalBusinessSchema(withKeywords);
     const org = (schema['@graph'] as Array<Record<string, unknown>>).find(n => n['@type'] === 'Organization');
     expect(org?.knowsAbout).toEqual(['dental care', 'cosmetic dentistry']);
+  });
+
+  it('LocalBusiness sibling Organization prefers typed knowsAbout entities', () => {
+    const withEntities = {
+      ...localInput,
+      pageData: {
+        ...localInput.pageData,
+        knowsAboutEntities: [{
+          id: 'wikidata:Q179183',
+          label: 'Dentistry',
+          type: 'Thing',
+          surfaces: ['organization_knows_about'],
+          confidence: 0.9,
+          source: 'workspace',
+          wikidata: { qid: 'Q179183', label: 'Dentistry', sameAs: 'https://www.wikidata.org/wiki/Q179183' },
+        }],
+      },
+    };
+    const org = (buildLocalBusinessSchema(withEntities)['@graph'] as Array<Record<string, unknown>>).find(n => n['@type'] === 'Organization');
+    expect(org?.knowsAbout).toEqual([{ '@type': 'Thing', name: 'Dentistry', sameAs: 'https://www.wikidata.org/wiki/Q179183' }]);
   });
 
   it('LocalBusiness emits areaServed as Place when populated', () => {
@@ -999,6 +1069,36 @@ describe('buildHomepageSchema', () => {
     expect(org.foundingDate).toBe('2020-01-01');
   });
 
+  it('Organization.sameAs MUST NOT include Wikidata URIs from knowsAbout entities (schema.org sameAs asserts identity)', () => {
+    const schema = buildHomepageSchema({
+      ...homepageInput,
+      pageData: {
+        ...homepageInput.pageData,
+        knowsAboutEntities: [
+          {
+            id: 'wikidata:thing:Q170477',
+            label: 'Web design',
+            type: 'Thing',
+            surfaces: ['organization_knows_about'],
+            confidence: 0.9,
+            source: 'workspace',
+            wikidata: {
+              qid: 'Q170477',
+              sameAs: 'https://www.wikidata.org/wiki/Q170477',
+              label: 'Web design',
+            },
+          },
+        ],
+      },
+      businessProfile: { socialProfiles: ['https://twitter.com/acme'] },
+    });
+    const org = (schema['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(org.sameAs).toEqual(['https://twitter.com/acme']);
+    // Wikidata URI for the topic appears on the embedded Thing node inside knowsAbout, not on Organization.
+    const knowsAbout = org.knowsAbout as Array<Record<string, unknown>>;
+    expect(knowsAbout[0]).toMatchObject({ '@type': 'Thing', sameAs: 'https://www.wikidata.org/wiki/Q170477' });
+  });
+
   it('Organization omits empty sameAs values from business profile', () => {
     const schema = buildHomepageSchema({
       ...homepageInput,
@@ -1025,6 +1125,47 @@ describe('buildHomepageSchema', () => {
     const schema = buildHomepageSchema(withKeywords);
     const org = (schema['@graph'] as Array<Record<string, unknown>>)[0];
     expect(org.knowsAbout).toEqual(['web design', 'webflow', 'brand strategy']);
+  });
+
+  it('Organization prefers typed knowsAbout entities when available', () => {
+    const schema = buildHomepageSchema({
+      ...homepageInput,
+      pageData: {
+        ...homepageInput.pageData,
+        knowsAboutEntities: [{
+          id: 'wikidata:Q170477',
+          label: 'Webflow',
+          type: 'Thing',
+          surfaces: ['organization_knows_about'],
+          confidence: 0.9,
+          source: 'workspace',
+          wikidata: { qid: 'Q170477', label: 'Webflow', sameAs: 'https://www.wikidata.org/wiki/Q170477' },
+        }],
+      },
+    });
+    const org = (schema['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(org.knowsAbout).toEqual([{ '@type': 'Thing', name: 'Webflow', sameAs: 'https://www.wikidata.org/wiki/Q170477' }]);
+  });
+
+  it('Organization knowsAbout omits sameAs for partially-resolved entities (no wikidata reference)', () => {
+    const schema = buildHomepageSchema({
+      ...homepageInput,
+      pageData: {
+        ...homepageInput.pageData,
+        knowsAboutEntities: [{
+          id: 'entity:web-design:thing',
+          label: 'Web design',
+          type: 'Thing',
+          surfaces: ['organization_knows_about'],
+          confidence: 0.6,
+          source: 'workspace',
+          // wikidata intentionally undefined — candidate scored below resolution threshold.
+        }],
+      },
+    });
+    const org = (schema['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(org.knowsAbout).toEqual([{ '@type': 'Thing', name: 'Web design' }]);
+    expect((org.knowsAbout as Array<Record<string, unknown>>)[0].sameAs).toBeUndefined();
   });
 
   it('Organization omits knowsAbout when knowsAbout is undefined or empty', () => {

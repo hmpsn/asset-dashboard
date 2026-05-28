@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { ContentTab } from '../../../src/components/client/ContentTab';
 import type { ClientContentRequest } from '../../../src/components/client/types';
 
@@ -96,6 +96,7 @@ const defaultProps = {
 describe('ContentTab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
   });
 
   it('renders without crashing when content requests are empty', () => {
@@ -176,6 +177,42 @@ describe('ContentTab', () => {
     const requests = [makeRequest({ status: 'post_review' })];
     render(<ContentTab {...defaultProps} contentRequests={requests} />);
     expect(screen.getByText(/post.*ready for your review/i)).toBeInTheDocument();
+  });
+
+  it('highlights newly returned post_review items until opened', () => {
+    const requests = [makeRequest({ status: 'post_review', topic: 'Needs Final Review' })];
+    render(<ContentTab {...defaultProps} contentRequests={requests} />);
+    expect(screen.getByText('New')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Needs Final Review'));
+    expect(screen.queryByText('New')).not.toBeInTheDocument();
+  });
+
+  it('shows the new highlight again when the same post returns to review later', () => {
+    const firstReview = makeRequest({
+      id: 'req-returned-post',
+      status: 'post_review',
+      topic: 'Returned Post',
+      updatedAt: '2026-05-01T00:00:00.000Z',
+    });
+    const { rerender } = render(<ContentTab {...defaultProps} contentRequests={[firstReview]} />);
+
+    fireEvent.click(screen.getByText('Returned Post'));
+    expect(screen.queryByText('New')).not.toBeInTheDocument();
+
+    rerender(<ContentTab {...defaultProps} contentRequests={[{
+      ...firstReview,
+      status: 'changes_requested',
+      updatedAt: '2026-05-02T00:00:00.000Z',
+    }]} />);
+
+    rerender(<ContentTab {...defaultProps} contentRequests={[{
+      ...firstReview,
+      status: 'post_review',
+      updatedAt: '2026-05-03T00:00:00.000Z',
+    }]} />);
+
+    expect(screen.getByText('New')).toBeInTheDocument();
   });
 
   it('renders declined items in a collapsed section', () => {

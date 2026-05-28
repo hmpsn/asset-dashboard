@@ -9,7 +9,7 @@ import { useAutoSave } from '../hooks/useAutoSave';
 import { contentBriefs, contentPosts } from '../api/content';
 import { getText } from '../api/client';
 import { useAdminPost, useAdminPostVersions, usePublishTarget } from '../hooks/admin';
-import { SectionCard, Icon, Modal, Button, IconButton, FormInput } from './ui';
+import { SectionCard, Icon, Modal, Button, IconButton, FormInput, FormTextarea } from './ui';
 import { SectionEditor } from './post-editor/SectionEditor';
 import { RichTextEditor } from './post-editor/RichTextEditor';
 import { PostPreview } from './post-editor/PostPreview';
@@ -17,9 +17,10 @@ import { VersionHistory } from './post-editor/VersionHistory';
 import { ReviewChecklist, CHECKLIST_ITEMS } from './post-editor/ReviewChecklist';
 import { FixDiffModal } from './post-editor/FixDiffModal';
 import { adminRichTextClass } from './post-editor/richTextStyles';
-import type { AiFixResult, ContentBrief, ContentReviewEvidence, IssueKey } from '../../shared/types/content';
+import type { AiFeedbackTarget, AiFixRequest, AiFixResult, ContentBrief, ContentReviewEvidence, IssueKey } from '../../shared/types/content';
 import { queryKeys } from '../lib/queryKeys';
 import { countWordsFromHtml } from '../lib/utils';
+import { formatDate } from '../utils/formatDates';
 
 interface PostSection {
   index: number;
@@ -73,6 +74,44 @@ interface PostEditorProps {
   postId: string;
   onClose: () => void;
   onDelete?: () => void;
+}
+
+interface FeedbackFixModalState {
+  open: boolean;
+  target: AiFeedbackTarget;
+  label: string;
+  sectionIndex?: number;
+}
+
+interface PostFixPayload {
+  introduction: string;
+  sections: Array<{ index: number; content: string }>;
+  conclusion: string;
+}
+
+function tryParsePostFixPayload(input: string): PostFixPayload | null {
+  try {
+    const parsed = JSON.parse(input) as unknown;
+    if (!parsed || typeof parsed !== 'object') return null;
+    const candidate = parsed as Partial<PostFixPayload>;
+    if (typeof candidate.introduction !== 'string') return null;
+    if (!Array.isArray(candidate.sections)) return null;
+    if (typeof candidate.conclusion !== 'string') return null;
+    const validSections = candidate.sections.every(section =>
+      section
+      && typeof section === 'object'
+      && typeof section.index === 'number'
+      && Number.isInteger(section.index)
+      && typeof section.content === 'string');
+    if (!validSections) return null;
+    return {
+      introduction: candidate.introduction,
+      sections: candidate.sections as Array<{ index: number; content: string }>,
+      conclusion: candidate.conclusion,
+    };
+  } catch {
+    return null;
+  }
 }
 
 function PostStatusBadge({ status }: { status: GeneratedPost['status'] }) {
@@ -137,6 +176,12 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   const [fixApplying, setFixApplying] = useState(false);
   const [fixResult, setFixResult] = useState<AiFixResult | null>(null);
   const [fixIssueLabel, setFixIssueLabel] = useState('');
+  const [feedbackFixModal, setFeedbackFixModal] = useState<FeedbackFixModalState>({
+    open: false,
+    target: 'section',
+    label: '',
+  });
+  const [feedbackText, setFeedbackText] = useState('');
 
   // Auto-save for section editing via RichTextEditor (SectionEditor new interface)
   const sectionAutoSaveFn = async (html: string) => {
@@ -261,6 +306,46 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     }
   };
 
+  const openFeedbackFix = (target: AiFeedbackTarget, label: string, sectionIndex?: number) => {
+    setFeedbackFixModal({ open: true, target, label, sectionIndex });
+    setFeedbackText('');
+  };
+
+  const closeFeedbackFix = () => {
+    setFeedbackFixModal(prev => ({ ...prev, open: false }));
+    setFeedbackText('');
+  };
+
+  const handleRequestFeedbackFix = async () => {
+    if (fixLoading) return;
+    const trimmedFeedback = feedbackText.trim();
+    if (!trimmedFeedback) return;
+    const gen = ++fixGenRef.current;
+    setFixLoading(true);
+    setFixIssueLabel(feedbackFixModal.label);
+    closeFeedbackFix();
+    try {
+      const body: AiFixRequest = feedbackFixModal.target === 'section'
+        ? {
+          mode: 'feedback',
+          target: 'section',
+          feedback: trimmedFeedback,
+          sectionIndex: feedbackFixModal.sectionIndex,
+        }
+        : {
+          mode: 'feedback',
+          target: feedbackFixModal.target,
+          feedback: trimmedFeedback,
+        };
+      const result = await contentPosts.aifix(workspaceId, postId, body);
+      if (gen === fixGenRef.current) setFixResult(result);
+    } catch (err) {
+      console.error('PostEditor operation failed:', err);
+    } finally {
+      if (gen === fixGenRef.current) setFixLoading(false);
+    }
+  };
+
   const handleDismissFix = () => {
     fixGenRef.current++;
     setFixResult(null);
@@ -299,6 +384,29 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
           return;
         }
         await saveField({ seoTitle: parsed.seoTitle, seoMetaDescription: parsed.seoMetaDescription });
+      } else if (result.field === 'post') {
+        const parsed = tryParsePostFixPayload(result.suggestedText);
+        if (!parsed) {
+          console.error('PostEditor: post fix returned malformed JSON');
+          handleDismissFix();
+          setFixApplying(false);
+          return;
+        }
+        const sectionByIndex = new Map(parsed.sections.map(section => [section.index, section.content]));
+        const nextSections = post.sections.map(section => {
+          const suggestedContent = sectionByIndex.get(section.index);
+          if (!suggestedContent) return section;
+          return {
+            ...section,
+            content: suggestedContent,
+            wordCount: countWordsFromHtml(suggestedContent),
+          };
+        });
+        await saveField({
+          introduction: parsed.introduction,
+          sections: nextSections,
+          conclusion: parsed.conclusion,
+        });
       }
       handleDismissFix();
       invalidatePost();
@@ -395,7 +503,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                 {post.unificationStatus === 'success' ? 'Unified' : post.unificationStatus === 'failed' ? 'Unify Failed' : 'Unify Skipped'}
               </span>
             )}
-            <span className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-1"><Icon as={Clock} size="sm" />{new Date(post.updatedAt).toLocaleDateString()}</span>
+            <span className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-1"><Icon as={Clock} size="sm" />{formatDate(post.updatedAt)}</span>
           </div>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -593,6 +701,10 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
               onChange={scheduleSectionSave}
               onDone={async () => { await flushSection(); setEditingSection(null); }}
               onRegenerate={handleRegenerate}
+              onGenerateWithFeedback={(sectionIndex) => {
+                const section = post.sections.find(item => item.index === sectionIndex);
+                openFeedbackFix('section', section ? `Section: ${section.heading}` : `Section ${sectionIndex + 1}`, sectionIndex);
+              }}
             />
           ))}
 
@@ -721,7 +833,73 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
             <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Meta Description {post.seoMetaDescription && <span className="normal-case text-[var(--brand-text-muted)]">({post.seoMetaDescription.length} chars)</span>}</div>
             <div className="text-xs text-[var(--brand-text)]">{post.seoMetaDescription || post.metaDescription}</div>
           </div>
+          <div className="pt-2 border-t border-[var(--brand-border)]/50 flex items-center gap-3">
+            <Button
+              onClick={() => openFeedbackFix('meta', 'SEO Title + Meta Description')}
+              size="sm"
+              variant="ghost"
+              icon={Sparkles}
+              className="h-auto px-0 py-0 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-300 hover:bg-transparent"
+            >
+              Generate SEO with feedback
+            </Button>
+          </div>
         </div>
+      )}
+      {!showPreview && (
+        <div className="flex justify-end">
+          <Button
+            onClick={() => openFeedbackFix('post', 'Full post')}
+            size="sm"
+            variant="secondary"
+            icon={Sparkles}
+            className="bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30"
+          >
+            Generate full post with feedback
+          </Button>
+        </div>
+      )}
+      {feedbackFixModal.open && (
+        <Modal open={feedbackFixModal.open} onClose={closeFeedbackFix} size="md">
+          <Modal.Header
+            title={`Generate With Feedback: ${feedbackFixModal.label}`}
+            onClose={closeFeedbackFix}
+          />
+          <Modal.Body>
+            <div className="space-y-3">
+              <p className="t-caption text-[var(--brand-text-muted)]">
+                Describe what you want changed. The AI suggestion will open in diff preview before anything is applied.
+              </p>
+              <FormTextarea
+                value={feedbackText}
+                onChange={setFeedbackText}
+                placeholder="Examples: Make this more direct, tighten repetition, align with a premium brand voice, and improve transitions."
+                rows={6}
+                className="w-full"
+              />
+            </div>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button
+              onClick={closeFeedbackFix}
+              variant="ghost"
+              size="sm"
+              className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRequestFeedbackFix}
+              disabled={!feedbackText.trim() || fixLoading}
+              size="sm"
+              variant="secondary"
+              icon={Sparkles}
+              className="bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30 disabled:opacity-50"
+            >
+              Generate preview
+            </Button>
+          </Modal.Footer>
+        </Modal>
       )}
       <FixDiffModal
         issueLabel={fixIssueLabel}

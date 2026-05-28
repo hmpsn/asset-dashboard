@@ -4,7 +4,8 @@
  * Product never emits zero-price offers.
  */
 import type { PageData, BusinessProfile } from '../data-sources.js';
-import { dropUndefined, orgRef, localBusinessRef, withBreadcrumb, webSiteRef, breadcrumbRef, filterHttpUrls } from './helpers.js';
+import { dropUndefined, orgRef, localBusinessRef, withBreadcrumb, webSiteRef, breadcrumbRef, filterHttpUrls, resolvedEntityToThingNode } from './helpers.js';
+import { cleanSchemaPublicText } from '../schema-text-sanitizer.js';
 
 export interface ServiceInput {
   baseUrl: string;
@@ -13,17 +14,7 @@ export interface ServiceInput {
   offers?: Array<{ name?: string; price: string; priceCurrency: string; description?: string }>;
 }
 
-function isOpaqueIdentifier(value: string): boolean {
-  const trimmed = value.trim();
-  return /^[a-f0-9]{24}$/i.test(trimmed) || /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed);
-}
-
-function safeText(value: string | undefined): string | undefined {
-  if (!value) return undefined;
-  const cleaned = value.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, ' ').trim();
-  if (!cleaned || isOpaqueIdentifier(cleaned)) return undefined;
-  return cleaned;
-}
+const safeText = cleanSchemaPublicText;
 
 export function buildServiceSchema(input: ServiceInput): Record<string, unknown> {
   const { pageData, baseUrl } = input;
@@ -76,7 +67,11 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
         }),
     'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
     'inLanguage': pageData.inLanguage,
-    'areaServed': safeAreaServed ? { '@type': 'Place' as const, name: safeAreaServed } : undefined,
+    'areaServed': pageData.areaServedEntity
+      ? resolvedEntityToThingNode(pageData.areaServedEntity)
+      : safeAreaServed
+        ? { '@type': 'Place' as const, name: safeAreaServed }
+        : undefined,
     'serviceType': pageData.serviceType,
     'offers': offers.length > 0
       ? offers.map((offer, idx) => dropUndefined({
@@ -134,6 +129,7 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
     'url': pageData.canonicalUrl,
     'name': pageData.cleanTitle,
     'description': pageData.description,
+    'dateModified': pageData.dateModified || pageData.datePublished,
     'isPartOf': webSiteRef(baseUrl),
     'about': { '@id': serviceId },
     'inLanguage': pageData.inLanguage,

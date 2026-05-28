@@ -4,6 +4,7 @@ import { schema as schemaApi } from '../../api/schema';
 import { usePageEditStates } from '../../hooks/usePageEditStates';
 import type { SchemaDeliveryDecision, SchemaPublishResponse } from '../../../shared/types/schema-generation';
 import type { SchemaPageSuggestion, SchemaSuggestion } from './schemaSuggesterTypes';
+import { formatDate } from '../../utils/formatDates';
 
 interface UseSchemaSuggesterPublishingWorkflowOptions {
   siteId: string;
@@ -255,7 +256,7 @@ export function useSchemaSuggesterPublishingWorkflow({
           suggestedSchemas: [{
             ...(p.suggestedSchemas[0] || { type: 'restored', priority: 'high' as const }),
             template: restoredSchema,
-            reason: `Restored from version history (${new Date().toLocaleDateString()})`,
+            reason: `Restored from version history (${formatDate(new Date())})`,
           }],
           lastPublishedAt: new Date().toISOString(),
         };

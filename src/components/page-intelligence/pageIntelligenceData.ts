@@ -60,6 +60,8 @@ export function buildEffectiveAnalyses(
         keywordDifficulty: sp.keywordDifficulty ?? 0,
         monthlyVolume: sp.monthlyVolume ?? 0,
         topicCluster: sp.topicCluster || '',
+        missingTrustSignals: sp.missingTrustSignals,
+        eeatAssetRecommendations: sp.eeatAssetRecommendations,
       };
     }
   }

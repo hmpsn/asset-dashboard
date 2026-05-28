@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Search, LineChart } from 'lucide-react';
-import { TabBar, EmptyState } from '../ui';
+import { useNavigate } from 'react-router-dom';
+import { TabBar, EmptyState, TierGate } from '../ui';
 import { SearchTab } from './SearchTab';
 import { AnalyticsTab } from './AnalyticsTab';
+import { useBetaMode } from './BetaContext';
+import { clientPath } from '../../routes';
 import type {
   SearchOverview, PerformanceTrend, SearchComparison,
   GA4Overview, GA4DailyTrend, GA4TopPage, GA4TopSource,
@@ -42,12 +45,15 @@ interface PerformanceTabProps {
   ga4Conversions: GA4ConversionSummary[];
   ga4Events: GA4Event[];
   ws: WorkspaceInfo;
+  tier: 'free' | 'growth' | 'premium';
   days: number;
   // Which sub-tab to start on
   initialSubTab?: 'search' | 'analytics';
 }
 
 export function PerformanceTab(props: PerformanceTabProps) {
+  const navigate = useNavigate();
+  const betaMode = useBetaMode();
   const hasSearch = !!props.overview;
   const hasAnalytics = !!props.ga4Overview;
   const searchExpected = !!props.ws.gscPropertyUrl;
@@ -72,6 +78,24 @@ export function PerformanceTab(props: PerformanceTabProps) {
       setSubTab('search');
     }
   }, [props.initialSubTab, hasAnalytics, hasSearch, searchExpected]);
+
+  if (props.tier === 'free') {
+    return (
+      <TierGate
+        tier={props.tier}
+        required="growth"
+        feature="Performance Insights"
+        teaser="Track search visibility and traffic trends over time. Available on Growth and Premium."
+        onLearnMore={() => navigate(clientPath(props.ws.id, 'plans', betaMode))}
+      >
+        <EmptyState
+          icon={LineChart}
+          title="Performance insights are locked"
+          description="Upgrade to compare search and analytics trends over time."
+        />
+      </TierGate>
+    );
+  }
 
   if (!hasSearch && !hasAnalytics) {
     return (

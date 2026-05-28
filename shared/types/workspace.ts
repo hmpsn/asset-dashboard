@@ -1,5 +1,6 @@
 // ── Workspace domain types ──────────────────────────────────────
 import type { MetricsSource, PageOptimizationScoreSnapshot, UrlLevelKeyword } from './keywords.ts';
+import type { EeatAssetRecommendation, MissingTrustSignal } from './eeat-assets.ts';
 
 export interface EventGroup {
   id: string;
@@ -46,6 +47,10 @@ export interface PageKeywordMap {
   contentGaps?: string[];
   optimizationScore?: number;
   analysisGeneratedAt?: string;
+  /** Deterministic trust-signal gaps derived from page type + available E-E-A-T assets. */
+  missingTrustSignals?: MissingTrustSignal[];
+  /** Top E-E-A-T assets recommended for this page's trust gaps. */
+  eeatAssetRecommendations?: EeatAssetRecommendation[];
   // Extended analysis fields (persisted for full report hydration)
   primaryKeywordPresence?: { inTitle: boolean; inMeta: boolean; inContent: boolean; inSlug: boolean };
   longTailKeywords?: string[];
@@ -168,8 +173,6 @@ export interface KeywordStrategy {
   businessContext?: string;      // user-provided context (locations, services, industry)
   seoDataMode?: SeoDataMode; // which SEO provider enrichment mode was used
   seoDataStatus?: SeoDataStatus; // whether provider grounding was available or degraded during generation
-  /** @deprecated use seoDataMode. Kept for strategies generated before provider-neutral naming. */
-  semrushMode?: SeoDataMode;
   /** Enriched search signals stored alongside strategy (not included in pageMap). */
   searchSignals?: {
     /** Matches DeviceBreakdown from server/search-console.ts */
@@ -356,4 +359,60 @@ export interface Workspace {
   lastBriefingRunWeekOf?: string | null;
   folder: string;
   createdAt: string;
+}
+
+export interface AdminWorkspaceView {
+  id: string;
+  name: string;
+  webflowSiteId?: string;
+  webflowSiteName?: string;
+  gscPropertyUrl?: string;
+  ga4PropertyId?: string;
+  clientEmail?: string;
+  liveDomain?: string;
+  eventConfig?: EventDisplayConfig[];
+  eventGroups?: EventGroup[];
+  keywordStrategy?: KeywordStrategy;
+  competitorDomains?: string[];
+  competitorLastFetchedAt?: string | null;
+  competitorDomainsAtLastFetch?: string[] | null;
+  personas?: AudiencePersona[];
+  clientPortalEnabled?: boolean;
+  seoClientView?: boolean;
+  analyticsClientView?: boolean;
+  siteIntelligenceClientView?: boolean;
+  siteHasSearch?: boolean;
+  autoReports?: boolean;
+  autoReportFrequency?: 'weekly' | 'monthly';
+  brandVoice?: string;
+  knowledgeBase?: string;
+  rewritePlaybook?: string;
+  brandLogoUrl?: string;
+  brandAccentColor?: string;
+  tier?: 'free' | 'growth' | 'premium';
+  trialEndsAt?: string;
+  billingMode?: 'platform' | 'external';
+  onboardingEnabled?: boolean;
+  onboardingCompleted?: boolean;
+  portalContacts?: { email: string; name?: string; capturedAt: string }[];
+  auditSuppressions?: { check: string; pageSlug: string; pagePattern?: string; reason?: string; createdAt: string }[];
+  pageEditStates?: Record<string, PageEditState>;
+  publishTarget?: Workspace['publishTarget'];
+  contentPricing?: Workspace['contentPricing'];
+  seoDataProvider?: 'semrush' | 'dataforseo';
+  businessProfile?: BusinessProfileContact | null;
+  businessPriorities?: string[];
+  customPromptNotes?: string;
+  scoringConfig?: Workspace['scoringConfig'];
+  intelligenceProfile?: Workspace['intelligenceProfile'];
+  autoPublishBriefings?: boolean;
+  autoPublishAfterHours?: number;
+  lastBriefingRunWeekOf?: string | null;
+  folder: string;
+  createdAt: string;
+  // Computed fields (not on Workspace row)
+  hasPassword: boolean;
+  isTrial: boolean;
+  trialDaysRemaining: number;
+  effectiveTier: string;
 }

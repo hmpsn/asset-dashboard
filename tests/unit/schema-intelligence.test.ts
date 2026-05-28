@@ -69,6 +69,7 @@ describe('buildSchemaIntelligence', () => {
       siteBaseUrl: 'https://example.com',
       webflowToken: 'workspace-token',
       enrichWithBacklinks: undefined,
+      resolveEntityReferences: undefined,
     });
     expect(result.workspaceId).toBe('ws-schema');
     expect(result.baseUrl).toBe('https://example.com');
@@ -86,6 +87,18 @@ describe('buildSchemaIntelligence', () => {
     expect(mocks.buildWorkspaceIntelligence).toHaveBeenCalledWith(
       'ws-schema',
       expect.objectContaining({ enrichWithBacklinks: true }),
+    );
+  });
+
+  it('includes entityResolution slice only when requested', async () => {
+    await buildSchemaIntelligence({
+      siteId: 'site-schema',
+      includeEntityResolution: true,
+    });
+
+    expect(mocks.buildWorkspaceIntelligence).toHaveBeenCalledWith(
+      'ws-schema',
+      expect.objectContaining({ slices: ['seoContext', 'entityResolution'], resolveEntityReferences: true }),
     );
   });
 
