@@ -31,7 +31,7 @@ jobs:
       - name: Run staging merge integrity audit
         env:
           GH_TOKEN: ${{ github.token }}
-        run: npm run verify:staging-merge-integrity -- --since-days 365 --soft-gate
+        run: npm run verify:staging-merge-integrity -- --since-days 365 --blocking-merged-since 2026-05-29 --soft-gate
       - name: Upload scan output on failure
         if: failure()
         uses: actions/upload-artifact@v5

@@ -37,6 +37,7 @@ import { handleOnDemandSeoAuditResult } from '../webflow-seo-audit-bridges.js';
 import { listWorkspaces, getTokenForSite } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { isProgrammingError } from '../errors.js';
+import { resolveSalesReportPath } from '../path-safety.js';
 
 const log = createLogger('reports');
 
@@ -143,7 +144,8 @@ router.get('/api/sales-reports', (_req, res) => {
 router.get('/api/sales-report/:id', (req, res) => {
   try {
     const reportsDir = getDataDir('sales-reports');
-    const filePath = path.join(reportsDir, `${req.params.id}.json`);
+    const filePath = resolveSalesReportPath(reportsDir, req.params.id);
+    if (!filePath) return res.status(400).json({ error: 'Invalid report id format' });
     if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Report not found' });
     const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
     res.json(data);
@@ -153,7 +155,8 @@ router.get('/api/sales-report/:id', (req, res) => {
 router.get('/api/sales-report/:id/html', (req, res) => {
   try {
     const reportsDir = getDataDir('sales-reports');
-    const filePath = path.join(reportsDir, `${req.params.id}.json`);
+    const filePath = resolveSalesReportPath(reportsDir, req.params.id);
+    if (!filePath) return res.status(400).send('Invalid report id format');
     if (!fs.existsSync(filePath)) return res.status(404).send('Report not found');
     const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
     const html = renderSalesReportHTML(data);

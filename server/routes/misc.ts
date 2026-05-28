@@ -26,6 +26,7 @@ import { getWorkspacePages } from '../workspace-data.js';
 import { createLogger } from '../logger.js';
 import { isProgrammingError } from '../errors.js';
 import { requireWorkspaceAccess, requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
+import { sanitizeFileName } from '../path-safety.js';
 
 const log = createLogger('misc');
 
@@ -222,7 +223,8 @@ router.post('/api/upload/:workspaceId/clipboard', requireWorkspaceAccess('worksp
   const destFolder = wsMatch ? path.join(getUploadRoot(), wsMatch.folder) : path.join(getUploadRoot(), '_unsorted');
   fs.mkdirSync(destFolder, { recursive: true });
 
-  const originalName = req.body.fileName || file.originalname || `clipboard-${Date.now()}.png`;
+  const fallbackName = `clipboard-${Date.now()}.png`;
+  const originalName = sanitizeFileName(req.body.fileName || file.originalname, fallbackName);
   const targetPath = path.join(destFolder, originalName);
 
   try {

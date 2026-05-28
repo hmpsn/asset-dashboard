@@ -123,8 +123,8 @@ router.get('/api/google/callback', async (req, res) => {
   // Google may redirect back with an error instead of a code
   const error = req.query.error as string;
   if (error) {
-    log.error(`OAuth error from Google: ${error}`);
-    return res.status(400).send(`Google auth error: ${error}. Check your OAuth consent screen and API settings in Google Cloud Console.`);
+    log.error({ error }, 'OAuth error from Google callback');
+    return res.status(400).send('Google auth error. Check your OAuth consent screen and API settings in Google Cloud Console.');
   }
   const code = req.query.code as string;
   const siteId = req.query.state as string;
