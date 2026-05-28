@@ -10,6 +10,7 @@ import type { TopicCluster } from '../shared/types/workspace.js';
 import { createLogger } from './logger.js';
 import { parseJsonFallback, parseJsonSafeArray } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { dedupeByLast } from './utils/collections.js';
 
 const log = createLogger('topic-clusters');
 
@@ -99,13 +100,6 @@ function modelToParams(workspaceId: string, cluster: TopicCluster) {
   };
 }
 
-function dedupeByTopic(clusters: TopicCluster[]): TopicCluster[] {
-  const byTopic = new Map<string, TopicCluster>();
-  for (const cluster of clusters) {
-    byTopic.set(cluster.topic.toLowerCase(), cluster);
-  }
-  return [...byTopic.values()];
-}
 
 const stmts = createStmtCache(() => ({
   listByWs: db.prepare<[workspaceId: string]>(
@@ -142,7 +136,7 @@ export function replaceAllTopicClusters(workspaceId: string, clusters: TopicClus
     if (normalized.length !== clusters.length) {
       log.warn({ workspaceId, total: clusters.length, kept: normalized.length }, 'Skipping invalid topic-cluster payload(s)');
     }
-    const deduped = dedupeByTopic(normalized);
+    const deduped = dedupeByLast(normalized, c => c.topic.toLowerCase());
     const insert = stmts().insert;
     for (const cluster of deduped) {
       insert.run(modelToParams(workspaceId, cluster));
@@ -179,9 +173,12 @@ export function migrateFromJsonBlob(): void {
       const topicClusters = strategy.topicClusters;
       if (!Array.isArray(topicClusters) || topicClusters.length === 0) continue;
 
-      const normalized = dedupeByTopic(topicClusters
-        .map((cluster) => normalizeTopicCluster(cluster))
-        .filter((cluster): cluster is TopicCluster => cluster != null));
+      const normalized = dedupeByLast(
+        topicClusters
+          .map((cluster) => normalizeTopicCluster(cluster))
+          .filter((cluster): cluster is TopicCluster => cluster != null),
+        c => c.topic.toLowerCase(),
+      );
       if (normalized.length === 0) continue;
 
       delete strategy.topicClusters;

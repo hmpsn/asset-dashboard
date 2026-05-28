@@ -19,6 +19,15 @@ export function dedupeBy<T>(items: T[], keyFn: (item: T) => string): T[] {
 }
 
 /**
+ * Deduplicate an array using a caller-supplied key function.
+ * Last occurrence wins — earlier items with the same key are dropped.
+ * Use when later entries in the array are considered more authoritative.
+ */
+export function dedupeByLast<T>(items: T[], keyFn: (item: T) => string): T[] {
+  return dedupeBy([...items].reverse(), keyFn).reverse();
+}
+
+/**
  * Deduplicate items that have a `keyword` field, using normalized
  * (lowercase + trimmed) keyword as the key.
  */

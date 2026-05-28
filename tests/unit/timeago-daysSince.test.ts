@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { daysSince } from '../../src/lib/timeAgo.js';
+import { daysSince } from '../../src/utils/formatDates.js';
 
 describe('daysSince', () => {
   it('returns 0 for today', () => {
