@@ -15,7 +15,7 @@ import type { Workspace } from './workspaces.js';
 import { createLogger } from './logger.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { isProgrammingError } from './errors.js';
-import { sanitizeQueryForPrompt } from './helpers.js';
+import { normalizePageUrl, sanitizeQueryForPrompt } from './helpers.js';
 import type * as OutcomeTracking from './outcome-tracking.js';
 
 const log = createLogger('content-decay');
@@ -131,8 +131,7 @@ export async function analyzeContentDecay(ws: Workspace): Promise<DecayAnalysis>
   // (GSC may return separate rows for www vs non-www, http vs https, etc.)
   const currentMap = new Map<string, { clicks: number; impressions: number; ctr: number; position: number; _count: number }>();
   for (const p of currentPages) {
-    let path: string;
-    try { path = new URL(p.page).pathname; } catch { path = p.page; }
+    const path = normalizePageUrl(p.page);
     const existing = currentMap.get(path);
     if (existing) {
       existing.clicks += p.clicks;
@@ -149,8 +148,7 @@ export async function analyzeContentDecay(ws: Workspace): Promise<DecayAnalysis>
   const prevPages = await getAllGscPages(ws.webflowSiteId, ws.gscPropertyUrl, 30, previousDateRange);
   const prevMap = new Map<string, { clicks: number; impressions: number; position: number; _count: number }>();
   for (const p of prevPages) {
-    let path: string;
-    try { path = new URL(p.page).pathname; } catch { path = p.page; }
+    const path = normalizePageUrl(p.page);
     const existing = prevMap.get(path);
     if (existing) {
       existing.clicks += p.clicks;
@@ -269,9 +267,7 @@ export async function generateRefreshRecommendation(
     try {
       const qpData = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90, { maxRows: 500 });
       const pageQueries = qpData
-        .filter(r => {
-          try { return new URL(r.page).pathname === page.page; } catch { return false; }
-        })
+        .filter(r => normalizePageUrl(r.page) === page.page)
         .sort((a, b) => b.impressions - a.impressions)
         .slice(0, 15);
 

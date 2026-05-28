@@ -23,6 +23,7 @@ import type * as Reports from './reports.js';
 import type * as PageKeywords from './page-keywords.js';
 import type * as ContentBriefMod from './content-brief.js';
 import type * as ContentPostsDb from './content-posts-db.js';
+import { toInsightPageId } from './helpers.js';
 const log = createLogger('insight-enrichment');
 
 // ── Pure utility functions ────────────────────────────────────────────────────
@@ -54,11 +55,7 @@ export function cleanSlugToTitle(urlOrPath: string): string {
 
   // Extract pathname if it looks like a full URL
   if (urlOrPath.startsWith('http://') || urlOrPath.startsWith('https://')) {
-    try {
-      pathname = new URL(urlOrPath).pathname;
-    } catch (err) {
-      log.debug({ urlOrPath, err }, 'insight-enrichment/url-parse: invalid URL in cleanSlugToTitle — using original value');
-    }
+    pathname = toInsightPageId(urlOrPath);
   }
 
   // Strip trailing slash
@@ -198,11 +195,7 @@ export function resolvePageTitle(
   // Try matching by pathname in case the stored key differs from the full URL
   let pathname = pageId;
   if (pageId.startsWith('http://') || pageId.startsWith('https://')) {
-    try {
-      pathname = new URL(pageId).pathname;
-    } catch (err) {
-      log.debug({ pageId, err }, 'insight-enrichment/url-parse: invalid URL in resolvePageTitle — using original value');
-    }
+    pathname = toInsightPageId(pageId);
   }
 
   const pathTitle = titleMap.get(pathname);
@@ -240,11 +233,7 @@ export function checkStrategyAlignment(
   // Normalise to pathname
   let pathname = pageId;
   if (pageId.startsWith('http://') || pageId.startsWith('https://')) {
-    try {
-      pathname = new URL(pageId).pathname;
-    } catch (err) {
-      log.debug({ pageId, err }, 'insight-enrichment/url-parse: invalid URL in checkStrategyAlignment — using original value');
-    }
+    pathname = toInsightPageId(pageId);
   }
 
   // Try exact and normalized path
@@ -297,20 +286,10 @@ export function checkPipelineStatus(
   // Normalise pageId to pathname for comparison
   let pathname = pageId;
   if (pageId.startsWith('http://') || pageId.startsWith('https://')) {
-    try {
-      pathname = new URL(pageId).pathname;
-    } catch (err) {
-      log.debug({ pageId, err }, 'insight-enrichment/url-parse: invalid URL in checkPipelineStatus — using original value');
-    }
+    pathname = toInsightPageId(pageId);
   }
 
-  const normalise = (s: string): string => {
-    try {
-      return new URL(s).pathname;
-    } catch { // catch-ok: URL parse on user-supplied data — TypeError is expected
-      return s;
-    }
-  };
+  const normalise = (s: string): string => toInsightPageId(s);
 
   // Check posts first (most complete)
   const matchingPost = posts.find((p) => {
@@ -355,12 +334,8 @@ export function getSchemaGapsForPage(workspaceId: string, pageUrl: string): stri
     let validation = getValidation(workspaceId, pageUrl);
 
     if (!validation && (pageUrl.startsWith('http://') || pageUrl.startsWith('https://'))) {
-      try {
-        const pathname = new URL(pageUrl).pathname;
-        validation = getValidation(workspaceId, pathname);
-      } catch (err) {
-        log.debug({ pageUrl, err }, 'insight-enrichment/url-parse: invalid URL in getSchemaGapsForPage — skipping pathname fallback');
-      }
+      const pathname = toInsightPageId(pageUrl);
+      validation = getValidation(workspaceId, pathname);
     }
 
     if (!validation) return [];
@@ -474,11 +449,7 @@ export function getAuditIssuesForPage(
   // Normalise pageId to a slug for matching
   let pathname = pageId;
   if (pageId.startsWith('http://') || pageId.startsWith('https://')) {
-    try {
-      pathname = new URL(pageId).pathname;
-    } catch (err) {
-      log.debug({ pageId, err }, 'insight-enrichment/url-parse: invalid URL in getAuditIssuesForPage — using original value');
-    }
+    pathname = toInsightPageId(pageId);
   }
 
   const normSlug = pathname.toLowerCase().replace(/^\//, '').replace(/\/$/, '');

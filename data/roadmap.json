@@ -44,7 +44,16 @@
           "est": "5-7h",
           "priority": "P1",
           "status": "pending",
-          "notes": "File clusters: ~69 new URL(...).pathname callsites across server/src/shared/tests (audit-indexed sweep). Risk: partial migration leaves subtle path-matching regressions. Done when: page-identity joins route through shared page-address helpers and remaining raw pathname usage is intentional/documented."
+          "notes": "File clusters: ~69 new URL(...).pathname callsites across server/src/shared/tests (audit-indexed sweep). Risk: partial migration leaves subtle path-matching regressions. Done when: page-identity joins route through shared page-address helpers and remaining raw pathname usage is intentional/documented.\n\n2026-05-28 phase update: server-first migration completed across high-risk join/matching callsites (`analytics-intelligence`, `content-decay`, `keyword-strategy-ai-synthesis`, `keyword-strategy-enrichment`, `search-console`, `insight-enrichment`, `content-requests`, `webflow-cms-images`). Parent remains pending because client/UI display-path cleanup is deferred to child item `dup-pathname-ui-display-callsite-cleanup` (parent: dup-pathname-extraction-fanout-migration)."
+        },
+        {
+          "id": "dup-pathname-ui-display-callsite-cleanup",
+          "title": "Clean up deferred UI pathname formatting/matching callsites",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "3-5h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Parent: dup-pathname-extraction-fanout-migration. Deferred from the 2026-05-28 server-first phase to keep blast radius low. Target areas: `src/components/*` and `src/hooks/*` callsites using raw `new URL(...).pathname` for labels/matching, especially Insight cards, RedirectManager, SearchDetail, client snapshot/search surfaces, and admin insight feed helpers. Done when UI callsites route through shared page-address helpers (or explicitly documented exceptions) and page-address contract tests + affected component tests are green."
         },
         {
           "id": "dup-route-query-parser-consolidation",
