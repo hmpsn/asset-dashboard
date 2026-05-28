@@ -12,7 +12,7 @@ import { validate, z } from '../middleware/validate.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { hasClientUsers, verifyClientToken } from '../client-users.js';
-import { requireAuthenticatedClientPortalAuth, verifyClientSession } from '../middleware.js';
+import { requireAuthenticatedClientPortalAuth, requireClientPortalAuth, verifyClientSession } from '../middleware.js';
 
 import { getLatestSnapshotBefore } from '../reports.js';
 import { getEffectiveAudit, getLatestEffectiveSnapshot, listEffectiveSnapshotSummaries } from '../audit-snapshot-views.js';
@@ -268,7 +268,7 @@ router.get('/api/public/audit-summary/:workspaceId', (req, res) => {
   });
 });
 
-router.get('/api/public/audit-detail/:workspaceId', (req, res) => {
+router.get('/api/public/audit-detail/:workspaceId', requireClientPortalAuth(), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (!ws.webflowSiteId) return res.status(400).json({ error: 'No site linked' });
@@ -660,7 +660,7 @@ const requireClientCopyReviewAuth: RequestHandler = (req, res, next) => {
 };
 
 // List blueprint entries with their copy status
-router.get('/api/public/copy/:workspaceId/entries', (req, res) => {
+router.get('/api/public/copy/:workspaceId/entries', requireClientPortalAuth(), (req, res) => {
   const wsId = req.params.workspaceId;
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -690,7 +690,7 @@ router.get('/api/public/copy/:workspaceId/entries', (req, res) => {
 });
 
 // Get sections for an entry (only client_review or approved — no drafts)
-router.get('/api/public/copy/:workspaceId/entry/:entryId/sections', (req, res) => {
+router.get('/api/public/copy/:workspaceId/entry/:entryId/sections', requireClientPortalAuth(), (req, res) => {
   const wsId = req.params.workspaceId;
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -787,7 +787,7 @@ router.post('/api/public/copy/:workspaceId/section/:sectionId/suggest', requireC
 // admin-only fields (sourceMetadata, adminNote) are intentionally stripped —
 // only weekOf, publishedAt, and the BriefingStory[] array reach the client.
 // Enrichment logic lives in server/briefing-client-projection.ts.
-router.get('/api/public/briefing/:workspaceId', (req, res) => {
+router.get('/api/public/briefing/:workspaceId', requireClientPortalAuth(), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (ws.clientPortalEnabled != null && !ws.clientPortalEnabled) {
