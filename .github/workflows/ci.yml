@@ -106,7 +106,7 @@ jobs:
       - name: Staging merge integrity checks
         env:
           GH_TOKEN: ${{ github.token }}
-        run: npm run verify:staging-merge-integrity -- --since-days 180
+        run: npm run verify:staging-merge-integrity -- --since-days 180 --blocking-merged-since 2026-05-29
 
       - name: AI reliability soft gate
         run: npx tsx scripts/report-ai-reliability.ts --soft-gate
