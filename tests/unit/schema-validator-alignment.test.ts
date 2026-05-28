@@ -94,6 +94,39 @@ describe('schema validator alignment', () => {
     expect(leanFindings.some(finding => finding.ruleId === 'review-rating-or-date-missing')).toBe(true);
   });
 
+  it('normalizes required/recommended message templates across publish and lean validators', () => {
+    const requiredMissingSchema = {
+      '@context': 'https://schema.org',
+      '@graph': [{
+        '@type': 'Review',
+        author: { '@type': 'Person', name: 'Taylor' },
+        reviewRating: { '@type': 'Rating', ratingValue: '5' },
+      }],
+    };
+    const requiredPublish = validateForGoogleRichResults(requiredMissingSchema);
+    const requiredLean = validateLeanSchema(requiredMissingSchema, 'Review');
+    const publishRequired = requiredPublish.errors.find(error => error.type === 'Review' && error.field === 'itemReviewed');
+    const leanRequired = requiredLean.find(finding => finding.type === 'Review' && finding.field === 'itemReviewed' && finding.ruleId === 'required-field-missing');
+    expect(publishRequired?.message).toBe('Missing required property "itemReviewed" for Review');
+    expect(leanRequired?.message).toBe('Missing required property "itemReviewed" for Review');
+
+    const recommendedMissingSchema = {
+      '@context': 'https://schema.org',
+      '@graph': [{
+        '@type': 'Review',
+        itemReviewed: { '@type': 'Service', name: 'Emergency Plumbing' },
+        author: { '@type': 'Person', name: 'Taylor' },
+        reviewRating: { '@type': 'Rating', ratingValue: '5' },
+      }],
+    };
+    const recommendedPublish = validateForGoogleRichResults(recommendedMissingSchema);
+    const recommendedLean = validateLeanSchema(recommendedMissingSchema, 'Review');
+    const publishRecommended = recommendedPublish.warnings.find(warning => warning.type === 'Review' && warning.field === 'reviewBody');
+    const leanRecommended = recommendedLean.find(finding => finding.type === 'Review' && finding.field === 'reviewBody' && finding.ruleId === 'recommended-field-missing');
+    expect(publishRecommended?.message).toBe('Missing recommended property "reviewBody" for Review');
+    expect(leanRecommended?.message).toBe('Missing recommended property "reviewBody" for Review');
+  });
+
   it('treats malformed Article image shapes as ineligible and publish-blocking', () => {
     const schema = {
       '@context': 'https://schema.org',

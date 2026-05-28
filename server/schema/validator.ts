@@ -8,6 +8,8 @@ import {
   hasReviewRatingOrDate,
   hasSchemaField,
   isImageObjectWithUrl,
+  recommendedPropertyMissingMessage,
+  requiredPropertyMissingMessage,
   REVIEW_RATING_OR_DATE_MISSING_MESSAGE,
 } from './schema-validation-core.js';
 
@@ -229,7 +231,7 @@ function validateCrossRefs(node: Record<string, unknown>, allNodes: Record<strin
         type: t,
         field: 'breadcrumb',
         ruleId: 'required-field-missing',
-        message: `${t} missing required field: breadcrumb`,
+        message: requiredPropertyMissingMessage(t, 'breadcrumb'),
       });
     }
   }
@@ -574,7 +576,7 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
             type: t,
             field,
             ruleId: 'required-field-missing',
-            message: `${t} missing required field: ${field}`,
+            message: requiredPropertyMissingMessage(t, field),
           });
         }
       }
@@ -594,7 +596,7 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
             type: t,
             field,
             ruleId: 'recommended-field-missing',
-            message: `${t} missing recommended field: ${field}`,
+            message: recommendedPropertyMissingMessage(t, field),
           });
         }
       }
