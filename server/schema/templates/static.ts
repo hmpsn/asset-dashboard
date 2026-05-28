@@ -101,6 +101,7 @@ export function buildWebPageSchema(input: StaticInput): Record<string, unknown> 
     '@id': `${pageData.canonicalUrl}#webpage`,
     'name': pageData.cleanTitle,
     'description': pageData.description,
+    'dateModified': pageData.dateModified || pageData.datePublished,
     'url': pageData.canonicalUrl,
     'isPartOf': webSiteRef(baseUrl),
     'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),

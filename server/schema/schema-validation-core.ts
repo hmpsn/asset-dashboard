@@ -25,6 +25,17 @@ export interface GoogleValidationEvaluation {
   byType: GoogleValidationTypeEvaluation[];
 }
 
+export const REVIEW_RATING_OR_DATE_MISSING_MESSAGE =
+  'Missing required property "reviewRating" or "datePublished" for Review';
+
+export function requiredPropertyMissingMessage(type: string, field: string): string {
+  return `Missing required property "${field}" for ${type}`;
+}
+
+export function recommendedPropertyMissingMessage(type: string, field: string): string {
+  return `Missing recommended property "${field}" for ${type}`;
+}
+
 function extractGraphNodes(schema: Record<string, unknown>): Array<Record<string, unknown>> {
   const graph = schema['@graph'];
   if (Array.isArray(graph)) return graph as Array<Record<string, unknown>>;
@@ -89,12 +100,12 @@ function evaluateType(node: Record<string, unknown>, type: string): GoogleValida
 
   const requiredMissing = rules.required.filter(field => !hasSchemaField(node, field));
   for (const field of requiredMissing) {
-    errors.push({ type, field, message: `Missing required property "${field}" for ${type}` });
+    errors.push({ type, field, message: requiredPropertyMissingMessage(type, field) });
   }
 
   for (const field of rules.recommended) {
     if (!hasSchemaField(node, field)) {
-      warnings.push({ type, field, message: `Missing recommended property "${field}" for ${type}` });
+      warnings.push({ type, field, message: recommendedPropertyMissingMessage(type, field) });
     }
   }
 
@@ -104,7 +115,7 @@ function evaluateType(node: Record<string, unknown>, type: string): GoogleValida
     errors.push({
       type,
       field: 'reviewRating',
-      message: 'Missing required property "reviewRating" or "datePublished" for Review',
+      message: REVIEW_RATING_OR_DATE_MISSING_MESSAGE,
     });
   }
 

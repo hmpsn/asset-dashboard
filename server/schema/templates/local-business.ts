@@ -7,6 +7,7 @@ import type { PageData, BusinessProfile } from '../data-sources.js';
 import type { SchemaIndustrySubtype } from '../../../shared/types/schema-plan.js';
 import type { SemanticPageData } from '../../../shared/types/page-elements.js';
 import { breadcrumbRef, dropUndefined, resolvedEntityToThingNode, withBreadcrumb } from './helpers.js';
+import { cleanSchemaPublicText } from '../schema-text-sanitizer.js';
 
 export interface LocalBusinessInput {
   baseUrl: string;
@@ -17,17 +18,7 @@ export interface LocalBusinessInput {
   industrySubtype?: SchemaIndustrySubtype;
 }
 
-function isOpaqueIdentifier(value: string): boolean {
-  const trimmed = value.trim();
-  return /^[a-f0-9]{24}$/i.test(trimmed) || /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed);
-}
-
-function safeText(value: string | undefined): string | undefined {
-  if (!value) return undefined;
-  const cleaned = value.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, ' ').trim();
-  if (!cleaned || isOpaqueIdentifier(cleaned)) return undefined;
-  return cleaned;
-}
+const safeText = cleanSchemaPublicText;
 
 function safeHttpUrl(value: string | undefined): string | undefined {
   const cleaned = safeText(value);
@@ -222,6 +213,7 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
     'url': pageData.canonicalUrl,
     'name': pageData.cleanTitle,
     'description': pageData.description,
+    'dateModified': pageData.dateModified || pageData.datePublished,
     'isPartOf': { '@id': `${baseUrl}/#website` },
     'about': { '@id': lbId },
     'inLanguage': pageData.inLanguage,

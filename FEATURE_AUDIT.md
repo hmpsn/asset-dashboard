@@ -1,8 +1,32 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **461 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **463 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 463. Schema Role/Type Registry Consolidation Authority
+
+**What it does:** Introduces a centralized schema role/type registry at `server/schema/role-type-registry.ts` and migrates both schema suggestion and generation callers to consume it. The registry now owns `PAGE_TYPE_LABELS`, `PAGE_TYPE_SCHEMA_MAP`, `SCHEMA_ROLE_TO_PAGE_KIND`, and diagnostics-type mapping (`schemaDiagnosticsTypeForRole`) so `server/schema-suggester.ts` and `server/schema/generator.ts` no longer maintain parallel maps. `schema-suggester` keeps compatibility by re-exporting the shared constants/types for existing callers/tests.
+
+**Agency value:** Reduces schema-role drift risk by collapsing multiple independently-edited maps into one typed authority.
+
+**Client value:** Improves consistency of suggested schema types and fallback diagnostics across schema tooling surfaces.
+
+**Mutual:** Lowers maintenance cost and bug probability while preserving current contracts and response shapes.
+
+---
+
+### 462. Schema Text Sanitizer Authority Consolidation
+
+**What it does:** Extracts a single schema-safe text sanitizer authority at `server/schema/schema-text-sanitizer.ts` and migrates the schema generator, LocalBusiness/Service templates, and JSON-LD page-element extractors to use it. This unifies whitespace normalization, zero-width character cleanup, and opaque ID rejection behavior across previously duplicated implementations (`safeText`, `safePublicText`, `cleanPublicText`, local `isOpaqueIdentifier`). A dedicated unit suite (`tests/unit/schema/schema-text-sanitizer.test.ts`) now locks the shared behavior.
+
+**Agency value:** Reduces one-off sanitization drift and makes future schema text hardening a one-location change instead of a multi-file chase.
+
+**Client value:** Improves consistency of emitted schema text fields by applying the same cleanup and opaque-token filtering rules everywhere.
+
+**Mutual:** Shrinks maintenance surface area and lowers silent-regression risk for schema quality work.
 
 ---
 

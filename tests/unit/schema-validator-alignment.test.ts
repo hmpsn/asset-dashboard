@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { validateForGoogleRichResults } from '../../server/schema-validator.js';
 import { checkRichResultsEligibility } from '../../server/schema/rich-results.js';
-import { evaluateGoogleSchema } from '../../server/schema/schema-validation-core.js';
+import {
+  evaluateGoogleSchema,
+  hasReviewRatingOrDate,
+  hasSchemaField,
+  isImageObjectWithUrl,
+} from '../../server/schema/schema-validation-core.js';
 import { validateLeanSchema } from '../../server/schema/validator.js';
 
 function eligibilityFor(schema: Record<string, unknown>, type: string) {
@@ -9,6 +14,46 @@ function eligibilityFor(schema: Record<string, unknown>, type: string) {
 }
 
 describe('schema validator alignment', () => {
+  it('uses shared helper semantics for opening hours alias and PostalAddress completeness', () => {
+    const withOpeningHoursSpec = {
+      '@type': 'LocalBusiness',
+      openingHoursSpecification: [{ '@type': 'OpeningHoursSpecification', dayOfWeek: 'Monday' }],
+    } as Record<string, unknown>;
+    const withCompletePostalAddress = {
+      '@type': 'LocalBusiness',
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: '123 Main St',
+        addressLocality: 'Austin',
+        addressRegion: 'TX',
+      },
+    } as Record<string, unknown>;
+    const withIncompletePostalAddress = {
+      '@type': 'LocalBusiness',
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: '123 Main St',
+        addressLocality: 'Austin',
+      },
+    } as Record<string, unknown>;
+
+    expect(hasSchemaField(withOpeningHoursSpec, 'openingHours')).toBe(true);
+    expect(hasSchemaField(withCompletePostalAddress, 'address')).toBe(true);
+    expect(hasSchemaField(withIncompletePostalAddress, 'address')).toBe(false);
+  });
+
+  it('uses shared helper semantics for review fallback and ImageObject URL validation', () => {
+    const reviewWithDateOnly = {
+      '@type': 'Review',
+      datePublished: '2026-05-20',
+    } as Record<string, unknown>;
+
+    expect(hasReviewRatingOrDate(reviewWithDateOnly)).toBe(true);
+    expect(isImageObjectWithUrl({ '@type': 'ImageObject', url: 'https://example.com/image.png' })).toBe(true);
+    expect(isImageObjectWithUrl({ '@type': 'ImageObject' })).toBe(false);
+    expect(isImageObjectWithUrl('https://example.com/image.png')).toBe(false);
+  });
+
   it('keeps LocalBusiness eligibility aligned with publish validation', () => {
     const schema = {
       '@context': 'https://schema.org',
@@ -47,6 +92,39 @@ describe('schema validator alignment', () => {
     expect(eligibility!.eligible).toBe(false);
     expect(eligibility!.missingFields).toContain('reviewRating');
     expect(leanFindings.some(finding => finding.ruleId === 'review-rating-or-date-missing')).toBe(true);
+  });
+
+  it('normalizes required/recommended message templates across publish and lean validators', () => {
+    const requiredMissingSchema = {
+      '@context': 'https://schema.org',
+      '@graph': [{
+        '@type': 'Review',
+        author: { '@type': 'Person', name: 'Taylor' },
+        reviewRating: { '@type': 'Rating', ratingValue: '5' },
+      }],
+    };
+    const requiredPublish = validateForGoogleRichResults(requiredMissingSchema);
+    const requiredLean = validateLeanSchema(requiredMissingSchema, 'Review');
+    const publishRequired = requiredPublish.errors.find(error => error.type === 'Review' && error.field === 'itemReviewed');
+    const leanRequired = requiredLean.find(finding => finding.type === 'Review' && finding.field === 'itemReviewed' && finding.ruleId === 'required-field-missing');
+    expect(publishRequired?.message).toBe('Missing required property "itemReviewed" for Review');
+    expect(leanRequired?.message).toBe('Missing required property "itemReviewed" for Review');
+
+    const recommendedMissingSchema = {
+      '@context': 'https://schema.org',
+      '@graph': [{
+        '@type': 'Review',
+        itemReviewed: { '@type': 'Service', name: 'Emergency Plumbing' },
+        author: { '@type': 'Person', name: 'Taylor' },
+        reviewRating: { '@type': 'Rating', ratingValue: '5' },
+      }],
+    };
+    const recommendedPublish = validateForGoogleRichResults(recommendedMissingSchema);
+    const recommendedLean = validateLeanSchema(recommendedMissingSchema, 'Review');
+    const publishRecommended = recommendedPublish.warnings.find(warning => warning.type === 'Review' && warning.field === 'reviewBody');
+    const leanRecommended = recommendedLean.find(finding => finding.type === 'Review' && finding.field === 'reviewBody' && finding.ruleId === 'recommended-field-missing');
+    expect(publishRecommended?.message).toBe('Missing recommended property "reviewBody" for Review');
+    expect(leanRecommended?.message).toBe('Missing recommended property "reviewBody" for Review');
   });
 
   it('treats malformed Article image shapes as ineligible and publish-blocking', () => {

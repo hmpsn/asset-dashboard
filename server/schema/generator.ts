@@ -40,6 +40,8 @@ import type { SiteContext, SiteContextPage } from './site-context.js';
 import { validateForGoogleRichResults } from '../schema-validator.js';
 import { createLogger } from '../logger.js';
 import { normalizeDomainHost } from '../domain-normalization.js';
+import { cleanSchemaPublicText } from './schema-text-sanitizer.js';
+import { schemaDiagnosticsTypeForRole } from './role-type-registry.js';
 
 const log = createLogger('schema/generator');
 
@@ -449,23 +451,6 @@ function validationStatus(findings: ValidationFinding[]): 'valid' | 'warnings' |
   return 'valid';
 }
 
-function roleToDiagnosticsType(role: SchemaPageRole): string | null {
-  const map: Partial<Record<SchemaPageRole, string>> = {
-    product: 'Product',
-    faq: 'FAQPage',
-    howto: 'HowTo',
-    video: 'VideoObject',
-    pricing: 'Offer',
-    author: 'ProfilePage',
-    'job-posting': 'JobPosting',
-    course: 'Course',
-    event: 'Event',
-    review: 'Review',
-    recipe: 'Recipe',
-  };
-  return map[role] ?? null;
-}
-
 function normalizeSchemaUrlPath(url: string | undefined): string | null {
   if (!url) return null;
   try {
@@ -655,17 +640,7 @@ function applyCanonicalEntityGraph(input: {
   if (referenceTarget) addCanonicalReferencesToNode(referenceTarget, refs);
 }
 
-function isOpaqueIdentifier(value: string): boolean {
-  const trimmed = value.trim();
-  return /^[a-f0-9]{24}$/i.test(trimmed) || /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed);
-}
-
-function safePublicText(value: string | undefined): string | undefined {
-  if (!value) return undefined;
-  const cleaned = value.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, ' ').trim();
-  if (!cleaned || isOpaqueIdentifier(cleaned)) return undefined;
-  return cleaned;
-}
+const safePublicText = cleanSchemaPublicText;
 
 function formatAreaServed(address: { city?: string; state?: string } | undefined): string | undefined {
   const city = safePublicText(address?.city);
@@ -961,7 +936,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     reason = 'Video role — Article base; VideoObject is emitted only when required video fields are verified.';
   } else if (role === 'job-posting' || role === 'course' || role === 'event') {
     schema = buildWebPageSchema({ baseUrl: schemaBaseUrl, pageData });
-    const type = roleToDiagnosticsType(role)!;
+    const type = schemaDiagnosticsTypeForRole(role)!;
     reason = `${type} role — WebPage fallback because required rich-result fields were not fully verified.`;
     skippedSchemaTypes.push({
       type,
@@ -969,7 +944,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     });
   } else if (role === 'review' || role === 'recipe') {
     schema = buildWebPageSchema({ baseUrl: schemaBaseUrl, pageData });
-    const type = roleToDiagnosticsType(role)!;
+    const type = schemaDiagnosticsTypeForRole(role)!;
     reason = `${type} role — WebPage fallback because required rich-result fields were not fully verified.`;
     skippedSchemaTypes.push({
       type,
