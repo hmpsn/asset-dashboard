@@ -141,8 +141,9 @@
           "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
           "est": "2-3h",
           "priority": "P3",
-          "status": "pending",
-          "notes": "File clusters: keyword/table modules using rowToModel/modelToParams/migrateFromJsonBlob patterns. Risk: over-abstraction could reduce readability without real bug reduction. Done when: keep-as-is vs extract decision is documented with targeted adoption only where complexity decreases."
+          "status": "done",
+          "notes": "File clusters: keyword/table modules using rowToModel/modelToParams/migrateFromJsonBlob patterns. Risk: over-abstraction could reduce readability without real bug reduction. Done when: keep-as-is vs extract decision is documented with targeted adoption only where complexity decreases.\n\nCompleted 2026-05-28 via decision record `docs/rules/table-mapper-pattern-review.md`: keep explicit row/model mappers local to domain modules for readability and schema clarity; no generic extraction introduced because current duplication is intentional pattern consistency with low bug risk.",
+          "shippedAt": "2026-05-28"
         }
       ]
     },
