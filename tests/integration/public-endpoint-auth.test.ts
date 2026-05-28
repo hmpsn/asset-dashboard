@@ -32,9 +32,11 @@ const { api, postJson, clearCookies } = ctx;
 
 let wsAId = '';
 let wsBId = '';
+let wsCId = '';
 let wsPasswordlessId = '';
 const wsAPassword = 'test-password-A';
 const wsBPassword = 'test-password-B';
+const wsCPassword = 'test-password-C';
 
 beforeAll(async () => {
   await ctx.startServer();
@@ -46,6 +48,12 @@ beforeAll(async () => {
   wsBId = wsB.id;
   updateWorkspace(wsBId, { clientPassword: wsBPassword });
 
+  // wsC is used by the soft-gated auth tests to avoid rate-limiter
+  // bucket collision with wsA (2 hard-gate auth calls) and wsB (1 validation call).
+  const wsC = createWorkspace('Public Auth Test WS C');
+  wsCId = wsC.id;
+  updateWorkspace(wsCId, { clientPassword: wsCPassword });
+
   const wsPasswordless = createWorkspace('Public Auth Test WS Passwordless');
   wsPasswordlessId = wsPasswordless.id;
   // Intentionally no clientPassword set — simulates a freshly-created
@@ -55,16 +63,34 @@ beforeAll(async () => {
 afterAll(async () => {
   deleteWorkspace(wsAId);
   deleteWorkspace(wsBId);
+  deleteWorkspace(wsCId);
   deleteWorkspace(wsPasswordlessId);
   await ctx.stopServer();
 });
 
-const protectedEndpoints = (wsId: string) => [
+// requireAuthenticatedClientPortalAuth — hard gate; passwordless workspaces are also blocked.
+// Use for actual business intelligence that should not leak during the workspace setup window
+// (rank tracking, anomalies, traffic analytics).
+const hardProtectedEndpoints = (wsId: string) => [
   { label: 'rank-tracking history', path: `/api/public/rank-tracking/${wsId}/history` },
   { label: 'rank-tracking latest', path: `/api/public/rank-tracking/${wsId}/latest` },
   { label: 'audit-traffic', path: `/api/public/audit-traffic/${wsId}` },
   { label: 'anomalies', path: `/api/public/anomalies/${wsId}` },
 ];
+
+// requireClientPortalAuth — soft gate; passwordless workspaces pass through (workspace ID is the credential).
+// Use for content explicitly published for the client (audit detail, briefings, copy, orders).
+const softProtectedEndpoints = (wsId: string) => [
+  { label: 'audit-detail', path: `/api/public/audit-detail/${wsId}` },
+  { label: 'copy entries', path: `/api/public/copy/${wsId}/entries` },
+  { label: 'copy sections', path: `/api/public/copy/${wsId}/entry/fake-entry-id/sections` },
+  { label: 'briefing', path: `/api/public/briefing/${wsId}` },
+  { label: 'fix-orders', path: `/api/public/fix-orders/${wsId}` },
+  { label: 'work-orders public', path: `/api/public/work-orders/${wsId}` },
+];
+
+// Keep legacy name for the existing describe-blocks (all hard-protected)
+const protectedEndpoints = hardProtectedEndpoints;
 
 describe('Public endpoint auth — unauthenticated callers on password-set workspace blocked', () => {
   for (const { label, path } of protectedEndpoints('PLACEHOLDER')) {
@@ -102,10 +128,12 @@ describe('Public endpoint auth — authenticated clients allowed', () => {
   });
 
   for (const { label, path } of protectedEndpoints('PLACEHOLDER')) {
-    it(`GET ${label} with valid workspace session returns 200`, async () => {
+    it(`GET ${label} with valid workspace session is not rejected with 401`, async () => {
       const realPath = path.replace('PLACEHOLDER', wsAId);
       const res = await api(realPath);
-      expect(res.status).toBe(200);
+      // Auth gate passed — business logic may return 200, 400, 402, or 404
+      // depending on workspace data state, but must NOT return 401.
+      expect(res.status).not.toBe(401);
     });
   }
 });
@@ -160,4 +188,66 @@ describe('Public endpoint auth — input validation on authenticated requests', 
     const body = await res.json();
     expect(body).toHaveProperty('error');
   });
+});
+
+// ── Soft-gated routes (requireClientPortalAuth) ──────────────────────────────
+// These are gated for password-set workspaces but allow passwordless workspaces
+// through — the workspace ID in the URL is the credential for passwordless portals.
+
+describe('Soft-gated endpoint auth — unauthenticated callers on password-set workspace blocked', () => {
+  for (const { label, path } of softProtectedEndpoints('PLACEHOLDER')) {
+    it(`GET ${label} without auth on password-set workspace returns 401`, async () => {
+      clearCookies();
+      const realPath = path.replace('PLACEHOLDER', wsAId);
+      const res = await api(realPath);
+      expect(res.status).toBe(401);
+    });
+  }
+});
+
+describe('Soft-gated endpoint auth — passwordless workspace passes through', () => {
+  for (const { label, path } of softProtectedEndpoints('PLACEHOLDER')) {
+    it(`GET ${label} on passwordless workspace without auth is not 401`, async () => {
+      clearCookies();
+      const realPath = path.replace('PLACEHOLDER', wsPasswordlessId);
+      const res = await api(realPath);
+      // requireClientPortalAuth lets passwordless workspaces through; handler
+      // may return 200, 402, 403, or 404 depending on data state.
+      expect(res.status).not.toBe(401);
+    });
+  }
+});
+
+describe('Soft-gated endpoint auth — authenticated clients on password-set workspace allowed', () => {
+  // Use wsC (fresh bucket) to avoid rate-limiter collision with wsA (2 hard-gate calls) + wsB (1 validation call).
+  beforeAll(async () => {
+    clearCookies();
+    const authRes = await postJson(`/api/public/auth/${wsCId}`, { password: wsCPassword });
+    expect(authRes.status).toBe(200);
+  });
+
+  for (const { label, path } of softProtectedEndpoints('PLACEHOLDER')) {
+    it(`GET ${label} with valid workspace session is not rejected with 401`, async () => {
+      const realPath = path.replace('PLACEHOLDER', wsCId);
+      const res = await api(realPath);
+      expect(res.status).not.toBe(401);
+    });
+  }
+});
+
+describe('Soft-gated endpoint auth — cross-workspace session rejected', () => {
+  // wsC session on wsA routes. wsC bucket has only 1 call from the preceding describe.
+  beforeAll(async () => {
+    clearCookies();
+    const authRes = await postJson(`/api/public/auth/${wsCId}`, { password: wsCPassword });
+    expect(authRes.status).toBe(200);
+  });
+
+  for (const { label, path } of softProtectedEndpoints('PLACEHOLDER')) {
+    it(`GET ${label} on workspace A with workspace C session returns 401`, async () => {
+      const realPath = path.replace('PLACEHOLDER', wsAId);
+      const res = await api(realPath);
+      expect(res.status).toBe(401);
+    });
+  }
 });

@@ -190,6 +190,9 @@ export function requireClientPortalAuth(wsIdParam = 'workspaceId') {
     const workspaceId = req.params[wsIdParam];
     const ws = getWorkspace(workspaceId);
     if (!ws) return next();
+    // Admin HMAC token always passes through (admin reads all client portal data).
+    const adminToken = (req.headers['x-auth-token'] || req.cookies?.auth_token || '') as string;
+    if (adminToken && verifyAdminToken(adminToken)) return next();
     // Check JWT token first (preferred)
     const clientToken = req.cookies?.[`client_user_token_${workspaceId}`];
     if (verifyClientUserTokenForWorkspace(workspaceId, clientToken)) return next();

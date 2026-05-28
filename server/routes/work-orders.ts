@@ -4,6 +4,7 @@
 import { Router } from 'express';
 
 import { requireWorkspaceAccess } from '../auth.js';
+import { requireClientPortalAuth } from '../middleware.js';
 const router = Router();
 
 import { addActivity } from '../activity-log.js';
@@ -16,7 +17,7 @@ import { getWorkspace, updatePageState } from '../workspaces.js';
 import { validate, z } from '../middleware/validate.js';
 import { WS_EVENTS } from '../ws-events.js';
 
-router.get('/api/public/fix-orders/:workspaceId', (req, res) => {
+router.get('/api/public/fix-orders/:workspaceId', requireClientPortalAuth(), (req, res) => {
   const payments = listPayments(req.params.workspaceId);
   const fixOrders = payments
     .filter(p => p.productType.startsWith('fix_') || p.productType.startsWith('schema_'))
@@ -94,7 +95,7 @@ router.patch('/api/work-orders/:workspaceId/:orderId', requireWorkspaceAccess('w
   res.json(order);
 });
 
-router.get('/api/public/work-orders/:workspaceId', (req, res) => {
+router.get('/api/public/work-orders/:workspaceId', requireClientPortalAuth(), (req, res) => {
   res.json(listWorkOrders(req.params.workspaceId));
 });
 
