@@ -18,7 +18,7 @@ import {
   getGlobalToken,
   GLOBAL_KEY,
 } from '../google-auth.js';
-import { IS_PROD } from '../middleware.js';
+import { IS_PROD, requireClientPortalAuth } from '../middleware.js';
 import { callAI } from '../ai.js';
 import {
   fetchSearchOverview,
@@ -374,7 +374,7 @@ router.delete('/api/google/annotations/:workspaceId/:id', requireWorkspaceAccess
 
 // Analytics annotations on a separate path to avoid shadowing the existing
 // /api/public/annotations/:workspaceId route in annotations.ts
-router.get('/api/public/analytics-annotations/:workspaceId', (req, res) => {
+router.get('/api/public/analytics-annotations/:workspaceId', requireClientPortalAuth(), (req, res) => {
   try {
     const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
     const annotations = getAnnotations(req.params.workspaceId, { startDate, endDate });

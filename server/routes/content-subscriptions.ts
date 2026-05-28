@@ -16,6 +16,7 @@ import { createLogger } from '../logger.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { requireWorkspaceAccess, requestUserCanAccessWorkspace, sendWorkspaceAccessDenied } from '../auth.js';
+import { requireClientPortalAuth } from '../middleware.js';
 import { InvalidTransitionError } from '../state-machines.js';
 
 const log = createLogger('routes:content-subscriptions');
@@ -172,12 +173,13 @@ router.post('/api/content-subscription/:id/delivered', (req, res) => {
 // ── Client endpoints (public) ──
 
 // Get available content plans
+// public-no-auth-ok: global plan catalog, no workspace data exposed
 router.get('/api/public/content-plans', (_req, res) => {
   res.json(CONTENT_SUB_PLANS);
 });
 
 // Get subscription status for a workspace (client-facing)
-router.get('/api/public/content-subscription/:workspaceId', (req, res) => {
+router.get('/api/public/content-subscription/:workspaceId', requireClientPortalAuth(), (req, res) => {
   try {
     const subs = listContentSubscriptions(req.params.workspaceId);
     // Return only the active/pending one (most recent)
@@ -190,7 +192,7 @@ router.get('/api/public/content-subscription/:workspaceId', (req, res) => {
 });
 
 // Client checkout for a content subscription
-router.post('/api/public/content-subscribe/:workspaceId', async (req, res) => {
+router.post('/api/public/content-subscribe/:workspaceId', requireClientPortalAuth(), async (req, res) => {
   try {
     const { plan } = req.body as { plan: ContentSubPlan };
     const planConfig = CONTENT_SUB_PLANS.find(p => p.plan === plan);

@@ -4,6 +4,7 @@
 import { Router } from 'express';
 
 import { requireWorkspaceAccess } from '../auth.js';
+import { requireClientPortalAuth } from '../middleware.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 const router = Router();
@@ -12,7 +13,7 @@ import { listAnnotations, addAnnotation, deleteAnnotation } from '../annotations
 
 // --- Annotations ---
 // Public: list annotations for a workspace
-router.get('/api/public/annotations/:workspaceId', (req, res) => {
+router.get('/api/public/annotations/:workspaceId', requireClientPortalAuth(), (req, res) => {
   res.json(listAnnotations(req.params.workspaceId));
 });
 
