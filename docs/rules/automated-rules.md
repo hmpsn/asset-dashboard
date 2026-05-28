@@ -175,8 +175,8 @@ advisory but tracked.
 | 13 | raw-z-index-inline-literal | warn | custom | `src/` | — | Inline numeric z-index values drift from the canonical token scale and make stacking behavior unpredictable across overlays, toasts, and modals. |
 | 14 | focus-visible-ring-contract | warn | custom | `src/components/` | — | Removing default focus outlines without an explicit focus-visible fallback risks keyboard-invisible controls and drifts from the styleguide focus ring contract. |
 | 15 | stat-primitive-bypass-signal | warn | custom | `src/components/` | — | Direct t-stat typography usage in feature shells often re-implements StatCard/CompactStatBar chrome and drifts from canonical spacing, labels, and responsive behavior. |
-| 16 | Workspace mutation route missing broadcastToWorkspace | warn | custom | `server/routes/` | `no-broadcast-ok` | Silent mutations mean UI never refreshes without a manual reload. |
-| 17 | inline-score-color-ternary | warn | pattern | `src/` | `score-color-inline-ok` | Inline score ternaries using the standard 80/60 thresholds duplicate the canonical Law-03 logic and drift when the palette changes. |
+| 16 | inline-score-color-ternary | warn | pattern | `src/` | `score-color-inline-ok` | Inline score ternaries using the standard 80/60 thresholds duplicate the canonical Law-03 logic and drift when the palette changes. |
+| 17 | Workspace mutation route missing broadcastToWorkspace | warn | custom | `server/routes/` | `no-broadcast-ok` | Silent mutations mean UI never refreshes without a manual reload. |
 | 18 | inline-toLocaleDateString | warn | pattern | `src/` | `format-date-inline-ok` | Scattered toLocaleDateString() calls produce inconsistent date formatting and break in non-en-US locales. Shared helpers ensure uniform output. |
 
 ---
