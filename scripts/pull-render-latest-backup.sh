@@ -14,6 +14,7 @@
 #   KEEP_LOCAL         default: 7
 #   FORCE_PULL         default: 0  (1 = keep file even if hash unchanged)
 #   LOCAL_DEV_DB_PATH  default: "" (if set, copy latest DB into this path)
+#   AUTH_TOKEN         default: "" (if set, skips login step)
 #
 set -euo pipefail
 
@@ -24,6 +25,7 @@ LOCAL_STATE_FILE="${LOCAL_STATE_FILE:-$LOCAL_BACKUP_ROOT/.last-db-export-sha256}
 KEEP_LOCAL="${KEEP_LOCAL:-7}"
 FORCE_PULL="${FORCE_PULL:-0}"
 LOCAL_DEV_DB_PATH="${LOCAL_DEV_DB_PATH:-}"
+AUTH_TOKEN="${AUTH_TOKEN:-}"
 
 if [[ -z "$APP_PASSWORD" ]]; then
   echo "Error: APP_PASSWORD is required."
@@ -33,6 +35,36 @@ fi
 
 mkdir -p "$LOCAL_BACKUP_ROOT"
 
+if [[ -z "$AUTH_TOKEN" ]]; then
+  echo "Authenticating with $PROD_URL..."
+  login_payload="$(node -e 'console.log(JSON.stringify({ password: process.env.APP_PASSWORD || "" }))')"
+  login_body_file="$LOCAL_BACKUP_ROOT/.login-response.json"
+  login_code="$(
+    curl -sS \
+      -H "Content-Type: application/json" \
+      -d "$login_payload" \
+      -o "$login_body_file" \
+      -w "%{http_code}" \
+      "$PROD_URL/api/auth/login"
+  )"
+  if [[ "$login_code" != "200" ]]; then
+    rm -f "$login_body_file"
+    echo "Error: login failed with HTTP $login_code."
+    echo "Tip: verify APP_PASSWORD and PROD_URL."
+    exit 1
+  fi
+
+  AUTH_TOKEN="$(
+    node -e "const fs=require('fs');const raw=fs.readFileSync(process.argv[1],'utf8');const data=JSON.parse(raw);if(!data.token){process.exit(2)}process.stdout.write(String(data.token));" "$login_body_file" \
+      || true
+  )"
+  rm -f "$login_body_file"
+  if [[ -z "$AUTH_TOKEN" ]]; then
+    echo "Error: login succeeded but no auth token returned."
+    exit 1
+  fi
+fi
+
 timestamp="$(date '+%Y-%m-%dT%H-%M-%S')"
 tmp_file="$LOCAL_BACKUP_ROOT/render-db-export-${timestamp}.sqlite3.partial"
 final_file="$LOCAL_BACKUP_ROOT/render-db-export-${timestamp}.sqlite3"
@@ -40,7 +72,7 @@ final_file="$LOCAL_BACKUP_ROOT/render-db-export-${timestamp}.sqlite3"
 echo "Downloading DB export from $PROD_URL..."
 http_code="$(
   curl -sS \
-    -H "x-auth-token: $APP_PASSWORD" \
+    -H "x-auth-token: $AUTH_TOKEN" \
     -H "Accept: application/octet-stream" \
     -o "$tmp_file" \
     -w "%{http_code}" \
