@@ -110,7 +110,15 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
     );
   }
 
-  if (!overview) return null;
+  if (!overview) {
+    return (
+      <EmptyState
+        icon={BarChart3}
+        title="No analytics data"
+        description="Google Analytics data could not be loaded for this workspace. Check your GA4 integration in workspace settings."
+      />
+    );
+  }
 
   return (
     <div className="space-y-8">
