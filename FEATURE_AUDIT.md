@@ -1,8 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **460 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **461 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 461. Schema Validation Core Unification + Contradiction Guardrail Harness
+
+**What it does:** Introduces a shared schema validation core at `server/schema/schema-validation-core.ts` and routes both publish validation (`validateForGoogleRichResults`) and eligibility checks (`checkRichResultsEligibility`) through the same rule evaluator (`evaluateGoogleSchema`). Lean validation now imports shared rule primitives (`hasSchemaField`, `hasReviewRatingOrDate`, `isImageObjectWithUrl`) instead of keeping local duplicates, reducing divergence risk while preserving lean-specific structural checks. Added a focused contradiction harness (`tests/unit/schema-validator-alignment.test.ts`) that exercises LocalBusiness address shape, Review rating/date semantics, and Article image-shape validation so a type cannot be marked eligible while publish validation reports errors for that same type.
+
+**Agency value:** Reduces one of the highest-risk drift surfaces in schema operations by collapsing duplicate rule implementations into shared authority logic.
+
+**Client value:** Improves reliability of schema readiness signals shown to teams by preventing contradictory eligibility/publish outcomes.
+
+**Mutual:** Creates a safer baseline for future schema strictness improvements by making validation contracts explicit and test-backed before broader rule expansion.
 
 ---
 

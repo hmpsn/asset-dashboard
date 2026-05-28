@@ -9,7 +9,7 @@ import db from './db/index.js';
 import { randomUUID } from 'crypto';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { GOOGLE_RICH_RESULT_RULES, GOOGLE_RICH_RESULT_TYPES } from './schema/google-rich-result-rules.js';
+import { evaluateGoogleSchema } from './schema/schema-validation-core.js';
 
 // ── Types ──
 
@@ -121,113 +121,12 @@ export function deleteValidation(workspaceId: string, pageId: string): boolean {
   return result.changes > 0;
 }
 
-// ── Google Rich Results Validator ──
-
-// Per-type required and recommended fields, based on Google's structured data documentation.
-const RICH_RESULT_RULES = GOOGLE_RICH_RESULT_RULES;
-const RICH_RESULT_TYPES = GOOGLE_RICH_RESULT_TYPES;
-
-function extractGraphNodes(schema: Record<string, unknown>): Array<Record<string, unknown>> {
-  const graph = schema['@graph'];
-  if (Array.isArray(graph)) return graph as Array<Record<string, unknown>>;
-  // Single node at top level
-  if (schema['@type']) return [schema as Record<string, unknown>];
-  return [];
-}
-
-function getNodeTypes(node: Record<string, unknown>): string[] {
-  const t = node['@type'];
-  if (typeof t === 'string') return [t];
-  if (Array.isArray(t)) return t.filter((v): v is string => typeof v === 'string');
-  return [];
-}
-
-function hasCompletePostalAddress(value: unknown): boolean {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  const address = value as Record<string, unknown>;
-  if (address['@type'] !== 'PostalAddress') return false;
-  return ['streetAddress', 'addressLocality', 'addressRegion'].every(field =>
-    typeof address[field] === 'string' && address[field].trim().length > 0);
-}
-
-function hasSchemaField(node: Record<string, unknown>, field: string): boolean {
-  const value = field === 'openingHours'
-    ? node.openingHours ?? node.openingHoursSpecification
-    : node[field];
-  if (field === 'address') return hasCompletePostalAddress(value);
-  if (value === undefined || value === null) return false;
-  if (typeof value === 'string') return value.trim().length > 0;
-  if (Array.isArray(value)) return value.length > 0;
-  return true;
-}
-
-function hasReviewRatingOrDate(node: Record<string, unknown>): boolean {
-  return hasSchemaField(node, 'reviewRating') || hasSchemaField(node, 'datePublished');
-}
-
 export function validateForGoogleRichResults(schema: Record<string, unknown>): ValidationResult {
-  const errors: ValidationError[] = [];
-  const warnings: ValidationError[] = [];
-  const richResults: string[] = [];
-
-  const nodes = extractGraphNodes(schema);
-
-  for (const node of nodes) {
-    const types = getNodeTypes(node);
-    if (types.length === 0) continue;
-
-    // Track errors/warnings per node across all its types to avoid duplicates
-    const seenErrorFields = new Set<string>();
-    const seenWarningFields = new Set<string>();
-    const nodeErrors: ValidationError[] = [];
-
-    for (const type of types) {
-      const rules = RICH_RESULT_RULES[type];
-      if (!rules) continue;
-
-      // Check required fields
-      for (const field of rules.required) {
-        if (seenErrorFields.has(field)) continue;
-        if (!hasSchemaField(node, field)) {
-          seenErrorFields.add(field);
-          nodeErrors.push({ type, field, message: `Missing required property "${field}" for ${type}` });
-        }
-      }
-      if (type === 'Review' && !hasReviewRatingOrDate(node) && !seenErrorFields.has('reviewRating')) {
-        seenErrorFields.add('reviewRating');
-        nodeErrors.push({
-          type,
-          field: 'reviewRating',
-          message: 'Missing required property "reviewRating" or "datePublished" for Review',
-        });
-      }
-
-      // Check recommended fields
-      for (const field of rules.recommended) {
-        if (seenWarningFields.has(field)) continue;
-        if (!hasSchemaField(node, field)) {
-          seenWarningFields.add(field);
-          warnings.push({ type, field, message: `Missing recommended property "${field}" for ${type}` });
-        }
-      }
-
-      // Rich result eligibility: type is eligible if ALL its required fields are present
-      const typeRules = RICH_RESULT_RULES[type];
-      const typeMissingRequired = typeRules ? typeRules.required.some(field => {
-        return !hasSchemaField(node, field);
-      }) || (type === 'Review' && !hasReviewRatingOrDate(node)) : false;
-      if (RICH_RESULT_TYPES.has(type) && !typeMissingRequired) {
-        richResults.push(type);
-      }
-    }
-
-    errors.push(...nodeErrors);
-  }
-
-  const status: 'valid' | 'warnings' | 'errors' =
-    errors.length > 0 ? 'errors' :
-    warnings.length > 0 ? 'warnings' :
-    'valid';
-
-  return { status, richResults, errors, warnings };
+  const evaluated = evaluateGoogleSchema(schema);
+  return {
+    status: evaluated.publish.status,
+    richResults: evaluated.publish.richResults,
+    errors: evaluated.publish.errors as ValidationError[],
+    warnings: evaluated.publish.warnings as ValidationError[],
+  };
 }
