@@ -30,14 +30,13 @@ import { buildLocalBusinessSchema } from './templates/local-business.js';
 import { buildAboutPageSchema, buildContactPageSchema, buildCollectionPageSchema, buildWebPageSchema, buildBlogIndexSchema, buildServiceHubSchema } from './templates/static.js';
 import { buildHomepageSchema } from './templates/homepage.js';
 import { validateLeanSchema } from './validator.js';
-import { checkRichResultsEligibility } from './rich-results.js';
 import type { RichResultEligibility } from './rich-results.js';
 import type { ValidationFinding } from '../../shared/types/schema-validation.js';
 import type { SchemaGenerationDiagnostics, SchemaRoleSource, SkippedSchemaType } from '../../shared/types/schema-generation.js';
 import type { CanonicalEntity, SchemaIndustrySubtype, SchemaPageRole } from '../../shared/types/schema-plan.js';
 import type { SchemaCmsDeliveryStatus, SchemaCollectionIdentity, SchemaFieldEvidence } from '../../shared/types/site-inventory.js';
 import type { SiteContext, SiteContextPage } from './site-context.js';
-import { validateForGoogleRichResults } from '../schema-validator.js';
+import { evaluateGoogleSchema, publishValidationFromEvaluation, richResultEligibilityFromEvaluation } from './schema-validation-core.js';
 import { createLogger } from '../logger.js';
 import { normalizeDomainHost } from '../domain-normalization.js';
 import { cleanSchemaPublicText } from './schema-text-sanitizer.js';
@@ -1157,8 +1156,9 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
   const validationFindings = validateLeanSchema(schema, classified.primaryType);
 
   // Fix 3: compute rich results eligibility and pass through to caller
-  const richResultsEligibility = checkRichResultsEligibility(schema);
-  const publishValidation = validateForGoogleRichResults(schema);
+  const googleEvaluation = evaluateGoogleSchema(schema);
+  const richResultsEligibility: RichResultEligibility[] = richResultEligibilityFromEvaluation(googleEvaluation);
+  const publishValidation = publishValidationFromEvaluation(googleEvaluation);
 
   // Determine declared types for the suggestion `type` field
   const graph = (schema['@graph'] as Array<Record<string, unknown>>) ?? [];

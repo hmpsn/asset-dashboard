@@ -1,8 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **463 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **464 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 464. Schema Validation Projection Unification + Pre-Validation UX State
+
+**What it does:** Completes the schema-validation core unification by making the shared evaluator (`evaluateGoogleSchema`) the single computation pass for schema generator publish/eligibility outputs and by exposing projection helpers (`publishValidationFromEvaluation`, `richResultEligibilityFromEvaluation`) consumed by both `validateForGoogleRichResults` and `checkRichResultsEligibility`. Added wrapper-projection contract assertions in `tests/unit/schema-validator-alignment.test.ts` to lock contradiction behavior and ensure wrappers remain pure projections over the shared core. On the frontend, `SchemaSuggester` now wires persisted per-page validation records into `SchemaPageCard` so cards explicitly show `Not validated yet` until a validation record exists.
+
+**Agency value:** Removes remaining evaluator drift and duplicate-pass risk while making schema review state clearer during operator workflows.
+
+**Client value:** Reduces confusing schema card state before first validation and keeps rich-result eligibility and publish health signals consistent.
+
+**Mutual:** Hardens schema quality contracts end-to-end and improves trust in pre-publish decisioning UX.
 
 ---
 

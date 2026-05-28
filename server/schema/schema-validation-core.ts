@@ -25,6 +25,20 @@ export interface GoogleValidationEvaluation {
   byType: GoogleValidationTypeEvaluation[];
 }
 
+export interface GooglePublishValidationResult {
+  status: 'valid' | 'warnings' | 'errors';
+  richResults: string[];
+  errors: GoogleValidationIssue[];
+  warnings: GoogleValidationIssue[];
+}
+
+export interface GoogleRichResultEligibilityResult {
+  type: string;
+  feature: string;
+  eligible: boolean;
+  missingFields?: string[];
+}
+
 export const REVIEW_RATING_OR_DATE_MISSING_MESSAGE =
   'Missing required property "reviewRating" or "datePublished" for Review';
 
@@ -200,4 +214,23 @@ export function evaluateGoogleSchema(schema: Record<string, unknown>): GoogleVal
     },
     byType,
   };
+}
+
+export function publishValidationFromEvaluation(
+  evaluation: GoogleValidationEvaluation,
+): GooglePublishValidationResult {
+  return evaluation.publish;
+}
+
+export function richResultEligibilityFromEvaluation(
+  evaluation: GoogleValidationEvaluation,
+): GoogleRichResultEligibilityResult[] {
+  return evaluation.byType
+    .filter(result => GOOGLE_RICH_RESULT_TYPES.has(result.type))
+    .map(result => ({
+      type: result.type,
+      feature: result.feature,
+      eligible: result.eligible,
+      missingFields: result.missingFields,
+    }));
 }

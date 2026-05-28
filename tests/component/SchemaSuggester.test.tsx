@@ -103,6 +103,10 @@ vi.mock('../../src/hooks/admin/useSchemaValidation', () => ({
     data: null,
     isFetching: false,
   }),
+  useSchemaValidations: vi.fn().mockReturnValue({
+    data: [],
+    isLoading: false,
+  }),
 }));
 
 vi.mock('../../src/hooks/usePageEditStates', () => ({

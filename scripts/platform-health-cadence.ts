@@ -11,6 +11,7 @@ const ROOT = path.resolve(__dirname, '..');
 
 const DEFAULT_CADENCE_PATH = path.resolve(__dirname, '../data/platform-health-cadence.json');
 const DEFAULT_ROADMAP_PATH = path.resolve(__dirname, '../data/roadmap.json');
+const DEFAULT_ROADMAP_ARCHIVE_PATH = path.resolve(__dirname, '../data/roadmap.archive.json');
 
 interface CadenceCheckpointMetrics {
   oversizedModulesBefore: number;
@@ -72,6 +73,7 @@ export interface PlatformHealthCadenceReport {
 interface CliOptions {
   cadencePath: string;
   roadmapPath: string;
+  roadmapArchivePath: string | null;
   asOf: string;
   json: boolean;
   help: boolean;
@@ -114,6 +116,14 @@ function daysBetween(fromIso: string, toIso: string): number | null {
 
 function loadJson<T>(filePath: string): T {
   return JSON.parse(fs.readFileSync(filePath, 'utf8')) as T;
+}
+
+function mergeRoadmaps(active: RoadmapData, archived: RoadmapData | null): RoadmapData {
+  if (!archived) return active;
+  return {
+    ...active,
+    sprints: [...active.sprints, ...archived.sprints],
+  };
 }
 
 function collectRoadmapReferences(roadmap: RoadmapData): { sprintIds: Set<string>; itemIds: Set<string> } {
@@ -303,13 +313,14 @@ export function formatPlatformHealthCadenceMarkdown(report: PlatformHealthCadenc
 
 function printUsage(): void {
   console.error(
-    'Usage: npm run verify:platform-health-cadence -- [--as-of YYYY-MM-DD] [--json] [--cadence path] [--roadmap path]',
+    'Usage: npm run verify:platform-health-cadence -- [--as-of YYYY-MM-DD] [--json] [--cadence path] [--roadmap path] [--roadmap-archive path|none]',
   );
 }
 
 export function parseCliArgs(args: string[]): CliOptions | null {
   let cadencePath = DEFAULT_CADENCE_PATH;
   let roadmapPath = DEFAULT_ROADMAP_PATH;
+  let roadmapArchivePath: string | null = DEFAULT_ROADMAP_ARCHIVE_PATH;
   let asOf = toIsoDate(new Date());
   let json = false;
   let help = false;
@@ -345,11 +356,18 @@ export function parseCliArgs(args: string[]): CliOptions | null {
       index += 1;
       continue;
     }
+    if (arg === '--roadmap-archive') {
+      const value = args[index + 1];
+      if (!value || value.startsWith('--')) return null;
+      roadmapArchivePath = value === 'none' ? null : path.resolve(process.cwd(), value);
+      index += 1;
+      continue;
+    }
     return null;
   }
 
   if (!parseIsoDateUtc(asOf)) return null;
-  return { cadencePath, roadmapPath, asOf, json, help };
+  return { cadencePath, roadmapPath, roadmapArchivePath, asOf, json, help };
 }
 
 export function runCli(argv: string[]): number {
@@ -364,8 +382,16 @@ export function runCli(argv: string[]): number {
   }
 
   const cadenceData = loadJson<PlatformHealthCadenceData>(opts.cadencePath);
-  const roadmap = loadJson<RoadmapData>(opts.roadmapPath);
-  const report = buildPlatformHealthCadenceReport(cadenceData, roadmap, opts.asOf);
+  const activeRoadmap = loadJson<RoadmapData>(opts.roadmapPath);
+  const archivedRoadmap =
+    opts.roadmapArchivePath && fs.existsSync(opts.roadmapArchivePath)
+      ? loadJson<RoadmapData>(opts.roadmapArchivePath)
+      : null;
+  const report = buildPlatformHealthCadenceReport(
+    cadenceData,
+    mergeRoadmaps(activeRoadmap, archivedRoadmap),
+    opts.asOf,
+  );
 
   if (opts.json) console.log(JSON.stringify(report, null, 2));
   else console.log(formatPlatformHealthCadenceMarkdown(report));

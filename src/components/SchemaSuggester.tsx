@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import type { BusinessProfileContact } from '../../shared/types/workspace.js';
 import { useRecommendations } from '../hooks/useRecommendations';
-import { useSchemaGraphValidation } from '../hooks/admin/useSchemaValidation';
+import { useSchemaGraphValidation, useSchemaValidations } from '../hooks/admin/useSchemaValidation';
 import { Icon, cn, Button } from './ui';
 import { WorkflowStepper, ErrorState, ProgressIndicator, NextStepsCard } from './ui';
 import { SchemaPageCard } from './schema/SchemaPageCard';
@@ -111,6 +111,10 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   const graphValidationQuery = useSchemaGraphValidation(siteId, workspaceId, started && !!data && data.length > 0 && !loading);
   const graphValidation = graphValidationQuery.data ?? null;
   const bulkPublishBlocked = graphValidation?.status === 'errors';
+  const schemaValidationsQuery = useSchemaValidations(siteId, workspaceId);
+  const validationStatusByPageId = new Map(
+    (schemaValidationsQuery.data ?? []).map(record => [record.pageId, record.status] as const),
+  );
 
   // Business-profile callout dismiss state
   const dismissedKey = workspaceId ? `schema-bp-callout-dismissed-${workspaceId}` : null;
@@ -493,6 +497,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
               getEffectiveSchema={getEffectiveSchema}
               siteId={siteId}
               onRestore={restoreSchema}
+              validationStatus={validationStatusByPageId.get(page.pageId)}
             />
           );
         })}
