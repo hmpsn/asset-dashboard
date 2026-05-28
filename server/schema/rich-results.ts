@@ -8,6 +8,7 @@
  */
 
 import { GOOGLE_RICH_RESULT_RULES, GOOGLE_RICH_RESULT_TYPES } from './google-rich-result-rules.js';
+import { evaluateGoogleSchema } from './schema-validation-core.js';
 
 export interface RichResultEligibility {
   type: string;
@@ -24,31 +25,13 @@ export function checkRichResultsEligibility(schema: Record<string, unknown>): Ri
   const graph = schema['@graph'] as Record<string, unknown>[] | undefined;
   if (!Array.isArray(graph)) return [];
 
-  const results: RichResultEligibility[] = [];
-
-  for (const node of graph) {
-    const rawType = node['@type'];
-    const types = Array.isArray(rawType) ? rawType as string[] : (rawType ? [rawType as string] : []);
-    for (const type of types) {
-      if (!type || !GOOGLE_RICH_RESULT_TYPES.has(type) || !GOOGLE_RICH_RESULT_RULES[type]) continue;
-
-      const { feature, required } = GOOGLE_RICH_RESULT_RULES[type];
-      const missingFields = required.filter(field => {
-        const val = node[field];
-        if (val === undefined || val === null) return true;
-        if (Array.isArray(val) && val.length === 0) return true;
-        if (typeof val === 'string' && val.trim() === '') return true;
-        return false;
-      });
-
-      results.push({
-        type,
-        feature,
-        eligible: missingFields.length === 0,
-        missingFields: missingFields.length > 0 ? missingFields : undefined,
-      });
-    }
-  }
-
-  return results;
+  const evaluated = evaluateGoogleSchema(schema);
+  return evaluated.byType
+    .filter(result => GOOGLE_RICH_RESULT_TYPES.has(result.type) && !!GOOGLE_RICH_RESULT_RULES[result.type])
+    .map(result => ({
+      type: result.type,
+      feature: result.feature,
+      eligible: result.eligible,
+      missingFields: result.missingFields,
+    }));
 }

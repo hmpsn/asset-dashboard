@@ -1,6 +1,132 @@
 {
   "sprints": [
     {
+      "id": "sprint-duplication-unification-audit-2026-05-27",
+      "name": "🚧 Duplication Unification Audit Follow-through",
+      "hours": "20-36",
+      "rationale": "Execute the 2026-05-27 duplication inventory with one-track-per-finding to reduce drift regressions.",
+      "notes": "Audit references: /docs/superpowers/audits/2026-05-27-duplication-inventory.md and /docs/superpowers/audits/2026-05-27-audit-drift-closure.md",
+      "items": [
+        {
+          "id": "dup-schema-validator-core-unification",
+          "title": "Unify schema validator core primitives",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "6-8h",
+          "priority": "P0",
+          "status": "pending",
+          "notes": "File clusters: server/schema-validator.ts, server/schema/rich-results.ts, server/schema/validator.ts, server/schema/schema-validation-core.ts, tests/unit/schema-validation-*. Risk: validator semantics drift can silently flip publish/readiness outcomes. Done when: publish/eligibility/lean paths consume shared rule primitives and contradiction matrix tests prove no eligible+publish-error states for the same type."
+        },
+        {
+          "id": "dup-schema-eligibility-publish-contradiction-elimination",
+          "title": "Eliminate eligibility vs publish contradictions",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "4-6h",
+          "priority": "P0",
+          "status": "pending",
+          "notes": "File clusters: server/schema/rich-results.ts, server/schema-validator.ts, server/schema/generator.ts, tests/unit/schema-validation-pipeline.test.ts. Risk: schema UI can report false green while publish gate blocks production. Done when: eligibility derives from publish-rule evaluation and contract tests assert contradiction impossibility per rich-result type."
+        },
+        {
+          "id": "dup-page-normalizer-authority-collision-cleanup",
+          "title": "Resolve normalizePageUrl authority collision",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "6-8h",
+          "priority": "P0",
+          "status": "pending",
+          "notes": "File clusters: shared/page-address-utils.ts, server/helpers.ts, server/analytics-intelligence.ts and high-fanout callers. Risk: same-name different-semantics helpers can corrupt joins/grouping with no compile-time signal. Done when: one canonical page-identity helper contract is enforced and non-canonical variants are renamed or removed. Cross-reference: keep alongside broad page-address work in roadmap item 2601 to avoid duplicate closure ambiguity."
+        },
+        {
+          "id": "dup-pathname-extraction-fanout-migration",
+          "title": "Migrate raw pathname extraction fan-out",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "5-7h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "File clusters: ~69 new URL(...).pathname callsites across server/src/shared/tests (audit-indexed sweep). Risk: partial migration leaves subtle path-matching regressions. Done when: page-identity joins route through shared page-address helpers and remaining raw pathname usage is intentional/documented."
+        },
+        {
+          "id": "dup-route-query-parser-consolidation",
+          "title": "Consolidate duplicated route query parsers",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "3-5h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "File clusters: server/routes/{ai,google,health,public-analytics,webflow-cms,workspace-home}.ts. Risk: parser behavior drift causes inconsistent pagination/default bounds by endpoint. Done when: shared parsePositiveIntQuery helper is adopted and legacy inline copies are removed with route-level tests."
+        },
+        {
+          "id": "dup-mutation-feedback-loop-helperization",
+          "title": "Helperize mutation feedback loop wiring",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "5-7h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "File clusters: server routes/services with repeated addActivity + broadcastToWorkspace patterns (53-file fanout from audit). Risk: omitted or mismatched side effects create stale UI and audit gaps. Done when: shared mutation-side-effect helper/guardrails reduce repeated boilerplate and high-churn mutation families are migrated first."
+        },
+        {
+          "id": "dup-schema-text-sanitizer-consolidation",
+          "title": "Consolidate schema text sanitizers",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "3-4h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "File clusters: server/schema/generator.ts, server/schema/templates/{service,local-business}.ts, server/schema/extractors/page-elements.ts. Risk: inconsistent sanitizer behavior can produce malformed or overly-stripped schema text. Done when: one shared schema-safe text sanitizer is adopted by generator/templates/extractors with fixture coverage for opaque IDs and empty text."
+        },
+        {
+          "id": "dup-schema-role-type-registry-consolidation",
+          "title": "Consolidate schema role/type registry mappings",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "File clusters: shared/types/schema-plan.ts, server/schema-suggester.ts, server/schema/generator.ts. Risk: role/type drift breaks diagnostics and emitted schema expectations. Done when: one typed registry drives planner/suggester/generator mappings and duplicate maps are retired. Cross-reference: complements schema-intelligence sprint items in sprint-platform-value-schema-intelligence-next."
+        },
+        {
+          "id": "dup-html-analysis-helper-consolidation",
+          "title": "Consolidate residual HTML analysis helper drift",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "2-4h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "File clusters: server/seo-audit-html.ts, server/sales-audit.ts, server/html-analysis-utils.ts. Risk: forked extraction logic yields inconsistent audit outcomes. Done when: wrappers only delegate to canonical html-analysis-utils helpers and no ad hoc extraction logic remains outside approved wrappers."
+        },
+        {
+          "id": "dup-ui-number-size-formatter-consolidation",
+          "title": "Consolidate UI numeric and size formatters",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "2-4h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "File clusters: src/components/{AssetBrowser,AssetAudit,PageWeight,assets/AssetCard}.tsx plus fmtNum/fmtMoney adoption gaps. Risk: inconsistent formatting and repeated bugs in display logic. Done when: shared format helpers cover bytes/number use cases and duplicate local helpers are removed."
+        },
+        {
+          "id": "dup-slug-url-helper-consolidation",
+          "title": "Consolidate slug and URL helper variants",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "2-4h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "File clusters: server/intelligence/entity-resolution-slice.ts, server/mcp/tools/keyword-actions.ts, server/sales-audit.ts, server/diagnostic-probe.ts. Risk: diverging normalization semantics break cross-domain linking over time. Done when: shared slug/url helpers exist with explicit domain wrappers where semantics intentionally differ."
+        },
+        {
+          "id": "dup-ws-invalidation-map-guardrails",
+          "title": "Add guardrails for WS invalidation map drift",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "3-5h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "File clusters: src/hooks/useWsInvalidation.ts and workspace-event broadcasters. Risk: repetitive handler map edits can miss new events or invalidate wrong keys. Done when: event coverage guardrails/tests enforce handler completeness for workspace-scoped broadcasts."
+        },
+        {
+          "id": "dup-table-mapper-pattern-review",
+          "title": "Review repeated table mapper patterns for safe extraction",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "2-3h",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "File clusters: keyword/table modules using rowToModel/modelToParams/migrateFromJsonBlob patterns. Risk: over-abstraction could reduce readability without real bug reduction. Done when: keep-as-is vs extract decision is documented with targeted adoption only where complexity decreases."
+        }
+      ]
+    },
+    {
       "id": "sprint-self-service",
       "name": "Self-Service & Growth",
       "hours": "26-37",
