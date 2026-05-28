@@ -8,6 +8,7 @@ import {
   hasReviewRatingOrDate,
   hasSchemaField,
   isImageObjectWithUrl,
+  REVIEW_RATING_OR_DATE_MISSING_MESSAGE,
 } from './schema-validation-core.js';
 
 interface RequiredFields {
@@ -583,7 +584,7 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
           type: t,
           field: 'reviewRating',
           ruleId: 'review-rating-or-date-missing',
-          message: 'Review missing reviewRating or datePublished',
+          message: REVIEW_RATING_OR_DATE_MISSING_MESSAGE,
         });
       }
       for (const field of rules.recommended ?? []) {

@@ -25,6 +25,9 @@ export interface GoogleValidationEvaluation {
   byType: GoogleValidationTypeEvaluation[];
 }
 
+export const REVIEW_RATING_OR_DATE_MISSING_MESSAGE =
+  'Missing required property "reviewRating" or "datePublished" for Review';
+
 function extractGraphNodes(schema: Record<string, unknown>): Array<Record<string, unknown>> {
   const graph = schema['@graph'];
   if (Array.isArray(graph)) return graph as Array<Record<string, unknown>>;
@@ -104,7 +107,7 @@ function evaluateType(node: Record<string, unknown>, type: string): GoogleValida
     errors.push({
       type,
       field: 'reviewRating',
-      message: 'Missing required property "reviewRating" or "datePublished" for Review',
+      message: REVIEW_RATING_OR_DATE_MISSING_MESSAGE,
     });
   }
 
