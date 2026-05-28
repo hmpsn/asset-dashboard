@@ -412,10 +412,13 @@ describe('GET /api/google/callback — OAuth callback edge cases', () => {
   });
 
   it('returns 400 text when Google redirects with an error param', async () => {
-    const { status, body } = await getJson(baseUrl, '/api/google/callback?error=access_denied');
+    const reflectedPayload = encodeURIComponent('<script>alert("xss")</script>');
+    const { status, body } = await getJson(baseUrl, `/api/google/callback?error=${reflectedPayload}`);
     expect(status).toBe(400);
     expect(typeof body).toBe('string');
-    expect((body as string)).toContain('access_denied');
+    expect((body as string)).toContain('Google auth error.');
+    expect((body as string)).not.toContain('<script>');
+    expect((body as string)).not.toContain('alert("xss")');
   });
 
   it('returns 400 when code is missing', async () => {

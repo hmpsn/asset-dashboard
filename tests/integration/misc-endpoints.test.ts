@@ -13,12 +13,15 @@
  * - GET /api/semrush/status
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import fs from 'fs';
+import path from 'path';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, getWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { signToken } from '../../server/auth.js';
 import { createUser, deleteUser } from '../../server/users.js';
 import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
 import { createContentSubscription, deleteContentSubscription } from '../../server/content-subscriptions.js';
+import { getUploadRoot } from '../../server/data-dir.js';
 import db from '../../server/db/index.js';
 
 const ctx = createTestContext(13209);
@@ -246,6 +249,65 @@ describe('Miscellaneous read-only endpoints (cont.)', () => {
     const res = await api(`/api/schema-impact/${testWsId}?limit=4.4`);
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
+  });
+});
+
+describe('Clipboard upload path safety', () => {
+  function multipartClipboardUpload(fileNameField: string, sourceFileName = 'clipboard.png') {
+    const boundary = '----codex-clipboard-upload-boundary';
+    const body =
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="file"; filename="${sourceFileName}"\r\n` +
+      'Content-Type: image/png\r\n\r\n' +
+      'fake image bytes\r\n' +
+      `--${boundary}\r\n` +
+      'Content-Disposition: form-data; name="fileName"\r\n\r\n' +
+      `${fileNameField}\r\n` +
+      `--${boundary}--\r\n`;
+    return { boundary, body };
+  }
+
+  it('normalizes traversal segments in body fileName and keeps writes in workspace folder', async () => {
+    const ws = getWorkspace(testWsId);
+    expect(ws).toBeTruthy();
+    if (!ws) return;
+
+    const { boundary, body } = multipartClipboardUpload('../../escape-target.png');
+    const res = await api(`/api/upload/${testWsId}/clipboard`, {
+      method: 'POST',
+      headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+      body,
+    });
+    expect(res.status).toBe(200);
+    const payload = await res.json() as { fileName: string; uploaded: number };
+    expect(payload.uploaded).toBe(1);
+    expect(payload.fileName).toBe('escape-target.png');
+
+    const wsFilePath = path.join(getUploadRoot(), ws.folder, 'escape-target.png');
+    const escapedPath = path.resolve(getUploadRoot(), 'escape-target.png');
+    expect(fs.existsSync(wsFilePath)).toBe(true);
+    expect(fs.existsSync(escapedPath)).toBe(false);
+    if (fs.existsSync(wsFilePath)) fs.unlinkSync(wsFilePath);
+  });
+
+  it('normalizes mixed backslash traversal in body fileName', async () => {
+    const ws = getWorkspace(testWsId);
+    expect(ws).toBeTruthy();
+    if (!ws) return;
+
+    const { boundary, body } = multipartClipboardUpload('..\\..\\mixed-separator.png');
+    const res = await api(`/api/upload/${testWsId}/clipboard`, {
+      method: 'POST',
+      headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+      body,
+    });
+    expect(res.status).toBe(200);
+    const payload = await res.json() as { fileName: string; uploaded: number };
+    expect(payload.uploaded).toBe(1);
+    expect(payload.fileName).toBe('mixed-separator.png');
+    const wsFilePath = path.join(getUploadRoot(), ws.folder, 'mixed-separator.png');
+    expect(fs.existsSync(wsFilePath)).toBe(true);
+    if (fs.existsSync(wsFilePath)) fs.unlinkSync(wsFilePath);
   });
 });
 

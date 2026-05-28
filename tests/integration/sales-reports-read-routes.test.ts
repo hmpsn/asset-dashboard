@@ -46,6 +46,22 @@ describe('Sales Reports — single by id (unknown)', () => {
     const res = await api('/api/sales-report/sr_nonexistent_00000000/html');
     expect(res.status).toBe(404);
   });
+
+  it('GET /api/sales-report/:id rejects malformed traversal id with 400', async () => {
+    const badId = encodeURIComponent('../../etc/passwd');
+    const res = await api(`/api/sales-report/${badId}`);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'Invalid report id format' });
+  });
+
+  it('GET /api/sales-report/:id/html rejects malformed traversal id with 400', async () => {
+    const badId = encodeURIComponent('../../etc/passwd');
+    const res = await api(`/api/sales-report/${badId}/html`);
+    expect(res.status).toBe(400);
+    const body = await res.text();
+    expect(body).toContain('Invalid report id format');
+  });
 });
 
 describe('Public snapshot report — unknown id', () => {
