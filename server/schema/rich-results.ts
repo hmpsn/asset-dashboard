@@ -22,9 +22,6 @@ export interface RichResultEligibility {
  * and what fields are missing for those that don't yet qualify.
  */
 export function checkRichResultsEligibility(schema: Record<string, unknown>): RichResultEligibility[] {
-  const graph = schema['@graph'] as Record<string, unknown>[] | undefined;
-  if (!Array.isArray(graph)) return [];
-
   const evaluated = evaluateGoogleSchema(schema);
   return evaluated.byType
     .filter(result => GOOGLE_RICH_RESULT_TYPES.has(result.type) && !!GOOGLE_RICH_RESULT_RULES[result.type])

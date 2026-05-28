@@ -853,6 +853,21 @@ describe('edge cases — empty, malformed, missing @context', () => {
     expect(result).toHaveLength(0);
   });
 
+  it('handles checkRichResultsEligibility for top-level node schemas without @graph', () => {
+    const schema = {
+      '@context': 'https://schema.org',
+      '@type': 'Article',
+      headline: 'Flat Article',
+      datePublished: '2026-01-01',
+      author: { name: 'Jane' },
+      image: 'https://example.com/img.jpg',
+    };
+    const result = checkRichResultsEligibility(schema);
+    const article = result.find(entry => entry.type === 'Article');
+    expect(article).toBeDefined();
+    expect(article?.eligible).toBe(true);
+  });
+
   it('handles validateForGoogleRichResults when @graph contains a null entry', () => {
     const schema = {
       '@context': 'https://schema.org',

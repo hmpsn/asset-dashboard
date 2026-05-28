@@ -25,7 +25,7 @@
           "priority": "P0",
           "status": "done",
           "shippedAt": "2026-05-27",
-          "notes": "Completed on codex/schema-unification-roadmap-capture by deriving eligibility from the shared publish-rule evaluator path. File clusters delivered: server/schema/rich-results.ts, server/schema-validator.ts, server/schema/generator.ts, tests/unit/schema-validation-pipeline.test.ts and tests/unit/schema-validator-alignment.test.ts. Outcome: contradiction state (eligible while publish errors for same type) is now contract-tested and blocked."
+          "notes": "Completed on codex/schema-unification-roadmap-capture by deriving eligibility from the shared publish-rule evaluator path. File clusters delivered: server/schema/rich-results.ts, server/schema-validator.ts, server/schema/schema-validation-core.ts, tests/unit/schema-validation-matrix.test.ts, and tests/unit/schema-validator-alignment.test.ts. Outcome: contradiction state (eligible while publish errors for same type) is now contract-tested and blocked."
         },
         {
           "id": "dup-page-normalizer-authority-collision-cleanup",
