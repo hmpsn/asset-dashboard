@@ -2,6 +2,7 @@
  * activity routes — extracted from server/index.ts
  */
 import { Router } from 'express';
+import { requireClientPortalAuth } from '../middleware.js';
 
 const router = Router();
 
@@ -16,7 +17,7 @@ function parseLimit(rawLimit: unknown): number | null {
 
 // --- Activity Log ---
 // Public: client views activity for their workspace
-router.get('/api/public/activity/:workspaceId', (req, res) => {
+router.get('/api/public/activity/:workspaceId', requireClientPortalAuth(), (req, res) => {
   const limit = parseLimit(req.query.limit);
   if (limit == null) return res.status(400).json({ error: 'limit must be a positive integer' });
   res.json(listClientActivity(req.params.workspaceId, limit));

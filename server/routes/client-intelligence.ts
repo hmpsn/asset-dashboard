@@ -7,6 +7,7 @@
  * strategy_alignment insight type, or bridge source tags.
  */
 import { Router } from 'express';
+import { requireClientPortalAuth } from '../middleware.js';
 import { computeEffectiveTier, getWorkspace } from '../workspaces.js';
 import { buildWorkspaceIntelligence } from '../workspace-intelligence.js';
 import { createLogger } from '../logger.js';
@@ -136,7 +137,7 @@ function formatCopyPipelineForClient(pipeline: ContentPipelineSlice): ClientCopy
 }
 
 // GET /api/public/intelligence/:workspaceId
-router.get('/api/public/intelligence/:workspaceId', async (req, res) => {
+router.get('/api/public/intelligence/:workspaceId', requireClientPortalAuth(), async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 

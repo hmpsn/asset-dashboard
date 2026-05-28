@@ -181,6 +181,7 @@ router.post('/api/public/reset-password', validate(resetPasswordSchema), async (
 });
 
 // --- Portal Email Capture (shared-password visitors) ---
+// public-no-auth-ok: intentionally pre-auth — visitors submit email before logging in
 router.post('/api/public/capture-email/:id', (req, res) => {
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });

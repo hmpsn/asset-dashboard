@@ -13,7 +13,7 @@ import type { default as SharpConstructor } from 'sharp';
 import type { execFileSync as ExecFileSyncFn } from 'child_process';
 import { getUploadRoot } from '../data-dir.js';
 import { getAuditTrafficForWorkspace } from '../helpers.js';
-import { upload, moveUploadedFiles } from '../middleware.js';
+import { upload, moveUploadedFiles, requireClientPortalAuth } from '../middleware.js';
 import { triggerOptimize } from '../processor.js';
 import { listSites, getPageDom } from '../webflow.js';
 import {
@@ -30,7 +30,7 @@ import { requireWorkspaceAccess, requireWorkspaceSiteAccess, requireWorkspaceSit
 const log = createLogger('misc');
 
 // GET all page states for a workspace (client/public)
-router.get('/api/public/page-states/:workspaceId', (req, res) => {
+router.get('/api/public/page-states/:workspaceId', requireClientPortalAuth(), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Not found' });
   res.json(getAllPageStates(req.params.workspaceId));

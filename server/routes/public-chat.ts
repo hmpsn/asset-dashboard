@@ -62,7 +62,7 @@ router.post('/api/public/chat-sessions/:workspaceId/:sessionId/summarize', async
 });
 
 // Chat usage / rate limit info
-router.get('/api/public/chat-usage/:workspaceId', (req, res) => {
+router.get('/api/public/chat-usage/:workspaceId', requireClientPortalAuth(), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const tier = computeEffectiveTier(ws);
@@ -71,7 +71,7 @@ router.get('/api/public/chat-usage/:workspaceId', (req, res) => {
 });
 
 // Unified usage summary — all features for a workspace
-router.get('/api/public/usage/:workspaceId', (req, res) => {
+router.get('/api/public/usage/:workspaceId', requireClientPortalAuth(), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const tier = computeEffectiveTier(ws);
