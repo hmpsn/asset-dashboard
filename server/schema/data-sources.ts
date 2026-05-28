@@ -13,6 +13,7 @@ import type { SchemaIndustrySubtype } from '../../shared/types/schema-plan.js';
 import type { ResolvedEntity } from '../../shared/types/entity-resolution.js';
 import { EEAT_ASSET_TYPE, type EeatAsset } from '../../shared/types/eeat-assets.js';
 import { normalizeDomainHost } from '../domain-normalization.js';
+import { parseJsonFallback } from '../db/json-validation.js';
 
 export interface PageMetaInput {
   title: string;
@@ -261,6 +262,111 @@ function extractVisibleAuthor($: cheerio.CheerioAPI): string | undefined {
   return undefined;
 }
 
+function schemaTypeList(node: Record<string, unknown>): string[] {
+  const rawType = node['@type'];
+  if (typeof rawType === 'string') return [rawType];
+  if (Array.isArray(rawType)) return rawType.filter((type): type is string => typeof type === 'string');
+  return [];
+}
+
+function normalizeComparablePageUrl(value: string | undefined, baseUrl: string): string | undefined {
+  if (!value?.trim()) return undefined;
+  try {
+    const parsed = new URL(value, baseUrl);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return undefined;
+    parsed.hash = '';
+    const href = parsed.toString();
+    return href.endsWith('/') && parsed.pathname !== '/' ? href.slice(0, -1) : href;
+  } catch { // catch-ok: malformed JSON-LD URLs are skipped in author extraction fallback
+    return undefined;
+  }
+}
+
+function nodeUrlCandidates(node: Record<string, unknown>): string[] {
+  const candidates: string[] = [];
+  const directCandidates = [node.url, node['@id'], node.mainEntityOfPage];
+  for (const candidate of directCandidates) {
+    if (typeof candidate === 'string') {
+      candidates.push(candidate);
+      continue;
+    }
+    if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
+      const nestedId = (candidate as Record<string, unknown>)['@id'];
+      const nestedUrl = (candidate as Record<string, unknown>).url;
+      if (typeof nestedId === 'string') candidates.push(nestedId);
+      if (typeof nestedUrl === 'string') candidates.push(nestedUrl);
+    }
+  }
+  return candidates;
+}
+
+function extractJsonLdObjects($: cheerio.CheerioAPI): Record<string, unknown>[] {
+  const objects: Record<string, unknown>[] = [];
+  $('script[type="application/ld+json"]').each((_, el) => {
+    const raw = $(el).contents().text().trim();
+    if (!raw) return;
+    const parsed = parseJsonFallback<unknown>(raw, null);
+    if (!parsed) return;
+    const queue: unknown[] = Array.isArray(parsed) ? [...parsed] : [parsed];
+    while (queue.length > 0) {
+      const item = queue.shift();
+      if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+      const node = item as Record<string, unknown>;
+      objects.push(node);
+      if (Array.isArray(node['@graph'])) {
+        queue.push(...(node['@graph'] as unknown[]));
+      }
+    }
+  });
+  return objects;
+}
+
+function extractAuthorNameFromJsonLdValue(value: unknown): string | undefined {
+  if (!value) return undefined;
+  if (Array.isArray(value)) {
+    for (const candidate of value) {
+      const author = extractAuthorNameFromJsonLdValue(candidate);
+      if (author) return author;
+    }
+    return undefined;
+  }
+  if (typeof value === 'string') {
+    const cleaned = cleanAuthorName(value);
+    return cleaned && looksLikePersonName(cleaned) ? cleaned : undefined;
+  }
+  if (typeof value !== 'object') return undefined;
+  const obj = value as Record<string, unknown>;
+  const cleanedName = cleanAuthorName(typeof obj.name === 'string' ? obj.name : undefined);
+  if (!cleanedName) return undefined;
+  const loweredTypes = schemaTypeList(obj).map(type => type.toLowerCase());
+  if (loweredTypes.includes('person')) return cleanedName;
+  if (loweredTypes.length > 0 && loweredTypes.every(type => type === 'organization')) return undefined;
+  return looksLikePersonName(cleanedName) ? cleanedName : undefined;
+}
+
+function extractArticleJsonLdAuthor($: cheerio.CheerioAPI, opts: { baseUrl: string; canonicalUrl: string }): string | undefined {
+  const nodes = extractJsonLdObjects($);
+  if (nodes.length === 0) return undefined;
+  const canonicalUrl = normalizeComparablePageUrl(opts.canonicalUrl, opts.baseUrl);
+  const articleLikeNodes = nodes.filter(node => {
+    const loweredTypes = schemaTypeList(node).map(type => type.toLowerCase());
+    return loweredTypes.includes('blogposting') || loweredTypes.includes('article') || loweredTypes.includes('newsarticle');
+  });
+  if (articleLikeNodes.length === 0) return undefined;
+
+  const matchingNodes = canonicalUrl
+    ? articleLikeNodes.filter(node => nodeUrlCandidates(node)
+      .some(candidate => normalizeComparablePageUrl(candidate, opts.baseUrl) === canonicalUrl))
+    : articleLikeNodes;
+  const candidateNodes = matchingNodes.length > 0 ? matchingNodes : articleLikeNodes;
+
+  for (const node of candidateNodes) {
+    const author = extractAuthorNameFromJsonLdValue(node.author);
+    if (author) return author;
+  }
+  return undefined;
+}
+
 function uniqueStrings(values: Array<string | undefined>): string[] {
   return Array.from(new Set(values.map(v => v?.trim()).filter((v): v is string => !!v)));
 }
@@ -440,11 +546,6 @@ export function extractPageData(input: ExtractInput): PageData {
   const image = ogImage || twitterImage || linkImage;
 
   const cmsFieldData = input.pageMeta.cmsFieldData ?? null;
-  const datePublishedCms = pickCmsFieldWithSlug(cmsFieldData, ['published-on', 'published-date', 'date-published']);
-  const dateModifiedCms = pickCmsFieldWithSlug(cmsFieldData, ['updated-on', 'last-updated']);
-  const authorCms = pickCmsFieldWithSlug(cmsFieldData, ['author-name', 'author', 'written-by']);
-  const visibleAuthor = extractVisibleAuthor($);
-  const eeatAuthorSignals = deriveEeatAuthorSignals(input.workspace.eeatAssets);
   const wordCount = countVisibleWords($);
   const fieldEvidence: SchemaFieldEvidence[] = [...(input.pageMeta.fieldEvidence ?? [])];
   const evidenceSources: Partial<Record<string, SchemaEvidenceSource>> = {};
@@ -462,6 +563,8 @@ export function extractPageData(input: ExtractInput): PageData {
     });
   }
 
+  const datePublishedCms = pickCmsFieldWithSlug(cmsFieldData, ['published-on', 'published-date', 'date-published']);
+  const dateModifiedCms = pickCmsFieldWithSlug(cmsFieldData, ['updated-on', 'last-updated']);
   const datePublished = $('time[itemprop="datePublished"]').attr('datetime')
     || datePublishedCms?.value
     || input.pageMeta.createdOn
@@ -472,39 +575,6 @@ export function extractPageData(input: ExtractInput): PageData {
     || input.pageMeta.lastPublished
     || datePublished
     || undefined;
-
-  const author = authorCms?.value ?? visibleAuthor ?? eeatAuthorSignals.author;
-  const authorMatchesEeat = !!(
-    author
-    && eeatAuthorSignals.author
-    && normalizeAuthorIdentity(author) === normalizeAuthorIdentity(eeatAuthorSignals.author)
-  );
-  if (datePublishedCms) {
-    evidenceSources.datePublished = `cms-field:${datePublishedCms.slug}`;
-    fieldEvidence.push({ field: 'datePublished', source: `cms-field:${datePublishedCms.slug}` });
-  }
-  if (dateModifiedCms) {
-    evidenceSources.dateModified = `cms-field:${dateModifiedCms.slug}`;
-    fieldEvidence.push({ field: 'dateModified', source: `cms-field:${dateModifiedCms.slug}` });
-  }
-  if (authorCms) {
-    evidenceSources.author = `cms-field:${authorCms.slug}`;
-    fieldEvidence.push({ field: 'author', source: `cms-field:${authorCms.slug}` });
-  } else if (visibleAuthor) {
-    evidenceSources.author = 'rendered-html';
-    fieldEvidence.push({ field: 'author', source: 'rendered-html' });
-  } else if (eeatAuthorSignals.author) {
-    evidenceSources.author = 'workspace-intelligence';
-    fieldEvidence.push({
-      field: 'author',
-      source: 'workspace-intelligence',
-      status: 'resolved',
-      message: 'Author resolved from workspace E-E-A-T team bio inventory.',
-    });
-  }
-
-  const inLanguage = input.pageMeta.locale?.trim() || input.workspace.defaultLocale || 'en';
-  const articleSection = deriveArticleSection(input.pageMeta.publishedPath);
   const renderedCanonical = $('link[rel="canonical"]').attr('href')?.trim();
   const renderedCanonicalUrl = renderedCanonical ? sameSiteUrl(renderedCanonical, input.baseUrl) : undefined;
   const fallbackCanonicalUrl = `${input.baseUrl}${input.pageMeta.publishedPath}`;
@@ -525,6 +595,50 @@ export function extractPageData(input: ExtractInput): PageData {
       message: 'canonicalUrl resolved from same-site rendered canonical link.',
     });
   }
+  const authorCms = pickCmsFieldWithSlug(cmsFieldData, ['author-name', 'author', 'written-by']);
+  const authorFromJsonLd = extractArticleJsonLdAuthor($, { baseUrl: input.baseUrl, canonicalUrl });
+  const visibleAuthor = extractVisibleAuthor($);
+  const eeatAuthorSignals = deriveEeatAuthorSignals(input.workspace.eeatAssets);
+  const author = authorCms?.value ?? authorFromJsonLd ?? visibleAuthor ?? eeatAuthorSignals.author;
+  const authorMatchesEeat = !!(
+    author
+    && eeatAuthorSignals.author
+    && normalizeAuthorIdentity(author) === normalizeAuthorIdentity(eeatAuthorSignals.author)
+  );
+  if (datePublishedCms) {
+    evidenceSources.datePublished = `cms-field:${datePublishedCms.slug}`;
+    fieldEvidence.push({ field: 'datePublished', source: `cms-field:${datePublishedCms.slug}` });
+  }
+  if (dateModifiedCms) {
+    evidenceSources.dateModified = `cms-field:${dateModifiedCms.slug}`;
+    fieldEvidence.push({ field: 'dateModified', source: `cms-field:${dateModifiedCms.slug}` });
+  }
+  if (authorCms) {
+    evidenceSources.author = `cms-field:${authorCms.slug}`;
+    fieldEvidence.push({ field: 'author', source: `cms-field:${authorCms.slug}` });
+  } else if (authorFromJsonLd) {
+    evidenceSources.author = 'existing-json-ld';
+    fieldEvidence.push({
+      field: 'author',
+      source: 'existing-json-ld',
+      status: 'resolved',
+      message: 'Author resolved from existing Article/BlogPosting JSON-LD.',
+    });
+  } else if (visibleAuthor) {
+    evidenceSources.author = 'rendered-html';
+    fieldEvidence.push({ field: 'author', source: 'rendered-html' });
+  } else if (eeatAuthorSignals.author) {
+    evidenceSources.author = 'workspace-intelligence';
+    fieldEvidence.push({
+      field: 'author',
+      source: 'workspace-intelligence',
+      status: 'resolved',
+      message: 'Author resolved from workspace E-E-A-T team bio inventory.',
+    });
+  }
+
+  const inLanguage = input.pageMeta.locale?.trim() || input.workspace.defaultLocale || 'en';
+  const articleSection = deriveArticleSection(input.pageMeta.publishedPath);
 
   // Derive Article.keywords (comma-joined) from per-page keywords.
   const pageKeywords = input.pageMeta.pageKeywords;

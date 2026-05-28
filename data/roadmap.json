@@ -1628,8 +1628,9 @@
           "source": "Platform audit 2026-05-27",
           "est": "3-5h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "Bare `JSON.parse` on AI output, no shape validation — silent runtime garbage if prompt drifts. Files: `server/content-brief.ts:38,1017` (includes the `outlineParsed.outline ?? outlineParsed.sections` guessed-field-name anti-pattern at 1020-1021); `server/aeo-page-review.ts:63,242`; `server/diagnostic-orchestrator.ts:466`; `server/schema-plan.ts:358`. Register each as a named AI operation in `server/ai-operation-registry.ts`, route through `callAI({ operation })`, and validate parsed output with Zod. See `docs/rules/ai-operation-contracts.md`. [PARTIAL 2026-05-27 — Plan B added pr-check rule \"Bare JSON.parse on AI text response without schema validation\" (zero hits at rule addition). Actual Zod validation of the 4 callers (content-brief.ts, aeo-page-review.ts, diagnostic-orchestrator.ts, schema-plan.ts) and named AI operation registry entries still required.]"
+          "status": "done",
+          "shippedAt": "2026-05-28",
+          "notes": "Completed and re-verified on 2026-05-28. The four audit-targeted AI structured-output callers now route through named operations and typed parsers/schemas:\n- `server/content-brief.ts` uses `operation: 'content-brief-regenerate'` + `operation: 'content-brief-outline'` with `parseContentBriefOutline()` schema validation.\n- `server/diagnostic-orchestrator.ts` uses `operation: 'diagnostic-root-causes'` with `parseDiagnosticRootCauses()` + typed array validation.\n- `server/schema-plan.ts` uses `operation: 'schema-plan-generate'` with `parseSchemaPlan()`.\n- `server/aeo-page-review.ts` uses `operation: 'aeo-page-review'` with `parseAeoReview()` + `normalizeAeoReviewResponse()`.\nResidual `JSON.parse` in `aeo-page-review.ts` is for existing on-page JSON-LD evidence extraction (not AI response parsing). The pr-check rule `Bare JSON.parse on AI text response without schema validation` remains active to prevent regressions."
         },
         {
           "id": "audit-drift-server-slugify-dedupe-consolidation",
@@ -1646,8 +1647,9 @@
           "source": "Platform health consolidation follow-up 2026-05-27",
           "est": "3-5h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "Create a canonical server domain-normalization helper contract (stripWww/lowercase/port + malformed fallback options), then migrate duplicated domain cleanup logic in `server/local-seo.ts`, `server/providers/dataforseo-provider.ts`, schema same-site comparators, and competitor-domain filtering wrappers. Preserve security-specific hostname normalization in `server/external-fetch.ts` as a separate safety boundary."
+          "status": "done",
+          "shippedAt": "2026-05-28",
+          "notes": "Completed and re-verified on 2026-05-28. Canonical server authority now lives in `server/domain-normalization.ts` (`normalizeDomainHost`, `normalizeDomainValue`) with explicit options for stripWww/lowercase/port/trailing-dot and malformed fallback behavior. Migration scope from the item is complete:\n- `server/local-seo.ts` migrated to `normalizeDomainValue`.\n- `server/providers/dataforseo-provider.ts` migrated to `normalizeDomainValue`.\n- Schema same-site comparators (`server/schema/generator.ts`, `server/schema/data-sources.ts`) migrated to `normalizeDomainHost`.\n- Competitor-domain wrappers (`server/competitor-domain-filter.ts`) migrated to canonical normalization.\nSecurity-specific normalization boundaries in `server/external-fetch.ts` remain intentionally separate."
         },
         {
           "id": "audit-drift-page-path-address-helper-consolidation",

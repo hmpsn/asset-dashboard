@@ -228,6 +228,24 @@ describe('extractFaq', () => {
     expect(result).toEqual([]);
   });
 
+  it('cleans escaped quote artifacts and removes quoted question prefix from answers', async () => {
+    const html = `
+      <details>
+        <summary>Where do we stand?</summary>
+        <p>\\"How is our engineering performing today?\\"A live, unified view of throughput and quality.</p>
+      </details>
+      <details>
+        <summary>How do we improve?</summary>
+        <p>\\"How can we drive 20% more productivity?\\"Diagnostics that pinpoint bottlenecks.</p>
+      </details>
+    `;
+    const result = await extractFaq(html);
+    expect(result).toEqual([
+      { question: 'Where do we stand?', answer: 'A live, unified view of throughput and quality.' },
+      { question: 'How do we improve?', answer: 'Diagnostics that pinpoint bottlenecks.' },
+    ]);
+  });
+
   it('skips entries with empty question or answer', async () => {
     const html = `
       <details><summary></summary><p>Orphan answer</p></details>

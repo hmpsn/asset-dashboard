@@ -25,6 +25,30 @@ const COMMERCIAL_HOST_RE = /(?:^|\.)((calendly|typeform|elfsight)\.com|grsm\.io)
 const AUTHORITY_ANCHOR_RE = /\b(?:docs?|documentation|guidelines?|research|stud(?:y|ies)|reports?|white\s*papers?|papers?|journals?|standards?|spec(?:ification)?|articles?|guides?|data|statistics|benchmarks?|surveys?)\b/i;
 const AUTHORITY_PATH_RE = /(?:^|[/_-])(?:docs?|documentation|guidelines?|research|stud(?:y|ies)|reports?|whitepapers?|papers?|journals?|articles?|guides?|data|statistics|benchmarks?|surveys?|api)(?:$|[/._-])/i;
 const AUTHORITY_HOST_RE = /(?:^|\.)((?:gov)|(?:edu)|developers\.google\.com|web\.dev|developer\.mozilla\.org|schema\.org)$/i;
+const BRANDED_FALLBACK_BLOCKED_HOST_RE = /(?:^|\.)((?:linkedin|facebook|instagram|x|twitter|youtube|tiktok|pinterest)\.com)$/i;
+const GENERIC_CITATION_LABEL_RE = /^(?:research|source|documentation|docs?|article|guide|study|report|paper|reference|website|link|read more|learn more|more)$/i;
+const GENERIC_PATH_SEGMENT = new Set([
+  'blog',
+  'blogs',
+  'article',
+  'articles',
+  'news',
+  'resources',
+  'docs',
+  'doc',
+  'documentation',
+  'guide',
+  'guides',
+  'research',
+  'study',
+  'studies',
+  'report',
+  'reports',
+  'paper',
+  'papers',
+  'post',
+  'posts',
+]);
 
 function parseUrlOrNull(url: string): URL | null {
   try {
@@ -44,17 +68,86 @@ function normalizeCitationUrl(url: URL): string {
   return normalized.toString();
 }
 
+function titleizeWords(value: string): string {
+  return value
+    .split(/\s+/g)
+    .filter(Boolean)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function safeDecodeSegment(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch { // catch-ok: malformed percent-encoded segment; fall back to raw segment
+    return segment;
+  }
+}
+
+function deriveTitleFromUrl(url: string): string | null {
+  const parsed = parseUrlOrNull(url);
+  if (!parsed) return null;
+  const segments = parsed.pathname
+    .split('/')
+    .map(segment => safeDecodeSegment(segment).trim().toLowerCase())
+    .filter(Boolean);
+
+  for (let i = segments.length - 1; i >= 0; i -= 1) {
+    const segment = segments[i]
+      .replace(/\.[a-z0-9]+$/i, '')
+      .replace(/[-_]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!segment) continue;
+    if (GENERIC_PATH_SEGMENT.has(segment)) continue;
+    if (segment.length < 4) continue;
+    return titleizeWords(segment);
+  }
+
+  const host = comparableHost(parsed.hostname);
+  const primaryLabel = host.split('.').filter(Boolean).slice(-2)[0] || host;
+  const cleanedHost = primaryLabel.replace(/[-_]+/g, ' ').trim();
+  return cleanedHost ? titleizeWords(cleanedHost) : null;
+}
+
+export function citationDisplayName(citation: Pick<Citation, 'text' | 'url'>): string {
+  const raw = citation.text.replace(/\s+/g, ' ').trim();
+  if (raw && !GENERIC_CITATION_LABEL_RE.test(raw) && raw.length >= 4) return raw;
+  return deriveTitleFromUrl(citation.url) ?? citation.url;
+}
+
+function brandAlignedWithHost(anchorText: string, host: string): boolean {
+  const anchor = anchorText.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!anchor) return false;
+  const labels = host.split('.').filter(Boolean);
+  if (labels.length === 0) return false;
+  const primaryLabel = labels.length >= 2 ? labels[labels.length - 2] : labels[0];
+  const hostTokens = primaryLabel
+    .split(/[^a-z0-9]+/g)
+    .map(token => token.trim())
+    .filter(token => token.length >= 3);
+  if (hostTokens.length === 0) return false;
+  return hostTokens.some(token => anchor.includes(token));
+}
+
 function isAuthorityCitation(linkUrl: URL, anchorText: string): boolean {
   const text = anchorText.replace(/\s+/g, ' ').trim();
+  const host = comparableHost(linkUrl.hostname);
+  if (COMMERCIAL_HOST_RE.test(host)) return false;
+  if (BRANDED_FALLBACK_BLOCKED_HOST_RE.test(host)) return false;
+  const hasPathBeyondRoot = Boolean(linkUrl.pathname && linkUrl.pathname !== '/');
   if (!text) return false;
   if (text.length < 4 || WEAK_ANCHOR_RE.test(text)) return false;
-  if (COMMERCIAL_HOST_RE.test(comparableHost(linkUrl.hostname))) return false;
   const anchorIntent = text.replace(/[-_]+/g, ' ');
   if (CTA_ANCHOR_RE.test(anchorIntent) || COMMERCIAL_PATH_RE.test(linkUrl.pathname)) return false;
-  const host = comparableHost(linkUrl.hostname);
-  return AUTHORITY_HOST_RE.test(host)
+  const isStrictAuthority = AUTHORITY_HOST_RE.test(host)
     || AUTHORITY_ANCHOR_RE.test(text)
     || AUTHORITY_PATH_RE.test(linkUrl.pathname);
+  // Cross-industry branded reference fallback:
+  // allow non-CTA branded links that point to an actual resource path and
+  // whose anchor text aligns with the linked domain brand (e.g. "Invisalign" -> invisalign.com).
+  const isBrandedReference = hasPathBeyondRoot && brandAlignedWithHost(text, host);
+  return isStrictAuthority || isBrandedReference;
 }
 
 export function filterAuthorityCitations(citations: Citation[], pageBaseUrl?: string): Citation[] {

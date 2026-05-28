@@ -726,6 +726,18 @@ describe('static page templates', () => {
     expect(node.breadcrumb).toEqual({ '@id': 'https://example.com/about#breadcrumb' });
     expect(node.inLanguage).toBe('en');
   });
+  it('WebPage omits author even when pageData.author is present', () => {
+    const withAuthor = {
+      ...staticInput,
+      pageData: {
+        ...staticInput.pageData,
+        author: 'Jane Writer',
+      },
+    };
+    const schema = buildWebPageSchema(withAuthor);
+    const node = (schema['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.author).toBeUndefined();
+  });
   it('uses cleanTitle, not raw title, for name', () => {
     const dirty = { ...staticInput, pageData: { ...staticInput.pageData, title: 'About Us | Acme', cleanTitle: 'About Us' } };
     const node = (buildWebPageSchema(dirty)['@graph'] as Array<Record<string, unknown>>)[0];
@@ -1010,6 +1022,29 @@ describe('Article + BlogPosting — citation[] enrichment (PR1)', () => {
     };
     const graph = buildArticleSchema(input as never, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>;
     expect(graph[0].citation).toBeUndefined();
+  });
+
+  it('derives citation display name from URL when anchor text is generic', () => {
+    const withGenericAnchor = {
+      ...baseInput,
+      pageData: {
+        ...baseInput.pageData,
+        elements: {
+          citations: [
+            { url: 'https://www.anthropic.com/engineering/harness-design-long-running-apps', text: 'research', isExternal: true },
+          ],
+        },
+      },
+    };
+    const graph = buildArticleSchema(withGenericAnchor, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>;
+    const primary = graph[0];
+    expect(primary.citation).toEqual([
+      {
+        '@type': 'WebPage',
+        url: 'https://www.anthropic.com/engineering/harness-design-long-running-apps',
+        name: 'Harness Design Long Running Apps',
+      },
+    ]);
   });
 });
 
