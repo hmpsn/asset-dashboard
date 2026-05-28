@@ -17,6 +17,7 @@
     "start": "NODE_ENV=production node --import tsx server/index.ts",
     "db:migrate": "tsx server/db/migrate-json.ts",
     "db:sync-staging": "tsx scripts/sync-staging-db.ts",
+    "db:pull-render-backup": "bash scripts/pull-render-latest-backup.sh",
     "test": "vitest run",
     "test:quiet": "vitest run --reporter=dot --silent=passed-only",
     "test:unit": "vitest run --project unit",
