@@ -15,7 +15,7 @@
           "priority": "P0",
           "status": "done",
           "shippedAt": "2026-05-27",
-          "notes": "Completed on codex/schema-unification-roadmap-capture via shared schema rule core extraction and adoption. File clusters delivered: server/schema-validator.ts, server/schema/rich-results.ts, server/schema/validator.ts, server/schema/schema-validation-core.ts, tests/unit/schema-validation-*. Outcome: publish/eligibility/lean paths now consume shared rule primitives and contradiction coverage is in place."
+          "notes": "Completed on codex/schema-unification-roadmap-capture via shared schema rule core extraction and adoption. File clusters delivered: server/schema-validator.ts, server/schema/rich-results.ts, server/schema/validator.ts, server/schema/schema-validation-core.ts, tests/unit/schema-validation-*. Outcome: publish/eligibility/lean paths now consume shared rule primitives and contradiction coverage is in place. Final closeout follow-up on 2026-05-28 unified generator callers onto the same core evaluation projections and added explicit wrapper-projection contract coverage."
         },
         {
           "id": "dup-schema-eligibility-publish-contradiction-elimination",
@@ -25,7 +25,7 @@
           "priority": "P0",
           "status": "done",
           "shippedAt": "2026-05-27",
-          "notes": "Completed on codex/schema-unification-roadmap-capture by deriving eligibility from the shared publish-rule evaluator path. File clusters delivered: server/schema/rich-results.ts, server/schema-validator.ts, server/schema/schema-validation-core.ts, tests/unit/schema-validation-matrix.test.ts, and tests/unit/schema-validator-alignment.test.ts. Outcome: contradiction state (eligible while publish errors for same type) is now contract-tested and blocked."
+          "notes": "Completed on codex/schema-unification-roadmap-capture by deriving eligibility from the shared publish-rule evaluator path. File clusters delivered: server/schema/rich-results.ts, server/schema-validator.ts, server/schema/schema-validation-core.ts, tests/unit/schema-validation-matrix.test.ts, and tests/unit/schema-validator-alignment.test.ts. Outcome: contradiction state (eligible while publish errors for same type) is now contract-tested and blocked. Final closeout follow-up on 2026-05-28 extended contradiction lock tests to assert core-projection parity between publish and eligibility wrappers."
         },
         {
           "id": "dup-page-normalizer-authority-collision-cleanup",

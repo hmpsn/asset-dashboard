@@ -9,7 +9,7 @@ import db from './db/index.js';
 import { randomUUID } from 'crypto';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { evaluateGoogleSchema } from './schema/schema-validation-core.js';
+import { evaluateGoogleSchema, publishValidationFromEvaluation } from './schema/schema-validation-core.js';
 
 // ── Types ──
 
@@ -122,11 +122,11 @@ export function deleteValidation(workspaceId: string, pageId: string): boolean {
 }
 
 export function validateForGoogleRichResults(schema: Record<string, unknown>): ValidationResult {
-  const evaluated = evaluateGoogleSchema(schema);
+  const publish = publishValidationFromEvaluation(evaluateGoogleSchema(schema));
   return {
-    status: evaluated.publish.status,
-    richResults: evaluated.publish.richResults,
-    errors: evaluated.publish.errors as ValidationError[],
-    warnings: evaluated.publish.warnings as ValidationError[],
+    status: publish.status,
+    richResults: publish.richResults,
+    errors: publish.errors as ValidationError[],
+    warnings: publish.warnings as ValidationError[],
   };
 }

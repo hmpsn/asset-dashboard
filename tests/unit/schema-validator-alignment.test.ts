@@ -6,6 +6,8 @@ import {
   hasReviewRatingOrDate,
   hasSchemaField,
   isImageObjectWithUrl,
+  publishValidationFromEvaluation,
+  richResultEligibilityFromEvaluation,
 } from '../../server/schema/schema-validation-core.js';
 import { validateLeanSchema } from '../../server/schema/validator.js';
 
@@ -224,6 +226,46 @@ describe('schema validator alignment', () => {
         const publishTypeErrors = evaluated.publish.errors.filter(error => error.type === item.type);
         expect(item.eligible && publishTypeErrors.length > 0).toBe(false);
       }
+    }
+  });
+
+  it('keeps wrapper callers locked to shared core projections', () => {
+    const schema = {
+      '@context': 'https://schema.org',
+      '@graph': [{
+        '@type': 'Review',
+        itemReviewed: { '@type': 'Service', name: 'Emergency Plumbing' },
+        author: { '@type': 'Person', name: 'Taylor' },
+      }, {
+        '@type': 'Article',
+        headline: 'How to Choose an HVAC Installer',
+        description: 'A practical guide for homeowners.',
+        image: { '@type': 'ImageObject' },
+        datePublished: '2026-05-20T10:00:00Z',
+        dateModified: '2026-05-21T10:00:00Z',
+        author: { '@type': 'Person', name: 'Jordan Smith' },
+        publisher: {
+          '@type': 'Organization',
+          name: 'Acme Home Services',
+          logo: { '@type': 'ImageObject', url: 'https://example.com/logo.png' },
+        },
+        isPartOf: { '@id': 'https://example.com/#website' },
+        inLanguage: 'en-US',
+      }],
+    };
+
+    const evaluated = evaluateGoogleSchema(schema);
+    const publishProjection = publishValidationFromEvaluation(evaluated);
+    const eligibilityProjection = richResultEligibilityFromEvaluation(evaluated);
+    const publish = validateForGoogleRichResults(schema);
+    const eligibility = checkRichResultsEligibility(schema);
+
+    expect(publish).toEqual(publishProjection);
+    expect(eligibility).toEqual(eligibilityProjection);
+
+    for (const item of eligibilityProjection) {
+      const publishTypeErrors = publishProjection.errors.filter(error => error.type === item.type);
+      expect(item.eligible && publishTypeErrors.length > 0).toBe(false);
     }
   });
 });

@@ -7,8 +7,7 @@
  * fields per @type), so it has no dependency on the lean generator pipeline.
  */
 
-import { GOOGLE_RICH_RESULT_RULES, GOOGLE_RICH_RESULT_TYPES } from './google-rich-result-rules.js';
-import { evaluateGoogleSchema } from './schema-validation-core.js';
+import { evaluateGoogleSchema, richResultEligibilityFromEvaluation } from './schema-validation-core.js';
 
 export interface RichResultEligibility {
   type: string;
@@ -22,13 +21,5 @@ export interface RichResultEligibility {
  * and what fields are missing for those that don't yet qualify.
  */
 export function checkRichResultsEligibility(schema: Record<string, unknown>): RichResultEligibility[] {
-  const evaluated = evaluateGoogleSchema(schema);
-  return evaluated.byType
-    .filter(result => GOOGLE_RICH_RESULT_TYPES.has(result.type) && !!GOOGLE_RICH_RESULT_RULES[result.type])
-    .map(result => ({
-      type: result.type,
-      feature: result.feature,
-      eligible: result.eligible,
-      missingFields: result.missingFields,
-    }));
+  return richResultEligibilityFromEvaluation(evaluateGoogleSchema(schema));
 }
