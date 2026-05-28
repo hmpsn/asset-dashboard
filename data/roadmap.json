@@ -2,7 +2,7 @@
   "sprints": [
     {
       "id": "sprint-duplication-unification-audit-2026-05-27",
-      "name": "🚧 Duplication Unification Audit Follow-through",
+      "name": "\ud83d\udea7 Duplication Unification Audit Follow-through",
       "hours": "20-36",
       "rationale": "Execute the 2026-05-27 duplication inventory with one-track-per-finding to reduce drift regressions.",
       "notes": "Audit references: /docs/superpowers/audits/2026-05-27-duplication-inventory.md and /docs/superpowers/audits/2026-05-27-audit-drift-closure.md",
@@ -1567,8 +1567,8 @@
           "source": "Platform audit 2026-05-27",
           "est": "1-2h",
           "priority": "P0",
-          "status": "pending",
-          "notes": "Security finding. `server/routes/rank-tracking.ts:125,133` and `server/routes/public-portal.ts:310` (audit-traffic) lack `requireClientPortalAuth`. Admin equivalents (`rank-tracking.ts:112,120`) use `requireWorkspaceAccess`. Ranking data and GA/GSC page metrics currently leak to anyone with a known workspaceId. [Expanded 2026-05-27 during plan verification] `server/routes/anomalies.ts:27` (public GET) also lacks auth, and admin mutations `anomalies.ts:34,43` (dismiss/acknowledge) have no workspace guard at all. Bundle all six fixes plus a pr-check rule that flags new routes mounted on the `/api/public/` prefix without an explicit auth middleware or a documented `// public-no-auth-ok` hatch."
+          "status": "done",
+          "notes": "Security finding. `server/routes/rank-tracking.ts:125,133` and `server/routes/public-portal.ts:310` (audit-traffic) lack `requireClientPortalAuth`. Admin equivalents (`rank-tracking.ts:112,120`) use `requireWorkspaceAccess`. Ranking data and GA/GSC page metrics currently leak to anyone with a known workspaceId. [Expanded 2026-05-27 during plan verification] `server/routes/anomalies.ts:27` (public GET) also lacks auth, and admin mutations `anomalies.ts:34,43` (dismiss/acknowledge) have no workspace guard at all. Bundle all six fixes plus a pr-check rule that flags new routes mounted on the `/api/public/` prefix without an explicit auth middleware or a documented `// public-no-auth-ok` hatch. [DONE 2026-05-27 \u2014 Plan A: added requireAuthenticatedClientPortalAuth to rank-tracking (4 routes), public-portal audit-traffic, anomalies public GET + admin mutations; added pr-check rule Public route under /api/public/ missing client-portal auth middleware.]"
         },
         {
           "id": "audit-drift-public-route-auth-sweep-followup",
@@ -1613,7 +1613,7 @@
           "est": "2-3h",
           "priority": "P1",
           "status": "pending",
-          "notes": "Three workspace-scoped mutation routes silently skip both halves of the feedback loop: `server/routes/client-actions.ts:49,67,84` (create, admin update, public respond); `server/routes/keyword-command-center.ts:123,137` (single + bulk); `server/routes/anomalies.ts:34,43` (dismiss + acknowledge). Add WS event constants in `server/ws-events.ts` if missing; call `broadcastToWorkspace()` and `addActivity()` after each successful mutation; wire `useWorkspaceEvents` invalidations on the frontend; add contract tests asserting both calls fire."
+          "notes": "Three workspace-scoped mutation routes silently skip both halves of the feedback loop: `server/routes/client-actions.ts:49,67,84` (create, admin update, public respond); `server/routes/keyword-command-center.ts:123,137` (single + bulk); `server/routes/anomalies.ts:34,43` (dismiss + acknowledge). Add WS event constants in `server/ws-events.ts` if missing; call `broadcastToWorkspace()` and `addActivity()` after each successful mutation; wire `useWorkspaceEvents` invalidations on the frontend; add contract tests asserting both calls fire. [PARTIAL 2026-05-27 \u2014 Plan B added pr-check rule \"Workspace mutation route missing broadcastToWorkspace\" (zero hits at time of rule addition, meaning these three route files either had zero matches or the rule scope excludes them). Actual broadcastToWorkspace + addActivity wiring in client-actions.ts, keyword-command-center.ts, anomalies.ts still required.]"
         },
         {
           "id": "audit-drift-ai-json-parse-zod-validation",
@@ -1622,7 +1622,7 @@
           "est": "3-5h",
           "priority": "P1",
           "status": "pending",
-          "notes": "Bare `JSON.parse` on AI output, no shape validation \u2014 silent runtime garbage if prompt drifts. Files: `server/content-brief.ts:38,1017` (includes the `outlineParsed.outline ?? outlineParsed.sections` guessed-field-name anti-pattern at 1020-1021); `server/aeo-page-review.ts:63,242`; `server/diagnostic-orchestrator.ts:466`; `server/schema-plan.ts:358`. Register each as a named AI operation in `server/ai-operation-registry.ts`, route through `callAI({ operation })`, and validate parsed output with Zod. See `docs/rules/ai-operation-contracts.md`."
+          "notes": "Bare `JSON.parse` on AI output, no shape validation \u2014 silent runtime garbage if prompt drifts. Files: `server/content-brief.ts:38,1017` (includes the `outlineParsed.outline ?? outlineParsed.sections` guessed-field-name anti-pattern at 1020-1021); `server/aeo-page-review.ts:63,242`; `server/diagnostic-orchestrator.ts:466`; `server/schema-plan.ts:358`. Register each as a named AI operation in `server/ai-operation-registry.ts`, route through `callAI({ operation })`, and validate parsed output with Zod. See `docs/rules/ai-operation-contracts.md`. [PARTIAL 2026-05-27 \u2014 Plan B added pr-check rule \"Bare JSON.parse on AI text response without schema validation\" (zero hits at rule addition). Actual Zod validation of the 4 callers (content-brief.ts, aeo-page-review.ts, diagnostic-orchestrator.ts, schema-plan.ts) and named AI operation registry entries still required.]"
         },
         {
           "id": "audit-drift-server-slugify-dedupe-consolidation",
@@ -1630,8 +1630,8 @@
           "source": "Platform audit 2026-05-27",
           "est": "2-3h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "Two divergent `slugify` regexes (`server/intelligence/entity-resolution-slice.ts:13` uses `[^a-z0-9\\s-]`; `server/mcp/tools/keyword-actions.ts:49` uses `[^a-z0-9]+`) \u2014 same name, different output. Move canonical to `server/helpers.ts`; migrate both callers. Then consolidate `dedupeByKeyword`/`dedupeByTopic`/`dedupeStrings`/`dedupeCandidates` across `server/cannibalization-issues.ts:131`, `server/keyword-gaps.ts:74`, `server/topic-clusters.ts:102`, `server/keyword-strategy-sanitizer.ts:103`, `server/keyword-recommendations.ts:137` into `dedupeBy<T>(items, keyFn)` and `dedupeByNormalizedKeyword` in a shared module."
+          "status": "done",
+          "notes": "Two divergent `slugify` regexes (`server/intelligence/entity-resolution-slice.ts:13` uses `[^a-z0-9\\s-]`; `server/mcp/tools/keyword-actions.ts:49` uses `[^a-z0-9]+`) \u2014 same name, different output. Move canonical to `server/helpers.ts`; migrate both callers. Then consolidate `dedupeByKeyword`/`dedupeByTopic`/`dedupeStrings`/`dedupeCandidates` across `server/cannibalization-issues.ts:131`, `server/keyword-gaps.ts:74`, `server/topic-clusters.ts:102`, `server/keyword-strategy-sanitizer.ts:103`, `server/keyword-recommendations.ts:137` into `dedupeBy<T>(items, keyFn)` and `dedupeByNormalizedKeyword` in a shared module. [DONE 2026-05-27 \u2014 Plan C C1+C6: canonical slugify moved to server/helpers.ts; dedupeBy/dedupeByLast/dedupeByNormalizedKeyword/uniqStrings added to server/utils/collections.ts; all divergent local copies migrated.]"
         },
         {
           "id": "audit-drift-domain-normalization-helper-migration-sweep",
@@ -1666,8 +1666,8 @@
           "source": "Platform audit 2026-05-27",
           "est": "3-4h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "~15 components hand-roll score-color thresholds instead of using `scoreColor`/`scoreColorClass`/`scoreBgClass` from `src/components/ui/constants.ts`. Sites: `AssetAudit.tsx:263`, `MetricRing.tsx:21,22`, `audit/AuditReportExport.tsx:79,132`, `page-intelligence/PageIntelligencePagesHeader.tsx:163-164`, `briefs/BriefDetail.tsx:242`, `briefs/BriefList.tsx:110`, `audit/CwvSummaryCard.tsx:53`, `strategy/TopicClusters.tsx:21-22`, `WorkspaceOverview.tsx:133`, `SiteArchitecture.tsx:342`, `TrafficDetail.tsx:477`, `ui/AIContextIndicator.tsx:92,98`, `hooks/useChat.ts:250`, `PageSpeedPanel.tsx:63` (local `scoreColor` shadow). Migrate then add pr-check rule flagging inline `score >= 80 ? 'text-emerald'` patterns outside `ui/constants.ts`."
+          "status": "done",
+          "notes": "~15 components hand-roll score-color thresholds instead of using `scoreColor`/`scoreColorClass`/`scoreBgClass` from `src/components/ui/constants.ts`. Sites: `AssetAudit.tsx:263`, `MetricRing.tsx:21,22`, `audit/AuditReportExport.tsx:79,132`, `page-intelligence/PageIntelligencePagesHeader.tsx:163-164`, `briefs/BriefDetail.tsx:242`, `briefs/BriefList.tsx:110`, `audit/CwvSummaryCard.tsx:53`, `strategy/TopicClusters.tsx:21-22`, `WorkspaceOverview.tsx:133`, `SiteArchitecture.tsx:342`, `TrafficDetail.tsx:477`, `ui/AIContextIndicator.tsx:92,98`, `hooks/useChat.ts:250`, `PageSpeedPanel.tsx:63` (local `scoreColor` shadow). Migrate then add pr-check rule flagging inline `score >= 80 ? 'text-emerald'` patterns outside `ui/constants.ts`. [DONE 2026-05-27 \u2014 Plan C C2: all ~15 inline score-color ternaries migrated to scoreColor()/scoreColorClass(); pr-check rule inline-score-color-ternary added.]"
         },
         {
           "id": "audit-drift-fmt-num-formatbytes-adoption",
@@ -1675,8 +1675,8 @@
           "source": "Platform audit 2026-05-27",
           "est": "4-6h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "~78 sites call `.toLocaleString()` directly instead of `fmtNum` from `src/utils/formatNumbers.ts`. Largest call-site clusters: `ContentPerformance.tsx`, `TrafficDetail.tsx`, `SearchDetail.tsx`, `KeywordStrategy.tsx`, `RankTracker.tsx`, `AIUsageSection.tsx`. Local `fmtNum`/`fmtTokens` reimplementations at `WorkspaceHome.tsx:46-47` and `AIUsageSection.tsx:70`. Add `formatBytes(bytes)` to `utils/formatNumbers.ts` and migrate the 3 copy-paste sites: `AssetBrowser.tsx:40-41`, `AssetAudit.tsx:38-39`, `PageWeight.tsx:35-36`. Add pr-check rule flagging `.toLocaleString()` on plain numbers in `src/components/` (allow on dates)."
+          "status": "done",
+          "notes": "~78 sites call `.toLocaleString()` directly instead of `fmtNum` from `src/utils/formatNumbers.ts`. Largest call-site clusters: `ContentPerformance.tsx`, `TrafficDetail.tsx`, `SearchDetail.tsx`, `KeywordStrategy.tsx`, `RankTracker.tsx`, `AIUsageSection.tsx`. Local `fmtNum`/`fmtTokens` reimplementations at `WorkspaceHome.tsx:46-47` and `AIUsageSection.tsx:70`. Add `formatBytes(bytes)` to `utils/formatNumbers.ts` and migrate the 3 copy-paste sites: `AssetBrowser.tsx:40-41`, `AssetAudit.tsx:38-39`, `PageWeight.tsx:35-36`. Add pr-check rule flagging `.toLocaleString()` on plain numbers in `src/components/` (allow on dates). [DONE 2026-05-27 \u2014 Plan C C3: all ~78 toLocaleString() sites migrated to fmtNum(); formatBytes() added to src/utils/formatNumbers.ts and 3 copy-paste sites migrated; pr-check rule inline-toLocaleString added.]"
         },
         {
           "id": "audit-drift-fmt-money-format-date-adoption",
@@ -1684,8 +1684,8 @@
           "source": "Platform audit 2026-05-27",
           "est": "4-6h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "Inline `Intl.NumberFormat` USD: `client/InsightsEngine.tsx:44`, `client/FixRecommendations.tsx:13`, `client/SeoCart.tsx:8`, `ClientDashboard.tsx:601` \u2014 migrate to `fmtMoney`. Then create `formatDate`/`formatDateShort`/`formatDateTime` in `src/utils/formatDates.ts` and migrate ~25 sites of raw `new Date(x).toLocaleDateString()` (`AdminChat.tsx:249`, `RevenueDashboard.tsx:231`, `ContentManager.tsx:291`, `KeywordStrategy.tsx:315,387`, `PostEditor.tsx:398`, `ContentDecay.tsx:140`, `ContentSubscriptions.tsx:258,307`, `ContentBriefs.tsx:482`, `settings/FeaturesTab.tsx:114`, plus ~14 more). Add pr-check rule flagging inline `Intl.NumberFormat` and raw `toLocaleDateString` outside the formatters utility."
+          "status": "done",
+          "notes": "Inline `Intl.NumberFormat` USD: `client/InsightsEngine.tsx:44`, `client/FixRecommendations.tsx:13`, `client/SeoCart.tsx:8`, `ClientDashboard.tsx:601` \u2014 migrate to `fmtMoney`. Then create `formatDate`/`formatDateShort`/`formatDateTime` in `src/utils/formatDates.ts` and migrate ~25 sites of raw `new Date(x).toLocaleDateString()` (`AdminChat.tsx:249`, `RevenueDashboard.tsx:231`, `ContentManager.tsx:291`, `KeywordStrategy.tsx:315,387`, `PostEditor.tsx:398`, `ContentDecay.tsx:140`, `ContentSubscriptions.tsx:258,307`, `ContentBriefs.tsx:482`, `settings/FeaturesTab.tsx:114`, plus ~14 more). Add pr-check rule flagging inline `Intl.NumberFormat` and raw `toLocaleDateString` outside the formatters utility. [DONE 2026-05-27 \u2014 Plan C C4+C5: inline Intl.NumberFormat USD migrated to fmtMoney(); formatDate/formatDateShort/formatDateTime added to src/utils/formatDates.ts; all ~25 bare toLocaleDateString() sites migrated; pr-check rule inline-toLocaleDateString added.]"
         },
         {
           "id": "audit-drift-use-toggle-set-adoption",
@@ -1712,7 +1712,7 @@
           "est": "4-6h",
           "priority": "P2",
           "status": "pending",
-          "notes": "(a) Migrate 4 custom relative-time formatters onto `src/lib/timeAgo.ts` (`LlmsTxtGenerator.tsx:25`, `WorkspaceHome.tsx:207`, `client/Briefing/WinsSurface.tsx:30`, `admin/MeetingBrief/BriefHeader.tsx:10`); (b) move status\u2192badge ternaries into `<Badge>`/`<StatusBadge>` or `lib/copyStatusConfig.ts` (`PendingApprovals.tsx:186`, `RankTracker.tsx:507`, `ContentBriefs.tsx:479`, `cms-editor/CmsEditorShellPanels.tsx:163-164`, `brand/BatchGenerationPanel.tsx:98`, `workspace-home/SeoWorkStatus.tsx:40,46`); (c) consolidate `uniq`/`uniqueStrings`/`uniqueSeoTexts`/`uniqueEntities` into `uniqStrings(values, opts)`; (d) collapse `sanitizeForPrompt` duplicates between `briefing-prompt.ts:169` and `helpers.ts:278,294`; (e) introduce typed shape in `shared/types/` for `matchedPage`/`meta` to replace the 8+ `(matchedPage as Record<string, unknown>)` ladder in `server/schema-suggester.ts:692-876`; (f) Lock `callAI()` adoption: delete the stale `// callAnthropic` comment at `server/copy-generation.ts:116` (actual call at line 106 already uses `callAI()`) and add a pr-check rule blocking new direct imports of `callOpenAI`/`callAnthropic` outside `server/ai.ts`. [Rescoped 2026-05-27 \u2014 originally proposed as a migration based on stale audit + stale CLAUDE.md note; re-verification confirmed full adoption is already complete, so item now mechanizes the invariant rather than migrating to it.]"
+          "notes": "(a) Migrate 4 custom relative-time formatters onto `src/lib/timeAgo.ts` (`LlmsTxtGenerator.tsx:25`, `WorkspaceHome.tsx:207`, `client/Briefing/WinsSurface.tsx:30`, `admin/MeetingBrief/BriefHeader.tsx:10`); (b) move status\u2192badge ternaries into `<Badge>`/`<StatusBadge>` or `lib/copyStatusConfig.ts` (`PendingApprovals.tsx:186`, `RankTracker.tsx:507`, `ContentBriefs.tsx:479`, `cms-editor/CmsEditorShellPanels.tsx:163-164`, `brand/BatchGenerationPanel.tsx:98`, `workspace-home/SeoWorkStatus.tsx:40,46`); (c) consolidate `uniq`/`uniqueStrings`/`uniqueSeoTexts`/`uniqueEntities` into `uniqStrings(values, opts)`; (d) collapse `sanitizeForPrompt` duplicates between `briefing-prompt.ts:169` and `helpers.ts:278,294`; (e) introduce typed shape in `shared/types/` for `matchedPage`/`meta` to replace the 8+ `(matchedPage as Record<string, unknown>)` ladder in `server/schema-suggester.ts:692-876`; (f) Lock `callAI()` adoption: delete the stale `// callAnthropic` comment at `server/copy-generation.ts:116` (actual call at line 106 already uses `callAI()`) and add a pr-check rule blocking new direct imports of `callOpenAI`/`callAnthropic` outside `server/ai.ts`. [Rescoped 2026-05-27 \u2014 originally proposed as a migration based on stale audit + stale CLAUDE.md note; re-verification confirmed full adoption is already complete, so item now mechanizes the invariant rather than migrating to it.] [PARTIAL 2026-05-27 \u2014 Plan C systemic: sub-item (f) callAI dispatcher lock done (pr-check rule \"Direct callOpenAI/callAnthropic import outside dispatcher\" added; stale comment in copy-generation.ts removed). Sub-items a-e remain: timeAgo migration (4 sites), Badge/StatusBadge ternary consolidation, uniqStrings consolidation, sanitizeForPrompt dedup.]"
         },
         {
           "id": "audit-drift-p3-residuals",
@@ -1721,7 +1721,7 @@
           "est": "3-5h",
           "priority": "P3",
           "status": "pending",
-          "notes": "(a) Retire `server/db/json-column.ts` parseJsonColumn in favor of `parseJsonFallback` from `server/db/json-validation.ts`; (b) collapse `titleCaseWord`/`capitalize`/`capitalizeSlugSegment` (`server/insight-enrichment.ts:37`, `server/schema/data-sources.ts:146,324`) into one `capitalizeWord`; (c) collapse two `compact()` siblings in `keyword-strategy-context.ts:36` + `keyword-strategy-ux.ts:85`; (d) add `useDebouncedValue` hook and migrate inline `setTimeout` debounces (`KeywordCommandCenter.tsx:116`, `useAutoSave.ts`, `ui/overlay/Tooltip.tsx:110`); (e) add `daysSince(iso)` to `lib/timeAgo.ts` and migrate `schema/SchemaPageCard.tsx:95`, `client/Briefing/WinsSurface.tsx:32`; (f) parity-fix `quickWins` shape between `keyword-strategy.ts:259` (full row) and `public-content.ts:216-221` (4 fields); (g) promote `sleep(ms)` from `server/local-seo.ts:156` into `server/helpers.ts`."
+          "notes": "(a) Retire `server/db/json-column.ts` parseJsonColumn in favor of `parseJsonFallback` from `server/db/json-validation.ts`; (b) collapse `titleCaseWord`/`capitalize`/`capitalizeSlugSegment` (`server/insight-enrichment.ts:37`, `server/schema/data-sources.ts:146,324`) into one `capitalizeWord`; (c) collapse two `compact()` siblings in `keyword-strategy-context.ts:36` + `keyword-strategy-ux.ts:85`; (d) add `useDebouncedValue` hook and migrate inline `setTimeout` debounces (`KeywordCommandCenter.tsx:116`, `useAutoSave.ts`, `ui/overlay/Tooltip.tsx:110`); (e) add `daysSince(iso)` to `lib/timeAgo.ts` and migrate `schema/SchemaPageCard.tsx:95`, `client/Briefing/WinsSurface.tsx:32`; (f) parity-fix `quickWins` shape between `keyword-strategy.ts:259` (full row) and `public-content.ts:216-221` (4 fields); (g) promote `sleep(ms)` from `server/local-seo.ts:156` into `server/helpers.ts`. [PARTIAL 2026-05-27 \u2014 Plan C: (a) parseJsonColumn retired in favor of parseJsonFallback DONE; (b) capitalize consolidated into shared utility DONE; (d) useDebouncedValue hook added and inline debounces migrated DONE; (e) daysSince added to lib/timeAgo.ts and sites migrated DONE. Still pending: (c) compact() collapse, (f) quickWins parity fix, (g) sleep() promotion to server/helpers.ts.]"
         }
       ]
     },
