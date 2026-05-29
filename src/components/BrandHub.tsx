@@ -1,15 +1,19 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from './Toast';
 import {
   Save, Sparkles, BookOpen, Users, MessageSquare,
-  Plus, Pencil, Trash2, Check, Upload, Mic, Award, Map,
+  Plus, Pencil, Trash2, Check, Upload, Mic, Award, Map, MapPin, BrainCircuit, Building2,
 } from 'lucide-react';
 import { PageHeader, SectionCard, TabBar, ErrorState, NextStepsCard, ProgressIndicator, Icon, Button, IconButton, ConfirmDialog, FormInput, FormSelect, FormTextarea } from './ui';
 import { ErrorBoundary } from './ErrorBoundary';
 import { workspaces } from '../api';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
+import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { queryKeys } from '../lib/queryKeys';
+import { inlineMarkdownToHtml } from '../lib/inline-markdown';
+import { resolveTabSearchParam } from '../lib/tab-search-param';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
 import type { AudiencePersona } from '../../shared/types/workspace';
 import { BrandscriptTab } from './brand/BrandscriptTab';
@@ -19,13 +23,39 @@ import { IdentityTab } from './brand/IdentityTab';
 import { PageStrategyTab } from './brand/PageStrategyTab';
 import { BlueprintDetail } from './brand/BlueprintDetail';
 import { BlueprintVersionHistory } from './brand/BlueprintVersionHistory';
+import { RichTextEditor } from './post-editor/RichTextEditor';
+import { EeatAssetsTab } from './settings/EeatAssetsTab';
+import { IntelligenceProfileTab } from './settings/IntelligenceProfileTab';
+import { LocationsTab } from './settings/LocationsTab';
+import { BusinessProfileTab } from './settings/BusinessProfileTab';
 
 interface WorkspaceData {
   id: string;
+  name: string;
   webflowSiteId?: string;
+  liveDomain?: string;
+  brandLogoUrl?: string;
+  siteHasSearch?: boolean;
   knowledgeBase?: string;
   brandVoice?: string;
   personas?: AudiencePersona[];
+  businessProfile?: {
+    email?: string;
+    phone?: string;
+    address?: { street?: string; city?: string; state?: string; zip?: string; country?: string };
+    socialProfiles?: string[];
+    openingHours?: string;
+    foundedDate?: string;
+    numberOfEmployees?: string;
+  } | null;
+  keywordStrategy?: {
+    businessContext?: string;
+  } | null;
+  intelligenceProfile?: {
+    industry?: string;
+    goals?: string[];
+    targetAudience?: string;
+  } | null;
 }
 
 interface Props {
@@ -33,7 +63,9 @@ interface Props {
   webflowSiteId?: string;
 }
 
-type BrandHubTab = 'overview' | 'brandscript' | 'discovery' | 'voice' | 'identity';
+type BrandHubTab = 'overview' | 'brandscript' | 'discovery' | 'voice' | 'identity' | 'business-profile' | 'eeat-assets' | 'intelligence-profile' | 'locations';
+const BASE_BRAND_TABS: readonly BrandHubTab[] = ['overview', 'brandscript', 'discovery', 'voice', 'identity', 'business-profile', 'eeat-assets', 'intelligence-profile'];
+const BRAND_TABS_WITH_LOCATIONS: readonly BrandHubTab[] = [...BASE_BRAND_TABS, 'locations'];
 
 function contextJobStorageKey(workspaceId: string, type: string): string {
   return `brand-hub:${workspaceId}:${type}:jobId`;
@@ -51,13 +83,162 @@ function storeContextJobId(workspaceId: string, type: string, jobId: string | nu
   else window.sessionStorage.removeItem(key);
 }
 
+const LEGACY_PREVIEW_SPLIT_RE = /(?:^|\n)\s*Preview\s*\n/i;
+const HTML_TAG_RE = /<\/?[a-z][^>]*>/i;
+
+function stripLegacyPreviewBlock(value: string): string {
+  const raw = value || '';
+  const match = LEGACY_PREVIEW_SPLIT_RE.exec(raw);
+  if (!match || match.index <= 0) return raw.trim();
+  return raw.slice(0, match.index).trim();
+}
+
+function textToEditorHtml(value: string): string {
+  const normalized = (value || '').trim();
+  if (!normalized) return '<p></p>';
+  if (HTML_TAG_RE.test(normalized)) return normalized;
+
+  const lines = normalized.split('\n');
+  const blocks: string[] = [];
+  let listItems: string[] = [];
+
+  const flushList = () => {
+    if (listItems.length === 0) return;
+    blocks.push(`<ul>${listItems.map(item => `<li>${item}</li>`).join('')}</ul>`);
+    listItems = [];
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) {
+      flushList();
+      continue;
+    }
+    const h3 = line.match(/^###\s+(.+)$/);
+    if (h3) {
+      flushList();
+      blocks.push(`<h3>${inlineMarkdownToHtml(h3[1])}</h3>`);
+      continue;
+    }
+    const h2 = line.match(/^##\s+(.+)$/);
+    if (h2) {
+      flushList();
+      blocks.push(`<h2>${inlineMarkdownToHtml(h2[1])}</h2>`);
+      continue;
+    }
+    const h1 = line.match(/^#\s+(.+)$/);
+    if (h1) {
+      flushList();
+      blocks.push(`<h2>${inlineMarkdownToHtml(h1[1])}</h2>`);
+      continue;
+    }
+    const bullet = line.match(/^[-*•]\s+(.+)$/);
+    if (bullet) {
+      listItems.push(inlineMarkdownToHtml(bullet[1]));
+      continue;
+    }
+    flushList();
+    blocks.push(`<p>${inlineMarkdownToHtml(line)}</p>`);
+  }
+  flushList();
+
+  return blocks.length ? blocks.join('') : '<p></p>';
+}
+
+function editorHtmlToText(value: string): string {
+  if (typeof document === 'undefined') return (value || '').trim();
+  const container = document.createElement('div');
+  container.innerHTML = value || '';
+
+  const renderInline = (node: Node): string => {
+    if (node.nodeType === Node.TEXT_NODE) return node.textContent || '';
+    if (node.nodeType !== Node.ELEMENT_NODE) return '';
+    const el = node as HTMLElement;
+    const tag = el.tagName.toLowerCase();
+    const inner = Array.from(el.childNodes).map(renderInline).join('');
+    if (tag === 'strong' || tag === 'b') return `**${inner}**`;
+    if (tag === 'em' || tag === 'i') return `*${inner}*`;
+    if (tag === 'a') {
+      const href = el.getAttribute('href') || '';
+      const label = inner.trim() || href;
+      return href ? `[${label}](${href})` : label;
+    }
+    if (tag === 'br') return '\n';
+    return inner;
+  };
+
+  const blocks: string[] = [];
+  const pushBlock = (line: string) => {
+    const normalized = line.replace(/\u00a0/g, ' ').replace(/[ \t]+\n/g, '\n').trim();
+    if (normalized) blocks.push(normalized);
+  };
+
+  const renderBlock = (node: Node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = (node.textContent || '').trim();
+      if (text) pushBlock(text);
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    const el = node as HTMLElement;
+    const tag = el.tagName.toLowerCase();
+
+    if (tag === 'h2') {
+      pushBlock(`## ${renderInline(el).trim()}`);
+      return;
+    }
+    if (tag === 'h3') {
+      pushBlock(`### ${renderInline(el).trim()}`);
+      return;
+    }
+    if (tag === 'ul') {
+      const items = Array.from(el.querySelectorAll(':scope > li'));
+      for (const item of items) pushBlock(`- ${renderInline(item).trim()}`);
+      return;
+    }
+    if (tag === 'ol') {
+      const items = Array.from(el.querySelectorAll(':scope > li'));
+      items.forEach((item, index) => pushBlock(`${index + 1}. ${renderInline(item).trim()}`));
+      return;
+    }
+    if (tag === 'p') {
+      pushBlock(renderInline(el));
+      return;
+    }
+
+    const directChildren = Array.from(el.childNodes);
+    if (directChildren.length === 0) {
+      pushBlock(renderInline(el));
+      return;
+    }
+    directChildren.forEach(renderBlock);
+  };
+
+  Array.from(container.childNodes).forEach(renderBlock);
+  return blocks.join('\n\n').trim();
+}
+
+function brandVoiceToEditorHtml(value: string): string {
+  return textToEditorHtml(stripLegacyPreviewBlock(value));
+}
+
+function editorHtmlToBrandVoice(value: string): string {
+  return stripLegacyPreviewBlock(editorHtmlToText(value));
+}
+
 export function BrandHub({ workspaceId, webflowSiteId }: Props) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { jobs, startJob, findActiveJob } = useBackgroundTasks();
+  const [searchParams] = useSearchParams();
+  const localSeoVisibilityEnabled = useFeatureFlag('local-seo-visibility');
+  const validBrandTabs = localSeoVisibilityEnabled ? BRAND_TABS_WITH_LOCATIONS : BASE_BRAND_TABS;
 
   // Active tab
-  const [activeTab, setActiveTab] = useState<BrandHubTab>('overview');
+  const [activeTab, setActiveTab] = useState<BrandHubTab>(() => resolveTabSearchParam<BrandHubTab>(searchParams.get('tab'), {
+    validValues: validBrandTabs,
+    fallback: 'overview',
+  }));
 
   // Workspace data (React Query)
   const { data: ws } = useQuery({
@@ -76,6 +257,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
 
   // Brand Voice state
   const [brandVoice, setBrandVoice] = useState('');
+  const [brandVoiceEditorHtml, setBrandVoiceEditorHtml] = useState('<p></p>');
   const [savingBrandVoice, setSavingBrandVoice] = useState(false);
   const [startingBrandVoiceJob, setStartingBrandVoiceJob] = useState(false);
   const [lastBrandVoiceJobId, setLastBrandVoiceJobId] = useState<string | null>(() =>
@@ -84,18 +266,27 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
 
   // Sync brand voice textarea from loaded workspace once
   useEffect(() => {
-    if (ws?.brandVoice !== undefined) setBrandVoice(ws.brandVoice || '');
+    if (ws?.brandVoice !== undefined) {
+      const normalizedVoice = stripLegacyPreviewBlock(ws.brandVoice || '');
+      setBrandVoice(normalizedVoice);
+      setBrandVoiceEditorHtml(brandVoiceToEditorHtml(normalizedVoice));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ws?.id]);
 
   // Sync knowledge base textarea from loaded workspace once
   useEffect(() => {
-    if (ws?.knowledgeBase !== undefined) setKbDraft(ws.knowledgeBase || '');
+    if (ws?.knowledgeBase !== undefined) {
+      const normalizedKb = (ws.knowledgeBase || '').trim();
+      setKbDraft(normalizedKb);
+      setKbEditorHtml(textToEditorHtml(normalizedKb));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ws?.id]);
 
   // Knowledge Base state
   const [kbDraft, setKbDraft] = useState('');
+  const [kbEditorHtml, setKbEditorHtml] = useState('<p></p>');
   const [savingKnowledgeBase, setSavingKnowledgeBase] = useState(false);
   const [startingKbJob, setStartingKbJob] = useState(false);
   const [lastKbJobId, setLastKbJobId] = useState<string | null>(() =>
@@ -130,6 +321,15 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
   const generatingBrandVoice = startingBrandVoiceJob || Boolean(activeBrandVoiceJob);
   const generatingKB = startingKbJob || Boolean(activeKbJob);
   const generatingPersonas = startingPersonasJob || Boolean(activePersonasJob);
+
+  // Keep BrandHub in sync with ?tab= deep links.
+  useEffect(() => {
+    setActiveTab(resolveTabSearchParam<BrandHubTab>(searchParams.get('tab'), {
+      validValues: validBrandTabs,
+      fallback: 'overview',
+    }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, localSeoVisibilityEnabled]);
 
   // effect-layout-ok: route changes swap the workspace whose draft job IDs we should recover.
   useEffect(() => {
@@ -168,7 +368,9 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
     if (completedBrandVoiceJob.status === 'done') {
       const result = completedBrandVoiceJob.result as { kind?: string; brandVoice?: string; pagesScraped?: number } | undefined;
       if (result?.kind === 'brandVoice' && typeof result.brandVoice === 'string') {
-        setBrandVoice(result.brandVoice);
+        const normalizedVoice = stripLegacyPreviewBlock(result.brandVoice);
+        setBrandVoice(normalizedVoice);
+        setBrandVoiceEditorHtml(brandVoiceToEditorHtml(normalizedVoice));
         toast(`Brand voice generated from ${result.pagesScraped ?? 0} pages — review and save`);
         setShowNextSteps(true);
       }
@@ -193,7 +395,9 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
     if (completedKbJob.status === 'done') {
       const result = completedKbJob.result as { kind?: string; knowledgeBase?: string; pagesScraped?: number } | undefined;
       if (result?.kind === 'knowledgeBase' && typeof result.knowledgeBase === 'string') {
-        setKbDraft(result.knowledgeBase);
+        const normalizedKb = result.knowledgeBase.trim();
+        setKbDraft(normalizedKb);
+        setKbEditorHtml(textToEditorHtml(normalizedKb));
         toast(`Knowledge base generated from ${result.pagesScraped ?? 0} pages — review and save`);
       }
       setLastKbJobId(null);
@@ -288,7 +492,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
         icon={<Icon as={Sparkles} size="lg" className="text-accent-brand" />}
       />
 
-      {/* tab-deeplink-ok — nothing navigates to BrandHub with ?tab= */}
+      {/* Supports ?tab= deep links (e.g., Brand & AI sub-panels like business-profile/locations). */}
       <TabBar
         active={activeTab}
         onChange={(id) => setActiveTab(id as BrandHubTab)}
@@ -298,6 +502,10 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
           { id: 'discovery', label: 'Discovery', icon: Upload },
           { id: 'voice', label: 'Voice', icon: Mic },
           { id: 'identity', label: 'Identity', icon: Award },
+          { id: 'business-profile', label: 'Business Profile', icon: Building2 },
+          { id: 'eeat-assets', label: 'E-E-A-T Assets', icon: Map },
+          { id: 'intelligence-profile', label: 'Intelligence Profile', icon: BrainCircuit },
+          ...(localSeoVisibilityEnabled ? [{ id: 'locations', label: 'Locations', icon: MapPin }] : []),
         ]}
       />
 
@@ -305,6 +513,39 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
       {activeTab === 'discovery' && <DiscoveryTab workspaceId={workspaceId} />}
       {activeTab === 'voice' && <VoiceTab workspaceId={workspaceId} />}
       {activeTab === 'identity' && <IdentityTab workspaceId={workspaceId} />}
+      {activeTab === 'business-profile' && (
+        <BusinessProfileTab
+          workspaceId={workspaceId}
+          businessProfile={ws?.businessProfile}
+          businessContext={ws?.keywordStrategy?.businessContext}
+          brandLogoUrl={ws?.brandLogoUrl}
+          siteHasSearch={ws?.siteHasSearch}
+          toast={toast}
+          onSave={() => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.admin.workspaceDetail(workspaceId) });
+          }}
+        />
+      )}
+      {activeTab === 'eeat-assets' && <EeatAssetsTab workspaceId={workspaceId} toast={toast} />}
+      {activeTab === 'intelligence-profile' && (
+        <IntelligenceProfileTab
+          workspaceId={workspaceId}
+          intelligenceProfile={ws?.intelligenceProfile}
+          toast={toast}
+          onSave={() => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.admin.workspaceDetail(workspaceId) });
+          }}
+        />
+      )}
+      {activeTab === 'locations' && localSeoVisibilityEnabled && (
+        <LocationsTab
+          workspaceId={workspaceId}
+          workspaceName={ws?.name || 'Workspace'}
+          liveDomain={ws?.liveDomain}
+          businessProfile={ws?.businessProfile}
+          toast={toast}
+        />
+      )}
 
       {activeTab === 'overview' && <>
       {/* ═══ BRAND VOICE ═══ */}
@@ -317,14 +558,18 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
           <p className="t-caption text-[var(--brand-text-muted)]">
             Tone, personality, and writing guidelines — used in ALL AI-generated copy (SEO rewrites, content briefs, blog posts)
           </p>
-          <FormTextarea
-            id="brand-voice-textarea"
-            value={brandVoice}
-            onChange={setBrandVoice}
-            placeholder="e.g., Professional but approachable. Use active voice. Avoid jargon. Speak directly to the reader. Our tone is confident and helpful, never salesy..."
-            className="w-full t-caption min-h-[80px]"
-            rows={5}
-          />
+          <div id="brand-voice-textarea">
+            <RichTextEditor
+              initialValue={brandVoiceEditorHtml}
+              onChange={(html) => {
+                setBrandVoiceEditorHtml(html);
+                setBrandVoice(editorHtmlToBrandVoice(html));
+              }}
+              variant="admin"
+              minHeight="300px"
+              className="w-full"
+            />
+          </div>
           <div className="flex items-center gap-2">
             <Button
               variant="primary"
@@ -389,14 +634,18 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
       >
         <div className="space-y-3">
           <p className="t-caption text-[var(--brand-text-muted)]">Business context for AI — services, capabilities, FAQs, industry info</p>
-          <FormTextarea
-            id="knowledge-base-textarea"
-            value={kbDraft}
-            onChange={setKbDraft}
-            rows={8}
-            placeholder={"Example:\n- Industry: Home services (plumbing, HVAC)\n- Location: Denver metro area\n- Key services: Emergency repair, new installations, maintenance plans\n- Differentiators: 24/7 availability, licensed & insured, 15+ years\n- Target audience: Homeowners, property managers\n- Common client questions: pricing, response time, service areas"}
-            className="font-mono leading-relaxed"
-          />
+          <div id="knowledge-base-textarea">
+            <RichTextEditor
+              initialValue={kbEditorHtml}
+              onChange={(html) => {
+                setKbEditorHtml(html);
+                setKbDraft(editorHtmlToText(html));
+              }}
+              variant="admin"
+              minHeight="300px"
+              className="w-full"
+            />
+          </div>
           <div className="flex items-center gap-2">
             <Button
               variant="primary"

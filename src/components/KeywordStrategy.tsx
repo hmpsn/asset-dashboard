@@ -335,7 +335,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
               onClick={() => generateStrategy('full')}
               disabled={generating}
               size="sm"
-              className="rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 text-white t-caption font-medium"
+              className="rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 text-slate-900 t-caption font-medium"
             >
               {generating ? (
                 <><Icon as={Loader2} size="sm" className="animate-spin" /> Generating...</>

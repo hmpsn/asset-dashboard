@@ -389,13 +389,11 @@ describe('Route registration smoke test', () => {
     expect(versionsRes.status, 'GET versions should not be 404').not.toBe(404);
   });
 
-  it('POST /api/page-strategy/:wsId/generate — route is registered (returns non-404 even without API key)', async () => {
-    // The generate endpoint requires ANTHROPIC_API_KEY, which is not set in CI.
-    // We only assert the route exists (not 404); the actual AI output is tested
-    // in the unit-style blueprint-generator tests.
-    const res = await postJson(`/api/page-strategy/${wsId}/generate`, {
-      industryType: 'healthcare',
-    });
+  it('POST /api/page-strategy/:wsId/generate — route is registered (returns non-404 for invalid payload)', async () => {
+    // Use an intentionally invalid payload so request validation fails fast.
+    // This keeps the route-registration smoke test deterministic and avoids
+    // invoking long-running AI generation paths in CI/local hooks.
+    const res = await postJson(`/api/page-strategy/${wsId}/generate`, {});
     // Any response except 404 confirms the route is registered
     expect(res.status, 'generate route must be registered — not 404').not.toBe(404);
   });

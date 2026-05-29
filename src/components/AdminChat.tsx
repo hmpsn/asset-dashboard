@@ -145,8 +145,8 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
     <>
       {/* ── Floating trigger button ── */}
       {!open && (
-        <Button onClick={() => setOpen(true)} variant="ghost" icon={Bot}
-          className="fixed bottom-6 right-6 px-4 py-3 rounded-[var(--radius-pill)] bg-gradient-to-r from-[var(--teal)] to-[var(--emerald)] hover:brightness-105 text-white t-body font-medium shadow-lg shadow-black/30 transition-all z-[var(--z-modal)]">
+        <Button onClick={() => setOpen(true)} variant="primary" size="lg" icon={Bot}
+          className="fixed bottom-6 right-6 rounded-[var(--radius-pill)] shadow-lg shadow-black/30 z-[var(--z-modal)]">
           Admin Insights
         </Button>
       )}

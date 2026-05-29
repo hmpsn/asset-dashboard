@@ -146,7 +146,7 @@ function ServiceGapNudge({ gap }: { gap: LocalSeoServiceGap }) {
 
 function BusinessLocationsShortcut({ workspaceId }: { workspaceId: string }) {
   const { data: locations, isLoading } = useLocalSeoLocations(workspaceId);
-  const settingsLocationsUrl = `${adminPath(workspaceId, 'workspace-settings')}?tab=locations`;
+  const brandLocationsUrl = `${adminPath(workspaceId, 'brand')}?tab=locations`;
 
   if (isLoading) {
     return (
@@ -196,9 +196,9 @@ function BusinessLocationsShortcut({ workspaceId }: { workspaceId: string }) {
           </p>
         </div>
         <Link
-          to={settingsLocationsUrl}
+          to={brandLocationsUrl}
           className="t-caption-sm font-medium text-teal-400 hover:text-teal-300 transition-colors shrink-0 whitespace-nowrap"
-          aria-label={`${cta} in Workspace Settings`}
+          aria-label={`${cta} in Brand & AI`}
         >
           {cta}
         </Link>

@@ -16,6 +16,8 @@ import {
   listEeatAssets,
   updateEeatAsset,
 } from '../eeat-assets.js';
+import { listPageKeywords } from '../page-keywords.js';
+import { getWorkspace } from '../workspaces.js';
 import { validate } from '../middleware/validate.js';
 import {
   createEeatAssetSchema,
@@ -28,6 +30,7 @@ import {
   runWorkspaceMutation,
   WorkspaceMutationError,
 } from '../workspace-mutation-helper.js';
+import { buildEeatAutofillCandidates } from '../eeat-assets-autofill.js';
 
 const router = Router();
 
@@ -161,6 +164,50 @@ router.delete('/api/workspaces/:workspaceId/eeat-assets/:assetId', requireWorksp
     }
     return res.status(500).json({ error: 'Failed to delete E-E-A-T asset' });
   }
+});
+
+router.post('/api/workspaces/:workspaceId/eeat-assets/autofill', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const workspaceId = req.params.workspaceId;
+  const workspace = getWorkspace(workspaceId);
+  if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+
+  const existing = listEeatAssets(workspaceId);
+  const pageKeywords = listPageKeywords(workspaceId);
+  const candidates = buildEeatAutofillCandidates({
+    workspace,
+    pageKeywords,
+    existingAssets: existing,
+    limit: 8,
+  });
+
+  if (candidates.length === 0) {
+    return res.json({ created: [], count: 0, message: 'No autofill candidates found yet.' });
+  }
+
+  const created = candidates.map(candidate => createEeatAsset(workspaceId, candidate));
+  for (const asset of created) {
+    addActivity(
+      workspaceId,
+      'eeat_asset_created',
+      `E-E-A-T asset auto-filled: ${asset.title}`,
+      `${asset.type}`,
+      { assetId: asset.id, type: asset.type, source: 'autofill' },
+    );
+  }
+
+  invalidateIntelligenceCache(workspaceId);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.EEAT_ASSETS_UPDATED, {
+    workspaceId,
+    action: 'autofilled',
+    count: created.length,
+    assetIds: created.map(asset => asset.id),
+  });
+
+  return res.json({
+    created,
+    count: created.length,
+    message: `Auto-filled ${created.length} E-E-A-T asset${created.length === 1 ? '' : 's'}.`,
+  });
 });
 
 export default router;

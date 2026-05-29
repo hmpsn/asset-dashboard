@@ -26,6 +26,7 @@ interface FieldGroup {
 
 export function SchemaCompletenessWidget({ pages, workspaceId }: SchemaCompletenessWidgetProps) {
   const navigate = useNavigate();
+  const brandScopedTabs = new Set(['business-profile', 'intelligence-profile', 'eeat-assets', 'locations']);
 
   const { groups, completenessPct, totalPages, fullyClean, pagesWithFindings } = useMemo(() => {
     const findingsByField = new Map<string, { severity: 'error' | 'warning'; pages: Set<string> }>();
@@ -114,7 +115,8 @@ export function SchemaCompletenessWidget({ pages, workspaceId }: SchemaCompleten
             size="sm"
             onClick={() => {
               if (!workspaceId) return;
-              navigate(`${adminPath(workspaceId, 'workspace-settings')}?tab=${g.target.tab}&focus=${g.target.focus}`);
+              const routeTab = brandScopedTabs.has(g.target.tab) ? 'brand' : 'workspace-settings';
+              navigate(`${adminPath(workspaceId, routeTab)}?tab=${g.target.tab}&focus=${g.target.focus}`);
             }}
             className="items-center justify-between gap-3 w-full px-3 py-2 rounded-[var(--radius-sm)] text-left hover:bg-[var(--surface-3)] group"
           >

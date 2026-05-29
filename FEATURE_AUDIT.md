@@ -1,8 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **464 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **465 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 465. E-E-A-T Asset Autofill from Page Intelligence + Schema Context
+
+**What it does:** Adds an auto-fill workflow to the E-E-A-T Asset Library that generates concrete starter assets from data the platform already stores. The new route (`POST /api/workspaces/:workspaceId/eeat-assets/autofill`) composes candidates from persisted Page Intelligence trust-gap signals (`missingTrustSignals` on `page_keywords`) plus fallback business-profile schema context when trust-gap data is sparse. The Brand & AI E-E-A-T tab now includes an **Auto-fill from existing data** action to create these assets in one click.
+
+**Agency value:** Reduces setup friction for trust-signal inventory and makes E-E-A-T personalization easier to operationalize across many client workspaces.
+
+**Client value:** Faster time-to-value on trust-proof recommendations because briefs, schema, and page intelligence can reference real asset inventory sooner.
+
+**Mutual:** Converts existing intelligence telemetry into actionable, reusable trust artifacts without introducing another manual data-entry workflow.
 
 ---
 

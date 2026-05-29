@@ -6,6 +6,7 @@ import type { BrandDeliverable, DeliverableType, DeliverableTier } from '../../.
 import { SectionCard, EmptyState, Skeleton, Button, cn, FormInput, FormTextarea } from '../ui';
 import { useToast } from '../Toast';
 import { queryKeys } from '../../lib/queryKeys';
+import { RenderMarkdown } from '../client/helpers';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -178,7 +179,9 @@ function DeliverableCard({ workspaceId, deliverableType, deliverable, onChanged 
                 />
               </>
             ) : (
-              <p className="text-sm text-[var(--brand-text)] whitespace-pre-wrap leading-relaxed">{deliverable.content}</p>
+              <div className="text-sm text-[var(--brand-text)] leading-relaxed">
+                <RenderMarkdown text={deliverable.content} />
+              </div>
             )}
           </div>
         )}

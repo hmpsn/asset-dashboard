@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Plus, Save, Trash2, ShieldCheck } from 'lucide-react';
+import { Plus, Save, Sparkles, Trash2, ShieldCheck } from 'lucide-react';
 
 import {
   EEAT_ASSET_TYPE,
@@ -12,6 +12,7 @@ import {
   useDeleteEeatAsset,
   useEeatAssets,
   useUpdateEeatAsset,
+  useAutofillEeatAssets,
 } from '../../hooks/admin/useEeatAssets';
 import {
   SectionCard,
@@ -118,6 +119,7 @@ export function EeatAssetsTab({ workspaceId, toast }: EeatAssetsTabProps) {
   const createAsset = useCreateEeatAsset(workspaceId);
   const updateAsset = useUpdateEeatAsset(workspaceId);
   const deleteAsset = useDeleteEeatAsset(workspaceId);
+  const autofillAssets = useAutofillEeatAssets(workspaceId);
 
   const [newDraft, setNewDraft] = useState<AssetDraft>(defaultDraft());
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -197,6 +199,16 @@ export function EeatAssetsTab({ workspaceId, toast }: EeatAssetsTabProps) {
     }
   };
 
+  const runAutofill = async () => {
+    try {
+      const result = await autofillAssets.mutateAsync();
+      if (result.count > 0) toast(result.message);
+      else toast(result.message, 'info');
+    } catch {
+      toast('Failed to auto-fill E-E-A-T assets', 'error');
+    }
+  };
+
   if (isLoading) {
     return <LoadingState message="Loading E-E-A-T asset inventory..." />;
   }
@@ -212,7 +224,7 @@ export function EeatAssetsTab({ workspaceId, toast }: EeatAssetsTabProps) {
   }
 
   const fieldClass = 'w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500 transition-colors';
-  const isSaving = createAsset.isPending || updateAsset.isPending || deleteAsset.isPending;
+  const isSaving = createAsset.isPending || updateAsset.isPending || deleteAsset.isPending || autofillAssets.isPending;
 
   return (
     <div className="space-y-6">
@@ -266,8 +278,17 @@ export function EeatAssetsTab({ workspaceId, toast }: EeatAssetsTabProps) {
             <FormInput className={fieldClass} value={newDraft.metricValue} onChange={value => setNewDraft(prev => ({ ...prev, metricValue: value }))} placeholder="Metric value" />
           </div>
 
-          <div className="flex justify-end">
-            <Button icon={Plus} variant="primary" onClick={onCreate} disabled={createAsset.isPending} loading={createAsset.isPending}>
+          <div className="flex items-center justify-between gap-2">
+            <Button
+              icon={autofillAssets.isPending ? undefined : Sparkles}
+              variant="secondary"
+              onClick={() => { void runAutofill(); }}
+              disabled={isSaving}
+              loading={autofillAssets.isPending}
+            >
+              {autofillAssets.isPending ? 'Auto-filling…' : 'Auto-fill from existing data'}
+            </Button>
+            <Button icon={Plus} variant="primary" onClick={onCreate} disabled={isSaving} loading={createAsset.isPending}>
               Add asset
             </Button>
           </div>

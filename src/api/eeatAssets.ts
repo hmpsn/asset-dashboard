@@ -17,6 +17,12 @@ export interface UpdateEeatAssetBody {
   metadata?: EeatAssetMetadata;
 }
 
+export interface EeatAssetAutofillResponse {
+  created: EeatAsset[];
+  count: number;
+  message: string;
+}
+
 export const eeatAssetsApi = {
   list: (workspaceId: string) =>
     get<EeatAsset[]>(`/api/workspaces/${workspaceId}/eeat-assets`),
@@ -32,4 +38,7 @@ export const eeatAssetsApi = {
 
   remove: (workspaceId: string, assetId: string) =>
     del<{ ok: true }>(`/api/workspaces/${workspaceId}/eeat-assets/${assetId}`),
+
+  autofill: (workspaceId: string) =>
+    post<EeatAssetAutofillResponse>(`/api/workspaces/${workspaceId}/eeat-assets/autofill`, {}),
 };

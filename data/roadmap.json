@@ -144,6 +144,15 @@
           "status": "done",
           "notes": "File clusters: keyword/table modules using rowToModel/modelToParams/migrateFromJsonBlob patterns. Risk: over-abstraction could reduce readability without real bug reduction. Done when: keep-as-is vs extract decision is documented with targeted adoption only where complexity decreases.\n\nCompleted 2026-05-28 via decision record `docs/rules/table-mapper-pattern-review.md`: keep explicit row/model mappers local to domain modules for readability and schema clarity; no generic extraction introduced because current duplication is intentional pattern consistency with low bug risk.",
           "shippedAt": "2026-05-28"
+        },
+        {
+          "id": "dup-brand-ai-overview-business-footprint-ia-consolidation",
+          "title": "Consolidate Brand & AI overview IA and business footprint surfaces",
+          "source": "Browser annotation review 2026-05-28",
+          "est": "3-5h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Brand & AI has become bulky and overlaps adjacent tabs. Consolidate IA without collapsing distinct data authorities. Keep separate models: `workspace.businessProfile` (schema/contact authority), `client_locations` (local-SEO operational authority), and `workspace.intelligenceProfile` (strategic AI context). UX target: Overview shows compact current snapshots + deep links (Current Context, Intelligence Profile, Business Profile, Locations), and the editing flow groups Business Profile + Locations into one business-footprint editing surface to reduce navigation churn. Done when: no duplicate long-form editors remain in Overview, legacy deep links continue to resolve, and Locations + Business Profile remain separately persisted but co-located in admin UX."
         }
       ]
     },
@@ -849,7 +858,7 @@
           "source": "USER REQUEST",
           "est": "4-6h",
           "priority": "P2",
-          "notes": "Completed 2026-05-27 on `codex/schema-intel-final-review`. Added `eeat_assets` workspace storage (migration 105 + CRUD routes/store + admin settings tab), intelligence slice registration (`eeatAssets`) with prompt formatter support, and workspace/event/query-key wiring (`eeat-assets:updated`). Added deterministic trust-signal evaluation (`server/eeat-trust-signals.ts`) and threaded it into both single-page and bulk page analysis persistence so `page_keywords` now stores `missingTrustSignals` + `eeatAssetRecommendations` and clears them on re-analysis resets. Content brief generation now injects specific E-E-A-T asset recommendations (page-level first, workspace fallback) instead of generic trust guidance. Schema generation now receives workspace E-E-A-T inventory through schema context and enriches Article author structured data with job title, identity links, and credential nodes when available. Added guardrail documentation at `docs/rules/eeat-asset-library.md`.",
+          "notes": "Completed 2026-05-27 on `codex/schema-intel-final-review`. Added `eeat_assets` workspace storage (migration 105 + CRUD routes/store + admin settings tab), intelligence slice registration (`eeatAssets`) with prompt formatter support, and workspace/event/query-key wiring (`eeat-assets:updated`). Added deterministic trust-signal evaluation (`server/eeat-trust-signals.ts`) and threaded it into both single-page and bulk page analysis persistence so `page_keywords` now stores `missingTrustSignals` + `eeatAssetRecommendations` and clears them on re-analysis resets. Content brief generation now injects specific E-E-A-T asset recommendations (page-level first, workspace fallback) instead of generic trust guidance. Schema generation now receives workspace E-E-A-T inventory through schema context and enriches Article author structured data with job title, identity links, and credential nodes when available. Added guardrail documentation at `docs/rules/eeat-asset-library.md`. Follow-up shipped 2026-05-28: Brand & AI E-E-A-T tab now supports one-click auto-fill from existing Page Intelligence trust gaps and business-profile/schema context (`POST /api/workspaces/:workspaceId/eeat-assets/autofill`) to seed inventory with deterministic starter assets.",
           "status": "done",
           "shippedAt": "2026-05-27"
         },
