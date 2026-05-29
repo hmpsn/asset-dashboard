@@ -238,15 +238,15 @@ export function RenderMarkdown({ text }: { text: string }) {
 
     // Headings — strip bold markers inside (GPT sends ## **Overview**)
     if (trimmed.startsWith('### ')) {
-      elements.push(<h4 key={elements.length} className="t-page font-semibold text-[var(--brand-text-bright)] mt-3 mb-0.5">{stripBold(trimmed.slice(4))}</h4>);
+      elements.push(<h4 key={elements.length} className="t-body text-base font-semibold leading-snug text-[var(--brand-text-bright)] mt-3 mb-0.5">{stripBold(trimmed.slice(4))}</h4>);
       idx++; continue;
     }
     if (trimmed.startsWith('## ')) {
-      elements.push(<h3 key={elements.length} className="t-page font-semibold text-[var(--brand-text-bright)] mt-3 mb-0.5">{stripBold(trimmed.slice(3))}</h3>);
+      elements.push(<h3 key={elements.length} className="t-body text-lg font-semibold leading-snug text-[var(--brand-text-bright)] mt-3 mb-0.5">{stripBold(trimmed.slice(3))}</h3>);
       idx++; continue;
     }
     if (trimmed.startsWith('# ')) {
-      elements.push(<h3 key={elements.length} className="t-page font-bold text-[var(--brand-text-bright)] mt-3 mb-0.5">{stripBold(trimmed.slice(2))}</h3>);
+      elements.push(<h2 key={elements.length} className="t-h2 text-[var(--brand-text-bright)] mt-3 mb-0.5">{stripBold(trimmed.slice(2))}</h2>);
       idx++; continue;
     }
 

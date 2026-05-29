@@ -7,8 +7,8 @@ const sharedListAndInlineClass = [
 
 export const adminRichTextClass = [
   'text-sm text-[var(--brand-text)] leading-relaxed',
-  '[&_h2]:text-base [&_h2]:font-semibold [&_h2]:text-[var(--brand-text-bright)] [&_h2]:mb-2',
-  '[&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-[var(--brand-text-bright)] [&_h3]:mt-3 [&_h3]:mb-1',
+  '[&_h2]:text-xl [&_h2]:font-semibold [&_h2]:text-[var(--brand-text-bright)] [&_h2]:mb-2',
+  '[&_h3]:text-lg [&_h3]:font-semibold [&_h3]:text-[var(--brand-text-bright)] [&_h3]:mt-3 [&_h3]:mb-1',
   '[&_p]:mb-2',
   '[&_ul]:mb-2 [&_ol]:mb-2 [&_li]:mb-1',
   '[&_a]:text-teal-400 [&_a]:underline',
@@ -39,8 +39,8 @@ export const previewRichTextClass = [
 
 export const diffRichTextClass = [
   'text-sm text-[var(--brand-text)] leading-relaxed',
-  '[&_h2]:text-base [&_h2]:font-semibold [&_h2]:text-[var(--brand-text-bright)] [&_h2]:mb-2',
-  '[&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-[var(--brand-text-bright)] [&_h3]:mt-3 [&_h3]:mb-1',
+  '[&_h2]:text-xl [&_h2]:font-semibold [&_h2]:text-[var(--brand-text-bright)] [&_h2]:mb-2',
+  '[&_h3]:text-lg [&_h3]:font-semibold [&_h3]:text-[var(--brand-text-bright)] [&_h3]:mt-3 [&_h3]:mb-1',
   '[&_p]:mb-2',
   '[&_ul]:mb-2 [&_ol]:mb-2 [&_li]:mb-1',
   '[&_a]:text-teal-400 [&_a]:underline',
@@ -64,6 +64,6 @@ export const prosemirrorClientClass = [
 
 export const prosemirrorAdminClass = [
   '[&_.ProseMirror]:text-sm [&_.ProseMirror]:leading-6',
-  '[&_.ProseMirror_h2]:text-base [&_.ProseMirror_h2]:font-semibold [&_.ProseMirror_h2]:text-[var(--brand-text-bright)] [&_.ProseMirror_h2]:mt-4 [&_.ProseMirror_h2]:mb-2',
-  '[&_.ProseMirror_h3]:text-sm [&_.ProseMirror_h3]:font-semibold [&_.ProseMirror_h3]:text-[var(--brand-text-bright)] [&_.ProseMirror_h3]:mt-3 [&_.ProseMirror_h3]:mb-1',
+  '[&_.ProseMirror_h2]:text-xl [&_.ProseMirror_h2]:font-semibold [&_.ProseMirror_h2]:text-[var(--brand-text-bright)] [&_.ProseMirror_h2]:mt-4 [&_.ProseMirror_h2]:mb-2',
+  '[&_.ProseMirror_h3]:text-lg [&_.ProseMirror_h3]:font-semibold [&_.ProseMirror_h3]:text-[var(--brand-text-bright)] [&_.ProseMirror_h3]:mt-3 [&_.ProseMirror_h3]:mb-1',
 ].join(' ');

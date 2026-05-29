@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Globe, Search, BarChart3, Loader2, Check, Unplug, LogIn, LogOut, ExternalLink, Server, AlertTriangle, Clock3,
+  Globe, Search, Loader2, Check, Unplug, LogIn, LogOut, ExternalLink, Server, AlertTriangle, Clock3,
 } from 'lucide-react';
 import SearchableSelect from '../SearchableSelect';
 import { Badge, SectionCard, Icon, Button, IconButton, FormInput, type BadgeTone } from '../ui';
@@ -160,48 +160,6 @@ export function ConnectionsTab({
         </div>
       </SectionCard>
 
-      {/* GSC Property */}
-      {googleStatus?.connected && gscSites.length > 0 && (
-        <SectionCard noPadding>
-          <div className="px-5 py-4 flex items-center gap-3">
-            <Icon as={Search} size="md" className="text-blue-400" />
-            <span className="text-sm font-medium flex-1 text-[var(--brand-text-bright)]">Search Console Property</span>
-            {loadingGoogle ? <Icon as={Loader2} size="md" className="animate-spin text-[var(--brand-text-muted)]" /> : (
-              <SearchableSelect
-                options={gscSites.map(s => ({ value: s.siteUrl, label: s.siteUrl }))}
-                value={ws?.gscPropertyUrl || ''}
-                onChange={saveGscProperty}
-                placeholder="Search properties..."
-                emptyLabel="— None —"
-                className="min-w-[200px]"
-                size="md"
-              />
-            )}
-          </div>
-        </SectionCard>
-      )}
-
-      {/* GA4 Property */}
-      {googleStatus?.connected && ga4Properties.length > 0 && (
-        <SectionCard noPadding>
-          <div className="px-5 py-4 flex items-center gap-3">
-            <Icon as={BarChart3} size="md" className="text-teal-400" />
-            <span className="text-sm font-medium flex-1 text-[var(--brand-text-bright)]">GA4 Property</span>
-            {loadingGoogle ? <Icon as={Loader2} size="md" className="animate-spin text-[var(--brand-text-muted)]" /> : (
-              <SearchableSelect
-                options={ga4Properties.map(p => ({ value: p.propertyId, label: p.displayName }))}
-                value={ws?.ga4PropertyId || ''}
-                onChange={saveGa4Property}
-                placeholder="Search properties..."
-                emptyLabel="— None —"
-                className="min-w-[220px]"
-                size="md"
-              />
-            )}
-          </div>
-        </SectionCard>
-      )}
-
       {/* Integration Health Center */}
       <SectionCard noPadding>
         <div className="px-5 py-4 flex items-center gap-3 border-b border-[var(--brand-border)]">
@@ -257,6 +215,42 @@ export function ConnectionsTab({
                 <p className="t-caption-sm text-[var(--brand-text-muted)]">Features: <span className="text-[var(--brand-text)]">{item.affectedFeatures.join(', ')}</span></p>
                 {item.quotaDetail && (
                   <p className="t-caption-sm text-blue-400 bg-blue-500/10 px-2.5 py-1.5 rounded-[var(--radius-lg)] inline-flex">{item.quotaDetail}</p>
+                )}
+                {item.key === 'gsc' && googleStatus?.connected && gscSites.length > 0 && (
+                  <div className="pt-1 flex flex-col gap-1.5 sm:flex-row sm:items-center">
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] sm:min-w-[120px]">Selected property</span>
+                    {loadingGoogle ? (
+                      <Icon as={Loader2} size="md" className="animate-spin text-[var(--brand-text-muted)]" />
+                    ) : (
+                      <SearchableSelect
+                        options={gscSites.map(s => ({ value: s.siteUrl, label: s.siteUrl }))}
+                        value={ws?.gscPropertyUrl || ''}
+                        onChange={saveGscProperty}
+                        placeholder="Search properties..."
+                        emptyLabel="— None —"
+                        className="min-w-[220px]"
+                        size="md"
+                      />
+                    )}
+                  </div>
+                )}
+                {item.key === 'ga4' && googleStatus?.connected && ga4Properties.length > 0 && (
+                  <div className="pt-1 flex flex-col gap-1.5 sm:flex-row sm:items-center">
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] sm:min-w-[120px]">Selected property</span>
+                    {loadingGoogle ? (
+                      <Icon as={Loader2} size="md" className="animate-spin text-[var(--brand-text-muted)]" />
+                    ) : (
+                      <SearchableSelect
+                        options={ga4Properties.map(p => ({ value: p.propertyId, label: p.displayName }))}
+                        value={ws?.ga4PropertyId || ''}
+                        onChange={saveGa4Property}
+                        placeholder="Search properties..."
+                        emptyLabel="— None —"
+                        className="min-w-[220px]"
+                        size="md"
+                      />
+                    )}
+                  </div>
                 )}
                 {item.lastError && (
                   <p className="t-caption-sm text-red-400">{item.lastError}</p>

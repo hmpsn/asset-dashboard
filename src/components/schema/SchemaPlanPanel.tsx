@@ -230,7 +230,7 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
           icon={Sparkles}
           size="md"
           variant="secondary"
-          className="rounded-[var(--radius-md)] bg-teal-600 hover:bg-teal-500 text-white border-0 font-medium disabled:opacity-50"
+          className="rounded-[var(--radius-md)] bg-teal-600 hover:bg-teal-500 text-slate-900 border-0 font-medium disabled:opacity-50"
         >
           {generating ? 'Analyzing site...' : 'Generate Site Plan'}
         </Button>

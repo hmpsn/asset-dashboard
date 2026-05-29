@@ -85,7 +85,11 @@ export function ClientHeader({
     <header className="border-b border-[var(--brand-border)]">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-          <img src="/logo.svg" alt={STUDIO_NAME} className="h-8 opacity-80" style={theme === 'light' ? { filter: 'invert(1) brightness(0.3)' } : undefined} />
+          <img
+            src={theme === 'light' ? '/hmpsn-studio-logo-wordmark-navy.svg' : '/logo.svg'}
+            alt={STUDIO_NAME}
+            className="h-8 opacity-80"
+          />
           <div className="w-px h-8 bg-[var(--brand-border)]" />
           <div className="min-w-0">
             <div className="flex items-center gap-2">

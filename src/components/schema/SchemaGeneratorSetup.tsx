@@ -47,7 +47,7 @@ export function SchemaBusinessProfileCallout({
         </p>
         {workspaceId && (
           <Link
-            to={adminPath(workspaceId, 'workspace-settings') + '?tab=business-profile'}
+            to={adminPath(workspaceId, 'brand') + '?tab=business-profile'}
             className="t-caption text-accent-brand hover:text-accent-brand mt-2 inline-block"
           >
             Complete business profile →
