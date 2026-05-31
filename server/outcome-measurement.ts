@@ -27,6 +27,8 @@ import type {
   ScoringConfig,
 } from '../shared/types/outcome-tracking.js';
 import { isProgrammingError } from './errors.js';
+import { getPageKeyword } from './page-keywords.js';
+import { normalizePageUrl } from './helpers.js';
 
 const log = createLogger('outcome-measurement');
 
@@ -260,6 +262,44 @@ export function scoreOutcome(
 }
 
 // ---------------------------------------------------------------------------
+// computeAttributedValue — clicks delta × per-page CPC
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute the dollar value attributed to a clicks delta using the page's CPC
+ * from the page_keywords table (the same source computeROI uses).
+ *
+ * Returns { attributedValue, valueBasis } when a CPC is available,
+ * or { attributedValue: null, valueBasis: null } when the page has no CPC
+ * or the primary metric is not clicks-based.
+ *
+ * Never fabricates a 0 — NULL means inconclusive.
+ */
+function computeAttributedValue(
+  workspaceId: string,
+  pageUrl: string | null | undefined,
+  primaryMetric: string,
+  delta: DeltaSummary,
+): { attributedValue: number | null; valueBasis: string | null } {
+  // Only applicable when the primary metric is clicks
+  if (primaryMetric !== 'clicks') return { attributedValue: null, valueBasis: null };
+  if (!pageUrl) return { attributedValue: null, valueBasis: null };
+
+  try {
+    const normalizedPath = normalizePageUrl(pageUrl);
+    const pageKw = getPageKeyword(workspaceId, normalizedPath);
+    const cpc = pageKw?.cpc ?? null;
+    if (cpc == null || cpc <= 0) return { attributedValue: null, valueBasis: null };
+
+    const attributedValue = Math.round(delta.delta_absolute * cpc * 100) / 100;
+    return { attributedValue, valueBasis: 'clicks_delta_x_cpc' };
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err, workspaceId, pageUrl }, 'outcome-measurement/computeAttributedValue: programming error');
+    return { attributedValue: null, valueBasis: null };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // scoreActionAtCheckpoint — scores a single action at a single checkpoint
 // ---------------------------------------------------------------------------
 
@@ -383,6 +423,16 @@ async function scoreActionAtCheckpoint(
     }
   }
 
+  // Compute attributed dollar value from clicks delta × per-page CPC.
+  // Only fires when the primary metric is 'clicks' and the page has a CPC in page_keywords.
+  // Inconclusive/no-CPC cases leave attributedValue null — never fabricate 0.
+  const { attributedValue, valueBasis } = computeAttributedValue(
+    action.workspaceId,
+    action.pageUrl,
+    primaryMetric,
+    delta,
+  );
+
   const outcome = recordOutcome({
     actionId: action.id,
     checkpointDays,
@@ -390,10 +440,12 @@ async function scoreActionAtCheckpoint(
     score,
     earlySignal,
     deltaSummary: delta,
+    attributedValue,
+    valueBasis,
   });
 
   log.info(
-    { actionId: action.id, checkpointDays, score, earlySignal, direction: delta.direction },
+    { actionId: action.id, checkpointDays, score, earlySignal, direction: delta.direction, attributedValue },
     'Action scored',
   );
 
