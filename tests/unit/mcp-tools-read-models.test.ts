@@ -3,15 +3,30 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const h = vi.hoisted(() => ({
   getWorkspace: vi.fn(),
   listWorkspaces: vi.fn(),
+  createWorkspace: vi.fn(),
+  updateWorkspace: vi.fn(),
+  deleteWorkspace: vi.fn(),
+  computeEffectiveTier: vi.fn(),
+  getClientPortalUrl: vi.fn(),
+  broadcast: vi.fn(),
+  broadcastToWorkspace: vi.fn(),
+  addActivity: vi.fn(),
+  toAdminWorkspaceView: vi.fn(),
+  normalizeSocialProfiles: vi.fn(),
+  invalidateIntelligenceCache: vi.fn(),
   listBatches: vi.fn(),
   listRequests: vi.fn(),
   countPendingClientActions: vi.fn(),
   listClientActions: vi.fn(),
   getInsights: vi.fn(),
+  getInsightsByDomain: vi.fn(),
+  getUnresolvedInsights: vi.fn(),
   listKeywordGaps: vi.fn(),
   listTopicClusters: vi.fn(),
   listCannibalizationIssues: vi.fn(),
+  getDiscoveredQuerySummary: vi.fn(),
   getLostVisibilityQueries: vi.fn(),
+  handleContentPerformance: vi.fn(),
   buildWorkspaceIntelligence: vi.fn(),
   getPrimaryMarketLocationCode: vi.fn(),
   loggerError: vi.fn(),
@@ -21,10 +36,37 @@ const h = vi.hoisted(() => ({
 vi.mock('../../server/workspaces.js', () => ({
   getWorkspace: h.getWorkspace,
   listWorkspaces: h.listWorkspaces,
+  createWorkspace: h.createWorkspace,
+  updateWorkspace: h.updateWorkspace,
+  deleteWorkspace: h.deleteWorkspace,
+  computeEffectiveTier: h.computeEffectiveTier,
+  getClientPortalUrl: h.getClientPortalUrl,
 }));
 
 vi.mock('../../server/approvals.js', () => ({
   listBatches: h.listBatches,
+}));
+
+vi.mock('../../server/broadcast.js', () => ({
+  broadcast: h.broadcast,
+  broadcastToWorkspace: h.broadcastToWorkspace,
+}));
+
+vi.mock('../../server/activity-log.js', () => ({
+  addActivity: h.addActivity,
+}));
+
+vi.mock('../../server/serializers/admin-workspace-view.js', () => ({
+  toAdminWorkspaceView: h.toAdminWorkspaceView,
+}));
+
+vi.mock('../../server/social-profiles.js', () => ({
+  normalizeSocialProfiles: h.normalizeSocialProfiles,
+}));
+
+vi.mock('../../server/workspace-intelligence.js', () => ({
+  buildWorkspaceIntelligence: h.buildWorkspaceIntelligence,
+  invalidateIntelligenceCache: h.invalidateIntelligenceCache,
 }));
 
 vi.mock('../../server/requests.js', () => ({
@@ -38,6 +80,8 @@ vi.mock('../../server/client-actions.js', () => ({
 
 vi.mock('../../server/analytics-insights-store.js', () => ({
   getInsights: h.getInsights,
+  getInsightsByDomain: h.getInsightsByDomain,
+  getUnresolvedInsights: h.getUnresolvedInsights,
 }));
 
 vi.mock('../../server/keyword-gaps.js', () => ({
@@ -53,11 +97,12 @@ vi.mock('../../server/cannibalization-issues.js', () => ({
 }));
 
 vi.mock('../../server/client-discovered-queries.js', () => ({
+  getDiscoveredQuerySummary: h.getDiscoveredQuerySummary,
   getLostVisibilityQueries: h.getLostVisibilityQueries,
 }));
 
-vi.mock('../../server/workspace-intelligence.js', () => ({
-  buildWorkspaceIntelligence: h.buildWorkspaceIntelligence,
+vi.mock('../../server/routes/content-requests.js', () => ({
+  handleContentPerformance: h.handleContentPerformance,
 }));
 
 vi.mock('../../server/local-seo.js', () => ({
@@ -94,6 +139,36 @@ describe('mcp read-model tools', () => {
       { id: 'ws-2', name: 'Workspace Two', tier: 'free', liveDomain: null },
       { id: 'ws-3', name: 'Workspace Three' },
     ]);
+    h.computeEffectiveTier.mockImplementation((ws: { tier?: string }) => ws.tier ?? 'free');
+    h.getClientPortalUrl.mockImplementation((ws: { id: string }) => `https://app.example.com/client/${ws.id}`);
+    h.createWorkspace.mockImplementation((name: string) => ({
+      id: 'ws-new',
+      name,
+      tier: 'free',
+      folder: 'ws-new',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    }));
+    h.updateWorkspace.mockImplementation((id: string, updates: Record<string, unknown>) => ({
+      id,
+      name: typeof updates.name === 'string' ? updates.name : 'Workspace One',
+      tier: 'growth',
+      folder: id,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      ...updates,
+    }));
+    h.deleteWorkspace.mockReturnValue(true);
+    h.toAdminWorkspaceView.mockImplementation((ws: { id: string; name: string; tier?: string }) => ({
+      id: ws.id,
+      name: ws.name,
+      tier: ws.tier ?? 'free',
+      folder: 'folder',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      hasPassword: false,
+      isTrial: false,
+      trialDaysRemaining: 0,
+      effectiveTier: ws.tier ?? 'free',
+    }));
+    h.normalizeSocialProfiles.mockImplementation((profiles: string[] | undefined) => profiles);
 
     h.listBatches.mockImplementation((workspaceId: string) => {
       if (workspaceId === 'ws-1') {
@@ -133,13 +208,23 @@ describe('mcp read-model tools', () => {
           { pageId: 'p2', impactScore: 9, severity: 'high', data: { decline: 30 } },
         ];
       }
+      if (type) {
+        return [{ id: `${type}-1`, insightType: type }, { id: `${type}-2`, insightType: type }];
+      }
       return [{ id: 'i1' }, { id: 'i2' }, { id: 'i3' }];
     });
+    h.getInsightsByDomain.mockReturnValue([
+      { id: 'd1', insightType: 'content_decay' },
+      { id: 'd2', insightType: 'page_health' },
+    ]);
+    h.getUnresolvedInsights.mockReturnValue([{ id: 'u1' }, { id: 'u2' }]);
 
     h.listKeywordGaps.mockReturnValue([{ keyword: 'gap' }]);
     h.listTopicClusters.mockReturnValue([{ topic: 'cluster' }]);
     h.listCannibalizationIssues.mockReturnValue([{ page: '/dup' }]);
+    h.getDiscoveredQuerySummary.mockReturnValue({ total: 3, byIntent: { informational: 2, commercial: 1 } });
     h.getLostVisibilityQueries.mockReturnValue([{ keyword: 'lost' }]);
+    h.handleContentPerformance.mockResolvedValue({ items: [{ id: 'perf-1' }] });
     h.getPrimaryMarketLocationCode.mockReturnValue({ label: 'United States' });
 
     h.buildWorkspaceIntelligence.mockResolvedValue({
@@ -158,8 +243,14 @@ describe('mcp read-model tools', () => {
     expect(listPayload[0]?.id).toBe('ws-1');
 
     const overview = await handleWorkspaceTool('get_workspace_overview', { workspaceId: 'ws-1' });
-    const overviewPayload = parseContent(overview) as { totalPending: number };
+    const overviewPayload = parseContent(overview) as {
+      totalPending: number;
+      effective_tier: string;
+      client_portal_url: string | null;
+    };
     expect(overviewPayload.totalPending).toBe(4);
+    expect(overviewPayload.effective_tier).toBe('growth');
+    expect(overviewPayload.client_portal_url).toContain('/client/ws-1');
 
     const overviewFallback = await handleWorkspaceTool('get_workspace_overview', { workspaceId: 'ws-3' });
     const overviewFallbackPayload = parseContent(overviewFallback) as { tier: string; liveDomain: string | null };
@@ -184,6 +275,43 @@ describe('mcp read-model tools', () => {
     const caughtString = await handleWorkspaceTool('list_workspaces', {});
     expect(caughtString.isError).toBe(true);
     expect(caughtString.content[0]?.text).toContain('Tool error: non-error-failure');
+  });
+
+  it('workspace mutation tools validate input and support create/update/delete', async () => {
+    const created = await handleWorkspaceTool('create_workspace', { name: 'Created Workspace' });
+    expect(created.isError).toBeUndefined();
+    expect(h.createWorkspace).toHaveBeenCalledWith('Created Workspace', undefined, undefined);
+
+    const invalidCreate = await handleWorkspaceTool('create_workspace', {});
+    expect(invalidCreate.isError).toBe(true);
+
+    const updated = await handleWorkspaceTool('update_workspace', {
+      workspace_id: 'ws-1',
+      updates: { name: 'Updated Workspace', business_profile: { socialProfiles: ['https://example.com'] } },
+    });
+    expect(updated.isError).toBeUndefined();
+    expect(h.updateWorkspace).toHaveBeenCalledWith('ws-1', expect.objectContaining({ name: 'Updated Workspace' }));
+    expect(h.invalidateIntelligenceCache).toHaveBeenCalledWith('ws-1');
+
+    h.updateWorkspace.mockReturnValueOnce(null);
+    const updateMissing = await handleWorkspaceTool('update_workspace', {
+      workspace_id: 'ws-1',
+      updates: { name: 'Missing' },
+    });
+    expect(updateMissing.isError).toBe(true);
+
+    const deleted = await handleWorkspaceTool('delete_workspace', {
+      workspace_id: 'ws-1',
+      confirm: 'delete_workspace',
+    });
+    expect(deleted.isError).toBeUndefined();
+    expect(h.deleteWorkspace).toHaveBeenCalledWith('ws-1');
+
+    const invalidDelete = await handleWorkspaceTool('delete_workspace', {
+      workspace_id: 'ws-1',
+      confirm: 'delete',
+    });
+    expect(invalidDelete.isError).toBe(true);
   });
 
   it('client tools handle single-workspace and cross-workspace pending work flows', async () => {
@@ -223,9 +351,17 @@ describe('mcp read-model tools', () => {
     const notFound = await handleInsightTool('get_insights', { workspaceId: 'ws-missing' });
     expect(notFound.isError).toBe(true);
 
-    const insights = await handleInsightTool('get_insights', { workspaceId: 'ws-1', type: 'page_health', limit: 2.9 });
+    const insights = await handleInsightTool('get_insights', { workspaceId: 'ws-1', type: 'page_health', limit: 2 });
     const insightsPayload = parseContent(insights) as Array<unknown>;
     expect(insightsPayload).toHaveLength(2);
+
+    const domainInsights = await handleInsightTool('get_insights', { workspaceId: 'ws-1', domain: 'search', type: 'content_decay' });
+    expect((parseContent(domainInsights) as Array<{ insightType: string }>)[0]?.insightType).toBe('content_decay');
+    expect(h.getInsightsByDomain).toHaveBeenCalledWith('ws-1', 'search');
+
+    const unresolved = await handleInsightTool('get_unresolved_insights', { workspaceId: 'ws-1', limit: 1 });
+    expect((parseContent(unresolved) as Array<unknown>)).toHaveLength(1);
+    expect(h.getUnresolvedInsights).toHaveBeenCalledWith('ws-1');
 
     const anomaliesOpen = await handleInsightTool('get_anomalies', { workspaceId: 'ws-1' });
     const anomaliesOpenPayload = parseContent(anomaliesOpen) as Array<{ resolutionStatus: string }>;
@@ -261,6 +397,7 @@ describe('mcp read-model tools', () => {
     expect(analysisPayload.geoVolumeLabel).toBe('United States');
     expect(analysisPayload.gaps).toHaveLength(1);
     expect(analysisPayload.lostVisibility).toHaveLength(1);
+    expect(analysisPayload).toHaveProperty('discovered_query_summary');
 
     h.getPrimaryMarketLocationCode.mockImplementationOnce(() => { throw new Error('geo unavailable'); });
     const analysisNoGeo = await handleContentTool('get_keyword_analysis', { workspaceId: 'ws-1' });
@@ -268,6 +405,9 @@ describe('mcp read-model tools', () => {
 
     const seoContext = await handleContentTool('get_seo_context', { workspaceId: 'ws-1' });
     expect(parseContent(seoContext)).toEqual({ domain: 'example.com' });
+
+    const performance = await handleContentTool('get_content_performance', { workspaceId: 'ws-1' });
+    expect(parseContent(performance)).toEqual({ items: [{ id: 'perf-1' }] });
 
     const unknown = await handleContentTool('unknown_content_tool', { workspaceId: 'ws-1' });
     expect(unknown.isError).toBe(true);
