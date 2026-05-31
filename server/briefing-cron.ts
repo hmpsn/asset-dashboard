@@ -45,6 +45,7 @@ import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { addActivity } from './activity-log.js';
 import { notifyClientBriefingReady } from './email.js';
 import { computeROI } from './roi.js';
+import { normalizePageUrl } from './helpers.js';
 import { listContentGaps } from './content-gaps.js';
 import { recordWeeklyBriefingSnapshot } from './workspace-metrics-snapshots.js';
 import { punchHeroHeadline, writeWeeklyOpener } from './briefing-prompt.js';
@@ -343,13 +344,17 @@ async function runBriefingForWorkspaceInner(
         // — the dispatch is purely in-memory for this story type.
         const action = getAction(candidate.referenceId);
         if (action && action.pageUrl && roiData?.contentItems) {
+          // ContentItemROI fields (roi.ts:121-132): requestId / targetPageSlug /
+          // clicks / topic / trafficValue — NOT contentRequestId / pageUrl /
+          // currentClicks / title. Match by content-request id, falling back to
+          // the normalized page slug.
+          const normalizedActionPage = normalizePageUrl(action.pageUrl);
           const item = roiData.contentItems.find((ci) => {
-            const ciAny = ci as { contentRequestId?: string; pageUrl?: string };
-            if (action.sourceId && ciAny.contentRequestId === action.sourceId) return true;
-            return ciAny.pageUrl === action.pageUrl;
-          }) as { currentClicks?: number; trafficValue?: number; title?: string } | undefined;
-          if (item && typeof item.currentClicks === 'number' && item.currentClicks > 0) {
-            const cc = item.currentClicks;
+            if (action.sourceId && ci.requestId === action.sourceId) return true;
+            return ci.targetPageSlug != null && normalizePageUrl(ci.targetPageSlug) === normalizedActionPage;
+          });
+          if (item && item.clicks > 0) {
+            const cc = item.clicks;
             const threshold: MilestoneAttributionData['thresholdCrossed'] =
               cc >= 100 ? 'hundred_clicks' : cc >= 50 ? 'fifty_clicks' : 'first_clicks';
             const daysSinceDelivery = Math.floor(
@@ -357,12 +362,12 @@ async function runBriefingForWorkspaceInner(
             );
             const data: MilestoneAttributionData = {
               briefId: action.sourceId ?? action.id,
-              briefTitle: item.title ?? action.targetKeyword ?? 'this brief',
+              briefTitle: item.topic || action.targetKeyword || 'this brief',
               pageUrl: action.pageUrl,
               thresholdCrossed: threshold,
               currentClicks: cc,
               daysSinceDelivery: Math.max(0, daysSinceDelivery),
-              trafficValue: typeof item.trafficValue === 'number' ? item.trafficValue : 0,
+              trafficValue: item.trafficValue,
             };
             const synthetic: AnalyticsInsight<'milestone_attribution'> = {
               id: `milestone-${data.briefId}`,
