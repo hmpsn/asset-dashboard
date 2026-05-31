@@ -22,6 +22,7 @@ vi.mock('../../server/content-posts-db.js', () => ({
 vi.mock('../../server/content-requests.js', () => ({
   createContentRequest: vi.fn(),
   getContentRequest: vi.fn(),
+  listContentRequests: vi.fn(),
   updateContentRequest: vi.fn(),
 }));
 vi.mock('../../server/broadcast.js', () => ({
@@ -35,7 +36,7 @@ import { getWorkspace } from '../../server/workspaces.js';
 import { buildContentGenerationContext } from '../../server/intelligence/generation-context-builders.js';
 import { getBrief, listBriefs, updateBrief, upsertBrief } from '../../server/content-brief.js';
 import { getPost, listPosts, savePost, updatePostField } from '../../server/content-posts-db.js';
-import { createContentRequest, getContentRequest, updateContentRequest } from '../../server/content-requests.js';
+import { createContentRequest, getContentRequest, listContentRequests, updateContentRequest } from '../../server/content-requests.js';
 import { broadcastToWorkspace } from '../../server/broadcast.js';
 import { addActivity } from '../../server/activity-log.js';
 import { contentActionTools, handleContentActionTool } from '../../server/mcp/tools/content-actions.js';
@@ -88,6 +89,7 @@ describe('mcp content action tools', () => {
     }));
     (createContentRequest as ReturnType<typeof vi.fn>).mockReturnValue({ id: 'cr_1' });
     (getContentRequest as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
+    (listContentRequests as ReturnType<typeof vi.fn>).mockReturnValue([]);
   });
 
   it('registers content action tool names', () => {
@@ -103,7 +105,92 @@ describe('mcp content action tools', () => {
       'prepare_post_context',
       'save_post',
       'send_to_client',
+      'list_content_requests',
+      'get_content_request',
+      'create_content_request',
     ]);
+  });
+
+  it('lists, gets, and creates content requests', async () => {
+    (listContentRequests as ReturnType<typeof vi.fn>).mockReturnValue([
+      {
+        id: 'cr_1',
+        topic: 'Topic',
+        targetKeyword: 'kw',
+        status: 'requested',
+        priority: 'medium',
+        serviceType: 'brief_only',
+        pageType: 'blog',
+        requestedAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ]);
+    (getContentRequest as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'cr_1',
+      topic: 'Topic',
+      targetKeyword: 'kw',
+      status: 'requested',
+      priority: 'medium',
+      serviceType: 'brief_only',
+      pageType: 'blog',
+      requestedAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    const listed = await handleContentActionTool('list_content_requests', { workspace_id: 'ws-1' });
+    expect(listed.isError).toBeUndefined();
+    const listPayload = JSON.parse(listed.content[0].text) as { requests: Array<{ request_id: string }> };
+    expect(listPayload.requests).toHaveLength(1);
+    expect(listPayload.requests[0]?.request_id).toBe('cr_1');
+
+    const fetched = await handleContentActionTool('get_content_request', { workspace_id: 'ws-1', request_id: 'cr_1' });
+    expect(fetched.isError).toBeUndefined();
+
+    const created = await handleContentActionTool('create_content_request', {
+      workspace_id: 'ws-1',
+      topic: 'Topic',
+      target_keyword: 'keyword',
+    });
+    expect(created.isError).toBeUndefined();
+    expect(createContentRequest).toHaveBeenCalledWith(
+      'ws-1',
+      expect.objectContaining({ topic: 'Topic', targetKeyword: 'keyword' }),
+    );
+  });
+
+  it('create_content_request does not emit created side effects when dedupe returns existing request', async () => {
+    (listContentRequests as ReturnType<typeof vi.fn>).mockReturnValue([
+      {
+        id: 'cr_existing',
+        topic: 'Existing Topic',
+        targetKeyword: 'keyword',
+        status: 'requested',
+        priority: 'medium',
+        requestedAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ]);
+    (createContentRequest as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'cr_existing',
+      topic: 'Existing Topic',
+      targetKeyword: 'keyword',
+      status: 'requested',
+      priority: 'medium',
+      requestedAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    const created = await handleContentActionTool('create_content_request', {
+      workspace_id: 'ws-1',
+      topic: 'Existing Topic',
+      target_keyword: 'keyword',
+    });
+    expect(created.isError).toBeUndefined();
+    const payload = JSON.parse(created.content[0].text) as { created: boolean; deduped: boolean };
+    expect(payload.created).toBe(false);
+    expect(payload.deduped).toBe(true);
+    expect(broadcastToWorkspace).not.toHaveBeenCalled();
+    expect(addActivity).not.toHaveBeenCalled();
   });
 
   it('lists and fetches briefs with revision tokens', async () => {
@@ -541,6 +628,35 @@ describe('mcp content action tools', () => {
         action: 'mcp_brief_sent_to_client',
       }),
     );
+  });
+
+  it('send_to_client supports brief_id without a handle', async () => {
+    (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'brief_123',
+      workspaceId: 'ws-1',
+      targetKeyword: 'kw',
+      secondaryKeywords: [],
+      suggestedTitle: 'Brief title',
+      suggestedMetaDesc: 'Meta',
+      outline: [],
+      wordCountTarget: 1000,
+      intent: 'informational',
+      audience: 'audience',
+      competitorInsights: '',
+      internalLinkSuggestions: [],
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    (createContentRequest as ReturnType<typeof vi.fn>).mockReturnValue({ id: 'cr_123' });
+
+    const result = await handleContentActionTool('send_to_client', {
+      workspace_id: 'ws-1',
+      brief_id: 'brief_123',
+    });
+
+    expect(result.isError).toBeUndefined();
+    const payload = JSON.parse(result.content[0].text) as { request_id: string; target: string };
+    expect(payload.request_id).toBe('cr_123');
+    expect(payload.target).toBe('brief');
   });
 
   it('send_to_client updates existing parent request with update event', async () => {

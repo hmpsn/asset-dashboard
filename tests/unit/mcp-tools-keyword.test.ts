@@ -9,8 +9,13 @@ vi.mock('../../server/workspaces.js', () => ({
   getWorkspace: vi.fn(),
 }));
 vi.mock('../../server/page-keywords.js', () => ({
+  deletePageKeyword: vi.fn(),
   getPageKeyword: vi.fn(),
+  listPageKeywords: vi.fn(),
+  listPageKeywordsLite: vi.fn(),
+  upsertAndCleanPageKeywords: vi.fn(),
   upsertPageKeyword: vi.fn(),
+  upsertPageKeywordsBatch: vi.fn(),
 }));
 vi.mock('../../server/broadcast.js', () => ({
   broadcastToWorkspace: vi.fn(),
@@ -24,7 +29,14 @@ vi.mock('../../server/activity-log.js', () => ({
 
 import { getConfiguredProvider } from '../../server/seo-data-provider.js';
 import { getWorkspace } from '../../server/workspaces.js';
-import { getPageKeyword, upsertPageKeyword } from '../../server/page-keywords.js';
+import {
+  deletePageKeyword,
+  getPageKeyword,
+  listPageKeywords,
+  upsertAndCleanPageKeywords,
+  upsertPageKeyword,
+  upsertPageKeywordsBatch,
+} from '../../server/page-keywords.js';
 import { broadcastToWorkspace } from '../../server/broadcast.js';
 import { invalidateIntelligenceCache } from '../../server/workspace-intelligence.js';
 import { addActivity } from '../../server/activity-log.js';
@@ -56,10 +68,14 @@ describe('mcp keyword action tools', () => {
     });
   });
 
-  it('registers both keyword action tools', () => {
+  it('registers keyword action tools', () => {
     expect(keywordActionTools.map(t => t.name)).toEqual([
       'research_keywords',
       'add_keyword_to_strategy',
+      'get_keyword_strategy',
+      'remove_page_keyword',
+      'add_keywords_batch',
+      'replace_keyword_strategy',
     ]);
   });
 
@@ -170,5 +186,37 @@ describe('mcp keyword action tools', () => {
     });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toMatch(/Workspace not found/);
+  });
+
+  it('supports strategy read + CRUD helpers', async () => {
+    (listPageKeywords as ReturnType<typeof vi.fn>).mockReturnValue([
+      { pagePath: '/a', pageTitle: 'A', primaryKeyword: 'kw', secondaryKeywords: [] },
+    ]);
+
+    const listResult = await handleKeywordActionTool('get_keyword_strategy', {
+      workspace_id: 'ws-1',
+    });
+    expect(listResult.isError).toBeUndefined();
+
+    const removeResult = await handleKeywordActionTool('remove_page_keyword', {
+      workspace_id: 'ws-1',
+      page_path: '/a',
+    });
+    expect(removeResult.isError).toBeUndefined();
+    expect(deletePageKeyword).toHaveBeenCalledWith('ws-1', '/a');
+
+    const batchResult = await handleKeywordActionTool('add_keywords_batch', {
+      workspace_id: 'ws-1',
+      entries: [{ pagePath: '/a', pageTitle: 'A', primaryKeyword: 'kw', secondaryKeywords: [] }],
+    });
+    expect(batchResult.isError).toBeUndefined();
+    expect(upsertPageKeywordsBatch).toHaveBeenCalledTimes(1);
+
+    const replaceResult = await handleKeywordActionTool('replace_keyword_strategy', {
+      workspace_id: 'ws-1',
+      entries: [{ pagePath: '/a', pageTitle: 'A', primaryKeyword: 'kw', secondaryKeywords: [] }],
+    });
+    expect(replaceResult.isError).toBeUndefined();
+    expect(upsertAndCleanPageKeywords).toHaveBeenCalledTimes(1);
   });
 });

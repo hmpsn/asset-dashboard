@@ -154,4 +154,53 @@ describe('MCP keyword tools (integration)', () => {
     expect(existingPage).toBeDefined();
     expect(existingPage?.primaryKeyword).toBe('bookkeeping for freelancers');
   });
+
+  it('supports keyword strategy read/remove/batch/replace tools', async () => {
+    const firstAdd = await callMcpTool('add_keyword_to_strategy', {
+      workspace_id: ws.workspaceId,
+      term: 'hvac tune up checklist',
+      target: { kind: 'new_page', topic: 'HVAC Tune-Up Checklist', intent: 'informational' },
+    });
+    expect(firstAdd.isError).toBeFalsy();
+
+    const strategyRead = await callMcpTool('get_keyword_strategy', {
+      workspace_id: ws.workspaceId,
+    });
+    expect(strategyRead.isError).toBeFalsy();
+    const strategyPayload = JSON.parse(strategyRead.content[0].text) as { entries: Array<{ pagePath: string }> };
+    expect(strategyPayload.entries.length).toBeGreaterThan(0);
+
+    const targetPath = '/planned/hvac-tune-up-checklist';
+    const removed = await callMcpTool('remove_page_keyword', {
+      workspace_id: ws.workspaceId,
+      page_path: targetPath,
+    });
+    expect(removed.isError).toBeFalsy();
+
+    const batch = await callMcpTool('add_keywords_batch', {
+      workspace_id: ws.workspaceId,
+      entries: [
+        {
+          pagePath: '/services/hvac-maintenance',
+          pageTitle: 'HVAC Maintenance',
+          primaryKeyword: 'hvac maintenance service',
+          secondaryKeywords: ['hvac service plan'],
+        },
+      ],
+    });
+    expect(batch.isError).toBeFalsy();
+
+    const replaced = await callMcpTool('replace_keyword_strategy', {
+      workspace_id: ws.workspaceId,
+      entries: [
+        {
+          pagePath: '/services/ac-repair',
+          pageTitle: 'AC Repair',
+          primaryKeyword: 'ac repair service',
+          secondaryKeywords: ['emergency ac repair'],
+        },
+      ],
+    });
+    expect(replaced.isError).toBeFalsy();
+  });
 });

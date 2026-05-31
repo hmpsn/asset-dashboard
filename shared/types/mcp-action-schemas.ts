@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  LOCAL_SEO_DEVICE,
+  LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP,
+} from './local-seo.js';
 
 // --- Shared building blocks -------------------------------------------------
 
@@ -205,22 +209,47 @@ export const getBriefInputSchema = z.object({
   brief_id: z.string().min(1),
 });
 
-export const updateBriefInputSchema = z.union([
-  z.object({
-    workspace_id: workspaceIdSchema,
-    brief_id: z.string().min(1),
-    expected_revision: revisionSchema,
-    mode: z.literal('patch'),
-    updates: briefPatchContentSchema,
-  }).strict(),
-  z.object({
-    workspace_id: workspaceIdSchema,
-    brief_id: z.string().min(1),
-    expected_revision: revisionSchema,
-    mode: z.literal('replace'),
-    content: briefContentSchema,
-  }).strict(),
-]);
+export const updateBriefInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  brief_id: z.string().min(1),
+  expected_revision: revisionSchema,
+  mode: z.enum(['patch', 'replace']),
+  updates: briefPatchContentSchema.optional(),
+  content: briefContentSchema.optional(),
+}).strict().superRefine((data, ctx) => {
+  if (data.mode === 'patch') {
+    if (!data.updates) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['updates'],
+        message: 'updates is required when mode is patch',
+      });
+    }
+    if (data.content !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['content'],
+        message: 'content is not allowed when mode is patch',
+      });
+    }
+  }
+  if (data.mode === 'replace') {
+    if (!data.content) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['content'],
+        message: 'content is required when mode is replace',
+      });
+    }
+    if (data.updates !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['updates'],
+        message: 'updates is not allowed when mode is replace',
+      });
+    }
+  }
+});
 
 export const listPostsInputSchema = z.object({
   workspace_id: workspaceIdSchema,
@@ -232,32 +261,86 @@ export const getPostInputSchema = z.object({
   post_id: z.string().min(1),
 });
 
-export const updatePostInputSchema = z.union([
-  z.object({
-    workspace_id: workspaceIdSchema,
-    post_id: z.string().min(1),
-    expected_revision: revisionSchema,
-    mode: z.literal('patch'),
-    updates: postPatchContentSchema,
-  }).strict(),
-  z.object({
-    workspace_id: workspaceIdSchema,
-    post_id: z.string().min(1),
-    expected_revision: revisionSchema,
-    mode: z.literal('replace'),
-    content: postReplaceContentSchema,
-  }).strict(),
-]);
+export const updatePostInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  post_id: z.string().min(1),
+  expected_revision: revisionSchema,
+  mode: z.enum(['patch', 'replace']),
+  updates: postPatchContentSchema.optional(),
+  content: postReplaceContentSchema.optional(),
+}).strict().superRefine((data, ctx) => {
+  if (data.mode === 'patch') {
+    if (!data.updates) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['updates'],
+        message: 'updates is required when mode is patch',
+      });
+    }
+    if (data.content !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['content'],
+        message: 'content is not allowed when mode is patch',
+      });
+    }
+  }
+  if (data.mode === 'replace') {
+    if (!data.content) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['content'],
+        message: 'content is required when mode is replace',
+      });
+    }
+    if (data.updates !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['updates'],
+        message: 'updates is not allowed when mode is replace',
+      });
+    }
+  }
+});
 
 export const sendToClientInputSchema = z.object({
   workspace_id: workspaceIdSchema,
   brief_handle: handleIdSchema.optional(),
   post_handle: handleIdSchema.optional(),
+  brief_id: z.string().min(1).optional(),
+  post_id: z.string().min(1).optional(),
   note: z.string().optional(),
 }).refine(
-  (data) => (data.brief_handle != null) !== (data.post_handle != null),
-  { message: 'must provide exactly one of brief_handle or post_handle' },
+  (data) => [data.brief_handle, data.post_handle, data.brief_id, data.post_id].filter(Boolean).length === 1,
+  { message: 'must provide exactly one target: brief_handle, post_handle, brief_id, or post_id' },
 );
+
+export const listContentRequestsInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  limit: z.number().int().positive().max(200).optional(),
+});
+
+export const getContentRequestInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  request_id: z.string().min(1),
+});
+
+export const createContentRequestInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  topic: z.string().trim().min(1).max(500),
+  target_keyword: z.string().trim().min(1).max(200),
+  intent: z.enum(['informational', 'commercial', 'transactional', 'navigational']).optional(),
+  priority: z.enum(['high', 'medium', 'low']).optional(),
+  rationale: z.string().trim().max(5000).optional(),
+  client_note: z.string().trim().max(5000).optional(),
+  source: z.enum(['strategy', 'client']).optional(),
+  service_type: z.enum(['brief_only', 'full_post']).optional(),
+  page_type: z.enum(['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource']).optional(),
+  initial_status: z.enum(['pending_payment', 'requested', 'brief_generated', 'in_progress']).optional(),
+  target_page_id: z.string().trim().min(1).max(200).optional(),
+  target_page_slug: z.string().trim().min(1).max(200).optional(),
+  dedupe: z.boolean().optional(),
+}).strict();
 
 // --- Job tool input schemas -------------------------------------------------
 
@@ -281,7 +364,61 @@ export const startSeoAuditInputSchema = z.object({
 
 export const startLocalSeoRefreshInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  refresh_body: z.unknown(),
+  refresh_body: z.object({
+    marketIds: z.array(z.string().min(1)).max(3).optional(),
+    keywords: z.array(z.string().min(1).max(200)).max(LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP).optional(),
+    device: z.enum([LOCAL_SEO_DEVICE.DESKTOP, LOCAL_SEO_DEVICE.MOBILE]).optional(),
+    languageCode: z.string().min(2).max(8).optional(),
+  }).strict(),
+});
+
+export const getJobStatusInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  job_id: z.string().min(1),
+});
+
+export const listJobsInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  status: z.enum(['pending', 'running', 'done', 'error', 'cancelled']).optional(),
+  limit: z.number().int().positive().max(200).optional(),
+});
+
+export const cancelJobInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  job_id: z.string().min(1),
+});
+
+const pageKeywordEntrySchema = z.object({
+  pagePath: z.string().min(1),
+  pageTitle: z.string().min(1),
+  primaryKeyword: z.string().min(1),
+  secondaryKeywords: z.array(z.string().min(1)),
+  searchIntent: z.string().optional(),
+  volume: z.number().nonnegative().optional(),
+  difficulty: z.number().nonnegative().optional(),
+  cpc: z.number().nonnegative().optional(),
+  metricsSource: z.string().optional(),
+  validated: z.boolean().optional(),
+}).passthrough();
+
+export const getKeywordStrategyInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  lite: z.boolean().optional(),
+});
+
+export const removePageKeywordInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  page_path: z.string().min(1),
+});
+
+export const addKeywordsBatchInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  entries: z.array(pageKeywordEntrySchema).min(1).max(500),
+});
+
+export const replaceKeywordStrategyInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  entries: z.array(pageKeywordEntrySchema).max(500),
 });
 
 // --- Type exports -----------------------------------------------------------
@@ -299,6 +436,16 @@ export type ListPostsInput = z.infer<typeof listPostsInputSchema>;
 export type GetPostInput = z.infer<typeof getPostInputSchema>;
 export type UpdatePostInput = z.infer<typeof updatePostInputSchema>;
 export type SendToClientInput = z.infer<typeof sendToClientInputSchema>;
+export type ListContentRequestsInput = z.infer<typeof listContentRequestsInputSchema>;
+export type GetContentRequestInput = z.infer<typeof getContentRequestInputSchema>;
+export type CreateContentRequestInput = z.infer<typeof createContentRequestInputSchema>;
 export type StartKeywordStrategyGenerationInput = z.infer<typeof startKeywordStrategyGenerationInputSchema>;
 export type StartSeoAuditInput = z.infer<typeof startSeoAuditInputSchema>;
 export type StartLocalSeoRefreshInput = z.infer<typeof startLocalSeoRefreshInputSchema>;
+export type GetJobStatusInput = z.infer<typeof getJobStatusInputSchema>;
+export type ListJobsInput = z.infer<typeof listJobsInputSchema>;
+export type CancelJobInput = z.infer<typeof cancelJobInputSchema>;
+export type GetKeywordStrategyInput = z.infer<typeof getKeywordStrategyInputSchema>;
+export type RemovePageKeywordInput = z.infer<typeof removePageKeywordInputSchema>;
+export type AddKeywordsBatchInput = z.infer<typeof addKeywordsBatchInputSchema>;
+export type ReplaceKeywordStrategyInput = z.infer<typeof replaceKeywordStrategyInputSchema>;

@@ -42,6 +42,25 @@ A comprehensive value assessment of every feature in the platform — **465 feat
 
 ---
 
+### 463. MCP Capability Upgrade — Reliability + Operator CRUD Surface
+
+**What it does:** Expands and hardens the MCP action layer for operator workflows across content, jobs, and keyword strategy. This pass fixes the schema-conversion regression path for union-shaped inputs, updates `update_brief`/`update_post` to object-first mode contracts, adds `send_to_client` by-ID targeting (`brief_id` / `post_id`), and strengthens local SEO refresh input validation (strict `refresh_body` shape).
+
+New MCP tools added:
+- Content requests: `list_content_requests`, `get_content_request`, `create_content_request`
+- Job observability: `get_job_status`, `list_jobs`, `cancel_job`
+- Keyword strategy CRUD: `get_keyword_strategy`, `remove_page_keyword`, `add_keywords_batch`, `replace_keyword_strategy`
+
+The implementation routes writes through existing service functions, preserves workspace event contracts, preserves `source: 'mcp-chat'` activity provenance, and adds contract-level schema guard coverage so object input schemas always expose top-level `properties`.
+
+**Agency value:** Unlocks full chat-native operator loops (create/list/inspect/update/send/cancel) without dropping into multiple dashboard routes.
+
+**Client value:** Indirectly improves delivery speed and operational reliability by reducing MCP dead-ends and stale-session handle failures.
+
+**Mutual:** Raises MCP safety and capability together: fewer silent schema failures plus wider, test-backed mutation coverage.
+
+---
+
 ### 462. Schema Text Sanitizer Authority Consolidation
 
 **What it does:** Extracts a single schema-safe text sanitizer authority at `server/schema/schema-text-sanitizer.ts` and migrates the schema generator, LocalBusiness/Service templates, and JSON-LD page-element extractors to use it. This unifies whitespace normalization, zero-width character cleanup, and opaque ID rejection behavior across previously duplicated implementations (`safeText`, `safePublicText`, `cleanPublicText`, local `isOpaqueIdentifier`). A dedicated unit suite (`tests/unit/schema/schema-text-sanitizer.test.ts`) now locks the shared behavior.
