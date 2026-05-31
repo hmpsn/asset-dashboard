@@ -1,16 +1,21 @@
 /**
- * Integration test for Task 1.1 — approving a SEO approval item resolves the
- * recommendations covering its page, exercised over the real HTTP route.
+ * Integration test for Task 1.1 — recommendation resolution is deferred to the
+ * APPLY path, never fired on per-item approve/reject.
  *
- * PATCH /api/public/approvals/:workspaceId/:batchId/:itemId { status: 'approved' }
- * runs in the spawned server (where broadcast is initialised) and calls
- * resolveRecommendationsForChange() after its DB writes. The matching rec must
- * drop to 'completed' and out of the active priority list. A rejection must NOT
- * resolve the rec (the client declined the fix).
+ * PATCH /api/public/approvals/:workspaceId/:batchId/:itemId only changes item
+ * status — the SEO change is not live on the page until the separate /apply
+ * endpoint pushes it. Resolving a rec on approve would mark it 'completed', and
+ * the regen merge preserves 'completed' even when the issue is still detected,
+ * permanently hiding a still-valid rec if the later apply fails. So approve and
+ * reject must BOTH leave matching recs untouched. (Positive resolution behaviour
+ * is covered by recommendations-resolve-on-apply.test.ts at the unit level and
+ * work-order-resolves-recommendations.test.ts end-to-end; the apply HTTP path
+ * resolves via the same unit-tested resolver using publishedPath/pageSlug.)
+ *
+ * This test FAILS against the earlier code that resolved on per-item approve.
  *
  * Recs + approval batches are seeded in-process; the spawned server shares the
- * worker-local SQLite DB, so HTTP reads/writes see the seeded rows (same pattern
- * as recommendation-resolution.test.ts).
+ * worker-local SQLite DB, so HTTP reads/writes see the seeded rows.
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 
@@ -82,8 +87,8 @@ beforeEach(() => {
   seedRecs([]);
 });
 
-describe('approving a SEO item resolves matching recommendations', () => {
-  it('marks the rec covering the approved page as completed', async () => {
+describe('per-item approve/reject does NOT resolve recommendations (resolution is on apply)', () => {
+  it('approving an item leaves the matching rec pending (not yet applied/live)', async () => {
     const batch = createBatch(testWsId, SITE_ID, 'Resolve batch', [
       { pageId: 'page-services', pageTitle: 'Services', pageSlug: 'services', publishedPath: '/services', field: 'seoTitle', currentValue: 'old', proposedValue: 'new' },
     ]);
@@ -98,8 +103,10 @@ describe('approving a SEO item resolves matching recommendations', () => {
     );
     expect(res.status).toBe(200);
 
+    // Approve only sets item status — the change is not live yet, so the rec
+    // must remain active until the /apply endpoint runs.
     const stored = loadRecommendations(testWsId)!;
-    expect(stored.recommendations.find(r => r.id === 'rec_services')!.status).toBe('completed');
+    expect(stored.recommendations.find(r => r.id === 'rec_services')!.status).toBe('pending');
     expect(stored.recommendations.find(r => r.id === 'rec_about')!.status).toBe('pending');
   });
 

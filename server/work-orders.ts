@@ -5,7 +5,11 @@ import { validateTransition, WORK_ORDER_TRANSITIONS } from './state-machines.js'
 import { invalidateContentPipelineCache } from './workspace-data.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { resolveRecommendationsForChange } from './recommendations.js';
+import { getPageState } from './page-edit-states.js';
+import { createLogger } from './logger.js';
 import { z } from 'zod';
+
+const log = createLogger('work-orders');
 
 // --- Types ---
 
@@ -164,9 +168,23 @@ export function updateWorkOrder(
   invalidateWorkOrderCaches(workspaceId);
 
   // A completed fix order resolves any recommendations covering the pages it
-  // touched, so the priority list drops them immediately (GSC-lag-free). // rec-refresh-ok
+  // touched, so the priority list drops them immediately (GSC-lag-free).
+  // order.pageIds are Webflow/page IDs (the page_edit_states key), but
+  // recommendation.affectedPages are SLUGS — resolve each id to its slug via
+  // page_edit_states before matching. Guarded so a resolver failure can never
+  // abort the work-order completion side-effects that run after updateWorkOrder
+  // returns (page-state → live, activity log, client email). // rec-refresh-ok
   if (updates.status === 'completed' && order.pageIds.length > 0) {
-    resolveRecommendationsForChange(workspaceId, { affectedPages: order.pageIds });
+    try {
+      const affectedSlugs = order.pageIds
+        .map(id => getPageState(workspaceId, id)?.slug)
+        .filter((s): s is string => typeof s === 'string' && s.length > 0);
+      if (affectedSlugs.length > 0) {
+        resolveRecommendationsForChange(workspaceId, { affectedPages: affectedSlugs });
+      }
+    } catch (err) {
+      log.warn({ err, workOrderId: order.id }, 'Failed to resolve recommendations after work-order completion');
+    }
   }
 
   return order;

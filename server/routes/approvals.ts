@@ -341,17 +341,12 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClien
           actionSummary: pageLabel,
           clientNote,
         });
-        // Resolve recommendations covering this page so an approved fix drops
-        // out of the active priority list immediately. A later failed apply is
-        // recovered by the auto-resolve/regen safety net (completed→pending). // rec-refresh-ok
-        const approvedPage = item.publishedPath || item.pageSlug || '';
-        if (approvedPage) {
-          try {
-            resolveRecommendationsForChange(req.params.workspaceId, { affectedPages: [approvedPage] });
-          } catch (err) {
-            log.warn({ err, itemId: item.id }, 'Failed to resolve recommendations after approval');
-          }
-        }
+        // NOTE: recommendation resolution happens on the APPLY path (the
+        // /apply endpoint below), NOT on approve. Approving only changes item
+        // status — the change isn't live on the page yet. Resolving here would
+        // mark the rec 'completed', and the regen merge preserves 'completed'
+        // even when the issue is still detected, so a later failed apply would
+        // permanently hide a still-valid recommendation.
       } else if (status === 'rejected' && statusChanged) {
         addActivity(req.params.workspaceId, 'changes_requested',
           `${actorName} requested changes to ${fieldLabel} for ${pageLabel}`,

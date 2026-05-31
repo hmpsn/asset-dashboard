@@ -160,12 +160,16 @@ router.post('/api/content-posts/:workspaceId/:postId/publish-to-webflow', requir
       post: updatedPost,
     });
 
-    // Enqueue debounced rec regen after response is sent — a content publish changes
-    // the live page inventory so recommendations should reflect the updated content state.
-    // Placed post-response (like llms.txt regen) to avoid blocking the HTTP response.
-    // recsInFlight in keyword-strategy-follow-ons deduplicates concurrent regens
-    // per workspace, so bulk publishes do not trigger N concurrent regen calls.
-    queueKeywordStrategyPostUpdateFollowOns({ workspaceId });
+    // Enqueue a recommendation regen after the response is sent — a content
+    // publish changes the live page inventory so recommendations should reflect
+    // it. Guarded in its own try/catch: the response has already been sent, so a
+    // throw here must NOT fall through to the outer catch (which would attempt a
+    // second, header-already-sent 500 response). recsInFlight dedupes per-workspace.
+    try {
+      queueKeywordStrategyPostUpdateFollowOns({ workspaceId });
+    } catch (err) {
+      log.warn({ err, workspaceId }, 'Failed to enqueue recommendation regen after content publish');
+    }
   } catch (err) {
     log.error({ err }, 'Publish to Webflow failed');
     res.status(500).json({ error: err instanceof Error ? err.message : 'Publish failed' });

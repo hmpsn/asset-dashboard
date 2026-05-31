@@ -125,8 +125,13 @@ Phase 4 (advisor context completeness) — independent; can also run parallel to
 - [ ] Add/confirm invalidation for each event; verify with a component test or manual WS trace.
 
 ### Phase 1 Systemic Improvements
-- **pr-check rule (warn):** "SEO-state write in `server/routes/` (approval-apply, work-order complete, strategy PATCH, publish) should resolve/regen recommendations or carry `// rec-refresh-ok`." Model on rule #8 ("Missing broadcastToWorkspace after DB write", automated-rules.md:170; escape hatch `// broadcast-ok`). Author per `docs/rules/pr-check-rule-authoring.md`.
+- **pr-check rule (warn) — DEFERRED to Phase 4's systemic batch:** "SEO-state write in `server/routes/` should resolve/regen recommendations or carry `// rec-refresh-ok`." Deferred deliberately: the write-then-refresh pattern is only complete once Phase 4 wires the remaining SEO-write paths, so authoring the rule now (against a half-covered surface) would either false-positive or bake in an incomplete allow-list. The `// rec-refresh-ok` annotations added in Phase 1 are intent markers the rule will recognize when authored. Model on rule #8 ("Missing broadcastToWorkspace after DB write", automated-rules.md:170).
 - **Tests:** integration tests above; a contract test that `RECOMMENDATIONS_UPDATED` has a frontend handler (mirror the existing tab-deep-link contract test pattern).
+
+### Phase 1 Scope Note & Deferrals (recorded after adversarial review, 2026-05-31)
+- **In scope (done):** rec resolution on approval *apply* + work-order completion (with Webflow/CMS page-ID → slug resolution via `page_edit_states`); strategy-PATCH regen; outcome-cron + content/schema-publish regen; shared `computeRecommendationSummary` so in-place resolves keep headline counts honest. Frontend invalidation was already satisfied by the existing `RECOMMENDATIONS_UPDATED` handler.
+- **Intentionally NOT in Phase 1:** the bulk admin SEO-write paths `webflow-seo-apply.ts`, `webflow-seo-suggestions.ts`, `webflow-cms.ts` also apply SEO changes but belong to the **Phase 4 / audit A-13 cache-invalidation cluster** (same files, same commit) — wiring rec-resolve there alongside cache invalidation is more efficient and avoids touching those files twice. Tracked for Phase 4.
+- **Deliberate design note:** rec resolution fires on the *apply* path only, never on per-item *approve* (approve doesn't make the change live; a premature `completed` would be preserved by the regen merge and permanently hide a still-valid rec).
 
 ### Phase 1 Verification
 - [ ] `npm run typecheck && npx vite build && npx vitest run`

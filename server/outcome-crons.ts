@@ -74,10 +74,12 @@ export function startOutcomeCrons() {
         log.info({ count: workspaceIds.length }, 'Invalidated intelligence cache for measured workspaces');
       }
 
-      // Enqueue debounced rec regen for each measured workspace.
-      // queueKeywordStrategyPostUpdateFollowOns guards against concurrent regens
-      // per workspace via recsInFlight — a bulk measure of N workspaces will not
-      // trigger N concurrent generateRecommendations calls.
+      // Enqueue a recommendation regen for each measured workspace so ranking
+      // reflects the new outcomes. NOTE: recsInFlight only dedupes concurrent
+      // regens for the SAME workspace — this loop still issues one regen per
+      // distinct measured workspace, bounded by the number measured this run
+      // (a handful at current scale, acceptable). If the client count grows
+      // materially, add cross-workspace concurrency limiting/staggering here.
       for (const wsId of workspaceIds) {
         queueKeywordStrategyPostUpdateFollowOns({ workspaceId: wsId });
       }
@@ -156,9 +158,10 @@ export function startOutcomeCrons() {
         log.info({ count: affectedWsIds.length }, 'Invalidated intelligence cache for learnings workspaces');
       }
 
-      // Enqueue debounced rec regen after learnings update.
-      // recsInFlight in keyword-strategy-follow-ons deduplicates concurrent regens
-      // per workspace, so a bulk learnings run across N workspaces is safe.
+      // Enqueue a recommendation regen after the learnings update. As above,
+      // recsInFlight dedupes only per-workspace; this issues one regen per
+      // distinct affected workspace (bounded by the run, acceptable at current
+      // scale — revisit with concurrency limiting if client count grows).
       for (const wsId of affectedWsIds) {
         queueKeywordStrategyPostUpdateFollowOns({ workspaceId: wsId });
       }

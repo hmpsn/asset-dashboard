@@ -357,11 +357,52 @@ export function resolveRecommendationsForChange(
 
   if (resolved === 0) return 0;
 
+  // Recompute the summary so client-facing headline counts (fixNow/fixSoon/
+  // trafficAtRisk/estimatedRecoverable*) reflect the resolved recs — otherwise
+  // the rendered list drops the item but the numbers stay inflated until the
+  // next full regen.
+  set.summary = computeRecommendationSummary(set.recommendations);
   saveRecommendations(set);
   invalidateIntelligenceCache(workspaceId);
   broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { resolved });
   log.info(`Resolved ${resolved} recommendation(s) in-place for ${workspaceId} (${changedPages.size} changed page(s))`);
   return resolved;
+}
+
+/**
+ * Compute the RecommendationSet summary (active counts + weighted recoverable
+ * traffic) from a rec list. Shared by the full regen (generateRecommendations)
+ * and the in-place resolver (resolveRecommendationsForChange) so client-facing
+ * headline numbers never drift from the rendered active list.
+ */
+export function computeRecommendationSummary(recs: Recommendation[]): RecommendationSet['summary'] {
+  const activeRecs = recs.filter(r => r.status !== 'completed' && r.status !== 'dismissed');
+  const actionableRecs = activeRecs.filter(r => r.priority === 'fix_now' || r.priority === 'fix_soon');
+
+  // Weighted recovery: each rec contributes traffic × its issue-specific recovery rate.
+  let weightedRecoverableClicks = 0;
+  let weightedRecoverableImpressions = 0;
+  for (const r of actionableRecs) {
+    const checkName = r.source?.startsWith('audit:site-wide:')
+      ? r.source.replace('audit:site-wide:', '')
+      : r.source?.startsWith('audit:')
+        ? r.source.replace('audit:', '')
+        : '';
+    const rate = checkName ? getRecoveryRate(checkName) : DEFAULT_RECOVERY;
+    weightedRecoverableClicks += r.trafficAtRisk * rate.summary;
+    weightedRecoverableImpressions += r.impressionsAtRisk * rate.summary;
+  }
+
+  return {
+    fixNow: activeRecs.filter(r => r.priority === 'fix_now').length,
+    fixSoon: activeRecs.filter(r => r.priority === 'fix_soon').length,
+    fixLater: activeRecs.filter(r => r.priority === 'fix_later').length,
+    ongoing: activeRecs.filter(r => r.priority === 'ongoing').length,
+    totalImpactScore: activeRecs.reduce((s, r) => s + r.impactScore, 0),
+    trafficAtRisk: activeRecs.reduce((s, r) => s + r.trafficAtRisk, 0),
+    estimatedRecoverableClicks: Math.round(weightedRecoverableClicks),
+    estimatedRecoverableImpressions: Math.round(weightedRecoverableImpressions),
+  };
 }
 
 // ─── Scoring Helpers ──────────────────────────────────────────────
@@ -1481,34 +1522,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   });
 
   // ── Build summary (exclude auto-resolved from active counts) ──
-  const activeRecs = recs.filter(r => r.status !== 'completed' && r.status !== 'dismissed');
-  const totalTrafficAtRisk = activeRecs.reduce((s, r) => s + r.trafficAtRisk, 0);
-  const actionableRecs = activeRecs.filter(r => r.priority === 'fix_now' || r.priority === 'fix_soon');
-
-  // Weighted recovery: each rec contributes traffic × its issue-specific recovery rate.
-  let weightedRecoverableClicks = 0;
-  let weightedRecoverableImpressions = 0;
-  for (const r of actionableRecs) {
-    const checkName = r.source?.startsWith('audit:site-wide:')
-      ? r.source.replace('audit:site-wide:', '')
-      : r.source?.startsWith('audit:')
-        ? r.source.replace('audit:', '')
-        : '';
-    const rate = checkName ? getRecoveryRate(checkName) : DEFAULT_RECOVERY;
-    weightedRecoverableClicks += r.trafficAtRisk * rate.summary;
-    weightedRecoverableImpressions += r.impressionsAtRisk * rate.summary;
-  }
-
-  const summary = {
-    fixNow: activeRecs.filter(r => r.priority === 'fix_now').length,
-    fixSoon: activeRecs.filter(r => r.priority === 'fix_soon').length,
-    fixLater: activeRecs.filter(r => r.priority === 'fix_later').length,
-    ongoing: activeRecs.filter(r => r.priority === 'ongoing').length,
-    totalImpactScore: activeRecs.reduce((s, r) => s + r.impactScore, 0),
-    trafficAtRisk: totalTrafficAtRisk,
-    estimatedRecoverableClicks: Math.round(weightedRecoverableClicks),
-    estimatedRecoverableImpressions: Math.round(weightedRecoverableImpressions),
-  };
+  const summary = computeRecommendationSummary(recs);
 
   const set: RecommendationSet = {
     workspaceId,
