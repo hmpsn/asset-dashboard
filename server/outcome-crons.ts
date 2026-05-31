@@ -6,6 +6,7 @@ import { createLogger } from './logger.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { queueKeywordStrategyPostUpdateFollowOns } from './keyword-strategy-follow-ons.js';
+import { runBackfill } from './outcome-backfill.js';
 import type * as OutcomeMeasurement from './outcome-measurement.js';
 import type * as WorkspaceLearnings from './workspace-learnings.js';
 import type * as ExternalDetection from './external-detection.js';
@@ -26,6 +27,7 @@ let learningsInterval: ReturnType<typeof setInterval> | null = null;
 let detectionInterval: ReturnType<typeof setInterval> | null = null;
 let archiveInterval: ReturnType<typeof setInterval> | null = null;
 let playbooksInterval: ReturnType<typeof setInterval> | null = null;
+let backfillInterval: ReturnType<typeof setInterval> | null = null;
 
 // Startup timeout handles — stored so stopOutcomeCrons() can cancel them
 // if shutdown is called within the first 35s of startup.
@@ -196,6 +198,20 @@ export function startOutcomeCrons() {
     });
   };
 
+  // Backfill sets only a MINIMAL baseline (not GSC) — it is a recovery net for
+  // missed recordAction calls on existing content/insights/recommendations, NOT a
+  // substitute for the live publish-path recordAction that fires at content publish
+  // time and captures real GSC baseline data. Run weekly so any newly published
+  // posts that slipped through the live path get caught quickly.
+  const runBackfillJob = () => {
+    try {
+      const result = runBackfill();
+      log.info({ backfilledCount: result.backfilledCount, errors: result.errors }, 'Outcome backfill cron complete');
+    } catch (err) {
+      log.error({ err }, 'Outcome backfill cron failed');
+    }
+  };
+
   // Run each job once after a short startup delay, then on their normal interval.
   // Store handles so stopOutcomeCrons() can cancel them during early shutdown.
   startupTimeouts = [
@@ -204,12 +220,14 @@ export function startOutcomeCrons() {
     setTimeout(() => void runDetection(), 25_000),
     setTimeout(() => void runPlaybooks(), 30_000),
     setTimeout(runArchive, 35_000),
+    setTimeout(runBackfillJob, 40_000),
   ];
 
   measureInterval = setInterval(() => void runMeasure(), DAILY_MS);
   learningsInterval = setInterval(() => void runLearnings(), DAILY_MS);
   detectionInterval = setInterval(() => void runDetection(), WEEKLY_MS);
   archiveInterval = setInterval(runArchive, DAILY_MS);
+  backfillInterval = setInterval(runBackfillJob, WEEKLY_MS);
 
   playbooksInterval = setInterval(() => void runPlaybooks(), 7 * DAILY_MS);
 
@@ -224,10 +242,12 @@ export function stopOutcomeCrons() {
   if (detectionInterval) clearInterval(detectionInterval);
   if (archiveInterval) clearInterval(archiveInterval);
   if (playbooksInterval) clearInterval(playbooksInterval);
+  if (backfillInterval) clearInterval(backfillInterval);
   measureInterval = null;
   learningsInterval = null;
   detectionInterval = null;
   archiveInterval = null;
   playbooksInterval = null;
+  backfillInterval = null;
   log.info('Outcome crons stopped');
 }
