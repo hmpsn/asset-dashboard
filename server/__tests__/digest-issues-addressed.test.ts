@@ -79,7 +79,7 @@ vi.mock('../../server/work-orders.js', () => ({
   listWorkOrders: mocks.listWorkOrders,
 }));
 
-const { generateMonthlyDigest } = await import('../../server/monthly-digest.js');
+const { generateMonthlyDigest } = await import('../../server/monthly-digest.js'); // dynamic-import-ok
 
 function makeWorkspace(overrides: Partial<Workspace> = {}): Workspace {
   return {

@@ -66,7 +66,7 @@ describe('scoreActionAtCheckpoint — clicks delta × CPC → attributed_value',
 
     // Create an action with a GSC baseline that has real clicks data.
     // insight_acted_on uses 'clicks' as its primary_metric — ideal for this test.
-    const action = recordAction({
+    const action = recordAction({ // recordAction-ok
       workspaceId: ws,
       actionType: 'insight_acted_on',
       sourceType: 'test-cpc',
@@ -82,16 +82,16 @@ describe('scoreActionAtCheckpoint — clicks delta × CPC → attributed_value',
     });
 
     // Backdate createdAt so the 30-day checkpoint is due
-    db.prepare(`UPDATE tracked_actions SET created_at = ? WHERE id = ?`)
+    db.prepare(`UPDATE tracked_actions SET created_at = ? WHERE id = ?`) // ws-scope-ok: tracked_actions.id is a UUID globally unique per row
       .run(new Date(Date.now() - 35 * 24 * 60 * 60 * 1000).toISOString(), action.id);
 
     // Mock getPageTrend to return a current snapshot with CURRENT_CLICKS
-    const measurementMod = await import('../../server/outcome-measurement.js');
+    const measurementMod = await import('../../server/outcome-measurement.js'); // dynamic-import-ok
     const { measurePendingOutcomes } = measurementMod;
 
     // We need to mock search-console.getPageTrend so fetchCurrentMetrics returns
     // a snapshot with current_clicks = CURRENT_CLICKS (20)
-    const searchConsoleMod = await import('../../server/search-console.js');
+    const searchConsoleMod = await import('../../server/search-console.js'); // dynamic-import-ok
     const getPageTrendSpy = vi.spyOn(searchConsoleMod, 'getPageTrend').mockResolvedValue(
       Array.from({ length: 14 }, () => ({
         date: new Date().toISOString().slice(0, 10),
@@ -143,7 +143,7 @@ describe('scoreActionAtCheckpoint — no CPC → attributed_value remains null',
       // no cpc field
     });
 
-    const action = recordAction({
+    const action = recordAction({ // recordAction-ok
       workspaceId: ws,
       actionType: 'insight_acted_on',
       sourceType: 'test-nocpc',
@@ -159,13 +159,13 @@ describe('scoreActionAtCheckpoint — no CPC → attributed_value remains null',
     });
 
     // Backdate createdAt so the 30-day checkpoint is due
-    db.prepare(`UPDATE tracked_actions SET created_at = ? WHERE id = ?`)
+    db.prepare(`UPDATE tracked_actions SET created_at = ? WHERE id = ?`) // ws-scope-ok: tracked_actions.id is a UUID globally unique per row
       .run(new Date(Date.now() - 35 * 24 * 60 * 60 * 1000).toISOString(), action.id);
 
-    const measurementMod = await import('../../server/outcome-measurement.js');
+    const measurementMod = await import('../../server/outcome-measurement.js'); // dynamic-import-ok
     const { measurePendingOutcomes } = measurementMod;
 
-    const searchConsoleMod = await import('../../server/search-console.js');
+    const searchConsoleMod = await import('../../server/search-console.js'); // dynamic-import-ok
     const getPageTrendSpy = vi.spyOn(searchConsoleMod, 'getPageTrend').mockResolvedValue(
       Array.from({ length: 14 }, () => ({
         date: new Date().toISOString().slice(0, 10),

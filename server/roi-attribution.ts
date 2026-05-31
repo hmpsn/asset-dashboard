@@ -1,4 +1,23 @@
 // server/roi-attribution.ts
+/**
+ * @deprecated This module is in the `deprecated` state of the deprecation lifecycle.
+ *
+ * ROI attribution now lives on `action_outcomes.attributed_value` (Phase 2 Outcome
+ * Intelligence Engine, shipped 2026-05-xx). The `roi_attributions` table and all
+ * functions in this module have been superseded by the `action_outcomes`-based path:
+ *
+ *   - ROI highlights → `getROIHighlightsFromOutcomes()` in `outcome-tracking.ts`
+ *   - Attribution recording → `recordAction()` + `recordOutcome()` in `outcome-tracking.ts`
+ *   - Value calculation → `scoreActionAtCheckpoint()` in `outcome-measurement.ts`
+ *
+ * Scheduled for removal: after Phase 2 is fully validated on staging (est. 2026-Q3).
+ * Do NOT delete the `roi_attributions` table until a data migration confirms all
+ * historical rows have been reconciled — data safety first.
+ *
+ * @see server/outcome-tracking.ts
+ * @see server/outcome-measurement.ts
+ * @see docs/rules/outcome-engine-stubs.md
+ */
 import { randomUUID } from 'crypto';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
@@ -51,6 +70,9 @@ const stmts = createStmtCache(() => ({
 /**
  * Record an optimization action for ROI tracking.
  * Normalizes page_url at write time for consistent lookup.
+ *
+ * @deprecated Use `recordAction()` from `outcome-tracking.ts` instead.
+ * `roi_attributions` is superseded by `action_outcomes.attributed_value` (Phase 2).
  */
 export function recordOptimization(params: {
   workspaceId: string;
@@ -79,6 +101,9 @@ export function recordOptimization(params: {
 
 /**
  * Measure the outcome of a previously recorded optimization.
+ *
+ * @deprecated Use `recordOutcome()` from `outcome-tracking.ts` instead.
+ * `roi_attributions` is superseded by `action_outcomes.attributed_value` (Phase 2).
  */
 export function measureOutcome(attributionId: string, params: {
   clicksAfter: number;
@@ -91,6 +116,9 @@ export function measureOutcome(attributionId: string, params: {
 /**
  * Get raw ROI attribution rows for the workspace intelligence assembler.
  * Returns structured data suitable for the ROIAttribution slice.
+ *
+ * @deprecated Use `getROIHighlightsFromOutcomes()` from `outcome-tracking.ts` instead.
+ * `roi_attributions` is superseded by `action_outcomes.attributed_value` (Phase 2).
  */
 export function getROIAttributionsRaw(workspaceId: string, limit = 10): Array<{
   id: string;
@@ -116,6 +144,9 @@ export function getROIAttributionsRaw(workspaceId: string, limit = 10): Array<{
 /**
  * Get ROI highlights for a workspace (monthly digest + client dashboard).
  * Only returns attributions where both before and after metrics are available.
+ *
+ * @deprecated Use `getROIHighlightsFromOutcomes()` from `outcome-tracking.ts` instead.
+ * `roi_attributions` is superseded by `action_outcomes.attributed_value` (Phase 2).
  */
 export function getROIHighlights(workspaceId: string, limit = 10): ROIHighlight[] {
   const rows = stmts().getHighlights.all(workspaceId, limit) as ROIAttributionRow[];
@@ -130,6 +161,9 @@ export function getROIHighlights(workspaceId: string, limit = 10): ROIHighlight[
 
 /**
  * Get unmeasured optimizations older than the measurement window.
+ *
+ * @deprecated ROI measurement is now handled by `measurePendingOutcomes()` in `outcome-measurement.ts`.
+ * `roi_attributions` is superseded by `action_outcomes.attributed_value` (Phase 2).
  */
 export function getUnmeasuredOptimizations(): ROIAttributionRow[] {
   return stmts().getUnmeasured.all() as ROIAttributionRow[];

@@ -48,7 +48,7 @@ describe('getROIHighlightsFromOutcomes', () => {
     const ws = `${WS_BASE}-main`;
     seedWorkspace(ws);
 
-    const action = recordAction({
+    const action = recordAction({ // recordAction-ok
       workspaceId: ws,
       actionType: 'content_published',
       sourceType: 'test',
@@ -101,7 +101,7 @@ describe('getROIHighlightsFromOutcomes', () => {
     seedWorkspace(ws);
 
     for (let i = 0; i < 4; i++) {
-      const action = recordAction({
+      const action = recordAction({ // recordAction-ok
         workspaceId: ws,
         actionType: 'content_published',
         sourceType: 'test',

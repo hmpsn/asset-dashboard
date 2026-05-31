@@ -39,7 +39,7 @@ afterAll(() => {
 });
 
 function makeAction(wsId: string) {
-  return recordAction({
+  return recordAction({ // recordAction-ok
     workspaceId: wsId,
     actionType: 'content_published',
     sourceType: 'test',
