@@ -130,6 +130,8 @@ describe('get_workspace_overview', () => {
     expect(result.id).toBe(ws.workspaceId);
     expect(typeof result.name).toBe('string');
     expect(typeof result.tier).toBe('string');
+    expect(typeof result.effective_tier).toBe('string');
+    expect(result).toHaveProperty('client_portal_url');
     expect(typeof result.pendingApprovals).toBe('number');
     expect(typeof result.pendingRequests).toBe('number');
   });
@@ -147,6 +149,59 @@ describe('get_workspace_overview', () => {
     const body = await res.json() as { result?: { isError?: boolean; content: Array<{ text: string }> } };
     expect(body.result?.isError).toBe(true);
     expect(body.result?.content[0].text).toContain('Workspace not found');
+  });
+});
+
+describe('workspace lifecycle mutations', () => {
+  it('supports create_workspace -> update_workspace -> delete_workspace', async () => {
+    const created = await mcpToolCall('create_workspace', {
+      name: 'MCP Lifecycle Workspace',
+    }) as { ok: boolean; workspace: { id: string; name: string } };
+    expect(created.ok).toBe(true);
+    expect(created.workspace.name).toBe('MCP Lifecycle Workspace');
+    const workspaceId = created.workspace.id;
+
+    const updated = await mcpToolCall('update_workspace', {
+      workspace_id: workspaceId,
+      updates: {
+        name: 'MCP Lifecycle Workspace Updated',
+        onboarding_enabled: true,
+      },
+    }) as { ok: boolean; workspace: { id: string; name: string; onboardingEnabled?: boolean } };
+    expect(updated.ok).toBe(true);
+    expect(updated.workspace.id).toBe(workspaceId);
+    expect(updated.workspace.name).toBe('MCP Lifecycle Workspace Updated');
+    expect(updated.workspace.onboardingEnabled).toBe(true);
+
+    const deleted = await mcpToolCall('delete_workspace', {
+      workspace_id: workspaceId,
+      confirm: 'delete_workspace',
+    }) as { ok: boolean; workspace_id: string; deleted: boolean };
+    expect(deleted.ok).toBe(true);
+    expect(deleted.workspace_id).toBe(workspaceId);
+    expect(deleted.deleted).toBe(true);
+  });
+
+  it('rejects update_workspace payloads outside the allowlist', async () => {
+    const res = await mcpPost(
+      {
+        jsonrpc: '2.0',
+        method: 'tools/call',
+        params: {
+          name: 'update_workspace',
+          arguments: {
+            workspace_id: ws.workspaceId,
+            updates: { disallowed_key: true },
+          },
+        },
+        id: 21,
+      },
+      MCP_TEST_KEY,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as { result?: { isError?: boolean; content: Array<{ text: string }> } };
+    expect(body.result?.isError).toBe(true);
+    expect(body.result?.content[0]?.text).toContain('Validation failed');
   });
 });
 
@@ -193,12 +248,32 @@ describe('get_workspace_intelligence', () => {
     expect(body.result?.isError).toBe(true);
     expect(body.result?.content[0].text).toContain('No valid intelligence slices');
   });
+
+  it('accepts enrichment flags and optional site-inventory auto include', async () => {
+    const result = await mcpToolCall('get_workspace_intelligence', {
+      workspaceId: ws.workspaceId,
+      enrich_with_backlinks: false,
+      resolve_entity_references: false,
+      include_site_inventory: true,
+    }) as Record<string, unknown>;
+    expect(result.workspaceId).toBe(ws.workspaceId);
+    expect(typeof result.assembledAt).toBe('string');
+  });
 });
 
 describe('get_insights', () => {
   it('returns an array for a known workspace', async () => {
     const result = await mcpToolCall('get_insights', {
       workspaceId: ws.workspaceId,
+    }) as unknown[];
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('accepts a domain filter', async () => {
+    const result = await mcpToolCall('get_insights', {
+      workspaceId: ws.workspaceId,
+      domain: 'search',
+      limit: 5,
     }) as unknown[];
     expect(Array.isArray(result)).toBe(true);
   });
@@ -226,6 +301,16 @@ describe('get_insights', () => {
     );
     const body = await res.json() as { result?: { isError?: boolean } };
     expect(body.result?.isError).toBe(true);
+  });
+});
+
+describe('get_unresolved_insights', () => {
+  it('returns unresolved queue entries for a known workspace', async () => {
+    const result = await mcpToolCall('get_unresolved_insights', {
+      workspaceId: ws.workspaceId,
+      limit: 10,
+    }) as unknown[];
+    expect(Array.isArray(result)).toBe(true);
   });
 });
 
@@ -268,6 +353,16 @@ describe('get_keyword_analysis', () => {
     expect(Array.isArray(result.gaps)).toBe(true);
     expect(Array.isArray(result.topicClusters)).toBe(true);
     expect(Array.isArray(result.cannibalization)).toBe(true);
+    expect(result).toHaveProperty('discovered_query_summary');
+  });
+});
+
+describe('get_content_performance', () => {
+  it('returns content performance items', async () => {
+    const result = await mcpToolCall('get_content_performance', {
+      workspaceId: ws.workspaceId,
+    }) as { items?: unknown[] };
+    expect(Array.isArray(result.items)).toBe(true);
   });
 });
 

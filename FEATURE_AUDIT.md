@@ -1,8 +1,26 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **465 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **466 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 466. MCP Limitations Sprint 2 Core — Workspace Automation + Content Lifecycle + Intelligence Enrichment
+
+**What it does:** Completes the next core MCP limitations wave after the top-5 rollout by shipping four additive capability groups:
+- Workspace management MCP write tools: `create_workspace`, `update_workspace` (moderate allowlist), `delete_workspace`, plus additive `get_workspace_overview` enrichments (`effective_tier`, `client_portal_url`).
+- Content/post lifecycle additions: `get_content_performance`, `delete_brief`, `delete_post`, `list_post_versions`, `revert_post_version`.
+- Insights/intelligence enrichments: `get_unresolved_insights`, `get_insights` optional `domain` filter, `get_keyword_analysis.discovered_query_summary`, and `get_workspace_intelligence` enrichment flags (`enrich_with_backlinks`, `resolve_entity_references`, `include_site_inventory`).
+- List-filter buildout in MCP layer: `list_briefs` and `list_posts` now accept optional `status` and `page_type` filters without breaking existing service signatures.
+
+All new mutation paths preserve existing platform contracts: service-first writes, `source: 'mcp-chat'` activity provenance, workspace broadcasts, and MCP dashboard URL responses.
+
+**Agency value:** Expands chat-native operator coverage to include workspace lifecycle operations, post-history workflows, and richer insights triage without context-switching to multiple admin routes.
+
+**Client value:** Improves operational turnaround and consistency by enabling safer, traceable MCP automation for common content and workspace operations.
+
+**Mutual:** Raises MCP parity with core platform workflows while preserving backward compatibility and existing event/activity contracts.
 
 ---
 

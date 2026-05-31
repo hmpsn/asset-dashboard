@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
+import { getPost, snapshotPostVersion } from '../../server/content-posts-db.js';
 
 const MCP_TEST_KEY = 'test-mcp-key-content';
 const ctx = createTestContext(13704, {
@@ -521,6 +522,172 @@ describe('MCP content tools (integration)', () => {
     const updateActivity = activities.find((entry) => entry.metadata?.action === 'mcp_post_updated');
     expect(updateActivity).toBeDefined();
     expect(updateActivity?.metadata?.source).toBe('mcp-chat');
+  });
+
+  it('supports list_briefs/list_posts optional status + page_type filters', async () => {
+    const preparedBrief = await callMcpTool('prepare_brief_context', {
+      workspace_id: ws.workspaceId,
+      topic: 'filtered CRM brief',
+      layout: buildLayout(),
+    });
+    const preparedBriefPayload = JSON.parse(preparedBrief.content[0].text) as { brief_request_handle: string };
+    const savedBrief = await callMcpTool('save_brief', {
+      workspace_id: ws.workspaceId,
+      brief_request_handle: preparedBriefPayload.brief_request_handle,
+      content: buildBriefContent(),
+    });
+    const savedBriefPayload = JSON.parse(savedBrief.content[0].text) as { brief_id: string; brief_handle: string };
+
+    await callMcpTool('send_to_client', {
+      workspace_id: ws.workspaceId,
+      brief_handle: savedBriefPayload.brief_handle,
+      note: 'filter status',
+    });
+
+    const briefs = await callMcpTool('list_briefs', {
+      workspace_id: ws.workspaceId,
+      status: 'client_review',
+      page_type: 'blog',
+    });
+    const briefList = JSON.parse(briefs.content[0].text) as { briefs: Array<{ brief_id: string; page_type: string | null; status: string | null }> };
+    expect(briefList.briefs.some(brief => brief.brief_id === savedBriefPayload.brief_id)).toBe(true);
+    const filteredBrief = briefList.briefs.find(brief => brief.brief_id === savedBriefPayload.brief_id);
+    expect(filteredBrief?.page_type).toBe('blog');
+    expect(filteredBrief?.status).toBe('client_review');
+
+    const preparedPost = await callMcpTool('prepare_post_context', {
+      workspace_id: ws.workspaceId,
+      brief_id: savedBriefPayload.brief_id,
+    });
+    const preparedPostPayload = JSON.parse(preparedPost.content[0].text) as { post_request_handle: string };
+    const savedPost = await callMcpTool('save_post', {
+      workspace_id: ws.workspaceId,
+      post_request_handle: preparedPostPayload.post_request_handle,
+      content: buildPostContent(savedBriefPayload.brief_id),
+    });
+    const savedPostPayload = JSON.parse(savedPost.content[0].text) as { post_id: string };
+
+    const posts = await callMcpTool('list_posts', {
+      workspace_id: ws.workspaceId,
+      status: 'draft',
+      page_type: 'blog',
+    });
+    const postList = JSON.parse(posts.content[0].text) as { posts: Array<{ post_id: string; page_type: string | null; status: string }> };
+    expect(postList.posts.some(post => post.post_id === savedPostPayload.post_id)).toBe(true);
+    const filteredPost = postList.posts.find(post => post.post_id === savedPostPayload.post_id);
+    expect(filteredPost?.page_type).toBe('blog');
+    expect(filteredPost?.status).toBe('draft');
+  });
+
+  it('supports list_post_versions and revert_post_version', async () => {
+    const preparedBrief = await callMcpTool('prepare_brief_context', {
+      workspace_id: ws.workspaceId,
+      topic: 'versioned CRM post',
+      layout: buildLayout(),
+    });
+    const preparedBriefPayload = JSON.parse(preparedBrief.content[0].text) as { brief_request_handle: string };
+    const savedBrief = await callMcpTool('save_brief', {
+      workspace_id: ws.workspaceId,
+      brief_request_handle: preparedBriefPayload.brief_request_handle,
+      content: buildBriefContent(),
+    });
+    const savedBriefPayload = JSON.parse(savedBrief.content[0].text) as { brief_id: string };
+
+    const preparedPost = await callMcpTool('prepare_post_context', {
+      workspace_id: ws.workspaceId,
+      brief_id: savedBriefPayload.brief_id,
+    });
+    const preparedPostPayload = JSON.parse(preparedPost.content[0].text) as { post_request_handle: string };
+    const savedPost = await callMcpTool('save_post', {
+      workspace_id: ws.workspaceId,
+      post_request_handle: preparedPostPayload.post_request_handle,
+      content: buildPostContent(savedBriefPayload.brief_id),
+    });
+    const savedPostPayload = JSON.parse(savedPost.content[0].text) as { post_id: string };
+
+    const storedPost = getPost(ws.workspaceId, savedPostPayload.post_id);
+    expect(storedPost).toBeDefined();
+    snapshotPostVersion(storedPost!, 'manual_edit', 'integration-test');
+
+    const versionsResult = await callMcpTool('list_post_versions', {
+      workspace_id: ws.workspaceId,
+      post_id: savedPostPayload.post_id,
+    });
+    const versionsPayload = JSON.parse(versionsResult.content[0].text) as { versions: Array<{ version_id: string }> };
+    expect(versionsPayload.versions.length).toBeGreaterThan(0);
+
+    const reverted = await callMcpTool('revert_post_version', {
+      workspace_id: ws.workspaceId,
+      post_id: savedPostPayload.post_id,
+      version_id: versionsPayload.versions[0].version_id,
+    });
+    expect(reverted.isError).toBeFalsy();
+    const revertedPayload = JSON.parse(reverted.content[0].text) as { post_id: string; version_id: string; revision: string };
+    expect(revertedPayload.post_id).toBe(savedPostPayload.post_id);
+    expect(revertedPayload.version_id).toBe(versionsPayload.versions[0].version_id);
+    expect(typeof revertedPayload.revision).toBe('string');
+  });
+
+  it('supports delete_brief and delete_post', async () => {
+    const preparedBrief = await callMcpTool('prepare_brief_context', {
+      workspace_id: ws.workspaceId,
+      topic: 'delete brief topic',
+      layout: buildLayout(),
+    });
+    const preparedBriefPayload = JSON.parse(preparedBrief.content[0].text) as { brief_request_handle: string };
+    const savedBrief = await callMcpTool('save_brief', {
+      workspace_id: ws.workspaceId,
+      brief_request_handle: preparedBriefPayload.brief_request_handle,
+      content: buildBriefContent(),
+    });
+    const savedBriefPayload = JSON.parse(savedBrief.content[0].text) as { brief_id: string };
+
+    const deletedBrief = await callMcpTool('delete_brief', {
+      workspace_id: ws.workspaceId,
+      brief_id: savedBriefPayload.brief_id,
+    });
+    expect(deletedBrief.isError).toBeFalsy();
+    const deletedBriefPayload = JSON.parse(deletedBrief.content[0].text) as { deleted: boolean };
+    expect(deletedBriefPayload.deleted).toBe(true);
+
+    const briefRes = await ctx.api(`/api/content-briefs/${ws.workspaceId}/${savedBriefPayload.brief_id}`);
+    expect(briefRes.status).toBe(404);
+
+    const preparedBrief2 = await callMcpTool('prepare_brief_context', {
+      workspace_id: ws.workspaceId,
+      topic: 'delete post topic',
+      layout: buildLayout(),
+    });
+    const preparedBriefPayload2 = JSON.parse(preparedBrief2.content[0].text) as { brief_request_handle: string };
+    const savedBrief2 = await callMcpTool('save_brief', {
+      workspace_id: ws.workspaceId,
+      brief_request_handle: preparedBriefPayload2.brief_request_handle,
+      content: buildBriefContent(),
+    });
+    const savedBriefPayload2 = JSON.parse(savedBrief2.content[0].text) as { brief_id: string };
+
+    const preparedPost = await callMcpTool('prepare_post_context', {
+      workspace_id: ws.workspaceId,
+      brief_id: savedBriefPayload2.brief_id,
+    });
+    const preparedPostPayload = JSON.parse(preparedPost.content[0].text) as { post_request_handle: string };
+    const savedPost = await callMcpTool('save_post', {
+      workspace_id: ws.workspaceId,
+      post_request_handle: preparedPostPayload.post_request_handle,
+      content: buildPostContent(savedBriefPayload2.brief_id),
+    });
+    const savedPostPayload = JSON.parse(savedPost.content[0].text) as { post_id: string };
+
+    const deletedPost = await callMcpTool('delete_post', {
+      workspace_id: ws.workspaceId,
+      post_id: savedPostPayload.post_id,
+    });
+    expect(deletedPost.isError).toBeFalsy();
+    const deletedPostPayload = JSON.parse(deletedPost.content[0].text) as { deleted: boolean };
+    expect(deletedPostPayload.deleted).toBe(true);
+
+    const postRes = await ctx.api(`/api/content-posts/${ws.workspaceId}/${savedPostPayload.post_id}`);
+    expect(postRes.status).toBe(404);
   });
 
   it('save_brief rejects unknown handles', async () => {

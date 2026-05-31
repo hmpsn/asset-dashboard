@@ -5,19 +5,33 @@ import {
   addKeywordToStrategyInputSchema,
   cancelJobInputSchema,
   createContentRequestInputSchema,
+  createWorkspaceInputSchema,
+  deleteBriefInputSchema,
+  deletePostInputSchema,
+  deleteWorkspaceInputSchema,
+  getAnomaliesInputSchema,
+  getContentPerformanceInputSchema,
   getContentRequestInputSchema,
+  getInsightsInputSchema,
   getJobStatusInputSchema,
   getKeywordStrategyInputSchema,
+  getUnresolvedInsightsInputSchema,
+  getWorkspaceIntelligenceInputSchema,
+  listBriefsInputSchema,
+  listPostVersionsInputSchema,
   prepareBriefContextInputSchema,
+  revertPostVersionInputSchema,
   saveBriefInputSchema,
   preparePostContextInputSchema,
   savePostInputSchema,
   listContentRequestsInputSchema,
   listJobsInputSchema,
+  listPostsInputSchema,
   removePageKeywordInputSchema,
   replaceKeywordStrategyInputSchema,
   sendToClientInputSchema,
   updateBriefInputSchema,
+  updateWorkspaceInputSchema,
   updatePostInputSchema,
   startKeywordStrategyGenerationInputSchema,
   startSeoAuditInputSchema,
@@ -153,14 +167,28 @@ describe('mcp-action-schemas', () => {
       const schemas = [
         researchKeywordsInputSchema,
         addKeywordToStrategyInputSchema,
+        listBriefsInputSchema,
         prepareBriefContextInputSchema,
         saveBriefInputSchema,
+        listPostsInputSchema,
         preparePostContextInputSchema,
         savePostInputSchema,
         sendToClientInputSchema,
         listContentRequestsInputSchema,
         getContentRequestInputSchema,
         createContentRequestInputSchema,
+        createWorkspaceInputSchema,
+        updateWorkspaceInputSchema,
+        deleteWorkspaceInputSchema,
+        getContentPerformanceInputSchema,
+        deleteBriefInputSchema,
+        deletePostInputSchema,
+        listPostVersionsInputSchema,
+        revertPostVersionInputSchema,
+        getUnresolvedInsightsInputSchema,
+        getInsightsInputSchema,
+        getAnomaliesInputSchema,
+        getWorkspaceIntelligenceInputSchema,
         getKeywordStrategyInputSchema,
         removePageKeywordInputSchema,
         addKeywordsBatchInputSchema,
@@ -172,7 +200,7 @@ describe('mcp-action-schemas', () => {
         listJobsInputSchema,
         cancelJobInputSchema,
       ];
-      expect(schemas).toHaveLength(20);
+      expect(schemas).toHaveLength(34);
       for (const schema of schemas) {
         expect(schema).toBeDefined();
         expect(typeof schema.safeParse).toBe('function');
@@ -191,5 +219,73 @@ describe('mcp-action-schemas', () => {
 
   it('typedOutlineSchema exports and accepts a minimal section', () => {
     expect(typedOutlineSchema.safeParse({ sections: [{ heading: { level: 1, text: 'x' } }] }).success).toBe(true);
+  });
+
+  describe('workspace mutation schemas', () => {
+    it('accepts create workspace payload', () => {
+      expect(createWorkspaceInputSchema.safeParse({ name: 'New Workspace' }).success).toBe(true);
+    });
+
+    it('enforces update_workspace allowlist and at least one updates field', () => {
+      expect(updateWorkspaceInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        updates: { name: 'Renamed Workspace', seo_data_provider: 'semrush' },
+      }).success).toBe(true);
+      expect(updateWorkspaceInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        updates: { trial_ends_at: '2026-12-31T00:00:00.000Z' },
+      }).success).toBe(true);
+      expect(updateWorkspaceInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        updates: { trial_ends_at: 'not-a-date' },
+      }).success).toBe(false);
+      expect(updateWorkspaceInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        updates: {},
+      }).success).toBe(false);
+      expect(updateWorkspaceInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        updates: { disallowed: true },
+      }).success).toBe(false);
+    });
+
+    it('requires delete_workspace confirm literal', () => {
+      expect(deleteWorkspaceInputSchema.safeParse({ workspace_id: 'ws-1', confirm: 'delete_workspace' }).success).toBe(true);
+      expect(deleteWorkspaceInputSchema.safeParse({ workspace_id: 'ws-1', confirm: 'delete' }).success).toBe(false);
+    });
+  });
+
+  describe('list filter schemas', () => {
+    it('accepts list_briefs filter params', () => {
+      expect(listBriefsInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        status: 'approved',
+        page_type: 'blog',
+        limit: 25,
+      }).success).toBe(true);
+    });
+
+    it('accepts list_posts filter params', () => {
+      expect(listPostsInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        status: 'draft',
+        page_type: 'service',
+        limit: 25,
+      }).success).toBe(true);
+    });
+  });
+
+  describe('insight read schemas', () => {
+    it('accepts valid get_insights type values and rejects invalid ones', () => {
+      expect(getInsightsInputSchema.safeParse({
+        workspaceId: 'ws-1',
+        type: 'content_decay',
+        limit: 10,
+      }).success).toBe(true);
+      expect(getInsightsInputSchema.safeParse({
+        workspaceId: 'ws-1',
+        type: 'content-decay',
+      }).success).toBe(false);
+    });
   });
 });

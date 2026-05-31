@@ -1,4 +1,5 @@
 import type { Tool } from '@modelcontextprotocol/sdk/types';
+import { getContentPerformanceInputSchema } from '../../../shared/types/mcp-action-schemas.js';
 import { getInsights } from '../../analytics-insights-store.js';
 import { listKeywordGaps } from '../../keyword-gaps.js';
 import { listTopicClusters } from '../../topic-clusters.js';
@@ -8,6 +9,8 @@ import { getWorkspace } from '../../workspaces.js';
 import type { IntelligenceSlice } from '../../../shared/types/intelligence.js';
 import { getPrimaryMarketLocationCode } from '../../local-seo.js';
 import { createLogger } from '../../logger.js';
+import { toMcpJsonSchema } from '../json-schema.js';
+import { handleContentPerformance } from '../../routes/content-requests.js';
 
 const log = createLogger('mcp-tools-content');
 
@@ -52,6 +55,12 @@ export const contentTools: Tool[] = [
       required: ['workspaceId'],
     },
   },
+  {
+    name: 'get_content_performance',
+    description:
+      'Get post/request content performance with GSC and GA4 metrics, publish age, and source metadata.',
+    inputSchema: toMcpJsonSchema(getContentPerformanceInputSchema),
+  },
 ];
 
 const SEO_CONTEXT_SLICE: readonly IntelligenceSlice[] = ['seoContext'];
@@ -89,7 +98,7 @@ export async function handleContentTool(
     }
 
     if (name === 'get_keyword_analysis') {
-      const { getLostVisibilityQueries } = await import('../../client-discovered-queries.js'); // dynamic-import-ok - optional discovery table degrades through outer tool error handling
+      const { getDiscoveredQuerySummary, getLostVisibilityQueries } = await import('../../client-discovered-queries.js'); // dynamic-import-ok - optional discovery table degrades through outer tool error handling
       const geo = (() => {
         try {
           return getPrimaryMarketLocationCode(workspaceId);
@@ -103,6 +112,14 @@ export async function handleContentTool(
         topicClusters: listTopicClusters(workspaceId),
         cannibalization: listCannibalizationIssues(workspaceId),
         lostVisibility: getLostVisibilityQueries(workspaceId),
+        discovered_query_summary: (() => {
+          try {
+            return getDiscoveredQuerySummary(workspaceId);
+          } catch (err) {
+            log.debug({ err, workspaceId }, 'get_keyword_analysis: discovered query summary unavailable, degrading gracefully');
+            return null;
+          }
+        })(),
         geoVolumeLabel: geo?.label ?? null,
       };
       return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
@@ -113,6 +130,18 @@ export async function handleContentTool(
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(intel.seoContext ?? {}) }],
       };
+    }
+
+    if (name === 'get_content_performance') {
+      const parsed = getContentPerformanceInputSchema.safeParse(args);
+      if (!parsed.success) {
+        return {
+          isError: true,
+          content: [{ type: 'text' as const, text: `Validation failed: ${JSON.stringify(parsed.error.issues)}` }],
+        };
+      }
+      const data = await handleContentPerformance(parsed.data.workspaceId);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(data) }] };
     }
 
     return { isError: true, content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }] };

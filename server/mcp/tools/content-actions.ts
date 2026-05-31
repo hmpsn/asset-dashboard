@@ -2,15 +2,19 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { Tool } from '@modelcontextprotocol/sdk/types';
 import {
   createContentRequestInputSchema,
+  deleteBriefInputSchema,
+  deletePostInputSchema,
   getContentRequestInputSchema,
   getBriefInputSchema,
   getPostInputSchema,
   layoutSchema,
+  listPostVersionsInputSchema,
   listBriefsInputSchema,
   listContentRequestsInputSchema,
   listPostsInputSchema,
   prepareBriefContextInputSchema,
   preparePostContextInputSchema,
+  revertPostVersionInputSchema,
   saveBriefInputSchema,
   savePostInputSchema,
   sendToClientInputSchema,
@@ -20,14 +24,22 @@ import {
 import type { ContentBrief, GeneratedPost } from '../../../shared/types/content.js';
 import { addActivity } from '../../activity-log.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
-import { getBrief, listBriefs, updateBrief, upsertBrief } from '../../content-brief.js';
+import { deleteBrief, getBrief, listBriefs, updateBrief, upsertBrief } from '../../content-brief.js';
 import {
   createContentRequest,
   getContentRequest,
   listContentRequests,
   updateContentRequest,
 } from '../../content-requests.js';
-import { getPost, listPosts, savePost, updatePostField } from '../../content-posts-db.js';
+import {
+  deletePost,
+  getPost,
+  listPostVersions,
+  listPosts,
+  revertToVersion,
+  savePost,
+  updatePostField,
+} from '../../content-posts-db.js';
 import { countHtmlWords } from '../../content-posts-ai.js';
 import { invalidateContentPipelineIntelligence } from '../../intelligence-freshness.js';
 import { buildContentGenerationContext } from '../../intelligence/generation-context-builders.js';
@@ -150,6 +162,26 @@ export const contentActionTools: Tool[] = [
     name: 'create_content_request',
     description: 'Create a content topic request in the workspace request pipeline.',
     inputSchema: toMcpJsonSchema(createContentRequestInputSchema),
+  },
+  {
+    name: 'delete_brief',
+    description: 'Delete a content brief by id.',
+    inputSchema: toMcpJsonSchema(deleteBriefInputSchema),
+  },
+  {
+    name: 'delete_post',
+    description: 'Delete a generated post by id.',
+    inputSchema: toMcpJsonSchema(deletePostInputSchema),
+  },
+  {
+    name: 'list_post_versions',
+    description: 'List historical versions for a generated post.',
+    inputSchema: toMcpJsonSchema(listPostVersionsInputSchema),
+  },
+  {
+    name: 'revert_post_version',
+    description: 'Revert a post back to a selected historical version.',
+    inputSchema: toMcpJsonSchema(revertPostVersionInputSchema),
   },
 ];
 
@@ -276,17 +308,29 @@ async function handleListBriefs(
 ): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
   const parsed = listBriefsInputSchema.safeParse(args);
   if (!parsed.success) return zodErrorToMcp(parsed.error);
-  const { workspace_id: workspaceId, limit } = parsed.data;
+  const { workspace_id: workspaceId, limit, status, page_type: pageType } = parsed.data;
   const workspace = requireWorkspace(workspaceId);
   if ('isError' in workspace) return workspace;
 
+  const requestStatusByBrief = new Map<string, { status: string; updatedAt: string }>();
+  for (const request of listContentRequests(workspaceId)) {
+    if (!request.briefId) continue;
+    const existing = requestStatusByBrief.get(request.briefId);
+    if (!existing || request.updatedAt > existing.updatedAt) {
+      requestStatusByBrief.set(request.briefId, { status: request.status, updatedAt: request.updatedAt });
+    }
+  }
+
   const rows = listBriefs(workspaceId)
+    .filter((brief) => (pageType ? brief.pageType === pageType : true))
+    .filter((brief) => (status ? requestStatusByBrief.get(brief.id)?.status === status : true))
     .slice(0, limit ?? 50)
     .map((brief) => ({
       brief_id: brief.id,
       target_keyword: brief.targetKeyword,
       suggested_title: brief.suggestedTitle,
       page_type: brief.pageType ?? null,
+      status: requestStatusByBrief.get(brief.id)?.status ?? null,
       created_at: brief.createdAt,
       revision: computeRevisionToken(buildBriefEditablePayload(brief)),
     }));
@@ -405,11 +449,14 @@ async function handleListPosts(
 ): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
   const parsed = listPostsInputSchema.safeParse(args);
   if (!parsed.success) return zodErrorToMcp(parsed.error);
-  const { workspace_id: workspaceId, limit } = parsed.data;
+  const { workspace_id: workspaceId, limit, status, page_type: pageType } = parsed.data;
   const workspace = requireWorkspace(workspaceId);
   if ('isError' in workspace) return workspace;
+  const briefPageTypeById = new Map(listBriefs(workspaceId).map(brief => [brief.id, brief.pageType ?? null]));
 
   const rows = listPosts(workspaceId)
+    .filter((post) => (status ? post.status === status : true))
+    .filter((post) => (pageType ? briefPageTypeById.get(post.briefId) === pageType : true))
     .slice(0, limit ?? 50)
     .map((post) => ({
       post_id: post.id,
@@ -417,6 +464,7 @@ async function handleListPosts(
       title: post.title,
       target_keyword: post.targetKeyword,
       status: post.status,
+      page_type: briefPageTypeById.get(post.briefId) ?? null,
       updated_at: post.updatedAt,
       revision: computeRevisionToken(buildPostEditablePayload(post)),
     }));
@@ -983,6 +1031,155 @@ async function handleCreateContentRequest(
   });
 }
 
+async function handleDeleteBrief(
+  args: Record<string, unknown>,
+): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
+  const parsed = deleteBriefInputSchema.safeParse(args);
+  if (!parsed.success) return zodErrorToMcp(parsed.error);
+  const { workspace_id: workspaceId, brief_id: briefId } = parsed.data;
+  const workspace = requireWorkspace(workspaceId);
+  if ('isError' in workspace) return workspace;
+
+  const existing = getBrief(workspaceId, briefId);
+  if (!existing) return mcpError(`Brief not found: ${briefId}`);
+
+  deleteBrief(workspaceId, briefId);
+  invalidateContentPipelineIntelligence(workspaceId);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, {
+    action: 'mcp_brief_deleted',
+    briefId,
+    deleted: true,
+  });
+  addActivity(
+    workspaceId,
+    'content_updated',
+    `Deleted content brief "${existing.suggestedTitle || existing.targetKeyword}"`,
+    undefined,
+    {
+      source: 'mcp-chat',
+      briefId,
+      action: 'mcp_brief_deleted',
+    },
+  );
+
+  return mcpSuccess({
+    ok: true,
+    brief_id: briefId,
+    deleted: true,
+    dashboard_url: buildDashboardUrl(workspaceId, 'content'),
+  });
+}
+
+async function handleDeletePost(
+  args: Record<string, unknown>,
+): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
+  const parsed = deletePostInputSchema.safeParse(args);
+  if (!parsed.success) return zodErrorToMcp(parsed.error);
+  const { workspace_id: workspaceId, post_id: postId } = parsed.data;
+  const workspace = requireWorkspace(workspaceId);
+  if ('isError' in workspace) return workspace;
+
+  const existing = getPost(workspaceId, postId);
+  if (!existing) return mcpError(`Post not found: ${postId}`);
+
+  deletePost(workspaceId, postId);
+  invalidateContentPipelineIntelligence(workspaceId);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.POST_UPDATED, {
+    action: 'mcp_post_deleted',
+    postId,
+    deleted: true,
+  });
+  addActivity(
+    workspaceId,
+    'content_updated',
+    `Deleted post "${existing.title}"`,
+    undefined,
+    {
+      source: 'mcp-chat',
+      postId,
+      action: 'mcp_post_deleted',
+    },
+  );
+
+  return mcpSuccess({
+    ok: true,
+    post_id: postId,
+    deleted: true,
+    dashboard_url: buildDashboardUrl(workspaceId, 'content'),
+  });
+}
+
+async function handleListPostVersions(
+  args: Record<string, unknown>,
+): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
+  const parsed = listPostVersionsInputSchema.safeParse(args);
+  if (!parsed.success) return zodErrorToMcp(parsed.error);
+  const { workspace_id: workspaceId, post_id: postId, limit } = parsed.data;
+  const workspace = requireWorkspace(workspaceId);
+  if ('isError' in workspace) return workspace;
+
+  const post = getPost(workspaceId, postId);
+  if (!post) return mcpError(`Post not found: ${postId}`);
+
+  const versions = listPostVersions(workspaceId, postId)
+    .slice(0, limit ?? 50)
+    .map((version) => ({
+      version_id: version.id,
+      version_number: version.versionNumber,
+      trigger: version.trigger,
+      trigger_detail: version.triggerDetail,
+      total_word_count: version.totalWordCount,
+      created_at: version.createdAt,
+    }));
+
+  return mcpSuccess({
+    post_id: postId,
+    versions,
+    dashboard_url: buildDashboardUrl(workspaceId, 'content'),
+  });
+}
+
+async function handleRevertPostVersion(
+  args: Record<string, unknown>,
+): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
+  const parsed = revertPostVersionInputSchema.safeParse(args);
+  if (!parsed.success) return zodErrorToMcp(parsed.error);
+  const { workspace_id: workspaceId, post_id: postId, version_id: versionId } = parsed.data;
+  const workspace = requireWorkspace(workspaceId);
+  if ('isError' in workspace) return workspace;
+
+  const reverted = revertToVersion(workspaceId, postId, versionId);
+  if (!reverted) return mcpError(`Post or version not found for post ${postId}`);
+
+  invalidateContentPipelineIntelligence(workspaceId);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.POST_UPDATED, {
+    action: 'mcp_post_reverted',
+    postId: reverted.id,
+    versionId,
+  });
+  addActivity(
+    workspaceId,
+    'post_reverted',
+    `Reverted post "${reverted.title}" to version ${versionId}`,
+    undefined,
+    {
+      source: 'mcp-chat',
+      postId: reverted.id,
+      versionId,
+      action: 'mcp_post_reverted',
+    },
+  );
+
+  return mcpSuccess({
+    ok: true,
+    post_id: reverted.id,
+    version_id: versionId,
+    revision: computeRevisionToken(buildPostEditablePayload(reverted)),
+    post: reverted,
+    dashboard_url: buildDashboardUrl(workspaceId, 'content'),
+  });
+}
+
 async function handleSendToClient(
   args: Record<string, unknown>,
 ): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
@@ -1128,5 +1325,9 @@ export async function handleContentActionTool(
   if (name === 'list_content_requests') return handleListContentRequests(args);
   if (name === 'get_content_request') return handleGetContentRequestById(args);
   if (name === 'create_content_request') return handleCreateContentRequest(args);
+  if (name === 'delete_brief') return handleDeleteBrief(args);
+  if (name === 'delete_post') return handleDeletePost(args);
+  if (name === 'list_post_versions') return handleListPostVersions(args);
+  if (name === 'revert_post_version') return handleRevertPostVersion(args);
   return mcpError(`Unknown content action tool: ${name}`);
 }
