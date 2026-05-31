@@ -83,8 +83,8 @@ describe('work-order completion resolves matching recommendations', () => {
     // cms-* id, each mapped to its slug via page_edit_states.
     const STATIC_PAGE_ID = 'wf-6471abc-services-001';
     const CMS_PAGE_ID = 'cms-blog-guide';
-    updatePageState(ws.workspaceId, STATIC_PAGE_ID, { slug: 'services', status: 'in_review' });
-    updatePageState(ws.workspaceId, CMS_PAGE_ID, { slug: 'blog/guide', status: 'in_review' });
+    updatePageState(ws.workspaceId, STATIC_PAGE_ID, { slug: 'services', status: 'in-review' });
+    updatePageState(ws.workspaceId, CMS_PAGE_ID, { slug: 'blog/guide', status: 'in-review' });
 
     seedRecs(ws.workspaceId, [
       makeRec(ws.workspaceId, { id: 'rec_static', affectedPages: ['services'], status: 'pending' }),
@@ -133,7 +133,7 @@ describe('work-order completion resolves matching recommendations', () => {
 
   it('does not resolve recs when the order is cancelled, not completed', () => {
     const STATIC_PAGE_ID = 'wf-6471abc-services-002';
-    updatePageState(ws.workspaceId, STATIC_PAGE_ID, { slug: 'services', status: 'in_review' });
+    updatePageState(ws.workspaceId, STATIC_PAGE_ID, { slug: 'services', status: 'in-review' });
     seedRecs(ws.workspaceId, [
       makeRec(ws.workspaceId, { id: 'rec_keep', affectedPages: ['services'], status: 'pending' }),
     ]);
