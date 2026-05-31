@@ -11,6 +11,8 @@ import { buildRecommendationGenerationContext } from './intelligence/generation-
 import { listAllInsightsFromSlice } from './intelligence/insights-slice.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { isProgrammingError } from './errors.js';
+import { listBatches } from './approvals.js';
+import { listWorkOrders } from './work-orders.js';
 
 const log = createLogger('monthly-digest');
 
@@ -74,15 +76,45 @@ async function computeDigest(
     .slice(0, 5)
     .map(insightToDigestItem);
 
-  // Issues addressed: resolved insights
-  const issuesAddressed = insights
+  // Issues addressed: resolved insights + applied approval batches + completed work orders.
+  // Approval-apply and work-order completion only set insight resolutionStatus to 'in_progress'
+  // via Bridge #7 — they never reach 'resolved'. Count the applied/completed work directly so
+  // the digest does not report "0 measurable improvements" after real work is done.
+  const resolvedInsightItems = insights
     .filter(i => i.resolutionStatus === 'resolved')
-    .slice(0, 5)
     .map(i => ({
       title: i.pageTitle ?? 'Page optimization',
       detail: i.resolutionNote ?? 'Issue addressed',
       insightId: i.id,
     }));
+
+  const appliedBatchItems = listBatches(ws.id)
+    .filter(b => b.status === 'applied')
+    .flatMap(b =>
+      b.items
+        .filter(item => item.status === 'applied')
+        .map(item => ({
+          title: item.pageTitle || 'Page optimization',
+          detail: `${item.field === 'seoTitle' ? 'Title' : 'Meta description'} updated via approved changes`,
+          insightId: `batch:${b.id}:${item.id}`,
+        })),
+    );
+
+  const completedWorkOrderItems = listWorkOrders(ws.id)
+    .filter(o => o.status === 'completed')
+    .map(o => ({
+      title: `${o.productType.replace(/_/g, ' ')} completed`,
+      detail: `${o.pageIds.length} page${o.pageIds.length !== 1 ? 's' : ''} fixed`,
+      insightId: `work-order:${o.id}`,
+    }));
+
+  // Merge: resolved insights first (most authoritative), then applied batch work,
+  // then completed work orders. Cap at 5 total to keep the digest scannable.
+  const issuesAddressed = [
+    ...resolvedInsightItems,
+    ...appliedBatchItems,
+    ...completedWorkOrderItems,
+  ].slice(0, 5);
 
   // Fetch GSC + GA4 period comparisons concurrently; degrade gracefully if unavailable
   const COMPARISON_DAYS = 28;
