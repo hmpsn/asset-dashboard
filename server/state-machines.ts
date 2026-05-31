@@ -83,6 +83,23 @@ export const CLIENT_ACTION_TRANSITIONS: Record<string, readonly string[]> = {
 
 export type ClientActionStateStatus = 'pending' | 'approved' | 'changes_requested' | 'completed' | 'archived';
 
+// ── Recommendation ──
+// Lifecycle for engine-produced recommendations (server/recommendations.ts).
+// A rec starts pending, can be moved to in_progress (work started), completed
+// (issue resolved — either by a client/admin marking it done, by an applied
+// change/work-order whose affected pages match it, or by auto-resolution on the
+// next full regen), or dismissed (client chose to ignore it). pending↔in_progress
+// is reversible; completed and dismissed are reopenable back to pending so a
+// regen that re-detects the issue (or a client un-dismiss) can revive it.
+export const RECOMMENDATION_TRANSITIONS: Record<string, readonly string[]> = {
+  pending:     ['in_progress', 'completed', 'dismissed'],
+  in_progress: ['pending', 'completed', 'dismissed'],
+  completed:   ['pending', 'in_progress'],   // pending/in_progress = issue re-detected
+  dismissed:   ['pending'],                  // un-dismiss
+};
+
+export type RecommendationStateStatus = 'pending' | 'in_progress' | 'completed' | 'dismissed';
+
 // ── Briefing Draft ──
 // Weekly client briefing lifecycle (server/briefing-store.ts).
 //   draft → approved → published   (admin reviewed + published)

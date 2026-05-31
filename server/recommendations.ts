@@ -49,6 +49,7 @@ import type { ConversionAttributionData, CtrOpportunityData } from '../shared/ty
 import type { LearningsSlice } from '../shared/types/intelligence.js';
 import type { ActionType } from '../shared/types/outcome-tracking.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
+import { RECOMMENDATION_TRANSITIONS, validateTransition } from './state-machines.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('recommendations');
@@ -300,6 +301,67 @@ export function updateRecommendationStatus(
 
 export function dismissRecommendation(workspaceId: string, recId: string): boolean {
   return updateRecommendationStatus(workspaceId, recId, 'dismissed') !== null;
+}
+
+/**
+ * Resolve (complete) recommendations in-place when a workspace change touches
+ * the pages they cover. Called from write sites that fix SEO issues directly
+ * (approval apply, per-item approve/reject, work-order completion) so the
+ * priority list reflects the change immediately — without waiting for the next
+ * full audit-driven `generateRecommendations` regen (which is GSC-lag-gated).
+ *
+ * Behaviour:
+ *  - Loads the existing rec set (no-op if none exists).
+ *  - Marks every non-completed, non-dismissed rec whose `affectedPages`
+ *    intersect `affectedPages` (slug-normalised via toPageSlug, matching the
+ *    auto-resolve branch in generateRecommendations) as `completed`, guarded by
+ *    validateTransition() (CLAUDE.md: status changes go through state machines).
+ *  - When `source` is provided, only recs in that source category are touched
+ *    (uses getRecSourceCategory so a `source` of `'audit'` matches `audit:title`
+ *    etc. — the same category prefixes the auto-resolve safety check uses).
+ *  - Saves, invalidates the intelligence cache, and broadcasts
+ *    RECOMMENDATIONS_UPDATED — only when at least one rec actually changed.
+ *
+ * @returns the number of recommendations transitioned to `completed`.
+ */
+export function resolveRecommendationsForChange(
+  workspaceId: string,
+  opts: { affectedPages: string[]; source?: string },
+): number {
+  const changedPages = new Set(
+    (opts.affectedPages ?? [])
+      .filter((p): p is string => typeof p === 'string' && p.length > 0)
+      .map(toPageSlug),
+  );
+  if (changedPages.size === 0) return 0;
+
+  const set = loadRecommendations(workspaceId);
+  if (!set) return 0;
+
+  // When a source filter is supplied, resolve it to its category so callers can
+  // pass either a full source string ('audit:title') or a bare category ('audit').
+  const sourceCategory = opts.source ? getRecSourceCategory(opts.source) : null;
+
+  let resolved = 0;
+  const now = new Date().toISOString();
+  for (const rec of set.recommendations) {
+    if (rec.status === 'completed' || rec.status === 'dismissed') continue;
+    if (sourceCategory && getRecSourceCategory(rec.source) !== sourceCategory) continue;
+    const intersects = rec.affectedPages.some(p => changedPages.has(toPageSlug(p)));
+    if (!intersects) continue;
+    validateTransition('recommendation', RECOMMENDATION_TRANSITIONS, rec.status, 'completed');
+    rec.status = 'completed';
+    rec.updatedAt = now;
+    resolved++;
+  }
+
+  if (resolved === 0) return 0;
+
+  saveRecommendations(set);
+  invalidateIntelligenceCache(workspaceId);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { resolved });
+  log.info(`Resolved ${resolved} recommendation(s) in-place for ${workspaceId} (${changedPages.size} changed page(s))`);
+  return resolved;
 }
 
 // ─── Scoring Helpers ──────────────────────────────────────────────

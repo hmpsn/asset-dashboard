@@ -35,6 +35,7 @@ import {
   clearPageState,
 } from '../workspaces.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
+import { resolveRecommendationsForChange } from '../recommendations.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';
 import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { createLogger } from '../logger.js';
@@ -340,6 +341,17 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClien
           actionSummary: pageLabel,
           clientNote,
         });
+        // Resolve recommendations covering this page so an approved fix drops
+        // out of the active priority list immediately. A later failed apply is
+        // recovered by the auto-resolve/regen safety net (completed→pending). // rec-refresh-ok
+        const approvedPage = item.publishedPath || item.pageSlug || '';
+        if (approvedPage) {
+          try {
+            resolveRecommendationsForChange(req.params.workspaceId, { affectedPages: [approvedPage] });
+          } catch (err) {
+            log.warn({ err, itemId: item.id }, 'Failed to resolve recommendations after approval');
+          }
+        }
       } else if (status === 'rejected' && statusChanged) {
         addActivity(req.params.workspaceId, 'changes_requested',
           `${actorName} requested changes to ${fieldLabel} for ${pageLabel}`,
@@ -511,6 +523,22 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
     }
   } catch (err) {
     log.warn({ err, batchId: req.params.batchId }, 'Failed to record outcome action for approval apply');
+  }
+
+  // Resolve any recommendations whose affected pages were just fixed by this
+  // apply, so the priority list drops them immediately (GSC-lag-free). // rec-refresh-ok
+  if (appliedIds.length > 0) {
+    const appliedPages = approved
+      .filter(i => appliedIds.includes(i.id))
+      .map(i => i.publishedPath || i.pageSlug || '')
+      .filter(Boolean);
+    if (appliedPages.length > 0) {
+      try {
+        resolveRecommendationsForChange(req.params.workspaceId, { affectedPages: appliedPages });
+      } catch (err) {
+        log.warn({ err, batchId: req.params.batchId }, 'Failed to resolve recommendations after approval apply');
+      }
+    }
   }
 
   res.json({ results, applied: appliedIds.length, failed: results.length - appliedIds.length });

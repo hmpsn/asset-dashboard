@@ -4,6 +4,7 @@ import { parseJsonSafeArray } from './db/json-validation.js';
 import { validateTransition, WORK_ORDER_TRANSITIONS } from './state-machines.js';
 import { invalidateContentPipelineCache } from './workspace-data.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { resolveRecommendationsForChange } from './recommendations.js';
 import { z } from 'zod';
 
 // --- Types ---
@@ -161,6 +162,13 @@ export function updateWorkOrder(
     updated_at: order.updatedAt,
   });
   invalidateWorkOrderCaches(workspaceId);
+
+  // A completed fix order resolves any recommendations covering the pages it
+  // touched, so the priority list drops them immediately (GSC-lag-free). // rec-refresh-ok
+  if (updates.status === 'completed' && order.pageIds.length > 0) {
+    resolveRecommendationsForChange(workspaceId, { affectedPages: order.pageIds });
+  }
+
   return order;
 }
 
