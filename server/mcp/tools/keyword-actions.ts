@@ -1,13 +1,25 @@
 import type { Tool } from '@modelcontextprotocol/sdk/types';
 import {
+  addKeywordsBatchInputSchema,
   addKeywordToStrategyInputSchema,
+  getKeywordStrategyInputSchema,
+  removePageKeywordInputSchema,
+  replaceKeywordStrategyInputSchema,
   researchKeywordsInputSchema,
 } from '../../../shared/types/mcp-action-schemas.js';
 import type { PageKeywordMap } from '../../../shared/types/workspace.js';
 import { addActivity } from '../../activity-log.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
 import { createLogger } from '../../logger.js';
-import { getPageKeyword, upsertPageKeyword } from '../../page-keywords.js';
+import {
+  deletePageKeyword,
+  getPageKeyword,
+  listPageKeywords,
+  listPageKeywordsLite,
+  upsertAndCleanPageKeywords,
+  upsertPageKeyword,
+  upsertPageKeywordsBatch,
+} from '../../page-keywords.js';
 import { getConfiguredProvider } from '../../seo-data-provider.js';
 import type { ProviderName } from '../../seo-data-provider.js';
 import { invalidateIntelligenceCache } from '../../workspace-intelligence.js';
@@ -38,6 +50,26 @@ export const keywordActionTools: Tool[] = [
     name: 'add_keyword_to_strategy',
     description: 'Persist a keyword into strategy targeting for an existing page or a new planned page.',
     inputSchema: toMcpJsonSchema(addKeywordToStrategyInputSchema),
+  },
+  {
+    name: 'get_keyword_strategy',
+    description: 'Read page-level keyword targeting strategy for a workspace.',
+    inputSchema: toMcpJsonSchema(getKeywordStrategyInputSchema),
+  },
+  {
+    name: 'remove_page_keyword',
+    description: 'Remove keyword targeting for a specific page path.',
+    inputSchema: toMcpJsonSchema(removePageKeywordInputSchema),
+  },
+  {
+    name: 'add_keywords_batch',
+    description: 'Batch upsert page keyword entries for a workspace.',
+    inputSchema: toMcpJsonSchema(addKeywordsBatchInputSchema),
+  },
+  {
+    name: 'replace_keyword_strategy',
+    description: 'Replace the full page-keyword strategy set for a workspace.',
+    inputSchema: toMcpJsonSchema(replaceKeywordStrategyInputSchema),
   },
 ];
 
@@ -196,11 +228,137 @@ async function handleAddKeywordToStrategy(
   });
 }
 
+async function handleGetKeywordStrategy(
+  args: Record<string, unknown>,
+): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
+  const parsed = getKeywordStrategyInputSchema.safeParse(args);
+  if (!parsed.success) return zodErrorToMcp(parsed.error);
+  const { workspace_id: workspaceId, lite } = parsed.data;
+  const workspace = requireWorkspace(workspaceId);
+  if ('isError' in workspace) return workspace;
+
+  const entries = lite ? listPageKeywordsLite(workspaceId) : listPageKeywords(workspaceId);
+  return mcpSuccess({
+    entries,
+    count: entries.length,
+    dashboard_url: buildDashboardUrl(workspaceId, 'content-plan'),
+  });
+}
+
+async function handleRemovePageKeyword(
+  args: Record<string, unknown>,
+): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
+  const parsed = removePageKeywordInputSchema.safeParse(args);
+  if (!parsed.success) return zodErrorToMcp(parsed.error);
+  const { workspace_id: workspaceId, page_path: pagePath } = parsed.data;
+  const workspace = requireWorkspace(workspaceId);
+  if ('isError' in workspace) return workspace;
+
+  deletePageKeyword(workspaceId, pagePath);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_UPDATED, {
+    workspaceId,
+    action: 'mcp_page_keyword_removed',
+    pagePath,
+  });
+  invalidateIntelligenceCache(workspaceId);
+  addActivity(
+    workspaceId,
+    'strategy_generated',
+    `Removed keyword targeting for "${pagePath}"`,
+    undefined,
+    {
+      source: 'mcp-chat',
+      pagePath,
+      action: 'mcp_page_keyword_removed',
+    },
+  );
+
+  return mcpSuccess({
+    ok: true,
+    page_path: pagePath,
+    dashboard_url: buildDashboardUrl(workspaceId, 'content-plan'),
+  });
+}
+
+async function handleAddKeywordsBatch(
+  args: Record<string, unknown>,
+): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
+  const parsed = addKeywordsBatchInputSchema.safeParse(args);
+  if (!parsed.success) return zodErrorToMcp(parsed.error);
+  const { workspace_id: workspaceId, entries } = parsed.data;
+  const workspace = requireWorkspace(workspaceId);
+  if ('isError' in workspace) return workspace;
+
+  upsertPageKeywordsBatch(workspaceId, entries as PageKeywordMap[]);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_UPDATED, {
+    workspaceId,
+    action: 'mcp_keywords_batch_added',
+    count: entries.length,
+  });
+  invalidateIntelligenceCache(workspaceId);
+  addActivity(
+    workspaceId,
+    'keyword_added',
+    `Batch added/updated ${entries.length} keyword mappings`,
+    undefined,
+    {
+      source: 'mcp-chat',
+      count: entries.length,
+      action: 'mcp_keywords_batch_added',
+    },
+  );
+
+  return mcpSuccess({
+    ok: true,
+    added_count: entries.length,
+    dashboard_url: buildDashboardUrl(workspaceId, 'content-plan'),
+  });
+}
+
+async function handleReplaceKeywordStrategy(
+  args: Record<string, unknown>,
+): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
+  const parsed = replaceKeywordStrategyInputSchema.safeParse(args);
+  if (!parsed.success) return zodErrorToMcp(parsed.error);
+  const { workspace_id: workspaceId, entries } = parsed.data;
+  const workspace = requireWorkspace(workspaceId);
+  if ('isError' in workspace) return workspace;
+
+  upsertAndCleanPageKeywords(workspaceId, entries as PageKeywordMap[]);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_UPDATED, {
+    workspaceId,
+    action: 'mcp_keyword_strategy_replaced',
+    count: entries.length,
+  });
+  invalidateIntelligenceCache(workspaceId);
+  addActivity(
+    workspaceId,
+    'strategy_generated',
+    `Replaced keyword strategy mappings (${entries.length} pages)`,
+    undefined,
+    {
+      source: 'mcp-chat',
+      count: entries.length,
+      action: 'mcp_keyword_strategy_replaced',
+    },
+  );
+
+  return mcpSuccess({
+    ok: true,
+    count: entries.length,
+    dashboard_url: buildDashboardUrl(workspaceId, 'content-plan'),
+  });
+}
+
 export async function handleKeywordActionTool(
   name: string,
   args: Record<string, unknown>,
 ): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
   if (name === 'research_keywords') return handleResearchKeywords(args);
   if (name === 'add_keyword_to_strategy') return handleAddKeywordToStrategy(args);
+  if (name === 'get_keyword_strategy') return handleGetKeywordStrategy(args);
+  if (name === 'remove_page_keyword') return handleRemovePageKeyword(args);
+  if (name === 'add_keywords_batch') return handleAddKeywordsBatch(args);
+  if (name === 'replace_keyword_strategy') return handleReplaceKeywordStrategy(args);
   return mcpError(`Unknown keyword action tool: ${name}`);
 }

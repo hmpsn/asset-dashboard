@@ -805,6 +805,18 @@
           "notes": "Completed on 2026-05-25. Closed out MCP actions with end-to-end integration coverage for all 10 tools (`tests/integration/mcp-tools-{keyword,content,jobs}.test.ts`), corrected send-to-client activity typing to `brief_sent_for_review` / `post_sent_for_review`, removed the stale `brief:updated` pending-routes allowlist entry now that MCP save_brief broadcasts it, and fixed post send-to-client request lifecycle typing so creation supports `in_progress` before transitioning to `post_review`. Final verification gate passed: typecheck, pr-check, targeted MCP test suites, and full suite/build in this phase."
         },
         {
+          "id": "superpowers-mcp-capability-upgrade-top5",
+          "title": "MCP capability upgrade — reliability + top-5 operator surface",
+          "source": "MCP limitations implementation pass 2026-05-31",
+          "est": "6-10h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-05-31",
+          "shippedAt": "2026-05-31",
+          "owner": "platform-foundation",
+          "notes": "Completed on 2026-05-31. Implemented the top-5 MCP capability expansion with reliability-first sequencing: (1) hardened MCP JSON-schema conversion for union/object edge cases and moved edit/update schemas to object-first contracts, (2) expanded `send_to_client` to support by-ID targets (`brief_id` / `post_id`) while keeping handle flows, (3) added strict local SEO refresh MCP input validation, (4) surfaced content-request tools (`list_content_requests`, `get_content_request`, `create_content_request`), (5) surfaced job observability tools (`get_job_status`, `list_jobs`, `cancel_job`), and (6) surfaced keyword strategy CRUD tools (`get_keyword_strategy`, `remove_page_keyword`, `add_keywords_batch`, `replace_keyword_strategy`). Added/updated unit, integration, and contract tests including a guard that MCP object input schemas always provide top-level `properties`."
+        },
+        {
           "id": "superpowers-mcp-content-edit-orchestration-followup",
           "title": "MCP content edit orchestration (server-side iterative sessions)",
           "source": "MCP iterative editing expansion follow-up (2026-05-27)",

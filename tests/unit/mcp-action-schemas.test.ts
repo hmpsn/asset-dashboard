@@ -1,12 +1,24 @@
 import { describe, it, expect } from 'vitest';
 import {
+  addKeywordsBatchInputSchema,
   researchKeywordsInputSchema,
   addKeywordToStrategyInputSchema,
+  cancelJobInputSchema,
+  createContentRequestInputSchema,
+  getContentRequestInputSchema,
+  getJobStatusInputSchema,
+  getKeywordStrategyInputSchema,
   prepareBriefContextInputSchema,
   saveBriefInputSchema,
   preparePostContextInputSchema,
   savePostInputSchema,
+  listContentRequestsInputSchema,
+  listJobsInputSchema,
+  removePageKeywordInputSchema,
+  replaceKeywordStrategyInputSchema,
   sendToClientInputSchema,
+  updateBriefInputSchema,
+  updatePostInputSchema,
   startKeywordStrategyGenerationInputSchema,
   startSeoAuditInputSchema,
   startLocalSeoRefreshInputSchema,
@@ -87,6 +99,26 @@ describe('mcp-action-schemas', () => {
     });
   });
 
+  describe('update schemas', () => {
+    it('requires updates for brief patch mode', () => {
+      expect(updateBriefInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        brief_id: 'brief-1',
+        expected_revision: 'rev-1',
+        mode: 'patch',
+      }).success).toBe(false);
+    });
+
+    it('requires content for post replace mode', () => {
+      expect(updatePostInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        post_id: 'post-1',
+        expected_revision: 'rev-1',
+        mode: 'replace',
+      }).success).toBe(false);
+    });
+  });
+
   describe('sendToClientInputSchema', () => {
     const validBriefHandle = `brief_${'a'.repeat(8)}-${'b'.repeat(4)}-${'c'.repeat(4)}-${'d'.repeat(4)}-${'e'.repeat(12)}`;
     const validPostHandle = `post_${'a'.repeat(8)}-${'b'.repeat(4)}-${'c'.repeat(4)}-${'d'.repeat(4)}-${'e'.repeat(12)}`;
@@ -97,6 +129,9 @@ describe('mcp-action-schemas', () => {
     it('accepts post_handle with note', () => {
       expect(sendToClientInputSchema.safeParse({ workspace_id: 'ws-1', post_handle: validPostHandle, note: 'ready' }).success).toBe(true);
     });
+    it('accepts brief_id', () => {
+      expect(sendToClientInputSchema.safeParse({ workspace_id: 'ws-1', brief_id: 'brief_1' }).success).toBe(true);
+    });
     it('rejects providing both brief_handle and post_handle', () => {
       expect(sendToClientInputSchema.safeParse({
         workspace_id: 'ws-1',
@@ -104,10 +139,17 @@ describe('mcp-action-schemas', () => {
         post_handle: validPostHandle,
       }).success).toBe(false);
     });
+    it('rejects mixed id and handle target payload', () => {
+      expect(sendToClientInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        brief_handle: validBriefHandle,
+        brief_id: 'brief_1',
+      }).success).toBe(false);
+    });
   });
 
   describe('all schemas export', () => {
-    it('every Phase 2 tool has an input schema exported', () => {
+    it('all MCP action schemas are exported and parse-capable', () => {
       const schemas = [
         researchKeywordsInputSchema,
         addKeywordToStrategyInputSchema,
@@ -116,15 +158,34 @@ describe('mcp-action-schemas', () => {
         preparePostContextInputSchema,
         savePostInputSchema,
         sendToClientInputSchema,
+        listContentRequestsInputSchema,
+        getContentRequestInputSchema,
+        createContentRequestInputSchema,
+        getKeywordStrategyInputSchema,
+        removePageKeywordInputSchema,
+        addKeywordsBatchInputSchema,
+        replaceKeywordStrategyInputSchema,
         startKeywordStrategyGenerationInputSchema,
         startSeoAuditInputSchema,
         startLocalSeoRefreshInputSchema,
+        getJobStatusInputSchema,
+        listJobsInputSchema,
+        cancelJobInputSchema,
       ];
-      expect(schemas).toHaveLength(10);
+      expect(schemas).toHaveLength(20);
       for (const schema of schemas) {
         expect(schema).toBeDefined();
         expect(typeof schema.safeParse).toBe('function');
       }
+    });
+  });
+
+  describe('local seo refresh schema', () => {
+    it('rejects non-object refresh_body', () => {
+      expect(startLocalSeoRefreshInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        refresh_body: 'invalid',
+      }).success).toBe(false);
     });
   });
 

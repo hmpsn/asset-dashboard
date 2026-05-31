@@ -5,9 +5,11 @@ vi.mock('../../server/workspaces.js', () => ({
   getTokenForSite: vi.fn(),
 }));
 vi.mock('../../server/jobs.js', () => ({
+  cancelJob: vi.fn(),
   createJob: vi.fn(),
   getJob: vi.fn(),
   hasActiveJob: vi.fn(),
+  listJobs: vi.fn(),
   updateJob: vi.fn(),
 }));
 vi.mock('../../server/keyword-strategy-generation.js', () => ({
@@ -40,7 +42,7 @@ vi.mock('../../server/activity-log.js', () => ({
 
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import { getWorkspace, getTokenForSite } from '../../server/workspaces.js';
-import { createJob, hasActiveJob } from '../../server/jobs.js';
+import { cancelJob, createJob, getJob, hasActiveJob, listJobs } from '../../server/jobs.js';
 import { hasActiveKeywordStrategyGeneration } from '../../server/keyword-strategy-generation.js';
 import { createLocalSeoRefreshPlan, runLocalSeoRefreshJob } from '../../server/local-seo.js';
 import { handleJobActionTool, jobActionTools } from '../../server/mcp/tools/job-actions.js';
@@ -78,6 +80,9 @@ describe('mcp job action tools', () => {
       'start_keyword_strategy_generation',
       'start_seo_audit',
       'start_local_seo_refresh',
+      'get_job_status',
+      'list_jobs',
+      'cancel_job',
     ]);
   });
 
@@ -133,5 +138,40 @@ describe('mcp job action tools', () => {
       'ws-1',
       {},
     );
+  });
+
+  it('supports get/list/cancel job tools', async () => {
+    (getJob as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'job-1',
+      workspaceId: 'ws-1',
+      status: 'running',
+      type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
+    });
+    (listJobs as ReturnType<typeof vi.fn>).mockReturnValue([
+      { id: 'job-1', workspaceId: 'ws-1', status: 'running', type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY },
+    ]);
+    (cancelJob as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'job-1',
+      workspaceId: 'ws-1',
+      status: 'cancelled',
+      type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
+    });
+
+    const status = await handleJobActionTool('get_job_status', {
+      workspace_id: 'ws-1',
+      job_id: 'job-1',
+    });
+    expect(status.isError).toBeUndefined();
+
+    const list = await handleJobActionTool('list_jobs', {
+      workspace_id: 'ws-1',
+    });
+    expect(list.isError).toBeUndefined();
+
+    const cancelled = await handleJobActionTool('cancel_job', {
+      workspace_id: 'ws-1',
+      job_id: 'job-1',
+    });
+    expect(cancelled.isError).toBeUndefined();
   });
 });

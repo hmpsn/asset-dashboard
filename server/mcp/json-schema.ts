@@ -1,16 +1,74 @@
 import type { ZodTypeAny } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 
+function toRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function toStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === 'string');
+}
+
+function mergeBranchProperties(schema: Record<string, unknown>): Record<string, unknown> {
+  const branchKeys = ['anyOf', 'oneOf', 'allOf'] as const;
+  const mergedProperties: Record<string, unknown> = {};
+  const branchRequiredLists: string[][] = [];
+
+  for (const key of branchKeys) {
+    const rawBranches = schema[key];
+    if (!Array.isArray(rawBranches)) continue;
+    for (const rawBranch of rawBranches) {
+      const branch = toRecord(rawBranch);
+      if (!branch) continue;
+      const branchProperties = toRecord(branch.properties);
+      if (!branchProperties) continue;
+      for (const [propName, propSchema] of Object.entries(branchProperties)) {
+        if (!(propName in mergedProperties)) {
+          mergedProperties[propName] = propSchema;
+        }
+      }
+      const branchRequired = toStringArray(branch.required);
+      if (branchRequired.length > 0) {
+        branchRequiredLists.push(branchRequired);
+      }
+    }
+  }
+
+  if (Object.keys(mergedProperties).length === 0) return schema;
+  if (!('properties' in schema)) {
+    schema.properties = mergedProperties;
+  }
+  if (!('required' in schema) && branchRequiredLists.length > 0) {
+    const commonRequired = branchRequiredLists.reduce<string[]>(
+      (acc, list) => acc.filter(item => list.includes(item)),
+      [...branchRequiredLists[0]],
+    );
+    if (commonRequired.length > 0) {
+      schema.required = commonRequired;
+    }
+  }
+  return schema;
+}
+
 export function toMcpJsonSchema(schema: ZodTypeAny): { type: 'object'; [key: string]: unknown } {
   const raw = zodToJsonSchema(schema, {
     target: 'jsonSchema7',
     $refStrategy: 'none',
   }) as Record<string, unknown>;
-  if ('$schema' in raw) {
-    const { $schema: _drop, ...rest } = raw;
-    if (rest.type === 'object') return rest as { type: 'object'; [key: string]: unknown };
-    return { type: 'object', ...rest };
+  const normalized = ('$schema' in raw)
+    ? (() => {
+      const { $schema: _drop, ...rest } = raw;
+      return rest;
+    })()
+    : raw;
+
+  if (normalized.type === 'object') {
+    return mergeBranchProperties(normalized) as { type: 'object'; [key: string]: unknown };
   }
-  if (raw.type === 'object') return raw as { type: 'object'; [key: string]: unknown };
-  return { type: 'object', ...raw };
+
+  const wrapped = { type: 'object', ...normalized };
+  return mergeBranchProperties(wrapped) as { type: 'object'; [key: string]: unknown };
 }

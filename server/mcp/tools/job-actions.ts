@@ -1,5 +1,8 @@
 import type { Tool } from '@modelcontextprotocol/sdk/types';
 import {
+  cancelJobInputSchema,
+  getJobStatusInputSchema,
+  listJobsInputSchema,
   startKeywordStrategyGenerationInputSchema,
   startLocalSeoRefreshInputSchema,
   startSeoAuditInputSchema,
@@ -8,7 +11,8 @@ import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs.js';
 import type { LocalSeoRefreshRequest } from '../../../shared/types/local-seo.js';
 import { addActivity } from '../../activity-log.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
-import { createJob, getJob, hasActiveJob, updateJob } from '../../jobs.js';
+import { cancelJob, createJob, getJob, hasActiveJob, listJobs, updateJob } from '../../jobs.js';
+import type { Job } from '../../jobs.js';
 import { createLocalSeoRefreshPlan, runLocalSeoRefreshJob } from '../../local-seo.js';
 import { createLogger } from '../../logger.js';
 import {
@@ -48,6 +52,21 @@ export const jobActionTools: Tool[] = [
     name: 'start_local_seo_refresh',
     description: 'Start the background local SEO refresh job for a workspace.',
     inputSchema: toMcpJsonSchema(startLocalSeoRefreshInputSchema),
+  },
+  {
+    name: 'get_job_status',
+    description: 'Get status and latest payload for a specific background job.',
+    inputSchema: toMcpJsonSchema(getJobStatusInputSchema),
+  },
+  {
+    name: 'list_jobs',
+    description: 'List recent background jobs for a workspace.',
+    inputSchema: toMcpJsonSchema(listJobsInputSchema),
+  },
+  {
+    name: 'cancel_job',
+    description: 'Cancel a running background job for a workspace.',
+    inputSchema: toMcpJsonSchema(cancelJobInputSchema),
   },
 ];
 
@@ -250,11 +269,6 @@ async function handleStartSeoAudit(
   });
 }
 
-function parseRefreshBody(raw: unknown): LocalSeoRefreshRequest {
-  if (!raw || typeof raw !== 'object') return {};
-  return raw as LocalSeoRefreshRequest;
-}
-
 async function handleStartLocalSeoRefresh(
   args: Record<string, unknown>,
 ): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
@@ -272,7 +286,7 @@ async function handleStartLocalSeoRefresh(
     return mcpError(`Another workspace is currently running local SEO refresh (${globalActiveJob.id})`);
   }
 
-  const refreshBody = parseRefreshBody(refreshBodyRaw);
+  const refreshBody = refreshBodyRaw as LocalSeoRefreshRequest;
   const plan = createLocalSeoRefreshPlan(workspaceId, refreshBody);
   if (!plan) return mcpError(`Workspace not found: ${workspaceId}`);
 
@@ -300,6 +314,80 @@ async function handleStartLocalSeoRefresh(
   });
 }
 
+function requireJobWorkspaceMatch(
+  workspaceId: string,
+  jobId: string,
+): Job | McpToolErrorResponse {
+  const job = getJob(jobId);
+  if (!job) return mcpError(`Job not found: ${jobId}`);
+  if (job.workspaceId && job.workspaceId !== workspaceId) {
+    return mcpError(`Job ${jobId} does not belong to workspace ${workspaceId}`);
+  }
+  if (!job.workspaceId) {
+    return mcpError(`Job ${jobId} is not workspace-scoped and is not accessible from this tool`);
+  }
+  return job;
+}
+
+async function handleGetJobStatus(
+  args: Record<string, unknown>,
+): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
+  const parsed = getJobStatusInputSchema.safeParse(args);
+  if (!parsed.success) return zodErrorToMcp(parsed.error);
+  const { workspace_id: workspaceId, job_id: jobId } = parsed.data;
+  const workspace = requireWorkspace(workspaceId);
+  if ('isError' in workspace) return workspace;
+
+  const job = requireJobWorkspaceMatch(workspaceId, jobId);
+  if ('isError' in job) return job;
+
+  return mcpSuccess({
+    job,
+    dashboard_url: buildDashboardUrl(workspaceId),
+  });
+}
+
+async function handleListJobs(
+  args: Record<string, unknown>,
+): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
+  const parsed = listJobsInputSchema.safeParse(args);
+  if (!parsed.success) return zodErrorToMcp(parsed.error);
+  const { workspace_id: workspaceId, status, limit } = parsed.data;
+  const workspace = requireWorkspace(workspaceId);
+  if ('isError' in workspace) return workspace;
+
+  const jobs = listJobs(workspaceId)
+    .filter(job => (status ? job.status === status : true))
+    .slice(0, limit ?? 50);
+
+  return mcpSuccess({
+    jobs,
+    dashboard_url: buildDashboardUrl(workspaceId),
+  });
+}
+
+async function handleCancelJob(
+  args: Record<string, unknown>,
+): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
+  const parsed = cancelJobInputSchema.safeParse(args);
+  if (!parsed.success) return zodErrorToMcp(parsed.error);
+  const { workspace_id: workspaceId, job_id: jobId } = parsed.data;
+  const workspace = requireWorkspace(workspaceId);
+  if ('isError' in workspace) return workspace;
+
+  const existing = requireJobWorkspaceMatch(workspaceId, jobId);
+  if ('isError' in existing) return existing;
+
+  const job = cancelJob(jobId);
+  if (!job) return mcpError(`Job not found: ${jobId}`);
+
+  return mcpSuccess({
+    ok: true,
+    job,
+    dashboard_url: buildDashboardUrl(workspaceId),
+  });
+}
+
 export async function handleJobActionTool(
   name: string,
   args: Record<string, unknown>,
@@ -307,5 +395,8 @@ export async function handleJobActionTool(
   if (name === 'start_keyword_strategy_generation') return handleStartKeywordStrategyGeneration(args);
   if (name === 'start_seo_audit') return handleStartSeoAudit(args);
   if (name === 'start_local_seo_refresh') return handleStartLocalSeoRefresh(args);
+  if (name === 'get_job_status') return handleGetJobStatus(args);
+  if (name === 'list_jobs') return handleListJobs(args);
+  if (name === 'cancel_job') return handleCancelJob(args);
   return mcpError(`Unknown job action tool: ${name}`);
 }

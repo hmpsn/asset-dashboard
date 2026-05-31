@@ -270,6 +270,57 @@ describe('MCP content tools (integration)', () => {
     expect(sentActivity?.metadata?.source).toBe('mcp-chat');
   });
 
+  it('send_to_client supports brief_id target without handle', async () => {
+    const prepared = await callMcpTool('prepare_brief_context', {
+      workspace_id: ws.workspaceId,
+      topic: 'best CRMs for solopreneurs',
+      layout: buildLayout(),
+    });
+    const preparedPayload = JSON.parse(prepared.content[0].text) as { brief_request_handle: string };
+    const saved = await callMcpTool('save_brief', {
+      workspace_id: ws.workspaceId,
+      brief_request_handle: preparedPayload.brief_request_handle,
+      content: buildBriefContent(),
+    });
+    const savedPayload = JSON.parse(saved.content[0].text) as { brief_id: string };
+
+    const sent = await callMcpTool('send_to_client', {
+      workspace_id: ws.workspaceId,
+      brief_id: savedPayload.brief_id,
+      note: 'send by id',
+    });
+    expect(sent.isError).toBeFalsy();
+    const payload = JSON.parse(sent.content[0].text) as { target: string; request_id: string };
+    expect(payload.target).toBe('brief');
+    expect(typeof payload.request_id).toBe('string');
+  });
+
+  it('supports content request list/get/create MCP tools', async () => {
+    const created = await callMcpTool('create_content_request', {
+      workspace_id: ws.workspaceId,
+      topic: 'HVAC checklist',
+      target_keyword: 'hvac checklist',
+    });
+    expect(created.isError).toBeFalsy();
+    const createdPayload = JSON.parse(created.content[0].text) as { request_id: string };
+    expect(typeof createdPayload.request_id).toBe('string');
+
+    const listed = await callMcpTool('list_content_requests', {
+      workspace_id: ws.workspaceId,
+    });
+    expect(listed.isError).toBeFalsy();
+    const listPayload = JSON.parse(listed.content[0].text) as { requests: Array<{ request_id: string }> };
+    expect(listPayload.requests.length).toBeGreaterThan(0);
+
+    const fetched = await callMcpTool('get_content_request', {
+      workspace_id: ws.workspaceId,
+      request_id: createdPayload.request_id,
+    });
+    expect(fetched.isError).toBeFalsy();
+    const fetchedPayload = JSON.parse(fetched.content[0].text) as { request: { id: string } };
+    expect(fetchedPayload.request.id).toBe(createdPayload.request_id);
+  });
+
   it('supports list/get/update for existing briefs with revision conflict protection', async () => {
     const prepared = await callMcpTool('prepare_brief_context', {
       workspace_id: ws.workspaceId,
