@@ -237,8 +237,8 @@ describe('digest issuesAddressed counting', () => {
     expect(result.issuesAddressed.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('does not double-count: resolved insight + applied batch for same page = 1 entry', async () => {
-    // A resolved insight for services page
+  it('does not double-count: resolved insight + applied batch for same page deduplicate to exactly 1 entry', async () => {
+    // A resolved insight for the services page (pageId = '/services')
     mocks.getInsights.mockReturnValue([
       makeInsight({
         id: 'ins_resolved',
@@ -246,23 +246,31 @@ describe('digest issuesAddressed counting', () => {
         resolutionStatus: 'resolved',
         resolutionNote: 'Fixed by audit',
         pageTitle: 'Services Page',
+        pageId: '/services',
       }),
     ]);
 
-    // Also an applied batch covering the same page
+    // An applied batch with one item for the SAME page (pageSlug = '/services').
+    // makeAppliedBatch already uses pageSlug: '/services' — same as the insight pageId.
+    // Pre-fix: both appear → issuesAddressed.length === 2.
+    // Post-fix: deduplication keeps only the resolved insight → length === 1.
     const ws = makeWorkspace({ id: 'ws_no_double_count' });
     mocks.listBatches.mockReturnValue([
       makeAppliedBatch({
         workspaceId: ws.id,
         name: 'Services Batch',
+        // item has pageSlug: '/services' (from makeAppliedBatch default)
       }),
     ]);
+    mocks.listWorkOrders.mockReturnValue([]);
 
     const result = await generateMonthlyDigest(ws, 'May 2026');
 
-    // Both sources contribute but total must be <= 5 (the slice limit) and >= 1
-    expect(result.issuesAddressed.length).toBeGreaterThanOrEqual(1);
-    expect(result.issuesAddressed.length).toBeLessThanOrEqual(5);
+    // Must be exactly 1 — not 2 — because the resolved insight and the batch item
+    // both map to the page key 'services' (after stripping leading slash + lower-casing).
+    expect(result.issuesAddressed.length).toBe(1);
+    // The resolved insight wins (it appears first in the merge order)
+    expect(result.issuesAddressed[0].detail).toBe('Fixed by audit');
   });
 
   it('still counts resolved insights when no applied batches exist', async () => {

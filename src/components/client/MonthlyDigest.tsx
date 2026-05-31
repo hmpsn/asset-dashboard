@@ -112,6 +112,9 @@ export function MonthlyDigestContent({ digest }: { digest: MonthlyDigestData }) 
                   {roi.clicksGained > 0 && (
                     <div className="t-caption text-accent-info mt-0.5">+{roi.clicksGained.toLocaleString()} clicks</div>
                   )}
+                  {typeof roi.attributedValue === 'number' && roi.attributedValue > 0 && (
+                    <div className="t-caption text-emerald-400 mt-0.5">~${roi.attributedValue.toFixed(2)} estimated value</div>
+                  )}
                 </li>
               ))}
             </ul>

@@ -196,3 +196,88 @@ describe('scoreActionAtCheckpoint — no CPC → attributed_value remains null',
     expect(row!.value_basis).toBeNull();
   });
 });
+
+// ── Test 3: content_published (primary_metric='position') with clicks data → attributed_value computed ──
+//
+// FIX 2: content_published uses primary_metric='position' so the old guard
+// `if (primaryMetric !== 'clicks') return null` silently blocked attribution
+// for this action type. After the fix, clicks delta is computed independently.
+
+describe('scoreActionAtCheckpoint — content_published (primary_metric=position) with clicks data → attributed_value computed', () => {
+  it('records attributed_value for content_published when baseline+current clicks are present and CPC is known', async () => {
+    const ws = `${WS_BASE}-publish`;
+    seedWorkspace(ws);
+
+    const PUBLISH_PAGE = '/services-published';
+    const PUBLISH_CPC = 3.0;
+    const BASELINE_PUBLISH_CLICKS = 5;
+    const CURRENT_PUBLISH_CLICKS = 20;
+    const EXPECTED_PUBLISH_VALUE = (CURRENT_PUBLISH_CLICKS - BASELINE_PUBLISH_CLICKS) * PUBLISH_CPC; // 45
+
+    upsertPageKeyword(ws, {
+      pagePath: PUBLISH_PAGE,
+      pageTitle: 'Services Published',
+      primaryKeyword: 'services',
+      secondaryKeywords: [],
+      clicks: CURRENT_PUBLISH_CLICKS,
+      impressions: 300,
+      cpc: PUBLISH_CPC,
+    });
+
+    // content_published uses primary_metric='position' — this is the action type
+    // that Task 2.6 records; previously attributed_value was always null for it.
+    const action = recordAction({ // recordAction-ok
+      workspaceId: ws,
+      actionType: 'content_published',
+      sourceType: 'test-publish',
+      sourceId: crypto.randomUUID(),
+      pageUrl: PUBLISH_PAGE,
+      baselineSnapshot: {
+        captured_at: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000).toISOString(),
+        clicks: BASELINE_PUBLISH_CLICKS,
+        impressions: 200,
+        position: 8,
+        ctr: 2.5,
+      },
+    });
+
+    db.prepare(`UPDATE tracked_actions SET created_at = ? WHERE id = ?`) // ws-scope-ok
+      .run(new Date(Date.now() - 35 * 24 * 60 * 60 * 1000).toISOString(), action.id);
+
+    const measurementMod = await import('../../server/outcome-measurement.js'); // dynamic-import-ok
+    const { measurePendingOutcomes } = measurementMod;
+
+    const searchConsoleMod = await import('../../server/search-console.js'); // dynamic-import-ok
+    // Return current snapshot with improved position AND more clicks
+    const getPageTrendSpy = vi.spyOn(searchConsoleMod, 'getPageTrend').mockResolvedValue(
+      Array.from({ length: 14 }, () => ({
+        date: new Date().toISOString().slice(0, 10),
+        clicks: CURRENT_PUBLISH_CLICKS,
+        impressions: 300,
+        ctr: 6.7,
+        position: 3, // improved from 8 to 3
+      })),
+    );
+
+    db.prepare(`UPDATE workspaces SET gsc_property_url = ?, webflow_site_id = ? WHERE id = ?`)
+      .run('https://example.com', 'site-456', ws);
+
+    try {
+      await measurePendingOutcomes();
+    } finally {
+      getPageTrendSpy.mockRestore();
+    }
+
+    const row = db.prepare(`
+      SELECT ao.attributed_value, ao.value_basis, ao.checkpoint_days, ao.score
+      FROM action_outcomes ao
+      WHERE ao.action_id = ? AND ao.checkpoint_days = 30
+    `).get(action.id) as { attributed_value: number | null; value_basis: string | null; checkpoint_days: number; score: string | null } | undefined;
+
+    expect(row).toBeDefined();
+    // Pre-fix: attributed_value would be NULL because primaryMetric='position' was blocked
+    // Post-fix: attributed_value = (20 - 5) × 3.0 = 45
+    expect(row!.attributed_value).toBe(EXPECTED_PUBLISH_VALUE);
+    expect(row!.value_basis).toBe('clicks_delta_x_cpc');
+  });
+});

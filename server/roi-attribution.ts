@@ -156,6 +156,8 @@ export function getROIHighlights(workspaceId: string, limit = 10): ROIHighlight[
     action: formatActionType(row.action_type),
     result: formatResult(row),
     clicksGained: (row.clicks_after ?? 0) - (row.clicks_before ?? 0),
+    // Deprecated path: roi_attributions does not store attributed_value; always null here.
+    attributedValue: null,
   }));
 }
 

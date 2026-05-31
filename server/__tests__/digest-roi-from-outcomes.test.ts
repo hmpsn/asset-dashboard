@@ -86,6 +86,10 @@ describe('getROIHighlightsFromOutcomes', () => {
 
     // pageUrl must reflect the tracked action's pageUrl
     expect(first.pageUrl).toBe('/our-services');
+
+    // FIX 3: attributedValue must be surfaced in the ROIHighlight
+    expect(first).toHaveProperty('attributedValue');
+    expect(first.attributedValue).toBe(100);
   });
 
   it('returns an empty list for a workspace with no scored outcomes', () => {
@@ -122,5 +126,50 @@ describe('getROIHighlightsFromOutcomes', () => {
 
     const highlights = getROIHighlightsFromOutcomes(ws, 2);
     expect(highlights.length).toBeLessThanOrEqual(2);
+  });
+
+  // FIX 4: dedup — an action with win outcomes at BOTH the 30-day and 60-day
+  // checkpoints must yield exactly ONE highlight (the higher checkpoint wins).
+  it('deduplicates: one action with wins at two checkpoints yields exactly one highlight', () => {
+    const ws = `${WS_BASE}-dedup`;
+    seedWorkspace(ws);
+
+    const action = recordAction({ // recordAction-ok
+      workspaceId: ws,
+      actionType: 'content_published',
+      sourceType: 'test',
+      sourceId: crypto.randomUUID(),
+      pageUrl: '/dedup-page',
+      baselineSnapshot: { captured_at: new Date().toISOString(), clicks: 5 },
+    });
+
+    // Record wins at BOTH 30 and 60 days — pre-fix this would emit two highlights
+    recordOutcome({
+      actionId: action.id,
+      checkpointDays: 30,
+      metricsSnapshot: { captured_at: new Date().toISOString(), clicks: 20 },
+      score: 'win',
+      deltaSummary: { ...WIN_DELTA, delta_absolute: 15, delta_percent: 300 },
+      attributedValue: 37.5,
+      valueBasis: 'clicks_delta_x_cpc',
+    });
+    recordOutcome({
+      actionId: action.id,
+      checkpointDays: 60,
+      metricsSnapshot: { captured_at: new Date().toISOString(), clicks: 40 },
+      score: 'strong_win',
+      deltaSummary: { ...WIN_DELTA, delta_absolute: 35, delta_percent: 700 },
+      attributedValue: 87.5,
+      valueBasis: 'clicks_delta_x_cpc',
+    });
+
+    const highlights = getROIHighlightsFromOutcomes(ws, 10);
+
+    // Must be exactly 1 — not 2 — despite having win outcomes at two checkpoints
+    expect(highlights.length).toBe(1);
+
+    // The single highlight should correspond to the HIGHER checkpoint (60 days)
+    // which has the stronger_win score and higher delta
+    expect(highlights[0].pageUrl).toBe('/dedup-page');
   });
 });

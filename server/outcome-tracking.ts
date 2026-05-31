@@ -54,14 +54,22 @@ const stmts = createStmtCache(() => ({
     VALUES (@id, @action_id, @checkpoint_days, @metrics_snapshot, @score, @early_signal, @delta_summary, @competitor_context, @measured_at, @attributed_value, @value_basis)
   `),
   getOutcomesByAction: db.prepare(`SELECT * FROM action_outcomes WHERE action_id = ? ORDER BY checkpoint_days ASC`),
-  // Returns win-scored outcomes (with action page_url) for a workspace ordered by
-  // delta_percent magnitude descending — used to build ROI highlights from live data.
+  // Returns ONE win-scored outcome per action_id (the highest checkpoint that scored
+  // a win) for a workspace, ordered by measured_at DESC.
+  // The correlated subquery deduplicates: an action with wins at day 30 AND day 60
+  // emits only the day-60 row instead of appearing twice in the client digest.
   getWinsWithValueByWorkspace: db.prepare(`
     SELECT ao.*, ta.page_url, ta.action_type
     FROM action_outcomes ao
     JOIN tracked_actions ta ON ta.id = ao.action_id
     WHERE ta.workspace_id = ?
       AND ao.score IN ('strong_win', 'win')
+      AND ao.checkpoint_days = (
+        SELECT MAX(ao2.checkpoint_days)
+        FROM action_outcomes ao2
+        WHERE ao2.action_id = ao.action_id
+          AND ao2.score IN ('strong_win', 'win')
+      )
     ORDER BY ao.measured_at DESC
     LIMIT ?
   `),
@@ -94,8 +102,15 @@ const stmts = createStmtCache(() => ({
     DELETE FROM tracked_actions
     WHERE measurement_complete = 1 AND updated_at < datetime('now', '-24 months')
   `),
+  // Explicit column list prevents positional misalignment caused by migration 106
+  // appending attributed_value/value_basis to the END of action_outcomes but
+  // BEFORE archived_at (which already existed from migration 041) in the archive.
+  // SELECT * positional insert would map attributed_value→archived_at, corrupting data.
   archiveOldOutcomes: db.prepare(`
-    INSERT INTO action_outcomes_archive SELECT *, datetime('now') AS archived_at
+    INSERT INTO action_outcomes_archive
+      (id, action_id, checkpoint_days, metrics_snapshot, score, early_signal, delta_summary, competitor_context, measured_at, attributed_value, value_basis, archived_at)
+    SELECT
+      id, action_id, checkpoint_days, metrics_snapshot, score, early_signal, delta_summary, competitor_context, measured_at, attributed_value, value_basis, datetime('now')
     FROM action_outcomes
     WHERE action_id IN (SELECT id FROM tracked_actions_archive)
   `),
@@ -506,7 +521,9 @@ export function getROIHighlightsFromOutcomes(workspaceId: string, limit = 10): R
         : '';
     const result = `${scoreText}${deltaText}`;
 
-    return { pageTitle, pageUrl, action, result, clicksGained };
+    const attributedValue = typeof row.attributed_value === 'number' ? row.attributed_value : null;
+
+    return { pageTitle, pageUrl, action, result, clicksGained, attributedValue };
   });
 }
 

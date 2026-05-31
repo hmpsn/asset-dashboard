@@ -86,6 +86,8 @@ async function computeDigest(
       title: i.pageTitle ?? 'Page optimization',
       detail: i.resolutionNote ?? 'Issue addressed',
       insightId: i.id,
+      // Stable dedup key: normalized page identifier from insight store
+      _dedupKey: `page:${(i.pageId ?? '').toLowerCase().replace(/^\/+/, '')}`,
     }));
 
   const appliedBatchItems = listBatches(ws.id)
@@ -97,6 +99,8 @@ async function computeDigest(
           title: item.pageTitle || 'Page optimization',
           detail: `${item.field === 'seoTitle' ? 'Title' : 'Meta description'} updated via approved changes`,
           insightId: `batch:${b.id}:${item.id}`,
+          // Dedup key: normalize page slug + field so the same fix only appears once
+          _dedupKey: `page:${(item.pageSlug ?? item.pageId ?? '').toLowerCase().replace(/^\/+/, '')}`,
         })),
     );
 
@@ -106,15 +110,28 @@ async function computeDigest(
       title: `${o.productType.replace(/_/g, ' ')} completed`,
       detail: `${o.pageIds.length} page${o.pageIds.length !== 1 ? 's' : ''} fixed`,
       insightId: `work-order:${o.id}`,
+      // Work orders affect multiple pages; use a unique key per work order
+      _dedupKey: `work-order:${o.id}`,
     }));
 
   // Merge: resolved insights first (most authoritative), then applied batch work,
-  // then completed work orders. Cap at 5 total to keep the digest scannable.
+  // then completed work orders. Dedup by stable key before capping at 5 — the same
+  // underlying fix can appear as both a resolved insight AND an applied approval/work-order
+  // (Bridge #7 sets 'in_progress', resolve paths set 'resolved'), so we keep the first
+  // occurrence (resolved insight wins over batch entry for the same page).
+  const seenDedupKeys = new Set<string>();
   const issuesAddressed = [
     ...resolvedInsightItems,
     ...appliedBatchItems,
     ...completedWorkOrderItems,
-  ].slice(0, 5);
+  ]
+    .filter(item => {
+      if (seenDedupKeys.has(item._dedupKey)) return false;
+      seenDedupKeys.add(item._dedupKey);
+      return true;
+    })
+    .map(({ _dedupKey: _k, ...rest }) => rest)
+    .slice(0, 5);
 
   // Fetch GSC + GA4 period comparisons concurrently; degrade gracefully if unavailable
   const COMPARISON_DAYS = 28;
@@ -267,13 +284,18 @@ async function generateDigestSummary(
   ].filter(Boolean).join('\n');
 
   try {
-    const prompt = `Write a 2-3 sentence monthly performance update for a website client's dashboard.
+    const roiDollarLines = roi
+    .filter(r => typeof r.attributedValue === 'number' && r.attributedValue !== null && r.attributedValue > 0)
+    .map(r => `  • ${r.pageTitle}: $${r.attributedValue!.toFixed(2)} estimated value (${r.action})`)
+    .join('\n');
+
+  const prompt = `Write a 2-3 sentence monthly performance update for a website client's dashboard.
 
 Data for ${month}:
 - ${wins.length} performance win${wins.length === 1 ? '' : 's'} identified
 - ${issues.length} optimization${issues.length === 1 ? '' : 's'} completed
 - ${metrics.pagesOptimized} page${metrics.pagesOptimized === 1 ? '' : 's'} optimized
-- ${roi.length} measurable improvement${roi.length === 1 ? '' : 's'}
+- ${roi.length} measurable improvement${roi.length === 1 ? '' : 's'}${roiDollarLines ? `\n- Estimated dollar value from tracked outcomes:\n${roiDollarLines}` : ''}
 ${recentOutcomesCount !== undefined ? `- ${recentOutcomesCount} tracked outcome${recentOutcomesCount === 1 ? '' : 's'} in workspace learnings` : ''}
 ${metricLines ? `\nSearch performance this period:\n${metricLines}` : ''}
 ${learningsSummary ? `\nWorkspace outcome learnings:\n${learningsSummary}` : ''}

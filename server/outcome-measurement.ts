@@ -280,10 +280,27 @@ function computeAttributedValue(
   pageUrl: string | null | undefined,
   primaryMetric: string,
   delta: DeltaSummary,
+  baselineSnapshot: BaselineSnapshot,
+  currentSnapshot: BaselineSnapshot,
 ): { attributedValue: number | null; valueBasis: string | null } {
-  // Only applicable when the primary metric is clicks
-  if (primaryMetric !== 'clicks') return { attributedValue: null, valueBasis: null };
   if (!pageUrl) return { attributedValue: null, valueBasis: null };
+
+  // Compute clicks delta independently of the action's primary metric.
+  // content_published uses primary_metric='position' and schema_deployed uses
+  // 'ctr', but both can have real click data that supports dollar attribution.
+  // When the primary metric IS clicks, delta.delta_absolute already captures it;
+  // otherwise we compute it from the baseline/current snapshots directly.
+  const clicksDelta: number | null = (() => {
+    if (primaryMetric === 'clicks') {
+      return typeof delta.delta_absolute === 'number' ? delta.delta_absolute : null;
+    }
+    const baseClicks = baselineSnapshot.clicks ?? null;
+    const currentClicks = currentSnapshot.clicks ?? null;
+    if (baseClicks == null || currentClicks == null) return null;
+    return currentClicks - baseClicks;
+  })();
+
+  if (clicksDelta == null) return { attributedValue: null, valueBasis: null };
 
   try {
     const normalizedPath = normalizePageUrl(pageUrl);
@@ -291,7 +308,7 @@ function computeAttributedValue(
     const cpc = pageKw?.cpc ?? null;
     if (cpc == null || cpc <= 0) return { attributedValue: null, valueBasis: null };
 
-    const attributedValue = Math.round(delta.delta_absolute * cpc * 100) / 100;
+    const attributedValue = Math.round(clicksDelta * cpc * 100) / 100;
     return { attributedValue, valueBasis: 'clicks_delta_x_cpc' };
   } catch (err) {
     if (isProgrammingError(err)) log.warn({ err, workspaceId, pageUrl }, 'outcome-measurement/computeAttributedValue: programming error');
@@ -424,13 +441,16 @@ async function scoreActionAtCheckpoint(
   }
 
   // Compute attributed dollar value from clicks delta × per-page CPC.
-  // Only fires when the primary metric is 'clicks' and the page has a CPC in page_keywords.
-  // Inconclusive/no-CPC cases leave attributedValue null — never fabricate 0.
+  // Clicks delta is computed independently of the primary metric so action types
+  // like content_published (position) and schema_deployed (ctr) also get dollar
+  // attribution when click data is present. No-CPC / no-click cases → null.
   const { attributedValue, valueBasis } = computeAttributedValue(
     action.workspaceId,
     action.pageUrl,
     primaryMetric,
     delta,
+    action.baselineSnapshot,
+    currentSnapshot,
   );
 
   const outcome = recordOutcome({
