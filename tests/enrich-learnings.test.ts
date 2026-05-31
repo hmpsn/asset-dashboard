@@ -19,18 +19,32 @@ vi.mock('../server/outcome-playbooks.js', () => ({
   getPlaybooks: vi.fn(() => []),
 }));
 
+// roi-attribution.js is no longer consulted by assembleLearnings (Task 2.3 — roi_attributions is dead).
+// The mock is kept so the module resolves without reaching real DB code.
 vi.mock('../server/roi-attribution.js', () => ({
-  getROIAttributionsRaw: vi.fn(() => [
-    { id: 'roi-1', pageUrl: '/blog/seo', actionType: 'content_refresh', clicksBefore: 10, clicksAfter: 25, clickGain: 15, measuredAt: '2026-03-28' },
-  ]),
+  getROIAttributionsRaw: vi.fn(() => []),
 }));
 
 vi.mock('../server/outcome-tracking.js', () => ({
   getActionsByWorkspace: vi.fn(() => [
-    { id: 'a1', actionType: 'content_refresh', pageUrl: '/blog/seo', workspaceId: 'ws-1' },
+    {
+      id: 'a1',
+      actionType: 'content_refresh',
+      pageUrl: '/blog/seo',
+      workspaceId: 'ws-1',
+      // Task 2.3: roiAttribution reads clicks from baseline_snapshot / metrics_snapshot
+      baselineSnapshot: { clicks: 10 },
+    },
   ]),
   getOutcomesForAction: vi.fn(() => [
-    { actionId: 'a1', score: 'strong_win', measuredAt: '2026-03-30' },
+    {
+      actionId: 'a1',
+      score: 'strong_win',
+      checkpointDays: 30,
+      // Task 2.3: clicksAfter comes from metricsSnapshot.clicks
+      metricsSnapshot: { clicks: 25 },
+      measuredAt: '2026-03-30',
+    },
   ]),
   getTopWinsFromActions: vi.fn(() => []),
   getPendingActions: vi.fn(() => []),
@@ -70,6 +84,8 @@ describe('assembleLearnings enrichment', () => {
   });
 
   it('includes ROI attribution data', async () => {
+    // Task 2.3: roiAttribution now comes from action_outcomes (live table), not roi_attributions.
+    // action a1 has baseline clicks=10 and outcome clicks=25 → clickGain=15.
     const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
     const result = await buildWorkspaceIntelligence('ws-1', { slices: ['learnings'] });
 

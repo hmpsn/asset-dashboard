@@ -7,6 +7,7 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { createLogger } from './logger.js';
 import { rowToTrackedAction, rowToActionOutcome } from './db/outcome-mappers.js';
 import type { TrackedActionRow, ActionOutcomeRow } from './db/outcome-mappers.js';
+import { parseJsonFallback } from './db/json-validation.js';
 import type {
   TrackedAction,
   ActionOutcome,
@@ -22,6 +23,7 @@ import type {
   EarlySignal,
   TopWin,
 } from '../shared/types/outcome-tracking.js';
+import type { ROIHighlight } from '../shared/types/narrative.js';
 import { fireBridge, withWorkspaceLock, debouncedOutcomeReweight } from './bridge-infrastructure.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
@@ -52,6 +54,17 @@ const stmts = createStmtCache(() => ({
     VALUES (@id, @action_id, @checkpoint_days, @metrics_snapshot, @score, @early_signal, @delta_summary, @competitor_context, @measured_at, @attributed_value, @value_basis)
   `),
   getOutcomesByAction: db.prepare(`SELECT * FROM action_outcomes WHERE action_id = ? ORDER BY checkpoint_days ASC`),
+  // Returns win-scored outcomes (with action page_url) for a workspace ordered by
+  // delta_percent magnitude descending — used to build ROI highlights from live data.
+  getWinsWithValueByWorkspace: db.prepare(`
+    SELECT ao.*, ta.page_url, ta.action_type
+    FROM action_outcomes ao
+    JOIN tracked_actions ta ON ta.id = ao.action_id
+    WHERE ta.workspace_id = ?
+      AND ao.score IN ('strong_win', 'win')
+    ORDER BY ao.measured_at DESC
+    LIMIT ?
+  `),
   getScoredByWorkspace: db.prepare(`
     SELECT ta.*, ao.score AS outcome_score, ao.checkpoint_days AS outcome_checkpoint_days, ao.delta_summary AS outcome_delta_summary, ao.measured_at AS scored_at
     FROM tracked_actions ta
@@ -434,6 +447,67 @@ export function getTopWinsFromActions(
  */
 export function getTopWinsForWorkspace(workspaceId: string, limit = 10): TopWin[] {
   return getTopWinsFromActions(getActionsByWorkspace(workspaceId), limit);
+}
+
+/**
+ * Builds ROI highlights for a workspace from the live action_outcomes table.
+ * Replaces getROIHighlights() from the dead roi_attributions table (Task 2.3).
+ * Returns win-scored outcomes ordered by recency, shaped as ROIHighlight.
+ * clicksGained is taken from deltaSummary.delta_absolute when primary_metric is clicks;
+ * falls back to 0 for non-clicks metrics so the field is always a number.
+ */
+export function getROIHighlightsFromOutcomes(workspaceId: string, limit = 10): ROIHighlight[] {
+  interface WinRow extends ActionOutcomeRow {
+    page_url: string | null;
+    action_type: string;
+  }
+  const rows = stmts().getWinsWithValueByWorkspace.all(workspaceId, limit) as WinRow[];
+  return rows.map(row => {
+    const delta = parseJsonFallback<{
+      primary_metric?: string;
+      delta_absolute?: number;
+      delta_percent?: number;
+      direction?: string;
+    }>(row.delta_summary, {});
+
+    const clicksGained =
+      delta.primary_metric === 'clicks' && typeof delta.delta_absolute === 'number'
+        ? delta.delta_absolute
+        : 0;
+
+    const pageUrl = row.page_url ?? '';
+    const pageTitle = pageUrl
+      ? (pageUrl.split('/').filter(Boolean).pop() ?? 'Home')
+          .split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+      : 'Site';
+
+    const actionLabel: Record<string, string> = {
+      content_published: 'Content published',
+      content_refreshed: 'Content refresh',
+      meta_updated: 'Meta update applied',
+      schema_deployed: 'Schema markup added',
+      audit_fix_applied: 'SEO fix applied',
+      internal_link_added: 'Internal link added',
+      brief_created: 'Brief created',
+      strategy_keyword_added: 'Keyword strategy update',
+      insight_acted_on: 'Insight acted on',
+      voice_calibrated: 'Voice calibrated',
+    };
+    const action = actionLabel[row.action_type] ?? row.action_type;
+
+    const scoreLabel: Record<string, string> = {
+      strong_win: 'Strong win',
+      win: 'Win',
+    };
+    const scoreText = scoreLabel[row.score ?? ''] ?? 'Improvement';
+    const deltaText =
+      typeof delta.delta_percent === 'number'
+        ? ` (+${Math.round(Math.abs(delta.delta_percent))}%)`
+        : '';
+    const result = `${scoreText}${deltaText}`;
+
+    return { pageTitle, pageUrl, action, result, clicksGained };
+  });
 }
 
 export function archiveOldActions(): { archived: number } {

@@ -1,5 +1,5 @@
 import { createLogger } from './logger.js';
-import { getROIHighlights } from './roi-attribution.js';
+import { getROIHighlightsFromOutcomes } from './outcome-tracking.js';
 import { callAI } from './ai.js';
 import { getSearchPeriodComparison } from './search-console.js';
 import { getGA4PeriodComparison } from './google-analytics.js';
@@ -66,7 +66,7 @@ async function computeDigest(
     includeLocalSeo: false,
   });
   const insights = insightContext.insights ? listAllInsightsFromSlice(insightContext.insights) : [];
-  const roiHighlights = getROIHighlights(ws.id, 5);
+  const roiHighlights = getROIHighlightsFromOutcomes(ws.id, 5);
 
   // Wins: positive severity or positive ranking mover
   const wins = insights
