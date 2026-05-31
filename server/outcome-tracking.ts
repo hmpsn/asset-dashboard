@@ -48,8 +48,8 @@ const stmts = createStmtCache(() => ({
   updateContext: db.prepare(`UPDATE tracked_actions SET context = ?, updated_at = datetime('now') WHERE id = ? AND workspace_id = ?`),
   updateBaseline: db.prepare(`UPDATE tracked_actions SET baseline_snapshot = ?, updated_at = datetime('now') WHERE id = ? AND workspace_id = ?`),
   insertOutcome: db.prepare(`
-    INSERT OR REPLACE INTO action_outcomes (id, action_id, checkpoint_days, metrics_snapshot, score, early_signal, delta_summary, competitor_context, measured_at)
-    VALUES (@id, @action_id, @checkpoint_days, @metrics_snapshot, @score, @early_signal, @delta_summary, @competitor_context, @measured_at)
+    INSERT OR REPLACE INTO action_outcomes (id, action_id, checkpoint_days, metrics_snapshot, score, early_signal, delta_summary, competitor_context, measured_at, attributed_value, value_basis)
+    VALUES (@id, @action_id, @checkpoint_days, @metrics_snapshot, @score, @early_signal, @delta_summary, @competitor_context, @measured_at, @attributed_value, @value_basis)
   `),
   getOutcomesByAction: db.prepare(`SELECT * FROM action_outcomes WHERE action_id = ? ORDER BY checkpoint_days ASC`),
   getScoredByWorkspace: db.prepare(`
@@ -263,6 +263,10 @@ export function recordOutcome(params: {
   earlySignal?: EarlySignal;
   deltaSummary: DeltaSummary;
   competitorContext?: object | null;
+  /** Dollar value attributed to this outcome (e.g. clicks_delta × page CPC). Omit or pass null when inconclusive. */
+  attributedValue?: number | null;
+  /** How attributedValue was computed (e.g. 'clicks_delta_x_cpc'). Omit or pass null when attributedValue is null. */
+  valueBasis?: string | null;
 }): ActionOutcome {
   const id = crypto.randomUUID();
 
@@ -277,6 +281,8 @@ export function recordOutcome(params: {
       delta_summary: JSON.stringify(params.deltaSummary),
       competitor_context: JSON.stringify(params.competitorContext ?? {}),
       measured_at: new Date().toISOString(),
+      attributed_value: params.attributedValue ?? null,
+      value_basis: params.valueBasis ?? null,
     });
 
     // Mark action complete after 90-day checkpoint.
