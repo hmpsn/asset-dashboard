@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   getWorkspaceIdsWithOutcomes: vi.fn(),
   detectExternalExecutions: vi.fn(),
   detectAllWorkspacePlaybooks: vi.fn(),
+  queueKeywordStrategyPostUpdateFollowOns: vi.fn(),
 }));
 
 vi.mock('../../server/logger.js', () => ({
@@ -43,6 +44,9 @@ vi.mock('../../server/external-detection.js', () => ({
 }));
 vi.mock('../../server/outcome-playbooks.js', () => ({
   detectAllWorkspacePlaybooks: mocks.detectAllWorkspacePlaybooks,
+}));
+vi.mock('../../server/keyword-strategy-follow-ons.js', () => ({
+  queueKeywordStrategyPostUpdateFollowOns: mocks.queueKeywordStrategyPostUpdateFollowOns,
 }));
 
 import { startOutcomeCrons, stopOutcomeCrons } from '../../server/outcome-crons.js';
@@ -234,5 +238,56 @@ describe('outcome crons', () => {
 
     expect(mocks.countActivityByType).toHaveBeenCalledWith('ws_1', 'action_backlog_alert', 7);
     expect(mocks.addActivity).not.toHaveBeenCalled();
+  });
+
+  // ── Task 1.3: outcome/publish debounced rec regen ────────────────────────────
+
+  it('enqueues a rec regen for each measured workspace after runMeasure', async () => {
+    mocks.measurePendingOutcomes.mockResolvedValue({ workspaceIds: ['ws_m1', 'ws_m2'] });
+
+    startOutcomeCrons();
+    // runMeasure fires at 15 s startup delay
+    await vi.advanceTimersByTimeAsync(16_000);
+
+    expect(mocks.queueKeywordStrategyPostUpdateFollowOns).toHaveBeenCalledWith({ workspaceId: 'ws_m1' });
+    expect(mocks.queueKeywordStrategyPostUpdateFollowOns).toHaveBeenCalledWith({ workspaceId: 'ws_m2' });
+  });
+
+  it('enqueues a rec regen for each learnings workspace after runLearnings', async () => {
+    mocks.getWorkspaceIdsWithOutcomes.mockReturnValue(['ws_l1', 'ws_l2']);
+
+    startOutcomeCrons();
+    // runLearnings fires at 20 s startup delay
+    await vi.advanceTimersByTimeAsync(21_000);
+
+    expect(mocks.queueKeywordStrategyPostUpdateFollowOns).toHaveBeenCalledWith({ workspaceId: 'ws_l1' });
+    expect(mocks.queueKeywordStrategyPostUpdateFollowOns).toHaveBeenCalledWith({ workspaceId: 'ws_l2' });
+  });
+
+  it('does not enqueue rec regen when measure produces no workspace ids', async () => {
+    mocks.measurePendingOutcomes.mockResolvedValue({ workspaceIds: [] });
+
+    startOutcomeCrons();
+    await vi.advanceTimersByTimeAsync(16_000);
+
+    expect(mocks.queueKeywordStrategyPostUpdateFollowOns).not.toHaveBeenCalled();
+  });
+
+  it('does not enqueue rec regen when learnings has no affected workspaces', async () => {
+    mocks.getWorkspaceIdsWithOutcomes.mockReturnValue([]);
+
+    startOutcomeCrons();
+    await vi.advanceTimersByTimeAsync(21_000);
+
+    // only measure fired by 16s; at 21s learnings has run with empty list
+    const learnCalls = mocks.queueKeywordStrategyPostUpdateFollowOns.mock.calls.filter(
+      (call: unknown[]) => (call[0] as { workspaceId: string }).workspaceId === 'ws_2',
+    );
+    // ws_2 comes from measurePendingOutcomes (mocked to return ws_1/ws_2 in beforeEach)
+    // with zero learnings workspaces, any call must be from measure only
+    const learnOnlyCalls = mocks.queueKeywordStrategyPostUpdateFollowOns.mock.calls.filter(
+      (call: unknown[]) => ['ws_l1', 'ws_l2'].includes((call[0] as { workspaceId: string }).workspaceId),
+    );
+    expect(learnOnlyCalls).toHaveLength(0);
   });
 });

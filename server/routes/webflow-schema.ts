@@ -37,6 +37,7 @@ import { detectSchemaFieldTarget, getRecommendedSchemaFieldSlug } from '../schem
 import type { SchemaCmsDeliveryStatus, SchemaFieldTarget } from '../../shared/types/site-inventory.ts';
 import { listWorkspaces, getTokenForSite, updatePageState, getWorkspace, getClientPortalUrl } from '../workspaces.js';
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
+import { queueKeywordStrategyPostUpdateFollowOns } from '../keyword-strategy-follow-ons.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
 import { captureBaselineFromGsc } from '../outcome-measurement.js';
@@ -438,6 +439,10 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceSiteAccessFro
         const rawCmsPublishedPath = req.body.publishedPath || req.body.pageSlug || '';
         const cmsPublishedPath = rawCmsPublishedPath ? normalizePageUrl(rawCmsPublishedPath) : '';
         recordSeoChange(cmsWs.id, pageId, cmsPublishedPath, req.body.pageTitle || '', ['schema'], 'schema-cms-field');
+        // Enqueue debounced rec regen — schema deploy changes page SEO signals so
+        // recommendations should reflect the updated schema state.
+        // recsInFlight deduplicates concurrent regens per workspace.
+        queueKeywordStrategyPostUpdateFollowOns({ workspaceId: cmsWs.id });
       }
       return res.json({ success: true, published: !!publishAfter, cmsDeliveryStatus: cmsDelivery });
     }
@@ -527,6 +532,14 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceSiteAccessFro
     try {
       const llmsWs = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
       if (llmsWs) queueLlmsTxtRegeneration(llmsWs.id, 'schema_published');
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-schema: programming error'); /* non-critical — response already sent */ }
+
+    // Enqueue debounced rec regen after direct schema publish — schema changes
+    // page SEO signals so recommendations should be refreshed.
+    // recsInFlight in keyword-strategy-follow-ons deduplicates concurrent regens
+    // per workspace, so bulk schema deploys do not trigger N concurrent regen calls.
+    try {
+      if (pubWs) queueKeywordStrategyPostUpdateFollowOns({ workspaceId: pubWs.id });
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-schema: programming error'); /* non-critical — response already sent */ }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

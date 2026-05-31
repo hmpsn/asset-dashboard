@@ -22,6 +22,7 @@ import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
 import { requireWorkspaceAccess, requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
+import { queueKeywordStrategyPostUpdateFollowOns } from '../keyword-strategy-follow-ons.js';
 
 const log = createLogger('content-publish');
 const router = Router();
@@ -158,6 +159,13 @@ router.post('/api/content-posts/:workspaceId/:postId/publish-to-webflow', requir
       isUpdate,
       post: updatedPost,
     });
+
+    // Enqueue debounced rec regen after response is sent — a content publish changes
+    // the live page inventory so recommendations should reflect the updated content state.
+    // Placed post-response (like llms.txt regen) to avoid blocking the HTTP response.
+    // recsInFlight in keyword-strategy-follow-ons deduplicates concurrent regens
+    // per workspace, so bulk publishes do not trigger N concurrent regen calls.
+    queueKeywordStrategyPostUpdateFollowOns({ workspaceId });
   } catch (err) {
     log.error({ err }, 'Publish to Webflow failed');
     res.status(500).json({ error: err instanceof Error ? err.message : 'Publish failed' });

@@ -41,6 +41,12 @@ vi.mock('../../server/content-image.js', () => ({
   }),
 }));
 
+// Stub out background follow-on jobs (llms.txt regen + rec regen) so they don't
+// fire extra Webflow calls that interfere with the captured-request count assertions.
+vi.mock('../../server/keyword-strategy-follow-ons.js', () => ({
+  queueKeywordStrategyPostUpdateFollowOns: vi.fn(),
+}));
+
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { getPost, savePost } from '../../server/content-posts-db.js';
 import db from '../../server/db/index.js';

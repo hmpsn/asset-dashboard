@@ -5,6 +5,7 @@
 import { createLogger } from './logger.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { queueKeywordStrategyPostUpdateFollowOns } from './keyword-strategy-follow-ons.js';
 import type * as OutcomeMeasurement from './outcome-measurement.js';
 import type * as WorkspaceLearnings from './workspace-learnings.js';
 import type * as ExternalDetection from './external-detection.js';
@@ -71,6 +72,14 @@ export function startOutcomeCrons() {
       }
       if (workspaceIds.length > 0) {
         log.info({ count: workspaceIds.length }, 'Invalidated intelligence cache for measured workspaces');
+      }
+
+      // Enqueue debounced rec regen for each measured workspace.
+      // queueKeywordStrategyPostUpdateFollowOns guards against concurrent regens
+      // per workspace via recsInFlight — a bulk measure of N workspaces will not
+      // trigger N concurrent generateRecommendations calls.
+      for (const wsId of workspaceIds) {
+        queueKeywordStrategyPostUpdateFollowOns({ workspaceId: wsId });
       }
 
       // Check action backlog thresholds per workspace.
@@ -145,6 +154,13 @@ export function startOutcomeCrons() {
       }
       if (affectedWsIds.length > 0) {
         log.info({ count: affectedWsIds.length }, 'Invalidated intelligence cache for learnings workspaces');
+      }
+
+      // Enqueue debounced rec regen after learnings update.
+      // recsInFlight in keyword-strategy-follow-ons deduplicates concurrent regens
+      // per workspace, so a bulk learnings run across N workspaces is safe.
+      for (const wsId of affectedWsIds) {
+        queueKeywordStrategyPostUpdateFollowOns({ workspaceId: wsId });
       }
     } catch (err) {
       log.error({ err }, 'Failed to compute workspace learnings');
