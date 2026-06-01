@@ -37,6 +37,9 @@ export const FEATURE_FLAGS = {
   // Unified Workspace Intelligence
   'intelligence-shadow-mode': false,
 
+  // Unified Opportunity Value scorer — flips ranked impactScore to the OV value
+  'opportunity-value-scorer': false,
+
   // Intelligence Phase 2 — Event Bridges (all default OFF, individually toggleable)
   'bridge-outcome-reweight': false,
   'bridge-decay-suggested-brief': false,
@@ -344,6 +347,19 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       createdAt: '2026-03-14',
       rolloutTarget: 'staging-validation',
       removalCondition: 'Remove after shadow/intelligence parity checks are complete and no longer needed for safe rollout.',
+      linkedRoadmapItemId: LEGACY_ROADMAP.intelligence,
+      staleAuditCadence: 'weekly',
+      lastReviewedAt: REVIEWED_AT,
+    },
+  },
+  'opportunity-value-scorer': {
+    label: 'Unified Opportunity Value scorer (ranked impactScore cutover)',
+    group: 'Workspace Intelligence Bridges',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: REVIEWED_AT,
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Remove after the Opportunity Value scorer is validated against legacy scoring and becomes the only ranking path.',
       linkedRoadmapItemId: LEGACY_ROADMAP.intelligence,
       staleAuditCadence: 'weekly',
       lastReviewedAt: REVIEWED_AT,
@@ -712,6 +728,7 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
     label: 'Workspace Intelligence Bridges',
     keys: [
       'intelligence-shadow-mode',
+      'opportunity-value-scorer',
       'bridge-outcome-reweight',
       'bridge-decay-suggested-brief',
       'bridge-strategy-invalidate',

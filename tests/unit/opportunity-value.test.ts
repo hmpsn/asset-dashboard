@@ -204,3 +204,28 @@ describe('timing component honesty (no score effect until P7 events)', () => {
     expect(timing && timing.contribution).toBeGreaterThan(0);
   });
 });
+
+describe('grounded fallbacks for impressions-only / precomputed-gap branches (PR3 review)', () => {
+  it('consumes a precomputed expectedClickGap directly (CTR-opportunity) — non-zero, scales with the gap', () => {
+    const small = computeOpportunityValue(base({ branch: 'ranking_opp', expectedClickGap: 20, currentPosition: 5 }));
+    const big = computeOpportunityValue(base({ branch: 'ranking_opp', expectedClickGap: 200, currentPosition: 5 }));
+    expect(small.value).toBeGreaterThan(0);
+    expect(big.value).toBeGreaterThan(small.value);
+    expect(big.confidence).toBeGreaterThanOrEqual(0.95); // GSC-grounded
+  });
+
+  it('falls back to GSC impressions when SEMrush volume is absent (intent-mismatch) — non-zero', () => {
+    const s = computeOpportunityValue(base({ branch: 'ranking_opp', impressions: 4000, currentPosition: 6, difficulty: 30, authorityStrength: 50 }));
+    expect(s.value).toBeGreaterThan(0);
+    expect(s.confidence).toBeGreaterThanOrEqual(0.95);
+    const higher = computeOpportunityValue(base({ branch: 'ranking_opp', impressions: 200, currentPosition: 6, difficulty: 30, authorityStrength: 50 }));
+    expect(s.value).toBeGreaterThan(higher.value); // more impressions → more value
+  });
+
+  it('an out-of-union llmLabel yields a finite value (no NaN) so the opportunity round-trips', () => {
+    const s = computeOpportunityValue(base({ branch: 'quick_win', llmLabel: 'critical' as any }));
+    expect(Number.isFinite(s.value)).toBe(true);
+    expect(Number.isFinite(s.emvPerWeek)).toBe(true);
+    expect(s.value).toBe(0); // unknown label → 0 fallback, never NaN
+  });
+});

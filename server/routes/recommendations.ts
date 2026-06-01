@@ -18,16 +18,38 @@ import { normalizePageUrl } from '../helpers.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import type { Recommendation, RecommendationSet } from '../../shared/types/recommendations.js';
 
 const log = createLogger('routes:recommendations');
 const router = Router();
+
+/**
+ * Strip the admin/AI-only `emvPerWeek` field from each rec's Opportunity Value
+ * before responding on a PUBLIC (client-facing) route. Per owner decision the
+ * client sees the ROI badge + breakdown bars, never the raw $/wk exposure.
+ * `opportunity` is null today so this is dark, but it closes the leak before
+ * the OV scorer arms it. The rest of the OpportunityScore (value, components,
+ * confidence, …) is preserved.
+ */
+function stripEmvFromPublicRecs(recs: Recommendation[]): Recommendation[] {
+  return recs.map(r => {
+    if (!r.opportunity) return r;
+    const { emvPerWeek: _emvPerWeek, ...publicOpportunity } = r.opportunity;
+    return { ...r, opportunity: publicOpportunity as Recommendation['opportunity'] };
+  });
+}
+
+/** Public-route response: a RecommendationSet whose recs have emvPerWeek stripped. */
+function toPublicRecommendationSet(set: RecommendationSet, recs: Recommendation[]): RecommendationSet {
+  return { ...set, recommendations: stripEmvFromPublicRecs(recs) };
+}
 
 // ─── Recommendation Engine ─────────────────────────────────────────
 // Generate (or re-generate) prioritized recommendations for a workspace
 router.post('/api/public/recommendations/:workspaceId/generate', async (req, res) => { // public-no-auth-ok: deferred to audit-drift-public-route-auth-sweep-followup
   try {
     const set = await generateRecommendations(req.params.workspaceId);
-    res.json(set);
+    res.json(toPublicRecommendationSet(set, set.recommendations));
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -47,7 +69,7 @@ router.get('/api/public/recommendations/:workspaceId', async (req, res) => { // 
     let recs = set.recommendations;
     if (status) recs = recs.filter(r => r.status === status);
     if (priority) recs = recs.filter(r => r.priority === priority);
-    res.json({ ...set, recommendations: recs });
+    res.json(toPublicRecommendationSet(set, recs));
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
