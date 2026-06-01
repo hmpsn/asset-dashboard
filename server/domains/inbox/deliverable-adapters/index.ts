@@ -19,6 +19,13 @@ import './audit-issue.js';
 import './schema-item.js';
 import './content-plan-sample.js';
 import './content-plan-template.js';
+// PR-1b: client_action family (redirect / internal_link / aeo_change / content_decay).
+// DARK — these self-register on import but are only mirrored when the
+// `unified-deliverables-broken-family` flag is on (default off → no-op).
+import './redirect.js';
+import './internal-link.js';
+import './aeo-change.js';
+import './content-decay.js';
 
 export {
   registerAdapter,
