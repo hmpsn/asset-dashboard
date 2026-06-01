@@ -53,8 +53,12 @@ export const contentDecayAdapter: DeliverableAdapter<ClientActionInput> = {
     const items = page != null ? [page] : [];
     return buildClientActionPayload('content_decay', action, items, 'page');
   },
-  // Stable per-page key: content_decay:<pagePath>. Falls back to the legacy sourceId so
-  // legacy + fresh dedupe as one.
+  // Stable per-page key: content_decay:<pagePath>, derived from origin.pageUrl / payload.page.page
+  // (the producer always sets these, so this is the path real rows take — and the backfill
+  // derives the SAME key, so dual-write + backfill dedupe as one). The raw-sourceId fallback is a
+  // last resort for a malformed row missing both; note it is NOT dedup-preserving (the legacy
+  // sourceId uses a HYPHEN prefix `content-decay:` vs this underscore key) — but such a row also
+  // lacks targetKeyword and is B13-skipped before insert, so it can never produce a duplicate.
   sourceRef: (input) => {
     const pagePath = decayPagePath(input);
     if (pagePath) return `content_decay:${pagePath}`;

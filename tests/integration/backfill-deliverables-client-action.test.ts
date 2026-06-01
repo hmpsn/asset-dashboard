@@ -9,12 +9,15 @@ import {
 } from '../../scripts/backfill-deliverables-client-action.js';
 import { listDeliverables } from '../../server/client-deliverables.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { setFlagOverride } from '../../server/feature-flags.js';
+import { mirrorClientActionToDeliverable, CLIENT_ACTION_FAMILY_FLAG } from '../../server/domains/inbox/client-action-dual-write.js';
 import type { ClientActionPayload } from '../../shared/types/client-actions.js';
 
 const ws = createWorkspace('backfill-client-action-test', 'site-bf-1');
 const WS = ws.id;
 
 afterEach(() => {
+  setFlagOverride(CLIENT_ACTION_FAMILY_FLAG, null); // revert dual-write flag to default (off)
   db.prepare('DELETE FROM client_actions WHERE workspace_id = ?').run(WS);
   db.prepare('DELETE FROM client_deliverable WHERE workspace_id = ?').run(WS);
 });
@@ -121,6 +124,23 @@ describe('backfill-deliverables-client-action', () => {
     expect(result.total).toBe(1);
     expect(result.inserted).toBe(0);
     expect(listDeliverables(WS)).toHaveLength(0);
+  });
+
+  it('CROSS-PATH cutover invariant: a dual-written deliverable + a backfilled legacy row for the same site collapse to ONE', () => {
+    // This is the invariant the stable sourceRef exists to deliver: the two seams
+    // (live dual-write + historical backfill) must converge on one row per (site, type).
+    setFlagOverride(CLIENT_ACTION_FAMILY_FLAG, true);
+    // Fresh send via the DUAL-WRITE path → one redirect:<siteId> deliverable.
+    const fresh = seedRedirect('redirects:fresh');
+    const mirrored = mirrorClientActionToDeliverable(WS, fresh);
+    expect(mirrored!.sourceRef).toBe('redirect:site-bf-1');
+    expect(listDeliverables(WS).filter((r) => r.type === 'redirect')).toHaveLength(1);
+    // A second, distinct legacy (timestamp-keyed) row for the SAME site, then BACKFILL.
+    seedRedirect('redirects:legacy-ts');
+    const result = backfillClientActionDeliverables();
+    // Both client_actions normalize to redirect:<siteId>, which already exists → no new row.
+    expect(result.inserted).toBe(0);
+    expect(listDeliverables(WS).filter((r) => r.type === 'redirect')).toHaveLength(1);
   });
 
   it('parity assertion accepts the four-type family', () => {
