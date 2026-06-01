@@ -584,8 +584,13 @@ router.post('/api/jobs', async (req, res) => {
                   if (!seoResult.success) {
                     results.push({ pageId: page.pageId, text: '', applied: false, error: seoResult.error ?? 'Webflow API error' });
                   } else {
-                    updatePageState(bulkSeoWorkspaceId, page.pageId, { status: 'live', source: 'bulk-fix', fields: [field], updatedBy: 'system' });
+                    // Persist the page slug on the page-edit-state so the post-job
+                    // rec-resolve (which maps page IDs → slugs via getPageState) can
+                    // match recommendation.affectedPages (slugs). bulk-fixed pages may
+                    // have no prior audit-bridge row, so without writing the slug here
+                    // the resolve would silently no-op for them.
                     const seoChangePagePath = bulkJobPagePath || (page.slug ? normalizePageUrl(page.slug) : '');
+                    updatePageState(bulkSeoWorkspaceId, page.pageId, { status: 'live', source: 'bulk-fix', fields: [field], updatedBy: 'system', ...(seoChangePagePath ? { slug: seoChangePagePath } : {}) });
                     recordSeoChange(bulkSeoWorkspaceId, page.pageId, seoChangePagePath, page.title || '', [field], 'bulk-fix');
                     results.push({ pageId: page.pageId, text, applied: true });
                   }
