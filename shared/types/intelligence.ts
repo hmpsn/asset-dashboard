@@ -166,6 +166,19 @@ export interface SeoContextSlice {
   discoveredQuerySummary?: DiscoveredQuerySummary;
   geoVolumeLabel?: string;
   strategyHistory?: StrategyHistory;
+  /**
+   * Latest competitor snapshots from competitor_snapshots table (migration 070).
+   * One entry per tracked competitor domain with current keyword count and organic
+   * traffic. Optional — only present when competitor domains are configured and
+   * at least one snapshot exists. Advisor uses this to flag competitive gaps.
+   */
+  competitorSnapshots?: Array<{
+    competitorDomain: string;
+    snapshotDate: string;
+    keywordCount: number | null;
+    organicTraffic: number | null;
+    topKeywords: Array<{ keyword: string; position: number; volume: number }>;
+  }>;
 }
 
 export interface InsightsSlice {
@@ -282,6 +295,25 @@ export interface SiteHealthSlice {
     /** Root cause titles from completed reports — the AI-synthesized findings. */
     rootCauseTitles?: string[];
   }>;
+  /**
+   * Weekly metric trend from workspace_metrics_snapshots (migration 080).
+   * Surfaces the latest week's values plus overall snapshot count so the
+   * advisor can cite "best-week" anchors. Optional — only present when
+   * at least one snapshot exists.
+   */
+  weeklyMetricsTrend?: {
+    /** Most recent snapshot (newest first). */
+    latestWeek: {
+      snapshotDate: string;
+      totalClicks: number | null;
+      totalImpressions: number | null;
+      avgPosition: number | null;
+      auditScore: number | null;
+      organicTrafficValue: number | null;
+    };
+    /** Total number of snapshots in the retention window (up to 90 days). */
+    snapshotCount: number;
+  };
 }
 
 export interface ClientSignalsSlice {
@@ -352,6 +384,31 @@ export interface OperationalSlice {
   detectedPlaybooks?: string[];
   workOrders?: { active: number; pending: number };
   insightAcceptanceRate?: InsightAcceptanceRate | null;
+  // New in Phase 4.2
+  /**
+   * Summary of page_edit_states by status for this workspace.
+   * Allows the advisor to understand how many pages are in review, live, or
+   * needing fixes without reading the full page list.
+   * Optional — only present when the page_edit_states table is accessible.
+   */
+  pageEditStateSummary?: {
+    /** Total page states tracked. */
+    total: number;
+    /** Count per status (e.g. 'clean', 'fix-proposed', 'in-review', 'approved', 'live', 'rejected', 'issue-detected'). */
+    byStatus: Record<string, number>;
+  };
+  /**
+   * Effective subscription tier after trial promotion (migration 072 trialEndsAt).
+   * `computeEffectiveTier()` returns 'growth' for free workspaces mid-trial.
+   * Optional — only present when the workspace record can be loaded.
+   */
+  effectiveTier?: 'free' | 'growth' | 'premium';
+  /**
+   * Per-feature usage remaining this month (positive integers; Infinity → unlimited).
+   * Derived from `getUsageSummary()` in usage-tracking.ts.
+   * Optional — only present when usage-tracking is accessible.
+   */
+  usageRemaining?: Partial<Record<string, number>>;
 }
 
 /**

@@ -295,6 +295,30 @@ export async function assembleSiteHealth(
     log.debug({ workspaceId, err }, 'siteHealth: AEO readiness optional, degrading gracefully');
   }
 
+  // ── Weekly metrics trend (workspace_metrics_snapshots, Task 4.2b) ─────
+  let weeklyMetricsTrend: SiteHealthSlice['weeklyMetricsTrend'];
+  try {
+    const { getSnapshots } = await import('../workspace-metrics-snapshots.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+    const snapshots = getSnapshots(workspaceId, 56); // last 8 weeks
+    if (snapshots.length > 0) {
+      // getSnapshots returns newest-first
+      const latest = snapshots[0];
+      weeklyMetricsTrend = {
+        latestWeek: {
+          snapshotDate: latest.snapshotDate,
+          totalClicks: latest.totalClicks,
+          totalImpressions: latest.totalImpressions,
+          avgPosition: latest.avgPosition,
+          auditScore: latest.auditScore,
+          organicTrafficValue: latest.organicTrafficValue,
+        },
+        snapshotCount: snapshots.length,
+      };
+    }
+  } catch (err) {
+    log.debug({ workspaceId, err }, 'siteHealth: weekly metrics trend optional, degrading gracefully');
+  }
+
   return {
     auditScore,
     auditScoreDelta,
@@ -311,6 +335,7 @@ export async function assembleSiteHealth(
     anomalyTypes,
     seoChangeVelocity,
     recentDiagnostics,
+    weeklyMetricsTrend,
   };
 }
 

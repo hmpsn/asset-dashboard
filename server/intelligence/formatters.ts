@@ -356,6 +356,26 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
     lines.push(`Strategy: revised ${ctx.strategyHistory.revisionsCount}x, last ${ctx.strategyHistory.lastRevisedAt.slice(0, 10)}`);
   }
 
+  // Competitor snapshots (Task 4.2c) — at standard+ verbosity
+  if (ctx.competitorSnapshots && ctx.competitorSnapshots.length > 0 && verbosity !== 'compact') {
+    if (verbosity === 'detailed') {
+      lines.push('Competitor intelligence:');
+      for (const snap of ctx.competitorSnapshots.slice(0, 5)) {
+        const parts: string[] = [`${snap.competitorDomain} (${snap.snapshotDate})`];
+        if (snap.keywordCount != null) parts.push(`${snap.keywordCount} keywords`);
+        if (snap.organicTraffic != null) parts.push(`${snap.organicTraffic} organic traffic`);
+        if (snap.topKeywords.length > 0) {
+          const topKw = snap.topKeywords.slice(0, 3).map(k => `${k.keyword} (#${k.position})`).join(', ');
+          parts.push(`top: ${topKw}`);
+        }
+        lines.push(`  - ${parts.join(' | ')}`);
+      }
+    } else {
+      const summary = ctx.competitorSnapshots.slice(0, 3).map(s => s.competitorDomain).join(', ');
+      lines.push(`Competitors tracked: ${ctx.competitorSnapshots.length} (${summary})`);
+    }
+  }
+
   // Return empty string rather than a bare header when no content was added
   if (lines.length === 1) return '';
 
@@ -621,6 +641,18 @@ function formatSiteHealthSection(health: SiteHealthSlice, verbosity: PromptVerbo
         `AEO readiness: ${health.aeoReadiness.pagesChecked} pages checked, ${pct(health.aeoReadiness.passingRate)} passing`
       );
     }
+    // Weekly metrics trend (Task 4.2b)
+    if (health.weeklyMetricsTrend) {
+      const t = health.weeklyMetricsTrend;
+      const w = t.latestWeek;
+      const parts: string[] = [];
+      if (w.totalClicks != null) parts.push(`${w.totalClicks} clicks`);
+      if (w.auditScore != null) parts.push(`audit ${w.auditScore}`);
+      if (w.organicTrafficValue != null) parts.push(`$${Math.round(w.organicTrafficValue)} traffic value`);
+      if (parts.length > 0) {
+        lines.push(`Latest week (${w.snapshotDate}): ${parts.join(', ')} — based on ${t.snapshotCount} snapshot${t.snapshotCount === 1 ? '' : 's'}`);
+      }
+    }
   }
 
   if (verbosity === 'detailed') {
@@ -758,6 +790,29 @@ function formatOperationalSection(ops: OperationalSlice, verbosity: PromptVerbos
     }
     if (ops.clientActionQueue) {
       lines.push(`Client action queue: ${ops.clientActionQueue.pending} pending${ops.clientActionQueue.oldestAge !== null ? `, oldest ${ops.clientActionQueue.oldestAge}h` : ''}`);
+    }
+  }
+
+  if (verbosity !== 'compact') {
+    // Tier + usage remaining (Task 4.2d)
+    if (ops.effectiveTier) {
+      lines.push(`Subscription tier: ${ops.effectiveTier}`);
+    }
+    if (ops.usageRemaining) {
+      const usageParts = Object.entries(ops.usageRemaining)
+        .filter(([, v]) => v != null && v !== Infinity)
+        .map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v} remaining`)
+        .slice(0, 5);
+      if (usageParts.length > 0) {
+        lines.push(`Usage remaining: ${usageParts.join(', ')}`);
+      }
+    }
+    // Page edit state summary (Task 4.2a)
+    if (ops.pageEditStateSummary && ops.pageEditStateSummary.total > 0) {
+      const statusParts = Object.entries(ops.pageEditStateSummary.byStatus)
+        .map(([s, n]) => `${n} ${s}`)
+        .join(', ');
+      lines.push(`Page states (${ops.pageEditStateSummary.total} total): ${statusParts}`);
     }
   }
 

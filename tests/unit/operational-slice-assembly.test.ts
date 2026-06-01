@@ -34,7 +34,12 @@ vi.mock('../../server/usage-tracking.js', () => ({
 }));
 
 vi.mock('../../server/workspaces.js', () => ({
-  getWorkspace: vi.fn(() => ({ tier: 'free' })),
+  getWorkspace: vi.fn(() => ({ tier: 'free', competitorDomains: [] })),
+  computeEffectiveTier: vi.fn(() => 'free'),
+}));
+
+vi.mock('../../server/page-edit-states.js', () => ({
+  getAllPageStates: vi.fn(() => ({})),
 }));
 
 vi.mock('../../server/approvals.js', () => ({
