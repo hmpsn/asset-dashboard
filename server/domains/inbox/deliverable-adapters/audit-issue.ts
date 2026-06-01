@@ -43,8 +43,10 @@ export function resolveAuditItemField(item: ApprovalItem): { field: string | nul
 
   if (check) {
     const field = auditCheckField(check);
-    // applyable is gated on BOTH a meta field AND the post-cutover apply flip (D-apply
-    // keeps it false this PR). The field carries the real target either way.
+    // applyable is HARDCODED false this PR (D-apply keeps the whole family non-applying
+    // and apply is opt-out). `field` carries the real per-check target (null for non-meta
+    // checks). At cutover, applyability must be gated on `field !== null` (a meta field) —
+    // it is NOT yet, so do not read this as "field already drives applyability".
     return { field, applyable: false };
   }
 

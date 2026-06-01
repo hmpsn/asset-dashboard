@@ -138,8 +138,6 @@ export function backfillApprovalDeliverables(opts: { dryRun?: boolean } = {}): B
 
   for (const batch of batches) {
     const type = classifyApprovalBatch(batch);
-    byType[type] += 1;
-
     const adapter = getAdapter(type);
     const sourceRef = adapter.sourceRef(batch);
 
@@ -149,6 +147,8 @@ export function backfillApprovalDeliverables(opts: { dryRun?: boolean } = {}): B
       continue;
     }
 
+    // byType counts rows that would be / are inserted (excludes skipped), matching `inserted`.
+    byType[type] += 1;
     if (opts.dryRun) continue;
 
     const built = adapter.buildPayload(batch);

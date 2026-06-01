@@ -131,9 +131,10 @@ export function batchItemsToDeliverableItems(
  * The audit check key for an item. The B1 source builds items WITHOUT a `check` field
  * (it collapses to `field`), so for audit batches the check is not carried on the legacy
  * item. We stash whatever we can derive: an explicit `check` if a future producer adds
- * one, else null. The audit adapter's resolver keys on `item.field` directly (which the
- * B1 source sets to seoTitle/seoDescription) AND records the original field so the
- * non-meta-collapse is detectable in the round-trip test.
+ * one, else null. NOTE: resolveAuditItemField keys on `check` FIRST; it only falls back to
+ * `item.field` when no check survived, and even then trusts ONLY the two literal meta
+ * values (seoTitle/seoDescription) — never a collapsed non-meta `field`. Do not "simplify"
+ * the resolver to key on `item.field` directly; that would reintroduce B1.
  */
 function deriveCheck(item: ApprovalItem): string | null {
   const raw = item as ApprovalItem & { check?: unknown };
