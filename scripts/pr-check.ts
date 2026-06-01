@@ -7556,6 +7556,156 @@ export const CHECKS: Check[] = [
       return hits;
     },
   },
+  {
+    // Unified Send-to-Client: client_deliverable / client_deliverable_item are written
+    // ONLY through the store (server/client-deliverables.ts) so the dedup index, JSON
+    // payload validation, and item lockstep all run. A raw INSERT elsewhere bypasses them.
+    // Escape hatch: // deliverable-write-ok (for the store itself / migrations).
+    name: 'no-direct-insert-to-client_deliverable-outside-store',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/client-deliverables.ts', 'tests/'],
+    message:
+      'Direct INSERT INTO client_deliverable(_item) outside server/client-deliverables.ts. ' +
+      'Route writes through upsertDeliverable() (or sendToClient()/respondToDeliverable()) so the ' +
+      'dedup index, payload validation, and item lockstep run. Add // deliverable-write-ok if intentional.',
+    severity: 'error',
+    excludeLines: ['deliverable-write-ok'],
+    rationale:
+      'The client_deliverable store is the only writer of the deliverable tables; a bypassing INSERT skips dedup, JSON validation, and item handling.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const insertRe = /INSERT\s+INTO\s+client_deliverable(_item)?\b/i;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes('/server/')) continue;
+        if (file.includes('/tests/')) continue;
+        if (file.endsWith('server/client-deliverables.ts')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        if (!insertRe.test(content)) continue;
+        const fileLines = content.split('\n');
+        for (let i = 0; i < fileLines.length; i++) {
+          if (!insertRe.test(fileLines[i])) continue;
+          if (hasHatch(fileLines, i, 'deliverable-write-ok')) continue;
+          hits.push({ file, line: i + 1, text: fileLines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // Unified Send-to-Client: every ACTIVE deliverable type (one whose phase-group flag
+    // is enabled) must have a registered adapter file under deliverable-adapters/. Starts
+    // as `warn` (Phase 0: all flags default false, so this never fires until a flag flips).
+    // Projected (copy_section/content_request) and notification (briefing) types are exempt
+    // — they implement projectFromSource / have no client transitions but still ship an
+    // adapter file when active, so they ARE required here too once their flag is on.
+    // Escape hatch: // deliverable-adapter-ok
+    name: 'every-active-type-has-an-adapter',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'shared/types/client-deliverable.ts',
+    message:
+      'A deliverable type whose phase-group flag is enabled has no adapter file under ' +
+      'server/domains/inbox/deliverable-adapters/<type>.ts. Add the adapter (with registerAdapter) ' +
+      'and its import line in deliverable-adapters/index.ts. Add // deliverable-adapter-ok if intentional.',
+    severity: 'warn',
+    excludeLines: ['deliverable-adapter-ok'],
+    rationale:
+      'sendToClient() resolves an adapter per type; an active type without one throws at send time. Phase-aware so it only fires once a flag group is enabled.',
+    claudeMdRef: '#code-conventions',
+    customCheck: () => {
+      const hits: CustomCheckMatch[] = [];
+      // Read the active flag groups + type→group mapping statically. In Phase 0 every
+      // flag defaults false, so no group is active and this returns no hits.
+      const ACTIVE_GROUPS: Record<string, string[]> = {
+        'unified-deliverables-approval-family': [
+          'seo_edit', 'audit_issue', 'schema_item', 'content_plan_sample', 'content_plan_template',
+        ],
+        'unified-deliverables-broken-family': ['redirect', 'internal_link', 'aeo_change', 'content_decay'],
+        'unified-deliverables-rest': ['schema_plan', 'copy_section', 'content_request', 'work_order', 'briefing'],
+      };
+      const flagsFile = readFileOrEmpty(path.join(ROOT, 'shared/types/feature-flags.ts'));
+      const adaptersDir = path.join(ROOT, 'server/domains/inbox/deliverable-adapters');
+      for (const [flag, types] of Object.entries(ACTIVE_GROUPS)) {
+        // A flag is "active" only if its default literal in FEATURE_FLAGS is true.
+        const enabled = new RegExp(`'${flag}'\\s*:\\s*true`).test(flagsFile);
+        if (!enabled) continue;
+        for (const type of types) {
+          const adapterPath = path.join(adaptersDir, `${type}.ts`);
+          if (!existsSync(adapterPath)) {
+            hits.push({
+              file: path.join(ROOT, 'shared/types/client-deliverable.ts'),
+              line: 1,
+              text: `active deliverable type '${type}' (flag ${flag}) has no adapter file`,
+            });
+          }
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // Unified Send-to-Client extension of the Admin Send Convention: no NEW bespoke
+    // POST /api/<x>/send-to-client route may be declared outside the unified service.
+    // All operator send surfaces route through sendToClient() (server/domains/inbox/).
+    // The pre-existing per-type send routes are grandfathered until their Phase-1 cutover.
+    // Escape hatch: // unified-send-route-ok
+    name: 'unified-send-to-client-bespoke-route',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    exclude: [
+      // Grandfathered bespoke send routes (migrate to sendToClient() in their Phase-1 PR).
+      'server/routes/approvals.ts',
+      'server/routes/content-plan-review.ts',
+      'server/routes/content-briefs.ts',
+      'server/routes/content-requests.ts',
+      'server/routes/copy-pipeline.ts',
+      'server/routes/webflow-schema.ts',
+      'server/routes/client-actions.ts',
+      'tests/',
+    ],
+    message:
+      'New bespoke POST /api/.../send-to-client route — operator send surfaces must route through ' +
+      'sendToClient() (server/domains/inbox/send-to-client.ts), not a sixth send pipeline. ' +
+      'Add // unified-send-route-ok if this is a grandfathered route mid-cutover.',
+    severity: 'error',
+    excludeLines: ['unified-send-route-ok'],
+    rationale:
+      'The unified send service is the single send path (design §3); a new bespoke send route re-creates the five-pipeline divergence the migration removes.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const GRANDFATHERED = [
+        'server/routes/approvals.ts',
+        'server/routes/content-plan-review.ts',
+        'server/routes/content-briefs.ts',
+        'server/routes/content-requests.ts',
+        'server/routes/copy-pipeline.ts',
+        'server/routes/webflow-schema.ts',
+        'server/routes/client-actions.ts',
+      ];
+      // router.post('/api/.../send-to-client' ...) — a bespoke send route declaration.
+      const sendRouteRe = /\.(post|patch|put)\s*\(\s*['"`][^'"`]*\/send-to-client\b/;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes('/server/routes/')) continue;
+        if (file.includes('/tests/')) continue;
+        if (GRANDFATHERED.some((g) => file.endsWith(g))) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        if (!sendRouteRe.test(content)) continue;
+        const fileLines = content.split('\n');
+        for (let i = 0; i < fileLines.length; i++) {
+          if (!sendRouteRe.test(fileLines[i])) continue;
+          if (hasHatch(fileLines, i, 'unified-send-route-ok')) continue;
+          hits.push({ file, line: i + 1, text: fileLines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
 
 ];
 

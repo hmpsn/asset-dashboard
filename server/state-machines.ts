@@ -128,6 +128,118 @@ export const BACKGROUND_JOB_TRANSITIONS: Record<string, readonly string[]> = {
 
 export type BackgroundJobStatus = 'pending' | 'running' | 'done' | 'error' | 'cancelled';
 
+// ── Client Deliverable (unified send-to-client spine) ──
+// One canonical status vocabulary across the five bespoke send-to-client pipelines
+// (design §4.2). Base map:
+//   draft → awaiting_client
+//   awaiting_client → {awaiting_client (resend/supersede) | changes_requested | approved | declined | partial}
+//   changes_requested ↔ awaiting_client
+//   approved → applied            (apply is opt-in per adapter, default no-op — D-apply)
+//   partial → {approved | declined | changes_requested}
+//   order lifecycle: ordered → in_progress → completed   (work_order, kind='order')
+//   terminals: applied | declined | expired | cancelled | completed
+// Any non-terminal state may also be cancelled/expired (operator/system close-out).
+// Per-type overrides are applied via getDeliverableTransitions(type).
+export const CLIENT_DELIVERABLE_TRANSITIONS: Record<string, readonly string[]> = {
+  draft:             ['awaiting_client', 'cancelled'],
+  // awaiting_client → awaiting_client is the idempotent resend/supersede edge (a second
+  // sendToClient with the same sourceRef onto a still-pending row). Terminal rows have no
+  // outbound awaiting_client edge, so a resend onto them throws (no silent revert).
+  awaiting_client:   ['awaiting_client', 'changes_requested', 'approved', 'declined', 'partial', 'expired', 'cancelled'],
+  changes_requested: ['awaiting_client', 'approved', 'declined', 'cancelled'],
+  partial:           ['approved', 'declined', 'changes_requested', 'cancelled'],
+  approved:          ['applied', 'cancelled'],
+  // order lifecycle (work_order)
+  ordered:           ['in_progress', 'cancelled'],
+  in_progress:       ['completed', 'cancelled'],
+  // terminals
+  applied:           [],
+  declined:          [],
+  expired:           [],
+  cancelled:         [],
+  completed:         [],
+};
+
+export type DeliverableStateStatus =
+  | 'draft'
+  | 'awaiting_client'
+  | 'changes_requested'
+  | 'partial'
+  | 'approved'
+  | 'declined'
+  | 'applied'
+  | 'expired'
+  | 'cancelled'
+  | 'ordered'
+  | 'in_progress'
+  | 'completed';
+
+// Per-type transition overrides (design §4.2). Each entry is MERGED onto the base map
+// (override keys replace the base key wholesale). Returned by getDeliverableTransitions.
+//   copy_section: approve is terminal (no →applied; the side-effect is voice-sample
+//     harvest, modeled as an adapter no-op apply) and changes_requested routes to draft.
+//   content_request: full production pipeline is carried by CONTENT_REQUEST_TRANSITIONS
+//     (the projected type keeps its own machine); no override needed here.
+//   schema_plan: client approve does NOT auto-apply — kept identical to the base map
+//     (apply is a separate operator transition), so no override entry.
+//   briefing / notification kind: one-way, NO client transitions.
+const DELIVERABLE_TYPE_OVERRIDES: Record<string, Record<string, readonly string[]>> = {
+  copy_section: {
+    changes_requested: ['draft', 'awaiting_client'],
+    approved: [], // terminal — copy approve has no apply step
+  },
+  // (briefing is handled by NOTIFICATION_DELIVERABLE_TYPES below; an override entry here
+  // would be dead — getDeliverableTransitions short-circuits to {} before reading this map.)
+};
+
+// Types whose kind is one-way notification — they have NO transitions of any kind.
+const NOTIFICATION_DELIVERABLE_TYPES = new Set<string>(['briefing']);
+
+/**
+ * Resolve the transition map for a specific deliverable type: the base
+ * CLIENT_DELIVERABLE_TRANSITIONS with the per-type override keys merged on top.
+ * Notification types (briefing) get an EMPTY map — no transitions are legal, so the
+ * validator rejects every status change (enforces the one-way safety, design §4.2).
+ */
+export function getDeliverableTransitions(type: string): Readonly<Record<string, readonly string[]>> {
+  if (NOTIFICATION_DELIVERABLE_TYPES.has(type)) return {};
+  const override = DELIVERABLE_TYPE_OVERRIDES[type];
+  if (!override) return CLIENT_DELIVERABLE_TRANSITIONS;
+  return { ...CLIENT_DELIVERABLE_TRANSITIONS, ...override };
+}
+
+// ── Content Matrix Cell (content-plan grid) ──
+// The 8 MatrixCellStatus values from shared/types/content.ts. updateMatrixCell
+// (server/content-matrices.ts) is currently any-to-any (CP-K4 gap) — this map brings
+// it under validateTransition during the content_plan cutover (design §4.4, M6).
+// Forward pipeline with the operator send-back edges (review→draft, flagged→draft).
+export const MATRIX_CELL_TRANSITIONS: Record<string, readonly string[]> = {
+  planned:           ['keyword_validated', 'brief_generated', 'draft'],
+  keyword_validated: ['brief_generated', 'draft', 'planned'],
+  brief_generated:   ['draft', 'keyword_validated'],
+  draft:             ['review', 'brief_generated'],
+  review:            ['flagged', 'approved', 'draft'],
+  flagged:           ['review', 'draft', 'approved'],
+  approved:          ['published', 'review'],
+  published:         [], // terminal
+};
+
+// ── Client Request (support tickets) ──
+// The 6 RequestStatus values from shared/types/requests.ts. PATCH /api/requests/:id
+// (server/routes/requests.ts) is currently any-to-any and re-fires the client status
+// email on illegal moves like closed→new (B24/M11). This map closes that gap.
+// Forward flow with operator reopen edges; closed is terminal.
+export const REQUEST_TRANSITIONS: Record<string, readonly string[]> = {
+  new:         ['in_review', 'in_progress', 'on_hold', 'completed', 'closed'],
+  in_review:   ['in_progress', 'on_hold', 'completed', 'closed', 'new'],
+  in_progress: ['on_hold', 'in_review', 'completed', 'closed'],
+  on_hold:     ['in_review', 'in_progress', 'completed', 'closed'],
+  completed:   ['closed', 'in_progress'], // reopen to in_progress if work resumes
+  closed:      [], // terminal — no reopen (forbids closed→new, B24)
+};
+
+export type RequestTransitionStatus = 'new' | 'in_review' | 'in_progress' | 'on_hold' | 'completed' | 'closed';
+
 // ── Generic validator ──
 
 export class InvalidTransitionError extends Error {

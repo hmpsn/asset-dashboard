@@ -87,6 +87,14 @@ export const FEATURE_FLAGS = {
 
   // Local SEO Visibility
   'local-seo-visibility': false,
+
+  // Unified Send-to-Client (strangler-fig, per phase group; dark by default).
+  // Finer per-type cutover granularity lives in a DB/env read-routing table keyed by
+  // type string, NOT the flag system (a per-type dynamic key is inexpressible against
+  // the closed FeatureFlagKey union — audit §C.3).
+  'unified-deliverables-approval-family': false,
+  'unified-deliverables-broken-family': false,
+  'unified-deliverables-rest': false,
 } as const;
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;
@@ -130,6 +138,7 @@ export const FEATURE_FLAG_GROUP_LABELS = [
   'Client IA Redesign',
   'Local SEO',
   'Schema AI',
+  'Unified Send-to-Client',
 ] as const;
 
 export type FeatureFlagGroupLabel = (typeof FEATURE_FLAG_GROUP_LABELS)[number];
@@ -727,6 +736,46 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: REVIEWED_AT,
     },
   },
+
+  'unified-deliverables-approval-family': {
+    label: 'Unified deliverables — approval-batch family read cutover (seo_edit / audit_issue / schema_item / content_plan_*)',
+    group: 'Unified Send-to-Client',
+    lifecycle: {
+      owner: 'inbox-platform',
+      createdAt: REVIEWED_AT,
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Remove after the approval-batch family reads client_deliverable in production for 2 releases with shadow-compare parity holding, and the old approval_batches read path is deleted.',
+      linkedRoadmapItemId: 'unified-deliverables-phase-0-contracts',
+      staleAuditCadence: 'monthly',
+      lastReviewedAt: REVIEWED_AT,
+    },
+  },
+  'unified-deliverables-broken-family': {
+    label: 'Unified deliverables — client_action family read cutover (redirect / internal_link / aeo_change / content_decay)',
+    group: 'Unified Send-to-Client',
+    lifecycle: {
+      owner: 'inbox-platform',
+      createdAt: REVIEWED_AT,
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Remove after the client_action family reads client_deliverable in production for 2 releases with shadow-compare parity holding, and the old client_actions read path is deleted.',
+      linkedRoadmapItemId: 'unified-deliverables-phase-0-contracts',
+      staleAuditCadence: 'monthly',
+      lastReviewedAt: REVIEWED_AT,
+    },
+  },
+  'unified-deliverables-rest': {
+    label: 'Unified deliverables — remaining types read cutover (schema_plan / copy / content_request / work_order / briefing)',
+    group: 'Unified Send-to-Client',
+    lifecycle: {
+      owner: 'inbox-platform',
+      createdAt: REVIEWED_AT,
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Remove after the remaining deliverable types read the unified model (or projected source) in production for 2 releases and the bespoke read paths are deleted.',
+      linkedRoadmapItemId: 'unified-deliverables-phase-0-contracts',
+      staleAuditCadence: 'monthly',
+      lastReviewedAt: REVIEWED_AT,
+    },
+  },
 };
 
 export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: FeatureFlagKey[] }> = [
@@ -807,6 +856,14 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   {
     label: 'Schema AI',
     keys: ['schema-ai-element-classifier'],
+  },
+  {
+    label: 'Unified Send-to-Client',
+    keys: [
+      'unified-deliverables-approval-family',
+      'unified-deliverables-broken-family',
+      'unified-deliverables-rest',
+    ],
   },
 ];
 

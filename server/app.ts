@@ -78,6 +78,7 @@ import ovDivergenceRouter from './routes/ov-divergence.js';
 import suggestedBriefsRouter from './routes/suggested-briefs.js';
 import clientSignalsRouter from './routes/client-signals.js';
 import clientActionsRouter from './routes/client-actions.js';
+import deliverablesRoutes from './routes/deliverables.js';
 import meetingBriefRouter from './routes/meeting-brief.js';
 import brandscriptRoutes from './routes/brandscript.js';
 import voiceCalibrationRoutes from './routes/voice-calibration.js';
@@ -349,6 +350,7 @@ export function createApp(): express.Express {
   app.use(suggestedBriefsRouter);
   app.use(clientSignalsRouter);
   app.use(clientActionsRouter);
+  app.use(deliverablesRoutes);
   app.use(meetingBriefRouter);
   app.use(brandscriptRoutes);
   app.use(voiceCalibrationRoutes);

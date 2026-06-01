@@ -1,0 +1,98 @@
+/**
+ * Deliverable adapter interface + self-registering registry (Phase 0, dark).
+ *
+ * Adding a reviewable work type later is AN ADAPTER, not a sixth send-to-client
+ * subsystem (design §4.5). Each Phase-1 type PR creates
+ * `server/domains/inbox/deliverable-adapters/<type>.ts`, calls `registerAdapter()`
+ * at module scope, and appends `import './<type>.js'` to `index.ts` (the only shared
+ * edit — kept append-only so parallel PRs merge trivially).
+ *
+ * In Phase 0 the registry is empty (no adapters imported by index.ts). The
+ * `every-active-type-has-an-adapter` pr-check rule starts as `warn` until each
+ * flag group activates.
+ */
+import type {
+  ClientDeliverable,
+  DeliverableKind,
+  DeliverableType,
+} from '../../../../shared/types/client-deliverable.js';
+import type { UpsertDeliverableItemInput } from '../../../client-deliverables.js';
+
+/** Result of validateSendable — `ok:false` carries an operator-facing reason. */
+export type SendableResult = { ok: true } | { ok: false; reason: string };
+
+/** The typed shape buildPayload returns — fed straight into upsertDeliverable. */
+export interface BuiltDeliverablePayload {
+  title: string;
+  summary?: string | null;
+  kind: DeliverableKind;
+  payload: Record<string, unknown>;
+  items?: UpsertDeliverableItemInput[];
+  externalRef?: string | null;
+  parentDeliverableId?: string | null;
+}
+
+/**
+ * Everything a new deliverable type implements. `applyDeliverable` is OPT-IN:
+ * the shared response handler only calls it on approve when `appliesOnApprove === true`
+ * (default false — D-apply, prevents the unified path from re-creating the B1
+ * destructive write). `projectFromSource` is implemented ONLY by the projected types
+ * (copy_section, content_request) whose source tables are retained.
+ */
+export interface DeliverableAdapter<TInput = unknown, TSourceRow = unknown> {
+  /** The deliverable type this adapter owns. Must be unique across the registry. */
+  type: DeliverableType;
+  /** Guarantee 0: reject not-ready inputs before anything else (design §4.3-g0). */
+  validateSendable(input: TInput): SendableResult;
+  /** Build the typed payload (+ child items) for the store. */
+  buildPayload(input: TInput): BuiltDeliverablePayload;
+  /** Stable natural key for dedup-on-resend (per-type, design §4.5). null = no dedup. */
+  sourceRef(input: TInput): string | null;
+  /**
+   * Opt-in: when appliesOnApprove is true, the response handler runs this on approve
+   * (Webflow write outside the DB txn). Default no-op — apply is a separate transition
+   * from "client approved" during cutover (D-apply).
+   */
+  appliesOnApprove?: boolean;
+  applyDeliverable?(deliverable: ClientDeliverable): Promise<{ applied: number }>;
+  /** ONLY for projected types — expose a source-table row through the unified model. */
+  projectFromSource?(sourceRow: TSourceRow): ClientDeliverable;
+}
+
+// Module-level registry. Adapters self-register on import (index.ts is the barrel).
+const registry = new Map<DeliverableType, DeliverableAdapter>();
+
+/**
+ * Register a deliverable adapter. Throws if the type is already registered — a double
+ * registration is a bug (two modules claiming the same type silently shadow each other).
+ */
+export function registerAdapter(adapter: DeliverableAdapter): void {
+  if (registry.has(adapter.type)) {
+    throw new Error(`deliverable adapter already registered for type: ${adapter.type}`);
+  }
+  registry.set(adapter.type, adapter);
+}
+
+/** Resolve the adapter for a type. Throws if none is registered. */
+export function getAdapter(type: DeliverableType): DeliverableAdapter {
+  const adapter = registry.get(type);
+  if (!adapter) {
+    throw new Error(`no deliverable adapter registered for type: ${type}`);
+  }
+  return adapter;
+}
+
+/** Resolve the adapter for a type, or undefined if none is registered (no throw). */
+export function tryGetAdapter(type: DeliverableType): DeliverableAdapter | undefined {
+  return registry.get(type);
+}
+
+/** All currently-registered deliverable types. */
+export function listAdapterTypes(): DeliverableType[] {
+  return [...registry.keys()];
+}
+
+/** Test-only: clear the registry between cases so registrations do not leak. */
+export function __resetAdapterRegistryForTests(): void {
+  registry.clear();
+}
