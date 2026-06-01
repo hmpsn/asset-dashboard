@@ -20,6 +20,8 @@ import {
   markApplied,
   selectVariation,
 } from '../seo-suggestions.js';
+import { getPageState } from '../page-edit-states.js';
+import { resolveRecommendationsForChange } from '../recommendations.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { updatePageSeo } from '../webflow.js';
 import { getTokenForSite, getWorkspace, updatePageState } from '../workspaces.js';
@@ -141,7 +143,27 @@ router.post('/api/webflow/seo-suggestions/:workspaceId/apply', requireWorkspaceA
     );
   }
 
-  if (appliedIds.length > 0) invalidateIntelligenceCache(workspaceId);
+  if (appliedIds.length > 0) {
+    invalidateIntelligenceCache(workspaceId);
+
+    // A live SEO change resolves any recommendations covering the pages it
+    // touched, so the priority list drops them immediately (GSC-lag-free).
+    // The applied result pageIds are Webflow page IDs (the page_edit_states
+    // key), but recommendation.affectedPages are SLUGS — resolve each id to its
+    // slug via page_edit_states before matching. Guarded so a resolver failure
+    // can never abort the apply response. // rec-refresh-ok
+    try {
+      const appliedPageIds = Array.from(new Set(results.filter(r => r.applied).map(r => r.pageId)));
+      const affectedSlugs = appliedPageIds
+        .map(id => getPageState(workspaceId, id)?.slug)
+        .filter((s): s is string => typeof s === 'string' && s.length > 0);
+      if (affectedSlugs.length > 0) {
+        resolveRecommendationsForChange(workspaceId, { affectedPages: affectedSlugs });
+      }
+    } catch (err) {
+      log.warn({ err, workspaceId }, 'Failed to resolve recommendations after SEO suggestions apply');
+    }
+  }
   log.info(`Applied ${appliedIds.length}/${toApply.length} SEO suggestions for workspace ${workspaceId}`);
   res.json({ results, applied: appliedIds.length, total: toApply.length });
 });

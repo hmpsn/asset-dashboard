@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **157** — 139 error, 18 warn.
+Total rules: **158** — 139 error, 19 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -170,16 +170,17 @@ advisory but tracked.
 | 6 | Layout-driving state set in useEffect | warn | custom | `src/` | `// effect-layout-ok` | One-frame layout flash: the browser paints with stale layout state, then the effect runs and re-lays-out, producing visible jitter. |
 | 7 | TabBar component without ?tab= deep-link support | warn | custom | `src/components/` | `tab-deeplink-ok` | A ?tab= URL that the target component ignores is a silent navigation bug — the user sees the default tab instead of the requested one. |
 | 8 | Missing broadcastToWorkspace after DB write in route handler | warn | custom | `server/routes/` | `// broadcast-ok` | Route handlers that write to the DB without broadcasting leave connected clients with stale data until they manually refresh. |
-| 9 | addActivity type not in CLIENT_VISIBLE_TYPES (public route) | warn | custom | `server/routes/` | `client-visibility-ok` | Public-portal mutations that log activity with a type absent from CLIENT_VISIBLE_TYPES create invisible entries — the activity is recorded but never shown to client-portal users. This is sometimes intentional (admin-only bookkeeping) but often an oversight when adding new activity types. |
-| 10 | Raw pageSlug prefixed as URL — normalize via Page Address helpers | warn | custom | `*.ts, *.tsx` | `// page-slug-url-ok` | Nested Webflow pages need canonical paths for outcome tracking, GSC baselines, audit joins, and live-page fetches. |
-| 11 | Background generation in high-churn routes must be allowlisted | warn | custom | `server/routes/` | `// background-generation-ok` | Anonymous post-response generation promises drift away from TaskPanel visibility, cancellation, activity, and cache invalidation. |
-| 12 | muted-text-two-tier-only | warn | custom | `src/components/` | — | Type hierarchy drift often comes from overusing dim text on primary copy, reducing contrast and making live surfaces feel noisier/less legible than styleguide specimens. |
-| 13 | raw-z-index-inline-literal | warn | custom | `src/` | — | Inline numeric z-index values drift from the canonical token scale and make stacking behavior unpredictable across overlays, toasts, and modals. |
-| 14 | focus-visible-ring-contract | warn | custom | `src/components/` | — | Removing default focus outlines without an explicit focus-visible fallback risks keyboard-invisible controls and drifts from the styleguide focus ring contract. |
-| 15 | stat-primitive-bypass-signal | warn | custom | `src/components/` | — | Direct t-stat typography usage in feature shells often re-implements StatCard/CompactStatBar chrome and drifts from canonical spacing, labels, and responsive behavior. |
-| 16 | inline-score-color-ternary | warn | pattern | `src/` | `score-color-inline-ok` | Inline score ternaries using the standard 80/60 thresholds duplicate the canonical Law-03 logic and drift when the palette changes. |
-| 17 | Workspace mutation route missing broadcastToWorkspace | warn | custom | `server/routes/` | `no-broadcast-ok` | Silent mutations mean UI never refreshes without a manual reload. |
-| 18 | inline-toLocaleDateString | warn | pattern | `src/` | `format-date-inline-ok` | Scattered toLocaleDateString() calls produce inconsistent date formatting and break in non-en-US locales. Shared helpers ensure uniform output. |
+| 9 | SEO-state write should resolve/regen recommendations | warn | custom | `server/routes/` | `// rec-refresh-ok` | Live SEO-state writes that skip rec refresh leave already-fixed items on the client priority list and in the AI advisor context until the GSC-lagged full audit regenerates them — the closed recommendation→apply→resolve loop silently breaks. |
+| 10 | addActivity type not in CLIENT_VISIBLE_TYPES (public route) | warn | custom | `server/routes/` | `client-visibility-ok` | Public-portal mutations that log activity with a type absent from CLIENT_VISIBLE_TYPES create invisible entries — the activity is recorded but never shown to client-portal users. This is sometimes intentional (admin-only bookkeeping) but often an oversight when adding new activity types. |
+| 11 | Raw pageSlug prefixed as URL — normalize via Page Address helpers | warn | custom | `*.ts, *.tsx` | `// page-slug-url-ok` | Nested Webflow pages need canonical paths for outcome tracking, GSC baselines, audit joins, and live-page fetches. |
+| 12 | Background generation in high-churn routes must be allowlisted | warn | custom | `server/routes/` | `// background-generation-ok` | Anonymous post-response generation promises drift away from TaskPanel visibility, cancellation, activity, and cache invalidation. |
+| 13 | muted-text-two-tier-only | warn | custom | `src/components/` | — | Type hierarchy drift often comes from overusing dim text on primary copy, reducing contrast and making live surfaces feel noisier/less legible than styleguide specimens. |
+| 14 | raw-z-index-inline-literal | warn | custom | `src/` | — | Inline numeric z-index values drift from the canonical token scale and make stacking behavior unpredictable across overlays, toasts, and modals. |
+| 15 | focus-visible-ring-contract | warn | custom | `src/components/` | — | Removing default focus outlines without an explicit focus-visible fallback risks keyboard-invisible controls and drifts from the styleguide focus ring contract. |
+| 16 | stat-primitive-bypass-signal | warn | custom | `src/components/` | — | Direct t-stat typography usage in feature shells often re-implements StatCard/CompactStatBar chrome and drifts from canonical spacing, labels, and responsive behavior. |
+| 17 | inline-score-color-ternary | warn | pattern | `src/` | `score-color-inline-ok` | Inline score ternaries using the standard 80/60 thresholds duplicate the canonical Law-03 logic and drift when the palette changes. |
+| 18 | Workspace mutation route missing broadcastToWorkspace | warn | custom | `server/routes/` | `no-broadcast-ok` | Silent mutations mean UI never refreshes without a manual reload. |
+| 19 | inline-toLocaleDateString | warn | pattern | `src/` | `format-date-inline-ok` | Scattered toLocaleDateString() calls produce inconsistent date formatting and break in non-en-US locales. Shared helpers ensure uniform output. |
 
 ---
 

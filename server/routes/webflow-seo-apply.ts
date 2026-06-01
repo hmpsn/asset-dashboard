@@ -10,6 +10,9 @@ import { requireWorkspaceSiteAccess } from '../auth.js';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { tryResolvePagePath, normalizePageUrl } from '../helpers.js';
+import { createLogger } from '../logger.js';
+import { getPageState } from '../page-edit-states.js';
+import { resolveRecommendationsForChange } from '../recommendations.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { updatePageSeo } from '../webflow.js';
 import {
@@ -21,6 +24,7 @@ import { WS_EVENTS } from '../ws-events.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 
 const router = Router();
+const log = createLogger('webflow-seo-apply');
 
 // --- Bulk AI SEO Fix ---
 router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceSiteAccess({
@@ -113,6 +117,23 @@ router.post('/api/webflow/seo-pattern-apply/:siteId', requireWorkspaceSiteAccess
         { field, action, pagesUpdated: appliedPageIds.length, totalPages: pages.length }
       );
       invalidateIntelligenceCache(ws.id);
+
+      // A live SEO change resolves any recommendations covering the pages it
+      // touched, so the priority list drops them immediately (GSC-lag-free).
+      // appliedPageIds are Webflow page IDs (the page_edit_states key), but
+      // recommendation.affectedPages are SLUGS — resolve each id to its slug via
+      // page_edit_states before matching. Guarded so a resolver failure can never
+      // abort the apply response. // rec-refresh-ok
+      try {
+        const affectedSlugs = appliedPageIds
+          .map(id => getPageState(ws.id, id)?.slug)
+          .filter((s): s is string => typeof s === 'string' && s.length > 0);
+        if (affectedSlugs.length > 0) {
+          resolveRecommendationsForChange(ws.id, { affectedPages: affectedSlugs });
+        }
+      } catch (err) {
+        log.warn({ err, workspaceId: ws.id }, 'Failed to resolve recommendations after SEO pattern apply');
+      }
     }
   }
 

@@ -22,7 +22,9 @@ import {
   getWorkspace,
   getTokenForSite,
   updatePageState,
+  getPageState,
 } from '../workspaces.js';
+import { resolveRecommendationsForChange } from '../recommendations.js';
 import { getWorkspacePages } from '../workspace-data.js';
 import { createLogger } from '../logger.js';
 import { normalizePageUrl } from '../helpers.js';
@@ -226,6 +228,21 @@ router.put('/api/webflow/pages/:pageId/seo', requireWorkspaceSiteAccess({
           source: 'editor',
         });
         invalidateIntelligenceCache(seoWs.id);
+
+        // A live single-page SEO edit resolves any recommendations covering the
+        // page it touched, so the priority list drops them immediately
+        // (GSC-lag-free). req.params.pageId is a Webflow page ID (the
+        // page_edit_states key), but recommendation.affectedPages are SLUGS —
+        // resolve the id to its slug via page_edit_states before matching.
+        // Guarded so a resolver failure can never abort the response. // rec-refresh-ok
+        try {
+          const slug = getPageState(seoWs.id, req.params.pageId)?.slug;
+          if (slug) {
+            resolveRecommendationsForChange(seoWs.id, { affectedPages: [slug] });
+          }
+        } catch (err) {
+          log.warn({ err, workspaceId: seoWs.id }, 'Failed to resolve recommendations after SEO editor save');
+        }
       }
     }
     res.json(result);
