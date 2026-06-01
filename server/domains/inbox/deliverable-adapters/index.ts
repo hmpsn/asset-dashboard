@@ -11,7 +11,14 @@
  */
 
 // --- Phase-1 adapter registrations go below this line (append-only) ---
-// (none in Phase 0)
+// PR-1a: approval_batch family (seo_edit / audit_issue / schema_item / content_plan_*).
+// DARK — these self-register on import but are only mirrored when the
+// `unified-deliverables-approval-family` flag is on (default off → no-op).
+import './seo-edit.js';
+import './audit-issue.js';
+import './schema-item.js';
+import './content-plan-sample.js';
+import './content-plan-template.js';
 
 export {
   registerAdapter,
