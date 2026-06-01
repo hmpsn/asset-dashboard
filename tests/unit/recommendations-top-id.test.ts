@@ -86,3 +86,40 @@ describe('computeRecommendationSummary — topRecommendationId', () => {
     expect(summary.topRecommendationId).toBe('rec_only');
   });
 });
+
+describe('computeRecommendationSummary — topOpportunityRationale (PR6 / SI2)', () => {
+  it('renders a client-safe rationale from the #1 rec opportunity components (no dollar figure)', () => {
+    const topRec = makeRec({
+      id: 'rec_top', priority: 'fix_now', impactScore: 82, status: 'pending',
+      opportunity: {
+        value: 82, emvPerWeek: 1450, roiPerEffortDay: 33, confidence: 0.95, calibration: 1,
+        groundedSpine: 'roiScore',
+        components: [
+          { dimension: 'demand', rawValue: 2400, normalized: 0.8, weight: 0.25, contribution: 0.20, evidence: '2,400 monthly searches' },
+          { dimension: 'intent', rawValue: 'transactional', normalized: 0.9, weight: 0.15, contribution: 0.135, evidence: 'transactional intent' },
+          { dimension: 'effort', rawValue: 0.5, normalized: 0.9, weight: 0.1, contribution: 0.05, evidence: 'low-effort fix' },
+        ],
+        calibrationVersion: 'v1', modelVersion: 'ov-1',
+      },
+    });
+    const summary = computeRecommendationSummary([topRec]);
+    // Top 2 contributors' evidence, joined.
+    expect(summary.topOpportunityRationale).toBe('2,400 monthly searches; transactional intent');
+    // No dollar figure / admin-only quantities leak into the client-safe string.
+    expect(summary.topOpportunityRationale).not.toContain('1450');
+    expect(summary.topOpportunityRationale).not.toContain('$');
+    expect(summary.topOpportunityRationale).not.toContain('low-effort fix'); // 3rd contributor dropped
+  });
+
+  it('is absent (undefined) for legacy recs without an opportunity', () => {
+    const legacy = makeRec({ id: 'rec_legacy', priority: 'fix_now', status: 'pending' });
+    const summary = computeRecommendationSummary([legacy]);
+    expect(summary.topOpportunityRationale).toBeUndefined();
+  });
+
+  it('is absent when there are no active recs', () => {
+    const done = makeRec({ id: 'rec_done', status: 'completed' });
+    const summary = computeRecommendationSummary([done]);
+    expect(summary.topOpportunityRationale).toBeUndefined();
+  });
+});

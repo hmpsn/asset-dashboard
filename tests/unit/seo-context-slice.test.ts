@@ -79,6 +79,19 @@ vi.mock('../../server/intelligence/seo-context-source.js', () => ({
   buildEffectiveBrandVoiceBlock: mocks.buildEffectiveBrandVoiceBlock,
 }));
 
+// PR6 (Spine D) — new optional slice reads degrade gracefully; mock them to empty.
+vi.mock('../../server/quick-wins.js', () => ({
+  listQuickWins: vi.fn(() => []),
+}));
+
+vi.mock('../../server/cannibalization-issues.js', () => ({
+  listCannibalizationIssues: vi.fn(() => []),
+}));
+
+vi.mock('../../server/recommendations.js', () => ({
+  loadRecommendations: vi.fn(() => null),
+}));
+
 const { assembleSeoContext } = await import('../../server/intelligence/seo-context-slice.js');
 
 beforeEach(() => {

@@ -24,17 +24,18 @@ const log = createLogger('routes:recommendations');
 const router = Router();
 
 /**
- * Strip the admin/AI-only `emvPerWeek` field from each rec's Opportunity Value
+ * Strip the admin/AI-only dollar/ROI fields from each rec's Opportunity Value
  * before responding on a PUBLIC (client-facing) route. Per owner decision the
- * client sees the ROI badge + breakdown bars, never the raw $/wk exposure.
- * `opportunity` is null today so this is dark, but it closes the leak before
- * the OV scorer arms it. The rest of the OpportunityScore (value, components,
- * confidence, …) is preserved.
+ * client sees the ROI badge + relative value + component breakdown bars, never
+ * the raw $/wk exposure (`emvPerWeek`) nor the internal ROI quantity
+ * (`roiPerEffortDay`). The rest of the OpportunityScore (value, confidence,
+ * groundedSpine, components, calibration, calibrationVersion, modelVersion) is
+ * preserved so the client #1 card can render its "why this is #1" breakdown.
  */
 function stripEmvFromPublicRecs(recs: Recommendation[]): Recommendation[] {
   return recs.map(r => {
     if (!r.opportunity) return r;
-    const { emvPerWeek: _emvPerWeek, ...publicOpportunity } = r.opportunity;
+    const { emvPerWeek: _emvPerWeek, roiPerEffortDay: _roiPerEffortDay, ...publicOpportunity } = r.opportunity;
     return { ...r, opportunity: publicOpportunity as Recommendation['opportunity'] };
   });
 }
@@ -152,7 +153,9 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', requireClientPor
     });
   }
   broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { recId, status });
-  res.json(rec);
+  // Client-facing single-rec response — strip the admin/AI-only dollar figures
+  // (emvPerWeek / roiPerEffortDay) just like the GET route does (owner constraint).
+  res.json(stripEmvFromPublicRecs([rec])[0]);
 });
 
 // Dismiss a recommendation

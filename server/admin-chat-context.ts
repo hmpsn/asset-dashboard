@@ -842,8 +842,15 @@ export async function assembleAdminContext(
       if (recSet?.recommendations?.length) {
         const active = recSet.recommendations.filter(r => r.status === 'pending' || r.status === 'in_progress');
         if (active.length > 0) {
+          const topRecId = recSet.summary?.topRecommendationId ?? null;
+          // MW6: surface impactScore + the admin/AI-only emvPerWeek (from rec.opportunity)
+          // + isTopRecommendation so the admin advisor reasons about the same ranked #1
+          // the client sees. This is the ADMIN prompt — emvPerWeek is allowed here.
           const recSummary = active.slice(0, 8).map(r => ({
             title: r.title, type: r.type, priority: r.priority, impact: r.impact, effort: r.effort,
+            impactScore: r.impactScore,
+            emvPerWeek: r.opportunity?.emvPerWeek,
+            isTopRecommendation: r.id === topRecId,
           }));
           sections.push(`AI RECOMMENDATIONS (active/new):\n${JSON.stringify(recSummary, null, 1)}`);
           dataSources.push(`AI Recommendations (${active.length} active)`);
