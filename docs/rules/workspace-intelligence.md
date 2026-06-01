@@ -40,7 +40,7 @@ Each slice is independently assembled. A failed assembler logs a warning and lea
 
 | Slice key | Interface | Contents |
 |---|---|---|
-| `seoContext` | `SeoContextSlice` | Keyword strategy, brand voice (raw + authority-resolved), business context, personas, knowledge base, rank tracking, backlink profile, SERP features, strategy history |
+| `seoContext` | `SeoContextSlice` | Keyword strategy, brand voice (raw + authority-resolved), business context, personas, knowledge base, rank tracking, backlink profile, SERP features, strategy history, quick wins (roiScore), cannibalization issues, enriched content gaps (opportunityScore + trendDirection), top-opportunity OV breakdown (emvPerWeek is admin/AI-only — never serialized to a client surface) |
 | `insights` | `InsightsSlice` | All stored analytics insights grouped by type/severity, top by impact, optional page filter |
 | `learnings` | `LearningsSlice` | Outcome tracking summaries, win rates by action type, ROI attributions, WeCalledIt entries, playbooks, scoring config |
 | `pageProfile` | `PageProfileSlice` | Per-page keyword targeting, audit issues, optimization score, rank history, content/schema/link health — **only assembled when `opts.pagePath` is provided** |
@@ -77,7 +77,7 @@ Each assembler is an `async` function that loads data from modules via dynamic `
 
 | Assembler | Primary data sources |
 |---|---|
-| `assembleSeoContext` | `intelligence/seo-context-source.ts` (brand voice authority + knowledge/raw readers), `workspaces.ts` (keyword strategy, business context, personas, intelligence profile, business profile), `page-keywords.ts` (live page keyword map), `rank-tracking.ts`, `strategy_history` table |
+| `assembleSeoContext` | `intelligence/seo-context-source.ts` (brand voice authority + knowledge/raw readers), `workspaces.ts` (keyword strategy, business context, personas, intelligence profile, business profile), `page-keywords.ts` (live page keyword map), `content-gaps.ts` (enriched content gaps), `quick-wins.ts` (quick wins + roiScore), `cannibalization-issues.ts`, `recommendations.ts` (`loadRecommendations` → top-opportunity OV breakdown), `rank-tracking.ts`, `strategy_history` table |
 | `assembleInsights` | `analytics-insights-store.ts` (all workspace insights, capped at 100 by impact score) |
 | `assembleLearnings` | `workspace-learnings.ts`, `outcome-playbooks.ts`, `roi-attribution.ts`, `outcome-tracking.ts` (WeCalledIt, TopWins) — **gated by `outcome-ai-injection` feature flag** |
 | `assemblePageProfile` | `page-keywords.ts`, `rank-tracking.ts`, `recommendations.ts`, `analytics-insights-store.ts`, `audit-page.ts`, `schema-validator.ts`, `site-architecture.ts`, `seo-change-tracker.ts`, `content-posts.ts`, `content-decay.ts`, `content-brief.ts` |

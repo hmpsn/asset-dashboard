@@ -418,6 +418,58 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
     lines.push(`Strategy: revised ${ctx.strategyHistory.revisionsCount}x, last ${ctx.strategyHistory.lastRevisedAt.slice(0, 10)}`);
   }
 
+  // Top Opportunity — the resolved #1 recommendation's OV breakdown (SI2/MW6).
+  // CLIENT-SAFE: this formatter is shared (formatForPrompt is audience-agnostic and
+  // reaches the client search-chat advisor), so it must NEVER print the dollar
+  // emvPerWeek. Only the relative value (0–100) + component evidence appear here;
+  // the admin advisor gets emvPerWeek via the admin-only recSummary (admin-chat-context).
+  // Inject opportunity.components evidence DIRECTLY — no format helper (authority-layered
+  // fields rule). Token budget: only the top-3 components by contribution, not all 7.
+  if (ctx.topOpportunity && ctx.topOpportunity.components.length > 0) {
+    const top = ctx.topOpportunity;
+    lines.push(`#1 OPPORTUNITY (value ${Math.round(top.value)}/100):`);
+    const topComponents = [...top.components]
+      .sort((a, b) => b.contribution - a.contribution)
+      .slice(0, 3);
+    for (const c of topComponents) {
+      lines.push(`  - ${c.dimension}: ${c.evidence}`);
+    }
+  }
+
+  // Quick wins — low-effort, high-impact fixes with grounded ROI (SI1); standard+ verbosity
+  if (ctx.quickWins && ctx.quickWins.length > 0 && verbosity !== 'compact') {
+    const limit = verbosity === 'detailed' ? 8 : 4;
+    lines.push('Quick wins (low-effort, high-impact):');
+    for (const qw of ctx.quickWins.slice(0, limit)) {
+      const roi = qw.roiScore != null ? ` [ROI ${Math.round(qw.roiScore)}]` : '';
+      lines.push(`  - ${qw.pagePath}: ${qw.action}${roi} (${qw.estimatedImpact} impact)`);
+    }
+  }
+
+  // Content gaps — enriched with opportunityScore + trendDirection (SI2); standard+ verbosity.
+  // contentGaps live on strategy (reassembled from the content_gaps table by the slice).
+  if (ctx.strategy?.contentGaps && ctx.strategy.contentGaps.length > 0 && verbosity !== 'compact') {
+    const limit = verbosity === 'detailed' ? 8 : 4;
+    const gaps = [...ctx.strategy.contentGaps]
+      .sort((a, b) => (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0))
+      .slice(0, limit);
+    lines.push('Content gaps (opportunity-ranked):');
+    for (const g of gaps) {
+      const score = g.opportunityScore != null ? ` [opportunity ${Math.round(g.opportunityScore)}]` : '';
+      const trend = g.trendDirection ? ` ${g.trendDirection}` : '';
+      lines.push(`  - ${g.topic} → "${g.targetKeyword}" (${g.intent})${score}${trend}`);
+    }
+  }
+
+  // Cannibalization issues — keyword overlap across pages (SI4); standard+ verbosity
+  if (ctx.cannibalizationIssues && ctx.cannibalizationIssues.length > 0 && verbosity !== 'compact') {
+    const limit = verbosity === 'detailed' ? 6 : 3;
+    lines.push('Keyword cannibalization:');
+    for (const issue of ctx.cannibalizationIssues.slice(0, limit)) {
+      lines.push(`  - [${issue.severity}] "${issue.keyword}" across ${issue.pages.length} pages: ${issue.recommendation}`);
+    }
+  }
+
   // Competitor snapshots (Task 4.2c) — at standard+ verbosity
   if (ctx.competitorSnapshots && ctx.competitorSnapshots.length > 0 && verbosity !== 'compact') {
     if (verbosity === 'detailed') {

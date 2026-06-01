@@ -121,6 +121,25 @@ vi.mock('../../server/seo-data-provider.js', () => ({
   getBacklinksProvider: (...args: unknown[]) => mockGetBacklinksProvider(...args),
 }));
 
+// PR6 (Spine D) — new slice reads: quick wins (SI1), cannibalization (SI4), top opportunity (SI2/MW6)
+import type { QuickWin, CannibalizationItem } from '../../shared/types/workspace.js';
+import type { RecommendationSet } from '../../shared/types/recommendations.js';
+
+const mockListQuickWins = vi.fn(() => [] as QuickWin[]);
+vi.mock('../../server/quick-wins.js', () => ({
+  listQuickWins: (...args: unknown[]) => mockListQuickWins(...args),
+}));
+
+const mockListCannibalizationIssues = vi.fn(() => [] as CannibalizationItem[]);
+vi.mock('../../server/cannibalization-issues.js', () => ({
+  listCannibalizationIssues: (...args: unknown[]) => mockListCannibalizationIssues(...args),
+}));
+
+const mockLoadRecommendations = vi.fn(() => null as RecommendationSet | null);
+vi.mock('../../server/recommendations.js', () => ({
+  loadRecommendations: (...args: unknown[]) => mockLoadRecommendations(...args),
+}));
+
 // ── Real import (after all mocks) ─────────────────────────────────────────────
 
 import { assembleSeoContext } from '../../server/intelligence/seo-context-slice.js';
@@ -186,6 +205,9 @@ beforeEach(() => {
   mockBuildEffectiveBrandVoiceBlock.mockReturnValue('');
   mockFindPageMapEntry.mockReturnValue(undefined);
   mockStrategyHistoryAll.mockReturnValue([]);
+  mockListQuickWins.mockReturnValue([]);
+  mockListCannibalizationIssues.mockReturnValue([]);
+  mockLoadRecommendations.mockReturnValue(null);
 });
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1008,6 +1030,184 @@ describe('pageKeywords enrichment', () => {
     expect(mockFindPageMapEntry).toHaveBeenCalledWith(expect.arrayContaining([
       expect.objectContaining({ pagePath: '/blog' }),
     ]), '/blog');
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// 11b. PR6 (Spine D) — quick wins, cannibalization, top opportunity
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('quick wins (SI1)', () => {
+  it('populates quickWins from listQuickWins when present', async () => {
+    mockGetWorkspace.mockReturnValue(makeWorkspace({ keywordStrategy: makeKeywordStrategy() }));
+    mockListQuickWins.mockReturnValue([
+      { pagePath: '/services', action: 'Add internal links', estimatedImpact: 'high', rationale: 'Boost authority', roiScore: 84 },
+    ]);
+
+    const result = await assembleSeoContext('ws-qw');
+
+    expect(result.quickWins).toHaveLength(1);
+    expect(result.quickWins?.[0].roiScore).toBe(84);
+  });
+
+  it('quickWins is absent when listQuickWins returns empty', async () => {
+    mockGetWorkspace.mockReturnValue(makeWorkspace({ keywordStrategy: makeKeywordStrategy() }));
+    mockListQuickWins.mockReturnValue([]);
+
+    const result = await assembleSeoContext('ws-no-qw');
+
+    expect(result.quickWins).toBeUndefined();
+  });
+
+  it('quickWins is absent when listQuickWins throws (graceful degradation)', async () => {
+    mockGetWorkspace.mockReturnValue(makeWorkspace({ keywordStrategy: makeKeywordStrategy() }));
+    mockListQuickWins.mockImplementation(() => { throw new Error('quick_wins table missing'); });
+
+    const result = await assembleSeoContext('ws-qw-throws');
+
+    expect(result.quickWins).toBeUndefined();
+  });
+});
+
+describe('cannibalization issues (SI4)', () => {
+  it('populates cannibalizationIssues from listCannibalizationIssues when present', async () => {
+    mockGetWorkspace.mockReturnValue(makeWorkspace({ keywordStrategy: makeKeywordStrategy() }));
+    mockListCannibalizationIssues.mockReturnValue([
+      {
+        keyword: 'seo tools',
+        pages: [
+          { path: '/a', source: 'keyword_map' },
+          { path: '/b', source: 'gsc' },
+        ],
+        severity: 'medium',
+        recommendation: 'Consolidate to /a',
+      },
+    ]);
+
+    const result = await assembleSeoContext('ws-cann');
+
+    expect(result.cannibalizationIssues).toHaveLength(1);
+    expect(result.cannibalizationIssues?.[0].keyword).toBe('seo tools');
+  });
+
+  it('cannibalizationIssues is absent when none exist', async () => {
+    mockGetWorkspace.mockReturnValue(makeWorkspace({ keywordStrategy: makeKeywordStrategy() }));
+    mockListCannibalizationIssues.mockReturnValue([]);
+
+    const result = await assembleSeoContext('ws-no-cann');
+
+    expect(result.cannibalizationIssues).toBeUndefined();
+  });
+
+  it('cannibalizationIssues is absent when the module throws', async () => {
+    mockGetWorkspace.mockReturnValue(makeWorkspace({ keywordStrategy: makeKeywordStrategy() }));
+    mockListCannibalizationIssues.mockImplementation(() => { throw new Error('table missing'); });
+
+    const result = await assembleSeoContext('ws-cann-throws');
+
+    expect(result.cannibalizationIssues).toBeUndefined();
+  });
+});
+
+describe('top opportunity (SI2/MW6)', () => {
+  function makeRecSet(opts: { topId: string | null; recs: RecommendationSet['recommendations'] }): RecommendationSet {
+    return {
+      workspaceId: 'ws-top',
+      generatedAt: '2026-05-01T00:00:00Z',
+      recommendations: opts.recs,
+      summary: {
+        fixNow: 0, fixSoon: 0, fixLater: 0, ongoing: 0,
+        totalImpactScore: 0, trafficAtRisk: 0,
+        estimatedRecoverableClicks: 0, estimatedRecoverableImpressions: 0,
+        topRecommendationId: opts.topId,
+      },
+    };
+  }
+
+  it('populates topOpportunity (incl. admin-only emvPerWeek) from the resolved #1 rec', async () => {
+    mockGetWorkspace.mockReturnValue(makeWorkspace({ keywordStrategy: makeKeywordStrategy() }));
+    mockLoadRecommendations.mockReturnValue(makeRecSet({
+      topId: 'rec-1',
+      recs: [
+        {
+          id: 'rec-1', workspaceId: 'ws-top', priority: 'fix_now', type: 'metadata',
+          title: 'Fix meta', description: 'd', insight: 'i', impact: 'high', effort: 'low',
+          impactScore: 80, source: 'audit:meta', affectedPages: ['home'],
+          trafficAtRisk: 0, impressionsAtRisk: 0, estimatedGain: 'g', actionType: 'manual',
+          status: 'pending', createdAt: 'x', updatedAt: 'x',
+          opportunity: {
+            value: 80, emvPerWeek: 999, roiPerEffortDay: 12, confidence: 0.95, calibration: 1,
+            groundedSpine: 'roiScore',
+            components: [
+              { dimension: 'demand', rawValue: 2400, normalized: 0.5, weight: 0.2, contribution: 0.1, evidence: '2,400 searches' },
+            ],
+            calibrationVersion: 'v1', modelVersion: 'ov-1',
+          },
+        },
+      ],
+    }));
+
+    const result = await assembleSeoContext('ws-top');
+
+    expect(result.topOpportunity).toBeDefined();
+    expect(result.topOpportunity?.recommendationId).toBe('rec-1');
+    expect(result.topOpportunity?.value).toBe(80);
+    // emvPerWeek IS carried in the slice for the admin advisor (stripped at the client boundary, not here)
+    expect(result.topOpportunity?.emvPerWeek).toBe(999);
+    expect(result.topOpportunity?.components).toHaveLength(1);
+  });
+
+  it('topOpportunity is absent when the #1 rec carries no opportunity (legacy set)', async () => {
+    mockGetWorkspace.mockReturnValue(makeWorkspace({ keywordStrategy: makeKeywordStrategy() }));
+    mockLoadRecommendations.mockReturnValue(makeRecSet({
+      topId: 'rec-legacy',
+      recs: [
+        {
+          id: 'rec-legacy', workspaceId: 'ws-top', priority: 'fix_now', type: 'metadata',
+          title: 'Legacy', description: 'd', insight: 'i', impact: 'high', effort: 'low',
+          impactScore: 60, source: 'audit:meta', affectedPages: ['home'],
+          trafficAtRisk: 0, impressionsAtRisk: 0, estimatedGain: 'g', actionType: 'manual',
+          status: 'pending', createdAt: 'x', updatedAt: 'x',
+        },
+      ],
+    }));
+
+    const result = await assembleSeoContext('ws-top-legacy');
+
+    expect(result.topOpportunity).toBeUndefined();
+  });
+
+  it('topOpportunity is absent when the #1 rec is completed/dismissed', async () => {
+    mockGetWorkspace.mockReturnValue(makeWorkspace({ keywordStrategy: makeKeywordStrategy() }));
+    mockLoadRecommendations.mockReturnValue(makeRecSet({
+      topId: 'rec-done',
+      recs: [
+        {
+          id: 'rec-done', workspaceId: 'ws-top', priority: 'fix_now', type: 'metadata',
+          title: 'Done', description: 'd', insight: 'i', impact: 'high', effort: 'low',
+          impactScore: 90, source: 'audit:meta', affectedPages: ['home'],
+          trafficAtRisk: 0, impressionsAtRisk: 0, estimatedGain: 'g', actionType: 'manual',
+          status: 'completed', createdAt: 'x', updatedAt: 'x',
+          opportunity: {
+            value: 90, emvPerWeek: 100, roiPerEffortDay: 1, confidence: 0.9, calibration: 1,
+            groundedSpine: 'computed', components: [], calibrationVersion: 'v1', modelVersion: 'ov-1',
+          },
+        },
+      ],
+    }));
+
+    const result = await assembleSeoContext('ws-top-done');
+
+    expect(result.topOpportunity).toBeUndefined();
+  });
+
+  it('topOpportunity is absent when no recommendations exist', async () => {
+    mockGetWorkspace.mockReturnValue(makeWorkspace({ keywordStrategy: makeKeywordStrategy() }));
+    mockLoadRecommendations.mockReturnValue(null);
+
+    const result = await assembleSeoContext('ws-no-recs');
+
+    expect(result.topOpportunity).toBeUndefined();
   });
 });
 

@@ -261,5 +261,51 @@ export async function assembleSeoContext(
     log.debug({ err, workspaceId }, 'assembleSeoContext: competitor snapshots optional, degrading gracefully');
   }
 
+  // Quick wins — low-effort, high-impact fixes with grounded roiScore (SI1).
+  // Reads the normalized quick_wins table (post-#367) so the advisor can recite
+  // grounded prioritization. Strategy.quickWins is stripped from the JSON blob.
+  try {
+    const { listQuickWins } = await import('../quick-wins.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+    const quickWins = listQuickWins(workspaceId);
+    if (quickWins.length > 0) base.quickWins = quickWins;
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleSeoContext: quick wins optional, degrading gracefully');
+  }
+
+  // Cannibalization issues — keyword cannibalization from the normalized table (SI4).
+  try {
+    const { listCannibalizationIssues } = await import('../cannibalization-issues.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+    const cannibalizationIssues = listCannibalizationIssues(workspaceId);
+    if (cannibalizationIssues.length > 0) base.cannibalizationIssues = cannibalizationIssues;
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleSeoContext: cannibalization issues optional, degrading gracefully');
+  }
+
+  // Top opportunity — the resolved #1 recommendation's Opportunity Value breakdown (SI2/MW6).
+  // Dynamic import avoids a static cycle (recommendations.ts → workspace-intelligence.ts →
+  // seo-context-slice.ts). Carries emvPerWeek for the ADMIN advisor only; the client
+  // serialization layer strips it (owner decision). Undefined when no active #1 exists
+  // or the #1 carries no opportunity (legacy sets) — additive and safe.
+  try {
+    const { loadRecommendations } = await import('../recommendations.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+    const recSet = loadRecommendations(workspaceId);
+    const topId = recSet?.summary?.topRecommendationId ?? null;
+    if (topId) {
+      const topRec = recSet?.recommendations.find(
+        r => r.id === topId && r.status !== 'completed' && r.status !== 'dismissed',
+      );
+      if (topRec?.opportunity) {
+        base.topOpportunity = {
+          recommendationId: topRec.id,
+          value: topRec.opportunity.value,
+          emvPerWeek: topRec.opportunity.emvPerWeek,
+          components: topRec.opportunity.components,
+        };
+      }
+    }
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleSeoContext: top opportunity optional, degrading gracefully');
+  }
+
   return base;
 }

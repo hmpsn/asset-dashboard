@@ -4,7 +4,8 @@
 
 import type { AnalyticsInsight, InsightType, InsightSeverity } from './analytics.js';
 import type { DiagnosticStatus } from './diagnostics.js';
-import type { KeywordStrategy, AudiencePersona, PageKeywordMap } from './workspace.js';
+import type { KeywordStrategy, AudiencePersona, PageKeywordMap, QuickWin, CannibalizationItem } from './workspace.js';
+import type { OpportunityComponent } from './recommendations.js';
 import type { BriefingSummary } from './briefing.js';
 import type { PageElementCatalog } from './page-elements.js';
 import type { SiteInventorySlice } from './site-inventory.js';
@@ -179,6 +180,39 @@ export interface SeoContextSlice {
     organicTraffic: number | null;
     topKeywords: Array<{ keyword: string; position: number; volume: number }>;
   }>;
+  /**
+   * Low-effort, high-impact keyword fixes from the quick_wins table (SI1).
+   * Carries `roiScore` so the advisor can recite grounded prioritization.
+   * Optional — only present when at least one quick win exists. Read by
+   * assembleSeoContext via listQuickWins(). Strategy-level (not per-page).
+   */
+  quickWins?: QuickWin[];
+  /**
+   * Keyword cannibalization issues from the cannibalization_issues table (SI4).
+   * Optional — only present when at least one issue exists. Read by
+   * assembleSeoContext via listCannibalizationIssues().
+   */
+  cannibalizationIssues?: CannibalizationItem[];
+  /**
+   * The resolved #1 recommendation's Opportunity Value breakdown (SI2/MW6),
+   * so the advisor recites the same explainable "why this is #1" the client sees.
+   *
+   * `emvPerWeek` is ADMIN/AI-ONLY (owner decision) — it is carried here for the
+   * admin advisor prompt (formatSeoContextSection) but MUST be stripped on every
+   * client-facing serialization. The formatter injects `components` evidence
+   * directly per the authority-layered fields rule (no format helper).
+   *
+   * Optional — undefined when no active recs exist or the rec carries no
+   * opportunity (legacy sets). Populated from loadRecommendations() +
+   * summary.topRecommendationId.
+   */
+  topOpportunity?: {
+    recommendationId: string;
+    value: number;
+    /** Admin/AI-only — never serialize to a client surface. */
+    emvPerWeek: number;
+    components: OpportunityComponent[];
+  };
 }
 
 export interface InsightsSlice {

@@ -115,3 +115,93 @@ describe('formatSeoContextSection page keyword fidelity', () => {
     expect(result).toContain('seo analytics');
   });
 });
+
+describe('formatSeoContextSection — PR6 (Spine D) top opportunity + quick wins + cannibalization', () => {
+  const withSpineD: WorkspaceIntelligence = {
+    ...intel,
+    seoContext: {
+      ...RICH_SEO_CONTEXT,
+      topOpportunity: {
+        recommendationId: 'rec-1',
+        value: 82,
+        emvPerWeek: 1450,
+        components: [
+          { dimension: 'demand', rawValue: 2400, normalized: 0.8, weight: 0.25, contribution: 0.20, evidence: '2,400 monthly searches' },
+          { dimension: 'winnability', rawValue: 7, normalized: 0.6, weight: 0.2, contribution: 0.12, evidence: 'currently ranking position 7' },
+          { dimension: 'intent', rawValue: 'transactional', normalized: 0.9, weight: 0.15, contribution: 0.135, evidence: 'transactional intent' },
+          { dimension: 'effort', rawValue: 0.5, normalized: 0.9, weight: 0.1, contribution: 0.09, evidence: 'low-effort title fix' },
+        ],
+      },
+      quickWins: [
+        { pagePath: '/services', action: 'Add internal links to /pricing', estimatedImpact: 'high', rationale: 'authority flow', roiScore: 88 },
+      ],
+      cannibalizationIssues: [
+        {
+          keyword: 'seo tools',
+          pages: [
+            { path: '/features', source: 'keyword_map' },
+            { path: '/blog/best-seo-tools', source: 'gsc' },
+          ],
+          severity: 'medium',
+          recommendation: 'Consolidate to /features',
+        },
+      ],
+      strategy: {
+        ...RICH_SEO_CONTEXT.strategy!,
+        contentGaps: [
+          { topic: 'AEO strategy guide', targetKeyword: 'aeo strategy', intent: 'informational', priority: 'high', rationale: 'rising trend', opportunityScore: 74, trendDirection: 'rising' },
+        ],
+      },
+    } satisfies SeoContextSlice,
+  };
+
+  it('emits the #1 opportunity value + components but NEVER the dollar emvPerWeek (this formatter is client-reachable via formatForPrompt)', () => {
+    const result = formatForPrompt(withSpineD, { verbosity: 'detailed', sections: ['seoContext'] });
+    expect(result).toContain('#1 OPPORTUNITY');
+    expect(result).toContain('82/100');
+    // Client-safe by construction: the client search-chat advisor reaches this formatter,
+    // so the dollar emvPerWeek (1,450) must NOT appear. Admin gets it via recSummary.
+    expect(result).not.toContain('1,450');
+    expect(result).not.toContain('/week');
+    expect(result).not.toMatch(/\$\d/);
+  });
+
+  it('emits only the top-3 components by contribution (token budget), not all 4', () => {
+    const result = formatForPrompt(withSpineD, { verbosity: 'detailed', sections: ['seoContext'] });
+    // demand (0.20), intent (0.135), winnability (0.12) are the top 3
+    expect(result).toContain('2,400 monthly searches');
+    expect(result).toContain('transactional intent');
+    expect(result).toContain('currently ranking position 7');
+    // effort (0.09) is the 4th — must be dropped
+    expect(result).not.toContain('low-effort title fix');
+  });
+
+  it('emits quick wins with the grounded ROI score (SI1)', () => {
+    const result = formatForPrompt(withSpineD, { verbosity: 'detailed', sections: ['seoContext'] });
+    expect(result).toContain('Quick wins');
+    expect(result).toContain('Add internal links to /pricing');
+    expect(result).toContain('ROI 88');
+  });
+
+  it('emits enriched content gaps with opportunityScore + trendDirection (SI2)', () => {
+    const result = formatForPrompt(withSpineD, { verbosity: 'detailed', sections: ['seoContext'] });
+    expect(result).toContain('Content gaps');
+    expect(result).toContain('aeo strategy');
+    expect(result).toContain('opportunity 74');
+    expect(result).toContain('rising');
+  });
+
+  it('emits cannibalization issues (SI4)', () => {
+    const result = formatForPrompt(withSpineD, { verbosity: 'detailed', sections: ['seoContext'] });
+    expect(result).toContain('Keyword cannibalization');
+    expect(result).toContain('seo tools');
+    expect(result).toContain('Consolidate to /features');
+  });
+
+  it('omits Spine D sections at compact verbosity (token budget)', () => {
+    const result = formatForPrompt(withSpineD, { verbosity: 'compact', sections: ['seoContext'] });
+    expect(result).not.toContain('Quick wins');
+    expect(result).not.toContain('Keyword cannibalization');
+    expect(result).not.toContain('Content gaps');
+  });
+});

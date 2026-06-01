@@ -443,7 +443,9 @@ export function computeRecommendationSummary(recs: Recommendation[]): Recommenda
   // recs are already sorted by sortRecommendations (tier → impactScore → intent
   // alignment) before computeRecommendationSummary is called, so activeRecs[0]
   // is the true highest-ranked active recommendation.
-  const topRecommendationId = activeRecs.length > 0 ? activeRecs[0].id : null;
+  const topRec = activeRecs.length > 0 ? activeRecs[0] : null;
+  const topRecommendationId = topRec?.id ?? null;
+  const topOpportunityRationale = topRec ? buildTopOpportunityRationale(topRec) : undefined;
 
   return {
     fixNow: activeRecs.filter(r => r.priority === 'fix_now').length,
@@ -455,7 +457,24 @@ export function computeRecommendationSummary(recs: Recommendation[]): Recommenda
     estimatedRecoverableClicks: Math.round(weightedRecoverableClicks),
     estimatedRecoverableImpressions: Math.round(weightedRecoverableImpressions),
     topRecommendationId,
+    ...(topOpportunityRationale ? { topOpportunityRationale } : {}),
   };
+}
+
+/** Render a one-line, CLIENT-SAFE rationale for the #1 recommendation from its
+ *  opportunity.components (top 2 contributors' evidence). Contains NO dollar
+ *  figure (emvPerWeek/roiPerEffortDay are admin/AI-only per owner decision).
+ *  Returns undefined for legacy recs with no opportunity — additive and safe. */
+function buildTopOpportunityRationale(rec: Recommendation): string | undefined {
+  const components = rec.opportunity?.components;
+  if (!components || components.length === 0) return undefined;
+  const top = [...components]
+    .sort((a, b) => b.contribution - a.contribution)
+    .slice(0, 2)
+    .map(c => c.evidence.trim())
+    .filter(Boolean);
+  if (top.length === 0) return undefined;
+  return top.join('; ');
 }
 
 // ─── Business-intent ranking ──────────────────────────────────────

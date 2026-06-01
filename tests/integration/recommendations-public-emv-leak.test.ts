@@ -1,11 +1,12 @@
 /**
  * PR3 (Spine A) — client-leak gate.
  *
- * The Opportunity Value `emvPerWeek` (expected value/week) is admin/AI-only per
- * owner decision — the client sees the ROI badge + breakdown bars, never the raw
- * $/wk exposure. This test pins that the PUBLIC recommendations route strips
- * `emvPerWeek` from each rec's opportunity while preserving the rest of the
- * OpportunityScore (value, components, confidence, …).
+ * The Opportunity Value `emvPerWeek` (expected value/week) AND `roiPerEffortDay`
+ * (internal ROI quantity) are admin/AI-only per owner decision — the client sees
+ * the ROI badge + relative value + component breakdown bars, never the raw $/wk
+ * exposure nor the internal ROI quantity. This test pins that the PUBLIC
+ * recommendations route strips BOTH from each rec's opportunity while preserving
+ * the rest of the OpportunityScore (value, components, confidence, groundedSpine, …).
  *
  * Seeds a rec WITH a full opportunity (emvPerWeek set) directly into the DB and
  * exercises the public GET endpoint — the actual client read path.
@@ -17,7 +18,7 @@ import { saveRecommendations } from '../../server/recommendations.js';
 import type { Recommendation, RecommendationSet, OpportunityScore } from '../../shared/types/recommendations.js';
 
 const ctx = createTestContext(13873); // port-ok: next free port above 13872
-const { api } = ctx;
+const { api, patchJson } = ctx;
 
 let testWsId = '';
 
@@ -93,8 +94,8 @@ afterAll(async () => {
   await ctx.stopServer();
 });
 
-describe('Public recommendations route — emvPerWeek leak gate', () => {
-  it('strips emvPerWeek from each rec opportunity but preserves the rest of the score', async () => {
+describe('Public recommendations route — emvPerWeek/roiPerEffortDay leak gate', () => {
+  it('strips emvPerWeek + roiPerEffortDay from each rec opportunity but preserves the rest of the score', async () => {
     seed([makeRec({ id: 'rec_emv_leak_001' })]);
 
     const res = await api(`/api/public/recommendations/${testWsId}`);
@@ -104,21 +105,41 @@ describe('Public recommendations route — emvPerWeek leak gate', () => {
     const found = body.recommendations.find(r => r.id === 'rec_emv_leak_001');
     expect(found).toBeDefined();
     expect(found!.opportunity).toBeTruthy();
-    // The leaky field must be absent.
+    // Both admin/AI-only fields must be absent.
     expect('emvPerWeek' in (found!.opportunity as object)).toBe(false);
     expect((found!.opportunity as Record<string, unknown>).emvPerWeek).toBeUndefined();
-    // The rest of the score must survive.
+    expect('roiPerEffortDay' in (found!.opportunity as object)).toBe(false);
+    expect((found!.opportunity as Record<string, unknown>).roiPerEffortDay).toBeUndefined();
+    // The client-safe rest of the score must survive (ROI badge + breakdown bars).
     expect(found!.opportunity!.value).toBe(72);
+    expect(found!.opportunity!.confidence).toBe(0.95);
+    expect(found!.opportunity!.groundedSpine).toBe('roiScore');
     expect(found!.opportunity!.modelVersion).toBe('ov-1');
     expect(found!.opportunity!.components.length).toBeGreaterThan(0);
   });
 
-  it('raw response JSON never contains the string "emvPerWeek"', async () => {
+  it('raw response JSON never contains "emvPerWeek" or "roiPerEffortDay"', async () => {
     seed([makeRec({ id: 'rec_emv_leak_002' })]);
 
     const res = await api(`/api/public/recommendations/${testWsId}`);
     expect(res.status).toBe(200);
     const raw = await res.text();
     expect(raw).not.toContain('emvPerWeek');
+    expect(raw).not.toContain('roiPerEffortDay');
+  });
+
+  it('PATCH status (write path) response also strips emvPerWeek + roiPerEffortDay', async () => {
+    // The PATCH route returns the updated single rec; it must strip the dollars too
+    // (the client portal calls this on every status flip from InsightsEngine).
+    seed([makeRec({ id: 'rec_emv_patch_001', status: 'pending' })]);
+
+    const res = await patchJson(`/api/public/recommendations/${testWsId}/rec_emv_patch_001`, { status: 'in_progress' });
+    expect(res.status).toBe(200);
+    const raw = await res.text();
+    expect(raw).not.toContain('emvPerWeek');
+    expect(raw).not.toContain('roiPerEffortDay');
+    const rec = JSON.parse(raw) as Recommendation;
+    expect(rec.opportunity).toBeTruthy();
+    expect(rec.opportunity!.value).toBe(72); // client-safe fields survive
   });
 });
