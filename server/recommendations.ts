@@ -42,6 +42,7 @@ import {
   kdClassificationNote,
 } from './authority-context.js';
 import { computeOpportunityValue, pickImpactScore } from './scoring/opportunity-value.js';
+import { recordOvDivergence } from './ov-divergence.js';
 import { buildCtrCurve, type GscKeywordObservation } from './scoring/ctr-curve.js';
 import { isFeatureEnabled } from './feature-flags.js';
 
@@ -1763,6 +1764,16 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         }
       }
     }
+  }
+
+  // ── Shadow divergence log (PR4): record legacy-#1 vs OV-#1 BEFORE the selector
+  // overwrites impactScore (so legacy is intact + opportunity.value is the OV value).
+  // Always-on, dark; must never break generation. sortRecommendations is injected
+  // to avoid a circular import. ──
+  try {
+    recordOvDivergence(workspaceId, recs, effectiveBusinessPriorities, sortRecommendations);
+  } catch (err) {
+    log.warn({ workspaceId, err: err instanceof Error ? err.message : String(err) }, 'OV divergence logging failed (non-fatal)');
   }
 
   // ── Opportunity Value cutover (flag-gated, single application point). ──

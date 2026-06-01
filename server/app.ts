@@ -74,6 +74,7 @@ import featuresRouter from './routes/features.js';
 import outcomesRouter from './routes/outcomes.js';
 import intelligenceRouter from './routes/intelligence.js';
 import debugRouter from './routes/debug.js';
+import ovDivergenceRouter from './routes/ov-divergence.js';
 import suggestedBriefsRouter from './routes/suggested-briefs.js';
 import clientSignalsRouter from './routes/client-signals.js';
 import clientActionsRouter from './routes/client-actions.js';
@@ -344,6 +345,7 @@ export function createApp(): express.Express {
   app.use(outcomesRouter);
   app.use(intelligenceRouter);
   app.use(debugRouter);
+  app.use(ovDivergenceRouter);
   app.use(suggestedBriefsRouter);
   app.use(clientSignalsRouter);
   app.use(clientActionsRouter);
