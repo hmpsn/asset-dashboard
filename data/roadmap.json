@@ -1,6 +1,134 @@
 {
   "sprints": [
     {
+      "id": "sprint-recommendation-intelligence-opportunity-value-2026-06-01",
+      "name": "🧠 Recommendation Intelligence — Integrity Remediation + Opportunity Value Re-Architecture",
+      "hours": "shipped + follow-ups",
+      "rationale": "Two read-only audits (foundational integrity, intelligence quality) drove a remediation wave then a full re-architecture of the recommendation scoring engine onto one grounded Opportunity Value model. Build is complete and dark; this sprint tracks the owner-gated cutover and the deferred hardening.",
+      "notes": "Audits: docs/audits/2026-05-31-foundational-integrity-audit.md, docs/audits/2026-05-31-intelligence-quality-audit.md. Design: docs/designs/2026-05-31-opportunity-value-model.md. Plan: docs/superpowers/plans/2026-06-01-opportunity-value-model.md. Pre-plan audit: docs/superpowers/audits/2026-06-01-opportunity-value-model-audit.md.",
+      "items": [
+        {
+          "id": "ov-integrity-remediation",
+          "title": "Foundational integrity remediation — freshness, ROI loop, priority reconciliation, advisor completeness",
+          "source": "/docs/audits/2026-05-31-foundational-integrity-audit.md",
+          "est": "shipped",
+          "priority": "P0",
+          "status": "done",
+          "shippedAt": "2026-05-31",
+          "notes": "PRs #997-#999 + a direct staging push (4 phases). Phase 1: applied SEO changes/approvals/work-orders/publishes resolve+regenerate the rec set (resolveRecommendationsForChange). Phase 2 (#997): migration 106 action_outcomes.attributed_value (clicks-delta x CPC); digest/learnings re-pointed off the dead roi_attributions. Phase 3 (#998): effectiveBusinessPriorities resolver + ranking + summary.topRecommendationId. Phase 4 (#999): intelligence-cache invalidation across write sites, new slice fields, admin-chat formatter routing, SEO-write rec-resolution. FEATURE_AUDIT #467."
+        },
+        {
+          "id": "ov-rearchitecture-build",
+          "title": "Unified Opportunity Value scorer — 7-phase build (DARK behind flags)",
+          "source": "/docs/designs/2026-05-31-opportunity-value-model.md",
+          "est": "shipped",
+          "priority": "P0",
+          "status": "done",
+          "shippedAt": "2026-06-01",
+          "notes": "PRs #1001-#1007. computeOpportunityValue (server/scoring/) + CTR-curve; opportunity persistence (Zod lockstep); Spine-A wiring behind a flag-off selector; shadow divergence logging (ov_divergence, migration 107); referring-domains authority + realized-outcome calibration + weights (migrations 108/109); advisor+client coherence (client sees ROI badge, never $); opportunity_events ledger + decaying Timing + decay/competitor/rank-drop detectors (migration 110). All dark behind opportunity-value-scorer / -calibration / -events (default false). FEATURE_AUDIT #468. Each phase adversarially reviewed; review caught 6 criticals (incl. roiScore-discarded, 2 client-$-leaks)."
+        },
+        {
+          "id": "ov-flag-flip-cutover",
+          "title": "P8 — owner-gated Opportunity Value cutover (shadow review then flip)",
+          "source": "/docs/designs/2026-05-31-opportunity-value-model.md",
+          "est": "owner-gated",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "NOT autonomous. Validation gate before flipping opportunity-value-scorer: (1) soak — let generateRecommendations log divergence; optionally enable -events/-calibration in shadow first; (2) review GET /api/ov-divergence/:workspaceId on both live workspaces — every OV-#1 != legacy-#1 must be defensibly higher value, invariant_held 100%; (3) confirm outcome-tracking/outcome-ai-injection flag state so calibration fires; (4) flip. WARNING: flag is global (all clients at once) — staged per-client needs ov-per-workspace-flag-dimension first."
+        },
+        {
+          "id": "ov-per-workspace-flag-dimension",
+          "title": "Per-workspace feature-flag dimension (for staged per-client OV rollout)",
+          "source": "/docs/superpowers/audits/2026-06-01-opportunity-value-model-audit.md",
+          "est": "4-6h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "feature_flag_overrides is keyed by flag only (global). The design's P8 tiered-client-rollout (client A then B) is not achievable as-is; a flip hits all workspaces at once. Add a per-workspace override dimension so OV can be enabled per client. Do before P8 if staged rollout is wanted."
+        },
+        {
+          "id": "ov-event-regen-single-flight",
+          "title": "Event-driven regen single-flight vs cron recsInFlight guard",
+          "source": "/docs/superpowers/audits/2026-06-01-opportunity-value-model-audit.md",
+          "est": "2-4h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "PR7 review (non-blocking, dark): triggerOpportunityRegen (debounced generateRecommendations) bypasses the cron's recsInFlight single-flight, so an event regen can run concurrently with a follow-on regen for the same workspace. Debounce mitigates but does not serialize. Harden before enabling opportunity-value-events."
+        },
+        {
+          "id": "ov-legacy-scorer-removal-postflip",
+          "title": "Post-flip cleanup — remove legacy magic scorers + the 11 outcome-adjust call sites",
+          "source": "/docs/superpowers/plans/2026-06-01-opportunity-value-model.md",
+          "est": "3-5h",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "After the OV flag is flipped + stable for 2 releases, delete the legacy magic-constant scorers (computeImpactScore branches, 75/55/35 etc.) and the 11 applyRecommendationOutcomeAdjustment call sites that were intentionally kept for the flag-off no-op path. Keep behind the kill-switch for one release first."
+        },
+        {
+          "id": "ov-magic-scale-prcheck-rule",
+          "title": "pr-check magic-scale guard (forbid new inline impactScore literals outside the scorer)",
+          "source": "/docs/superpowers/plans/2026-06-01-opportunity-value-model.md",
+          "est": "1-2h",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "Deferred from PR3: the rule would flag the legacy magic that is intentionally still present. Add it together with (or after) ov-legacy-scorer-removal-postflip so it doesn't false-positive. Mirrors the systemic-root-cause fix: one scorer chokepoint enforced like callAI()/buildWorkspaceIntelligence()."
+        },
+        {
+          "id": "ov-estimatedgain-real-attribution",
+          "title": "Re-ground client-facing estimatedGain in real traffic-at-risk + accumulated outcomes",
+          "source": "/docs/audits/2026-05-31-intelligence-quality-audit.md",
+          "est": "3-5h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Audit finding Q7: estimatedGain recovery-% are static per-check constants ('could recover 15-30%'), identical for every workspace/page. Deferred from PR3/PR6 (client-facing + $-exposure). Once OV is live, derive the client-safe gain string from the page's actual traffic-at-risk + median realized attributed_value — never a raw $/wk to the client."
+        },
+        {
+          "id": "ov-calibration-realized-vs-predicted-emv",
+          "title": "Upgrade OV calibration from win-rate proxy to realized-vs-predicted EMV",
+          "source": "/docs/superpowers/plans/2026-06-01-opportunity-value-model.md",
+          "est": "3-5h",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "PR5 ships a documented win-rate-derived calibration because predicted EMV isn't persisted to divide against. Persist predicted emvPerWeek at rec-generation time (or join via ov_divergence), then swap computeOvCalibration to median(realized attributed_value / predicted EMV) per (actionType, difficultyBucket). Clamp + identity-gate contract stays. Needs accumulated outcome history."
+        },
+        {
+          "id": "ov-seasonality-monthly-volumes",
+          "title": "Seasonal opportunity events + keyword_monthly_volumes (migration 111)",
+          "source": "/docs/designs/2026-05-31-opportunity-value-model.md",
+          "est": "4-6h",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "Deferred from PR7. Persist the 12-month volume series that trendDirection() currently consumes and drops; emit a 'seasonal' opportunity event (timing boost) when demand rises. Needs >= 1 year of the monthly series before it is useful."
+        },
+        {
+          "id": "ov-competitor-defensive-rec-mint",
+          "title": "Mint a net-new defensive recommendation on competitor overtake",
+          "source": "/docs/designs/2026-05-31-opportunity-value-model.md",
+          "est": "3-5h",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "Deferred from PR7: the competitor detector currently only raises a timing boost on the affected page's EXISTING recs. When no rec covers the overtaken keyword, mint a defensive recommendation. Higher-risk (creates recs) — do after OV is live + validated."
+        },
+        {
+          "id": "ov-events-dead-code-cleanup",
+          "title": "Remove dead 'publish' event enum/schema member (or wire the publish detector)",
+          "source": "/docs/superpowers/audits/2026-06-01-opportunity-value-model-audit.md",
+          "est": "1h",
+          "priority": "P4",
+          "status": "pending",
+          "notes": "PR7 review minor: the opportunity-event 'publish' type + its boost/half-life default exist but no detector emits it (the publish/apply path triggers a regen via resolveRecommendationsForChange instead). Either wire a publish-event detector or drop the unused enum member + schema branch."
+        },
+        {
+          "id": "ov-divergence-dashboard-ui",
+          "title": "Admin UI panel for the OV shadow-divergence log",
+          "source": "/docs/superpowers/plans/2026-06-01-opportunity-value-model.md",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "PR4 shipped the data + GET /api/ov-divergence/:workspaceId + a typed api wrapper but deferred the UI panel (no natural admin-per-workspace debug page). Add a minimal SectionCard panel (legacy-#1 vs OV-#1, agree %, top-3 diff, invariant pass-rate) to support the P8 owner review without hitting the endpoint by hand."
+        }
+      ]
+    },
+    {
       "id": "sprint-duplication-unification-audit-2026-05-27",
       "name": "🚧 Duplication Unification Audit Follow-through",
       "hours": "20-36",
