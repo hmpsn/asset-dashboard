@@ -41,6 +41,9 @@ import {
   assessAuthorityFromBacklinks,
   kdClassificationNote,
 } from './authority-context.js';
+import { computeOpportunityValue, pickImpactScore } from './scoring/opportunity-value.js';
+import { buildCtrCurve, type GscKeywordObservation } from './scoring/ctr-curve.js';
+import { isFeatureEnabled } from './feature-flags.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -137,6 +140,17 @@ function applyRecommendationOutcomeAdjustment(
     difficulty,
   });
   return applyOutcomeAdjustmentScore(baseScore, adjustment);
+}
+
+/** Coerce a free-form search-intent string (PageKeywordMap.searchIntent) to the
+ *  strict OpportunityInput.intent union, or null when it isn't one of the four
+ *  recognised intents. Keeps the OV scorer's intent map total. */
+function toOpportunityIntent(
+  intent: string | null | undefined,
+): 'transactional' | 'commercial' | 'informational' | 'navigational' | null {
+  return intent === 'transactional' || intent === 'commercial' || intent === 'informational' || intent === 'navigational'
+    ? intent
+    : null;
 }
 
 // ─── Recommendation source keys ────────────────────────────────────
@@ -879,6 +893,11 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
 
   const now = new Date().toISOString();
   const recs: Recommendation[] = [];
+  // Opportunity Value cutover flag. Resolved once per rec-gen cycle. When OFF
+  // (default), every rec keeps its legacy impactScore and the OV value is only
+  // attached (shadow). When ON, the single selector below the sort flips
+  // impactScore to opportunity.value — the entire cutover surface.
+  const useOv = isFeatureEnabled('opportunity-value-scorer');
   const tier = ws.tier || 'free';
   const assignedTo: 'team' | 'client' = tier === 'premium' ? 'team' : 'client';
 
@@ -917,6 +936,23 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
 
   // Fetch domain strength once per rec-gen cycle (cached at provider layer; see resolveDomainStrength).
   const domainStrength = await resolveDomainStrength(ws, workspaceId);
+
+  // Build a per-workspace position→CTR curve once from the workspace's own GSC
+  // observations (the `gscKeywords` persisted on page_keywords). Falls back to the
+  // documented industry curve when there is too little signal. Best-effort: only
+  // feeds the Opportunity Value scorer (shadow until the flag flips); a failure
+  // degrades to the industry fallback and never blocks rec generation.
+  let ovCtrCurve: Record<number, number> | null = null;
+  try {
+    const gscObservations: GscKeywordObservation[] = [];
+    for (const pk of listPageKeywords(workspaceId)) {
+      if (!pk.gscKeywords) continue;
+      for (const g of pk.gscKeywords) gscObservations.push(g);
+    }
+    ovCtrCurve = buildCtrCurve(gscObservations).curve;
+  } catch (err) {
+    log.warn({ err, workspaceId }, 'CTR curve build failed for Opportunity Value — using industry fallback');
+  }
 
   // Build conversion rate map: slug → conversionRate (%)
   // pageId for conversion_attribution insights is the landing page URL (e.g. "/plumbing")
@@ -1031,6 +1067,12 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         impact,
         effort,
         impactScore: adjustedImpactScore,
+        opportunity: computeOpportunityValue({
+          branch: 'technical',
+          severity: group.severity,
+          isCritical: isCrit,
+          currentClicks: group.totalClicks,
+        }),
         source: RecSource.audit(group.check),
         affectedPages: sortedPages.map(p => p.slug),
         trafficAtRisk: group.totalClicks,
@@ -1083,6 +1125,12 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         impact: isCrit ? 'high' : 'medium',
         effort: 'low',
         impactScore: adjustedImpactScore,
+        opportunity: computeOpportunityValue({
+          branch: 'technical',
+          severity: isCrit ? 'error' : 'warning',
+          isCritical: isCrit,
+          currentClicks: pageTraffic,
+        }),
         source: RecSource.auditSiteWide(issue.check),
         affectedPages: pages.map(p => p.replace(/^\//, '')),
         trafficAtRisk: pageTraffic,
@@ -1137,6 +1185,11 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           impact: qw.estimatedImpact as 'high' | 'medium' | 'low',
           effort: 'low',
           impactScore: adjustedScore,
+          opportunity: computeOpportunityValue({
+            branch: 'quick_win',
+            roiScore: qw.roiScore ?? null,
+            llmLabel: qw.estimatedImpact,
+          }),
           source: RecSource.strategyQuickWin(),
           affectedPages: [qw.pagePath.replace(/^\//, '')],
           trafficAtRisk: t.clicks,
@@ -1206,6 +1259,17 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           impact: cg.priority as 'high' | 'medium' | 'low',
           effort: 'high',
           impactScore: adjustedImpactScore,
+          opportunity: computeOpportunityValue({
+            branch: 'content_gap',
+            opportunityScore: cg.opportunityScore ?? null,
+            volume: cg.volume ?? null,
+            difficulty: cg.difficulty ?? null,
+            trendDirection: cg.trendDirection ?? null,
+            llmLabel: cg.priority,
+            intent: cg.intent ?? null,
+            authorityStrength: domainStrength || null,
+            ctrCurve: ovCtrCurve,
+          }),
           source: RecSource.strategyContentGap(),
           affectedPages: [],
           trafficAtRisk: 0,
@@ -1259,6 +1323,17 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
             impact: pm.currentPosition <= 10 ? 'high' : 'medium',
             effort: 'medium',
             impactScore: adjustedImpactScore,
+            opportunity: computeOpportunityValue({
+              branch: 'ranking_opp',
+              volume: pm.volume ?? null,
+              currentPosition: pm.currentPosition ?? null,
+              difficulty: pm.difficulty ?? null,
+              impressions: pm.impressions ?? null,
+              cpc: pm.cpc ?? null,
+              intent: toOpportunityIntent(pm.searchIntent),
+              authorityStrength: domainStrength || null,
+              ctrCurve: ovCtrCurve,
+            }),
             source: RecSource.strategyRankingOpp(),
             affectedPages: [pm.pagePath.replace(/^\//, '')],
             trafficAtRisk: pm.clicks || 0,
@@ -1307,6 +1382,17 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         impact: 'medium',
         effort: 'medium',
         impactScore: adjustedImpactScore,
+        opportunity: computeOpportunityValue({
+          branch: 'ranking_opp',
+          volume: pk.volume ?? null,
+          currentPosition: pk.currentPosition ?? null,
+          difficulty: pk.difficulty ?? null,
+          impressions: pk.impressions ?? null,
+          cpc: pk.cpc ?? null,
+          intent: toOpportunityIntent(pk.searchIntent),
+          authorityStrength: domainStrength || null,
+          ctrCurve: ovCtrCurve,
+        }),
         source: RecSource.strategyIntentMismatch(pageSlug),
         affectedPages: [pageSlug],
         trafficAtRisk: 0,
@@ -1366,6 +1452,13 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           impact: dp.severity === 'critical' ? 'high' : 'medium',
           effort: 'medium',
           impactScore: adjustedImpactScore,
+          opportunity: computeOpportunityValue({
+            branch: 'decay',
+            previousClicks: dp.previousClicks,
+            currentClicks: dp.currentClicks,
+            currentPosition: dp.currentPosition,
+            isRepeatDecay: dp.isRepeatDecay ?? null,
+          }),
           source: RecSource.decay(pageSlug),
           affectedPages: [pageSlug],
           trafficAtRisk: dp.previousClicks,
@@ -1432,6 +1525,14 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         impact: gap > 100 ? 'high' : gap > 30 ? 'medium' : 'low',
         effort: 'low',
         impactScore: adjustedImpactScore,
+        opportunity: computeOpportunityValue({
+          branch: 'ranking_opp',
+          expectedClickGap: d.estimatedClickGap ?? null,
+          impressions: d.impressions ?? null,
+          currentPosition: d.position ?? null,
+          authorityStrength: domainStrength || null,
+          ctrCurve: ovCtrCurve,
+        }),
         source: RecSource.ctrOpportunity(pageSlug),
         affectedPages: [pageSlug],
         trafficAtRisk: gap,
@@ -1482,6 +1583,10 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           impact: action.impact,
           effort: action.effort,
           impactScore: adjustedImpactScore,
+          opportunity: computeOpportunityValue({
+            branch: 'diagnostic',
+            llmLabel: action.impact,
+          }),
           source: RecSource.diagnostic(report.id, actionIdx, action.title),
           affectedPages: action.pageUrls?.map(toPageSlug) ?? [],
           trafficAtRisk: 0,
@@ -1535,6 +1640,10 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         impact: d.daysSinceLastAnalysis > 180 ? 'high' : 'medium',
         effort: 'medium',
         impactScore: adjustedImpactScore,
+        opportunity: computeOpportunityValue({
+          branch: 'freshness',
+          impressions: trafficAtRisk,
+        }),
         source: RecSource.freshnessAlert(toPageSlug(d.pagePath)),
         affectedPages: [toPageSlug(d.pagePath)],
         trafficAtRisk,
@@ -1655,6 +1764,12 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       }
     }
   }
+
+  // ── Opportunity Value cutover (flag-gated, single application point). ──
+  // With the flag OFF this is a no-op and impactScore stays byte-identical to
+  // legacy. With it ON, the ranked impactScore reads from the attached OV value.
+  // Score ONLY — estimatedGain is untouched (client-facing, deferred to P5/P6).
+  for (const r of recs) r.impactScore = pickImpactScore(r, useOv);
 
   // ── Sort: tier PRIMARY, impactScore SECONDARY, business-intent alignment as
   // the final within-tier tiebreaker (see sortRecommendations). ──

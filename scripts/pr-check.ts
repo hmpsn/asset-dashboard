@@ -1164,16 +1164,23 @@ export const CHECKS: Check[] = [
     // Tests and auto-generated codesight files are excluded because they
     // legitimately reference the deleted name when explaining why it's gone.
     name: 'formatBrandVoiceForPrompt reintroduction',
-    pattern: '\\bformatBrandVoiceForPrompt\\b',
+    // Also blocks a hypothetical `formatOpportunityForPrompt` / `formatOpportunity<X>ForPrompt`
+    // helper: the Unified Opportunity Value (server/scoring/opportunity-value.ts) is the
+    // single authority-layered scoring representation, injected DIRECTLY onto each rec as
+    // `opportunity` (precedent `effectiveBrandVoiceBlock`). A generic OV→prompt format helper
+    // would let an advisor caller bypass the scorer's confidence/calibration chain the same
+    // way `formatBrandVoiceForPrompt` bypassed voice authority. No such OV helper exists today,
+    // so this is a pre-emptive guard with no false positive.
+    pattern: '\\b(formatBrandVoiceForPrompt|formatOpportunity[A-Za-z]*ForPrompt)\\b',
     fileGlobs: ['*.ts', '*.tsx'],
     exclude: [
       'tests/',
       '.codesight/',
       'scripts/pr-check.ts', // this rule itself references the name
     ],
-    message: 'formatBrandVoiceForPrompt was deleted in PR #168 because it bypassed voice-profile authority. Use `seo?.effectiveBrandVoiceBlock ?? ""` — it is pre-formatted by the SEO context source with full authority applied. See CLAUDE.md "Authority-layered fields — expose one resolved representation, never raw + format helper".',
+    message: 'formatBrandVoiceForPrompt was deleted in PR #168 because it bypassed voice-profile authority. Use `seo?.effectiveBrandVoiceBlock ?? ""` — it is pre-formatted by the SEO context source with full authority applied. Likewise, do NOT add a `formatOpportunityForPrompt`/`formatOpportunity…ForPrompt` helper — inject the rec\'s `opportunity` (Unified Opportunity Value) directly. See CLAUDE.md "Authority-layered fields — expose one resolved representation, never raw + format helper".',
     severity: 'error',
-    rationale: 'A generic format helper that wraps a raw authority-layered field bypasses the authority chain silently — the compiler cannot catch it because the raw field type is still `string`.',
+    rationale: 'A generic format helper that wraps a raw authority-layered field (brand voice, or the Opportunity Value score) bypasses the authority chain silently — the compiler cannot catch it because the underlying field type is unchanged.',
     claudeMdRef: '#code-conventions',
   },
   {

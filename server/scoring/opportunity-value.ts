@@ -148,13 +148,20 @@ function winnability(difficulty: number | null, authorityStrength: number | null
 }
 
 function provenanceConfidence(input: OpportunityInput): { confidence: number; spine: OpportunityScore['groundedSpine'] } {
-  const hasProvider = num(input.volume) != null && num(input.currentPosition) != null;
   const hasRoi = num(input.roiScore) != null;
   const hasOpp = num(input.opportunityScore) != null;
-  if (hasProvider) return { confidence: CONFIDENCE.groundedProvider, spine: hasRoi ? 'roiScore' : hasOpp ? 'opportunityScore' : 'computed' };
+  // GSC-grounded: a precomputed click gap, or (SEMrush volume OR GSC impressions) with a position.
+  const hasDelta = num(input.expectedClickGap) != null;
+  const hasGsc = (num(input.volume) != null || num(input.impressions) != null) && num(input.currentPosition) != null;
+  if (hasDelta || hasGsc) return { confidence: CONFIDENCE.groundedProvider, spine: hasRoi ? 'roiScore' : hasOpp ? 'opportunityScore' : 'computed' };
   if (hasRoi || hasOpp) return { confidence: CONFIDENCE.groundedComposite, spine: hasRoi ? 'roiScore' : 'opportunityScore' };
   if (input.llmLabel) return { confidence: CONFIDENCE.llmLabel, spine: 'computed' };
   return { confidence: CONFIDENCE.heuristic, spine: 'computed' };
+}
+
+/** LLM-label fallback delta, guarded against out-of-union labels (→ 0, never NaN). */
+function llmFallback(label: OpportunityInput['llmLabel']): number {
+  return label ? (LLM_FALLBACK_CLICKDELTA[label] ?? 0) : 0;
 }
 
 /** Target position a ranking change aims for: top-of-page (3) when below it,
@@ -179,25 +186,37 @@ function ctrUplift(input: OpportunityInput): number {
  * when provider volume is absent (closes Q6/MW1/CC1/IW1 + the §2.4 invariant).
  */
 function expectedClickDelta(input: OpportunityInput): number {
+  // A producer-precomputed grounded delta (e.g. CTR-opportunity's estimatedClickGap)
+  // is the most direct signal — use it for any branch.
+  const directGap = num(input.expectedClickGap);
+  if (directGap != null) return Math.max(0, directGap);
+
   const volume = num(input.volume);
+  const impressions = num(input.impressions);
   const win = winnability(num(input.difficulty), num(input.authorityStrength));
   const roiScore = num(input.roiScore);
   const opportunityScore = num(input.opportunityScore);
+  // Grounded demand fallback when SEMrush volume is absent but GSC impressions exist
+  // (intent-mismatch / CTR pages): impressions are real demand — close the CTR gap on
+  // them rather than scoring 0.
+  const impressionsDelta = impressions != null && impressions > 0 ? impressions * ctrUplift(input) * win : null;
 
   switch (input.branch) {
     case 'quick_win': {
       // Grounded spine: the persisted roiScore composite (volume·(1−KD/100)/position).
       if (roiScore != null) return Math.max(0, roiScore);
       if (volume != null && volume > 0) return volume * ctrUplift(input) * win;
-      return input.llmLabel ? LLM_FALLBACK_CLICKDELTA[input.llmLabel] : 0;
+      if (impressionsDelta != null) return impressionsDelta;
+      return llmFallback(input.llmLabel);
     }
     case 'ranking_opp': {
       // Striking-distance: real CTR uplift × winnability, reading volume + KD/authority
-      // (the flat 60/40 + unread-volume bug). Falls back to a grounded composite.
+      // (the flat 60/40 + unread-volume bug). Falls back to grounded composite / impressions.
       if (volume != null && volume > 0) return volume * ctrUplift(input) * win;
       if (roiScore != null) return Math.max(0, roiScore);
       if (opportunityScore != null) return (opportunityScore / 100) * DEMAND_CEILING * win / 10;
-      return input.llmLabel ? LLM_FALLBACK_CLICKDELTA[input.llmLabel] : 0;
+      if (impressionsDelta != null) return impressionsDelta;
+      return llmFallback(input.llmLabel);
     }
     case 'content_gap': {
       // Grounded spine: the trend-weighted opportunityScore composite.
@@ -207,7 +226,8 @@ function expectedClickDelta(input: OpportunityInput): number {
         return (opportunityScore / 100) * DEMAND_CEILING * win / 10;
       }
       if (volume != null && volume > 0) return volume * ctrUplift(input) * win;
-      return input.llmLabel ? LLM_FALLBACK_CLICKDELTA[input.llmLabel] : 0;
+      if (impressionsDelta != null) return impressionsDelta;
+      return llmFallback(input.llmLabel);
     }
     case 'decay': {
       const prev = num(input.previousClicks) ?? 0;
@@ -231,7 +251,7 @@ function expectedClickDelta(input: OpportunityInput): number {
       return impr * FRESHNESS_CTR_GAP;
     }
     case 'diagnostic': {
-      return input.llmLabel ? LLM_FALLBACK_CLICKDELTA[input.llmLabel] : 0;
+      return llmFallback(input.llmLabel);
     }
   }
 }
@@ -297,8 +317,10 @@ export function computeOpportunityValue(input: OpportunityInput, opts: ComputeOp
   let effortDays = Math.max(MIN_EFFORT_DAYS, overrideOrDefault);
   if (isUngrounded) effortDays = Math.max(effortDays, UNGROUNDED_MIN_EFFORT_DAYS);
 
-  const clickDeltaPerWeek = Math.max(0, expectedClickDelta(input));
-  const emvPerWeek = clickDeltaPerWeek * valuePerClick(input);
+  const rawDelta = expectedClickDelta(input);
+  const clickDeltaPerWeek = Number.isFinite(rawDelta) ? Math.max(0, rawDelta) : 0;
+  const rawEmv = clickDeltaPerWeek * valuePerClick(input);
+  const emvPerWeek = Number.isFinite(rawEmv) ? rawEmv : 0;
   const businessFit = 1 + 0.5 * clamp01(num(input.businessFitAlignment) ?? 0);
   const timing = 1 + Math.max(0, num(input.timingBoost) ?? 0);
 

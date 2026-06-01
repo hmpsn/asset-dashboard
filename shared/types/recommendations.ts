@@ -100,6 +100,9 @@ export interface OpportunityInput {
   intent?: 'transactional' | 'commercial' | 'informational' | 'navigational' | null;
   roiScore?: number | null;              // grounded composite (quick-win spine)
   opportunityScore?: number | null;      // grounded composite (content-gap spine)
+  /** A producer-precomputed grounded weekly click delta (e.g. CTR-opportunity's
+   *  estimatedClickGap). When present it is used directly as the click delta. */
+  expectedClickGap?: number | null;
   trendDirection?: 'rising' | 'declining' | 'stable' | null;
   previousClicks?: number | null;        // decay
   currentClicks?: number | null;         // decay / technical traffic proxy
