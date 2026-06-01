@@ -296,6 +296,11 @@ export function updateRecommendationStatus(
   if (!rec) return null;
   rec.status = status;
   rec.updatedAt = new Date().toISOString();
+  // Recompute the summary so topRecommendationId stays consistent after a
+  // status flip — completing or dismissing a rec must not leave the pointer
+  // referencing that now-inactive rec. computeRecommendationSummary already
+  // excludes completed/dismissed recs when picking activeRecs[0].
+  set.summary = computeRecommendationSummary(set.recommendations);
   saveRecommendations(set);
   return rec;
 }
@@ -427,6 +432,8 @@ export function computeRecommendationSummary(recs: Recommendation[]): Recommenda
 /** Generic tokens that carry no business-intent signal — matching on these alone
  * would make almost every rec "aligned", defeating the purpose. Kept small and
  * SEO/priority-domain specific so genuinely distinctive topic words still match.
+ * Min token length is 3 so short but distinctive terms ('spa', 'law') still match,
+ * while structural/page-type nouns in this set prevent false positives.
  * @internal exported for unit testing */
 export const INTENT_STOPWORDS = new Set<string>([
   'the', 'and', 'for', 'with', 'our', 'your', 'more', 'get', 'getting', 'grow',
@@ -434,6 +441,10 @@ export const INTENT_STOPWORDS = new Set<string>([
   'pages', 'site', 'website', 'seo', 'add', 'fix', 'fixing', 'new', 'better',
   'overall', 'experience', 'revenue', 'leads', 'lead', 'jobs', 'job', 'sales',
   'traffic', 'rankings', 'ranking', 'from', 'into', 'this', 'that', 'them',
+  // Structural/page-type nouns — matching on these alone produces false positives
+  // because nearly every rec touches some kind of "services page" or "product page".
+  'services', 'products', 'product', 'about', 'contact', 'home', 'homepage',
+  'blog', 'content', 'schema', 'metadata', 'title', 'description', 'meta',
 ]);
 
 /** Tokenise a free-text string into lowercased, de-noised intent words.
@@ -445,7 +456,7 @@ function intentTokens(text: string): Set<string> {
   const tokens = withoutCategory
     .toLowerCase()
     .split(/[^a-z0-9]+/)
-    .filter(t => t.length >= 4 && !INTENT_STOPWORDS.has(t));
+    .filter(t => t.length >= 3 && !INTENT_STOPWORDS.has(t));
   return new Set(tokens);
 }
 

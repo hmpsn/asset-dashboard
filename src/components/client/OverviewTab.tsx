@@ -97,7 +97,10 @@ export function OverviewTab({
   // sortRecommendations pass, so it always agrees with the Health tab ordering.
   const topRecId = recSet?.summary?.topRecommendationId ?? null;
   const topRec = topRecId != null
-    ? recSet?.recommendations.find(r => r.id === topRecId)
+    // Defensive: only render the #1 card when the rec is still active.
+    // updateRecommendationStatus now recomputes the summary on every status flip,
+    // but guard here in case a cached summary still points at a completed/dismissed rec.
+    ? (recSet?.recommendations.find(r => r.id === topRecId && r.status !== 'completed' && r.status !== 'dismissed') ?? null)
     : null;
 
   // ── client-briefing-v2 magazine layout (Phase 2) ─────────────────────────

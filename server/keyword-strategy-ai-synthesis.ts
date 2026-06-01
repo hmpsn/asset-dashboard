@@ -267,8 +267,8 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
     if (clientSignals?.contentGapVotes?.length) {
       businessSection += `\nCLIENT-PRIORITIZED TOPICS (upvoted by client — give high priority):\n${clientSignals.contentGapVotes.map(v => `- "${v.topic}" (${v.votes} votes)`).join('\n')}\n`;
     }
-    if (clientSignals?.businessPriorities?.length) {
-      businessSection += `\nBUSINESS PRIORITIES: ${clientSignals.businessPriorities.join('; ')}\n`;
+    if (clientSignals?.effectiveBusinessPriorities?.length) {
+      businessSection += `\nBUSINESS PRIORITIES: ${clientSignals.effectiveBusinessPriorities.join('; ')}\n`;
     }
     const coverageGaps = strategyIntel.contentPipeline?.coverageGaps ?? [];
     if (coverageGaps.length > 0) {

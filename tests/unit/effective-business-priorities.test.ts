@@ -153,4 +153,25 @@ describe('buildEffectiveBusinessPriorities — authority-layered resolver', () =
       'Admin goal',
     ]);
   });
+
+  it('admin-only priorities are present in effectiveBusinessPriorities but absent from raw businessPriorities', async () => {
+    // This test verifies that consumers who read effectiveBusinessPriorities (not businessPriorities)
+    // actually see admin-set goals — the core authority-bypass fix.
+    seeded = seedWorkspace({
+      // No client priorities — only admin-set goals
+      adminPriorities: ['Increase organic visibility', 'Reduce bounce rate'],
+    });
+    invalidateIntelligenceCache(seeded.workspaceId);
+
+    const intel = await buildWorkspaceIntelligence(seeded.workspaceId, { slices: ['clientSignals'] });
+    const cs = intel.clientSignals as ClientSignalsSlice;
+
+    // Raw client-only field should be empty (no client entries)
+    expect(cs.businessPriorities).toEqual([]);
+    // Resolved field must include the admin-set goals
+    expect(cs.effectiveBusinessPriorities).toEqual([
+      'Increase organic visibility',
+      'Reduce bounce rate',
+    ]);
+  });
 });

@@ -49,7 +49,7 @@ export function buildStrategyKeywordEvaluationContext(
       options.seoContext?.knowledgeBase,
       options.seoContext?.brandVoice,
     ]),
-    businessPriorities: options.clientSignals?.businessPriorities ?? [],
+    businessPriorities: options.clientSignals?.effectiveBusinessPriorities ?? [],
     contentGapTopics: (options.clientSignals?.contentGapVotes ?? []).map(vote => vote.topic),
     recentChatTopics: options.clientSignals?.recentChatTopics ?? [],
     declinedKeywords: options.declinedKeywords ?? [],

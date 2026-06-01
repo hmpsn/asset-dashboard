@@ -70,6 +70,32 @@ describe('isRecIntentAligned', () => {
     expect(isRecIntentAligned(rec, ['Improve the overall page experience and the site'])).toBe(false);
   });
 
+  it('does NOT match when the only shared token is the structural noun "services"', () => {
+    // A services-page rec should NOT align to a priority like "Grow services revenue"
+    // because "services" is a structural/page-type noun, not a distinctive topic word.
+    const rec = makeRec({
+      title: 'Improve metadata on the services page',
+      affectedPages: ['services'],
+    });
+    expect(isRecIntentAligned(rec, ['Grow services revenue'])).toBe(false);
+  });
+
+  it('DOES match when a distinctive priority term (e.g. "plumbing") appears in the rec', () => {
+    const rec = makeRec({
+      title: 'Add FAQ schema to the plumbing services page',
+      affectedPages: ['services/plumbing'],
+    });
+    expect(isRecIntentAligned(rec, ['Grow plumbing revenue'])).toBe(true);
+  });
+
+  it('DOES match on short but distinctive industry terms (length >= 3) such as "spa" and "law"', () => {
+    const spaRec = makeRec({ title: 'Add schema to the spa landing page' });
+    expect(isRecIntentAligned(spaRec, ['Grow spa bookings'])).toBe(true);
+
+    const lawRec = makeRec({ title: 'Improve metadata on law practice pages' });
+    expect(isRecIntentAligned(lawRec, ['Win law firm leads'])).toBe(true);
+  });
+
   it('returns false when there are no priorities', () => {
     const rec = makeRec({ title: 'Add FAQ schema to plumbing services' });
     expect(isRecIntentAligned(rec, [])).toBe(false);

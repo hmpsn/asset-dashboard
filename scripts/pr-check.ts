@@ -604,7 +604,11 @@ const KNOWN_UNRENDERED_FIELDS = new Set([
   'searchIntent',
   // insights: page-level insights array; page-specific insights are shown via the top-level InsightsSlice
   'insights',
-  // ClientSignalsSlice — these are rendered but may not appear by field name
+  // ClientSignalsSlice — businessPriorities is the RAW client-only store field; it is
+  // intentionally not injected into prompts. Only effectiveBusinessPriorities (the resolved
+  // superset) is rendered by formatClientSignalsSection. The raw field remains in the type
+  // for the assembler + public-portal write boundary; it is never a prompt target.
+  'businessPriorities',
   // OperationalSlice
   // none
   // PageElementSlice top-level fields (`pagePath`, `catalog`) are both
@@ -1197,6 +1201,43 @@ export const CHECKS: Check[] = [
     message: 'Do not read `client_business_priorities` directly. Use `clientSignals.effectiveBusinessPriorities` — it is pre-resolved by buildEffectiveBusinessPriorities() (business-priorities-source.ts), merging the client store (021) and the admin store (workspaces.business_priorities, 048) with documented precedence. A raw read of only the client store silently drops admin-set goals. See CLAUDE.md "Authority-layered fields — expose one resolved representation, never raw + format helper".',
     severity: 'error',
     rationale: 'A raw read of one authority store (client_business_priorities) silently drops the other (admin business_priorities) — the compiler cannot catch it because both halves are string[].',
+    claudeMdRef: '#code-conventions',
+  },
+  {
+    // Field-level contract enforcement for ClientSignalsSlice.businessPriorities.
+    // The raw `clientSignals.businessPriorities` slice field carries only the CLIENT
+    // store (client_business_priorities table). Intelligence consumers (ranking, prompts,
+    // keyword scoring) that read this raw field silently drop admin-set priorities.
+    // The resolved authority superset is `clientSignals.effectiveBusinessPriorities`.
+    //
+    // Allowed sites: the assembler that WRITES the field (client-signals-slice.ts),
+    // the shared type def (intelligence.ts), the public-portal write boundary,
+    // business-priorities-source.ts, and non-slice object reads (workspace.businessPriorities,
+    // ws.businessPriorities, ctx.businessPriorities from workspace/evaluation-context objects).
+    // Add `// businesspriorities-ok` inline to suppress for any remaining legitimate raw-field
+    // sites not covered by the file-level excludes below.
+    name: 'clientSignals slice-field raw businessPriorities read',
+    pattern: '\\.businessPriorities\\b',
+    fileGlobs: ['*.ts', '*.tsx'],
+    exclude: [
+      'tests/',
+      '.codesight/',
+      'server/intelligence/business-priorities-source.ts', // the resolver itself
+      'server/intelligence/client-signals-slice.ts',       // the assembler that sets the field
+      'server/intelligence/formatters.ts',                 // now reads effectiveBusinessPriorities — kept as historical allow-list entry
+      'server/intelligence/seo-context-slice.ts',          // reads workspace.businessPriorities (admin store object, not clientSignals slice)
+      'shared/types/intelligence.ts',                      // the type definition
+      'server/routes/public-portal.ts',                    // client-store write boundary
+      'server/workspaces.ts',                              // DB mapper/writer for workspace.businessPriorities (admin store)
+      'server/serializers/admin-workspace-view.ts',        // serialises workspace.businessPriorities for admin UI
+      'server/local-seo.ts',                               // reads workspace.businessPriorities (admin store object)
+      'server/keyword-intelligence/rules.ts',              // reads ctx.businessPriorities (CandidateScoringContext, not clientSignals)
+      'scripts/pr-check.ts',                               // this rule references the field name
+    ],
+    excludeLines: ['// businesspriorities-ok'],
+    message: 'Use clientSignals.effectiveBusinessPriorities (the resolved field) — clientSignals.businessPriorities is the raw client-only store and silently drops admin-set priorities. See CLAUDE.md "Authority-layered fields — expose one resolved representation, never raw + format helper".',
+    severity: 'error',
+    rationale: 'clientSignals.businessPriorities carries only the client store half; reading it drops admin-set priorities. TypeScript cannot catch this because both halves are string[].',
     claudeMdRef: '#code-conventions',
   },
   {
