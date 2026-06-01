@@ -80,6 +80,27 @@ const stmts = createStmtCache(() => ({
     WHERE ta.workspace_id = ? AND ao.score IS NOT NULL AND ao.score NOT IN ('insufficient_data', 'inconclusive')
     ORDER BY ao.measured_at DESC
   `),
+  // Conclusive scored outcomes WITH a realized attributed_value for a workspace,
+  // deduplicated to the highest checkpoint per action (so a 30+60 day action is
+  // counted once). Feeds the OV realized-$ calibration (server/scoring/ov-calibration.ts);
+  // read-only and independent of the legacy buildOutcomeAdjustment win-rate path.
+  getCalibrationOutcomesByWorkspace: db.prepare(`
+    SELECT ao.score AS score, ao.attributed_value AS attributed_value, ta.action_type AS action_type
+    FROM action_outcomes ao
+    JOIN tracked_actions ta ON ta.id = ao.action_id
+    WHERE ta.workspace_id = ?
+      AND ao.attributed_value IS NOT NULL
+      AND ao.score IS NOT NULL
+      AND ao.score NOT IN ('insufficient_data', 'inconclusive')
+      AND ao.checkpoint_days = (
+        SELECT MAX(ao2.checkpoint_days)
+        FROM action_outcomes ao2
+        WHERE ao2.action_id = ao.action_id
+          AND ao2.attributed_value IS NOT NULL
+          AND ao2.score IS NOT NULL
+          AND ao2.score NOT IN ('insufficient_data', 'inconclusive')
+      )
+  `),
   countByWorkspace: db.prepare(`
     SELECT
       COUNT(*) AS total,
@@ -525,6 +546,31 @@ export function getROIHighlightsFromOutcomes(workspaceId: string, limit = 10): R
 
     return { pageTitle, pageUrl, action, result, clicksGained, attributedValue };
   });
+}
+
+/** A conclusive scored outcome carrying a realized attributed_value. Read-only
+ *  input to the OV realized-$ calibration (server/scoring/ov-calibration.ts). */
+export interface CalibrationOutcome {
+  score: OutcomeScore;
+  attributedValue: number;
+  actionType: string;
+}
+
+/**
+ * Conclusive scored outcomes (one per action, highest checkpoint) that carry a
+ * realized attributed_value for a workspace. Independent read path — does NOT
+ * touch the legacy buildOutcomeAdjustment win-rate calibration.
+ */
+export function getCalibrationOutcomes(workspaceId: string): CalibrationOutcome[] {
+  const rows = stmts().getCalibrationOutcomesByWorkspace.all(workspaceId) as Array<{
+    score: string | null;
+    attributed_value: number | null;
+    action_type: string;
+  }>;
+  return rows
+    .filter((r): r is { score: string; attributed_value: number; action_type: string } =>
+      r.score != null && typeof r.attributed_value === 'number' && Number.isFinite(r.attributed_value))
+    .map(r => ({ score: r.score as OutcomeScore, attributedValue: r.attributed_value, actionType: r.action_type }));
 }
 
 export function archiveOldActions(): { archived: number } {
