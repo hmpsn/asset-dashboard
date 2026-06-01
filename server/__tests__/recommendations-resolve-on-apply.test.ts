@@ -23,6 +23,9 @@ import {
   saveRecommendations,
   loadRecommendations,
   resolveRecommendationsForChange,
+  updateRecommendationStatus,
+  computeRecommendationSummary,
+  sortRecommendations,
 } from '../recommendations.js';
 import type { Recommendation, RecommendationSet } from '../../shared/types/recommendations.js';
 
@@ -73,6 +76,7 @@ function seed(recs: Recommendation[]): void {
       fixNow: 0, fixSoon: 0, fixLater: 0, ongoing: 0,
       totalImpactScore: 0, trafficAtRisk: 0,
       estimatedRecoverableClicks: 0, estimatedRecoverableImpressions: 0,
+      topRecommendationId: null,
     },
   };
   saveRecommendations(set);
@@ -185,5 +189,55 @@ describe('resolveRecommendationsForChange', () => {
     resolveRecommendationsForChange(WS_ID, { affectedPages: ['home'] });
 
     expect(broadcastSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('updateRecommendationStatus — topRecommendationId stays fresh after status change', () => {
+  beforeEach(() => {
+    db.prepare('DELETE FROM recommendation_sets WHERE workspace_id = ?').run(WS_ID);
+    broadcastSpy.mockClear();
+  });
+
+  it('completing the current top rec updates summary.topRecommendationId to the next active rec', () => {
+    const topRec = makeRec({ id: 'rec_top', priority: 'fix_now', impactScore: 80, status: 'pending' });
+    const nextRec = makeRec({ id: 'rec_next', priority: 'fix_soon', impactScore: 60, status: 'pending' });
+    // Pre-sort so recs are in canonical order (required by computeRecommendationSummary contract)
+    const recs = [topRec, nextRec];
+    sortRecommendations(recs, []);
+    const initialSummary = computeRecommendationSummary(recs);
+    const set: RecommendationSet = {
+      workspaceId: WS_ID,
+      generatedAt: new Date().toISOString(),
+      recommendations: recs,
+      summary: initialSummary,
+    };
+    saveRecommendations(set);
+
+    // Verify initial state
+    expect(loadRecommendations(WS_ID)!.summary.topRecommendationId).toBe('rec_top');
+
+    // Complete the current top rec
+    updateRecommendationStatus(WS_ID, 'rec_top', 'completed');
+
+    // Summary must now point at the next active rec
+    const stored = loadRecommendations(WS_ID)!;
+    expect(stored.summary.topRecommendationId).toBe('rec_next');
+  });
+
+  it('summary.topRecommendationId becomes null when the last active rec is completed', () => {
+    const onlyRec = makeRec({ id: 'rec_only', priority: 'fix_now', impactScore: 90, status: 'pending' });
+    const recs = [onlyRec];
+    const set: RecommendationSet = {
+      workspaceId: WS_ID,
+      generatedAt: new Date().toISOString(),
+      recommendations: recs,
+      summary: computeRecommendationSummary(recs),
+    };
+    saveRecommendations(set);
+
+    updateRecommendationStatus(WS_ID, 'rec_only', 'completed');
+
+    const stored = loadRecommendations(WS_ID)!;
+    expect(stored.summary.topRecommendationId).toBeNull();
   });
 });

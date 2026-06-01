@@ -287,7 +287,24 @@ export interface SiteHealthSlice {
 export interface ClientSignalsSlice {
   keywordFeedback: { approved: string[]; rejected: string[]; patterns: { approveRate: number; topRejectionReasons: string[] } };
   contentGapVotes: { topic: string; votes: number }[];
+  /**
+   * RAW client-entered priorities only (client_business_priorities table, migration 021).
+   * Read-only legacy field. Prompt/ranking callers MUST use `effectiveBusinessPriorities`
+   * below, which is the single authority-resolved representation (client store + admin
+   * store reconciled with precedence). There is intentionally no helper that re-formats
+   * this raw field — any such helper would bypass the admin-store merge and silently
+   * drop admin-set goals. See CLAUDE.md "Authority-layered fields".
+   */
   businessPriorities: string[];
+  /**
+   * Pre-resolved, authority-layered business priorities. Source of truth:
+   * `buildEffectiveBusinessPriorities()` (business-priorities-source.ts), which merges the
+   * CLIENT store (client_business_priorities, 021) and the ADMIN store
+   * (workspaces.business_priorities, 048) into one de-duplicated list with documented
+   * precedence: client-entered priorities first, admin-set priorities as a supplement.
+   * Intelligence-path callers (ranking, prompts) inject this DIRECTLY.
+   */
+  effectiveBusinessPriorities: string[];
   approvalPatterns: { approvalRate: number; avgResponseTime: number | null };
   recentChatTopics: string[];
   churnRisk: 'low' | 'medium' | 'high' | null;

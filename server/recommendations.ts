@@ -271,7 +271,8 @@ export function loadRecommendations(workspaceId: string): RecommendationSet | nu
       fixNow: 0, fixSoon: 0, fixLater: 0, ongoing: 0,
       totalImpactScore: 0, trafficAtRisk: 0,
       estimatedRecoverableClicks: 0, estimatedRecoverableImpressions: 0,
-    }, { table: 'recommendation_sets', field: 'summary', workspaceId }),
+      topRecommendationId: null,
+    }, { table: 'recommendation_sets', field: 'summary', workspaceId }) as RecommendationSet['summary'],
   };
 }
 
@@ -295,6 +296,11 @@ export function updateRecommendationStatus(
   if (!rec) return null;
   rec.status = status;
   rec.updatedAt = new Date().toISOString();
+  // Recompute the summary so topRecommendationId stays consistent after a
+  // status flip — completing or dismissing a rec must not leave the pointer
+  // referencing that now-inactive rec. computeRecommendationSummary already
+  // excludes completed/dismissed recs when picking activeRecs[0].
+  set.summary = computeRecommendationSummary(set.recommendations);
   saveRecommendations(set);
   return rec;
 }
@@ -393,6 +399,11 @@ export function computeRecommendationSummary(recs: Recommendation[]): Recommenda
     weightedRecoverableImpressions += r.impressionsAtRisk * rate.summary;
   }
 
+  // recs are already sorted by sortRecommendations (tier → impactScore → intent
+  // alignment) before computeRecommendationSummary is called, so activeRecs[0]
+  // is the true highest-ranked active recommendation.
+  const topRecommendationId = activeRecs.length > 0 ? activeRecs[0].id : null;
+
   return {
     fixNow: activeRecs.filter(r => r.priority === 'fix_now').length,
     fixSoon: activeRecs.filter(r => r.priority === 'fix_soon').length,
@@ -402,7 +413,108 @@ export function computeRecommendationSummary(recs: Recommendation[]): Recommenda
     trafficAtRisk: activeRecs.reduce((s, r) => s + r.trafficAtRisk, 0),
     estimatedRecoverableClicks: Math.round(weightedRecoverableClicks),
     estimatedRecoverableImpressions: Math.round(weightedRecoverableImpressions),
+    topRecommendationId,
   };
+}
+
+// ─── Business-intent ranking ──────────────────────────────────────
+//
+// Recs whose topic matches a stated business priority (the authority-resolved
+// `effectiveBusinessPriorities` — client store + admin store reconciled in
+// business-priorities-source.ts) get a ranking boost. The boost is deliberately
+// bounded to a *within-tier tiebreaker*: it can reorder two recs that share the
+// same priority tier AND the same impactScore, but it can never move a rec
+// across tiers (fix_now > fix_soon > …) or beat a higher impactScore in the same
+// tier. This keeps the ranking explainable — tier and traffic-driven impact stay
+// the dominant signals; intent only settles ties the engine would otherwise
+// break arbitrarily.
+
+/** Generic tokens that carry no business-intent signal — matching on these alone
+ * would make almost every rec "aligned", defeating the purpose. Kept small and
+ * SEO/priority-domain specific so genuinely distinctive topic words still match.
+ * Min token length is 3 so short but distinctive terms ('spa', 'law') still match,
+ * while structural/page-type nouns in this set prevent false positives.
+ * @internal exported for unit testing */
+export const INTENT_STOPWORDS = new Set<string>([
+  'the', 'and', 'for', 'with', 'our', 'your', 'more', 'get', 'getting', 'grow',
+  'growth', 'increase', 'improve', 'improving', 'boost', 'win', 'winning', 'page',
+  'pages', 'site', 'website', 'seo', 'add', 'fix', 'fixing', 'new', 'better',
+  'overall', 'experience', 'revenue', 'leads', 'lead', 'jobs', 'job', 'sales',
+  'traffic', 'rankings', 'ranking', 'from', 'into', 'this', 'that', 'them',
+  // Structural/page-type nouns — matching on these alone produces false positives
+  // because nearly every rec touches some kind of "services page" or "product page".
+  'services', 'products', 'product', 'about', 'contact', 'home', 'homepage',
+  'blog', 'content', 'schema', 'metadata', 'title', 'description', 'meta',
+]);
+
+/** Tokenise a free-text string into lowercased, de-noised intent words.
+ * Strips a leading `[category]` prefix (client priorities are stored as
+ * `[category] text`), splits on non-alphanumerics, drops short/stopword tokens.
+ */
+function intentTokens(text: string): Set<string> {
+  const withoutCategory = text.replace(/^\s*\[[^\]]*\]\s*/, '');
+  const tokens = withoutCategory
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(t => t.length >= 3 && !INTENT_STOPWORDS.has(t));
+  return new Set(tokens);
+}
+
+/** True when a recommendation's topic (its title + affectedPages slugs) shares a
+ * meaningful (non-stopword) token with any stated business priority.
+ *
+ * Intentionally conservative: matches on distinctive nouns (e.g. "plumbing",
+ * "roofing", "emergency") so a priority like "Grow plumbing services revenue"
+ * aligns with a rec touching the plumbing pages, but a generic priority like
+ * "Improve the overall site experience" aligns with nothing in particular.
+ * @internal exported for unit testing */
+export function isRecIntentAligned(
+  rec: Pick<Recommendation, 'title' | 'affectedPages'>,
+  effectiveBusinessPriorities: string[],
+): boolean {
+  if (!effectiveBusinessPriorities.length) return false;
+  const recTokens = intentTokens([rec.title, ...rec.affectedPages].join(' '));
+  if (recTokens.size === 0) return false;
+  for (const priority of effectiveBusinessPriorities) {
+    for (const token of intentTokens(priority)) {
+      if (recTokens.has(token)) return true;
+    }
+  }
+  return false;
+}
+
+/** Canonical recommendation ranking. Sorts `recs` in place:
+ *   1. priority tier (fix_now > fix_soon > fix_later > ongoing) — PRIMARY
+ *   2. impactScore (highest first) — SECONDARY
+ *   3. business-intent alignment (aligned first) — within-tier TIEBREAKER only
+ *
+ * Because intent is the LAST comparator, an intent-aligned rec can only outrank
+ * another rec that is otherwise equal (same tier, same impactScore). A higher
+ * tier or a higher impactScore always wins regardless of intent.
+ * @internal exported for unit testing */
+export function sortRecommendations(
+  recs: Recommendation[],
+  effectiveBusinessPriorities: string[],
+): void {
+  const priorityOrder: Record<RecPriority, number> = { fix_now: 0, fix_soon: 1, fix_later: 2, ongoing: 3 };
+  // Memoise alignment so we don't re-tokenise per comparison.
+  const aligned = new Map<string, boolean>();
+  const isAligned = (rec: Recommendation): boolean => {
+    let v = aligned.get(rec.id);
+    if (v === undefined) {
+      v = isRecIntentAligned(rec, effectiveBusinessPriorities);
+      aligned.set(rec.id, v);
+    }
+    return v;
+  };
+  recs.sort((a, b) => {
+    const pDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+    if (pDiff !== 0) return pDiff;
+    const scoreDiff = b.impactScore - a.impactScore;
+    if (scoreDiff !== 0) return scoreDiff;
+    // Equal tier and impact — let stated business intent break the tie.
+    return Number(isAligned(b)) - Number(isAligned(a));
+  });
 }
 
 // ─── Scoring Helpers ──────────────────────────────────────────────
@@ -760,7 +872,12 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   const traffic = await getAuditTrafficForWorkspace(ws);
   const strategy = ws.keywordStrategy;
   const recommendationContext = await buildRecommendationGenerationContext(workspaceId, {
-    slices: ['learnings', 'seoContext'],
+    // `clientSignals` carries the authority-resolved `effectiveBusinessPriorities`
+    // (client store + admin store reconciled — see business-priorities-source.ts).
+    // We consume it through the shared builder rather than a hand-rolled read so
+    // intent stays sourced from the one blessed representation (CLAUDE.md
+    // "AI/recommendation generation consumers must use shared intelligence context builders").
+    slices: ['learnings', 'seoContext', 'clientSignals'],
     learningsDomain: 'all',
     verbosity: 'standard',
     tokenBudget: 800,
@@ -771,6 +888,9 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   });
   const outcomeLearnings = recommendationContext?.intelligence.learnings;
   const backlinkProfile = recommendationContext?.intelligence.seoContext?.backlinkProfile;
+  // Resolved business priorities (client-entered first, admin-set as supplement).
+  // Used only as a within-tier ranking tiebreaker below — never to change tiers.
+  const effectiveBusinessPriorities = recommendationContext?.intelligence.clientSignals?.effectiveBusinessPriorities ?? [];
 
   // Fetch domain strength once per rec-gen cycle (cached at provider layer; see resolveDomainStrength).
   const domainStrength = await resolveDomainStrength(ws, workspaceId);
@@ -1513,13 +1633,9 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     }
   }
 
-  // ── Sort by impact score (highest first within each priority) ──
-  recs.sort((a, b) => {
-    const priorityOrder: Record<RecPriority, number> = { fix_now: 0, fix_soon: 1, fix_later: 2, ongoing: 3 };
-    const pDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
-    if (pDiff !== 0) return pDiff;
-    return b.impactScore - a.impactScore;
-  });
+  // ── Sort: tier PRIMARY, impactScore SECONDARY, business-intent alignment as
+  // the final within-tier tiebreaker (see sortRecommendations). ──
+  sortRecommendations(recs, effectiveBusinessPriorities);
 
   // ── Build summary (exclude auto-resolved from active counts) ──
   const summary = computeRecommendationSummary(recs);

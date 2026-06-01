@@ -30,6 +30,8 @@ function makeClientSignals(
       { topic: 'drain unclogging', votes: 3 },
     ],
     businessPriorities: ['same-day service', 'licensed technicians'],
+    // effectiveBusinessPriorities is the resolved superset — consumers read this, not businessPriorities.
+    effectiveBusinessPriorities: ['same-day service', 'licensed technicians'],
     approvalPatterns: { approvalRate: 0.75, avgResponseTime: null },
     recentChatTopics: ['burst pipe emergency', 'after-hours plumbing'],
     churnRisk: null,
@@ -76,13 +78,17 @@ describe('buildStrategyKeywordEvaluationContext', () => {
     expect(ctx.businessTerms.some(t => t.trim() === '')).toBe(false);
   });
 
-  it('merges client signals: businessPriorities, contentGapTopics, recentChatTopics', () => {
-    const signals = makeClientSignals();
+  it('merges client signals: effectiveBusinessPriorities (resolved), contentGapTopics, recentChatTopics', () => {
+    // Consumer reads effectiveBusinessPriorities — the authority-resolved superset.
+    const signals = makeClientSignals({
+      effectiveBusinessPriorities: ['same-day service', 'licensed technicians', '[admin] reduce churn'],
+    });
     const ctx = buildStrategyKeywordEvaluationContext({
       workspaceId: 'ws_3',
       clientSignals: signals,
     });
-    expect(ctx.businessPriorities).toEqual(['same-day service', 'licensed technicians']);
+    // ctx.businessPriorities is populated from effectiveBusinessPriorities, not raw businessPriorities
+    expect(ctx.businessPriorities).toEqual(['same-day service', 'licensed technicians', '[admin] reduce churn']);
     expect(ctx.contentGapTopics).toEqual(['water heater repair', 'drain unclogging']);
     expect(ctx.recentChatTopics).toEqual(['burst pipe emergency', 'after-hours plumbing']);
   });

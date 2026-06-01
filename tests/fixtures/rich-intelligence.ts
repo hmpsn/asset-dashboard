@@ -221,6 +221,7 @@ export const RICH_CLIENT_SIGNALS: ClientSignalsSlice = {
     { topic: 'Local SEO guide', votes: 3 },
   ],
   businessPriorities: ['Launch APAC market by Q3', 'Reduce CAC by 20%'],
+  effectiveBusinessPriorities: ['Launch APAC market by Q3', 'Reduce CAC by 20%', 'Grow patient appointments 25%'],
   approvalPatterns: { approvalRate: 0.85, avgResponseTime: 48 },
   recentChatTopics: ['content decay', 'keyword cannibalization', 'schema markup'],
   churnRisk: 'low',

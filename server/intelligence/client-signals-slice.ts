@@ -9,10 +9,9 @@ import type { SessionSummary } from '../chat-memory.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
 import { createStmtCache } from '../db/stmt-cache.js';
-import { parseJsonSafeArray } from '../db/json-validation.js';
-import { clientBusinessPrioritySchema, type ClientBusinessPriorityInput } from '../schemas/client-business-priorities.js';
 import { isProgrammingError } from '../errors.js';
 import { buildKeywordFeedbackSignals } from '../keyword-feedback.js';
+import { buildEffectiveBusinessPriorities, getRawClientBusinessPriorities } from './business-priorities-source.js';
 
 const log = createLogger('workspace-intelligence/client-signals');
 
@@ -20,20 +19,7 @@ const stmts = createStmtCache(() => ({
   contentGapVotes: db.prepare(
     'SELECT keyword, COUNT(*) as cnt FROM content_gap_votes WHERE workspace_id = ? GROUP BY keyword ORDER BY cnt DESC',
   ),
-  clientBusinessPriorities: db.prepare(
-    'SELECT priorities FROM client_business_priorities WHERE workspace_id = ?',
-  ),
 }));
-
-function formatClientBusinessPriority(
-  priority: ClientBusinessPriorityInput,
-): string {
-  if (typeof priority === 'string') return priority.trim();
-  const text = priority.text.trim();
-  if (!text) return '';
-  const category = priority.category?.trim();
-  return category ? `[${category}] ${text}` : text;
-}
 
 export async function assembleClientSignals(
   workspaceId: string,
@@ -56,22 +42,20 @@ export async function assembleClientSignals(
     log.debug({ err, workspaceId }, 'assembleClientSignals: content gap votes table optional, degrading gracefully');
   }
 
-  // Business priorities (DB direct)
+  // Business priorities.
+  // `businessPriorities` is the RAW client-only list (read-only legacy field).
+  // `effectiveBusinessPriorities` is the authority-resolved representation that merges
+  // the client store (client_business_priorities, 021) with the admin store
+  // (workspaces.business_priorities, 048) — precedence: client first, admin as supplement.
+  // Both reads live in business-priorities-source.ts so there is no external format helper
+  // that could bypass the authority chain (CLAUDE.md "Authority-layered fields").
   let businessPriorities: string[] = [];
+  let effectiveBusinessPriorities: string[] = [];
   try {
-    const row = stmts().clientBusinessPriorities.get(workspaceId) as { priorities: string } | undefined;
-    if (row) {
-      const priorities = parseJsonSafeArray(
-        row.priorities,
-        clientBusinessPrioritySchema,
-        { workspaceId, field: 'priorities', table: 'client_business_priorities' },
-      );
-      businessPriorities = priorities
-        .map(formatClientBusinessPriority)
-        .filter((priority): priority is string => priority.length > 0);
-    }
+    businessPriorities = getRawClientBusinessPriorities(workspaceId);
+    effectiveBusinessPriorities = buildEffectiveBusinessPriorities(workspaceId);
   } catch (err) {
-    log.debug({ err, workspaceId }, 'assembleClientSignals: business priorities table optional, degrading gracefully');
+    log.debug({ err, workspaceId }, 'assembleClientSignals: business priorities optional, degrading gracefully');
   }
 
   // Churn signals
@@ -337,6 +321,7 @@ export async function assembleClientSignals(
     keywordFeedback,
     contentGapVotes,
     businessPriorities,
+    effectiveBusinessPriorities,
     approvalPatterns,
     recentChatTopics,
     churnRisk,

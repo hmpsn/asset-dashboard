@@ -5,6 +5,21 @@ import { queryKeys } from '../lib/queryKeys';
 import { matchPageIdentity } from '../lib/pathUtils';
 import type { Recommendation, RecommendationSet } from '../../shared/types/recommendations.ts';
 
+/**
+ * Fetch the full RecommendationSet for a workspace, including `summary.topRecommendationId`.
+ * Uses the same queryKey as useRecommendations / InsightsEngine so all three share
+ * the React Query cache — no extra network request when they co-exist on a page.
+ */
+export function useRecommendationSet(workspaceId?: string) {
+  return useQuery<RecommendationSet>({
+    queryKey: queryKeys.shared.recommendations(workspaceId!),
+    queryFn: (): Promise<RecommendationSet> =>
+      get<RecommendationSet>(`/api/public/recommendations/${workspaceId}`),
+    enabled: !!workspaceId,
+    staleTime: 60_000,
+  });
+}
+
 export function recommendationAppliesToPage(
   recommendation: Pick<Recommendation, 'affectedPages'>,
   pageIdentity: string,

@@ -761,6 +761,7 @@ describe('contract: ClientSignalsSlice field population', () => {
     expect(result).toHaveProperty('keywordFeedback');
     expect(result).toHaveProperty('contentGapVotes');
     expect(result).toHaveProperty('businessPriorities');
+    expect(result).toHaveProperty('effectiveBusinessPriorities');
     expect(result).toHaveProperty('approvalPatterns');
     expect(result).toHaveProperty('recentChatTopics');
     expect(result).toHaveProperty('churnRisk');
@@ -780,6 +781,9 @@ describe('contract: ClientSignalsSlice field population', () => {
 
     // businessPriorities
     expect(Array.isArray(result.businessPriorities)).toBe(true);
+
+    // effectiveBusinessPriorities (authority-resolved: client store + admin store)
+    expect(Array.isArray(result.effectiveBusinessPriorities)).toBe(true);
 
     // approvalPatterns
     expect(typeof result.approvalPatterns.approvalRate).toBe('number');
