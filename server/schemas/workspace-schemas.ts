@@ -299,6 +299,30 @@ export const competitorDomainsSchema = z.array(z.string());
 // aren't yet captured in the schema. parseJsonSafeArray validates each
 // recommendation individually so a single malformed row doesn't drop the
 // entire set.
+// Mirrors OpportunityScore / OpportunityComponent in
+// shared/types/recommendations.ts. Validated at the read boundary so a corrupt
+// opportunity blob is caught rather than silently passed through .passthrough().
+export const opportunityComponentSchema = z.object({
+  dimension: z.enum(['demand', 'winnability', 'intent', 'effort', 'businessFit', 'timing', 'evidence']),
+  rawValue: z.union([z.number(), z.string()]).nullable(),
+  normalized: z.number(),
+  weight: z.number(),
+  contribution: z.number(),
+  evidence: z.string(),
+});
+
+export const opportunityScoreSchema = z.object({
+  value: z.number(),
+  emvPerWeek: z.number(),
+  roiPerEffortDay: z.number(),
+  confidence: z.number(),
+  calibration: z.number(),
+  groundedSpine: z.enum(['roiScore', 'opportunityScore', 'computed']),
+  components: z.array(opportunityComponentSchema),
+  calibrationVersion: z.string(),
+  modelVersion: z.string(),
+});
+
 export const recommendationSchema = z.object({
   id: z.string(),
   workspaceId: z.string(),
@@ -325,6 +349,9 @@ export const recommendationSchema = z.object({
   assignedTo: z.enum(['team', 'client']).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  // Unified Opportunity Value breakdown (PR1). Optional on legacy rows; a malformed
+  // opportunity degrades to undefined (rec survives) rather than dropping the whole rec.
+  opportunity: opportunityScoreSchema.optional().catch(undefined),
 }).passthrough();
 
 // Mirrors RecommendationSet['summary'] in shared/types/recommendations.ts.
@@ -341,6 +368,8 @@ export const recommendationSummarySchema = z.object({
   estimatedRecoverableClicks: z.number(),
   estimatedRecoverableImpressions: z.number(),
   topRecommendationId: z.string().nullable().optional(),
+  // One-line rendered rationale for the #1 (from its opportunity.components, PR6).
+  topOpportunityRationale: z.string().optional(),
 }).passthrough();
 
 // ── Audit snapshots (audit_snapshots table) ──
