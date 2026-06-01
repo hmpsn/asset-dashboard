@@ -41,6 +41,7 @@ import { queueKeywordStrategyPostUpdateFollowOns } from '../keyword-strategy-fol
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { mirrorSchemaPlanToDeliverable } from '../domains/inbox/schema-plan-dual-write.js';
 import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { listPendingSchemas } from '../schema-queue.js';
 import { createLogger } from '../logger.js';
@@ -703,6 +704,12 @@ router.post('/api/webflow/schema-plan/:siteId/send-to-client', requireWorkspaceS
 
     // Update plan status — no approval batch; client reviews in the Schema tab
     const updated = updateSchemaPlanStatus(req.params.siteId, 'sent_to_client');
+
+    // DARK dual-write (PR-1c): mirror the sent plan into the unified client_deliverable model
+    // when `unified-deliverables-rest` is ON. Default off → no-op. Best-effort + swallowed: it
+    // can NEVER break the legacy send (the status is already persisted above). The OWNING
+    // workspace is read straight off the plan (plan.workspaceId === ws.id) — not guessed.
+    mirrorSchemaPlanToDeliverable(ws.id, updated || plan);
 
     // Notify client via email, directing to the Schema tab
     if (ws.clientEmail) {

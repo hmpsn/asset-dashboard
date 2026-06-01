@@ -26,6 +26,10 @@ import './redirect.js';
 import './internal-link.js';
 import './aeo-change.js';
 import './content-decay.js';
+// PR-1c: schema_plan (the per-site schema STRATEGY review artifact — distinct from the
+// PR-1a schema_item per-page batches). DARK — self-registers on import but is only mirrored
+// when the `unified-deliverables-rest` flag is on (default off → no-op).
+import './schema-plan.js';
 
 export {
   registerAdapter,
