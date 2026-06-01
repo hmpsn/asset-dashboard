@@ -363,6 +363,22 @@ export function getDeliverable(id: string): ClientDeliverable | null {
   return rowToDeliverable(row, items);
 }
 
+/**
+ * Resolve the existing deduped row (if any) for a (workspaceId, type, sourceRef) natural
+ * key, fully mapped (+ items). Used by the send-path guard to read the CURRENT status
+ * before a resend so a re-send onto a terminal row throws instead of silently reverting
+ * via the ON CONFLICT DO UPDATE (design §4.5). Returns null when no row exists yet.
+ */
+export function findBySourceRef(
+  workspaceId: string,
+  type: DeliverableType,
+  sourceRef: string,
+): ClientDeliverable | null {
+  const row = stmts().findBySourceRef.get(workspaceId, type, sourceRef) as { id: string } | undefined;
+  if (!row) return null;
+  return getDeliverable(row.id);
+}
+
 export function listDeliverables(workspaceId: string): ClientDeliverable[] {
   const rows = stmts().listByWs.all(workspaceId) as ClientDeliverableRow[];
   return rows.map((r) => rowToDeliverable(r));

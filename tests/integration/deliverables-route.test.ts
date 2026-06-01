@@ -18,6 +18,8 @@ import { createTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
+import { upsertDeliverable } from '../../server/client-deliverables.js';
+import { listActivity } from '../../server/activity-log.js';
 
 const ctx = createTestContext(13874); // port-ok: next free after 13873
 
@@ -100,5 +102,29 @@ describe('POST /api/deliverables/:workspaceId/:id/remind (admin)', () => {
       method: 'POST',
     });
     expect(res.status).toBe(404);
+  });
+
+  it('writes a deliverable_reminded activity row on a successful remind', async () => {
+    // Seed a real awaiting_client deliverable so the handler succeeds.
+    const d = upsertDeliverable({
+      workspaceId: pwless.workspaceId,
+      type: 'redirect',
+      kind: 'decision',
+      status: 'awaiting_client',
+      title: 'Reminder target',
+      payload: {},
+      sentAt: new Date().toISOString(),
+    });
+
+    const res = await ctx.api(`/api/deliverables/${pwless.workspaceId}/${d.id}/remind`, {
+      method: 'POST',
+    });
+    expect(res.status).toBe(200);
+
+    const reminded = listActivity(pwless.workspaceId, 50).find(
+      (a) => a.type === 'deliverable_reminded',
+    );
+    expect(reminded).toBeTruthy();
+    expect(reminded!.metadata?.deliverableId).toBe(d.id);
   });
 });

@@ -8,7 +8,8 @@ import {
   type DeliverableAdapter,
 } from '../../server/domains/inbox/deliverable-adapters/types.js';
 import { sendToClient, respondToDeliverable } from '../../server/domains/inbox/send-to-client.js';
-import { getDeliverable } from '../../server/client-deliverables.js';
+import { getDeliverable, upsertDeliverable } from '../../server/client-deliverables.js';
+import { InvalidTransitionError } from '../../server/state-machines.js';
 
 const WS = 'send-to-client-test';
 
@@ -82,6 +83,48 @@ describe('sendToClient', () => {
     expect(d.sentAt).toBeTruthy();
     expect(d.sourceRef).toBe('redirect:fake-site');
     expect(wsBroadcast).toHaveBeenCalledWith(WS, WS_EVENTS.DELIVERABLE_SENT, expect.objectContaining({ deliverableId: d.id }));
+  });
+
+  it('resend onto a still-pending awaiting_client row supersedes (same dedup row, no throw)', async () => {
+    registerAdapter(noopApplyAdapter());
+    const first = await sendToClient(WS, 'redirect', { ready: true, title: 'First' });
+    const second = await sendToClient(WS, 'redirect', { ready: true, title: 'Second' });
+    // Dedup-on-resend: same (ws, type, sourceRef) → same row, refreshed.
+    expect(second.id).toBe(first.id);
+    expect(second.status).toBe('awaiting_client');
+    expect(second.title).toBe('Second');
+  });
+
+  it('resend onto a TERMINAL row throws and does NOT revert status / null decided_at', async () => {
+    registerAdapter(noopApplyAdapter());
+    const sent = await sendToClient(WS, 'redirect', { ready: true, title: 'Original' });
+    // Force the deduped row to a terminal status with a decided_at, simulating an
+    // approval that has already happened (the store is the only table writer).
+    const decidedAtIso = '2026-01-01T00:00:00.000Z';
+    const approved = upsertDeliverable({
+      id: sent.id,
+      workspaceId: WS,
+      type: 'redirect',
+      kind: 'decision',
+      status: 'approved',
+      title: sent.title,
+      payload: {},
+      sourceRef: 'redirect:fake-site',
+      sentAt: sent.sentAt,
+      decidedAt: decidedAtIso,
+    });
+    expect(approved.status).toBe('approved');
+
+    // A second send with the same sourceRef must THROW (no silent revert via ON CONFLICT).
+    await expect(
+      sendToClient(WS, 'redirect', { ready: true, title: 'Sneaky resend' }),
+    ).rejects.toThrow(InvalidTransitionError);
+
+    // The terminal row is untouched: still approved, decided_at preserved, title unchanged.
+    const after = getDeliverable(sent.id)!;
+    expect(after.status).toBe('approved');
+    expect(after.decidedAt).toBe(decidedAtIso);
+    expect(after.title).toBe('Original');
   });
 });
 

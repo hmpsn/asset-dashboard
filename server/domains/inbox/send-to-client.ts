@@ -22,6 +22,7 @@
  * but is NOT imported back by any of them — no circular value-import.
  */
 import {
+  findBySourceRef,
   getDeliverable,
   upsertDeliverable,
   type UpsertDeliverableInput,
@@ -88,11 +89,20 @@ export async function sendToClient<TInput>(
   // Guarantee 2: typed payload (+ child items).
   const built = adapter.buildPayload(input);
 
-  // Guarantee 1: state-machine-guarded entry. The new row is born at draft then
-  // transitions to awaiting_client — validateTransition asserts the move is legal for
-  // this type (notification types are never sendable through this path).
+  // Guarantee 1: state-machine-guarded entry. Two cases, both guarded against the
+  // per-type machine (notification types are never sendable through this path):
+  //   (a) FRESH send: the new row is born at draft → awaiting_client.
+  //   (b) RESEND (sourceRef collides with an existing row): upsertDeliverable's
+  //       ON CONFLICT DO UPDATE will overwrite the existing row's status back to
+  //       awaiting_client. We MUST therefore guard from the row's ACTUAL current
+  //       status — a resend onto a still-pending awaiting_client/changes_requested row
+  //       is the intended "supersede", but a resend onto a terminal
+  //       approved/applied/declined/completed row must throw InvalidTransitionError
+  //       rather than silently revert (and null decided_at/applied_at/note).
   const transitions = getDeliverableTransitions(type);
-  validateTransition('deliverable', transitions, 'draft', 'awaiting_client');
+  const sourceRef = adapter.sourceRef(input);
+  const existing = sourceRef != null ? findBySourceRef(workspaceId, type, sourceRef) : null;
+  validateTransition('deliverable', transitions, existing ? existing.status : 'draft', 'awaiting_client');
 
   const nowIso = opts.sentAt ?? new Date().toISOString();
   const upsertInput: UpsertDeliverableInput = {
@@ -109,7 +119,7 @@ export async function sendToClient<TInput>(
     sentAt: nowIso,
     generatedAt: nowIso,
     source: opts.source ?? null,
-    sourceRef: adapter.sourceRef(input),
+    sourceRef,
     items: built.items,
   };
   const deliverable = upsertDeliverable(upsertInput);
@@ -162,6 +172,11 @@ export async function respondToDeliverable(
 
   // Guarantee 4: team notification on every outcome.
   notifyTeamOfResponse(workspaceId, responded, input.decision);
+  // INTENTIONAL two-phase broadcast (do NOT "optimize" into a single emit): on an opt-in
+  // apply this emits DELIVERABLE_UPDATED status:approved here, then a SECOND
+  // status:applied from applyApprovedDeliverable after the (slow) external apply call.
+  // The double emit (+ double invalidateIntelligenceCache) lets the UI reflect "approved"
+  // immediately while the Webflow write is in flight, then flips to "applied" when it lands.
   broadcastToWorkspace(workspaceId, WS_EVENTS.DELIVERABLE_UPDATED, {
     deliverableId: responded.id,
     type: responded.type,

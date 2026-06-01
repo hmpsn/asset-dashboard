@@ -77,6 +77,15 @@ router.post(
     const { workspaceId, id } = req.params;
     try {
       const deliverable = remindDeliverable(workspaceId, id);
+      // Data-Flow Rule #4: the sibling respond handler logs activity; a remind is an
+      // operator-initiated client-facing nudge, so it must too (NOT client-visible).
+      addActivity(
+        workspaceId,
+        'deliverable_reminded',
+        `Reminded client about "${deliverable.title}"`,
+        undefined,
+        { deliverableId: deliverable.id, type: deliverable.type, status: deliverable.status },
+      );
       res.json(deliverable);
     } catch (err) {
       if (err instanceof SendToClientError) {

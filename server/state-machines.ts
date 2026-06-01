@@ -132,7 +132,7 @@ export type BackgroundJobStatus = 'pending' | 'running' | 'done' | 'error' | 'ca
 // One canonical status vocabulary across the five bespoke send-to-client pipelines
 // (design §4.2). Base map:
 //   draft → awaiting_client
-//   awaiting_client → {changes_requested | approved | declined | partial}
+//   awaiting_client → {awaiting_client (resend/supersede) | changes_requested | approved | declined | partial}
 //   changes_requested ↔ awaiting_client
 //   approved → applied            (apply is opt-in per adapter, default no-op — D-apply)
 //   partial → {approved | declined | changes_requested}
@@ -142,7 +142,10 @@ export type BackgroundJobStatus = 'pending' | 'running' | 'done' | 'error' | 'ca
 // Per-type overrides are applied via getDeliverableTransitions(type).
 export const CLIENT_DELIVERABLE_TRANSITIONS: Record<string, readonly string[]> = {
   draft:             ['awaiting_client', 'cancelled'],
-  awaiting_client:   ['changes_requested', 'approved', 'declined', 'partial', 'expired', 'cancelled'],
+  // awaiting_client → awaiting_client is the idempotent resend/supersede edge (a second
+  // sendToClient with the same sourceRef onto a still-pending row). Terminal rows have no
+  // outbound awaiting_client edge, so a resend onto them throws (no silent revert).
+  awaiting_client:   ['awaiting_client', 'changes_requested', 'approved', 'declined', 'partial', 'expired', 'cancelled'],
   changes_requested: ['awaiting_client', 'approved', 'declined', 'cancelled'],
   partial:           ['approved', 'declined', 'changes_requested', 'cancelled'],
   approved:          ['applied', 'cancelled'],
@@ -185,7 +188,8 @@ const DELIVERABLE_TYPE_OVERRIDES: Record<string, Record<string, readonly string[
     changes_requested: ['draft', 'awaiting_client'],
     approved: [], // terminal — copy approve has no apply step
   },
-  briefing: {}, // notification: replaced wholesale below (no transitions at all)
+  // (briefing is handled by NOTIFICATION_DELIVERABLE_TYPES below; an override entry here
+  // would be dead — getDeliverableTransitions short-circuits to {} before reading this map.)
 };
 
 // Types whose kind is one-way notification — they have NO transitions of any kind.
@@ -197,7 +201,7 @@ const NOTIFICATION_DELIVERABLE_TYPES = new Set<string>(['briefing']);
  * Notification types (briefing) get an EMPTY map — no transitions are legal, so the
  * validator rejects every status change (enforces the one-way safety, design §4.2).
  */
-export function getDeliverableTransitions(type: string): Record<string, readonly string[]> {
+export function getDeliverableTransitions(type: string): Readonly<Record<string, readonly string[]>> {
   if (NOTIFICATION_DELIVERABLE_TYPES.has(type)) return {};
   const override = DELIVERABLE_TYPE_OVERRIDES[type];
   if (!override) return CLIENT_DELIVERABLE_TRANSITIONS;

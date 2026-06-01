@@ -90,6 +90,7 @@ export type ActivityType =
   | 'client_action_completed'
   | 'deliverable_sent'
   | 'deliverable_responded'
+  | 'deliverable_reminded'   // operator: admin re-nudged the client about a pending deliverable (NOT client-visible)
   | 'meeting_brief_generated'
   | 'brandscript_created'
   | 'brandscript_deleted'
