@@ -7633,7 +7633,11 @@ export const CHECKS: Check[] = [
         const enabled = new RegExp(`'${flag}'\\s*:\\s*true`).test(flagsFile);
         if (!enabled) continue;
         for (const type of types) {
-          const adapterPath = path.join(adaptersDir, `${type}.ts`);
+          // Adapter files use the hyphenated convention (copy_section → copy-section.ts,
+          // schema_plan → schema-plan.ts, …), so normalize the underscore type id before
+          // resolving the file. (Without this the rule false-positives for every multi-word
+          // type once its flag flips, even though the adapter exists.)
+          const adapterPath = path.join(adaptersDir, `${type.replace(/_/g, '-')}.ts`);
           if (!existsSync(adapterPath)) {
             hits.push({
               file: path.join(ROOT, 'shared/types/client-deliverable.ts'),
