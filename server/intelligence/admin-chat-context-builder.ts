@@ -1,8 +1,23 @@
 import type { IntelligenceSlice, WorkspaceIntelligence } from '../../shared/types/intelligence.js';
+import { PROMPT_FORMATTABLE_INTELLIGENCE_SLICES } from '../../shared/types/intelligence.js';
 import { buildWorkspaceIntelligence, formatForPrompt, formatPageMapForPrompt } from '../workspace-intelligence.js';
 
 const SEO_CONTEXT_SECTIONS = ['seoContext'] as const;
 const LEARNINGS_SECTIONS = ['learnings'] as const;
+
+/**
+ * Slices that have dedicated top-level blocks in buildAdminChatIntelligenceContext
+ * (seoContextBlock and learningsBlock). All other assembled + prompt-formattable slices
+ * are routed through the additional-slices block so their data reaches the model.
+ */
+const DEDICATED_SECTIONS = new Set<IntelligenceSlice>(['seoContext', 'learnings']);
+
+/**
+ * Token budget for the additional slices block (operational, siteHealth, clientSignals,
+ * insights, contentPipeline, localSeo). Kept below the seoContext budget (2600) so the
+ * combined prompt stays within the ~6400-token workspace context envelope.
+ */
+const ADDITIONAL_SLICES_TOKEN_BUDGET = 1500;
 
 export type AdminChatContextCategory =
   | 'general'
@@ -88,12 +103,44 @@ export async function buildAdminChatIntelligenceContext(
       })
     : '';
 
+  // Route the additional assembled slices (operational, siteHealth, clientSignals, insights,
+  // contentPipeline, localSeo) through formatForPrompt so their data reaches the model.
+  // B-10 fix: previously these slices were assembled but their formatted output was never
+  // included in the context block, making them invisible to the advisor.
+  const additionalSections = slices.filter(
+    (s): s is typeof PROMPT_FORMATTABLE_INTELLIGENCE_SLICES[number] =>
+      !DEDICATED_SECTIONS.has(s) &&
+      (PROMPT_FORMATTABLE_INTELLIGENCE_SLICES as readonly string[]).includes(s),
+  );
+
+  let additionalBlock = '';
+  const additionalDataSources: string[] = [];
+  if (additionalSections.length > 0) {
+    const formatted = formatForPrompt(intelligence, {
+      verbosity: 'standard',
+      sections: additionalSections,
+      tokenBudget: ADDITIONAL_SLICES_TOKEN_BUDGET,
+    });
+    if (hasFormattedIntelligenceSection(formatted)) {
+      additionalBlock = formatted;
+      // Build a readable data-source label from the section names
+      const label = additionalSections.map(s => s.replace(/([A-Z])/g, ' $1').trim()).join(', ');
+      additionalDataSources.push(`Workspace Intelligence: ${label}`);
+    }
+  }
+
+  if (additionalBlock) workspaceParts.push(additionalBlock);
+
+  const dataSources: string[] = [];
+  if (workspaceParts.length > 0) dataSources.push('Workspace Intelligence: SEO Context');
+  dataSources.push(...additionalDataSources);
+
   return {
     intelligence,
     workspaceContextBlock: workspaceParts.length > 0
       ? `WORKSPACE INTELLIGENCE CONTEXT:\n${workspaceParts.join('\n\n')}`
       : '',
     learningsBlock: hasFormattedIntelligenceSection(learningsBlock) ? learningsBlock : '',
-    dataSources: workspaceParts.length > 0 ? ['Workspace Intelligence: SEO Context'] : [],
+    dataSources,
   };
 }
