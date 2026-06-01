@@ -11,6 +11,11 @@ import {
   detectCompetitorAlerts, saveCompetitorAlerts, snapshotExistsForDate, linkAlertToInsight,
 } from './competitor-snapshot-store.js';
 import { upsertInsight, deleteStaleInsightsByType } from './analytics-insights-store.js';
+import { isFeatureEnabled } from './feature-flags.js';
+import type * as PageKeywords from './page-keywords.js';
+import type * as OpportunityEvents from './opportunity-events.js';
+import type * as OpportunityRegen from './scoring/opportunity-regen.js';
+import type * as OpportunityTiming from './scoring/opportunity-timing.js';
 
 const log = createLogger('intelligence-crons');
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
@@ -105,6 +110,31 @@ async function runCompetitorCheck(): Promise<void> {
           continue;
         }
 
+        // ── PR7 · Spine B — competitor → opportunity-event detector setup. ──
+        // When the events flag is ON, resolve a keyword→our-page map once per
+        // workspace so a competitor-overtake alert can raise a DECAYING timing
+        // boost on the page that ranks for the overtaken keyword. Entirely gated +
+        // try/catch isolated; flag OFF leaves this map empty and emits no events.
+        const eventsFlagOn = isFeatureEnabled('opportunity-value-events');
+        const keywordToPage = new Map<string, string>();
+        let competitorEventsWritten = 0;
+        if (eventsFlagOn) {
+          try {
+            const { listPageKeywords }: typeof PageKeywords = await import('./page-keywords.js'); // dynamic-import-ok
+            const { keywordComparisonKey } = await import('../shared/keyword-normalization.js'); // dynamic-import-ok
+            for (const pk of listPageKeywords(ws.id)) {
+              if (!pk.pagePath) continue;
+              const keys = [pk.primaryKeyword, ...(pk.secondaryKeywords ?? [])];
+              for (const kw of keys) {
+                const norm = keywordComparisonKey(kw);
+                if (norm && !keywordToPage.has(norm)) keywordToPage.set(norm, pk.pagePath);
+              }
+            }
+          } catch (mapErr) {
+            log.warn({ workspaceId: ws.id, err: mapErr }, 'competitor event keyword map build failed — emitting domain-level events only');
+          }
+        }
+
         let anyDomainFailed = false;
         let anyDomainProcessed = false;
         for (const domain of ws.competitorDomains) {
@@ -144,6 +174,41 @@ async function runCompetitorCheck(): Promise<void> {
               });
               // Link the alert row back to its insight for traceability
               linkAlertToInsight(alert.id, insight.id, ws.id);
+
+              // ── PR7 · Spine B — raise a DECAYING competitor timing boost. ──
+              // A competitor overtaking us on a keyword is the most urgent, fastest-
+              // fading signal. We key the event to OUR page that ranks for that
+              // keyword (when resolvable) so the boost lands on the right rec. We do
+              // NOT mint a net-new defensive rec (DEFERRED) — the boost on existing
+              // recs is the value. Flag-gated + try/catch (never break the cron).
+              if (eventsFlagOn && alert.keyword) {
+                try {
+                  const { keywordComparisonKey } = await import('../shared/keyword-normalization.js'); // dynamic-import-ok
+                  const { insertOpportunityEvent }: typeof OpportunityEvents = await import('./opportunity-events.js'); // dynamic-import-ok
+                  const { EVENT_BOOST_DEFAULTS }: typeof OpportunityTiming = await import('./scoring/opportunity-timing.js'); // dynamic-import-ok
+                  const norm = keywordComparisonKey(alert.keyword);
+                  const pagePath = norm ? keywordToPage.get(norm) ?? null : null;
+                  const { boost, halfLifeDays } = EVENT_BOOST_DEFAULTS.competitor;
+                  insertOpportunityEvent({
+                    workspaceId: ws.id,
+                    type: 'competitor',
+                    pagePath,
+                    keyword: alert.keyword,
+                    boost,
+                    halfLifeDays,
+                    source: 'competitor-cron',
+                    payload: {
+                      competitorDomain: alert.competitorDomain,
+                      alertType: alert.alertType,
+                      currentPosition: alert.currentPosition,
+                      previousPosition: alert.previousPosition,
+                    },
+                  });
+                  competitorEventsWritten++;
+                } catch (evErr) {
+                  log.warn({ workspaceId: ws.id, err: evErr }, 'competitor opportunity-event write failed (non-fatal)');
+                }
+              }
             }
           } catch (err) {
             anyDomainFailed = true;
@@ -158,6 +223,19 @@ async function runCompetitorCheck(): Promise<void> {
         // in that case would delete valid insights written by the pre-restart run.
         if (anyDomainProcessed && !anyDomainFailed) {
           deleteStaleInsightsByType(ws.id, 'competitor_alert', cycleStart);
+        }
+
+        // ── PR7 · Spine B — debounced re-rank after competitor events. ──
+        // One trigger per workspace (collapses the per-alert burst); flag-gated +
+        // try/catch so it can never break the competitor cron.
+        if (competitorEventsWritten > 0) {
+          try {
+            const { triggerOpportunityRegen }: typeof OpportunityRegen = await import('./scoring/opportunity-regen.js'); // dynamic-import-ok
+            triggerOpportunityRegen(ws.id);
+            log.info({ workspaceId: ws.id, competitorEventsWritten }, 'competitor opportunity events written — regen enqueued');
+          } catch (regenErr) {
+            log.warn({ workspaceId: ws.id, err: regenErr }, 'competitor regen trigger failed (non-fatal)');
+          }
         }
       } catch (err) {
         log.warn({ err, workspaceId: ws.id }, 'Competitor monitoring workspace failed — continuing');

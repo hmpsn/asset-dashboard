@@ -13,6 +13,7 @@ import type * as ExternalDetection from './external-detection.js';
 import type * as OutcomePlaybooks from './outcome-playbooks.js';
 import type * as OutcomeTracking from './outcome-tracking.js';
 import type * as ActivityLog from './activity-log.js';
+import type * as OpportunityDetectors from './scoring/opportunity-detectors.js';
 
 const log = createLogger('outcome-crons');
 
@@ -28,6 +29,8 @@ let detectionInterval: ReturnType<typeof setInterval> | null = null;
 let archiveInterval: ReturnType<typeof setInterval> | null = null;
 let playbooksInterval: ReturnType<typeof setInterval> | null = null;
 let backfillInterval: ReturnType<typeof setInterval> | null = null;
+let decayScanInterval: ReturnType<typeof setInterval> | null = null;
+let rankDeclineScanInterval: ReturnType<typeof setInterval> | null = null;
 
 // Startup timeout handles — stored so stopOutcomeCrons() can cancel them
 // if shutdown is called within the first 35s of startup.
@@ -212,6 +215,36 @@ export function startOutcomeCrons() {
     }
   };
 
+  // ── PR7 · Spine B — decay → opportunity-event detector (24h). ──
+  // Thin cron wrapper around runDecayDetector (see opportunity-detectors.ts): reads
+  // the PERSISTED decay analysis (no crawl), emits DECAYING `decay` events for
+  // critical / repeat-decay pages, and enqueues a debounced regen. ENTIRELY gated by
+  // the `opportunity-value-events` flag inside the detector — flag OFF is a no-op.
+  // Loaded via dynamic import so the cron module doesn't pull the detector's
+  // transitive deps at startup.
+  const runDecayScan = async () => {
+    try {
+      const { runDecayDetector }: typeof OpportunityDetectors = await import('./scoring/opportunity-detectors.js'); // dynamic-import-ok
+      runDecayDetector();
+    } catch (err) {
+      log.error({ err }, 'Decay opportunity-event scan failed');
+    }
+  };
+
+  // ── PR7 · Spine B — rank-decline → opportunity-event detector (24h). ──
+  // Thin cron wrapper around runRankDeclineDetector: a LIGHT check over the
+  // already-persisted rank snapshots (no crawl) that emits DECAYING `rank_drop`
+  // events for tracked keywords that crossed the decline threshold, then enqueues a
+  // debounced regen. Flag-gated inside the detector — flag OFF is a no-op.
+  const runRankDeclineScan = async () => {
+    try {
+      const { runRankDeclineDetector }: typeof OpportunityDetectors = await import('./scoring/opportunity-detectors.js'); // dynamic-import-ok
+      runRankDeclineDetector();
+    } catch (err) {
+      log.error({ err }, 'Rank-decline opportunity-event scan failed');
+    }
+  };
+
   // Run each job once after a short startup delay, then on their normal interval.
   // Store handles so stopOutcomeCrons() can cancel them during early shutdown.
   startupTimeouts = [
@@ -221,6 +254,8 @@ export function startOutcomeCrons() {
     setTimeout(() => void runPlaybooks(), 30_000),
     setTimeout(runArchive, 35_000),
     setTimeout(runBackfillJob, 40_000),
+    setTimeout(() => void runDecayScan(), 45_000),
+    setTimeout(() => void runRankDeclineScan(), 50_000),
   ];
 
   measureInterval = setInterval(() => void runMeasure(), DAILY_MS);
@@ -228,6 +263,8 @@ export function startOutcomeCrons() {
   detectionInterval = setInterval(() => void runDetection(), WEEKLY_MS);
   archiveInterval = setInterval(runArchive, DAILY_MS);
   backfillInterval = setInterval(runBackfillJob, WEEKLY_MS);
+  decayScanInterval = setInterval(() => void runDecayScan(), DAILY_MS);
+  rankDeclineScanInterval = setInterval(() => void runRankDeclineScan(), DAILY_MS);
 
   playbooksInterval = setInterval(() => void runPlaybooks(), 7 * DAILY_MS);
 
@@ -243,11 +280,15 @@ export function stopOutcomeCrons() {
   if (archiveInterval) clearInterval(archiveInterval);
   if (playbooksInterval) clearInterval(playbooksInterval);
   if (backfillInterval) clearInterval(backfillInterval);
+  if (decayScanInterval) clearInterval(decayScanInterval);
+  if (rankDeclineScanInterval) clearInterval(rankDeclineScanInterval);
   measureInterval = null;
   learningsInterval = null;
   detectionInterval = null;
   archiveInterval = null;
   playbooksInterval = null;
   backfillInterval = null;
+  decayScanInterval = null;
+  rankDeclineScanInterval = null;
   log.info('Outcome crons stopped');
 }
