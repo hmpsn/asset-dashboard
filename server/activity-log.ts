@@ -88,6 +88,8 @@ export type ActivityType =
   | 'client_action_approved'
   | 'client_action_changes_requested'
   | 'client_action_completed'
+  | 'deliverable_sent'
+  | 'deliverable_responded'
   | 'meeting_brief_generated'
   | 'brandscript_created'
   | 'brandscript_deleted'
@@ -185,6 +187,7 @@ const CLIENT_VISIBLE_TYPES: Set<ActivityType> = new Set([
   'content_published', 'copy_sent_to_client', 'post_approved', 'post_changes_requested',
   'post_client_edit', 'brief_sent_for_review', 'post_sent_for_review', 'client_action_sent', 'client_action_approved',
   'client_action_changes_requested', 'client_action_completed',
+  'deliverable_sent', 'deliverable_responded',
 ]);
 
 const CLIENT_ENGAGEMENT_TYPES: ActivityType[] = [

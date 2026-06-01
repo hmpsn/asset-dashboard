@@ -205,6 +205,27 @@ async function applyApprovedDeliverable(
   return applied;
 }
 
+/**
+ * Re-nudge the client about a still-pending deliverable (admin "remind"). Generalizes
+ * the approval-reminder prior art across every type (design §6, E4). No-op-safe when
+ * email is unconfigured. Returns the deliverable so the route can echo it back.
+ */
+export function remindDeliverable(workspaceId: string, deliverableId: string): ClientDeliverable {
+  const current = getDeliverable(deliverableId);
+  if (!current || current.workspaceId !== workspaceId) {
+    throw new SendToClientError('Deliverable not found', 404);
+  }
+  notifyClientOfSend(workspaceId, current);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.DELIVERABLE_UPDATED, {
+    deliverableId: current.id,
+    type: current.type,
+    status: current.status,
+    reminded: true,
+  });
+  log.debug({ workspaceId, deliverableId }, 'deliverable reminder sent');
+  return current;
+}
+
 // ── helpers ──
 
 /**
