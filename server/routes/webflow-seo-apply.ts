@@ -18,6 +18,7 @@ import {
   updatePageState,
 } from '../workspaces.js';
 import { WS_EVENTS } from '../ws-events.js';
+import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 
 const router = Router();
 
@@ -111,6 +112,7 @@ router.post('/api/webflow/seo-pattern-apply/:siteId', requireWorkspaceSiteAccess
         `Pattern ${action} applied to ${appliedPageIds.length}/${pages.length} pages`,
         { field, action, pagesUpdated: appliedPageIds.length, totalPages: pages.length }
       );
+      invalidateIntelligenceCache(ws.id);
     }
   }
 

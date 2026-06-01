@@ -28,6 +28,7 @@ import { createLogger } from '../logger.js';
 import { normalizePageUrl } from '../helpers.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
+import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 
 const log = createLogger('webflow');
 
@@ -224,6 +225,7 @@ router.put('/api/webflow/pages/:pageId/seo', requireWorkspaceSiteAccess({
           fields: changedFields,
           source: 'editor',
         });
+        invalidateIntelligenceCache(seoWs.id);
       }
     }
     res.json(result);

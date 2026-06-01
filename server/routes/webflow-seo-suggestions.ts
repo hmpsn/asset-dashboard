@@ -25,6 +25,7 @@ import { updatePageSeo } from '../webflow.js';
 import { getTokenForSite, getWorkspace, updatePageState } from '../workspaces.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { normalizePageUrl } from '../helpers.js';
+import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 
 const router = Router();
 const log = createLogger('webflow-seo-suggestions');
@@ -140,6 +141,7 @@ router.post('/api/webflow/seo-suggestions/:workspaceId/apply', requireWorkspaceA
     );
   }
 
+  if (appliedIds.length > 0) invalidateIntelligenceCache(workspaceId);
   log.info(`Applied ${appliedIds.length}/${toApply.length} SEO suggestions for workspace ${workspaceId}`);
   res.json({ results, applied: appliedIds.length, total: toApply.length });
 });

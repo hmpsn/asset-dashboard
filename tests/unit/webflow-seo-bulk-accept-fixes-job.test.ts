@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   getWorkspace: vi.fn(() => ({ id: 'ws_1' })),
   updatePageState: vi.fn(),
   recordSeoChange: vi.fn(),
+  invalidateIntelligenceCache: vi.fn(),
   logger: {
     debug: vi.fn(),
     error: vi.fn(),
@@ -38,6 +39,9 @@ vi.mock('../../server/ws-events.js', () => ({
     BULK_OPERATION_PROGRESS: 'bulk:progress',
     PAGE_STATE_UPDATED: 'page-state:updated',
   },
+}));
+vi.mock('../../server/workspace-intelligence.js', () => ({
+  invalidateIntelligenceCache: mocks.invalidateIntelligenceCache,
 }));
 
 const { runSeoBulkAcceptFixesJob } = await import('../../server/webflow-seo-bulk-accept-fixes-job.js');

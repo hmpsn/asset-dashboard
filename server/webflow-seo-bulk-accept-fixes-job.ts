@@ -7,6 +7,7 @@ import { updatePageSeo } from './webflow.js';
 import { getWorkspace, updatePageState } from './workspaces.js';
 import { WS_EVENTS } from './ws-events.js';
 import { normalizePageUrl } from './helpers.js';
+import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import type { SeoBulkAcceptFix } from './schemas/seo-bulk-jobs.js';
 
 const log = createLogger('webflow-seo-bulk-accept-fixes-job');
@@ -151,6 +152,7 @@ export async function runSeoBulkAcceptFixesJob({
       total: fixes.length,
       appliedKeys: applied,
     });
+    if (applied.length > 0) invalidateIntelligenceCache(workspaceId);
 
     if (applied.length > 0) {
       const fixLabel = applied.length === 1 ? 'fix' : 'fixes';
