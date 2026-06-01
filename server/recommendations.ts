@@ -16,6 +16,7 @@ import db from './db/index.js';
 import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
 import { recommendationSchema, recommendationSummarySchema } from './schemas/workspace-schemas.js';
 import { getWorkspace, updatePageState, getPageIdBySlug } from './workspaces.js';
+import { getPageState } from './page-edit-states.js';
 import type { Workspace, QuickWin, ContentGap } from './workspaces.js';
 import { getLatestSnapshot } from './reports.js';
 import type { AuditSnapshot } from './reports.js';
@@ -373,6 +374,28 @@ export function resolveRecommendationsForChange(
   broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { resolved });
   log.info(`Resolved ${resolved} recommendation(s) in-place for ${workspaceId} (${changedPages.size} changed page(s))`);
   return resolved;
+}
+
+/**
+ * Resolve recommendations covering a set of Webflow/CMS PAGE IDs (the
+ * page_edit_states key). recommendation.affectedPages are SLUGS, so each id is
+ * mapped to its slug via getPageState() before matching — the recurring pattern
+ * shared by SEO-write apply paths (work orders, bulk SEO fix). Returns the number
+ * of recommendations resolved (0 when no id maps to a slug, or no rec matches).
+ *
+ * `opts.source` is forwarded to resolveRecommendationsForChange so callers can
+ * scope resolution to a single rec category (e.g. 'audit').
+ */
+export function resolveRecommendationsForPageIds(
+  workspaceId: string,
+  pageIds: string[],
+  opts: { source?: string } = {},
+): number {
+  const affectedSlugs = (pageIds ?? [])
+    .map(id => getPageState(workspaceId, id)?.slug)
+    .filter((s): s is string => typeof s === 'string' && s.length > 0);
+  if (affectedSlugs.length === 0) return 0;
+  return resolveRecommendationsForChange(workspaceId, { affectedPages: affectedSlugs, source: opts.source });
 }
 
 /**

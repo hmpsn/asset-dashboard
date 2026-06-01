@@ -106,9 +106,9 @@ vi.mock('../server/outcome-playbooks.js', () => ({
 
 vi.mock('../server/usage-tracking.js', () => ({
   getUsageSummary: vi.fn(() => ({
-    briefs: { used: 5, limit: 10 },
-    audits: { used: 3, limit: 10 },
-    reports: { used: 0, limit: 10 },
+    briefs: { used: 5, limit: 10, remaining: 5 },
+    audits: { used: 3, limit: 10, remaining: 7 },
+    reports: { used: 0, limit: 10, remaining: 10 },
   })),
 }));
 
@@ -122,7 +122,12 @@ vi.mock('../server/analytics-insights-store.js', () => ({
 }));
 
 vi.mock('../server/workspaces.js', () => ({
-  getWorkspace: vi.fn(() => ({ id: 'ws-1', tier: 'growth', personas: [] })),
+  getWorkspace: vi.fn(() => ({ id: 'ws-1', tier: 'growth', personas: [], competitorDomains: [] })),
+  computeEffectiveTier: vi.fn(() => 'growth'),
+}));
+
+vi.mock('../server/page-edit-states.js', () => ({
+  getAllPageStates: vi.fn(() => ({})),
 }));
 
 // ── Mocks for other slices used by workspace-intelligence.ts ──────────────
@@ -248,9 +253,9 @@ describe('assembleOperational', () => {
 
     const { getUsageSummary } = await import('../server/usage-tracking.js');
     vi.mocked(getUsageSummary).mockReturnValue({
-      briefs: { used: 5, limit: 10 },
-      audits: { used: 3, limit: 10 },
-      reports: { used: 0, limit: 10 },
+      briefs: { used: 5, limit: 10, remaining: 5 },
+      audits: { used: 3, limit: 10, remaining: 7 },
+      reports: { used: 0, limit: 10, remaining: 10 },
     } as any);
 
     const { getInsights } = await import('../server/analytics-insights-store.js');

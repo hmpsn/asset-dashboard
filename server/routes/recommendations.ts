@@ -53,7 +53,11 @@ router.get('/api/public/recommendations/:workspaceId', async (req, res) => { // 
   }
 });
 
-// Update recommendation status (pending → in_progress → completed)
+// Update recommendation status (pending → in_progress → completed).
+// This endpoint IS the rec-completion path — it sets the recommendation to
+// completed and mirrors the affected pages to live state. There is no separate
+// rec to resolve; resolving here would be circular.
+// rec-refresh-ok
 router.patch('/api/public/recommendations/:workspaceId/:recId', requireClientPortalAuth(), (req, res) => {
   const { workspaceId, recId } = req.params;
   const { status } = req.body;

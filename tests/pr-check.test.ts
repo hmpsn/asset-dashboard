@@ -5108,6 +5108,10 @@ describe('Meta: customCheck rule name registry', () => {
     // callAI() dispatcher invariant; prevents direct callOpenAI/callAnthropic
     // imports outside server/ai.ts and provider helpers.
     'Direct callOpenAI/callAnthropic import outside dispatcher',
+    // Foundational integrity remediation Phase 4 (audit A-1/A-13) — live
+    // SEO-state writes must resolve/regen recommendations (or carry
+    // // rec-refresh-ok).
+    'SEO-state write should resolve/regen recommendations',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -9451,5 +9455,187 @@ describe('Rule: Direct callOpenAI/callAnthropic import outside dispatcher', () =
       ),
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: SEO-state write should resolve/regen recommendations', () => {
+  const RULE = 'SEO-state write should resolve/regen recommendations';
+
+  it('flags a live updatePageState write with no rec-refresh call (reports the WRITE line)', () => {
+    const file = write(
+      uniqPath('rule-seo-rec-refresh', 'server/routes/webflow-seo-apply.ts'),
+      lines(
+        "router.post('/api/webflow/seo-pattern-apply/:siteId', async (req, res) => {",  // 1
+        "  updatePageState(ws.id, page.pageId, { status: 'live', source: 'pattern-apply' });", // 2
+        "  res.json({ ok: true });",                                                     // 3
+        "});",                                                                           // 4
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    // The hardened rule reports the precise offending write, not the route decl.
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags a recordSeoChange write with no rec-refresh call (reports the WRITE line)', () => {
+    const file = write(
+      uniqPath('rule-seo-rec-refresh', 'server/routes/webflow-editor.ts'),
+      lines(
+        "router.put('/api/webflow/pages/:pageId/seo', async (req, res) => {",            // 1
+        "  recordSeoChange(ws.id, pageId, pagePath, title, ['title'], 'editor');",       // 2
+        "  res.json({ ok: true });",                                                     // 3
+        "});",                                                                           // 4
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('does not flag when resolveRecommendationsForChange is called in the body', () => {
+    const file = write(
+      uniqPath('rule-seo-rec-refresh', 'server/routes/webflow-wired.ts'),
+      lines(
+        "router.post('/api/webflow/seo-pattern-apply/:siteId', async (req, res) => {",
+        "  updatePageState(ws.id, page.pageId, { status: 'live', source: 'pattern-apply' });",
+        "  const slugs = ids.map(id => getPageState(ws.id, id)?.slug).filter(Boolean);",
+        "  resolveRecommendationsForChange(ws.id, { affectedPages: slugs });",
+        "  res.json({ ok: true });",
+        "});",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag when generateRecommendations is called in the body', () => {
+    const file = write(
+      uniqPath('rule-seo-rec-refresh', 'server/routes/recommendations.ts'),
+      lines(
+        "router.post('/api/recommendations/:workspaceId/regen', async (req, res) => {",
+        "  updatePageState(workspaceId, resolvedPageId, { status: 'live' });",
+        "  await generateRecommendations(workspaceId);",
+        "  res.json({ ok: true });",
+        "});",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects the // rec-refresh-ok hatch on the route declaration line', () => {
+    const file = write(
+      uniqPath('rule-seo-rec-refresh', 'server/routes/webflow-draft.ts'),
+      lines(
+        "router.patch('/api/webflow/collections/:c/items/:i', async (req, res) => { // rec-refresh-ok",
+        "  updatePageState(ws.id, itemId, { status: 'live', source: 'cms-publish' });",
+        "  res.json({ ok: true });",
+        "});",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects an inline // rec-refresh-ok marker inside the handler body', () => {
+    const file = write(
+      uniqPath('rule-seo-rec-refresh', 'server/routes/webflow-hatched-body.ts'),
+      lines(
+        "router.post('/api/webflow/seo-pattern-apply/:siteId', async (req, res) => {",
+        "  updatePageState(ws.id, page.pageId, { status: 'live', source: 'pattern-apply' });",
+        "  // rec-refresh-ok — these pages are never rec-eligible",
+        "  res.json({ ok: true });",
+        "});",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag a draft (non-live) updatePageState write', () => {
+    const file = write(
+      uniqPath('rule-seo-rec-refresh', 'server/routes/webflow-cms-draft.ts'),
+      lines(
+        "router.patch('/api/webflow/collections/:c/items/:i', async (req, res) => {",
+        "  updatePageState(ws.id, itemId, { status: 'fix-proposed', source: 'cms-draft' });",
+        "  res.json({ ok: true });",
+        "});",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag files outside server/routes/', () => {
+    const file = write(
+      uniqPath('rule-seo-rec-refresh', 'server/webflow-seo-bulk-job.ts'),
+      lines(
+        "export function applyBulk() {",
+        "  updatePageState(ws.id, pageId, { status: 'live', source: 'bulk-fix' });",
+        "}",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  // ── FIX B hardening: a far-down write past the old 200-line lookahead cap must
+  //    be flagged even when an UNRELATED refresh sits in an earlier sub-branch
+  //    inside the same giant route handler (the bulk-seo-fix false-negative). ──
+  it('flags a far-down live write whose own forward window has no refresh, despite an earlier unrelated refresh in a different sub-branch', () => {
+    const filler = Array.from({ length: 250 }, (_, i) => `  // filler line ${i}`);
+    const file = write(
+      uniqPath('rule-seo-rec-refresh', 'server/routes/jobs-like.ts'),
+      lines(
+        "router.post('/api/jobs', async (req, res) => {",                 // 1
+        "  switch (type) {",                                              // 2
+        "    case 'audit': {",                                            // 3
+        "      await generateRecommendations(ws.id); // unrelated branch", // 4
+        "      break;",                                                   // 5
+        "    }",                                                          // 6
+        ...filler,                                                        // 7..256
+        "    case 'bulk-fix': {",                                         // 257
+        "      updatePageState(ws.id, pageId, { status: 'live', source: 'bulk-fix' });", // 258 — the offending write
+        "      break;",                                                   // 259
+        "    }",                                                          // 260
+        "  }",                                                            // 261
+        "});",                                                            // 262
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    // The earlier generateRecommendations (line 4) must NOT exempt the far-down
+    // write — it is in a different sub-branch and >200 lines away.
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(258);
+  });
+
+  it('does NOT flag a far-down live write when a refresh follows it in its OWN forward window', () => {
+    const filler = Array.from({ length: 250 }, (_, i) => `  // filler line ${i}`);
+    const file = write(
+      uniqPath('rule-seo-rec-refresh', 'server/routes/jobs-like-wired.ts'),
+      lines(
+        "router.post('/api/jobs', async (req, res) => {",
+        "  switch (type) {",
+        ...filler,
+        "    case 'bulk-fix': {",
+        "      updatePageState(ws.id, pageId, { status: 'live', source: 'bulk-fix' });",
+        "      resolveRecommendationsForPageIds(ws.id, [pageId]);",
+        "      break;",
+        "    }",
+        "  }",
+        "});",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags BOTH a live updatePageState and a recordSeoChange in the same route when neither is refreshed', () => {
+    const file = write(
+      uniqPath('rule-seo-rec-refresh', 'server/routes/webflow-double.ts'),
+      lines(
+        "router.put('/api/webflow/pages/:pageId/seo', async (req, res) => {", // 1
+        "  updatePageState(ws.id, pageId, { status: 'live', source: 'editor' });", // 2
+        "  recordSeoChange(ws.id, pageId, path, title, ['title'], 'editor');", // 3
+        "  res.json({ ok: true });", // 4
+        "});", // 5
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(2);
+    expect(hits.map(h => h.line).sort((a, b) => a - b)).toEqual([2, 3]);
   });
 });

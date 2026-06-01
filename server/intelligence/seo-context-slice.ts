@@ -233,5 +233,33 @@ export async function assembleSeoContext(
     }
   }
 
+  // Competitor snapshots — latest per tracked domain (Task 4.2c)
+  // Reads from competitor_snapshots table (migration 070) via the store.
+  // competitorDomains comes from workspace.competitorDomains (stored as JSON).
+  try {
+    const competitorDomains: string[] = workspace?.competitorDomains ?? [];
+    if (competitorDomains.length > 0) {
+      const { getLatestCompetitorSnapshot } = await import('../competitor-snapshot-store.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const snapshots = [];
+      for (const domain of competitorDomains.slice(0, 10)) { // cap at 10 competitors
+        const snap = getLatestCompetitorSnapshot(workspaceId, domain);
+        if (snap) {
+          snapshots.push({
+            competitorDomain: snap.competitorDomain,
+            snapshotDate: snap.snapshotDate,
+            keywordCount: snap.keywordCount,
+            organicTraffic: snap.organicTraffic,
+            topKeywords: snap.topKeywords,
+          });
+        }
+      }
+      base.competitorSnapshots = snapshots;
+    } else {
+      base.competitorSnapshots = [];
+    }
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleSeoContext: competitor snapshots optional, degrading gracefully');
+  }
+
   return base;
 }

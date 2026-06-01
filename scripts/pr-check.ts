@@ -829,6 +829,12 @@ const ROUTE_BROADCAST_LOOKAHEAD = 120;
  *  public-portal rule — admin handlers can be similarly long. */
 const ADMIN_ACTIVITY_LOOKAHEAD = 250;
 
+/** Max lines to scan forward in a route handler body when looking for a
+ *  recommendation refresh call (resolveRecommendationsForChange / regen) that
+ *  must follow a live SEO-state write. Matches the broadcast rule's generous
+ *  cap — bulk SEO-apply handlers can be long (per-page loop + post-loop block). */
+const SEO_REC_REFRESH_LOOKAHEAD = 200;
+
 /** Extracts workspace-*only* event string values from `server/ws-events.ts`.
  *  Returns WS_EVENTS values minus any values that also appear in ADMIN_EVENTS.
  *  Values that exist in both objects (e.g. 'workspace:updated', 'request:created')
@@ -3484,6 +3490,103 @@ export const CHECKS: Check[] = [
           if (/\bbroadcastToWorkspace\s*\(/.test(routeBody)) continue;
           if (/\bbroadcast\s*\(/.test(routeBody)) continue;
           hits.push({ file, line: start + 1, text: lines[start].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+
+  {
+    // Phase 4 (audit A-1/A-13) expansion rule: SEO-state writes must refresh
+    // recommendations.
+    //
+    // A route handler that flips a page to a live SEO state — `updatePageState(
+    // ..., { status: 'live', ... })` or `recordSeoChange(...)` — has changed the
+    // facts the recommendation engine ranked on. Unless the handler resolves the
+    // matching recs in-place (resolveRecommendationsForChange) or regenerates the
+    // set (generateRecommendations / queueKeywordStrategyPostUpdateFollowOns),
+    // the priority list keeps showing a "fix" the admin already applied until the
+    // next GSC-lagged full audit. This mirrors the work-orders.ts /
+    // approvals.ts apply paths wired in Phase 1.
+    //
+    // Suppress with `// rec-refresh-ok` on (or just above) the route declaration
+    // for handlers that legitimately don't touch rec-eligible pages (e.g. a draft
+    // save that is NOT yet live, or a path whose pages can never carry a rec).
+    name: 'SEO-state write should resolve/regen recommendations',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    excludeLines: ['// rec-refresh-ok'],
+    message:
+      'This route handler writes a live SEO state (updatePageState({ status: \'live\' }) ' +
+      'or recordSeoChange()) but never refreshes recommendations. The applied change ' +
+      'will linger in the priority list until the next full audit. Call ' +
+      'resolveRecommendationsForChange(workspaceId, { affectedPages }) — or the helper ' +
+      'resolveRecommendationsForPageIds(workspaceId, pageIds) which maps Webflow page IDs ' +
+      'to slugs via getPageState() for you — or regenerate the set, mirroring ' +
+      'server/work-orders.ts. Suppress with // rec-refresh-ok if this path never touches ' +
+      'rec-eligible pages (e.g. a draft save that is not yet live).',
+    severity: 'warn',
+    rationale:
+      'Live SEO-state writes that skip rec refresh leave already-fixed items on the ' +
+      'client priority list and in the AI advisor context until the GSC-lagged full audit ' +
+      'regenerates them — the closed recommendation→apply→resolve loop silently breaks.',
+    claudeMdRef: '#data-flow-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const routeRe = /\brouter\.(post|put|patch|delete)\s*\(/i;
+      const recordSeoChangeRe = /\brecordSeoChange\s*\(/;
+      const updatePageStateRe = /\bupdatePageState\s*\(/;
+      const liveStateRe = /status:\s*['"]live['"]/;
+      const refreshRe =
+        /\b(resolveRecommendationsForChange|resolveRecommendationsForPageIds|generateRecommendations|queueKeywordStrategyPostUpdateFollowOns)\s*\(/;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes('/server/routes/') && !file.includes('\\server\\routes\\')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        const routeIdx: number[] = [];
+        for (let i = 0; i < lines.length; i++) {
+          if (routeRe.test(lines[i])) routeIdx.push(i);
+        }
+        for (let k = 0; k < routeIdx.length; k++) {
+          const start = routeIdx[k];
+          if (hasHatch(lines, start, '// rec-refresh-ok')) continue;
+          // The FULL route body runs to the next router.<verb> declaration (or
+          // EOF). We scan the full body — not a fixed 200-line window — so a
+          // live-write far past the lookahead cap (e.g. the bulk-seo-fix write
+          // ~400 lines into the giant `router.post('/api/jobs')` switch) is not
+          // silently skipped. A short window also let an UNRELATED refresh in an
+          // earlier sub-branch (e.g. generateRecommendations in the seo-audit
+          // case) exempt a far-down write in a different case. To prevent that,
+          // each live-write is paired with its OWN nearby refresh: we require a
+          // refresh call (or inline // rec-refresh-ok) within SEO_REC_REFRESH_
+          // LOOKAHEAD lines AFTER that specific write, bounded by the route body.
+          const bodyEnd = k + 1 < routeIdx.length ? routeIdx[k + 1] : lines.length;
+          // Collect the line index of each live SEO-state write in this body.
+          const writeIdx: number[] = [];
+          for (let i = start; i < bodyEnd; i++) {
+            const line = lines[i];
+            if (recordSeoChangeRe.test(line)) { writeIdx.push(i); continue; }
+            // updatePageState(...) can span multiple lines; pair it with a
+            // status: 'live' in the same small call window.
+            if (updatePageStateRe.test(line)) {
+              const callWindow = lines.slice(i, Math.min(bodyEnd, i + 8)).join('\n');
+              if (liveStateRe.test(callWindow)) writeIdx.push(i);
+            }
+          }
+          if (writeIdx.length === 0) continue;
+          for (const w of writeIdx) {
+            const windowEnd = Math.min(bodyEnd, w + SEO_REC_REFRESH_LOOKAHEAD);
+            const window = lines.slice(w, windowEnd).join('\n');
+            // Inline // rec-refresh-ok near the write suppresses it (the wired
+            // handlers carry the marker next to the resolver call).
+            if (window.includes('// rec-refresh-ok')) continue;
+            // A refresh call within this write's own forward window clears it.
+            if (refreshRe.test(window)) continue;
+            hits.push({ file, line: w + 1, text: lines[w].trim() });
+          }
         }
       }
       return hits;

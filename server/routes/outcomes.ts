@@ -36,6 +36,7 @@ import type {
   TrackedAction,
 } from '../../shared/types/outcome-tracking.js';
 import { actionTypeEnum, attributionEnum, outcomeScoreEnum } from '../schemas/outcome-schemas.js';
+import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 
 const log = createLogger('outcomes');
 
@@ -290,6 +291,7 @@ router.post(
         });
 
         broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.OUTCOME_ACTION_RECORDED, { actionId: action.id });
+        invalidateIntelligenceCache(req.params.workspaceId);
         return { success: true, action } as const;
       });
       res.json(response);
@@ -360,6 +362,7 @@ router.post(
         notes: existingNotes ? `${existingNotes}\n${req.body.note}` : req.body.note,
       };
       updateActionContext(req.params.actionId, req.params.workspaceId, updatedContext);
+      invalidateIntelligenceCache(req.params.workspaceId);
       res.json({ success: true });
     } catch (err) {
       log.error({ err, workspaceId: req.params.workspaceId, actionId: req.params.actionId }, 'Failed to add note');

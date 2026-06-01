@@ -19,8 +19,11 @@ import {
   updatePageState,
   listWorkspaces,
 } from '../workspaces.js';
+import { getPageState } from '../page-edit-states.js';
+import { resolveRecommendationsForChange } from '../recommendations.js';
 import { createLogger } from '../logger.js';
 import { WS_EVENTS } from '../ws-events.js';
+import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 
 const log = createLogger('webflow-cms');
 
@@ -262,6 +265,24 @@ router.post('/api/webflow/collections/:collectionId/publish', requireWorkspaceSi
         pageIds: itemIds,
         source: 'cms-publish',
       });
+      invalidateIntelligenceCache(workspaceId);
+
+      // A live CMS-item publish resolves any recommendations covering the pages
+      // it touched, so the priority list drops them immediately (GSC-lag-free).
+      // itemIds are Webflow CMS item IDs (the page_edit_states key), but
+      // recommendation.affectedPages are SLUGS — resolve each id to its slug via
+      // page_edit_states before matching. Guarded so a resolver failure can never
+      // abort the publish response. // rec-refresh-ok
+      try {
+        const affectedSlugs = (itemIds as string[])
+          .map(id => getPageState(workspaceId, id)?.slug)
+          .filter((s): s is string => typeof s === 'string' && s.length > 0);
+        if (affectedSlugs.length > 0) {
+          resolveRecommendationsForChange(workspaceId, { affectedPages: affectedSlugs });
+        }
+      } catch (err) {
+        log.warn({ err, workspaceId }, 'Failed to resolve recommendations after CMS item publish');
+      }
     }
     res.json(result);
   } catch (err) {

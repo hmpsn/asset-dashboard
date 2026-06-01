@@ -31,9 +31,9 @@ import {
   getTokenForSite,
   getClientPortalUrl,
   updatePageState,
-  getPageState,
   clearPageState,
 } from '../workspaces.js';
+import { getPageState } from '../page-edit-states.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { resolveRecommendationsForChange } from '../recommendations.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';

@@ -10,6 +10,8 @@ import { requireWorkspaceSiteAccess } from '../auth.js';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { tryResolvePagePath, normalizePageUrl } from '../helpers.js';
+import { createLogger } from '../logger.js';
+import { resolveRecommendationsForChange } from '../recommendations.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { updatePageSeo } from '../webflow.js';
 import {
@@ -18,8 +20,10 @@ import {
   updatePageState,
 } from '../workspaces.js';
 import { WS_EVENTS } from '../ws-events.js';
+import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 
 const router = Router();
+const log = createLogger('webflow-seo-apply');
 
 // --- Bulk AI SEO Fix ---
 router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceSiteAccess({
@@ -111,6 +115,33 @@ router.post('/api/webflow/seo-pattern-apply/:siteId', requireWorkspaceSiteAccess
         `Pattern ${action} applied to ${appliedPageIds.length}/${pages.length} pages`,
         { field, action, pagesUpdated: appliedPageIds.length, totalPages: pages.length }
       );
+      invalidateIntelligenceCache(ws.id);
+
+      // A live SEO change resolves any recommendations covering the pages it
+      // touched, so the priority list drops them immediately (GSC-lag-free).
+      // recommendation.affectedPages are SLUGS, and each applied page already
+      // carries its slug in hand (pages[i] via tryResolvePagePath/slug — the same
+      // source used for recordSeoChange above, mapped by result index), so use it
+      // directly instead of round-tripping through getPageState (which would
+      // silently no-op for any pageId that has no page_edit_states slug). Guarded
+      // so a resolver failure can never abort the apply response. // rec-refresh-ok
+      try {
+        const affectedSlugs = Array.from(new Set(
+          results
+            .map((r, i) => {
+              if (!r.applied) return undefined;
+              const page = pages[i];
+              if (!page) return undefined;
+              return tryResolvePagePath(page) || (page.slug ? normalizePageUrl(page.slug) : '');
+            })
+            .filter((s): s is string => typeof s === 'string' && s.length > 0),
+        ));
+        if (affectedSlugs.length > 0) {
+          resolveRecommendationsForChange(ws.id, { affectedPages: affectedSlugs });
+        }
+      } catch (err) {
+        log.warn({ err, workspaceId: ws.id }, 'Failed to resolve recommendations after SEO pattern apply');
+      }
     }
   }
 
