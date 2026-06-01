@@ -54,6 +54,7 @@ import {
   buildKeywordStrategyRefreshSummary,
   buildKeywordStrategyUxPayload,
 } from '../keyword-strategy-ux.js';
+import { queueKeywordStrategyPostUpdateFollowOns } from '../keyword-strategy-follow-ons.js';
 export { buildStrategyIntelligenceBlock, computeOpportunityScore, shouldFetchCompetitorData } from '../keyword-strategy-generation.js';
 
 const log = createLogger('keyword-strategy');
@@ -484,6 +485,9 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAcces
     responseTopicClusters,
     responseCannibalization,
   } = applyPatch();
+  // Queue background rec regen after transaction commits (Task 1.2 — strategy PATCH must
+  // trigger recommendation regeneration so stale recs don't linger after a strategy edit).
+  queueKeywordStrategyPostUpdateFollowOns({ workspaceId: ws.id });
   if (pageMapChanged) {
     debouncedPageAnalysisInvalidate(ws.id, () => {
       invalidateIntelligenceCache(ws.id);

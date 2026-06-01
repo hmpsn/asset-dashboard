@@ -4,7 +4,8 @@
 
 import type { AnalyticsInsight, InsightType, InsightSeverity } from './analytics.js';
 import type { DiagnosticStatus } from './diagnostics.js';
-import type { KeywordStrategy, AudiencePersona, PageKeywordMap } from './workspace.js';
+import type { KeywordStrategy, AudiencePersona, PageKeywordMap, QuickWin, CannibalizationItem } from './workspace.js';
+import type { OpportunityComponent } from './recommendations.js';
 import type { BriefingSummary } from './briefing.js';
 import type { PageElementCatalog } from './page-elements.js';
 import type { SiteInventorySlice } from './site-inventory.js';
@@ -166,6 +167,52 @@ export interface SeoContextSlice {
   discoveredQuerySummary?: DiscoveredQuerySummary;
   geoVolumeLabel?: string;
   strategyHistory?: StrategyHistory;
+  /**
+   * Latest competitor snapshots from competitor_snapshots table (migration 070).
+   * One entry per tracked competitor domain with current keyword count and organic
+   * traffic. Optional — only present when competitor domains are configured and
+   * at least one snapshot exists. Advisor uses this to flag competitive gaps.
+   */
+  competitorSnapshots?: Array<{
+    competitorDomain: string;
+    snapshotDate: string;
+    keywordCount: number | null;
+    organicTraffic: number | null;
+    topKeywords: Array<{ keyword: string; position: number; volume: number }>;
+  }>;
+  /**
+   * Low-effort, high-impact keyword fixes from the quick_wins table (SI1).
+   * Carries `roiScore` so the advisor can recite grounded prioritization.
+   * Optional — only present when at least one quick win exists. Read by
+   * assembleSeoContext via listQuickWins(). Strategy-level (not per-page).
+   */
+  quickWins?: QuickWin[];
+  /**
+   * Keyword cannibalization issues from the cannibalization_issues table (SI4).
+   * Optional — only present when at least one issue exists. Read by
+   * assembleSeoContext via listCannibalizationIssues().
+   */
+  cannibalizationIssues?: CannibalizationItem[];
+  /**
+   * The resolved #1 recommendation's Opportunity Value breakdown (SI2/MW6),
+   * so the advisor recites the same explainable "why this is #1" the client sees.
+   *
+   * `emvPerWeek` is ADMIN/AI-ONLY (owner decision) — it is carried here for the
+   * admin advisor prompt (formatSeoContextSection) but MUST be stripped on every
+   * client-facing serialization. The formatter injects `components` evidence
+   * directly per the authority-layered fields rule (no format helper).
+   *
+   * Optional — undefined when no active recs exist or the rec carries no
+   * opportunity (legacy sets). Populated from loadRecommendations() +
+   * summary.topRecommendationId.
+   */
+  topOpportunity?: {
+    recommendationId: string;
+    value: number;
+    /** Admin/AI-only — never serialize to a client surface. */
+    emvPerWeek: number;
+    components: OpportunityComponent[];
+  };
 }
 
 export interface InsightsSlice {
@@ -282,12 +329,50 @@ export interface SiteHealthSlice {
     /** Root cause titles from completed reports — the AI-synthesized findings. */
     rootCauseTitles?: string[];
   }>;
+  /**
+   * Weekly metric trend from workspace_metrics_snapshots (migration 080).
+   * Surfaces the most recent week's values plus the overall snapshot count so
+   * the advisor can ground statements in the latest measured week. Optional —
+   * only present when at least one snapshot exists. (The "best week since X"
+   * anchor phrasing used in briefings is computed separately by
+   * workspace-metrics-snapshots.ts:findBestWeekSince — it is NOT a field here.)
+   */
+  weeklyMetricsTrend?: {
+    /** Most recent snapshot (newest first). */
+    latestWeek: {
+      snapshotDate: string;
+      totalClicks: number | null;
+      totalImpressions: number | null;
+      avgPosition: number | null;
+      auditScore: number | null;
+      organicTrafficValue: number | null;
+    };
+    /** Total number of snapshots in the retention window (up to 90 days). */
+    snapshotCount: number;
+  };
 }
 
 export interface ClientSignalsSlice {
   keywordFeedback: { approved: string[]; rejected: string[]; patterns: { approveRate: number; topRejectionReasons: string[] } };
   contentGapVotes: { topic: string; votes: number }[];
+  /**
+   * RAW client-entered priorities only (client_business_priorities table, migration 021).
+   * Read-only legacy field. Prompt/ranking callers MUST use `effectiveBusinessPriorities`
+   * below, which is the single authority-resolved representation (client store + admin
+   * store reconciled with precedence). There is intentionally no helper that re-formats
+   * this raw field — any such helper would bypass the admin-store merge and silently
+   * drop admin-set goals. See CLAUDE.md "Authority-layered fields".
+   */
   businessPriorities: string[];
+  /**
+   * Pre-resolved, authority-layered business priorities. Source of truth:
+   * `buildEffectiveBusinessPriorities()` (business-priorities-source.ts), which merges the
+   * CLIENT store (client_business_priorities, 021) and the ADMIN store
+   * (workspaces.business_priorities, 048) into one de-duplicated list with documented
+   * precedence: client-entered priorities first, admin-set priorities as a supplement.
+   * Intelligence-path callers (ranking, prompts) inject this DIRECTLY.
+   */
+  effectiveBusinessPriorities: string[];
   approvalPatterns: { approvalRate: number; avgResponseTime: number | null };
   recentChatTopics: string[];
   churnRisk: 'low' | 'medium' | 'high' | null;
@@ -335,6 +420,31 @@ export interface OperationalSlice {
   detectedPlaybooks?: string[];
   workOrders?: { active: number; pending: number };
   insightAcceptanceRate?: InsightAcceptanceRate | null;
+  // New in Phase 4.2
+  /**
+   * Summary of page_edit_states by status for this workspace.
+   * Allows the advisor to understand how many pages are in review, live, or
+   * needing fixes without reading the full page list.
+   * Optional — only present when the page_edit_states table is accessible.
+   */
+  pageEditStateSummary?: {
+    /** Total page states tracked. */
+    total: number;
+    /** Count per status (e.g. 'clean', 'fix-proposed', 'in-review', 'approved', 'live', 'rejected', 'issue-detected'). */
+    byStatus: Record<string, number>;
+  };
+  /**
+   * Effective subscription tier after trial promotion (migration 072 trialEndsAt).
+   * `computeEffectiveTier()` returns 'growth' for free workspaces mid-trial.
+   * Optional — only present when the workspace record can be loaded.
+   */
+  effectiveTier?: 'free' | 'growth' | 'premium';
+  /**
+   * Per-feature usage remaining this month (positive integers; Infinity → unlimited).
+   * Derived from `getUsageSummary()` in usage-tracking.ts.
+   * Optional — only present when usage-tracking is accessible.
+   */
+  usageRemaining?: Partial<Record<string, number>>;
 }
 
 /**

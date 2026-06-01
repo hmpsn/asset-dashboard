@@ -128,6 +128,7 @@ function makeClientSignals(): ClientSignalsSlice {
     keywordFeedback: { approved: ['seo tools'], rejected: ['cheap seo'], patterns: { approveRate: 0.8, topRejectionReasons: ['off-brand'] } },
     contentGapVotes: [{ topic: 'AI SEO', votes: 5 }],
     businessPriorities: ['organic growth'],
+    effectiveBusinessPriorities: ['organic growth'],
     approvalPatterns: { approvalRate: 0.75, avgResponseTime: 48 },
     recentChatTopics: ['content strategy'],
     churnRisk: 'low',

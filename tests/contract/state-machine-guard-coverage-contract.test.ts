@@ -20,6 +20,7 @@ const GUARD_SIGNALS: GuardSignal[] = [
   { entity: 'client_action', file: 'server/client-actions.ts', transitionToken: 'CLIENT_ACTION_TRANSITIONS' },
   { entity: 'briefing_draft', file: 'server/briefing-store.ts', transitionToken: 'BRIEFING_DRAFT_TRANSITIONS' },
   { entity: 'background_job', file: 'server/jobs.ts', transitionToken: 'BACKGROUND_JOB_TRANSITIONS' },
+  { entity: 'recommendation', file: 'server/recommendations.ts', transitionToken: 'RECOMMENDATION_TRANSITIONS' },
 ];
 
 function readSource(file: string): string {

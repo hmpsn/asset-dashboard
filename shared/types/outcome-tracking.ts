@@ -128,6 +128,10 @@ export interface ActionOutcome {
   deltaSummary: DeltaSummary;
   competitorContext: CompetitorContext | null;
   measuredAt: string;
+  /** Dollar value attributed to this outcome (clicks_delta × page CPC). NULL when inconclusive or no CPC data. */
+  attributedValue: number | null;
+  /** Describes how attributedValue was computed (e.g. 'clicks_delta_x_cpc'). NULL when attributedValue is NULL. */
+  valueBasis: string | null;
 }
 
 export interface PlaybookStep {

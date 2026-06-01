@@ -14,8 +14,10 @@ const h = vi.hoisted(() => {
     addActivity: vi.fn(),
     broadcastToWorkspace: vi.fn(),
     createJob: vi.fn(),
+    cancelJob: vi.fn(),
     getJob: vi.fn(),
     hasActiveJob: vi.fn(),
+    listJobs: vi.fn(),
     updateJob: vi.fn(),
     createLocalSeoRefreshPlan: vi.fn(),
     runLocalSeoRefreshJob: vi.fn(),
@@ -41,9 +43,11 @@ vi.mock('../../server/broadcast.js', () => ({
 }));
 
 vi.mock('../../server/jobs.js', () => ({
+  cancelJob: h.cancelJob,
   createJob: h.createJob,
   getJob: h.getJob,
   hasActiveJob: h.hasActiveJob,
+  listJobs: h.listJobs,
   updateJob: h.updateJob,
 }));
 
@@ -204,7 +208,7 @@ describe('mcp job action tools', () => {
   it('starts local seo refresh and handles active jobs, missing plan, and rejected runner', async () => {
     const ok = await handleJobActionTool('start_local_seo_refresh', {
       workspace_id: 'ws-1',
-      refresh_body: { force: true },
+      refresh_body: {},
     });
     expect(ok.isError).toBeUndefined();
     const payload = JSON.parse(ok.content[0].text) as { selected_market_count: number; selected_keyword_count: number };
@@ -235,6 +239,21 @@ describe('mcp job action tools', () => {
     await handleJobActionTool('start_local_seo_refresh', { workspace_id: 'ws-1', refresh_body: {} });
     await Promise.resolve();
     expect(h.updateJob).toHaveBeenCalledWith('job-1', expect.objectContaining({ status: 'error', error: 'refresh failed' }));
+  });
+
+  it('supports get_job_status, list_jobs, and cancel_job', async () => {
+    h.getJob.mockReturnValue({ id: 'job-1', workspaceId: 'ws-1', status: 'running', type: 'keyword-strategy' });
+    h.listJobs.mockReturnValue([{ id: 'job-1', workspaceId: 'ws-1', status: 'running', type: 'keyword-strategy' }]);
+    h.cancelJob.mockReturnValue({ id: 'job-1', workspaceId: 'ws-1', status: 'cancelled', type: 'keyword-strategy' });
+
+    const status = await handleJobActionTool('get_job_status', { workspace_id: 'ws-1', job_id: 'job-1' });
+    expect(status.isError).toBeUndefined();
+
+    const list = await handleJobActionTool('list_jobs', { workspace_id: 'ws-1' });
+    expect(list.isError).toBeUndefined();
+
+    const cancelled = await handleJobActionTool('cancel_job', { workspace_id: 'ws-1', job_id: 'job-1' });
+    expect(cancelled.isError).toBeUndefined();
   });
 
   it('returns unknown-tool error for unsupported job action', async () => {
@@ -366,10 +385,10 @@ describe('mcp job action tools', () => {
     });
     expect(missingLocalWorkspace.isError).toBe(true);
 
-    await handleJobActionTool('start_local_seo_refresh', {
+    const invalidBody = await handleJobActionTool('start_local_seo_refresh', {
       workspace_id: 'ws-1',
       refresh_body: null,
     });
-    expect(h.createLocalSeoRefreshPlan).toHaveBeenCalledWith('ws-1', {});
+    expect(invalidBody.isError).toBe(true);
   });
 });

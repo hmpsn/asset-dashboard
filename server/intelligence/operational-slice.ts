@@ -63,26 +63,47 @@ export async function assembleOperational(
     log.debug({ err, workspaceId }, 'assembleOperational: jobs optional, degrading gracefully');
   }
 
-  // Time saved (usage tracking)
+  // Time saved (usage tracking) + tier/entitlement (Task 4.2d)
   let timeSaved: OperationalSlice['timeSaved'] = null;
+  let effectiveTier: OperationalSlice['effectiveTier'] = undefined;
+  let usageRemaining: OperationalSlice['usageRemaining'] = undefined;
   try {
     const { getUsageSummary } = await import('../usage-tracking.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-    const { getWorkspace } = await import('../workspaces.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+    const { getWorkspace, computeEffectiveTier } = await import('../workspaces.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
     const ws: Workspace | undefined = getWorkspace(workspaceId);
-    const tier = ws?.tier ?? 'free';
-    const summary = getUsageSummary(workspaceId, tier);
+    const resolvedTier = ws ? computeEffectiveTier(ws) : 'free' as const;
+    effectiveTier = resolvedTier;
+    const summary = getUsageSummary(workspaceId, resolvedTier);
     let totalMinutes = 0;
     const byFeature: Record<string, number> = {};
+    const remaining: Record<string, number> = {};
     for (const [feature, data] of Object.entries(summary)) {
       const minutes = (data.used ?? 0) * 5;
       totalMinutes += minutes;
       if (minutes > 0) byFeature[feature] = minutes;
+      remaining[feature] = data.remaining ?? 0;
     }
     if (totalMinutes > 0) {
       timeSaved = { totalMinutes, byFeature };
     }
+    usageRemaining = remaining;
   } catch (err) {
     log.debug({ err, workspaceId }, 'assembleOperational: usage tracking optional, degrading gracefully');
+  }
+
+  // Page edit states summary (Task 4.2a)
+  let pageEditStateSummary: OperationalSlice['pageEditStateSummary'] = undefined;
+  try {
+    const { getAllPageStates } = await import('../page-edit-states.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+    const states = getAllPageStates(workspaceId);
+    const byStatus: Record<string, number> = {};
+    for (const state of Object.values(states)) {
+      const s = state.status ?? 'unknown';
+      byStatus[s] = (byStatus[s] ?? 0) + 1;
+    }
+    pageEditStateSummary = { total: Object.keys(states).length, byStatus };
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleOperational: page-edit-states optional, degrading gracefully');
   }
 
   // Approval queue
@@ -210,5 +231,8 @@ export async function assembleOperational(
     detectedPlaybooks,
     workOrders,
     insightAcceptanceRate,
+    pageEditStateSummary,
+    effectiveTier,
+    usageRemaining,
   };
 }

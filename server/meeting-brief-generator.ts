@@ -64,7 +64,7 @@ export function buildBriefPrompt(intel: WorkspaceIntelligence): string {
     : 'unknown';
   const siteScore = intel.siteHealth?.auditScore ?? 'unknown';
   const scoreDelta = intel.siteHealth?.auditScoreDelta;
-  const priorities = intel.clientSignals?.businessPriorities ?? [];
+  const priorities = intel.clientSignals?.effectiveBusinessPriorities ?? [];
   const pipeline = intel.contentPipeline;
   const strategy = intel.seoContext?.strategy;
   const localSeoBlock = intel.localSeo?.enabled && intel.localSeo.effectiveLocalSeoBlock
@@ -140,7 +140,7 @@ function buildPromptHash(intel: WorkspaceIntelligence, customPromptNotes: string
     topWins: intel.learnings?.topWins?.slice(0, 5).map(w => `${w.actionId}:${w.score}:${w.delta?.delta_percent ?? 0}`) ?? [],
     criticalIssues: intel.insights?.bySeverity?.critical,
     rankingOpportunities: intel.insights?.byType?.ranking_opportunity?.length,
-    priorities: intel.clientSignals?.businessPriorities ?? [],
+    priorities: intel.clientSignals?.effectiveBusinessPriorities ?? [],
     siteKeywords: intel.seoContext?.strategy?.siteKeywords?.slice(0, 5) ?? [],
     localSeo: intel.localSeo ? {
       enabled: intel.localSeo.enabled,

@@ -91,7 +91,7 @@ function shouldUseSmartRanking(
     || seoContext?.brandVoice
     || seoContext?.personas?.length
     || seoContext?.strategy
-    || clientSignals?.businessPriorities?.length
+    || clientSignals?.effectiveBusinessPriorities?.length
     || clientSignals?.keywordFeedback?.approved?.length
     || clientSignals?.keywordFeedback?.rejected?.length
     || clientSignals?.recentChatTopics?.length
@@ -115,7 +115,7 @@ function buildScoringContext(
     declinedKeywords: getDeclinedKeywords(workspaceId),
     requestedKeywords: getRequestedKeywords(workspaceId),
     approvedKeywords: clientSignals?.keywordFeedback.approved ?? [],
-    businessPriorities: clientSignals?.businessPriorities ?? [],
+    businessPriorities: clientSignals?.effectiveBusinessPriorities ?? [],
     contentGapTopics: (clientSignals?.contentGapVotes ?? []).map(vote => vote.topic),
     recentChatTopics: clientSignals?.recentChatTopics ?? [],
     rejectionReasons: clientSignals?.keywordFeedback.patterns.topRejectionReasons ?? [],
@@ -128,7 +128,7 @@ function buildScoringContext(
       seoContext?.knowledgeBase ?? '',
       seoContext?.brandVoice ?? '',
       ...(seoContext?.personas ?? []).map(persona => `${persona.name} ${persona.painPoints?.join(' ') ?? ''} ${persona.goals?.join(' ') ?? ''}`),
-      ...(clientSignals?.businessPriorities ?? []),
+      ...(clientSignals?.effectiveBusinessPriorities ?? []),
       ...(clientSignals?.recentChatTopics ?? []),
     ],
   };
@@ -168,7 +168,7 @@ function scoreKeywordCandidate(candidate: KeywordCandidate, ctx: CandidateScorin
     declinedKeywords: ctx.declinedKeywords,
     requestedKeywords: ctx.requestedKeywords,
     approvedKeywords: ctx.approvedKeywords,
-    businessPriorities: ctx.businessPriorities,
+    businessPriorities: ctx.businessPriorities, // businesspriorities-ok — ctx.businessPriorities is CandidateScoringContext, not clientSignals
     businessTerms: ctx.businessTerms,
     contentGapTopics: ctx.contentGapTopics,
     recentChatTopics: ctx.recentChatTopics,

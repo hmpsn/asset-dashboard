@@ -1,13 +1,20 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { Tool } from '@modelcontextprotocol/sdk/types';
 import {
+  createContentRequestInputSchema,
+  deleteBriefInputSchema,
+  deletePostInputSchema,
+  getContentRequestInputSchema,
   getBriefInputSchema,
   getPostInputSchema,
   layoutSchema,
+  listPostVersionsInputSchema,
   listBriefsInputSchema,
+  listContentRequestsInputSchema,
   listPostsInputSchema,
   prepareBriefContextInputSchema,
   preparePostContextInputSchema,
+  revertPostVersionInputSchema,
   saveBriefInputSchema,
   savePostInputSchema,
   sendToClientInputSchema,
@@ -17,9 +24,22 @@ import {
 import type { ContentBrief, GeneratedPost } from '../../../shared/types/content.js';
 import { addActivity } from '../../activity-log.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
-import { getBrief, listBriefs, updateBrief, upsertBrief } from '../../content-brief.js';
-import { createContentRequest, getContentRequest, updateContentRequest } from '../../content-requests.js';
-import { getPost, listPosts, savePost, updatePostField } from '../../content-posts-db.js';
+import { deleteBrief, getBrief, listBriefs, updateBrief, upsertBrief } from '../../content-brief.js';
+import {
+  createContentRequest,
+  getContentRequest,
+  listContentRequests,
+  updateContentRequest,
+} from '../../content-requests.js';
+import {
+  deletePost,
+  getPost,
+  listPostVersions,
+  listPosts,
+  revertToVersion,
+  savePost,
+  updatePostField,
+} from '../../content-posts-db.js';
 import { countHtmlWords } from '../../content-posts-ai.js';
 import { invalidateContentPipelineIntelligence } from '../../intelligence-freshness.js';
 import { buildContentGenerationContext } from '../../intelligence/generation-context-builders.js';
@@ -42,7 +62,7 @@ const log = createLogger('mcp-tools-content-actions');
 const briefContentSchema = saveBriefInputSchema.shape.content;
 const postContentSchema = savePostInputSchema.shape.content;
 
-type PostPatchUpdates = Exclude<typeof updatePostInputSchema['_output'], { mode: 'replace' }>['updates'];
+type PostPatchUpdates = NonNullable<typeof updatePostInputSchema['_output']['updates']>;
 
 interface BriefRequestPayload {
   topic: string;
@@ -125,8 +145,43 @@ export const contentActionTools: Tool[] = [
   },
   {
     name: 'send_to_client',
-    description: 'Create or update client-facing content requests from a saved brief/post handle.',
+    description: 'Create or update client-facing content requests from a saved brief/post handle or id.',
     inputSchema: toMcpJsonSchema(sendToClientInputSchema),
+  },
+  {
+    name: 'list_content_requests',
+    description: 'List content topic requests for a workspace.',
+    inputSchema: toMcpJsonSchema(listContentRequestsInputSchema),
+  },
+  {
+    name: 'get_content_request',
+    description: 'Get a single content topic request by id.',
+    inputSchema: toMcpJsonSchema(getContentRequestInputSchema),
+  },
+  {
+    name: 'create_content_request',
+    description: 'Create a content topic request in the workspace request pipeline.',
+    inputSchema: toMcpJsonSchema(createContentRequestInputSchema),
+  },
+  {
+    name: 'delete_brief',
+    description: 'Delete a content brief by id.',
+    inputSchema: toMcpJsonSchema(deleteBriefInputSchema),
+  },
+  {
+    name: 'delete_post',
+    description: 'Delete a generated post by id.',
+    inputSchema: toMcpJsonSchema(deletePostInputSchema),
+  },
+  {
+    name: 'list_post_versions',
+    description: 'List historical versions for a generated post.',
+    inputSchema: toMcpJsonSchema(listPostVersionsInputSchema),
+  },
+  {
+    name: 'revert_post_version',
+    description: 'Revert a post back to a selected historical version.',
+    inputSchema: toMcpJsonSchema(revertPostVersionInputSchema),
   },
 ];
 
@@ -253,17 +308,29 @@ async function handleListBriefs(
 ): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
   const parsed = listBriefsInputSchema.safeParse(args);
   if (!parsed.success) return zodErrorToMcp(parsed.error);
-  const { workspace_id: workspaceId, limit } = parsed.data;
+  const { workspace_id: workspaceId, limit, status, page_type: pageType } = parsed.data;
   const workspace = requireWorkspace(workspaceId);
   if ('isError' in workspace) return workspace;
 
+  const requestStatusByBrief = new Map<string, { status: string; updatedAt: string }>();
+  for (const request of listContentRequests(workspaceId)) {
+    if (!request.briefId) continue;
+    const existing = requestStatusByBrief.get(request.briefId);
+    if (!existing || request.updatedAt > existing.updatedAt) {
+      requestStatusByBrief.set(request.briefId, { status: request.status, updatedAt: request.updatedAt });
+    }
+  }
+
   const rows = listBriefs(workspaceId)
+    .filter((brief) => (pageType ? brief.pageType === pageType : true))
+    .filter((brief) => (status ? requestStatusByBrief.get(brief.id)?.status === status : true))
     .slice(0, limit ?? 50)
     .map((brief) => ({
       brief_id: brief.id,
       target_keyword: brief.targetKeyword,
       suggested_title: brief.suggestedTitle,
       page_type: brief.pageType ?? null,
+      status: requestStatusByBrief.get(brief.id)?.status ?? null,
       created_at: brief.createdAt,
       revision: computeRevisionToken(buildBriefEditablePayload(brief)),
     }));
@@ -313,6 +380,7 @@ async function handleUpdateBrief(
   let updates: Partial<Omit<ContentBrief, 'id' | 'workspaceId' | 'createdAt'>>;
   if (parsed.data.mode === 'patch') {
     const patch = parsed.data.updates;
+    if (!patch) return mcpError('Invalid patch payload: updates is required when mode is patch');
     updates = {
       ...(patch.targetKeyword !== undefined ? { targetKeyword: patch.targetKeyword } : {}),
       ...(patch.secondaryKeywords !== undefined ? { secondaryKeywords: patch.secondaryKeywords } : {}),
@@ -335,10 +403,12 @@ async function handleUpdateBrief(
         : {}),
     };
   } else {
+    const replacement = parsed.data.content;
+    if (!replacement) return mcpError('Invalid replace payload: content is required when mode is replace');
     updates = {
       ...(buildBriefEditablePayload(existing) as Partial<Omit<ContentBrief, 'id' | 'workspaceId' | 'createdAt'>>),
-      ...parsed.data.content,
-      outline: parsed.data.content.outline.map(section => ({
+      ...replacement,
+      outline: replacement.outline.map(section => ({
         ...section,
         notes: section.notes ?? '',
       })),
@@ -379,11 +449,14 @@ async function handleListPosts(
 ): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
   const parsed = listPostsInputSchema.safeParse(args);
   if (!parsed.success) return zodErrorToMcp(parsed.error);
-  const { workspace_id: workspaceId, limit } = parsed.data;
+  const { workspace_id: workspaceId, limit, status, page_type: pageType } = parsed.data;
   const workspace = requireWorkspace(workspaceId);
   if ('isError' in workspace) return workspace;
+  const briefPageTypeById = new Map(listBriefs(workspaceId).map(brief => [brief.id, brief.pageType ?? null]));
 
   const rows = listPosts(workspaceId)
+    .filter((post) => (status ? post.status === status : true))
+    .filter((post) => (pageType ? briefPageTypeById.get(post.briefId) === pageType : true))
     .slice(0, limit ?? 50)
     .map((post) => ({
       post_id: post.id,
@@ -391,6 +464,7 @@ async function handleListPosts(
       title: post.title,
       target_keyword: post.targetKeyword,
       status: post.status,
+      page_type: briefPageTypeById.get(post.briefId) ?? null,
       updated_at: post.updatedAt,
       revision: computeRevisionToken(buildPostEditablePayload(post)),
     }));
@@ -440,6 +514,7 @@ async function handleUpdatePost(
   const updates: Partial<Omit<GeneratedPost, 'id' | 'workspaceId' | 'createdAt'>> = {};
   if (parsed.data.mode === 'patch') {
     const patch = parsed.data.updates;
+    if (!patch) return mcpError('Invalid patch payload: updates is required when mode is patch');
     if (patch.title !== undefined) updates.title = patch.title;
     if (patch.metaDescription !== undefined) updates.metaDescription = patch.metaDescription;
     if (patch.introduction !== undefined) updates.introduction = patch.introduction;
@@ -460,6 +535,7 @@ async function handleUpdatePost(
     }
   } else {
     const replacement = parsed.data.content;
+    if (!replacement) return mcpError('Invalid replace payload: content is required when mode is replace');
     updates.title = replacement.title;
     updates.metaDescription = replacement.metaDescription;
     updates.introduction = replacement.introduction;
@@ -832,27 +908,310 @@ function ensurePostRequest(workspaceId: string, post: GeneratedPost, note: strin
   return request.id;
 }
 
+async function handleListContentRequests(
+  args: Record<string, unknown>,
+): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
+  const parsed = listContentRequestsInputSchema.safeParse(args);
+  if (!parsed.success) return zodErrorToMcp(parsed.error);
+  const { workspace_id: workspaceId, limit } = parsed.data;
+  const workspace = requireWorkspace(workspaceId);
+  if ('isError' in workspace) return workspace;
+
+  const requests = listContentRequests(workspaceId)
+    .slice(0, limit ?? 50)
+    .map((request) => ({
+      request_id: request.id,
+      topic: request.topic,
+      target_keyword: request.targetKeyword,
+      status: request.status,
+      priority: request.priority,
+      service_type: request.serviceType ?? null,
+      page_type: request.pageType ?? null,
+      brief_id: request.briefId ?? null,
+      post_id: request.postId ?? null,
+      requested_at: request.requestedAt,
+      updated_at: request.updatedAt,
+    }));
+
+  return mcpSuccess({
+    requests,
+    dashboard_url: buildDashboardUrl(workspaceId, 'content'),
+  });
+}
+
+async function handleGetContentRequestById(
+  args: Record<string, unknown>,
+): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
+  const parsed = getContentRequestInputSchema.safeParse(args);
+  if (!parsed.success) return zodErrorToMcp(parsed.error);
+  const { workspace_id: workspaceId, request_id: requestId } = parsed.data;
+  const workspace = requireWorkspace(workspaceId);
+  if ('isError' in workspace) return workspace;
+
+  const request = getContentRequest(workspaceId, requestId);
+  if (!request) return mcpError(`Content request not found: ${requestId}`);
+
+  return mcpSuccess({
+    request,
+    dashboard_url: buildDashboardUrl(workspaceId, 'content'),
+  });
+}
+
+async function handleCreateContentRequest(
+  args: Record<string, unknown>,
+): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
+  const parsed = createContentRequestInputSchema.safeParse(args);
+  if (!parsed.success) return zodErrorToMcp(parsed.error);
+  const {
+    workspace_id: workspaceId,
+    topic,
+    target_keyword: targetKeyword,
+    intent,
+    priority,
+    rationale,
+    client_note: clientNote,
+    source,
+    service_type: serviceType,
+    page_type: pageType,
+    initial_status: initialStatus,
+    target_page_id: targetPageId,
+    target_page_slug: targetPageSlug,
+    dedupe,
+  } = parsed.data;
+  const workspace = requireWorkspace(workspaceId);
+  if ('isError' in workspace) return workspace;
+  const dedupeEnabled = dedupe !== false;
+  const existingMatchingRequest = dedupeEnabled
+    ? listContentRequests(workspaceId).find((item) => item.targetKeyword === targetKeyword && item.status !== 'declined')
+    : undefined;
+
+  const request = createContentRequest(workspaceId, {
+    topic,
+    targetKeyword,
+    intent: intent ?? 'informational',
+    priority: priority ?? 'medium',
+    rationale: rationale ?? `Content request for "${targetKeyword}"`,
+    clientNote,
+    source: source ?? 'strategy',
+    serviceType: serviceType ?? 'brief_only',
+    pageType: pageType ?? 'blog',
+    initialStatus: initialStatus ?? 'requested',
+    targetPageId,
+    targetPageSlug,
+    dedupe,
+  });
+  const deduped = !!existingMatchingRequest && existingMatchingRequest.id === request.id;
+
+  if (!deduped) {
+    invalidateContentPipelineIntelligence(workspaceId);
+    broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_REQUEST_CREATED, {
+      id: request.id,
+      topic: request.topic,
+    });
+    addActivity(
+      workspaceId,
+      'content_requested',
+      `MCP requested topic: "${request.topic}"`,
+      `Keyword: "${request.targetKeyword}" · Priority: ${request.priority}`,
+      {
+        source: 'mcp-chat',
+        requestId: request.id,
+        action: 'mcp_content_request_created',
+      },
+    );
+  }
+
+  return mcpSuccess({
+    ok: true,
+    created: !deduped,
+    deduped,
+    request_id: request.id,
+    request,
+    dashboard_url: buildDashboardUrl(workspaceId, 'content'),
+  });
+}
+
+async function handleDeleteBrief(
+  args: Record<string, unknown>,
+): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
+  const parsed = deleteBriefInputSchema.safeParse(args);
+  if (!parsed.success) return zodErrorToMcp(parsed.error);
+  const { workspace_id: workspaceId, brief_id: briefId } = parsed.data;
+  const workspace = requireWorkspace(workspaceId);
+  if ('isError' in workspace) return workspace;
+
+  const existing = getBrief(workspaceId, briefId);
+  if (!existing) return mcpError(`Brief not found: ${briefId}`);
+
+  deleteBrief(workspaceId, briefId);
+  invalidateContentPipelineIntelligence(workspaceId);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, {
+    action: 'mcp_brief_deleted',
+    briefId,
+    deleted: true,
+  });
+  addActivity(
+    workspaceId,
+    'content_updated',
+    `Deleted content brief "${existing.suggestedTitle || existing.targetKeyword}"`,
+    undefined,
+    {
+      source: 'mcp-chat',
+      briefId,
+      action: 'mcp_brief_deleted',
+    },
+  );
+
+  return mcpSuccess({
+    ok: true,
+    brief_id: briefId,
+    deleted: true,
+    dashboard_url: buildDashboardUrl(workspaceId, 'content'),
+  });
+}
+
+async function handleDeletePost(
+  args: Record<string, unknown>,
+): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
+  const parsed = deletePostInputSchema.safeParse(args);
+  if (!parsed.success) return zodErrorToMcp(parsed.error);
+  const { workspace_id: workspaceId, post_id: postId } = parsed.data;
+  const workspace = requireWorkspace(workspaceId);
+  if ('isError' in workspace) return workspace;
+
+  const existing = getPost(workspaceId, postId);
+  if (!existing) return mcpError(`Post not found: ${postId}`);
+
+  deletePost(workspaceId, postId);
+  invalidateContentPipelineIntelligence(workspaceId);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.POST_UPDATED, {
+    action: 'mcp_post_deleted',
+    postId,
+    deleted: true,
+  });
+  addActivity(
+    workspaceId,
+    'content_updated',
+    `Deleted post "${existing.title}"`,
+    undefined,
+    {
+      source: 'mcp-chat',
+      postId,
+      action: 'mcp_post_deleted',
+    },
+  );
+
+  return mcpSuccess({
+    ok: true,
+    post_id: postId,
+    deleted: true,
+    dashboard_url: buildDashboardUrl(workspaceId, 'content'),
+  });
+}
+
+async function handleListPostVersions(
+  args: Record<string, unknown>,
+): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
+  const parsed = listPostVersionsInputSchema.safeParse(args);
+  if (!parsed.success) return zodErrorToMcp(parsed.error);
+  const { workspace_id: workspaceId, post_id: postId, limit } = parsed.data;
+  const workspace = requireWorkspace(workspaceId);
+  if ('isError' in workspace) return workspace;
+
+  const post = getPost(workspaceId, postId);
+  if (!post) return mcpError(`Post not found: ${postId}`);
+
+  const versions = listPostVersions(workspaceId, postId)
+    .slice(0, limit ?? 50)
+    .map((version) => ({
+      version_id: version.id,
+      version_number: version.versionNumber,
+      trigger: version.trigger,
+      trigger_detail: version.triggerDetail,
+      total_word_count: version.totalWordCount,
+      created_at: version.createdAt,
+    }));
+
+  return mcpSuccess({
+    post_id: postId,
+    versions,
+    dashboard_url: buildDashboardUrl(workspaceId, 'content'),
+  });
+}
+
+async function handleRevertPostVersion(
+  args: Record<string, unknown>,
+): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
+  const parsed = revertPostVersionInputSchema.safeParse(args);
+  if (!parsed.success) return zodErrorToMcp(parsed.error);
+  const { workspace_id: workspaceId, post_id: postId, version_id: versionId } = parsed.data;
+  const workspace = requireWorkspace(workspaceId);
+  if ('isError' in workspace) return workspace;
+
+  const reverted = revertToVersion(workspaceId, postId, versionId);
+  if (!reverted) return mcpError(`Post or version not found for post ${postId}`);
+
+  invalidateContentPipelineIntelligence(workspaceId);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.POST_UPDATED, {
+    action: 'mcp_post_reverted',
+    postId: reverted.id,
+    versionId,
+  });
+  addActivity(
+    workspaceId,
+    'post_reverted',
+    `Reverted post "${reverted.title}" to version ${versionId}`,
+    undefined,
+    {
+      source: 'mcp-chat',
+      postId: reverted.id,
+      versionId,
+      action: 'mcp_post_reverted',
+    },
+  );
+
+  return mcpSuccess({
+    ok: true,
+    post_id: reverted.id,
+    version_id: versionId,
+    revision: computeRevisionToken(buildPostEditablePayload(reverted)),
+    post: reverted,
+    dashboard_url: buildDashboardUrl(workspaceId, 'content'),
+  });
+}
+
 async function handleSendToClient(
   args: Record<string, unknown>,
 ): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
   const parsed = sendToClientInputSchema.safeParse(args);
   if (!parsed.success) return zodErrorToMcp(parsed.error);
 
-  const { workspace_id: workspaceId, brief_handle: briefHandle, post_handle: postHandle, note } = parsed.data;
+  const {
+    workspace_id: workspaceId,
+    brief_handle: briefHandle,
+    post_handle: postHandle,
+    brief_id: briefId,
+    post_id: postId,
+    note,
+  } = parsed.data;
   const workspace = requireWorkspace(workspaceId);
   if ('isError' in workspace) return workspace;
 
   try {
-    if (briefHandle) {
-      const payload = consumeHandle<BriefSavedPayload>(briefHandle, 'brief', workspaceId);
-      const brief = getBrief(workspaceId, payload.briefId);
-      if (!brief) return mcpError(`Brief not found: ${payload.briefId}`);
+    if (briefHandle || briefId) {
+      let payload: BriefSavedPayload | null = null;
+      if (briefHandle) {
+        payload = consumeHandle<BriefSavedPayload>(briefHandle, 'brief', workspaceId);
+      }
+      const resolvedBriefId = payload?.briefId ?? briefId!;
+      const brief = getBrief(workspaceId, resolvedBriefId);
+      if (!brief) return mcpError(`Brief not found: ${resolvedBriefId}`);
 
-      const requestId = payload.parentRequestId && getContentRequest(workspaceId, payload.parentRequestId)
+      const requestId = payload?.parentRequestId && getContentRequest(workspaceId, payload.parentRequestId)
         ? payload.parentRequestId
         : ensureBriefRequest(workspaceId, brief, note);
 
-      if (requestId === payload.parentRequestId) {
+      if (requestId === payload?.parentRequestId) {
         updateContentRequest(workspaceId, requestId, {
           briefId: brief.id,
           status: 'client_review',
@@ -860,7 +1219,7 @@ async function handleSendToClient(
         });
       }
 
-      const requestEvent = requestId === payload.parentRequestId
+      const requestEvent = requestId === payload?.parentRequestId
         ? WS_EVENTS.CONTENT_REQUEST_UPDATE
         : WS_EVENTS.CONTENT_REQUEST_CREATED;
       invalidateContentPipelineIntelligence(workspaceId);
@@ -891,15 +1250,19 @@ async function handleSendToClient(
       });
     }
 
-    const payload = consumeHandle<PostSavedPayload>(postHandle!, 'post', workspaceId);
-    const post = getPost(workspaceId, payload.postId);
-    if (!post) return mcpError(`Post not found: ${payload.postId}`);
+    let payload: PostSavedPayload | null = null;
+    if (postHandle) {
+      payload = consumeHandle<PostSavedPayload>(postHandle, 'post', workspaceId);
+    }
+    const resolvedPostId = payload?.postId ?? postId!;
+    const post = getPost(workspaceId, resolvedPostId);
+    if (!post) return mcpError(`Post not found: ${resolvedPostId}`);
 
-    const requestId = payload.parentRequestId && getContentRequest(workspaceId, payload.parentRequestId)
+    const requestId = payload?.parentRequestId && getContentRequest(workspaceId, payload.parentRequestId)
       ? payload.parentRequestId
       : ensurePostRequest(workspaceId, post, note);
 
-    if (requestId === payload.parentRequestId) {
+    if (requestId === payload?.parentRequestId) {
       updateContentRequest(workspaceId, requestId, {
         briefId: post.briefId,
         postId: post.id,
@@ -908,7 +1271,7 @@ async function handleSendToClient(
       });
     }
 
-    const requestEvent = requestId === payload.parentRequestId
+    const requestEvent = requestId === payload?.parentRequestId
       ? WS_EVENTS.CONTENT_REQUEST_UPDATE
       : WS_EVENTS.CONTENT_REQUEST_CREATED;
     invalidateContentPipelineIntelligence(workspaceId);
@@ -959,5 +1322,12 @@ export async function handleContentActionTool(
   if (name === 'prepare_post_context') return handlePreparePostContext(args);
   if (name === 'save_post') return handleSavePost(args);
   if (name === 'send_to_client') return handleSendToClient(args);
+  if (name === 'list_content_requests') return handleListContentRequests(args);
+  if (name === 'get_content_request') return handleGetContentRequestById(args);
+  if (name === 'create_content_request') return handleCreateContentRequest(args);
+  if (name === 'delete_brief') return handleDeleteBrief(args);
+  if (name === 'delete_post') return handleDeletePost(args);
+  if (name === 'list_post_versions') return handleListPostVersions(args);
+  if (name === 'revert_post_version') return handleRevertPostVersion(args);
   return mcpError(`Unknown content action tool: ${name}`);
 }

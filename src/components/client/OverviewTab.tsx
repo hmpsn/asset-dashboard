@@ -1,15 +1,16 @@
 import {
   AlertTriangle, Users, MousePointerClick, Eye, BarChart3, Shield, Target,
-  Sparkles, Activity, FileText, Search,
+  Sparkles, Activity, FileText, Search, Zap, ArrowRight,
 } from 'lucide-react';
 import { MonthlyDigest } from './MonthlyDigest';
 import { IntelligenceSummaryCard } from './IntelligenceSummaryCard';
 import { HealthScoreCard } from './HealthScoreCard';
 import { PredictionShowcaseCard } from './PredictionShowcaseCard';
 import { useClientIntelligence } from '../../hooks/client';
+import { useRecommendationSet } from '../../hooks/useRecommendations';
 import type { Tier } from '../ui/TierGate';
 import { useNavigate } from 'react-router-dom';
-import { StatCard, MetricRing, Icon, Button, ClickableRow, SectionCard } from '../ui';
+import { StatCard, MetricRing, Icon, Button, ClickableRow, SectionCard, Badge } from '../ui';
 import { Explainer } from './SeoGlossary';
 import { useBetaMode } from './BetaContext';
 import { InsightsDigest } from './InsightsDigest';
@@ -87,6 +88,20 @@ export function OverviewTab({
   const navigate = useNavigate();
   const betaMode = useBetaMode();
   const { data: clientIntel } = useClientIntelligence(workspaceId);
+  // useRecommendationSet shares the same React Query cache key as InsightsEngine
+  // so loading the Health tab first means this is already warm — no extra fetch.
+  const { data: recSet } = useRecommendationSet(workspaceId);
+
+  // Resolve the single reconciled #1 priority from the ranked summary pointer.
+  // topRecommendationId is set by computeRecommendationSummary after the full
+  // sortRecommendations pass, so it always agrees with the Health tab ordering.
+  const topRecId = recSet?.summary?.topRecommendationId ?? null;
+  const topRec = topRecId != null
+    // Defensive: only render the #1 card when the rec is still active.
+    // updateRecommendationStatus now recomputes the summary on every status flip,
+    // but guard here in case a cached summary still points at a completed/dismissed rec.
+    ? (recSet?.recommendations.find(r => r.id === topRecId && r.status !== 'completed' && r.status !== 'dismissed') ?? null)
+    : null;
 
   // ── client-briefing-v2 magazine layout (Phase 2) ─────────────────────────
   // When the flag is on, replace the entire overview body with the
@@ -251,6 +266,66 @@ export function OverviewTab({
         </div>
       );
     })()}
+
+    {/* #1 Priority — single reconciled top recommendation from the ranked engine.
+        topRecommendationId is set after the full sort (tier → impactScore → intent)
+        so this always agrees with what the Health tab shows at position 1. */}
+    {topRec && (
+      <ClickableRow
+        onClick={() => navigate(clientPath(workspaceId, 'health', betaMode))}
+        className="bg-gradient-to-r from-red-600/8 via-[var(--surface-2)] to-amber-600/8 border border-red-500/20 px-4 py-3"
+        style={{ borderRadius: 'var(--radius-signature)' }}
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-red-500/12 border border-red-500/20 flex items-center justify-center flex-shrink-0">
+            <Icon as={Zap} size="md" className="text-accent-danger" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="t-caption-sm font-semibold text-accent-danger uppercase tracking-wider">Your #1 priority</span>
+              {/* Relative ROI badge — opportunity.value (0-100). Blue = data per the Four Laws.
+                  NEVER show emvPerWeek (admin/AI-only; stripped at the public boundary). */}
+              {topRec.opportunity && (
+                <Badge label={`ROI ${Math.round(topRec.opportunity.value)}`} tone="blue" variant="outline" shape="pill" />
+              )}
+            </div>
+            <div className="t-page font-medium text-[var(--brand-text-bright)] truncate">{topRec.title}</div>
+            <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 line-clamp-1">{topRec.insight}</div>
+          </div>
+          <Icon as={ArrowRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
+        </div>
+        {/* "Why this is #1" breakdown — rendered from opportunity.components when present.
+            Relative contribution bars (blue = data). Graceful: legacy recs without an
+            opportunity simply omit this block. No raw $ — emvPerWeek is admin/AI-only. */}
+        {topRec.opportunity && topRec.opportunity.components.length > 0 && (() => {
+          const components = [...topRec.opportunity.components]
+            .sort((a, b) => b.contribution - a.contribution)
+            .slice(0, 3);
+          const maxContribution = Math.max(...components.map(c => c.contribution), 0.0001);
+          return (
+            <div className="mt-2.5 pt-2.5 border-t border-[var(--brand-border)]/40">
+              <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1.5">Why this is your top priority</div>
+              <div className="flex flex-col gap-1.5">
+                {components.map((c, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <div className="w-20 flex-shrink-0">
+                      <span className="t-caption-sm font-medium text-[var(--brand-text)] capitalize">{c.dimension}</span>
+                    </div>
+                    <div className="flex-1 min-w-0 h-1.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)] overflow-hidden">
+                      <div
+                        className="h-full rounded-[var(--radius-pill)] bg-blue-500"
+                        style={{ width: `${Math.max(6, Math.round((c.contribution / maxContribution) * 100))}%` }}
+                      />
+                    </div>
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] truncate flex-1 min-w-0">{c.evidence}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+      </ClickableRow>
+    )}
 
     {/* Primary CTA Banner - contextual next action */}
     {(() => {

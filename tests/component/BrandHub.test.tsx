@@ -202,7 +202,7 @@ describe('BrandHub', () => {
     renderBrandHub();
     await waitFor(() => {
       expect(
-        screen.getByDisplayValue('Professional and approachable.')
+        screen.getByText('Professional and approachable.')
       ).toBeInTheDocument();
     });
   });
@@ -241,7 +241,7 @@ describe('BrandHub', () => {
     mockUpdate.mockResolvedValue({});
     renderBrandHub();
     await waitFor(() => {
-      expect(screen.getByDisplayValue('Professional and approachable.')).toBeInTheDocument();
+      expect(screen.getByText('Professional and approachable.')).toBeInTheDocument();
     });
     fireEvent.click(screen.getByRole('button', { name: /save brand voice/i }));
     await waitFor(() => {
@@ -255,7 +255,7 @@ describe('BrandHub', () => {
   it('shows toast on successful Save Brand Voice', async () => {
     mockUpdate.mockResolvedValue({});
     renderBrandHub();
-    await waitFor(() => screen.getByDisplayValue('Professional and approachable.'));
+    await waitFor(() => screen.getByText('Professional and approachable.'));
     fireEvent.click(screen.getByRole('button', { name: /save brand voice/i }));
     await waitFor(() => {
       expect(toastMock).toHaveBeenCalledWith('Brand voice saved');
@@ -265,7 +265,7 @@ describe('BrandHub', () => {
   it('shows error toast when Save Brand Voice fails', async () => {
     mockUpdate.mockRejectedValueOnce(new Error('Network error'));
     renderBrandHub();
-    await waitFor(() => screen.getByDisplayValue('Professional and approachable.'));
+    await waitFor(() => screen.getByText('Professional and approachable.'));
     fireEvent.click(screen.getByRole('button', { name: /save brand voice/i }));
     await waitFor(() => {
       expect(toastMock).toHaveBeenCalledWith('Failed to save brand voice', 'error');
@@ -275,7 +275,7 @@ describe('BrandHub', () => {
   it('shows knowledge base textarea populated from workspace data', async () => {
     renderBrandHub();
     await waitFor(() => {
-      expect(screen.getByDisplayValue('We do plumbing and HVAC.')).toBeInTheDocument();
+      expect(screen.getByText('We do plumbing and HVAC.')).toBeInTheDocument();
     });
   });
 

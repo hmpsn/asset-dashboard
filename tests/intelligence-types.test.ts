@@ -91,6 +91,7 @@ describe('Intelligence types', () => {
       keywordFeedback: { approved: ['kw1'], rejected: ['kw2'], patterns: { approveRate: 0.8, topRejectionReasons: ['low volume'] } },
       contentGapVotes: [{ topic: 'AI', votes: 3 }],
       businessPriorities: ['Growth'],
+      effectiveBusinessPriorities: ['Growth', 'Grow MRR'],
       approvalPatterns: { approvalRate: 0.85, avgResponseTime: 48 },
       recentChatTopics: ['rankings'],
       churnRisk: 'low',

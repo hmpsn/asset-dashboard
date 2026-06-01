@@ -88,7 +88,7 @@ function makeIntel(overrides: Record<string, unknown> = {}): Record<string, unkn
       overallWinRate: 0.56,
       topWins: [{ actionId: 'a1', actionType: 'content_published', pageUrl: '/seo', targetKeyword: 'seo agency', delta: { delta_percent: 12.3 }, score: 90 }],
     },
-    clientSignals: { businessPriorities: ['Grow local leads'] },
+    clientSignals: { businessPriorities: ['Grow local leads'], effectiveBusinessPriorities: ['Grow local leads'] },
     seoContext: { strategy: { siteKeywords: ['seo agency', 'local seo'] } },
     localSeo: {
       enabled: true,

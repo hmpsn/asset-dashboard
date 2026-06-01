@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   listJobs: vi.fn(),
   getUsageSummary: vi.fn(),
   getWorkspace: vi.fn(),
+  computeEffectiveTier: vi.fn(),
+  getAllPageStates: vi.fn(),
   listBatches: vi.fn(),
   getClientActionQueueStats: vi.fn(),
   loadRecommendations: vi.fn(),
@@ -39,6 +41,11 @@ vi.mock('../../server/usage-tracking.js', () => ({
 
 vi.mock('../../server/workspaces.js', () => ({
   getWorkspace: mocks.getWorkspace,
+  computeEffectiveTier: mocks.computeEffectiveTier,
+}));
+
+vi.mock('../../server/page-edit-states.js', () => ({
+  getAllPageStates: mocks.getAllPageStates,
 }));
 
 vi.mock('../../server/approvals.js', () => ({
@@ -103,11 +110,16 @@ beforeEach(() => {
     { status: 'completed' },
   ]);
 
-  mocks.getWorkspace.mockReturnValue({ tier: 'growth' });
+  mocks.getWorkspace.mockReturnValue({ tier: 'growth', competitorDomains: [] });
+  mocks.computeEffectiveTier.mockReturnValue('growth');
   mocks.getUsageSummary.mockReturnValue({
-    seo_audit: { used: 3 },
-    schema_generation: { used: 0 },
-    keyword_research: { used: 1 },
+    seo_audit: { used: 3, limit: 10, remaining: 7 },
+    schema_generation: { used: 0, limit: 10, remaining: 10 },
+    keyword_research: { used: 1, limit: 10, remaining: 9 },
+  });
+  mocks.getAllPageStates.mockReturnValue({
+    'page-1': { pageId: 'page-1', status: 'clean', updatedAt: '2026-05-01T00:00:00Z' },
+    'page-2': { pageId: 'page-2', status: 'fix-proposed', updatedAt: '2026-05-01T00:00:00Z' },
   });
 
   mocks.listBatches.mockReturnValue([
@@ -207,6 +219,18 @@ describe('assembleOperational', () => {
       dismissed: 1,
       rate: 0.5,
     });
+
+    // New fields (Task 4.2)
+    expect(result.effectiveTier).toBe('growth');
+    expect(result.usageRemaining).toEqual({
+      seo_audit: 7,
+      schema_generation: 10,
+      keyword_research: 9,
+    });
+    expect(result.pageEditStateSummary).toEqual({
+      total: 2,
+      byStatus: { clean: 1, 'fix-proposed': 1 },
+    });
   });
 
   it('degrades gracefully to stable defaults when optional subsystems fail', async () => {
@@ -246,6 +270,9 @@ describe('assembleOperational', () => {
     mocks.getInsights.mockImplementation(() => {
       throw new Error('insight store unavailable');
     });
+    mocks.getAllPageStates.mockImplementation(() => {
+      throw new Error('page edit states unavailable');
+    });
 
     const result = await assembleOperational('ws_degraded');
 
@@ -261,6 +288,13 @@ describe('assembleOperational', () => {
       detectedPlaybooks: [],
       workOrders: { active: 0, pending: 0 },
       insightAcceptanceRate: null,
+      // New optional fields (Task 4.2):
+      // effectiveTier is set before getUsageSummary throws, so it's still populated
+      effectiveTier: 'growth',
+      // usageRemaining is undefined because getUsageSummary throws before it's set
+      usageRemaining: undefined,
+      // pageEditStateSummary is undefined because getAllPageStates throws
+      pageEditStateSummary: undefined,
     });
     expect(mocks.logDebug).toHaveBeenCalled();
   });

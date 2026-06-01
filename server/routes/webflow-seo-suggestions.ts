@@ -20,11 +20,13 @@ import {
   markApplied,
   selectVariation,
 } from '../seo-suggestions.js';
+import { resolveRecommendationsForChange } from '../recommendations.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { updatePageSeo } from '../webflow.js';
 import { getTokenForSite, getWorkspace, updatePageState } from '../workspaces.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { normalizePageUrl } from '../helpers.js';
+import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 
 const router = Router();
 const log = createLogger('webflow-seo-suggestions');
@@ -140,6 +142,31 @@ router.post('/api/webflow/seo-suggestions/:workspaceId/apply', requireWorkspaceA
     );
   }
 
+  if (appliedIds.length > 0) {
+    invalidateIntelligenceCache(workspaceId);
+
+    // A live SEO change resolves any recommendations covering the pages it
+    // touched, so the priority list drops them immediately (GSC-lag-free).
+    // recommendation.affectedPages are SLUGS, and each applied suggestion already
+    // carries its slug in hand (toApply[i].pageSlug, mapped by result index — the
+    // same source used for recordSeoChange above), so use it directly instead of
+    // round-tripping through getPageState (which would silently no-op for any
+    // pageId that has no page_edit_states slug). Guarded so a resolver failure can
+    // never abort the apply response. // rec-refresh-ok
+    try {
+      const affectedSlugs = Array.from(new Set(
+        results
+          .map((r, i) => (r.applied ? toApply[i]?.pageSlug : undefined))
+          .filter((s): s is string => typeof s === 'string' && s.length > 0)
+          .map(slug => normalizePageUrl(slug)),
+      ));
+      if (affectedSlugs.length > 0) {
+        resolveRecommendationsForChange(workspaceId, { affectedPages: affectedSlugs });
+      }
+    } catch (err) {
+      log.warn({ err, workspaceId }, 'Failed to resolve recommendations after SEO suggestions apply');
+    }
+  }
   log.info(`Applied ${appliedIds.length}/${toApply.length} SEO suggestions for workspace ${workspaceId}`);
   res.json({ results, applied: appliedIds.length, total: toApply.length });
 });

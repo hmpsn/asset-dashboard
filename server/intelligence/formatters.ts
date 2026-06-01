@@ -140,7 +140,15 @@ export function formatForPrompt(
   // Apply tokenBudget truncation if requested (§20 priority chain)
   const tokenBudget = opts?.tokenBudget;
   if (tokenBudget && tokenBudget > 0) {
-    return applyTokenBudget(sections, intelligence, tokenBudget);
+    // The §20 priority chain treats seoContext as the never-dropped anchor and
+    // drops operational FIRST. That ordering is correct for the full prompt, but
+    // for a slice-filtered call that does NOT request seoContext (e.g. the
+    // admin-chat additional-slices block: operational/siteHealth/clientSignals/…),
+    // there is no anchor, and dropping operational first silently removes the very
+    // slice the question selected. Tell applyTokenBudget whether seoContext is in
+    // play so it can protect requested slices when it is not.
+    const seoContextIsAnchor = !include || include.has('seoContext');
+    return applyTokenBudget(sections, intelligence, tokenBudget, seoContextIsAnchor);
   }
 
   return sections.filter(Boolean).join('\n\n');
@@ -150,12 +158,23 @@ function applyTokenBudget(
   sections: string[],
   intelligence: WorkspaceIntelligence,
   budget: number,
+  seoContextIsAnchor: boolean = true,
 ): string {
   const estimateTokens = (text: string) => Math.ceil(text.length / 4);
 
   let current = sections.filter(Boolean);
   let output = current.join('\n\n');
   if (estimateTokens(output) <= budget) return output;
+
+  // Slice-filtered call with no seoContext anchor: the standard "drop operational
+  // first / collapse to seoContext only" chain would erase the requested slices.
+  // Instead degrade in place — truncate every non-header section to its first few
+  // lines, keeping ALL requested sections present (operational included) — then,
+  // only if still over budget, drop trailing sections from the end (least-recently
+  // requested in formatForPrompt's fixed emit order) while always keeping the first.
+  if (!seoContextIsAnchor) {
+    return applyFilteredTokenBudget(current, budget, estimateTokens);
+  }
 
   // Step 1: Drop operational
   current = current.filter(s => !s.startsWith('## Operational'));
@@ -216,6 +235,49 @@ function applyTokenBudget(
     s.startsWith('[Workspace Intelligence]') || s.startsWith('## SEO Context'),
   );
   return seoOnly.join('\n\n');
+}
+
+/**
+ * Token-budget truncation for slice-filtered calls that have NO seoContext anchor
+ * (e.g. the admin-chat additional-slices block). Unlike the §20 priority chain,
+ * this never drops operational first and never collapses to "seoContext only" —
+ * the requested slices ARE the answer, so it keeps them all and degrades in place:
+ *
+ *   1. If under budget, return as-is.
+ *   2. Otherwise truncate each section body to its first `keepLines` lines
+ *      (header + most-salient lines first), keeping every requested section
+ *      present so the slice the question selected never silently vanishes.
+ *   3. Only if STILL over budget after maximal per-section truncation, drop whole
+ *      sections from the END of formatForPrompt's fixed emit order, always
+ *      retaining the first content section.
+ */
+function applyFilteredTokenBudget(
+  sections: string[],
+  budget: number,
+  estimateTokens: (text: string) => number,
+): string {
+  const header = sections.filter(s => s.startsWith('[Workspace Intelligence]'));
+  let content = sections.filter(s => !s.startsWith('[Workspace Intelligence]'));
+
+  const render = (cs: string[]) => [...header, ...cs].join('\n\n');
+  if (estimateTokens(render(content)) <= budget) return render(content);
+
+  // Step 2: progressively truncate every section body, header line always kept.
+  for (let keepLines = 8; keepLines >= 1; keepLines--) {
+    content = content.map(s => {
+      const lines = s.split('\n');
+      if (lines.length <= keepLines + 1) return s;
+      return [...lines.slice(0, keepLines + 1), '  (truncated)'].join('\n');
+    });
+    if (estimateTokens(render(content)) <= budget) return render(content);
+  }
+
+  // Step 3: still over budget — drop whole sections from the end, but always keep
+  // at least the first content section so the block never collapses to nothing.
+  while (content.length > 1 && estimateTokens(render(content)) > budget) {
+    content = content.slice(0, -1);
+  }
+  return render(content);
 }
 
 function pct(rate: number | null | undefined): string {
@@ -354,6 +416,78 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
 
   if (ctx.strategyHistory && verbosity === 'detailed') {
     lines.push(`Strategy: revised ${ctx.strategyHistory.revisionsCount}x, last ${ctx.strategyHistory.lastRevisedAt.slice(0, 10)}`);
+  }
+
+  // Top Opportunity — the resolved #1 recommendation's OV breakdown (SI2/MW6).
+  // CLIENT-SAFE: this formatter is shared (formatForPrompt is audience-agnostic and
+  // reaches the client search-chat advisor), so it must NEVER print the dollar
+  // emvPerWeek. Only the relative value (0–100) + component evidence appear here;
+  // the admin advisor gets emvPerWeek via the admin-only recSummary (admin-chat-context).
+  // Inject opportunity.components evidence DIRECTLY — no format helper (authority-layered
+  // fields rule). Token budget: only the top-3 components by contribution, not all 7.
+  if (ctx.topOpportunity && ctx.topOpportunity.components.length > 0) {
+    const top = ctx.topOpportunity;
+    lines.push(`#1 OPPORTUNITY (value ${Math.round(top.value)}/100):`);
+    const topComponents = [...top.components]
+      .sort((a, b) => b.contribution - a.contribution)
+      .slice(0, 3);
+    for (const c of topComponents) {
+      lines.push(`  - ${c.dimension}: ${c.evidence}`);
+    }
+  }
+
+  // Quick wins — low-effort, high-impact fixes with grounded ROI (SI1); standard+ verbosity
+  if (ctx.quickWins && ctx.quickWins.length > 0 && verbosity !== 'compact') {
+    const limit = verbosity === 'detailed' ? 8 : 4;
+    lines.push('Quick wins (low-effort, high-impact):');
+    for (const qw of ctx.quickWins.slice(0, limit)) {
+      const roi = qw.roiScore != null ? ` [ROI ${Math.round(qw.roiScore)}]` : '';
+      lines.push(`  - ${qw.pagePath}: ${qw.action}${roi} (${qw.estimatedImpact} impact)`);
+    }
+  }
+
+  // Content gaps — enriched with opportunityScore + trendDirection (SI2); standard+ verbosity.
+  // contentGaps live on strategy (reassembled from the content_gaps table by the slice).
+  if (ctx.strategy?.contentGaps && ctx.strategy.contentGaps.length > 0 && verbosity !== 'compact') {
+    const limit = verbosity === 'detailed' ? 8 : 4;
+    const gaps = [...ctx.strategy.contentGaps]
+      .sort((a, b) => (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0))
+      .slice(0, limit);
+    lines.push('Content gaps (opportunity-ranked):');
+    for (const g of gaps) {
+      const score = g.opportunityScore != null ? ` [opportunity ${Math.round(g.opportunityScore)}]` : '';
+      const trend = g.trendDirection ? ` ${g.trendDirection}` : '';
+      lines.push(`  - ${g.topic} → "${g.targetKeyword}" (${g.intent})${score}${trend}`);
+    }
+  }
+
+  // Cannibalization issues — keyword overlap across pages (SI4); standard+ verbosity
+  if (ctx.cannibalizationIssues && ctx.cannibalizationIssues.length > 0 && verbosity !== 'compact') {
+    const limit = verbosity === 'detailed' ? 6 : 3;
+    lines.push('Keyword cannibalization:');
+    for (const issue of ctx.cannibalizationIssues.slice(0, limit)) {
+      lines.push(`  - [${issue.severity}] "${issue.keyword}" across ${issue.pages.length} pages: ${issue.recommendation}`);
+    }
+  }
+
+  // Competitor snapshots (Task 4.2c) — at standard+ verbosity
+  if (ctx.competitorSnapshots && ctx.competitorSnapshots.length > 0 && verbosity !== 'compact') {
+    if (verbosity === 'detailed') {
+      lines.push('Competitor intelligence:');
+      for (const snap of ctx.competitorSnapshots.slice(0, 5)) {
+        const parts: string[] = [`${snap.competitorDomain} (${snap.snapshotDate})`];
+        if (snap.keywordCount != null) parts.push(`${snap.keywordCount} keywords`);
+        if (snap.organicTraffic != null) parts.push(`${snap.organicTraffic} organic traffic`);
+        if (snap.topKeywords.length > 0) {
+          const topKw = snap.topKeywords.slice(0, 3).map(k => `${k.keyword} (#${k.position})`).join(', ');
+          parts.push(`top: ${topKw}`);
+        }
+        lines.push(`  - ${parts.join(' | ')}`);
+      }
+    } else {
+      const summary = ctx.competitorSnapshots.slice(0, 3).map(s => s.competitorDomain).join(', ');
+      lines.push(`Competitors tracked: ${ctx.competitorSnapshots.length} (${summary})`);
+    }
   }
 
   // Return empty string rather than a bare header when no content was added
@@ -621,6 +755,18 @@ function formatSiteHealthSection(health: SiteHealthSlice, verbosity: PromptVerbo
         `AEO readiness: ${health.aeoReadiness.pagesChecked} pages checked, ${pct(health.aeoReadiness.passingRate)} passing`
       );
     }
+    // Weekly metrics trend (Task 4.2b)
+    if (health.weeklyMetricsTrend) {
+      const t = health.weeklyMetricsTrend;
+      const w = t.latestWeek;
+      const parts: string[] = [];
+      if (w.totalClicks != null) parts.push(`${w.totalClicks} clicks`);
+      if (w.auditScore != null) parts.push(`audit ${w.auditScore}`);
+      if (w.organicTrafficValue != null) parts.push(`$${Math.round(w.organicTrafficValue)} traffic value`);
+      if (parts.length > 0) {
+        lines.push(`Latest week (${w.snapshotDate}): ${parts.join(', ')} — based on ${t.snapshotCount} snapshot${t.snapshotCount === 1 ? '' : 's'}`);
+      }
+    }
   }
 
   if (verbosity === 'detailed') {
@@ -683,8 +829,13 @@ function formatClientSignalsSection(signals: ClientSignalsSlice, verbosity: Prom
     if (signals.approvalPatterns.approvalRate > 0) {
       lines.push(`Approval rate: ${pct(signals.approvalPatterns.approvalRate)}`);
     }
-    if (signals.businessPriorities.length > 0) {
-      lines.push(`Business priorities: ${signals.businessPriorities.join('; ')}`);
+    // Use the authority-resolved list (client store + admin store, deduped) so the
+    // prompt reflects reconciled business intent, not just the client half.
+    // effectiveBusinessPriorities is always a superset of businessPriorities, so no
+    // fallback to the raw field is needed.
+    const promptPriorities = signals.effectiveBusinessPriorities ?? [];
+    if (promptPriorities.length > 0) {
+      lines.push(`Business priorities: ${promptPriorities.join('; ')}`);
     }
     if (signals.serviceRequests) {
       lines.push(`Service requests: ${signals.serviceRequests.pending} pending, ${signals.serviceRequests.total} total`);
@@ -753,6 +904,29 @@ function formatOperationalSection(ops: OperationalSlice, verbosity: PromptVerbos
     }
     if (ops.clientActionQueue) {
       lines.push(`Client action queue: ${ops.clientActionQueue.pending} pending${ops.clientActionQueue.oldestAge !== null ? `, oldest ${ops.clientActionQueue.oldestAge}h` : ''}`);
+    }
+  }
+
+  if (verbosity !== 'compact') {
+    // Tier + usage remaining (Task 4.2d)
+    if (ops.effectiveTier) {
+      lines.push(`Subscription tier: ${ops.effectiveTier}`);
+    }
+    if (ops.usageRemaining) {
+      const usageParts = Object.entries(ops.usageRemaining)
+        .filter(([, v]) => v != null && v !== Infinity)
+        .map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v} remaining`)
+        .slice(0, 5);
+      if (usageParts.length > 0) {
+        lines.push(`Usage remaining: ${usageParts.join(', ')}`);
+      }
+    }
+    // Page edit state summary (Task 4.2a)
+    if (ops.pageEditStateSummary && ops.pageEditStateSummary.total > 0) {
+      const statusParts = Object.entries(ops.pageEditStateSummary.byStatus)
+        .map(([s, n]) => `${n} ${s}`)
+        .join(', ');
+      lines.push(`Page states (${ops.pageEditStateSummary.total} total): ${statusParts}`);
     }
   }
 

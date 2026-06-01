@@ -23,6 +23,7 @@ import { getAllGscPages } from '../search-console.js';
 import { listWorkspaces, getTokenForSite } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
+import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 
 const router = Router();
 const log = createLogger('webflow-analysis');
@@ -270,6 +271,7 @@ router.get('/api/webflow/internal-links/:siteId', requireWorkspaceSiteAccessFrom
       } catch (err) {
         log.warn({ err }, 'Failed to record outcome actions for internal link suggestions');
       }
+      try { invalidateIntelligenceCache(workspaceId); } catch (_e) { /* non-critical */ }
     }
 
     res.json(result);

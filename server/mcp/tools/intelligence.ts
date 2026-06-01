@@ -1,9 +1,11 @@
 import type { Tool } from '@modelcontextprotocol/sdk/types';
+import { getWorkspaceIntelligenceInputSchema } from '../../../shared/types/mcp-action-schemas.js';
 import { buildWorkspaceIntelligence } from '../../workspace-intelligence.js';
 import { getWorkspace } from '../../workspaces.js';
 import { INTELLIGENCE_SLICES, isIntelligenceSlice } from '../../../shared/types/intelligence.js';
 import type { IntelligenceOptions } from '../../../shared/types/intelligence.js';
 import { createLogger } from '../../logger.js';
+import { toMcpJsonSchema } from '../json-schema.js';
 
 const log = createLogger('mcp-tools-intelligence');
 
@@ -12,31 +14,7 @@ export const intelligenceTools: Tool[] = [
     name: 'get_workspace_intelligence',
     description:
       'Get the full intelligence bundle for a workspace — the same context used by AdminChat. Includes SEO context, insights summary, content pipeline, site health, client signals, and keyword context. Use when you need the complete picture before making decisions about a workspace. Pass specific slices to reduce response size.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        workspaceId: { type: 'string', description: 'The workspace ID' },
-        slices: {
-          type: 'array',
-          items: { type: 'string' },
-          description:
-            `Optional: limit to specific slices. Valid values: ${INTELLIGENCE_SLICES.join(', ')}. Omit for all slices. The localSeo slice carries the full bounded candidate universe (capped at 1000) plus a pre-formatted prompt block — external agents get the full data; internal AI prompts use the sampled block.`,
-        },
-        pagePath: {
-          type: 'string',
-          description: 'Optional page path for page-scoped slices such as pageProfile and pageElements.',
-        },
-        siteId: {
-          type: 'string',
-          description: 'Optional Webflow site ID for siteInventory assembly.',
-        },
-        siteBaseUrl: {
-          type: 'string',
-          description: 'Optional resolved live base URL for siteInventory assembly.',
-        },
-      },
-      required: ['workspaceId'],
-    },
+    inputSchema: toMcpJsonSchema(getWorkspaceIntelligenceInputSchema),
   },
 ];
 
@@ -48,17 +26,32 @@ export async function handleIntelligenceTool(
     return { isError: true, content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }] };
   }
 
-  const workspaceId = args.workspaceId;
+  const parsed = getWorkspaceIntelligenceInputSchema.safeParse(args);
+  if (!parsed.success) {
+    return {
+      isError: true,
+      content: [{ type: 'text' as const, text: `Validation failed: ${JSON.stringify(parsed.error.issues)}` }],
+    };
+  }
+  const {
+    workspaceId,
+    slices: sliceArgs,
+    pagePath,
+    siteId: siteIdArg,
+    siteBaseUrl: siteBaseUrlArg,
+    enrich_with_backlinks: enrichWithBacklinks,
+    resolve_entity_references: resolveEntityReferences,
+    include_site_inventory: includeSiteInventory,
+  } = parsed.data;
   if (typeof workspaceId !== 'string') {
     return { isError: true, content: [{ type: 'text' as const, text: 'Missing or invalid workspaceId' }] };
   }
 
-  const requestedSlices = Array.isArray(args.slices)
-    ? (args.slices as string[]).filter(isIntelligenceSlice)
+  let requestedSlices = Array.isArray(sliceArgs)
+    ? sliceArgs.filter(isIntelligenceSlice)
     : [...INTELLIGENCE_SLICES];
-
-  if (requestedSlices.length === 0) {
-    return { isError: true, content: [{ type: 'text' as const, text: 'No valid intelligence slices specified' }] };
+  if (includeSiteInventory && !requestedSlices.includes('siteInventory')) {
+    requestedSlices = [...requestedSlices, 'siteInventory'];
   }
 
   if (requestedSlices.length === 0) {
@@ -74,14 +67,22 @@ export async function handleIntelligenceTool(
       };
     }
 
-    const pagePath = typeof args.pagePath === 'string' ? args.pagePath : undefined;
-    const siteId = typeof args.siteId === 'string' ? args.siteId : undefined;
-    const siteBaseUrl = typeof args.siteBaseUrl === 'string' ? args.siteBaseUrl : undefined;
+    const normalizeBaseUrl = (value: string | undefined): string | undefined => {
+      if (!value) return undefined;
+      if (value.startsWith('http://') || value.startsWith('https://')) return value;
+      return `https://${value}`;
+    };
+    const siteId = siteIdArg ?? (includeSiteInventory ? ws.webflowSiteId : undefined);
+    const siteBaseUrl = normalizeBaseUrl(siteBaseUrlArg ?? (includeSiteInventory ? ws.liveDomain : undefined));
+    const webflowToken = includeSiteInventory ? ws.webflowToken : undefined;
     const opts: IntelligenceOptions = {
       slices: requestedSlices,
       pagePath,
       siteId,
       siteBaseUrl,
+      webflowToken,
+      enrichWithBacklinks,
+      resolveEntityReferences,
     };
     const intel = await buildWorkspaceIntelligence(workspaceId, opts); // bwi-all-ok: MCP read model intentionally returns the full registered bundle when slices are omitted
     return { content: [{ type: 'text' as const, text: JSON.stringify(intel) }] };

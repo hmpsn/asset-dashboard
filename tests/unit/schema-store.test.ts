@@ -22,6 +22,7 @@ import {
   updateSchemaPlanRoles,
   updateSchemaPlanStatus,
 } from '../../server/schema-store.js';
+import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import type { SchemaPageSuggestion } from '../../server/schema-suggester.js';
 import type { SchemaSitePlan } from '../../shared/types/schema-plan.js';
 
@@ -112,6 +113,23 @@ describe('schema-store', () => {
     expect(patched?.organizationNode).toMatchObject({ name: 'Second', logo: 'https://example.com/logo.png' });
     expect(patched?.websiteNode).toMatchObject({ name: 'Site 2', inLanguage: 'en-US' });
     expect(patchSiteTemplate('missing-site')).toBeNull();
+  });
+
+  it('normalizes template names to workspace name when workspace context exists', () => {
+    const workspace = createWorkspace('Faros');
+    const template = saveSiteTemplate(
+      SITE_ID,
+      workspace.id,
+      { '@type': 'Organization', name: 'Faros AI', url: 'https://www.faros.ai' },
+      { '@type': 'WebSite', name: 'Faros AI', url: 'https://www.faros.ai' },
+    );
+
+    expect(template.organizationNode.name).toBe('Faros');
+    expect(template.websiteNode.name).toBe('Faros');
+    expect(getSiteTemplate(SITE_ID)?.organizationNode.name).toBe('Faros');
+    expect(getSiteTemplate(SITE_ID)?.websiteNode.name).toBe('Faros');
+
+    deleteWorkspace(workspace.id);
   });
 
   it('persists schema plans and mutates status and roles', () => {

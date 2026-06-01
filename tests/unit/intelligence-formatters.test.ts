@@ -118,6 +118,7 @@ function makeClientSignalsSlice(overrides: Partial<ClientSignalsSlice> = {}): Cl
     },
     contentGapVotes: [],
     businessPriorities: [],
+    effectiveBusinessPriorities: [],
     approvalPatterns: { approvalRate: 0, avgResponseTime: null },
     recentChatTopics: [],
     churnRisk: null,
@@ -1380,6 +1381,7 @@ describe('formatForPrompt — clientSignals section', () => {
       clientSignals: makeClientSignalsSlice({
         churnRisk: 'low',
         businessPriorities: ['more local traffic', 'rank for implants'],
+        effectiveBusinessPriorities: ['more local traffic', 'rank for implants'],
       }),
     });
     const result = formatForPrompt(intel);

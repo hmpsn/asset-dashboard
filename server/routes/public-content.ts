@@ -218,6 +218,9 @@ router.get('/api/public/seo-strategy/:workspaceId', async (req, res, next) => {
         action: q.action,
         estimatedImpact: q.estimatedImpact,
         rationale: q.rationale,
+        // SI3: surface the grounded relative ROI score for client prioritization.
+        // This is the quick-win composite (0–100), NOT the admin/AI-only emvPerWeek.
+        roiScore: q.roiScore,
       })),
       keywordGaps: keywordGaps.slice(0, 20).map(g => ({
         keyword: g.keyword,

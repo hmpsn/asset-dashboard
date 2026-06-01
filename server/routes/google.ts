@@ -41,15 +41,9 @@ import { requireWorkspaceAccess, requireWorkspaceSiteAccess, requireWorkspaceSit
 import { requireAdminAuth } from '../middleware/admin-auth.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
+import { parsePositiveIntQuery } from '../query-param-parsers.js';
 
 const log = createLogger('google-auth');
-
-function parsePositiveIntQuery(rawValue: unknown, fallback: number): number | null {
-  if (rawValue == null) return fallback;
-  const parsed = Number(rawValue);
-  if (!Number.isInteger(parsed) || parsed <= 0) return null;
-  return parsed;
-}
 
 const requireWorkspaceGscPropertyAccess: RequestHandler = (req, res, next) => {
   const rawWorkspaceId = req.query.workspaceId;

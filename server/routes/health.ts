@@ -22,6 +22,7 @@ import { isProgrammingError } from '../errors.js';
 import { createLogger } from '../logger.js';
 import type { IntegrationHealthItem, IntegrationHealthState, WorkspaceIntegrationHealth } from '../../shared/types/integration-health.js';
 import { buildWorkspaceObservabilityReport } from '../platform-observability-report.js';
+import { parsePositiveIntQuery } from '../query-param-parsers.js';
 
 
 const log = createLogger('health');
@@ -35,13 +36,6 @@ let shuttingDown = false;
 export function setShuttingDown(): void { shuttingDown = true; }
 
 const DATA_ROOT = DATA_BASE || path.join(process.env.HOME || '', '.asset-dashboard');
-
-function parsePositiveIntQuery(rawValue: unknown, fallback: number): number | null {
-  if (rawValue == null) return fallback;
-  const parsed = Number(rawValue);
-  if (!Number.isInteger(parsed) || parsed <= 0) return null;
-  return parsed;
-}
 
 function parsePositiveIntBody(rawValue: unknown, fallback: number): number | null {
   if (rawValue == null) return fallback;

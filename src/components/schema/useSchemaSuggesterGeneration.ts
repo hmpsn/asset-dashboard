@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { post, getSafe } from '../../api/client';
-import { useSchemaSnapshot, useWebflowPages } from '../../hooks/admin';
+import { useSchemaSnapshot } from '../../hooks/admin';
 import { useBackgroundTasks } from '../../hooks/useBackgroundTasks';
 import { queryKeys } from '../../lib/queryKeys';
 import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs';
@@ -76,12 +76,33 @@ export function useSchemaSuggesterGeneration({
       .catch(() => { /* ignore — page types are non-critical */ });
   }, [siteId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const { data: fetchedPages = [] } = useWebflowPages(siteId, workspaceId);
-  useEffect(() => {
-    if (fetchedPages.length > 0 && availablePages.length === 0) {
-      setAvailablePages(fetchedPages);
-    }
-  }, [fetchedPages]); // eslint-disable-line react-hooks/exhaustive-deps
+  const fetchAllPageOptions = useCallback(async () => {
+    const pages = await getSafe<Array<{ _id?: string; id?: string; title?: string; slug?: string }>>(
+      `/api/webflow/all-pages/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`,
+      [],
+    );
+    if (!Array.isArray(pages)) return [] as SchemaPageOption[];
+    return pages
+      .map(page => ({
+        id: page._id || page.id || '',
+        title: page.title || page.slug || 'Untitled',
+        slug: page.slug || '',
+      }))
+      .filter(page => page.id.length > 0);
+  }, [siteId, workspaceId]);
+
+  useEffect(() => { // effect-layout-ok: page inventory is fetched asynchronously and cached in local state.
+    let cancelled = false;
+    setLoadingPages(true);
+    fetchAllPageOptions()
+      .then((pages) => {
+        if (!cancelled) setAvailablePages(pages);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingPages(false);
+      });
+    return () => { cancelled = true; };
+  }, [fetchAllPageOptions]);
 
   useEffect(() => { // effect-layout-ok: background job results arrive asynchronously via WebSocket.
     if (!jobIdRef.current) return;
@@ -140,20 +161,14 @@ export function useSchemaSuggesterGeneration({
     }
     setLoadingPages(true);
     try {
-      const pages = await getSafe<Array<{ _id?: string; id?: string; title?: string; slug?: string }>>(`/api/webflow/pages/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`, []);
-      if (Array.isArray(pages)) {
-        setAvailablePages(pages.map(page => ({
-          id: page._id || page.id || '',
-          title: page.title || page.slug || 'Untitled',
-          slug: page.slug || '',
-        })));
-      }
+      const pages = await fetchAllPageOptions();
+      setAvailablePages(pages);
       setShowPagePicker(true);
     } catch (err) {
       console.error('SchemaSuggester operation failed:', err);
     }
     setLoadingPages(false);
-  }, [availablePages.length, siteId, workspaceId]);
+  }, [availablePages.length, fetchAllPageOptions]);
 
   const generateSinglePage = useCallback(async (pageId: string) => {
     setGeneratingSingle(pageId);

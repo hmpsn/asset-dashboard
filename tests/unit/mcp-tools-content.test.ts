@@ -8,20 +8,25 @@ vi.mock('../../server/intelligence/generation-context-builders.js', () => ({
   buildContentGenerationContext: vi.fn(),
 }));
 vi.mock('../../server/content-brief.js', () => ({
+  deleteBrief: vi.fn(),
   getBrief: vi.fn(),
   listBriefs: vi.fn(),
   updateBrief: vi.fn(),
   upsertBrief: vi.fn(),
 }));
 vi.mock('../../server/content-posts-db.js', () => ({
+  deletePost: vi.fn(),
   getPost: vi.fn(),
+  listPostVersions: vi.fn(),
   listPosts: vi.fn(),
+  revertToVersion: vi.fn(),
   savePost: vi.fn(),
   updatePostField: vi.fn(),
 }));
 vi.mock('../../server/content-requests.js', () => ({
   createContentRequest: vi.fn(),
   getContentRequest: vi.fn(),
+  listContentRequests: vi.fn(),
   updateContentRequest: vi.fn(),
 }));
 vi.mock('../../server/broadcast.js', () => ({
@@ -33,9 +38,9 @@ vi.mock('../../server/activity-log.js', () => ({
 
 import { getWorkspace } from '../../server/workspaces.js';
 import { buildContentGenerationContext } from '../../server/intelligence/generation-context-builders.js';
-import { getBrief, listBriefs, updateBrief, upsertBrief } from '../../server/content-brief.js';
-import { getPost, listPosts, savePost, updatePostField } from '../../server/content-posts-db.js';
-import { createContentRequest, getContentRequest, updateContentRequest } from '../../server/content-requests.js';
+import { deleteBrief, getBrief, listBriefs, updateBrief, upsertBrief } from '../../server/content-brief.js';
+import { deletePost, getPost, listPostVersions, listPosts, revertToVersion, savePost, updatePostField } from '../../server/content-posts-db.js';
+import { createContentRequest, getContentRequest, listContentRequests, updateContentRequest } from '../../server/content-requests.js';
 import { broadcastToWorkspace } from '../../server/broadcast.js';
 import { addActivity } from '../../server/activity-log.js';
 import { contentActionTools, handleContentActionTool } from '../../server/mcp/tools/content-actions.js';
@@ -88,6 +93,11 @@ describe('mcp content action tools', () => {
     }));
     (createContentRequest as ReturnType<typeof vi.fn>).mockReturnValue({ id: 'cr_1' });
     (getContentRequest as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
+    (listContentRequests as ReturnType<typeof vi.fn>).mockReturnValue([]);
+    (deleteBrief as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    (deletePost as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    (listPostVersions as ReturnType<typeof vi.fn>).mockReturnValue([]);
+    (revertToVersion as ReturnType<typeof vi.fn>).mockReturnValue(null);
   });
 
   it('registers content action tool names', () => {
@@ -103,7 +113,96 @@ describe('mcp content action tools', () => {
       'prepare_post_context',
       'save_post',
       'send_to_client',
+      'list_content_requests',
+      'get_content_request',
+      'create_content_request',
+      'delete_brief',
+      'delete_post',
+      'list_post_versions',
+      'revert_post_version',
     ]);
+  });
+
+  it('lists, gets, and creates content requests', async () => {
+    (listContentRequests as ReturnType<typeof vi.fn>).mockReturnValue([
+      {
+        id: 'cr_1',
+        topic: 'Topic',
+        targetKeyword: 'kw',
+        status: 'requested',
+        priority: 'medium',
+        serviceType: 'brief_only',
+        pageType: 'blog',
+        requestedAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ]);
+    (getContentRequest as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'cr_1',
+      topic: 'Topic',
+      targetKeyword: 'kw',
+      status: 'requested',
+      priority: 'medium',
+      serviceType: 'brief_only',
+      pageType: 'blog',
+      requestedAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    const listed = await handleContentActionTool('list_content_requests', { workspace_id: 'ws-1' });
+    expect(listed.isError).toBeUndefined();
+    const listPayload = JSON.parse(listed.content[0].text) as { requests: Array<{ request_id: string }> };
+    expect(listPayload.requests).toHaveLength(1);
+    expect(listPayload.requests[0]?.request_id).toBe('cr_1');
+
+    const fetched = await handleContentActionTool('get_content_request', { workspace_id: 'ws-1', request_id: 'cr_1' });
+    expect(fetched.isError).toBeUndefined();
+
+    const created = await handleContentActionTool('create_content_request', {
+      workspace_id: 'ws-1',
+      topic: 'Topic',
+      target_keyword: 'keyword',
+    });
+    expect(created.isError).toBeUndefined();
+    expect(createContentRequest).toHaveBeenCalledWith(
+      'ws-1',
+      expect.objectContaining({ topic: 'Topic', targetKeyword: 'keyword' }),
+    );
+  });
+
+  it('create_content_request does not emit created side effects when dedupe returns existing request', async () => {
+    (listContentRequests as ReturnType<typeof vi.fn>).mockReturnValue([
+      {
+        id: 'cr_existing',
+        topic: 'Existing Topic',
+        targetKeyword: 'keyword',
+        status: 'requested',
+        priority: 'medium',
+        requestedAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ]);
+    (createContentRequest as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'cr_existing',
+      topic: 'Existing Topic',
+      targetKeyword: 'keyword',
+      status: 'requested',
+      priority: 'medium',
+      requestedAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    const created = await handleContentActionTool('create_content_request', {
+      workspace_id: 'ws-1',
+      topic: 'Existing Topic',
+      target_keyword: 'keyword',
+    });
+    expect(created.isError).toBeUndefined();
+    const payload = JSON.parse(created.content[0].text) as { created: boolean; deduped: boolean };
+    expect(payload.created).toBe(false);
+    expect(payload.deduped).toBe(true);
+    expect(broadcastToWorkspace).not.toHaveBeenCalled();
+    expect(addActivity).not.toHaveBeenCalled();
   });
 
   it('lists and fetches briefs with revision tokens', async () => {
@@ -257,6 +356,230 @@ describe('mcp content action tools', () => {
     });
     expect(conflicted.isError).toBe(true);
     expect(conflicted.content[0].text).toContain('Revision conflict');
+  });
+
+  it('applies optional status/page_type filters to list_briefs and list_posts', async () => {
+    (listBriefs as ReturnType<typeof vi.fn>).mockReturnValue([
+      {
+        id: 'brief_blog',
+        workspaceId: 'ws-1',
+        targetKeyword: 'hvac blog',
+        secondaryKeywords: [],
+        suggestedTitle: 'Blog brief',
+        suggestedMetaDesc: 'Meta',
+        outline: [],
+        wordCountTarget: 1000,
+        intent: 'informational',
+        audience: 'homeowners',
+        competitorInsights: '',
+        internalLinkSuggestions: [],
+        pageType: 'blog',
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        id: 'brief_service',
+        workspaceId: 'ws-1',
+        targetKeyword: 'hvac service',
+        secondaryKeywords: [],
+        suggestedTitle: 'Service brief',
+        suggestedMetaDesc: 'Meta',
+        outline: [],
+        wordCountTarget: 1000,
+        intent: 'commercial',
+        audience: 'homeowners',
+        competitorInsights: '',
+        internalLinkSuggestions: [],
+        pageType: 'service',
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+    ]);
+    (listContentRequests as ReturnType<typeof vi.fn>).mockReturnValue([
+      { id: 'req1', briefId: 'brief_blog', status: 'approved', updatedAt: '2026-01-02T00:00:00.000Z' },
+      { id: 'req2', briefId: 'brief_service', status: 'requested', updatedAt: '2026-01-03T00:00:00.000Z' },
+    ]);
+
+    const briefs = await handleContentActionTool('list_briefs', {
+      workspace_id: 'ws-1',
+      status: 'approved',
+      page_type: 'blog',
+    });
+    const briefPayload = JSON.parse(briefs.content[0].text) as { briefs: Array<{ brief_id: string; status: string | null }> };
+    expect(briefPayload.briefs).toHaveLength(1);
+    expect(briefPayload.briefs[0]).toMatchObject({ brief_id: 'brief_blog', status: 'approved' });
+
+    (listPosts as ReturnType<typeof vi.fn>).mockReturnValue([
+      {
+        id: 'post_blog',
+        workspaceId: 'ws-1',
+        briefId: 'brief_blog',
+        targetKeyword: 'hvac blog',
+        title: 'Blog post',
+        metaDescription: 'Meta',
+        introduction: '<p>Intro</p>',
+        sections: [],
+        conclusion: '<p>End</p>',
+        totalWordCount: 120,
+        targetWordCount: 120,
+        status: 'draft',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        id: 'post_service',
+        workspaceId: 'ws-1',
+        briefId: 'brief_service',
+        targetKeyword: 'hvac service',
+        title: 'Service post',
+        metaDescription: 'Meta',
+        introduction: '<p>Intro</p>',
+        sections: [],
+        conclusion: '<p>End</p>',
+        totalWordCount: 120,
+        targetWordCount: 120,
+        status: 'approved',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ]);
+
+    const posts = await handleContentActionTool('list_posts', {
+      workspace_id: 'ws-1',
+      status: 'approved',
+      page_type: 'service',
+    });
+    const postPayload = JSON.parse(posts.content[0].text) as {
+      posts: Array<{ post_id: string; page_type: string | null; status: string }>;
+    };
+    expect(postPayload.posts).toHaveLength(1);
+    expect(postPayload.posts[0]).toMatchObject({ post_id: 'post_service', page_type: 'service', status: 'approved' });
+  });
+
+  it('supports delete_brief and delete_post mutation tools', async () => {
+    (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'brief_1',
+      workspaceId: 'ws-1',
+      targetKeyword: 'hvac',
+      suggestedTitle: 'HVAC brief',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    const briefDeleted = await handleContentActionTool('delete_brief', {
+      workspace_id: 'ws-1',
+      brief_id: 'brief_1',
+    });
+    expect(briefDeleted.isError).toBeUndefined();
+    expect(deleteBrief).toHaveBeenCalledWith('ws-1', 'brief_1');
+    expect(broadcastToWorkspace).toHaveBeenCalledWith('ws-1', 'content:updated', expect.objectContaining({ action: 'mcp_brief_deleted' }));
+
+    (getBrief as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
+    const missingBrief = await handleContentActionTool('delete_brief', {
+      workspace_id: 'ws-1',
+      brief_id: 'brief_missing',
+    });
+    expect(missingBrief.isError).toBe(true);
+
+    (getPost as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'post_1',
+      workspaceId: 'ws-1',
+      briefId: 'brief_1',
+      targetKeyword: 'hvac',
+      title: 'HVAC post',
+      metaDescription: 'Meta',
+      introduction: '<p>Intro</p>',
+      sections: [],
+      conclusion: '<p>End</p>',
+      totalWordCount: 100,
+      targetWordCount: 120,
+      status: 'draft',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+    const postDeleted = await handleContentActionTool('delete_post', {
+      workspace_id: 'ws-1',
+      post_id: 'post_1',
+    });
+    expect(postDeleted.isError).toBeUndefined();
+    expect(deletePost).toHaveBeenCalledWith('ws-1', 'post_1');
+    expect(broadcastToWorkspace).toHaveBeenCalledWith('ws-1', 'post:updated', expect.objectContaining({ action: 'mcp_post_deleted' }));
+
+    (getPost as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
+    const missingPost = await handleContentActionTool('delete_post', {
+      workspace_id: 'ws-1',
+      post_id: 'post_missing',
+    });
+    expect(missingPost.isError).toBe(true);
+  });
+
+  it('supports list_post_versions and revert_post_version branches', async () => {
+    (getPost as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'post_1',
+      workspaceId: 'ws-1',
+      briefId: 'brief_1',
+      targetKeyword: 'hvac',
+      title: 'HVAC post',
+      metaDescription: 'Meta',
+      introduction: '<p>Intro</p>',
+      sections: [],
+      conclusion: '<p>End</p>',
+      totalWordCount: 100,
+      targetWordCount: 120,
+      status: 'draft',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+    (listPostVersions as ReturnType<typeof vi.fn>).mockReturnValue([
+      {
+        id: 'ver_1',
+        workspaceId: 'ws-1',
+        postId: 'post_1',
+        versionNumber: 1,
+        trigger: 'manual_edit',
+        triggerDetail: 'before review',
+        totalWordCount: 100,
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+    ]);
+
+    const listed = await handleContentActionTool('list_post_versions', {
+      workspace_id: 'ws-1',
+      post_id: 'post_1',
+    });
+    const listedPayload = JSON.parse(listed.content[0].text) as { versions: Array<{ version_id: string }> };
+    expect(listedPayload.versions).toHaveLength(1);
+    expect(listedPayload.versions[0]?.version_id).toBe('ver_1');
+
+    (revertToVersion as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'post_1',
+      workspaceId: 'ws-1',
+      briefId: 'brief_1',
+      targetKeyword: 'hvac',
+      title: 'HVAC reverted',
+      metaDescription: 'Meta',
+      introduction: '<p>Intro</p>',
+      sections: [],
+      conclusion: '<p>End</p>',
+      totalWordCount: 100,
+      targetWordCount: 120,
+      status: 'draft',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+    });
+
+    const reverted = await handleContentActionTool('revert_post_version', {
+      workspace_id: 'ws-1',
+      post_id: 'post_1',
+      version_id: 'ver_1',
+    });
+    expect(reverted.isError).toBeUndefined();
+    expect(revertToVersion).toHaveBeenCalledWith('ws-1', 'post_1', 'ver_1');
+    expect(broadcastToWorkspace).toHaveBeenCalledWith('ws-1', 'post:updated', expect.objectContaining({ action: 'mcp_post_reverted' }));
+
+    (revertToVersion as ReturnType<typeof vi.fn>).mockReturnValue(null);
+    const missing = await handleContentActionTool('revert_post_version', {
+      workspace_id: 'ws-1',
+      post_id: 'post_1',
+      version_id: 'ver_missing',
+    });
+    expect(missing.isError).toBe(true);
   });
 
   it('prepare_brief_context returns a brief request handle', async () => {
@@ -541,6 +864,35 @@ describe('mcp content action tools', () => {
         action: 'mcp_brief_sent_to_client',
       }),
     );
+  });
+
+  it('send_to_client supports brief_id without a handle', async () => {
+    (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'brief_123',
+      workspaceId: 'ws-1',
+      targetKeyword: 'kw',
+      secondaryKeywords: [],
+      suggestedTitle: 'Brief title',
+      suggestedMetaDesc: 'Meta',
+      outline: [],
+      wordCountTarget: 1000,
+      intent: 'informational',
+      audience: 'audience',
+      competitorInsights: '',
+      internalLinkSuggestions: [],
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    (createContentRequest as ReturnType<typeof vi.fn>).mockReturnValue({ id: 'cr_123' });
+
+    const result = await handleContentActionTool('send_to_client', {
+      workspace_id: 'ws-1',
+      brief_id: 'brief_123',
+    });
+
+    expect(result.isError).toBeUndefined();
+    const payload = JSON.parse(result.content[0].text) as { request_id: string; target: string };
+    expect(payload.request_id).toBe('cr_123');
+    expect(payload.target).toBe('brief');
   });
 
   it('send_to_client updates existing parent request with update event', async () => {

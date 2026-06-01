@@ -32,6 +32,9 @@ vi.mock('../../server/outcome-playbooks.js', () => ({
   getPlaybooks: vi.fn().mockReturnValue([]),
 }));
 
+// roi-attribution.js is no longer used by learnings-slice (Task 2.3).
+// The module may still exist for other callers; the mock here prevents any
+// accidental import from reaching real DB code.
 vi.mock('../../server/roi-attribution.js', () => ({
   getROIAttributionsRaw: vi.fn().mockReturnValue([]),
 }));
@@ -65,6 +68,7 @@ import { isFeatureEnabled } from '../../server/feature-flags.js';
 import { getWorkspaceLearnings } from '../../server/workspace-learnings.js';
 import { getPlaybooks } from '../../server/outcome-playbooks.js';
 import { getActionsByWorkspace, getOutcomesForAction, getTopWinsFromActions } from '../../server/outcome-tracking.js';
+// getROIAttributionsRaw is imported to verify the mock is wired (the old path is dead after Task 2.3).
 import { getROIAttributionsRaw } from '../../server/roi-attribution.js';
 import { getWorkspace } from '../../server/workspaces.js';
 
@@ -92,7 +96,8 @@ function makeAction(id: string, overrides: Record<string, unknown> = {}) {
     sourceId: null,
     pageUrl: `/page/${id}`,
     targetKeyword: null,
-    baselineSnapshot: {},
+    // baselineSnapshot.clicks is read by the roiAttribution loop (Task 2.3)
+    baselineSnapshot: { clicks: 100 },
     trailingHistory: {},
     attribution: {},
     measurementWindow: 30,
@@ -112,7 +117,8 @@ function makeOutcome(actionId: string, score: string | null = 'strong_win') {
     id: `outcome-${actionId}`,
     actionId,
     checkpointDays: 30,
-    metricsSnapshot: {},
+    // metricsSnapshot.clicks is read by the roiAttribution loop (Task 2.3)
+    metricsSnapshot: { clicks: 150 },
     score,
     deltaSummary: { delta_percent: 20 },
     competitorContext: null,
@@ -120,11 +126,13 @@ function makeOutcome(actionId: string, score: string | null = 'strong_win') {
   };
 }
 
-/** Build a minimal ROI row as returned by getROIAttributionsRaw. */
-function makeROIRow(id: string) {
+/** @deprecated Was used for the old getROIAttributionsRaw path (roi_attributions, dead table).
+ * Retained as a no-op to avoid breaking the test file structure; the new roiAttribution tests
+ * build their data via makeAction + makeOutcome (Task 2.3). */
+function makeROIRow(_id: string) {
   return {
-    id,
-    pageUrl: `/roi-page/${id}`,
+    id: _id,
+    pageUrl: `/roi-page/${_id}`,
     actionType: 'content_update',
     clicksBefore: 100,
     clicksAfter: 150,
@@ -147,7 +155,7 @@ describe('assembleLearnings', () => {
     vi.mocked(getActionsByWorkspace).mockReturnValue([]);
     vi.mocked(getOutcomesForAction).mockReturnValue([]);
     vi.mocked(getTopWinsFromActions).mockReturnValue([]);
-    vi.mocked(getROIAttributionsRaw).mockReturnValue([]);
+    vi.mocked(getROIAttributionsRaw).mockReturnValue([]); // kept for completeness; no longer called by assembleLearnings (Task 2.3)
     vi.mocked(getWorkspace).mockReturnValue(null);
   });
 
@@ -606,16 +614,19 @@ describe('assembleLearnings', () => {
     });
   });
 
-  // ── 7. ROI attribution mapping ────────────────────────────────────────────────
+  // ── 7. ROI attribution mapping (Task 2.3: reads live action_outcomes, not roi_attributions) ─
 
   describe('ROI attribution mapping', () => {
     it('maps ROI rows to roiAttribution array with correct field names', async () => {
-      vi.mocked(getROIAttributionsRaw).mockReturnValue([makeROIRow('roi-1')] as any);
+      // action-1 has a win outcome: clicksBefore=100 (baselineSnapshot), clicksAfter=150 (metricsSnapshot)
+      const action = makeAction('action-1');
+      vi.mocked(getActionsByWorkspace).mockReturnValue([action] as any);
+      vi.mocked(getOutcomesForAction).mockReturnValue([makeOutcome('action-1', 'win')] as any);
       const result = await assembleLearnings(WS_ID);
       expect(result.roiAttribution).toHaveLength(1);
       expect(result.roiAttribution![0]).toEqual({
-        actionId: 'roi-1',
-        pageUrl: '/roi-page/roi-1',
+        actionId: 'action-1',
+        pageUrl: `/page/action-1`,
         actionType: 'content_update',
         clicksBefore: 100,
         clicksAfter: 150,
@@ -624,37 +635,54 @@ describe('assembleLearnings', () => {
       });
     });
 
-    it('maps id → actionId field (not id)', async () => {
-      vi.mocked(getROIAttributionsRaw).mockReturnValue([makeROIRow('myid')] as any);
+    it('maps actionId from action.id (not a separate id field)', async () => {
+      const action = makeAction('myid');
+      vi.mocked(getActionsByWorkspace).mockReturnValue([action] as any);
+      vi.mocked(getOutcomesForAction).mockReturnValue([makeOutcome('myid', 'win')] as any);
       const result = await assembleLearnings(WS_ID);
       expect(result.roiAttribution![0]).toHaveProperty('actionId', 'myid');
       expect(result.roiAttribution![0]).not.toHaveProperty('id');
     });
 
-    it('returns empty roiAttribution when getROIAttributionsRaw returns empty array', async () => {
-      vi.mocked(getROIAttributionsRaw).mockReturnValue([]);
+    it('returns empty roiAttribution when no actions', async () => {
+      vi.mocked(getActionsByWorkspace).mockReturnValue([]);
       const result = await assembleLearnings(WS_ID);
       expect(result.roiAttribution).toEqual([]);
     });
 
-    it('returns empty roiAttribution when getROIAttributionsRaw throws', async () => {
-      vi.mocked(getROIAttributionsRaw).mockImplementation(() => {
-        throw new Error('roi db error');
+    it('returns empty roiAttribution when all outcomes are non-win scores', async () => {
+      const action = makeAction('a1');
+      vi.mocked(getActionsByWorkspace).mockReturnValue([action] as any);
+      vi.mocked(getOutcomesForAction).mockReturnValue([makeOutcome('a1', 'neutral')] as any);
+      const result = await assembleLearnings(WS_ID);
+      expect(result.roiAttribution).toEqual([]);
+    });
+
+    it('returns empty roiAttribution when outcome-tracking throws', async () => {
+      vi.mocked(getActionsByWorkspace).mockImplementation(() => {
+        throw new Error('tracking db error');
       });
       const result = await assembleLearnings(WS_ID);
       expect(result.roiAttribution).toEqual([]);
     });
 
-    it('maps multiple rows preserving order', async () => {
-      const rows = [makeROIRow('r1'), makeROIRow('r2'), makeROIRow('r3')];
-      vi.mocked(getROIAttributionsRaw).mockReturnValue(rows as any);
+    it('maps multiple actions preserving insertion order (ordered by action list)', async () => {
+      const actions = [makeAction('r1'), makeAction('r2'), makeAction('r3')];
+      vi.mocked(getActionsByWorkspace).mockReturnValue(actions as any);
+      vi.mocked(getOutcomesForAction).mockImplementation((actionId: string) =>
+        [makeOutcome(actionId, 'win')] as any,
+      );
       const result = await assembleLearnings(WS_ID);
       expect(result.roiAttribution!.map(r => r.actionId)).toEqual(['r1', 'r2', 'r3']);
     });
 
-    it('calls getROIAttributionsRaw with workspaceId and limit=10', async () => {
+    it('does not call getROIAttributionsRaw (dead table no longer consulted)', async () => {
+      const action = makeAction('a1');
+      vi.mocked(getActionsByWorkspace).mockReturnValue([action] as any);
+      vi.mocked(getOutcomesForAction).mockReturnValue([makeOutcome('a1', 'win')] as any);
       await assembleLearnings(WS_ID);
-      expect(vi.mocked(getROIAttributionsRaw)).toHaveBeenCalledWith(WS_ID, 10);
+      // getROIAttributionsRaw must not be called — roi_attributions has zero writers (Task 2.3)
+      expect(vi.mocked(getROIAttributionsRaw)).not.toHaveBeenCalled();
     });
   });
 
@@ -708,31 +736,30 @@ describe('assembleLearnings', () => {
   // ── 9. Graceful degradation — independent sub-sections ───────────────────────
 
   describe('graceful degradation of independent sub-sections', () => {
-    it('roi failure does not affect availability or weCalledIt', async () => {
+    it('win outcome (not strong_win) contributes to roiAttribution but not weCalledIt', async () => {
+      // Task 2.3: roiAttribution and weCalledIt now come from the same action_outcomes loop.
+      // A "win" outcome is included in roiAttribution but excluded from weCalledIt (strong_win only).
       vi.mocked(getWorkspaceLearnings).mockReturnValue(makeSummary() as any);
-      vi.mocked(getROIAttributionsRaw).mockImplementation(() => {
-        throw new Error('roi fail');
-      });
       const action = makeAction('a1');
       vi.mocked(getActionsByWorkspace).mockReturnValue([action] as any);
-      vi.mocked(getOutcomesForAction).mockReturnValue([makeOutcome('a1', 'strong_win')] as any);
+      vi.mocked(getOutcomesForAction).mockReturnValue([makeOutcome('a1', 'win')] as any);
 
       const result = await assembleLearnings(WS_ID);
       expect(result.availability).toBe('ready');
-      expect(result.weCalledIt).toHaveLength(1);
-      expect(result.roiAttribution).toEqual([]);
+      expect(result.weCalledIt).toHaveLength(0); // win, not strong_win
+      expect(result.roiAttribution).toHaveLength(1); // win qualifies
     });
 
-    it('outcome-tracking failure does not affect availability or roiAttribution', async () => {
+    it('outcome-tracking failure degrades roiAttribution, weCalledIt, and topWins to empty', async () => {
+      // Task 2.3: all three fields come from the same outcome-tracking block — all fail together.
       vi.mocked(getWorkspaceLearnings).mockReturnValue(makeSummary() as any);
       vi.mocked(getActionsByWorkspace).mockImplementation(() => {
         throw new Error('tracking fail');
       });
-      vi.mocked(getROIAttributionsRaw).mockReturnValue([makeROIRow('r1')] as any);
 
       const result = await assembleLearnings(WS_ID);
       expect(result.availability).toBe('ready');
-      expect(result.roiAttribution).toHaveLength(1);
+      expect(result.roiAttribution).toEqual([]);
       expect(result.weCalledIt).toEqual([]);
       expect(result.topWins).toEqual([]);
     });
@@ -754,7 +781,6 @@ describe('assembleLearnings', () => {
 
     it('all sub-sections fail simultaneously — result is still a valid shape', async () => {
       vi.mocked(getWorkspaceLearnings).mockReturnValue(makeSummary() as any);
-      vi.mocked(getROIAttributionsRaw).mockImplementation(() => { throw new Error(); });
       vi.mocked(getActionsByWorkspace).mockImplementation(() => { throw new Error(); });
       vi.mocked(getWorkspace).mockImplementation(() => { throw new Error(); });
 

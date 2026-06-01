@@ -302,6 +302,9 @@ export function SchemaPageCard({
               {validationStatus === 'errors' && (
                 <Badge label="Fix errors to publish" tone="red" variant="outline" shape="pill" size="sm" icon={XCircle} ariaLabel="Fix errors before publishing" />
               )}
+              {!validationStatus && (
+                <Badge label="Not validated yet" tone="blue" variant="outline" shape="pill" size="sm" icon={Clock} />
+              )}
               {!page.pageId.startsWith('cms-') && (
                 published ? (
                   <Badge label="Published to Webflow" tone="emerald" variant="outline" shape="sm" size="md" icon={CheckCircle} />

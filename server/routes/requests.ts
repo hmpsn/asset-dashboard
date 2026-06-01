@@ -177,7 +177,14 @@ router.get('/api/requests/:id', (req, res) => {
   res.json(r);
 });
 
-// Internal: update request status/priority/category
+// Internal: update request status/priority/category.
+// The updatePageState({ status: 'live' }) below is UI bookkeeping for a resolved
+// generic client request (bug/design/content/feature/seo/other) — it records that
+// the request's associated page was touched, not the application of a structured
+// audit/keyword recommendation. Resolved requests do not map 1:1 to the
+// recommendation engine's rec set (which is keyed on audit issues + keyword
+// strategy), so there is no rec to resolve here.
+// rec-refresh-ok
 router.patch('/api/requests/:id', validate(updateRequestSchema), (req, res) => {
   const { status, priority, category } = req.body as {
     status?: RequestStatus;

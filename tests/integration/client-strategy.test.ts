@@ -469,7 +469,7 @@ describe('GET /api/public/seo-strategy — happy path', () => {
     expect(body.updatedAt).toBeTruthy();
   });
 
-  it('quickWins array preserves client-safe fields only (no roiScore)', async () => {
+  it('quickWins array exposes client-safe fields incl. roiScore (SI3 relative ROI), not currentKeyword', async () => {
     const res = await api(`/api/public/seo-strategy/${strategyWsId}`);
     const body = await res.json();
 
@@ -479,11 +479,15 @@ describe('GET /api/public/seo-strategy — happy path', () => {
       expect(typeof qw.action).toBe('string');
       expect(['high', 'medium', 'low']).toContain(qw.estimatedImpact);
       expect(typeof qw.rationale).toBe('string');
-      // roiScore is an internal scoring field — not returned to clients
-      expect(qw.roiScore).toBeUndefined();
-      // currentKeyword is also not exposed (internal)
+      // PR6 (SI3): roiScore is the grounded RELATIVE ROI composite (0–100) the client
+      // sees as a prioritization signal. It is NOT the admin/AI-only dollar emvPerWeek.
+      // currentKeyword remains internal and must not be exposed.
       expect(qw.currentKeyword).toBeUndefined();
     }
+    // The seeded quick win carries roiScore: 85 — it must now round-trip to the client.
+    const withRoi = body.quickWins.find((qw: { roiScore?: number }) => qw.roiScore != null);
+    expect(withRoi).toBeDefined();
+    expect(withRoi.roiScore).toBe(85);
   });
 
   it('pageMap is assembled from page_keywords table (not keyword_strategy JSON)', async () => {

@@ -137,4 +137,36 @@ describe('MCP job tools (integration)', () => {
     expect(typeof payload.selected_keyword_count).toBe('number');
     expect(payload.dashboard_url).toContain(`/ws/${ws.workspaceId}/local-seo`);
   });
+
+  it('supports get_job_status, list_jobs, and cancel_job tools', async () => {
+    const started = await callMcpTool('start_keyword_strategy_generation', {
+      workspace_id: ws.workspaceId,
+      options: { mode: 'full' },
+    });
+    expect(started.isError).toBeFalsy();
+    const startedPayload = JSON.parse(started.content[0].text) as { job_id: string };
+
+    const status = await callMcpTool('get_job_status', {
+      workspace_id: ws.workspaceId,
+      job_id: startedPayload.job_id,
+    });
+    expect(status.isError).toBeFalsy();
+    const statusPayload = JSON.parse(status.content[0].text) as { job: { id: string } };
+    expect(statusPayload.job.id).toBe(startedPayload.job_id);
+
+    const listed = await callMcpTool('list_jobs', {
+      workspace_id: ws.workspaceId,
+    });
+    expect(listed.isError).toBeFalsy();
+    const listPayload = JSON.parse(listed.content[0].text) as { jobs: Array<{ id: string }> };
+    expect(listPayload.jobs.some(job => job.id === startedPayload.job_id)).toBe(true);
+
+    const cancelled = await callMcpTool('cancel_job', {
+      workspace_id: ws.workspaceId,
+      job_id: startedPayload.job_id,
+    });
+    expect(cancelled.isError).toBeFalsy();
+    const cancelledPayload = JSON.parse(cancelled.content[0].text) as { job: { status: string } };
+    expect(['cancelled', 'done', 'error']).toContain(cancelledPayload.job.status);
+  });
 });

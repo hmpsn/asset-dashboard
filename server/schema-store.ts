@@ -16,6 +16,7 @@ import db from './db/index.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { getWorkspace } from './workspaces.js';
 
 const log = createLogger('schema-store');
 
@@ -161,6 +162,28 @@ const templateStmts = createStmtCache(() => ({
   ),
 }));
 
+function canonicalWorkspaceName(workspaceId: string): string | undefined {
+  if (!workspaceId) return undefined;
+  const workspace = getWorkspace(workspaceId);
+  const name = workspace?.name?.trim();
+  return name ? name : undefined;
+}
+
+function applyCanonicalTemplateName(
+  workspaceId: string,
+  organizationNode: Record<string, unknown>,
+  websiteNode: Record<string, unknown>,
+): { organizationNode: Record<string, unknown>; websiteNode: Record<string, unknown> } {
+  const canonicalName = canonicalWorkspaceName(workspaceId);
+  if (!canonicalName) {
+    return { organizationNode, websiteNode };
+  }
+  return {
+    organizationNode: { ...organizationNode, name: canonicalName },
+    websiteNode: { ...websiteNode, name: canonicalName },
+  };
+}
+
 export function saveSiteTemplate(
   siteId: string,
   workspaceId: string,
@@ -169,20 +192,26 @@ export function saveSiteTemplate(
 ): SchemaSiteTemplate {
   const now = new Date().toISOString();
   const existing = templateStmts().getBySite.get(siteId) as TemplateRow | undefined;
+  const canonicalWorkspaceId = workspaceId || existing?.workspace_id || '';
+  const normalizedNodes = applyCanonicalTemplateName(
+    canonicalWorkspaceId,
+    organizationNode,
+    websiteNode,
+  );
   templateStmts().upsert.run({
     site_id: siteId,
-    workspace_id: workspaceId,
-    organization_node: JSON.stringify(organizationNode),
-    website_node: JSON.stringify(websiteNode),
+    workspace_id: canonicalWorkspaceId,
+    organization_node: JSON.stringify(normalizedNodes.organizationNode),
+    website_node: JSON.stringify(normalizedNodes.websiteNode),
     created_at: existing?.created_at || now,
     updated_at: now,
   });
   log.info(`Saved site template for ${siteId}`);
   return {
     siteId,
-    workspaceId,
-    organizationNode,
-    websiteNode,
+    workspaceId: canonicalWorkspaceId,
+    organizationNode: normalizedNodes.organizationNode,
+    websiteNode: normalizedNodes.websiteNode,
     createdAt: existing?.created_at || now,
     updatedAt: now,
   };
@@ -191,11 +220,18 @@ export function saveSiteTemplate(
 export function getSiteTemplate(siteId: string): SchemaSiteTemplate | null {
   const row = templateStmts().getBySite.get(siteId) as TemplateRow | undefined;
   if (!row) return null;
+  const parsedOrganizationNode = parseJsonFallback<Record<string, unknown>>(row.organization_node, {});
+  const parsedWebsiteNode = parseJsonFallback<Record<string, unknown>>(row.website_node, {});
+  const normalizedNodes = applyCanonicalTemplateName(
+    row.workspace_id,
+    parsedOrganizationNode,
+    parsedWebsiteNode,
+  );
   return {
     siteId: row.site_id,
     workspaceId: row.workspace_id,
-    organizationNode: parseJsonFallback<Record<string, unknown>>(row.organization_node, {}),
-    websiteNode: parseJsonFallback<Record<string, unknown>>(row.website_node, {}),
+    organizationNode: normalizedNodes.organizationNode,
+    websiteNode: normalizedNodes.websiteNode,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

@@ -36,6 +36,11 @@ vi.mock('../../../src/hooks/client', () => ({
   useClientIntelligence: () => ({ data: undefined }),
 }));
 
+// ── Recommendations hook — no top rec by default ──────────────────────────────
+vi.mock('../../../src/hooks/useRecommendations', () => ({
+  useRecommendationSet: () => ({ data: undefined }),
+}));
+
 // ── Heavy sub-components ──────────────────────────────────────────────────────
 vi.mock('../../../src/components/client/MonthlyDigest', () => ({
   MonthlyDigest: () => <div data-testid="monthly-digest" />,

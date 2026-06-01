@@ -540,12 +540,7 @@ export async function getTopDroppedGscPage(
   }
 
   if (!topPage) return null;
-
-  try {
-    return new URL(topPage).pathname;
-  } catch (err) {
-    return topPage.startsWith('/') ? topPage : null;
-  }
+  return extractGscPagePathname(topPage);
 }
 
 /**
@@ -600,12 +595,7 @@ export async function getTopSpikedGscPage(
   }
 
   if (!topPage) return null;
-
-  try {
-    return new URL(topPage).pathname;
-  } catch (err) {
-    return topPage.startsWith('/') ? topPage : null;
-  }
+  return extractGscPagePathname(topPage);
 }
 
 /**

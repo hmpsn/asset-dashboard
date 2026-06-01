@@ -47,7 +47,7 @@ export function SchemaBusinessProfileCallout({
         </p>
         {workspaceId && (
           <Link
-            to={adminPath(workspaceId, 'workspace-settings') + '?tab=business-profile'}
+            to={adminPath(workspaceId, 'brand') + '?tab=business-profile'}
             className="t-caption text-accent-brand hover:text-accent-brand mt-2 inline-block"
           >
             Complete business profile →
@@ -133,9 +133,9 @@ export function SchemaInitialPageTypePicker({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="t-caption text-[var(--brand-text-muted)]">{availablePages.length} pages — set page types for better AI prompts</span>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="t-caption text-[var(--brand-text-muted)] truncate">{availablePages.length} pages — set page types for better AI prompts</span>
           <Button
             onClick={() => setShowTypeGuide(value => !value)}
             variant="ghost"
@@ -152,22 +152,31 @@ export function SchemaInitialPageTypePicker({
           value={pageSearch}
           onChange={onPageSearchChange}
           placeholder="Filter pages..."
-          className="t-caption w-48"
+          className="t-caption w-full sm:w-48"
         />
       </div>
       {showTypeGuide && <SchemaPageTypeGuide />}
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden max-h-[400px] overflow-y-auto" style={{ borderRadius: 'var(--radius-signature)' }}>
+      <div
+        className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden"
+        style={{ borderRadius: 'var(--radius-signature)' }}
+      >
+        <div className="grid grid-cols-[minmax(0,1fr)_11rem_auto] gap-3 px-4 py-2 border-b border-[var(--brand-border)]/60 bg-[var(--surface-3)]/40">
+          <span className="t-caption-sm font-medium text-[var(--brand-text-muted)]">Page</span>
+          <span className="t-caption-sm font-medium text-[var(--brand-text-muted)]">Type</span>
+          <span className="t-caption-sm font-medium text-[var(--brand-text-muted)] text-right">Action</span>
+        </div>
+        <div className="max-h-[400px] overflow-y-auto">
         {filteredPages.map(page => (
-          <div key={page.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-[var(--brand-border)]/50 last:border-b-0 hover:bg-[var(--surface-3)]/30 transition-colors">
-            <div className="flex-1 min-w-0">
-              <div className="t-caption text-[var(--brand-text)] truncate">{page.title}</div>
-              <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">/{page.slug}</div>
+          <div key={page.id} className="grid grid-cols-[minmax(0,1fr)_11rem_auto] items-center gap-3 px-4 py-2.5 border-b border-[var(--brand-border)]/50 last:border-b-0 hover:bg-[var(--surface-3)]/30 transition-colors">
+            <div className="min-w-0">
+              <div className="t-caption text-[var(--brand-text)] truncate">{page.title || 'Untitled page'}</div>
+              <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">/{page.slug || ''}</div>
             </div>
             <FormSelect
               value={pageTypes[page.id] || 'auto'}
               onChange={pageType => onPageTypeSelect(page.id, pageType)}
               options={SCHEMA_PAGE_TYPE_OPTIONS}
-              className="px-2 py-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] t-caption-sm text-[var(--brand-text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500 cursor-pointer"
+              className="w-44 px-2 py-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] t-caption-sm text-[var(--brand-text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500 cursor-pointer"
             />
             <Button
               onClick={() => onGenerateSinglePage(page.id)}
@@ -181,6 +190,7 @@ export function SchemaInitialPageTypePicker({
             </Button>
           </div>
         ))}
+        </div>
       </div>
     </div>
   );

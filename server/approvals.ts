@@ -8,6 +8,7 @@ import { parseJsonFallback } from './db/json-validation.js';
 import { approvalItemSchema } from './schemas/approval-schemas.js';
 import { createLogger } from './logger.js';
 import { validateTransition, APPROVAL_ITEM_TRANSITIONS } from './state-machines.js';
+import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 
 const log = createLogger('approvals');
 
@@ -113,6 +114,7 @@ export function createBatch(
     created_at: now,
     updated_at: now,
   });
+  invalidateIntelligenceCache(workspaceId);
   return batch;
 }
 
@@ -147,6 +149,7 @@ export function updateItem(
   Object.assign(item, defined, { updatedAt: new Date().toISOString() });
 
   recalcBatchStatus(batch);
+  invalidateIntelligenceCache(workspaceId);
   return batch;
 }
 
@@ -188,10 +191,12 @@ export function markBatchApplied(workspaceId: string, batchId: string, itemIds: 
   }
 
   recalcBatchStatus(batch);
+  invalidateIntelligenceCache(workspaceId);
   return batch;
 }
 
 export function deleteBatch(workspaceId: string, batchId: string): boolean {
   const info = stmts().deleteById.run(batchId, workspaceId);
+  if (info.changes > 0) invalidateIntelligenceCache(workspaceId);
   return info.changes > 0;
 }

@@ -45,6 +45,11 @@ router.get('/api/work-orders/:workspaceId', requireWorkspaceAccess('workspaceId'
   res.json(listWorkOrders(req.params.workspaceId));
 });
 
+// rec-resolve for a completed work order happens inside updateWorkOrder()
+// (server/work-orders.ts) — it resolves recommendations covering the order's
+// pages. The updatePageState({ status: 'live' }) calls below only mirror that
+// state for the UI, so no rec-refresh is needed at the route layer.
+// rec-refresh-ok
 router.patch('/api/work-orders/:workspaceId/:orderId', requireWorkspaceAccess('workspaceId'), validate(updateWorkOrderSchema), (req, res, next) => {
   const { status, assignedTo, notes } = req.body;
   const wsId = req.params.workspaceId;

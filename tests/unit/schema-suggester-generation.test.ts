@@ -19,7 +19,8 @@ describe('SchemaSuggester generation workflow extraction', () => {
     const hook = readFileSync('src/components/schema/useSchemaSuggesterGeneration.ts', 'utf-8'); // readFile-ok — intentional behavior preservation guard
 
     expect(hook).toContain('useSchemaSnapshot(siteId, workspaceId)');
-    expect(hook).toContain('useWebflowPages(siteId, workspaceId)');
+    expect(hook).toContain('/api/webflow/all-pages/');
+    expect(hook).toContain('fetchAllPageOptions');
     expect(hook).toContain("fixContext.targetRoute === 'seo-schema'");
     expect(hook).toContain('generateSinglePage(fixContext.pageId!)');
     expect(hook).toContain('lastPublishedAt: page.lastPublishedAt');

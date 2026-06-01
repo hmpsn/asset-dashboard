@@ -45,5 +45,7 @@ export interface ROIHighlight {
   result: string;            // "Position improved from 8 to 3"
   /** Net click change after measurement window. May be 0 if unmeasured yet. */
   clicksGained: number;
+  /** Dollar value attributed to this outcome (clicks_delta × CPC). Null when CPC unavailable. */
+  attributedValue: number | null;
 }
 

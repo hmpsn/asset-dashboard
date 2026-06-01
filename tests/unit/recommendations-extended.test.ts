@@ -806,6 +806,7 @@ describe('recommendation persistence integrity', () => {
       trafficAtRisk: 0,
       estimatedRecoverableClicks: 0,
       estimatedRecoverableImpressions: 0,
+      topRecommendationId: null,
     });
   });
 

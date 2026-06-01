@@ -10,13 +10,14 @@ import type { CmsImageScanResult, CmsImageAsset, CmsCollectionImageInfo } from '
 import type * as WebflowClient from '../webflow-client.js';
 import { isProgrammingError } from '../errors.js';
 import { requireWorkspaceSiteAccessFromQuery } from '../auth.js';
+import { toInsightPageId } from '../helpers.js';
 
 const router = Router();
 const log = createLogger('webflow-cms-images');
 
 function displayNameFromUrl(url: string): string {
   try {
-    const pathname = new URL(url).pathname;
+    const pathname = toInsightPageId(url);
     return pathname.split('/').pop()?.split('?')[0] || url;
   } catch (err) {
     return url.split('/').pop()?.split('?')[0] || url;

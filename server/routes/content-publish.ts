@@ -22,6 +22,10 @@ import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
 import { requireWorkspaceAccess, requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
+import { queueKeywordStrategyPostUpdateFollowOns } from '../keyword-strategy-follow-ons.js';
+import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
+import { captureBaselineFromGsc } from '../outcome-measurement.js';
+import { normalizePageUrl } from '../helpers.js';
 
 const log = createLogger('content-publish');
 const router = Router();
@@ -141,6 +145,31 @@ router.post('/api/content-posts/:workspaceId/:postId/publish-to-webflow', requir
       { postId, itemId, collectionId, slug, isUpdate },
     );
 
+    // Record for outcome tracking — guard prevents duplicates if the same post
+    // is re-published (e.g. re-deploy after a content edit).
+    try {
+      if (!getActionByWorkspaceAndSource(workspaceId, 'post', postId)) {
+        const publishedPagePath = slug ? normalizePageUrl(slug) : null;
+        const postAction = recordAction({ // recordAction-ok: workspaceId from validated route param
+          workspaceId,
+          actionType: 'content_published',
+          sourceType: 'post',
+          sourceId: postId,
+          pageUrl: publishedPagePath,
+          targetKeyword: post.targetKeyword ?? null,
+          baselineSnapshot: {
+            captured_at: new Date().toISOString(),
+          },
+          attribution: 'platform_executed',
+        });
+        if (publishedPagePath) {
+          void captureBaselineFromGsc(postAction.id, workspaceId, publishedPagePath);
+        }
+      }
+    } catch (err) {
+      log.warn({ err, postId }, 'Failed to record outcome action for manual content publish');
+    }
+
     // Broadcast to workspace
     invalidateContentPipelineIntelligence(workspaceId);
     broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_PUBLISHED, {
@@ -158,6 +187,17 @@ router.post('/api/content-posts/:workspaceId/:postId/publish-to-webflow', requir
       isUpdate,
       post: updatedPost,
     });
+
+    // Enqueue a recommendation regen after the response is sent — a content
+    // publish changes the live page inventory so recommendations should reflect
+    // it. Guarded in its own try/catch: the response has already been sent, so a
+    // throw here must NOT fall through to the outer catch (which would attempt a
+    // second, header-already-sent 500 response). recsInFlight dedupes per-workspace.
+    try {
+      queueKeywordStrategyPostUpdateFollowOns({ workspaceId });
+    } catch (err) {
+      log.warn({ err, workspaceId }, 'Failed to enqueue recommendation regen after content publish');
+    }
   } catch (err) {
     log.error({ err }, 'Publish to Webflow failed');
     res.status(500).json({ error: err instanceof Error ? err.message : 'Publish failed' });

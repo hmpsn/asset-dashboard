@@ -230,7 +230,7 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
           icon={Sparkles}
           size="md"
           variant="secondary"
-          className="rounded-[var(--radius-md)] bg-teal-600 hover:bg-teal-500 text-white border-0 font-medium disabled:opacity-50"
+          className="rounded-[var(--radius-md)] bg-teal-600 hover:bg-teal-500 text-slate-900 border-0 font-medium disabled:opacity-50"
         >
           {generating ? 'Analyzing site...' : 'Generate Site Plan'}
         </Button>
@@ -459,33 +459,41 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
           {/* Page roles table */}
           <div className="space-y-1">
             <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium px-1">Page Roles</div>
-            <div className="bg-[var(--surface-1)]/50 rounded-[var(--radius-md)] border border-[var(--brand-border)] overflow-hidden max-h-[400px] overflow-y-auto">
-              {plan.pageRoles.map((pr) => (
-                <div
-                  key={pr.pagePath}
-                  className="flex items-center gap-3 px-3 py-2 border-b border-[var(--brand-border)]/50 last:border-b-0 hover:bg-[var(--surface-3)]/20 transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="t-caption text-[var(--brand-text)] truncate">{pr.pageTitle}</div>
-                    <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{pr.pagePath}</div>
-                  </div>
-                  <span className="t-caption-sm text-[var(--brand-text-muted)] font-mono shrink-0">{pr.primaryType}</span>
-                  <FormSelect
-                    value={pr.role}
-                    onChange={value => handleRoleChange(pr.pagePath, value as SchemaPageRole)}
-                    options={ROLE_OPTIONS.map(role => ({
-                      value: role,
-                      label: SCHEMA_ROLE_LABELS[role],
-                    }))}
-                    className={cn('px-2 py-1 rounded t-caption-sm font-medium border cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:ring-1 focus:ring-teal-500 bg-transparent', ROLE_COLORS[pr.role] ?? DEFAULT_ROLE_COLOR)}
-                  />
-                  {pr.entityRefs.length > 0 && (
-                    <span className="t-caption-sm text-[var(--brand-text-muted)]" title={pr.entityRefs.join(', ')}>
-                      {pr.entityRefs.length} ref{pr.entityRefs.length > 1 ? 's' : ''}
+            <div className="bg-[var(--surface-1)]/50 rounded-[var(--radius-md)] border border-[var(--brand-border)] overflow-hidden">
+              <div className="grid grid-cols-[minmax(0,1fr)_7rem_14rem_auto] gap-3 px-3 py-2 border-b border-[var(--brand-border)]/60 bg-[var(--surface-3)]/30">
+                <span className="t-caption-sm font-medium text-[var(--brand-text-muted)]">Page</span>
+                <span className="t-caption-sm font-medium text-[var(--brand-text-muted)]">Type</span>
+                <span className="t-caption-sm font-medium text-[var(--brand-text-muted)]">Role</span>
+                <span className="t-caption-sm font-medium text-[var(--brand-text-muted)] text-right">Refs</span>
+              </div>
+              <div className="max-h-[400px] overflow-y-auto">
+                {plan.pageRoles.map((pr) => (
+                  <div
+                    key={pr.pagePath}
+                    className="grid grid-cols-[minmax(0,1fr)_7rem_14rem_auto] items-center gap-3 px-3 py-2 border-b border-[var(--brand-border)]/50 last:border-b-0 hover:bg-[var(--surface-3)]/20 transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <div className="t-caption text-[var(--brand-text)] truncate">{pr.pageTitle}</div>
+                      <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{pr.pagePath}</div>
+                    </div>
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] font-mono truncate" title={pr.primaryType}>{pr.primaryType}</span>
+                    <FormSelect
+                      value={pr.role}
+                      onChange={value => handleRoleChange(pr.pagePath, value as SchemaPageRole)}
+                      options={ROLE_OPTIONS.map(role => ({
+                        value: role,
+                        label: SCHEMA_ROLE_LABELS[role],
+                      }))}
+                      className={cn('w-56 px-2 py-1 rounded t-caption-sm font-medium border cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:ring-1 focus:ring-teal-500 bg-transparent', ROLE_COLORS[pr.role] ?? DEFAULT_ROLE_COLOR)}
+                    />
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] text-right" title={pr.entityRefs.join(', ')}>
+                      {pr.entityRefs.length > 0
+                        ? `${pr.entityRefs.length} ref${pr.entityRefs.length > 1 ? 's' : ''}`
+                        : '—'}
                     </span>
-                  )}
-                </div>
-              ))}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 

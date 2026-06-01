@@ -61,17 +61,26 @@ vi.mock('../../server/db/json-validation.js', () => ({
 // ── Mock: middleware/validate — provide a real z stub ────────────────────────
 
 vi.mock('../../server/middleware/validate.js', () => {
-  const stringSchema = { parse: (v: unknown) => v };
-  const arrayFn = () => ({ optional: () => ({}) });
-  const objectFn = (_shape: unknown) => ({});
-  return {
-    validate: vi.fn(),
-    z: {
-      string: () => stringSchema,
-      array: arrayFn,
-      object: objectFn,
-    },
-  };
+  // Fully chainable Zod stub via Proxy: ANY schema-builder method returns a
+  // chain, so the diverse module-level schemas transitively imported through
+  // workspace-intelligence (z.string().trim(), z.object().strict(),
+  // z.*.min/email/default/transform/…) never throw at load time. This chain is
+  // reached now that outcome-measurement imports normalizePageUrl from helpers.ts.
+  // parse/safeParse pass through, preserving prior test behaviour.
+  const makeChain = (): any =>
+    new Proxy((() => makeChain()) as unknown as object, {
+      get: (_t, prop) => {
+        if (prop === 'then') return undefined;
+        if (prop === 'parse') return (v: unknown) => v;
+        if (prop === 'safeParse') return (v: unknown) => ({ success: true, data: v });
+        return () => makeChain();
+      },
+      apply: () => makeChain(),
+    });
+  const z: any = new Proxy({}, {
+    get: (_t, prop) => (prop === 'then' ? undefined : makeChain()),
+  });
+  return { validate: vi.fn(), z };
 });
 
 // ── Mock: outcome-tracking (DB-backed) ───────────────────────────────────────

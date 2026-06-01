@@ -1,5 +1,9 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { eeatAssetsApi, type CreateEeatAssetBody, type UpdateEeatAssetBody } from '../../api/eeatAssets';
+import {
+  eeatAssetsApi,
+  type CreateEeatAssetBody,
+  type UpdateEeatAssetBody,
+} from '../../api/eeatAssets';
 import { queryKeys } from '../../lib/queryKeys';
 
 export function useEeatAssets(workspaceId: string | undefined) {
@@ -27,5 +31,11 @@ export function useUpdateEeatAsset(workspaceId: string) {
 export function useDeleteEeatAsset(workspaceId: string) {
   return useMutation({
     mutationFn: (assetId: string) => eeatAssetsApi.remove(workspaceId, assetId),
+  });
+}
+
+export function useAutofillEeatAssets(workspaceId: string) {
+  return useMutation({
+    mutationFn: () => eeatAssetsApi.autofill(workspaceId),
   });
 }

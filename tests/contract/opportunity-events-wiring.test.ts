@@ -1,0 +1,85 @@
+/**
+ * PR7 · Spine B — wiring contract tests (source-level greps, no server boot).
+ *
+ * Verifies that the event-driven re-ranking detectors + apply tail are wired and
+ * gated by the `opportunity-value-events` flag, and that the regen helper breaks the
+ * recommendations.ts ↔ event-store cycle via a dynamic import.
+ */
+import { readFileSync } from 'fs';
+import { describe, expect, it } from 'vitest';
+
+describe('competitor cron → opportunity event + regen', () => {
+  const src = readFileSync('server/intelligence-crons.ts', 'utf-8'); // readFile-ok - wiring contract
+
+  it('gates the competitor event write on the events flag', () => {
+    expect(src).toContain("isFeatureEnabled('opportunity-value-events')");
+  });
+  it('writes a competitor opportunity event', () => {
+    expect(src).toContain("type: 'competitor'");
+    expect(src).toContain('insertOpportunityEvent');
+  });
+  it('triggers a debounced regen after writing competitor events', () => {
+    expect(src).toContain('triggerOpportunityRegen(ws.id)');
+  });
+  it('does NOT mint a defensive recommendation (deferred)', () => {
+    // The competitor detector raises a timing boost on EXISTING recs; it must not
+    // create a net-new rec. Guard against accidental rec minting in the cron.
+    expect(src).not.toContain('generateRecommendations');
+  });
+});
+
+describe('apply tail → opportunity regen', () => {
+  const src = readFileSync('server/recommendations.ts', 'utf-8'); // readFile-ok - wiring contract
+
+  it('triggers a debounced regen on resolveRecommendationsForChange (events flag-gated)', () => {
+    const fnStart = src.indexOf('export function resolveRecommendationsForChange');
+    expect(fnStart).toBeGreaterThan(0);
+    const fnSrc = src.slice(fnStart, src.indexOf('export function resolveRecommendationsForPageIds'));
+    expect(fnSrc).toContain("isFeatureEnabled('opportunity-value-events')");
+    expect(fnSrc).toContain('triggerOpportunityRegen(workspaceId)');
+  });
+
+  it('threads a decaying timingBoost into every computeOpportunityValue call', () => {
+    // Each OV push site must carry a timingBoost computed from the rec's pages.
+    const ovCalls = (src.match(/computeOpportunityValue\(\{/g) ?? []).length;
+    const timingBoosts = (src.match(/timingBoost: maxBoostForPages\(timingBoosts,/g) ?? []).length;
+    expect(ovCalls).toBeGreaterThan(0);
+    expect(timingBoosts).toBe(ovCalls);
+  });
+
+  it('generateRecommendations does NOT call triggerOpportunityRegen (no recursion)', () => {
+    const genStart = src.indexOf('export async function generateRecommendations');
+    expect(genStart).toBeGreaterThan(0);
+    const genSrc = src.slice(genStart);
+    expect(genSrc).not.toContain('triggerOpportunityRegen');
+  });
+});
+
+describe('opportunity-regen breaks the recommendations cycle', () => {
+  const src = readFileSync('server/scoring/opportunity-regen.ts', 'utf-8'); // readFile-ok - cycle contract
+
+  it('loads generateRecommendations via a DYNAMIC import (not a static value import)', () => {
+    expect(src).toContain("await import('../recommendations.js')");
+    expect(src).not.toContain("from '../recommendations.js'");
+  });
+  it('is built on debounceBridge with the events flag', () => {
+    expect(src).toContain("debounceBridge('opportunity-value-events'");
+  });
+});
+
+describe('outcome-crons registers the decay + rank-decline detectors', () => {
+  const src = readFileSync('server/outcome-crons.ts', 'utf-8'); // readFile-ok - wiring contract
+
+  it('schedules runDecayScan and runRankDeclineScan', () => {
+    expect(src).toContain('runDecayScan');
+    expect(src).toContain('runRankDeclineScan');
+    expect(src).toContain('decayScanInterval = setInterval');
+    expect(src).toContain('rankDeclineScanInterval = setInterval');
+  });
+  it('cleans up the new intervals in stopOutcomeCrons', () => {
+    const stopStart = src.indexOf('export function stopOutcomeCrons');
+    const stopSrc = src.slice(stopStart);
+    expect(stopSrc).toContain('clearInterval(decayScanInterval)');
+    expect(stopSrc).toContain('clearInterval(rankDeclineScanInterval)');
+  });
+});

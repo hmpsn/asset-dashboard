@@ -73,7 +73,14 @@ describe('mcp keyword action tools', () => {
   });
 
   it('registers keyword action tool names', () => {
-    expect(keywordActionTools.map(t => t.name)).toEqual(['research_keywords', 'add_keyword_to_strategy']);
+    expect(keywordActionTools.map(t => t.name)).toEqual([
+      'research_keywords',
+      'add_keyword_to_strategy',
+      'get_keyword_strategy',
+      'remove_page_keyword',
+      'add_keywords_batch',
+      'replace_keyword_strategy',
+    ]);
   });
 
   it('research_keywords returns provider metrics and reusable handles', async () => {

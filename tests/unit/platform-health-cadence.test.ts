@@ -13,6 +13,15 @@ const roadmap = JSON.parse(
 ) as {
   sprints: Array<{ id: string; items: Array<{ id: string }> }>;
 };
+const roadmapArchive = JSON.parse(
+  fs.readFileSync(path.resolve(process.cwd(), 'data/roadmap.archive.json'), 'utf8'),
+) as {
+  sprints: Array<{ id: string; items: Array<{ id: string }> }>;
+};
+const combinedRoadmap = {
+  ...roadmap,
+  sprints: [...roadmap.sprints, ...roadmapArchive.sprints],
+};
 const cadence = JSON.parse(
   fs.readFileSync(path.resolve(process.cwd(), 'data/platform-health-cadence.json'), 'utf8'),
 ) as {
@@ -25,7 +34,7 @@ const cadence = JSON.parse(
 
 describe('platform health cadence audit', () => {
   it('builds a valid report for the seeded cadence contract', () => {
-    const report = buildPlatformHealthCadenceReport(cadence, roadmap, '2026-05-15');
+    const report = buildPlatformHealthCadenceReport(cadence, combinedRoadmap, '2026-05-15');
     expect(report.generatedBy).toBe('scripts/platform-health-cadence.ts');
     expect(report.checkpointsTracked).toBeGreaterThan(0);
     expect(report.issues).toEqual([]);
@@ -84,7 +93,7 @@ describe('platform health cadence audit', () => {
   });
 
   it('renders markdown report sections', () => {
-    const report = buildPlatformHealthCadenceReport(cadence, roadmap, '2026-05-15');
+    const report = buildPlatformHealthCadenceReport(cadence, combinedRoadmap, '2026-05-15');
     const markdown = formatPlatformHealthCadenceMarkdown(report);
     expect(markdown).toContain('# Platform Health Cadence Report');
     expect(markdown).toContain('## Cadence Contract');

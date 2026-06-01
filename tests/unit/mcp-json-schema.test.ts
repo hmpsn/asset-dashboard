@@ -24,4 +24,28 @@ describe('toMcpJsonSchema', () => {
     const anySchema = toMcpJsonSchema(z.any());
     expect(anySchema.type).toBe('object');
   });
+
+  it('hoists top-level properties for union object schemas', () => {
+    const unionSchema = z.union([
+      z.object({
+        workspace_id: z.string(),
+        mode: z.literal('patch'),
+        updates: z.object({ title: z.string() }),
+      }),
+      z.object({
+        workspace_id: z.string(),
+        mode: z.literal('replace'),
+        content: z.object({ title: z.string() }),
+      }),
+    ]);
+
+    const result = toMcpJsonSchema(unionSchema);
+    expect(result.type).toBe('object');
+    expect(result.properties).toBeDefined();
+    const properties = result.properties as Record<string, unknown>;
+    expect(properties.workspace_id).toBeDefined();
+    expect(properties.mode).toBeDefined();
+    expect(properties.updates).toBeDefined();
+    expect(properties.content).toBeDefined();
+  });
 });

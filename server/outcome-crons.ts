@@ -5,12 +5,15 @@
 import { createLogger } from './logger.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { queueKeywordStrategyPostUpdateFollowOns } from './keyword-strategy-follow-ons.js';
+import { runBackfill } from './outcome-backfill.js';
 import type * as OutcomeMeasurement from './outcome-measurement.js';
 import type * as WorkspaceLearnings from './workspace-learnings.js';
 import type * as ExternalDetection from './external-detection.js';
 import type * as OutcomePlaybooks from './outcome-playbooks.js';
 import type * as OutcomeTracking from './outcome-tracking.js';
 import type * as ActivityLog from './activity-log.js';
+import type * as OpportunityDetectors from './scoring/opportunity-detectors.js';
 
 const log = createLogger('outcome-crons');
 
@@ -25,6 +28,9 @@ let learningsInterval: ReturnType<typeof setInterval> | null = null;
 let detectionInterval: ReturnType<typeof setInterval> | null = null;
 let archiveInterval: ReturnType<typeof setInterval> | null = null;
 let playbooksInterval: ReturnType<typeof setInterval> | null = null;
+let backfillInterval: ReturnType<typeof setInterval> | null = null;
+let decayScanInterval: ReturnType<typeof setInterval> | null = null;
+let rankDeclineScanInterval: ReturnType<typeof setInterval> | null = null;
 
 // Startup timeout handles — stored so stopOutcomeCrons() can cancel them
 // if shutdown is called within the first 35s of startup.
@@ -71,6 +77,16 @@ export function startOutcomeCrons() {
       }
       if (workspaceIds.length > 0) {
         log.info({ count: workspaceIds.length }, 'Invalidated intelligence cache for measured workspaces');
+      }
+
+      // Enqueue a recommendation regen for each measured workspace so ranking
+      // reflects the new outcomes. NOTE: recsInFlight only dedupes concurrent
+      // regens for the SAME workspace — this loop still issues one regen per
+      // distinct measured workspace, bounded by the number measured this run
+      // (a handful at current scale, acceptable). If the client count grows
+      // materially, add cross-workspace concurrency limiting/staggering here.
+      for (const wsId of workspaceIds) {
+        queueKeywordStrategyPostUpdateFollowOns({ workspaceId: wsId });
       }
 
       // Check action backlog thresholds per workspace.
@@ -146,6 +162,14 @@ export function startOutcomeCrons() {
       if (affectedWsIds.length > 0) {
         log.info({ count: affectedWsIds.length }, 'Invalidated intelligence cache for learnings workspaces');
       }
+
+      // Enqueue a recommendation regen after the learnings update. As above,
+      // recsInFlight dedupes only per-workspace; this issues one regen per
+      // distinct affected workspace (bounded by the run, acceptable at current
+      // scale — revisit with concurrency limiting if client count grows).
+      for (const wsId of affectedWsIds) {
+        queueKeywordStrategyPostUpdateFollowOns({ workspaceId: wsId });
+      }
     } catch (err) {
       log.error({ err }, 'Failed to compute workspace learnings');
     }
@@ -177,6 +201,50 @@ export function startOutcomeCrons() {
     });
   };
 
+  // Backfill sets only a MINIMAL baseline (not GSC) — it is a recovery net for
+  // missed recordAction calls on existing content/insights/recommendations, NOT a
+  // substitute for the live publish-path recordAction that fires at content publish
+  // time and captures real GSC baseline data. Run weekly so any newly published
+  // posts that slipped through the live path get caught quickly.
+  const runBackfillJob = () => {
+    try {
+      const result = runBackfill();
+      log.info({ backfilledCount: result.backfilledCount, errors: result.errors }, 'Outcome backfill cron complete');
+    } catch (err) {
+      log.error({ err }, 'Outcome backfill cron failed');
+    }
+  };
+
+  // ── PR7 · Spine B — decay → opportunity-event detector (24h). ──
+  // Thin cron wrapper around runDecayDetector (see opportunity-detectors.ts): reads
+  // the PERSISTED decay analysis (no crawl), emits DECAYING `decay` events for
+  // critical / repeat-decay pages, and enqueues a debounced regen. ENTIRELY gated by
+  // the `opportunity-value-events` flag inside the detector — flag OFF is a no-op.
+  // Loaded via dynamic import so the cron module doesn't pull the detector's
+  // transitive deps at startup.
+  const runDecayScan = async () => {
+    try {
+      const { runDecayDetector }: typeof OpportunityDetectors = await import('./scoring/opportunity-detectors.js'); // dynamic-import-ok
+      runDecayDetector();
+    } catch (err) {
+      log.error({ err }, 'Decay opportunity-event scan failed');
+    }
+  };
+
+  // ── PR7 · Spine B — rank-decline → opportunity-event detector (24h). ──
+  // Thin cron wrapper around runRankDeclineDetector: a LIGHT check over the
+  // already-persisted rank snapshots (no crawl) that emits DECAYING `rank_drop`
+  // events for tracked keywords that crossed the decline threshold, then enqueues a
+  // debounced regen. Flag-gated inside the detector — flag OFF is a no-op.
+  const runRankDeclineScan = async () => {
+    try {
+      const { runRankDeclineDetector }: typeof OpportunityDetectors = await import('./scoring/opportunity-detectors.js'); // dynamic-import-ok
+      runRankDeclineDetector();
+    } catch (err) {
+      log.error({ err }, 'Rank-decline opportunity-event scan failed');
+    }
+  };
+
   // Run each job once after a short startup delay, then on their normal interval.
   // Store handles so stopOutcomeCrons() can cancel them during early shutdown.
   startupTimeouts = [
@@ -185,12 +253,18 @@ export function startOutcomeCrons() {
     setTimeout(() => void runDetection(), 25_000),
     setTimeout(() => void runPlaybooks(), 30_000),
     setTimeout(runArchive, 35_000),
+    setTimeout(runBackfillJob, 40_000),
+    setTimeout(() => void runDecayScan(), 45_000),
+    setTimeout(() => void runRankDeclineScan(), 50_000),
   ];
 
   measureInterval = setInterval(() => void runMeasure(), DAILY_MS);
   learningsInterval = setInterval(() => void runLearnings(), DAILY_MS);
   detectionInterval = setInterval(() => void runDetection(), WEEKLY_MS);
   archiveInterval = setInterval(runArchive, DAILY_MS);
+  backfillInterval = setInterval(runBackfillJob, WEEKLY_MS);
+  decayScanInterval = setInterval(() => void runDecayScan(), DAILY_MS);
+  rankDeclineScanInterval = setInterval(() => void runRankDeclineScan(), DAILY_MS);
 
   playbooksInterval = setInterval(() => void runPlaybooks(), 7 * DAILY_MS);
 
@@ -205,10 +279,16 @@ export function stopOutcomeCrons() {
   if (detectionInterval) clearInterval(detectionInterval);
   if (archiveInterval) clearInterval(archiveInterval);
   if (playbooksInterval) clearInterval(playbooksInterval);
+  if (backfillInterval) clearInterval(backfillInterval);
+  if (decayScanInterval) clearInterval(decayScanInterval);
+  if (rankDeclineScanInterval) clearInterval(rankDeclineScanInterval);
   measureInterval = null;
   learningsInterval = null;
   detectionInterval = null;
   archiveInterval = null;
   playbooksInterval = null;
+  backfillInterval = null;
+  decayScanInterval = null;
+  rankDeclineScanInterval = null;
   log.info('Outcome crons stopped');
 }

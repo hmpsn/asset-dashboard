@@ -36,6 +36,7 @@ import { getWorkspacePages } from '../workspace-data.js';
 import { getWorkspace, getTokenForSite, updatePageState } from '../workspaces.js';
 import { normalizePageUrl, resolvePagePath, sanitizeQueryForPrompt } from '../helpers.js';
 import { listPageKeywords } from '../page-keywords.js';
+import { queueKeywordStrategyPostUpdateFollowOns } from '../keyword-strategy-follow-ons.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
 import { isProgrammingError } from '../errors.js';
@@ -135,13 +136,20 @@ router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('w
       });
     }
   }
-  // When content is delivered and has a target page, update page state to live
+  // When content is delivered/published and has a target page, update page state
+  // to live. Either transition makes a new/updated page live, so it changes the
+  // page inventory the recommendation engine ranks on — enqueue the debounced
+  // post-update follow-ons (recs regen + llms.txt) just like content-publish.ts
+  // and the keyword-strategy paths. Guarded in its own try/catch so a follow-on
+  // failure can never abort the request update (response is sent below).
+  let contentWentLive = false;
   if (status === 'delivered' && updated.targetPageId) {
     updatePageState(req.params.workspaceId, updated.targetPageId, {
       status: 'live',
       source: 'content-delivery',
       contentRequestId: updated.id,
     });
+    contentWentLive = true;
   }
   // When content is marked as published and has a target page, update page state to live
   if (status === 'published' && updated.targetPageId) {
@@ -150,6 +158,14 @@ router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('w
       source: 'content-delivery',
       contentRequestId: updated.id,
     });
+    contentWentLive = true;
+  }
+  if (contentWentLive) {
+    try {
+      queueKeywordStrategyPostUpdateFollowOns({ workspaceId: req.params.workspaceId }); // rec-refresh-ok
+    } catch (err) {
+      log.warn({ err, workspaceId: req.params.workspaceId }, 'Failed to enqueue follow-ons after content delivery');
+    }
   }
   // Notify client when content is published
   if (status === 'published') {
@@ -317,7 +333,7 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
           // Fall back to a fresh fetch only if the earlier call failed (cachedGscRows === null).
           const qpRows = cachedGscRows ?? await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90, { maxRows: 500 });
           const pageQueries = qpRows
-            .filter(r => { try { return new URL(r.page).pathname === decayPage.page; } catch { return false; } })
+            .filter(r => normalizePageUrl(r.page) === decayPage.page)
             .sort((a, b) => b.impressions - a.impressions)
             .slice(0, 15);
           if (pageQueries.length > 0) {

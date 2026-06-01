@@ -100,6 +100,16 @@ function buildRouteMap(): Map<string, string> {
     }
   }
 
+  // Some admin routes return wrapped JSX (e.g., `<FeatureFlag><BrandHub ... /></FeatureFlag>`),
+  // which makes the simple `if (...) return <Component` regex capture the wrapper and miss the
+  // actual page component. Keep explicit fallbacks for known wrapped route pages.
+  if (!routeMap.has('brand')) {
+    const brandFallback = join(SRC_DIR, 'components/BrandHub.tsx');
+    if (existsSync(brandFallback)) {
+      routeMap.set('brand', brandFallback);
+    }
+  }
+
   return routeMap;
 }
 

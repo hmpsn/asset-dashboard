@@ -184,3 +184,56 @@ describe('tokenBudget truncation', () => {
     expect(seoIdx).toBeGreaterThan(-1);
   });
 });
+
+// ── FIX F: slice-filtered calls with no seoContext anchor must NOT drop the
+//          requested slice (operational) first. The §20 "drop operational first /
+//          collapse to seoContext only" chain is correct for the FULL prompt but
+//          would silently delete the very slice the question selected for a
+//          filtered call (e.g. admin-chat additional-slices block). ────────────
+describe('tokenBudget truncation — slice-filtered calls without seoContext anchor', () => {
+  // sections explicitly EXCLUDE seoContext — operational is a REQUESTED slice.
+  const FILTERED_SECTIONS = ['operational', 'siteHealth', 'clientSignals'] as const;
+
+  it('keeps ## Operational present at a tight budget when it is a requested slice (no seoContext)', () => {
+    const intel = makeLargeIntelligence();
+    // Confirm the unbudgeted filtered block actually exceeds the chosen budget so
+    // the truncation path is genuinely exercised (non-vacuous).
+    const full = formatForPrompt(intel, { verbosity: 'standard', sections: FILTERED_SECTIONS });
+    const fullTokens = Math.ceil(full.length / 4);
+    const budget = Math.floor(fullTokens * 0.5);
+    expect(fullTokens).toBeGreaterThan(budget); // precondition: over budget
+
+    const output = formatForPrompt(intel, {
+      verbosity: 'standard',
+      sections: FILTERED_SECTIONS,
+      tokenBudget: budget,
+    });
+
+    // The requested slice MUST survive — it is the answer to the question.
+    expect(output).toContain('## Operational');
+    // And the output must actually respect the budget.
+    expect(Math.ceil(output.length / 4)).toBeLessThanOrEqual(budget);
+  });
+
+  it('keeps all requested slices present at the admin-chat additional-slices budget (1500)', () => {
+    const intel = makeLargeIntelligence();
+    const output = formatForPrompt(intel, {
+      verbosity: 'standard',
+      sections: FILTERED_SECTIONS,
+      tokenBudget: 1500,
+    });
+    expect(output).toContain('## Operational');
+    expect(output).toContain('## Site Health');
+    expect(output).toContain('## Client Signals');
+  });
+
+  it('still drops operational FIRST for the FULL prompt (seoContext anchor) — regression guard', () => {
+    // The filtered-call fix must NOT change the full-prompt drop order.
+    const intel = makeLargeIntelligence();
+    const full = formatForPrompt(intel, { verbosity: 'detailed' });
+    const fullTokens = Math.ceil(full.length / 4);
+    const output = formatForPrompt(intel, { verbosity: 'detailed', tokenBudget: Math.floor(fullTokens * 0.8) });
+    expect(output).not.toContain('## Operational');
+    expect(output).toContain('## SEO Context');
+  });
+});

@@ -19,26 +19,18 @@ import {
   updatePageState,
   listWorkspaces,
 } from '../workspaces.js';
+import { getPageState } from '../page-edit-states.js';
+import { resolveRecommendationsForChange } from '../recommendations.js';
 import { createLogger } from '../logger.js';
 import { WS_EVENTS } from '../ws-events.js';
+import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 
 const log = createLogger('webflow-cms');
 
 import { requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 import { isProgrammingError } from '../errors.js';
+import { parseNonNegativeIntQuery, parsePositiveIntQuery } from '../query-param-parsers.js';
 const router = Router();
-
-function parseNonNegativeIntQuery(rawValue: unknown): number | null {
-  const parsed = Number(rawValue);
-  if (!Number.isInteger(parsed) || parsed < 0) return null;
-  return parsed;
-}
-
-function parsePositiveIntQuery(rawValue: unknown): number | null {
-  const parsed = Number(rawValue);
-  if (!Number.isInteger(parsed) || parsed <= 0) return null;
-  return parsed;
-}
 
 // --- CMS Collections ---
 router.get('/api/webflow/collections/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
@@ -70,9 +62,9 @@ router.get('/api/webflow/collections/:collectionId/items', requireWorkspaceSiteA
   workspace: { source: 'query', name: 'workspaceId' },
   site: { source: 'query', name: 'siteId' },
 }), async (req, res) => {
-  const limit = req.query.limit == null ? 100 : parsePositiveIntQuery(req.query.limit);
+  const limit = parsePositiveIntQuery(req.query.limit, 100);
   if (limit == null) return res.status(400).json({ error: 'limit must be a positive integer' });
-  const offset = req.query.offset == null ? 0 : parseNonNegativeIntQuery(req.query.offset);
+  const offset = parseNonNegativeIntQuery(req.query.offset, 0);
   if (offset == null) return res.status(400).json({ error: 'offset must be a non-negative integer' });
   try {
     const siteId = typeof req.query.siteId === 'string' ? req.query.siteId : undefined;
@@ -273,6 +265,24 @@ router.post('/api/webflow/collections/:collectionId/publish', requireWorkspaceSi
         pageIds: itemIds,
         source: 'cms-publish',
       });
+      invalidateIntelligenceCache(workspaceId);
+
+      // A live CMS-item publish resolves any recommendations covering the pages
+      // it touched, so the priority list drops them immediately (GSC-lag-free).
+      // itemIds are Webflow CMS item IDs (the page_edit_states key), but
+      // recommendation.affectedPages are SLUGS — resolve each id to its slug via
+      // page_edit_states before matching. Guarded so a resolver failure can never
+      // abort the publish response. // rec-refresh-ok
+      try {
+        const affectedSlugs = (itemIds as string[])
+          .map(id => getPageState(workspaceId, id)?.slug)
+          .filter((s): s is string => typeof s === 'string' && s.length > 0);
+        if (affectedSlugs.length > 0) {
+          resolveRecommendationsForChange(workspaceId, { affectedPages: affectedSlugs });
+        }
+      } catch (err) {
+        log.warn({ err, workspaceId }, 'Failed to resolve recommendations after CMS item publish');
+      }
     }
     res.json(result);
   } catch (err) {
