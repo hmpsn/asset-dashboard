@@ -237,40 +237,69 @@ describe('digest issuesAddressed counting', () => {
     expect(result.issuesAddressed.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('does not double-count: resolved insight + applied batch for same page deduplicate to exactly 1 entry', async () => {
-    // A resolved insight for the services page (pageId = '/services')
-    mocks.getInsights.mockReturnValue([
-      makeInsight({
-        id: 'ins_resolved',
-        severity: 'warning',
-        resolutionStatus: 'resolved',
-        resolutionNote: 'Fixed by audit',
-        pageTitle: 'Services Page',
-        pageId: '/services',
-      }),
-    ]);
-
-    // An applied batch with one item for the SAME page (pageSlug = '/services').
-    // makeAppliedBatch already uses pageSlug: '/services' — same as the insight pageId.
-    // Pre-fix: both appear → issuesAddressed.length === 2.
-    // Post-fix: deduplication keeps only the resolved insight → length === 1.
-    const ws = makeWorkspace({ id: 'ws_no_double_count' });
+  it('counts distinct fields on the same page as separate fixes (title AND meta description)', async () => {
+    // One applied batch fixing BOTH the title and the meta description on /services.
+    // These are two genuinely distinct pieces of completed work and must both be
+    // reported — the dedup key is page-path + field, so they do NOT collapse.
+    mocks.getInsights.mockReturnValue([]);
+    const ws = makeWorkspace({ id: 'ws_distinct_fields' });
     mocks.listBatches.mockReturnValue([
       makeAppliedBatch({
         workspaceId: ws.id,
         name: 'Services Batch',
-        // item has pageSlug: '/services' (from makeAppliedBatch default)
+        items: [
+          {
+            id: 'item_title', pageId: 'page_abc', pageTitle: 'Services Page', pageSlug: '/services',
+            field: 'seoTitle', currentValue: 'old', proposedValue: 'new title', status: 'applied',
+            createdAt: '2026-05-01T00:00:00.000Z', updatedAt: '2026-05-15T00:00:00.000Z',
+          },
+          {
+            id: 'item_desc', pageId: 'page_abc', pageTitle: 'Services Page', pageSlug: '/services',
+            field: 'seoDescription', currentValue: 'old', proposedValue: 'new desc', status: 'applied',
+            createdAt: '2026-05-01T00:00:00.000Z', updatedAt: '2026-05-15T00:00:00.000Z',
+          },
+        ],
       }),
     ]);
     mocks.listWorkOrders.mockReturnValue([]);
 
     const result = await generateMonthlyDigest(ws, 'May 2026');
 
-    // Must be exactly 1 — not 2 — because the resolved insight and the batch item
-    // both map to the page key 'services' (after stripping leading slash + lower-casing).
+    // Both distinct fixes survive (pre-fix the page-only key collapsed them to 1).
+    expect(result.issuesAddressed.length).toBe(2);
+    const details = result.issuesAddressed.map(i => i.detail).join(' | ');
+    expect(details).toContain('Title updated');
+    expect(details).toContain('Meta description updated');
+  });
+
+  it('collapses a true duplicate: the SAME field on the SAME page appears once', async () => {
+    // Two applied items for the same page AND same field (e.g. re-applied) share the
+    // page-path+field dedup key and must collapse to a single entry.
+    mocks.getInsights.mockReturnValue([]);
+    const ws = makeWorkspace({ id: 'ws_true_dup' });
+    mocks.listBatches.mockReturnValue([
+      makeAppliedBatch({
+        workspaceId: ws.id,
+        name: 'Dup Batch',
+        items: [
+          {
+            id: 'item_a', pageId: 'page_abc', pageTitle: 'Services Page', pageSlug: '/services',
+            field: 'seoTitle', currentValue: 'old', proposedValue: 'new title', status: 'applied',
+            createdAt: '2026-05-01T00:00:00.000Z', updatedAt: '2026-05-15T00:00:00.000Z',
+          },
+          {
+            id: 'item_b', pageId: 'page_abc', pageTitle: 'Services Page', pageSlug: '/services',
+            field: 'seoTitle', currentValue: 'newer', proposedValue: 'newer title', status: 'applied',
+            createdAt: '2026-05-10T00:00:00.000Z', updatedAt: '2026-05-20T00:00:00.000Z',
+          },
+        ],
+      }),
+    ]);
+    mocks.listWorkOrders.mockReturnValue([]);
+
+    const result = await generateMonthlyDigest(ws, 'May 2026');
+
     expect(result.issuesAddressed.length).toBe(1);
-    // The resolved insight wins (it appears first in the merge order)
-    expect(result.issuesAddressed[0].detail).toBe('Fixed by audit');
   });
 
   it('still counts resolved insights when no applied batches exist', async () => {

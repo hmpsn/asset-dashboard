@@ -99,8 +99,12 @@ async function computeDigest(
           title: item.pageTitle || 'Page optimization',
           detail: `${item.field === 'seoTitle' ? 'Title' : 'Meta description'} updated via approved changes`,
           insightId: `batch:${b.id}:${item.id}`,
-          // Dedup key: normalize page slug + field so the same fix only appears once
-          _dedupKey: `page:${(item.pageSlug ?? item.pageId ?? '').toLowerCase().replace(/^\/+/, '')}`,
+          // Dedup key: canonical page path (publishedPath preferred over the
+          // legacy/display-only pageSlug) + field. A true duplicate of the SAME
+          // field on a page collapses, but distinct fields on one page (a title
+          // AND a meta-description fix) are BOTH reported — they are separate
+          // pieces of completed work.
+          _dedupKey: `page:${(item.publishedPath ?? item.pageSlug ?? item.pageId ?? '').toLowerCase().replace(/^\/+/, '')}:${item.field}`,
         })),
     );
 
@@ -115,10 +119,13 @@ async function computeDigest(
     }));
 
   // Merge: resolved insights first (most authoritative), then applied batch work,
-  // then completed work orders. Dedup by stable key before capping at 5 — the same
-  // underlying fix can appear as both a resolved insight AND an applied approval/work-order
-  // (Bridge #7 sets 'in_progress', resolve paths set 'resolved'), so we keep the first
-  // occurrence (resolved insight wins over batch entry for the same page).
+  // then completed work orders. Dedup by stable FIELD-LEVEL key before capping at 5,
+  // keeping the first occurrence of any exact-key duplicate. Keys: page-path+field for
+  // approvals (a title AND a meta fix on one page both count; a re-applied same field
+  // collapses), insight pageId for resolved insights, work-order id for work orders.
+  // Distinct pieces of work are never dropped. (Approval-apply sets insight status to
+  // 'in_progress', not 'resolved', so a resolved insight and an applied approval are
+  // generally separate events — we do not force-collapse them across sources.)
   const seenDedupKeys = new Set<string>();
   const issuesAddressed = [
     ...resolvedInsightItems,
