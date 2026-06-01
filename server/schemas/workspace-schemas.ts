@@ -328,6 +328,9 @@ export const recommendationSchema = z.object({
 }).passthrough();
 
 // Mirrors RecommendationSet['summary'] in shared/types/recommendations.ts.
+// topRecommendationId is optional in the schema so that summaries persisted
+// before Task 3.3 (which lacked the field) still parse without falling back to
+// the empty default. Callers should treat undefined as null (no active rec).
 export const recommendationSummarySchema = z.object({
   fixNow: z.number(),
   fixSoon: z.number(),
@@ -337,6 +340,7 @@ export const recommendationSummarySchema = z.object({
   trafficAtRisk: z.number(),
   estimatedRecoverableClicks: z.number(),
   estimatedRecoverableImpressions: z.number(),
+  topRecommendationId: z.string().nullable().optional(),
 }).passthrough();
 
 // ── Audit snapshots (audit_snapshots table) ──

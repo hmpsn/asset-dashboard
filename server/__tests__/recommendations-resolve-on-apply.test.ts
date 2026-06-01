@@ -73,6 +73,7 @@ function seed(recs: Recommendation[]): void {
       fixNow: 0, fixSoon: 0, fixLater: 0, ongoing: 0,
       totalImpactScore: 0, trafficAtRisk: 0,
       estimatedRecoverableClicks: 0, estimatedRecoverableImpressions: 0,
+      topRecommendationId: null,
     },
   };
   saveRecommendations(set);

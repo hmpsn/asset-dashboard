@@ -271,7 +271,8 @@ export function loadRecommendations(workspaceId: string): RecommendationSet | nu
       fixNow: 0, fixSoon: 0, fixLater: 0, ongoing: 0,
       totalImpactScore: 0, trafficAtRisk: 0,
       estimatedRecoverableClicks: 0, estimatedRecoverableImpressions: 0,
-    }, { table: 'recommendation_sets', field: 'summary', workspaceId }),
+      topRecommendationId: null,
+    }, { table: 'recommendation_sets', field: 'summary', workspaceId }) as RecommendationSet['summary'],
   };
 }
 
@@ -393,6 +394,11 @@ export function computeRecommendationSummary(recs: Recommendation[]): Recommenda
     weightedRecoverableImpressions += r.impressionsAtRisk * rate.summary;
   }
 
+  // recs are already sorted by sortRecommendations (tier → impactScore → intent
+  // alignment) before computeRecommendationSummary is called, so activeRecs[0]
+  // is the true highest-ranked active recommendation.
+  const topRecommendationId = activeRecs.length > 0 ? activeRecs[0].id : null;
+
   return {
     fixNow: activeRecs.filter(r => r.priority === 'fix_now').length,
     fixSoon: activeRecs.filter(r => r.priority === 'fix_soon').length,
@@ -402,6 +408,7 @@ export function computeRecommendationSummary(recs: Recommendation[]): Recommenda
     trafficAtRisk: activeRecs.reduce((s, r) => s + r.trafficAtRisk, 0),
     estimatedRecoverableClicks: Math.round(weightedRecoverableClicks),
     estimatedRecoverableImpressions: Math.round(weightedRecoverableImpressions),
+    topRecommendationId,
   };
 }
 

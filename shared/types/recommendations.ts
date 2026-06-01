@@ -43,5 +43,9 @@ export interface RecommendationSet {
     trafficAtRisk: number;
     estimatedRecoverableClicks: number;     // conservative 12% recovery of trafficAtRisk
     estimatedRecoverableImpressions: number;
+    /** The id of the highest-ranked active (non-completed, non-dismissed) recommendation,
+     *  or null when no active recs exist. Set from the already-sorted recs array so it
+     *  always agrees with the Health tab's ordering. */
+    topRecommendationId: string | null;
   };
 }
