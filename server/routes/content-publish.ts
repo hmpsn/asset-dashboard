@@ -23,6 +23,9 @@ import { validate, z } from '../middleware/validate.js';
 import { requireWorkspaceAccess, requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
 import { queueKeywordStrategyPostUpdateFollowOns } from '../keyword-strategy-follow-ons.js';
+import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
+import { captureBaselineFromGsc } from '../outcome-measurement.js';
+import { normalizePageUrl } from '../helpers.js';
 
 const log = createLogger('content-publish');
 const router = Router();
@@ -141,6 +144,31 @@ router.post('/api/content-posts/:workspaceId/:postId/publish-to-webflow', requir
       `Collection: ${ws.publishTarget.collectionName} · Slug: ${slug}`,
       { postId, itemId, collectionId, slug, isUpdate },
     );
+
+    // Record for outcome tracking — guard prevents duplicates if the same post
+    // is re-published (e.g. re-deploy after a content edit).
+    try {
+      if (!getActionByWorkspaceAndSource(workspaceId, 'post', postId)) {
+        const publishedPagePath = slug ? normalizePageUrl(slug) : null;
+        const postAction = recordAction({ // recordAction-ok: workspaceId from validated route param
+          workspaceId,
+          actionType: 'content_published',
+          sourceType: 'post',
+          sourceId: postId,
+          pageUrl: publishedPagePath,
+          targetKeyword: post.targetKeyword ?? null,
+          baselineSnapshot: {
+            captured_at: new Date().toISOString(),
+          },
+          attribution: 'platform_executed',
+        });
+        if (publishedPagePath) {
+          void captureBaselineFromGsc(postAction.id, workspaceId, publishedPagePath);
+        }
+      }
+    } catch (err) {
+      log.warn({ err, postId }, 'Failed to record outcome action for manual content publish');
+    }
 
     // Broadcast to workspace
     invalidateContentPipelineIntelligence(workspaceId);

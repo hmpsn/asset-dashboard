@@ -57,6 +57,20 @@
 
 ---
 
+## Phase 2 — ROI attribution migration (2026-05-xx)
+
+### `roi_attributions` table and `server/roi-attribution.ts` are deprecated
+
+ROI attribution now lives on `action_outcomes.attributed_value` (Phase 2 Outcome Intelligence Engine).
+
+- **New source of truth:** `action_outcomes.attributed_value` (value in dollars, calculated as `clicks_delta × page CPC`) and `action_outcomes.value_basis` (calculation method, e.g. `clicks_delta_x_cpc`).
+- **New read path:** `getROIHighlightsFromOutcomes(workspaceId, limit)` in `server/outcome-tracking.ts` — used by monthly digest and client dashboard.
+- **New write path:** `recordAction()` + `recordOutcome()` in `server/outcome-tracking.ts`; value computation in `scoreActionAtCheckpoint()` in `server/outcome-measurement.ts`.
+- **Old module:** `server/roi-attribution.ts` and the `roi_attributions` table are in the `deprecated` lifecycle state. All exported functions are marked `@deprecated`. Do NOT delete the table until historical data is reconciled.
+- **Scheduled for removal:** est. 2026-Q3, after Phase 2 is validated on staging.
+
+---
+
 ## LOW — Known design choices, not bugs
 
 ### `totalScored + pendingMeasurement` can exceed `totalTracked`

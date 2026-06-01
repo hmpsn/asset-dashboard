@@ -7,6 +7,7 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { createLogger } from './logger.js';
 import { rowToTrackedAction, rowToActionOutcome } from './db/outcome-mappers.js';
 import type { TrackedActionRow, ActionOutcomeRow } from './db/outcome-mappers.js';
+import { parseJsonFallback } from './db/json-validation.js';
 import type {
   TrackedAction,
   ActionOutcome,
@@ -22,6 +23,7 @@ import type {
   EarlySignal,
   TopWin,
 } from '../shared/types/outcome-tracking.js';
+import type { ROIHighlight } from '../shared/types/narrative.js';
 import { fireBridge, withWorkspaceLock, debouncedOutcomeReweight } from './bridge-infrastructure.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
@@ -48,10 +50,29 @@ const stmts = createStmtCache(() => ({
   updateContext: db.prepare(`UPDATE tracked_actions SET context = ?, updated_at = datetime('now') WHERE id = ? AND workspace_id = ?`),
   updateBaseline: db.prepare(`UPDATE tracked_actions SET baseline_snapshot = ?, updated_at = datetime('now') WHERE id = ? AND workspace_id = ?`),
   insertOutcome: db.prepare(`
-    INSERT OR REPLACE INTO action_outcomes (id, action_id, checkpoint_days, metrics_snapshot, score, early_signal, delta_summary, competitor_context, measured_at)
-    VALUES (@id, @action_id, @checkpoint_days, @metrics_snapshot, @score, @early_signal, @delta_summary, @competitor_context, @measured_at)
+    INSERT OR REPLACE INTO action_outcomes (id, action_id, checkpoint_days, metrics_snapshot, score, early_signal, delta_summary, competitor_context, measured_at, attributed_value, value_basis)
+    VALUES (@id, @action_id, @checkpoint_days, @metrics_snapshot, @score, @early_signal, @delta_summary, @competitor_context, @measured_at, @attributed_value, @value_basis)
   `),
   getOutcomesByAction: db.prepare(`SELECT * FROM action_outcomes WHERE action_id = ? ORDER BY checkpoint_days ASC`),
+  // Returns ONE win-scored outcome per action_id (the highest checkpoint that scored
+  // a win) for a workspace, ordered by measured_at DESC.
+  // The correlated subquery deduplicates: an action with wins at day 30 AND day 60
+  // emits only the day-60 row instead of appearing twice in the client digest.
+  getWinsWithValueByWorkspace: db.prepare(`
+    SELECT ao.*, ta.page_url, ta.action_type
+    FROM action_outcomes ao
+    JOIN tracked_actions ta ON ta.id = ao.action_id
+    WHERE ta.workspace_id = ?
+      AND ao.score IN ('strong_win', 'win')
+      AND ao.checkpoint_days = (
+        SELECT MAX(ao2.checkpoint_days)
+        FROM action_outcomes ao2
+        WHERE ao2.action_id = ao.action_id
+          AND ao2.score IN ('strong_win', 'win')
+      )
+    ORDER BY ao.measured_at DESC
+    LIMIT ?
+  `),
   getScoredByWorkspace: db.prepare(`
     SELECT ta.*, ao.score AS outcome_score, ao.checkpoint_days AS outcome_checkpoint_days, ao.delta_summary AS outcome_delta_summary, ao.measured_at AS scored_at
     FROM tracked_actions ta
@@ -81,8 +102,15 @@ const stmts = createStmtCache(() => ({
     DELETE FROM tracked_actions
     WHERE measurement_complete = 1 AND updated_at < datetime('now', '-24 months')
   `),
+  // Explicit column list prevents positional misalignment caused by migration 106
+  // appending attributed_value/value_basis to the END of action_outcomes but
+  // BEFORE archived_at (which already existed from migration 041) in the archive.
+  // SELECT * positional insert would map attributed_value→archived_at, corrupting data.
   archiveOldOutcomes: db.prepare(`
-    INSERT INTO action_outcomes_archive SELECT *, datetime('now') AS archived_at
+    INSERT INTO action_outcomes_archive
+      (id, action_id, checkpoint_days, metrics_snapshot, score, early_signal, delta_summary, competitor_context, measured_at, attributed_value, value_basis, archived_at)
+    SELECT
+      id, action_id, checkpoint_days, metrics_snapshot, score, early_signal, delta_summary, competitor_context, measured_at, attributed_value, value_basis, datetime('now')
     FROM action_outcomes
     WHERE action_id IN (SELECT id FROM tracked_actions_archive)
   `),
@@ -263,6 +291,10 @@ export function recordOutcome(params: {
   earlySignal?: EarlySignal;
   deltaSummary: DeltaSummary;
   competitorContext?: object | null;
+  /** Dollar value attributed to this outcome (e.g. clicks_delta × page CPC). Omit or pass null when inconclusive. */
+  attributedValue?: number | null;
+  /** How attributedValue was computed (e.g. 'clicks_delta_x_cpc'). Omit or pass null when attributedValue is null. */
+  valueBasis?: string | null;
 }): ActionOutcome {
   const id = crypto.randomUUID();
 
@@ -277,6 +309,8 @@ export function recordOutcome(params: {
       delta_summary: JSON.stringify(params.deltaSummary),
       competitor_context: JSON.stringify(params.competitorContext ?? {}),
       measured_at: new Date().toISOString(),
+      attributed_value: params.attributedValue ?? null,
+      value_basis: params.valueBasis ?? null,
     });
 
     // Mark action complete after 90-day checkpoint.
@@ -428,6 +462,69 @@ export function getTopWinsFromActions(
  */
 export function getTopWinsForWorkspace(workspaceId: string, limit = 10): TopWin[] {
   return getTopWinsFromActions(getActionsByWorkspace(workspaceId), limit);
+}
+
+/**
+ * Builds ROI highlights for a workspace from the live action_outcomes table.
+ * Replaces getROIHighlights() from the dead roi_attributions table (Task 2.3).
+ * Returns win-scored outcomes ordered by recency, shaped as ROIHighlight.
+ * clicksGained is taken from deltaSummary.delta_absolute when primary_metric is clicks;
+ * falls back to 0 for non-clicks metrics so the field is always a number.
+ */
+export function getROIHighlightsFromOutcomes(workspaceId: string, limit = 10): ROIHighlight[] {
+  interface WinRow extends ActionOutcomeRow {
+    page_url: string | null;
+    action_type: string;
+  }
+  const rows = stmts().getWinsWithValueByWorkspace.all(workspaceId, limit) as WinRow[];
+  return rows.map(row => {
+    const delta = parseJsonFallback<{
+      primary_metric?: string;
+      delta_absolute?: number;
+      delta_percent?: number;
+      direction?: string;
+    }>(row.delta_summary, {});
+
+    const clicksGained =
+      delta.primary_metric === 'clicks' && typeof delta.delta_absolute === 'number'
+        ? delta.delta_absolute
+        : 0;
+
+    const pageUrl = row.page_url ?? '';
+    const pageTitle = pageUrl
+      ? (pageUrl.split('/').filter(Boolean).pop() ?? 'Home')
+          .split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+      : 'Site';
+
+    const actionLabel: Record<string, string> = {
+      content_published: 'Content published',
+      content_refreshed: 'Content refresh',
+      meta_updated: 'Meta update applied',
+      schema_deployed: 'Schema markup added',
+      audit_fix_applied: 'SEO fix applied',
+      internal_link_added: 'Internal link added',
+      brief_created: 'Brief created',
+      strategy_keyword_added: 'Keyword strategy update',
+      insight_acted_on: 'Insight acted on',
+      voice_calibrated: 'Voice calibrated',
+    };
+    const action = actionLabel[row.action_type] ?? row.action_type;
+
+    const scoreLabel: Record<string, string> = {
+      strong_win: 'Strong win',
+      win: 'Win',
+    };
+    const scoreText = scoreLabel[row.score ?? ''] ?? 'Improvement';
+    const deltaText =
+      typeof delta.delta_percent === 'number'
+        ? ` (+${Math.round(Math.abs(delta.delta_percent))}%)`
+        : '';
+    const result = `${scoreText}${deltaText}`;
+
+    const attributedValue = typeof row.attributed_value === 'number' ? row.attributed_value : null;
+
+    return { pageTitle, pageUrl, action, result, clicksGained, attributedValue };
+  });
 }
 
 export function archiveOldActions(): { archived: number } {

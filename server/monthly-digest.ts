@@ -1,5 +1,5 @@
 import { createLogger } from './logger.js';
-import { getROIHighlights } from './roi-attribution.js';
+import { getROIHighlightsFromOutcomes } from './outcome-tracking.js';
 import { callAI } from './ai.js';
 import { getSearchPeriodComparison } from './search-console.js';
 import { getGA4PeriodComparison } from './google-analytics.js';
@@ -11,6 +11,8 @@ import { buildRecommendationGenerationContext } from './intelligence/generation-
 import { listAllInsightsFromSlice } from './intelligence/insights-slice.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { isProgrammingError } from './errors.js';
+import { listBatches } from './approvals.js';
+import { listWorkOrders } from './work-orders.js';
 
 const log = createLogger('monthly-digest');
 
@@ -66,7 +68,7 @@ async function computeDigest(
     includeLocalSeo: false,
   });
   const insights = insightContext.insights ? listAllInsightsFromSlice(insightContext.insights) : [];
-  const roiHighlights = getROIHighlights(ws.id, 5);
+  const roiHighlights = getROIHighlightsFromOutcomes(ws.id, 5);
 
   // Wins: positive severity or positive ranking mover
   const wins = insights
@@ -74,15 +76,69 @@ async function computeDigest(
     .slice(0, 5)
     .map(insightToDigestItem);
 
-  // Issues addressed: resolved insights
-  const issuesAddressed = insights
+  // Issues addressed: resolved insights + applied approval batches + completed work orders.
+  // Approval-apply and work-order completion only set insight resolutionStatus to 'in_progress'
+  // via Bridge #7 — they never reach 'resolved'. Count the applied/completed work directly so
+  // the digest does not report "0 measurable improvements" after real work is done.
+  const resolvedInsightItems = insights
     .filter(i => i.resolutionStatus === 'resolved')
-    .slice(0, 5)
     .map(i => ({
       title: i.pageTitle ?? 'Page optimization',
       detail: i.resolutionNote ?? 'Issue addressed',
       insightId: i.id,
+      // Stable dedup key: normalized page identifier from insight store
+      _dedupKey: `page:${(i.pageId ?? '').toLowerCase().replace(/^\/+/, '')}`,
     }));
+
+  const appliedBatchItems = listBatches(ws.id)
+    .filter(b => b.status === 'applied')
+    .flatMap(b =>
+      b.items
+        .filter(item => item.status === 'applied')
+        .map(item => ({
+          title: item.pageTitle || 'Page optimization',
+          detail: `${item.field === 'seoTitle' ? 'Title' : 'Meta description'} updated via approved changes`,
+          insightId: `batch:${b.id}:${item.id}`,
+          // Dedup key: canonical page path (publishedPath preferred over the
+          // legacy/display-only pageSlug) + field. A true duplicate of the SAME
+          // field on a page collapses, but distinct fields on one page (a title
+          // AND a meta-description fix) are BOTH reported — they are separate
+          // pieces of completed work.
+          _dedupKey: `page:${(item.publishedPath ?? item.pageSlug ?? item.pageId ?? '').toLowerCase().replace(/^\/+/, '')}:${item.field}`,
+        })),
+    );
+
+  const completedWorkOrderItems = listWorkOrders(ws.id)
+    .filter(o => o.status === 'completed')
+    .map(o => ({
+      title: `${o.productType.replace(/_/g, ' ')} completed`,
+      detail: `${o.pageIds.length} page${o.pageIds.length !== 1 ? 's' : ''} fixed`,
+      insightId: `work-order:${o.id}`,
+      // Work orders affect multiple pages; use a unique key per work order
+      _dedupKey: `work-order:${o.id}`,
+    }));
+
+  // Merge: resolved insights first (most authoritative), then applied batch work,
+  // then completed work orders. Dedup by stable FIELD-LEVEL key before capping at 5,
+  // keeping the first occurrence of any exact-key duplicate. Keys: page-path+field for
+  // approvals (a title AND a meta fix on one page both count; a re-applied same field
+  // collapses), insight pageId for resolved insights, work-order id for work orders.
+  // Distinct pieces of work are never dropped. (Approval-apply sets insight status to
+  // 'in_progress', not 'resolved', so a resolved insight and an applied approval are
+  // generally separate events — we do not force-collapse them across sources.)
+  const seenDedupKeys = new Set<string>();
+  const issuesAddressed = [
+    ...resolvedInsightItems,
+    ...appliedBatchItems,
+    ...completedWorkOrderItems,
+  ]
+    .filter(item => {
+      if (seenDedupKeys.has(item._dedupKey)) return false;
+      seenDedupKeys.add(item._dedupKey);
+      return true;
+    })
+    .map(({ _dedupKey: _k, ...rest }) => rest)
+    .slice(0, 5);
 
   // Fetch GSC + GA4 period comparisons concurrently; degrade gracefully if unavailable
   const COMPARISON_DAYS = 28;
@@ -235,13 +291,18 @@ async function generateDigestSummary(
   ].filter(Boolean).join('\n');
 
   try {
-    const prompt = `Write a 2-3 sentence monthly performance update for a website client's dashboard.
+    const roiDollarLines = roi
+    .filter(r => typeof r.attributedValue === 'number' && r.attributedValue !== null && r.attributedValue > 0)
+    .map(r => `  • ${r.pageTitle}: $${r.attributedValue!.toFixed(2)} estimated value (${r.action})`)
+    .join('\n');
+
+  const prompt = `Write a 2-3 sentence monthly performance update for a website client's dashboard.
 
 Data for ${month}:
 - ${wins.length} performance win${wins.length === 1 ? '' : 's'} identified
 - ${issues.length} optimization${issues.length === 1 ? '' : 's'} completed
 - ${metrics.pagesOptimized} page${metrics.pagesOptimized === 1 ? '' : 's'} optimized
-- ${roi.length} measurable improvement${roi.length === 1 ? '' : 's'}
+- ${roi.length} measurable improvement${roi.length === 1 ? '' : 's'}${roiDollarLines ? `\n- Estimated dollar value from tracked outcomes:\n${roiDollarLines}` : ''}
 ${recentOutcomesCount !== undefined ? `- ${recentOutcomesCount} tracked outcome${recentOutcomesCount === 1 ? '' : 's'} in workspace learnings` : ''}
 ${metricLines ? `\nSearch performance this period:\n${metricLines}` : ''}
 ${learningsSummary ? `\nWorkspace outcome learnings:\n${learningsSummary}` : ''}

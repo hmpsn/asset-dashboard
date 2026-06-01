@@ -4,7 +4,6 @@ const mocks = vi.hoisted(() => ({
   isFeatureEnabled: vi.fn(),
   getWorkspaceLearnings: vi.fn(),
   getPlaybooks: vi.fn(),
-  getROIAttributionsRaw: vi.fn(),
   getActionsByWorkspace: vi.fn(),
   getOutcomesForAction: vi.fn(),
   getTopWinsFromActions: vi.fn(),
@@ -24,10 +23,6 @@ vi.mock('../../server/workspace-learnings.js', () => ({
 
 vi.mock('../../server/outcome-playbooks.js', () => ({
   getPlaybooks: mocks.getPlaybooks,
-}));
-
-vi.mock('../../server/roi-attribution.js', () => ({
-  getROIAttributionsRaw: mocks.getROIAttributionsRaw,
 }));
 
 vi.mock('../../server/outcome-tracking.js', () => ({
@@ -71,27 +66,33 @@ beforeEach(() => {
     },
   });
   mocks.getPlaybooks.mockReturnValue([{ name: 'Refresh decaying pages' }]);
-  mocks.getROIAttributionsRaw.mockReturnValue([
-    {
-      id: 'roi_1',
-      pageUrl: '/services',
-      actionType: 'content_update',
-      clicksBefore: 120,
-      clicksAfter: 200,
-      clickGain: 80,
-      measuredAt: '2026-05-20T10:00:00.000Z',
-    },
-  ]);
 
+  // roiAttribution and weCalledIt now come from action_outcomes (live table), not roi_attributions.
+  // action_1 has a strong_win outcome with clicks data → contributes to both roiAttribution and weCalledIt.
   mocks.getActionsByWorkspace.mockReturnValue([
-    { id: 'action_1', actionType: 'schema_fix', pageUrl: '/pricing' },
-    { id: 'action_2', actionType: 'internal_link', pageUrl: null },
+    {
+      id: 'action_1',
+      actionType: 'schema_fix',
+      pageUrl: '/pricing',
+      baselineSnapshot: { clicks: 120 },
+    },
+    {
+      id: 'action_2',
+      actionType: 'internal_link',
+      pageUrl: null,
+      baselineSnapshot: { clicks: 0 },
+    },
   ]);
   mocks.getOutcomesForAction.mockImplementation((actionId: string) => {
     if (actionId === 'action_1') {
-      return [{ score: 'strong_win', measuredAt: '2026-05-22T12:00:00.000Z' }];
+      return [{
+        score: 'strong_win',
+        checkpointDays: 30,
+        metricsSnapshot: { clicks: 200 },
+        measuredAt: '2026-05-22T12:00:00.000Z',
+      }];
     }
-    return [{ score: 'neutral', measuredAt: '2026-05-23T12:00:00.000Z' }];
+    return [{ score: 'neutral', checkpointDays: 30, metricsSnapshot: { clicks: 0 }, measuredAt: '2026-05-23T12:00:00.000Z' }];
   });
   mocks.getTopWinsFromActions.mockImplementation((actions: Array<{ id: string }>, _limit: number, getOutcomes: (id: string) => Array<{ score: string }>) => {
     const action = actions.find((candidate: { id: string }) => getOutcomes(candidate.id).some(outcome => outcome.score === 'strong_win'));
@@ -125,15 +126,17 @@ describe('assembleLearnings', () => {
     expect(result.recentTrend).toBe('improving');
     expect(result.playbooks).toEqual([{ name: 'Refresh decaying pages' }]);
 
+    // roiAttribution now reads from the live action_outcomes table (Task 2.3).
+    // action_1 (schema_fix on /pricing) has a strong_win with clicks 120→200.
     expect(result.roiAttribution).toEqual([
       {
-        actionId: 'roi_1',
-        pageUrl: '/services',
-        actionType: 'content_update',
+        actionId: 'action_1',
+        pageUrl: '/pricing',
+        actionType: 'schema_fix',
         clicksBefore: 120,
         clicksAfter: 200,
         clickGain: 80,
-        measuredAt: '2026-05-20T10:00:00.000Z',
+        measuredAt: '2026-05-22T12:00:00.000Z',
       },
     ]);
 
@@ -176,15 +179,13 @@ describe('assembleLearnings', () => {
     });
     expect(mocks.getWorkspaceLearnings).not.toHaveBeenCalled();
     expect(mocks.getPlaybooks).not.toHaveBeenCalled();
-    expect(mocks.getROIAttributionsRaw).not.toHaveBeenCalled();
+    // roi_attributions no longer consulted (Task 2.3) — getActionsByWorkspace provides the data
+    expect(mocks.getActionsByWorkspace).not.toHaveBeenCalled();
   });
 
   it('degrades core load failures and preserves stable defaults', async () => {
     mocks.getWorkspaceLearnings.mockImplementation(() => {
       throw new Error('learnings unavailable');
-    });
-    mocks.getROIAttributionsRaw.mockImplementation(() => {
-      throw new Error('roi unavailable');
     });
     mocks.getActionsByWorkspace.mockImplementation(() => {
       throw new Error('actions unavailable');
@@ -215,9 +216,7 @@ describe('assembleLearnings', () => {
     mocks.getPlaybooks.mockImplementation(() => {
       throw new Error('playbook store unavailable');
     });
-    mocks.getROIAttributionsRaw.mockImplementation(() => {
-      throw new Error('roi unavailable');
-    });
+    // roi_attributions no longer consulted (Task 2.3) — roiAttribution comes from action_outcomes
 
     const result = await assembleLearnings('ws_no_data');
 
@@ -225,7 +224,18 @@ describe('assembleLearnings', () => {
     expect(result.summary).toBeNull();
     expect(result.confidence).toBeNull();
     expect(result.playbooks).toEqual([]);
-    expect(result.roiAttribution).toEqual([]);
+    // action_1 has strong_win → contributes to both roiAttribution and weCalledIt/topWins
+    expect(result.roiAttribution).toEqual([
+      {
+        actionId: 'action_1',
+        pageUrl: '/pricing',
+        actionType: 'schema_fix',
+        clicksBefore: 120,
+        clicksAfter: 200,
+        clickGain: 80,
+        measuredAt: '2026-05-22T12:00:00.000Z',
+      },
+    ]);
     expect(result.topWins).toEqual([{ actionId: 'action_1', score: 'strong_win' }]);
   });
 });

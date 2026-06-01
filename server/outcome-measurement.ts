@@ -27,6 +27,8 @@ import type {
   ScoringConfig,
 } from '../shared/types/outcome-tracking.js';
 import { isProgrammingError } from './errors.js';
+import { getPageKeyword } from './page-keywords.js';
+import { normalizePageUrl } from './helpers.js';
 
 const log = createLogger('outcome-measurement');
 
@@ -260,6 +262,61 @@ export function scoreOutcome(
 }
 
 // ---------------------------------------------------------------------------
+// computeAttributedValue — clicks delta × per-page CPC
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute the dollar value attributed to a clicks delta using the page's CPC
+ * from the page_keywords table (the same source computeROI uses).
+ *
+ * Returns { attributedValue, valueBasis } when a CPC is available,
+ * or { attributedValue: null, valueBasis: null } when the page has no CPC
+ * or the primary metric is not clicks-based.
+ *
+ * Never fabricates a 0 — NULL means inconclusive.
+ */
+function computeAttributedValue(
+  workspaceId: string,
+  pageUrl: string | null | undefined,
+  primaryMetric: string,
+  delta: DeltaSummary,
+  baselineSnapshot: BaselineSnapshot,
+  currentSnapshot: BaselineSnapshot,
+): { attributedValue: number | null; valueBasis: string | null } {
+  if (!pageUrl) return { attributedValue: null, valueBasis: null };
+
+  // Compute clicks delta independently of the action's primary metric.
+  // content_published uses primary_metric='position' and schema_deployed uses
+  // 'ctr', but both can have real click data that supports dollar attribution.
+  // When the primary metric IS clicks, delta.delta_absolute already captures it;
+  // otherwise we compute it from the baseline/current snapshots directly.
+  const clicksDelta: number | null = (() => {
+    if (primaryMetric === 'clicks') {
+      return typeof delta.delta_absolute === 'number' ? delta.delta_absolute : null;
+    }
+    const baseClicks = baselineSnapshot.clicks ?? null;
+    const currentClicks = currentSnapshot.clicks ?? null;
+    if (baseClicks == null || currentClicks == null) return null;
+    return currentClicks - baseClicks;
+  })();
+
+  if (clicksDelta == null) return { attributedValue: null, valueBasis: null };
+
+  try {
+    const normalizedPath = normalizePageUrl(pageUrl);
+    const pageKw = getPageKeyword(workspaceId, normalizedPath);
+    const cpc = pageKw?.cpc ?? null;
+    if (cpc == null || cpc <= 0) return { attributedValue: null, valueBasis: null };
+
+    const attributedValue = Math.round(clicksDelta * cpc * 100) / 100;
+    return { attributedValue, valueBasis: 'clicks_delta_x_cpc' };
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err, workspaceId, pageUrl }, 'outcome-measurement/computeAttributedValue: programming error');
+    return { attributedValue: null, valueBasis: null };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // scoreActionAtCheckpoint — scores a single action at a single checkpoint
 // ---------------------------------------------------------------------------
 
@@ -383,6 +440,19 @@ async function scoreActionAtCheckpoint(
     }
   }
 
+  // Compute attributed dollar value from clicks delta × per-page CPC.
+  // Clicks delta is computed independently of the primary metric so action types
+  // like content_published (position) and schema_deployed (ctr) also get dollar
+  // attribution when click data is present. No-CPC / no-click cases → null.
+  const { attributedValue, valueBasis } = computeAttributedValue(
+    action.workspaceId,
+    action.pageUrl,
+    primaryMetric,
+    delta,
+    action.baselineSnapshot,
+    currentSnapshot,
+  );
+
   const outcome = recordOutcome({
     actionId: action.id,
     checkpointDays,
@@ -390,10 +460,12 @@ async function scoreActionAtCheckpoint(
     score,
     earlySignal,
     deltaSummary: delta,
+    attributedValue,
+    valueBasis,
   });
 
   log.info(
-    { actionId: action.id, checkpointDays, score, earlySignal, direction: delta.direction },
+    { actionId: action.id, checkpointDays, score, earlySignal, direction: delta.direction, attributedValue },
     'Action scored',
   );
 

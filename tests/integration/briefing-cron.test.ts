@@ -39,6 +39,9 @@ import { runBriefingForWorkspace } from '../../server/briefing-cron.js';
 import { getBriefingByWeek } from '../../server/briefing-store.js';
 import { upsertSchedule } from '../../server/scheduled-audits.js';
 import { upsertInsight } from '../../server/analytics-insights-store.js';
+import { upsertPageKeyword } from '../../server/page-keywords.js';
+import { createContentRequest, updateContentRequest } from '../../server/content-requests.js';
+import { recordAction } from '../../server/outcome-tracking.js';
 import db from '../../server/db/index.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -175,5 +178,77 @@ describe('briefing-cron / runBriefingForWorkspace (deterministic templates)', ()
     expect(r1.status).toBe('generated');
     const r2 = await runBriefingForWorkspace(wsId, { manual: true });
     expect(r2.status).toBe('generated');
+  });
+
+  // ── Phase 2.5: milestone_attribution bridge ──────────────────────────────────
+  //
+  // Regression guard for the silent field-name mismatch: the briefing bridge
+  // (briefing-candidates.ts + briefing-cron.ts) read `ci.contentRequestId` /
+  // `item.currentClicks` / `item.title`, none of which exist on ContentItemROI
+  // (roi.ts → requestId / clicks / topic, no title). The mismatch was masked by
+  // an `as {...}` cast, so a delivered brief whose page crossed 100 clicks/mo
+  // never produced a milestone_attribution story. This test seeds exactly that
+  // realistic scenario and asserts the story fires.
+  it('a delivered brief whose page crossed 100 clicks/mo produces a milestone_attribution story', async () => {
+    const slug = '/blog/fleet-maintenance-guide';
+    const targetKeyword = 'fleet maintenance guide austin';
+
+    // Seed GSC-derived per-page traffic: clicks in the [100,150) hundred-clicks
+    // band, with a CPC so computeROI assigns a non-zero trafficValue.
+    upsertPageKeyword(wsId, {
+      pagePath: slug,
+      pageTitle: 'Fleet Maintenance Guide — Austin',
+      primaryKeyword: targetKeyword,
+      secondaryKeywords: [],
+      clicks: 120,
+      impressions: 3200,
+      currentPosition: 5,
+      cpc: 2.5,
+    });
+
+    // A delivered content request pointing at that page (computeROI only counts
+    // requests with status delivered|published AND a targetPageId).
+    const req = createContentRequest(wsId, {
+      topic: 'Fleet Maintenance Guide',
+      targetKeyword,
+      intent: 'informational',
+      priority: 'high',
+      rationale: 'High-volume informational gap',
+      targetPageId: 'page-fleet-maintenance',
+      targetPageSlug: slug,
+      dedupe: false,
+    });
+    updateContentRequest(wsId, req.id, { status: 'delivered' });
+
+    // The tracked action that anchors the milestone candidate. brief_created is
+    // the actionType collectMilestoneAttributionCandidates filters on; sourceId
+    // = the content request id (the join key the bridge uses).
+    recordAction({
+      workspaceId: wsId,
+      actionType: 'brief_created',
+      sourceType: 'content_request',
+      sourceId: req.id,
+      pageUrl: slug,
+      targetKeyword,
+      baselineSnapshot: { captured_at: new Date().toISOString(), clicks: 0, impressions: 0 },
+    });
+
+    try {
+      const r = await runBriefingForWorkspace(wsId, { manual: true });
+      expect(r.status).toBe('generated');
+      const draft = getBriefingByWeek(wsId, r.weekOf);
+      expect(draft).not.toBeNull();
+      const milestone = draft!.stories.find((s) => s.id.startsWith('milestone-'));
+      expect(milestone, 'expected a milestone_attribution story to fire').toBeTruthy();
+      // The 100-clicks threshold headline and the real topic (not undefined "title").
+      expect(milestone!.headline).toContain('100 clicks/mo');
+      expect(milestone!.narrative).toContain('Fleet Maintenance Guide');
+      // currentClicks surfaced from ContentItemROI.clicks (was silently 0/undefined).
+      expect(milestone!.metrics.some((m) => m.value === '120')).toBe(true);
+    } finally {
+      db.prepare('DELETE FROM tracked_actions WHERE workspace_id = ?').run(wsId);
+      db.prepare('DELETE FROM content_topic_requests WHERE workspace_id = ?').run(wsId);
+      db.prepare('DELETE FROM page_keywords WHERE workspace_id = ?').run(wsId);
+    }
   });
 });

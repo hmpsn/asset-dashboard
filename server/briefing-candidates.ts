@@ -5,6 +5,7 @@ import { getSchedule } from './scheduled-audits.js';
 import { listContentGaps } from './content-gaps.js';
 import { getActionsByWorkspace, getOutcomesForAction } from './outcome-tracking.js';
 import { computeROI } from './roi.js';
+import { normalizePageUrl } from './helpers.js';
 import { createLogger } from './logger.js';
 import type {
   BriefingCategory,
@@ -343,16 +344,20 @@ export function collectMilestoneAttributionCandidates(workspaceId: string): Cand
     if (!action.pageUrl) continue;
 
     // Match the action to its ROI content-item entry by sourceId
-    // (content_request id) when possible, falling back to pageUrl.
+    // (content_request id) when possible, falling back to the page slug.
+    // ContentItemROI fields (roi.ts:121-132): requestId / targetPageSlug /
+    // clicks / topic — NOT contentRequestId / pageUrl / currentClicks / title.
+    const normalizedActionPage = action.pageUrl ? normalizePageUrl(action.pageUrl) : null;
     const item = roi.contentItems.find((ci) => {
-      // contentItems carry a contentRequestId or similar — match best-effort.
-      const ciAny = ci as { contentRequestId?: string; pageUrl?: string };
-      if (action.sourceId && ciAny.contentRequestId === action.sourceId) return true;
-      return ciAny.pageUrl === action.pageUrl;
+      if (action.sourceId && ci.requestId === action.sourceId) return true;
+      return (
+        normalizedActionPage != null &&
+        ci.targetPageSlug != null &&
+        normalizePageUrl(ci.targetPageSlug) === normalizedActionPage
+      );
     });
     if (!item) continue;
-    const itemAny = item as { currentClicks?: number; trafficValue?: number; title?: string };
-    const currentClicks = typeof itemAny.currentClicks === 'number' ? itemAny.currentClicks : 0;
+    const currentClicks = item.clicks;
     if (currentClicks < 1) continue;
 
     // Pick the highest threshold the page has crossed AND is "fresh" (in the
@@ -371,7 +376,7 @@ export function collectMilestoneAttributionCandidates(workspaceId: string): Cand
       referenceId: action.id,
       referenceType: 'analytics_insight',
       occurredAt: Date.now(),
-      title: itemAny.title ? `Brief milestone: "${itemAny.title}"` : `Brief milestone: ${action.pageUrl}`,
+      title: item.topic ? `Brief milestone: "${item.topic}"` : `Brief milestone: ${action.pageUrl}`,
       description: '',
       drillIn: { page: 'performance', queryParams: { page: action.pageUrl } },
       metrics: [],

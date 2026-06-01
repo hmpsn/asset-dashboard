@@ -439,6 +439,29 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceSiteAccessFro
         const rawCmsPublishedPath = req.body.publishedPath || req.body.pageSlug || '';
         const cmsPublishedPath = rawCmsPublishedPath ? normalizePageUrl(rawCmsPublishedPath) : '';
         recordSeoChange(cmsWs.id, pageId, cmsPublishedPath, req.body.pageTitle || '', ['schema'], 'schema-cms-field');
+        // Record for outcome tracking — guard prevents duplicates on re-deploy.
+        // Mirrors the direct-publish path below (line ~512).
+        try {
+          if (!getActionByWorkspaceAndSource(cmsWs.id, 'schema', pageId)) {
+            const schemaAction = recordAction({ // recordAction-ok: cmsWs guaranteed non-null by enclosing if
+              workspaceId: cmsWs.id,
+              actionType: 'schema_deployed',
+              sourceType: 'schema',
+              sourceId: pageId,
+              pageUrl: cmsPublishedPath || null,
+              targetKeyword: null,
+              baselineSnapshot: {
+                captured_at: new Date().toISOString(),
+                rich_result_eligible: true,
+                rich_result_appearing: false,
+              },
+              attribution: 'platform_executed',
+            });
+            if (cmsPublishedPath) void captureBaselineFromGsc(schemaAction.id, cmsWs.id, cmsPublishedPath);
+          }
+        } catch (err) {
+          log.warn({ err, pageId }, 'Failed to record outcome action for CMS-field schema deployment');
+        }
         // Enqueue debounced rec regen — schema deploy changes page SEO signals so
         // recommendations should reflect the updated schema state.
         // recsInFlight deduplicates concurrent regens per workspace.

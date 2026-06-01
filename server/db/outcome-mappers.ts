@@ -58,6 +58,8 @@ export interface ActionOutcomeRow {
   delta_summary: string;
   competitor_context: string;
   measured_at: string;
+  attributed_value: number | null;
+  value_basis: string | null;
 }
 
 export interface ActionPlaybookRow {
@@ -136,6 +138,8 @@ export function rowToActionOutcome(row: ActionOutcomeRow): ActionOutcome {
       ? parseJsonSafe(row.competitor_context, competitorContextSchema, null, { field: 'competitor_context', table: 'action_outcomes' })
       : null,
     measuredAt: row.measured_at,
+    attributedValue: row.attributed_value ?? null,
+    valueBasis: row.value_basis ?? null,
   };
 }
 
