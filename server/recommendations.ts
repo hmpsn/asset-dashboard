@@ -45,6 +45,9 @@ import { computeOpportunityValue, pickImpactScore } from './scoring/opportunity-
 import { recordOvDivergence } from './ov-divergence.js';
 import { buildCtrCurve, type GscKeywordObservation } from './scoring/ctr-curve.js';
 import { isFeatureEnabled } from './feature-flags.js';
+import { resolveOvAuthorityStrength } from './workspace-authority.js';
+import { getOrCreateWorkspaceWeights } from './opportunity-weights.js';
+import { computeOvCalibration } from './scoring/ov-calibration.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -936,7 +939,22 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   const effectiveBusinessPriorities = recommendationContext?.intelligence.clientSignals?.effectiveBusinessPriorities ?? [];
 
   // Fetch domain strength once per rec-gen cycle (cached at provider layer; see resolveDomainStrength).
+  // LEGACY-ONLY: this feeds adjustKdImpactScore / kdClassificationNote (the production
+  // impactScore). Untouched by PR5 to keep the flag-off path byte-identical.
   const domainStrength = await resolveDomainStrength(ws, workspaceId);
+
+  // ── PR5 · Spine C — self-calibrating OV inputs (OV path ONLY, dark/shadow). ──
+  // Resolved ONCE per rec-gen cycle and threaded into every computeOpportunityValue
+  // call so the attached `opportunity` object uses better, self-correcting signals:
+  //   • ovAuthority   — REAL referring-domains authority (not the organic-keyword proxy)
+  //   • ovCalibration — per-workspace realized-$ multiplier (1.0 identity until enabled+outcomes)
+  //   • ovWeights     — per-workspace calibrated display weights (platform defaults today)
+  // None of these touch the legacy impactScore; they only improve the shadow OV value.
+  const ovWeights = getOrCreateWorkspaceWeights(workspaceId);
+  const ovCalibration = computeOvCalibration(workspaceId);
+  // Reuse the backlinkProfile already resolved above via the cached/rate-limited
+  // intelligence SEO-context path (enrichWithBacklinks) — no duplicate API call.
+  const ovAuthority = resolveOvAuthorityStrength(workspaceId, backlinkProfile);
 
   // Build a per-workspace position→CTR curve once from the workspace's own GSC
   // observations (the `gscKeywords` persisted on page_keywords). Falls back to the
@@ -1073,7 +1091,8 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           severity: group.severity,
           isCritical: isCrit,
           currentClicks: group.totalClicks,
-        }),
+          authorityStrength: ovAuthority ?? null,
+        }, { calibration: ovCalibration, weights: ovWeights }),
         source: RecSource.audit(group.check),
         affectedPages: sortedPages.map(p => p.slug),
         trafficAtRisk: group.totalClicks,
@@ -1131,7 +1150,8 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           severity: isCrit ? 'error' : 'warning',
           isCritical: isCrit,
           currentClicks: pageTraffic,
-        }),
+          authorityStrength: ovAuthority ?? null,
+        }, { calibration: ovCalibration, weights: ovWeights }),
         source: RecSource.auditSiteWide(issue.check),
         affectedPages: pages.map(p => p.replace(/^\//, '')),
         trafficAtRisk: pageTraffic,
@@ -1190,7 +1210,8 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
             branch: 'quick_win',
             roiScore: qw.roiScore ?? null,
             llmLabel: qw.estimatedImpact,
-          }),
+            authorityStrength: ovAuthority ?? null,
+          }, { calibration: ovCalibration, weights: ovWeights }),
           source: RecSource.strategyQuickWin(),
           affectedPages: [qw.pagePath.replace(/^\//, '')],
           trafficAtRisk: t.clicks,
@@ -1268,9 +1289,9 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
             trendDirection: cg.trendDirection ?? null,
             llmLabel: cg.priority,
             intent: cg.intent ?? null,
-            authorityStrength: domainStrength || null,
+            authorityStrength: ovAuthority ?? null,
             ctrCurve: ovCtrCurve,
-          }),
+          }, { calibration: ovCalibration, weights: ovWeights }),
           source: RecSource.strategyContentGap(),
           affectedPages: [],
           trafficAtRisk: 0,
@@ -1332,9 +1353,9 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
               impressions: pm.impressions ?? null,
               cpc: pm.cpc ?? null,
               intent: toOpportunityIntent(pm.searchIntent),
-              authorityStrength: domainStrength || null,
+              authorityStrength: ovAuthority ?? null,
               ctrCurve: ovCtrCurve,
-            }),
+            }, { calibration: ovCalibration, weights: ovWeights }),
             source: RecSource.strategyRankingOpp(),
             affectedPages: [pm.pagePath.replace(/^\//, '')],
             trafficAtRisk: pm.clicks || 0,
@@ -1391,9 +1412,9 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           impressions: pk.impressions ?? null,
           cpc: pk.cpc ?? null,
           intent: toOpportunityIntent(pk.searchIntent),
-          authorityStrength: domainStrength || null,
+          authorityStrength: ovAuthority ?? null,
           ctrCurve: ovCtrCurve,
-        }),
+        }, { calibration: ovCalibration, weights: ovWeights }),
         source: RecSource.strategyIntentMismatch(pageSlug),
         affectedPages: [pageSlug],
         trafficAtRisk: 0,
@@ -1459,7 +1480,8 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
             currentClicks: dp.currentClicks,
             currentPosition: dp.currentPosition,
             isRepeatDecay: dp.isRepeatDecay ?? null,
-          }),
+            authorityStrength: ovAuthority ?? null,
+          }, { calibration: ovCalibration, weights: ovWeights }),
           source: RecSource.decay(pageSlug),
           affectedPages: [pageSlug],
           trafficAtRisk: dp.previousClicks,
@@ -1531,9 +1553,9 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           expectedClickGap: d.estimatedClickGap ?? null,
           impressions: d.impressions ?? null,
           currentPosition: d.position ?? null,
-          authorityStrength: domainStrength || null,
+          authorityStrength: ovAuthority ?? null,
           ctrCurve: ovCtrCurve,
-        }),
+        }, { calibration: ovCalibration, weights: ovWeights }),
         source: RecSource.ctrOpportunity(pageSlug),
         affectedPages: [pageSlug],
         trafficAtRisk: gap,
@@ -1587,7 +1609,8 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           opportunity: computeOpportunityValue({
             branch: 'diagnostic',
             llmLabel: action.impact,
-          }),
+            authorityStrength: ovAuthority ?? null,
+          }, { calibration: ovCalibration, weights: ovWeights }),
           source: RecSource.diagnostic(report.id, actionIdx, action.title),
           affectedPages: action.pageUrls?.map(toPageSlug) ?? [],
           trafficAtRisk: 0,
@@ -1644,7 +1667,8 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         opportunity: computeOpportunityValue({
           branch: 'freshness',
           impressions: trafficAtRisk,
-        }),
+          authorityStrength: ovAuthority ?? null,
+        }, { calibration: ovCalibration, weights: ovWeights }),
         source: RecSource.freshnessAlert(toPageSlug(d.pagePath)),
         affectedPages: [toPageSlug(d.pagePath)],
         trafficAtRisk,

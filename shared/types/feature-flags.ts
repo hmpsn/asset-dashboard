@@ -39,6 +39,9 @@ export const FEATURE_FLAGS = {
 
   // Unified Opportunity Value scorer — flips ranked impactScore to the OV value
   'opportunity-value-scorer': false,
+  // Self-calibrating OV inputs — per-workspace realized-$ outcome calibration
+  // (identity 1.0 until enabled AND enough outcomes accrue). Dark by default.
+  'opportunity-value-calibration': false,
 
   // Intelligence Phase 2 — Event Bridges (all default OFF, individually toggleable)
   'bridge-outcome-reweight': false,
@@ -360,6 +363,19 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       createdAt: REVIEWED_AT,
       rolloutTarget: 'staging-validation',
       removalCondition: 'Remove after the Opportunity Value scorer is validated against legacy scoring and becomes the only ranking path.',
+      linkedRoadmapItemId: LEGACY_ROADMAP.intelligence,
+      staleAuditCadence: 'weekly',
+      lastReviewedAt: REVIEWED_AT,
+    },
+  },
+  'opportunity-value-calibration': {
+    label: 'Opportunity Value — per-workspace realized-$ calibration',
+    group: 'Workspace Intelligence Bridges',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: REVIEWED_AT,
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Remove after per-workspace outcome calibration is validated against realized value and becomes the only calibration path.',
       linkedRoadmapItemId: LEGACY_ROADMAP.intelligence,
       staleAuditCadence: 'weekly',
       lastReviewedAt: REVIEWED_AT,
@@ -729,6 +745,7 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
     keys: [
       'intelligence-shadow-mode',
       'opportunity-value-scorer',
+      'opportunity-value-calibration',
       'bridge-outcome-reweight',
       'bridge-decay-suggested-brief',
       'bridge-strategy-invalidate',
