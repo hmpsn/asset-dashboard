@@ -30,6 +30,11 @@ import './content-decay.js';
 // PR-1a schema_item per-page batches). DARK — self-registers on import but is only mirrored
 // when the `unified-deliverables-rest` flag is on (default off → no-op).
 import './schema-plan.js';
+// PR-1d: copy_section — the FIRST PROJECTED type (D-hybrid). Its source tables (copy_sections,
+// copy_metadata) are RETAINED; the adapter exposes a copy ENTRY through the unified interface at
+// READ time via projectFromSource() (no dual-write, no backfill). DARK — self-registers on import
+// but is consumed only by the Phase-2 inbox/rollup (gated by `unified-deliverables-rest`).
+import './copy-section.js';
 
 export {
   registerAdapter,
