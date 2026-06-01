@@ -1,8 +1,32 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **466 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **468 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 468. Unified Opportunity Value Recommendation Model (built dark — pending owner-gated flip)
+
+**What it does:** Replaces the recommendation engine's per-producer magic-constant scores (severity 60/35/15, quick-win 75/55/35, ranking-opp flat 60/40, `impressions/50`, …) with one shared, data-grounded `computeOpportunityValue()` (`server/scoring/`) that every producer branch calls — technical, quick-win, content-gap, striking-distance, decay, freshness, diagnostic. Each rec gets a commensurable Opportunity Value: expected-value-grounded (demand × winnability-vs-authority × commercial intent ÷ effort), confidence-discounted so an ungrounded LLM "high" can never outrank a grounded opportunity, per-workspace outcome-calibrated (realized `attributed_value`), and lifted by a decaying timing boost when an opportunity event fires (competitor overtake, content decay, rank decline, publish). Surfaced coherently to the AI advisor, the client `#1` card (relative ROI badge + a "why this is #1" component breakdown — **never raw dollars**, owner decision), and the public payloads. Built across 7 phase PRs (#1001–#1007): the pure scorer + CTR-curve, persistence (Zod lockstep), Spine-A wiring behind a flag-off selector, shadow divergence logging (`ov_divergence`: legacy-#1 vs OV-#1), real referring-domains authority + outcome calibration + calibrated weights (migrations 108/109), advisor+client coherence, and the `opportunity_events` ledger + detectors (migration 110). Ships behind three default-OFF flags (`opportunity-value-scorer`, `-calibration`, `-events`).
+
+**Agency value:** The ranked queue stops surfacing plausible LLM/heuristic guesses and orders by grounded expected value that re-prioritizes when the world changes — and every `#1` is explainable to the client with the exact drivers.
+
+**Client value:** The single "do this next" reflects real winnability + demand + commercial intent + timing with a transparent ROI rationale — not a title fix on a dead page.
+
+**Mutual:** One scoring spine the dashboard, the advisor, and the client all read, self-correcting from real outcomes. **Currently dark** (flags off); the production cutover is owner-gated on a shadow-divergence review — see roadmap `ov-flag-flip-cutover` and `docs/designs/2026-05-31-opportunity-value-model.md`.
+
+---
+
+### 467. Foundational Integrity Remediation — Recommendation Freshness · ROI Loop · Priority Reconciliation · Advisor Completeness
+
+**What it does:** Closes the highest-impact findings of the 2026-05-31 foundational-integrity audit (`docs/audits/2026-05-31-foundational-integrity-audit.md`) across four phases (PRs #997–#999 + a direct push): (1) applied SEO changes / approvals / work-orders / publishes now resolve + regenerate the recommendation set (`resolveRecommendationsForChange`), so a completed action drops off the priority list instead of lingering; (2) the recommendation → action → outcome → ROI loop now persists an attributed dollar value (migration 106 `action_outcomes.attributed_value` = clicks-delta × CPC), and the monthly digest + learnings read it instead of the dead, never-written `roi_attributions`; (3) one reconciled `effectiveBusinessPriorities` resolver (admin + client intent, authority-layered) feeds recommendation ranking plus a stored `summary.topRecommendationId`; (4) advisor completeness — intelligence-cache invalidation across the write sites, new slice fields, admin-chat formatter routing, and SEO-write rec-resolution.
+
+**Agency value:** The headline "one ranked priority" stays fresh after action, proof-of-value surfaces can show real dollar outcomes, and the AI advisor reasons over complete, current context.
+
+**Client value:** The priority they act on disappears once done, ROI becomes attributable, and the advisor's answers match the dashboard.
+
+**Mutual:** The platform now wires its write events to the surfaces that set priority and prove value — the structural foundation the Unified Opportunity Value model (#468) builds on.
 
 ---
 
