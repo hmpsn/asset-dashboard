@@ -140,7 +140,15 @@ export function formatForPrompt(
   // Apply tokenBudget truncation if requested (§20 priority chain)
   const tokenBudget = opts?.tokenBudget;
   if (tokenBudget && tokenBudget > 0) {
-    return applyTokenBudget(sections, intelligence, tokenBudget);
+    // The §20 priority chain treats seoContext as the never-dropped anchor and
+    // drops operational FIRST. That ordering is correct for the full prompt, but
+    // for a slice-filtered call that does NOT request seoContext (e.g. the
+    // admin-chat additional-slices block: operational/siteHealth/clientSignals/…),
+    // there is no anchor, and dropping operational first silently removes the very
+    // slice the question selected. Tell applyTokenBudget whether seoContext is in
+    // play so it can protect requested slices when it is not.
+    const seoContextIsAnchor = !include || include.has('seoContext');
+    return applyTokenBudget(sections, intelligence, tokenBudget, seoContextIsAnchor);
   }
 
   return sections.filter(Boolean).join('\n\n');
@@ -150,12 +158,23 @@ function applyTokenBudget(
   sections: string[],
   intelligence: WorkspaceIntelligence,
   budget: number,
+  seoContextIsAnchor: boolean = true,
 ): string {
   const estimateTokens = (text: string) => Math.ceil(text.length / 4);
 
   let current = sections.filter(Boolean);
   let output = current.join('\n\n');
   if (estimateTokens(output) <= budget) return output;
+
+  // Slice-filtered call with no seoContext anchor: the standard "drop operational
+  // first / collapse to seoContext only" chain would erase the requested slices.
+  // Instead degrade in place — truncate every non-header section to its first few
+  // lines, keeping ALL requested sections present (operational included) — then,
+  // only if still over budget, drop trailing sections from the end (least-recently
+  // requested in formatForPrompt's fixed emit order) while always keeping the first.
+  if (!seoContextIsAnchor) {
+    return applyFilteredTokenBudget(current, budget, estimateTokens);
+  }
 
   // Step 1: Drop operational
   current = current.filter(s => !s.startsWith('## Operational'));
@@ -216,6 +235,49 @@ function applyTokenBudget(
     s.startsWith('[Workspace Intelligence]') || s.startsWith('## SEO Context'),
   );
   return seoOnly.join('\n\n');
+}
+
+/**
+ * Token-budget truncation for slice-filtered calls that have NO seoContext anchor
+ * (e.g. the admin-chat additional-slices block). Unlike the §20 priority chain,
+ * this never drops operational first and never collapses to "seoContext only" —
+ * the requested slices ARE the answer, so it keeps them all and degrades in place:
+ *
+ *   1. If under budget, return as-is.
+ *   2. Otherwise truncate each section body to its first `keepLines` lines
+ *      (header + most-salient lines first), keeping every requested section
+ *      present so the slice the question selected never silently vanishes.
+ *   3. Only if STILL over budget after maximal per-section truncation, drop whole
+ *      sections from the END of formatForPrompt's fixed emit order, always
+ *      retaining the first content section.
+ */
+function applyFilteredTokenBudget(
+  sections: string[],
+  budget: number,
+  estimateTokens: (text: string) => number,
+): string {
+  const header = sections.filter(s => s.startsWith('[Workspace Intelligence]'));
+  let content = sections.filter(s => !s.startsWith('[Workspace Intelligence]'));
+
+  const render = (cs: string[]) => [...header, ...cs].join('\n\n');
+  if (estimateTokens(render(content)) <= budget) return render(content);
+
+  // Step 2: progressively truncate every section body, header line always kept.
+  for (let keepLines = 8; keepLines >= 1; keepLines--) {
+    content = content.map(s => {
+      const lines = s.split('\n');
+      if (lines.length <= keepLines + 1) return s;
+      return [...lines.slice(0, keepLines + 1), '  (truncated)'].join('\n');
+    });
+    if (estimateTokens(render(content)) <= budget) return render(content);
+  }
+
+  // Step 3: still over budget — drop whole sections from the end, but always keep
+  // at least the first content section so the block never collapses to nothing.
+  while (content.length > 1 && estimateTokens(render(content)) > budget) {
+    content = content.slice(0, -1);
+  }
+  return render(content);
 }
 
 function pct(rate: number | null | undefined): string {

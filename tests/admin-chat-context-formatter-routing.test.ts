@@ -184,4 +184,50 @@ describe('admin-chat context builder — B-10 slice formatter routing', () => {
     );
     expect(otherSlicesCall).toBeDefined();
   });
+
+  // ── FIX E: dataSources must not falsely list 'SEO Context' when seoContext
+  //          produced no formatted content (regression guard). ─────────────────
+  it('does NOT list SEO Context in dataSources when seoContext is empty but operational is populated', async () => {
+    // Override the formatter so the seoContext block formats to NOTHING (no `## `
+    // header) while the additional-slices block still produces real content.
+    vi.mocked(formatForPrompt).mockImplementation((_intel, opts) => {
+      const sections = opts?.sections ?? [];
+      if (sections.includes('seoContext')) return ''; // empty SEO context
+      if (sections.includes('learnings')) return '## Outcome Learnings\nWin rate: n/a';
+      const nonSeoSections = sections.filter(s => s !== 'seoContext' && s !== 'learnings');
+      if (nonSeoSections.length > 0) {
+        return `## Operational\nPending: 3 approvals`;
+      }
+      return '';
+    });
+
+    const result = await buildAdminChatIntelligenceContext(
+      'ws-4-3',
+      'What approvals are pending?',
+      new Set(['approvals']),
+    );
+
+    // SEO Context must NOT appear — it formatted to nothing, so claiming it as a
+    // data source would be a false attribution.
+    const hasSeoContextSource = result.dataSources.some(s => s === 'Workspace Intelligence: SEO Context');
+    expect(hasSeoContextSource).toBe(false);
+
+    // …but the additional slices that DID produce content MUST still be listed.
+    const hasOperationalSource = result.dataSources.some(s => /operational/i.test(s));
+    expect(hasOperationalSource).toBe(true);
+
+    // And the operational content must still reach the context block.
+    expect(result.workspaceContextBlock).toContain('## Operational');
+  });
+
+  it('DOES list SEO Context in dataSources when seoContext produced content', async () => {
+    // Sanity counterpart: with the default formatter (seoContext non-empty), the
+    // label must be present — guards against the gate being overzealous.
+    const result = await buildAdminChatIntelligenceContext(
+      'ws-4-3',
+      'What approvals are pending?',
+      new Set(['approvals']),
+    );
+    expect(result.dataSources).toContain('Workspace Intelligence: SEO Context');
+  });
 });

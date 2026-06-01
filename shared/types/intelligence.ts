@@ -297,9 +297,11 @@ export interface SiteHealthSlice {
   }>;
   /**
    * Weekly metric trend from workspace_metrics_snapshots (migration 080).
-   * Surfaces the latest week's values plus overall snapshot count so the
-   * advisor can cite "best-week" anchors. Optional — only present when
-   * at least one snapshot exists.
+   * Surfaces the most recent week's values plus the overall snapshot count so
+   * the advisor can ground statements in the latest measured week. Optional —
+   * only present when at least one snapshot exists. (The "best week since X"
+   * anchor phrasing used in briefings is computed separately by
+   * workspace-metrics-snapshots.ts:findBestWeekSince — it is NOT a field here.)
    */
   weeklyMetricsTrend?: {
     /** Most recent snapshot (newest first). */

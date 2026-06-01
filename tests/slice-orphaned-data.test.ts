@@ -343,7 +343,7 @@ describe('Task 4.2 — Orphaned data wired into intelligence slices', () => {
   });
 
   describe('(b) workspace_metrics_snapshots weekly trend in siteHealth slice', () => {
-    it('surfaces weeklyMetricsTrend with latestWeek and bestWeek values', async () => {
+    it('surfaces weeklyMetricsTrend with latestWeek values and snapshot count', async () => {
       const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
       const result = await buildWorkspaceIntelligence('ws-1', { slices: ['siteHealth'] });
 
@@ -357,7 +357,8 @@ describe('Task 4.2 — Orphaned data wired into intelligence slices', () => {
       expect(trend.latestWeek.totalClicks).toBe(1500);
       expect(trend.latestWeek.auditScore).toBe(78);
 
-      // Best: highest clicks among snapshots = 1500 (most recent), best audit = 78
+      // The slice exposes only latestWeek + snapshotCount — there is no bestWeek
+      // field (best-week anchors are computed elsewhere by findBestWeekSince).
       expect(trend.snapshotCount).toBe(3);
     });
 

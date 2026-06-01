@@ -131,8 +131,14 @@ export async function buildAdminChatIntelligenceContext(
 
   if (additionalBlock) workspaceParts.push(additionalBlock);
 
+  // Gate the 'SEO Context' data-source label on the seoContext block having
+  // produced real content — NOT on workspaceParts being non-empty. workspaceParts
+  // can be non-empty solely because additionalBlock (operational, siteHealth, …)
+  // was pushed, even when seoContext formatted to nothing; listing 'SEO Context'
+  // in that case is a false claim about which slices grounded the answer.
+  const hasSeoContextContent = hasFormattedIntelligenceSection(seoContextBlock);
   const dataSources: string[] = [];
-  if (workspaceParts.length > 0) dataSources.push('Workspace Intelligence: SEO Context');
+  if (hasSeoContextContent) dataSources.push('Workspace Intelligence: SEO Context');
   dataSources.push(...additionalDataSources);
 
   return {

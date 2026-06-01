@@ -748,15 +748,21 @@ router.delete('/api/webflow/schema-plan/:siteId', requireWorkspaceSiteAccessFrom
   const snapshotDeleted = deleteSchemaSnapshot(req.params.siteId);
   if (snapshotDeleted) broadcastSchemaSnapshotUpdated(req.params.siteId, plan.workspaceId, 'deleted');
 
-  // Delete the associated approval batch (sent-to-client preview) if one exists
+  // Delete the associated approval batch (sent-to-client preview) if one exists.
+  // deleteBatch() already calls invalidateIntelligenceCache(plan.workspaceId)
+  // internally when it removes a batch, so track whether that happened to avoid a
+  // redundant second invalidation of the same workspace below.
+  let cacheInvalidated = false;
   if (plan.clientPreviewBatchId) {
-    deleteBatch(plan.workspaceId, plan.clientPreviewBatchId);
+    if (deleteBatch(plan.workspaceId, plan.clientPreviewBatchId)) cacheInvalidated = true;
   }
 
   const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
   if (ws) {
     addActivity(ws.id, 'schema_plan_deleted', 'Schema site plan retracted', 'Plan deleted by admin');
-    invalidateIntelligenceCache(ws.id);
+    // The schema-plan + snapshot deletions also changed intelligence inputs, so
+    // invalidate — unless deleteBatch already did it for this same workspace.
+    if (!cacheInvalidated) invalidateIntelligenceCache(ws.id);
   }
   res.json({ success: true });
 });

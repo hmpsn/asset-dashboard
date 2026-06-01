@@ -20,7 +20,6 @@ import {
   markApplied,
   selectVariation,
 } from '../seo-suggestions.js';
-import { getPageState } from '../page-edit-states.js';
 import { resolveRecommendationsForChange } from '../recommendations.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { updatePageSeo } from '../webflow.js';
@@ -148,15 +147,19 @@ router.post('/api/webflow/seo-suggestions/:workspaceId/apply', requireWorkspaceA
 
     // A live SEO change resolves any recommendations covering the pages it
     // touched, so the priority list drops them immediately (GSC-lag-free).
-    // The applied result pageIds are Webflow page IDs (the page_edit_states
-    // key), but recommendation.affectedPages are SLUGS — resolve each id to its
-    // slug via page_edit_states before matching. Guarded so a resolver failure
-    // can never abort the apply response. // rec-refresh-ok
+    // recommendation.affectedPages are SLUGS, and each applied suggestion already
+    // carries its slug in hand (toApply[i].pageSlug, mapped by result index — the
+    // same source used for recordSeoChange above), so use it directly instead of
+    // round-tripping through getPageState (which would silently no-op for any
+    // pageId that has no page_edit_states slug). Guarded so a resolver failure can
+    // never abort the apply response. // rec-refresh-ok
     try {
-      const appliedPageIds = Array.from(new Set(results.filter(r => r.applied).map(r => r.pageId)));
-      const affectedSlugs = appliedPageIds
-        .map(id => getPageState(workspaceId, id)?.slug)
-        .filter((s): s is string => typeof s === 'string' && s.length > 0);
+      const affectedSlugs = Array.from(new Set(
+        results
+          .map((r, i) => (r.applied ? toApply[i]?.pageSlug : undefined))
+          .filter((s): s is string => typeof s === 'string' && s.length > 0)
+          .map(slug => normalizePageUrl(slug)),
+      ));
       if (affectedSlugs.length > 0) {
         resolveRecommendationsForChange(workspaceId, { affectedPages: affectedSlugs });
       }

@@ -8,6 +8,7 @@ import { getWorkspace, updatePageState } from './workspaces.js';
 import { WS_EVENTS } from './ws-events.js';
 import { normalizePageUrl } from './helpers.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { resolveRecommendationsForChange } from './recommendations.js';
 import type { SeoBulkAcceptFix } from './schemas/seo-bulk-jobs.js';
 
 const log = createLogger('webflow-seo-bulk-accept-fixes-job');
@@ -34,6 +35,11 @@ export async function runSeoBulkAcceptFixesJob({
     let done = 0;
     let failed = 0;
     const applied: string[] = [];
+    // Slugs of pages whose audit fixes actually applied — used to resolve the
+    // matching audit recommendations in-place after the loop. These fixes carry
+    // their slug in hand (publishedPath/pageSlug); this job never writes the
+    // page_edit_states slug, so we must NOT round-trip through getPageState here.
+    const appliedSlugs = new Set<string>();
 
     for (const fix of fixes) {
       if (isJobCancelled(jobId) || signal.aborted) break;
@@ -70,6 +76,7 @@ export async function runSeoBulkAcceptFixesJob({
               const pagePath = fix.publishedPath
                 ? normalizePageUrl(fix.publishedPath)
                 : fix.pageSlug ? normalizePageUrl(fix.pageSlug) : '';
+              if (pagePath) appliedSlugs.add(pagePath);
               recordSeoChange(ws.id, fix.pageId, pagePath, fix.pageName || '', [changedField], 'audit-fix');
               broadcastToWorkspace(ws.id, WS_EVENTS.PAGE_STATE_UPDATED, {
                 pageId: fix.pageId,
@@ -153,6 +160,21 @@ export async function runSeoBulkAcceptFixesJob({
       appliedKeys: applied,
     });
     if (applied.length > 0) invalidateIntelligenceCache(workspaceId);
+
+    // These are AUDIT fixes, so resolve any audit-category recommendations
+    // covering the fixed pages in-place — otherwise the already-applied audit
+    // items linger on the client priority list until the next GSC-lagged full
+    // audit. Pass source:'audit' so only audit-category recs are touched (a
+    // keyword/decay rec on the same page is untouched). The slugs are in hand
+    // (publishedPath/pageSlug); no getPageState round-trip. Guarded so a resolver
+    // failure can never abort the job's completion side-effects (activity log).
+    if (appliedSlugs.size > 0) {
+      try {
+        resolveRecommendationsForChange(workspaceId, { affectedPages: [...appliedSlugs], source: 'audit' }); // rec-refresh-ok
+      } catch (err) {
+        log.warn({ err, jobId }, 'bulk-accept-fixes: failed to resolve recommendations after applying audit fixes');
+      }
+    }
 
     if (applied.length > 0) {
       const fixLabel = applied.length === 1 ? 'fix' : 'fixes';

@@ -3521,8 +3521,9 @@ export const CHECKS: Check[] = [
       'This route handler writes a live SEO state (updatePageState({ status: \'live\' }) ' +
       'or recordSeoChange()) but never refreshes recommendations. The applied change ' +
       'will linger in the priority list until the next full audit. Call ' +
-      'resolveRecommendationsForChange(workspaceId, { affectedPages }) — resolving Webflow ' +
-      'page IDs to slugs via getPageState() first — or regenerate the set, mirroring ' +
+      'resolveRecommendationsForChange(workspaceId, { affectedPages }) — or the helper ' +
+      'resolveRecommendationsForPageIds(workspaceId, pageIds) which maps Webflow page IDs ' +
+      'to slugs via getPageState() for you — or regenerate the set, mirroring ' +
       'server/work-orders.ts. Suppress with // rec-refresh-ok if this path never touches ' +
       'rec-eligible pages (e.g. a draft save that is not yet live).',
     severity: 'warn',
@@ -3534,13 +3535,11 @@ export const CHECKS: Check[] = [
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
       const routeRe = /\brouter\.(post|put|patch|delete)\s*\(/i;
-      // A live SEO-state write: updatePageState({ ... status: 'live' ... }) or
-      // any recordSeoChange() call (recordSeoChange only ever records an applied,
-      // live change).
-      const liveStateRe = /status:\s*['"]live['"]/;
       const recordSeoChangeRe = /\brecordSeoChange\s*\(/;
+      const updatePageStateRe = /\bupdatePageState\s*\(/;
+      const liveStateRe = /status:\s*['"]live['"]/;
       const refreshRe =
-        /\b(resolveRecommendationsForChange|generateRecommendations|queueKeywordStrategyPostUpdateFollowOns)\s*\(/;
+        /\b(resolveRecommendationsForChange|resolveRecommendationsForPageIds|generateRecommendations|queueKeywordStrategyPostUpdateFollowOns)\s*\(/;
       for (const file of files) {
         if (!file.endsWith('.ts')) continue;
         if (!file.includes('/server/routes/') && !file.includes('\\server\\routes\\')) continue;
@@ -3554,18 +3553,40 @@ export const CHECKS: Check[] = [
         for (let k = 0; k < routeIdx.length; k++) {
           const start = routeIdx[k];
           if (hasHatch(lines, start, '// rec-refresh-ok')) continue;
-          const nextStart = k + 1 < routeIdx.length ? routeIdx[k + 1] : lines.length;
-          const routeBodyEnd = Math.min(nextStart, start + SEO_REC_REFRESH_LOOKAHEAD);
-          const routeBody = lines.slice(start, routeBodyEnd).join('\n');
-          // Must have a live SEO-state write.
-          const updatesLiveState = liveStateRe.test(routeBody) && /\bupdatePageState\s*\(/.test(routeBody);
-          if (!updatesLiveState && !recordSeoChangeRe.test(routeBody)) continue;
-          // Inline // rec-refresh-ok anywhere in the body also suppresses (the
-          // wired handlers carry the marker next to the resolver call).
-          if (routeBody.includes('// rec-refresh-ok')) continue;
-          // Check for a rec-refresh call.
-          if (refreshRe.test(routeBody)) continue;
-          hits.push({ file, line: start + 1, text: lines[start].trim() });
+          // The FULL route body runs to the next router.<verb> declaration (or
+          // EOF). We scan the full body — not a fixed 200-line window — so a
+          // live-write far past the lookahead cap (e.g. the bulk-seo-fix write
+          // ~400 lines into the giant `router.post('/api/jobs')` switch) is not
+          // silently skipped. A short window also let an UNRELATED refresh in an
+          // earlier sub-branch (e.g. generateRecommendations in the seo-audit
+          // case) exempt a far-down write in a different case. To prevent that,
+          // each live-write is paired with its OWN nearby refresh: we require a
+          // refresh call (or inline // rec-refresh-ok) within SEO_REC_REFRESH_
+          // LOOKAHEAD lines AFTER that specific write, bounded by the route body.
+          const bodyEnd = k + 1 < routeIdx.length ? routeIdx[k + 1] : lines.length;
+          // Collect the line index of each live SEO-state write in this body.
+          const writeIdx: number[] = [];
+          for (let i = start; i < bodyEnd; i++) {
+            const line = lines[i];
+            if (recordSeoChangeRe.test(line)) { writeIdx.push(i); continue; }
+            // updatePageState(...) can span multiple lines; pair it with a
+            // status: 'live' in the same small call window.
+            if (updatePageStateRe.test(line)) {
+              const callWindow = lines.slice(i, Math.min(bodyEnd, i + 8)).join('\n');
+              if (liveStateRe.test(callWindow)) writeIdx.push(i);
+            }
+          }
+          if (writeIdx.length === 0) continue;
+          for (const w of writeIdx) {
+            const windowEnd = Math.min(bodyEnd, w + SEO_REC_REFRESH_LOOKAHEAD);
+            const window = lines.slice(w, windowEnd).join('\n');
+            // Inline // rec-refresh-ok near the write suppresses it (the wired
+            // handlers carry the marker next to the resolver call).
+            if (window.includes('// rec-refresh-ok')) continue;
+            // A refresh call within this write's own forward window clears it.
+            if (refreshRe.test(window)) continue;
+            hits.push({ file, line: w + 1, text: lines[w].trim() });
+          }
         }
       }
       return hits;

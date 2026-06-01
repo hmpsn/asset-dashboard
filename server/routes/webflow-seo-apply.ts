@@ -11,7 +11,6 @@ import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { tryResolvePagePath, normalizePageUrl } from '../helpers.js';
 import { createLogger } from '../logger.js';
-import { getPageState } from '../page-edit-states.js';
 import { resolveRecommendationsForChange } from '../recommendations.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { updatePageSeo } from '../webflow.js';
@@ -120,14 +119,23 @@ router.post('/api/webflow/seo-pattern-apply/:siteId', requireWorkspaceSiteAccess
 
       // A live SEO change resolves any recommendations covering the pages it
       // touched, so the priority list drops them immediately (GSC-lag-free).
-      // appliedPageIds are Webflow page IDs (the page_edit_states key), but
-      // recommendation.affectedPages are SLUGS — resolve each id to its slug via
-      // page_edit_states before matching. Guarded so a resolver failure can never
-      // abort the apply response. // rec-refresh-ok
+      // recommendation.affectedPages are SLUGS, and each applied page already
+      // carries its slug in hand (pages[i] via tryResolvePagePath/slug — the same
+      // source used for recordSeoChange above, mapped by result index), so use it
+      // directly instead of round-tripping through getPageState (which would
+      // silently no-op for any pageId that has no page_edit_states slug). Guarded
+      // so a resolver failure can never abort the apply response. // rec-refresh-ok
       try {
-        const affectedSlugs = appliedPageIds
-          .map(id => getPageState(ws.id, id)?.slug)
-          .filter((s): s is string => typeof s === 'string' && s.length > 0);
+        const affectedSlugs = Array.from(new Set(
+          results
+            .map((r, i) => {
+              if (!r.applied) return undefined;
+              const page = pages[i];
+              if (!page) return undefined;
+              return tryResolvePagePath(page) || (page.slug ? normalizePageUrl(page.slug) : '');
+            })
+            .filter((s): s is string => typeof s === 'string' && s.length > 0),
+        ));
         if (affectedSlugs.length > 0) {
           resolveRecommendationsForChange(ws.id, { affectedPages: affectedSlugs });
         }

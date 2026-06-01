@@ -29,7 +29,7 @@ import {
 } from '../jobs.js';
 import { APP_PASSWORD, signAdminToken } from '../middleware.js';
 import { requestUserCanAccessWorkspace, sendWorkspaceAccessDenied, workspaceOwnsWebflowSite } from '../auth.js';
-import { generateRecommendations, loadRecommendations } from '../recommendations.js';
+import { generateRecommendations, loadRecommendations, resolveRecommendationsForPageIds } from '../recommendations.js';
 import { getBrief } from '../content-brief.js';
 import {
   createContentPostGenerationJob,
@@ -79,6 +79,7 @@ import {
   formatKeywordsForPrompt,
   formatKnowledgeBaseForPrompt,
   formatPersonasForPrompt,
+  invalidateIntelligenceCache,
 } from '../workspace-intelligence.js';
 import type { default as SharpConstructor } from 'sharp';
 import type * as SvgoMod from 'svgo';
@@ -606,6 +607,19 @@ router.post('/api/jobs', async (req, res) => {
                 fields: [field],
                 source: 'bulk-fix',
               });
+              // A bulk SEO write changes live page state, so the intelligence cache
+              // must be invalidated and any recommendation covering the fixed pages
+              // resolved (matching the work-order completion pattern). appliedPageIds
+              // are Webflow/page IDs (page_edit_states key) — the shared helper maps
+              // each to its slug before matching against recommendation.affectedPages
+              // (SLUGS). Guarded so a resolver failure can never abort the job's
+              // completion side-effects.
+              invalidateIntelligenceCache(bulkSeoWorkspaceId);
+              try {
+                resolveRecommendationsForPageIds(bulkSeoWorkspaceId, appliedPageIds); // rec-refresh-ok
+              } catch (err) {
+                log.warn({ err, jobId: job.id }, 'Failed to resolve recommendations after bulk-seo-fix');
+              }
             }
             addActivity(bulkSeoWorkspaceId, 'seo_updated',
               `Bulk ${field} optimization: ${appliedResults.length} pages updated`,
