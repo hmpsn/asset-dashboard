@@ -6,6 +6,7 @@ import { invalidateContentPipelineCache } from './workspace-data.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { resolveRecommendationsForChange } from './recommendations.js';
 import { getPageState } from './page-edit-states.js';
+import { mirrorWorkOrderToDeliverable } from './domains/inbox/work-order-dual-write.js';
 import { createLogger } from './logger.js';
 import { z } from 'zod';
 
@@ -134,6 +135,11 @@ export function createWorkOrder(
 
   invalidateWorkOrderCaches(workspaceId);
 
+  // DARK dual-write (PR-1fg): mirror the freshly-created order into client_deliverable when the
+  // `unified-deliverables-rest` flag is on (default off → no-op). Best-effort/never-throws so it
+  // can never break the live create. Idempotent on `work_order:<id>`.
+  mirrorWorkOrderToDeliverable(order);
+
   return order;
 }
 
@@ -166,6 +172,14 @@ export function updateWorkOrder(
     updated_at: order.updatedAt,
   });
   invalidateWorkOrderCaches(workspaceId);
+
+  // DARK dual-write (PR-1fg): re-mirror the order on a status change so the order deliverable
+  // reflects lifecycle progress (pending→ordered, in_progress, completed, cancelled). Gated on a
+  // status change to skip pure assignee/notes edits. When the `unified-deliverables-rest` flag is
+  // off (default) this is a no-op. Best-effort/never-throws; idempotent on `work_order:<id>`.
+  if (updates.status !== undefined) {
+    mirrorWorkOrderToDeliverable(order);
+  }
 
   // A completed fix order resolves any recommendations covering the pages it
   // touched, so the priority list drops them immediately (GSC-lag-free).
