@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **158** — 139 error, 19 warn.
+Total rules: **161** — 141 error, 20 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -155,6 +155,8 @@ advisory but tracked.
 | 137 | Bare JSON.parse on AI text response without schema validation | error | custom | `server/` | `ai-json-parse-ok` | Unvalidated AI JSON silently propagates wrong shapes when prompts drift. |
 | 138 | Workspace object spread-and-redact in route handler | error | custom | `server/routes/` | `admin-view-ok` | Spread-and-redact is deny-list based — new secrets leak by default. |
 | 139 | Direct callOpenAI/callAnthropic import outside dispatcher | error | custom | `server/` | `direct-ai-helper-ok` | callAI() is the single entry point for all AI calls (~50 sites as of 2026-05-27). Direct imports bypass provider routing, retry logic, and operation registry. |
+| 140 | no-direct-insert-to-client_deliverable-outside-store | error | custom | `server/` | `deliverable-write-ok` | The client_deliverable store is the only writer of the deliverable tables; a bypassing INSERT skips dedup, JSON validation, and item handling. |
+| 141 | unified-send-to-client-bespoke-route | error | custom | `server/routes/` | `unified-send-route-ok` | The unified send service is the single send path (design §3); a new bespoke send route re-creates the five-pipeline divergence the migration removes. |
 
 ---
 
@@ -181,6 +183,7 @@ advisory but tracked.
 | 17 | inline-score-color-ternary | warn | pattern | `src/` | `score-color-inline-ok` | Inline score ternaries using the standard 80/60 thresholds duplicate the canonical Law-03 logic and drift when the palette changes. |
 | 18 | Workspace mutation route missing broadcastToWorkspace | warn | custom | `server/routes/` | `no-broadcast-ok` | Silent mutations mean UI never refreshes without a manual reload. |
 | 19 | inline-toLocaleDateString | warn | pattern | `src/` | `format-date-inline-ok` | Scattered toLocaleDateString() calls produce inconsistent date formatting and break in non-en-US locales. Shared helpers ensure uniform output. |
+| 20 | every-active-type-has-an-adapter | warn | custom | `shared/types/client-deliverable.ts` | `deliverable-adapter-ok` | sendToClient() resolves an adapter per type; an active type without one throws at send time. Phase-aware so it only fires once a flag group is enabled. |
 
 ---
 
