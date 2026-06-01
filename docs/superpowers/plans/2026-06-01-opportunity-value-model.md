@@ -125,9 +125,11 @@ Migrations (next number is **107**): M107 (PR2), M108 (PR7), M109+M111 (PR5), M1
 
 ---
 
-## PR2 (P2) — M107 migration + mapper/Zod lockstep (dark)
+## PR2 (P2) — opportunity persistence via explicit Zod validation (dark)
 
-**Goal:** Persist an `opportunity_json` column on recommendations, dark-launched (column exists, mapper/Zod handle it, nothing writes a non-null value yet).
+> **IMPLEMENTED WITHOUT A MIGRATION (deviation from the M107 spec below — recorded per CLAUDE.md spec-plan-sync).** `recommendation_sets` stores recs as a `.passthrough()` JSON blob (`recommendations TEXT`; `saveRecommendations` `JSON.stringify`s the recs array), so `Recommendation.opportunity` already round-trips inside each rec object with **no column**. The originally-specced `M107`/`opportunity_json`/`opportunity_model_version` was written against a per-rec *relational* table that does not exist. PR2 instead adds explicit `opportunityScoreSchema` validation to `recommendationSchema` with `.optional().catch(undefined)` (a corrupt opportunity degrades to undefined, the rec survives) + a round-trip test. The set-level `opportunity_model_version` column is **dropped** — per-rec `opportunity.modelVersion` already carries it and PR4's `ov_divergence` table is self-contained, so nothing downstream needs it. Next migration number remains **107**.
+
+**Goal (original spec, superseded by the note above):** Persist an `opportunity_json` column on recommendations, dark-launched (column exists, mapper/Zod handle it, nothing writes a non-null value yet).
 
 **Files:**
 - Create: `server/db/migrations/107-recommendation-opportunity.sql`
@@ -153,13 +155,15 @@ Migrations (next number is **107**): M107 (PR2), M108 (PR7), M109+M111 (PR5), M1
 - Modify: `server/recommendations.ts` (all scoring sites per audit §Scanner-1), consumes `server/scoring/opportunity-value.ts`.
 - Modify: `shared/types/feature-flags.ts` (+`opportunity-value-scorer` flag).
 - Modify: `scripts/pr-check.ts` (+magic-scale guard rule; extend authority-layered rule `:1166` to also block `formatOpportunityForPrompt`).
-- Test: `tests/unit/recommendations-opportunity-wiring.test.ts`; update the pinning tests per audit §Scanner-3.
+- Modify: `server/routes/recommendations.ts` — the public GET (`:37-50`) is a raw `res.json({ ...set, recommendations: recs })` passthrough with NO field allow-list, so attaching `opportunity` here would leak `emvPerWeek` to the **client** before PR6's gating (PR2-review trap). Strip `emvPerWeek` from `opportunity` on the public response (client sees ROI/components, not raw $, per owner decision); admin route keeps it.
+- Test: `tests/unit/recommendations-opportunity-wiring.test.ts`; a public-route test asserting `emvPerWeek` is absent client-side; update the pinning tests per audit §Scanner-3.
 
 **Tasks:**
 - [ ] **Add `pickImpactScore(rec, workspaceId)` selector** + the `opportunity-value-scorer` flag (default false). Selector returns `rec.opportunity?.value` only when the flag is on for that workspace, else legacy `rec.impactScore`. Single chokepoint.
 - [ ] **For each of the 7 magic sites** (audit: technical `:584`/`:985`, site-wide `:1052`, quick-win `:1118`, content-gap `:1163`, ranking-opp `:1234`, decay `:1335`, **diagnostic `:1462`**, freshness `:1514`): build the `OpportunityInput` from the branch's already-available fields and call `computeOpportunityValue`; attach `opportunity` to the rec; set `impactScore = opportunity.value` ONLY behind the selector (shadow write keeps `opportunity` regardless). Ranking-opp must now read `pm.volume` (audit: unread in `1226-1275`) and route `difficulty` through authority.
 - [ ] **Replace the 11 `applyRecommendationOutcomeAdjustment` call sites** (audit: `:1017…:1521`) — calibration now lives inside `computeOpportunityValue` (uniform). Keep the anomaly/outcome `applyScoreAdjustment` ledger path (`score-preservation.test.ts`) intact — that is a different mechanism.
 - [ ] **Re-ground `estimatedGain`** (Q7): replace `RECOVERY_RATES` interpolation (`:62-104`,`:1012`) with `emvPerWeek × HorizonWeeks` (admin/AI dollars) → a client-safe relative string at the boundary. (Client $ visibility deferred to PR6 per owner decision.)
+- [ ] **Close the client-portal leak trap (PR2-review):** in the public recommendations route, strip `opportunity.emvPerWeek` from each rec before `res.json` (admin/AI-only). Add a test asserting the public response never contains `emvPerWeek`.
 - [ ] **pr-check magic-scale guard:** flag any new inline `impactScore = <literal>` / `'high'?75:` bucket in `recommendations.ts` outside `computeOpportunityValue`; `// scorer-ok` hatch. Run `npm run rules:generate`.
 - [ ] **Update pinning tests** (audit §Scanner-3): re-point recovery-rate/`computeImpactScore` assertions to the OV path or golden fixtures; **keep `recommendations-top-id.test.ts` + `recommendations-intent-ranking.test.ts` green with the flag OFF** (proves the no-op boundary). Add `recommendations-opportunity-wiring.test.ts`: with flag ON, ranking reflects OV; with flag OFF, identical to legacy.
 - [ ] **Gate (kill orphaned test-server PIDs first) + PR → CI green → merge to staging.**
