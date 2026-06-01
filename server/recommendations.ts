@@ -42,6 +42,8 @@ import {
   kdClassificationNote,
 } from './authority-context.js';
 import { computeOpportunityValue, pickImpactScore } from './scoring/opportunity-value.js';
+import { computeTimingBoosts, maxBoostForPages } from './scoring/opportunity-timing.js';
+import { triggerOpportunityRegen } from './scoring/opportunity-regen.js';
 import { recordOvDivergence } from './ov-divergence.js';
 import { buildCtrCurve, type GscKeywordObservation } from './scoring/ctr-curve.js';
 import { isFeatureEnabled } from './feature-flags.js';
@@ -391,6 +393,20 @@ export function resolveRecommendationsForChange(
   invalidateIntelligenceCache(workspaceId);
   broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { resolved });
   log.info(`Resolved ${resolved} recommendation(s) in-place for ${workspaceId} (${changedPages.size} changed page(s))`);
+
+  // ── PR7 · Spine B — reprioritize-on-apply tail (events flag, try/catch). ──
+  // Completing a rec (e.g. the #1) frees its page; a debounced regen re-ranks the
+  // queue so the next-best opportunity is promoted with fresh timing boosts. Flag
+  // OFF → no event store touched and the bridge no-ops, so the legacy apply path
+  // (above) is byte-identical. Never let the regen trigger break the apply.
+  try {
+    if (isFeatureEnabled('opportunity-value-events')) {
+      triggerOpportunityRegen(workspaceId);
+    }
+  } catch (err) {
+    log.warn({ workspaceId, err: err instanceof Error ? err.message : String(err) }, 'opportunity regen trigger failed on apply (non-fatal)');
+  }
+
   return resolved;
 }
 
@@ -975,6 +991,14 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   // intelligence SEO-context path (enrichWithBacklinks) — no duplicate API call.
   const ovAuthority = resolveOvAuthorityStrength(workspaceId, backlinkProfile);
 
+  // ── PR7 · Spine B — decaying Timing boosts (OV path; dark behind the events flag). ──
+  // Resolved ONCE per rec-gen cycle: Map<pageSlug, decaying boost> aggregated from the
+  // active opportunity-event ledger. When the `opportunity-value-events` flag is OFF this
+  // is an EMPTY map → maxBoostForPages() is 0 → timingBoost 0 → timing multiplier 1 →
+  // computeOpportunityValue output byte-identical to the pre-PR7 frozen snapshot.
+  const nowDate = new Date(now);
+  const timingBoosts = computeTimingBoosts(workspaceId, nowDate);
+
   // Build a per-workspace position→CTR curve once from the workspace's own GSC
   // observations (the `gscKeywords` persisted on page_keywords). Falls back to the
   // documented industry curve when there is too little signal. Best-effort: only
@@ -1111,6 +1135,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           isCritical: isCrit,
           currentClicks: group.totalClicks,
           authorityStrength: ovAuthority ?? null,
+          timingBoost: maxBoostForPages(timingBoosts, sortedPages.map(p => p.slug)),
         }, { calibration: ovCalibration, weights: ovWeights }),
         source: RecSource.audit(group.check),
         affectedPages: sortedPages.map(p => p.slug),
@@ -1170,6 +1195,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           isCritical: isCrit,
           currentClicks: pageTraffic,
           authorityStrength: ovAuthority ?? null,
+          timingBoost: maxBoostForPages(timingBoosts, pages.map(p => p.replace(/^\//, ''))),
         }, { calibration: ovCalibration, weights: ovWeights }),
         source: RecSource.auditSiteWide(issue.check),
         affectedPages: pages.map(p => p.replace(/^\//, '')),
@@ -1230,6 +1256,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
             roiScore: qw.roiScore ?? null,
             llmLabel: qw.estimatedImpact,
             authorityStrength: ovAuthority ?? null,
+            timingBoost: maxBoostForPages(timingBoosts, [qw.pagePath.replace(/^\//, '')]),
           }, { calibration: ovCalibration, weights: ovWeights }),
           source: RecSource.strategyQuickWin(),
           affectedPages: [qw.pagePath.replace(/^\//, '')],
@@ -1310,6 +1337,9 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
             intent: cg.intent ?? null,
             authorityStrength: ovAuthority ?? null,
             ctrCurve: ovCtrCurve,
+            // content_gap recs carry no affectedPages today → timingBoost is always 0
+            // (no page to key an event to); included for consistency/future-proofing.
+            timingBoost: maxBoostForPages(timingBoosts, []),
           }, { calibration: ovCalibration, weights: ovWeights }),
           source: RecSource.strategyContentGap(),
           affectedPages: [],
@@ -1374,6 +1404,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
               intent: toOpportunityIntent(pm.searchIntent),
               authorityStrength: ovAuthority ?? null,
               ctrCurve: ovCtrCurve,
+              timingBoost: maxBoostForPages(timingBoosts, [pm.pagePath.replace(/^\//, '')]),
             }, { calibration: ovCalibration, weights: ovWeights }),
             source: RecSource.strategyRankingOpp(),
             affectedPages: [pm.pagePath.replace(/^\//, '')],
@@ -1433,6 +1464,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           intent: toOpportunityIntent(pk.searchIntent),
           authorityStrength: ovAuthority ?? null,
           ctrCurve: ovCtrCurve,
+          timingBoost: maxBoostForPages(timingBoosts, [pageSlug]),
         }, { calibration: ovCalibration, weights: ovWeights }),
         source: RecSource.strategyIntentMismatch(pageSlug),
         affectedPages: [pageSlug],
@@ -1500,6 +1532,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
             currentPosition: dp.currentPosition,
             isRepeatDecay: dp.isRepeatDecay ?? null,
             authorityStrength: ovAuthority ?? null,
+            timingBoost: maxBoostForPages(timingBoosts, [pageSlug]),
           }, { calibration: ovCalibration, weights: ovWeights }),
           source: RecSource.decay(pageSlug),
           affectedPages: [pageSlug],
@@ -1574,6 +1607,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           currentPosition: d.position ?? null,
           authorityStrength: ovAuthority ?? null,
           ctrCurve: ovCtrCurve,
+          timingBoost: maxBoostForPages(timingBoosts, [pageSlug]),
         }, { calibration: ovCalibration, weights: ovWeights }),
         source: RecSource.ctrOpportunity(pageSlug),
         affectedPages: [pageSlug],
@@ -1629,6 +1663,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
             branch: 'diagnostic',
             llmLabel: action.impact,
             authorityStrength: ovAuthority ?? null,
+            timingBoost: maxBoostForPages(timingBoosts, action.pageUrls?.map(toPageSlug) ?? []),
           }, { calibration: ovCalibration, weights: ovWeights }),
           source: RecSource.diagnostic(report.id, actionIdx, action.title),
           affectedPages: action.pageUrls?.map(toPageSlug) ?? [],
@@ -1687,6 +1722,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           branch: 'freshness',
           impressions: trafficAtRisk,
           authorityStrength: ovAuthority ?? null,
+          timingBoost: maxBoostForPages(timingBoosts, [toPageSlug(d.pagePath)]),
         }, { calibration: ovCalibration, weights: ovWeights }),
         source: RecSource.freshnessAlert(toPageSlug(d.pagePath)),
         affectedPages: [toPageSlug(d.pagePath)],
