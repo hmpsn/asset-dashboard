@@ -19,6 +19,7 @@ import {
   deleteBatch,
 } from '../approvals.js';
 import { broadcastToWorkspace } from '../broadcast.js';
+import { mirrorApprovalBatchToDeliverable } from '../domains/inbox/approval-batch-dual-write.js';
 import { notifyApprovalReady, notifyTeamActionApproved, notifyTeamChangesRequested } from '../email.js';
 import { getClientActor, requireClientPortalAuth } from '../middleware.js';
 import {
@@ -114,6 +115,10 @@ const updateItemSchema = z.object({
 router.post('/api/approvals/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(createBatchSchema), (req, res) => {
   const { siteId, name, note, items } = req.body;
   const batch = createBatch(req.params.workspaceId, siteId, name || 'SEO Changes', items, note);
+  // Unified deliverables (DARK): mirror the batch into client_deliverable when the
+  // approval-family flag is on. Default off → no-op; never throws (best-effort mirror).
+  // The classifier resolves the sub-type (seo_edit / audit_issue / schema_item).
+  mirrorApprovalBatchToDeliverable(req.params.workspaceId, batch, { note, source: 'approvals-send' });
   // Track all pages in this batch as in-review
   for (const item of items) {
     if (item.pageId) updatePageState(req.params.workspaceId, item.pageId, { status: 'in-review', fields: [item.field], approvalBatchId: batch.id, updatedBy: 'admin' });

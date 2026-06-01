@@ -23,7 +23,7 @@
           "est": "owner-gated",
           "priority": "P2",
           "status": "pending",
-          "notes": "Migrate each work type onto the spine one PR at a time, gated behind its phase-group flag. Approval-batch family first (fixes the live B1 destructive write). Not started until Phase 0 is merged + green on staging (phase-per-PR)."
+          "notes": "Migrate each work type onto the spine one PR at a time, gated behind its phase-group flag. Approval-batch family first (fixes the live B1 destructive write). Not started until Phase 0 is merged + green on staging (phase-per-PR). PR-1a (approval_batch family: seo_edit/audit_issue/schema_item/content_plan_*) DARK machinery landed: 5 self-registering adapters (audit_issue carries the real per-check field map + applyable=false for non-meta checks — B1 fix), send-time dual-write mirror gated on unified-deliverables-approval-family (default off → no-op), deterministic sub-type classifier + idempotent backfill script (scripts/backfill-deliverables-approval.ts, not auto-run). Apply stays disabled (D-apply). No reader/UI changes, no flag flip. Still pending: dual-write on response/apply paths, content_plan matrix-cell guard (CP-K4), nudge cron, backfill→shadow-compare→flag-flip."
         }
       ]
     },
