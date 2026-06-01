@@ -35,6 +35,12 @@ import './schema-plan.js';
 // READ time via projectFromSource() (no dual-write, no backfill). DARK — self-registers on import
 // but is consumed only by the Phase-2 inbox/rollup (gated by `unified-deliverables-rest`).
 import './copy-section.js';
+// PR-1e: content_request — the SECOND PROJECTED type (D-hybrid). Its source table
+// (content_topic_requests) is RETAINED; the adapter exposes a content REQUEST (brief/post review)
+// through the unified interface at READ time via projectFromSource() (no dual-write, no backfill).
+// DARK — self-registers on import but is consumed only by the Phase-2 inbox/rollup (gated by
+// `unified-deliverables-rest`).
+import './content-request.js';
 
 export {
   registerAdapter,
