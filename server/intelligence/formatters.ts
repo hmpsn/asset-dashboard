@@ -683,8 +683,15 @@ function formatClientSignalsSection(signals: ClientSignalsSlice, verbosity: Prom
     if (signals.approvalPatterns.approvalRate > 0) {
       lines.push(`Approval rate: ${pct(signals.approvalPatterns.approvalRate)}`);
     }
-    if (signals.businessPriorities.length > 0) {
-      lines.push(`Business priorities: ${signals.businessPriorities.join('; ')}`);
+    // Use the authority-resolved list (client store + admin store, deduped) so the
+    // prompt reflects reconciled business intent, not just the client half. Falls back
+    // to the raw client-only field for safety if the resolved list is somehow empty.
+    const resolvedPriorities = signals.effectiveBusinessPriorities ?? [];
+    const promptPriorities = resolvedPriorities.length > 0
+      ? resolvedPriorities
+      : signals.businessPriorities;
+    if (promptPriorities.length > 0) {
+      lines.push(`Business priorities: ${promptPriorities.join('; ')}`);
     }
     if (signals.serviceRequests) {
       lines.push(`Service requests: ${signals.serviceRequests.pending} pending, ${signals.serviceRequests.total} total`);

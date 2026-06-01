@@ -1167,6 +1167,39 @@ export const CHECKS: Check[] = [
     claudeMdRef: '#code-conventions',
   },
   {
+    // Authority-layer rule, modeled on `formatBrandVoiceForPrompt reintroduction` above.
+    // "business priorities/business intent" lives in TWO siloed stores — the CLIENT store
+    // (client_business_priorities table, migration 021) and the ADMIN store
+    // (workspaces.business_priorities column, migration 048). `buildEffectiveBusinessPriorities()`
+    // in server/intelligence/business-priorities-source.ts is the ONLY place they merge
+    // (precedence: client first, admin as supplement) and is exposed as the single
+    // resolved field `ClientSignalsSlice.effectiveBusinessPriorities`.
+    //
+    // Any NEW intelligence consumer that issues its own raw `SELECT ... FROM
+    // client_business_priorities` read sees only the client half and silently drops the
+    // admin-set goals — the same authority-bypass hazard the brand-voice rule prevents.
+    // The TypeScript types can't catch it (both halves are `string[]`), so we mechanize
+    // the ban here.
+    //
+    // Allowed sites: the resolver source module itself, and public-portal.ts — the
+    // client-facing portal GET/POST that owns reads/writes of the client store directly
+    // (it is the write boundary, not an intelligence consumer).
+    name: 'raw businessPriorities read outside the resolver',
+    pattern: 'FROM[[:space:]]+client_business_priorities',
+    fileGlobs: ['*.ts', '*.tsx'],
+    exclude: [
+      'tests/',
+      '.codesight/',
+      'server/intelligence/business-priorities-source.ts', // the resolver itself
+      'server/routes/public-portal.ts', // client-store write boundary (portal GET/POST)
+      'scripts/pr-check.ts', // this rule references the table name
+    ],
+    message: 'Do not read `client_business_priorities` directly. Use `clientSignals.effectiveBusinessPriorities` — it is pre-resolved by buildEffectiveBusinessPriorities() (business-priorities-source.ts), merging the client store (021) and the admin store (workspaces.business_priorities, 048) with documented precedence. A raw read of only the client store silently drops admin-set goals. See CLAUDE.md "Authority-layered fields — expose one resolved representation, never raw + format helper".',
+    severity: 'error',
+    rationale: 'A raw read of one authority store (client_business_priorities) silently drops the other (admin business_priorities) — the compiler cannot catch it because both halves are string[].',
+    claudeMdRef: '#code-conventions',
+  },
+  {
     // Catches the silent-overwrite bug class from PR #267: `new Map(arr.map(r => [key.toLowerCase(), v]))`
     // keeps only the LAST entry when the source array has duplicate normalized keys.
     // The canonical failure: GSC query×page data (one row per (query, page)) built this way,
