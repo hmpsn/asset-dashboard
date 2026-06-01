@@ -1,6 +1,33 @@
 {
   "sprints": [
     {
+      "id": "sprint-unified-send-to-client-2026-06-01",
+      "name": "📬 Unified Send-to-Client — Spine + Strangler-Fig Migration",
+      "hours": "phased",
+      "rationale": "Replace the five bespoke 'send to client' pipelines with one ClientDeliverable model + one sendToClient() service + one client inbox + one admin inbox, via a per-type strangler-fig cutover production never feels. Adding a reviewable work type later becomes an adapter, not a sixth subsystem.",
+      "notes": "Design: docs/designs/2026-06-01-unified-send-to-client-design.md. Pre-plan audit: docs/superpowers/audits/2026-06-01-unified-send-to-client-audit.md. Plan: docs/superpowers/plans/2026-06-01-unified-send-to-client.md. Phase 0 lands the shared spine dark behind three phase-group flags (unified-deliverables-approval-family / -broken-family / -rest, all default false).",
+      "items": [
+        {
+          "id": "unified-deliverables-phase-0-contracts",
+          "title": "Phase 0 — shared contracts (migrations, types, store, state machines, adapter registry, service, route, flags, pr-check rules) DARK",
+          "source": "/docs/superpowers/plans/2026-06-01-unified-send-to-client.md",
+          "est": "shipped",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "client_deliverable + _item tables (111/112); shared/types/client-deliverable.ts; server/client-deliverables.ts store; CLIENT_DELIVERABLE/MATRIX_CELL/REQUEST transitions; self-registering adapter registry; sendToClient + respondToDeliverable service (5 guarantees, apply opt-in); public respond + admin remind routes; 3 phase-group flags + catalog; 3 pr-check rules. All dark, zero importers, production behavior unchanged."
+        },
+        {
+          "id": "unified-deliverables-phase-1-cutover",
+          "title": "Phase 1 — per-type cutover (7 PRs: dual-write → backfill → shadow-compare → flag-flip)",
+          "source": "/docs/superpowers/plans/2026-06-01-unified-send-to-client.md",
+          "est": "owner-gated",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Migrate each work type onto the spine one PR at a time, gated behind its phase-group flag. Approval-batch family first (fixes the live B1 destructive write). Not started until Phase 0 is merged + green on staging (phase-per-PR)."
+        }
+      ]
+    },
+    {
       "id": "sprint-recommendation-intelligence-opportunity-value-2026-06-01",
       "name": "🧠 Recommendation Intelligence — Integrity Remediation + Opportunity Value Re-Architecture",
       "hours": "shipped + follow-ups",
