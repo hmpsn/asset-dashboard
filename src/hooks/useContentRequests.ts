@@ -7,11 +7,17 @@ interface UseContentRequestsOptions {
   workspaceId: string;
   setContentRequests: React.Dispatch<React.SetStateAction<ClientContentRequest[]>>;
   setToast: (t: { message: string; type: 'success' | 'error' } | null) => void;
+  /**
+   * Optional: seed the initially-expanded content request (R4 in-shell projected review — the
+   * unified inbox mounts ContentTab inside a modal and auto-expands the projected request).
+   * Default `undefined` → no auto-expand → legacy ContentTab call sites behave exactly as before.
+   */
+  initialExpandedRequestId?: string;
 }
 
-export function useContentRequests({ workspaceId, setContentRequests, setToast }: UseContentRequestsOptions) {
+export function useContentRequests({ workspaceId, setContentRequests, setToast, initialExpandedRequestId }: UseContentRequestsOptions) {
   // Expansion / interaction state
-  const [expandedContentReq, setExpandedContentReq] = useState<string | null>(null);
+  const [expandedContentReq, setExpandedContentReq] = useState<string | null>(initialExpandedRequestId ?? null);
   const [contentComment, setContentComment] = useState('');
   const [sendingContentComment, setSendingContentComment] = useState(false);
   const [declineReqId, setDeclineReqId] = useState<string | null>(null);

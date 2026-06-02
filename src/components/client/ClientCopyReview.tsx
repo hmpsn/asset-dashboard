@@ -112,21 +112,27 @@ const SECTION_TYPE_LABELS: Record<string, string> = {
 
 interface ClientCopyReviewProps {
   workspaceId: string;
+  /**
+   * Optional: seed the initially-expanded entry (R4 in-shell projected review — the unified inbox
+   * mounts this surface inside a modal and auto-expands the projected copy entry). Default
+   * `undefined` → no auto-expand → legacy call sites (InboxTab) behave exactly as before.
+   */
+  initialExpandedEntryId?: string;
 }
 
 // ── Main component ──
 
-export function ClientCopyReview({ workspaceId }: ClientCopyReviewProps) {
+export function ClientCopyReview({ workspaceId, initialExpandedEntryId }: ClientCopyReviewProps) {
   return (
     <ErrorBoundary>
-      <ClientCopyReviewInner workspaceId={workspaceId} />
+      <ClientCopyReviewInner workspaceId={workspaceId} initialExpandedEntryId={initialExpandedEntryId} />
     </ErrorBoundary>
   );
 }
 
-function ClientCopyReviewInner({ workspaceId }: ClientCopyReviewProps) {
+function ClientCopyReviewInner({ workspaceId, initialExpandedEntryId }: ClientCopyReviewProps) {
   const queryClient = useQueryClient();
-  const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
+  const [expandedEntryId, setExpandedEntryId] = useState<string | null>(initialExpandedEntryId ?? null);
 
   // ── Real-time updates ──
   // Invalidate all section queries for the workspace (not just the currently expanded

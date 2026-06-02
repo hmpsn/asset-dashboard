@@ -30,7 +30,7 @@ interface ContentPerfItem {
   ga4: { sessions: number; users: number } | null;
 }
 
-interface ContentTabProps {
+export interface ContentTabProps {
   contentRequests: ClientContentRequest[];
   setContentRequests: React.Dispatch<React.SetStateAction<ClientContentRequest[]>>;
   effectiveTier: Tier;
@@ -43,12 +43,18 @@ interface ContentTabProps {
   setToast: (t: { message: string; type: 'success' | 'error' } | null) => void;
   /** When true (external billing), hide price chips on upgrade button. */
   hidePrices?: boolean;
+  /**
+   * Optional: seed the initially-expanded content request (R4 in-shell projected review — the
+   * unified inbox mounts this surface inside a modal and auto-expands the projected request).
+   * Default `undefined` → no auto-expand → legacy call sites (InboxTab) behave exactly as before.
+   */
+  initialExpandedRequestId?: string;
 }
 
 export function ContentTab({
   contentRequests, setContentRequests, effectiveTier,
   briefPrice, fullPostPrice, fmtPrice, setPricingModal, pricingConfirming,
-  workspaceId, setToast, hidePrices = false,
+  workspaceId, setToast, hidePrices = false, initialExpandedRequestId,
 }: ContentTabProps) {
   const navigate = useNavigate();
   const betaMode = useBetaMode();
@@ -138,7 +144,7 @@ export function ContentTab({
     briefPreviews,
     declineTopic, approveBrief, requestChanges,
     addContentComment, loadBriefPreview,
-  } = useContentRequests({ workspaceId, setContentRequests, setToast });
+  } = useContentRequests({ workspaceId, setContentRequests, setToast, initialExpandedRequestId });
 
   return (<>
     <PageHeader
