@@ -36,6 +36,12 @@ export interface RespondToDeliverableVars {
   deliverableId: string;
   decision: DeliverableResponseDecision;
   note?: string;
+  /**
+   * R3 per-item subset (approval family only): the ClientDeliverableItem.id`s the client flagged
+   * in the DeliverableDetailModal. Forwarded to /respond; the server approves the unflagged items
+   * and holds the flagged ones. Ignored on reject decisions / the client_action family.
+   */
+  flaggedItemIds?: string[];
 }
 
 /**
@@ -47,8 +53,8 @@ export interface RespondToDeliverableVars {
 export function useRespondToDeliverable(workspaceId: string) {
   const queryClient = useQueryClient();
   return useMutation<ClientDeliverable, Error, RespondToDeliverableVars>({
-    mutationFn: ({ deliverableId, decision, note }) =>
-      publicDeliverables.respond(workspaceId, deliverableId, { decision, note }),
+    mutationFn: ({ deliverableId, decision, note, flaggedItemIds }) =>
+      publicDeliverables.respond(workspaceId, deliverableId, { decision, note, flaggedItemIds }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.client.unifiedInbox(workspaceId) });
     },

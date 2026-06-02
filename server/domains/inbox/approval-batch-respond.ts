@@ -38,11 +38,33 @@ const log = createLogger('approval-batch-respond');
 /** The whole-batch decision the client made (R2 maps the deliverable decision onto this). */
 export type ApprovalBatchDecision = 'approved' | 'rejected';
 
+/**
+ * R3 per-item override: a single legacy approval item's resolved status. When the client
+ * approves the deliverable but flags a subset of items ("implement N of M"), the source write
+ * must approve the UNFLAGGED items and reject the FLAGGED ones — driven per legacy item id
+ * rather than whole-batch. `legacyItemId` is the `approval_item.id` (carried on the deliverable
+ * item's `itemPayload.legacyItemId`).
+ */
+export interface ApprovalItemDecision {
+  legacyItemId: string;
+  status: 'approved' | 'rejected';
+  /** Optional per-item client note (the flag note); falls back to the batch-level note. */
+  note?: string | null;
+}
+
 export interface RespondToApprovalBatchOptions {
   /** Client note carried onto each item + the team email + activity. */
   note?: string | null;
   /** Optional actor (client user) for the activity log. */
   actor?: { id?: string; name?: string };
+  /**
+   * R3 per-item mode. When provided (non-empty), drive each named legacy item to its resolved
+   * status (approve subset / reject flagged) inside the transaction INSTEAD of the whole-batch
+   * approve-all-pending. When absent, the whole-batch back-compat behavior (R2) is unchanged.
+   * Items not named here are left untouched (already-decided items stay decided). The team-notify
+   * + activity + broadcast still fire once, keyed to the top-level `decision`.
+   */
+  itemDecisions?: ApprovalItemDecision[];
 }
 
 export interface RespondToApprovalBatchResult {
@@ -79,32 +101,68 @@ export function respondToApprovalBatch(
 
   const note = opts.note ?? undefined;
   const itemStatus = decision === 'approved' ? 'approved' : 'rejected';
+  const itemDecisions = opts.itemDecisions;
+  const perItemMode = Array.isArray(itemDecisions) && itemDecisions.length > 0;
+
   // Only PENDING items are movable (approved/rejected/applied items are already decided — the
   // approval_item machine would reject e.g. applied→rejected). Mirrors the route's pending filter.
   const pendingItems = batch.items.filter(i => i.status === 'pending');
 
   let updatedBatch = batch;
+  let itemsUpdated = 0;
   // Atomic: all per-item moves commit together, so a mid-loop failure (e.g. a concurrent
   // request flipping an item) cannot leave the batch half-decided. Side-effects (activity,
   // email, broadcast) fire AFTER, outside the transaction.
   db.transaction(() => {
-    for (const item of pendingItems) {
-      const result = updateItem(workspaceId, batchId, item.id, {
-        status: itemStatus,
-        ...(note ? { clientNote: note } : {}),
-      });
-      if (result) updatedBatch = result;
+    if (perItemMode) {
+      // R3 per-item: drive each NAMED pending item to its resolved status (approve subset / reject
+      // flagged). Items not named are left untouched; non-pending named items are skipped (the
+      // approval_item machine would reject re-deciding an already-decided item).
+      const byLegacyId = new Map(itemDecisions.map(d => [d.legacyItemId, d]));
+      for (const item of pendingItems) {
+        const decisionForItem = byLegacyId.get(item.id);
+        if (!decisionForItem) continue;
+        const itemNote = decisionForItem.note ?? note;
+        const result = updateItem(workspaceId, batchId, item.id, {
+          status: decisionForItem.status,
+          ...(itemNote ? { clientNote: itemNote } : {}),
+        });
+        if (result) {
+          updatedBatch = result;
+          itemsUpdated += 1;
+        }
+      }
+    } else {
+      for (const item of pendingItems) {
+        const result = updateItem(workspaceId, batchId, item.id, {
+          status: itemStatus,
+          ...(note ? { clientNote: note } : {}),
+        });
+        if (result) {
+          updatedBatch = result;
+          itemsUpdated += 1;
+        }
+      }
     }
   })();
 
   const ws = getWorkspace(workspaceId);
   const actorName = opts.actor?.name || 'Client';
+  // In R3 per-item mode some items may have been REJECTED (flagged/held) even on an `approved`
+  // top-level decision — reflect "N of M" in the activity copy rather than "all changes".
+  const rejectedInThisMove = perItemMode
+    ? itemDecisions!.filter(d => d.status === 'rejected').length
+    : 0;
 
   if (decision === 'approved') {
+    const approvalSummary =
+      rejectedInThisMove > 0
+        ? `${actorName} approved ${itemsUpdated - rejectedInThisMove} of ${itemsUpdated} changes in batch "${batch.name}" (held ${rejectedInThisMove})`
+        : `${actorName} approved all changes in batch "${batch.name}"`;
     addActivity(
       workspaceId,
       'approval_applied',
-      `${actorName} approved all changes in batch "${batch.name}"`,
+      approvalSummary,
       note,
       { batchId },
       opts.actor,
@@ -114,7 +172,7 @@ export function respondToApprovalBatch(
       workspaceName: ws?.name || workspaceId,
       actionTitle: `SEO batch approved: ${batch.name}`,
       sourceType: 'seo_approval',
-      actionSummary: `${pendingItems.length} approved change${pendingItems.length === 1 ? '' : 's'}`,
+      actionSummary: `${itemsUpdated} approved change${itemsUpdated === 1 ? '' : 's'}`,
       clientNote: note,
       dashboardUrl: ws ? getClientPortalUrl(ws) : undefined,
     });
@@ -141,5 +199,5 @@ export function respondToApprovalBatch(
     status: decision,
   });
 
-  return { batch: updatedBatch, itemsUpdated: pendingItems.length };
+  return { batch: updatedBatch, itemsUpdated };
 }

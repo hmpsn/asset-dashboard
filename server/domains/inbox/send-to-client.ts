@@ -139,6 +139,15 @@ export async function sendToClient<TInput>(
 export interface RespondToDeliverableInput {
   decision: DeliverableResponseDecision;
   note?: string | null;
+  /**
+   * R3 per-item subset (APPROVAL-FAMILY ONLY). The `ClientDeliverableItem.id`s the client flagged
+   * in the detail modal. On an `approved` decision, the approval_batch source write approves the
+   * UNFLAGGED items and rejects (holds) the flagged ones ("implement N of M"); the deliverable
+   * mirror status stays `approved` (the client approved the deliverable; a subset is held).
+   * Empty/absent → approve-all-pending (R2 back-compat). Ignored on changes_requested/declined and
+   * by the client_action family (whole-action only — no typed items).
+   */
+  flaggedItemIds?: string[];
 }
 
 /**
@@ -185,6 +194,9 @@ export async function respondToDeliverable(
   if (adapter.respondToSource) {
     const result = await adapter.respondToSource(workspaceId, responded, input.decision, {
       note: input.note ?? null,
+      // R3: carry the flagged-item subset to the source write. Only the approval_batch family
+      // consumes it (typed items); the client_action family ignores it (whole-action only).
+      flaggedItemIds: input.flaggedItemIds,
     });
     sourceHandledTeamNotify = result.handled;
   }

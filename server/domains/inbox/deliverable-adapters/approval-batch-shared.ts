@@ -41,7 +41,7 @@ import type {
 } from './types.js';
 import type { UpsertDeliverableItemInput } from '../../../client-deliverables.js';
 import type { ClientDeliverable, DeliverableType } from '../../../../shared/types/client-deliverable.js';
-import { respondToApprovalBatch } from '../approval-batch-respond.js';
+import { respondToApprovalBatch, type ApprovalItemDecision } from '../approval-batch-respond.js';
 import { createLogger } from '../../../logger.js';
 
 const log = createLogger('approval-batch-shared');
@@ -269,9 +269,57 @@ export async function respondToApprovalBatchSource(
   }
   // approve → approved; changes_requested / declined → rejected (the family's reject path).
   const batchDecision = decision === 'approved' ? 'approved' : 'rejected';
+
+  // R3 per-item subset: when the client APPROVED the deliverable but flagged a subset of items,
+  // build per-item decisions from the deliverable's typed items[] (the unflagged → approved,
+  // the flagged → rejected). The deliverable→legacy mapping is `itemPayload.legacyItemId` (the
+  // approval_item.id stashed by batchItemsToDeliverableItems). Items with no legacyItemId are
+  // skipped with a warn (they cannot be propagated to the source). Only meaningful on approve —
+  // a whole-deliverable reject (changes_requested/declined) rejects everything regardless.
+  const itemDecisions =
+    decision === 'approved'
+      ? buildItemDecisions(workspaceId, deliverable, opts.flaggedItemIds ?? [])
+      : undefined;
+
   respondToApprovalBatch(workspaceId, batchId, batchDecision, {
     note: opts.note ?? null,
     actor: opts.actor,
+    itemDecisions,
   });
   return { handled: true };
+}
+
+/**
+ * Build the per-item decision list for R3 subset-approve. Returns `undefined` when no items were
+ * flagged (so `respondToApprovalBatch` falls back to its whole-batch approve-all-pending path —
+ * the R2 back-compat behavior). When at least one item is flagged, every deliverable item with a
+ * `legacyItemId` becomes an explicit decision: flagged → rejected, unflagged → approved.
+ */
+function buildItemDecisions(
+  workspaceId: string,
+  deliverable: ClientDeliverable,
+  flaggedItemIds: string[],
+): ApprovalItemDecision[] | undefined {
+  if (flaggedItemIds.length === 0) return undefined;
+  const flagged = new Set(flaggedItemIds);
+  const items = deliverable.items ?? [];
+  const decisions: ApprovalItemDecision[] = [];
+  for (const item of items) {
+    const legacyItemId = (item.itemPayload as { legacyItemId?: unknown } | null)?.legacyItemId;
+    if (typeof legacyItemId !== 'string' || !legacyItemId.trim()) {
+      log.warn(
+        { workspaceId, deliverableId: deliverable.id, deliverableItemId: item.id },
+        'approval_batch respondToSource: deliverable item has no legacyItemId — skipping per-item propagation for it',
+      );
+      continue;
+    }
+    decisions.push({
+      legacyItemId,
+      status: flagged.has(item.id) ? 'rejected' : 'approved',
+      note: item.clientNote ?? null,
+    });
+  }
+  // If the deliverable carried no items (or none had a legacyItemId) there is nothing to drive
+  // per-item; returning undefined lets the whole-batch path approve all pending (safe fallback).
+  return decisions.length > 0 ? decisions : undefined;
 }

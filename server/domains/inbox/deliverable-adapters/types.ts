@@ -28,6 +28,14 @@ export type DeliverableSourceDecision = 'approved' | 'changes_requested' | 'decl
 export interface RespondToSourceOptions {
   note?: string | null;
   actor?: { id?: string; name?: string };
+  /**
+   * R3 per-item subset (APPROVAL-FAMILY ONLY). The `ClientDeliverableItem.id`s the client flagged
+   * in the detail modal. On an `approved` decision, the approval_batch adapter approves the
+   * UNFLAGGED items and rejects (holds) the flagged ones ("implement N of M"). Empty/absent →
+   * the whole-batch R2 behavior (approve all pending). Ignored on changes_requested/declined
+   * (whole-deliverable reject) and by the client_action family (no typed items — whole-action only).
+   */
+  flaggedItemIds?: string[];
 }
 
 /** Outcome of a source propagation — `handled` drives the double-notify suppression. */
