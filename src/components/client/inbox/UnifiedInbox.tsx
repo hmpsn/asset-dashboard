@@ -6,6 +6,7 @@ import type { LucideIcon } from 'lucide-react';
 import { LoadingState } from '../../ui';
 import { PriorityStrip, type PriorityItem } from '../PriorityStrip';
 import { DecisionCard } from '../DecisionCard';
+import { DeliverableDetailModal } from '../DeliverableDetailModal';
 import { useBetaMode } from '../BetaContext';
 import { normalizeDeliverable, isProjectedDeliverable } from '../../../lib/decision-adapters';
 import { useUnifiedInbox, useRespondToDeliverable } from '../../../hooks/client/useUnifiedInbox';
@@ -14,7 +15,7 @@ import { WS_EVENTS } from '../../../lib/wsEvents';
 import { queryKeys } from '../../../lib/queryKeys';
 import { clientPath } from '../../../routes';
 import type { ClientDeliverable, DeliverableKind } from '../../../../shared/types/client-deliverable';
-import type { NormalizedDecision } from '../../../../shared/types/decision';
+import type { NormalizedDecision, FlaggedItem } from '../../../../shared/types/decision';
 
 interface UnifiedInboxProps {
   workspaceId: string;
@@ -69,6 +70,8 @@ export function UnifiedInbox({ workspaceId, setToast }: UnifiedInboxProps) {
   const { deliverables, isLoading } = useUnifiedInbox(workspaceId);
   const respond = useRespondToDeliverable(workspaceId);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
+  // R3: the deliverable open in the detail modal (substance + per-item review). null = closed.
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   // PROJECTED deliverables (copy_section / content_request) have no physical row and 404 on the
   // uniform /respond verbs — copy is reviewed in Inbox > Reviews (ClientCopyReview) and briefs/posts
@@ -100,23 +103,36 @@ export function UnifiedInbox({ workspaceId, setToast }: UnifiedInboxProps) {
     [deliverables],
   );
 
+  // The deliverable open in the detail modal, resolved from the live list (so a WS-driven refetch
+  // keeps the modal in sync). null when closed or once the item leaves the actionable set.
+  const detailDeliverable = useMemo(
+    () => (detailId ? deliverables.find((d) => d.id === detailId) ?? null : null),
+    [deliverables, detailId],
+  );
+
   const handleRespond = async (
     d: ClientDeliverable,
     decision: 'approved' | 'changes_requested' | 'declined',
     note?: string,
+    flaggedItems?: FlaggedItem[],
   ) => {
     setSubmittingId(d.id);
     try {
-      await respond.mutateAsync({ deliverableId: d.id, decision, note });
+      await respond.mutateAsync({ deliverableId: d.id, decision, note, flaggedItems });
+      const heldCount = decision === 'approved' ? flaggedItems?.length ?? 0 : 0;
       setToast({
         message:
           decision === 'approved'
-            ? 'Approved. Your team will handle the rest.'
+            ? heldCount > 0
+              ? `Approved. ${heldCount} item${heldCount === 1 ? '' : 's'} held for your team to review.`
+              : 'Approved. Your team will handle the rest.'
             : decision === 'declined'
               ? 'Declined. Your team has been notified.'
               : 'Feedback sent to your team.',
         type: 'success',
       });
+      // Close the detail modal after a successful response from inside it.
+      setDetailId((cur) => (cur === d.id ? null : cur));
     } catch {
       setToast({ message: 'Could not submit your response. Please try again.', type: 'error' });
     } finally {
@@ -163,10 +179,10 @@ export function UnifiedInbox({ workspaceId, setToast }: UnifiedInboxProps) {
                   uniformVerbs
                   ageLabel={ageLabel(d.sentAt)}
                   onReview={projected ? goToReviews : undefined}
-                  onOpen={() => {
-                    const el = document.getElementById(`unified-decision-${d.id}`);
-                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                  }}
+                  // "View N →" opens the detail modal (substance + per-item review). Projected
+                  // deliverables render the read-only "Review →" deep-link instead of "View N", so
+                  // this is never reached for them (no-op kept for the required prop contract).
+                  onOpen={projected ? () => {} : () => setDetailId(d.id)}
                   onApprove={
                     projected || submittingId === d.id
                       ? undefined
@@ -194,6 +210,24 @@ export function UnifiedInbox({ workspaceId, setToast }: UnifiedInboxProps) {
           <Inbox size={16} className="flex-shrink-0" />
           <span>Nothing needs your attention right now. New items will appear here.</span>
         </div>
+      )}
+
+      {/* R3: the detail modal — substance + per-item review for a batch deliverable. Reuses the
+          proven renderers (decision-renderers.tsx). The approve carries the flagged item ids to the
+          single /respond path; request-changes/decline are whole-deliverable. */}
+      {detailDeliverable && (
+        <DeliverableDetailModal
+          decision={normalizeDeliverable(detailDeliverable)}
+          submitting={submittingId === detailDeliverable.id}
+          onApprove={(flaggedItems: FlaggedItem[]) =>
+            handleRespond(detailDeliverable, 'approved', undefined, flaggedItems)
+          }
+          onRequestChanges={(note) =>
+            handleRespond(detailDeliverable, 'changes_requested', note || undefined)
+          }
+          onDecline={(note) => handleRespond(detailDeliverable, 'declined', note || undefined)}
+          onDismiss={() => setDetailId(null)}
+        />
       )}
     </div>
   );

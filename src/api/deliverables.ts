@@ -24,7 +24,18 @@ export const publicDeliverables = {
   respond: (
     wsId: string,
     deliverableId: string,
-    body: { decision: DeliverableResponseDecision; note?: string },
+    body: {
+      decision: DeliverableResponseDecision;
+      note?: string;
+      /**
+       * R3 per-item subset (approval family only): the items the client flagged in the detail
+       * modal — each carrying the `ClientDeliverableItem.id` plus the typed flag note. On
+       * `approved`, the server approves the unflagged items and holds the flagged ones ("implement
+       * N of M"), persisting the typed note onto each held item. Ignored on reject decisions /
+       * client_action.
+       */
+      flaggedItems?: { itemId: string; note?: string }[];
+    },
   ) =>
     patch<ClientDeliverable>(
       `/api/public/deliverables/${wsId}/${deliverableId}/respond`,
