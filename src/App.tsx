@@ -7,6 +7,7 @@ import { StatusBar } from './components/StatusBar';
 import { LoginScreen } from './components/LoginScreen';
 import { MobileGuard } from './components/MobileGuard';
 import { useAuth } from './hooks/useAuth';
+import { useFeatureFlag } from './hooks/useFeatureFlag';
 import { useGlobalAdminEvents } from './hooks/useGlobalAdminEvents';
 import { useWsInvalidation } from './hooks/useWsInvalidation';
 import { ADMIN_EVENTS } from './lib/wsEvents';
@@ -64,6 +65,8 @@ const OutcomeDashboard = lazyWithRetry(() => import('./components/admin/outcomes
 const OutcomesOverview = lazyWithRetry(() => import('./components/admin/outcomes/OutcomesOverview'));
 const AdminInbox = lazyWithRetry(() => import('./components/admin/AdminInbox').then(m => ({ default: m.AdminInbox })));
 const ClientActionsTab = lazyWithRetry(() => import('./components/admin/ClientActionsTab').then(m => ({ default: m.ClientActionsTab })));
+// PR-2b unified admin "Client Deliverables" pane — DARK behind the `unified-inbox` flag.
+const ClientDeliverablesPane = lazyWithRetry(() => import('./components/admin/ClientDeliverablesPane').then(m => ({ default: m.ClientDeliverablesPane })));
 const MeetingBriefPage = lazyWithRetry(() => import('./components/admin/MeetingBrief/MeetingBriefPage').then(m => ({ default: m.MeetingBriefPage })));
 const DiagnosticReportPage = lazyWithRetry(() => import('./components/admin/DiagnosticReport/DiagnosticReportPage').then(m => ({ default: m.DiagnosticReportPage })));
 
@@ -239,7 +242,11 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
 
   const [clipboardStatus, setClipboardStatus] = useState<string | null>(null);
   const [pendingContentRequests, setPendingContentRequests] = useState(0);
-  const [requestsSubTab, setRequestsSubTab] = useState<'signals' | 'requests' | 'actions'>('signals');
+  // 'deliverables' is the PR-2b unified pane (DARK behind `unified-inbox`); the other three are the
+  // existing flag-OFF sub-tabs, left byte-for-byte unchanged.
+  const [requestsSubTab, setRequestsSubTab] = useState<'signals' | 'requests' | 'actions' | 'deliverables'>('signals');
+  // PR-2b: gate the new "Client Deliverables" sub-tab on the existing `unified-inbox` flag.
+  const unifiedInbox = useFeatureFlag('unified-inbox');
 
   // Reset requests sub-tab when workspace changes so stale state doesn't persist
   useEffect(() => { setRequestsSubTab('signals'); }, [urlWorkspaceId]); // effect-layout-ok — state reset on workspace switch, not layout derivation
@@ -463,14 +470,18 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
       <div className="flex flex-col">
         <TabBar
           tabs={[
+            // PR-2b: when `unified-inbox` is ON, surface the unified "Client Deliverables" pane as
+            // the first sub-tab. When OFF this array is the original three tabs unchanged.
+            ...(unifiedInbox ? [{ id: 'deliverables', label: 'Client Deliverables' }] : []),
             { id: 'signals', label: 'Signals' },
             { id: 'requests', label: 'Requests' },
             { id: 'actions', label: 'Client Actions' },
           ]}
           active={requestsSubTab}
-          onChange={(id) => setRequestsSubTab(id as 'signals' | 'requests' | 'actions')}
+          onChange={(id) => setRequestsSubTab(id as 'signals' | 'requests' | 'actions' | 'deliverables')}
           className="mb-6"
         />
+        {unifiedInbox && requestsSubTab === 'deliverables' && <ClientDeliverablesPane key={`deliverables-${selected.id}`} workspaceId={selected.id} />}
         {requestsSubTab === 'signals' && <AdminInbox key={`inbox-${selected.id}`} workspaceId={selected.id} />}
         {requestsSubTab === 'requests' && <RequestManager key={`requests-${selected.id}`} workspaceId={selected.id} />}
         {requestsSubTab === 'actions' && <ClientActionsTab key={`actions-${selected.id}`} workspaceId={selected.id} />}

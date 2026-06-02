@@ -37,6 +37,8 @@ export const queryKeys = {
     requests: (wsId: string) => ['admin-requests', wsId] as const,
     approvals: (wsId: string) => ['admin-approvals', wsId] as const,
     clientActions: (wsId: string) => ['admin-client-actions', wsId] as const,
+    // Unified admin "Client Deliverables" pane (PR-2b) — GET /api/deliverables/:workspaceId
+    workspaceDeliverables: (wsId: string) => ['admin-workspace-deliverables', wsId] as const,
     posts: (wsId: string) => ['admin-posts', wsId] as const,
     post: (wsId: string, postId: string) => ['admin-post', wsId, postId] as const,
     postsDetailAll: (wsId: string) => ['admin-post', wsId] as const,

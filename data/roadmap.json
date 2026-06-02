@@ -33,6 +33,16 @@
           "priority": "P2",
           "status": "pending",
           "notes": "Strangler-fig client UI: additive flag-gated unified path in InboxTab (flag off → existing new-inbox-ia + legacy layouts byte-for-byte unchanged). New GET /api/public/deliverables/:workspaceId read endpoint assembles physical client_deliverable rows + projected copy/content_request (via adapter projectFromSource), filtered to client-facing statuses, Zod-validated response. NormalizedDecision generalized (add kind + widen DecisionSource to include 'deliverable', isSingleAction kept for back-compat) + normalizeDeliverable() adapter. useUnifiedInbox React Query hook (client- prefixed key, typed api wrapper) fetches only when flag on. When on, InboxTab renders PriorityStrip (mounted — was orphaned) as the single Needs-your-attention list with uniform Approve / Request changes (+note) / Decline calling the real PATCH /respond endpoint (dark). No flag flip; dual-write flags untouched."
+        },
+        {
+          "id": "unified-deliverables-phase-2b-admin-inbox",
+          "title": "Phase 2b — admin unified \"Client Deliverables\" pane DARK behind unified-inbox flag (status axis + stale + Remind)",
+          "source": "/docs/superpowers/plans/2026-06-01-unified-send-to-client.md",
+          "est": "in-progress",
+          "priority": "P2",
+          "status": "done",
+          "shippedAt": "2026-06-01",
+          "notes": "Strangler-fig admin UI (additive — AdminInbox/ClientActionsTab untouched on the flag-off path). New admin read endpoint GET /api/deliverables/:workspaceId (requireWorkspaceAccess, NOT requireAuth) returns EVERY status (physical + projected) via new listAllWorkspaceDeliverables() (the client-facing filter factored out into a shared assembleAllDeliverables), annotated by server/domains/inbox/admin-inbox-read.ts with statusAxis (awaiting_client/changes_requested[+partial]/approved/other), ageDays from sentAt, and a derived stale flag (awaiting_client + ageDays>=STALE_AWAITING_DAYS=7). Zod-validated response (shared/types/admin-deliverable-view.ts). New ClientDeliverablesPane.tsx groups by axis (oldest-first), shows pending-N-days/stale styling + type badge + a Remind button per awaiting_client item wired to the existing POST /api/deliverables/:ws/:id/remind. useWorkspaceDeliverables hook (admin- key, typed adminDeliverables api wrapper, no raw fetch, flag-gated fetch) + useWorkspaceEvents DELIVERABLE_* invalidation. Mounted dark as the first sub-tab in App.tsx's requests TabBar only when unified-inbox is ON (single additive branch: spread an empty tab array + skip the render when off). No flag flip; dual-write flags untouched. DEFERRED to cutover runbook: operator revise/resend/acknowledge on changes_requested (B18/E7 — needs new mutate endpoints), notification-bell categorization (E3/A2), workspace-overview B29 double-count, the read-path slice cutover."
         }
       ]
     },

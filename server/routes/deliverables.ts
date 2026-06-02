@@ -31,12 +31,14 @@ import {
   SendToClientError,
 } from '../domains/inbox/send-to-client.js';
 import { listClientFacingDeliverables } from '../domains/inbox/unified-inbox-read.js';
+import { listAdminDeliverables } from '../domains/inbox/admin-inbox-read.js';
 import { InvalidTransitionError } from '../state-machines.js';
 import {
   DELIVERABLE_KINDS,
   DELIVERABLE_STATUSES,
   DELIVERABLE_TYPES,
 } from '../../shared/types/client-deliverable.js';
+import { DELIVERABLE_STATUS_AXES } from '../../shared/types/admin-deliverable-view.js';
 
 const router = Router();
 const log = createLogger('routes:deliverables');
@@ -101,6 +103,20 @@ const deliverablesListResponseSchema = z.object({
   deliverables: z.array(deliverableResponseSchema),
 });
 
+// Admin "Client Deliverables" pane response (PR-2b). The same deliverable contract plus the
+// operator status axis + derived staleness (annotated in admin-inbox-read.ts). A defensive Zod
+// schema asserts the assembled+annotated list before it's served (drift guard — same rationale as
+// the client read: the assembly mixes physical rows + projected adapters).
+const adminDeliverableViewSchema = deliverableResponseSchema.extend({
+  statusAxis: z.enum(DELIVERABLE_STATUS_AXES),
+  ageDays: z.number().nullable(),
+  stale: z.boolean(),
+});
+
+const adminDeliverablesListResponseSchema = z.object({
+  deliverables: z.array(adminDeliverableViewSchema),
+});
+
 // GET /api/public/deliverables/:workspaceId — the unified client-facing deliverable list (PR-2a).
 // Standard public-portal client auth (matches the sibling projected reads like the copy /entries
 // endpoint). Returns physical client_deliverable rows + projected copy/content_request, filtered
@@ -128,6 +144,39 @@ router.get(
       res.json(parsed.data);
     } catch (err) {
       log.error({ err, workspaceId }, 'Failed to list client-facing deliverables');
+      res.status(500).json({ error: 'Failed to list deliverables' });
+    }
+  },
+);
+
+// GET /api/deliverables/:workspaceId — the admin "Client Deliverables" pane (PR-2b, DARK).
+// Admin-only (requireWorkspaceAccess — HMAC-gated, NOT requireAuth per auth conventions). Returns
+// EVERY deliverable in the workspace (all statuses, physical + projected) annotated with the
+// operator status axis + a derived `stale` flag (design §6). The pane only fetches this behind the
+// `unified-inbox` flag; the read itself is inert (empty physical table) until cutover, so it's
+// exercised here with seeded rows regardless of flag state.
+router.get(
+  '/api/deliverables/:workspaceId',
+  requireWorkspaceAccess('workspaceId'),
+  (req, res) => {
+    const { workspaceId } = req.params;
+    const ws = getWorkspace(workspaceId);
+    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+    try {
+      const deliverables = listAdminDeliverables(workspaceId);
+      const parsed = adminDeliverablesListResponseSchema.safeParse({ deliverables });
+      if (!parsed.success) {
+        // A drifted projection/row/annotation would land here — fail loud rather than serving a
+        // malformed operator list.
+        log.error(
+          { workspaceId, issues: parsed.error.issues },
+          'admin deliverable list failed response validation',
+        );
+        return res.status(500).json({ error: 'Failed to assemble deliverables' });
+      }
+      res.json(parsed.data);
+    } catch (err) {
+      log.error({ err, workspaceId }, 'Failed to list admin deliverables');
       res.status(500).json({ error: 'Failed to list deliverables' });
     }
   },
