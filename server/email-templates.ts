@@ -187,7 +187,9 @@ export type EmailEventType =
   | 'client_signal'
   | 'client_briefing_ready'
   | 'content_changes_requested'
-  | 'action_approved';
+  | 'action_approved'
+  | 'work_order_comment_team'
+  | 'work_order_comment_client';
 
 // ── Template renderers ──
 
@@ -269,6 +271,10 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
       result = renderContentChangesRequested(events, count, ws, dashUrl, logoUrl); break;
     case 'action_approved':
       result = renderActionApproved(events, count, ws, dashUrl, logoUrl); break;
+    case 'work_order_comment_team':
+      result = renderWorkOrderCommentTeam(events, count, ws, dashUrl, logoUrl); break;
+    case 'work_order_comment_client':
+      result = renderWorkOrderCommentClient(events, count, ws, dashUrl, logoUrl); break;
     default:
       result = { subject: 'Notification', html: '' };
   }
@@ -462,6 +468,59 @@ function renderContentChangesRequested(events: EmailEvent[], count: number, ws: 
       subtitle: ws,
       body: (count > 1 ? countPill(count, 'change request') : '') + items,
       cta: dashUrl ? { label: 'View in Dashboard', url: dashUrl } : undefined,
+      logoUrl,
+    }),
+  };
+}
+
+function renderWorkOrderCommentTeam(events: EmailEvent[], count: number, ws: string, dashUrl?: string, logoUrl?: string) {
+  // client → team: the client added a comment to a work-order conversation.
+  const items = events.map((e, i) => {
+    const message = (e.data.message as string) || '';
+    return itemRow({
+      title: (e.data.orderTitle as string) || 'Work Order',
+      detail: message ? `"${message.slice(0, 200)}${message.length > 200 ? '…' : ''}"` : undefined,
+      badge: { label: 'New comment', color: '#0d9488', bg: '#f0fdfa' },
+      isLast: i === events.length - 1,
+    });
+  }).join('');
+
+  return {
+    subject: count === 1
+      ? `New comment on "${(events[0].data.orderTitle as string) || 'work order'}" — ${ws}`
+      : `${count} new comments on work orders — ${ws}`,
+    html: layout({
+      preheader: `Client commented on ${count} work order${count !== 1 ? 's' : ''}`,
+      headline: count === 1 ? 'New Work-Order Comment' : `${count} New Work-Order Comments`,
+      subtitle: ws,
+      body: (count > 1 ? countPill(count, 'comment') : '') + items,
+      cta: dashUrl ? { label: 'View in Dashboard', url: dashUrl } : undefined,
+      logoUrl,
+    }),
+  };
+}
+
+function renderWorkOrderCommentClient(events: EmailEvent[], count: number, ws: string, dashUrl?: string, logoUrl?: string) {
+  // team → client: the team replied on a work-order conversation.
+  const items = events.map((e, i) => {
+    const message = (e.data.message as string) || '';
+    return itemRow({
+      title: (e.data.orderTitle as string) || 'Your Work Order',
+      detail: message ? `"${message.slice(0, 200)}${message.length > 200 ? '…' : ''}"` : undefined,
+      isLast: i === events.length - 1,
+    });
+  }).join('');
+
+  return {
+    subject: count === 1
+      ? `New reply on "${(events[0].data.orderTitle as string) || 'your work order'}" — ${ws}`
+      : `${count} new replies on your work orders — ${ws}`,
+    html: layout({
+      preheader: `Your team replied on ${count} work order${count !== 1 ? 's' : ''}`,
+      headline: count === 1 ? 'New Reply From Your Team' : `${count} New Replies From Your Team`,
+      subtitle: ws,
+      body: (count > 1 ? countPill(count, 'reply') : '') + items,
+      cta: dashUrl ? { label: 'View Conversation', url: dashUrl } : undefined,
       logoUrl,
     }),
   };

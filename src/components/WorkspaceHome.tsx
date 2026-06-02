@@ -11,6 +11,7 @@ import { FeatureFlag } from './ui/FeatureFlag';
 import { themeColor } from './ui/constants';
 import { WorkspaceHealthBadge } from './admin/WorkspaceHealthBadge';
 import { BriefingReviewQueue } from './admin/BriefingReviewQueue';
+import { WorkOrderPanel } from './admin/WorkOrderPanel';
 import { InsightsEngine } from './client/InsightsEngine';
 import { CartProvider } from './client/useCart';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -75,6 +76,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   const [now, setNow] = useState(() => new Date());
   const [showMoreActions, setShowMoreActions] = useState(false);
   const [showSetupSuggestions, setShowSetupSuggestions] = useState(false);
+  const [workOrderPanelOpen, setWorkOrderPanelOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<HomeTab>(() => {
     const param = searchParams.get('tab');
     return param === 'meeting-brief' ? 'meeting-brief' : 'overview';
@@ -160,11 +162,24 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
     : null;
 
   // Action items — priority: 1=critical, 2=important, 3=setup suggestions
-  type ActionItem = { label: string; sub: string; color: 'red' | 'amber' | 'teal' | 'emerald'; icon: typeof Bell; tab: string; priority: 1 | 2 | 3; queryString?: string };
+  type ActionItem = { label: string; sub: string; color: 'red' | 'amber' | 'teal' | 'emerald'; icon: typeof Bell; tab: string; priority: 1 | 2 | 3; queryString?: string; onClick?: () => void };
   const actions: ActionItem[] = [];
   if (newRequests.length > 0) actions.push({ label: `${newRequests.length} new client request${newRequests.length > 1 ? 's' : ''}`, sub: 'Review and respond', color: 'red', icon: Bell, tab: 'requests', priority: 1 });
-  const pendingOrders = workOrders.filter(o => o.status === 'pending' || o.status === 'in_progress');
-  if (pendingOrders.length > 0) actions.push({ label: `${pendingOrders.length} purchased fix${pendingOrders.length > 1 ? 'es' : ''} awaiting fulfillment`, sub: 'Complete work orders from client purchases', color: 'teal', icon: Clipboard, tab: 'workspace-settings', priority: 2 });
+  // Open orders = any non-terminal order (NOT closed/cancelled). Includes `completed`
+  // so the operator can still reach the panel to reply or close out a fulfilled order
+  // once nothing else is pending — `completed` is the exact state you close FROM.
+  const openOrders = workOrders.filter(o => o.status === 'pending' || o.status === 'in_progress' || o.status === 'completed');
+  if (openOrders.length > 0) {
+    const readyToClose = openOrders.filter(o => o.status === 'completed').length;
+    const awaiting = openOrders.length - readyToClose;
+    const label = awaiting > 0
+      ? `${awaiting} purchased fix${awaiting > 1 ? 'es' : ''} awaiting fulfillment`
+      : `${readyToClose} completed order${readyToClose > 1 ? 's' : ''} ready to close out`;
+    const sub = awaiting > 0 && readyToClose > 0
+      ? `${readyToClose} completed and ready to close out — open the conversation/close panel to fulfill, reply, and close out`
+      : 'Open the conversation/close panel to fulfill, reply, and close out';
+    actions.push({ label, sub, color: 'teal', icon: Clipboard, tab: 'workspace-settings', priority: 2, onClick: () => setWorkOrderPanelOpen(true) });
+  }
   for (const signal of churnSignals) {
     actions.push({
       label: signal.title,
@@ -527,7 +542,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
                 return (
                   <ClickableRow
                     key={i}
-                    onClick={() => navigate(adminPath(workspaceId, item.tab as Page) + (item.queryString ? `?${item.queryString}` : ''))}
+                    onClick={() => item.onClick ? item.onClick() : navigate(adminPath(workspaceId, item.tab as Page) + (item.queryString ? `?${item.queryString}` : ''))}
                     className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)]"
                   >
                     <ItemIcon className={cn('w-4 h-4 flex-shrink-0', colorMap[item.color])} />
@@ -562,7 +577,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
                     return (
                       <ClickableRow
                         key={`setup-${i}`}
-                        onClick={() => navigate(adminPath(workspaceId, item.tab as Page) + (item.queryString ? `?${item.queryString}` : ''))}
+                        onClick={() => item.onClick ? item.onClick() : navigate(adminPath(workspaceId, item.tab as Page) + (item.queryString ? `?${item.queryString}` : ''))}
                         className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)] opacity-60"
                       >
                         <ItemIcon className={cn('w-4 h-4 flex-shrink-0', colorMap[item.color])} />
@@ -621,6 +636,12 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       </>
       )}
 
+      {/* ── Work-order conversation/close panel (focused modal) ── */}
+      {workOrderPanelOpen && (
+        <ErrorBoundary label="Work Orders">
+          <WorkOrderPanel workspaceId={workspaceId} onDismiss={() => setWorkOrderPanelOpen(false)} />
+        </ErrorBoundary>
+      )}
     </div>
   );
 }

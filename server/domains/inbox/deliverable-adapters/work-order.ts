@@ -71,6 +71,14 @@ export function mapWorkOrderStatusToDeliverableStatus(
       return 'in_progress';
     case 'completed':
       return 'completed';
+    case 'closed':
+      // An operator-closed order LEAVES the client lane: `cancelled` is NOT in
+      // CLIENT_FACING_ORDER_STATUSES, so the re-mirror on `→ closed` excludes it
+      // from the client unified inbox. The raw `closed` status is preserved in
+      // payload.workOrderStatus (buildWorkOrderPayload carries order.status), so
+      // the canonical mapping never loses it. (`completed` stays mapped to
+      // `completed` → stays in the lane.)
+      return 'cancelled';
     case 'cancelled':
       return 'cancelled';
     default: {

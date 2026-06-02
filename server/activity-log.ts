@@ -53,6 +53,8 @@ export type ActivityType =
   | 'payment_received'
   | 'payment_failed'
   | 'fix_completed'
+  | 'work_order_commented'
+  | 'order_closed'
   | 'anomaly_detected'
   | 'anomaly_positive'
   | 'anomaly_dismissed'
@@ -185,6 +187,7 @@ const CLIENT_VISIBLE_TYPES: Set<ActivityType> = new Set([
   'images_optimized', 'links_fixed', 'content_updated', 'content_requested',
   'content_declined', 'content_request_commented', 'brief_generated', 'brief_approved',
   'changes_requested', 'briefing_published', 'briefing_auto_published', 'content_upgraded', 'fix_completed',
+  'work_order_commented', 'order_closed',
   'content_published', 'copy_sent_to_client', 'post_approved', 'post_changes_requested',
   'post_client_edit', 'brief_sent_for_review', 'post_sent_for_review', 'client_action_sent', 'client_action_approved',
   'client_action_changes_requested', 'client_action_completed',

@@ -30,6 +30,7 @@ interface OrderRow {
   quantity: number;
   assigned_to: string | null;
   completed_at: string | null;
+  closed_at: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -37,8 +38,8 @@ interface OrderRow {
 
 const stmts = createStmtCache(() => ({
   insert: db.prepare(
-    `INSERT INTO work_orders (id, workspace_id, payment_id, product_type, status, page_ids, issue_checks, quantity, assigned_to, completed_at, notes, created_at, updated_at)
-         VALUES (@id, @workspace_id, @payment_id, @product_type, @status, @page_ids, @issue_checks, @quantity, @assigned_to, @completed_at, @notes, @created_at, @updated_at)`,
+    `INSERT INTO work_orders (id, workspace_id, payment_id, product_type, status, page_ids, issue_checks, quantity, assigned_to, completed_at, closed_at, notes, created_at, updated_at)
+         VALUES (@id, @workspace_id, @payment_id, @product_type, @status, @page_ids, @issue_checks, @quantity, @assigned_to, @completed_at, @closed_at, @notes, @created_at, @updated_at)`,
   ),
   selectByWorkspace: db.prepare(
     `SELECT * FROM work_orders WHERE workspace_id = ? ORDER BY created_at DESC`,
@@ -47,7 +48,7 @@ const stmts = createStmtCache(() => ({
     `SELECT * FROM work_orders WHERE id = ? AND workspace_id = ?`,
   ),
   update: db.prepare(
-    `UPDATE work_orders SET status = @status, assigned_to = @assigned_to, notes = @notes, completed_at = @completed_at, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`, // status-ok: validateTransition guard in updateWorkOrder()
+    `UPDATE work_orders SET status = @status, assigned_to = @assigned_to, notes = @notes, completed_at = @completed_at, closed_at = @closed_at, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`, // status-ok: validateTransition guard in updateWorkOrder()
   ),
 }));
 
@@ -73,6 +74,7 @@ function rowToOrder(row: OrderRow): WorkOrder {
     quantity: row.quantity,
     assignedTo: row.assigned_to ?? undefined,
     completedAt: row.completed_at ?? undefined,
+    closedAt: row.closed_at ?? undefined,
     notes: row.notes ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -128,6 +130,7 @@ export function createWorkOrder(
     quantity: order.quantity,
     assigned_to: null,
     completed_at: null,
+    closed_at: null,
     notes: null,
     created_at: now,
     updated_at: now,
@@ -146,7 +149,7 @@ export function createWorkOrder(
 export function updateWorkOrder(
   workspaceId: string,
   orderId: string,
-  updates: Partial<Pick<WorkOrder, 'status' | 'assignedTo' | 'notes' | 'completedAt'>>,
+  updates: Partial<Pick<WorkOrder, 'status' | 'assignedTo' | 'notes' | 'completedAt' | 'closedAt'>>,
 ): WorkOrder | null {
   const order = getWorkOrder(workspaceId, orderId);
   if (!order) return null;
@@ -160,6 +163,7 @@ export function updateWorkOrder(
   if (updates.assignedTo !== undefined) order.assignedTo = updates.assignedTo;
   if (updates.notes !== undefined) order.notes = updates.notes;
   if (updates.completedAt !== undefined) order.completedAt = updates.completedAt;
+  if (updates.closedAt !== undefined) order.closedAt = updates.closedAt;
   order.updatedAt = new Date().toISOString();
 
   stmts().update.run({
@@ -169,6 +173,7 @@ export function updateWorkOrder(
     assigned_to: order.assignedTo ?? null,
     notes: order.notes ?? null,
     completed_at: order.completedAt ?? null,
+    closed_at: order.closedAt ?? null,
     updated_at: order.updatedAt,
   });
   invalidateWorkOrderCaches(workspaceId);

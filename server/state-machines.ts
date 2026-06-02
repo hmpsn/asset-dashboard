@@ -49,14 +49,20 @@ export const POST_STATUS_TRANSITIONS: Record<string, readonly string[]> = {
 export type PostStatus = 'generating' | 'draft' | 'review' | 'approved' | 'error';
 
 // ── Work Order ──
+// completed → closed is the operator-only one-way close-out (no reopen): once
+// the fulfillment is delivered, an operator can explicitly CLOSE the order to
+// take it out of the client conversation lane. There is intentionally NO
+// completed → in_progress reopen and NO closed → anything edge (closed is
+// terminal). cancelled stays terminal.
 export const WORK_ORDER_TRANSITIONS: Record<string, readonly string[]> = {
   pending:     ['in_progress', 'cancelled'],
   in_progress: ['completed', 'cancelled'],
-  completed:   [],  // terminal
+  completed:   ['closed'],  // operator-only one-way close-out (no reopen)
+  closed:      [],  // terminal — no reopen
   cancelled:   [],  // terminal
 };
 
-export type WorkOrderStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+export type WorkOrderStatus = 'pending' | 'in_progress' | 'completed' | 'closed' | 'cancelled';
 
 // ── Content Subscription ──
 export const CONTENT_SUB_TRANSITIONS: Record<string, readonly string[]> = {
