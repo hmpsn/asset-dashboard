@@ -30,6 +30,15 @@ vi.mock('../../src/hooks/client/useUnifiedInbox', () => ({
   useApplyDeliverable: () => ({ mutateAsync: mockApplyMutateAsync, isPending: false }),
 }));
 
+// Work-order conversation hooks (DARK). Mocked so the track-lane tests don't need a real
+// QueryClient (the @tanstack mock below stubs useQueryClient/useQuery but not useMutation).
+const mockUseClientWorkOrderComments = vi.fn();
+const mockPostCommentMutate = vi.fn();
+vi.mock('../../src/hooks/client/useWorkOrderConversation', () => ({
+  useClientWorkOrderComments: (...args: unknown[]) => mockUseClientWorkOrderComments(...args),
+  usePostClientWorkOrderComment: () => ({ mutate: mockPostCommentMutate, isPending: false }),
+}));
+
 // react-query (UnifiedInbox uses useQueryClient)
 vi.mock('@tanstack/react-query', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-query')>();
@@ -107,6 +116,7 @@ beforeEach(() => {
   mockUseUnifiedInbox.mockReturnValue({ unifiedInbox: false, deliverables: [], isLoading: false });
   mockMutateAsync.mockResolvedValue({});
   mockApplyMutateAsync.mockResolvedValue({ applied: 1, failed: 0, results: [] });
+  mockUseClientWorkOrderComments.mockReturnValue({ data: [] });
 });
 
 /** An applyable approval-family item (static seoTitle) for the "Ready to publish" surface. */
@@ -527,6 +537,77 @@ describe('InboxTab unified-inbox flag gating', () => {
 
     render(<InboxTab {...baseProps} />);
     expect(screen.queryByText('Work in progress')).not.toBeInTheDocument();
+  });
+
+  // ── DARK work-order conversation (client↔team) inside the track card ──
+
+  it('flag ON → a non-closed order with a sourceRef renders the conversation thread + the comment input', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseClientWorkOrderComments.mockReturnValue({
+      data: [
+        { id: 'c1', workOrderId: 'wo-1', author: 'team', content: 'On it!', createdAt: new Date().toISOString() },
+        { id: 'c2', workOrderId: 'wo-1', author: 'client', content: 'Thanks', createdAt: new Date().toISOString() },
+      ],
+    });
+    mockUseUnifiedInbox.mockReturnValue({
+      unifiedInbox: true,
+      deliverables: [makeWorkOrderDeliverable({ sourceRef: 'work_order:wo-1' })],
+      isLoading: false,
+    });
+
+    render(<InboxTab {...baseProps} />);
+
+    // The conversation messages render.
+    expect(screen.getByText('On it!')).toBeInTheDocument();
+    expect(screen.getByText('Thanks')).toBeInTheDocument();
+    // The comment input is present (status !== 'closed').
+    expect(screen.getByLabelText('Message your team about this work order')).toBeInTheDocument();
+    // Still NO decision verbs (the lane stays verb-free; only the conversation input is interactive).
+    expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Request changes' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Decline' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Apply to Website' })).not.toBeInTheDocument();
+  });
+
+  it('flag ON → posting a comment calls the client comment mutation with the order id', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseClientWorkOrderComments.mockReturnValue({ data: [] });
+    mockUseUnifiedInbox.mockReturnValue({
+      unifiedInbox: true,
+      deliverables: [makeWorkOrderDeliverable({ sourceRef: 'work_order:wo-42' })],
+      isLoading: false,
+    });
+
+    render(<InboxTab {...baseProps} />);
+    const input = screen.getByLabelText('Message your team about this work order');
+    fireEvent.change(input, { target: { value: 'Any update?' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    expect(mockPostCommentMutate).toHaveBeenCalledWith(
+      { orderId: 'wo-42', content: 'Any update?' },
+      expect.anything(),
+    );
+  });
+
+  it('flag ON → a CLOSED order hides the comment input (closed-gated)', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseClientWorkOrderComments.mockReturnValue({ data: [] });
+    // A closed order normally leaves the lane (mirror → cancelled), but if one reaches the card the
+    // input is gated on workOrderStatus !== 'closed'.
+    mockUseUnifiedInbox.mockReturnValue({
+      unifiedInbox: true,
+      deliverables: [
+        makeWorkOrderDeliverable({
+          sourceRef: 'work_order:wo-closed',
+          payload: { family: 'work_order', workOrderStatus: 'closed', pageIds: ['pg-1'] },
+        }),
+      ],
+      isLoading: false,
+    });
+
+    render(<InboxTab {...baseProps} />);
+    expect(screen.queryByLabelText('Message your team about this work order')).not.toBeInTheDocument();
+    // No Send affordance either.
+    expect(screen.queryByRole('button', { name: 'Send' })).not.toBeInTheDocument();
   });
 
   // ── ISSUE 1 — inline approval-review card (approval family renders inline, not a modal CTA) ──

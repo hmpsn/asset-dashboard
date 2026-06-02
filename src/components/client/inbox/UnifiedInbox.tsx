@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Inbox, FileText, ListChecks, MessageSquare, UploadCloud, Clock, Loader2, CheckCircle2 } from 'lucide-react';
+import { Inbox, FileText, ListChecks, MessageSquare, UploadCloud, Clock, Loader2, CheckCircle2, Send } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { LoadingState, Button, ConfirmDialog, ErrorState } from '../../ui';
+import { FormTextarea } from '../../ui/forms/FormTextarea';
 import { PriorityStrip, type PriorityItem } from '../PriorityStrip';
 import { DecisionCard } from '../DecisionCard';
 import { DeliverableDetailModal } from '../DeliverableDetailModal';
@@ -10,6 +11,7 @@ import { InlineApprovalCard } from './InlineApprovalCard';
 import { ProjectedReviewModal } from './ProjectedReviewModal';
 import { normalizeDeliverable, isProjectedDeliverable } from '../../../lib/decision-adapters';
 import { useUnifiedInbox, useRespondToDeliverable, useApplyDeliverable } from '../../../hooks/client/useUnifiedInbox';
+import { useClientWorkOrderComments, usePostClientWorkOrderComment } from '../../../hooks/client/useWorkOrderConversation';
 import { isClientApplyableDeliverableBatch } from '../../../../shared/applyability';
 import { useWorkspaceEvents } from '../../../hooks/useWorkspaceEvents';
 import { WS_EVENTS } from '../../../lib/wsEvents';
@@ -125,6 +127,141 @@ function OrderTrackStepper({ status }: { status: 'ordered' | 'in_progress' | 'co
   );
 }
 
+/** Extract the work order id from a deliverable sourceRef (`work_order:<id>`), or null. */
+function workOrderIdFromSourceRef(sourceRef: string | null): string | null {
+  if (!sourceRef) return null;
+  const prefix = 'work_order:';
+  return sourceRef.startsWith(prefix) ? sourceRef.slice(prefix.length) : null;
+}
+
+/**
+ * WorkOrderTrackCard — one read-only "Work in progress" track-lane card PLUS the client↔team
+ * conversation thread + comment input (DARK; only reachable when UnifiedInbox renders, gated on the
+ * `unified-inbox` flag).
+ *
+ * VERB-FREE by contract: a work order is NOT a decision. There is NO approve / decline / apply /
+ * review affordance — the conversation + the status stepper are the only client affordances. The
+ * comment input is the single interactive element (a question/note to the team), and it is gated on
+ * `status !== 'closed'` (a closed order leaves the lane via the mirror anyway).
+ */
+function WorkOrderTrackCard({
+  deliverable,
+  workspaceId,
+}: {
+  deliverable: ClientDeliverable;
+  workspaceId: string;
+}) {
+  const d = deliverable;
+  const orderStatus: 'ordered' | 'in_progress' | 'completed' =
+    d.status === 'in_progress' || d.status === 'completed' ? d.status : 'ordered';
+  const chip = ORDER_STATUS_CHIP[orderStatus];
+  const ChipIcon = chip.icon;
+  const age = ageLabel(d.sentAt);
+  // Count-only page summary — NEVER render raw payload.pageIds (raw Webflow ids).
+  const rawPageIds = (d.payload as { pageIds?: unknown }).pageIds;
+  const pageCount = Array.isArray(rawPageIds) ? rawPageIds.length : 0;
+
+  const orderId = workOrderIdFromSourceRef(d.sourceRef);
+  // Closed orders leave the lane (mirror → cancelled), so this card never renders for `closed`;
+  // the explicit gate is belt-and-suspenders so the input can never appear on a closed order.
+  const isClosed = (d.payload as { workOrderStatus?: unknown }).workOrderStatus === 'closed';
+  const canComment = !!orderId && !isClosed;
+
+  const { data: comments } = useClientWorkOrderComments(workspaceId, orderId);
+  const postComment = usePostClientWorkOrderComment(workspaceId);
+  const [draft, setDraft] = useState('');
+
+  const handleSend = () => {
+    const content = draft.trim();
+    if (!content || !orderId) return;
+    postComment.mutate({ orderId, content }, { onSuccess: () => setDraft('') });
+  };
+
+  return (
+    <div
+      // pr-check-disable-next-line -- brand signature radius intentional; mirrors DecisionCard visual identity
+      className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden p-4"
+      style={{ borderRadius: 'var(--radius-signature-lg)' }}
+    >
+      <div className="flex items-center gap-2 mb-1">
+        <span
+          className={`inline-flex items-center gap-1.5 t-caption-sm font-medium px-2 py-0.5 rounded-[var(--radius-pill)] border ${chip.bg} ${chip.border} ${chip.color}`}
+        >
+          <ChipIcon className={`w-3 h-3 ${chip.spin ? 'animate-spin' : ''}`} />
+          {chip.label}
+        </span>
+      </div>
+      {/* duplicate-heading-ok -- distinct section: the work-order TRACK-lane card title mirrors the "Ready to publish" card title intentionally (two separate sections, same card grammar) */}
+      <h4 className="t-body font-semibold text-[var(--brand-text-bright)]">{d.title}</h4>
+      {d.summary && (
+        <p className="t-caption text-[var(--brand-text-muted)] mt-0.5 line-clamp-2">{d.summary}</p>
+      )}
+      {/* Skip the stepper for `completed` — there is no progress left to show. */}
+      {orderStatus !== 'completed' && <OrderTrackStepper status={orderStatus} />}
+      <div className="flex items-center gap-2 mt-2 flex-wrap t-caption-sm text-[var(--brand-text-muted)]">
+        {pageCount > 0 && (
+          <span>{pageCount} page{pageCount !== 1 ? 's' : ''}</span>
+        )}
+        {pageCount > 0 && age && <span aria-hidden="true">·</span>}
+        {age && <span>{age}</span>}
+      </div>
+
+      {/* Conversation — verb-free: a question/note thread with the team, NOT a decision surface. */}
+      {orderId && (
+        <div className="mt-3 pt-3 border-t border-[var(--brand-border)]">
+          {(comments ?? []).length > 0 && (
+            <ul className="space-y-2 mb-2">
+              {(comments ?? []).map((c) => (
+                <li
+                  key={c.id}
+                  className={`max-w-[85%] px-3 py-2 ${
+                    c.author === 'client'
+                      ? 'ml-auto bg-teal-500/10 border border-teal-500/30'
+                      : 'mr-auto bg-[var(--surface-3)] border border-[var(--brand-border)]'
+                  }`}
+                  style={{ borderRadius: 'var(--radius-md)' }}
+                >
+                  <div className="t-caption-sm font-medium text-[var(--brand-text-muted)] mb-0.5">
+                    {c.author === 'client' ? 'You' : 'Your team'}
+                  </div>
+                  <p className="t-caption text-[var(--brand-text-bright)] whitespace-pre-wrap">{c.content}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+          {canComment && (
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <FormTextarea
+                  value={draft}
+                  onChange={setDraft}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleSend(); }
+                  }}
+                  placeholder="Ask your team a question…"
+                  rows={2}
+                  maxLength={2000}
+                  aria-label="Message your team about this work order"
+                />
+              </div>
+              <Button
+                variant="primary"
+                size="sm"
+                icon={Send}
+                loading={postComment.isPending}
+                disabled={!draft.trim() || postComment.isPending}
+                onClick={handleSend}
+              >
+                Send
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
  * UnifiedInbox — the PR-2a unified client inbox (DARK behind the `unified-inbox` flag).
  *
@@ -179,6 +316,20 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
         [WS_EVENTS.CONTENT_REQUEST_UPDATE]: invalidateInbox,
         // ws-invalidation-ok — client unified-inbox key differs from any admin copy/content key
         [WS_EVENTS.POST_UPDATED]: invalidateInbox,
+        // Work-order conversation: a team reply (or the client's own post echoed) — refresh the
+        // commented order's thread so the client sees replies live. The payload carries { id: orderId }.
+        // ws-invalidation-ok — client work-order-comment thread key differs from any admin key
+        [WS_EVENTS.WORK_ORDER_COMMENT]: (data: unknown) => {
+          const orderId = typeof data === 'object' && data !== null && 'id' in data
+            ? String((data as { id: unknown }).id)
+            : undefined;
+          if (orderId) {
+            queryClient.invalidateQueries({ queryKey: queryKeys.client.workOrderComments(workspaceId, orderId) });
+          } else {
+            queryClient.invalidateQueries({ queryKey: queryKeys.client.workOrderCommentsAll(workspaceId) });
+          }
+          invalidateInbox();
+        },
       };
     },
     [queryClient, workspaceId],
@@ -454,58 +605,21 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
 
       {/* R5 — "Work in progress": the read-only work-order TRACK lane. Work the agency does FOR the
           client (paid fix/schema orders), surfaced as STATUS they FOLLOW — there is NO approve/decline/
-          apply/review verb (a work order is not a decision). Each card is PLAIN markup: it does NOT
-          call normalizeDeliverable, does NOT construct a DecisionCard, and wires ZERO mutations
-          (structural verb-safety). Page targets are shown count-only — the raw payload.pageIds are raw
-          Webflow ids and are never surfaced to the client (CLAUDE.md "never surface raw IDs"). Mirrors
-          the R3b "Ready to publish" container (surface-2 + brand signature radius). */}
+          apply/review verb (a work order is not a decision). Each card does NOT call
+          normalizeDeliverable, does NOT construct a DecisionCard, and wires ZERO decision mutations
+          (structural verb-safety). The ONLY interactive element is the verb-free client↔team
+          conversation input (DARK; reachable only when UnifiedInbox renders behind `unified-inbox`).
+          Page targets are shown count-only — the raw payload.pageIds are raw Webflow ids and are never
+          surfaced to the client (CLAUDE.md "never surface raw IDs"). Mirrors the R3b "Ready to publish"
+          container (surface-2 + brand signature radius). */}
       {workOrders.length > 0 && (
         <section aria-label="Work in progress" className="space-y-3">
           <h3 className="t-label text-[var(--brand-text-muted)] uppercase tracking-wide">
             Work in progress
           </h3>
-          {workOrders.map((d) => {
-            // Order rows only ever reach here in the three canonical track statuses (the server admits
-            // ONLY ordered/in_progress/completed for kind:'order'); fall back to `ordered` defensively.
-            const orderStatus = (d.status === 'in_progress' || d.status === 'completed') ? d.status : 'ordered';
-            const chip = ORDER_STATUS_CHIP[orderStatus];
-            const ChipIcon = chip.icon;
-            const age = ageLabel(d.sentAt);
-            // Count-only page summary — NEVER render raw payload.pageIds (raw Webflow ids).
-            const rawPageIds = (d.payload as { pageIds?: unknown }).pageIds;
-            const pageCount = Array.isArray(rawPageIds) ? rawPageIds.length : 0;
-            return (
-              <div
-                key={d.id}
-                // pr-check-disable-next-line -- brand signature radius intentional; mirrors DecisionCard visual identity
-                className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden p-4"
-                style={{ borderRadius: 'var(--radius-signature-lg)' }}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <span
-                    className={`inline-flex items-center gap-1.5 t-caption-sm font-medium px-2 py-0.5 rounded-[var(--radius-pill)] border ${chip.bg} ${chip.border} ${chip.color}`}
-                  >
-                    <ChipIcon className={`w-3 h-3 ${chip.spin ? 'animate-spin' : ''}`} />
-                    {chip.label}
-                  </span>
-                </div>
-                {/* duplicate-heading-ok -- distinct section: the work-order TRACK-lane card title mirrors the "Ready to publish" card title intentionally (two separate sections, same card grammar) */}
-                <h4 className="t-body font-semibold text-[var(--brand-text-bright)]">{d.title}</h4>
-                {d.summary && (
-                  <p className="t-caption text-[var(--brand-text-muted)] mt-0.5 line-clamp-2">{d.summary}</p>
-                )}
-                {/* Skip the stepper for `completed` — there is no progress left to show. */}
-                {orderStatus !== 'completed' && <OrderTrackStepper status={orderStatus} />}
-                <div className="flex items-center gap-2 mt-2 flex-wrap t-caption-sm text-[var(--brand-text-muted)]">
-                  {pageCount > 0 && (
-                    <span>{pageCount} page{pageCount !== 1 ? 's' : ''}</span>
-                  )}
-                  {pageCount > 0 && age && <span aria-hidden="true">·</span>}
-                  {age && <span>{age}</span>}
-                </div>
-              </div>
-            );
-          })}
+          {workOrders.map((d) => (
+            <WorkOrderTrackCard key={d.id} deliverable={d} workspaceId={workspaceId} />
+          ))}
         </section>
       )}
 
