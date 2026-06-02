@@ -136,20 +136,24 @@ describe('InlineApprovalCard', () => {
     expect(h.onDecline).toHaveBeenCalledWith('Not now');
   });
 
-  it('multi-page items render per-page group sub-headers', () => {
+  it('multi-page items render per-page group sub-headers with de-duplicated row labels', () => {
     const items = [
       makeItem({ id: 'a', field: 'seoTitle', itemPayload: { pageTitle: 'Home', pageSlug: '/home' } }),
-      makeItem({ id: 'b', field: 'seoTitle', itemPayload: { pageTitle: 'About', pageSlug: '/about' } }),
+      makeItem({ id: 'b', field: 'metaDescription', itemPayload: { pageTitle: 'About', pageSlug: '/about' } }),
     ];
     const h = baseHandlers();
     render(<InlineApprovalCard decision={makeDecision(items)} ageLabel={null} submitting={false} {...h} />);
 
-    // The group sub-headers render the bare page label ("Home" / "About"); the per-item row labels
-    // render the combined "Home — seoTitle" form, so the bare label is unique to the sub-header.
+    // FIX 4 — the group sub-headers render the page title ("Home" / "About"). The per-item row
+    // labels are de-duplicated to the field ONLY ("seoTitle" / "metaDescription"), so the page name
+    // is NOT repeated under its own group header. The combined "Page — field" form is absent in
+    // multi-page mode.
     expect(screen.getByText('Home')).toBeInTheDocument();
     expect(screen.getByText('About')).toBeInTheDocument();
-    expect(screen.getByText('Home — seoTitle')).toBeInTheDocument();
-    expect(screen.getByText('About — seoTitle')).toBeInTheDocument();
+    expect(screen.getByText('seoTitle')).toBeInTheDocument();
+    expect(screen.getByText('metaDescription')).toBeInTheDocument();
+    expect(screen.queryByText('Home — seoTitle')).not.toBeInTheDocument();
+    expect(screen.queryByText('About — metaDescription')).not.toBeInTheDocument();
   });
 
   it('single-page items suppress the group sub-header (no bare page-label header)', () => {
@@ -186,6 +190,20 @@ describe('InlineApprovalCard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Show full ↓' }));
     expect(screen.getByRole('button', { name: 'Show less ↑' })).toBeInTheDocument();
+  });
+
+  it('submitting=true → CTA reads "Submitting…" and Approve/Request changes/Decline are disabled', () => {
+    const items = [makeItem({ id: 'a' })];
+    const h = baseHandlers();
+    render(<InlineApprovalCard decision={makeDecision(items)} ageLabel={null} submitting={true} {...h} />);
+
+    // Primary CTA shows the submitting label.
+    const cta = screen.getByRole('button', { name: 'Submitting…' });
+    expect(cta).toBeInTheDocument();
+    expect(cta).toBeDisabled();
+    // The action buttons are all disabled while a response is in flight.
+    expect(screen.getByRole('button', { name: 'Request changes' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Decline' })).toBeDisabled();
   });
 
   // Guard the page-label sub-header is wrapped in the same card chrome (smoke: title + badge present).

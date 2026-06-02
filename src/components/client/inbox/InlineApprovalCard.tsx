@@ -127,8 +127,13 @@ export function InlineApprovalCard({
             {pageItems.map((item) => (
               <ItemDiffRow
                 key={item.id}
-                label={itemPageLabel(item)}
-                field={item.field}
+                // FIX 4 — in multi-page grouped mode the per-page group sub-header (above) already
+                // shows the page title, so showing it again here would duplicate the page name on
+                // every row. Pass a field-only label (the field as the label, no `field` suffix) so
+                // the row reads just "seoTitle" under its page-group header. Single-page mode keeps
+                // the combined "Page — field" label (no group header to de-duplicate against).
+                label={isMultiPage ? (item.field ?? 'Item') : itemPageLabel(item)}
+                field={isMultiPage ? null : item.field}
                 currentValue={item.currentValue}
                 proposedValue={item.proposedValue}
                 flagged={flaggedItems.has(item.id)}

@@ -396,8 +396,10 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
 
       {/* Orders-only empty state (R5 fix): the "nothing needs your attention" line must NOT show when
           there are work orders to TRACK — the track lane below is content, even though it's not
-          actionable. Guard on BOTH the actionable queue and the order track lane being empty. */}
-      {actionable.length === 0 && workOrders.length === 0 && (
+          actionable. Guard on the actionable queue, the order track lane, AND the "Ready to publish"
+          lane being empty — matching the F2 PriorityStrip guard, so the line never renders above a
+          populated "Ready to publish" section (same false-empty class). */}
+      {actionable.length === 0 && workOrders.length === 0 && readyToApply.length === 0 && (
         <div className="flex items-center gap-3 px-4 py-3 t-caption text-[var(--brand-text-muted)]">
           <Inbox size={16} className="flex-shrink-0" />
           <span>Nothing needs your attention right now. New items will appear here.</span>
