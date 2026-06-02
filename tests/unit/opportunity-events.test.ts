@@ -85,7 +85,7 @@ describe('insertOpportunityEvent / listActiveOpportunityEvents', () => {
   });
 
   it('clamps a non-positive half-life to a safe value and NaN boost to 0', () => {
-    insertOpportunityEvent({ workspaceId: WS_A, type: 'publish', pagePath: 'x', boost: Number.NaN, halfLifeDays: 0 });
+    insertOpportunityEvent({ workspaceId: WS_A, type: 'decay', pagePath: 'x', boost: Number.NaN, halfLifeDays: 0 });
     const e = listActiveOpportunityEvents(WS_A)[0];
     expect(e.boost).toBe(0);
     expect(e.halfLifeDays).toBeGreaterThan(0);
