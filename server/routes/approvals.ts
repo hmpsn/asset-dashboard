@@ -19,8 +19,13 @@ import {
   deleteBatch,
 } from '../approvals.js';
 import { broadcastToWorkspace } from '../broadcast.js';
-import { mirrorApprovalBatchToDeliverable } from '../domains/inbox/approval-batch-dual-write.js';
+import { APPROVAL_FAMILY_FLAG, mirrorApprovalBatchToDeliverable } from '../domains/inbox/approval-batch-dual-write.js';
 import { respondToApprovalBatch } from '../domains/inbox/approval-batch-respond.js';
+import { classifyApprovalBatch } from '../domains/inbox/deliverable-adapters/approval-batch-classifier.js';
+import { markDeliverableApplied } from '../domains/inbox/send-to-client.js';
+import { findBySourceRef } from '../client-deliverables.js';
+import { isFeatureEnabled } from '../feature-flags.js';
+import { isClientApplyableFields } from '../../shared/applyability.js';
 import { notifyApprovalReady, notifyTeamActionApproved, notifyTeamChangesRequested } from '../email.js';
 import { getClientActor, requireClientPortalAuth } from '../middleware.js';
 import {
@@ -70,13 +75,6 @@ const APPROVAL_FIELD_LABELS: Record<string, string> = {
 
 function approvalActivityLabel(field: string): string {
   return APPROVAL_FIELD_LABELS[field] ?? field.replace(/[_-]+/g, ' ');
-}
-
-const CMS_NON_SEO_APPROVAL_FIELDS = new Set(['name', 'slug']);
-
-function isCmsSeoApprovalField(field: string): boolean {
-  const normalized = field.trim().toLowerCase();
-  return normalized.length > 0 && !CMS_NON_SEO_APPROVAL_FIELDS.has(normalized);
 }
 
 function normalizeSeoChangeField(field: string): string {
@@ -401,11 +399,10 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
 
   const approved = batch.items.filter(i => i.status === 'approved');
   if (!approved.length) return res.status(400).json({ error: 'No approved items to apply' });
-  if (approved.some(i => {
-    if (i.pageId.startsWith('cms-')) return true;
-    if (i.collectionId) return !isCmsSeoApprovalField(i.field);
-    return i.field !== 'seoTitle' && i.field !== 'seoDescription';
-  })) {
+  // Single source of truth: the shared applyability predicate (the legacy field/pageId/collectionId
+  // gate, now in shared/applyability.ts so the R3b client UI uses the SAME rule). The two in-loop
+  // `cms-` guards below stay as defense-in-depth.
+  if (approved.some(i => !isClientApplyableFields({ field: i.field, targetRef: i.pageId, collectionId: i.collectionId ?? null }))) {
     return res.status(400).json({ error: 'Only static page SEO title/meta approvals and real CMS item approvals can be applied by clients.' });
   }
 
@@ -473,6 +470,21 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
       `Applied ${appliedIds.length} approved SEO changes`,
       batchData ? `Batch: ${batchData.name}` : undefined,
       { batchId: req.params.batchId, appliedCount: appliedIds.length });
+  }
+
+  // R3b mirror-flip (DARK): when the unified approval-family mirror exists, move it to `applied`
+  // so the unified inbox reflects the publish. Gated on APPROVAL_FAMILY_FLAG (the flag that governs
+  // mirror EXISTENCE — NOT unified-inbox). The Webflow write already succeeded above; a mirror miss
+  // must never fail this response, so the whole block is best-effort (log + swallow). isFeatureEnabled
+  // is single-arg/global (no workspaceId). With the flag off this is byte-identical to before.
+  if (appliedIds.length > 0 && isFeatureEnabled(APPROVAL_FAMILY_FLAG)) {
+    try {
+      const type = classifyApprovalBatch(batch);
+      const mirror = findBySourceRef(req.params.workspaceId, type, `${type}:${req.params.batchId}`);
+      if (mirror) markDeliverableApplied(req.params.workspaceId, mirror.id);
+    } catch (err) {
+      log.warn({ err, batchId: req.params.batchId }, 'unified mirror apply-sync failed (swallowed; webflow already applied)');
+    }
   }
 
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.APPROVAL_APPLIED, { batchId: req.params.batchId, applied: appliedIds.length });

@@ -26,6 +26,7 @@ const mockUseUnifiedInbox = vi.fn();
 vi.mock('../../src/hooks/client/useUnifiedInbox', () => ({
   useUnifiedInbox: (...args: unknown[]) => mockUseUnifiedInbox(...args),
   useRespondToDeliverable: () => ({ mutateAsync: mockMutateAsync, isPending: false }),
+  useApplyDeliverable: () => ({ mutateAsync: vi.fn().mockResolvedValue({ applied: 0, failed: 0, results: [] }), isPending: false }),
 }));
 
 // react-query (UnifiedInbox uses useQueryClient)

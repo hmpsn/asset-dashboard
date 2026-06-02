@@ -41,6 +41,15 @@ interface DeliverableDetailModalProps {
   onDecline: (note: string) => Promise<void> | void;
   onDismiss: () => void;
   submitting?: boolean;
+  /**
+   * R3b — Apply to Website (DARK). When `canApply` is true and `onApply` is provided (an already-
+   * approved, client-applyable deliverable), the footer renders a SINGLE full-width "Apply to
+   * Website" primary button INSTEAD of the approve/request/decline row (apply is a separate step
+   * after approve, not alongside it). When `canApply` is false the normal footer renders unchanged.
+   */
+  onApply?: () => Promise<void> | void;
+  applying?: boolean;
+  canApply?: boolean;
 }
 
 /** The approval_batch-family deliverable types whose typed items[] drive the per-item flag UX. */
@@ -80,6 +89,9 @@ export function DeliverableDetailModal({
   onDecline,
   onDismiss,
   submitting = false,
+  onApply,
+  applying = false,
+  canApply = false,
 }: DeliverableDetailModalProps) {
   const [flaggedItems, setFlaggedItems] = useState<Map<string, string>>(new Map());
   const [noteMode, setNoteMode] = useState<'none' | 'changes' | 'decline'>('none');
@@ -223,7 +235,18 @@ export function DeliverableDetailModal({
 
         {/* Footer */}
         <div className="flex-shrink-0 px-6 py-4 border-t border-[var(--brand-border)] bg-[var(--surface-2)] space-y-2">
-          {noteMode === 'none' ? (
+          {canApply && onApply ? (
+            /* R3b — Apply to Website: a single full-width primary button. Apply is a SEPARATE step
+               after approve, so this replaces (not augments) the approve/request/decline row. */
+            <Button
+              variant="primary"
+              className="w-full"
+              disabled={applying}
+              onClick={() => void onApply()}
+            >
+              {applying ? 'Applying…' : 'Apply to Website'}
+            </Button>
+          ) : noteMode === 'none' ? (
             <>
               <Button variant="primary" className="w-full" disabled={submitting} onClick={handleApprove}>
                 {ctaLabel}

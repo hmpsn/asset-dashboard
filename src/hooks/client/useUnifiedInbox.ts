@@ -62,3 +62,33 @@ export function useRespondToDeliverable(workspaceId: string) {
     },
   });
 }
+
+/** Result shape of the apply mutation (mirrors the legacy /apply route response). */
+export interface ApplyDeliverableResult {
+  results: Array<{ itemId: string; pageId: string; success: boolean; error?: string }>;
+  applied: number;
+  failed: number;
+}
+
+export interface ApplyDeliverableVars {
+  /** The legacy approval-batch id, read off the deliverable's `payload.legacyBatchId`. */
+  legacyBatchId: string;
+}
+
+/**
+ * useApplyDeliverable — R3b "Apply to Website" mutation (DARK; only reachable behind `unified-inbox`).
+ *
+ * Calls the SAME proven legacy apply route via the typed wrapper (no new apply logic). On success it
+ * invalidates the unified inbox query — the applied deliverable flips to `applied`, which is filtered
+ * OUT of the client-facing list, so the item leaves the inbox (intended post-apply UX). Sibling of
+ * useRespondToDeliverable.
+ */
+export function useApplyDeliverable(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation<ApplyDeliverableResult, Error, ApplyDeliverableVars>({
+    mutationFn: ({ legacyBatchId }) => publicDeliverables.applyApproval(workspaceId, legacyBatchId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.client.unifiedInbox(workspaceId) });
+    },
+  });
+}

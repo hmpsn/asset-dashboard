@@ -1,15 +1,16 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Inbox, FileText, ListChecks, MessageSquare } from 'lucide-react';
+import { Inbox, FileText, ListChecks, MessageSquare, UploadCloud } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { LoadingState } from '../../ui';
+import { LoadingState, Button, ConfirmDialog } from '../../ui';
 import { PriorityStrip, type PriorityItem } from '../PriorityStrip';
 import { DecisionCard } from '../DecisionCard';
 import { DeliverableDetailModal } from '../DeliverableDetailModal';
 import { useBetaMode } from '../BetaContext';
 import { normalizeDeliverable, isProjectedDeliverable } from '../../../lib/decision-adapters';
-import { useUnifiedInbox, useRespondToDeliverable } from '../../../hooks/client/useUnifiedInbox';
+import { useUnifiedInbox, useRespondToDeliverable, useApplyDeliverable } from '../../../hooks/client/useUnifiedInbox';
+import { isClientApplyableDeliverableBatch } from '../../../../shared/applyability';
 import { useWorkspaceEvents } from '../../../hooks/useWorkspaceEvents';
 import { WS_EVENTS } from '../../../lib/wsEvents';
 import { queryKeys } from '../../../lib/queryKeys';
@@ -69,9 +70,12 @@ export function UnifiedInbox({ workspaceId, setToast }: UnifiedInboxProps) {
   const betaMode = useBetaMode();
   const { deliverables, isLoading } = useUnifiedInbox(workspaceId);
   const respond = useRespondToDeliverable(workspaceId);
+  const apply = useApplyDeliverable(workspaceId);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   // R3: the deliverable open in the detail modal (substance + per-item review). null = closed.
   const [detailId, setDetailId] = useState<string | null>(null);
+  // R3b — Apply to Website: the deliverable pending the "Apply to live site?" confirmation. null = no dialog.
+  const [applyConfirm, setApplyConfirm] = useState<ClientDeliverable | null>(null);
 
   // PROJECTED deliverables (copy_section / content_request) have no physical row and 404 on the
   // uniform /respond verbs — copy is reviewed in Inbox > Reviews (ClientCopyReview) and briefs/posts
@@ -100,6 +104,17 @@ export function UnifiedInbox({ workspaceId, setToast }: UnifiedInboxProps) {
 
   const actionable = useMemo(
     () => deliverables.filter((d) => ACTIONABLE_STATUSES.has(d.status)),
+    [deliverables],
+  );
+
+  // R3b "Ready to publish": already-approved deliverables that are client-applyable through the
+  // legacy /apply route (the shared predicate mirrors that route's field/targetRef/collectionId
+  // gate — see shared/applyability.ts). `approved` is intentionally NOT in ACTIONABLE_STATUSES (it
+  // must not re-show approve/decline verbs), but it IS client-facing, so these rows ARE present in
+  // `deliverables`. Non-applyable approved deliverables (schema, content_plan, approved
+  // client_actions) are excluded by the predicate and simply do not appear here.
+  const readyToApply = useMemo(
+    () => deliverables.filter((d) => d.status === 'approved' && isClientApplyableDeliverableBatch(d.items ?? [])),
     [deliverables],
   );
 
@@ -137,6 +152,35 @@ export function UnifiedInbox({ workspaceId, setToast }: UnifiedInboxProps) {
       setToast({ message: 'Could not submit your response. Please try again.', type: 'error' });
     } finally {
       setSubmittingId(null);
+    }
+  };
+
+  // R3b — open the "Apply to live site?" confirmation (copy mirrors the legacy ApprovalBatchCard).
+  const onApply = (d: ClientDeliverable) => setApplyConfirm(d);
+
+  // R3b — run the apply after the client confirms. Reads the legacy batch id off the deliverable's
+  // payload (typeof-guard) and calls the SAME proven legacy /apply route via the typed mutation.
+  // Post-apply UX (corrected-defect #4): the deliverable flips to `applied`, which is filtered OUT
+  // of the client-facing list (CLIENT_FACING_STATUSES excludes `applied`). On refetch the item LEAVES
+  // the inbox (both the actionable + ready-to-publish sections) and the modal auto-unmounts
+  // (detailDeliverable → null). That is the intended UX; the success toast confirms.
+  const confirmApply = async () => {
+    const d = applyConfirm;
+    setApplyConfirm(null);
+    if (!d) return;
+    const legacyBatchId = (d.payload as { legacyBatchId?: unknown }).legacyBatchId;
+    if (typeof legacyBatchId !== 'string' || !legacyBatchId) {
+      setToast({ message: 'Could not apply: this item is missing its source reference.', type: 'error' });
+      return;
+    }
+    try {
+      const data = await apply.mutateAsync({ legacyBatchId });
+      setToast({
+        message: `${data.applied} change${data.applied !== 1 ? 's' : ''} applied to your website`,
+        type: 'success',
+      });
+    } catch {
+      setToast({ message: 'Failed to apply changes. Please try again.', type: 'error' });
     }
   };
 
@@ -212,6 +256,52 @@ export function UnifiedInbox({ workspaceId, setToast }: UnifiedInboxProps) {
         </div>
       )}
 
+      {/* R3b — "Ready to publish": already-approved, client-applyable deliverables with an explicit
+          "Apply to Website" step (a separate step AFTER approve — `approved` is NOT actionable so
+          this is a distinct surface). Faithfully replicates the legacy ApprovalBatchCard footer
+          (keep the approved card visible with an Apply button gated on the applyability predicate). */}
+      {readyToApply.length > 0 && (
+        <section aria-label="Ready to publish" className="space-y-3">
+          <h3 className="t-label text-[var(--brand-text-muted)] uppercase tracking-wide">
+            Ready to publish
+          </h3>
+          {readyToApply.map((d) => (
+            <div
+              key={d.id}
+              // pr-check-disable-next-line -- brand signature radius intentional; mirrors DecisionCard visual identity
+              className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden p-4"
+              style={{ borderRadius: 'var(--radius-signature-lg)' }}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className="t-caption-sm font-medium px-2 py-0.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)]">
+                  Approved
+                </span>
+              </div>
+              <h4 className="t-body font-semibold text-[var(--brand-text-bright)]">{d.title}</h4>
+              {d.summary && (
+                <p className="t-caption text-[var(--brand-text-muted)] mt-0.5 line-clamp-2">{d.summary}</p>
+              )}
+              <div className="flex items-center gap-2 mt-3 flex-wrap">
+                <Button
+                  size="sm"
+                  variant="primary"
+                  icon={UploadCloud}
+                  disabled={apply.isPending}
+                  onClick={() => onApply(d)}
+                >
+                  {apply.isPending ? 'Applying…' : 'Apply to Website'}
+                </Button>
+                {(d.items?.length ?? 0) > 0 && (
+                  <Button size="sm" variant="ghost" onClick={() => setDetailId(d.id)} className="ml-auto">
+                    View {d.items!.length} change{d.items!.length !== 1 ? 's' : ''} →
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
       {/* R3: the detail modal — substance + per-item review for a batch deliverable. Reuses the
           proven renderers (decision-renderers.tsx). The approve carries the flagged item ids to the
           single /respond path; request-changes/decline are whole-deliverable. */}
@@ -227,8 +317,26 @@ export function UnifiedInbox({ workspaceId, setToast }: UnifiedInboxProps) {
           }
           onDecline={(note) => handleRespond(detailDeliverable, 'declined', note || undefined)}
           onDismiss={() => setDetailId(null)}
+          // R3b: when the modal shows an already-approved, client-applyable deliverable, render the
+          // single "Apply to Website" step instead of the approve/request/decline row.
+          canApply={
+            detailDeliverable.status === 'approved' &&
+            isClientApplyableDeliverableBatch(detailDeliverable.items ?? [])
+          }
+          applying={apply.isPending}
+          onApply={() => onApply(detailDeliverable)}
         />
       )}
+
+      {/* R3b — "Apply to live site?" confirmation (copy mirrors the legacy ApprovalBatchCard). */}
+      <ConfirmDialog
+        open={applyConfirm !== null}
+        title="Apply to live site?"
+        message="This will update your live website with the approved changes. This cannot be undone from the dashboard."
+        confirmLabel="Apply to Website"
+        onConfirm={() => void confirmApply()}
+        onCancel={() => setApplyConfirm(null)}
+      />
     </div>
   );
 }
