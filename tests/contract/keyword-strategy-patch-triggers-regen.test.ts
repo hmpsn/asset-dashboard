@@ -21,17 +21,19 @@ describe('keyword-strategy PATCH triggers rec regen via follow-ons', () => {
   });
 
   it('calls queueKeywordStrategyPostUpdateFollowOns with workspaceId after the transaction commits', () => {
-    const src = readFileSync('server/routes/keyword-strategy.ts', 'utf-8'); // readFile-ok — ordering guard: follow-on must be queued after applyPatch() returns, not inside the transaction.
+    const src = readFileSync('server/routes/keyword-strategy.ts', 'utf-8'); // readFile-ok — ordering guard: follow-on must be queued after applyPatch.immediate() returns, not inside the transaction.
 
     // The import line and the call site must both be present
     expect(src).toContain('queueKeywordStrategyPostUpdateFollowOns({ workspaceId: ws.id })');
 
-    // The call must appear AFTER applyPatch() (i.e. after the transaction commits)
-    const applyPatchIdx = src.indexOf('applyPatch()');
+    // The call must appear AFTER applyPatch.immediate() (i.e. after the transaction commits).
+    // The transaction is invoked via BEGIN IMMEDIATE (.immediate()) to avoid the WAL
+    // SQLITE_BUSY_SNAPSHOT flake on read-then-write transactions.
+    const applyPatchIdx = src.indexOf('applyPatch.immediate()');
     const callIdx = src.indexOf('queueKeywordStrategyPostUpdateFollowOns({ workspaceId: ws.id })');
 
-    expect(applyPatchIdx, 'applyPatch() call must exist in the PATCH handler').toBeGreaterThan(0);
+    expect(applyPatchIdx, 'applyPatch.immediate() call must exist in the PATCH handler').toBeGreaterThan(0);
     expect(callIdx, 'queueKeywordStrategyPostUpdateFollowOns call must exist in the PATCH handler').toBeGreaterThan(0);
-    expect(callIdx, 'follow-on must be called after the transaction commits (after applyPatch())').toBeGreaterThan(applyPatchIdx);
+    expect(callIdx, 'follow-on must be called after the transaction commits (after applyPatch.immediate())').toBeGreaterThan(applyPatchIdx);
   });
 });

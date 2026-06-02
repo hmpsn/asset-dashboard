@@ -113,7 +113,7 @@ export function respondToApprovalBatch(
   // Atomic: all per-item moves commit together, so a mid-loop failure (e.g. a concurrent
   // request flipping an item) cannot leave the batch half-decided. Side-effects (activity,
   // email, broadcast) fire AFTER, outside the transaction.
-  db.transaction(() => {
+  const applyDecisions = db.transaction(() => {
     if (perItemMode) {
       // R3 per-item: drive each NAMED pending item to its resolved status (approve subset / reject
       // flagged). Items not named are left untouched; non-pending named items are skipped (the
@@ -144,7 +144,8 @@ export function respondToApprovalBatch(
         }
       }
     }
-  })();
+  });
+  applyDecisions.immediate();
 
   const ws = getWorkspace(workspaceId);
   const actorName = opts.actor?.name || 'Client';

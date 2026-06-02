@@ -498,7 +498,7 @@ export function upsertPageKeyword(workspaceId: string, entry: PageKeywordMap): v
     stmts().upsert.run(modelToParams(workspaceId, entry, preserveAnalysisFields));
     maybeRecordScoreSnapshot(workspaceId, entry);
   });
-  run();
+  run.immediate();
 }
 
 /** Upsert multiple page keyword entries in a single transaction. */
@@ -511,7 +511,7 @@ export function upsertPageKeywordsBatch(workspaceId: string, entries: PageKeywor
       maybeRecordScoreSnapshot(workspaceId, entry);
     }
   });
-  run();
+  run.immediate();
 }
 
 /**
@@ -542,7 +542,7 @@ export function upsertAndCleanPageKeywords(workspaceId: string, entries: PageKey
       `DELETE FROM page_keyword_score_history WHERE workspace_id = ? AND page_path NOT IN (${placeholders})`
     ).run(workspaceId, ...normalizedPaths);
   });
-  run();
+  run.immediate();
 }
 
 /** Replace all page keywords for a workspace (delete + insert in transaction). */
