@@ -180,7 +180,15 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
       attribution: 'platform_executed',
     });
   });
-  writeKeywordStrategy();
+  // Run as BEGIN IMMEDIATE (not better-sqlite3's default deferred): the transaction body READS
+  // table-backed prior state (listPageKeywords/listContentGaps/…) BEFORE it writes, so under a
+  // concurrent writer on another connection a deferred txn upgrades a stale read snapshot and
+  // SQLite returns SQLITE_BUSY_SNAPSHOT ("database is locked") IMMEDIATELY — busy_timeout cannot
+  // retry a snapshot conflict. IMMEDIATE acquires the write lock up front (before the reads), so
+  // there is no snapshot to invalidate and busy_timeout retries plain lock contention as intended.
+  // Fixes the keyword-strategy-partial-state WAL write-contention flake and hardens real concurrent
+  // generation.
+  writeKeywordStrategy.immediate();
 
   debouncedPageAnalysisInvalidate(ws.id, () => {
     invalidateIntelligenceCache(ws.id);

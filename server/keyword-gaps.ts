@@ -167,7 +167,7 @@ export function migrateFromJsonBlob(): void {
         return 'migrated';
       });
 
-      const outcome = migrateOne();
+      const outcome = migrateOne.immediate();
       if (outcome === 'already-migrated') {
         skipped++;
         continue;

@@ -103,7 +103,7 @@ export function addPattern(
   data: { patternType: IntelligencePatternType; pattern: string; source?: string },
 ): CopyIntelligencePattern {
   // Wrap in transaction to eliminate TOCTOU race between SELECT and INSERT
-  return db.transaction(() => {
+  const upsertPattern = db.transaction(() => {
     const existing = stmts().findByPattern.get(wsId, data.pattern) as CopyIntelligenceRow | undefined;
     if (existing) {
       stmts().incrementFrequency.run(existing.id, wsId);
@@ -114,7 +114,8 @@ export function addPattern(
     const now = new Date().toISOString();
     stmts().insertPattern.run(id, wsId, data.patternType, data.pattern, data.source ?? null, 1, 1, now);
     return rowToPattern(stmts().findByPattern.get(wsId, data.pattern) as CopyIntelligenceRow);
-  })();
+  });
+  return upsertPattern.immediate();
 }
 
 export function togglePattern(patternId: string, wsId: string, active: boolean): void {

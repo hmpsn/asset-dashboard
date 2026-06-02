@@ -267,7 +267,7 @@ function handleApprovedVoiceSample(section: CopySection, workspaceId: string): v
       return;
     }
 
-    db.transaction(() => {
+    const addApprovedSample = db.transaction(() => {
       // Re-read inside transaction for TOCTOU safety on concurrent approvals
       const freshProfile = getVoiceProfile(workspaceId);
       const existingForTag = (freshProfile?.samples ?? [])
@@ -283,7 +283,8 @@ function handleApprovedVoiceSample(section: CopySection, workspaceId: string): v
       }
 
       addVoiceSample(workspaceId, section.generatedCopy!, contextTag, 'copy_approved');
-    })();
+    });
+    addApprovedSample.immediate();
 
     log.info({ sectionId: section.id, workspaceId, contextTag }, 'auto-added approved copy as voice sample');
   } catch (err) {
