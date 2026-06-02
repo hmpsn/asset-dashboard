@@ -132,3 +132,17 @@ describe('normalizeApprovalBatch', () => {
     expect(normalizeApprovalBatch(cmsBatch).badge).toBe('CMS');
   });
 });
+
+describe('legacy adapters omit the R1 deliverable-only fields (additive back-compat)', () => {
+  it('normalizeClientAction never sets items/payload', () => {
+    const d = normalizeClientAction(baseAction);
+    expect(d.items).toBeUndefined();
+    expect(d.payload).toBeUndefined();
+  });
+
+  it('normalizeApprovalBatch never sets items/payload', () => {
+    const d = normalizeApprovalBatch(baseBatch);
+    expect(d.items).toBeUndefined();
+    expect(d.payload).toBeUndefined();
+  });
+});

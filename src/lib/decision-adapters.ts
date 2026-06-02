@@ -137,15 +137,48 @@ export function isProjectedDeliverable(type: DeliverableType | string): boolean 
 }
 
 /**
+ * The client_action-family types whose sub-items ride in `payload.items` (the multi-field
+ * redirect / internal-link / AEO diff arrays), NOT the typed `_item` columns (design §4.1).
+ * For these, `itemCount` must count `payload.items.length`, not `items[].length` (which is empty).
+ */
+const PAYLOAD_ITEMS_DELIVERABLE_TYPES: ReadonlySet<DeliverableType> = new Set<DeliverableType>([
+  'redirect',
+  'internal_link',
+  'aeo_change',
+]);
+
+/**
+ * Count the substantive sub-items of a unified deliverable for the inbox card's "View N →" affordance.
+ *
+ * Two storage shapes (design §4.1):
+ *  - approval/SEO/schema family → typed `_item` rows in `items[]`.
+ *  - client_action family (redirect/internal_link/aeo_change) → sub-items in `payload.items`
+ *    (the `_item` columns stay empty for this family), so `items[].length` would wrongly be 0
+ *    and fall back to 1. Count `payload.items.length` instead.
+ *
+ * Falls back to 1 (the deliverable is itself a single item, e.g. content_decay).
+ */
+function itemCountForDeliverable(d: ClientDeliverable): number {
+  if (PAYLOAD_ITEMS_DELIVERABLE_TYPES.has(d.type)) {
+    const payloadItems = (d.payload as Record<string, unknown>)?.items;
+    if (Array.isArray(payloadItems) && payloadItems.length > 0) return payloadItems.length;
+    return 1;
+  }
+  return d.items && d.items.length > 0 ? d.items.length : 1;
+}
+
+/**
  * Normalize a unified `ClientDeliverable` into a `NormalizedDecision` (design §5).
  *
  * `kind` is carried straight through from the deliverable; `isSingleAction` is DERIVED from
  * `kind === 'decision'` so the inline-vs-modal affordance is identical to the legacy path.
- * `itemCount` reflects child items when present (kind 'batch'), else 1. `sentAt` carries the
- * staleness clock so the inbox can show the send age.
+ * `itemCount` reflects the substantive sub-items: the typed `_item` rows for the approval/SEO/
+ * schema family, or `payload.items` for the client_action family (redirect/internal_link/aeo_change)
+ * whose sub-items ride in payload (design §4.1), else 1. `sentAt` carries the staleness clock so
+ * the inbox can show the send age. `items` + `payload` are carried through so R3 can render the
+ * per-item review/diff surface without a second fetch (additive — legacy adapters omit them).
  */
 export function normalizeDeliverable(d: ClientDeliverable): NormalizedDecision {
-  const itemCount = d.items && d.items.length > 0 ? d.items.length : 1;
   return {
     id: `cd-${d.id}`,
     source: 'deliverable',
@@ -153,11 +186,13 @@ export function normalizeDeliverable(d: ClientDeliverable): NormalizedDecision {
     title: d.title,
     summary: d.summary ?? '',
     priority: undefined,
-    itemCount,
+    itemCount: itemCountForDeliverable(d),
     kind: d.kind,
     isSingleAction: d.kind === 'decision',
     badge: deliverableTypeBadge(d.type),
     createdAt: d.createdAt,
     sentAt: d.sentAt,
+    items: d.items,
+    payload: d.payload,
   };
 }
