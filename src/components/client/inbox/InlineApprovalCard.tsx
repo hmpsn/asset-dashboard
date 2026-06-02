@@ -16,14 +16,35 @@ import { approveCtaLabel } from '../../../lib/decision-adapters';
 import type { NormalizedDecision, FlaggedItem } from '../../../../shared/types/decision';
 import type { ClientDeliverableItem } from '../../../../shared/types/client-deliverable';
 
+/** Item 2 — a per-item edited proposed value (seoTitle/seoDescription) forwarded on approve. */
+export interface EditedItem {
+  itemId: string;
+  value: string;
+}
+
 interface InlineApprovalCardProps {
   decision: NormalizedDecision; // normalizeDeliverable(d) — carries items/payload/badge/sentAt
   ageLabel: string | null;
   submitting: boolean;
-  onApprove: (flaggedItems: FlaggedItem[]) => void;
+  /**
+   * Approve. `flaggedItems` carries the per-item held subset; `editedItems` (item 2) carries the
+   * per-item edited proposed values (seoTitle/seoDescription). A client can edit AND approve.
+   */
+  onApprove: (flaggedItems: FlaggedItem[], editedItems: EditedItem[]) => void;
   onRequestChanges: (note: string) => void;
   onDecline: (note: string) => void;
+  /**
+   * Item 2 — when true (non-free tier), seoTitle/seoDescription rows show the inline "Edit" editor.
+   * Free tier never sees the editor (legacy free-tier gate parity). Defaults to false.
+   */
+  editable?: boolean;
 }
+
+/**
+ * Item 2 — the ONLY fields that are client-editable before approve (seoTitle / seoDescription).
+ * NEVER `schema` — the legacy ApprovalsTab hid Edit for schema (long JSON-LD is not hand-edited).
+ */
+const EDITABLE_FIELDS = new Set(['seoTitle', 'seoDescription']);
 
 /** Pull the human page label off an item's itemPayload (pageTitle ?? pageSlug ?? targetRef). */
 function itemPageLabel(item: ClientDeliverableItem): string {
@@ -48,10 +69,13 @@ export function InlineApprovalCard({
   onApprove,
   onRequestChanges,
   onDecline,
+  editable = false,
 }: InlineApprovalCardProps) {
   // Per-item flag/hold map (itemId → note) — mirrors DeliverableDetailModal's proven pattern. On
   // Approve we emit the held items as FlaggedItem[]; the unflagged items are implemented.
   const [flaggedItems, setFlaggedItems] = useState<Map<string, string>>(new Map());
+  // Item 2 — per-item edited proposed value (itemId → edited value). Orthogonal to flags.
+  const [editedItems, setEditedItems] = useState<Map<string, string>>(new Map());
   const [noteMode, setNoteMode] = useState<'none' | 'changes' | 'decline'>('none');
   const [note, setNote] = useState('');
 
@@ -65,6 +89,9 @@ export function InlineApprovalCard({
       return m;
     });
   }, []);
+  const editItem = useCallback((id: string, value: string) => {
+    setEditedItems((prev) => new Map(prev).set(id, value));
+  }, []);
 
   const items = decision.items ?? [];
   const totalItems = decision.itemCount;
@@ -75,7 +102,11 @@ export function InlineApprovalCard({
       itemId,
       note: n,
     }));
-    onApprove(flaggedList);
+    const editedList: EditedItem[] = Array.from(editedItems.entries()).map(([itemId, value]) => ({
+      itemId,
+      value,
+    }));
+    onApprove(flaggedList, editedList);
   };
 
   // Group items by page (single page → suppress the group sub-header, like ApprovalBatchCard).
@@ -139,6 +170,13 @@ export function InlineApprovalCard({
                 // Long JSON-LD schema values get a Show full/less toggle; everything else keeps the
                 // existing 2-line clamp (no-regression invariant for non-schema fields).
                 expandable={item.field === 'schema'}
+                // Item 2 — inline edit for seoTitle/seoDescription only, behind the non-free tier.
+                onEdit={
+                  editable && item.field && EDITABLE_FIELDS.has(item.field)
+                    ? (value) => editItem(item.id, value)
+                    : undefined
+                }
+                editedValue={editedItems.get(item.id)}
               />
             ))}
           </div>

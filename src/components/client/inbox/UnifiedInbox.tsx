@@ -295,6 +295,10 @@ function SectionHeading({ title, subtitle }: { title: string; subtitle: string }
  */
 export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: UnifiedInboxProps) {
   const queryClient = useQueryClient();
+  // Item 2 — edit-before-approve is gated to the non-free tier (legacy ApprovalsTab parity:
+  // edit/approve were behind `effectiveTier !== 'free'`). `effectiveTier` rides in the ContentTab
+  // pass-through props the inbox already receives.
+  const editable = contentTabProps.effectiveTier !== 'free';
   const { deliverables, isLoading, isError, refetch } = useUnifiedInbox(workspaceId);
   const respond = useRespondToDeliverable(workspaceId);
   const apply = useApplyDeliverable(workspaceId);
@@ -399,10 +403,12 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
     decision: 'approved' | 'changes_requested' | 'declined',
     note?: string,
     flaggedItems?: FlaggedItem[],
+    // Item 2 — the per-item edited proposed values (seoTitle/seoDescription) on an approve.
+    editedItems?: { itemId: string; value: string }[],
   ) => {
     setSubmittingId(d.id);
     try {
-      await respond.mutateAsync({ deliverableId: d.id, decision, note, flaggedItems });
+      await respond.mutateAsync({ deliverableId: d.id, decision, note, flaggedItems, editedItems });
       const heldCount = decision === 'approved' ? flaggedItems?.length ?? 0 : 0;
       setToast({
         message:
@@ -535,7 +541,8 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
                     decision={decision}
                     ageLabel={ageLabel(d.sentAt)}
                     submitting={submittingId === d.id}
-                    onApprove={(f) => void handleRespond(d, 'approved', undefined, f)}
+                    editable={editable}
+                    onApprove={(f, e) => void handleRespond(d, 'approved', undefined, f, e)}
                     onRequestChanges={(n) => void handleRespond(d, 'changes_requested', n || undefined)}
                     onDecline={(n) => void handleRespond(d, 'declined', n || undefined)}
                   />
@@ -652,8 +659,9 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
         <DeliverableDetailModal
           decision={normalizeDeliverable(detailDeliverable)}
           submitting={submittingId === detailDeliverable.id}
-          onApprove={(flaggedItems: FlaggedItem[]) =>
-            handleRespond(detailDeliverable, 'approved', undefined, flaggedItems)
+          editable={editable}
+          onApprove={(flaggedItems: FlaggedItem[], editedItems) =>
+            handleRespond(detailDeliverable, 'approved', undefined, flaggedItems, editedItems)
           }
           onRequestChanges={(note) =>
             handleRespond(detailDeliverable, 'changes_requested', note || undefined)

@@ -35,6 +35,13 @@ export const publicDeliverables = {
        * client_action.
        */
       flaggedItems?: { itemId: string; note?: string }[];
+      /**
+       * Item 2 — EDIT-before-approve (approval family only): the per-item edited proposed values
+       * (seoTitle/seoDescription) the client typed in the inline editor. The server persists each as
+       * the legacy approval item's `clientValue` (the Webflow apply path prefers it). Orthogonal to
+       * `flaggedItems`. Ignored on reject decisions / client_action.
+       */
+      editedItems?: { itemId: string; value: string }[];
     },
   ) =>
     patch<ClientDeliverable>(

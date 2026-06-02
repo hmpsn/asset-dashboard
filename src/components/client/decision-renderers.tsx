@@ -12,8 +12,8 @@
 //  - ApprovalItemRow    — legacy wrapper: maps a legacy ApprovalItem onto ItemDiffRow.
 //  - AeoRenderer / InternalLinkRenderer / RedirectRenderer — read-only diff renderers.
 import { useState } from 'react';
-import { Flag } from 'lucide-react';
-import { Button, FormInput, Icon } from '../ui';
+import { Flag, Pencil } from 'lucide-react';
+import { Button, FormInput, FormTextarea, Icon } from '../ui';
 import type { ApprovalItem } from '../../../shared/types/approvals';
 import type {
   AeoChangePayload,
@@ -49,6 +49,17 @@ export interface ItemDiffRowProps {
    * no-regression invariant.
    */
   expandable?: boolean;
+  /**
+   * Item 2 — EDIT-before-approve. When provided, the Proposed cell gains an "Edit" affordance that
+   * turns the proposed value into an editable input seeded with the current proposed value; on
+   * "Save edit" the new value is reported via `onEdit(value)` and the row shows the edited value.
+   * The caller (InlineApprovalCard / DeliverableDetailModal) gates this to `seoTitle` /
+   * `seoDescription` ONLY (never `schema` — legacy hid Edit for schema) and behind the non-free tier.
+   * `editedValue` is the currently-edited value (undefined → not edited → shows `proposedValue`).
+   * OPTIONAL: callers that pass neither prop see the EXACT prior read-only rendering (no-regression).
+   */
+  onEdit?: (value: string) => void;
+  editedValue?: string;
 }
 
 /**
@@ -67,10 +78,16 @@ export function ItemDiffRow({
   onUnflag,
   readOnly = false,
   expandable = false,
+  onEdit,
+  editedValue,
 }: ItemDiffRowProps) {
   const [flagging, setFlagging] = useState(false);
   const [note, setNote] = useState('');
   const [expanded, setExpanded] = useState(false);
+  // Item 2 — inline edit state for the Proposed value. `editing` toggles the input; `draft` holds the
+  // in-progress text seeded from the current edited/proposed value.
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
 
   // ISSUE 1b — when `expandable` and the value is expanded, swap the 2-line clamp for a scrollable
   // monospace block (matches legacy ApprovalBatchCard schema preview: 200px, font-mono). When not
@@ -79,6 +96,24 @@ export function ItemDiffRow({
     expandable && expanded
       ? 't-caption text-[var(--brand-text)] overflow-y-auto max-h-[200px] font-mono whitespace-pre-wrap'
       : 't-caption text-[var(--brand-text)] line-clamp-2';
+
+  // Item 2 — editing is offered only when the caller wires `onEdit` (gated to seoTitle/seoDescription
+  // + non-free tier by the caller) and the row is not in read-only (publish) mode.
+  const canEdit = !!onEdit && !readOnly;
+  // The value shown in the Proposed cell: the client's edited value if present, else the original.
+  const effectiveProposed = editedValue ?? proposedValue;
+  const isEdited = editedValue != null && editedValue !== proposedValue;
+  // seoDescription is multi-line; seoTitle is a single line — use a textarea for descriptions.
+  const isLongField = field === 'seoDescription';
+
+  const beginEdit = () => {
+    setDraft(effectiveProposed ?? '');
+    setEditing(true);
+  };
+  const saveEdit = () => {
+    onEdit?.(draft);
+    setEditing(false);
+  };
 
   return (
     <div
@@ -102,10 +137,69 @@ export function ItemDiffRow({
               </p>
             </div>
             <div>
-              <p className="t-caption-sm text-accent-brand mb-0.5">Proposed</p>
-              <p className={valueClass}>
-                {proposedValue || '—'}
-              </p>
+              <div className="flex items-center gap-2 mb-0.5">
+                <p className="t-caption-sm text-accent-brand">Proposed</p>
+                {isEdited && !editing && (
+                  <span className="t-caption-sm text-accent-info">· edited</span>
+                )}
+                {canEdit && !editing && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={beginEdit}
+                    className="ml-auto flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-accent-brand transition-colors px-1 py-0"
+                  >
+                    <Icon as={Pencil} size="xs" />
+                    Edit
+                  </Button>
+                )}
+              </div>
+              {canEdit && editing ? (
+                <div className="space-y-1.5">
+                  {isLongField ? (
+                    <FormTextarea
+                      value={draft}
+                      onChange={setDraft}
+                      rows={3}
+                      maxLength={5000}
+                      autoFocus
+                      aria-label={`Edit proposed ${field}`}
+                    />
+                  ) : (
+                    <FormInput
+                      type="text"
+                      value={draft}
+                      onChange={setDraft}
+                      maxLength={5000}
+                      autoFocus
+                      aria-label={`Edit proposed ${field}`}
+                      className="t-caption"
+                    />
+                  )}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={saveEdit}
+                      className="t-caption-sm font-medium text-accent-brand px-2 py-1 hover:bg-teal-500/10 rounded-[var(--radius-md)] transition-colors"
+                    >
+                      Save edit
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setEditing(false); setDraft(''); }}
+                      className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors px-1"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <p className={valueClass}>
+                  {effectiveProposed || '—'}
+                </p>
+              )}
             </div>
           </div>
           {expandable && (

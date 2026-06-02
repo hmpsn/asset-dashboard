@@ -148,7 +148,8 @@ describe('DeliverableDetailModal — approval family (seo_edit, typed items)', (
 
     fireEvent.click(screen.getByRole('button', { name: /implement 2 of 3/i }));
     await waitFor(() => {
-      expect(onApprove).toHaveBeenCalledWith([{ itemId: 'd1', note: '' }]);
+      // Item 2 — onApprove now carries (flaggedItems, editedItems); no edits here → empty edit list.
+      expect(onApprove).toHaveBeenCalledWith([{ itemId: 'd1', note: '' }], []);
     });
   });
 
@@ -156,7 +157,7 @@ describe('DeliverableDetailModal — approval family (seo_edit, typed items)', (
     const onApprove = vi.fn().mockResolvedValue(undefined);
     renderModal(seoDecision, onApprove);
     fireEvent.click(screen.getByRole('button', { name: /implement 3 →/i }));
-    await waitFor(() => expect(onApprove).toHaveBeenCalledWith([]));
+    await waitFor(() => expect(onApprove).toHaveBeenCalledWith([], []));
   });
 });
 

@@ -44,6 +44,13 @@ export interface RespondToDeliverableVars {
    * client_action family.
    */
   flaggedItems?: { itemId: string; note?: string }[];
+  /**
+   * Item 2 — EDIT-before-approve (approval family only): the per-item edited proposed values the
+   * client typed in the inline editor (seoTitle/seoDescription). Forwarded to /respond; the server
+   * persists each as the legacy approval item's `clientValue` (the Webflow apply path prefers it).
+   * Orthogonal to `flaggedItems`. Ignored on reject decisions / the client_action family.
+   */
+  editedItems?: { itemId: string; value: string }[];
 }
 
 /**
@@ -55,8 +62,8 @@ export interface RespondToDeliverableVars {
 export function useRespondToDeliverable(workspaceId: string) {
   const queryClient = useQueryClient();
   return useMutation<ClientDeliverable, Error, RespondToDeliverableVars>({
-    mutationFn: ({ deliverableId, decision, note, flaggedItems }) =>
-      publicDeliverables.respond(workspaceId, deliverableId, { decision, note, flaggedItems }),
+    mutationFn: ({ deliverableId, decision, note, flaggedItems, editedItems }) =>
+      publicDeliverables.respond(workspaceId, deliverableId, { decision, note, flaggedItems, editedItems }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.client.unifiedInbox(workspaceId) });
     },

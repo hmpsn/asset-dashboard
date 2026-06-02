@@ -56,6 +56,16 @@ const respondSchema = z
       .array(z.object({ itemId: z.string(), note: z.string().max(2000).optional() }))
       .max(500)
       .optional(),
+    // Item 2 — EDIT-before-approve (APPROVAL-FAMILY ONLY): the per-item edited proposed values the
+    // client typed in the inline editor (seoTitle / seoDescription only). Each carries the
+    // ClientDeliverableItem.id + the edited value. Persisted as the legacy approval item's
+    // `clientValue`, which the Webflow apply path already prefers (`item.clientValue || proposedValue`,
+    // approvals.ts). Orthogonal to flaggedItems — a client can edit AND approve the same item.
+    // Bounded; ignored on reject decisions and by the client_action family (no typed items).
+    editedItems: z
+      .array(z.object({ itemId: z.string(), value: z.string().max(5000) }))
+      .max(500)
+      .optional(),
   })
   .strict();
 

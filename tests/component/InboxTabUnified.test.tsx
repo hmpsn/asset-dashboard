@@ -691,6 +691,60 @@ describe('InboxTab unified-inbox flag gating', () => {
     );
   });
 
+  // ── Item 2 — edit-before-approve free-tier gate (the unified inbox reads effectiveTier) ──
+
+  const seoEditDeliverable = () =>
+    makeDeliverable({
+      id: 'cd_seo',
+      type: 'seo_edit',
+      kind: 'batch',
+      status: 'awaiting_client',
+      title: 'SEO title updates',
+      summary: '1 change ready for your approval',
+      items: [
+        makeApplyableItem({ id: 'i1', field: 'seoTitle', proposedValue: 'New title A', itemPayload: { pageTitle: 'Home', pageSlug: '/home' } }),
+      ],
+    });
+
+  it('flag ON + GROWTH tier → seoTitle row shows Edit; the edit flows into the respond editedItems', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseUnifiedInbox.mockReturnValue({
+      unifiedInbox: true,
+      deliverables: [seoEditDeliverable()],
+      isLoading: false,
+    });
+
+    render(<InboxTab {...baseProps} effectiveTier="growth" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    const input = screen.getByLabelText('Edit proposed seoTitle');
+    fireEvent.change(input, { target: { value: 'Client-fixed title' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save edit' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Looks good — implement 1 →' }));
+    expect(mockMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        deliverableId: 'cd_seo',
+        decision: 'approved',
+        editedItems: [{ itemId: 'i1', value: 'Client-fixed title' }],
+      }),
+    );
+  });
+
+  it('flag ON + FREE tier → the seoTitle row shows NO Edit affordance (legacy free-tier gate)', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseUnifiedInbox.mockReturnValue({
+      unifiedInbox: true,
+      deliverables: [seoEditDeliverable()],
+      isLoading: false,
+    });
+
+    render(<InboxTab {...baseProps} effectiveTier="free" />);
+    // The substance still renders, but the inline edit affordance is gated off for free tier.
+    expect(screen.getByText('New title A')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+  });
+
   it('flag ON → client_action batch with EMPTY items keeps the DecisionCard write verbs (not InlineApprovalCard)', () => {
     mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
     mockUseUnifiedInbox.mockReturnValue({
