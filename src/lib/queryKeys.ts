@@ -178,6 +178,9 @@ export const queryKeys = {
       ['admin-intelligence', wsId, pagePath ?? '', learningsDomain ?? 'all', ...(slices ? [...slices].sort() : [])] as const,
     intelligenceAll: (wsId: string) => ['admin-intelligence', wsId] as const,
     clientSignals: (wsId: string) => ['admin-client-signals', wsId] as const,
+    // OV (Opportunity Value) divergence shadow-log — admin-only diagnostic.
+    // GET /api/ov-divergence/:workspaceId
+    ovDivergence: (wsId: string) => ['admin-ov-divergence', wsId] as const,
     notifications: () => ['admin-notifications'] as const,
     featureFlags: () => ['admin-feature-flags'] as const,
     roadmap: () => ['admin-roadmap'] as const,

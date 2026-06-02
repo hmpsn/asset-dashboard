@@ -26,6 +26,7 @@ export { useActionQueue } from './useActionQueue';
 export { useClientSignals, useUpdateSignalStatus, useCreateClientSignal } from './useClientSignals';
 export { useNotifications, type NotificationItem } from './useNotifications';
 export { useAdminMeetingBrief } from './useAdminMeetingBrief';
+export { useOvDivergence } from './useOvDivergence';
 export { useLocalSeo, useLocalSeoLocationLookup, useLocalSeoRefresh, useLocalSeoUpdate, useSetPrimaryMarket } from './useLocalSeo';
 export { useLocalSeoLocations, useCreateLocation, useUpdateLocation, useDeleteLocation } from './useLocalSeoLocations';
 export { useEeatAssets, useCreateEeatAsset, useUpdateEeatAsset, useDeleteEeatAsset } from './useEeatAssets';
