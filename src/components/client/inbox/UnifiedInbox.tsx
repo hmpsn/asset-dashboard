@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Inbox, FileText, ListChecks, MessageSquare, UploadCloud } from 'lucide-react';
+import { Inbox, FileText, ListChecks, MessageSquare, UploadCloud, Clock, Loader2, CheckCircle2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { LoadingState, Button, ConfirmDialog } from '../../ui';
 import { PriorityStrip, type PriorityItem } from '../PriorityStrip';
@@ -60,6 +60,57 @@ function ageLabel(sentAt: string | null | undefined): string | null {
   if (days <= 0) return 'Sent today';
   if (days === 1) return 'Sent 1 day ago';
   return `Sent ${days} days ago`;
+}
+
+/**
+ * R5 — Work-order TRACK-lane status chip tokens (the canonical ORDER lifecycle). Mirrors the legacy
+ * `OrderStatus.tsx` STATUS_BADGE colors, mapped to the Four Laws:
+ *   ordered     → amber   (warning hue — a paid, not-yet-started order is waiting)
+ *   in_progress → blue    (data hue — read-only progress, never an action; spinner)
+ *   completed   → emerald (success hue — fulfilled)
+ * NEVER teal here — teal is reserved for actions, and the track lane has NO action.
+ */
+const ORDER_STATUS_CHIP: Record<'ordered' | 'in_progress' | 'completed', { label: string; icon: LucideIcon; color: string; bg: string; border: string; spin?: boolean }> = {
+  ordered:     { label: 'Ordered',     icon: Clock,        color: 'text-accent-warning', bg: 'bg-amber-500/10',   border: 'border-amber-500/20' },
+  in_progress: { label: 'In Progress', icon: Loader2,      color: 'text-accent-info',    bg: 'bg-blue-500/10',    border: 'border-blue-500/20', spin: true },
+  completed:   { label: 'Completed',   icon: CheckCircle2, color: 'text-accent-success', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+};
+
+/** The canonical ORDER-lifecycle steps the track stepper walks (NOT the legacy `pending`). */
+const ORDER_TRACK_STEPS = ['ordered', 'in_progress', 'completed'] as const;
+const ORDER_TRACK_STEP_LABELS: Record<(typeof ORDER_TRACK_STEPS)[number], string> = {
+  ordered: 'Ordered',
+  in_progress: 'In Progress',
+  completed: 'Completed',
+};
+
+/**
+ * OrderTrackStepper — read-only 3-step progress over the canonical ORDER lifecycle. Mirrors the
+ * legacy `OrderStatus.tsx` StatusStepper, but over `['ordered','in_progress','completed']` (the
+ * legacy uses `'pending'`). The completed-step dots/connectors use teal to mark completed PROGRESS
+ * (a data affordance, consistent with OrderStatus) — this is not an action surface.
+ */
+function OrderTrackStepper({ status }: { status: 'ordered' | 'in_progress' | 'completed' }) {
+  const currentIdx = ORDER_TRACK_STEPS.indexOf(status);
+  return (
+    <div className="flex items-center gap-1 mt-2">
+      {ORDER_TRACK_STEPS.map((step, i) => {
+        const isActive = i <= currentIdx;
+        const isCurrent = i === currentIdx;
+        return (
+          <div key={step} className="flex items-center gap-1">
+            <div className={`flex items-center gap-1 ${isCurrent ? 'opacity-100' : isActive ? 'opacity-70' : 'opacity-30'}`}>
+              <div className={`w-2 h-2 rounded-[var(--radius-pill)] ${isActive ? 'bg-teal-400' : 'bg-[var(--brand-border)]'}`} />
+              <span className={`t-micro ${isActive ? 'text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)]'}`}>{ORDER_TRACK_STEP_LABELS[step]}</span>
+            </div>
+            {i < ORDER_TRACK_STEPS.length - 1 && (
+              <div className={`w-4 h-px ${i < currentIdx ? 'bg-teal-400' : 'bg-[var(--brand-border)]'}`} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 /**
@@ -137,6 +188,13 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
     () => deliverables.filter((d) => d.status === 'approved' && isClientApplyableDeliverableBatch(d.items ?? [])),
     [deliverables],
   );
+
+  // R5 — work-order TRACK lane: `kind:'order'` rows the client FOLLOWS (no decision). The server read
+  // (unified-inbox-read.ts) admits these in `ordered`/`in_progress`/`completed` ONLY for kind:'order'
+  // (cancelled excluded). They never enter `actionable` (ACTIONABLE_STATUSES has no order status), so
+  // they never reach the PriorityStrip — they render in a dedicated read-only "Work in progress"
+  // section below with ZERO verbs (structural verb-safety: there is no verb to wire).
+  const workOrders = useMemo(() => deliverables.filter((d) => d.kind === 'order'), [deliverables]);
 
   // The deliverable open in the detail modal, resolved from the full client-facing `deliverables`
   // list (so approved/ready-to-publish items render too, not just actionable ones) and kept in sync
@@ -287,7 +345,10 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
         </section>
       )}
 
-      {actionable.length === 0 && (
+      {/* Orders-only empty state (R5 fix): the "nothing needs your attention" line must NOT show when
+          there are work orders to TRACK — the track lane below is content, even though it's not
+          actionable. Guard on BOTH the actionable queue and the order track lane being empty. */}
+      {actionable.length === 0 && workOrders.length === 0 && (
         <div className="flex items-center gap-3 px-4 py-3 t-caption text-[var(--brand-text-muted)]">
           <Inbox size={16} className="flex-shrink-0" />
           <span>Nothing needs your attention right now. New items will appear here.</span>
@@ -337,6 +398,63 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
               </div>
             </div>
           ))}
+        </section>
+      )}
+
+      {/* R5 — "Work in progress": the read-only work-order TRACK lane. Work the agency does FOR the
+          client (paid fix/schema orders), surfaced as STATUS they FOLLOW — there is NO approve/decline/
+          apply/review verb (a work order is not a decision). Each card is PLAIN markup: it does NOT
+          call normalizeDeliverable, does NOT construct a DecisionCard, and wires ZERO mutations
+          (structural verb-safety). Page targets are shown count-only — the raw payload.pageIds are raw
+          Webflow ids and are never surfaced to the client (CLAUDE.md "never surface raw IDs"). Mirrors
+          the R3b "Ready to publish" container (surface-2 + brand signature radius). */}
+      {workOrders.length > 0 && (
+        <section aria-label="Work in progress" className="space-y-3">
+          <h3 className="t-label text-[var(--brand-text-muted)] uppercase tracking-wide">
+            Work in progress
+          </h3>
+          {workOrders.map((d) => {
+            // Order rows only ever reach here in the three canonical track statuses (the server admits
+            // ONLY ordered/in_progress/completed for kind:'order'); fall back to `ordered` defensively.
+            const orderStatus = (d.status === 'in_progress' || d.status === 'completed') ? d.status : 'ordered';
+            const chip = ORDER_STATUS_CHIP[orderStatus];
+            const ChipIcon = chip.icon;
+            const age = ageLabel(d.sentAt);
+            // Count-only page summary — NEVER render raw payload.pageIds (raw Webflow ids).
+            const rawPageIds = (d.payload as { pageIds?: unknown }).pageIds;
+            const pageCount = Array.isArray(rawPageIds) ? rawPageIds.length : 0;
+            return (
+              <div
+                key={d.id}
+                // pr-check-disable-next-line -- brand signature radius intentional; mirrors DecisionCard visual identity
+                className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden p-4"
+                style={{ borderRadius: 'var(--radius-signature-lg)' }}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span
+                    className={`inline-flex items-center gap-1.5 t-caption-sm font-medium px-2 py-0.5 rounded-[var(--radius-pill)] border ${chip.bg} ${chip.border} ${chip.color}`}
+                  >
+                    <ChipIcon className={`w-3 h-3 ${chip.spin ? 'animate-spin' : ''}`} />
+                    {chip.label}
+                  </span>
+                </div>
+                {/* duplicate-heading-ok -- distinct section: the work-order TRACK-lane card title mirrors the "Ready to publish" card title intentionally (two separate sections, same card grammar) */}
+                <h4 className="t-body font-semibold text-[var(--brand-text-bright)]">{d.title}</h4>
+                {d.summary && (
+                  <p className="t-caption text-[var(--brand-text-muted)] mt-0.5 line-clamp-2">{d.summary}</p>
+                )}
+                {/* Skip the stepper for `completed` — there is no progress left to show. */}
+                {orderStatus !== 'completed' && <OrderTrackStepper status={orderStatus} />}
+                <div className="flex items-center gap-2 mt-2 flex-wrap t-caption-sm text-[var(--brand-text-muted)]">
+                  {pageCount > 0 && (
+                    <span>{pageCount} page{pageCount !== 1 ? 's' : ''}</span>
+                  )}
+                  {pageCount > 0 && age && <span aria-hidden="true">·</span>}
+                  {age && <span>{age}</span>}
+                </div>
+              </div>
+            );
+          })}
         </section>
       )}
 
