@@ -23,6 +23,7 @@
  * Leaf rule: imports the approvals store + email + broadcast + activity; it is NOT imported
  * back by any of them (no circular value-import).
  */
+import db from '../../db/index.js';
 import { getBatch, updateItem } from '../../approvals.js';
 import { addActivity } from '../../activity-log.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
@@ -83,13 +84,18 @@ export function respondToApprovalBatch(
   const pendingItems = batch.items.filter(i => i.status === 'pending');
 
   let updatedBatch = batch;
-  for (const item of pendingItems) {
-    const result = updateItem(workspaceId, batchId, item.id, {
-      status: itemStatus,
-      ...(note ? { clientNote: note } : {}),
-    });
-    if (result) updatedBatch = result;
-  }
+  // Atomic: all per-item moves commit together, so a mid-loop failure (e.g. a concurrent
+  // request flipping an item) cannot leave the batch half-decided. Side-effects (activity,
+  // email, broadcast) fire AFTER, outside the transaction.
+  db.transaction(() => {
+    for (const item of pendingItems) {
+      const result = updateItem(workspaceId, batchId, item.id, {
+        status: itemStatus,
+        ...(note ? { clientNote: note } : {}),
+      });
+      if (result) updatedBatch = result;
+    }
+  })();
 
   const ws = getWorkspace(workspaceId);
   const actorName = opts.actor?.name || 'Client';

@@ -256,11 +256,10 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/approve', requireClien
 
   let result: ReturnType<typeof respondToApprovalBatch>;
   try {
-    // No db.transaction() wrapper: the service drives the per-item updateItem writes (each
-    // persists independently — there is no cross-item atomicity invariant) and then fires the
-    // team email + broadcast + activity. Wrapping those non-DB side-effects in a transaction
-    // would couple them to a rollback; the R2 unified respond path calls the same service
-    // without a transaction, so this keeps both callers identical.
+    // Delegates to the shared respondToApprovalBatch service (R2) so this route and the
+    // unified-inbox respond path drive identical source writes. The service wraps its
+    // per-item updateItem writes in a db.transaction() (atomic batch decision) and fires
+    // the team email + broadcast + activity AFTER, outside the transaction.
     result = respondToApprovalBatch(workspaceId, batchId, 'approved', {
       note: clientNote ?? null,
       actor: getClientActor(req, workspaceId),
