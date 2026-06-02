@@ -10,7 +10,14 @@
  * The list is filtered to CLIENT-FACING statuses (what the client is actually being asked to look
  * at): the active queue (`awaiting_client`, `changes_requested`, `partial`) plus recently-decided
  * items (`approved`, `declined`) so the inbox can show "just approved" context. Internal lifecycle
- * states (`draft`, `applied`, `expired`, `cancelled`, the order/production internals) are excluded.
+ * states (`draft`, `applied`, `expired`, `cancelled`) are excluded.
+ *
+ * KIND-AWARE TRACK LANE (R5): `kind:'order'` rows (work orders) are the exception — they are
+ * surfaced to the client as a READ-ONLY TRACK lane in the order-lifecycle statuses
+ * `ordered | in_progress | completed`. The client FOLLOWS order progress; they do NOT decide on it
+ * (no approve/decline verbs). `cancelled` orders stay excluded. These order-lifecycle statuses are
+ * admitted ONLY for `kind:'order'` (see `CLIENT_FACING_ORDER_STATUSES` + `isClientFacingDeliverable`),
+ * so no other type leaks `ordered`/`in_progress`/`completed` into the client list.
  *
  * This is a PURE read: it writes nothing. The `client_deliverable` table is empty until the
  * per-type send-path cutover flips (Phase 1), so in production this returns only the projected
@@ -38,8 +45,9 @@ const log = createLogger('unified-inbox-read');
 
 /**
  * Statuses the client is actively being shown in the unified inbox. The active queue plus
- * recently-decided context. (`draft`/`applied`/`expired`/`cancelled` and the order/production
- * internals are NOT client-facing inbox items.)
+ * recently-decided context. (`draft`/`applied`/`expired`/`cancelled` are NOT client-facing inbox
+ * items.) Order-lifecycle statuses (`ordered`/`in_progress`/`completed`) are NOT in this set — they
+ * are admitted separately and ONLY for `kind:'order'` via `CLIENT_FACING_ORDER_STATUSES` (R5).
  */
 const CLIENT_FACING_STATUSES: ReadonlySet<DeliverableStatus> = new Set<DeliverableStatus>([
   'awaiting_client',
@@ -49,8 +57,24 @@ const CLIENT_FACING_STATUSES: ReadonlySet<DeliverableStatus> = new Set<Deliverab
   'declined',
 ]);
 
+/** Order-lifecycle statuses surfaced to the client as a READ-ONLY TRACK lane (R5, kind:'order' only).
+ *  The client follows order progress; they do NOT decide on it. `cancelled` stays excluded. These are
+ *  admitted ONLY for kind:'order' so no other type leaks ordered/in_progress/completed into the list. */
+const CLIENT_FACING_ORDER_STATUSES: ReadonlySet<DeliverableStatus> = new Set<DeliverableStatus>(['ordered', 'in_progress', 'completed']);
+
 export function isClientFacingDeliverableStatus(status: DeliverableStatus): boolean {
   return CLIENT_FACING_STATUSES.has(status);
+}
+
+/**
+ * Kind-aware client-facing predicate (R5). `kind:'order'` rows ride the order-lifecycle track lane
+ * (`ordered`/`in_progress`/`completed`); every other kind uses the review/decision status set. Gating
+ * on `kind` (not `type`) keeps the order statuses scoped so no review/decision/batch row can leak an
+ * `ordered`/`in_progress`/`completed` status into the client list.
+ */
+function isClientFacingDeliverable(d: ClientDeliverable): boolean {
+  if (d.kind === 'order') return CLIENT_FACING_ORDER_STATUSES.has(d.status);
+  return isClientFacingDeliverableStatus(d.status);
 }
 
 /** Sort newest-sent first (the inbox shows the most recently sent at the top), id as a stable tiebreak. */
@@ -125,9 +149,7 @@ function assembleAllDeliverables(workspaceId: string): ClientDeliverable[] {
  * projected (copy/content_request), filtered to client-facing statuses, newest-sent first.
  */
 export function listClientFacingDeliverables(workspaceId: string): ClientDeliverable[] {
-  const all = assembleAllDeliverables(workspaceId).filter((d) =>
-    isClientFacingDeliverableStatus(d.status),
-  );
+  const all = assembleAllDeliverables(workspaceId).filter(isClientFacingDeliverable);
 
   log.debug(
     { workspaceId, clientFacing: all.length },
