@@ -1,15 +1,18 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Inbox, FileText, ListChecks, MessageSquare } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { LoadingState } from '../../ui';
 import { PriorityStrip, type PriorityItem } from '../PriorityStrip';
 import { DecisionCard } from '../DecisionCard';
-import { normalizeDeliverable } from '../../../lib/decision-adapters';
+import { useBetaMode } from '../BetaContext';
+import { normalizeDeliverable, isProjectedDeliverable } from '../../../lib/decision-adapters';
 import { useUnifiedInbox, useRespondToDeliverable } from '../../../hooks/client/useUnifiedInbox';
 import { useWorkspaceEvents } from '../../../hooks/useWorkspaceEvents';
 import { WS_EVENTS } from '../../../lib/wsEvents';
 import { queryKeys } from '../../../lib/queryKeys';
+import { clientPath } from '../../../routes';
 import type { ClientDeliverable, DeliverableKind } from '../../../../shared/types/client-deliverable';
 import type { NormalizedDecision } from '../../../../shared/types/decision';
 
@@ -61,9 +64,20 @@ function ageLabel(sentAt: string | null | undefined): string | null {
  */
 export function UnifiedInbox({ workspaceId, setToast }: UnifiedInboxProps) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const betaMode = useBetaMode();
   const { deliverables, isLoading } = useUnifiedInbox(workspaceId);
   const respond = useRespondToDeliverable(workspaceId);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
+
+  // PROJECTED deliverables (copy_section / content_request) have no physical row and 404 on the
+  // uniform /respond verbs — copy is reviewed in Inbox > Reviews (ClientCopyReview) and briefs/posts
+  // in Inbox > Reviews (ContentTab). For those we deep-link to ?tab=reviews (the ?tab= two-halves
+  // contract — InboxTab reads the param) instead of rendering dead Approve/Decline buttons.
+  // TODO(cutover): once projected respond routes to the bespoke copy-pipeline/content-briefs
+  // handlers, the write verbs can be wired here too; for now this stays a read-only deep-link.
+  const goToReviews = () =>
+    navigate(`${clientPath(workspaceId, 'inbox', betaMode)}?tab=reviews`);
 
   // Two-halves broadcast contract (CLAUDE.md Data Flow #2): the server emits DELIVERABLE_*
   // on every send/response; this handler invalidates the unified inbox query so the list reflects
@@ -138,26 +152,33 @@ export function UnifiedInbox({ workspaceId, setToast }: UnifiedInboxProps) {
         <section aria-label="Needs your attention" className="space-y-3">
           {actionable.map((d) => {
             const decision: NormalizedDecision = normalizeDeliverable(d);
+            // Projected (copy_section / content_request): render a read-only "Review →" deep-link
+            // instead of the uniform write verbs (which /respond → PK lookup → 404 for a projected
+            // id). The card still shows title/summary/age.
+            const projected = isProjectedDeliverable(d.type);
             return (
               <div key={d.id} id={`unified-decision-${d.id}`}>
                 <DecisionCard
                   decision={decision}
                   uniformVerbs
                   ageLabel={ageLabel(d.sentAt)}
+                  onReview={projected ? goToReviews : undefined}
                   onOpen={() => {
                     const el = document.getElementById(`unified-decision-${d.id}`);
                     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                   }}
                   onApprove={
-                    submittingId === d.id ? undefined : () => void handleRespond(d, 'approved')
+                    projected || submittingId === d.id
+                      ? undefined
+                      : () => void handleRespond(d, 'approved')
                   }
                   onFlagWithNote={
-                    submittingId === d.id
+                    projected || submittingId === d.id
                       ? undefined
                       : (note) => void handleRespond(d, 'changes_requested', note || undefined)
                   }
                   onDecline={
-                    submittingId === d.id
+                    projected || submittingId === d.id
                       ? undefined
                       : (note) => void handleRespond(d, 'declined', note || undefined)
                   }

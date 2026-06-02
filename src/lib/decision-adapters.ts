@@ -119,6 +119,24 @@ export function deliverableTypeBadge(type: DeliverableType | string): string {
 }
 
 /**
+ * The PROJECTED (D-hybrid) deliverable types — `copy_section` and `content_request` — have NO
+ * physical `client_deliverable` row; their ids are `copy:<entryId>` / `content_request:<id>` and
+ * they are projected at read time from their source tables (design §13-D1). They are responded to
+ * via their own bespoke routes (copy-pipeline / content-briefs), NOT the unified `/respond`
+ * endpoint (which does a PK lookup on the physical table and 404s for a projected id). The unified
+ * inbox uses this predicate to render a read-only "Review →" deep-link for projected items instead
+ * of wiring the uniform Approve / Request-changes / Decline verbs to `/respond`.
+ */
+const PROJECTED_DELIVERABLE_TYPES: ReadonlySet<DeliverableType> = new Set<DeliverableType>([
+  'copy_section',
+  'content_request',
+]);
+
+export function isProjectedDeliverable(type: DeliverableType | string): boolean {
+  return PROJECTED_DELIVERABLE_TYPES.has(type as DeliverableType);
+}
+
+/**
  * Normalize a unified `ClientDeliverable` into a `NormalizedDecision` (design §5).
  *
  * `kind` is carried straight through from the deliverable; `isSingleAction` is DERIVED from

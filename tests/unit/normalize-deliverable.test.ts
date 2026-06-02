@@ -9,6 +9,7 @@ import {
   normalizeClientAction,
   normalizeApprovalBatch,
   deliverableTypeBadge,
+  isProjectedDeliverable,
 } from '../../src/lib/decision-adapters.js';
 import type { ClientDeliverable } from '../../shared/types/client-deliverable.js';
 import type { ClientAction } from '../../shared/types/client-actions.js';
@@ -107,6 +108,25 @@ describe('normalizeDeliverable', () => {
 describe('deliverableTypeBadge', () => {
   it('falls back to a generic label for an unknown type', () => {
     expect(deliverableTypeBadge('totally_unknown')).toBe('Update');
+  });
+});
+
+describe('isProjectedDeliverable (projected vs physical tagging)', () => {
+  it('tags copy_section and content_request as projected (no physical row → /respond would 404)', () => {
+    expect(isProjectedDeliverable('copy_section')).toBe(true);
+    expect(isProjectedDeliverable('content_request')).toBe(true);
+  });
+
+  it('tags physical types (redirect, seo_edit, schema_plan, work_order, …) as NOT projected', () => {
+    expect(isProjectedDeliverable('redirect')).toBe(false);
+    expect(isProjectedDeliverable('seo_edit')).toBe(false);
+    expect(isProjectedDeliverable('schema_plan')).toBe(false);
+    expect(isProjectedDeliverable('work_order')).toBe(false);
+    expect(isProjectedDeliverable('aeo_change')).toBe(false);
+  });
+
+  it('an unknown type is not projected (safe default)', () => {
+    expect(isProjectedDeliverable('totally_unknown')).toBe(false);
   });
 });
 

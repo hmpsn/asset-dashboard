@@ -23,6 +23,13 @@ interface DecisionCardProps {
   uniformVerbs?: boolean;
   /** Human send-age label (e.g. "Sent 3 days ago"), shown in uniform mode when provided. */
   ageLabel?: string | null;
+  /**
+   * Uniform mode (PR-2a unified inbox): for PROJECTED deliverables (copy_section /
+   * content_request) the write verbs would 404 (they have no physical row and are responded to via
+   * bespoke routes). When provided, render a single read-only "Review →" deep-link to the surface
+   * where the client actually acts on the item, INSTEAD of Approve / Request changes / Decline.
+   */
+  onReview?: () => void;
 }
 
 /**
@@ -37,7 +44,7 @@ interface DecisionCardProps {
  *    Decline rendered inline for EVERY card, with the send age. Calls the real respond endpoint.
  */
 export function DecisionCard({
-  decision, onOpen, onApprove, onFlagWithNote, onDecline, uniformVerbs = false, ageLabel,
+  decision, onOpen, onApprove, onFlagWithNote, onDecline, uniformVerbs = false, ageLabel, onReview,
 }: DecisionCardProps) {
   const [flagging, setFlagging] = useState(false);
   const [declining, setDeclining] = useState(false);
@@ -128,7 +135,13 @@ export function DecisionCard({
 
       {/* Actions */}
       <div className="flex items-center gap-2 mt-3 flex-wrap">
-        {uniformVerbs ? (
+        {uniformVerbs && onReview ? (
+          /* Projected deliverable (copy / content_request): read-only deep-link, NOT the write
+             verbs — those /respond on a PK lookup and 404 for a projected id (design §13-D1). */
+          <Button size="sm" variant="primary" onClick={onReview}>
+            Review →
+          </Button>
+        ) : uniformVerbs ? (
           uniformActions
         ) : decision.isSingleAction ? (
           /* Single-action mode (content_decay) — inline approve / flag */
