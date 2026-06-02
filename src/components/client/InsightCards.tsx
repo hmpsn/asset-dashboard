@@ -3,6 +3,7 @@ import { Icon } from '../ui/Icon';
 import { SectionCard } from '../ui/SectionCard';
 import { Skeleton } from '../ui/Skeleton';
 import { TierGate } from '../ui/TierGate';
+import { normalizePageUrl } from '../../lib/pathUtils';
 import type { AnalyticsInsight, QuickWinData, ContentDecayData, SiteHealthInsightData, CompetitorAlertData, EmergingKeywordData, FreshnessAlertData } from '../../../shared/types/analytics';
 
 interface InsightCardsProps {
@@ -237,8 +238,7 @@ export function SchemaOpportunitiesCard({
           </p>
           <ul className="space-y-1">
             {highTrafficPages.slice(0, 3).map(insight => {
-              let path: string;
-              try { path = new URL(insight.pageId || '').pathname; } catch { path = insight.pageId || 'page'; }
+              const path = insight.pageId ? normalizePageUrl(insight.pageId) : 'page';
               return (
                 <li key={insight.id} className="flex items-center justify-between text-[var(--brand-text)] t-caption">
                   <span className="truncate">{path}</span>
@@ -320,8 +320,7 @@ export function ContentHealthCard({
           </p>
           <ul className="space-y-1">
             {decayInsights.slice(0, 3).map((d, i) => {
-              let path: string;
-              try { path = new URL(d.pageId || '').pathname; } catch { path = d.pageId || 'page'; }
+              const path = d.pageId ? normalizePageUrl(d.pageId) : 'page';
               return (
                 <li key={i} className="flex items-center justify-between text-[var(--brand-text)] t-caption">
                   <span className="truncate">{path}</span>

@@ -11,6 +11,7 @@ import type {
   SearchOverview, PerformanceTrend, SearchComparison, SortKey,
 } from './types';
 import { capitalize } from '../../utils/strings';
+import { normalizePageUrl } from '../../lib/pathUtils';
 
 interface SearchInsights {
   lowHanging: { query: string; position: number; impressions: number; clicks: number; ctr: number }[];
@@ -222,8 +223,7 @@ export function SearchTab({
                 </tr>
               ))}
               {searchSubTab === 'pages' && sortedPages().map((p, i) => {
-                let pagePath: string;
-                try { pagePath = new URL(p.page).pathname; } catch { pagePath = p.page; }
+                const pagePath = normalizePageUrl(p.page);
                 return (
                   <tr key={i} className="border-b border-[var(--brand-border)]/50 hover:bg-[var(--surface-3)]/30">
                     <td className="py-2.5 px-4 text-[var(--brand-text)] font-medium max-w-xs truncate">{pagePath}</td>
