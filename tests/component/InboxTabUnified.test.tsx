@@ -147,6 +147,20 @@ function makeReadyToPublishDeliverable(): ClientDeliverable {
   });
 }
 
+/** A work-order (kind:'order') deliverable for the R5 read-only "Work in progress" track lane. */
+function makeWorkOrderDeliverable(overrides: Partial<ClientDeliverable> = {}): ClientDeliverable {
+  return makeDeliverable({
+    id: 'cd_order',
+    type: 'work_order',
+    kind: 'order',
+    status: 'in_progress',
+    title: 'Order: fix meta',
+    summary: 'Metadata optimization for your top pages',
+    payload: { family: 'work_order', workOrderStatus: 'in_progress', pageIds: ['pg-1', 'pg-2', 'pg-3'] },
+    ...overrides,
+  });
+}
+
 describe('InboxTab unified-inbox flag gating', () => {
   it('flag OFF → does NOT render the unified "Needs your attention" strip', () => {
     mockUseFeatureFlag.mockImplementation(() => false);
@@ -375,5 +389,123 @@ describe('InboxTab unified-inbox flag gating', () => {
     expect(screen.getByRole('button', { name: 'Request changes' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Decline' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Review →' })).not.toBeInTheDocument();
+  });
+
+  // ── R5 — work-order read-only TRACK lane ──
+
+  it('flag ON → work order renders the "Work in progress" track section (title/summary/chip/stepper)', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseUnifiedInbox.mockReturnValue({
+      unifiedInbox: true,
+      deliverables: [makeWorkOrderDeliverable()],
+      isLoading: false,
+    });
+
+    render(<InboxTab {...baseProps} />);
+
+    // The dedicated read-only track section + its content.
+    expect(screen.getByText('Work in progress')).toBeInTheDocument();
+    expect(screen.getByText('Order: fix meta')).toBeInTheDocument();
+    expect(screen.getByText('Metadata optimization for your top pages')).toBeInTheDocument();
+    // Count-only page summary (NOT raw payload.pageIds). The raw ids must never reach the DOM.
+    expect(screen.getByText('3 pages')).toBeInTheDocument();
+    expect(screen.queryByText('pg-1')).not.toBeInTheDocument();
+    // The status chip (in_progress) renders. The stepper labels include "In Progress" too — so the
+    // chip's "In Progress" appears multiple times; just assert it's present at least once.
+    expect(screen.getAllByText('In Progress').length).toBeGreaterThanOrEqual(1);
+    // Stepper steps (canonical ORDER lifecycle, not legacy 'pending').
+    expect(screen.getByText('Ordered')).toBeInTheDocument();
+    expect(screen.getByText('Completed')).toBeInTheDocument();
+  });
+
+  it('flag ON → track card wires ZERO verbs (no Approve/Request changes/Decline/Apply/Review) and never calls the mutations', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseUnifiedInbox.mockReturnValue({
+      unifiedInbox: true,
+      deliverables: [makeWorkOrderDeliverable()],
+      isLoading: false,
+    });
+
+    render(<InboxTab {...baseProps} />);
+
+    // Core requirement: the track card has NO decision/apply verbs (structural verb-safety).
+    expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Request changes' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Decline' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Apply to Website' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Review →' })).not.toBeInTheDocument();
+
+    // No interaction with the track card can reach the respond/apply mutations — there is no control
+    // to click, so neither mutation is ever invoked.
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+    expect(mockApplyMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('flag ON → a work order does NOT appear in the PriorityStrip "Needs your attention" list', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseUnifiedInbox.mockReturnValue({
+      unifiedInbox: true,
+      deliverables: [makeWorkOrderDeliverable()],
+      isLoading: false,
+    });
+
+    render(<InboxTab {...baseProps} />);
+
+    // Order rows never enter `actionable` → the strip shows the all-caught-up state, not the order.
+    expect(screen.getByText("You're all caught up")).toBeInTheDocument();
+    expect(screen.queryByText('Needs your attention')).not.toBeInTheDocument();
+    // The order's title does NOT render as a PriorityStrip CTA item (no "Review Order: fix meta" CTA).
+    expect(screen.queryByRole('button', { name: 'Review Order: fix meta' })).not.toBeInTheDocument();
+  });
+
+  it('flag ON → a COMPLETED order renders the chip but NOT the stepper', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseUnifiedInbox.mockReturnValue({
+      unifiedInbox: true,
+      deliverables: [makeWorkOrderDeliverable({ id: 'cd_order_done', status: 'completed', title: 'Order: schema (done)' })],
+      isLoading: false,
+    });
+
+    render(<InboxTab {...baseProps} />);
+
+    expect(screen.getByText('Work in progress')).toBeInTheDocument();
+    expect(screen.getByText('Order: schema (done)')).toBeInTheDocument();
+    // The "Completed" chip is present...
+    expect(screen.getAllByText('Completed').length).toBeGreaterThanOrEqual(1);
+    // ...but the stepper is skipped for completed, so the stepper's "Ordered" / "In Progress" step
+    // labels are absent (those only render inside OrderTrackStepper).
+    expect(screen.queryByText('Ordered')).not.toBeInTheDocument();
+    expect(screen.queryByText('In Progress')).not.toBeInTheDocument();
+  });
+
+  it('flag ON → orders-only (no actionable) → the "Nothing needs your attention" message does NOT render', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseUnifiedInbox.mockReturnValue({
+      unifiedInbox: true,
+      deliverables: [makeWorkOrderDeliverable()],
+      isLoading: false,
+    });
+
+    render(<InboxTab {...baseProps} />);
+
+    // The track lane is content even though it is not actionable — the empty-state line is suppressed.
+    expect(
+      screen.queryByText('Nothing needs your attention right now. New items will appear here.'),
+    ).not.toBeInTheDocument();
+    // The track section is what renders instead.
+    expect(screen.getByText('Work in progress')).toBeInTheDocument();
+  });
+
+  it('flag OFF → the unified "Work in progress" track section does NOT render', () => {
+    mockUseFeatureFlag.mockImplementation(() => false);
+    // Even if the hook were to return an order, the flag-off path renders the legacy layout.
+    mockUseUnifiedInbox.mockReturnValue({
+      unifiedInbox: false,
+      deliverables: [makeWorkOrderDeliverable()],
+      isLoading: false,
+    });
+
+    render(<InboxTab {...baseProps} />);
+    expect(screen.queryByText('Work in progress')).not.toBeInTheDocument();
   });
 });
