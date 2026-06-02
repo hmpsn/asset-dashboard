@@ -95,10 +95,12 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
   // R4 — the PROJECTED respond paths go through the bespoke copy-pipeline / content-request / posts
   // routes, which broadcast COPY_SECTION_UPDATED / CONTENT_REQUEST_UPDATE / POST_UPDATED (NOT
   // DELIVERABLE_*). Without listening on those, an in-shell respond would leave the projected card
-  // in the list and the modal open. We invalidate the unified-inbox query on all three so the card
-  // leaves the list and the modal auto-closes (the modal mount is gated on `reviewProjected`, which
-  // refers to a card that is re-derived from the refetched list). These events are already
-  // broadcast + handled elsewhere (tests/integration/broadcast-handler-pairs.test.ts stays green).
+  // stuck in the list. We invalidate the unified-inbox query on all three so the card leaves the
+  // list once the bespoke respond lands. NOTE: this does NOT auto-close the ProjectedReviewModal —
+  // its mount is gated on the independent `reviewProjected` state (not derived from the list, unlike
+  // `detailDeliverable`), so the modal stays open showing the self-updated bespoke surface until the
+  // client dismisses it (close / Escape / backdrop). These events are already broadcast + handled
+  // elsewhere (tests/integration/broadcast-handler-pairs.test.ts stays green).
   const wsHandlers = useMemo(
     () => {
       const invalidateInbox = () =>
