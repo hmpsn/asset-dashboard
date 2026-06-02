@@ -6,11 +6,11 @@ import { capitalize } from '../utils/strings';
 import {
   Loader2, FileText, PenLine, Clock, CheckCircle2, Eye, Send,
   Trash2, Download, Search, ArrowUpDown, Filter,
-  Sparkles, X, Globe, Check, AlertTriangle,
+  Sparkles, X, Globe, Check, AlertTriangle, UserCheck,
 } from 'lucide-react';
 import { PostEditor } from './PostEditor';
 import { contentPosts } from '../api/content';
-import { useAdminPostsList, usePublishTarget } from '../hooks/admin';
+import { useAdminPostsList, usePublishTarget, useSendPostToClient } from '../hooks/admin';
 import { queryKeys } from '../lib/queryKeys';
 
 interface PostSummary {
@@ -54,6 +54,8 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
   const [sortAsc, setSortAsc] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [sendToClientPost, setSendToClientPost] = useState<string | null>(null);
+  const [sendNote, setSendNote] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [publishingPost, setPublishingPost] = useState<string | null>(null);
   const [scoringVoice, setScoringVoice] = useState<string | null>(null);
@@ -77,6 +79,18 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
       invalidatePosts();
     } catch (err) { console.error('ContentManager operation failed:', err); }
     setUpdatingStatus(null);
+  };
+
+  // Send to client (POST-C1) — the SEPARATE client-facing action (distinct from the internal
+  // "Review" status bump). Single "Send to client" button + optional inline note per the Admin
+  // Send Convention. On success the post becomes a post_review content_request in the client inbox.
+  const sendPostToClient = useSendPostToClient(workspaceId);
+  const confirmSendToClient = (postId: string) => {
+    const note = sendNote.trim();
+    sendPostToClient.mutate(
+      { postId, note: note || undefined },
+      { onSuccess: () => { setSendToClientPost(null); setSendNote(''); } },
+    );
   };
 
   const deletePost = async (postId: string) => {
@@ -366,6 +380,22 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                       </div>
                     )}
 
+                    {/* Send to client (POST-C1) — separate client-facing action. Teal CTA + optional
+                        inline note (Admin Send Convention). Distinct from the internal Review button. */}
+                    {!isGenerating && sendToClientPost !== post.id && (
+                      <Button
+                        onClick={() => { setSendToClientPost(post.id); setSendNote(''); }}
+                        disabled={sendPostToClient.isPending}
+                        icon={UserCheck}
+                        variant="primary"
+                        size="sm"
+                        className="t-caption-sm px-2 py-1 font-medium"
+                        title="Send this post to the client for review"
+                      >
+                        Send to client
+                      </Button>
+                    )}
+
                     {/* Publish to Webflow */}
                     {hasPublishTarget && !isGenerating && (post.status === 'approved' || post.status === 'review') && (
                       post.publishedAt ? (
@@ -433,6 +463,44 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                   </div>
                 </div>
               </div>
+
+              {/* Send to client — inline optional note (Admin Send Convention: one button + optional note) */}
+              {sendToClientPost === post.id && (
+                <div className="px-4 pb-3 border-t border-[var(--brand-border)]/50">
+                  <div className="mt-2 mb-2 t-caption-sm text-[var(--brand-text-muted)]">
+                    Send <span className="text-[var(--brand-text-bright)] font-medium">"{post.title}"</span> to the client for review. Add an optional note:
+                  </div>
+                  <FormInput
+                    value={sendNote}
+                    onChange={(value) => setSendNote(value)}
+                    placeholder="Optional note for the client…"
+                    maxLength={5000}
+                    aria-label="Optional note for the client"
+                  />
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
+                    <Button
+                      onClick={() => confirmSendToClient(post.id)}
+                      disabled={sendPostToClient.isPending}
+                      loading={sendPostToClient.isPending}
+                      icon={UserCheck}
+                      variant="primary"
+                      size="sm"
+                      className="t-caption-sm px-3 py-1 font-medium"
+                    >
+                      Send to client
+                    </Button>
+                    <Button
+                      onClick={() => { setSendToClientPost(null); setSendNote(''); }}
+                      disabled={sendPostToClient.isPending}
+                      variant="ghost"
+                      size="sm"
+                      className="t-caption-sm px-2 py-1 rounded-[var(--radius-md)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               {/* Expandable voice feedback */}
               {expandedVoice === post.id && post.voiceFeedback && (

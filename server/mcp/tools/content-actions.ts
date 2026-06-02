@@ -41,6 +41,7 @@ import {
   updatePostField,
 } from '../../content-posts-db.js';
 import { countHtmlWords } from '../../content-posts-ai.js';
+import { sendPostToClientForReview, PostNotFoundError } from '../../domains/content/send-post-to-client.js';
 import { invalidateContentPipelineIntelligence } from '../../intelligence-freshness.js';
 import { buildContentGenerationContext } from '../../intelligence/generation-context-builders.js';
 import { createLogger } from '../../logger.js';
@@ -885,29 +886,6 @@ function ensureBriefRequest(workspaceId: string, brief: ContentBrief, note: stri
   return request.id;
 }
 
-function ensurePostRequest(workspaceId: string, post: GeneratedPost, note: string | undefined): string {
-  const request = createContentRequest(workspaceId, {
-    topic: post.title,
-    targetKeyword: post.targetKeyword,
-    intent: 'informational',
-    priority: 'medium',
-    rationale: 'Post shared from MCP',
-    source: 'strategy',
-    serviceType: 'full_post',
-    pageType: 'blog',
-    initialStatus: 'in_progress',
-    dedupe: false,
-    clientNote: note,
-  });
-  updateContentRequest(workspaceId, request.id, {
-    briefId: post.briefId,
-    postId: post.id,
-    status: 'post_review',
-    internalNote: note,
-  });
-  return request.id;
-}
-
 async function handleListContentRequests(
   args: Record<string, unknown>,
 ): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
@@ -1255,46 +1233,35 @@ async function handleSendToClient(
       payload = consumeHandle<PostSavedPayload>(postHandle, 'post', workspaceId);
     }
     const resolvedPostId = payload?.postId ?? postId!;
-    const post = getPost(workspaceId, resolvedPostId);
-    if (!post) return mcpError(`Post not found: ${resolvedPostId}`);
 
-    const requestId = payload?.parentRequestId && getContentRequest(workspaceId, payload.parentRequestId)
-      ? payload.parentRequestId
-      : ensurePostRequest(workspaceId, post, note);
-
-    if (requestId === payload?.parentRequestId) {
-      updateContentRequest(workspaceId, requestId, {
-        briefId: post.briefId,
-        postId: post.id,
-        status: 'post_review',
-        internalNote: note,
+    // Delegate the find-or-create + transition + notify + broadcast + activity to the shared
+    // service (server/domains/content/send-post-to-client.ts). Reusing it means the MCP post-send
+    // now ALSO emails the client (fixes B6) while staying otherwise identical: pass the parent
+    // request as the reuse hint (the service reuses it when it exists, else find-or-create), and tag
+    // the activity with the MCP source + action. The service throws PostNotFoundError if the post is
+    // missing — surface it as an MCP error (same message).
+    let sendResult;
+    try {
+      sendResult = sendPostToClientForReview(workspaceId, resolvedPostId, {
+        note,
+        requestId: payload?.parentRequestId,
+        activitySource: 'mcp-chat',
+        activityMetadata: { action: 'mcp_post_sent_to_client' },
       });
+    } catch (err) {
+      if (err instanceof PostNotFoundError) return mcpError(err.message);
+      throw err;
     }
+    const { request, post } = sendResult;
+    const requestId = request.id;
 
-    const requestEvent = requestId === payload?.parentRequestId
-      ? WS_EVENTS.CONTENT_REQUEST_UPDATE
-      : WS_EVENTS.CONTENT_REQUEST_CREATED;
-    invalidateContentPipelineIntelligence(workspaceId);
-    broadcastToWorkspace(workspaceId, requestEvent, { id: requestId });
+    // The shared service emits CONTENT_REQUEST_CREATED/UPDATE; the MCP path additionally signals the
+    // post surface so the editor refreshes (MCP-specific, not part of the shared send contract).
     broadcastToWorkspace(workspaceId, WS_EVENTS.POST_UPDATED, {
       action: 'mcp_post_sent_to_client',
       postId: post.id,
       requestId,
     });
-    addActivity(
-      workspaceId,
-      'post_sent_for_review',
-      `Sent post "${post.title}" to client for review`,
-      `Keyword: ${post.targetKeyword}`,
-      {
-        source: 'mcp-chat',
-        postId: post.id,
-        briefId: post.briefId,
-        requestId,
-        note,
-        action: 'mcp_post_sent_to_client',
-      },
-    );
     return mcpSuccess({
       ok: true,
       request_id: requestId,
