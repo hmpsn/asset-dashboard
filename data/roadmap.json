@@ -2,129 +2,129 @@
   "sprints": [
     {
       "id": "sprint-unified-send-to-client-2026-06-01",
-      "name": "📬 Unified Send-to-Client — Spine + Strangler-Fig Migration",
+      "name": "\ud83d\udcec Unified Send-to-Client \u2014 Spine + Strangler-Fig Migration",
       "hours": "phased",
       "rationale": "Replace the five bespoke 'send to client' pipelines with one ClientDeliverable model + one sendToClient() service + one client inbox + one admin inbox, via a per-type strangler-fig cutover production never feels. Adding a reviewable work type later becomes an adapter, not a sixth subsystem.",
       "notes": "Design: docs/designs/2026-06-01-unified-send-to-client-design.md. Pre-plan audit: docs/superpowers/audits/2026-06-01-unified-send-to-client-audit.md. Plan: docs/superpowers/plans/2026-06-01-unified-send-to-client.md. Phase 0 lands the shared spine dark behind three phase-group flags (unified-deliverables-approval-family / -broken-family / -rest, all default false).",
       "items": [
         {
           "id": "unified-deliverables-phase-0-contracts",
-          "title": "Phase 0 — shared contracts (migrations, types, store, state machines, adapter registry, service, route, flags, pr-check rules) DARK",
+          "title": "Phase 0 \u2014 shared contracts (migrations, types, store, state machines, adapter registry, service, route, flags, pr-check rules) DARK",
           "source": "/docs/superpowers/plans/2026-06-01-unified-send-to-client.md",
           "est": "shipped",
           "priority": "P1",
-          "status": "pending",
-          "notes": "client_deliverable + _item tables (111/112); shared/types/client-deliverable.ts; server/client-deliverables.ts store; CLIENT_DELIVERABLE/MATRIX_CELL/REQUEST transitions; self-registering adapter registry; sendToClient + respondToDeliverable service (5 guarantees, apply opt-in); public respond + admin remind routes; 3 phase-group flags + catalog; 3 pr-check rules. All dark, zero importers, production behavior unchanged."
+          "status": "done",
+          "notes": "client_deliverable + _item tables (111/112); shared/types/client-deliverable.ts; server/client-deliverables.ts store; CLIENT_DELIVERABLE/MATRIX_CELL/REQUEST transitions; self-registering adapter registry; sendToClient + respondToDeliverable service (5 guarantees, apply opt-in); public respond + admin remind routes; 3 phase-group flags + catalog; 3 pr-check rules. All dark, zero importers, production behavior unchanged. [DONE 2026-06-02 (PR #1012): spine fully merged + dark \u2014 migrations 111/112, shared/types/client-deliverable.ts, store, CLIENT_DELIVERABLE transitions, self-registering adapter registry, sendToClient/respondToDeliverable service. Verified by roadmap audit.]"
         },
         {
           "id": "unified-deliverables-phase-1-cutover",
-          "title": "Phase 1 — per-type cutover (7 PRs: dual-write → backfill → shadow-compare → flag-flip)",
+          "title": "Phase 1 \u2014 per-type cutover (7 PRs: dual-write \u2192 backfill \u2192 shadow-compare \u2192 flag-flip)",
           "source": "/docs/superpowers/plans/2026-06-01-unified-send-to-client.md",
           "est": "owner-gated",
           "priority": "P2",
           "status": "pending",
-          "notes": "Migrate each work type onto the spine one PR at a time, gated behind its phase-group flag. Approval-batch family first (fixes the live B1 destructive write). Not started until Phase 0 is merged + green on staging (phase-per-PR). PR-1a (approval_batch family: seo_edit/audit_issue/schema_item/content_plan_*) DARK machinery landed: 5 self-registering adapters (audit_issue carries the real per-check field map + applyable=false for non-meta checks — B1 fix), send-time dual-write mirror gated on unified-deliverables-approval-family (default off → no-op), deterministic sub-type classifier + idempotent backfill script (scripts/backfill-deliverables-approval.ts, not auto-run). Apply stays disabled (D-apply). No reader/UI changes, no flag flip. Still pending: dual-write on response/apply paths, content_plan matrix-cell guard (CP-K4), nudge cron, backfill→shadow-compare→flag-flip."
+          "notes": "Migrate each work type onto the spine one PR at a time, gated behind its phase-group flag. Approval-batch family first (fixes the live B1 destructive write). Not started until Phase 0 is merged + green on staging (phase-per-PR). PR-1a (approval_batch family: seo_edit/audit_issue/schema_item/content_plan_*) DARK machinery landed: 5 self-registering adapters (audit_issue carries the real per-check field map + applyable=false for non-meta checks \u2014 B1 fix), send-time dual-write mirror gated on unified-deliverables-approval-family (default off \u2192 no-op), deterministic sub-type classifier + idempotent backfill script (scripts/backfill-deliverables-approval.ts, not auto-run). Apply stays disabled (D-apply). No reader/UI changes, no flag flip. Still pending: dual-write on response/apply paths, content_plan matrix-cell guard (CP-K4), nudge cron, backfill\u2192shadow-compare\u2192flag-flip. [UPDATE 2026-06-02: dual-write + backfill scripts built + flag-gated for all 5 physical families (PR-1a..1fg, #1013-#1018). REMAINING = shadow-compare (not yet built) -> owner-gated flag-flip -> backfill auto-run -> nudge cron. OWNER-GATED; the B1 destructive-write fix lands at the flip.]"
         },
         {
           "id": "unified-deliverables-phase-2a-client-inbox",
-          "title": "Phase 2a — client unified inbox DARK behind unified-inbox flag (PriorityStrip + uniform Approve / Request changes / Decline)",
+          "title": "Phase 2a \u2014 client unified inbox DARK behind unified-inbox flag (PriorityStrip + uniform Approve / Request changes / Decline)",
           "source": "/docs/superpowers/plans/2026-06-01-unified-send-to-client.md",
           "est": "in-progress",
           "priority": "P2",
-          "status": "pending",
-          "notes": "Strangler-fig client UI: additive flag-gated unified path in InboxTab (flag off → existing new-inbox-ia + legacy layouts byte-for-byte unchanged). New GET /api/public/deliverables/:workspaceId read endpoint assembles physical client_deliverable rows + projected copy/content_request (via adapter projectFromSource), filtered to client-facing statuses, Zod-validated response. NormalizedDecision generalized (add kind + widen DecisionSource to include 'deliverable', isSingleAction kept for back-compat) + normalizeDeliverable() adapter. useUnifiedInbox React Query hook (client- prefixed key, typed api wrapper) fetches only when flag on. When on, InboxTab renders PriorityStrip (mounted — was orphaned) as the single Needs-your-attention list with uniform Approve / Request changes (+note) / Decline calling the real PATCH /respond endpoint (dark). No flag flip; dual-write flags untouched."
+          "status": "done",
+          "notes": "Strangler-fig client UI: additive flag-gated unified path in InboxTab (flag off \u2192 existing new-inbox-ia + legacy layouts byte-for-byte unchanged). New GET /api/public/deliverables/:workspaceId read endpoint assembles physical client_deliverable rows + projected copy/content_request (via adapter projectFromSource), filtered to client-facing statuses, Zod-validated response. NormalizedDecision generalized (add kind + widen DecisionSource to include 'deliverable', isSingleAction kept for back-compat) + normalizeDeliverable() adapter. useUnifiedInbox React Query hook (client- prefixed key, typed api wrapper) fetches only when flag on. When on, InboxTab renders PriorityStrip (mounted \u2014 was orphaned) as the single Needs-your-attention list with uniform Approve / Request changes (+note) / Decline calling the real PATCH /respond endpoint (dark). No flag flip; dual-write flags untouched. [DONE 2026-06-02 (PR #1019 + R2-R5 #1025-#1029 + finalize #1031): DARK unified client inbox \u2014 read endpoint, useUnifiedInbox flag-gated, PriorityStrip, uniform verbs, inline review, single-item modals. Cutover (flag-flip) tracked separately in phase-1-cutover. Verified by roadmap audit.]"
         },
         {
           "id": "unified-deliverables-phase-2b-admin-inbox",
-          "title": "Phase 2b — admin unified \"Client Deliverables\" pane DARK behind unified-inbox flag (status axis + stale + Remind)",
+          "title": "Phase 2b \u2014 admin unified \"Client Deliverables\" pane DARK behind unified-inbox flag (status axis + stale + Remind)",
           "source": "/docs/superpowers/plans/2026-06-01-unified-send-to-client.md",
           "est": "in-progress",
           "priority": "P2",
           "status": "done",
           "shippedAt": "2026-06-01",
-          "notes": "Strangler-fig admin UI (additive — AdminInbox/ClientActionsTab untouched on the flag-off path). New admin read endpoint GET /api/deliverables/:workspaceId (requireWorkspaceAccess, NOT requireAuth) returns EVERY status (physical + projected) via new listAllWorkspaceDeliverables() (the client-facing filter factored out into a shared assembleAllDeliverables), annotated by server/domains/inbox/admin-inbox-read.ts with statusAxis (awaiting_client/changes_requested[+partial]/approved/other), ageDays from sentAt, and a derived stale flag (awaiting_client + ageDays>=STALE_AWAITING_DAYS=7). Zod-validated response (shared/types/admin-deliverable-view.ts). New ClientDeliverablesPane.tsx groups by axis (oldest-first), shows pending-N-days/stale styling + type badge + a Remind button per awaiting_client item wired to the existing POST /api/deliverables/:ws/:id/remind. useWorkspaceDeliverables hook (admin- key, typed adminDeliverables api wrapper, no raw fetch, flag-gated fetch) + useWorkspaceEvents DELIVERABLE_* invalidation. Mounted dark as the first sub-tab in App.tsx's requests TabBar only when unified-inbox is ON (single additive branch: spread an empty tab array + skip the render when off). No flag flip; dual-write flags untouched. DEFERRED to cutover runbook: operator revise/resend/acknowledge on changes_requested (B18/E7 — needs new mutate endpoints), notification-bell categorization (E3/A2), workspace-overview B29 double-count, the read-path slice cutover."
+          "notes": "Strangler-fig admin UI (additive \u2014 AdminInbox/ClientActionsTab untouched on the flag-off path). New admin read endpoint GET /api/deliverables/:workspaceId (requireWorkspaceAccess, NOT requireAuth) returns EVERY status (physical + projected) via new listAllWorkspaceDeliverables() (the client-facing filter factored out into a shared assembleAllDeliverables), annotated by server/domains/inbox/admin-inbox-read.ts with statusAxis (awaiting_client/changes_requested[+partial]/approved/other), ageDays from sentAt, and a derived stale flag (awaiting_client + ageDays>=STALE_AWAITING_DAYS=7). Zod-validated response (shared/types/admin-deliverable-view.ts). New ClientDeliverablesPane.tsx groups by axis (oldest-first), shows pending-N-days/stale styling + type badge + a Remind button per awaiting_client item wired to the existing POST /api/deliverables/:ws/:id/remind. useWorkspaceDeliverables hook (admin- key, typed adminDeliverables api wrapper, no raw fetch, flag-gated fetch) + useWorkspaceEvents DELIVERABLE_* invalidation. Mounted dark as the first sub-tab in App.tsx's requests TabBar only when unified-inbox is ON (single additive branch: spread an empty tab array + skip the render when off). No flag flip; dual-write flags untouched. DEFERRED to cutover runbook: operator revise/resend/acknowledge on changes_requested (B18/E7 \u2014 needs new mutate endpoints), notification-bell categorization (E3/A2), workspace-overview B29 double-count, the read-path slice cutover."
         },
         {
           "id": "unified-deliverables-r2-respond-propagation",
-          "title": "R2 — respond propagation: unified respondToDeliverable writes back to the SOURCE artifact (DARK behind unified-inbox)",
+          "title": "R2 \u2014 respond propagation: unified respondToDeliverable writes back to the SOURCE artifact (DARK behind unified-inbox)",
           "source": "/docs/superpowers/plans/2026-06-01-unified-send-to-client.md",
           "est": "done",
           "priority": "P2",
           "status": "done",
           "shippedAt": "2026-06-01",
-          "notes": "Fixed the linchpin silent no-op: respondToDeliverable previously wrote ONLY client_deliverable.status, so a unified-inbox client Approve never touched the real source artifact the operator/apply logic reads. Added an optional respondToSource(workspaceId, deliverable, decision, opts) to the adapter interface; every decision-bearing PHYSICAL adapter implements it (approval_batch family seo_edit/audit_issue/schema_item/content_plan_* → legacy approval batch; client_action family redirect/internal_link/aeo_change/content_decay → legacy client_action; schema_plan → schema_site_plans). Each maps the deliverable back to its source id via payload (legacyBatchId / legacyActionId / externalRef=siteId) and reuses the EXISTING source-write logic — extracted two route-inline bodies into shared services: server/domains/inbox/approval-batch-respond.ts (respondToApprovalBatch — whole-batch approve→items approved / changes_requested|declined→items rejected, the team email + APPROVAL_UPDATE broadcast + activity) now called by BOTH the public PATCH /api/public/approvals/:ws/:batch/approve route AND the unified path; server/domains/inbox/schema-plan-respond.ts (respondToSchemaPlanFeedback — approve→client_approved / request_changes→client_changes_requested + activity + SCHEMA_PLAN_SENT broadcast) now called by BOTH the public schema-plan /feedback route AND the unified path; client_action reuses the existing respondToPublicClientAction (lazy import to break the adapter↔mutations module cycle). respondToDeliverable now calls adapter.respondToSource after writing the mirror and SUPPRESSES its own deliverable-level team email when the source path reports handled (no double-notify); the DELIVERABLE_UPDATED broadcast is always kept for the unified inbox UI. R2 propagates only the DECISION/status — apply (Webflow publish) stays a separate step (R3, D-apply unchanged). work_order/briefing (no client decision, R5) and projected copy/content_request (R4) get no respondToSource; respond on a projected/unknown id still 404s. Tests: tests/integration/respond-propagation.test.ts seeds BOTH a client_deliverable mirror AND its source artifact per family and asserts (a) the SOURCE status changed, (b) the mirror status changed, (c) team-notify fired exactly once; contract guard extended in tests/contract/inbox-route-service-extraction.test.ts. No flag flip; DARK behind unified-inbox (the unified respond is only reachable when the inbox is on)."
+          "notes": "Fixed the linchpin silent no-op: respondToDeliverable previously wrote ONLY client_deliverable.status, so a unified-inbox client Approve never touched the real source artifact the operator/apply logic reads. Added an optional respondToSource(workspaceId, deliverable, decision, opts) to the adapter interface; every decision-bearing PHYSICAL adapter implements it (approval_batch family seo_edit/audit_issue/schema_item/content_plan_* \u2192 legacy approval batch; client_action family redirect/internal_link/aeo_change/content_decay \u2192 legacy client_action; schema_plan \u2192 schema_site_plans). Each maps the deliverable back to its source id via payload (legacyBatchId / legacyActionId / externalRef=siteId) and reuses the EXISTING source-write logic \u2014 extracted two route-inline bodies into shared services: server/domains/inbox/approval-batch-respond.ts (respondToApprovalBatch \u2014 whole-batch approve\u2192items approved / changes_requested|declined\u2192items rejected, the team email + APPROVAL_UPDATE broadcast + activity) now called by BOTH the public PATCH /api/public/approvals/:ws/:batch/approve route AND the unified path; server/domains/inbox/schema-plan-respond.ts (respondToSchemaPlanFeedback \u2014 approve\u2192client_approved / request_changes\u2192client_changes_requested + activity + SCHEMA_PLAN_SENT broadcast) now called by BOTH the public schema-plan /feedback route AND the unified path; client_action reuses the existing respondToPublicClientAction (lazy import to break the adapter\u2194mutations module cycle). respondToDeliverable now calls adapter.respondToSource after writing the mirror and SUPPRESSES its own deliverable-level team email when the source path reports handled (no double-notify); the DELIVERABLE_UPDATED broadcast is always kept for the unified inbox UI. R2 propagates only the DECISION/status \u2014 apply (Webflow publish) stays a separate step (R3, D-apply unchanged). work_order/briefing (no client decision, R5) and projected copy/content_request (R4) get no respondToSource; respond on a projected/unknown id still 404s. Tests: tests/integration/respond-propagation.test.ts seeds BOTH a client_deliverable mirror AND its source artifact per family and asserts (a) the SOURCE status changed, (b) the mirror status changed, (c) team-notify fired exactly once; contract guard extended in tests/contract/inbox-route-service-extraction.test.ts. No flag flip; DARK behind unified-inbox (the unified respond is only reachable when the inbox is on)."
         },
         {
           "id": "unified-deliverables-r3-detail-surfaces",
-          "title": "R3a — deliverable detail + per-item review: surface the substance in the unified inbox + flag/subset-approve (DARK behind unified-inbox)",
+          "title": "R3a \u2014 deliverable detail + per-item review: surface the substance in the unified inbox + flag/subset-approve (DARK behind unified-inbox)",
           "source": "/docs/superpowers/plans/2026-06-01-unified-send-to-client.md",
           "est": "done",
           "priority": "P2",
           "status": "done",
           "shippedAt": "2026-06-01",
-          "notes": "Fixed the owner complaint that the unified inbox sends the task, not the content. The card's 'View N →' now opens a new full-screen DeliverableDetailModal (src/components/client/DeliverableDetailModal.tsx) rendering the SUBSTANCE from the deliverable's carried NormalizedDecision.items + .payload (no second fetch). REUSED the proven legacy renderers by EXTRACTING them into src/components/client/decision-renderers.tsx (ApprovalItemRow, AeoRenderer, InternalLinkRenderer, RedirectRenderer) plus a new presentational ItemDiffRow that both the legacy DecisionDetailModal and the new modal drive (DRY); legacy modal behavior unchanged. Approval family (seo_edit/audit_issue/schema_item/content_plan_*) → typed items[] rows with PER-ITEM Flag/Unflag + 'Looks good — implement N of M →' subset CTA; client_action family (redirect/internal_link/aeo_change) → payload.items fed read-only to the matching renderer wrapper with whole-action Approve/Request changes/Decline (no per-item flag — matches legacy). One respond path: modal approve forwards flagged ClientDeliverableItem.id`s through the EXISTING useRespondToDeliverable → PATCH /respond (new optional flaggedItemIds: z.array(z.string()).max(500).optional()), extending R2. Server: respondToApprovalBatch gained an optional per-item mode (itemDecisions: {legacyItemId,status,note}[]) — when present, drives updateItem per legacy item (unflagged→approved, flagged→rejected) inside the existing db.transaction(); absent → whole-batch approve-all-pending (back-compat). respondToApprovalBatchSource builds itemDecisions from deliverable.items (item→legacy approval_item.id via itemPayload.legacyItemId, skip+warn on no mapping) only on approved with non-empty flags; the mirror status stays approved (implement N of M); changes_requested/declined ignore flags. Per-item flag notes thread onto each held item's clientNote. content_decay stays inline single-action; projected types keep their read-only deep-link. Confirmed getDeliverable() DOES load items so responded.items carries itemPayload.legacyItemId. NOT the Apply-to-Website PR (that is R3b — Webflow apply unchanged/disabled, D-apply). Tests: tests/integration/respond-per-item-propagation.test.ts (port-free service-level; subset approve, multi-flag, back-compat approve-all, empty-array back-compat, reject-ignores-flags, client_action-ignores-flags) + tests/unit/DeliverableDetailModal.test.tsx (deliverable→renderer mapping per family + per-item flag CTA + onApprove carries flagged id). No flag flip; DARK behind unified-inbox."
+          "notes": "Fixed the owner complaint that the unified inbox sends the task, not the content. The card's 'View N \u2192' now opens a new full-screen DeliverableDetailModal (src/components/client/DeliverableDetailModal.tsx) rendering the SUBSTANCE from the deliverable's carried NormalizedDecision.items + .payload (no second fetch). REUSED the proven legacy renderers by EXTRACTING them into src/components/client/decision-renderers.tsx (ApprovalItemRow, AeoRenderer, InternalLinkRenderer, RedirectRenderer) plus a new presentational ItemDiffRow that both the legacy DecisionDetailModal and the new modal drive (DRY); legacy modal behavior unchanged. Approval family (seo_edit/audit_issue/schema_item/content_plan_*) \u2192 typed items[] rows with PER-ITEM Flag/Unflag + 'Looks good \u2014 implement N of M \u2192' subset CTA; client_action family (redirect/internal_link/aeo_change) \u2192 payload.items fed read-only to the matching renderer wrapper with whole-action Approve/Request changes/Decline (no per-item flag \u2014 matches legacy). One respond path: modal approve forwards flagged ClientDeliverableItem.id`s through the EXISTING useRespondToDeliverable \u2192 PATCH /respond (new optional flaggedItemIds: z.array(z.string()).max(500).optional()), extending R2. Server: respondToApprovalBatch gained an optional per-item mode (itemDecisions: {legacyItemId,status,note}[]) \u2014 when present, drives updateItem per legacy item (unflagged\u2192approved, flagged\u2192rejected) inside the existing db.transaction(); absent \u2192 whole-batch approve-all-pending (back-compat). respondToApprovalBatchSource builds itemDecisions from deliverable.items (item\u2192legacy approval_item.id via itemPayload.legacyItemId, skip+warn on no mapping) only on approved with non-empty flags; the mirror status stays approved (implement N of M); changes_requested/declined ignore flags. Per-item flag notes thread onto each held item's clientNote. content_decay stays inline single-action; projected types keep their read-only deep-link. Confirmed getDeliverable() DOES load items so responded.items carries itemPayload.legacyItemId. NOT the Apply-to-Website PR (that is R3b \u2014 Webflow apply unchanged/disabled, D-apply). Tests: tests/integration/respond-per-item-propagation.test.ts (port-free service-level; subset approve, multi-flag, back-compat approve-all, empty-array back-compat, reject-ignores-flags, client_action-ignores-flags) + tests/unit/DeliverableDetailModal.test.tsx (deliverable\u2192renderer mapping per family + per-item flag CTA + onApprove carries flagged id). No flag flip; DARK behind unified-inbox."
         },
         {
           "id": "unified-deliverables-r3b-apply-to-website",
-          "title": "R3b — Apply to Website: explicit post-approve publish step in the unified inbox, reusing the EXISTING Webflow apply route (DARK behind unified-inbox)",
+          "title": "R3b \u2014 Apply to Website: explicit post-approve publish step in the unified inbox, reusing the EXISTING Webflow apply route (DARK behind unified-inbox)",
           "source": "/docs/superpowers/plans/2026-06-01-unified-send-to-client.md",
           "est": "done",
           "priority": "P2",
           "status": "done",
           "shippedAt": "2026-06-02",
-          "notes": "Owner requirement: a SEPARATE, explicit 'Apply to Website' step after approve that goes through the proven Webflow apply route (ZERO new apply logic). The client calls the SAME POST /api/public/approvals/:ws/:batch/apply route the legacy ApprovalBatchCard uses (it already does updatePageSeo/updateCollectionItem/publishCollectionItems, the server-side applyability gate, markBatchApplied, activity, outcome tracking, broadcasts). Added ONLY: (1) shared/applyability.ts — the SINGLE source of truth applyability predicate (field/targetRef/collectionId), intentionally mirroring the LEGACY ROUTE GATE, NOT the per-item applyable column (which is hardcoded false for the whole approval family under D-apply); the legacy src/components/client/approvalApplyability.ts now delegates to it (behavior-preserving), and the server route gate (server/routes/approvals.ts) + its local isCmsSeoApprovalField were replaced with isClientApplyableFields (the two in-loop cms- guards kept as defense-in-depth). (2) Server mirror-flip markDeliverableApplied (server/domains/inbox/send-to-client.ts) — body of applyApprovedDeliverable MINUS the external apply() call (Webflow write already done by the legacy route), idempotent on already-applied; called from the /apply route AFTER markBatchApplied, gated on APPROVAL_FAMILY_FLAG (NOT unified-inbox), wrapped in try/catch that logs+swallows (a mirror miss must not fail the apply response). isFeatureEnabled is single-arg/global. The disabled applyDisabledStub stays wired (appliesOnApprove omitted) — D-apply holds; the mirror-flip does NOT call adapter.applyDeliverable. (3) Client: publicDeliverables.applyApproval wrapper + useApplyDeliverable hook (invalidates the unified inbox key); a new 'Ready to publish' section in UnifiedInbox.tsx (approved + client-applyable deliverables, since approved is NOT in ACTIONABLE_STATUSES but IS client-facing) rendering an 'Apply to Website' primary button (ConfirmDialog 'Apply to live site?') + 'View N changes →'; DeliverableDetailModal gained canApply/applying/onApply props rendering a single full-width Apply button instead of the approve/decline row. Post-apply the deliverable flips to applied (filtered OUT of CLIENT_FACING_STATUSES) so the item LEAVES the inbox + the modal auto-unmounts (intended UX; success toast confirms). Held/subset-rejected items are never applied (the route's status==='approved' filter excludes them). schema_item/schema_plan/content_plan_*/client_action get NO button (the shared predicate excludes them; the route gate rejects them). Tests: tests/integration/r3b-apply-to-website.test.ts (5: applyable seo_edit flips mirror, subset-held not applied + mirror still flips, schema_item 400 no flip, flag-off byte-identical no flip, markDeliverableApplied idempotency) + tests/unit/applyability-shared.test.ts (incl. the documented divergence: applyable:false items still canApply=true) + DeliverableDetailModal Apply-footer cases. No flag flip; DARK behind unified-inbox + APPROVAL_FAMILY_FLAG."
+          "notes": "Owner requirement: a SEPARATE, explicit 'Apply to Website' step after approve that goes through the proven Webflow apply route (ZERO new apply logic). The client calls the SAME POST /api/public/approvals/:ws/:batch/apply route the legacy ApprovalBatchCard uses (it already does updatePageSeo/updateCollectionItem/publishCollectionItems, the server-side applyability gate, markBatchApplied, activity, outcome tracking, broadcasts). Added ONLY: (1) shared/applyability.ts \u2014 the SINGLE source of truth applyability predicate (field/targetRef/collectionId), intentionally mirroring the LEGACY ROUTE GATE, NOT the per-item applyable column (which is hardcoded false for the whole approval family under D-apply); the legacy src/components/client/approvalApplyability.ts now delegates to it (behavior-preserving), and the server route gate (server/routes/approvals.ts) + its local isCmsSeoApprovalField were replaced with isClientApplyableFields (the two in-loop cms- guards kept as defense-in-depth). (2) Server mirror-flip markDeliverableApplied (server/domains/inbox/send-to-client.ts) \u2014 body of applyApprovedDeliverable MINUS the external apply() call (Webflow write already done by the legacy route), idempotent on already-applied; called from the /apply route AFTER markBatchApplied, gated on APPROVAL_FAMILY_FLAG (NOT unified-inbox), wrapped in try/catch that logs+swallows (a mirror miss must not fail the apply response). isFeatureEnabled is single-arg/global. The disabled applyDisabledStub stays wired (appliesOnApprove omitted) \u2014 D-apply holds; the mirror-flip does NOT call adapter.applyDeliverable. (3) Client: publicDeliverables.applyApproval wrapper + useApplyDeliverable hook (invalidates the unified inbox key); a new 'Ready to publish' section in UnifiedInbox.tsx (approved + client-applyable deliverables, since approved is NOT in ACTIONABLE_STATUSES but IS client-facing) rendering an 'Apply to Website' primary button (ConfirmDialog 'Apply to live site?') + 'View N changes \u2192'; DeliverableDetailModal gained canApply/applying/onApply props rendering a single full-width Apply button instead of the approve/decline row. Post-apply the deliverable flips to applied (filtered OUT of CLIENT_FACING_STATUSES) so the item LEAVES the inbox + the modal auto-unmounts (intended UX; success toast confirms). Held/subset-rejected items are never applied (the route's status==='approved' filter excludes them). schema_item/schema_plan/content_plan_*/client_action get NO button (the shared predicate excludes them; the route gate rejects them). Tests: tests/integration/r3b-apply-to-website.test.ts (5: applyable seo_edit flips mirror, subset-held not applied + mirror still flips, schema_item 400 no flip, flag-off byte-identical no flip, markDeliverableApplied idempotency) + tests/unit/applyability-shared.test.ts (incl. the documented divergence: applyable:false items still canApply=true) + DeliverableDetailModal Apply-footer cases. No flag flip; DARK behind unified-inbox + APPROVAL_FAMILY_FLAG."
         },
         {
           "id": "unified-deliverables-r4-projected-review",
-          "title": "R4 — in-shell projected review: mount the bespoke copy/content review surfaces inside the unified inbox so the client reviews + responds without leaving (DARK behind unified-inbox)",
+          "title": "R4 \u2014 in-shell projected review: mount the bespoke copy/content review surfaces inside the unified inbox so the client reviews + responds without leaving (DARK behind unified-inbox)",
           "source": "/docs/superpowers/plans/2026-06-01-unified-send-to-client.md",
           "est": "done",
           "priority": "P2",
           "status": "done",
           "shippedAt": "2026-06-02",
-          "notes": "Owner requirement: the two PROJECTED deliverable types (copy_section / content_request) had no physical row; R3a rendered them as a read-only 'Review →' deep-link that navigated the client OUT to ?tab=reviews. R4 mounts the PROVEN bespoke review surfaces IN-SHELL so the client reviews + responds 'once and for all' without leaving. Added ONLY: (1) src/components/client/inbox/ProjectedReviewModal.tsx — a thin full-screen modal wrapper (chrome + Escape-to-close guard copied verbatim from DeliverableDetailModal, incl. the isContentEditable/input/textarea/select guard so the RichTextEditor + useAutoSave inside PostReviewCard never lose typing on a stray Escape; WIDE max-w-5xl panel since ContentTab renders a PageHeader + 4-col stat grid + pipeline list). Branches on TYPE (never deliverable status): copy_section → <ClientCopyReview initialExpandedEntryId={externalRef}/>; content_request → <ContentTab {...passThrough} initialExpandedRequestId={externalRef}/> (ContentTab self-selects brief actions vs PostReviewCard from the LOCAL ClientContentRequest.status — both client_review brief + post_review post map to canonical awaiting_client, the raw status lives only in payload.contentRequestStatus). (2) Additive OPTIONAL props on the shared bespoke components (legacy-safe, default = current behavior): ClientCopyReview.initialExpandedEntryId (threaded outer wrapper → inner → seeds expandedEntryId useState); ContentTab.initialExpandedRequestId → useContentRequests seeds expandedContentReq. PostReviewCard unchanged (reached transitively); DecisionCard.onReview contract unchanged (only the callback body swapped in UnifiedInbox). (3) UnifiedInbox: reviewProjected state; projected onReview now opens the modal (reading raw d.type + d.externalRef — normalizeDeliverable drops both) instead of goToReviews (deleted, with its dead navigate/betaMode locals + useNavigate/useBetaMode/clientPath imports — tsc noUnusedLocals confirms zero unused); modal mounted near DeliverableDetailModal; UnifiedInboxProps extended with the ContentTab pass-through props (Omit<ContentTabProps,'workspaceId'|'setToast'|'initialExpandedRequestId'>), threaded from ClientDashboard → InboxTab (NOT hasCopyEntries — it's a ClientCopyReview gate, not a ContentTab prop). (4) MANDATORY unified-list refresh: the bespoke respond routes broadcast COPY_SECTION_UPDATED / CONTENT_REQUEST_UPDATE / POST_UPDATED, which UnifiedInbox did NOT listen on — added 3 additive handlers (flag-ON-only) each invalidating queryKeys.client.unifiedInbox so after an in-shell respond the card leaves the list + the modal can be dismissed; all 3 events already broadcast + handled elsewhere so broadcast-handler-pairs.test.ts stays green. Respond NEVER hits the unified /respond (projected ids 404 there — getDeliverable returns null → SendToClientError 404). BetaProvider confirmed already above the modal (ClientDashboard wraps the dashboard at :637). Tests: updated tests/component/InboxTabUnified.test.tsx (the 2 projected tests now assert 'Review →' OPENS the in-shell modal + does NOT navigate, with real externalRefs); new tests/component/ProjectedReviewModal.test.tsx (copy→ClientCopyReview auto-expanded, content→ContentTab auto-expanded + pass-through, Escape guarded in editable / closes elsewhere, backdrop close); new tests/integration/projected-review-respond-routes.test.ts (port 13877: content-request approve emits CONTENT_REQUEST_UPDATE, copy approve emits COPY_SECTION_UPDATED, + NEGATIVE projected content_request:/copy: ids 404 on unified /respond). No flag flip; DARK behind unified-inbox (flag-off + legacy ?tab=reviews surfaces byte-identical)."
+          "notes": "Owner requirement: the two PROJECTED deliverable types (copy_section / content_request) had no physical row; R3a rendered them as a read-only 'Review \u2192' deep-link that navigated the client OUT to ?tab=reviews. R4 mounts the PROVEN bespoke review surfaces IN-SHELL so the client reviews + responds 'once and for all' without leaving. Added ONLY: (1) src/components/client/inbox/ProjectedReviewModal.tsx \u2014 a thin full-screen modal wrapper (chrome + Escape-to-close guard copied verbatim from DeliverableDetailModal, incl. the isContentEditable/input/textarea/select guard so the RichTextEditor + useAutoSave inside PostReviewCard never lose typing on a stray Escape; WIDE max-w-5xl panel since ContentTab renders a PageHeader + 4-col stat grid + pipeline list). Branches on TYPE (never deliverable status): copy_section \u2192 <ClientCopyReview initialExpandedEntryId={externalRef}/>; content_request \u2192 <ContentTab {...passThrough} initialExpandedRequestId={externalRef}/> (ContentTab self-selects brief actions vs PostReviewCard from the LOCAL ClientContentRequest.status \u2014 both client_review brief + post_review post map to canonical awaiting_client, the raw status lives only in payload.contentRequestStatus). (2) Additive OPTIONAL props on the shared bespoke components (legacy-safe, default = current behavior): ClientCopyReview.initialExpandedEntryId (threaded outer wrapper \u2192 inner \u2192 seeds expandedEntryId useState); ContentTab.initialExpandedRequestId \u2192 useContentRequests seeds expandedContentReq. PostReviewCard unchanged (reached transitively); DecisionCard.onReview contract unchanged (only the callback body swapped in UnifiedInbox). (3) UnifiedInbox: reviewProjected state; projected onReview now opens the modal (reading raw d.type + d.externalRef \u2014 normalizeDeliverable drops both) instead of goToReviews (deleted, with its dead navigate/betaMode locals + useNavigate/useBetaMode/clientPath imports \u2014 tsc noUnusedLocals confirms zero unused); modal mounted near DeliverableDetailModal; UnifiedInboxProps extended with the ContentTab pass-through props (Omit<ContentTabProps,'workspaceId'|'setToast'|'initialExpandedRequestId'>), threaded from ClientDashboard \u2192 InboxTab (NOT hasCopyEntries \u2014 it's a ClientCopyReview gate, not a ContentTab prop). (4) MANDATORY unified-list refresh: the bespoke respond routes broadcast COPY_SECTION_UPDATED / CONTENT_REQUEST_UPDATE / POST_UPDATED, which UnifiedInbox did NOT listen on \u2014 added 3 additive handlers (flag-ON-only) each invalidating queryKeys.client.unifiedInbox so after an in-shell respond the card leaves the list + the modal can be dismissed; all 3 events already broadcast + handled elsewhere so broadcast-handler-pairs.test.ts stays green. Respond NEVER hits the unified /respond (projected ids 404 there \u2014 getDeliverable returns null \u2192 SendToClientError 404). BetaProvider confirmed already above the modal (ClientDashboard wraps the dashboard at :637). Tests: updated tests/component/InboxTabUnified.test.tsx (the 2 projected tests now assert 'Review \u2192' OPENS the in-shell modal + does NOT navigate, with real externalRefs); new tests/component/ProjectedReviewModal.test.tsx (copy\u2192ClientCopyReview auto-expanded, content\u2192ContentTab auto-expanded + pass-through, Escape guarded in editable / closes elsewhere, backdrop close); new tests/integration/projected-review-respond-routes.test.ts (port 13877: content-request approve emits CONTENT_REQUEST_UPDATE, copy approve emits COPY_SECTION_UPDATED, + NEGATIVE projected content_request:/copy: ids 404 on unified /respond). No flag flip; DARK behind unified-inbox (flag-off + legacy ?tab=reviews surfaces byte-identical)."
         },
         {
           "id": "unified-deliverables-r5-work-order-lane",
-          "title": "R5 — work_order TRACK lane: read-only order-progress lane in the unified inbox (NO approve/decline verbs, DARK behind unified-inbox)",
+          "title": "R5 \u2014 work_order TRACK lane: read-only order-progress lane in the unified inbox (NO approve/decline verbs, DARK behind unified-inbox)",
           "source": "/docs/superpowers/plans/2026-06-01-unified-send-to-client.md",
           "est": "done",
           "priority": "P2",
           "status": "done",
           "shippedAt": "2026-06-02",
-          "notes": "Owner decision: work orders must LIVE in the unified inbox but as a read/TRACK lane — STATUS the client FOLLOWS (work the agency does FOR them), NOT a decision they make → ZERO approve/decline/apply/review verbs. (briefing stays OUT — it's surfaced on the dashboard homepage, not the inbox.) CRITICAL pre-fix: work_order rows were NOT client-facing today — work_order statuses are ordered|in_progress|completed|cancelled, NONE of which were in CLIENT_FACING_STATUSES, so they were filtered OUT of the client list. R5 needed BOTH a server read change AND a client render path. SERVER (server/domains/inbox/unified-inbox-read.ts): added CLIENT_FACING_ORDER_STATUSES={ordered,in_progress,completed} (cancelled excluded) + a KIND-AWARE predicate isClientFacingDeliverable(d) that admits the order-lifecycle statuses ONLY for kind:'order' and uses isClientFacingDeliverableStatus for every other kind; listClientFacingDeliverables now filters on it. isClientFacingDeliverableStatus stays exported+unchanged (other callers); listAllWorkspaceDeliverables (admin pane) untouched (already returns all statuses). Gated on KIND, not type, so no review/decision/batch row can leak ordered/in_progress/completed into the client list. The work_order adapter + dual-write needed NO change (they already produce correct rows — they were just filtered out). CLIENT (src/components/client/inbox/UnifiedInbox.tsx): added module-level ORDER_STATUS_CHIP (Four Laws — ordered=amber, in_progress=blue+Loader2 spin, completed=emerald; NEVER teal for the chip) + OrderTrackStepper over the canonical steps [ordered,in_progress,completed] (completed-step dots/connectors use teal to mark completed PROGRESS, a data affordance, consistent with the legacy OrderStatus stepper) + a workOrders useMemo (deliverables.filter kind==='order'). New dedicated read-only <section> 'Work in progress' (mirrors the R3b 'Ready to publish' container: surface-2 + radius-signature-lg w/ the pr-check-disable-next-line brand-radius hatch). Each card: status chip, title, summary, OrderTrackStepper (SKIPPED for completed), age (ageLabel), and a COUNT-ONLY page summary ('N pages') — raw payload.pageIds are raw Webflow ids and are NEVER surfaced (CLAUDE.md 'never surface raw IDs'). The card is PLAIN markup: NO normalizeDeliverable, NO DecisionCard, NO onApprove/onFlagWithNote/onDecline/onReview/onApply wired (structural verb-safety — there is no verb to wire). Orders never enter `actionable` (ACTIONABLE_STATUSES has no order status) so they never reach the PriorityStrip; PriorityStrip's sectionForKind case 'order' left as-is (unreachable). Orders-only empty-state FIX: the 'Nothing needs your attention' guard is now actionable.length===0 && workOrders.length===0 so it does NOT show when there are orders to track. NOTE (intentional, out-of-scope): the legacy src/components/client/OrderStatus.tsx + its route /api/public/work-orders/:ws stay LIVE — R5 introduces a SECOND client-facing surface for work-order data (the unified track lane) and intentionally does NOT retire the legacy component/route; reconciliation is a future follow-up. No new flag (DARK behind unified-inbox fetch flag + unified-deliverables-rest mirror flag, both default false). Tests: tests/integration/work-order-track-lane-read.test.ts (port 13878: kind:'order' in ordered/in_progress/completed INCLUDED, cancelled EXCLUDED, CROSS-LEAK guard seo_edit/batch in in_progress/ordered EXCLUDED, review-status rows still included, client-portal auth still 401s) + extended tests/component/InboxTabUnified.test.tsx (track section renders title/summary/chip/stepper, ZERO verbs + mutations never called, order absent from PriorityStrip, completed renders chip but no stepper, orders-only empty-state suppressed, flag OFF no section)."
+          "notes": "Owner decision: work orders must LIVE in the unified inbox but as a read/TRACK lane \u2014 STATUS the client FOLLOWS (work the agency does FOR them), NOT a decision they make \u2192 ZERO approve/decline/apply/review verbs. (briefing stays OUT \u2014 it's surfaced on the dashboard homepage, not the inbox.) CRITICAL pre-fix: work_order rows were NOT client-facing today \u2014 work_order statuses are ordered|in_progress|completed|cancelled, NONE of which were in CLIENT_FACING_STATUSES, so they were filtered OUT of the client list. R5 needed BOTH a server read change AND a client render path. SERVER (server/domains/inbox/unified-inbox-read.ts): added CLIENT_FACING_ORDER_STATUSES={ordered,in_progress,completed} (cancelled excluded) + a KIND-AWARE predicate isClientFacingDeliverable(d) that admits the order-lifecycle statuses ONLY for kind:'order' and uses isClientFacingDeliverableStatus for every other kind; listClientFacingDeliverables now filters on it. isClientFacingDeliverableStatus stays exported+unchanged (other callers); listAllWorkspaceDeliverables (admin pane) untouched (already returns all statuses). Gated on KIND, not type, so no review/decision/batch row can leak ordered/in_progress/completed into the client list. The work_order adapter + dual-write needed NO change (they already produce correct rows \u2014 they were just filtered out). CLIENT (src/components/client/inbox/UnifiedInbox.tsx): added module-level ORDER_STATUS_CHIP (Four Laws \u2014 ordered=amber, in_progress=blue+Loader2 spin, completed=emerald; NEVER teal for the chip) + OrderTrackStepper over the canonical steps [ordered,in_progress,completed] (completed-step dots/connectors use teal to mark completed PROGRESS, a data affordance, consistent with the legacy OrderStatus stepper) + a workOrders useMemo (deliverables.filter kind==='order'). New dedicated read-only <section> 'Work in progress' (mirrors the R3b 'Ready to publish' container: surface-2 + radius-signature-lg w/ the pr-check-disable-next-line brand-radius hatch). Each card: status chip, title, summary, OrderTrackStepper (SKIPPED for completed), age (ageLabel), and a COUNT-ONLY page summary ('N pages') \u2014 raw payload.pageIds are raw Webflow ids and are NEVER surfaced (CLAUDE.md 'never surface raw IDs'). The card is PLAIN markup: NO normalizeDeliverable, NO DecisionCard, NO onApprove/onFlagWithNote/onDecline/onReview/onApply wired (structural verb-safety \u2014 there is no verb to wire). Orders never enter `actionable` (ACTIONABLE_STATUSES has no order status) so they never reach the PriorityStrip; PriorityStrip's sectionForKind case 'order' left as-is (unreachable). Orders-only empty-state FIX: the 'Nothing needs your attention' guard is now actionable.length===0 && workOrders.length===0 so it does NOT show when there are orders to track. NOTE (intentional, out-of-scope): the legacy src/components/client/OrderStatus.tsx + its route /api/public/work-orders/:ws stay LIVE \u2014 R5 introduces a SECOND client-facing surface for work-order data (the unified track lane) and intentionally does NOT retire the legacy component/route; reconciliation is a future follow-up. No new flag (DARK behind unified-inbox fetch flag + unified-deliverables-rest mirror flag, both default false). Tests: tests/integration/work-order-track-lane-read.test.ts (port 13878: kind:'order' in ordered/in_progress/completed INCLUDED, cancelled EXCLUDED, CROSS-LEAK guard seo_edit/batch in in_progress/ordered EXCLUDED, review-status rows still included, client-portal auth still 401s) + extended tests/component/InboxTabUnified.test.tsx (track section renders title/summary/chip/stepper, ZERO verbs + mutations never called, order absent from PriorityStrip, completed renders chip but no stepper, orders-only empty-state suppressed, flag OFF no section)."
         },
         {
           "id": "work-order-conversation-close",
-          "title": "Work-order conversation (client↔team comments) + explicit `closed` state + admin conversation/close panel (PRODUCTION data model/routes/admin; client thread DARK behind unified-inbox)",
+          "title": "Work-order conversation (client\u2194team comments) + explicit `closed` state + admin conversation/close panel (PRODUCTION data model/routes/admin; client thread DARK behind unified-inbox)",
           "source": "feat/work-order-conversation-close",
           "est": "L",
           "priority": "P2",
           "status": "done",
           "shippedAt": "2026-06-02",
-          "notes": "Owner decisions: focused admin conversation/close panel (NOT a full dashboard tab); email both ways; dedicated comments table; operator-only close; completed→closed one-way (NO reopen); comments OUT-OF-BAND from the deliverable payload. DARK SPLIT — PRODUCTION (not flag-gated): the data model, state machine, migration, store, routes, notifications, the mirror exhaustive-switch arm, and the ADMIN conversation/close panel. DARK (behind unified-inbox): only the CLIENT-facing conversation thread + comment input inside the 'Work in progress' track-lane card. STATE MACHINE (server/state-machines.ts): WORK_ORDER_TRANSITIONS completed→['closed'] (was []), closed:[] terminal; added 'closed' to WorkOrderStatus. No completed→in_progress reopen. SHARED (shared/types/payments.ts): 'closed' added to WorkOrder.status; optional closedAt?; new WorkOrderComment{id,workOrderId,author:'client'|'team',content,createdAt,readAt?} + WorkOrderCommentAuthor. MIGRATION 113-work-order-comments.sql: CREATE TABLE work_order_comments (FK→work_orders + workspaces, both ON DELETE CASCADE) + 2 indexes + ALTER TABLE work_orders ADD COLUMN closed_at (the runner detects ADD COLUMN → per-statement exec w/ duplicate-column tolerance, so mixed CREATE+ALTER is safe; append-only). STORE: closed_at lockstep in server/work-orders.ts (OrderRow/insert/update/rowToOrder/createWorkOrder writes null/updateWorkOrder accepts closedAt). New server/work-order-comments.ts (sibling module): listWorkOrderComments + addWorkOrderComment (null if parent missing; the read+insert+parent-updated_at bump wrapped in db.transaction(...).immediate() — BEGIN IMMEDIATE avoids the SQLITE_BUSY_SNAPSHOT read-then-write race); own stmt-cache + rowToComment (three-state read_at). Comments are NOT a field on WorkOrder/OrderRow (served out-of-band). ROUTES: admin PATCH (server/routes/work-orders.ts) added 'closed' to the Zod enum + a closed branch (set closedAt + order_closed activity; does NOT re-enter the completed page-state/email block); admin comment POST (author 'team') + GET; client public comment POST (server/routes/public-content.ts, behind the router-level requireClientPortalAuth prefix gate, author HARDCODED 'client', 409 when closed) + public GET. New server/schemas/work-orders.ts workOrderCommentSchema {content: string.min(1).max(2000)}.strict(). EVENTS: WS_EVENTS.WORK_ORDER_COMMENT='work-order:comment' (server + frontend mirror). ACTIVITY: 'work_order_commented' + 'order_closed' added to ActivityType + CLIENT_VISIBLE_TYPES. EMAIL: notifyTeamWorkOrderComment (client→team, internal) + notifyClientWorkOrderComment (team→client, action) + 2 templates + email-throttle category map entries; best-effort, never blocks the write. MIRROR (server/domains/inbox/deliverable-adapters/work-order.ts): 'closed' case → 'cancelled' (leaves the client lane, ∉ CLIENT_FACING_ORDER_STATUSES; raw status preserved in payload.workOrderStatus) — satisfies the exhaustive never-guard; completed stays 'completed' (stays in lane). ADMIN PANEL: src/components/admin/WorkOrderPanel.tsx — focused full-screen modal (mirrors DeliverableDetailModal chrome) opened from WorkspaceHome's 'purchased fixes awaiting fulfillment' attention item (the item now carries onClick→setWorkOrderPanelOpen instead of navigating to workspace-settings). Lists orders → select → order detail + client↔team conversation + reply box (author 'team') + Start work / Mark complete / Close out (ConfirmDialog, destructive). No purple (not AI). New src/api/work-orders.ts (workOrders + publicWorkOrders typed wrappers) + src/hooks/admin/useWorkOrders.ts (list/comments/status PATCH/comment mutation). queryKeys.admin.workOrders + workOrderComments. CLIENT LANE (DARK): the 'Work in progress' card's map body extracted into a module-level WorkOrderTrackCard sub-component (so a hook can run per card) that renders the existing verb-free card PLUS the client↔team conversation thread (public GET via useClientWorkOrderComments) + a comment input (public POST via usePostClientWorkOrderComment, author 'client'). Order id extracted from sourceRef ('work_order:<id>'). Input gated on workOrderStatus !== 'closed' (closed leaves the lane anyway). Lane stays verb-free — NO approve/decline/apply; the conversation input is the ONLY interactive element. queryKeys.client.workOrderComments. WS HANDLERS: WORK_ORDER_COMMENT handled on BOTH the admin side (useWsInvalidation → admin workOrderComments+workOrders) and the client side (UnifiedInbox wsHandlers → client workOrderComments + unified inbox) so broadcast-handler-pairs.test.ts stays green. TESTS: state-machine (completed→closed legal, closed terminal, illegal in_progress→closed/closed→* rejected; existing assertions updated); store unit (work-order-comments.test.ts: insert/null-missing-parent/ordered/scope/closedAt); routes integration (work-order-conversation-close.test.ts port 13409: admin PATCH→closed sets closedAt+activity, admin comment POST author team + GET, client public comment forces 'client'+409-when-closed+401-unauth-on-pw-workspace+.strict()-rejects-author, illegal close 400); mirror arm in work-order-adapter.test.ts (closed→cancelled); client lane component (InboxTabUnified.test.tsx: conversation thread+input render for non-closed w/ sourceRef, post calls mutation, input hidden when closed, still no decision verbs). NOTE: the deferred unified-inbox-deferred-ia-polish item (a) WORK_ORDER realtime gap is partially addressed — the WORK_ORDER_COMMENT handler invalidates the unified inbox; the WORK_ORDER_UPDATE→unified-inbox invalidation + completed-order lane decay remain in that item."
+          "notes": "Owner decisions: focused admin conversation/close panel (NOT a full dashboard tab); email both ways; dedicated comments table; operator-only close; completed\u2192closed one-way (NO reopen); comments OUT-OF-BAND from the deliverable payload. DARK SPLIT \u2014 PRODUCTION (not flag-gated): the data model, state machine, migration, store, routes, notifications, the mirror exhaustive-switch arm, and the ADMIN conversation/close panel. DARK (behind unified-inbox): only the CLIENT-facing conversation thread + comment input inside the 'Work in progress' track-lane card. STATE MACHINE (server/state-machines.ts): WORK_ORDER_TRANSITIONS completed\u2192['closed'] (was []), closed:[] terminal; added 'closed' to WorkOrderStatus. No completed\u2192in_progress reopen. SHARED (shared/types/payments.ts): 'closed' added to WorkOrder.status; optional closedAt?; new WorkOrderComment{id,workOrderId,author:'client'|'team',content,createdAt,readAt?} + WorkOrderCommentAuthor. MIGRATION 113-work-order-comments.sql: CREATE TABLE work_order_comments (FK\u2192work_orders + workspaces, both ON DELETE CASCADE) + 2 indexes + ALTER TABLE work_orders ADD COLUMN closed_at (the runner detects ADD COLUMN \u2192 per-statement exec w/ duplicate-column tolerance, so mixed CREATE+ALTER is safe; append-only). STORE: closed_at lockstep in server/work-orders.ts (OrderRow/insert/update/rowToOrder/createWorkOrder writes null/updateWorkOrder accepts closedAt). New server/work-order-comments.ts (sibling module): listWorkOrderComments + addWorkOrderComment (null if parent missing; the read+insert+parent-updated_at bump wrapped in db.transaction(...).immediate() \u2014 BEGIN IMMEDIATE avoids the SQLITE_BUSY_SNAPSHOT read-then-write race); own stmt-cache + rowToComment (three-state read_at). Comments are NOT a field on WorkOrder/OrderRow (served out-of-band). ROUTES: admin PATCH (server/routes/work-orders.ts) added 'closed' to the Zod enum + a closed branch (set closedAt + order_closed activity; does NOT re-enter the completed page-state/email block); admin comment POST (author 'team') + GET; client public comment POST (server/routes/public-content.ts, behind the router-level requireClientPortalAuth prefix gate, author HARDCODED 'client', 409 when closed) + public GET. New server/schemas/work-orders.ts workOrderCommentSchema {content: string.min(1).max(2000)}.strict(). EVENTS: WS_EVENTS.WORK_ORDER_COMMENT='work-order:comment' (server + frontend mirror). ACTIVITY: 'work_order_commented' + 'order_closed' added to ActivityType + CLIENT_VISIBLE_TYPES. EMAIL: notifyTeamWorkOrderComment (client\u2192team, internal) + notifyClientWorkOrderComment (team\u2192client, action) + 2 templates + email-throttle category map entries; best-effort, never blocks the write. MIRROR (server/domains/inbox/deliverable-adapters/work-order.ts): 'closed' case \u2192 'cancelled' (leaves the client lane, \u2209 CLIENT_FACING_ORDER_STATUSES; raw status preserved in payload.workOrderStatus) \u2014 satisfies the exhaustive never-guard; completed stays 'completed' (stays in lane). ADMIN PANEL: src/components/admin/WorkOrderPanel.tsx \u2014 focused full-screen modal (mirrors DeliverableDetailModal chrome) opened from WorkspaceHome's 'purchased fixes awaiting fulfillment' attention item (the item now carries onClick\u2192setWorkOrderPanelOpen instead of navigating to workspace-settings). Lists orders \u2192 select \u2192 order detail + client\u2194team conversation + reply box (author 'team') + Start work / Mark complete / Close out (ConfirmDialog, destructive). No purple (not AI). New src/api/work-orders.ts (workOrders + publicWorkOrders typed wrappers) + src/hooks/admin/useWorkOrders.ts (list/comments/status PATCH/comment mutation). queryKeys.admin.workOrders + workOrderComments. CLIENT LANE (DARK): the 'Work in progress' card's map body extracted into a module-level WorkOrderTrackCard sub-component (so a hook can run per card) that renders the existing verb-free card PLUS the client\u2194team conversation thread (public GET via useClientWorkOrderComments) + a comment input (public POST via usePostClientWorkOrderComment, author 'client'). Order id extracted from sourceRef ('work_order:<id>'). Input gated on workOrderStatus !== 'closed' (closed leaves the lane anyway). Lane stays verb-free \u2014 NO approve/decline/apply; the conversation input is the ONLY interactive element. queryKeys.client.workOrderComments. WS HANDLERS: WORK_ORDER_COMMENT handled on BOTH the admin side (useWsInvalidation \u2192 admin workOrderComments+workOrders) and the client side (UnifiedInbox wsHandlers \u2192 client workOrderComments + unified inbox) so broadcast-handler-pairs.test.ts stays green. TESTS: state-machine (completed\u2192closed legal, closed terminal, illegal in_progress\u2192closed/closed\u2192* rejected; existing assertions updated); store unit (work-order-comments.test.ts: insert/null-missing-parent/ordered/scope/closedAt); routes integration (work-order-conversation-close.test.ts port 13409: admin PATCH\u2192closed sets closedAt+activity, admin comment POST author team + GET, client public comment forces 'client'+409-when-closed+401-unauth-on-pw-workspace+.strict()-rejects-author, illegal close 400); mirror arm in work-order-adapter.test.ts (closed\u2192cancelled); client lane component (InboxTabUnified.test.tsx: conversation thread+input render for non-closed w/ sourceRef, post calls mutation, input hidden when closed, still no decision verbs). NOTE: the deferred unified-inbox-deferred-ia-polish item (a) WORK_ORDER realtime gap is partially addressed \u2014 the WORK_ORDER_COMMENT handler invalidates the unified inbox; the WORK_ORDER_UPDATE\u2192unified-inbox invalidation + completed-order lane decay remain in that item."
         },
         {
           "id": "unified-inbox-deferred-ia-polish",
-          "title": "Deferred IA polish for the unified inbox (completed-order lane decay + WORK_ORDER realtime gap, ?tab= deep-link under the flag, PriorityStrip↔section-heading taxonomy alignment)",
+          "title": "Deferred IA polish for the unified inbox (completed-order lane decay + WORK_ORDER realtime gap, ?tab= deep-link under the flag, PriorityStrip\u2194section-heading taxonomy alignment)",
           "source": "/docs/superpowers/plans/2026-06-01-unified-send-to-client.md",
           "est": "M",
           "priority": "P3",
           "status": "pending",
-          "notes": "Deferred from the unified-inbox finalize-UX PR (feat/unified-inbox-finalize-ux). Three IA-polish items captured for a follow-up, NOT built in that PR: (a) COMPLETED work orders should LEAVE the 'Work in progress' lane (recency window or collapse) so the lane only shows live work — AND close the WORK_ORDER_UPDATE realtime-refresh gap: the work-order mirror create/update does not currently invalidate the unified inbox query (no WS event handler), so a status change isn't reflected live (CLAUDE.md Data Flow #2 two-halves contract). (b) ?tab= deep-link resolution under the unified-inbox flag: the unified flat list ignores searchParams, so a ?tab=decisions|reviews|conversations URL lands on the default view — violates the ?tab= two-halves contract (CLAUDE.md UI/UX rule 12). (c) Align the PriorityStrip Decisions/Reviews/Conversations taxonomy with the visible section headings (Needs-your-attention / Ready to publish / Work in progress) — including adding a heading for the primary actionable section so the strip's section labels match what the client actually sees scrolling the list."
+          "notes": "Deferred from the unified-inbox finalize-UX PR (feat/unified-inbox-finalize-ux). Three IA-polish items captured for a follow-up, NOT built in that PR: (a) COMPLETED work orders should LEAVE the 'Work in progress' lane (recency window or collapse) so the lane only shows live work \u2014 AND close the WORK_ORDER_UPDATE realtime-refresh gap: the work-order mirror create/update does not currently invalidate the unified inbox query (no WS event handler), so a status change isn't reflected live (CLAUDE.md Data Flow #2 two-halves contract). (b) ?tab= deep-link resolution under the unified-inbox flag: the unified flat list ignores searchParams, so a ?tab=decisions|reviews|conversations URL lands on the default view \u2014 violates the ?tab= two-halves contract (CLAUDE.md UI/UX rule 12). (c) Align the PriorityStrip Decisions/Reviews/Conversations taxonomy with the visible section headings (Needs-your-attention / Ready to publish / Work in progress) \u2014 including adding a heading for the primary actionable section so the strip's section labels match what the client actually sees scrolling the list. [UPDATE 2026-06-02: sub-item (a) WORK_ORDER_UPDATE realtime is DONE (#1032). The completed-order lane-decay concern is SUPERSEDED by the work-order CLOSED state (#1032): completed now intentionally STAYS (conversation-active) and closed LEAVES the lane. REMAINING = ?tab= deep-link resolution under the unified-inbox flag (UnifiedInbox ignores searchParams) + PriorityStrip taxonomy/section headings.]"
         }
       ]
     },
     {
       "id": "sprint-recommendation-intelligence-opportunity-value-2026-06-01",
-      "name": "🧠 Recommendation Intelligence — Integrity Remediation + Opportunity Value Re-Architecture",
+      "name": "\ud83e\udde0 Recommendation Intelligence \u2014 Integrity Remediation + Opportunity Value Re-Architecture",
       "hours": "shipped + follow-ups",
       "rationale": "Two read-only audits (foundational integrity, intelligence quality) drove a remediation wave then a full re-architecture of the recommendation scoring engine onto one grounded Opportunity Value model. Build is complete and dark; this sprint tracks the owner-gated cutover and the deferred hardening.",
       "notes": "Audits: docs/audits/2026-05-31-foundational-integrity-audit.md, docs/audits/2026-05-31-intelligence-quality-audit.md. Design: docs/designs/2026-05-31-opportunity-value-model.md. Plan: docs/superpowers/plans/2026-06-01-opportunity-value-model.md. Pre-plan audit: docs/superpowers/audits/2026-06-01-opportunity-value-model-audit.md.",
       "items": [
         {
           "id": "ov-integrity-remediation",
-          "title": "Foundational integrity remediation — freshness, ROI loop, priority reconciliation, advisor completeness",
+          "title": "Foundational integrity remediation \u2014 freshness, ROI loop, priority reconciliation, advisor completeness",
           "source": "/docs/audits/2026-05-31-foundational-integrity-audit.md",
           "est": "shipped",
           "priority": "P0",
@@ -134,7 +134,7 @@
         },
         {
           "id": "ov-rearchitecture-build",
-          "title": "Unified Opportunity Value scorer — 7-phase build (DARK behind flags)",
+          "title": "Unified Opportunity Value scorer \u2014 7-phase build (DARK behind flags)",
           "source": "/docs/designs/2026-05-31-opportunity-value-model.md",
           "est": "shipped",
           "priority": "P0",
@@ -144,12 +144,12 @@
         },
         {
           "id": "ov-flag-flip-cutover",
-          "title": "P8 — owner-gated Opportunity Value cutover (shadow review then flip)",
+          "title": "P8 \u2014 owner-gated Opportunity Value cutover (shadow review then flip)",
           "source": "/docs/designs/2026-05-31-opportunity-value-model.md",
           "est": "owner-gated",
           "priority": "P1",
           "status": "pending",
-          "notes": "NOT autonomous. Validation gate before flipping opportunity-value-scorer: (1) soak — let generateRecommendations log divergence; optionally enable -events/-calibration in shadow first; (2) review GET /api/ov-divergence/:workspaceId on both live workspaces — every OV-#1 != legacy-#1 must be defensibly higher value, invariant_held 100%; (3) confirm outcome-tracking/outcome-ai-injection flag state so calibration fires; (4) flip. WARNING: flag is global (all clients at once) — staged per-client needs ov-per-workspace-flag-dimension first."
+          "notes": "NOT autonomous. Validation gate before flipping opportunity-value-scorer: (1) soak \u2014 let generateRecommendations log divergence; optionally enable -events/-calibration in shadow first; (2) review GET /api/ov-divergence/:workspaceId on both live workspaces \u2014 every OV-#1 != legacy-#1 must be defensibly higher value, invariant_held 100%; (3) confirm outcome-tracking/outcome-ai-injection flag state so calibration fires; (4) flip. WARNING: flag is global (all clients at once) \u2014 staged per-client needs ov-per-workspace-flag-dimension first."
         },
         {
           "id": "ov-per-workspace-flag-dimension",
@@ -171,7 +171,7 @@
         },
         {
           "id": "ov-legacy-scorer-removal-postflip",
-          "title": "Post-flip cleanup — remove legacy magic scorers + the 11 outcome-adjust call sites",
+          "title": "Post-flip cleanup \u2014 remove legacy magic scorers + the 11 outcome-adjust call sites",
           "source": "/docs/superpowers/plans/2026-06-01-opportunity-value-model.md",
           "est": "3-5h",
           "priority": "P3",
@@ -194,7 +194,7 @@
           "est": "3-5h",
           "priority": "P2",
           "status": "pending",
-          "notes": "Audit finding Q7: estimatedGain recovery-% are static per-check constants ('could recover 15-30%'), identical for every workspace/page. Deferred from PR3/PR6 (client-facing + $-exposure). Once OV is live, derive the client-safe gain string from the page's actual traffic-at-risk + median realized attributed_value — never a raw $/wk to the client."
+          "notes": "Audit finding Q7: estimatedGain recovery-% are static per-check constants ('could recover 15-30%'), identical for every workspace/page. Deferred from PR3/PR6 (client-facing + $-exposure). Once OV is live, derive the client-safe gain string from the page's actual traffic-at-risk + median realized attributed_value \u2014 never a raw $/wk to the client."
         },
         {
           "id": "ov-calibration-realized-vs-predicted-emv",
@@ -212,7 +212,7 @@
           "est": "4-6h",
           "priority": "P3",
           "status": "pending",
-          "notes": "Deferred from PR7. Persist the 12-month volume series that trendDirection() currently consumes and drops; emit a 'seasonal' opportunity event (timing boost) when demand rises. Needs >= 1 year of the monthly series before it is useful."
+          "notes": "Deferred from PR7. Persist the 12-month volume series that trendDirection() currently consumes and drops; emit a 'seasonal' opportunity event (timing boost) when demand rises. Needs >= 1 year of the monthly series before it is useful. [CORRECTION 2026-06-02: title says \"migration 111\" but that number is TAKEN (111/112 = client-deliverable, 113 = work-order-comments). Renumber to migration 114 (next free). Also fix the stale \"migration 111\" comment in server/scoring/opportunity-timing.ts.]"
         },
         {
           "id": "ov-competitor-defensive-rec-mint",
@@ -221,7 +221,7 @@
           "est": "3-5h",
           "priority": "P3",
           "status": "pending",
-          "notes": "Deferred from PR7: the competitor detector currently only raises a timing boost on the affected page's EXISTING recs. When no rec covers the overtaken keyword, mint a defensive recommendation. Higher-risk (creates recs) — do after OV is live + validated."
+          "notes": "Deferred from PR7: the competitor detector currently only raises a timing boost on the affected page's EXISTING recs. When no rec covers the overtaken keyword, mint a defensive recommendation. Higher-risk (creates recs) \u2014 do after OV is live + validated."
         },
         {
           "id": "ov-events-dead-code-cleanup",
@@ -245,7 +245,7 @@
     },
     {
       "id": "sprint-duplication-unification-audit-2026-05-27",
-      "name": "🚧 Duplication Unification Audit Follow-through",
+      "name": "\ud83d\udea7 Duplication Unification Audit Follow-through",
       "hours": "20-36",
       "rationale": "Execute the 2026-05-27 duplication inventory with one-track-per-finding to reduce drift regressions.",
       "notes": "Audit references: /docs/superpowers/audits/2026-05-27-duplication-inventory.md and /docs/superpowers/audits/2026-05-27-audit-drift-closure.md",
@@ -429,7 +429,7 @@
           "source": "ADMIN_UX_AUDIT P2-7",
           "est": "2-3h",
           "priority": "P1",
-          "notes": "Shipped in feat/admin-ux-pr4-onboarding — OnboardingChecklist modal overlay on WorkspaceHome first visit. 4 steps: Connect Webflow, Connect GSC, Run First Audit, Set Client Password. Blue progress bar, teal checkmarks, localStorage dismissal per workspace, auto-celebrate on completion. Feature #291.",
+          "notes": "Shipped in feat/admin-ux-pr4-onboarding \u2014 OnboardingChecklist modal overlay on WorkspaceHome first visit. 4 steps: Connect Webflow, Connect GSC, Run First Audit, Set Client Password. Blue progress bar, teal checkmarks, localStorage dismissal per workspace, auto-celebrate on completion. Feature #291.",
           "status": "done",
           "shippedAt": "2026-04-13"
         },
@@ -439,7 +439,7 @@
           "source": "FEATURE_VISION #14",
           "est": "8-12h",
           "priority": "P1",
-          "notes": "Register as official Webflow App → appear in Marketplace → one-click install. Zero-cost distribution channel. Depends on OAuth (#100).",
+          "notes": "Register as official Webflow App \u2192 appear in Marketplace \u2192 one-click install. Zero-cost distribution channel. Depends on OAuth (#100).",
           "status": "pending"
         },
         {
@@ -448,7 +448,7 @@
           "source": "MONETIZATION.md White-Label",
           "est": "4-6h",
           "priority": "P1",
-          "notes": "CNAME + reverse proxy. Configurable branding (logo, colors, favicon, email sender, chatbot persona). Agency resale tiers ($299-999/mo). Moved from Sprint C — fits better with distribution/growth.",
+          "notes": "CNAME + reverse proxy. Configurable branding (logo, colors, favicon, email sender, chatbot persona). Agency resale tiers ($299-999/mo). Moved from Sprint C \u2014 fits better with distribution/growth.",
           "status": "pending"
         },
         {
@@ -457,14 +457,14 @@
           "source": "Market prep analysis Mar 2026; revised May 2026 post-review",
           "est": "8-15h",
           "priority": "P2",
-          "notes": "91 route files in server/routes/ with no formal API spec. Triggers to pull forward: (a) first external API consumer signed (paid agency white-label, Zapier, contractor onboarding), (b) committing to migrate response validation to Zod for other reasons (OpenAPI becomes a free byproduct), (c) hitting 'I don't know what this endpoint returns' friction during builds. Implementation: use @asteasolutions/zod-to-openapi — NOT tsoa (requires controller-class refactor incompatible with Express+middleware style) or swagger-jsdoc (hand-maintained doc blocks rot immediately). Prerequisites before start: (1) response schemas must be migrated from shared/types/ TS interfaces to Zod (currently only request schemas are Zod via validate() middleware) — this is the bulk of the work, not the spec emission, (2) per-route security tagging for the dual auth model (HMAC x-auth-token admin vs JWT client vs public token), (3) pr-check rule asserting every Express route has a registered OpenAPI entry to prevent drift (zod-to-openapi does NOT introspect the route table — registration is opt-in per route). Out of scope: WebSocket broadcasts (would need separate AsyncAPI spec). Deliverables: registered request+response schemas per route, /api/docs Swagger UI gated to authenticated admins only, generated spec in CI artifact, drift-detection test.",
+          "notes": "91 route files in server/routes/ with no formal API spec. Triggers to pull forward: (a) first external API consumer signed (paid agency white-label, Zapier, contractor onboarding), (b) committing to migrate response validation to Zod for other reasons (OpenAPI becomes a free byproduct), (c) hitting 'I don't know what this endpoint returns' friction during builds. Implementation: use @asteasolutions/zod-to-openapi \u2014 NOT tsoa (requires controller-class refactor incompatible with Express+middleware style) or swagger-jsdoc (hand-maintained doc blocks rot immediately). Prerequisites before start: (1) response schemas must be migrated from shared/types/ TS interfaces to Zod (currently only request schemas are Zod via validate() middleware) \u2014 this is the bulk of the work, not the spec emission, (2) per-route security tagging for the dual auth model (HMAC x-auth-token admin vs JWT client vs public token), (3) pr-check rule asserting every Express route has a registered OpenAPI entry to prevent drift (zod-to-openapi does NOT introspect the route table \u2014 registration is opt-in per route). Out of scope: WebSocket broadcasts (would need separate AsyncAPI spec). Deliverables: registered request+response schemas per route, /api/docs Swagger UI gated to authenticated admins only, generated spec in CI artifact, drift-detection test.",
           "status": "pending"
         }
       ]
     },
     {
       "id": "sprint-intelligence-quality-consolidation",
-      "name": "Intelligence Quality Consolidation — Recommendations & AI Content",
+      "name": "Intelligence Quality Consolidation \u2014 Recommendations & AI Content",
       "hours": "50-82",
       "rationale": "Close the root quality gaps in platform insights and AI content generation by joining mature subsystems through the existing intelligence conventions instead of hand-rolling context, scoring, narrative, and evidence handling per feature. The target architecture is: workspace data -> intelligence slices -> shared generation context -> AI operation contract -> deterministic recommendation/story output -> tracked action/outcome -> future intelligence. The remaining keyword work extends this consolidation into a full keyword operating loop: provider source data -> shared keyword intelligence -> strategy/recommendation judgment -> rank-tracking propagation -> content/action follow-through -> outcome feedback.",
       "items": [
@@ -602,7 +602,7 @@
           "est": "5-8h",
           "priority": "P1",
           "status": "done",
-          "notes": "Completed in PR4. Added `server/signal-story-registry.ts` as the server-local boundary for signal→story projection across three surfaces: client insight narratives, deterministic briefing insight dispatch, and overlapping recommendation copy. `server/insight-narrative.ts` now consumes the registry instead of hand-writing inline narrative maps, which closed generic fallback gaps for `audit_finding`, `site_health`, and `milestone_attribution` while keeping explicit non-client exclusions for `strategy_alignment` and `keyword_cluster`. `server/briefing-templates/index.ts` now routes insight/content-gap dispatch through the shared registry boundary without replacing the existing deterministic templates. `server/recommendations.ts` now uses centralized story copy builders for content gaps, ranking opportunities, content decay, CTR underperformance, and freshness alerts so overlapping signals stop inventing separate phrasing. Added focused coverage in `tests/unit/signal-story-registry.test.ts` and updated narrative coverage tests."
+          "notes": "Completed in PR4. Added `server/signal-story-registry.ts` as the server-local boundary for signal\u2192story projection across three surfaces: client insight narratives, deterministic briefing insight dispatch, and overlapping recommendation copy. `server/insight-narrative.ts` now consumes the registry instead of hand-writing inline narrative maps, which closed generic fallback gaps for `audit_finding`, `site_health`, and `milestone_attribution` while keeping explicit non-client exclusions for `strategy_alignment` and `keyword_cluster`. `server/briefing-templates/index.ts` now routes insight/content-gap dispatch through the shared registry boundary without replacing the existing deterministic templates. `server/recommendations.ts` now uses centralized story copy builders for content gaps, ranking opportunities, content decay, CTR underperformance, and freshness alerts so overlapping signals stop inventing separate phrasing. Added focused coverage in `tests/unit/signal-story-registry.test.ts` and updated narrative coverage tests."
         },
         {
           "id": "intel-quality-outcome-learning-default-path",
@@ -701,7 +701,7 @@
           "est": "6-10h",
           "priority": "P1",
           "status": "done",
-          "notes": "After source data, shared intelligence, and propagation are in place, make the keyword strategy experience visibly more useful to admins and clients. This is the PR13 quality/UX pass that turns the backend operating loop into product value.\n\nIntent:\n- Move the platform from “we generated a keyword strategy” to “here is the keyword operating plan, why each keyword was chosen, how it is performing, what changed, and what to do next.”\n\nImplementation opportunities:\n- Add a strategy refresh summary: keywords added, removed/deprecated, reassigned to new pages, preserved because manually pinned/client-requested, and content gaps newly created or resolved.\n- Add keyword-level explainability using the shared keyword intelligence explanation primitives: source evidence, business fit, client feedback, existing page conflict/cannibalization posture, authority posture, opportunity score, and whether AI reranking or deterministic scoring influenced the choice.\n- Improve admin surfaces around page keyword maps: show why each page has its primary keyword, whether it came from GSC/provider/client request/competitor gap/source expansion, and whether the platform considers it reachable now or authority-building.\n- Improve rank-tracking and Page Intelligence handoff: show newly tracked keywords, tracking status, baseline state, and whether rank data is waiting for the next snapshot.\n- Improve client Strategy tab copy without overexposing internals: frame strategy changes as “what changed,” “what we are watching,” and “what we recommend doing next.”\n- Connect keyword choices to content actions: generate brief CTA for new content gaps, optimization CTA for existing-page keyword moves, and recommendation card refreshes for newly underperforming or newly reachable opportunities.\n- Preserve no-publishing/no-auto-action posture: this PR should explain and queue actions, not silently publish content or change live site metadata.\n\nTests:\n- Component/hook tests for refresh summary and keyword explanation rendering if UI changes land.\n- Contract tests ensuring explanation payloads remain optional/backward-compatible if exposed through existing APIs.\n- Integration tests proving a regenerated strategy can produce a coherent change set and that deprecated/reassigned keywords render safely.\n- Staging QA on at least two workspaces: an established site with rich GSC/provider data and a sparse/cold-start site.\n\nAcceptance criteria:\n- Admins can quickly answer: why this keyword, what changed, what should we track, and what action should happen next.\n- Clients see a clearer strategy story without raw-provider jargon.\n- Keyword choices are connected to content briefs/recommendations/rank tracking in the UI.\n- No client API breakage and no automatic publishing behavior is introduced.\n\nPrerequisite now satisfied by `intel-quality-keyword-strategy-refactor-signal-hygiene`: PR13 can build UX/explainability on sanitized strategy outputs, lifecycle-retired stale tracking keywords, and signal-boundary-filtered keyword insights rather than compensating for noisy backend primitives.\n\nCompleted in PR13 on 2026-05-20. Added the visible strategy quality/action-loop layer on top of the PR10-PR12 source, lifecycle, and shared keyword-intelligence work.\n\nWhat changed:\n- Added shared optional strategy UX contracts in `shared/types/keyword-strategy-ux.ts` for refresh summaries, keyword explanations, tracking/action state, and raw evidence posture.\n- Added `server/keyword-strategy-ux.ts`, a read-only assembler that derives explanations from existing strategy, page keyword, content-gap, keyword-gap, feedback, rank-tracking lifecycle, and shared keyword-intelligence evaluation data.\n- Extended admin strategy reads, strategy diff reads, and public/client strategy reads backward-compatibly with optional `strategyUx` / summary / explanation fields.\n- Upgraded admin \"What Changed\" into a refresh summary with added/retained/reassigned/retired/preserved counts and explanation previews.\n- Relabeled competitor keyword gaps as raw provider evidence so noisy provider terms are not presented as selected strategy actions.\n- Added client-safe strategy refresh and explanation affordances in the Strategy tab, keyword drawer, and page keyword map, preserving existing feedback/request flows.\n- Added small rank-tracker handoff labels for strategy/client-sourced tracked keywords.\n\nScope boundaries preserved:\n- No scoring/ranking rewrite, no automatic regeneration, no publishing/live metadata writes, no DB migration, and no local SEO implementation.\n- Optional fields are additive and absent-safe for existing callers.\n\nVerification coverage:\n- Added focused tests for refresh summary counts, keyword explanation mapping, raw evidence posture, and client-safe omission of competitor-gap evidence."
+          "notes": "After source data, shared intelligence, and propagation are in place, make the keyword strategy experience visibly more useful to admins and clients. This is the PR13 quality/UX pass that turns the backend operating loop into product value.\n\nIntent:\n- Move the platform from \u201cwe generated a keyword strategy\u201d to \u201chere is the keyword operating plan, why each keyword was chosen, how it is performing, what changed, and what to do next.\u201d\n\nImplementation opportunities:\n- Add a strategy refresh summary: keywords added, removed/deprecated, reassigned to new pages, preserved because manually pinned/client-requested, and content gaps newly created or resolved.\n- Add keyword-level explainability using the shared keyword intelligence explanation primitives: source evidence, business fit, client feedback, existing page conflict/cannibalization posture, authority posture, opportunity score, and whether AI reranking or deterministic scoring influenced the choice.\n- Improve admin surfaces around page keyword maps: show why each page has its primary keyword, whether it came from GSC/provider/client request/competitor gap/source expansion, and whether the platform considers it reachable now or authority-building.\n- Improve rank-tracking and Page Intelligence handoff: show newly tracked keywords, tracking status, baseline state, and whether rank data is waiting for the next snapshot.\n- Improve client Strategy tab copy without overexposing internals: frame strategy changes as \u201cwhat changed,\u201d \u201cwhat we are watching,\u201d and \u201cwhat we recommend doing next.\u201d\n- Connect keyword choices to content actions: generate brief CTA for new content gaps, optimization CTA for existing-page keyword moves, and recommendation card refreshes for newly underperforming or newly reachable opportunities.\n- Preserve no-publishing/no-auto-action posture: this PR should explain and queue actions, not silently publish content or change live site metadata.\n\nTests:\n- Component/hook tests for refresh summary and keyword explanation rendering if UI changes land.\n- Contract tests ensuring explanation payloads remain optional/backward-compatible if exposed through existing APIs.\n- Integration tests proving a regenerated strategy can produce a coherent change set and that deprecated/reassigned keywords render safely.\n- Staging QA on at least two workspaces: an established site with rich GSC/provider data and a sparse/cold-start site.\n\nAcceptance criteria:\n- Admins can quickly answer: why this keyword, what changed, what should we track, and what action should happen next.\n- Clients see a clearer strategy story without raw-provider jargon.\n- Keyword choices are connected to content briefs/recommendations/rank tracking in the UI.\n- No client API breakage and no automatic publishing behavior is introduced.\n\nPrerequisite now satisfied by `intel-quality-keyword-strategy-refactor-signal-hygiene`: PR13 can build UX/explainability on sanitized strategy outputs, lifecycle-retired stale tracking keywords, and signal-boundary-filtered keyword insights rather than compensating for noisy backend primitives.\n\nCompleted in PR13 on 2026-05-20. Added the visible strategy quality/action-loop layer on top of the PR10-PR12 source, lifecycle, and shared keyword-intelligence work.\n\nWhat changed:\n- Added shared optional strategy UX contracts in `shared/types/keyword-strategy-ux.ts` for refresh summaries, keyword explanations, tracking/action state, and raw evidence posture.\n- Added `server/keyword-strategy-ux.ts`, a read-only assembler that derives explanations from existing strategy, page keyword, content-gap, keyword-gap, feedback, rank-tracking lifecycle, and shared keyword-intelligence evaluation data.\n- Extended admin strategy reads, strategy diff reads, and public/client strategy reads backward-compatibly with optional `strategyUx` / summary / explanation fields.\n- Upgraded admin \"What Changed\" into a refresh summary with added/retained/reassigned/retired/preserved counts and explanation previews.\n- Relabeled competitor keyword gaps as raw provider evidence so noisy provider terms are not presented as selected strategy actions.\n- Added client-safe strategy refresh and explanation affordances in the Strategy tab, keyword drawer, and page keyword map, preserving existing feedback/request flows.\n- Added small rank-tracker handoff labels for strategy/client-sourced tracked keywords.\n\nScope boundaries preserved:\n- No scoring/ranking rewrite, no automatic regeneration, no publishing/live metadata writes, no DB migration, and no local SEO implementation.\n- Optional fields are additive and absent-safe for existing callers.\n\nVerification coverage:\n- Added focused tests for refresh summary counts, keyword explanation mapping, raw evidence posture, and client-safe omission of competitor-gap evidence."
         },
         {
           "id": "intel-quality-keyword-command-center",
@@ -747,7 +747,7 @@
           "priority": "P0",
           "status": "done",
           "owner": "seo-health",
-          "notes": "Completed in PR16 on 2026-05-20. Added the bounded, feature-flagged local-pack visibility foundation after PR15 keyword equality hardening.\n\nWhat changed:\n- Added shared local SEO contracts in `shared/types/local-seo.ts` for workspace posture, posture source, markets, devices, provider source endpoints, local visibility snapshots, business-match confidence, and degraded/provider-failure states.\n- Added the `local-seo-visibility` feature flag and `local-seo-refresh` background job type.\n- Added storage via `096-local-seo-visibility.sql` for workspace local SEO settings, explicit local markets, and append-only local visibility snapshots separate from GSC Rank Tracker snapshots.\n- Extended `SeoDataProvider` with optional `getLocalVisibility()` and implemented DataForSEO Google Organic SERP local-pack parsing inside the provider layer, with local endpoint credit labels, cache keys that include keyword/market/device/language/source endpoint, typed provider-failure degradation, and no direct DataForSEO imports in strategy/UI code.\n- Added server-local local SEO service logic for posture suggestions, business-profile market suggestions, explicit admin market storage, local-intent keyword selection from active tracked/page-assigned terms, conservative business match confidence, snapshot persistence, broadcasts, activity logging, and intelligence cache invalidation.\n- Added admin-only APIs: `GET /api/local-seo/:workspaceId`, `PUT /api/local-seo/:workspaceId`, and `POST /api/local-seo/:workspaceId/refresh`. Refreshes are gated by `local-seo-visibility`, run through a background job, originally capped v1 to three markets and twenty-five keywords, and do not mutate strategy, publish content, write metadata, or mix local visibility into Rank Tracker.\n\nScope boundaries preserved: no client-facing local SEO payloads, no reporting UI, no GBP health/reviews, no geo-grid tracking, no synchronous strategy-generation provider fanout, and no publishing/live-site mutation. PR17 should build the admin reporting and Strategy/Keyword Command Center/Page Intelligence annotations on top of this stored evidence.\n\nFollow-up note: `intel-quality-local-keyword-lens-visibility-usability` later raised the keyword refresh cap to 50 prioritized candidates after staging QA showed the passive 20–25 keyword set was too thin for local businesses."
+          "notes": "Completed in PR16 on 2026-05-20. Added the bounded, feature-flagged local-pack visibility foundation after PR15 keyword equality hardening.\n\nWhat changed:\n- Added shared local SEO contracts in `shared/types/local-seo.ts` for workspace posture, posture source, markets, devices, provider source endpoints, local visibility snapshots, business-match confidence, and degraded/provider-failure states.\n- Added the `local-seo-visibility` feature flag and `local-seo-refresh` background job type.\n- Added storage via `096-local-seo-visibility.sql` for workspace local SEO settings, explicit local markets, and append-only local visibility snapshots separate from GSC Rank Tracker snapshots.\n- Extended `SeoDataProvider` with optional `getLocalVisibility()` and implemented DataForSEO Google Organic SERP local-pack parsing inside the provider layer, with local endpoint credit labels, cache keys that include keyword/market/device/language/source endpoint, typed provider-failure degradation, and no direct DataForSEO imports in strategy/UI code.\n- Added server-local local SEO service logic for posture suggestions, business-profile market suggestions, explicit admin market storage, local-intent keyword selection from active tracked/page-assigned terms, conservative business match confidence, snapshot persistence, broadcasts, activity logging, and intelligence cache invalidation.\n- Added admin-only APIs: `GET /api/local-seo/:workspaceId`, `PUT /api/local-seo/:workspaceId`, and `POST /api/local-seo/:workspaceId/refresh`. Refreshes are gated by `local-seo-visibility`, run through a background job, originally capped v1 to three markets and twenty-five keywords, and do not mutate strategy, publish content, write metadata, or mix local visibility into Rank Tracker.\n\nScope boundaries preserved: no client-facing local SEO payloads, no reporting UI, no GBP health/reviews, no geo-grid tracking, no synchronous strategy-generation provider fanout, and no publishing/live-site mutation. PR17 should build the admin reporting and Strategy/Keyword Command Center/Page Intelligence annotations on top of this stored evidence.\n\nFollow-up note: `intel-quality-local-keyword-lens-visibility-usability` later raised the keyword refresh cap to 50 prioritized candidates after staging QA showed the passive 20\u201325 keyword set was too thin for local businesses."
         },
         {
           "id": "intel-quality-local-seo-reporting-strategy-integration",
@@ -766,7 +766,7 @@
           "est": "M",
           "priority": "P0",
           "status": "done",
-          "notes": "Completed in this PR on 2026-05-20. Made Local SEO Visibility operate as a lens inside the Keyword Command Center instead of a separate keyword silo.\n\nWhat changed:\n- Shrank Local SEO reporting panels into summary/control cards: configured markets, last refresh, checked/visible/possible/not-found/degraded counts, configure market, refresh visibility, and a View local keywords handoff. Keyword-level lists now live in Keywords.\n- Expanded local refresh selection with a server-local local keyword candidate builder that draws from strategy keywords, active tracked keywords, page-assigned primary/secondary keywords, service page titles, content gaps, configured market city/state, and safe city/near-me local variants. Declined, retired, duplicate, weak-fit, and known-noisy candidates are suppressed through the shared keyword-intelligence rules.\n- Raised the bounded local refresh cap to 50 prioritized keywords per refresh so local businesses are not limited to the previous passive 20–25 existing terms, while preserving background-job/provider guardrails.\n- Extended Keyword Command Center rows with local lifecycle/priority state, local visibility evidence, top local-result evidence, and safe next actions such as Check locally/Refresh local, Track keyword, Promote candidate, Decline, Review page, and Generate brief.\n- Added local filters: Local, Local Candidates, Visible Locally, Possible Match, Not Visible, Not Checked, and Provider Degraded. Local candidates appear in the main keyword universe, not as selected strategy terms until promoted/tracked.\n- Added a stability hardening patch after staging QA: keyword strategy background jobs now store and broadcast only a compact completion summary instead of the full generated strategy payload. The strategy itself remains persisted in the domain store and is read through the normal strategy endpoint, which avoids large SQLite/job-cache/WebSocket payloads at the end of heavy generation runs.\n\nBoundaries preserved: no client-facing local SEO, no strategy regeneration, no publishing, no live metadata/schema writes, no GBP mutation, no geo-grid tracking, and no separate local keyword manager. Rank Tracker remains Search Console measurement-only."
+          "notes": "Completed in this PR on 2026-05-20. Made Local SEO Visibility operate as a lens inside the Keyword Command Center instead of a separate keyword silo.\n\nWhat changed:\n- Shrank Local SEO reporting panels into summary/control cards: configured markets, last refresh, checked/visible/possible/not-found/degraded counts, configure market, refresh visibility, and a View local keywords handoff. Keyword-level lists now live in Keywords.\n- Expanded local refresh selection with a server-local local keyword candidate builder that draws from strategy keywords, active tracked keywords, page-assigned primary/secondary keywords, service page titles, content gaps, configured market city/state, and safe city/near-me local variants. Declined, retired, duplicate, weak-fit, and known-noisy candidates are suppressed through the shared keyword-intelligence rules.\n- Raised the bounded local refresh cap to 50 prioritized keywords per refresh so local businesses are not limited to the previous passive 20\u201325 existing terms, while preserving background-job/provider guardrails.\n- Extended Keyword Command Center rows with local lifecycle/priority state, local visibility evidence, top local-result evidence, and safe next actions such as Check locally/Refresh local, Track keyword, Promote candidate, Decline, Review page, and Generate brief.\n- Added local filters: Local, Local Candidates, Visible Locally, Possible Match, Not Visible, Not Checked, and Provider Degraded. Local candidates appear in the main keyword universe, not as selected strategy terms until promoted/tracked.\n- Added a stability hardening patch after staging QA: keyword strategy background jobs now store and broadcast only a compact completion summary instead of the full generated strategy payload. The strategy itself remains persisted in the domain store and is read through the normal strategy endpoint, which avoids large SQLite/job-cache/WebSocket payloads at the end of heavy generation runs.\n\nBoundaries preserved: no client-facing local SEO, no strategy regeneration, no publishing, no live metadata/schema writes, no GBP mutation, no geo-grid tracking, and no separate local keyword manager. Rank Tracker remains Search Console measurement-only."
         },
         {
           "id": "intel-quality-keyword-command-center-oom-hotfix",
@@ -790,7 +790,7 @@
           "source": "Staging filter row-count drift report 2026-05-21",
           "status": "done",
           "owner": "seo-health",
-          "notes": "Completed in this PR on 2026-05-21. Staging showed filtered tabs inflating beyond their badge counts (Tracked badge 235 / table 275; In Strategy 224 / table 227; Visible Locally 1 / table showed many non-local rows with `—` posture). Root cause: `filterBundleToKeys` and `buildFilteredBundle` used a boolean `pageMatchesKeys` that let pages survive whole if ANY of their primary/secondary keywords was in the selected key set, after which `populateDraftRows` created rows for every page keyword — inflating filtered results with sibling keywords. Fix: introduced `restrictPageToKeys` transformer that trims each surviving page's primary and secondary keywords to only those in the key set (or drops the page if nothing remains), making the paged key set a hard row-creation boundary. Added post-materialization filter validation in `buildKeywordCommandCenterRowsSkinny` as defense-in-depth with a `rowsDropped` diagnostic in the structured log line so regressions surface in staging logs. Also fixed `localCandidates: 0` hardcoded in the skinny summary so the badge reflects the bounded candidate generator output (still capped by `LOCAL_CANDIDATE_HARD_CAP = 1000`). Added 6 regression tests covering tracked/empty/visible_locally/possible_match/all-count-alignment/localCandidates-badge cases. No public route or payload shape changes. **NOTE 2026-05-21:** localCandidates count portion of this PR caused a 35-second summary regression on rich workspaces and was reverted in `intel-quality-localcandidates-summary-revert`. Other parts (row expansion fix) remain in place."
+          "notes": "Completed in this PR on 2026-05-21. Staging showed filtered tabs inflating beyond their badge counts (Tracked badge 235 / table 275; In Strategy 224 / table 227; Visible Locally 1 / table showed many non-local rows with `\u2014` posture). Root cause: `filterBundleToKeys` and `buildFilteredBundle` used a boolean `pageMatchesKeys` that let pages survive whole if ANY of their primary/secondary keywords was in the selected key set, after which `populateDraftRows` created rows for every page keyword \u2014 inflating filtered results with sibling keywords. Fix: introduced `restrictPageToKeys` transformer that trims each surviving page's primary and secondary keywords to only those in the key set (or drops the page if nothing remains), making the paged key set a hard row-creation boundary. Added post-materialization filter validation in `buildKeywordCommandCenterRowsSkinny` as defense-in-depth with a `rowsDropped` diagnostic in the structured log line so regressions surface in staging logs. Also fixed `localCandidates: 0` hardcoded in the skinny summary so the badge reflects the bounded candidate generator output (still capped by `LOCAL_CANDIDATE_HARD_CAP = 1000`). Added 6 regression tests covering tracked/empty/visible_locally/possible_match/all-count-alignment/localCandidates-badge cases. No public route or payload shape changes. **NOTE 2026-05-21:** localCandidates count portion of this PR caused a 35-second summary regression on rich workspaces and was reverted in `intel-quality-localcandidates-summary-revert`. Other parts (row expansion fix) remain in place."
         },
         {
           "id": "intel-quality-localcandidates-summary-revert",
@@ -798,7 +798,7 @@
           "source": "Render staging crash logs 2026-05-21",
           "status": "done",
           "owner": "seo-health",
-          "notes": "Completed in this PR on 2026-05-21. The localCandidates count addition from PR #876 ran `buildLocalSeoKeywordCandidates(workspace.id).length` on every summary request. Although the candidates Map was bounded at `LOCAL_CANDIDATE_HARD_CAP = 1000`, the function still ran `evaluateKeywordCandidate` (in `server/keyword-intelligence/rules.ts`) on every candidate. That evaluator scans pageMap × secondary keywords per call (~250 string comparisons each) and runs token-overlap, business-fit, and near-duplicate heuristics. On Swish (~235 tracked keywords + ~50 pages × multiple keywords + per-base variants × markets), the summary took 35.8 seconds — observed in Render logs as `totalMs: 35838`, `finalHeapMb: 101`. The badge fix re-introduced the exact hot-path regression that PRs #871–#873 had removed. This revert returns `localCandidates: 0` in the skinny summary path until a follow-up lands the proper fix. Test updated to lock in the 0 expectation so the regression cannot reappear silently."
+          "notes": "Completed in this PR on 2026-05-21. The localCandidates count addition from PR #876 ran `buildLocalSeoKeywordCandidates(workspace.id).length` on every summary request. Although the candidates Map was bounded at `LOCAL_CANDIDATE_HARD_CAP = 1000`, the function still ran `evaluateKeywordCandidate` (in `server/keyword-intelligence/rules.ts`) on every candidate. That evaluator scans pageMap \u00d7 secondary keywords per call (~250 string comparisons each) and runs token-overlap, business-fit, and near-duplicate heuristics. On Swish (~235 tracked keywords + ~50 pages \u00d7 multiple keywords + per-base variants \u00d7 markets), the summary took 35.8 seconds \u2014 observed in Render logs as `totalMs: 35838`, `finalHeapMb: 101`. The badge fix re-introduced the exact hot-path regression that PRs #871\u2013#873 had removed. This revert returns `localCandidates: 0` in the skinny summary path until a follow-up lands the proper fix. Test updated to lock in the 0 expectation so the regression cannot reappear silently."
         },
         {
           "id": "intel-quality-kcc-tracking-has-signal",
@@ -806,7 +806,7 @@
           "source": "Live data hygiene audit on Swish 2026-05-21",
           "status": "done",
           "owner": "seo-health",
-          "notes": "Completed in this PR on 2026-05-21. Live audit found 175/235 (74%) of Swish active-tracked rows had `metrics.currentPosition == null` AND no GSC clicks/impressions — they were tracked in name only because the rank snapshot worker only writes rows for keywords that actually surface in GSC results. Showing all of them as plain 'Active' overstated tracking coverage. Fix: added `tracking.hasSignal: boolean` to the public `KeywordCommandCenterTrackingState` contract, set in `finalizeDraftRow` based on `row.metrics.currentPosition || clicks || impressions`. Drawer UI now renders 'Active · Awaiting data' with an amber sub-line ('No GSC clicks, impressions, or rank position recorded yet for this keyword.') when status is active and hasSignal is false. Also cleaned up the source detail rendering so residual `unknown` enum values don't display literally — show 'Source not recorded' instead. Field is omitted (undefined) for not_tracked rows since the signal concept doesn't apply. Two regression tests cover the true/false states."
+          "notes": "Completed in this PR on 2026-05-21. Live audit found 175/235 (74%) of Swish active-tracked rows had `metrics.currentPosition == null` AND no GSC clicks/impressions \u2014 they were tracked in name only because the rank snapshot worker only writes rows for keywords that actually surface in GSC results. Showing all of them as plain 'Active' overstated tracking coverage. Fix: added `tracking.hasSignal: boolean` to the public `KeywordCommandCenterTrackingState` contract, set in `finalizeDraftRow` based on `row.metrics.currentPosition || clicks || impressions`. Drawer UI now renders 'Active \u00b7 Awaiting data' with an amber sub-line ('No GSC clicks, impressions, or rank position recorded yet for this keyword.') when status is active and hasSignal is false. Also cleaned up the source detail rendering so residual `unknown` enum values don't display literally \u2014 show 'Source not recorded' instead. Field is omitted (undefined) for not_tracked rows since the signal concept doesn't apply. Two regression tests cover the true/false states."
         },
         {
           "id": "intel-quality-kcc-tracking-source-backfill",
@@ -814,7 +814,7 @@
           "source": "Live data hygiene audit on Swish 2026-05-21",
           "status": "done",
           "owner": "seo-health",
-          "notes": "Completed in this PR on 2026-05-21. Live audit of Swish found 231/235 active-tracked rows had `tracking.source: \"unknown\"` — a legacy migration artifact since `rank-tracking.ts:140` defaults to UNKNOWN when source isn't supplied and `db/migrate-json.ts:1026` migrated pre-source-field tracked keywords without provenance. Effects: `protectedReason()` couldn't flag CLIENT_REQUESTED / MANUAL keywords as protected (234/235 unprotected on Swish), `trackedKeywordMatchesFilter(IN_STRATEGY)` missed inferred-strategy keywords, and the UI rendered the literal `unknown` string as a meaningful source detail. Fix: added `inferTrackedKeywordSources` in keyword-command-center.ts that cross-references the workspace's current strategy (siteKeywordMetrics → STRATEGY_PRIMARY, siteKeywords → STRATEGY_SITE_KEYWORD), keyword_feedback (requested → CLIENT_REQUESTED), and content_gaps (CONTENT_GAP) to upgrade UNKNOWN tracked keywords at read time. Applied at bundle assembly level so all downstream consumers see the inferred sources uniformly. Read-time only — does not persist back to storage so the inference can adapt as strategy evolves. UI detail-label code (`trackingSourceDetail`) now returns undefined for UNKNOWN so the literal string is never displayed. Six regression tests cover: each inference rule (strategy_primary, strategy_site_keyword, client_requested), unchanged-when-no-hint, recorded-source-wins-over-inference, and summary/rows alignment after inference."
+          "notes": "Completed in this PR on 2026-05-21. Live audit of Swish found 231/235 active-tracked rows had `tracking.source: \"unknown\"` \u2014 a legacy migration artifact since `rank-tracking.ts:140` defaults to UNKNOWN when source isn't supplied and `db/migrate-json.ts:1026` migrated pre-source-field tracked keywords without provenance. Effects: `protectedReason()` couldn't flag CLIENT_REQUESTED / MANUAL keywords as protected (234/235 unprotected on Swish), `trackedKeywordMatchesFilter(IN_STRATEGY)` missed inferred-strategy keywords, and the UI rendered the literal `unknown` string as a meaningful source detail. Fix: added `inferTrackedKeywordSources` in keyword-command-center.ts that cross-references the workspace's current strategy (siteKeywordMetrics \u2192 STRATEGY_PRIMARY, siteKeywords \u2192 STRATEGY_SITE_KEYWORD), keyword_feedback (requested \u2192 CLIENT_REQUESTED), and content_gaps (CONTENT_GAP) to upgrade UNKNOWN tracked keywords at read time. Applied at bundle assembly level so all downstream consumers see the inferred sources uniformly. Read-time only \u2014 does not persist back to storage so the inference can adapt as strategy evolves. UI detail-label code (`trackingSourceDetail`) now returns undefined for UNKNOWN so the literal string is never displayed. Six regression tests cover: each inference rule (strategy_primary, strategy_site_keyword, client_requested), unchanged-when-no-hint, recorded-source-wins-over-inference, and summary/rows alignment after inference."
         },
         {
           "id": "intel-quality-localcandidates-cheap-count",
@@ -822,7 +822,7 @@
           "source": "Render staging crash logs 2026-05-21",
           "status": "done",
           "owner": "seo-health",
-          "notes": "Completed in PR #G on 2026-05-21. Added `countLocalSeoKeywordCandidates(workspaceId)` in server/local-seo.ts that mirrors the candidate generator's outer iteration and cheap filters (declined, inactive, intent regex, market modifier regex) but skips `evaluateKeywordCandidate` — the per-candidate scan that caused the 35-second regression in PR #876. Sub-100ms even on Swish-scale workspaces. Slight overcount is possible (no eligibility evaluation) but acceptable as a UX hint — the actual displayable list still comes from the full generator when the user opens the Local Candidates filter. Three regression tests cover the cheap-path activation, the no-markets short-circuit (returns 0), and the LOCAL_CANDIDATE_HARD_CAP guardrail (count never exceeds 1000)."
+          "notes": "Completed in PR #G on 2026-05-21. Added `countLocalSeoKeywordCandidates(workspaceId)` in server/local-seo.ts that mirrors the candidate generator's outer iteration and cheap filters (declined, inactive, intent regex, market modifier regex) but skips `evaluateKeywordCandidate` \u2014 the per-candidate scan that caused the 35-second regression in PR #876. Sub-100ms even on Swish-scale workspaces. Slight overcount is possible (no eligibility evaluation) but acceptable as a UX hint \u2014 the actual displayable list still comes from the full generator when the user opens the Local Candidates filter. Three regression tests cover the cheap-path activation, the no-markets short-circuit (returns 0), and the LOCAL_CANDIDATE_HARD_CAP guardrail (count never exceeds 1000)."
         },
         {
           "id": "intel-quality-kcc-data-hygiene-polish",
@@ -830,7 +830,7 @@
           "source": "Live data hygiene audit on Swish 2026-05-21",
           "status": "done",
           "owner": "seo-health",
-          "notes": "Completed in PR #G on 2026-05-21. Final polish pass on the four medium-severity findings from the data hygiene audit. (1) Assignment-gap UI: in-strategy rows lacking an assignment now render the inline column label in amber and show a dedicated drawer block explaining the keyword is in strategy but not yet mapped to a page. (2) Promotion CTA for untracked-with-rank rows: verified already working — needs_review + untracked rows show [add_to_strategy, track, decline] as next actions via existing buildNextActions logic (line 400-409 of keyword-command-center.ts). No code change needed; confirmed live on Swish. (3) Volume-null diagnostic: added `missingVolume` count to summary via parallel `keysWithVolume` set computation, properly excluding planner-bucket sentinels. UI surfaces an amber 'X missing demand' badge in the panel header when missingVolume > 5% of the universe. (4) Local lifecycle state verification: all five KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE values (SELECTED, CANDIDATE, CHECKED, RAW_EVIDENCE, NOT_CHECKED) verified reachable in buildLocalSeoState. The audit's 100% 'selected' observation reflects natural data distribution on Swish (most checked-local keywords are also in_strategy), not a bug."
+          "notes": "Completed in PR #G on 2026-05-21. Final polish pass on the four medium-severity findings from the data hygiene audit. (1) Assignment-gap UI: in-strategy rows lacking an assignment now render the inline column label in amber and show a dedicated drawer block explaining the keyword is in strategy but not yet mapped to a page. (2) Promotion CTA for untracked-with-rank rows: verified already working \u2014 needs_review + untracked rows show [add_to_strategy, track, decline] as next actions via existing buildNextActions logic (line 400-409 of keyword-command-center.ts). No code change needed; confirmed live on Swish. (3) Volume-null diagnostic: added `missingVolume` count to summary via parallel `keysWithVolume` set computation, properly excluding planner-bucket sentinels. UI surfaces an amber 'X missing demand' badge in the panel header when missingVolume > 5% of the universe. (4) Local lifecycle state verification: all five KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE values (SELECTED, CANDIDATE, CHECKED, RAW_EVIDENCE, NOT_CHECKED) verified reachable in buildLocalSeoState. The audit's 100% 'selected' observation reflects natural data distribution on Swish (most checked-local keywords are also in_strategy), not a bug."
         },
         {
           "id": "intel-quality-kcc-planner-bucket-mask",
@@ -838,7 +838,7 @@
           "source": "Live data hygiene audit on Swish 2026-05-21",
           "status": "done",
           "owner": "seo-health",
-          "notes": "Completed in this PR on 2026-05-21. Live audit of the Swish workspace (371 rows) revealed 15 rows (~4% of universe, ~5.5% of active-tracked) displayed `volume: 1,000,000, difficulty: 21` — DataForSEO's Google Ads planner-grouped bucket sentinel pair. Branded long-tail keywords like 'contact swish dental' showed 1.0M monthly searches when the real value is well under 100. The codebase already has `isSuspiciousPlannerGroupedVolume` in `server/keyword-strategy-helpers.ts` and uses it in strategy generation paths, but it was never plugged into `keyword-command-center.ts` so the sentinel propagated through `mergeMetrics` and overwrote real provider data from page-keyword sources (later spreads win in the merge). Fix: wire the helper into `mergeMetrics` so the sentinel pair is dropped before merge. UI now renders `—` for affected rows instead of misleading 1.0M. The mask treats ALL volumes >= 1,000,000 as suspicious by design (rare for SMB workspaces to have legitimate million-volume keywords); if a niche ever needs higher legitimate ceilings, raise `PLANNER_GROUPED_VOLUME_FLOOR` in lockstep. Three regression tests cover: (a) sentinel from one source masked while real data from another wins, (b) orphan sentinel renders `—`, (c) sub-threshold real volumes preserved."
+          "notes": "Completed in this PR on 2026-05-21. Live audit of the Swish workspace (371 rows) revealed 15 rows (~4% of universe, ~5.5% of active-tracked) displayed `volume: 1,000,000, difficulty: 21` \u2014 DataForSEO's Google Ads planner-grouped bucket sentinel pair. Branded long-tail keywords like 'contact swish dental' showed 1.0M monthly searches when the real value is well under 100. The codebase already has `isSuspiciousPlannerGroupedVolume` in `server/keyword-strategy-helpers.ts` and uses it in strategy generation paths, but it was never plugged into `keyword-command-center.ts` so the sentinel propagated through `mergeMetrics` and overwrote real provider data from page-keyword sources (later spreads win in the merge). Fix: wire the helper into `mergeMetrics` so the sentinel pair is dropped before merge. UI now renders `\u2014` for affected rows instead of misleading 1.0M. The mask treats ALL volumes >= 1,000,000 as suspicious by design (rare for SMB workspaces to have legitimate million-volume keywords); if a niche ever needs higher legitimate ceilings, raise `PLANNER_GROUPED_VOLUME_FLOOR` in lockstep. Three regression tests cover: (a) sentinel from one source masked while real data from another wins, (b) orphan sentinel renders `\u2014`, (c) sub-threshold real volumes preserved."
         },
         {
           "id": "intel-quality-local-seo-visibility-intelligence-slice",
@@ -846,27 +846,27 @@
           "source": "Keyword Command Center stability and local SEO performance discussion 2026-05-21",
           "status": "done",
           "owner": "analytics-intelligence",
-          "notes": "Completed in this PR on 2026-05-21. New `LocalSeoSlice` wired through `buildWorkspaceIntelligence({ slices: ['localSeo'] })` so AdminChat, content/recommendation generation, and MCP `get_workspace_intelligence` are no longer blind to local SEO context. Design split: `candidates` carries the FULL bounded universe (capped only by LOCAL_CANDIDATE_HARD_CAP=1000 in local-seo.ts) so MCP consumers see everything; `effectiveLocalSeoBlock` is a pre-formatted, stratified-sampled prompt block (top 8 per active market, capped at 50 total) so AI prompts stay within token budget on hyper-local workspaces. Content generation has access to `selectRelevantLocalCandidates(slice, target, limit=15)` which boosts token-overlap and market-match candidates above unrelated higher-score ones — so per-piece content gen surfaces only locally relevant context. AdminChat includes the slice on performance/general questions and when the question mentions local signals (local, near me, GBP, market, location, city). Content + recommendation generation gate inclusion on a cheap active-markets check so non-local workspaces pay zero token cost. Empty-but-valid baseline returned when feature flag is off or no markets are configured. TODO documented in slice file: LocalSeoKeywordCandidate does not yet carry a `marketId` field, so per-market stratification falls back to flat top-N until that lands. No publishing, metadata writes, schema writes, GBP mutation, or strategy regeneration."
+          "notes": "Completed in this PR on 2026-05-21. New `LocalSeoSlice` wired through `buildWorkspaceIntelligence({ slices: ['localSeo'] })` so AdminChat, content/recommendation generation, and MCP `get_workspace_intelligence` are no longer blind to local SEO context. Design split: `candidates` carries the FULL bounded universe (capped only by LOCAL_CANDIDATE_HARD_CAP=1000 in local-seo.ts) so MCP consumers see everything; `effectiveLocalSeoBlock` is a pre-formatted, stratified-sampled prompt block (top 8 per active market, capped at 50 total) so AI prompts stay within token budget on hyper-local workspaces. Content generation has access to `selectRelevantLocalCandidates(slice, target, limit=15)` which boosts token-overlap and market-match candidates above unrelated higher-score ones \u2014 so per-piece content gen surfaces only locally relevant context. AdminChat includes the slice on performance/general questions and when the question mentions local signals (local, near me, GBP, market, location, city). Content + recommendation generation gate inclusion on a cheap active-markets check so non-local workspaces pay zero token cost. Empty-but-valid baseline returned when feature flag is off or no markets are configured. TODO documented in slice file: LocalSeoKeywordCandidate does not yet carry a `marketId` field, so per-market stratification falls back to flat top-N until that lands. No publishing, metadata writes, schema writes, GBP mutation, or strategy regeneration."
         },
         {
           "id": "intel-quality-local-seo-refresh-budget-per-workspace",
-          "title": "Local SEO refresh budget — default 100, per-workspace override 25–300",
+          "title": "Local SEO refresh budget \u2014 default 100, per-workspace override 25\u2013300",
           "source": "Tier 2 refactor cost analysis 2026-05-21",
           "status": "done",
           "owner": "seo-health",
-          "notes": "Completed in this PR on 2026-05-21. Raised the global keywords-per-refresh default from 50 → 100 and added a per-workspace `keywordsPerRefresh` override in `local_seo_workspace_settings` (migration 098-local-seo-keywords-per-refresh.sql). Bounds: 25–300. With the Tier 2 cheap/Evaluated split landing the same PR, the cost-per-refresh stays trivial (~$0.20 per active market for 100 keywords, ~$0.60 for 300) while local-first clients can now spend that budget on broader local-pack coverage. Surfaced in the Local SEO setup drawer as a numeric input with live cost-estimate text. Shared constants `LOCAL_SEO_MIN/DEFAULT/MAX_KEYWORDS_PER_REFRESH(_CAP)` in `shared/types/local-seo.ts`; server resolver `getEffectiveKeywordsPerRefresh(workspaceId)` clamps + falls back. Route validation via Zod `keywordsPerRefresh` field on the update payload. `caps` block in the read model now carries `keywordsPerRefreshMin/Max/Default` for the UI. Regression tests: default-when-unset, override-within-bounds, clamp-high, clamp-low, clear-to-null-reverts-to-default, read-model caps surface."
+          "notes": "Completed in this PR on 2026-05-21. Raised the global keywords-per-refresh default from 50 \u2192 100 and added a per-workspace `keywordsPerRefresh` override in `local_seo_workspace_settings` (migration 098-local-seo-keywords-per-refresh.sql). Bounds: 25\u2013300. With the Tier 2 cheap/Evaluated split landing the same PR, the cost-per-refresh stays trivial (~$0.20 per active market for 100 keywords, ~$0.60 for 300) while local-first clients can now spend that budget on broader local-pack coverage. Surfaced in the Local SEO setup drawer as a numeric input with live cost-estimate text. Shared constants `LOCAL_SEO_MIN/DEFAULT/MAX_KEYWORDS_PER_REFRESH(_CAP)` in `shared/types/local-seo.ts`; server resolver `getEffectiveKeywordsPerRefresh(workspaceId)` clamps + falls back. Route validation via Zod `keywordsPerRefresh` field on the update payload. `caps` block in the read model now carries `keywordsPerRefreshMin/Max/Default` for the UI. Regression tests: default-when-unset, override-within-bounds, clamp-high, clamp-low, clear-to-null-reverts-to-default, read-model caps surface."
         },
         {
           "id": "intel-quality-local-seo-candidate-architecture-tier2",
-          "title": "Local SEO candidate architecture — Tier 2 cheap/Evaluated split + TTL cache",
+          "title": "Local SEO candidate architecture \u2014 Tier 2 cheap/Evaluated split + TTL cache",
           "source": "Strategy refresh OOM crash + KCC Local Candidates 43s wait on Swish 2026-05-21",
           "status": "done",
           "owner": "seo-health",
-          "notes": "Completed in this PR on 2026-05-21. Tier 2 refactor of `buildLocalSeoKeywordCandidates`. The old function ran the evaluator + suppression per candidate (scanning pageMap × secondaries × markets) and caused two production issues: (a) Strategy 'Refresh' button crashed staging via OOM kill, (b) KCC Local Candidates filter took 35–43s on Swish. Refactor: (1) Extracted `iterateLocalCandidateSignals` generator that yields source signals (explicit, strategy, tracking, page map, content gaps) without scoring or evaluation. (2) Split into two functions — `buildLocalSeoKeywordCandidates` is now the cheap default (no evaluator, empty reasons, no scoreDelta — safe for all current production callers: refresh path, KCC row enrichment, intelligence slice) and `buildLocalSeoKeywordCandidatesEvaluated` is the opt-in slow variant (preserves original evaluator+suppression+reasons). (3) `loadCandidateIterationContext` accepts `{ withEvaluationContext: true }` so the Evaluated path reuses the single `buildCandidateContext` read instead of calling it twice. (4) `countLocalSeoKeywordCandidates` rewritten to share the new generator. (5) No module-level TTL cache — an earlier draft included a 60s memo but it risked stale-data bugs after workspace mutations (admin declines a candidate but it reappears for 60s) and unbounded memory growth across explicitKeywords permutations; the cheap generator is fast enough on its own. pr-check rule retargeted to the Evaluated variant with new `local-candidates-evaluated-ok` hatch token. Scales for upcoming geo-grid tracking, local SEO recommendations, Google reviews, and client local SEO module — all of which need cheap candidate enumeration, not the evaluator. Includes regression tests for cheap-path reasons[], Evaluated-as-subset-of-cheap contract, Evaluated path reasons populated, and KCC Local Candidates <2s timing on a 30-page workspace."
+          "notes": "Completed in this PR on 2026-05-21. Tier 2 refactor of `buildLocalSeoKeywordCandidates`. The old function ran the evaluator + suppression per candidate (scanning pageMap \u00d7 secondaries \u00d7 markets) and caused two production issues: (a) Strategy 'Refresh' button crashed staging via OOM kill, (b) KCC Local Candidates filter took 35\u201343s on Swish. Refactor: (1) Extracted `iterateLocalCandidateSignals` generator that yields source signals (explicit, strategy, tracking, page map, content gaps) without scoring or evaluation. (2) Split into two functions \u2014 `buildLocalSeoKeywordCandidates` is now the cheap default (no evaluator, empty reasons, no scoreDelta \u2014 safe for all current production callers: refresh path, KCC row enrichment, intelligence slice) and `buildLocalSeoKeywordCandidatesEvaluated` is the opt-in slow variant (preserves original evaluator+suppression+reasons). (3) `loadCandidateIterationContext` accepts `{ withEvaluationContext: true }` so the Evaluated path reuses the single `buildCandidateContext` read instead of calling it twice. (4) `countLocalSeoKeywordCandidates` rewritten to share the new generator. (5) No module-level TTL cache \u2014 an earlier draft included a 60s memo but it risked stale-data bugs after workspace mutations (admin declines a candidate but it reappears for 60s) and unbounded memory growth across explicitKeywords permutations; the cheap generator is fast enough on its own. pr-check rule retargeted to the Evaluated variant with new `local-candidates-evaluated-ok` hatch token. Scales for upcoming geo-grid tracking, local SEO recommendations, Google reviews, and client local SEO module \u2014 all of which need cheap candidate enumeration, not the evaluator. Includes regression tests for cheap-path reasons[], Evaluated-as-subset-of-cheap contract, Evaluated path reasons populated, and KCC Local Candidates <2s timing on a 30-page workspace."
         },
         {
           "id": "intel-quality-gsc-query-discovery-variant-matching",
-          "title": "GSC query discovery pipeline — depth, variants, lost visibility",
+          "title": "GSC query discovery pipeline \u2014 depth, variants, lost visibility",
           "source": "GSC Discovery Pipeline implementation plan 2026-05-22",
           "est": "5-8h",
           "priority": "P0",
@@ -877,7 +877,7 @@
         },
         {
           "id": "kcc-ui-overhaul",
-          "title": "Keyword Command Center UI/UX overhaul — slide-over drawer, bulk actions, overflow polish",
+          "title": "Keyword Command Center UI/UX overhaul \u2014 slide-over drawer, bulk actions, overflow polish",
           "source": "Staging Swish keyword detail audit 2026-05-21",
           "priority": "P1",
           "est": "1-2 days",
@@ -889,7 +889,7 @@
         },
         {
           "id": "local-seo-surface-audit",
-          "title": "Local SEO surface audit — Strategy / Keywords / Page Intelligence",
+          "title": "Local SEO surface audit \u2014 Strategy / Keywords / Page Intelligence",
           "source": "Tier 2 staging review 2026-05-21",
           "priority": "P2",
           "est": "0.5 day scoping + 1 day implementation",
@@ -900,14 +900,14 @@
         },
         {
           "id": "intel-quality-keyword-per-market-relevance",
-          "title": "Per-market keyword relevance — keyword↔market assignment model",
+          "title": "Per-market keyword relevance \u2014 keyword\u2194market assignment model",
           "source": "Tier 2 staging quality audit 2026-05-21",
           "priority": "P2",
           "est": "2-3 days",
           "status": "pending",
           "plannedSprint": "deferred",
           "owner": "seo-health",
-          "notes": "Today the refresh planner pairs every selected keyword with every active market — `dentist at houston` gets queried against Austin's market and surfaces Houston competitors as 'top local results' in the Austin context. Confirmed on Swish staging refresh 2026-05-21 (55 of 200 snapshots = 27.5% cross-market noise). Fix is non-trivial because it requires a keyword↔market assignment model. (1) New `keyword_markets` join table mapping which keywords should be checked against which markets. (2) Default: keyword applies to all active markets (matches current implicit behavior, no migration of existing data needed). (3) Override path: admin pins a keyword to specific market(s). (4) Auto-inference: if keyword text contains an active market's city/region name, default assignment to that market only. (5) Iterator + refresh planner respect the assignment. (6) UI: per-market detail blocks in keyword drawer instead of single block, with pin/unpin controls. (7) **Per-market volume/clicks/impressions reporting**: the keyword detail surface should show separate volume, GSC clicks, GSC impressions, and CTR per active market the keyword applies to — today these are workspace-global and don't distinguish between Austin and Houston performance for the same keyword. Requires per-market metric storage AND geo-targeted DataForSEO volume queries (see intel-quality-keyword-volume-geo-targeting). Deferred to P2 because no current client uses multi-market in production — Swish is the only multi-market workspace and is internal."
+          "notes": "Today the refresh planner pairs every selected keyword with every active market \u2014 `dentist at houston` gets queried against Austin's market and surfaces Houston competitors as 'top local results' in the Austin context. Confirmed on Swish staging refresh 2026-05-21 (55 of 200 snapshots = 27.5% cross-market noise). Fix is non-trivial because it requires a keyword\u2194market assignment model. (1) New `keyword_markets` join table mapping which keywords should be checked against which markets. (2) Default: keyword applies to all active markets (matches current implicit behavior, no migration of existing data needed). (3) Override path: admin pins a keyword to specific market(s). (4) Auto-inference: if keyword text contains an active market's city/region name, default assignment to that market only. (5) Iterator + refresh planner respect the assignment. (6) UI: per-market detail blocks in keyword drawer instead of single block, with pin/unpin controls. (7) **Per-market volume/clicks/impressions reporting**: the keyword detail surface should show separate volume, GSC clicks, GSC impressions, and CTR per active market the keyword applies to \u2014 today these are workspace-global and don't distinguish between Austin and Houston performance for the same keyword. Requires per-market metric storage AND geo-targeted DataForSEO volume queries (see intel-quality-keyword-volume-geo-targeting). Deferred to P2 because no current client uses multi-market in production \u2014 Swish is the only multi-market workspace and is internal."
         },
         {
           "id": "intel-quality-multi-location-business-match",
@@ -1049,7 +1049,7 @@
         },
         {
           "id": "superpowers-mcp-capability-upgrade-top5",
-          "title": "MCP capability upgrade — reliability + top-5 operator surface",
+          "title": "MCP capability upgrade \u2014 reliability + top-5 operator surface",
           "source": "MCP limitations implementation pass 2026-05-31",
           "est": "6-10h",
           "priority": "P1",
@@ -1086,13 +1086,13 @@
     },
     {
       "id": "sprint-roadmap-closeout-residuals",
-      "name": "Roadmap Residual Closeout — Near-Finish Sprint Cleanup",
+      "name": "Roadmap Residual Closeout \u2014 Near-Finish Sprint Cleanup",
       "hours": "8-13",
-      "rationale": "Consolidate the final 1–2 items from near-finished sprints into one explicit closeout queue so shipped sprint history stays clean while remaining work is execution-ready.",
+      "rationale": "Consolidate the final 1\u20132 items from near-finished sprints into one explicit closeout queue so shipped sprint history stays clean while remaining work is execution-ready.",
       "items": [
         {
           "id": 535,
-          "title": "CMS Editor UX Redesign — Match SeoEditor simplicity",
+          "title": "CMS Editor UX Redesign \u2014 Match SeoEditor simplicity",
           "source": "PR #138 review / manual testing",
           "est": "3-5h",
           "priority": "P1",
@@ -1121,7 +1121,7 @@
         },
         {
           "id": 356,
-          "title": "E-E-A-T Asset Library — Personalized Trust Signal Recommendations",
+          "title": "E-E-A-T Asset Library \u2014 Personalized Trust Signal Recommendations",
           "source": "USER REQUEST",
           "est": "4-6h",
           "priority": "P2",
@@ -1131,7 +1131,7 @@
         },
         {
           "id": 634,
-          "title": "Platform UX Audit 2026-05-19 — Quick Wins Batch",
+          "title": "Platform UX Audit 2026-05-19 \u2014 Quick Wins Batch",
           "source": "docs/audits/2026-05-19-platform-ux-audit.md",
           "est": "3-5h",
           "priority": "P1",
@@ -1143,19 +1143,19 @@
     },
     {
       "id": "sprint-platform-value-schema-intelligence-next",
-      "name": "Platform Value Wave — Schema Intelligence & Authority",
+      "name": "Platform Value Wave \u2014 Schema Intelligence & Authority",
       "hours": "80-140",
       "rationale": "Highest strategic SEO differentiation and trust-evidence value. Prioritizes schema intelligence upgrades that improve rich-result eligibility, E-E-A-T signaling, and entity grounding.",
       "items": [
         {
           "id": "schema-page-element-catalog-pr3",
-          "title": "Schema Page-Element Catalog PR3 — polish (codeBlocks, headings/ToC, speakable)",
-          "source": "docs/superpowers/specs/2026-04-29-page-element-catalog-design.md §5.3",
+          "title": "Schema Page-Element Catalog PR3 \u2014 polish (codeBlocks, headings/ToC, speakable)",
+          "source": "docs/superpowers/specs/2026-04-29-page-element-catalog-design.md \u00a75.3",
           "est": "2d",
           "priority": "P2",
           "sprint": "future",
           "status": "pending",
-          "notes": "Optional polish: codeBlocks → CodeRepository/SoftwareSourceCode (low ROI for agency sites); headings → WebPage.speakable cssSelector (overlaps with schema-engagement-signals; whichever ships first wins). May be skipped if cycles are short."
+          "notes": "Optional polish: codeBlocks \u2192 CodeRepository/SoftwareSourceCode (low ROI for agency sites); headings \u2192 WebPage.speakable cssSelector (overlaps with schema-engagement-signals; whichever ships first wins). May be skipped if cycles are short."
         },
         {
           "id": "schema-cleanup-dead-pageKeywordMap",
@@ -1170,7 +1170,7 @@
         },
         {
           "id": "schema-entity-grounding-phase-a-contract-guardrails",
-          "title": "Schema entity grounding Phase A — shared contracts + guardrails",
+          "title": "Schema entity grounding Phase A \u2014 shared contracts + guardrails",
           "source": "Platform health recommendation pass 2026-05-26",
           "est": "2-4h",
           "priority": "P0",
@@ -1181,7 +1181,7 @@
         },
         {
           "id": "schema-entity-grounding-phase-b-slice-wiring",
-          "title": "Schema entity grounding Phase B — intelligence slice wiring",
+          "title": "Schema entity grounding Phase B \u2014 intelligence slice wiring",
           "source": "Schema entity grounding rollout plan 2026-05-27",
           "est": "3-5h",
           "priority": "P0",
@@ -1192,7 +1192,7 @@
         },
         {
           "id": "schema-entity-grounding-phase-c-wikidata-resolution",
-          "title": "Schema entity grounding Phase C — Wikidata resolution + cache",
+          "title": "Schema entity grounding Phase C \u2014 Wikidata resolution + cache",
           "source": "Schema entity grounding rollout plan 2026-05-27",
           "est": "4-6h",
           "priority": "P0",
@@ -1203,7 +1203,7 @@
         },
         {
           "id": "schema-entity-grounding-phase-d-template-emission",
-          "title": "Schema entity grounding Phase D — typed entity emission wiring",
+          "title": "Schema entity grounding Phase D \u2014 typed entity emission wiring",
           "source": "Schema entity grounding rollout plan 2026-05-27",
           "est": "4-6h",
           "priority": "P0",
@@ -1214,54 +1214,54 @@
         },
         {
           "id": "schema-engagement-signals",
-          "title": "Schema engagement signals — wordCount, timeRequired, speakable, educationalLevel",
+          "title": "Schema engagement signals \u2014 wordCount, timeRequired, speakable, educationalLevel",
           "source": "Strategic landscape brainstorm 2026-04-29 (post-PR1 merge)",
           "est": "2d",
           "priority": "P1",
           "sprint": "future",
           "status": "pending",
-          "notes": "Article.wordCount shipped in the Blog/Article Schema Quality Hardening pass (May 2026) using visible content extraction instead of full articleBody duplication. Remaining quick-win Tier-4 fields with data the platform already has: Article.timeRequired = wordCount/250wpm rounded; WebPage.speakable with cssSelector pointing to .lead/.intro/first-paragraph — voice-assistant rich result; Article.educationalLevel via AI classification (Beginner/Intermediate/Advanced). All wire through existing PageData typed boundary. No new admin UI required for the basics; speakable cssSelector is a per-template constant. Independent rich-result eligibility unlock for Google Article + voice-search amplification."
+          "notes": "Article.wordCount shipped in the Blog/Article Schema Quality Hardening pass (May 2026) using visible content extraction instead of full articleBody duplication. Remaining quick-win Tier-4 fields with data the platform already has: Article.timeRequired = wordCount/250wpm rounded; WebPage.speakable with cssSelector pointing to .lead/.intro/first-paragraph \u2014 voice-assistant rich result; Article.educationalLevel via AI classification (Beginner/Intermediate/Advanced). All wire through existing PageData typed boundary. No new admin UI required for the basics; speakable cssSelector is a per-template constant. Independent rich-result eligibility unlock for Google Article + voice-search amplification."
         },
         {
           "id": "schema-eeat-amplifiers",
-          "title": "Schema E-E-A-T amplifiers — publishingPrinciples, reviewedBy, copyrightHolder, isAccessibleForFree, Person.jobTitle",
+          "title": "Schema E-E-A-T amplifiers \u2014 publishingPrinciples, reviewedBy, copyrightHolder, isAccessibleForFree, Person.jobTitle",
           "source": "Strategic landscape brainstorm 2026-04-29 (post-PR1 merge)",
           "est": "1w",
           "priority": "P1",
           "sprint": "future",
           "status": "pending",
-          "notes": "Tier-3 trust signals Google increasingly weighs. Add 4 new optional Workspace fields: publishingPrinciplesUrl, actionableFeedbackPolicyUrl (both → Organization.publishingPrinciples + actionableFeedbackPolicy on every page's @graph). Article.copyrightHolder ref to Organization, copyrightYear from datePublished. Article.reviewedBy as Person from new CMS field 'fact_checker' (optional). Article.isAccessibleForFree from per-tier content gating. Person.jobTitle + worksFor on author when CMS author records have those fields (currently they're just string names). Mostly admin Settings UI work + template emission. Each field is an additive E-E-A-T signal — non-breaking, immediate ranking benefit on YMYL content."
+          "notes": "Tier-3 trust signals Google increasingly weighs. Add 4 new optional Workspace fields: publishingPrinciplesUrl, actionableFeedbackPolicyUrl (both \u2192 Organization.publishingPrinciples + actionableFeedbackPolicy on every page's @graph). Article.copyrightHolder ref to Organization, copyrightYear from datePublished. Article.reviewedBy as Person from new CMS field 'fact_checker' (optional). Article.isAccessibleForFree from per-tier content gating. Person.jobTitle + worksFor on author when CMS author records have those fields (currently they're just string names). Mostly admin Settings UI work + template emission. Each field is an additive E-E-A-T signal \u2014 non-breaking, immediate ranking benefit on YMYL content."
         },
         {
           "id": "schema-entity-grounding-wikidata",
-          "title": "Schema entity grounding — typed Thing/Place entities + Wikidata sameAs disambiguation",
+          "title": "Schema entity grounding \u2014 typed Thing/Place entities + Wikidata sameAs disambiguation",
           "source": "Strategic landscape brainstorm 2026-04-29 (post-PR1 merge)",
           "est": "2-3w",
           "priority": "P0",
           "sprint": "future",
           "status": "done",
-          "notes": "Tier-2 / biggest competitive moat. Replace string knowsAbout (currently ['brand strategy','webflow']) with typed Thing entities linked to Wikidata Q-numbers via sameAs. Same upgrade for Article.about (typed Thing — what is this article about?), Article.mentions[] (entities referenced in body), Place entities for areaServed (Austin, TX → Wikidata Q16559), Organization.sameAs extended with Wikidata identifier. Architecture: new EntityResolutionSlice on buildWorkspaceIntelligence, populated by a Cheerio-based extractor that runs entity recognition (likely via OpenAI structured-output prompt against curated entity types) + Wikidata SPARQL lookup for top candidates, cached per-entity. Most agencies don't do this; Google's knowledge graph rewards disambiguation heavily. Architectural prerequisite met by parity-fields PR1 Pattern B starter. Can ship after schema-page-element-catalog-v1 (the catalog feeds Article.mentions extraction).\n[Platform health recommendation pass 2026-05-26: prioritized as the next emergent intelligence slice (EntityResolutionSlice) to prevent schema authority drift and duplicate ad hoc entity handling.]\n[Phase A completed 2026-05-27: contracts + guardrails shipped in roadmap item `schema-entity-grounding-phase-a-contract-guardrails`.]\n[Phase B completed 2026-05-27: intelligence slice scaffolding + schema-intelligence wrapper wiring shipped in roadmap item `schema-entity-grounding-phase-b-slice-wiring`.]\n[Phase C completed 2026-05-27: Wikidata disambiguation + cache shipped in roadmap item `schema-entity-grounding-phase-c-wikidata-resolution`.]\n[Phase D completed 2026-05-27: typed schema emission wiring shipped in roadmap item `schema-entity-grounding-phase-d-template-emission`; remaining follow-up is confidence tuning/telemetry.]\n\nNow complete: foundational phases A-D are shipped (contract guardrails, slice wiring, Wikidata resolution/cache, typed schema emission). Remaining confidence tuning/telemetry is follow-up quality work, not a blocker for this roadmap item.",
+          "notes": "Tier-2 / biggest competitive moat. Replace string knowsAbout (currently ['brand strategy','webflow']) with typed Thing entities linked to Wikidata Q-numbers via sameAs. Same upgrade for Article.about (typed Thing \u2014 what is this article about?), Article.mentions[] (entities referenced in body), Place entities for areaServed (Austin, TX \u2192 Wikidata Q16559), Organization.sameAs extended with Wikidata identifier. Architecture: new EntityResolutionSlice on buildWorkspaceIntelligence, populated by a Cheerio-based extractor that runs entity recognition (likely via OpenAI structured-output prompt against curated entity types) + Wikidata SPARQL lookup for top candidates, cached per-entity. Most agencies don't do this; Google's knowledge graph rewards disambiguation heavily. Architectural prerequisite met by parity-fields PR1 Pattern B starter. Can ship after schema-page-element-catalog-v1 (the catalog feeds Article.mentions extraction).\n[Platform health recommendation pass 2026-05-26: prioritized as the next emergent intelligence slice (EntityResolutionSlice) to prevent schema authority drift and duplicate ad hoc entity handling.]\n[Phase A completed 2026-05-27: contracts + guardrails shipped in roadmap item `schema-entity-grounding-phase-a-contract-guardrails`.]\n[Phase B completed 2026-05-27: intelligence slice scaffolding + schema-intelligence wrapper wiring shipped in roadmap item `schema-entity-grounding-phase-b-slice-wiring`.]\n[Phase C completed 2026-05-27: Wikidata disambiguation + cache shipped in roadmap item `schema-entity-grounding-phase-c-wikidata-resolution`.]\n[Phase D completed 2026-05-27: typed schema emission wiring shipped in roadmap item `schema-entity-grounding-phase-d-template-emission`; remaining follow-up is confidence tuning/telemetry.]\n\nNow complete: foundational phases A-D are shipped (contract guardrails, slice wiring, Wikidata resolution/cache, typed schema emission). Remaining confidence tuning/telemetry is follow-up quality work, not a blocker for this roadmap item.",
           "shippedAt": "2026-05-27"
         },
         {
           "id": "schema-commerce-types",
-          "title": "Schema commerce types — Service.offers (PriceSpecification), Product, Course, Event",
+          "title": "Schema commerce types \u2014 Service.offers (PriceSpecification), Product, Course, Event",
           "source": "Strategic landscape brainstorm 2026-04-29 (post-PR1 merge)",
           "est": "1-2w per type, parallelizable",
           "priority": "P2",
           "sprint": "future",
           "status": "pending",
-          "notes": "Tier-5 monetization opportunity for agencies with productized services / paid content. Service.offers with Offer { price, priceCurrency, availability } — Google's 'service prices' SERP feature. Product schema for templates/digital products. Course for educational content/training. Event for webinars/launches with eventStatus + eventAttendanceMode (Online/Offline/Mixed). Each is independent rich-result eligibility unlock. Workspace.contentPricing already exists (used for content-purchase tiers); Service.offers can reuse the pricing infra. Per-type effort similar to parity-fields PR1's per-template additions; parallelizable across template files. Default-off; admin opts in per-workspace. Most useful for agencies with packaged services (web-design + brand audit + content retainer); skip for service-only sites without published prices."
+          "notes": "Tier-5 monetization opportunity for agencies with productized services / paid content. Service.offers with Offer { price, priceCurrency, availability } \u2014 Google's 'service prices' SERP feature. Product schema for templates/digital products. Course for educational content/training. Event for webinars/launches with eventStatus + eventAttendanceMode (Online/Offline/Mixed). Each is independent rich-result eligibility unlock. Workspace.contentPricing already exists (used for content-purchase tiers); Service.offers can reuse the pricing infra. Per-type effort similar to parity-fields PR1's per-template additions; parallelizable across template files. Default-off; admin opts in per-workspace. Most useful for agencies with packaged services (web-design + brand audit + content retainer); skip for service-only sites without published prices."
         },
         {
           "id": "schema-trust-authority-graph",
-          "title": "Schema trust/authority — Organization.award, member, hasCredential, numberOfEmployees",
+          "title": "Schema trust/authority \u2014 Organization.award, member, hasCredential, numberOfEmployees",
           "source": "Strategic landscape brainstorm 2026-04-29 (post-PR1 merge)",
           "est": "2-3d",
           "priority": "P2",
           "sprint": "future",
           "status": "pending",
-          "notes": "Tier-6 reputation graph fields. New Workspace.organizationAwards (string[] of Award names → Award entity[]), Workspace.organizationMemberships (industry orgs → ProgramMembership/Organization references), Workspace.organizationCredentials (certifications → EducationalOccupationalCredential), Workspace.numberOfEmployees (QuantitativeValue { minValue, maxValue, unitText: 'employee' }). Each emitted on Organization sibling node in homepage + local-business templates. Pure admin Settings UI + template extension; no AI/intelligence dependencies. Agency credibility in SERP, especially for B2B competitive queries."
+          "notes": "Tier-6 reputation graph fields. New Workspace.organizationAwards (string[] of Award names \u2192 Award entity[]), Workspace.organizationMemberships (industry orgs \u2192 ProgramMembership/Organization references), Workspace.organizationCredentials (certifications \u2192 EducationalOccupationalCredential), Workspace.numberOfEmployees (QuantitativeValue { minValue, maxValue, unitText: 'employee' }). Each emitted on Organization sibling node in homepage + local-business templates. Pure admin Settings UI + template extension; no AI/intelligence dependencies. Agency credibility in SERP, especially for B2B competitive queries."
         },
         {
           "id": "schema-intelligence-layer-v2",
@@ -1277,7 +1277,7 @@
     },
     {
       "id": "sprint-platform-value-team-collaboration-controls",
-      "name": "Platform Value Wave — Team, Permissions, and Collaboration Controls",
+      "name": "Platform Value Wave \u2014 Team, Permissions, and Collaboration Controls",
       "hours": "20-28",
       "rationale": "Unlocks multi-user adoption and safer account expansion by closing core team-management, role-gating, and collaboration workflow gaps.",
       "items": [
@@ -1339,14 +1339,14 @@
     },
     {
       "id": "sprint-platform-value-experience-adoption",
-      "name": "Platform Value Wave — UX Adoption & Onboarding Momentum",
+      "name": "Platform Value Wave \u2014 UX Adoption & Onboarding Momentum",
       "hours": "34-48",
       "rationale": "Improves activation and stickiness through customizable workspace surfaces, guided education, accessibility UX uplift, and onboarding automation.",
       "items": [
         {
           "id": 540,
-          "title": "Widget System — Customizable Workspace Home dashboard",
-          "source": "UI_UX_AUDIT §Long-Term",
+          "title": "Widget System \u2014 Customizable Workspace Home dashboard",
+          "source": "UI_UX_AUDIT \u00a7Long-Term",
           "est": "6-8h",
           "priority": "P2",
           "notes": "Let users pin/unpin modules on Workspace Home, rearrange widget order, choose sizes (compact/full/wide). Save per-workspace layouts to localStorage or workspace config.",
@@ -1354,8 +1354,8 @@
         },
         {
           "id": 541,
-          "title": "AI Insights Feed — TikTok-style vertical feed of actionable insights",
-          "source": "UI_UX_AUDIT §Long-Term",
+          "title": "AI Insights Feed \u2014 TikTok-style vertical feed of actionable insights",
+          "source": "UI_UX_AUDIT \u00a7Long-Term",
           "est": "4-6h",
           "priority": "P3",
           "notes": "Swipeable insight cards: 'LCP improved 23%', '3 pages need schema', 'Competitor published 5 articles'. Auto-generated from anomaly detection + audit + strategy data.\n[Audit 2026-04-22 partial] Filterable insight feed UI shipped (src/components/insights/InsightFeed + InsightFeedItem + filter chips); swipeable vertical-feed presentation not built.",
@@ -1363,8 +1363,8 @@
         },
         {
           "id": 542,
-          "title": "Command Palette 2.0 — Action palette with natural language",
-          "source": "UI_UX_AUDIT §Long-Term",
+          "title": "Command Palette 2.0 \u2014 Action palette with natural language",
+          "source": "UI_UX_AUDIT \u00a7Long-Term",
           "est": "4-6h",
           "priority": "P3",
           "notes": "Expand from navigation to actions: 'Generate schema for [page]', 'Create brief for [keyword]', 'Run audit'. Natural language: 'Show thin content pages'.\n[Audit 2026-04-22 partial] CommandPalette.tsx scaffolds an \"action\" item type alongside nav/workspace/recent, but no natural-language action handlers are wired (no LLM call, no parameterised \"Generate schema for [page]\").",
@@ -1372,8 +1372,8 @@
         },
         {
           "id": 514,
-          "title": "Client Education Hub — Embedded SEO education throughout",
-          "source": "UI_UX_AUDIT §Long-Term",
+          "title": "Client Education Hub \u2014 Embedded SEO education throughout",
+          "source": "UI_UX_AUDIT \u00a7Long-Term",
           "est": "3-4h",
           "priority": "P3",
           "notes": "Contextual tooltips with 'Why this matters'. 'Learn more' links to SeoGlossary. Video explanations for complex features. Education tip cards in empty states.\n[Audit 2026-04-22 partial] SeoGlossary.tsx + SeoEducationTip.tsx (tab-keyed learnMore content for overview/performance/health/strategy/content/roi) ship; \"Why this matters\" framing, video embeds, and Glossary cross-links from tips are not wired.",
@@ -1381,8 +1381,8 @@
         },
         {
           "id": 515,
-          "title": "Performance Budget Dashboard — Visual page weight tracker",
-          "source": "UI_UX_AUDIT §Long-Term",
+          "title": "Performance Budget Dashboard \u2014 Visual page weight tracker",
+          "source": "UI_UX_AUDIT \u00a7Long-Term",
           "est": "3-4h",
           "priority": "P3",
           "notes": "Show page weight over time per workspace. Alert on regressions. Recommendations: 'Homepage grew 400KB, consider image optimization'.\n[Audit 2026-04-22 partial] PageWeight + PageSpeedPanel + server/performance-store ship point-in-time data; historical weight trend per workspace + regression alerts are not built.",
@@ -1390,8 +1390,8 @@
         },
         {
           "id": 516,
-          "title": "Accessibility Improvements — WCAG AA compliance pass",
-          "source": "UI_UX_AUDIT §10",
+          "title": "Accessibility Improvements \u2014 WCAG AA compliance pass",
+          "source": "UI_UX_AUDIT \u00a710",
           "est": "4-6h",
           "priority": "P2",
           "notes": "Add ARIA landmarks, focus management for modals, keyboard navigation for complex widgets. Skip links. Test with screen reader (NVDA/VoiceOver).\n[Audit 2026-04-22 partial] 63 aria-label usages across 20 components ship; ARIA landmark roles, skip-links, and modal focus-management are not implemented.",
@@ -1403,23 +1403,23 @@
           "source": "FEATURE_AUDIT",
           "est": "4-6h",
           "priority": "P3",
-          "notes": "Sidebar → bottom nav, stacked cards on small screens.",
+          "notes": "Sidebar \u2192 bottom nav, stacked cards on small screens.",
           "status": "pending"
         },
         {
           "id": 523,
-          "title": "Workspace onboarding automation — templates, batch setup, reduce repetitive per-workspace tasks",
+          "title": "Workspace onboarding automation \u2014 templates, batch setup, reduce repetitive per-workspace tasks",
           "source": "Connected Intelligence brainstorming",
           "est": "6-8h",
           "priority": "P3",
-          "notes": "Each new workspace requires: connect Webflow, connect GSC, connect GA4, run keyword analysis, run site audit, set up brand voice, configure competitors, set content pricing, enable client portal. Most steps are identical across workspaces. Add: workspace templates (clone config from existing workspace), batch analysis trigger (run audit + keyword analysis + decay analysis in one click), onboarding checklist with progress tracking, default competitor auto-discovery. Separate initiative from intelligence engine — scoped as its own spec.",
+          "notes": "Each new workspace requires: connect Webflow, connect GSC, connect GA4, run keyword analysis, run site audit, set up brand voice, configure competitors, set content pricing, enable client portal. Most steps are identical across workspaces. Add: workspace templates (clone config from existing workspace), batch analysis trigger (run audit + keyword analysis + decay analysis in one click), onboarding checklist with progress tracking, default competitor auto-discovery. Separate initiative from intelligence engine \u2014 scoped as its own spec.",
           "status": "pending"
         }
       ]
     },
     {
       "id": "sprint-platform-value-automation-ops",
-      "name": "Platform Value Wave — Operational Automation & Quality Signals",
+      "name": "Platform Value Wave \u2014 Operational Automation & Quality Signals",
       "hours": "30-45",
       "rationale": "Reduces manual operating overhead and increases signal quality with workflow automation, accessibility quality expansion, and strategy-memory follow-through.",
       "items": [
@@ -1508,7 +1508,7 @@
     },
     {
       "id": "sprint-platform-value-integrations-expansion",
-      "name": "Platform Value Wave — Integrations, Distribution, and Expansion Bets",
+      "name": "Platform Value Wave \u2014 Integrations, Distribution, and Expansion Bets",
       "hours": "65-95",
       "rationale": "Packages higher-latency integration and expansion work into a distinct growth track so near-term value sprints stay focused while long-horizon platform expansion remains actionable.",
       "items": [
@@ -1563,7 +1563,7 @@
           "source": "FEATURE_VISION #3",
           "est": "8-12h",
           "priority": "P4",
-          "notes": "Historical GSC data + Google Trends API + seasonal patterns → predict growing keywords 30-90 days out.",
+          "notes": "Historical GSC data + Google Trends API + seasonal patterns \u2192 predict growing keywords 30-90 days out.",
           "status": "pending"
         },
         {
@@ -1581,7 +1581,7 @@
           "source": "FEATURE_VISION #5",
           "est": "10-15h",
           "priority": "P2",
-          "notes": "Ahrefs/Moz API → backlink profile → link gaps → AI outreach templates. Elevated from P3 — backlinks are a top-3 ranking factor and this capability justifies premium pricing. Lightweight overview (#213) ships first in Sprint F; this is the full-featured follow-up.",
+          "notes": "Ahrefs/Moz API \u2192 backlink profile \u2192 link gaps \u2192 AI outreach templates. Elevated from P3 \u2014 backlinks are a top-3 ranking factor and this capability justifies premium pricing. Lightweight overview (#213) ships first in Sprint F; this is the full-featured follow-up.",
           "status": "pending"
         },
         {
@@ -1620,7 +1620,7 @@
       "items": [
         {
           "id": "schema-page-element-catalog-pr1",
-          "title": "Schema Page-Element Catalog PR1 — slice + 3 element types + 3 schema integrations",
+          "title": "Schema Page-Element Catalog PR1 \u2014 slice + 3 element types + 3 schema integrations",
           "source": "docs/superpowers/plans/2026-04-29-page-element-catalog-pr1.md",
           "est": "5d",
           "priority": "P1",
@@ -1631,8 +1631,8 @@
         },
         {
           "id": "schema-page-element-catalog-pr2",
-          "title": "Schema Page-Element Catalog PR2 — images + tables + testimonials",
-          "source": "docs/superpowers/specs/2026-04-29-page-element-catalog-design.md §5.2 + §6",
+          "title": "Schema Page-Element Catalog PR2 \u2014 images + tables + testimonials",
+          "source": "docs/superpowers/specs/2026-04-29-page-element-catalog-design.md \u00a75.2 + \u00a76",
           "est": "4d",
           "priority": "P1",
           "sprint": "J",
@@ -1641,14 +1641,14 @@
         },
         {
           "id": "schema-entity-graph-workstream-c",
-          "title": "Schema Workstream C — Entity Graph Hub Dispatch",
+          "title": "Schema Workstream C \u2014 Entity Graph Hub Dispatch",
           "source": "claude/schema-v2-brainstorm branch",
           "est": "1d",
           "priority": "P0",
           "sprint": "J",
           "status": "done",
           "shippedAt": "2026-04-30",
-          "notes": "Workstream C shipped: hub pages now emit semantically correct schema types with cross-page @id references via assembleSiteContext + SiteContext plumbing into generateLeanSchema. BlogIndex → Blog with blogPost[] (@id refs, sorted newest-first, capped at 10, numberOfItems = true count). ServiceIndex → Service + hasOfferCatalog: { @type: OfferCatalog, hasPart[] }. CaseStudyIndex → CollectionPage + mainEntity: { @type: ItemList, itemListElement[] (positional ListItems) }. All three fall back to CollectionPage when siteContext is absent. Non-hub pages (BlogPosting, Service, AboutPage, etc.) unchanged. 18 integration tests in tests/integration/schema-entity-graph.test.ts."
+          "notes": "Workstream C shipped: hub pages now emit semantically correct schema types with cross-page @id references via assembleSiteContext + SiteContext plumbing into generateLeanSchema. BlogIndex \u2192 Blog with blogPost[] (@id refs, sorted newest-first, capped at 10, numberOfItems = true count). ServiceIndex \u2192 Service + hasOfferCatalog: { @type: OfferCatalog, hasPart[] }. CaseStudyIndex \u2192 CollectionPage + mainEntity: { @type: ItemList, itemListElement[] (positional ListItems) }. All three fall back to CollectionPage when siteContext is absent. Non-hub pages (BlogPosting, Service, AboutPage, etc.) unchanged. 18 integration tests in tests/integration/schema-entity-graph.test.ts."
         },
         {
           "id": "schema-semantic-extraction",
@@ -1659,12 +1659,12 @@
           "sprint": "J",
           "status": "done",
           "shippedAt": "2026-05-01",
-          "notes": "AI-powered universal page content extraction layer for schema generation. extractSemanticData() (Haiku 4.5 tool_use) extracts phone, address, hours, staff, services, aggregateRating, sameAs, faq, primaryImage per page — stored on PageElementCatalog.semantics. applyPostEnrichment() appends FAQPage/AggregateRating/sameAs/VideoObject nodes to generated schema using extracted semantics with rollback-on-new-errors safety. generateSchemaForUnknownType() generates WebPage-classified pages with non-empty semantics via second Haiku call + static SCHEMA_TYPE_REFERENCE. Validator extended with DEDICATED_VALIDATOR_TYPES guard, unverified-type warnings for unknown Schema.org types, addressCountry in ContactPage. GSC URL Inspection integration: inspectUrlForRichResults() calls GSC API 3 minutes after publish, stores google_validation_status on schema_publish_history. schema.org pre-publish validator: validateWithSchemaOrg() fires at generation time (fire-and-forget, logs only). Migrations 081 (google_validation_status on schema_publish_history) + 082 (schema_org_validation_status on schema_snapshots). WS_EVENTS.SCHEMA_GOOGLE_VALIDATION added. 9 new/modified test files; 5805 tests passing."
+          "notes": "AI-powered universal page content extraction layer for schema generation. extractSemanticData() (Haiku 4.5 tool_use) extracts phone, address, hours, staff, services, aggregateRating, sameAs, faq, primaryImage per page \u2014 stored on PageElementCatalog.semantics. applyPostEnrichment() appends FAQPage/AggregateRating/sameAs/VideoObject nodes to generated schema using extracted semantics with rollback-on-new-errors safety. generateSchemaForUnknownType() generates WebPage-classified pages with non-empty semantics via second Haiku call + static SCHEMA_TYPE_REFERENCE. Validator extended with DEDICATED_VALIDATOR_TYPES guard, unverified-type warnings for unknown Schema.org types, addressCountry in ContactPage. GSC URL Inspection integration: inspectUrlForRichResults() calls GSC API 3 minutes after publish, stores google_validation_status on schema_publish_history. schema.org pre-publish validator: validateWithSchemaOrg() fires at generation time (fire-and-forget, logs only). Migrations 081 (google_validation_status on schema_publish_history) + 082 (schema_org_validation_status on schema_snapshots). WS_EVENTS.SCHEMA_GOOGLE_VALIDATION added. 9 new/modified test files; 5805 tests passing."
         },
         {
           "id": "schema-context-builder-pattern-b-migration",
           "title": "Migrate buildSchemaContext direct reads to intelligence slices",
-          "source": "docs/superpowers/specs/2026-04-29-schema-yoast-parity-fields-design.md §6",
+          "source": "docs/superpowers/specs/2026-04-29-schema-yoast-parity-fields-design.md \u00a76",
           "est": "2-3h cumulative across opportunistic PRs",
           "priority": "P1",
           "sprint": "I",
@@ -1704,7 +1704,7 @@
         },
         {
           "id": "schema-pillar-2-1-searchaction-correctness",
-          "title": "Schema Pillar 2.1 — Stop emitting SearchAction on sites without search",
+          "title": "Schema Pillar 2.1 \u2014 Stop emitting SearchAction on sites without search",
           "source": "docs/superpowers/plans/2026-04-29-schema-pillar-2-data-wiring.md (post-merge correction)",
           "est": "1h",
           "priority": "P0",
@@ -1715,7 +1715,7 @@
         },
         {
           "id": "schema-pillar-1-validator-bar",
-          "title": "Schema Pillar 1 — Raise the Validator Bar",
+          "title": "Schema Pillar 1 \u2014 Raise the Validator Bar",
           "source": "docs/superpowers/plans/2026-04-29-schema-pillar-1-validator-bar.md",
           "est": "1d",
           "priority": "P0",
@@ -1726,7 +1726,7 @@
         },
         {
           "id": "schema-yoast-parity-fields-pr1",
-          "title": "Schema Yoast-Parity Fields PR1 — validator API + 6 fields + slice-migration starter",
+          "title": "Schema Yoast-Parity Fields PR1 \u2014 validator API + 6 fields + slice-migration starter",
           "source": "docs/superpowers/plans/2026-04-29-schema-yoast-parity-fields-pr1.md",
           "est": "2d",
           "priority": "P0",
@@ -1737,23 +1737,23 @@
         },
         {
           "id": "schema-yoast-parity-fields-pr2",
-          "title": "Schema Yoast-Parity Fields PR2 — admin discoverability surfaces",
+          "title": "Schema Yoast-Parity Fields PR2 \u2014 admin discoverability surfaces",
           "source": "docs/superpowers/plans/2026-04-29-schema-yoast-parity-fields-pr2.md",
           "est": "1.5d",
           "priority": "P0",
           "sprint": "I",
           "status": "done",
           "shippedAt": "2026-04-29",
-          "notes": "Admin discoverability layer atop PR1's typed validationFindings. SchemaCompletenessWidget on the Schema page aggregates findings across all pages with progress bar + missing-field deep-link buttons. BusinessProfileTab gains a 'Schema impact' read-only mirror SectionCard listing 5 schema-impacting fields with ✓/✗ status + deep-links (cross-tab via Link with ?tab=...&focus=..., in-tab via scroll-to-element). FeaturesTab gains Logo URL microcopy + new 'Site capabilities' SectionCard with the siteHasSearch checkbox (toggling on activates PR1's gated WebSite.potentialAction emission). SchemaPageCard now groups findings by field with click-to-expand collapsible rows when a single field has 2+ findings on a page. SchemaSuggester header gains 'X fixes available' annotation. New shared useDeepLinkFocus hook + data-schema-deeplink attribute convention establishes the field-level deep-link two-halves contract. New fieldTargets.ts module is the single source of truth mapping ValidationFinding.field → Settings deep-link. Frontend-only; no backend changes. 8 new component tests (3 hook + 5 widget). Plan: docs/superpowers/plans/2026-04-29-schema-yoast-parity-fields-pr2.md."
+          "notes": "Admin discoverability layer atop PR1's typed validationFindings. SchemaCompletenessWidget on the Schema page aggregates findings across all pages with progress bar + missing-field deep-link buttons. BusinessProfileTab gains a 'Schema impact' read-only mirror SectionCard listing 5 schema-impacting fields with \u2713/\u2717 status + deep-links (cross-tab via Link with ?tab=...&focus=..., in-tab via scroll-to-element). FeaturesTab gains Logo URL microcopy + new 'Site capabilities' SectionCard with the siteHasSearch checkbox (toggling on activates PR1's gated WebSite.potentialAction emission). SchemaPageCard now groups findings by field with click-to-expand collapsible rows when a single field has 2+ findings on a page. SchemaSuggester header gains 'X fixes available' annotation. New shared useDeepLinkFocus hook + data-schema-deeplink attribute convention establishes the field-level deep-link two-halves contract. New fieldTargets.ts module is the single source of truth mapping ValidationFinding.field \u2192 Settings deep-link. Frontend-only; no backend changes. 8 new component tests (3 hook + 5 widget). Plan: docs/superpowers/plans/2026-04-29-schema-yoast-parity-fields-pr2.md."
         },
         {
           "id": "schema-pillar-3-gates",
-          "title": "Schema Pillar 3 — Compile-time + CI Gates",
+          "title": "Schema Pillar 3 \u2014 Compile-time + CI Gates",
           "source": "docs/superpowers/plans/2026-04-29-schema-pillar-3-gates.md",
           "est": "1d",
           "priority": "P2",
           "status": "deferred",
-          "notes": "DEFERRED. Pillar 3 is regression-prevention hardening (schema-dts compile-time types + schemarama CI corpus + pr-check rule for cross-ref helper imports). It does not change schema output — it locks the bar Pillars 1 + 2 set. Decision (2026-04-29): defer until after schema-yoast-parity-fields ships, because the field expansion will reshape templates and Pillar 3's typed signatures would have to be rewritten. Reactivate after intelligence layer settles. Plan file remains committed for reference."
+          "notes": "DEFERRED. Pillar 3 is regression-prevention hardening (schema-dts compile-time types + schemarama CI corpus + pr-check rule for cross-ref helper imports). It does not change schema output \u2014 it locks the bar Pillars 1 + 2 set. Decision (2026-04-29): defer until after schema-yoast-parity-fields ships, because the field expansion will reshape templates and Pillar 3's typed signatures would have to be rewritten. Reactivate after intelligence layer settles. Plan file remains committed for reference."
         }
       ]
     },
@@ -1762,8 +1762,8 @@
       "items": [
         {
           "id": "client-inbox-phase31-schema-admin-consolidation",
-          "title": "InboxTab Phase 3.1 — Schema admin consolidation (retire standalone client schema route)",
-          "source": "Session 2026-05-11 — Phase 3 planning",
+          "title": "InboxTab Phase 3.1 \u2014 Schema admin consolidation (retire standalone client schema route)",
+          "source": "Session 2026-05-11 \u2014 Phase 3 planning",
           "est": "3-4h",
           "priority": "P2",
           "status": "done",
@@ -1773,8 +1773,8 @@
         },
         {
           "id": "client-inbox-phase32-wins-enrichment",
-          "title": "InboxTab Phase 3.2 — Wins enrichment (more signal types in WinsSurface)",
-          "source": "Session 2026-05-11 — Phase 3 planning",
+          "title": "InboxTab Phase 3.2 \u2014 Wins enrichment (more signal types in WinsSurface)",
+          "source": "Session 2026-05-11 \u2014 Phase 3 planning",
           "est": "3-5h",
           "priority": "P1",
           "status": "pending",
@@ -1783,18 +1783,18 @@
         },
         {
           "id": "client-inbox-phase33-per-item-exclusion",
-          "title": "InboxTab Phase 3.3 — Per-item exclusion in approval batches",
-          "source": "Session 2026-05-11 — Phase 3 planning",
+          "title": "InboxTab Phase 3.3 \u2014 Per-item exclusion in approval batches",
+          "source": "Session 2026-05-11 \u2014 Phase 3 planning",
           "est": "4-6h",
           "priority": "P2",
           "status": "pending",
           "createdAt": "2026-05-11",
-          "notes": "Clients can currently only approve/reject an entire approval batch. Add per-item approve/reject/exclude in DecisionDetailModal so clients can accept most items and flag specific ones. Requires ApprovalItem status transitions per-item and UI changes in DecisionDetailModal."
+          "notes": "Clients can currently only approve/reject an entire approval batch. Add per-item approve/reject/exclude in DecisionDetailModal so clients can accept most items and flag specific ones. Requires ApprovalItem status transitions per-item and UI changes in DecisionDetailModal. [NOTE 2026-06-02: likely OBSOLETE \u2014 per-item flag/subset-approve already ships in production (DecisionDetailModal flaggedItems via InboxTab) and in the unified path (R3a, #1026). OWNER TO CONFIRM: close as obsolete, OR split a narrower \"independent per-item status rows\" item if that distinct UX is still wanted.]"
         },
         {
           "id": "client-inbox-phase34-client-signals-resolution",
-          "title": "InboxTab Phase 3.4 — Client signals resolution (loop engagement → insight engine)",
-          "source": "Session 2026-05-11 — Phase 3 planning",
+          "title": "InboxTab Phase 3.4 \u2014 Client signals resolution (loop engagement \u2192 insight engine)",
+          "source": "Session 2026-05-11 \u2014 Phase 3 planning",
           "est": "4-6h",
           "priority": "P2",
           "status": "done",
@@ -1803,11 +1803,11 @@
           "notes": "Shipped 2026-05-18. Added client-action feedback loop helper (`server/domains/inbox/client-action-feedback-loop.ts`) wired into public approval, admin completion, and playbook auto-completion paths. Insight resolution now prefers explicit payload origin IDs (`payload.metadata.origin.insightIds`) and only uses page/keyword fallback when exactly one unresolved insight matches (conservative ambiguity guard). Outcome linkage now records/updates tracked action lifecycle rows (`sourceType='client_action'`) and upgrades pre-action `content_decay` tracked rows via `trackingSourceId` metadata to `platform_executed` with related action linkage."
         }
       ],
-      "name": "Client Inbox IA — Phase 3 Deferred (3.1–3.4)"
+      "name": "Client Inbox IA \u2014 Phase 3 Deferred (3.1\u20133.4)"
     },
     {
       "id": "sprint-platform-health-wave7-drift-closure",
-      "name": "Platform Health Wave 7 — Drift Closure & Conventions Hardening",
+      "name": "Platform Health Wave 7 \u2014 Drift Closure & Conventions Hardening",
       "hours": "24-36",
       "rationale": "Closes active convention drift where duplicate implementations, compatibility shims, and unenforced contracts can silently regress platform reliability.",
       "items": [
@@ -1851,7 +1851,7 @@
     },
     {
       "id": "sprint-platform-health-wave8-audit-drift-closure",
-      "name": "Platform Health Wave 8 — Audit Drift Closure (May 2026)",
+      "name": "Platform Health Wave 8 \u2014 Audit Drift Closure (May 2026)",
       "hours": "40-60",
       "rationale": "Close the drift and duplication findings surfaced by the 2026-05-27 four-agent platform audit. Highest-priority items are two unauthenticated public endpoints and a set of admin/client divergence bugs where the same concept is computed twice with different formulas. Bulk of the sprint is mechanical adoption sweeps to migrate ~150 frontend call sites onto existing shared primitives (scoreColor, fmtNum, fmtMoney, useToggleSet, plus new formatBytes/formatDate helpers) and lock each sweep in with a pr-check rule so the drift cannot reopen.",
       "items": [
@@ -1862,7 +1862,7 @@
           "est": "1-2h",
           "priority": "P0",
           "status": "done",
-          "notes": "Security finding. `server/routes/rank-tracking.ts:125,133` and `server/routes/public-portal.ts:310` (audit-traffic) lack `requireClientPortalAuth`. Admin equivalents (`rank-tracking.ts:112,120`) use `requireWorkspaceAccess`. Ranking data and GA/GSC page metrics currently leak to anyone with a known workspaceId. [Expanded 2026-05-27 during plan verification] `server/routes/anomalies.ts:27` (public GET) also lacks auth, and admin mutations `anomalies.ts:34,43` (dismiss/acknowledge) have no workspace guard at all. Bundle all six fixes plus a pr-check rule that flags new routes mounted on the `/api/public/` prefix without an explicit auth middleware or a documented `// public-no-auth-ok` hatch. [DONE 2026-05-27 — Plan A: added requireAuthenticatedClientPortalAuth to rank-tracking (4 routes), public-portal audit-traffic, anomalies public GET + admin mutations; added pr-check rule Public route under /api/public/ missing client-portal auth middleware.]"
+          "notes": "Security finding. `server/routes/rank-tracking.ts:125,133` and `server/routes/public-portal.ts:310` (audit-traffic) lack `requireClientPortalAuth`. Admin equivalents (`rank-tracking.ts:112,120`) use `requireWorkspaceAccess`. Ranking data and GA/GSC page metrics currently leak to anyone with a known workspaceId. [Expanded 2026-05-27 during plan verification] `server/routes/anomalies.ts:27` (public GET) also lacks auth, and admin mutations `anomalies.ts:34,43` (dismiss/acknowledge) have no workspace guard at all. Bundle all six fixes plus a pr-check rule that flags new routes mounted on the `/api/public/` prefix without an explicit auth middleware or a documented `// public-no-auth-ok` hatch. [DONE 2026-05-27 \u2014 Plan A: added requireAuthenticatedClientPortalAuth to rank-tracking (4 routes), public-portal audit-traffic, anomalies public GET + admin mutations; added pr-check rule Public route under /api/public/ missing client-portal auth middleware.]"
         },
         {
           "id": "audit-drift-public-route-auth-sweep-followup",
@@ -1927,7 +1927,7 @@
           "est": "2-3h",
           "priority": "P1",
           "status": "done",
-          "notes": "Two divergent `slugify` regexes (`server/intelligence/entity-resolution-slice.ts:13` uses `[^a-z0-9\\s-]`; `server/mcp/tools/keyword-actions.ts:49` uses `[^a-z0-9]+`) — same name, different output. Move canonical to `server/helpers.ts`; migrate both callers. Then consolidate `dedupeByKeyword`/`dedupeByTopic`/`dedupeStrings`/`dedupeCandidates` across `server/cannibalization-issues.ts:131`, `server/keyword-gaps.ts:74`, `server/topic-clusters.ts:102`, `server/keyword-strategy-sanitizer.ts:103`, `server/keyword-recommendations.ts:137` into `dedupeBy<T>(items, keyFn)` and `dedupeByNormalizedKeyword` in a shared module. [DONE 2026-05-27 — Plan C C1+C6: canonical slugify moved to server/helpers.ts; dedupeBy/dedupeByLast/dedupeByNormalizedKeyword/uniqStrings added to server/utils/collections.ts; all divergent local copies migrated.]"
+          "notes": "Two divergent `slugify` regexes (`server/intelligence/entity-resolution-slice.ts:13` uses `[^a-z0-9\\s-]`; `server/mcp/tools/keyword-actions.ts:49` uses `[^a-z0-9]+`) \u2014 same name, different output. Move canonical to `server/helpers.ts`; migrate both callers. Then consolidate `dedupeByKeyword`/`dedupeByTopic`/`dedupeStrings`/`dedupeCandidates` across `server/cannibalization-issues.ts:131`, `server/keyword-gaps.ts:74`, `server/topic-clusters.ts:102`, `server/keyword-strategy-sanitizer.ts:103`, `server/keyword-recommendations.ts:137` into `dedupeBy<T>(items, keyFn)` and `dedupeByNormalizedKeyword` in a shared module. [DONE 2026-05-27 \u2014 Plan C C1+C6: canonical slugify moved to server/helpers.ts; dedupeBy/dedupeByLast/dedupeByNormalizedKeyword/uniqStrings added to server/utils/collections.ts; all divergent local copies migrated.]"
         },
         {
           "id": "audit-drift-domain-normalization-helper-migration-sweep",
@@ -1964,7 +1964,7 @@
           "est": "3-4h",
           "priority": "P1",
           "status": "done",
-          "notes": "~15 components hand-roll score-color thresholds instead of using `scoreColor`/`scoreColorClass`/`scoreBgClass` from `src/components/ui/constants.ts`. Sites: `AssetAudit.tsx:263`, `MetricRing.tsx:21,22`, `audit/AuditReportExport.tsx:79,132`, `page-intelligence/PageIntelligencePagesHeader.tsx:163-164`, `briefs/BriefDetail.tsx:242`, `briefs/BriefList.tsx:110`, `audit/CwvSummaryCard.tsx:53`, `strategy/TopicClusters.tsx:21-22`, `WorkspaceOverview.tsx:133`, `SiteArchitecture.tsx:342`, `TrafficDetail.tsx:477`, `ui/AIContextIndicator.tsx:92,98`, `hooks/useChat.ts:250`, `PageSpeedPanel.tsx:63` (local `scoreColor` shadow). Migrate then add pr-check rule flagging inline `score >= 80 ? 'text-emerald'` patterns outside `ui/constants.ts`. [DONE 2026-05-27 — Plan C C2: all ~15 inline score-color ternaries migrated to scoreColor()/scoreColorClass(); pr-check rule inline-score-color-ternary added.]"
+          "notes": "~15 components hand-roll score-color thresholds instead of using `scoreColor`/`scoreColorClass`/`scoreBgClass` from `src/components/ui/constants.ts`. Sites: `AssetAudit.tsx:263`, `MetricRing.tsx:21,22`, `audit/AuditReportExport.tsx:79,132`, `page-intelligence/PageIntelligencePagesHeader.tsx:163-164`, `briefs/BriefDetail.tsx:242`, `briefs/BriefList.tsx:110`, `audit/CwvSummaryCard.tsx:53`, `strategy/TopicClusters.tsx:21-22`, `WorkspaceOverview.tsx:133`, `SiteArchitecture.tsx:342`, `TrafficDetail.tsx:477`, `ui/AIContextIndicator.tsx:92,98`, `hooks/useChat.ts:250`, `PageSpeedPanel.tsx:63` (local `scoreColor` shadow). Migrate then add pr-check rule flagging inline `score >= 80 ? 'text-emerald'` patterns outside `ui/constants.ts`. [DONE 2026-05-27 \u2014 Plan C C2: all ~15 inline score-color ternaries migrated to scoreColor()/scoreColorClass(); pr-check rule inline-score-color-ternary added.]"
         },
         {
           "id": "audit-drift-fmt-num-formatbytes-adoption",
@@ -1973,7 +1973,7 @@
           "est": "4-6h",
           "priority": "P1",
           "status": "done",
-          "notes": "~78 sites call `.toLocaleString()` directly instead of `fmtNum` from `src/utils/formatNumbers.ts`. Largest call-site clusters: `ContentPerformance.tsx`, `TrafficDetail.tsx`, `SearchDetail.tsx`, `KeywordStrategy.tsx`, `RankTracker.tsx`, `AIUsageSection.tsx`. Local `fmtNum`/`fmtTokens` reimplementations at `WorkspaceHome.tsx:46-47` and `AIUsageSection.tsx:70`. Add `formatBytes(bytes)` to `utils/formatNumbers.ts` and migrate the 3 copy-paste sites: `AssetBrowser.tsx:40-41`, `AssetAudit.tsx:38-39`, `PageWeight.tsx:35-36`. Add pr-check rule flagging `.toLocaleString()` on plain numbers in `src/components/` (allow on dates). [DONE 2026-05-27 — Plan C C3: all ~78 toLocaleString() sites migrated to fmtNum(); formatBytes() added to src/utils/formatNumbers.ts and 3 copy-paste sites migrated; pr-check rule inline-toLocaleString added.]"
+          "notes": "~78 sites call `.toLocaleString()` directly instead of `fmtNum` from `src/utils/formatNumbers.ts`. Largest call-site clusters: `ContentPerformance.tsx`, `TrafficDetail.tsx`, `SearchDetail.tsx`, `KeywordStrategy.tsx`, `RankTracker.tsx`, `AIUsageSection.tsx`. Local `fmtNum`/`fmtTokens` reimplementations at `WorkspaceHome.tsx:46-47` and `AIUsageSection.tsx:70`. Add `formatBytes(bytes)` to `utils/formatNumbers.ts` and migrate the 3 copy-paste sites: `AssetBrowser.tsx:40-41`, `AssetAudit.tsx:38-39`, `PageWeight.tsx:35-36`. Add pr-check rule flagging `.toLocaleString()` on plain numbers in `src/components/` (allow on dates). [DONE 2026-05-27 \u2014 Plan C C3: all ~78 toLocaleString() sites migrated to fmtNum(); formatBytes() added to src/utils/formatNumbers.ts and 3 copy-paste sites migrated; pr-check rule inline-toLocaleString added.]"
         },
         {
           "id": "audit-drift-fmt-money-format-date-adoption",
@@ -1982,7 +1982,7 @@
           "est": "4-6h",
           "priority": "P1",
           "status": "done",
-          "notes": "Inline `Intl.NumberFormat` USD: `client/InsightsEngine.tsx:44`, `client/FixRecommendations.tsx:13`, `client/SeoCart.tsx:8`, `ClientDashboard.tsx:601` — migrate to `fmtMoney`. Then create `formatDate`/`formatDateShort`/`formatDateTime` in `src/utils/formatDates.ts` and migrate ~25 sites of raw `new Date(x).toLocaleDateString()` (`AdminChat.tsx:249`, `RevenueDashboard.tsx:231`, `ContentManager.tsx:291`, `KeywordStrategy.tsx:315,387`, `PostEditor.tsx:398`, `ContentDecay.tsx:140`, `ContentSubscriptions.tsx:258,307`, `ContentBriefs.tsx:482`, `settings/FeaturesTab.tsx:114`, plus ~14 more). Add pr-check rule flagging inline `Intl.NumberFormat` and raw `toLocaleDateString` outside the formatters utility. [DONE 2026-05-27 — Plan C C4+C5: inline Intl.NumberFormat USD migrated to fmtMoney(); formatDate/formatDateShort/formatDateTime added to src/utils/formatDates.ts; all ~25 bare toLocaleDateString() sites migrated; pr-check rule inline-toLocaleDateString added.]"
+          "notes": "Inline `Intl.NumberFormat` USD: `client/InsightsEngine.tsx:44`, `client/FixRecommendations.tsx:13`, `client/SeoCart.tsx:8`, `ClientDashboard.tsx:601` \u2014 migrate to `fmtMoney`. Then create `formatDate`/`formatDateShort`/`formatDateTime` in `src/utils/formatDates.ts` and migrate ~25 sites of raw `new Date(x).toLocaleDateString()` (`AdminChat.tsx:249`, `RevenueDashboard.tsx:231`, `ContentManager.tsx:291`, `KeywordStrategy.tsx:315,387`, `PostEditor.tsx:398`, `ContentDecay.tsx:140`, `ContentSubscriptions.tsx:258,307`, `ContentBriefs.tsx:482`, `settings/FeaturesTab.tsx:114`, plus ~14 more). Add pr-check rule flagging inline `Intl.NumberFormat` and raw `toLocaleDateString` outside the formatters utility. [DONE 2026-05-27 \u2014 Plan C C4+C5: inline Intl.NumberFormat USD migrated to fmtMoney(); formatDate/formatDateShort/formatDateTime added to src/utils/formatDates.ts; all ~25 bare toLocaleDateString() sites migrated; pr-check rule inline-toLocaleDateString added.]"
         },
         {
           "id": "audit-drift-use-toggle-set-adoption",
@@ -2009,7 +2009,7 @@
           "est": "4-6h",
           "priority": "P2",
           "status": "pending",
-          "notes": "(a) Migrate 4 custom relative-time formatters onto `src/lib/timeAgo.ts` (`LlmsTxtGenerator.tsx:25`, `WorkspaceHome.tsx:207`, `client/Briefing/WinsSurface.tsx:30`, `admin/MeetingBrief/BriefHeader.tsx:10`); (b) move status→badge ternaries into `<Badge>`/`<StatusBadge>` or `lib/copyStatusConfig.ts` (`PendingApprovals.tsx:186`, `RankTracker.tsx:507`, `ContentBriefs.tsx:479`, `cms-editor/CmsEditorShellPanels.tsx:163-164`, `brand/BatchGenerationPanel.tsx:98`, `workspace-home/SeoWorkStatus.tsx:40,46`); (c) consolidate `uniq`/`uniqueStrings`/`uniqueSeoTexts`/`uniqueEntities` into `uniqStrings(values, opts)`; (d) collapse `sanitizeForPrompt` duplicates between `briefing-prompt.ts:169` and `helpers.ts:278,294`; (e) introduce typed shape in `shared/types/` for `matchedPage`/`meta` to replace the 8+ `(matchedPage as Record<string, unknown>)` ladder in `server/schema-suggester.ts:692-876`; (f) Lock `callAI()` adoption: delete the stale `// callAnthropic` comment at `server/copy-generation.ts:116` (actual call at line 106 already uses `callAI()`) and add a pr-check rule blocking new direct imports of `callOpenAI`/`callAnthropic` outside `server/ai.ts`. [Rescoped 2026-05-27 — originally proposed as a migration based on stale audit + stale CLAUDE.md note; re-verification confirmed full adoption is already complete, so item now mechanizes the invariant rather than migrating to it.] [PARTIAL 2026-05-27 — Plan C systemic: sub-item (f) callAI dispatcher lock done (pr-check rule \"Direct callOpenAI/callAnthropic import outside dispatcher\" added; stale comment in copy-generation.ts removed). Sub-items a-e remain: timeAgo migration (4 sites), Badge/StatusBadge ternary consolidation, uniqStrings consolidation, sanitizeForPrompt dedup.]"
+          "notes": "(a) Migrate 4 custom relative-time formatters onto `src/lib/timeAgo.ts` (`LlmsTxtGenerator.tsx:25`, `WorkspaceHome.tsx:207`, `client/Briefing/WinsSurface.tsx:30`, `admin/MeetingBrief/BriefHeader.tsx:10`); (b) move status\u2192badge ternaries into `<Badge>`/`<StatusBadge>` or `lib/copyStatusConfig.ts` (`PendingApprovals.tsx:186`, `RankTracker.tsx:507`, `ContentBriefs.tsx:479`, `cms-editor/CmsEditorShellPanels.tsx:163-164`, `brand/BatchGenerationPanel.tsx:98`, `workspace-home/SeoWorkStatus.tsx:40,46`); (c) consolidate `uniq`/`uniqueStrings`/`uniqueSeoTexts`/`uniqueEntities` into `uniqStrings(values, opts)`; (d) collapse `sanitizeForPrompt` duplicates between `briefing-prompt.ts:169` and `helpers.ts:278,294`; (e) introduce typed shape in `shared/types/` for `matchedPage`/`meta` to replace the 8+ `(matchedPage as Record<string, unknown>)` ladder in `server/schema-suggester.ts:692-876`; (f) Lock `callAI()` adoption: delete the stale `// callAnthropic` comment at `server/copy-generation.ts:116` (actual call at line 106 already uses `callAI()`) and add a pr-check rule blocking new direct imports of `callOpenAI`/`callAnthropic` outside `server/ai.ts`. [Rescoped 2026-05-27 \u2014 originally proposed as a migration based on stale audit + stale CLAUDE.md note; re-verification confirmed full adoption is already complete, so item now mechanizes the invariant rather than migrating to it.] [PARTIAL 2026-05-27 \u2014 Plan C systemic: sub-item (f) callAI dispatcher lock done (pr-check rule \"Direct callOpenAI/callAnthropic import outside dispatcher\" added; stale comment in copy-generation.ts removed). Sub-items a-e remain: timeAgo migration (4 sites), Badge/StatusBadge ternary consolidation, uniqStrings consolidation, sanitizeForPrompt dedup.]"
         },
         {
           "id": "audit-drift-p3-residuals",
@@ -2018,7 +2018,7 @@
           "est": "3-5h",
           "priority": "P3",
           "status": "pending",
-          "notes": "(a) Retire `server/db/json-column.ts` parseJsonColumn in favor of `parseJsonFallback` from `server/db/json-validation.ts`; (b) collapse `titleCaseWord`/`capitalize`/`capitalizeSlugSegment` (`server/insight-enrichment.ts:37`, `server/schema/data-sources.ts:146,324`) into one `capitalizeWord`; (c) collapse two `compact()` siblings in `keyword-strategy-context.ts:36` + `keyword-strategy-ux.ts:85`; (d) add `useDebouncedValue` hook and migrate inline `setTimeout` debounces (`KeywordCommandCenter.tsx:116`, `useAutoSave.ts`, `ui/overlay/Tooltip.tsx:110`); (e) add `daysSince(iso)` to `lib/timeAgo.ts` and migrate `schema/SchemaPageCard.tsx:95`, `client/Briefing/WinsSurface.tsx:32`; (f) parity-fix `quickWins` shape between `keyword-strategy.ts:259` (full row) and `public-content.ts:216-221` (4 fields); (g) promote `sleep(ms)` from `server/local-seo.ts:156` into `server/helpers.ts`. [PARTIAL 2026-05-27 — Plan C: (a) DONE; (b) DONE; (d) DONE; (e) DONE. Still pending: (c) compact() collapse, (g) sleep() promotion to server/helpers.ts. (f) quickWins parity VERIFIED CLOSED 2026-05-27 — public endpoint correctly returns 4 fields (pagePath/action/estimatedImpact/rationale) matching ClientKeywordStrategy type; currentKeyword and roiScore are intentionally admin-only. No change needed.] [ALSO 2026-05-27 — Public-route auth sweep: added requireClientPortalAuth() to audit-detail, copy-entries, copy-sections, briefing, fix-orders, work-orders public GET in public-portal.ts and work-orders.ts. Extended public-endpoint-auth.test.ts with 20 soft-gate tests (3 new workspaces, 4 describe blocks). All gated routes now require auth on password-set workspaces; passwordless workspaces pass through per requireClientPortalAuth semantics.]"
+          "notes": "(a) Retire `server/db/json-column.ts` parseJsonColumn in favor of `parseJsonFallback` from `server/db/json-validation.ts`; (b) collapse `titleCaseWord`/`capitalize`/`capitalizeSlugSegment` (`server/insight-enrichment.ts:37`, `server/schema/data-sources.ts:146,324`) into one `capitalizeWord`; (c) collapse two `compact()` siblings in `keyword-strategy-context.ts:36` + `keyword-strategy-ux.ts:85`; (d) add `useDebouncedValue` hook and migrate inline `setTimeout` debounces (`KeywordCommandCenter.tsx:116`, `useAutoSave.ts`, `ui/overlay/Tooltip.tsx:110`); (e) add `daysSince(iso)` to `lib/timeAgo.ts` and migrate `schema/SchemaPageCard.tsx:95`, `client/Briefing/WinsSurface.tsx:32`; (f) parity-fix `quickWins` shape between `keyword-strategy.ts:259` (full row) and `public-content.ts:216-221` (4 fields); (g) promote `sleep(ms)` from `server/local-seo.ts:156` into `server/helpers.ts`. [PARTIAL 2026-05-27 \u2014 Plan C: (a) DONE; (b) DONE; (d) DONE; (e) DONE. Still pending: (c) compact() collapse, (g) sleep() promotion to server/helpers.ts. (f) quickWins parity VERIFIED CLOSED 2026-05-27 \u2014 public endpoint correctly returns 4 fields (pagePath/action/estimatedImpact/rationale) matching ClientKeywordStrategy type; currentKeyword and roiScore are intentionally admin-only. No change needed.] [ALSO 2026-05-27 \u2014 Public-route auth sweep: added requireClientPortalAuth() to audit-detail, copy-entries, copy-sections, briefing, fix-orders, work-orders public GET in public-portal.ts and work-orders.ts. Extended public-endpoint-auth.test.ts with 20 soft-gate tests (3 new workspaces, 4 describe blocks). All gated routes now require auth on password-set workspaces; passwordless workspaces pass through per requireClientPortalAuth semantics.]"
         }
       ]
     }
