@@ -179,6 +179,10 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      // The key WorkOrderPanel reads — a second admin session's open panel would otherwise
+      // show stale status after another operator marks complete / closes (matches the
+      // WORK_ORDER_COMMENT handler below).
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workOrders(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.workOrders(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
     },

@@ -30,7 +30,10 @@ const stmts = createStmtCache(() => ({
          VALUES (@id, @work_order_id, @workspace_id, @author, @content, @created_at, @read_at)`,
   ),
   selectByOrder: db.prepare(
-    `SELECT * FROM work_order_comments WHERE workspace_id = ? AND work_order_id = ? ORDER BY created_at ASC`,
+    // Secondary `id ASC` sort makes same-millisecond inserts deterministic. The index
+    // idx_work_order_comments_order is on (work_order_id, created_at); the id tiebreak is an
+    // in-memory sort over the (tiny) per-order comment set — cheap.
+    `SELECT * FROM work_order_comments WHERE workspace_id = ? AND work_order_id = ? ORDER BY created_at ASC, id ASC`,
   ),
   // Confirm the parent order exists + belongs to the workspace before inserting a
   // comment (FK alone would reject a missing order, but we want a clean null return).
@@ -75,6 +78,12 @@ export function listWorkOrderComments(
  * snapshot, opening the exact race window; .immediate() takes the write lock up
  * front.
  */
+// Process-monotonic counter so same-millisecond inserts get lexicographically increasing
+// ids. listWorkOrderComments orders by (created_at ASC, id ASC); the id tiebreak is only a
+// true insertion-order tiebreak if the id sorts in insertion order, which a random suffix
+// does not. The zero-padded counter (after the ms timestamp) guarantees that.
+let commentSeq = 0;
+
 export function addWorkOrderComment(
   workspaceId: string,
   workOrderId: string,
@@ -82,8 +91,9 @@ export function addWorkOrderComment(
   content: string,
 ): WorkOrderComment | null {
   const now = new Date().toISOString();
+  const seq = (commentSeq++).toString(36).padStart(6, '0');
   const comment: WorkOrderComment = {
-    id: `wocmt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    id: `wocmt_${Date.now()}_${seq}_${Math.random().toString(36).slice(2, 6)}`,
     workOrderId,
     author,
     content,

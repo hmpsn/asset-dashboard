@@ -22,6 +22,8 @@ const ctx = createTestContext(13409);
 
 // pwless: the URL is the credential, so requireClientPortalAuth() passes and we can hit public routes.
 let pwless: SeededFullWorkspace;
+// pwlessB: a second passwordless workspace — owns an order used to prove cross-workspace isolation.
+let pwlessB: SeededFullWorkspace;
 // pw: a password-protected workspace — an unauthenticated public POST must 401.
 let pw: SeededFullWorkspace;
 
@@ -48,11 +50,13 @@ function seedOrder(workspaceId: string, status: WorkOrder['status'] = 'in_progre
 beforeAll(async () => {
   await ctx.startServer();
   pwless = seedWorkspace({ clientPassword: '' });
+  pwlessB = seedWorkspace({ clientPassword: '' });
   pw = seedWorkspace({ clientPassword: 'secret-pass' });
 }, 30_000);
 
 afterAll(async () => {
   pwless?.cleanup();
+  pwlessB?.cleanup();
   pw?.cleanup();
   await ctx.stopServer();
 });
@@ -152,6 +156,21 @@ describe('Client public work-order comment', () => {
       content: 'too late?',
     });
     expect(res.status).toBe(409);
+  });
+
+  it('404s + persists zero rows when the orderId belongs to a different workspace (tenant isolation)', async () => {
+    // Order lives in workspace B; the request targets workspace `pwless` in the URL (auth passes
+    // because pwless is passwordless). getWorkOrder(pwless, orderInB) must miss → 404, and
+    // addWorkOrderComment's WHERE id=? AND workspace_id=? guard must write nothing. This proves a
+    // client authenticated for one workspace can't comment cross-workspace by guessing an orderId.
+    const orderInB = seedOrder(pwlessB.workspaceId, 'in_progress');
+    const res = await ctx.postJson(`/api/public/work-order/${pwless.workspaceId}/${orderInB.id}/comment`, {
+      content: 'cross-workspace comment attempt',
+    });
+    expect(res.status).toBe(404);
+    // Zero rows under the real owning workspace AND under the URL workspace.
+    expect(listWorkOrderComments(pwlessB.workspaceId, orderInB.id).length).toBe(0);
+    expect(listWorkOrderComments(pwless.workspaceId, orderInB.id).length).toBe(0);
   });
 
   it('401s unauthenticated on a password-protected workspace', async () => {

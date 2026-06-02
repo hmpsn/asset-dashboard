@@ -126,11 +126,18 @@ router.post('/api/work-orders/:workspaceId/:orderId/comment', requireWorkspaceAc
   const orderId = req.params.orderId;
   const content = sanitizeString(req.body.content, 2000);
   if (!content) return res.status(400).json({ error: 'content is required' });
+
+  // Symmetric close-out enforcement (mirrors the client route): once an order is closed
+  // the conversation lane is over — commenting would email the client about an order that
+  // has already left their lane (a dead-end). Reject before writing.
+  const order = getWorkOrder(wsId, orderId);
+  if (!order) return res.status(404).json({ error: 'Work order not found' });
+  if (order.status === 'closed') return res.status(409).json({ error: 'This work order is closed' });
+
   const comment = addWorkOrderComment(wsId, orderId, 'team', content);
   if (!comment) return res.status(404).json({ error: 'Work order not found' });
 
-  const order = getWorkOrder(wsId, orderId);
-  const orderTitle = order ? order.productType.replace(/_/g, ' ') : 'work order';
+  const orderTitle = order.productType.replace(/_/g, ' ');
   addActivity(wsId, 'work_order_commented',
     `Team commented on "${orderTitle}"`,
     content.length > 200 ? `${content.slice(0, 197)}...` : content,

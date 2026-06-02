@@ -9,7 +9,7 @@
 // Colors: admin surface, but this is NOT an AI feature, so NO purple (Four Laws).
 // Teal = actions, blue = info, emerald = done, amber = in-progress, red = cancel.
 import { useEffect, useMemo, useState } from 'react';
-import { X, Send, Clock, Loader2, CheckCircle2, Archive, MessageSquare, ChevronRight } from 'lucide-react';
+import { X, Send, Clock, CheckCircle2, Archive, MessageSquare, ChevronRight } from 'lucide-react';
 import {
   Button,
   IconButton,
@@ -63,6 +63,11 @@ export function WorkOrderPanel({ workspaceId, onDismiss }: WorkOrderPanelProps) 
     () => (orders ?? []).find((o) => o.id === selectedId) ?? null,
     [orders, selectedId],
   );
+
+  // Terminal orders (closed/cancelled) have left the client conversation lane — no reply
+  // and no further status actions. The admin comment route 409s on `closed` anyway; this
+  // hides the dead-end client email path before the operator can trigger it.
+  const isTerminal = selected?.status === 'closed' || selected?.status === 'cancelled';
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -224,32 +229,39 @@ export function WorkOrderPanel({ workspaceId, onDismiss }: WorkOrderPanelProps) 
                 )}
               </div>
 
-              {/* Reply box */}
-              <div className="flex items-end gap-2">
-                <div className="flex-1">
-                  <FormTextarea
-                    value={reply}
-                    onChange={setReply}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleSend(); }
-                    }}
-                    placeholder="Reply to the client…"
-                    rows={2}
-                    maxLength={2000}
-                    aria-label="Reply to the client about this work order"
-                  />
+              {/* Reply box — hidden once the order is terminal (closed/cancelled): the
+                  conversation lane is over, and the admin comment route would 409 anyway. */}
+              {isTerminal ? (
+                <p className="t-caption text-[var(--brand-text-muted)] py-2 border-t border-[var(--brand-border)]">
+                  This order is {STATUS_META[selected.status].label.toLowerCase()} — the conversation is closed.
+                </p>
+              ) : (
+                <div className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <FormTextarea
+                      value={reply}
+                      onChange={setReply}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleSend(); }
+                      }}
+                      placeholder="Reply to the client…"
+                      rows={2}
+                      maxLength={2000}
+                      aria-label="Reply to the client about this work order"
+                    />
+                  </div>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon={Send}
+                    loading={postComment.isPending}
+                    disabled={!reply.trim() || postComment.isPending}
+                    onClick={handleSend}
+                  >
+                    Send
+                  </Button>
                 </div>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  icon={Send}
-                  loading={postComment.isPending}
-                  disabled={!reply.trim() || postComment.isPending}
-                  onClick={handleSend}
-                >
-                  Send
-                </Button>
-              </div>
+              )}
             </div>
           )}
         </div>
@@ -290,9 +302,8 @@ export function WorkOrderPanel({ workspaceId, onDismiss }: WorkOrderPanelProps) 
                 Close out
               </Button>
             )}
-            {(selected.status === 'closed' || selected.status === 'cancelled') && (
-              <span className="t-caption-sm text-[var(--brand-text-muted)] inline-flex items-center gap-1.5">
-                <Loader2 className="w-3 h-3 hidden" />
+            {isTerminal && (
+              <span className="t-caption-sm text-[var(--brand-text-muted)]">
                 This order is {STATUS_META[selected.status].label.toLowerCase()} — no further actions.
               </span>
             )}

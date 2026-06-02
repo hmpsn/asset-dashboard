@@ -165,8 +165,21 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   type ActionItem = { label: string; sub: string; color: 'red' | 'amber' | 'teal' | 'emerald'; icon: typeof Bell; tab: string; priority: 1 | 2 | 3; queryString?: string; onClick?: () => void };
   const actions: ActionItem[] = [];
   if (newRequests.length > 0) actions.push({ label: `${newRequests.length} new client request${newRequests.length > 1 ? 's' : ''}`, sub: 'Review and respond', color: 'red', icon: Bell, tab: 'requests', priority: 1 });
-  const pendingOrders = workOrders.filter(o => o.status === 'pending' || o.status === 'in_progress');
-  if (pendingOrders.length > 0) actions.push({ label: `${pendingOrders.length} purchased fix${pendingOrders.length > 1 ? 'es' : ''} awaiting fulfillment`, sub: 'Open the conversation/close panel to fulfill, reply, and close out', color: 'teal', icon: Clipboard, tab: 'workspace-settings', priority: 2, onClick: () => setWorkOrderPanelOpen(true) });
+  // Open orders = any non-terminal order (NOT closed/cancelled). Includes `completed`
+  // so the operator can still reach the panel to reply or close out a fulfilled order
+  // once nothing else is pending — `completed` is the exact state you close FROM.
+  const openOrders = workOrders.filter(o => o.status === 'pending' || o.status === 'in_progress' || o.status === 'completed');
+  if (openOrders.length > 0) {
+    const readyToClose = openOrders.filter(o => o.status === 'completed').length;
+    const awaiting = openOrders.length - readyToClose;
+    const label = awaiting > 0
+      ? `${awaiting} purchased fix${awaiting > 1 ? 'es' : ''} awaiting fulfillment`
+      : `${readyToClose} completed order${readyToClose > 1 ? 's' : ''} ready to close out`;
+    const sub = awaiting > 0 && readyToClose > 0
+      ? `${readyToClose} completed and ready to close out — open the conversation/close panel to fulfill, reply, and close out`
+      : 'Open the conversation/close panel to fulfill, reply, and close out';
+    actions.push({ label, sub, color: 'teal', icon: Clipboard, tab: 'workspace-settings', priority: 2, onClick: () => setWorkOrderPanelOpen(true) });
+  }
   for (const signal of churnSignals) {
     actions.push({
       label: signal.title,

@@ -316,6 +316,12 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
         [WS_EVENTS.CONTENT_REQUEST_UPDATE]: invalidateInbox,
         // ws-invalidation-ok — client unified-inbox key differs from any admin copy/content key
         [WS_EVENTS.POST_UPDATED]: invalidateInbox,
+        // Work-order status change: on close-out the PATCH→closed broadcasts WORK_ORDER_UPDATE
+        // and the mirror flips the deliverable to `cancelled` → it leaves the inbox lane. Without
+        // this the client card lingers until another event. The same broadcast also covers
+        // mark-complete transitions that change the card's verbs.
+        // ws-invalidation-ok — client unified-inbox key differs from any admin work-order key
+        [WS_EVENTS.WORK_ORDER_UPDATE]: invalidateInbox,
         // Work-order conversation: a team reply (or the client's own post echoed) — refresh the
         // commented order's thread so the client sees replies live. The payload carries { id: orderId }.
         // ws-invalidation-ok — client work-order-comment thread key differs from any admin key

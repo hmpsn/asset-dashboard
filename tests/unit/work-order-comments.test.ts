@@ -9,18 +9,24 @@ import { createWorkOrder, updateWorkOrder, getWorkOrder } from '../../server/wor
 import { addWorkOrderComment, listWorkOrderComments } from '../../server/work-order-comments.js';
 
 let wsId = '';
+// A second workspace used only by the tenant-isolation test below.
+let wsBId = '';
 
 beforeAll(() => {
   wsId = createWorkspace('Work Order Comments Test').id;
+  wsBId = createWorkspace('Work Order Comments Test B').id;
 });
 
 afterAll(() => {
   deleteWorkspace(wsId);
+  deleteWorkspace(wsBId);
 });
 
 beforeEach(() => {
   db.prepare('DELETE FROM work_order_comments WHERE workspace_id = ?').run(wsId);
   db.prepare('DELETE FROM work_orders WHERE workspace_id = ?').run(wsId);
+  db.prepare('DELETE FROM work_order_comments WHERE workspace_id = ?').run(wsBId);
+  db.prepare('DELETE FROM work_orders WHERE workspace_id = ?').run(wsBId);
 });
 
 function makeOrder() {
@@ -65,6 +71,25 @@ describe('addWorkOrderComment', () => {
     addWorkOrderComment(wsId, order.id, 'team', 'team reply');
     const thread = listWorkOrderComments(wsId, order.id);
     expect(thread.map(c => c.author)).toEqual(['client', 'team']);
+  });
+
+  it('refuses to comment cross-workspace: returns null and writes zero rows (tenant isolation)', () => {
+    // Order belongs to workspace A; the call passes workspace B's id.
+    const orderInA = makeOrder();
+    const result = addWorkOrderComment(wsBId, orderInA.id, 'team', 'cross-tenant attempt');
+    expect(result).toBeNull();
+    // Zero rows persisted under EITHER workspace (the WHERE id=? AND workspace_id=? guard
+    // never matched, so the parent-exists check returned null before any insert).
+    const rowsForOrder = db
+      .prepare('SELECT COUNT(*) AS n FROM work_order_comments WHERE work_order_id = ?')
+      .get(orderInA.id) as { n: number };
+    expect(rowsForOrder.n).toBe(0);
+    const rowsForWsB = db
+      .prepare('SELECT COUNT(*) AS n FROM work_order_comments WHERE workspace_id = ?')
+      .get(wsBId) as { n: number };
+    expect(rowsForWsB.n).toBe(0);
+    // The order's own thread (read under its true workspace) is still empty.
+    expect(listWorkOrderComments(wsId, orderInA.id)).toEqual([]);
   });
 });
 
