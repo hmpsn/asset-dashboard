@@ -28,11 +28,13 @@ export const publicDeliverables = {
       decision: DeliverableResponseDecision;
       note?: string;
       /**
-       * R3 per-item subset (approval family only): the ClientDeliverableItem.id`s the client
-       * flagged in the detail modal. On `approved`, the server approves the unflagged items and
-       * holds the flagged ones ("implement N of M"). Ignored on reject decisions / client_action.
+       * R3 per-item subset (approval family only): the items the client flagged in the detail
+       * modal — each carrying the `ClientDeliverableItem.id` plus the typed flag note. On
+       * `approved`, the server approves the unflagged items and holds the flagged ones ("implement
+       * N of M"), persisting the typed note onto each held item. Ignored on reject decisions /
+       * client_action.
        */
-      flaggedItemIds?: string[];
+      flaggedItems?: { itemId: string; note?: string }[];
     },
   ) =>
     patch<ClientDeliverable>(

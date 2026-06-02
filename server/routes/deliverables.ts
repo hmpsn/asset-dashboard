@@ -47,11 +47,15 @@ const respondSchema = z
   .object({
     decision: z.enum(['approved', 'changes_requested', 'declined']),
     note: z.string().max(2000).optional(),
-    // R3 per-item subset (APPROVAL-FAMILY ONLY): the ClientDeliverableItem.id`s the client flagged
-    // in the detail modal. On `approved`, the source write approves the unflagged items and holds
-    // the flagged ones ("implement N of M"). Optional + bounded; ignored on reject decisions and by
-    // the client_action family. The deliverable mirror status is still `approved`.
-    flaggedItemIds: z.array(z.string()).max(500).optional(),
+    // R3 per-item subset (APPROVAL-FAMILY ONLY): the items the client flagged in the detail modal,
+    // each carrying the ClientDeliverableItem.id plus the typed flag note. On `approved`, the source
+    // write approves the unflagged items and holds the flagged ones ("implement N of M"), persisting
+    // the typed note onto each held item. Optional + bounded; ignored on reject decisions and by the
+    // client_action family. The deliverable mirror status is still `approved`.
+    flaggedItems: z
+      .array(z.object({ itemId: z.string(), note: z.string().max(2000).optional() }))
+      .max(500)
+      .optional(),
   })
   .strict();
 

@@ -37,11 +37,13 @@ export interface RespondToDeliverableVars {
   decision: DeliverableResponseDecision;
   note?: string;
   /**
-   * R3 per-item subset (approval family only): the ClientDeliverableItem.id`s the client flagged
-   * in the DeliverableDetailModal. Forwarded to /respond; the server approves the unflagged items
-   * and holds the flagged ones. Ignored on reject decisions / the client_action family.
+   * R3 per-item subset (approval family only): the items the client flagged in the
+   * DeliverableDetailModal — each carrying the `ClientDeliverableItem.id` plus the typed flag note.
+   * Forwarded to /respond; the server approves the unflagged items and holds (rejects) the flagged
+   * ones, persisting the typed note onto each held item. Ignored on reject decisions / the
+   * client_action family.
    */
-  flaggedItemIds?: string[];
+  flaggedItems?: { itemId: string; note?: string }[];
 }
 
 /**
@@ -53,8 +55,8 @@ export interface RespondToDeliverableVars {
 export function useRespondToDeliverable(workspaceId: string) {
   const queryClient = useQueryClient();
   return useMutation<ClientDeliverable, Error, RespondToDeliverableVars>({
-    mutationFn: ({ deliverableId, decision, note, flaggedItemIds }) =>
-      publicDeliverables.respond(workspaceId, deliverableId, { decision, note, flaggedItemIds }),
+    mutationFn: ({ deliverableId, decision, note, flaggedItems }) =>
+      publicDeliverables.respond(workspaceId, deliverableId, { decision, note, flaggedItems }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.client.unifiedInbox(workspaceId) });
     },

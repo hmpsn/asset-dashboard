@@ -1,13 +1,13 @@
 /**
  * R3 — per-item subset respond propagation. Extends the R2 whole-batch linchpin: a unified-inbox
- * `respondToDeliverable({ decision:'approved', flaggedItemIds:[…] })` must approve the UNFLAGGED
- * legacy approval items and REJECT (hold) the flagged ones ("implement N of M"), while the
- * deliverable mirror stays `approved`. Back-compat: `approved` with no flaggedItemIds approves ALL
- * pending (the R2 behavior — unchanged).
+ * `respondToDeliverable({ decision:'approved', flaggedItems:[{itemId, note}] })` must approve the
+ * UNFLAGGED legacy approval items and REJECT (hold) the flagged ones ("implement N of M"), persist
+ * the client's TYPED flag note onto each held item, while the deliverable mirror stays `approved`.
+ * Back-compat: `approved` with no flaggedItems approves ALL pending (the R2 behavior — unchanged).
  *
  * Per-item flag/subset is APPROVAL-FAMILY ONLY (the approval_batch family stores typed item rows
  * with `itemPayload.legacyItemId` = the legacy approval_item.id). The client_action family has no
- * typed items, so flaggedItemIds is a no-op there (asserted: whole-action approve still works).
+ * typed items, so flaggedItems is a no-op there (asserted: whole-action approve still works).
  *
  * Email is mocked so the suppression/no-double-notify contract stays deterministic (same pattern
  * as respond-propagation.test.ts).
@@ -100,7 +100,7 @@ function legacyIdByDeliverableItemId(d: ClientDeliverable): Record<string, strin
 }
 
 describe('R3 per-item subset propagation — approval_batch family', () => {
-  it('approve with flaggedItemIds=[one item] → unflagged approved, flagged rejected (mirror approved)', async () => {
+  it('approve with flaggedItems=[one item + note] → unflagged approved, flagged rejected w/ note (mirror approved)', async () => {
     const batch = createBatch(WS, SITE, 'SEO Changes', [
       { pageId: 'p1', pageTitle: 'P1', pageSlug: 'p1', field: 'seoTitle', currentValue: 'a', proposedValue: 'b' },
       { pageId: 'p2', pageTitle: 'P2', pageSlug: 'p2', field: 'seoTitle', currentValue: 'c', proposedValue: 'd' },
@@ -109,14 +109,15 @@ describe('R3 per-item subset propagation — approval_batch family', () => {
     const deliverable = mirror('seo_edit', batch);
     const idMap = legacyIdByDeliverableItemId(deliverable);
 
-    // Flag the deliverable item that maps to legacy item p2 (the second).
+    // Flag the deliverable item that maps to legacy item p2 (the second), with a typed concern.
     const flaggedDeliverableItemId = (deliverable.items ?? []).find(
       (i) => idMap[i.id] === batch.items[1].id,
     )!.id;
+    const TYPED_NOTE = 'This title is too long — please shorten to under 60 chars.';
 
     const updated = await respondToDeliverable(WS, deliverable.id, {
       decision: 'approved',
-      flaggedItemIds: [flaggedDeliverableItemId],
+      flaggedItems: [{ itemId: flaggedDeliverableItemId, note: TYPED_NOTE }],
     });
 
     // 1. THE LINCHPIN: the real source items — unflagged approved, flagged rejected.
@@ -125,6 +126,12 @@ describe('R3 per-item subset propagation — approval_batch family', () => {
     expect(byId.get(batch.items[0].id)!.status).toBe('approved');
     expect(byId.get(batch.items[1].id)!.status).toBe('rejected'); // flagged → held
     expect(byId.get(batch.items[2].id)!.status).toBe('approved');
+    // 1b. REGRESSION (review-caught): the client's TYPED flag note must reach the legacy item's
+    //     clientNote — not be discarded en route. The freshly-mirrored item had no persisted note,
+    //     so this proves the just-typed note threaded end-to-end (UI → wire → source write).
+    expect(byId.get(batch.items[1].id)!.clientNote).toBe(TYPED_NOTE);
+    // Unflagged (approved) items carry no spurious note.
+    expect(byId.get(batch.items[0].id)!.clientNote ?? null).toBeNull();
     // Mixed approved+rejected → batch status `partial`.
     expect(sourceAfter.status).toBe('partial');
     // 2. the deliverable mirror is still `approved` (client approved; a subset held).
@@ -135,7 +142,7 @@ describe('R3 per-item subset propagation — approval_batch family', () => {
     expect(mockNotifyTeamChangesRequested).not.toHaveBeenCalled();
   });
 
-  it('approve with flaggedItemIds=[multiple] holds each flagged item, approves the rest', async () => {
+  it('approve with flaggedItems=[multiple] holds each flagged item w/ its own note, approves the rest', async () => {
     const batch = createBatch(WS, SITE, 'SEO Changes', [
       { pageId: 'p1', pageTitle: 'P1', pageSlug: 'p1', field: 'seoTitle', currentValue: 'a', proposedValue: 'b' },
       { pageId: 'p2', pageTitle: 'P2', pageSlug: 'p2', field: 'seoTitle', currentValue: 'c', proposedValue: 'd' },
@@ -148,7 +155,10 @@ describe('R3 per-item subset propagation — approval_batch family', () => {
 
     await respondToDeliverable(WS, deliverable.id, {
       decision: 'approved',
-      flaggedItemIds: [flag1, flag3],
+      flaggedItems: [
+        { itemId: flag1, note: 'wrong keyword' },
+        { itemId: flag3, note: 'keep the original' },
+      ],
     });
 
     const sourceAfter = getBatch(WS, batch.id)!;
@@ -156,10 +166,13 @@ describe('R3 per-item subset propagation — approval_batch family', () => {
     expect(byId.get(batch.items[0].id)!.status).toBe('rejected');
     expect(byId.get(batch.items[1].id)!.status).toBe('approved');
     expect(byId.get(batch.items[2].id)!.status).toBe('rejected');
+    // Each held item carries ITS OWN typed note (not a shared/batch note).
+    expect(byId.get(batch.items[0].id)!.clientNote).toBe('wrong keyword');
+    expect(byId.get(batch.items[2].id)!.clientNote).toBe('keep the original');
     expect(sourceAfter.status).toBe('partial');
   });
 
-  it('BACK-COMPAT: approve with NO flaggedItemIds approves ALL pending (R2 behavior)', async () => {
+  it('BACK-COMPAT: approve with NO flaggedItems approves ALL pending (R2 behavior)', async () => {
     const batch = createBatch(WS, SITE, 'SEO Changes', [
       { pageId: 'p1', pageTitle: 'P1', pageSlug: 'p1', field: 'seoTitle', currentValue: 'a', proposedValue: 'b' },
       { pageId: 'p2', pageTitle: 'P2', pageSlug: 'p2', field: 'seoTitle', currentValue: 'c', proposedValue: 'd' },
@@ -173,21 +186,21 @@ describe('R3 per-item subset propagation — approval_batch family', () => {
     expect(sourceAfter.items.every((i) => i.status === 'approved')).toBe(true); // every-ok: length>0 (2 items seeded)
   });
 
-  it('BACK-COMPAT: approve with empty flaggedItemIds[] approves ALL pending', async () => {
+  it('BACK-COMPAT: approve with empty flaggedItems[] approves ALL pending', async () => {
     const batch = createBatch(WS, SITE, 'SEO Changes', [
       { pageId: 'p1', pageTitle: 'P1', pageSlug: 'p1', field: 'seoTitle', currentValue: 'a', proposedValue: 'b' },
       { pageId: 'p2', pageTitle: 'P2', pageSlug: 'p2', field: 'seoTitle', currentValue: 'c', proposedValue: 'd' },
     ]);
     const deliverable = mirror('seo_edit', batch);
 
-    await respondToDeliverable(WS, deliverable.id, { decision: 'approved', flaggedItemIds: [] });
+    await respondToDeliverable(WS, deliverable.id, { decision: 'approved', flaggedItems: [] });
 
     const sourceAfter = getBatch(WS, batch.id)!;
     expect(sourceAfter.status).toBe('approved');
     expect(sourceAfter.items.every((i) => i.status === 'approved')).toBe(true); // every-ok: length>0 (2 items seeded)
   });
 
-  it('changes_requested ignores flaggedItemIds — whole batch rejected', async () => {
+  it('changes_requested ignores flaggedItems — whole batch rejected', async () => {
     const batch = createBatch(WS, SITE, 'SEO Changes', [
       { pageId: 'p1', pageTitle: 'P1', pageSlug: 'p1', field: 'seoTitle', currentValue: 'a', proposedValue: 'b' },
       { pageId: 'p2', pageTitle: 'P2', pageSlug: 'p2', field: 'seoTitle', currentValue: 'c', proposedValue: 'd' },
@@ -198,7 +211,7 @@ describe('R3 per-item subset propagation — approval_batch family', () => {
     await respondToDeliverable(WS, deliverable.id, {
       decision: 'changes_requested',
       note: 'redo all',
-      flaggedItemIds: [flaggedId],
+      flaggedItems: [{ itemId: flaggedId, note: 'should be ignored' }],
     });
 
     const sourceAfter = getBatch(WS, batch.id)!;
@@ -207,8 +220,8 @@ describe('R3 per-item subset propagation — approval_batch family', () => {
   });
 });
 
-describe('R3 per-item — client_action family ignores flaggedItemIds (whole-action only)', () => {
-  it('approve with flaggedItemIds on a redirect deliverable still approves the whole action', async () => {
+describe('R3 per-item — client_action family ignores flaggedItems (whole-action only)', () => {
+  it('approve with flaggedItems on a redirect deliverable still approves the whole action', async () => {
     const action = createClientAction({
       workspaceId: WS,
       sourceType: 'redirect_proposal',
@@ -221,7 +234,7 @@ describe('R3 per-item — client_action family ignores flaggedItemIds (whole-act
 
     const updated = await respondToDeliverable(WS, deliverable.id, {
       decision: 'approved',
-      flaggedItemIds: ['ignored-id'],
+      flaggedItems: [{ itemId: 'ignored-id', note: 'ignored note' }],
     });
 
     expect(getClientAction(WS, action.id)!.status).toBe('approved');

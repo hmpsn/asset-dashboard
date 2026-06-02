@@ -114,12 +114,12 @@ export function UnifiedInbox({ workspaceId, setToast }: UnifiedInboxProps) {
     d: ClientDeliverable,
     decision: 'approved' | 'changes_requested' | 'declined',
     note?: string,
-    flaggedItemIds?: string[],
+    flaggedItems?: FlaggedItem[],
   ) => {
     setSubmittingId(d.id);
     try {
-      await respond.mutateAsync({ deliverableId: d.id, decision, note, flaggedItemIds });
-      const heldCount = decision === 'approved' ? flaggedItemIds?.length ?? 0 : 0;
+      await respond.mutateAsync({ deliverableId: d.id, decision, note, flaggedItems });
+      const heldCount = decision === 'approved' ? flaggedItems?.length ?? 0 : 0;
       setToast({
         message:
           decision === 'approved'
@@ -220,12 +220,7 @@ export function UnifiedInbox({ workspaceId, setToast }: UnifiedInboxProps) {
           decision={normalizeDeliverable(detailDeliverable)}
           submitting={submittingId === detailDeliverable.id}
           onApprove={(flaggedItems: FlaggedItem[]) =>
-            handleRespond(
-              detailDeliverable,
-              'approved',
-              undefined,
-              flaggedItems.map((f) => f.itemId),
-            )
+            handleRespond(detailDeliverable, 'approved', undefined, flaggedItems)
           }
           onRequestChanges={(note) =>
             handleRespond(detailDeliverable, 'changes_requested', note || undefined)

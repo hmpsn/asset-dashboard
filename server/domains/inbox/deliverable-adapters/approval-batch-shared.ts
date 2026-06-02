@@ -272,13 +272,14 @@ export async function respondToApprovalBatchSource(
 
   // R3 per-item subset: when the client APPROVED the deliverable but flagged a subset of items,
   // build per-item decisions from the deliverable's typed items[] (the unflagged → approved,
-  // the flagged → rejected). The deliverable→legacy mapping is `itemPayload.legacyItemId` (the
-  // approval_item.id stashed by batchItemsToDeliverableItems). Items with no legacyItemId are
-  // skipped with a warn (they cannot be propagated to the source). Only meaningful on approve —
-  // a whole-deliverable reject (changes_requested/declined) rejects everything regardless.
+  // the flagged → rejected, carrying the just-typed flag note). The deliverable→legacy mapping is
+  // `itemPayload.legacyItemId` (the approval_item.id stashed by batchItemsToDeliverableItems).
+  // Items with no legacyItemId are skipped with a warn (they cannot be propagated to the source).
+  // Only meaningful on approve — a whole-deliverable reject (changes_requested/declined) rejects
+  // everything regardless.
   const itemDecisions =
     decision === 'approved'
-      ? buildItemDecisions(workspaceId, deliverable, opts.flaggedItemIds ?? [])
+      ? buildItemDecisions(workspaceId, deliverable, opts.flaggedItems ?? [])
       : undefined;
 
   respondToApprovalBatch(workspaceId, batchId, batchDecision, {
@@ -294,14 +295,22 @@ export async function respondToApprovalBatchSource(
  * flagged (so `respondToApprovalBatch` falls back to its whole-batch approve-all-pending path —
  * the R2 back-compat behavior). When at least one item is flagged, every deliverable item with a
  * `legacyItemId` becomes an explicit decision: flagged → rejected, unflagged → approved.
+ *
+ * The flagged subset carries the typed flag note the client entered in the detail modal. For a
+ * flagged (held) item we persist `notesMap.get(item.id) ?? item.clientNote ?? null` — preferring
+ * the just-typed note over any stale persisted note (which is null for a freshly-mirrored item).
  */
 function buildItemDecisions(
   workspaceId: string,
   deliverable: ClientDeliverable,
-  flaggedItemIds: string[],
+  flaggedItems: { itemId: string; note?: string }[],
 ): ApprovalItemDecision[] | undefined {
-  if (flaggedItemIds.length === 0) return undefined;
-  const flagged = new Set(flaggedItemIds);
+  if (flaggedItems.length === 0) return undefined;
+  const flagged = new Set(flaggedItems.map((f) => f.itemId));
+  const notesMap = new Map<string, string>();
+  for (const f of flaggedItems) {
+    if (typeof f.note === 'string' && f.note.trim()) notesMap.set(f.itemId, f.note);
+  }
   const items = deliverable.items ?? [];
   const decisions: ApprovalItemDecision[] = [];
   for (const item of items) {
@@ -313,10 +322,12 @@ function buildItemDecisions(
       );
       continue;
     }
+    const isFlagged = flagged.has(item.id);
     decisions.push({
       legacyItemId,
-      status: flagged.has(item.id) ? 'rejected' : 'approved',
-      note: item.clientNote ?? null,
+      status: isFlagged ? 'rejected' : 'approved',
+      // For a flagged (held) item, prefer the just-typed flag note over any stale persisted note.
+      note: isFlagged ? notesMap.get(item.id) ?? item.clientNote ?? null : item.clientNote ?? null,
     });
   }
   // If the deliverable carried no items (or none had a legacyItemId) there is nothing to drive
