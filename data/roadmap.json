@@ -229,8 +229,8 @@
           "source": "/docs/superpowers/audits/2026-06-01-opportunity-value-model-audit.md",
           "est": "1h",
           "priority": "P4",
-          "status": "pending",
-          "notes": "PR7 review minor: the opportunity-event 'publish' type + its boost/half-life default exist but no detector emits it (the publish/apply path triggers a regen via resolveRecommendationsForChange instead). Either wire a publish-event detector or drop the unused enum member + schema branch."
+          "status": "done",
+          "notes": "PR7 review minor: the opportunity-event 'publish' type + its boost/half-life default exist but no detector emits it (the publish/apply path triggers a regen via resolveRecommendationsForChange instead). Either wire a publish-event detector or drop the unused enum member + schema branch. [DONE 2026-06-02 (PR #1035): removed the dead `publish` opportunity-event (type union, OPPORTUNITY_EVENT_TYPES, Zod enum, EVENT_BOOST_DEFAULTS.publish, doc refs); confirmed no detector emits it; coerceType fallback now `decay`.]"
         },
         {
           "id": "ov-divergence-dashboard-ui",
@@ -238,8 +238,8 @@
           "source": "/docs/superpowers/plans/2026-06-01-opportunity-value-model.md",
           "est": "2-4h",
           "priority": "P3",
-          "status": "pending",
-          "notes": "PR4 shipped the data + GET /api/ov-divergence/:workspaceId + a typed api wrapper but deferred the UI panel (no natural admin-per-workspace debug page). Add a minimal SectionCard panel (legacy-#1 vs OV-#1, agree %, top-3 diff, invariant pass-rate) to support the P8 owner review without hitting the endpoint by hand."
+          "status": "done",
+          "notes": "PR4 shipped the data + GET /api/ov-divergence/:workspaceId + a typed api wrapper but deferred the UI panel (no natural admin-per-workspace debug page). Add a minimal SectionCard panel (legacy-#1 vs OV-#1, agree %, top-3 diff, invariant pass-rate) to support the P8 owner review without hitting the endpoint by hand. [DONE 2026-06-02 (PR #1036): admin OvDivergencePanel in the per-workspace Meeting Brief page \u2014 agree-rate headline + red flags (invariant-broken, OV-no-pick) + legacy-vs-OV disagreement detail (top-3 + per-rec deltas), reading the existing /api/ov-divergence endpoint. v1 is per-workspace; a cross-workspace aggregate rollup (new endpoint) is a possible follow-up. This is the instrument for the OV flag-flip decision.]"
         }
       ]
     },
@@ -295,8 +295,8 @@
           "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
           "est": "3-5h",
           "priority": "P2",
-          "status": "pending",
-          "notes": "Parent: dup-pathname-extraction-fanout-migration. Deferred from the 2026-05-28 server-first phase to keep blast radius low. Target areas: `src/components/*` and `src/hooks/*` callsites using raw `new URL(...).pathname` for labels/matching, especially Insight cards, RedirectManager, SearchDetail, client snapshot/search surfaces, and admin insight feed helpers. Done when UI callsites route through shared page-address helpers (or explicitly documented exceptions) and page-address contract tests + affected component tests are green."
+          "status": "done",
+          "notes": "Parent: dup-pathname-extraction-fanout-migration. Deferred from the 2026-05-28 server-first phase to keep blast radius low. Target areas: `src/components/*` and `src/hooks/*` callsites using raw `new URL(...).pathname` for labels/matching, especially Insight cards, RedirectManager, SearchDetail, client snapshot/search surfaces, and admin insight feed helpers. Done when UI callsites route through shared page-address helpers (or explicitly documented exceptions) and page-address contract tests + affected component tests are green. [DONE 2026-06-02 (PR #1035): 8 genuine new URL().pathname display callsites migrated to the shared normalizePageUrl helper (+ a pinning test for output parity / trailing-slash normalization). The remaining new URL() uses in src/ read hostname/protocol or validate URLs \u2014 out of scope for this helper, intentionally left.]"
         },
         {
           "id": "dup-route-query-parser-consolidation",
@@ -1871,7 +1871,7 @@
           "est": "8-14h",
           "priority": "P1",
           "status": "pending",
-          "notes": "While implementing the P0 endpoint-auth fix we found ~19 additional /api/public/<resource>/:workspaceId routes that rely on the global app gate (server/app.ts:262) without per-route portal auth. The global gate short-circuits on workspaces with no clientPassword, so each of these still leaks data during the pre-setup window. Files grandfathered in the pr-check rule's exclude list: public-portal.ts (12 routes), public-content.ts (mutations beyond the file-level router.use covered ones), public-requests.ts (6), recommendations.ts (2), reports.ts (3), stripe.ts (2), work-orders.ts (2). Migration is large because adding requireAuthenticatedClientPortalAuth() broke ~798 existing integration tests that seed workspaces without clientPassword and expect 200 on public endpoints. Sweep route-by-route, updating each integration-test file in the same PR to authenticate via /api/public/auth/:id before hitting data endpoints. When a file's routes are all migrated, remove that file from the pr-check rule's exclude list. Coordinate with the broader test-fixture refactor (consider a shared `authenticatePortal(ctx, wsId)` helper)."
+          "notes": "While implementing the P0 endpoint-auth fix we found ~19 additional /api/public/<resource>/:workspaceId routes that rely on the global app gate (server/app.ts:262) without per-route portal auth. The global gate short-circuits on workspaces with no clientPassword, so each of these still leaks data during the pre-setup window. Files grandfathered in the pr-check rule's exclude list: public-portal.ts (12 routes), public-content.ts (mutations beyond the file-level router.use covered ones), public-requests.ts (6), recommendations.ts (2), reports.ts (3), stripe.ts (2), work-orders.ts (2). Migration is large because adding requireAuthenticatedClientPortalAuth() broke ~798 existing integration tests that seed workspaces without clientPassword and expect 200 on public endpoints. Sweep route-by-route, updating each integration-test file in the same PR to authenticate via /api/public/auth/:id before hitting data endpoints. When a file's routes are all migrated, remove that file from the pr-check rule's exclude list. Coordinate with the broader test-fixture refactor (consider a shared `authenticatePortal(ctx, wsId)` helper). [PARTIAL 2026-06-02 (PR #1035): work-orders.ts removed from the pr-check auth-sweep exclude (both its public GETs use requireClientPortalAuth; rule accepts either variant). ~18 unprotected /api/public/ routes still remain (public-portal.ts, reports.ts).]"
         },
         {
           "id": "audit-drift-trial-state-canonical",
