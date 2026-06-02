@@ -342,3 +342,32 @@ describe('DeliverableDetailModal — R3b Apply to Website footer', () => {
     expect(screen.getByRole('button', { name: /implement 3 →/i })).toBeInTheDocument();
   });
 });
+
+describe('DeliverableDetailModal — item 3: centered resized modal shell', () => {
+  it('uses the centered max-h panel (not the old full-bleed h-full shell)', () => {
+    renderModal(seoDecision);
+    const dialog = screen.getByRole('dialog');
+    // Outer wrapper centers the panel instead of stacking it full-bleed.
+    expect(dialog.className).toContain('items-center');
+    expect(dialog.className).toContain('justify-center');
+    expect(dialog.className).not.toContain('flex-col');
+    // The panel is the centered ~75vw / ≤1200px / ~90vh card, not the old h-full / max-w-3xl shell.
+    const panel = dialog.querySelector('.relative');
+    expect(panel).not.toBeNull();
+    expect(panel!.className).toContain('max-w-[1200px]');
+    expect(panel!.className).toContain('max-h-[90vh]');
+    expect(panel!.className).toContain('sm:w-[75vw]');
+    expect(panel!.className).toContain('rounded-[var(--radius-xl)]');
+    expect(panel!.className).not.toContain('h-full');
+    expect(panel!.className).not.toContain('max-w-3xl');
+  });
+
+  it('backdrop uses the brand-overlay token (SG-3), not raw bg-black/80', () => {
+    renderModal(seoDecision);
+    const dialog = screen.getByRole('dialog');
+    const backdrop = dialog.querySelector('.absolute.inset-0');
+    expect(backdrop).not.toBeNull();
+    expect(backdrop!.className).toContain('bg-[var(--brand-overlay)]');
+    expect(backdrop!.className).not.toContain('bg-black/80');
+  });
+});

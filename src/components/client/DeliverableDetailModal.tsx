@@ -282,12 +282,11 @@ export function DeliverableDetailModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="deliverable-modal-title"
-      className="fixed inset-0 z-[var(--z-modal-fullscreen)] flex flex-col" // fixed-inset-ok — full-screen trust-first panel; escape key + backdrop click handled in component body
+      className="fixed inset-0 z-[var(--z-modal-fullscreen)] flex items-center justify-center p-4" // fixed-inset-ok — centered review dialog; escape key + backdrop click handled in component body
     >
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onDismiss} />
+      <div className="absolute inset-0 bg-[var(--brand-overlay)] backdrop-blur-sm" onClick={onDismiss} />
       <div
-        className="relative z-[var(--z-sticky)] flex flex-col h-full max-w-3xl mx-auto w-full bg-[var(--surface-1)] shadow-2xl overflow-hidden"
-        style={{ borderRadius: `0 0 var(--radius-xl) var(--radius-xl)` }}
+        className="relative z-[var(--z-sticky)] flex flex-col w-[90vw] sm:w-[75vw] max-w-[1200px] max-h-[90vh] bg-[var(--surface-1)] shadow-2xl overflow-hidden rounded-[var(--radius-xl)]"
       >
         {/* Header */}
         <div className="flex items-center gap-3 px-6 py-4 border-b border-[var(--brand-border)] flex-shrink-0">
