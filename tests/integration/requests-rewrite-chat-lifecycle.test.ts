@@ -36,7 +36,12 @@ import db from '../../server/db/index.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createRequest, getRequest, listRequests } from '../../server/requests.js';
 
-const ctx = createTestContext(13860); // port-ok: unique in integration suite
+// Spawn the test server WITHOUT an OpenAI key so the rewrite-chat "no key → 400" assertion is
+// deterministic and fast. Otherwise an ambient OPENAI_API_KEY (CI/local) makes the chat route
+// attempt a real, slow AI call and the 5s test times out — a pre-existing ordering/env flake.
+// No other test in this file needs the key (all chat POSTs assert validation 400/404; the 200s
+// are /pages + requests CRUD).
+const ctx = createTestContext(13860, { env: { OPENAI_API_KEY: '' } }); // port-ok: unique in integration suite
 const { api, postJson, patchJson, del } = ctx;
 
 let workspaceId = '';
@@ -643,16 +648,15 @@ describe('POST /api/rewrite-chat/:workspaceId — chat validation', () => {
   });
 
   it('returns 400 when OPENAI_API_KEY is not configured', async () => {
-    // This test runs with no API key set — server returns 400 with a descriptive error
+    // Deterministic: the test server is spawned with OPENAI_API_KEY='' (see createTestContext
+    // call at the top of this file), so the route takes the fast no-key 400 branch
+    // (rewrite-chat.ts:226-227) rather than attempting a real, slow AI call.
     const res = await postJson(`/api/rewrite-chat/${workspaceId}`, {
       question: 'Please review the homepage headings.',
     });
-    // Accept either 200 (if key happens to be present in env) or 400 (no key)
-    expect([200, 400]).toContain(res.status);
-    if (res.status === 400) {
-      const body = await res.json() as { error: string };
-      expect(body.error).toContain('OPENAI_API_KEY');
-    }
+    expect(res.status).toBe(400);
+    const body = await res.json() as { error: string };
+    expect(body.error).toContain('OPENAI_API_KEY');
   });
 
   it('returns 404 for unknown workspace even with valid question and session', async () => {

@@ -32,6 +32,7 @@ import { isFeatureEnabled } from '../feature-flags.js';
 import { createLogger } from '../logger.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { buildBriefingClientView } from '../briefing-client-projection.js';
+import { mirrorBriefingToDeliverable } from '../domains/inbox/briefing-dual-write.js';
 
 const log = createLogger('routes:briefing');
 const router = Router();
@@ -141,6 +142,11 @@ router.post(
       if (!updated) {
         return res.status(404).json({ error: 'Draft not found' });
       }
+
+      // DARK dual-write (PR-1fg): mirror the just-published briefing into client_deliverable as a
+      // one-way notification when the `unified-deliverables-rest` flag is on (default off → no-op).
+      // Best-effort/never-throws so it can never break the live publish. Idempotent on briefing:<id>.
+      mirrorBriefingToDeliverable(updated);
 
       addActivity(
         req.params.workspaceId,

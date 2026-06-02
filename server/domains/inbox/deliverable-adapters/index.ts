@@ -41,6 +41,12 @@ import './copy-section.js';
 // DARK — self-registers on import but is consumed only by the Phase-2 inbox/rollup (gated by
 // `unified-deliverables-rest`).
 import './content-request.js';
+// PR-1fg: work_order (kind='order') + briefing (kind='notification') — the final two Phase-1
+// type adapters. NET-NEW additive types. DARK — both self-register on import but are only mirrored
+// when the `unified-deliverables-rest` flag is on (default off → no-op). work_order is dual-written
+// at the createWorkOrder/updateWorkOrder seams; briefing at the publish seams (manual + auto).
+import './work-order.js';
+import './briefing.js';
 
 export {
   registerAdapter,
