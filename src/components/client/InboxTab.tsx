@@ -305,7 +305,22 @@ export function InboxTab({
         <p className="t-body text-[var(--brand-text-muted)] mt-0.5">
           Everything that needs your attention — all in one place.
         </p>
-        <UnifiedInbox workspaceId={workspaceId} setToast={setToast} />
+        {/* R4 — pass the ContentTab pass-through props so the in-shell ProjectedReviewModal can mount
+            ContentTab for projected content_request items. `hasCopyEntries` is intentionally NOT
+            passed: it's a ClientCopyReview gate in InboxTab, not a ContentTab prop. */}
+        <UnifiedInbox
+          workspaceId={workspaceId}
+          setToast={setToast}
+          contentRequests={contentRequests}
+          setContentRequests={setContentRequests}
+          effectiveTier={effectiveTier}
+          briefPrice={briefPrice}
+          fullPostPrice={fullPostPrice}
+          fmtPrice={fmtPrice}
+          setPricingModal={setPricingModal}
+          pricingConfirming={pricingConfirming}
+          hidePrices={hidePrices}
+        />
       </div>
     );
   }

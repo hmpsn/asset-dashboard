@@ -212,15 +212,17 @@ describe('InboxTab unified-inbox flag gating', () => {
     expect(screen.getByText("You're all caught up")).toBeInTheDocument();
   });
 
-  it('flag ON → PROJECTED item (content_request) renders a read-only "Review →" link, NOT the write verbs', () => {
-    // A projected deliverable has no physical row; its /respond verbs would 404. The card must show
-    // a "Review →" deep-link instead of Approve / Request changes / Decline.
+  it('flag ON → PROJECTED item (content_request) "Review →" opens the in-shell review modal, NOT navigation', () => {
+    // R4: a projected deliverable has no physical row; its /respond verbs would 404. The card shows
+    // a "Review →" CTA instead of Approve / Request changes / Decline — and clicking it now opens the
+    // bespoke ContentTab review surface IN-SHELL (ProjectedReviewModal), it does NOT navigate out.
     mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
     mockUseUnifiedInbox.mockReturnValue({
       unifiedInbox: true,
       deliverables: [
         makeDeliverable({
           id: 'content_request:cr-1',
+          externalRef: 'cr-1', // real source id → modal seeds the auto-expand with it, not the '' fallback
           type: 'content_request',
           kind: 'review',
           status: 'awaiting_client',
@@ -235,25 +237,32 @@ describe('InboxTab unified-inbox flag gating', () => {
 
     render(<InboxTab {...baseProps} />);
 
-    // Read-only deep-link present.
+    // Read-only "Review →" CTA present (no uniform write verbs — they'd 404 on a projected id).
     expect(screen.getByRole('button', { name: 'Review →' })).toBeInTheDocument();
-    // The uniform write verbs must NOT be wired (they'd 404 on a projected id).
     expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Request changes' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Decline' })).not.toBeInTheDocument();
 
-    // Clicking "Review →" deep-links to the Reviews section (?tab=reviews two-halves contract).
+    // Before click: the in-shell review modal is not mounted.
+    expect(screen.queryByRole('dialog', { name: 'Content Review' })).not.toBeInTheDocument();
+
+    // Clicking "Review →" opens the in-shell ProjectedReviewModal (mounts the bespoke ContentTab
+    // surface) — and must NOT navigate the client out to ?tab=reviews.
     fireEvent.click(screen.getByRole('button', { name: 'Review →' }));
-    expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('?tab=reviews'));
+    expect(screen.getByRole('dialog', { name: 'Content Review' })).toBeInTheDocument();
+    // ContentTab's own PageHeader is rendered inside the modal.
+    expect(screen.getByText('Content Pipeline')).toBeInTheDocument();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  it('flag ON → PROJECTED copy_section item also renders "Review →" (no write verbs)', () => {
+  it('flag ON → PROJECTED copy_section item "Review →" opens the in-shell copy review modal (no navigation)', () => {
     mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
     mockUseUnifiedInbox.mockReturnValue({
       unifiedInbox: true,
       deliverables: [
         makeDeliverable({
           id: 'copy:entry-1',
+          externalRef: 'entry-1', // real copy entry id → seeds ClientCopyReview's auto-expand
           type: 'copy_section',
           kind: 'review',
           status: 'awaiting_client',
@@ -269,6 +278,11 @@ describe('InboxTab unified-inbox flag gating', () => {
     render(<InboxTab {...baseProps} />);
     expect(screen.getByRole('button', { name: 'Review →' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Review →' }));
+    // The in-shell ProjectedReviewModal mounts the bespoke ClientCopyReview surface.
+    expect(screen.getByRole('dialog', { name: 'Copy Review' })).toBeInTheDocument();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it('flag ON → approved applyable seo_edit renders the "Ready to publish" section + Apply button', () => {
