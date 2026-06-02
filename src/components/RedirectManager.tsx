@@ -6,6 +6,7 @@ import {
   Send,
 } from 'lucide-react';
 import { Badge, PageHeader, StatCard, FormInput, FormTextarea, Icon, SectionCard, Button, ClickableRow, cn } from './ui';
+import { normalizePageUrl } from '../lib/pathUtils';
 import { redirects } from '../api/misc';
 import { clientActions } from '../api/clientActions';
 import { themeColor } from './ui/constants';
@@ -313,7 +314,7 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
                     {isExpanded
                       ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                       : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />}
-                    <span className="t-caption text-[var(--brand-text-bright)] truncate font-mono">{new URL(chain.originalUrl).pathname}</span>
+                    <span className="t-caption text-[var(--brand-text-bright)] truncate font-mono">{normalizePageUrl(chain.originalUrl)}</span>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <Badge label={`${chain.totalHops} hop${chain.totalHops !== 1 ? 's' : ''}`} tone="amber" />
@@ -507,7 +508,7 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
                     <div className="min-w-0">
                       {page.redirectsTo ? (
                         <a href={page.redirectsTo} target="_blank" rel="noopener noreferrer" className="t-caption-sm text-amber-400 hover:underline truncate block flex items-center gap-0.5">
-                          {(() => { try { return new URL(page.redirectsTo).pathname; } catch { return page.redirectsTo; } })()}
+                          {normalizePageUrl(page.redirectsTo)}
                           <Icon as={ExternalLink} size="sm" className="flex-shrink-0" />
                         </a>
                       ) : (

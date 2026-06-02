@@ -11,6 +11,7 @@ import type {
 } from './types';
 import { ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { fmtNum as formatNum } from '../../utils/formatNumbers';
+import { normalizePageUrl } from '../../lib/pathUtils';
 import { Button, SectionCard, TrendBadge, CompactStatBar } from '../ui';
 
 // ─── Helpers ───
@@ -109,8 +110,7 @@ export function SearchSnapshot({ overview, trend, comparison, devices, onViewMor
           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1.5">Most visited pages</div>
           <div className="space-y-1">
             {overview.topPages.slice(0, 5).map((p, i) => {
-              let pagePath: string;
-              try { pagePath = new URL(p.page).pathname; } catch { pagePath = p.page; }
+              let pagePath = normalizePageUrl(p.page);
               if (pagePath === '/') pagePath = 'Homepage';
               return (
                 <div key={i} className="flex items-center justify-between t-caption-sm py-1.5 px-2.5 rounded-[var(--radius-md)] bg-[var(--surface-3)]/30">

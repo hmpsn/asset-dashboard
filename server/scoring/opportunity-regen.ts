@@ -2,8 +2,8 @@
  * opportunity-regen — debounced re-rank trigger for event-driven re-ranking
  * (PR7 · Spine B).
  *
- * When a detector writes an opportunity event (decay, competitor, rank_drop,
- * publish), it calls triggerOpportunityRegen(workspaceId). That collapses a burst
+ * When a detector writes an opportunity event (decay, competitor, rank_drop),
+ * it calls triggerOpportunityRegen(workspaceId). That collapses a burst
  * of events for the same workspace into a SINGLE generateRecommendations() run
  * (debounced 90s), so the queue re-ranks within ~90s of a timing-critical event
  * without thrashing.
