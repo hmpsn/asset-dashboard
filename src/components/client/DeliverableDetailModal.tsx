@@ -25,6 +25,8 @@ import type {
   InternalLinkPayload,
   RedirectProposalPayload,
 } from '../../../shared/types/client-actions';
+import type { PageRoleAssignment, CanonicalEntity, SchemaPageRole } from '../../../shared/types/schema-plan';
+import { SCHEMA_ROLE_LABELS } from '../../../shared/types/schema-plan';
 import { ItemDiffRow, AeoRenderer, InternalLinkRenderer, RedirectRenderer } from './decision-renderers';
 
 interface DeliverableDetailModalProps {
@@ -68,6 +70,72 @@ function itemLabel(item: ClientDeliverableItem): string {
   const title = typeof payload?.pageTitle === 'string' ? payload.pageTitle : '';
   const slug = typeof payload?.pageSlug === 'string' ? payload.pageSlug : '';
   return title || slug || item.targetRef || 'Item';
+}
+
+/**
+ * A1b — read-only schema_plan substance renderer. `schema_plan` (kind:'review') carries NO typed
+ * items; its substance lives in `payload.pageRoles` (PageRoleAssignment[]) + `payload.canonicalEntities`
+ * (CanonicalEntity[]). Without this branch the modal fell through to the summary-only else and the
+ * client approved a whole-site schema strategy reviewed blind. This mirrors the legacy
+ * SchemaReviewTab presentation (page-roles list grouped by role + canonical entity chips), rendered
+ * read-only — the existing Approve/Request/Decline footer drives the response. The unified inbox is
+ * the only mount for this modal (R3a), so this branch is additive and never reached by legacy.
+ */
+function SchemaPlanReview({
+  pageRoles,
+  canonicalEntities,
+}: {
+  pageRoles: PageRoleAssignment[];
+  canonicalEntities: CanonicalEntity[];
+}) {
+  if (pageRoles.length === 0 && canonicalEntities.length === 0) {
+    return (
+      <p className="t-body text-[var(--brand-text-muted)]">No schema strategy detail to review.</p>
+    );
+  }
+  return (
+    <div className="space-y-5">
+      {pageRoles.length > 0 && (
+        <div className="space-y-2">
+          <p className="t-caption-sm font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider">
+            Page roles ({pageRoles.length})
+          </p>
+          <div className="divide-y divide-[var(--brand-border)]/50">
+            {pageRoles.map((pr) => (
+              <div key={pr.pagePath} className="flex items-center gap-3 py-2">
+                <div className="flex-1 min-w-0">
+                  <div className="t-caption text-[var(--brand-text-bright)] truncate">{pr.pageTitle}</div>
+                  <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{pr.pagePath}</div>
+                </div>
+                <span className="t-caption-sm text-[var(--brand-text-muted)] shrink-0">
+                  {SCHEMA_ROLE_LABELS[pr.role as SchemaPageRole] ?? pr.role}
+                </span>
+                <span className="t-caption-sm text-accent-brand font-mono shrink-0">{pr.primaryType}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {canonicalEntities.length > 0 && (
+        <div className="space-y-2">
+          <p className="t-caption-sm font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider">
+            Site entities ({canonicalEntities.length})
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {canonicalEntities.map((entity, i) => (
+              <span
+                key={i}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[var(--radius-lg)] t-caption-sm bg-[var(--surface-3)]/50 border border-[var(--brand-border-strong)]"
+              >
+                <span className="text-accent-brand font-mono">{entity.type}</span>
+                <span className="text-[var(--brand-text)]">{entity.name}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -144,6 +212,16 @@ export function DeliverableDetailModal({
   let body: React.ReactNode;
   const subType = payloadSubType(decision);
   const payloadItems = (decision.payload as { items?: unknown } | undefined)?.items;
+  // A1b — schema_plan substance rides in payload.pageRoles + payload.canonicalEntities (no typed items).
+  const schemaPlanPayload = decision.payload as
+    | { pageRoles?: unknown; canonicalEntities?: unknown }
+    | undefined;
+  const schemaPlanPageRoles = Array.isArray(schemaPlanPayload?.pageRoles)
+    ? (schemaPlanPayload!.pageRoles as PageRoleAssignment[])
+    : [];
+  const schemaPlanEntities = Array.isArray(schemaPlanPayload?.canonicalEntities)
+    ? (schemaPlanPayload!.canonicalEntities as CanonicalEntity[])
+    : [];
 
   if (isApprovalFamily && items.length > 0) {
     body = (
@@ -179,6 +257,10 @@ export function DeliverableDetailModal({
         payload={{ redirects: (payloadItems as RedirectProposalPayload['redirects']) ?? [] }}
       />
     );
+  } else if (schemaPlanPageRoles.length > 0 || schemaPlanEntities.length > 0) {
+    // A1b — schema_plan (kind:'review', no typed items): render its pageRoles + canonicalEntities
+    // read-only so the whole-site schema strategy is reviewable, not blind.
+    body = <SchemaPlanReview pageRoles={schemaPlanPageRoles} canonicalEntities={schemaPlanEntities} />;
   } else {
     body = (
       <p className="t-body text-[var(--brand-text-muted)]">
