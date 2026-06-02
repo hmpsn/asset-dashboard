@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Inbox, FileText, ListChecks, MessageSquare, UploadCloud } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -7,21 +6,31 @@ import { LoadingState, Button, ConfirmDialog } from '../../ui';
 import { PriorityStrip, type PriorityItem } from '../PriorityStrip';
 import { DecisionCard } from '../DecisionCard';
 import { DeliverableDetailModal } from '../DeliverableDetailModal';
-import { useBetaMode } from '../BetaContext';
+import { ProjectedReviewModal } from './ProjectedReviewModal';
 import { normalizeDeliverable, isProjectedDeliverable } from '../../../lib/decision-adapters';
 import { useUnifiedInbox, useRespondToDeliverable, useApplyDeliverable } from '../../../hooks/client/useUnifiedInbox';
 import { isClientApplyableDeliverableBatch } from '../../../../shared/applyability';
 import { useWorkspaceEvents } from '../../../hooks/useWorkspaceEvents';
 import { WS_EVENTS } from '../../../lib/wsEvents';
 import { queryKeys } from '../../../lib/queryKeys';
-import { clientPath } from '../../../routes';
-import type { ClientDeliverable, DeliverableKind } from '../../../../shared/types/client-deliverable';
+import type { ContentTabProps } from '../ContentTab';
+import type { ClientDeliverable, DeliverableKind, DeliverableType } from '../../../../shared/types/client-deliverable';
 import type { NormalizedDecision, FlaggedItem } from '../../../../shared/types/decision';
 
-interface UnifiedInboxProps {
+/**
+ * The ContentTab pass-through props the unified inbox forwards to the in-shell ProjectedReviewModal
+ * (R4). `workspaceId`, `setToast`, and the auto-expand seed are supplied locally, so they are
+ * omitted from the bag. Threaded from ClientDashboard → InboxTab → here (flag-ON-only).
+ */
+export type UnifiedInboxContentTabProps = Omit<
+  ContentTabProps,
+  'workspaceId' | 'setToast' | 'initialExpandedRequestId'
+>;
+
+type UnifiedInboxProps = UnifiedInboxContentTabProps & {
   workspaceId: string;
   setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
-}
+};
 
 /** Statuses the client is actively being asked to act on (drive the PriorityStrip). */
 const ACTIONABLE_STATUSES = new Set(['awaiting_client', 'changes_requested', 'partial']);
@@ -64,10 +73,8 @@ function ageLabel(sentAt: string | null | undefined): string | null {
  * This component is only rendered when the flag is ON (InboxTab branches on it); the hook is
  * additionally flag-gated so the fetch never fires with the flag off.
  */
-export function UnifiedInbox({ workspaceId, setToast }: UnifiedInboxProps) {
+export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: UnifiedInboxProps) {
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
-  const betaMode = useBetaMode();
   const { deliverables, isLoading } = useUnifiedInbox(workspaceId);
   const respond = useRespondToDeliverable(workspaceId);
   const apply = useApplyDeliverable(workspaceId);
@@ -76,28 +83,41 @@ export function UnifiedInbox({ workspaceId, setToast }: UnifiedInboxProps) {
   const [detailId, setDetailId] = useState<string | null>(null);
   // R3b — Apply to Website: the deliverable pending the "Apply to live site?" confirmation. null = no dialog.
   const [applyConfirm, setApplyConfirm] = useState<ClientDeliverable | null>(null);
-
-  // PROJECTED deliverables (copy_section / content_request) have no physical row and 404 on the
-  // uniform /respond verbs — copy is reviewed in Inbox > Reviews (ClientCopyReview) and briefs/posts
-  // in Inbox > Reviews (ContentTab). For those we deep-link to ?tab=reviews (the ?tab= two-halves
-  // contract — InboxTab reads the param) instead of rendering dead Approve/Decline buttons.
-  // TODO(cutover): once projected respond routes to the bespoke copy-pipeline/content-briefs
-  // handlers, the write verbs can be wired here too; for now this stays a read-only deep-link.
-  const goToReviews = () =>
-    navigate(`${clientPath(workspaceId, 'inbox', betaMode)}?tab=reviews`);
+  // R4 — in-shell projected review: the projected deliverable (copy_section / content_request) open
+  // in the bespoke review modal. null = closed. We carry the raw `type` + `externalRef` (the source
+  // id) read off the RAW deliverable — normalizeDeliverable drops both.
+  const [reviewProjected, setReviewProjected] = useState<{ type: DeliverableType; externalRef: string } | null>(null);
 
   // Two-halves broadcast contract (CLAUDE.md Data Flow #2): the server emits DELIVERABLE_*
   // on every send/response; this handler invalidates the unified inbox query so the list reflects
   // the change in real time.
+  //
+  // R4 — the PROJECTED respond paths go through the bespoke copy-pipeline / content-request / posts
+  // routes, which broadcast COPY_SECTION_UPDATED / CONTENT_REQUEST_UPDATE / POST_UPDATED (NOT
+  // DELIVERABLE_*). Without listening on those, an in-shell respond would leave the projected card
+  // stuck in the list. We invalidate the unified-inbox query on all three so the card leaves the
+  // list once the bespoke respond lands. NOTE: this does NOT auto-close the ProjectedReviewModal —
+  // its mount is gated on the independent `reviewProjected` state (not derived from the list, unlike
+  // `detailDeliverable`), so the modal stays open showing the self-updated bespoke surface until the
+  // client dismisses it (close / Escape / backdrop). These events are already broadcast + handled
+  // elsewhere (tests/integration/broadcast-handler-pairs.test.ts stays green).
   const wsHandlers = useMemo(
-    () => ({
-      // ws-invalidation-ok — client unified-inbox key differs from any admin deliverable key
-      [WS_EVENTS.DELIVERABLE_SENT]: () =>
-        queryClient.invalidateQueries({ queryKey: queryKeys.client.unifiedInbox(workspaceId) }),
-      // ws-invalidation-ok — client unified-inbox key differs from any admin deliverable key
-      [WS_EVENTS.DELIVERABLE_UPDATED]: () =>
-        queryClient.invalidateQueries({ queryKey: queryKeys.client.unifiedInbox(workspaceId) }),
-    }),
+    () => {
+      const invalidateInbox = () =>
+        queryClient.invalidateQueries({ queryKey: queryKeys.client.unifiedInbox(workspaceId) });
+      return {
+        // ws-invalidation-ok — client unified-inbox key differs from any admin deliverable key
+        [WS_EVENTS.DELIVERABLE_SENT]: invalidateInbox,
+        // ws-invalidation-ok — client unified-inbox key differs from any admin deliverable key
+        [WS_EVENTS.DELIVERABLE_UPDATED]: invalidateInbox,
+        // ws-invalidation-ok — client unified-inbox key differs from any admin copy/content key
+        [WS_EVENTS.COPY_SECTION_UPDATED]: invalidateInbox,
+        // ws-invalidation-ok — client unified-inbox key differs from any admin copy/content key
+        [WS_EVENTS.CONTENT_REQUEST_UPDATE]: invalidateInbox,
+        // ws-invalidation-ok — client unified-inbox key differs from any admin copy/content key
+        [WS_EVENTS.POST_UPDATED]: invalidateInbox,
+      };
+    },
     [queryClient, workspaceId],
   );
   useWorkspaceEvents(workspaceId, wsHandlers);
@@ -227,9 +247,12 @@ export function UnifiedInbox({ workspaceId, setToast }: UnifiedInboxProps) {
         <section aria-label="Needs your attention" className="space-y-3">
           {actionable.map((d) => {
             const decision: NormalizedDecision = normalizeDeliverable(d);
-            // Projected (copy_section / content_request): render a read-only "Review →" deep-link
-            // instead of the uniform write verbs (which /respond → PK lookup → 404 for a projected
-            // id). The card still shows title/summary/age.
+            // Projected (copy_section / content_request): render a "Review →" CTA that opens the
+            // bespoke review surface IN-SHELL (ProjectedReviewModal) instead of the uniform write
+            // verbs (which /respond → PK lookup → 404 for a projected id). Respond goes through the
+            // bespoke copy-pipeline / content-request / posts routes the mounted surface calls; the
+            // unified /respond is never reached for projected items. Read `type`/`externalRef` off
+            // the RAW deliverable `d` — normalizeDeliverable drops both.
             const projected = isProjectedDeliverable(d.type);
             return (
               <div key={d.id} id={`unified-decision-${d.id}`}>
@@ -237,7 +260,7 @@ export function UnifiedInbox({ workspaceId, setToast }: UnifiedInboxProps) {
                   decision={decision}
                   uniformVerbs
                   ageLabel={ageLabel(d.sentAt)}
-                  onReview={projected ? goToReviews : undefined}
+                  onReview={projected ? () => setReviewProjected({ type: d.type, externalRef: d.externalRef ?? '' }) : undefined}
                   // "View N →" opens the detail modal (substance + per-item review). Projected
                   // deliverables render the read-only "Review →" deep-link instead of "View N", so
                   // this is never reached for them (no-op kept for the required prop contract).
@@ -340,6 +363,22 @@ export function UnifiedInbox({ workspaceId, setToast }: UnifiedInboxProps) {
           }
           applying={apply.isPending}
           onApply={() => onApply(detailDeliverable)}
+        />
+      )}
+
+      {/* R4 — in-shell projected review: mount the proven bespoke surface (ClientCopyReview /
+          ContentTab → PostReviewCard) for a projected deliverable, branched on TYPE. The client
+          reviews + responds without leaving; respond goes through the bespoke routes, and the new
+          COPY_SECTION_UPDATED / CONTENT_REQUEST_UPDATE / POST_UPDATED handlers above refetch the
+          list so the card leaves and the client can dismiss. */}
+      {reviewProjected && (
+        <ProjectedReviewModal
+          type={reviewProjected.type as Extract<DeliverableType, 'copy_section' | 'content_request'>}
+          externalRef={reviewProjected.externalRef}
+          workspaceId={workspaceId}
+          setToast={setToast}
+          onDismiss={() => setReviewProjected(null)}
+          {...contentTabProps}
         />
       )}
 
