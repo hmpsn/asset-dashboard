@@ -1,6 +1,6 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **469 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **470 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
@@ -15,6 +15,18 @@ A comprehensive value assessment of every feature in the platform — **469 feat
 **Client value:** A single prioritized list of everything that needs their attention, with the same Approve / Request changes / Decline choice on every item and a clear "sent N days ago" age — no per-feature inbox dialects.
 
 **Mutual:** Built fully dark behind `unified-inbox` (default off); production with the flag off is unchanged. No flag flip and no dual-write flags touched. The `client_deliverable` table is empty until the Phase-1 send-path cutover, so the endpoint returns only projected copy/content_request entries today — exercised with seeded rows in tests. See roadmap `unified-deliverables-phase-2a-client-inbox` and `docs/designs/2026-06-01-unified-send-to-client-design.md` §5.
+
+---
+
+### 470. Unified Admin "Client Deliverables" Pane — status axis + stale signal + per-item Remind (built dark — `unified-inbox` flag)
+
+**What it does:** Adds a flag-gated unified admin operator pane (`ClientDeliverablesPane.tsx`) mounted as the first sub-tab of the admin `requests` tab when `unified-inbox` is ON (strangler-fig: when OFF, the existing Signals/Requests/Client Actions sub-tabs render byte-for-byte unchanged; `AdminInbox.tsx` and `ClientActionsTab.tsx` are untouched). The pane is backed by a new admin read endpoint `GET /api/deliverables/:workspaceId` (`requireWorkspaceAccess`, never `requireAuth`) that returns ONE list of EVERY deliverable in the workspace — all statuses, physical `client_deliverable` rows PLUS projected `copy_section`/`content_request` — via `listAllWorkspaceDeliverables()` (the client-facing status filter was factored out so both reads share `assembleAllDeliverables`). Each row is annotated server-side (`server/domains/inbox/admin-inbox-read.ts`) with the operator **status axis** (`awaiting_client` · `changes_requested` [incl. `partial`] · `approved` (to apply) · `other`), an `ageDays` derived from `sentAt`, and a derived **`stale`** flag (an `awaiting_client` item whose age ≥ `STALE_AWAITING_DAYS` = 7). The Zod-validated response (`shared/types/admin-deliverable-view.ts`) feeds a flag-gated React Query hook (`useWorkspaceDeliverables`, `admin-`-prefixed key, typed `adminDeliverables` api wrapper, no raw fetch). The pane groups items by axis (oldest-first within each), shows "pending N days" / stale styling and a type badge, and surfaces a **Remind** button on each `awaiting_client` item wired to the existing Phase-0 `POST /api/deliverables/:ws/:id/remind`. `useWorkspaceEvents` invalidates the pane on `DELIVERABLE_*` broadcasts. Phase-2b of the unified send-to-client migration (Pillar 3 admin inbox).
+
+**Agency value:** One operator view of everything sent to a client across all five "send to client" pipelines, with a staleness axis that makes the "client hasn't responded in N days" nudge queue visible for the first time (audit §E1/E2/E6) — and a one-click Remind on every awaiting item.
+
+**Client value:** Indirect — operators can see and chase stalled approvals, so clients get faster follow-up and fewer dropped reviews.
+
+**Mutual:** Built fully dark behind `unified-inbox` (default off); production with the flag off is byte-for-byte unchanged (the new sub-tab and pane never render, the endpoint is never fetched). No flag flip and no dual-write flags touched. The `client_deliverable` table is empty until the Phase-1 send-path cutover, so the endpoint returns only projected entries today — exercised with seeded rows in tests. Deferred to the cutover runbook: operator revise/resend/acknowledge on `changes_requested` items (B18/E7 — needs new mutate endpoints), the notification-bell categorization fix (E3/A2), the workspace-overview B29 double-count, and the read-path slice cutover. See roadmap `unified-deliverables-phase-2b-admin-inbox` and `docs/designs/2026-06-01-unified-send-to-client-design.md` §6.
 
 ---
 

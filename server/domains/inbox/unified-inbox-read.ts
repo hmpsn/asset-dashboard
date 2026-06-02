@@ -104,28 +104,47 @@ function projectContentRequests(workspaceId: string): ClientDeliverable[] {
 }
 
 /**
- * The unified client-facing deliverable list for a workspace: physical (`client_deliverable`) +
- * projected (copy/content_request), filtered to client-facing statuses, newest-sent first.
+ * Assemble the FULL unified deliverable list for a workspace: physical (`client_deliverable`) +
+ * projected (copy/content_request), newest-sent first, WITHOUT any status filter. The single
+ * assembly the two reads share — `listClientFacingDeliverables` (client) filters this to the
+ * client-facing statuses; the admin pane (PR-2b) keeps every status so the operator sees the whole
+ * picture (E2). Internal/no-op only — no flag dependency.
  */
-export function listClientFacingDeliverables(workspaceId: string): ClientDeliverable[] {
+function assembleAllDeliverables(workspaceId: string): ClientDeliverable[] {
   const physical = listDeliverables(workspaceId);
   const projectedCopy = projectCopyEntries(workspaceId);
   const projectedRequests = projectContentRequests(workspaceId);
 
-  const all = [...physical, ...projectedCopy, ...projectedRequests].filter((d) =>
+  const all = [...physical, ...projectedCopy, ...projectedRequests];
+  all.sort(bySentDesc);
+  return all;
+}
+
+/**
+ * The unified client-facing deliverable list for a workspace: physical (`client_deliverable`) +
+ * projected (copy/content_request), filtered to client-facing statuses, newest-sent first.
+ */
+export function listClientFacingDeliverables(workspaceId: string): ClientDeliverable[] {
+  const all = assembleAllDeliverables(workspaceId).filter((d) =>
     isClientFacingDeliverableStatus(d.status),
   );
-  all.sort(bySentDesc);
 
   log.debug(
-    {
-      workspaceId,
-      physical: physical.length,
-      projectedCopy: projectedCopy.length,
-      projectedRequests: projectedRequests.length,
-      clientFacing: all.length,
-    },
+    { workspaceId, clientFacing: all.length },
     'assembled unified client-facing deliverable list',
   );
+  return all;
+}
+
+/**
+ * The FULL unified deliverable list for a workspace (EVERY status), newest-sent first. Backs the
+ * admin "Client Deliverables" pane (PR-2b) — the operator view of everything sent to the client,
+ * across all five types. The route annotates each row with the status axis + stale flag (see
+ * server/domains/inbox/admin-inbox-read.ts). Like the client read, this is a pure inert read until
+ * cutover (the physical table is empty), exercised with seeded rows in tests.
+ */
+export function listAllWorkspaceDeliverables(workspaceId: string): ClientDeliverable[] {
+  const all = assembleAllDeliverables(workspaceId);
+  log.debug({ workspaceId, total: all.length }, 'assembled full workspace deliverable list (admin)');
   return all;
 }
