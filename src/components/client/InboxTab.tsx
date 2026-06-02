@@ -27,6 +27,7 @@ import type { FlaggedItem } from '../../../shared/types/decision';
 import { useInboxTabShell, type InboxMode } from './inbox/useInboxTabShell';
 import type { InboxFilter } from './inbox/inbox-filter';
 import { LegacyInboxLayout, NewInboxLayout } from './inbox/InboxTabLayouts';
+import { UnifiedInbox } from './inbox/UnifiedInbox';
 import { partitionCollaborationArtifacts } from '../../lib/collaboration-artifacts';
 export {
   INBOX_FILTER_VALUES,
@@ -166,6 +167,10 @@ export function InboxTab({
 
   // Feature flag: new 3-section inbox IA layout
   const newInboxIa = useFeatureFlag('new-inbox-ia');
+  // Feature flag: PR-2a unified client inbox (DARK). When ON, render the unified PriorityStrip +
+  // uniform Approve / Request changes / Decline path; when OFF, the existing layouts below are
+  // byte-for-byte unchanged.
+  const unifiedInbox = useFeatureFlag('unified-inbox');
 
   const pendingApprovalBatches = approvalBatches.filter(batch =>
     batch.items.some(item => item.status === 'pending'),
@@ -291,6 +296,19 @@ export function InboxTab({
       </div>
     </div>
   ) : null;
+
+  // PR-2a unified inbox (DARK behind `unified-inbox`). When ON, render the new unified view; the
+  // existing newInboxIa/legacy layouts below are left byte-for-byte unchanged for the flag-off path.
+  if (unifiedInbox) {
+    return (
+      <div className="space-y-6">
+        <p className="t-body text-[var(--brand-text-muted)] mt-0.5">
+          Everything that needs your attention — all in one place.
+        </p>
+        <UnifiedInbox workspaceId={workspaceId} setToast={setToast} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

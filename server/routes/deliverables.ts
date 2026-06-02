@@ -16,16 +16,27 @@
  */
 import { Router } from 'express';
 import { requireWorkspaceAccess } from '../auth.js';
-import { requireAuthenticatedClientPortalAuth, getClientActor } from '../middleware.js';
+import {
+  requireAuthenticatedClientPortalAuth,
+  requireClientPortalAuth,
+  getClientActor,
+} from '../middleware.js';
 import { validate, z } from '../middleware/validate.js';
 import { addActivity } from '../activity-log.js';
+import { getWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import {
   respondToDeliverable,
   remindDeliverable,
   SendToClientError,
 } from '../domains/inbox/send-to-client.js';
+import { listClientFacingDeliverables } from '../domains/inbox/unified-inbox-read.js';
 import { InvalidTransitionError } from '../state-machines.js';
+import {
+  DELIVERABLE_KINDS,
+  DELIVERABLE_STATUSES,
+  DELIVERABLE_TYPES,
+} from '../../shared/types/client-deliverable.js';
 
 const router = Router();
 const log = createLogger('routes:deliverables');
@@ -36,6 +47,91 @@ const respondSchema = z
     note: z.string().max(2000).optional(),
   })
   .strict();
+
+// Response shape for GET /api/public/deliverables/:workspaceId. A defensive Zod schema asserts
+// the assembled list matches the ClientDeliverable contract (drift guard — the assembly mixes
+// physical rows + projected adapters, so a drifted projection would surface as a parse failure).
+const deliverableItemResponseSchema = z
+  .object({
+    id: z.string(),
+    deliverableId: z.string(),
+    status: z.string(),
+    targetRef: z.string().nullable(),
+    collectionId: z.string().nullable(),
+    field: z.string().nullable(),
+    currentValue: z.string().nullable(),
+    proposedValue: z.string().nullable(),
+    clientValue: z.string().nullable(),
+    clientNote: z.string().nullable(),
+    applyable: z.boolean(),
+    itemPayload: z.record(z.unknown()).nullable(),
+    sortOrder: z.number(),
+    createdAt: z.string(),
+  })
+  .passthrough();
+
+const deliverableResponseSchema = z
+  .object({
+    id: z.string(),
+    workspaceId: z.string(),
+    externalRef: z.string().nullable(),
+    type: z.enum(DELIVERABLE_TYPES),
+    kind: z.enum(DELIVERABLE_KINDS),
+    status: z.enum(DELIVERABLE_STATUSES),
+    title: z.string(),
+    summary: z.string().nullable(),
+    payload: z.record(z.unknown()),
+    note: z.string().nullable(),
+    clientResponseNote: z.string().nullable(),
+    parentDeliverableId: z.string().nullable(),
+    sentAt: z.string().nullable(),
+    decidedAt: z.string().nullable(),
+    dueAt: z.string().nullable(),
+    appliedAt: z.string().nullable(),
+    generatedAt: z.string().nullable(),
+    source: z.string().nullable(),
+    sourceRef: z.string().nullable(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    items: z.array(deliverableItemResponseSchema).optional(),
+  })
+  .passthrough();
+
+const deliverablesListResponseSchema = z.object({
+  deliverables: z.array(deliverableResponseSchema),
+});
+
+// GET /api/public/deliverables/:workspaceId — the unified client-facing deliverable list (PR-2a).
+// Standard public-portal client auth (matches the sibling projected reads like the copy /entries
+// endpoint). Returns physical client_deliverable rows + projected copy/content_request, filtered
+// to client-facing statuses. The physical table is empty until the Phase-1 send-path cutover, so
+// in production this returns only the projected entries — expected and correct.
+router.get(
+  '/api/public/deliverables/:workspaceId',
+  requireClientPortalAuth('workspaceId'),
+  (req, res) => {
+    const { workspaceId } = req.params;
+    const ws = getWorkspace(workspaceId);
+    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+    if (ws.clientPortalEnabled != null && !ws.clientPortalEnabled) {
+      return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
+    }
+    try {
+      const deliverables = listClientFacingDeliverables(workspaceId);
+      const parsed = deliverablesListResponseSchema.safeParse({ deliverables });
+      if (!parsed.success) {
+        // A drifted projection/row would land here — fail loud rather than serving a malformed
+        // client-facing list (the unified inbox renders Approve/Decline against these rows).
+        log.error({ workspaceId, issues: parsed.error.issues }, 'unified deliverable list failed response validation');
+        return res.status(500).json({ error: 'Failed to assemble deliverables' });
+      }
+      res.json(parsed.data);
+    } catch (err) {
+      log.error({ err, workspaceId }, 'Failed to list client-facing deliverables');
+      res.status(500).json({ error: 'Failed to list deliverables' });
+    }
+  },
+);
 
 // PATCH /api/public/deliverables/:workspaceId/:id/respond — client responds to a deliverable.
 router.patch(

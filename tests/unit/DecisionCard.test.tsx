@@ -91,3 +91,50 @@ describe('DecisionCard — single-action mode', () => {
     expect(screen.queryByRole('button', { name: /review.*change/i })).not.toBeInTheDocument();
   });
 });
+
+describe('DecisionCard — uniform mode (PR-2a unified inbox)', () => {
+  const uniform: NormalizedDecision = {
+    ...bulkDecision,
+    id: 'cd-1',
+    source: 'deliverable',
+    sourceId: 'cd-1',
+    kind: 'review',
+    priority: undefined,
+  };
+
+  it('renders Approve / Request changes / Decline when uniformVerbs and no onReview (physical)', () => {
+    render(
+      <DecisionCard
+        decision={uniform}
+        uniformVerbs
+        onOpen={vi.fn()}
+        onApprove={vi.fn()}
+        onFlagWithNote={vi.fn()}
+        onDecline={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Request changes' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Decline' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Review →' })).not.toBeInTheDocument();
+  });
+
+  it('renders read-only "Review →" and NO write verbs when onReview is provided (projected)', () => {
+    const onReview = vi.fn();
+    render(
+      <DecisionCard
+        decision={uniform}
+        uniformVerbs
+        onReview={onReview}
+        onOpen={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Review →' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Request changes' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Decline' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Review →' }));
+    expect(onReview).toHaveBeenCalledOnce();
+  });
+});

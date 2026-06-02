@@ -156,7 +156,10 @@ function renderInboxTab(
 
 describe('InboxTab workflow routing (new inbox IA)', () => {
   beforeEach(() => {
-    mockUseFeatureFlag.mockReturnValue(true);
+    // This block exercises the `new-inbox-ia` layout. Enable that flag specifically rather
+    // than a blanket true — `unified-inbox` (PR-2a) must stay OFF here or its early-return
+    // would short-circuit the Decisions/Reviews/Conversations layout these tests assert on.
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'new-inbox-ia');
     mockUseBetaMode.mockReturnValue(false);
     mockGetOptional.mockResolvedValue(null);
   });
