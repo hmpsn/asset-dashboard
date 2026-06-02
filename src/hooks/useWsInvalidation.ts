@@ -182,6 +182,21 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.client.workOrders(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
     },
+    [WS_EVENTS.WORK_ORDER_COMMENT]: (data: unknown) => {
+      if (!workspaceId) return;
+      const orderId = typeof data === 'object' && data !== null && 'id' in data
+        ? String((data as { id: unknown }).id)
+        : undefined;
+      // Refresh the admin conversation thread for the commented order (and the list,
+      // whose updated_at bumped). Prefix-invalidate all order threads when the id is
+      // absent so the admin panel never shows a stale conversation.
+      if (orderId) {
+        qc.invalidateQueries({ queryKey: queryKeys.admin.workOrderComments(workspaceId, orderId) });
+      } else {
+        qc.invalidateQueries({ queryKey: queryKeys.admin.workOrderCommentsAll(workspaceId) });
+      }
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workOrders(workspaceId) });
+    },
     [WS_EVENTS.INSIGHT_RESOLVED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.actionQueue(workspaceId) });
