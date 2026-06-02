@@ -356,6 +356,13 @@ Premium-only one-line "letter from the editor" rendered ABOVE the dateline when 
 | **FixDiffModal.tsx** | "Before" column header | `text-[var(--brand-text-muted)]` | Muted = old/passive content |
 | **FixDiffModal.tsx** | "After" column header | `text-teal-300` | Teal = new/actionable suggestion |
 | **FixDiffModal.tsx** | "Apply Fix" CTA | `bg-teal-600 hover:bg-teal-500` | Teal = action (Law 1) |
+| **OvDivergencePanel.tsx** | Section title icon (`Activity`) | `text-blue-400` | Blue = data — this is a read-only diagnostic, not an action surface |
+| **OvDivergencePanel.tsx** | Agree-rate value (`CompactStatBar`) | `text-emerald-400` (≥80%) / `text-amber-400` (≥50%) / `text-red-400` (<50%) | Health read on the rate — emerald/amber/red per Laws; NEVER teal (no action) |
+| **OvDivergencePanel.tsx** | Red-flag counts (invariant-broken, OV-null) | `text-red-400` when > 0, else `text-[var(--brand-text-bright)]` | Red = the flag is raised; neutral when clean |
+| **OvDivergencePanel.tsx** | OV pick quality badges (confidence / EMV / grounded-spine) | `Badge tone="blue"` | Blue = read-only data metric (Law 2) |
+| **OvDivergencePanel.tsx** | `invariantHeld` indicator | `Badge tone="emerald"` (held) / `Badge tone="red"` (broken, `AlertTriangle`) | Emerald = success; red = failure |
+| **OvDivergencePanel.tsx** | "OV no pick" flag | `Badge tone="red"` (`ShieldOff`) | Red = missing OV pick (red flag) |
+| **OvDivergencePanel.tsx** | Show/Hide collapse + disagreement rows | `Button variant="ghost"` + `ClickableRow` | Primitives only — no raw `<button>`. Admin-only, no purple. |
 
 ### Outcome Tracking
 

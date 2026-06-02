@@ -11,6 +11,7 @@ import { AtAGlanceStrip } from './AtAGlanceStrip';
 import { BriefSection } from './BriefSection';
 import { RecommendationsList } from './RecommendationsList';
 import { BlueprintProgress } from './BlueprintProgress';
+import { OvDivergencePanel } from '../OvDivergencePanel';
 
 interface Props {
   workspaceId: string;
@@ -169,6 +170,15 @@ export function MeetingBriefPage({ workspaceId, onNavigate }: Props) {
             />
             <BlueprintProgress progress={brief.blueprintProgress} onOpenBlueprint={() => openTab('brief')} />
           </SectionCard>
+
+          {/* OV (Opportunity Value) divergence — admin-only shadow diagnostic.
+              Collapsible by default; surfaces whether the OV recommendation
+              scorer is safe to flip on for this workspace. */}
+          <ErrorBoundary label="OV Divergence">
+            <div className="mt-6">
+              <OvDivergencePanel workspaceId={workspaceId} />
+            </div>
+          </ErrorBoundary>
         </ErrorBoundary>
       )}
     </div>
