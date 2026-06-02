@@ -2,10 +2,11 @@ import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Inbox, FileText, ListChecks, MessageSquare, UploadCloud, Clock, Loader2, CheckCircle2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { LoadingState, Button, ConfirmDialog } from '../../ui';
+import { LoadingState, Button, ConfirmDialog, ErrorState } from '../../ui';
 import { PriorityStrip, type PriorityItem } from '../PriorityStrip';
 import { DecisionCard } from '../DecisionCard';
 import { DeliverableDetailModal } from '../DeliverableDetailModal';
+import { InlineApprovalCard } from './InlineApprovalCard';
 import { ProjectedReviewModal } from './ProjectedReviewModal';
 import { normalizeDeliverable, isProjectedDeliverable } from '../../../lib/decision-adapters';
 import { useUnifiedInbox, useRespondToDeliverable, useApplyDeliverable } from '../../../hooks/client/useUnifiedInbox';
@@ -19,12 +20,14 @@ import type { NormalizedDecision, FlaggedItem } from '../../../../shared/types/d
 
 /**
  * The ContentTab pass-through props the unified inbox forwards to the in-shell ProjectedReviewModal
- * (R4). `workspaceId`, `setToast`, and the auto-expand seed are supplied locally, so they are
- * omitted from the bag. Threaded from ClientDashboard → InboxTab → here (flag-ON-only).
+ * (R4). `workspaceId`, `setToast`, the auto-expand seed, AND the solo id are supplied locally, so they
+ * are omitted from the bag. Threaded from ClientDashboard → InboxTab → here (flag-ON-only).
+ * `soloRequestId` (ISSUE 2d) is supplied by the modal locally — it must NOT be a forwarded
+ * pass-through prop.
  */
 export type UnifiedInboxContentTabProps = Omit<
   ContentTabProps,
-  'workspaceId' | 'setToast' | 'initialExpandedRequestId'
+  'workspaceId' | 'setToast' | 'initialExpandedRequestId' | 'soloRequestId'
 >;
 
 type UnifiedInboxProps = UnifiedInboxContentTabProps & {
@@ -32,8 +35,17 @@ type UnifiedInboxProps = UnifiedInboxContentTabProps & {
   setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
 };
 
-/** Statuses the client is actively being asked to act on (drive the PriorityStrip). */
-const ACTIONABLE_STATUSES = new Set(['awaiting_client', 'changes_requested', 'partial']);
+/**
+ * Statuses the client is actively being asked to act on (drive the PriorityStrip).
+ *
+ * C1 — `changes_requested` is INTENTIONALLY excluded (owner decision: "items just leave"). After the
+ * client requests changes, the mirror flips to `changes_requested` — the ball is now in the team's
+ * court. That status matches no render bucket here (not actionable, not approved/ready-to-publish,
+ * not an order), so the item LEAVES the inbox until the team re-sends it (which returns it to
+ * `awaiting_client`). The success toast already confirms the action at the time it's taken.
+ * `declined` and approved-non-applyable items already render in no bucket → they already leave.
+ */
+const ACTIONABLE_STATUSES = new Set(['awaiting_client', 'partial']);
 
 /** PriorityStrip section + icon per deliverable kind (design §5 taxonomy). */
 function sectionForKind(kind: DeliverableKind): { section: PriorityItem['section']; icon: LucideIcon } {
@@ -126,7 +138,7 @@ function OrderTrackStepper({ status }: { status: 'ordered' | 'in_progress' | 'co
  */
 export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: UnifiedInboxProps) {
   const queryClient = useQueryClient();
-  const { deliverables, isLoading } = useUnifiedInbox(workspaceId);
+  const { deliverables, isLoading, isError, refetch } = useUnifiedInbox(workspaceId);
   const respond = useRespondToDeliverable(workspaceId);
   const apply = useApplyDeliverable(workspaceId);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
@@ -296,10 +308,29 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
     return <LoadingState message="Loading your inbox items..." size="lg" />;
   }
 
+  // F1 — a failed fetch must NOT render the green "all caught up" empty state (that would falsely tell
+  // the client there's nothing for them when we simply couldn't load the list). Show an empathetic
+  // retry instead (CLAUDE.md UI/UX rule 4).
+  if (isError) {
+    return (
+      <ErrorState
+        type="network"
+        title="Couldn't load your inbox"
+        message="We had trouble loading your items. Please try again in a moment."
+        action={{ label: 'Retry', onClick: () => void refetch() }}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {/* The single prioritized "Needs your attention" list (PriorityStrip, finally mounted). */}
-      <PriorityStrip items={priorityItems} showAllCaughtUp />
+      {/* The single prioritized "Needs your attention" list (PriorityStrip, finally mounted).
+          F2 — only claim "all caught up" when there is NO live work below either: an empty actionable
+          queue with items in Ready-to-publish or Work-in-progress must NOT show the banner above them. */}
+      <PriorityStrip
+        items={priorityItems}
+        showAllCaughtUp={readyToApply.length === 0 && workOrders.length === 0}
+      />
 
       {actionable.length > 0 && (
         <section aria-label="Needs your attention" className="space-y-3">
@@ -312,33 +343,51 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
             // unified /respond is never reached for projected items. Read `type`/`externalRef` off
             // the RAW deliverable `d` — normalizeDeliverable drops both.
             const projected = isProjectedDeliverable(d.type);
+            // ISSUE 1c — the approval family (typed items[]) renders its substance INLINE via
+            // InlineApprovalCard (no modal). This predicate captures EXACTLY that family: a
+            // non-projected batch-kind deliverable carrying typed items. It excludes client_action
+            // (empty d.items), content_decay (kind:'decision'), projected (copy/content_request), and
+            // schema_plan (kind:'review'). Those keep the DecisionCard path (uniformVerbs / onReview /
+            // onOpen→modal) unchanged.
+            const inlineApproval = !projected && d.kind === 'batch' && (d.items?.length ?? 0) > 0;
             return (
               <div key={d.id} id={`unified-decision-${d.id}`}>
-                <DecisionCard
-                  decision={decision}
-                  uniformVerbs
-                  ageLabel={ageLabel(d.sentAt)}
-                  onReview={projected ? () => setReviewProjected({ type: d.type, externalRef: d.externalRef ?? '' }) : undefined}
-                  // "View N →" opens the detail modal (substance + per-item review). Projected
-                  // deliverables render the read-only "Review →" deep-link instead of "View N", so
-                  // this is never reached for them (no-op kept for the required prop contract).
-                  onOpen={projected ? () => {} : () => setDetailId(d.id)}
-                  onApprove={
-                    projected || submittingId === d.id
-                      ? undefined
-                      : () => void handleRespond(d, 'approved')
-                  }
-                  onFlagWithNote={
-                    projected || submittingId === d.id
-                      ? undefined
-                      : (note) => void handleRespond(d, 'changes_requested', note || undefined)
-                  }
-                  onDecline={
-                    projected || submittingId === d.id
-                      ? undefined
-                      : (note) => void handleRespond(d, 'declined', note || undefined)
-                  }
-                />
+                {inlineApproval ? (
+                  <InlineApprovalCard
+                    decision={decision}
+                    ageLabel={ageLabel(d.sentAt)}
+                    submitting={submittingId === d.id}
+                    onApprove={(f) => void handleRespond(d, 'approved', undefined, f)}
+                    onRequestChanges={(n) => void handleRespond(d, 'changes_requested', n || undefined)}
+                    onDecline={(n) => void handleRespond(d, 'declined', n || undefined)}
+                  />
+                ) : (
+                  <DecisionCard
+                    decision={decision}
+                    uniformVerbs
+                    ageLabel={ageLabel(d.sentAt)}
+                    onReview={projected ? () => setReviewProjected({ type: d.type, externalRef: d.externalRef ?? '' }) : undefined}
+                    // "View N →" opens the detail modal (substance + per-item review). Projected
+                    // deliverables render the read-only "Review →" deep-link instead of "View N", so
+                    // this is never reached for them (no-op kept for the required prop contract).
+                    onOpen={projected ? () => {} : () => setDetailId(d.id)}
+                    onApprove={
+                      projected || submittingId === d.id
+                        ? undefined
+                        : () => void handleRespond(d, 'approved')
+                    }
+                    onFlagWithNote={
+                      projected || submittingId === d.id
+                        ? undefined
+                        : (note) => void handleRespond(d, 'changes_requested', note || undefined)
+                    }
+                    onDecline={
+                      projected || submittingId === d.id
+                        ? undefined
+                        : (note) => void handleRespond(d, 'declined', note || undefined)
+                    }
+                  />
+                )}
               </div>
             );
           })}
@@ -347,8 +396,10 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
 
       {/* Orders-only empty state (R5 fix): the "nothing needs your attention" line must NOT show when
           there are work orders to TRACK — the track lane below is content, even though it's not
-          actionable. Guard on BOTH the actionable queue and the order track lane being empty. */}
-      {actionable.length === 0 && workOrders.length === 0 && (
+          actionable. Guard on the actionable queue, the order track lane, AND the "Ready to publish"
+          lane being empty — matching the F2 PriorityStrip guard, so the line never renders above a
+          populated "Ready to publish" section (same false-empty class). */}
+      {actionable.length === 0 && workOrders.length === 0 && readyToApply.length === 0 && (
         <div className="flex items-center gap-3 px-4 py-3 t-caption text-[var(--brand-text-muted)]">
           <Inbox size={16} className="flex-shrink-0" />
           <span>Nothing needs your attention right now. New items will appear here.</span>

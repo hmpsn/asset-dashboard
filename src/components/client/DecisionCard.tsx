@@ -79,9 +79,14 @@ export function DecisionCard({
               Decline
             </Button>
           )}
-          {decision.itemCount > 1 && (
+          {/* A1a — uniform-mode "View" gate: `>= 1` (was `> 1`) so single-item modal-routed types
+              (schema_plan + single-item client_action redirects/links/AEO) get a View affordance and
+              are no longer reviewed blind. Label drops the count when itemCount===1 ("View →"). This
+              gate is inside the uniformActions block (uniform mode = unified inbox only) and does NOT
+              touch the legacy bulk-mode "Review N changes →" path below. */}
+          {decision.itemCount >= 1 && (
             <Button size="sm" variant="ghost" onClick={onOpen} className="ml-auto">
-              View {decision.itemCount} →
+              {decision.itemCount === 1 ? 'View →' : `View ${decision.itemCount} →`}
             </Button>
           )}
         </>

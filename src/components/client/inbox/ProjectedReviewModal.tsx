@@ -27,13 +27,13 @@ import { ClientCopyReview } from '../ClientCopyReview';
 import { ContentTab, type ContentTabProps } from '../ContentTab';
 
 /**
- * The ContentTab pass-through props the modal forwards verbatim. `workspaceId`, `setToast`, and the
- * auto-expand seed are supplied by the modal itself (not part of the pass-through bag), so they are
- * omitted here.
+ * The ContentTab pass-through props the modal forwards verbatim. `workspaceId`, `setToast`, the
+ * auto-expand seed, AND the solo id are supplied by the modal itself (not part of the pass-through
+ * bag), so they are omitted here. `soloRequestId` (ISSUE 2c) is set locally from `externalRef`.
  */
 type ContentTabPassThroughProps = Omit<
   ContentTabProps,
-  'workspaceId' | 'setToast' | 'initialExpandedRequestId'
+  'workspaceId' | 'setToast' | 'initialExpandedRequestId' | 'soloRequestId'
 >;
 
 type ProjectedReviewModalProps = ContentTabPassThroughProps & {
@@ -81,10 +81,11 @@ export function ProjectedReviewModal({
       className="fixed inset-0 z-[var(--z-modal-fullscreen)] flex flex-col" // fixed-inset-ok — full-screen trust-first panel; escape key + backdrop click handled in component body
     >
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onDismiss} />
-      {/* WIDE panel (max-w-5xl): ContentTab renders a PageHeader + a 4-column stat grid + the
-          pipeline list, so the max-w-3xl from DeliverableDetailModal would be cramped. */}
+      {/* ISSUE 2c — SOLO panel (max-w-3xl, matching DeliverableDetailModal): the bespoke surfaces now
+          render only the opened item (no PageHeader / stat grid / multi-entry chrome), so the wide
+          max-w-5xl is no longer needed. The narrower panel keeps the single-item review focused. */}
       <div
-        className="relative z-[var(--z-sticky)] flex flex-col h-full max-w-5xl mx-auto w-full bg-[var(--surface-1)] shadow-2xl overflow-hidden"
+        className="relative z-[var(--z-sticky)] flex flex-col h-full max-w-3xl mx-auto w-full bg-[var(--surface-1)] shadow-2xl overflow-hidden"
         style={{ borderRadius: `0 0 var(--radius-xl) var(--radius-xl)` }}
       >
         {/* Header */}
@@ -106,13 +107,14 @@ export function ProjectedReviewModal({
         {/* Body — the proven bespoke surface, auto-expanded to the projected source id. */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
           {type === 'copy_section' ? (
-            <ClientCopyReview workspaceId={workspaceId} initialExpandedEntryId={externalRef} />
+            <ClientCopyReview workspaceId={workspaceId} initialExpandedEntryId={externalRef} soloEntryId={externalRef} />
           ) : (
             <ContentTab
               {...contentTabProps}
               workspaceId={workspaceId}
               setToast={setToast}
               initialExpandedRequestId={externalRef}
+              soloRequestId={externalRef}
             />
           )}
         </div>

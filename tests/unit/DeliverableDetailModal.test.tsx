@@ -10,6 +10,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { DeliverableDetailModal } from '../../src/components/client/DeliverableDetailModal';
 import type { NormalizedDecision } from '../../shared/types/decision';
 import type { ClientDeliverableItem } from '../../shared/types/client-deliverable';
+import type { PageRoleAssignment, CanonicalEntity } from '../../shared/types/schema-plan';
 
 function makeItem(over: Partial<ClientDeliverableItem> & { id: string }): ClientDeliverableItem {
   return {
@@ -187,6 +188,96 @@ describe('DeliverableDetailModal — client_action family (payload.items, read-o
     expect(screen.getByText('Old answer')).toBeInTheDocument();
     expect(screen.getByText('New answer')).toBeInTheDocument();
     expect(screen.getByText(/clarity/)).toBeInTheDocument();
+  });
+});
+
+// A1b — schema_plan (kind:'review') carries NO typed items; its substance rides in
+// payload.pageRoles (PageRoleAssignment[]) + payload.canonicalEntities (CanonicalEntity[]). Field
+// names confirmed against shared/types/schema-plan.ts: PageRoleAssignment = { pagePath, pageTitle,
+// role, primaryType, entityRefs, notes?, industrySubtype? }; CanonicalEntity = { type, name,
+// canonicalUrl, id, description? }. The modal's schema_plan branch renders pageTitle/pagePath/
+// primaryType per page-role row and type/name chips per entity.
+const schemaPlanPageRoles: PageRoleAssignment[] = [
+  {
+    pagePath: '/',
+    pageTitle: 'Acme Home',
+    role: 'homepage',
+    primaryType: 'Organization',
+    entityRefs: ['https://example.com/#org'],
+  },
+  {
+    pagePath: '/platform',
+    pageTitle: 'Platform Overview',
+    role: 'pillar',
+    primaryType: 'SoftwareApplication',
+    entityRefs: [],
+  },
+];
+
+const schemaPlanEntities: CanonicalEntity[] = [
+  {
+    type: 'SoftwareApplication',
+    name: 'Acme Platform',
+    canonicalUrl: 'https://example.com/platform',
+    id: 'https://example.com/platform/#software',
+    description: 'The Acme product',
+  },
+  {
+    type: 'Organization',
+    name: 'Acme Inc',
+    canonicalUrl: 'https://example.com',
+    id: 'https://example.com/#org',
+  },
+];
+
+const schemaPlanDecision: NormalizedDecision = {
+  id: 'cd-5',
+  source: 'deliverable',
+  sourceId: 'cd-5',
+  title: 'Schema strategy for your site',
+  summary: 'Whole-site schema plan for review',
+  itemCount: 2,
+  kind: 'review',
+  isSingleAction: false,
+  badge: 'Schema',
+  createdAt: '2026-05-01T00:00:00Z',
+  // schema_plan carries no typed items; its substance is in payload.pageRoles + payload.canonicalEntities.
+  items: [],
+  payload: { family: 'approval_batch', pageRoles: schemaPlanPageRoles, canonicalEntities: schemaPlanEntities },
+};
+
+describe('DeliverableDetailModal — A1b schema_plan (payload.pageRoles + payload.canonicalEntities)', () => {
+  it('renders the page-roles section: "Page roles (N)" sub-header + each page title/path/primaryType', () => {
+    renderModal(schemaPlanDecision);
+    // Page-roles sub-header with the count.
+    expect(screen.getByText('Page roles (2)')).toBeInTheDocument();
+    // Each page-role row renders pageTitle, pagePath, and primaryType.
+    expect(screen.getByText('Acme Home')).toBeInTheDocument();
+    expect(screen.getByText('/')).toBeInTheDocument();
+    expect(screen.getByText('Platform Overview')).toBeInTheDocument();
+    expect(screen.getByText('/platform')).toBeInTheDocument();
+    // 'Organization' and 'SoftwareApplication' each appear as both a page-role primaryType and an
+    // entity type chip, so assert at least one occurrence rather than uniqueness.
+    expect(screen.getAllByText('Organization').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('SoftwareApplication').length).toBeGreaterThan(0);
+  });
+
+  it('renders the entities section: "Site entities (N)" sub-header + entity name/type chips', () => {
+    renderModal(schemaPlanDecision);
+    expect(screen.getByText('Site entities (2)')).toBeInTheDocument();
+    // Entity name + type chips.
+    expect(screen.getByText('Acme Platform')).toBeInTheDocument();
+    expect(screen.getByText('Acme Inc')).toBeInTheDocument();
+    expect(screen.getAllByText('SoftwareApplication').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Organization').length).toBeGreaterThan(0);
+  });
+
+  it('does NOT fall through to the generic summary-only fallback (no longer reviewed blind)', () => {
+    renderModal(schemaPlanDecision);
+    // The else branch text must be ABSENT — the schema_plan branch handled the render.
+    expect(screen.queryByText('No reviewable detail for this item.')).not.toBeInTheDocument();
+    // And the SchemaPlanReview empty-state text must also be absent (we have substance).
+    expect(screen.queryByText('No schema strategy detail to review.')).not.toBeInTheDocument();
   });
 });
 

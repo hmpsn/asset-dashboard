@@ -49,15 +49,26 @@ export interface ContentTabProps {
    * Default `undefined` → no auto-expand → legacy call sites (InboxTab) behave exactly as before.
    */
   initialExpandedRequestId?: string;
+  /**
+   * ISSUE 2a — SOLO mode (single-item review): when set, this surface shows ONLY the one request
+   * with this id, with ALL pipeline chrome hidden (PageHeader, banners, stat grid, topic form, empty
+   * state, declined list). Used by ProjectedReviewModal so a content-request review shows just the
+   * opened item instead of the whole pipeline. Default `undefined` → `isSolo` false → the full
+   * pipeline renders exactly as before (legacy mounts pass nothing → byte-identical).
+   */
+  soloRequestId?: string;
 }
 
 export function ContentTab({
   contentRequests, setContentRequests, effectiveTier,
   briefPrice, fullPostPrice, fmtPrice, setPricingModal, pricingConfirming,
-  workspaceId, setToast, hidePrices = false, initialExpandedRequestId,
+  workspaceId, setToast, hidePrices = false, initialExpandedRequestId, soloRequestId,
 }: ContentTabProps) {
   const navigate = useNavigate();
   const betaMode = useBetaMode();
+  // ISSUE 2a — solo mode: show ONLY the opened request, hide all pipeline chrome. Default false in
+  // legacy mounts (no prop) → full pipeline renders unchanged.
+  const isSolo = soloRequestId != null;
   // Topic form state
   const [showTopicForm, setShowTopicForm] = useState(false);
   const [newTopicName, setNewTopicName] = useState('');
@@ -144,18 +155,43 @@ export function ContentTab({
     briefPreviews,
     declineTopic, approveBrief, requestChanges,
     addContentComment, loadBriefPreview,
-  } = useContentRequests({ workspaceId, setContentRequests, setToast, initialExpandedRequestId });
+  } = useContentRequests({ workspaceId, setContentRequests, setToast, initialExpandedRequestId: initialExpandedRequestId ?? soloRequestId });
+
+  // ISSUE 2a — brief-preview on seed: when a request is seeded-expanded (R4 modal / solo), load its
+  // brief preview on mount so the brief renders without a manual click. Provably inert in legacy
+  // (no seed → early return). loadBriefPreview self-guards if the brief is already loaded.
+  const briefSeed = initialExpandedRequestId ?? soloRequestId;
+  useEffect(() => {
+    if (!briefSeed) return; // provably inert in legacy (no seed)
+    const req = contentRequests.find(r => r.id === briefSeed);
+    if (req?.briefId) loadBriefPreview(req.briefId); // loadBriefPreview self-guards if already loaded
+  }, [briefSeed, loadBriefPreview, contentRequests]);
+
+  // ISSUE 2a — solo mode shows ONLY the seeded request; full mode shows the active (non-declined) list.
+  const visibleRequests = isSolo
+    ? contentRequests.filter(r => r.id === soloRequestId)
+    : contentRequests.filter(r => r.status !== 'declined');
+
+  // Solo not-found: the seeded request isn't in the prop array yet (transient pre-hydration window).
+  // Render a contextual loading message rather than a blank modal.
+  if (isSolo && visibleRequests.length === 0) {
+    return (
+      <p className="t-body text-[var(--brand-text-muted)] py-8 text-center">Loading review…</p>
+    );
+  }
 
   return (<>
-    <PageHeader
-      title="Content Pipeline"
-      subtitle="Track and manage your content requests"
-      actions={<Button onClick={() => setShowTopicForm(!showTopicForm)} icon={Plus} size="sm">Suggest a Topic</Button>}
-      className="mb-1"
-    />
+    {!isSolo && (
+      <PageHeader
+        title="Content Pipeline"
+        subtitle="Track and manage your content requests"
+        actions={<Button onClick={() => setShowTopicForm(!showTopicForm)} icon={Plus} size="sm">Suggest a Topic</Button>}
+        className="mb-1"
+      />
+    )}
 
     {/* Alert banner for items needing review */}
-    {(() => {
+    {!isSolo && (() => {
       const reviewCount = contentRequests.filter(r => r.status === 'client_review').length;
       const newComments = contentRequests.filter(r => r.comments && r.comments.length > 0 && r.comments[r.comments.length - 1].author === 'team' && r.status !== 'declined').length;
       if (reviewCount > 0 || newComments > 0) return (
@@ -175,7 +211,7 @@ export function ContentTab({
       );
       return null;
     })()}
-    {(() => {
+    {!isSolo && (() => {
       const needsPostReview = contentRequests.filter(r => r.status === 'post_review').length;
       if (needsPostReview === 0) return null;
       return (
@@ -194,7 +230,7 @@ export function ContentTab({
     })()}
 
     {/* Status summary cards */}
-    {contentRequests.length > 0 && (() => {
+    {!isSolo && contentRequests.length > 0 && (() => {
       const active = contentRequests.filter(r => r.status !== 'declined');
       // post_review is "awaiting client action" — move it out of inProgress.
       // changes_requested stays in inProgress for both flows (admin is acting).
@@ -221,7 +257,7 @@ export function ContentTab({
     })()}
 
     {/* Topic submission form */}
-    {showTopicForm && (
+    {!isSolo && showTopicForm && (
       <SectionCard title="Suggest a Content Topic" className="border-teal-500/20">
         <div className="space-y-3">
         <FormInput type="text" value={newTopicName} onChange={setNewTopicName} placeholder="Topic name (e.g. 'Benefits of sedation dentistry')" className="w-full t-caption" />
@@ -253,7 +289,7 @@ export function ContentTab({
     )}
 
     {/* Empty state when no requests yet */}
-    {contentRequests.length === 0 && (
+    {!isSolo && contentRequests.length === 0 && (
       <div className="text-center py-16">
         <Icon as={FileText} size="2xl" className="text-[var(--brand-text-faint)] mx-auto mb-3" />
         <p className="t-body font-medium text-[var(--brand-text-muted)]">Your content pipeline is empty</p>
@@ -267,9 +303,9 @@ export function ContentTab({
       </div>
     )}
 
-    {/* Pipeline items — review-needed first */}
+    {/* Pipeline items — review-needed first (solo → only the opened request) */}
     <div className="space-y-3">
-      {contentRequests.filter(r => r.status !== 'declined').sort((a, b) => {
+      {visibleRequests.sort((a, b) => {
         const priority = (s: string) => s === 'client_review' || s === 'post_review' ? 0 : s === 'changes_requested' ? 1 : 2;
         const diff = priority(a.status) - priority(b.status);
         return diff !== 0 ? diff : b.updatedAt.localeCompare(a.updatedAt);
@@ -787,7 +823,7 @@ export function ContentTab({
     </div>
 
     {/* Declined items (collapsed) */}
-    {contentRequests.filter(r => r.status === 'declined').length > 0 && (
+    {!isSolo && contentRequests.filter(r => r.status === 'declined').length > 0 && (
       <details className="mt-4">
         <summary className="t-caption text-[var(--brand-text-muted)] cursor-pointer hover:text-[var(--brand-text)] transition-colors">
           {contentRequests.filter(r => r.status === 'declined').length} declined topic{contentRequests.filter(r => r.status === 'declined').length > 1 ? 's' : ''}
