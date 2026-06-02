@@ -7230,7 +7230,6 @@ export const CHECKS: Check[] = [
       // public-content.ts and public-requests.ts use router.use() file-level
       // portal auth — Pass 1 detects that, so no exclude needed.
       'server/routes/reports.ts',
-      'server/routes/work-orders.ts',
       // recommendations.ts and stripe.ts have mixed auth coverage — individual
       // unprotected routes are hatched with // public-no-auth-ok inline.
     ],
