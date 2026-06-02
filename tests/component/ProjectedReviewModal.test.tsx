@@ -68,9 +68,9 @@ describe('ProjectedReviewModal', () => {
 
     expect(screen.getByTestId('client-copy-review')).toBeInTheDocument();
     expect(screen.queryByTestId('content-tab')).not.toBeInTheDocument();
-    // Auto-expand seed wired from externalRef.
+    // Auto-expand seed wired from externalRef AND the solo id (ISSUE 2c) forwarded from externalRef.
     expect(copyReviewProps).toHaveBeenCalledWith(
-      expect.objectContaining({ workspaceId: 'ws-1', initialExpandedEntryId: 'entry-42' }),
+      expect.objectContaining({ workspaceId: 'ws-1', initialExpandedEntryId: 'entry-42', soloEntryId: 'entry-42' }),
     );
     // Modal chrome — accessible dialog with the Copy Review label.
     expect(screen.getByRole('dialog', { name: 'Copy Review' })).toBeInTheDocument();
@@ -94,6 +94,8 @@ describe('ProjectedReviewModal', () => {
       expect.objectContaining({
         workspaceId: 'ws-1',
         initialExpandedRequestId: 'cr-7',
+        // ISSUE 2c — the solo id is forwarded from externalRef alongside the auto-expand seed.
+        soloRequestId: 'cr-7',
         // pass-through props forwarded
         effectiveTier: 'growth',
         contentRequests: [],

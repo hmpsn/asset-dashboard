@@ -249,7 +249,21 @@ describe('InboxTab unified-inbox flag gating', () => {
       isLoading: false,
     });
 
-    render(<InboxTab {...baseProps} />);
+    // Seed a content request matching the projected externalRef so SOLO mode (ISSUE 2) renders that
+    // ONE request's block (instead of the not-found fallback). The pipeline chrome must be HIDDEN.
+    const contentRequests = [
+      {
+        id: 'cr-1',
+        topic: 'Spring campaign topic',
+        targetKeyword: 'spring keyword',
+        intent: 'informational',
+        priority: 'medium',
+        status: 'client_review' as const,
+        requestedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ];
+    render(<InboxTab {...baseProps} contentRequests={contentRequests} />);
 
     // Read-only "Review →" CTA present (no uniform write verbs — they'd 404 on a projected id).
     expect(screen.getByRole('button', { name: 'Review →' })).toBeInTheDocument();
@@ -264,8 +278,10 @@ describe('InboxTab unified-inbox flag gating', () => {
     // surface) — and must NOT navigate the client out to ?tab=reviews.
     fireEvent.click(screen.getByRole('button', { name: 'Review →' }));
     expect(screen.getByRole('dialog', { name: 'Content Review' })).toBeInTheDocument();
-    // ContentTab's own PageHeader is rendered inside the modal.
-    expect(screen.getByText('Content Pipeline')).toBeInTheDocument();
+    // SOLO mode (ISSUE 2): the modal shows ONLY the opened request — the full-pipeline PageHeader
+    // ("Content Pipeline") must be ABSENT, and the soloed request's block renders instead.
+    expect(screen.queryByText('Content Pipeline')).not.toBeInTheDocument();
+    expect(screen.getByText('Spring campaign topic')).toBeInTheDocument();
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
@@ -451,11 +467,15 @@ describe('InboxTab unified-inbox flag gating', () => {
 
     render(<InboxTab {...baseProps} />);
 
-    // Order rows never enter `actionable` → the strip shows the all-caught-up state, not the order.
-    expect(screen.getByText("You're all caught up")).toBeInTheDocument();
+    // Order rows never enter `actionable` → the PriorityStrip's "Needs your attention" actionable
+    // list is empty, so the order's title does NOT render as a PriorityStrip CTA item.
     expect(screen.queryByText('Needs your attention')).not.toBeInTheDocument();
-    // The order's title does NOT render as a PriorityStrip CTA item (no "Review Order: fix meta" CTA).
     expect(screen.queryByRole('button', { name: 'Review Order: fix meta' })).not.toBeInTheDocument();
+    // F2 — with a work order present (live work in the track lane), the strip must NOT falsely claim
+    // "all caught up" above it (showAllCaughtUp is gated on readyToApply + workOrders both empty).
+    expect(screen.queryByText("You're all caught up")).not.toBeInTheDocument();
+    // The order still renders in the read-only "Work in progress" lane below.
+    expect(screen.getByText('Work in progress')).toBeInTheDocument();
   });
 
   it('flag ON → a COMPLETED order renders the chip but NOT the stepper', () => {
@@ -507,5 +527,96 @@ describe('InboxTab unified-inbox flag gating', () => {
 
     render(<InboxTab {...baseProps} />);
     expect(screen.queryByText('Work in progress')).not.toBeInTheDocument();
+  });
+
+  // ── ISSUE 1 — inline approval-review card (approval family renders inline, not a modal CTA) ──
+
+  it('flag ON → approval-family deliverable (batch + non-empty items, non-projected) renders InlineApprovalCard inline (no modal-opening "View")', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseUnifiedInbox.mockReturnValue({
+      unifiedInbox: true,
+      deliverables: [
+        makeDeliverable({
+          id: 'cd_seo',
+          type: 'seo_edit',
+          kind: 'batch',
+          status: 'awaiting_client',
+          title: 'SEO title updates',
+          summary: '2 changes ready for your approval',
+          items: [
+            makeApplyableItem({ id: 'i1', field: 'seoTitle', proposedValue: 'New title A', itemPayload: { pageTitle: 'Home', pageSlug: '/home' } }),
+            makeApplyableItem({ id: 'i2', field: 'seoDescription', proposedValue: 'New desc B', itemPayload: { pageTitle: 'Home', pageSlug: '/home' } }),
+          ],
+        }),
+      ],
+      isLoading: false,
+    });
+
+    render(<InboxTab {...baseProps} />);
+
+    // The substance renders INLINE (proposed values visible) — no "View N →" modal affordance.
+    expect(screen.getByText('New title A')).toBeInTheDocument();
+    expect(screen.getByText('New desc B')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^View/ })).not.toBeInTheDocument();
+    // The inline subset-approve CTA replaces the bare "Approve" verb.
+    expect(screen.getByRole('button', { name: 'Looks good — implement 2 of 2 →' })).toBeInTheDocument();
+    // Approve forwards the (empty) flagged subset to the respond mutation.
+    fireEvent.click(screen.getByRole('button', { name: 'Looks good — implement 2 of 2 →' }));
+    expect(mockMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ deliverableId: 'cd_seo', decision: 'approved', flaggedItems: [] }),
+    );
+  });
+
+  it('flag ON → client_action batch with EMPTY items keeps the DecisionCard write verbs (not InlineApprovalCard)', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseUnifiedInbox.mockReturnValue({
+      unifiedInbox: true,
+      // redirect is a client_action-family batch — its sub-items ride in payload.items, so d.items
+      // is empty → it must NOT route to InlineApprovalCard; it keeps the DecisionCard uniform verbs.
+      deliverables: [
+        makeDeliverable({
+          id: 'cd_redir',
+          type: 'redirect',
+          kind: 'batch',
+          status: 'awaiting_client',
+          title: 'Redirect plan',
+          summary: '3 redirects',
+          payload: { subType: 'redirect', items: [{}, {}, {}] },
+          items: [],
+        }),
+      ],
+      isLoading: false,
+    });
+
+    render(<InboxTab {...baseProps} />);
+    // DecisionCard uniform verbs render (the inline subset CTA does not).
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Request changes' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Decline' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Looks good/ })).not.toBeInTheDocument();
+  });
+
+  it('flag ON → content_decay (kind:decision) keeps the DecisionCard (not InlineApprovalCard)', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseUnifiedInbox.mockReturnValue({
+      unifiedInbox: true,
+      deliverables: [
+        makeDeliverable({
+          id: 'cd_decay',
+          type: 'content_decay',
+          kind: 'decision',
+          status: 'awaiting_client',
+          title: 'Refresh decaying content',
+          summary: 'Traffic is dropping on /blog/old-post',
+          items: [],
+        }),
+      ],
+      isLoading: false,
+    });
+
+    render(<InboxTab {...baseProps} />);
+    // content_decay is kind:'decision' → DecisionCard uniform verbs, never the inline subset CTA.
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Looks good/ })).not.toBeInTheDocument();
   });
 });
