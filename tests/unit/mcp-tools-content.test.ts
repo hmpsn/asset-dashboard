@@ -92,6 +92,17 @@ describe('mcp content action tools', () => {
       ...updates as Record<string, unknown>,
     }));
     (createContentRequest as ReturnType<typeof vi.fn>).mockReturnValue({ id: 'cr_1' });
+    // updateContentRequest returns the updated request (the shared send-post service consumes the
+    // return value). Default echoes the request id + merged updates so callers see a coherent row.
+    (updateContentRequest as ReturnType<typeof vi.fn>).mockImplementation(
+      (_ws: string, id: string, updates: unknown) => ({
+        id,
+        workspaceId: 'ws-1',
+        topic: 'Post title',
+        targetKeyword: 'hvac',
+        ...(updates as Record<string, unknown>),
+      }),
+    );
     (getContentRequest as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
     (listContentRequests as ReturnType<typeof vi.fn>).mockReturnValue([]);
     (deleteBrief as ReturnType<typeof vi.fn>).mockReturnValue(true);
