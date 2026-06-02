@@ -257,6 +257,41 @@ async function applyApprovedDeliverable(
 }
 
 /**
+ * R3b mirror-flip: move a unified deliverable to `applied` AFTER the legacy `/apply` route has
+ * already done the Webflow write. This is the body of `applyApprovedDeliverable` MINUS the external
+ * `apply()` call (the Webflow write was already performed by the proven legacy route). It does NOT
+ * call any adapter — D-apply still holds; this is the SEPARATE R3b apply path through the legacy
+ * route. Idempotent: a re-apply on an already-`applied` row short-circuits (no InvalidTransitionError).
+ * Returns null when the deliverable is missing / belongs to another workspace (best-effort caller
+ * swallows that), the applied deliverable otherwise.
+ */
+export function markDeliverableApplied(
+  workspaceId: string,
+  deliverableId: string,
+): ClientDeliverable | null {
+  const current = getDeliverable(deliverableId);
+  if (!current || current.workspaceId !== workspaceId) return null;
+  if (current.status === 'applied') return current; // idempotent re-apply
+  validateTransition(
+    'deliverable',
+    getDeliverableTransitions(current.type),
+    current.status,
+    'applied',
+  );
+  const applied = upsertDeliverable(
+    toUpsert(current, { status: 'applied', appliedAt: new Date().toISOString() }),
+  );
+  broadcastToWorkspace(workspaceId, WS_EVENTS.DELIVERABLE_UPDATED, {
+    deliverableId: applied.id,
+    type: applied.type,
+    status: applied.status,
+  });
+  invalidateIntelligenceCache(workspaceId);
+  log.debug({ workspaceId, deliverableId: applied.id }, 'deliverable mirror-flipped to applied (R3b)');
+  return applied;
+}
+
+/**
  * Re-nudge the client about a still-pending deliverable (admin "remind"). Generalizes
  * the approval-reminder prior art across every type (design §6, E4). No-op-safe when
  * email is unconfigured. Returns the deliverable so the route can echo it back.

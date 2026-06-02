@@ -1,17 +1,19 @@
 import type { ApprovalBatch, ApprovalItem } from './types';
+import { isClientApplyableFields } from '../../../shared/applyability';
 
-const STATIC_APPLY_FIELDS = new Set(['seoTitle', 'seoDescription']);
-const CMS_NON_SEO_FIELDS = new Set(['name', 'slug']);
-
-function isCmsSeoApplyField(field: string): boolean {
-  const normalized = field.trim().toLowerCase();
-  return normalized.length > 0 && !CMS_NON_SEO_FIELDS.has(normalized);
-}
-
+/**
+ * Legacy approval-batch applyability predicate (live consumers: ApprovalBatchCard footer +
+ * client-approval-applyability unit test). Behavior-preserving thin delegation to the SINGLE
+ * source of truth in `shared/applyability.ts` — the legacy `pageId` maps onto the shared
+ * `targetRef`. See that module's header for why this mirrors the legacy ROUTE GATE
+ * (field/pageId/collectionId), not the per-item `applyable` column.
+ */
 export function isClientApplyableApprovalItem(item: ApprovalItem): boolean {
-  if (!item.field || item.pageId.startsWith('cms-')) return false;
-  if (item.collectionId) return isCmsSeoApplyField(item.field);
-  return STATIC_APPLY_FIELDS.has(item.field);
+  return isClientApplyableFields({
+    field: item.field,
+    targetRef: item.pageId,
+    collectionId: item.collectionId ?? null,
+  });
 }
 
 export function isClientApplyableBatch(batch: ApprovalBatch): boolean {

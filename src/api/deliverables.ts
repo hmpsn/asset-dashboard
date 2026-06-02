@@ -41,6 +41,20 @@ export const publicDeliverables = {
       `/api/public/deliverables/${wsId}/${deliverableId}/respond`,
       body,
     ),
+
+  /**
+   * R3b — Apply to Website (DARK). Calls the SAME proven legacy apply route the legacy
+   * ApprovalBatchCard uses (no new apply logic): it does the Webflow writes + server-side
+   * applyability gate + markBatchApplied + activity + outcome tracking + broadcasts, and (behind
+   * APPROVAL_FAMILY_FLAG) flips the unified mirror to `applied`. `legacyBatchId` is read off the
+   * deliverable's `payload.legacyBatchId`. Return shape matches the route at approvals.ts.
+   */
+  applyApproval: (wsId: string, legacyBatchId: string) =>
+    post<{
+      results: Array<{ itemId: string; pageId: string; success: boolean; error?: string }>;
+      applied: number;
+      failed: number;
+    }>(`/api/public/approvals/${wsId}/${legacyBatchId}/apply`),
 };
 
 /**

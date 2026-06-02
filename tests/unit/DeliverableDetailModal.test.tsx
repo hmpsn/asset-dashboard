@@ -189,3 +189,65 @@ describe('DeliverableDetailModal — client_action family (payload.items, read-o
     expect(screen.getByText(/clarity/)).toBeInTheDocument();
   });
 });
+
+describe('DeliverableDetailModal — R3b Apply to Website footer', () => {
+  it('canApply=true renders a single Apply button and NOT the approve/request/decline row', () => {
+    const onApply = vi.fn().mockResolvedValue(undefined);
+    render(
+      <DeliverableDetailModal
+        decision={seoDecision}
+        onApprove={vi.fn()}
+        onRequestChanges={vi.fn()}
+        onDecline={vi.fn()}
+        onDismiss={vi.fn()}
+        canApply
+        onApply={onApply}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /apply to website/i })).toBeInTheDocument();
+    // The approve / request-changes / decline verbs are suppressed (apply is a separate step).
+    expect(screen.queryByRole('button', { name: /implement/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /request changes/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^decline$/i })).not.toBeInTheDocument();
+  });
+
+  it('clicking Apply fires onApply', async () => {
+    const onApply = vi.fn().mockResolvedValue(undefined);
+    render(
+      <DeliverableDetailModal
+        decision={seoDecision}
+        onApprove={vi.fn()}
+        onRequestChanges={vi.fn()}
+        onDecline={vi.fn()}
+        onDismiss={vi.fn()}
+        canApply
+        onApply={onApply}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /apply to website/i }));
+    await waitFor(() => expect(onApply).toHaveBeenCalledTimes(1));
+  });
+
+  it('applying=true shows "Applying…" and disables the button', () => {
+    render(
+      <DeliverableDetailModal
+        decision={seoDecision}
+        onApprove={vi.fn()}
+        onRequestChanges={vi.fn()}
+        onDecline={vi.fn()}
+        onDismiss={vi.fn()}
+        canApply
+        applying
+        onApply={vi.fn()}
+      />,
+    );
+    const btn = screen.getByRole('button', { name: /applying…/i });
+    expect(btn).toBeDisabled();
+  });
+
+  it('canApply=false renders the normal approve row, no Apply button', () => {
+    renderModal(seoDecision);
+    expect(screen.queryByRole('button', { name: /apply to website/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /implement 3 →/i })).toBeInTheDocument();
+  });
+});
