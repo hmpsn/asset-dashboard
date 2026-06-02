@@ -477,7 +477,15 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
   // mirror EXISTENCE — NOT unified-inbox). The Webflow write already succeeded above; a mirror miss
   // must never fail this response, so the whole block is best-effort (log + swallow). isFeatureEnabled
   // is single-arg/global (no workspaceId). With the flag off this is byte-identical to before.
-  if (appliedIds.length > 0 && isFeatureEnabled(APPROVAL_FAMILY_FLAG)) {
+  //
+  // Flip ONLY on a FULLY-successful apply (`failed === 0 && every approved item applied`). On a
+  // partial/total Webflow failure `markBatchApplied` marks only the succeeded items `applied` and the
+  // legacy batch stays retryable; flipping the WHOLE mirror to `applied` (terminal — filtered out of
+  // the client list) would strand the still-`approved` failed items. Leaving the mirror `approved`
+  // keeps it in "Ready to publish" so re-clicking Apply re-applies only the failed items — matching
+  // the legacy batch's retry semantics.
+  const failed = results.length - appliedIds.length;
+  if (failed === 0 && appliedIds.length === approved.length && isFeatureEnabled(APPROVAL_FAMILY_FLAG)) {
     try {
       const type = classifyApprovalBatch(batch);
       const mirror = findBySourceRef(req.params.workspaceId, type, `${type}:${req.params.batchId}`);
@@ -538,7 +546,7 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
     }
   }
 
-  res.json({ results, applied: appliedIds.length, failed: results.length - appliedIds.length });
+  res.json({ results, applied: appliedIds.length, failed });
 });
 
 export default router;

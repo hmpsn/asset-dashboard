@@ -34,6 +34,12 @@ export interface ItemDiffRowProps {
   flagged: boolean;
   onFlag: (note: string) => void;
   onUnflag: () => void;
+  /**
+   * R3b — when true (the publish/"Apply to Website" review), the per-item Flag/Unflag affordance is
+   * hidden: this is a read-only review-before-publish view (approve is unreachable in publish mode,
+   * so the flag controls would be inert). The Current/Proposed diff still renders.
+   */
+  readOnly?: boolean;
 }
 
 /**
@@ -50,6 +56,7 @@ export function ItemDiffRow({
   flagged,
   onFlag,
   onUnflag,
+  readOnly = false,
 }: ItemDiffRowProps) {
   const [flagging, setFlagging] = useState(false);
   const [note, setNote] = useState('');
@@ -82,7 +89,7 @@ export function ItemDiffRow({
           </div>
         </div>
         <div className="flex-shrink-0">
-          {flagged ? (
+          {readOnly ? null : flagged ? (
             <Button
               variant="ghost"
               size="sm"

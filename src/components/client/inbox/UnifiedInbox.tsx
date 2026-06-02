@@ -118,8 +118,10 @@ export function UnifiedInbox({ workspaceId, setToast }: UnifiedInboxProps) {
     [deliverables],
   );
 
-  // The deliverable open in the detail modal, resolved from the live list (so a WS-driven refetch
-  // keeps the modal in sync). null when closed or once the item leaves the actionable set.
+  // The deliverable open in the detail modal, resolved from the full client-facing `deliverables`
+  // list (so approved/ready-to-publish items render too, not just actionable ones) and kept in sync
+  // by a WS-driven refetch. null when closed, or when the item leaves CLIENT_FACING_STATUSES
+  // (e.g. after a successful apply → `applied`, which is filtered out of the list).
   const detailDeliverable = useMemo(
     () => (detailId ? deliverables.find((d) => d.id === detailId) ?? null : null),
     [deliverables, detailId],
@@ -160,10 +162,14 @@ export function UnifiedInbox({ workspaceId, setToast }: UnifiedInboxProps) {
 
   // R3b — run the apply after the client confirms. Reads the legacy batch id off the deliverable's
   // payload (typeof-guard) and calls the SAME proven legacy /apply route via the typed mutation.
-  // Post-apply UX (corrected-defect #4): the deliverable flips to `applied`, which is filtered OUT
+  // The legacy /apply route returns HTTP 200 even on a total runtime Webflow write failure
+  // (`applied:0, failed:N`), so we MUST branch on the result body — never show success
+  // unconditionally (FM-2 anti-pattern). Mirrors the proven legacy ApprovalBatchCard guard.
+  // Post-apply UX on full success: the deliverable flips to `applied`, which is filtered OUT
   // of the client-facing list (CLIENT_FACING_STATUSES excludes `applied`). On refetch the item LEAVES
   // the inbox (both the actionable + ready-to-publish sections) and the modal auto-unmounts
-  // (detailDeliverable → null). That is the intended UX; the success toast confirms.
+  // (detailDeliverable → null). On partial/total failure the mirror stays `approved` (server gate,
+  // FIX 2) so the item remains in "Ready to publish" and the client can retry the failed items.
   const confirmApply = async () => {
     const d = applyConfirm;
     setApplyConfirm(null);
@@ -175,10 +181,19 @@ export function UnifiedInbox({ workspaceId, setToast }: UnifiedInboxProps) {
     }
     try {
       const data = await apply.mutateAsync({ legacyBatchId });
-      setToast({
-        message: `${data.applied} change${data.applied !== 1 ? 's' : ''} applied to your website`,
-        type: 'success',
-      });
+      if (data.applied > 0 && data.failed === 0) {
+        setToast({
+          message: `${data.applied} change${data.applied !== 1 ? 's' : ''} applied to your website`,
+          type: 'success',
+        });
+      } else if (data.applied > 0 && data.failed > 0) {
+        setToast({
+          message: `${data.applied} applied, ${data.failed} failed — please retry`,
+          type: 'error',
+        });
+      } else {
+        setToast({ message: 'Failed to apply changes. Please try again.', type: 'error' });
+      }
     } catch {
       setToast({ message: 'Failed to apply changes. Please try again.', type: 'error' });
     }

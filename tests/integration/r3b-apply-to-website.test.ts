@@ -176,7 +176,8 @@ describe('R3b — Apply to Website (legacy route reuse + mirror flip)', () => {
     expect(webflowState.seoPageIds).toContain('page-A');
     expect(webflowState.seoPageIds).not.toContain('page-B');
 
-    // Mirror still flips to applied (gated on appliedIds.length > 0, which is 1 here).
+    // Mirror still flips to applied: the held item B is `rejected` (not in the `approved` set), so
+    // the FULLY-successful gate holds — failed === 0 AND all 1 `approved` item (A) was applied.
     expect(getDeliverable(mirror.id)?.status).toBe('applied');
   });
 
@@ -228,6 +229,46 @@ describe('R3b — Apply to Website (legacy route reuse + mirror flip)', () => {
 
     // Mirror NOT flipped (the gate is off) — stays approved, never applied.
     expect(getDeliverable(mirror.id)?.status).toBe('approved');
+  });
+
+  it('total Webflow write failure: applied:0/failed:1 (HTTP 200), item NOT applied, mirror stays approved (flip skipped)', async () => {
+    // FM-2 external-API-error test: mock the Webflow SEO write to FAIL at runtime. The legacy /apply
+    // route catches the failure per-item and falls through to res.json with applied:0/failed:N — a
+    // success-shaped HTTP 200 envelope, NOT a 4xx. The mirror-flip gate (FIX 2) must therefore see
+    // failed > 0 and SKIP the flip, leaving the mirror `approved` so the client can retry.
+    setFlagOverride(APPROVAL_FAMILY_FLAG, true);
+    webflowState.seoResult = { success: false, error: 'Webflow API write failed' };
+
+    const batch = createBatch(ws.workspaceId, ws.webflowSiteId, 'SEO Changes', [{
+      pageId: 'page-fail-1',
+      pageTitle: 'Home',
+      pageSlug: '/home',
+      field: 'seoTitle',
+      currentValue: 'Old',
+      proposedValue: 'New',
+    }]);
+    const mirror = mirrorApprovalBatchToDeliverable(ws.workspaceId, batch)!;
+    expect(mirror.type).toBe('seo_edit');
+
+    await respondToDeliverable(ws.workspaceId, mirror.id, { decision: 'approved' });
+    expect(getDeliverable(mirror.id)?.status).toBe('approved');
+
+    const res = await postJson(`/api/public/approvals/${ws.workspaceId}/${batch.id}/apply`, {});
+    // Total runtime write failure is still HTTP 200 with a failed count (not a 4xx).
+    expect(res.status).toBe(200);
+    const body = await res.json() as { applied: number; failed: number; results: unknown[] };
+    expect(body.applied).toBe(0);
+    expect(body.failed).toBe(1);
+    expect(body.results).toHaveLength(1);
+
+    // markBatchApplied was NOT invoked (no succeeded ids) → the legacy item stays `approved`/retryable.
+    expect(getBatch(ws.workspaceId, batch.id)?.items[0].status).toBe('approved');
+
+    // The mirror flip was SKIPPED (failed > 0) → mirror stays `approved` (assert DIRECTLY, NOT via
+    // the public client list) so it remains in "Ready to publish" and the client can retry.
+    const afterApply = getDeliverable(mirror.id);
+    expect(afterApply?.status).toBe('approved');
+    expect(afterApply?.appliedAt).toBeFalsy();
   });
 
   it('markDeliverableApplied is idempotent (a second call does not throw)', async () => {

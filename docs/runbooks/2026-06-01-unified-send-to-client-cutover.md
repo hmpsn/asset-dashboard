@@ -21,6 +21,8 @@ Merged PRs **#1012–#1020** (Phase 0 spine → 7 type adapters → client + adm
 
 **Migrations 111/112** (`client_deliverable` + `_item`) are applied. The service (`sendToClient`/`respondToDeliverable`), adapters, dual-write hooks, backfill scripts (`scripts/backfill-deliverables-*.ts`), and the inbox UI are all present but inert until a flag flips.
 
+> **⚠️ R3b "Apply to Website" requires BOTH flags ON, and they must move together.** The client "Apply to Website" step (the "Ready to publish" surface in `UnifiedInbox`) needs **both** `unified-inbox` (renders the Apply button) **and** `unified-deliverables-approval-family` (the mirror must exist, and the post-apply `markDeliverableApplied` flip is gated on this flag — `server/routes/approvals.ts`). **Once approval-family mirrors exist, do not turn `unified-deliverables-approval-family` OFF independently of `unified-inbox`.** If the family flag is off while `unified-inbox` is on, an `approved` mirror still renders an Apply button, but the post-apply mirror flip never fires — the Webflow write succeeds yet the mirror stays `approved`, leaving the item stuck in "Ready to publish" (it re-offers Apply forever). Flip them together; for rollback, turn `unified-inbox` off at the same time as (or before) the family flag (see §6).
+
 ---
 
 ## 1. ⚠️ Code prerequisites BEFORE any flag flip

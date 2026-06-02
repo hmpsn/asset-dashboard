@@ -158,6 +158,9 @@ export function DeliverableDetailModal({
             flagged={flaggedItems.has(item.id)}
             onFlag={(n) => flagItem(item.id, n)}
             onUnflag={() => unflagItem(item.id)}
+            // R3b — in publish mode (canApply) the per-item Flag controls are inert (approve is
+            // unreachable), so render this as a read-only review-before-publish view.
+            readOnly={canApply}
           />
         ))}
       </div>

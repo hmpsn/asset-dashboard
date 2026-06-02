@@ -22,11 +22,12 @@ vi.mock('../../src/hooks/useWorkspaceEvents', () => ({
 }));
 
 const mockMutateAsync = vi.fn().mockResolvedValue({});
+const mockApplyMutateAsync = vi.fn().mockResolvedValue({ applied: 1, failed: 0, results: [] });
 const mockUseUnifiedInbox = vi.fn();
 vi.mock('../../src/hooks/client/useUnifiedInbox', () => ({
   useUnifiedInbox: (...args: unknown[]) => mockUseUnifiedInbox(...args),
   useRespondToDeliverable: () => ({ mutateAsync: mockMutateAsync, isPending: false }),
-  useApplyDeliverable: () => ({ mutateAsync: vi.fn().mockResolvedValue({ applied: 0, failed: 0, results: [] }), isPending: false }),
+  useApplyDeliverable: () => ({ mutateAsync: mockApplyMutateAsync, isPending: false }),
 }));
 
 // react-query (UnifiedInbox uses useQueryClient)
@@ -104,7 +105,47 @@ const baseProps = {
 beforeEach(() => {
   vi.clearAllMocks();
   mockUseUnifiedInbox.mockReturnValue({ unifiedInbox: false, deliverables: [], isLoading: false });
+  mockMutateAsync.mockResolvedValue({});
+  mockApplyMutateAsync.mockResolvedValue({ applied: 1, failed: 0, results: [] });
 });
+
+/** An applyable approval-family item (static seoTitle) for the "Ready to publish" surface. */
+function makeApplyableItem(
+  overrides: Partial<import('../../shared/types/client-deliverable').ClientDeliverableItem> = {},
+): import('../../shared/types/client-deliverable').ClientDeliverableItem {
+  return {
+    id: 'cdi_1',
+    deliverableId: 'cd_apply',
+    status: 'approved',
+    targetRef: 'page-static-1',
+    collectionId: null,
+    field: 'seoTitle',
+    currentValue: 'Old title',
+    proposedValue: 'New title',
+    clientValue: null,
+    clientNote: null,
+    applyable: false, // intentionally false: R3b gates on field/targetRef, not this column (see shared/applyability.ts)
+    itemPayload: { pageTitle: 'Home', pageSlug: '/home' },
+    sortOrder: 0,
+    createdAt: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+/** An approved, client-applyable seo_edit deliverable (drives the "Ready to publish" section). */
+function makeReadyToPublishDeliverable(): ClientDeliverable {
+  return makeDeliverable({
+    id: 'cd_apply',
+    type: 'seo_edit',
+    kind: 'batch',
+    status: 'approved',
+    title: 'SEO title update for /home',
+    summary: '1 change ready to publish',
+    payload: { legacyBatchId: 'batch-xyz' },
+    decidedAt: new Date().toISOString(),
+    items: [makeApplyableItem()],
+  });
+}
 
 describe('InboxTab unified-inbox flag gating', () => {
   it('flag OFF → does NOT render the unified "Needs your attention" strip', () => {
@@ -228,6 +269,82 @@ describe('InboxTab unified-inbox flag gating', () => {
     render(<InboxTab {...baseProps} />);
     expect(screen.getByRole('button', { name: 'Review →' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+  });
+
+  it('flag ON → approved applyable seo_edit renders the "Ready to publish" section + Apply button', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseUnifiedInbox.mockReturnValue({
+      unifiedInbox: true,
+      deliverables: [makeReadyToPublishDeliverable()],
+      isLoading: false,
+    });
+
+    render(<InboxTab {...baseProps} />);
+
+    // The R3b "Ready to publish" surface (the D1 fix) renders for an approved applyable deliverable.
+    expect(screen.getByText('Ready to publish')).toBeInTheDocument();
+    expect(screen.getByText('SEO title update for /home')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Apply to Website' })).toBeInTheDocument();
+    // `approved` is NOT actionable → the uniform write verbs must NOT render for this item.
+    expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+  });
+
+  it('flag ON → Apply to Website → confirm → fires the apply mutation and shows the success toast', async () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseUnifiedInbox.mockReturnValue({
+      unifiedInbox: true,
+      deliverables: [makeReadyToPublishDeliverable()],
+      isLoading: false,
+    });
+
+    render(<InboxTab {...baseProps} />);
+
+    // Click the card's Apply button → the "Apply to live site?" ConfirmDialog opens (not yet applied).
+    fireEvent.click(screen.getByRole('button', { name: 'Apply to Website' }));
+    expect(screen.getByText('Apply to live site?')).toBeInTheDocument();
+    expect(mockApplyMutateAsync).not.toHaveBeenCalled();
+
+    // Confirm — the dialog's own "Apply to Website" confirm button is the 2nd match (rendered after
+    // the card button). Clicking it fires the apply mutation with the deliverable's legacyBatchId.
+    const applyButtons = screen.getAllByRole('button', { name: 'Apply to Website' });
+    fireEvent.click(applyButtons[applyButtons.length - 1]);
+
+    await vi.waitFor(() => {
+      expect(mockApplyMutateAsync).toHaveBeenCalledWith({ legacyBatchId: 'batch-xyz' });
+    });
+    // FIX 1: applied:1/failed:0 → success toast.
+    await vi.waitFor(() => {
+      expect(baseProps.setToast).toHaveBeenCalledWith(
+        expect.objectContaining({ message: '1 change applied to your website', type: 'success' }),
+      );
+    });
+  });
+
+  it('flag ON → apply returns applied:0/failed:1 → error toast (FIX 1 false-success guard)', async () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseUnifiedInbox.mockReturnValue({
+      unifiedInbox: true,
+      deliverables: [makeReadyToPublishDeliverable()],
+      isLoading: false,
+    });
+    // The legacy /apply route returns HTTP 200 with applied:0/failed:N on a total write failure — the
+    // mutation RESOLVES (no throw), so the toast branching is the only thing preventing a false-success.
+    mockApplyMutateAsync.mockResolvedValue({ applied: 0, failed: 1, results: [] });
+
+    render(<InboxTab {...baseProps} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Apply to Website' }));
+    const applyButtons = screen.getAllByRole('button', { name: 'Apply to Website' });
+    fireEvent.click(applyButtons[applyButtons.length - 1]);
+
+    await vi.waitFor(() => {
+      expect(baseProps.setToast).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Failed to apply changes. Please try again.', type: 'error' }),
+      );
+    });
+    // The success toast must NOT have been shown.
+    expect(baseProps.setToast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'success' }),
+    );
   });
 
   it('flag ON → PHYSICAL item renders the write verbs, NOT a "Review →" link', () => {
