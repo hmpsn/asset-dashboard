@@ -105,6 +105,112 @@ describe('normalizeDeliverable', () => {
   });
 });
 
+describe('normalizeDeliverable — itemCount (R1: payload.items vs items[])', () => {
+  it('redirect counts payload.items.length (sub-items ride in payload, items[] is empty)', () => {
+    const d = normalizeDeliverable(
+      makeDeliverable({
+        type: 'redirect',
+        kind: 'batch',
+        items: [], // client_action family: typed _item rows are empty
+        payload: { family: 'client_action', subType: 'redirect', items: [{}, {}, {}] },
+      }),
+    );
+    // Must NOT fall back to 1 — the three redirects live in payload.items.
+    expect(d.itemCount).toBe(3);
+  });
+
+  it('internal_link counts payload.items.length', () => {
+    const d = normalizeDeliverable(
+      makeDeliverable({
+        type: 'internal_link',
+        kind: 'batch',
+        items: [],
+        payload: { family: 'client_action', subType: 'internal_link', items: [{}, {}] },
+      }),
+    );
+    expect(d.itemCount).toBe(2);
+  });
+
+  it('aeo_change counts payload.items.length', () => {
+    const d = normalizeDeliverable(
+      makeDeliverable({
+        type: 'aeo_change',
+        kind: 'batch',
+        items: [],
+        payload: { family: 'client_action', subType: 'aeo_change', items: [{}, {}, {}, {}] },
+      }),
+    );
+    expect(d.itemCount).toBe(4);
+  });
+
+  it('redirect with no payload.items falls back to 1 (not 0)', () => {
+    const d = normalizeDeliverable(
+      makeDeliverable({ type: 'redirect', kind: 'batch', items: [], payload: { items: [] } }),
+    );
+    expect(d.itemCount).toBe(1);
+  });
+
+  it('approval/SEO family counts items[].length (NOT payload.items)', () => {
+    const d = normalizeDeliverable(
+      makeDeliverable({
+        type: 'seo_edit',
+        kind: 'batch',
+        // payload.items is intentionally present but must be IGNORED for the typed-item family.
+        payload: { family: 'approval_batch', items: [{}, {}, {}, {}, {}] },
+        items: [
+          {
+            id: 'i1', deliverableId: 'cd_123', status: 'awaiting_client', targetRef: 'p1',
+            collectionId: null, field: 'seoTitle', currentValue: 'old', proposedValue: 'new',
+            clientValue: null, clientNote: null, applyable: false, itemPayload: null, sortOrder: 0,
+            createdAt: '2026-05-29T00:00:00.000Z',
+          },
+          {
+            id: 'i2', deliverableId: 'cd_123', status: 'awaiting_client', targetRef: 'p2',
+            collectionId: null, field: 'metaDescription', currentValue: 'c', proposedValue: 'd',
+            clientValue: null, clientNote: null, applyable: false, itemPayload: null, sortOrder: 1,
+            createdAt: '2026-05-29T00:00:00.000Z',
+          },
+        ],
+      }),
+    );
+    expect(d.itemCount).toBe(2);
+  });
+});
+
+describe('normalizeDeliverable — carries items + payload to the card contract (R1)', () => {
+  it('carries the typed items[] (field/currentValue/proposedValue/clientValue/targetRef/applyable/itemPayload)', () => {
+    const items = [
+      {
+        id: 'i1', deliverableId: 'cd_123', status: 'awaiting_client', targetRef: 'page-1',
+        collectionId: 'col-1', field: 'seoTitle', currentValue: 'Old title',
+        proposedValue: 'New title', clientValue: null, clientNote: null, applyable: true,
+        itemPayload: { check: 'title' }, sortOrder: 0, createdAt: '2026-05-29T00:00:00.000Z',
+      },
+    ];
+    const d = normalizeDeliverable(makeDeliverable({ type: 'seo_edit', kind: 'batch', items }));
+    expect(d.items).toEqual(items);
+    expect(d.items?.[0].field).toBe('seoTitle');
+    expect(d.items?.[0].currentValue).toBe('Old title');
+    expect(d.items?.[0].proposedValue).toBe('New title');
+    expect(d.items?.[0].targetRef).toBe('page-1');
+    expect(d.items?.[0].applyable).toBe(true);
+    expect(d.items?.[0].itemPayload).toEqual({ check: 'title' });
+  });
+
+  it('carries the deliverable payload (so payload.items reaches R3 for the client_action family)', () => {
+    const payload = { family: 'client_action', subType: 'redirect', items: [{ source: '/a', target: '/b' }] };
+    const d = normalizeDeliverable(makeDeliverable({ type: 'redirect', kind: 'batch', items: [], payload }));
+    expect(d.payload).toEqual(payload);
+    expect((d.payload?.items as unknown[]).length).toBe(1);
+  });
+
+  it('source is "deliverable" so the additive fields never leak onto legacy adapters', () => {
+    const d = normalizeDeliverable(makeDeliverable());
+    expect(d.source).toBe('deliverable');
+    // The legacy adapters (normalizeClientAction/normalizeApprovalBatch) never set items/payload.
+  });
+});
+
 describe('deliverableTypeBadge', () => {
   it('falls back to a generic label for an unknown type', () => {
     expect(deliverableTypeBadge('totally_unknown')).toBe('Update');

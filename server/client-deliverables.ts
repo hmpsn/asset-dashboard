@@ -215,6 +215,15 @@ const stmts = createStmtCache(() => ({
   getItems: db.prepare(
     'SELECT * FROM client_deliverable_item WHERE deliverable_id = ? ORDER BY sort_order ASC, created_at ASC, id ASC',
   ),
+  // Batched item read for listDeliverables: every item for the whole workspace in one query
+  // (joined back to its parent via the indexed deliverable_id), avoiding an N+1 per-row fetch.
+  // Ordered so the in-memory group-by preserves the same per-deliverable order as getItems.
+  getItemsByWs: db.prepare(`
+    SELECT i.* FROM client_deliverable_item i
+    JOIN client_deliverable d ON d.id = i.deliverable_id
+    WHERE d.workspace_id = ?
+    ORDER BY i.deliverable_id ASC, i.sort_order ASC, i.created_at ASC, i.id ASC
+  `),
   listByWs: db.prepare(
     'SELECT * FROM client_deliverable WHERE workspace_id = ? ORDER BY COALESCE(sent_at, created_at) DESC, id DESC',
   ),
@@ -381,5 +390,17 @@ export function findBySourceRef(
 
 export function listDeliverables(workspaceId: string): ClientDeliverable[] {
   const rows = stmts().listByWs.all(workspaceId) as ClientDeliverableRow[];
-  return rows.map((r) => rowToDeliverable(r));
+  // Attach each physical deliverable's child items[] (mirrors getDeliverable). Batched: one
+  // workspace-wide item read grouped by deliverable_id in memory rather than an N+1 per-row
+  // fetch (R1, design §13-D1). Approval/SEO/schema substance lives in these typed _item rows;
+  // the client_action family (redirect/internal_link/aeo_change) carries its sub-items in
+  // payload.items instead, so those deliverables get an empty items[] here — that is correct.
+  const itemRows = stmts().getItemsByWs.all(workspaceId) as ClientDeliverableItemRow[];
+  const itemsByDeliverable = new Map<string, ClientDeliverableItemRow[]>();
+  for (const ir of itemRows) {
+    const bucket = itemsByDeliverable.get(ir.deliverable_id);
+    if (bucket) bucket.push(ir);
+    else itemsByDeliverable.set(ir.deliverable_id, [ir]);
+  }
+  return rows.map((r) => rowToDeliverable(r, itemsByDeliverable.get(r.id) ?? []));
 }

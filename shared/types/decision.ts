@@ -15,6 +15,8 @@
  *      - true  → inline approve/flag affordance in the Decisions section, no full-screen modal.
  *      - false → entry-point card that opens `<DecisionDetailModal>` on click.
  */
+import type { ClientDeliverableItem } from './client-deliverable.js';
+
 export type DecisionSource = 'client_action' | 'approval_batch' | 'deliverable';
 
 /**
@@ -51,6 +53,24 @@ export interface NormalizedDecision {
    * Present only for unified deliverables (source==='deliverable'); used to show send age.
    */
   sentAt?: string | null;
+  /**
+   * The unified deliverable's typed per-item rows (field/currentValue/proposedValue/clientValue/
+   * targetRef/applyable/itemPayload). Carried straight from `ClientDeliverable.items` so R3 can
+   * render the per-item diff/review surface without a second fetch. Present only for unified
+   * deliverables (source==='deliverable'); the approval/SEO/schema family populates this, the
+   * client_action family (redirect/internal_link/aeo_change) carries its sub-items in `payload`
+   * instead (design §4.1), so this may be an empty array for those types. Additive — legacy
+   * adapters (client_action/approval_batch) leave it undefined and existing consumers are unchanged.
+   */
+  items?: ClientDeliverableItem[];
+  /**
+   * The unified deliverable's typed JSON payload (discriminated by the deliverable type). Carried
+   * straight from `ClientDeliverable.payload` so R3 can render the substance that does NOT live in
+   * the typed `_item` rows — notably the redirect/internal_link/aeo_change sub-items, which ride in
+   * `payload.items` (design §4.1). Present only for unified deliverables (source==='deliverable').
+   * Additive — legacy adapters leave it undefined.
+   */
+  payload?: Record<string, unknown>; // record-unknown-ok: mirrors ClientDeliverable.payload, validated by Zod in the store (design §4.1)
 }
 
 /** An item flagged by the client inside DecisionDetailModal. */
