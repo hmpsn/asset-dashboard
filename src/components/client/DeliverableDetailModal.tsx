@@ -28,6 +28,7 @@ import type {
 import type { PageRoleAssignment, CanonicalEntity, SchemaPageRole } from '../../../shared/types/schema-plan';
 import { SCHEMA_ROLE_LABELS } from '../../../shared/types/schema-plan';
 import { ItemDiffRow, AeoRenderer, InternalLinkRenderer, RedirectRenderer } from './decision-renderers';
+import { approveCtaLabel } from '../../lib/decision-adapters';
 
 interface DeliverableDetailModalProps {
   decision: NormalizedDecision;
@@ -199,7 +200,6 @@ export function DeliverableDetailModal({
   const items = decision.items ?? [];
   const totalItems = decision.itemCount;
   const flaggedCount = flaggedItems.size;
-  const unflaggedCount = Math.max(totalItems - flaggedCount, 0);
 
   const handleApprove = async () => {
     const flaggedList: FlaggedItem[] = Array.from(flaggedItems.entries()).map(
@@ -269,13 +269,9 @@ export function DeliverableDetailModal({
     );
   }
 
-  const ctaLabel = submitting
-    ? 'Submitting…'
-    : isApprovalFamily && flaggedCount > 0
-      ? `Looks good — implement ${unflaggedCount} of ${totalItems} →`
-      : isApprovalFamily
-        ? `Looks good — implement ${totalItems} →`
-        : 'Approve →';
+  // Item 5 — canonical approve CTA shared across the unified inbox. The approval family carries the
+  // held subset (flaggedCount); the client_action family has no typed items to hold, so heldCount is 0.
+  const ctaLabel = approveCtaLabel(totalItems, isApprovalFamily ? flaggedCount : 0, submitting);
 
   return (
     <div

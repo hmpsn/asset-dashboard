@@ -92,7 +92,9 @@ export function ItemDiffRow({
             {label}
             {field ? ` — ${field}` : ''}
           </p>
-          <div className="grid grid-cols-2 gap-3 mt-1">
+          {/* Mobile diff — stack Current/Proposed on phones (item 5 cheap polish, pairs with the
+              responsive modal). grid-cols-1 sm:grid-cols-2. */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
             <div>
               <p className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Current</p>
               <p className={valueClass}>
@@ -131,6 +133,8 @@ export function ItemDiffRow({
             <Button
               variant="ghost"
               size="sm"
+              // aria-pressed conveys the flagged state to screen readers (item 5 cheap polish).
+              aria-pressed={flagged}
               onClick={() => setFlagging(true)}
               className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption-sm text-[var(--brand-text-muted)] hover:text-accent-warning hover:bg-amber-500/10 transition-colors border border-transparent hover:border-amber-500/20"
             >

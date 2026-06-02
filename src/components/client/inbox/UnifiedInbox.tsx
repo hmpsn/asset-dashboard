@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Inbox, FileText, ListChecks, MessageSquare, UploadCloud, Clock, Loader2, CheckCircle2, Send } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { LoadingState, Button, ConfirmDialog, ErrorState } from '../../ui';
+import { LoadingState, Button, ConfirmDialog, ErrorState, StatusBadge } from '../../ui';
 import { FormTextarea } from '../../ui/forms/FormTextarea';
 import { PriorityStrip, type PriorityItem } from '../PriorityStrip';
 import { DecisionCard } from '../DecisionCard';
@@ -215,8 +215,10 @@ function WorkOrderTrackCard({
                 <li
                   key={c.id}
                   className={`max-w-[85%] px-3 py-2 ${
+                    // SG-2 — the client's own bubble is BLUE (client context = read-only data per
+                    // BRAND_DESIGN_LANGUAGE.md; teal = actions). The team bubble stays neutral.
                     c.author === 'client'
-                      ? 'ml-auto bg-teal-500/10 border border-teal-500/30'
+                      ? 'ml-auto bg-blue-500/10 border border-blue-500/30'
                       : 'mr-auto bg-[var(--surface-3)] border border-[var(--brand-border)]'
                   }`}
                   style={{ borderRadius: 'var(--radius-md)' }}
@@ -258,6 +260,24 @@ function WorkOrderTrackCard({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * SectionHeading — the visible heading + one-line "what is this" subtitle shared by every inbox
+ * section (item 5). Token-styled `t-label` uppercase heading (matching BRAND_DESIGN_LANGUAGE §
+ * "Client Inbox IA — 3-Section Layout") plus a muted subtitle. Used by the actionable "Decisions"
+ * section (which previously had NO visible heading — only an aria-label), "Ready to publish", and
+ * "Work in progress" so all three read consistently and the PriorityStrip chips agree with the
+ * sections they scroll to.
+ */
+function SectionHeading({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div>
+      {/* duplicate-heading-ok -- distinct inbox sections deliberately share the same heading grammar */}
+      <h3 className="t-label text-[var(--brand-text-muted)] uppercase tracking-wide">{title}</h3>
+      <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{subtitle}</p>
     </div>
   );
 }
@@ -490,7 +510,8 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
       />
 
       {actionable.length > 0 && (
-        <section aria-label="Needs your attention" className="space-y-3">
+        <section aria-label="Decisions" className="space-y-3">
+          <SectionHeading title="Decisions" subtitle="Items waiting on your decision" />
           {actionable.map((d) => {
             const decision: NormalizedDecision = normalizeDeliverable(d);
             // Projected (copy_section / content_request): render a "Review →" CTA that opens the
@@ -569,9 +590,7 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
           (keep the approved card visible with an Apply button gated on the applyability predicate). */}
       {readyToApply.length > 0 && (
         <section aria-label="Ready to publish" className="space-y-3">
-          <h3 className="t-label text-[var(--brand-text-muted)] uppercase tracking-wide">
-            Ready to publish
-          </h3>
+          <SectionHeading title="Ready to publish" subtitle="Approved — apply to your live site" />
           {readyToApply.map((d) => (
             <div
               key={d.id}
@@ -580,9 +599,8 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
               style={{ borderRadius: 'var(--radius-signature-lg)' }}
             >
               <div className="flex items-center gap-2 mb-1">
-                <span className="t-caption-sm font-medium px-2 py-0.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)]">
-                  Approved
-                </span>
+                {/* SG-1 — the "Approved" pill reads as success (emerald), not neutral zinc. */}
+                <StatusBadge domain="approval" status="approved" variant="soft" />
               </div>
               <h4 className="t-body font-semibold text-[var(--brand-text-bright)]">{d.title}</h4>
               {d.summary && (
@@ -620,9 +638,7 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
           container (surface-2 + brand signature radius). */}
       {workOrders.length > 0 && (
         <section aria-label="Work in progress" className="space-y-3">
-          <h3 className="t-label text-[var(--brand-text-muted)] uppercase tracking-wide">
-            Work in progress
-          </h3>
+          <SectionHeading title="Work in progress" subtitle="Work your team is doing for you" />
           {workOrders.map((d) => (
             <WorkOrderTrackCard key={d.id} deliverable={d} workspaceId={workspaceId} />
           ))}

@@ -113,7 +113,9 @@ describe('DecisionCard — uniform mode (PR-2a unified inbox)', () => {
         onDecline={vi.fn()}
       />,
     );
-    expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
+    // Item 5 — uniform-mode approve uses the canonical CTA (itemCount=3 → "implement 3 →"). The
+    // legacy single-action + bulk modes still say "Approve" (asserted in those describe blocks).
+    expect(screen.getByRole('button', { name: 'Looks good — implement 3 →' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Request changes' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Decline' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Review →' })).not.toBeInTheDocument();
@@ -130,7 +132,7 @@ describe('DecisionCard — uniform mode (PR-2a unified inbox)', () => {
       />,
     );
     expect(screen.getByRole('button', { name: 'Review →' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Looks good/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Request changes' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Decline' })).not.toBeInTheDocument();
 

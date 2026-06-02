@@ -168,6 +168,24 @@ function itemCountForDeliverable(d: ClientDeliverable): number {
 }
 
 /**
+ * The single canonical approve-CTA label for the unified inbox (item 5 — vocab reconcile). Every
+ * approve affordance in the unified inbox (InlineApprovalCard, DeliverableDetailModal, DecisionCard
+ * uniform mode) reads the SAME way:
+ *   - no subset held  → "Looks good — implement N →"
+ *   - subset held     → "Looks good — implement N of M →"  (N = items being implemented now, M = total)
+ *   - submitting      → "Submitting…"
+ * `heldCount` is the number of items flagged/held back (0 when nothing is held). This keeps the
+ * "N of M" held-count where a subset is held, per the owner's vocab reconcile.
+ */
+export function approveCtaLabel(totalItems: number, heldCount = 0, submitting = false): string {
+  if (submitting) return 'Submitting…';
+  const implementing = Math.max(totalItems - heldCount, 0);
+  return heldCount > 0
+    ? `Looks good — implement ${implementing} of ${totalItems} →`
+    : `Looks good — implement ${totalItems} →`;
+}
+
+/**
  * Normalize a unified `ClientDeliverable` into a `NormalizedDecision` (design §5).
  *
  * `kind` is carried straight through from the deliverable; `isSingleAction` is DERIVED from

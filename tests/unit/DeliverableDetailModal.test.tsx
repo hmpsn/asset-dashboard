@@ -168,8 +168,9 @@ describe('DeliverableDetailModal — client_action family (payload.items, read-o
     expect(screen.getByText('/old-b')).toBeInTheDocument();
     // No per-item flag UX for the client_action family.
     expect(screen.queryByRole('button', { name: /^flag$/i })).not.toBeInTheDocument();
-    // Whole-action approve CTA (not "implement N").
-    expect(screen.getByRole('button', { name: /^approve →$/i })).toBeInTheDocument();
+    // Item 5 — canonical approve CTA, now shared with the approval family (redirect itemCount=2 →
+    // "implement 2 →"). The client_action family has no typed items to hold, so no "of M" subset.
+    expect(screen.getByRole('button', { name: /^looks good — implement 2 →$/i })).toBeInTheDocument();
   });
 
   it('internal_link deliverable feeds payload.items to the InternalLinkRenderer table', () => {

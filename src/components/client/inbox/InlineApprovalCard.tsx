@@ -12,6 +12,7 @@
 import { useState, useCallback } from 'react';
 import { Button, FormInput } from '../../ui';
 import { ItemDiffRow } from '../decision-renderers';
+import { approveCtaLabel } from '../../../lib/decision-adapters';
 import type { NormalizedDecision, FlaggedItem } from '../../../../shared/types/decision';
 import type { ClientDeliverableItem } from '../../../../shared/types/client-deliverable';
 
@@ -68,7 +69,6 @@ export function InlineApprovalCard({
   const items = decision.items ?? [];
   const totalItems = decision.itemCount;
   const flaggedCount = flaggedItems.size;
-  const unflaggedCount = Math.max(totalItems - flaggedCount, 0);
 
   const handleApprove = () => {
     const flaggedList: FlaggedItem[] = Array.from(flaggedItems.entries()).map(([itemId, n]) => ({
@@ -87,11 +87,8 @@ export function InlineApprovalCard({
   }
   const isMultiPage = grouped.size > 1;
 
-  const ctaLabel = submitting
-    ? 'Submitting…'
-    : flaggedCount > 0
-      ? `implement ${unflaggedCount} of ${totalItems} →`
-      : `Looks good — implement ${totalItems} of ${totalItems} →`;
+  // Item 5 — canonical approve CTA shared across the unified inbox.
+  const ctaLabel = approveCtaLabel(totalItems, flaggedCount, submitting);
 
   return (
     // pr-check-disable-next-line -- brand signature radius intentional; mirrors DecisionCard visual identity for inline approval cards

@@ -204,7 +204,8 @@ describe('InboxTab unified-inbox flag gating', () => {
 
     // The title appears in both the PriorityStrip item and the DecisionCard.
     expect(screen.getAllByText('Redirect plan for /old').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
+    // Item 5 — canonical approve CTA (redirect default itemCount=1 → "implement 1 →").
+    expect(screen.getByRole('button', { name: 'Looks good — implement 1 →' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Request changes' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Decline' })).toBeInTheDocument();
 
@@ -221,7 +222,7 @@ describe('InboxTab unified-inbox flag gating', () => {
     });
 
     render(<InboxTab {...baseProps} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Looks good — implement 1 →' }));
 
     expect(mockMutateAsync).toHaveBeenCalledWith(
       expect.objectContaining({ deliverableId: 'cd_abc', decision: 'approved' }),
@@ -234,6 +235,48 @@ describe('InboxTab unified-inbox flag gating', () => {
 
     render(<InboxTab {...baseProps} />);
     expect(screen.getByText("You're all caught up")).toBeInTheDocument();
+  });
+
+  // ── Item 5 — section headings + vocab reconcile ──
+
+  it('flag ON → the actionable section has a visible "Decisions" heading + subtitle (was aria-only)', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseUnifiedInbox.mockReturnValue({
+      unifiedInbox: true,
+      deliverables: [makeDeliverable()],
+      isLoading: false,
+    });
+
+    render(<InboxTab {...baseProps} />);
+
+    // Visible heading (an <h3>, not just an aria-label) for the actionable section.
+    const heading = screen.getByRole('heading', { name: 'Decisions' });
+    expect(heading).toBeInTheDocument();
+    expect(heading.tagName).toBe('H3');
+    // The one-line "what is this" subtitle.
+    expect(screen.getByText('Items waiting on your decision')).toBeInTheDocument();
+    // Vocab reconcile: "Decisions" appears BOTH as the PriorityStrip chip (span) AND as the section
+    // heading (h3) — the chip and the section it scrolls to now use the same canonical noun.
+    const decisionsNodes = screen.getAllByText('Decisions');
+    expect(decisionsNodes.length).toBeGreaterThanOrEqual(2);
+    expect(decisionsNodes.some((n) => n.tagName === 'H3')).toBe(true);
+    expect(decisionsNodes.some((n) => n.tagName === 'SPAN')).toBe(true);
+  });
+
+  it('flag ON → Ready to publish + Work in progress sections render their subtitles', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseUnifiedInbox.mockReturnValue({
+      unifiedInbox: true,
+      deliverables: [makeReadyToPublishDeliverable(), makeWorkOrderDeliverable()],
+      isLoading: false,
+    });
+
+    render(<InboxTab {...baseProps} />);
+
+    expect(screen.getByRole('heading', { name: 'Ready to publish' })).toBeInTheDocument();
+    expect(screen.getByText('Approved — apply to your live site')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Work in progress' })).toBeInTheDocument();
+    expect(screen.getByText('Work your team is doing for you')).toBeInTheDocument();
   });
 
   it('flag ON → PROJECTED item (content_request) "Review →" opens the in-shell review modal, NOT navigation', () => {
@@ -411,7 +454,7 @@ describe('InboxTab unified-inbox flag gating', () => {
     });
 
     render(<InboxTab {...baseProps} />);
-    expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Looks good — implement 1 →' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Request changes' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Decline' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Review →' })).not.toBeInTheDocument();
@@ -639,10 +682,10 @@ describe('InboxTab unified-inbox flag gating', () => {
     expect(screen.getByText('New title A')).toBeInTheDocument();
     expect(screen.getByText('New desc B')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^View/ })).not.toBeInTheDocument();
-    // The inline subset-approve CTA replaces the bare "Approve" verb.
-    expect(screen.getByRole('button', { name: 'Looks good — implement 2 of 2 →' })).toBeInTheDocument();
+    // The inline subset-approve CTA replaces the bare "Approve" verb (item 5: "implement N →", no "of").
+    expect(screen.getByRole('button', { name: 'Looks good — implement 2 →' })).toBeInTheDocument();
     // Approve forwards the (empty) flagged subset to the respond mutation.
-    fireEvent.click(screen.getByRole('button', { name: 'Looks good — implement 2 of 2 →' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Looks good — implement 2 →' }));
     expect(mockMutateAsync).toHaveBeenCalledWith(
       expect.objectContaining({ deliverableId: 'cd_seo', decision: 'approved', flaggedItems: [] }),
     );
@@ -670,11 +713,14 @@ describe('InboxTab unified-inbox flag gating', () => {
     });
 
     render(<InboxTab {...baseProps} />);
-    // DecisionCard uniform verbs render (the inline subset CTA does not).
-    expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
+    // DecisionCard uniform verbs render (the DecisionCard now uses the same canonical approve CTA:
+    // redirect payload.items=3 → "implement 3 →").
+    expect(screen.getByRole('button', { name: 'Looks good — implement 3 →' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Request changes' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Decline' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Looks good/ })).not.toBeInTheDocument();
+    // The DecisionCard-only "View 3 →" modal affordance confirms this routed to DecisionCard, NOT
+    // InlineApprovalCard (which renders substance inline and never shows a "View" button).
+    expect(screen.getByRole('button', { name: 'View 3 →' })).toBeInTheDocument();
   });
 
   it('flag ON → content_decay (kind:decision) keeps the DecisionCard (not InlineApprovalCard)', () => {
@@ -696,8 +742,10 @@ describe('InboxTab unified-inbox flag gating', () => {
     });
 
     render(<InboxTab {...baseProps} />);
-    // content_decay is kind:'decision' → DecisionCard uniform verbs, never the inline subset CTA.
-    expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Looks good/ })).not.toBeInTheDocument();
+    // content_decay is kind:'decision' → DecisionCard uniform verbs (itemCount=1 → "implement 1 →"),
+    // never the InlineApprovalCard inline-substance card. The DecisionCard-only "View →" affordance
+    // confirms the routing (InlineApprovalCard never renders a "View" button).
+    expect(screen.getByRole('button', { name: 'Looks good — implement 1 →' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'View →' })).toBeInTheDocument();
   });
 });

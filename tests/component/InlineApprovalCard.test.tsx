@@ -85,13 +85,14 @@ describe('InlineApprovalCard', () => {
     expect(screen.getByText('Sent 2 days ago')).toBeInTheDocument();
   });
 
-  it('Approve with no flags → onApprove([]) and CTA reads "implement N of M"', () => {
+  it('Approve with no flags → onApprove([]) and CTA reads the canonical "implement N →" (no "of")', () => {
     const items = [makeItem({ id: 'a' }), makeItem({ id: 'b' })];
     const h = baseHandlers();
     render(<InlineApprovalCard decision={makeDecision(items)} ageLabel={null} submitting={false} {...h} />);
 
-    expect(screen.getByRole('button', { name: 'Looks good — implement 2 of 2 →' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Looks good — implement 2 of 2 →' }));
+    // Item 5 — no subset held → "implement 2 →" (the redundant "of 2" is dropped by the shared helper).
+    expect(screen.getByRole('button', { name: 'Looks good — implement 2 →' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Looks good — implement 2 →' }));
     expect(h.onApprove).toHaveBeenCalledWith([]);
   });
 
@@ -106,9 +107,9 @@ describe('InlineApprovalCard', () => {
     // Submit the flag (no note).
     fireEvent.click(screen.getByRole('button', { name: 'Flag it' }));
 
-    // CTA now reflects the held item.
-    expect(screen.getByRole('button', { name: 'implement 1 of 2 →' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'implement 1 of 2 →' }));
+    // CTA now reflects the held item (subset held → "N of M" preserved).
+    expect(screen.getByRole('button', { name: 'Looks good — implement 1 of 2 →' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Looks good — implement 1 of 2 →' }));
     expect(h.onApprove).toHaveBeenCalledWith([{ itemId: 'a', note: '' }]);
   });
 
