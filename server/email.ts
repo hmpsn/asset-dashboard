@@ -294,6 +294,33 @@ export function notifyClientFixesApplied(opts: {
   }));
 }
 
+export function notifyTeamWorkOrderComment(opts: {
+  workspaceName: string;
+  workspaceId: string;
+  orderTitle: string;
+  message: string;
+}): void {
+  const to = getNotificationEmail();
+  if (!to || !isEmailConfigured()) return;
+  queueEmail(makeEvent('work_order_comment_team', to, opts.workspaceId, opts.workspaceName, undefined, {
+    orderTitle: opts.orderTitle, message: opts.message,
+  }));
+}
+
+export function notifyClientWorkOrderComment(opts: {
+  clientEmail: string;
+  workspaceName: string;
+  workspaceId: string;
+  orderTitle: string;
+  message: string;
+  dashboardUrl?: string;
+}): void {
+  if (!isEmailConfigured()) return;
+  queueEmail(makeEvent('work_order_comment_client', opts.clientEmail, opts.workspaceId, opts.workspaceName, opts.dashboardUrl, {
+    orderTitle: opts.orderTitle, message: opts.message,
+  }));
+}
+
 export function notifyTeamPaymentReceived(opts: {
   workspaceName: string;
   workspaceId: string;

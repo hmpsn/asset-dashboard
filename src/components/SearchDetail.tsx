@@ -7,6 +7,7 @@ import { useAdminSearch } from '../hooks/admin';
 import { useInsightFeed } from '../hooks/admin/useInsightFeed';
 import { useAnalyticsAnnotations, useCreateAnnotation } from '../hooks/admin/useAnalyticsAnnotations';
 import { useToggleSet } from '../hooks/useToggleSet';
+import { normalizePageUrl } from '../lib/pathUtils';
 import { InsightFeed } from './insights';
 import { AnnotatedTrendChart } from './charts/AnnotatedTrendChart';
 import type { TrendLine, ChartCallout } from './charts/AnnotatedTrendChart';
@@ -325,8 +326,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                     );
                   })}
                   {tableView === 'pages' && sortByKey(overview.topPages).map((p, i) => {
-                    let pagePath: string;
-                    try { pagePath = new URL(p.page).pathname; } catch { pagePath = p.page; }
+                    const pagePath = normalizePageUrl(p.page);
                     const badge = badgeMap.get(p.page);
                     return (
                       <tr key={i} className={`border-b border-[var(--brand-border)]/50 hover:bg-[var(--surface-3)]/30 ${rowTint(badge)}`}>

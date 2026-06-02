@@ -20,6 +20,7 @@ import {
   updateContentRequest,
   deleteContentRequest,
 } from '../content-requests.js';
+import { sendPostToClientForReview, PostNotFoundError } from '../domains/content/send-post-to-client.js';
 import { listPosts } from '../content-posts.js';
 import { notifyClientBriefReady, notifyClientContentPublished, notifyClientPostReady } from '../email.js';
 import { getGA4LandingPages } from '../google-analytics.js';
@@ -58,6 +59,12 @@ const updateContentRequestSchema = z.object({
 
 const generateRequestBriefSchema = z.object({
   generationStyle: z.enum(CONTENT_GENERATION_STYLES).optional(),
+}).strict();
+
+// Admin Send Convention: a single "Send to client" action + an OPTIONAL inline note (no
+// "Send for Review" / "Flag for Client" split). The note is the operator's message to the client.
+const sendPostToClientSchema = z.object({
+  note: z.string().max(5000).optional(),
 }).strict();
 
 // --- Helper: Derive journey stage from intent ---
@@ -204,6 +211,36 @@ router.delete('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: req.params.id, deleted: true });
   res.json({ ok: true });
 });
+
+// Send a generated post to the client for review (POST-C1). This is the SEPARATE "Send to client"
+// action that creates a client-facing artifact — distinct from ContentManager's internal "Review"
+// button (which only bumps GeneratedPost.status). It delegates to the shared
+// sendPostToClientForReview service (find-or-create the post's content_request, transition to
+// post_review, notify the client, broadcast, log activity), so the post reaches BOTH the legacy
+// ContentTab/PostReviewCard surface AND the unified inbox (listClientFacingDeliverables →
+// awaiting_client). Lives in the grandfathered content-requests route file, so it does not trip the
+// unified-send-to-client-bespoke-route pr-check rule.
+router.post(
+  '/api/content-requests/:workspaceId/posts/:postId/send-to-client',
+  requireWorkspaceAccess('workspaceId'),
+  validate(sendPostToClientSchema),
+  (req, res, next) => {
+    const { workspaceId, postId } = req.params;
+    const { note } = req.body as { note?: string };
+    try {
+      const { request } = sendPostToClientForReview(workspaceId, postId, { note, activitySource: 'admin' });
+      res.json(request);
+    } catch (err: unknown) {
+      if (err instanceof PostNotFoundError) {
+        return res.status(404).json({ error: err.message });
+      }
+      if (err instanceof Error && err.name === 'InvalidTransitionError') {
+        return res.status(400).json({ error: err.message });
+      }
+      return next(err);
+    }
+  },
+);
 
 // --- Helper: fetch all published site pages for content brief internal linking ---
 export async function getAllSitePages(ws: { id: string; webflowSiteId?: string; liveDomain?: string }): Promise<string[]> {

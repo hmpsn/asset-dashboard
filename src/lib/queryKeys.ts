@@ -37,6 +37,11 @@ export const queryKeys = {
     requests: (wsId: string) => ['admin-requests', wsId] as const,
     approvals: (wsId: string) => ['admin-approvals', wsId] as const,
     clientActions: (wsId: string) => ['admin-client-actions', wsId] as const,
+    workOrders: (wsId: string) => ['admin-work-orders', wsId] as const,
+    workOrderComments: (wsId: string, orderId: string) => ['admin-work-order-comments', wsId, orderId] as const,
+    workOrderCommentsAll: (wsId: string) => ['admin-work-order-comments', wsId] as const,
+    // Unified admin "Client Deliverables" pane (PR-2b) — GET /api/deliverables/:workspaceId
+    workspaceDeliverables: (wsId: string) => ['admin-workspace-deliverables', wsId] as const,
     posts: (wsId: string) => ['admin-posts', wsId] as const,
     post: (wsId: string, postId: string) => ['admin-post', wsId, postId] as const,
     postsDetailAll: (wsId: string) => ['admin-post', wsId] as const,
@@ -173,6 +178,9 @@ export const queryKeys = {
       ['admin-intelligence', wsId, pagePath ?? '', learningsDomain ?? 'all', ...(slices ? [...slices].sort() : [])] as const,
     intelligenceAll: (wsId: string) => ['admin-intelligence', wsId] as const,
     clientSignals: (wsId: string) => ['admin-client-signals', wsId] as const,
+    // OV (Opportunity Value) divergence shadow-log — admin-only diagnostic.
+    // GET /api/ov-divergence/:workspaceId
+    ovDivergence: (wsId: string) => ['admin-ov-divergence', wsId] as const,
     notifications: () => ['admin-notifications'] as const,
     featureFlags: () => ['admin-feature-flags'] as const,
     roadmap: () => ['admin-roadmap'] as const,
@@ -199,8 +207,12 @@ export const queryKeys = {
     approvals: (wsId: string) => ['client-approvals', wsId] as const,
     clientActions: (wsId: string) => ['client-actions', wsId] as const,
     workOrders: (wsId: string) => ['client-work-orders', wsId] as const,
+    workOrderComments: (wsId: string, orderId: string) => ['client-work-order-comments', wsId, orderId] as const,
+    workOrderCommentsAll: (wsId: string) => ['client-work-order-comments', wsId] as const,
     requests: (wsId: string) => ['client-requests', wsId] as const,
     contentRequests: (wsId: string) => ['client-content-requests', wsId] as const,
+    // Unified client inbox (PR-2a) — GET /api/public/deliverables/:workspaceId
+    unifiedInbox: (wsId: string) => ['client-unified-inbox', wsId] as const,
     auditSummary: (wsId: string) => ['client-audit-summary', wsId] as const,
     auditDetail: (wsId: string) => ['client-audit-detail', wsId] as const,
     schemaPlan: (wsId: string) => ['client-schema-plan', wsId] as const,

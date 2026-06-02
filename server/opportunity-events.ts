@@ -1,8 +1,8 @@
 /**
  * opportunity-events — event ledger for event-driven re-ranking (PR7 · Spine B).
  *
- * A detected opportunity event (content decay, competitor overtake, rank decline,
- * publish) is appended here with an initial timing `boost` and a `halfLifeDays`.
+ * A detected opportunity event (content decay, competitor overtake, rank decline)
+ * is appended here with an initial timing `boost` and a `halfLifeDays`.
  * server/scoring/opportunity-timing.ts reads the ACTIVE events and aggregates the
  * DECAYING boost per page (boost · exp(−ageDays/halfLifeDays)) into
  * OpportunityInput.timingBoost, which lifts the timing multiplier in
@@ -28,13 +28,12 @@ import { createLogger } from './logger.js';
 
 const log = createLogger('opportunity-events');
 
-export type OpportunityEventType = 'decay' | 'competitor' | 'rank_drop' | 'publish';
+export type OpportunityEventType = 'decay' | 'competitor' | 'rank_drop';
 
 export const OPPORTUNITY_EVENT_TYPES: readonly OpportunityEventType[] = [
   'decay',
   'competitor',
   'rank_drop',
-  'publish',
 ];
 
 export interface OpportunityEvent {
@@ -72,7 +71,7 @@ interface OpportunityEventRow {
 export const opportunityEventSchema = z.object({
   id: z.string(),
   workspaceId: z.string(),
-  type: z.enum(['decay', 'competitor', 'rank_drop', 'publish']),
+  type: z.enum(['decay', 'competitor', 'rank_drop']),
   pagePath: z.string().nullable(),
   keyword: z.string().nullable(),
   boost: z.number(),
@@ -100,7 +99,7 @@ export function normalizeEventPagePath(raw: string | null | undefined): string |
 function coerceType(raw: string): OpportunityEventType {
   return (OPPORTUNITY_EVENT_TYPES as readonly string[]).includes(raw)
     ? (raw as OpportunityEventType)
-    : 'publish';
+    : 'decay';
 }
 
 function rowToOpportunityEvent(r: OpportunityEventRow): OpportunityEvent {

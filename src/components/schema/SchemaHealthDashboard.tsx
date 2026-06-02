@@ -7,6 +7,7 @@
 import { useState } from 'react';
 import { ShieldCheck, AlertTriangle, XCircle, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
 import { Badge, SectionCard, Icon, IconButton } from '../ui';
+import { normalizePageUrl } from '../../lib/pathUtils';
 
 export interface ValidationRecord {
   id: string;
@@ -41,11 +42,7 @@ function ValidationBadge({ status }: { status: 'valid' | 'warnings' | 'errors' }
 }
 
 function pageLabel(pageId: string): string {
-  try {
-    return new URL(pageId).pathname || '/';
-  } catch {
-    return pageId;
-  }
+  return normalizePageUrl(pageId);
 }
 
 function ValidationRow({ record, onRevalidate }: { record: ValidationRecord; onRevalidate: (id: string) => void }) {

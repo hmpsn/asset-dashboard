@@ -10,6 +10,7 @@ import { WS_EVENTS } from '../../ws-events.js';
 import { InvalidTransitionError } from '../../state-machines.js';
 import type { ClientAction, ClientActionPayload, ClientActionSourceType } from '../../../shared/types/client-actions.js';
 import { applyClientActionFeedbackLoop } from './client-action-feedback-loop.js';
+import { mirrorClientActionToDeliverable } from './client-action-dual-write.js';
 
 type ClientActor = { id?: string; name?: string } | undefined;
 
@@ -43,7 +44,7 @@ function broadcastActionUpdate(workspaceId: string, actionId: string, action: st
 }
 
 export function createAdminClientAction(workspaceId: string, input: CreateClientActionRequest): ClientAction {
-  const { action } = runWorkspaceMutation({
+  const { action, isDuplicate } = runWorkspaceMutation({
     workspaceId,
     defaultErrorMessage: 'Failed to create client action',
     readBeforeWrite: ({ workspaceId: currentWorkspaceId }) => {
@@ -82,6 +83,14 @@ export function createAdminClientAction(workspaceId: string, input: CreateClient
       broadcastActionUpdate(currentWorkspaceId, result.action.id, 'created');
     },
   });
+  // Dual-write mirror (PR-1b, DARK): mirror the freshly-created action into the unified
+  // client_deliverable model when the broken-family flag is on (default off → no-op). This
+  // single seam covers all four producer routes (redirect / internal_link / aeo_change /
+  // content_decay). Skipped for duplicates (the legacy create itself returned the existing
+  // row). Best-effort + self-swallowing — it can NEVER break the legacy create.
+  if (!isDuplicate) {
+    mirrorClientActionToDeliverable(workspaceId, action);
+  }
   return action;
 }
 

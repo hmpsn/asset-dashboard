@@ -46,13 +46,11 @@ const log = createLogger('opportunity-timing');
  *  • competitor — a competitor overtaking us is the most urgent, fast-fading signal.
  *  • decay      — a decaying page is urgent but recovers over a longer window.
  *  • rank_drop  — a SERP-position decline; medium urgency, medium fade.
- *  • publish    — a fresh publish/apply; a gentle, long nudge to reprioritize.
  */
 export const EVENT_BOOST_DEFAULTS: Record<OpportunityEventType, { boost: number; halfLifeDays: number }> = {
   competitor: { boost: 0.6, halfLifeDays: 7 },   // calibration-path: P5 per-workspace
   decay: { boost: 0.5, halfLifeDays: 14 },       // calibration-path: P5 per-workspace
   rank_drop: { boost: 0.4, halfLifeDays: 10 },   // calibration-path: P5 per-workspace
-  publish: { boost: 0.3, halfLifeDays: 30 },     // calibration-path: P5 per-workspace
 };
 
 /** Per-page boost cap so Timing can't hijack the #1 pre-calibration (design §5). */

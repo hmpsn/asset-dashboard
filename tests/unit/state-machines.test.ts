@@ -374,6 +374,10 @@ describe('Work Order transitions', () => {
     it('in_progress → cancelled', () => {
       expect(validate('in_progress', 'cancelled')).toBe('cancelled');
     });
+
+    it('completed → closed (operator-only one-way close-out)', () => {
+      expect(validate('completed', 'closed')).toBe('closed');
+    });
   });
 
   describe('invalid transitions', () => {
@@ -381,16 +385,36 @@ describe('Work Order transitions', () => {
       expect(() => validate('pending', 'completed')).toThrow(InvalidTransitionError);
     });
 
+    it('pending → closed (cannot close a non-completed order)', () => {
+      expect(() => validate('pending', 'closed')).toThrow(InvalidTransitionError);
+    });
+
+    it('in_progress → closed (must complete before closing)', () => {
+      expect(() => validate('in_progress', 'closed')).toThrow(InvalidTransitionError);
+    });
+
     it('completed → pending (cannot reopen)', () => {
       expect(() => validate('completed', 'pending')).toThrow(InvalidTransitionError);
     });
 
-    it('completed → in_progress (terminal state)', () => {
+    it('completed → in_progress (NO reopen — one-way close-out only)', () => {
       expect(() => validate('completed', 'in_progress')).toThrow(InvalidTransitionError);
     });
 
-    it('completed → cancelled (terminal state)', () => {
+    it('completed → cancelled (completed only allows closed)', () => {
       expect(() => validate('completed', 'cancelled')).toThrow(InvalidTransitionError);
+    });
+
+    it('closed → completed (terminal — no reopen)', () => {
+      expect(() => validate('closed', 'completed')).toThrow(InvalidTransitionError);
+    });
+
+    it('closed → in_progress (terminal — no reopen)', () => {
+      expect(() => validate('closed', 'in_progress')).toThrow(InvalidTransitionError);
+    });
+
+    it('closed → pending (terminal — no reopen)', () => {
+      expect(() => validate('closed', 'pending')).toThrow(InvalidTransitionError);
     });
 
     it('cancelled → pending (terminal state)', () => {
@@ -406,8 +430,12 @@ describe('Work Order transitions', () => {
     });
   });
 
-  it('completed has an empty transition array (terminal)', () => {
-    expect(WORK_ORDER_TRANSITIONS['completed']).toEqual([]);
+  it('completed allows only closed (one-way close-out)', () => {
+    expect(WORK_ORDER_TRANSITIONS['completed']).toEqual(['closed']);
+  });
+
+  it('closed has an empty transition array (terminal)', () => {
+    expect(WORK_ORDER_TRANSITIONS['closed']).toEqual([]);
   });
 
   it('cancelled has an empty transition array (terminal)', () => {

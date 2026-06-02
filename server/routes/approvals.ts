@@ -19,6 +19,13 @@ import {
   deleteBatch,
 } from '../approvals.js';
 import { broadcastToWorkspace } from '../broadcast.js';
+import { APPROVAL_FAMILY_FLAG, mirrorApprovalBatchToDeliverable } from '../domains/inbox/approval-batch-dual-write.js';
+import { respondToApprovalBatch } from '../domains/inbox/approval-batch-respond.js';
+import { classifyApprovalBatch } from '../domains/inbox/deliverable-adapters/approval-batch-classifier.js';
+import { markDeliverableApplied } from '../domains/inbox/send-to-client.js';
+import { findBySourceRef } from '../client-deliverables.js';
+import { isFeatureEnabled } from '../feature-flags.js';
+import { isClientApplyableFields } from '../../shared/applyability.js';
 import { notifyApprovalReady, notifyTeamActionApproved, notifyTeamChangesRequested } from '../email.js';
 import { getClientActor, requireClientPortalAuth } from '../middleware.js';
 import {
@@ -42,7 +49,6 @@ import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
 import { normalizePageUrl } from '../helpers.js';
 import { WS_EVENTS } from '../ws-events.js';
-import db from '../db/index.js';
 import { toClientInboxApprovalBatch, toClientInboxApprovalBatches } from '../serializers/client-safe.js';
 
 const log = createLogger('approvals');
@@ -69,13 +75,6 @@ const APPROVAL_FIELD_LABELS: Record<string, string> = {
 
 function approvalActivityLabel(field: string): string {
   return APPROVAL_FIELD_LABELS[field] ?? field.replace(/[_-]+/g, ' ');
-}
-
-const CMS_NON_SEO_APPROVAL_FIELDS = new Set(['name', 'slug']);
-
-function isCmsSeoApprovalField(field: string): boolean {
-  const normalized = field.trim().toLowerCase();
-  return normalized.length > 0 && !CMS_NON_SEO_APPROVAL_FIELDS.has(normalized);
 }
 
 function normalizeSeoChangeField(field: string): string {
@@ -114,6 +113,10 @@ const updateItemSchema = z.object({
 router.post('/api/approvals/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(createBatchSchema), (req, res) => {
   const { siteId, name, note, items } = req.body;
   const batch = createBatch(req.params.workspaceId, siteId, name || 'SEO Changes', items, note);
+  // Unified deliverables (DARK): mirror the batch into client_deliverable when the
+  // approval-family flag is on. Default off → no-op; never throws (best-effort mirror).
+  // The classifier resolves the sub-type (seo_edit / audit_issue / schema_item).
+  mirrorApprovalBatchToDeliverable(req.params.workspaceId, batch, { note, source: 'approvals-send' });
   // Track all pages in this batch as in-review
   for (const item of items) {
     if (item.pageId) updatePageState(req.params.workspaceId, item.pageId, { status: 'in-review', fields: [item.field], approvalBatchId: batch.id, updatedBy: 'admin' });
@@ -235,6 +238,8 @@ const bulkApproveSchema = z.object({
 
 // Bulk-approve all pending items in a batch (client submits trust-first approval)
 // MUST precede the /:itemId route so 'approve' is not captured as a param.
+// Delegates to the shared respondToApprovalBatch service (R2) so this route and the
+// unified-inbox respond propagation drive the SAME source write (no divergence).
 router.patch('/api/public/approvals/:workspaceId/:batchId/approve', requireClientPortalAuth(), validate(bulkApproveSchema), (req, res, next) => {
   const { workspaceId, batchId } = req.params;
   const { clientNote } = req.body as { clientNote?: string };
@@ -247,42 +252,25 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/approve', requireClien
     return res.status(400).json({ error: 'No pending items to approve' });
   }
 
-  let updatedBatch = batch;
+  let result: ReturnType<typeof respondToApprovalBatch>;
   try {
-    db.transaction(() => {
-      for (const item of pendingItems) {
-        const result = updateItem(workspaceId, batchId, item.id, {
-          status: 'approved',
-          ...(clientNote ? { clientNote } : {}),
-        });
-        if (result) updatedBatch = result;
-      }
-    })();
+    // Delegates to the shared respondToApprovalBatch service (R2) so this route and the
+    // unified-inbox respond path drive identical source writes. The service wraps its
+    // per-item updateItem writes in a db.transaction() (atomic batch decision) and fires
+    // the team email + broadcast + activity AFTER, outside the transaction.
+    result = respondToApprovalBatch(workspaceId, batchId, 'approved', {
+      note: clientNote ?? null,
+      actor: getClientActor(req, workspaceId),
+    });
   } catch (err: unknown) {
     if (err instanceof Error && err.name === 'InvalidTransitionError') {
       return res.status(400).json({ error: err.message });
     }
     return next(err);
   }
+  if (!result) return res.status(404).json({ error: 'Batch not found' });
 
-  const actorInfo = getClientActor(req, workspaceId);
-  addActivity(workspaceId, 'approval_applied',
-    `${actorInfo?.name || 'Client'} approved all changes in batch "${batch.name}"`,
-    clientNote || undefined,
-    { batchId },
-    actorInfo);
-  const wsInfo = getWorkspace(workspaceId);
-  notifyTeamActionApproved({
-    workspaceId,
-    workspaceName: wsInfo?.name || workspaceId,
-    actionTitle: `SEO batch approved: ${batch.name}`,
-    sourceType: 'seo_approval',
-    actionSummary: `${pendingItems.length} approved change${pendingItems.length === 1 ? '' : 's'}`,
-    clientNote,
-  });
-
-  broadcastToWorkspace(workspaceId, WS_EVENTS.APPROVAL_UPDATE, { batchId, status: 'approved' });
-  res.json(updatedBatch);
+  res.json(result.batch);
 });
 
 router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClientPortalAuth(), validate(updateItemSchema), (req, res, next) => {
@@ -411,11 +399,10 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
 
   const approved = batch.items.filter(i => i.status === 'approved');
   if (!approved.length) return res.status(400).json({ error: 'No approved items to apply' });
-  if (approved.some(i => {
-    if (i.pageId.startsWith('cms-')) return true;
-    if (i.collectionId) return !isCmsSeoApprovalField(i.field);
-    return i.field !== 'seoTitle' && i.field !== 'seoDescription';
-  })) {
+  // Single source of truth: the shared applyability predicate (the legacy field/pageId/collectionId
+  // gate, now in shared/applyability.ts so the R3b client UI uses the SAME rule). The two in-loop
+  // `cms-` guards below stay as defense-in-depth.
+  if (approved.some(i => !isClientApplyableFields({ field: i.field, targetRef: i.pageId, collectionId: i.collectionId ?? null }))) {
     return res.status(400).json({ error: 'Only static page SEO title/meta approvals and real CMS item approvals can be applied by clients.' });
   }
 
@@ -485,6 +472,29 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
       { batchId: req.params.batchId, appliedCount: appliedIds.length });
   }
 
+  // R3b mirror-flip (DARK): when the unified approval-family mirror exists, move it to `applied`
+  // so the unified inbox reflects the publish. Gated on APPROVAL_FAMILY_FLAG (the flag that governs
+  // mirror EXISTENCE — NOT unified-inbox). The Webflow write already succeeded above; a mirror miss
+  // must never fail this response, so the whole block is best-effort (log + swallow). isFeatureEnabled
+  // is single-arg/global (no workspaceId). With the flag off this is byte-identical to before.
+  //
+  // Flip ONLY on a FULLY-successful apply (`failed === 0 && every approved item applied`). On a
+  // partial/total Webflow failure `markBatchApplied` marks only the succeeded items `applied` and the
+  // legacy batch stays retryable; flipping the WHOLE mirror to `applied` (terminal — filtered out of
+  // the client list) would strand the still-`approved` failed items. Leaving the mirror `approved`
+  // keeps it in "Ready to publish" so re-clicking Apply re-applies only the failed items — matching
+  // the legacy batch's retry semantics.
+  const failed = results.length - appliedIds.length;
+  if (failed === 0 && appliedIds.length === approved.length && isFeatureEnabled(APPROVAL_FAMILY_FLAG)) {
+    try {
+      const type = classifyApprovalBatch(batch);
+      const mirror = findBySourceRef(req.params.workspaceId, type, `${type}:${req.params.batchId}`);
+      if (mirror) markDeliverableApplied(req.params.workspaceId, mirror.id);
+    } catch (err) {
+      log.warn({ err, batchId: req.params.batchId }, 'unified mirror apply-sync failed (swallowed; webflow already applied)');
+    }
+  }
+
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.APPROVAL_APPLIED, { batchId: req.params.batchId, applied: appliedIds.length });
   if (appliedIds.length > 0) {
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.PAGE_STATE_UPDATED, {
@@ -536,7 +546,7 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
     }
   }
 
-  res.json({ results, applied: appliedIds.length, failed: results.length - appliedIds.length });
+  res.json({ results, applied: appliedIds.length, failed });
 });
 
 export default router;

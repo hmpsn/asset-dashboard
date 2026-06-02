@@ -26,6 +26,7 @@ export const WS_EVENTS = {
   ACTIVITY_NEW: 'activity:new',
   AUDIT_COMPLETE: 'audit:complete',
   WORK_ORDER_UPDATE: 'work-order:update',
+  WORK_ORDER_COMMENT: 'work-order:comment',
   ANOMALIES_UPDATE: 'anomalies:update',
   CONTENT_PUBLISHED: 'content:published',
   POST_UPDATED: 'post:updated',
@@ -46,6 +47,12 @@ export const WS_EVENTS = {
   CLIENT_SIGNAL_CREATED: 'client-signal:created',
   CLIENT_SIGNAL_UPDATED: 'client-signal:updated',
   CLIENT_ACTION_UPDATE: 'client-action:update',
+
+  // Unified Send-to-Client deliverables (Phase 0, dark until the unified-deliverables-* flags flip).
+  // No frontend handler yet — the client/admin inboxes that consume these are built in Phase 2.
+  DELIVERABLE_SENT: 'deliverable:sent',
+  DELIVERABLE_UPDATED: 'deliverable:updated',
+
   MEETING_BRIEF_GENERATED: 'meeting-brief:generated',
 
   // Brand Engine (Phase 1 — brandscript, discovery, voice, identity)

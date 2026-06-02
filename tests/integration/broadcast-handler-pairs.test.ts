@@ -310,7 +310,10 @@ function collectFrontendHandlers(
  * Each entry must have a comment explaining why.
  */
 const KNOWN_UNHANDLED_BROADCASTS = new Set<string>([
-  // (intentionally empty)
+  // deliverable:sent / deliverable:updated are now HANDLED by the PR-2a client unified inbox
+  // (src/components/client/inbox/UnifiedInbox.tsx wires useWorkspaceEvents for both, invalidating
+  // the unified-inbox query). They are intentionally NOT listed here anymore. (The admin inbox
+  // half lands in PR-2b; a single frontend handler already satisfies this contract.)
 ]);
 
 /**

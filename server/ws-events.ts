@@ -45,6 +45,7 @@ export const WS_EVENTS = {
 
   // Work orders
   WORK_ORDER_UPDATE: 'work-order:update',
+  WORK_ORDER_COMMENT: 'work-order:comment',
 
   // Anomalies (auto-broadcast via initAnomalyBroadcast)
   ANOMALIES_UPDATE: 'anomalies:update',
@@ -84,6 +85,10 @@ export const WS_EVENTS = {
 
   // Client action queue
   CLIENT_ACTION_UPDATE: 'client-action:update',
+
+  // Unified Send-to-Client deliverables (Phase 0, dark until the unified-deliverables-* flags flip)
+  DELIVERABLE_SENT: 'deliverable:sent',
+  DELIVERABLE_UPDATED: 'deliverable:updated',
 
   // Meeting Brief
   MEETING_BRIEF_GENERATED: 'meeting-brief:generated',

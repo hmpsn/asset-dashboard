@@ -12,6 +12,7 @@ import { Router } from 'express';
 import { getMatrix, listMatrices, updateMatrixCell } from '../content-matrices.js';
 import { getTemplate } from '../content-templates.js';
 import { createBatch } from '../approvals.js';
+import { mirrorApprovalBatchToDeliverable } from '../domains/inbox/approval-batch-dual-write.js';
 import { getWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { broadcastToWorkspace } from '../broadcast.js';
@@ -210,6 +211,13 @@ router.post('/api/content-plan/:workspaceId/:matrixId/send-template-review', req
       }],
     );
 
+    // Unified deliverables (DARK): mirror the template-review batch as content_plan_template
+    // when the approval-family flag is on. Default off → no-op; never throws.
+    mirrorApprovalBatchToDeliverable(req.params.workspaceId, batch, {
+      type: 'content_plan_template',
+      source: 'content-plan-template-review',
+    });
+
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.APPROVAL_UPDATE, { batchId: batch.id, action: 'created' });
     addActivity(
       req.params.workspaceId,
@@ -270,6 +278,13 @@ router.post('/api/content-plan/:workspaceId/:matrixId/send-samples', requireWork
       `Content Plan: ${matrix.name} — Sample Review (${selectedCells.length} pages)`,
       items,
     );
+
+    // Unified deliverables (DARK): mirror the sample-review batch as content_plan_sample
+    // when the approval-family flag is on. Default off → no-op; never throws.
+    mirrorApprovalBatchToDeliverable(req.params.workspaceId, batch, {
+      type: 'content_plan_sample',
+      source: 'content-plan-sample-review',
+    });
 
     // Update cell statuses to review
     for (const cell of selectedCells) {

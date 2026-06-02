@@ -484,7 +484,7 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAcces
     responseKeywordGaps,
     responseTopicClusters,
     responseCannibalization,
-  } = applyPatch();
+  } = applyPatch.immediate();
   // Queue background rec regen after transaction commits (Task 1.2 — strategy PATCH must
   // trigger recommendation regeneration so stale recs don't linger after a strategy edit).
   queueKeywordStrategyPostUpdateFollowOns({ workspaceId: ws.id });

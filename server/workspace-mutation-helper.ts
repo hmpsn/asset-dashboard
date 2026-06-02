@@ -76,7 +76,7 @@ export function runWorkspaceMutation<TRead, TResult>({
       return { existing, result };
     });
 
-    const { existing, result } = tx();
+    const { existing, result } = tx.immediate();
     const callbackCtx: WorkspaceMutationAfterContext<TRead, TResult> = { workspaceId, existing, result };
     onActivity?.(callbackCtx);
     onBroadcast?.(callbackCtx);

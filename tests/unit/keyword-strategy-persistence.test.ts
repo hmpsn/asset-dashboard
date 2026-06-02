@@ -27,10 +27,20 @@ const mockBroadcastToWorkspace = vi.fn();
 const mockAddActivity = vi.fn();
 const mockNormalizePageUrl = vi.fn((p: string) => p);
 
-// DB mock — transaction fn wraps and calls the callback
+// DB mock — transaction fn wraps and calls the callback. better-sqlite3's
+// transaction object is itself callable AND exposes .immediate()/.deferred()/
+// .exclusive() variants; the persistence code invokes .immediate() (BEGIN
+// IMMEDIATE) to dodge the WAL SQLITE_BUSY_SNAPSHOT flake, so the mock must
+// carry that method too.
 const mockDbPrepare = vi.fn();
 const mockRun = vi.fn(() => ({ changes: 0 }));
-const mockTransaction = vi.fn((fn: () => void) => fn);
+const mockTransaction = vi.fn((fn: (...args: unknown[]) => unknown) => {
+  const txn = (...args: unknown[]) => fn(...args);
+  txn.immediate = (...args: unknown[]) => fn(...args);
+  txn.deferred = (...args: unknown[]) => fn(...args);
+  txn.exclusive = (...args: unknown[]) => fn(...args);
+  return txn;
+});
 
 vi.mock('../../server/workspace-intelligence.js', () => ({
   invalidateIntelligenceCache: mockInvalidateIntelligenceCache,
@@ -146,8 +156,16 @@ function makeSearchData() {
 describe('persistKeywordStrategy', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // transaction mock: execute fn immediately and return it
-    mockTransaction.mockImplementation((fn: () => void) => fn);
+    // transaction mock: return a callable that also exposes .immediate()/
+    // .deferred()/.exclusive() (matching better-sqlite3's Transaction object),
+    // each executing fn immediately. The persistence code invokes .immediate().
+    mockTransaction.mockImplementation((fn: (...args: unknown[]) => unknown) => {
+      const txn = (...args: unknown[]) => fn(...args);
+      txn.immediate = (...args: unknown[]) => fn(...args);
+      txn.deferred = (...args: unknown[]) => fn(...args);
+      txn.exclusive = (...args: unknown[]) => fn(...args);
+      return txn;
+    });
     mockDbPrepare.mockReturnValue({ run: mockRun });
     mockNormalizePageUrl.mockImplementation((p: string) => p);
   });

@@ -6,6 +6,7 @@ import { invalidateContentPipelineCache } from './workspace-data.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { resolveRecommendationsForChange } from './recommendations.js';
 import { getPageState } from './page-edit-states.js';
+import { mirrorWorkOrderToDeliverable } from './domains/inbox/work-order-dual-write.js';
 import { createLogger } from './logger.js';
 import { z } from 'zod';
 
@@ -29,6 +30,7 @@ interface OrderRow {
   quantity: number;
   assigned_to: string | null;
   completed_at: string | null;
+  closed_at: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -36,8 +38,8 @@ interface OrderRow {
 
 const stmts = createStmtCache(() => ({
   insert: db.prepare(
-    `INSERT INTO work_orders (id, workspace_id, payment_id, product_type, status, page_ids, issue_checks, quantity, assigned_to, completed_at, notes, created_at, updated_at)
-         VALUES (@id, @workspace_id, @payment_id, @product_type, @status, @page_ids, @issue_checks, @quantity, @assigned_to, @completed_at, @notes, @created_at, @updated_at)`,
+    `INSERT INTO work_orders (id, workspace_id, payment_id, product_type, status, page_ids, issue_checks, quantity, assigned_to, completed_at, closed_at, notes, created_at, updated_at)
+         VALUES (@id, @workspace_id, @payment_id, @product_type, @status, @page_ids, @issue_checks, @quantity, @assigned_to, @completed_at, @closed_at, @notes, @created_at, @updated_at)`,
   ),
   selectByWorkspace: db.prepare(
     `SELECT * FROM work_orders WHERE workspace_id = ? ORDER BY created_at DESC`,
@@ -46,7 +48,7 @@ const stmts = createStmtCache(() => ({
     `SELECT * FROM work_orders WHERE id = ? AND workspace_id = ?`,
   ),
   update: db.prepare(
-    `UPDATE work_orders SET status = @status, assigned_to = @assigned_to, notes = @notes, completed_at = @completed_at, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`, // status-ok: validateTransition guard in updateWorkOrder()
+    `UPDATE work_orders SET status = @status, assigned_to = @assigned_to, notes = @notes, completed_at = @completed_at, closed_at = @closed_at, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`, // status-ok: validateTransition guard in updateWorkOrder()
   ),
 }));
 
@@ -72,6 +74,7 @@ function rowToOrder(row: OrderRow): WorkOrder {
     quantity: row.quantity,
     assignedTo: row.assigned_to ?? undefined,
     completedAt: row.completed_at ?? undefined,
+    closedAt: row.closed_at ?? undefined,
     notes: row.notes ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -127,6 +130,7 @@ export function createWorkOrder(
     quantity: order.quantity,
     assigned_to: null,
     completed_at: null,
+    closed_at: null,
     notes: null,
     created_at: now,
     updated_at: now,
@@ -134,13 +138,18 @@ export function createWorkOrder(
 
   invalidateWorkOrderCaches(workspaceId);
 
+  // DARK dual-write (PR-1fg): mirror the freshly-created order into client_deliverable when the
+  // `unified-deliverables-rest` flag is on (default off → no-op). Best-effort/never-throws so it
+  // can never break the live create. Idempotent on `work_order:<id>`.
+  mirrorWorkOrderToDeliverable(order);
+
   return order;
 }
 
 export function updateWorkOrder(
   workspaceId: string,
   orderId: string,
-  updates: Partial<Pick<WorkOrder, 'status' | 'assignedTo' | 'notes' | 'completedAt'>>,
+  updates: Partial<Pick<WorkOrder, 'status' | 'assignedTo' | 'notes' | 'completedAt' | 'closedAt'>>,
 ): WorkOrder | null {
   const order = getWorkOrder(workspaceId, orderId);
   if (!order) return null;
@@ -154,6 +163,7 @@ export function updateWorkOrder(
   if (updates.assignedTo !== undefined) order.assignedTo = updates.assignedTo;
   if (updates.notes !== undefined) order.notes = updates.notes;
   if (updates.completedAt !== undefined) order.completedAt = updates.completedAt;
+  if (updates.closedAt !== undefined) order.closedAt = updates.closedAt;
   order.updatedAt = new Date().toISOString();
 
   stmts().update.run({
@@ -163,9 +173,18 @@ export function updateWorkOrder(
     assigned_to: order.assignedTo ?? null,
     notes: order.notes ?? null,
     completed_at: order.completedAt ?? null,
+    closed_at: order.closedAt ?? null,
     updated_at: order.updatedAt,
   });
   invalidateWorkOrderCaches(workspaceId);
+
+  // DARK dual-write (PR-1fg): re-mirror the order on a status change so the order deliverable
+  // reflects lifecycle progress (pending→ordered, in_progress, completed, cancelled). Gated on a
+  // status change to skip pure assignee/notes edits. When the `unified-deliverables-rest` flag is
+  // off (default) this is a no-op. Best-effort/never-throws; idempotent on `work_order:<id>`.
+  if (updates.status !== undefined) {
+    mirrorWorkOrderToDeliverable(order);
+  }
 
   // A completed fix order resolves any recommendations covering the pages it
   // touched, so the priority list drops them immediately (GSC-lag-free).

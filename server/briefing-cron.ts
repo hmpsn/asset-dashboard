@@ -57,6 +57,7 @@ import {
 } from './briefing-templates/index.js';
 import { getInsightById } from './analytics-insights-store.js';
 import { getAction, getOutcomesForAction } from './outcome-tracking.js';
+import { mirrorBriefingToDeliverable } from './domains/inbox/briefing-dual-write.js';
 import type { BriefingStory, BriefingSourceMetadata } from '../shared/types/briefing.js';
 import type { AnalyticsInsight, MilestoneAttributionData } from '../shared/types/analytics.js';
 import { createLogger } from './logger.js';
@@ -544,6 +545,11 @@ async function runBriefingForWorkspaceInner(
   ) {
     const published = markPublished(workspaceId, draft.id, { autoPublished: true });
     if (published) {
+      // DARK dual-write (PR-1fg): mirror the just-auto-published briefing into client_deliverable
+      // as a one-way notification when the `unified-deliverables-rest` flag is on (default off →
+      // no-op). Best-effort/never-throws so it can never break the live auto-publish. Idempotent
+      // on briefing:<id>.
+      mirrorBriefingToDeliverable(published);
       addActivity(
         workspaceId,
         'briefing_auto_published',

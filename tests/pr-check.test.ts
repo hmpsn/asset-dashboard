@@ -5112,6 +5112,11 @@ describe('Meta: customCheck rule name registry', () => {
     // SEO-state writes must resolve/regen recommendations (or carry
     // // rec-refresh-ok).
     'SEO-state write should resolve/regen recommendations',
+    // Unified Send-to-Client Phase 0 (2026-06-01) — the deliverable store is the
+    // only writer; active types need adapters; no new bespoke send routes.
+    'no-direct-insert-to-client_deliverable-outside-store',
+    'every-active-type-has-an-adapter',
+    'unified-send-to-client-bespoke-route',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -9637,5 +9642,121 @@ describe('Rule: SEO-state write should resolve/regen recommendations', () => {
     const hits = runRule(RULE, [file]);
     expect(hits).toHaveLength(2);
     expect(hits.map(h => h.line).sort((a, b) => a - b)).toEqual([2, 3]);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: no-direct-insert-to-client_deliverable-outside-store
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: no-direct-insert-to-client_deliverable-outside-store', () => {
+  const RULE = 'no-direct-insert-to-client_deliverable-outside-store';
+
+  it('flags a raw INSERT INTO client_deliverable in a non-store server file', () => {
+    const file = write(
+      uniqPath('rule-cd-insert', 'server/rogue.ts'),
+      lines(
+        "export function rogue() {",                                            // 1
+        "  db.prepare('INSERT INTO client_deliverable (id) VALUES (?)').run(x);", // 2
+        "}",                                                                   // 3
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags INSERT INTO client_deliverable_item too', () => {
+    const file = write(
+      uniqPath('rule-cd-insert', 'server/rogue-item.ts'),
+      lines("db.prepare('INSERT INTO client_deliverable_item (id) VALUES (?)').run(x);"),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('respects the // deliverable-write-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-cd-insert', 'server/hatched.ts'),
+      lines("db.prepare('INSERT INTO client_deliverable (id) VALUES (?)').run(x); // deliverable-write-ok"),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag the store module itself', () => {
+    const file = write(
+      uniqPath('rule-cd-insert', 'server/client-deliverables.ts'),
+      lines("db.prepare('INSERT INTO client_deliverable (id) VALUES (?)').run(x);"),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag a file that only reads client_deliverable', () => {
+    const file = write(
+      uniqPath('rule-cd-insert', 'server/reader.ts'),
+      lines("const rows = db.prepare('SELECT * FROM client_deliverable WHERE workspace_id = ?').all(ws);"),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: every-active-type-has-an-adapter (warn, phase-aware)
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: every-active-type-has-an-adapter', () => {
+  const RULE = 'every-active-type-has-an-adapter';
+
+  it('returns no hits in Phase 0 (all phase-group flags default false)', () => {
+    // The customCheck ignores its file args and reads FEATURE_FLAGS from disk; with every
+    // unified-deliverables-* flag false, no type is active so nothing is required yet.
+    expect(runRule(RULE, [])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: unified-send-to-client-bespoke-route
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: unified-send-to-client-bespoke-route', () => {
+  const RULE = 'unified-send-to-client-bespoke-route';
+
+  it('flags a NEW bespoke POST /api/.../send-to-client route in a non-grandfathered route file', () => {
+    const file = write(
+      uniqPath('rule-unified-send', 'server/routes/new-thing.ts'),
+      lines(
+        "import { Router } from 'express';",                                       // 1
+        "const router = Router();",                                                // 2
+        "router.post('/api/new-thing/:workspaceId/send-to-client', (req, res) => {", // 3
+        "  res.json({ ok: true });",                                              // 4
+        "});",                                                                    // 5
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  it('respects the // unified-send-route-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-unified-send', 'server/routes/hatched.ts'),
+      lines("router.post('/api/x/:workspaceId/send-to-client', h); // unified-send-route-ok"),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag a grandfathered route file (approvals.ts)', () => {
+    const file = write(
+      uniqPath('rule-unified-send', 'server/routes/approvals.ts'),
+      lines("router.post('/api/approvals/:workspaceId/send-to-client', h);"),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag an unrelated route', () => {
+    const file = write(
+      uniqPath('rule-unified-send', 'server/routes/unrelated.ts'),
+      lines("router.post('/api/unrelated/:workspaceId/do-thing', h);"),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
   });
 });

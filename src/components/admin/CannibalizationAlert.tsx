@@ -1,6 +1,7 @@
 import { AlertTriangle } from 'lucide-react';
 import { SectionCard } from '../ui/SectionCard';
 import { TierGate } from '../ui/TierGate';
+import { normalizePageUrl } from '../../lib/pathUtils';
 import type { CannibalizationWarning } from '../../../shared/types/intelligence';
 
 interface Props {
@@ -20,14 +21,9 @@ const SEVERITY_ICON_COLOR: Record<CannibalizationWarning['severity'], string> = 
   low: 'text-accent-info',
 };
 
-/** Strip protocol + domain from a URL, leaving only the path. Falls back to the original string if not a valid URL. */
+/** Strip protocol + domain from a URL, leaving only the normalized path. */
 function toPath(url: string): string {
-  try {
-    return new URL(url).pathname;
-  } catch {
-    // Already a path or malformed — return as-is
-    return url;
-  }
+  return normalizePageUrl(url);
 }
 
 export function CannibalizationAlert({ warnings, tier }: Props) {
