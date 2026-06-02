@@ -255,12 +255,19 @@ describe('WORK_ORDER_TRANSITIONS', () => {
   it('in_progress → completed', () => expect(validate('in_progress', 'completed')).toBe('completed'));
   it('in_progress → cancelled', () => expect(validate('in_progress', 'cancelled')).toBe('cancelled'));
 
+  it('completed → closed (operator-only one-way close-out)', () => expect(validate('completed', 'closed')).toBe('closed'));
+
   it('pending → completed (skips in_progress) throws', () => {
     expect(() => validate('pending', 'completed')).toThrow(InvalidTransitionError);
   });
 
-  it('completed and cancelled are both terminal', () => {
-    expect(WORK_ORDER_TRANSITIONS['completed']).toEqual([]);
+  it('completed → in_progress (no reopen) throws', () => {
+    expect(() => validate('completed', 'in_progress')).toThrow(InvalidTransitionError);
+  });
+
+  it('completed allows only closed; closed and cancelled are terminal', () => {
+    expect(WORK_ORDER_TRANSITIONS['completed']).toEqual(['closed']);
+    expect(WORK_ORDER_TRANSITIONS['closed']).toEqual([]);
     expect(WORK_ORDER_TRANSITIONS['cancelled']).toEqual([]);
   });
 });

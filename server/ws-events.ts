@@ -45,6 +45,7 @@ export const WS_EVENTS = {
 
   // Work orders
   WORK_ORDER_UPDATE: 'work-order:update',
+  WORK_ORDER_COMMENT: 'work-order:comment',
 
   // Anomalies (auto-broadcast via initAnomalyBroadcast)
   ANOMALIES_UPDATE: 'anomalies:update',

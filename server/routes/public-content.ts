@@ -13,7 +13,9 @@ import {
   updateContentRequest,
   addComment,
 } from '../content-requests.js';
-import { notifyTeamActionApproved, notifyTeamContentRequest, notifyTeamChangesRequested } from '../email.js';
+import { notifyTeamActionApproved, notifyTeamContentRequest, notifyTeamChangesRequested, notifyTeamWorkOrderComment } from '../email.js';
+import { getWorkOrder } from '../work-orders.js';
+import { addWorkOrderComment, listWorkOrderComments } from '../work-order-comments.js';
 import { getPost, updatePostField, snapshotPostVersion, getMostRecentPostVersion } from '../content-posts.js';
 import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
 import { normalizePageUrl, sanitizeString, validateEnum } from '../helpers.js';
@@ -54,6 +56,7 @@ import {
   requestPostChangesSchema,
   clientPostEditSchema,
 } from '../schemas/public-content.js';
+import { workOrderCommentSchema } from '../schemas/work-orders.js';
 import type { ContentTopicRequest, GeneratedPost } from '../../shared/types/content.js';
 
 const log = createLogger('public-content');
@@ -458,6 +461,50 @@ router.post('/api/public/content-request/:workspaceId/:id/comment', validate(add
   addActivity(req.params.workspaceId, 'content_request_commented', `${actor?.name || 'Client'} commented on "${updated.topic}"`, activityCommentPreview(content), { requestId: updated.id }, actor);
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
   res.json(updated);
+});
+
+// Client reads its own work-order conversation thread (the "Work in progress" lane).
+router.get('/api/public/work-order/:workspaceId/:orderId/comments', (req, res) => {
+  res.json(listWorkOrderComments(req.params.workspaceId, req.params.orderId));
+});
+
+// Client posts a comment on a work-order conversation. Author HARDCODED 'client' —
+// NEVER trust req.body (mirrors the content-request comment route; unauthenticated-shape
+// public endpoint behind the router-level requireClientPortalAuth gate). Rejected with 409
+// once the order is closed (the conversation is over).
+router.post('/api/public/work-order/:workspaceId/:orderId/comment', validate(workOrderCommentSchema), (req, res) => {
+  const wsId = req.params.workspaceId;
+  const orderId = req.params.orderId;
+  const content = sanitizeString(req.body.content, 2000);
+  if (!content) return res.status(400).json({ error: 'content is required' });
+
+  const order = getWorkOrder(wsId, orderId);
+  if (!order) return res.status(404).json({ error: 'Work order not found' });
+  if (order.status === 'closed') return res.status(409).json({ error: 'This work order is closed' });
+
+  const comment = addWorkOrderComment(wsId, orderId, 'client', content);
+  if (!comment) return res.status(404).json({ error: 'Work order not found' });
+
+  const orderTitle = order.productType.replace(/_/g, ' ');
+  const actor = getClientActor(req, wsId);
+  addActivity(wsId, 'work_order_commented',
+    `${actor?.name || 'Client'} commented on "${orderTitle}"`,
+    activityCommentPreview(content),
+    { workOrderId: orderId }, actor);
+  broadcastToWorkspace(wsId, WS_EVENTS.WORK_ORDER_COMMENT, { id: orderId });
+
+  // Best-effort client → team notification (never blocks the write).
+  const ws = getWorkspace(wsId);
+  if (ws) {
+    notifyTeamWorkOrderComment({
+      workspaceName: ws.name,
+      workspaceId: wsId,
+      orderTitle,
+      message: content,
+    });
+  }
+
+  res.json(comment);
 });
 
 // Client can view a brief (for review)

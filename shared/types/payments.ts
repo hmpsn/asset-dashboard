@@ -30,13 +30,29 @@ export interface WorkOrder {
   workspaceId: string;
   paymentId: string;
   productType: ProductType;
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'pending' | 'in_progress' | 'completed' | 'closed' | 'cancelled';
   pageIds: string[];
   issueChecks?: string[];
   quantity: number;
   assignedTo?: string;
   completedAt?: string;
+  /** Set when an operator explicitly closes out a completed order (one-way, no reopen). */
+  closedAt?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+// ── Work-order conversation (client ↔ team comment thread) ──
+// Comments live in a dedicated `work_order_comments` table, served out-of-band
+// from the work-order deliverable payload.
+export type WorkOrderCommentAuthor = 'client' | 'team';
+
+export interface WorkOrderComment {
+  id: string;
+  workOrderId: string;
+  author: WorkOrderCommentAuthor;
+  content: string;
+  createdAt: string;
+  readAt?: string;
 }

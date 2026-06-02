@@ -44,8 +44,11 @@ describe('work_order adapter — status map (legacy → canonical ORDER lifecycl
   it('in_progress → in_progress', () => {
     expect(mapWorkOrderStatusToDeliverableStatus('in_progress')).toBe('in_progress');
   });
-  it('completed → completed', () => {
+  it('completed → completed (stays in the client lane)', () => {
     expect(mapWorkOrderStatusToDeliverableStatus('completed')).toBe('completed');
+  });
+  it('closed → cancelled (leaves the client lane; raw status preserved in payload)', () => {
+    expect(mapWorkOrderStatusToDeliverableStatus('closed')).toBe('cancelled');
   });
   it('cancelled → cancelled', () => {
     expect(mapWorkOrderStatusToDeliverableStatus('cancelled')).toBe('cancelled');
