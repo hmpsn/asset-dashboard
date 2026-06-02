@@ -95,6 +95,11 @@ export const FEATURE_FLAGS = {
   'unified-deliverables-approval-family': false,
   'unified-deliverables-broken-family': false,
   'unified-deliverables-rest': false,
+  // PR-2a — the client-facing unified inbox (Pillar 2). When ON, InboxTab renders the
+  // new unified PriorityStrip + uniform Approve / Request changes / Decline path backed
+  // by GET /api/public/deliverables/:workspaceId. OFF = the existing new-inbox-ia + legacy
+  // layouts render unchanged. Independent of the dual-write read-cutover flags above.
+  'unified-inbox': false,
 } as const;
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;
@@ -776,6 +781,19 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: REVIEWED_AT,
     },
   },
+  'unified-inbox': {
+    label: 'Unified client inbox (PriorityStrip + uniform Approve / Request changes / Decline)',
+    group: 'Unified Send-to-Client',
+    lifecycle: {
+      owner: 'inbox-platform',
+      createdAt: REVIEWED_AT,
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Remove after the unified client inbox is the only maintained client inbox layout and the new-inbox-ia + legacy InboxTab layouts are torn down (Phase 3).',
+      linkedRoadmapItemId: 'unified-deliverables-phase-2a-client-inbox',
+      staleAuditCadence: 'monthly',
+      lastReviewedAt: REVIEWED_AT,
+    },
+  },
 };
 
 export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: FeatureFlagKey[] }> = [
@@ -863,6 +881,7 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
       'unified-deliverables-approval-family',
       'unified-deliverables-broken-family',
       'unified-deliverables-rest',
+      'unified-inbox',
     ],
   },
 ];

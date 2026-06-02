@@ -310,14 +310,10 @@ function collectFrontendHandlers(
  * Each entry must have a comment explaining why.
  */
 const KNOWN_UNHANDLED_BROADCASTS = new Set<string>([
-  // deliverable:sent / deliverable:updated — Unified Send-to-Client Phase 0 (dark).
-  // The service (server/domains/inbox/send-to-client.ts) emits these, but the client
-  // and admin inboxes that consume them are built in Phase 2 (the two-inboxes PRs).
-  // Until then there is intentionally no frontend handler — the events are dark behind
-  // the unified-deliverables-* flags. Remove these entries when Phase 2 wires the
-  // useWorkspaceEvents handlers in the client/admin inboxes.
-  'deliverable:sent',
-  'deliverable:updated',
+  // deliverable:sent / deliverable:updated are now HANDLED by the PR-2a client unified inbox
+  // (src/components/client/inbox/UnifiedInbox.tsx wires useWorkspaceEvents for both, invalidating
+  // the unified-inbox query). They are intentionally NOT listed here anymore. (The admin inbox
+  // half lands in PR-2b; a single frontend handler already satisfies this contract.)
 ]);
 
 /**

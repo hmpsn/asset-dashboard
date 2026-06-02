@@ -1,6 +1,7 @@
 import type { ClientAction, ClientActionSourceType } from '../../shared/types/client-actions.js';
 import type { ApprovalBatch } from '../../shared/types/approvals.js';
-import type { NormalizedDecision } from '../../shared/types/decision.js';
+import type { DecisionKind, NormalizedDecision } from '../../shared/types/decision.js';
+import type { ClientDeliverable, DeliverableType } from '../../shared/types/client-deliverable.js';
 
 // ── Badge labels ───────────────────────────────────────────────────────────
 
@@ -53,6 +54,8 @@ function itemCountForAction(action: ClientAction): number {
  * with approve/flag buttons; all other types open `<DecisionDetailModal>`.
  */
 export function normalizeClientAction(action: ClientAction): NormalizedDecision {
+  // content_decay → inline single-action ('decision' kind); all others open the modal ('batch').
+  const kind: DecisionKind = action.sourceType === 'content_decay' ? 'decision' : 'batch';
   return {
     id: `ca-${action.id}`,
     source: 'client_action',
@@ -61,7 +64,8 @@ export function normalizeClientAction(action: ClientAction): NormalizedDecision 
     summary: action.summary,
     priority: action.priority,
     itemCount: itemCountForAction(action),
-    isSingleAction: action.sourceType === 'content_decay',
+    kind,
+    isSingleAction: kind === 'decision',
     badge: clientActionSourceLabel(action.sourceType),
     createdAt: action.createdAt,
   };
@@ -82,8 +86,60 @@ export function normalizeApprovalBatch(batch: ApprovalBatch): NormalizedDecision
     summary: `${batch.items.length} change${batch.items.length !== 1 ? 's' : ''} ready for your approval`,
     priority: undefined,
     itemCount: batch.items.length,
+    // Approval batches always open the full-screen modal (never inline) regardless of item count.
+    kind: 'batch',
     isSingleAction: false,
     badge: badgeForBatch(batch.name),
     createdAt: batch.createdAt,
+  };
+}
+
+// ── Unified ClientDeliverable adapter (PR-2a) ───────────────────────────────
+
+/** Short human badge for each unified deliverable type — shown in the inbox card/strip. */
+const DELIVERABLE_TYPE_BADGES: Record<DeliverableType, string> = {
+  seo_edit:              'SEO Editor',
+  audit_issue:           'Audit',
+  schema_item:           'Schema',
+  schema_plan:           'Schema',
+  redirect:              'Redirects',
+  internal_link:         'Internal Links',
+  aeo_change:            'AEO',
+  content_decay:         'Content',
+  content_plan_sample:   'Content Plan',
+  content_plan_template: 'Content Plan',
+  work_order:            'Work Order',
+  briefing:              'Briefing',
+  copy_section:          'Copy',
+  content_request:       'Content',
+};
+
+export function deliverableTypeBadge(type: DeliverableType | string): string {
+  return DELIVERABLE_TYPE_BADGES[type as DeliverableType] ?? 'Update';
+}
+
+/**
+ * Normalize a unified `ClientDeliverable` into a `NormalizedDecision` (design §5).
+ *
+ * `kind` is carried straight through from the deliverable; `isSingleAction` is DERIVED from
+ * `kind === 'decision'` so the inline-vs-modal affordance is identical to the legacy path.
+ * `itemCount` reflects child items when present (kind 'batch'), else 1. `sentAt` carries the
+ * staleness clock so the inbox can show the send age.
+ */
+export function normalizeDeliverable(d: ClientDeliverable): NormalizedDecision {
+  const itemCount = d.items && d.items.length > 0 ? d.items.length : 1;
+  return {
+    id: `cd-${d.id}`,
+    source: 'deliverable',
+    sourceId: d.id,
+    title: d.title,
+    summary: d.summary ?? '',
+    priority: undefined,
+    itemCount,
+    kind: d.kind,
+    isSingleAction: d.kind === 'decision',
+    badge: deliverableTypeBadge(d.type),
+    createdAt: d.createdAt,
+    sentAt: d.sentAt,
   };
 }

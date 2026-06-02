@@ -1,8 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **468 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **469 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 469. Unified Client Inbox — PriorityStrip + uniform Approve / Request changes / Decline (built dark — `unified-inbox` flag)
+
+**What it does:** Adds a flag-gated unified client inbox path to `InboxTab` (strangler-fig: when `unified-inbox` is OFF, the existing `new-inbox-ia` + legacy layouts render byte-for-byte unchanged; when ON, the new unified view renders instead). The unified view mounts the previously-orphaned `PriorityStrip` as the single prioritized "Needs your attention" list, backed by a new `GET /api/public/deliverables/:workspaceId` read endpoint that assembles ONE client-facing list from the hybrid `ClientDeliverable` model — physical `client_deliverable` rows PLUS projected `copy_section`/`content_request` entries (via each adapter's `projectFromSource()`), filtered to client-facing statuses (awaiting/changes-requested/partial/approved/declined) and Zod-validated. Each item renders as a `DecisionCard` with uniform Approve / Request changes (+note) / Decline verbs that call the real `PATCH /respond` endpoint, and shows the send age (from `sentAt`). `NormalizedDecision` is generalized to read the unified model (`kind` added alongside the kept `isSingleAction`; `DecisionSource` widened to include `'deliverable'`; `normalizeDeliverable()` adapter added) without changing legacy behavior. A flag-gated React Query hook (`useUnifiedInbox`, client-prefixed key, typed `src/api/deliverables.ts` wrapper, no raw fetch) fetches only when the flag is on. Phase-2a of the unified send-to-client migration (Pillar 2 client inbox).
+
+**Agency value:** One coherent client review surface and one decision contract per item, replacing the five bespoke per-pipeline client surfaces — adding a reviewable work type later renders through the same inbox automatically.
+
+**Client value:** A single prioritized list of everything that needs their attention, with the same Approve / Request changes / Decline choice on every item and a clear "sent N days ago" age — no per-feature inbox dialects.
+
+**Mutual:** Built fully dark behind `unified-inbox` (default off); production with the flag off is unchanged. No flag flip and no dual-write flags touched. The `client_deliverable` table is empty until the Phase-1 send-path cutover, so the endpoint returns only projected copy/content_request entries today — exercised with seeded rows in tests. See roadmap `unified-deliverables-phase-2a-client-inbox` and `docs/designs/2026-06-01-unified-send-to-client-design.md` §5.
 
 ---
 

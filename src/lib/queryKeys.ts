@@ -201,6 +201,8 @@ export const queryKeys = {
     workOrders: (wsId: string) => ['client-work-orders', wsId] as const,
     requests: (wsId: string) => ['client-requests', wsId] as const,
     contentRequests: (wsId: string) => ['client-content-requests', wsId] as const,
+    // Unified client inbox (PR-2a) — GET /api/public/deliverables/:workspaceId
+    unifiedInbox: (wsId: string) => ['client-unified-inbox', wsId] as const,
     auditSummary: (wsId: string) => ['client-audit-summary', wsId] as const,
     auditDetail: (wsId: string) => ['client-audit-detail', wsId] as const,
     schemaPlan: (wsId: string) => ['client-schema-plan', wsId] as const,
