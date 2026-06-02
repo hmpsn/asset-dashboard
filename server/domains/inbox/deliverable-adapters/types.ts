@@ -21,6 +21,25 @@ import type { UpsertDeliverableItemInput } from '../../../client-deliverables.js
 /** Result of validateSendable — `ok:false` carries an operator-facing reason. */
 export type SendableResult = { ok: true } | { ok: false; reason: string };
 
+/** The client decision propagated to the source artifact (R2). */
+export type DeliverableSourceDecision = 'approved' | 'changes_requested' | 'declined';
+
+/** Optional context for respondToSource (the client's note, the actor). */
+export interface RespondToSourceOptions {
+  note?: string | null;
+  actor?: { id?: string; name?: string };
+}
+
+/** Outcome of a source propagation — `handled` drives the double-notify suppression. */
+export interface RespondToSourceResult {
+  /**
+   * True when this adapter OWNS the team notification for its source write (it fired the
+   * source-path team email / signal itself). `respondToDeliverable` SUPPRESSES its own
+   * deliverable-level team email when this is true, so the team is notified exactly once.
+   */
+  handled: boolean;
+}
+
 /** The typed shape buildPayload returns — fed straight into upsertDeliverable. */
 export interface BuiltDeliverablePayload {
   title: string;
@@ -55,6 +74,27 @@ export interface DeliverableAdapter<TInput = unknown, TSourceRow = unknown> {
    */
   appliesOnApprove?: boolean;
   applyDeliverable?(deliverable: ClientDeliverable): Promise<{ applied: number }>;
+  /**
+   * R2 — respond propagation. Implemented by the PHYSICAL types whose source artifact the
+   * operator/apply logic still reads (approval_batch family → legacy batch; client_action
+   * family → legacy client_action; schema_plan → schema_site_plans). Maps the deliverable
+   * back to its source id (via `payload`) and drives the EXISTING per-type source-writing
+   * logic so a unified-inbox client decision is no longer a silent no-op on the real work.
+   *
+   * Propagates only the DECISION/status (R2) — never the Webflow publish (R3, a separate
+   * step). `approved` → source approved; `changes_requested`/`declined` → source reject/
+   * changes path (passing the client's note). Returns `{ handled }` so respondToDeliverable
+   * can suppress its deliverable-level team email for types whose source path owns it.
+   *
+   * Notification/decision-less types (work_order/briefing) and projected types
+   * (copy_section/content_request) do NOT implement this.
+   */
+  respondToSource?(
+    workspaceId: string,
+    deliverable: ClientDeliverable,
+    decision: DeliverableSourceDecision,
+    opts?: RespondToSourceOptions,
+  ): Promise<RespondToSourceResult> | RespondToSourceResult;
   /** ONLY for projected types — expose a source-table row through the unified model. */
   projectFromSource?(sourceRow: TSourceRow): ClientDeliverable;
 }

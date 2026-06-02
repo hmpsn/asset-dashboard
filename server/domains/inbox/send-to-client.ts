@@ -170,8 +170,30 @@ export async function respondToDeliverable(
     decidedAt: nowIso,
   }));
 
-  // Guarantee 4: team notification on every outcome.
-  notifyTeamOfResponse(workspaceId, responded, input.decision);
+  // R2 — respond propagation (the LINCHPIN): after writing the deliverable mirror status, push
+  // the SAME decision into the real SOURCE artifact (legacy approval batch / client_action /
+  // schema plan) via the adapter, reusing the existing per-type source-writing logic. Without
+  // this, a client "Approve" in the unified inbox is a silent no-op on the work the operator/
+  // apply logic actually reads. Physical types implement respondToSource; notification/
+  // decision-less (work_order/briefing) and projected (copy/content_request) types do not.
+  //
+  // AVOID DOUBLE-NOTIFY: the source-respond logic already emails/signals the team (APPROVAL_
+  // UPDATE + team email, CLIENT_ACTION team-approved email, SCHEMA_PLAN_SENT). When the adapter
+  // reports `handled`, we SUPPRESS the deliverable-level team email below — the source path owns
+  // it. We always keep the DELIVERABLE_UPDATED broadcast (the unified inbox UI listens on it).
+  let sourceHandledTeamNotify = false;
+  if (adapter.respondToSource) {
+    const result = await adapter.respondToSource(workspaceId, responded, input.decision, {
+      note: input.note ?? null,
+    });
+    sourceHandledTeamNotify = result.handled;
+  }
+
+  // Guarantee 4: team notification on every outcome — UNLESS the source path already owns it
+  // (no double-notify). Types without a respondToSource still notify here as before.
+  if (!sourceHandledTeamNotify) {
+    notifyTeamOfResponse(workspaceId, responded, input.decision);
+  }
   // INTENTIONAL two-phase broadcast (do NOT "optimize" into a single emit): on an opt-in
   // apply this emits DELIVERABLE_UPDATED status:approved here, then a SECOND
   // status:applied from applyApprovedDeliverable after the (slow) external apply call.

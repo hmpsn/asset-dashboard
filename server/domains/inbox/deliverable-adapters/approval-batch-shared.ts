@@ -21,16 +21,30 @@
  * make the disabled-apply contract explicit (it is unreachable while `appliesOnApprove`
  * is false).
  *
- * Leaf rule: this module imports only shared types + the store input shape; it is NOT
- * imported back by the store/service (no circular value-import).
+ * R2 — respond propagation: `respondToApprovalBatchSource` maps a deliverable back to its
+ * legacy batch (via `payload.legacyBatchId`) and drives the SHARED `respondToApprovalBatch`
+ * service so a unified-inbox decision writes the REAL approval items (not just the mirror).
+ * approve → items approved; changes_requested/declined → items rejected. The service owns the
+ * team email, so the adapter returns `{ handled: true }` for the no-double-notify contract.
+ *
+ * Leaf rule: this module imports shared types + the store input shape + the R2 respond
+ * service (which itself imports the approvals store / email / broadcast — none of which import
+ * back into the adapters, so there is no circular value-import).
  */
 import type { ApprovalBatch, ApprovalItem } from '../../../../shared/types/approvals.js';
 import type {
   BuiltDeliverablePayload,
+  DeliverableSourceDecision,
+  RespondToSourceOptions,
+  RespondToSourceResult,
   SendableResult,
 } from './types.js';
 import type { UpsertDeliverableItemInput } from '../../../client-deliverables.js';
 import type { ClientDeliverable, DeliverableType } from '../../../../shared/types/client-deliverable.js';
+import { respondToApprovalBatch } from '../approval-batch-respond.js';
+import { createLogger } from '../../../logger.js';
+
+const log = createLogger('approval-batch-shared');
 
 /**
  * The adapter input for every approval_batch-family type: the legacy ApprovalBatch as
@@ -213,4 +227,51 @@ export async function applyDisabledStub(_deliverable: ClientDeliverable): Promis
   throw new Error(
     'approval_batch apply is not wired until cutover (D-apply): apply stays disabled behind the flag until the field map soaks',
   );
+}
+
+/**
+ * Read the legacy approval-batch id off a mirrored deliverable's payload. Every
+ * approval_batch-family adapter stashes it as `payload.legacyBatchId`
+ * (`buildApprovalBatchPayload`), so this is the deliverable → source mapping for the family.
+ */
+function legacyBatchId(deliverable: ClientDeliverable): string | null {
+  const id = (deliverable.payload as { legacyBatchId?: unknown })?.legacyBatchId;
+  return typeof id === 'string' && id.trim() ? id : null;
+}
+
+/**
+ * R2 source propagation for the whole approval_batch family. Maps the deliverable back to its
+ * legacy batch and drives the SHARED respondToApprovalBatch service:
+ *   - approved                       → every pending item approved
+ *   - changes_requested / declined   → every pending item rejected (client note carried through)
+ *
+ * The shared service fires the team email + APPROVAL_UPDATE broadcast + activity, so this
+ * returns `{ handled: true }` (the source path owns the team notification — no double-notify).
+ * A missing/legacy-less payload or absent batch is a swallowed best-effort miss (the
+ * deliverable mirror has already moved); we still report `handled: true` so the unified path
+ * does not ALSO send a deliverable-level team email for a family whose canonical surface is the
+ * source batch. Throws InvalidTransitionError only if an item is in an illegal state for the
+ * move (the route/caller surfaces it as a 4xx).
+ */
+export async function respondToApprovalBatchSource(
+  workspaceId: string,
+  deliverable: ClientDeliverable,
+  decision: DeliverableSourceDecision,
+  opts: RespondToSourceOptions = {},
+): Promise<RespondToSourceResult> {
+  const batchId = legacyBatchId(deliverable);
+  if (!batchId) {
+    log.warn(
+      { workspaceId, deliverableId: deliverable.id, type: deliverable.type },
+      'approval_batch respondToSource: no legacyBatchId in payload — source not updated',
+    );
+    return { handled: true };
+  }
+  // approve → approved; changes_requested / declined → rejected (the family's reject path).
+  const batchDecision = decision === 'approved' ? 'approved' : 'rejected';
+  respondToApprovalBatch(workspaceId, batchId, batchDecision, {
+    note: opts.note ?? null,
+    actor: opts.actor,
+  });
+  return { handled: true };
 }

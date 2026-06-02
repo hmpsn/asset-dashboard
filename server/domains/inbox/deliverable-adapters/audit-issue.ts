@@ -27,6 +27,7 @@ import {
   approvalBatchSourceRef,
   auditCheckField,
   buildApprovalBatchPayload,
+  respondToApprovalBatchSource,
   validateApprovalBatchSendable,
 } from './approval-batch-shared.js';
 
@@ -66,6 +67,9 @@ export const auditIssueAdapter: DeliverableAdapter<ApprovalBatchInput> = {
   buildPayload: (batch) =>
     buildApprovalBatchPayload('audit_issue', batch, (item) => resolveAuditItemField(item)),
   sourceRef: (batch) => approvalBatchSourceRef('audit_issue', batch),
+  // R2: propagate the client decision to the legacy approval batch (R2 is decision-only;
+  // apply stays disabled — a rejected non-meta audit item can still never write meta).
+  respondToSource: respondToApprovalBatchSource,
   // apply opt-out — D-apply. Stub throws if ever reached. Even after the field map soaks,
   // only meta checks become applyable; non-meta checks stay applyable=false forever.
   applyDeliverable: applyDisabledStub,

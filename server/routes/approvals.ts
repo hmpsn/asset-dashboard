@@ -20,6 +20,7 @@ import {
 } from '../approvals.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { mirrorApprovalBatchToDeliverable } from '../domains/inbox/approval-batch-dual-write.js';
+import { respondToApprovalBatch } from '../domains/inbox/approval-batch-respond.js';
 import { notifyApprovalReady, notifyTeamActionApproved, notifyTeamChangesRequested } from '../email.js';
 import { getClientActor, requireClientPortalAuth } from '../middleware.js';
 import {
@@ -43,7 +44,6 @@ import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
 import { normalizePageUrl } from '../helpers.js';
 import { WS_EVENTS } from '../ws-events.js';
-import db from '../db/index.js';
 import { toClientInboxApprovalBatch, toClientInboxApprovalBatches } from '../serializers/client-safe.js';
 
 const log = createLogger('approvals');
@@ -240,6 +240,8 @@ const bulkApproveSchema = z.object({
 
 // Bulk-approve all pending items in a batch (client submits trust-first approval)
 // MUST precede the /:itemId route so 'approve' is not captured as a param.
+// Delegates to the shared respondToApprovalBatch service (R2) so this route and the
+// unified-inbox respond propagation drive the SAME source write (no divergence).
 router.patch('/api/public/approvals/:workspaceId/:batchId/approve', requireClientPortalAuth(), validate(bulkApproveSchema), (req, res, next) => {
   const { workspaceId, batchId } = req.params;
   const { clientNote } = req.body as { clientNote?: string };
@@ -252,42 +254,26 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/approve', requireClien
     return res.status(400).json({ error: 'No pending items to approve' });
   }
 
-  let updatedBatch = batch;
+  let result: ReturnType<typeof respondToApprovalBatch>;
   try {
-    db.transaction(() => {
-      for (const item of pendingItems) {
-        const result = updateItem(workspaceId, batchId, item.id, {
-          status: 'approved',
-          ...(clientNote ? { clientNote } : {}),
-        });
-        if (result) updatedBatch = result;
-      }
-    })();
+    // No db.transaction() wrapper: the service drives the per-item updateItem writes (each
+    // persists independently — there is no cross-item atomicity invariant) and then fires the
+    // team email + broadcast + activity. Wrapping those non-DB side-effects in a transaction
+    // would couple them to a rollback; the R2 unified respond path calls the same service
+    // without a transaction, so this keeps both callers identical.
+    result = respondToApprovalBatch(workspaceId, batchId, 'approved', {
+      note: clientNote ?? null,
+      actor: getClientActor(req, workspaceId),
+    });
   } catch (err: unknown) {
     if (err instanceof Error && err.name === 'InvalidTransitionError') {
       return res.status(400).json({ error: err.message });
     }
     return next(err);
   }
+  if (!result) return res.status(404).json({ error: 'Batch not found' });
 
-  const actorInfo = getClientActor(req, workspaceId);
-  addActivity(workspaceId, 'approval_applied',
-    `${actorInfo?.name || 'Client'} approved all changes in batch "${batch.name}"`,
-    clientNote || undefined,
-    { batchId },
-    actorInfo);
-  const wsInfo = getWorkspace(workspaceId);
-  notifyTeamActionApproved({
-    workspaceId,
-    workspaceName: wsInfo?.name || workspaceId,
-    actionTitle: `SEO batch approved: ${batch.name}`,
-    sourceType: 'seo_approval',
-    actionSummary: `${pendingItems.length} approved change${pendingItems.length === 1 ? '' : 's'}`,
-    clientNote,
-  });
-
-  broadcastToWorkspace(workspaceId, WS_EVENTS.APPROVAL_UPDATE, { batchId, status: 'approved' });
-  res.json(updatedBatch);
+  res.json(result.batch);
 });
 
 router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClientPortalAuth(), validate(updateItemSchema), (req, res, next) => {

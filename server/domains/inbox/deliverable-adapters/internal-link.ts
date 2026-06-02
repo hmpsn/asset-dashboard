@@ -21,6 +21,7 @@ import {
   applyDisabledStub,
   buildClientActionPayload,
   internalLinkItems,
+  respondToClientActionSource,
   validateNonEmptyItems,
 } from './client-action-shared.js';
 
@@ -31,6 +32,8 @@ export const internalLinkAdapter: DeliverableAdapter<ClientActionInput> = {
     buildClientActionPayload('internal_link', action, internalLinkItems(action), 'suggestion'),
   // Stable per-site key (B17): internal_link:<siteId>. Null when the workspace has no site.
   sourceRef: ({ siteId }) => (siteId ? `internal_link:${siteId}` : null),
+  // R2: propagate the client decision to the legacy client_action. Source path owns the email.
+  respondToSource: respondToClientActionSource,
   // apply opt-out — D-apply (permanent for this family). Stub throws if ever reached.
   applyDeliverable: applyDisabledStub,
 };

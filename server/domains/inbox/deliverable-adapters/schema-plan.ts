@@ -47,7 +47,16 @@ import type { SchemaSitePlan } from '../../../../shared/types/schema-plan.js';
 import type { ClientDeliverable } from '../../../../shared/types/client-deliverable.js';
 import { findBySourceRef } from '../../../client-deliverables.js';
 import { createLogger } from '../../../logger.js';
-import { registerAdapter, type BuiltDeliverablePayload, type DeliverableAdapter, type SendableResult } from './types.js';
+import { respondToSchemaPlanFeedback } from '../schema-plan-respond.js';
+import {
+  registerAdapter,
+  type BuiltDeliverablePayload,
+  type DeliverableAdapter,
+  type DeliverableSourceDecision,
+  type RespondToSourceOptions,
+  type RespondToSourceResult,
+  type SendableResult,
+} from './types.js';
 
 const log = createLogger('schema-plan-adapter');
 
@@ -137,10 +146,60 @@ export const schemaPlanAdapter: DeliverableAdapter<SchemaPlanInput> = {
   // re-send dedupes onto one deliverable row. Null only if a malformed plan has no siteId.
   sourceRef: ({ plan }) => (plan.siteId ? `schema_plan:${plan.siteId}` : null),
 
+  // R2: propagate the client decision to the legacy schema_site_plans row (approve →
+  // client_approved; changes_requested/declined → client_changes_requested). Operator publish
+  // of the per-page markup stays a separate transition (D-apply) — R2 is decision-only.
+  respondToSource: respondToSchemaPlanSource,
+
   // apply opt-out — D-apply. A client approving the STRATEGY does not auto-publish the per-page
   // schema markup; operator publish is a separate transition. Stub throws if ever reached.
   applyDeliverable: schemaPlanApplyDisabledStub,
 };
+
+/**
+ * Read the legacy siteId off a mirrored schema_plan deliverable. The adapter stores it as the
+ * `externalRef` (and mirrors it into `payload.siteId`); prefer the externalRef, falling back to
+ * the payload field. This is the deliverable → source mapping for schema_plan.
+ */
+function schemaPlanSiteId(deliverable: ClientDeliverable): string | null {
+  if (typeof deliverable.externalRef === 'string' && deliverable.externalRef.trim()) {
+    return deliverable.externalRef;
+  }
+  const fromPayload = (deliverable.payload as { siteId?: unknown })?.siteId;
+  return typeof fromPayload === 'string' && fromPayload.trim() ? fromPayload : null;
+}
+
+/**
+ * R2 source propagation for schema_plan. Maps the deliverable back to its site and drives the
+ * SHARED `respondToSchemaPlanFeedback` service:
+ *   - approved                       → plan status `client_approved`
+ *   - changes_requested / declined   → plan status `client_changes_requested` (note carried)
+ *
+ * The schema-plan source path notifies the team via the activity log + SCHEMA_PLAN_SENT
+ * broadcast (it has NO team email — same as the legacy feedback route, by design / B4-parity).
+ * To keep the no-double-notify contract — the source path is the single owner of the team-facing
+ * signal — this returns `{ handled: true }`, so respondToDeliverable suppresses its own
+ * deliverable-level team email for schema_plan. A missing siteId / absent plan is a swallowed
+ * best-effort miss (the deliverable mirror has already moved).
+ */
+export function respondToSchemaPlanSource(
+  workspaceId: string,
+  deliverable: ClientDeliverable,
+  decision: DeliverableSourceDecision,
+  opts: RespondToSourceOptions = {},
+): RespondToSourceResult {
+  const siteId = schemaPlanSiteId(deliverable);
+  if (!siteId) {
+    log.warn(
+      { workspaceId, deliverableId: deliverable.id },
+      'schema_plan respondToSource: no siteId on deliverable (externalRef/payload) — source not updated',
+    );
+    return { handled: true };
+  }
+  const action = decision === 'approved' ? 'approve' : 'request_changes';
+  respondToSchemaPlanFeedback(workspaceId, siteId, action, opts.note ?? null);
+  return { handled: true };
+}
 
 /**
  * The disabled-apply stub for schema_plan. The client approving the schema strategy does NOT

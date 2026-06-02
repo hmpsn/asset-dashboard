@@ -26,6 +26,7 @@ import {
   buildClientActionPayload,
   originPageUrl,
   originTargetKeyword,
+  respondToClientActionSource,
 } from './client-action-shared.js';
 
 /** Resolve the decaying page path for the sourceRef: origin → payload.page.page → null. */
@@ -64,6 +65,8 @@ export const contentDecayAdapter: DeliverableAdapter<ClientActionInput> = {
     if (pagePath) return `content_decay:${pagePath}`;
     return input.action.sourceId ?? null;
   },
+  // R2: propagate the client decision to the legacy client_action. Source path owns the email.
+  respondToSource: respondToClientActionSource,
   // apply opt-out — D-apply (permanent for this family). Stub throws if ever reached.
   applyDeliverable: applyDisabledStub,
 };

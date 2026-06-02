@@ -16,6 +16,7 @@ import {
   applyDisabledStub,
   approvalBatchSourceRef,
   buildApprovalBatchPayload,
+  respondToApprovalBatchSource,
   validateApprovalBatchSendable,
 } from './approval-batch-shared.js';
 
@@ -29,6 +30,9 @@ export const schemaItemAdapter: DeliverableAdapter<ApprovalBatchInput> = {
       applyable: false,
     })),
   sourceRef: (batch) => approvalBatchSourceRef('schema_item', batch),
+  // R2: propagate the client decision to the legacy approval batch (decision-only; the
+  // per-page schema markup publish stays a separate operator transition).
+  respondToSource: respondToApprovalBatchSource,
   applyDeliverable: applyDisabledStub,
 };
 

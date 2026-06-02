@@ -20,6 +20,7 @@ import {
   applyDisabledStub,
   buildClientActionPayload,
   redirectItems,
+  respondToClientActionSource,
   validateNonEmptyItems,
 } from './client-action-shared.js';
 
@@ -30,6 +31,9 @@ export const redirectAdapter: DeliverableAdapter<ClientActionInput> = {
     buildClientActionPayload('redirect', action, redirectItems(action), 'redirect'),
   // Stable per-site key (B17): redirect:<siteId>. Null when the workspace has no site.
   sourceRef: ({ siteId }) => (siteId ? `redirect:${siteId}` : null),
+  // R2: propagate the client decision to the legacy client_action (approve → approved;
+  // changes_requested/declined → changes_requested). The source path owns the team email.
+  respondToSource: respondToClientActionSource,
   // apply opt-out — D-apply (permanent for this family). Stub throws if ever reached.
   applyDeliverable: applyDisabledStub,
 };
