@@ -91,6 +91,15 @@ export const contentPosts = {
 
   aifix: (wsId: string, postId: string, body: AiFixRequest) =>
     post<AiFixResult>(`/api/content-posts/${wsId}/${postId}/ai-fix`, body),
+
+  // Send a generated post to the client for review (POST-C1). Distinct from the internal
+  // "Review" status bump — this creates a client-facing content_request (post_review) that
+  // reaches the client inbox. Optional inline note per the Admin Send Convention.
+  sendToClient: (wsId: string, postId: string, note?: string) =>
+    post<ContentTopicRequest>(
+      `/api/content-requests/${wsId}/posts/${postId}/send-to-client`,
+      note ? { note } : {},
+    ),
 };
 
 export const contentRequests = {
