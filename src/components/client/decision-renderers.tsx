@@ -40,6 +40,15 @@ export interface ItemDiffRowProps {
    * so the flag controls would be inert). The Current/Proposed diff still renders.
    */
   readOnly?: boolean;
+  /**
+   * ISSUE 1b — when true, the Current/Proposed values get a "Show full ↓ / Show less ↑" toggle that
+   * swaps the default `line-clamp-2` clamp for a scrollable monospace block (overflow-y-auto,
+   * max-h-[200px], font-mono — mirrors the legacy ApprovalBatchCard schema preview). Used by
+   * InlineApprovalCard ONLY for `field === 'schema'` items (long JSON-LD). Defaults to `false`,
+   * which preserves the EXACT current `line-clamp-2` rendering for the existing modal caller — a
+   * no-regression invariant.
+   */
+  expandable?: boolean;
 }
 
 /**
@@ -57,9 +66,19 @@ export function ItemDiffRow({
   onFlag,
   onUnflag,
   readOnly = false,
+  expandable = false,
 }: ItemDiffRowProps) {
   const [flagging, setFlagging] = useState(false);
   const [note, setNote] = useState('');
+  const [expanded, setExpanded] = useState(false);
+
+  // ISSUE 1b — when `expandable` and the value is expanded, swap the 2-line clamp for a scrollable
+  // monospace block (matches legacy ApprovalBatchCard schema preview: 200px, font-mono). When not
+  // expandable (the existing modal caller) this resolves to the unchanged `line-clamp-2`.
+  const valueClass =
+    expandable && expanded
+      ? 't-caption text-[var(--brand-text)] overflow-y-auto max-h-[200px] font-mono whitespace-pre-wrap'
+      : 't-caption text-[var(--brand-text)] line-clamp-2';
 
   return (
     <div
@@ -76,17 +95,27 @@ export function ItemDiffRow({
           <div className="grid grid-cols-2 gap-3 mt-1">
             <div>
               <p className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Current</p>
-              <p className="t-caption text-[var(--brand-text)] line-clamp-2">
+              <p className={valueClass}>
                 {currentValue || '—'}
               </p>
             </div>
             <div>
               <p className="t-caption-sm text-accent-brand mb-0.5">Proposed</p>
-              <p className="t-caption text-[var(--brand-text)] line-clamp-2">
+              <p className={valueClass}>
                 {proposedValue || '—'}
               </p>
             </div>
           </div>
+          {expandable && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setExpanded((v) => !v)}
+              className="mt-1 t-caption-sm text-accent-brand hover:text-[var(--brand-text)] transition-colors px-0"
+            >
+              {expanded ? 'Show less ↑' : 'Show full ↓'}
+            </Button>
+          )}
         </div>
         <div className="flex-shrink-0">
           {readOnly ? null : flagged ? (
