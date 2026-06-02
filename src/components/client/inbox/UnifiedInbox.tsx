@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Inbox, FileText, ListChecks, MessageSquare, UploadCloud, Clock, Loader2, CheckCircle2, Send } from 'lucide-react';
+import { Inbox, FileText, ListChecks, MessageSquare, UploadCloud, Clock, Loader2, CheckCircle2, Send, Plus } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { LoadingState, Button, ConfirmDialog, ErrorState, StatusBadge } from '../../ui';
 import { FormTextarea } from '../../ui/forms/FormTextarea';
@@ -9,6 +9,7 @@ import { DecisionCard } from '../DecisionCard';
 import { DeliverableDetailModal } from '../DeliverableDetailModal';
 import { InlineApprovalCard } from './InlineApprovalCard';
 import { ProjectedReviewModal } from './ProjectedReviewModal';
+import { SubmitRequestChooserModal } from './SubmitRequestChooserModal';
 import { normalizeDeliverable, isProjectedDeliverable } from '../../../lib/decision-adapters';
 import { useUnifiedInbox, useRespondToDeliverable, useApplyDeliverable } from '../../../hooks/client/useUnifiedInbox';
 import { useClientWorkOrderComments, usePostClientWorkOrderComment } from '../../../hooks/client/useWorkOrderConversation';
@@ -35,6 +36,12 @@ export type UnifiedInboxContentTabProps = Omit<
 type UnifiedInboxProps = UnifiedInboxContentTabProps & {
   workspaceId: string;
   setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
+  /**
+   * Item 1 — the logged-in client user (or null for password-only portals). Threaded so the
+   * "Submit a request" chooser can pre-fill the submitter on the free-form request form (matching
+   * the legacy RequestsTab behavior). Optional → password-only portals show the "Your Name" field.
+   */
+  clientUser?: { id: string; name: string; email: string; role: string } | null;
 };
 
 /**
@@ -293,12 +300,14 @@ function SectionHeading({ title, subtitle }: { title: string; subtitle: string }
  * This component is only rendered when the flag is ON (InboxTab branches on it); the hook is
  * additionally flag-gated so the fetch never fires with the flag off.
  */
-export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: UnifiedInboxProps) {
+export function UnifiedInbox({ workspaceId, setToast, clientUser, ...contentTabProps }: UnifiedInboxProps) {
   const queryClient = useQueryClient();
   // Item 2 — edit-before-approve is gated to the non-free tier (legacy ApprovalsTab parity:
   // edit/approve were behind `effectiveTier !== 'free'`). `effectiveTier` rides in the ContentTab
   // pass-through props the inbox already receives.
   const editable = contentTabProps.effectiveTier !== 'free';
+  // Item 1 — the "Submit a request" chooser modal open state.
+  const [chooserOpen, setChooserOpen] = useState(false);
   const { deliverables, isLoading, isError, refetch } = useUnifiedInbox(workspaceId);
   const respond = useRespondToDeliverable(workspaceId);
   const apply = useApplyDeliverable(workspaceId);
@@ -507,6 +516,15 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
 
   return (
     <div className="space-y-6">
+      {/* Item 1 — persistent "Submit a request" entry point. Lives at the TOP of the tree (above the
+          PriorityStrip) so flag-on clients can always initiate a request — even when the queue is
+          empty. Opens the chooser ("Ask for content" vs "Send a request"). */}
+      <div className="flex items-center justify-end">
+        <Button size="sm" variant="primary" icon={Plus} onClick={() => setChooserOpen(true)}>
+          Submit a request
+        </Button>
+      </div>
+
       {/* The single prioritized "Needs your attention" list (PriorityStrip, finally mounted).
           F2 — only claim "all caught up" when there is NO live work below either: an empty actionable
           queue with items in Ready-to-publish or Work-in-progress must NOT show the banner above them. */}
@@ -704,6 +722,19 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
         onConfirm={() => void confirmApply()}
         onCancel={() => setApplyConfirm(null)}
       />
+
+      {/* Item 1 — the "Submit a request" chooser (free-form request reuse + content-topic pricing
+          reuse). Mounted on demand from the header button. */}
+      {chooserOpen && (
+        <SubmitRequestChooserModal
+          workspaceId={workspaceId}
+          clientUser={clientUser}
+          setToast={setToast}
+          onDismiss={() => setChooserOpen(false)}
+          setPricingModal={contentTabProps.setPricingModal}
+          pricingConfirming={contentTabProps.pricingConfirming}
+        />
+      )}
     </div>
   );
 }

@@ -311,6 +311,7 @@ export function InboxTab({
         <UnifiedInbox
           workspaceId={workspaceId}
           setToast={setToast}
+          clientUser={clientUser}
           contentRequests={contentRequests}
           setContentRequests={setContentRequests}
           effectiveTier={effectiveTier}

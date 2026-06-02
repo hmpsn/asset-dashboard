@@ -8,7 +8,7 @@
  *     (Approve / Request changes / Decline), and the verbs call the respond mutation.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import type { ClientDeliverable } from '../../shared/types/client-deliverable';
 
 // ── Mocks ──
@@ -235,6 +235,76 @@ describe('InboxTab unified-inbox flag gating', () => {
 
     render(<InboxTab {...baseProps} />);
     expect(screen.getByText("You're all caught up")).toBeInTheDocument();
+  });
+
+  // ── Item 1 — Submit-a-request chooser ──
+
+  it('flag ON → the "Submit a request" button is present even when the queue is empty', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseUnifiedInbox.mockReturnValue({ unifiedInbox: true, deliverables: [], isLoading: false });
+
+    render(<InboxTab {...baseProps} />);
+    // Persistent entry point above the (empty) queue.
+    expect(screen.getByRole('button', { name: 'Submit a request' })).toBeInTheDocument();
+  });
+
+  it('flag ON → clicking "Submit a request" opens the chooser with both options', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseUnifiedInbox.mockReturnValue({ unifiedInbox: true, deliverables: [], isLoading: false });
+
+    render(<InboxTab {...baseProps} />);
+    expect(screen.queryByRole('dialog', { name: 'Submit a request' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Submit a request' }));
+    expect(screen.getByRole('dialog', { name: 'Submit a request' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Ask for content/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Send a request/ })).toBeInTheDocument();
+  });
+
+  it('flag ON → chooser → "Send a request" mounts the extracted SubmitRequestForm (pre-filled categories)', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseUnifiedInbox.mockReturnValue({ unifiedInbox: true, deliverables: [], isLoading: false });
+
+    render(<InboxTab {...baseProps} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Submit a request' }));
+    fireEvent.click(screen.getByRole('button', { name: /Send a request/ }));
+
+    // The extracted free-form request form renders, with its pre-filled category select.
+    expect(screen.getByText('Submit a Request')).toBeInTheDocument();
+    const select = screen.getByRole('combobox');
+    const labels = within(select).getAllByRole('option').map((o) => o.textContent);
+    expect(labels).toEqual(['Content Update', 'Design Change', 'Bug Report', 'SEO', 'New Feature', 'Other']);
+  });
+
+  it('flag ON → chooser → "Ask for content" → Continue reuses the pricing flow (setPricingModal, source:client)', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseUnifiedInbox.mockReturnValue({ unifiedInbox: true, deliverables: [], isLoading: false });
+
+    render(<InboxTab {...baseProps} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Submit a request' }));
+    fireEvent.click(screen.getByRole('button', { name: /Ask for content/ }));
+
+    fireEvent.change(screen.getByPlaceholderText(/Topic name/), { target: { value: 'Sedation dentistry benefits' } });
+    fireEvent.change(screen.getByPlaceholderText(/Target keyword/), { target: { value: 'sedation dentistry' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    // Reuses the EXISTING content-topic pricing flow (the same setPricingModal ContentTab calls).
+    expect(baseProps.setPricingModal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        serviceType: 'brief_only',
+        topic: 'Sedation dentistry benefits',
+        targetKeyword: 'sedation dentistry',
+        source: 'client',
+      }),
+    );
+    // The chooser closes so the global PricingConfirmationModal isn't stacked under it.
+    expect(screen.queryByRole('dialog', { name: 'Ask for content' })).not.toBeInTheDocument();
+  });
+
+  it('flag OFF → no "Submit a request" button (legacy layout)', () => {
+    mockUseFeatureFlag.mockImplementation(() => false);
+    render(<InboxTab {...baseProps} />);
+    expect(screen.queryByRole('button', { name: 'Submit a request' })).not.toBeInTheDocument();
   });
 
   // ── Item 5 — section headings + vocab reconcile ──
