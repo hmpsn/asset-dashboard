@@ -118,21 +118,30 @@ interface ClientCopyReviewProps {
    * `undefined` → no auto-expand → legacy call sites (InboxTab) behave exactly as before.
    */
   initialExpandedEntryId?: string;
+  /**
+   * ISSUE 2b — SOLO mode (single-item review): when set, this surface shows ONLY the entry with this
+   * id, with the header + summary-stats row + per-blueprint h3 hidden. Used by ProjectedReviewModal
+   * so a copy review shows just the opened entry instead of every entry. Default `undefined` →
+   * `isSolo` false → all entries + chrome render exactly as before (legacy mounts → byte-identical).
+   */
+  soloEntryId?: string;
 }
 
 // ── Main component ──
 
-export function ClientCopyReview({ workspaceId, initialExpandedEntryId }: ClientCopyReviewProps) {
+export function ClientCopyReview({ workspaceId, initialExpandedEntryId, soloEntryId }: ClientCopyReviewProps) {
   return (
     <ErrorBoundary>
-      <ClientCopyReviewInner workspaceId={workspaceId} initialExpandedEntryId={initialExpandedEntryId} />
+      <ClientCopyReviewInner workspaceId={workspaceId} initialExpandedEntryId={initialExpandedEntryId} soloEntryId={soloEntryId} />
     </ErrorBoundary>
   );
 }
 
-function ClientCopyReviewInner({ workspaceId, initialExpandedEntryId }: ClientCopyReviewProps) {
+function ClientCopyReviewInner({ workspaceId, initialExpandedEntryId, soloEntryId }: ClientCopyReviewProps) {
   const queryClient = useQueryClient();
-  const [expandedEntryId, setExpandedEntryId] = useState<string | null>(initialExpandedEntryId ?? null);
+  // ISSUE 2b — solo mode: show only `soloEntryId`, hide chrome. Default false → full list unchanged.
+  const isSolo = soloEntryId != null;
+  const [expandedEntryId, setExpandedEntryId] = useState<string | null>(initialExpandedEntryId ?? soloEntryId ?? null);
 
   // ── Real-time updates ──
   // Invalidate all section queries for the workspace (not just the currently expanded
@@ -195,7 +204,7 @@ function ClientCopyReviewInner({ workspaceId, initialExpandedEntryId }: ClientCo
     );
   }
 
-  // ── Empty state ──
+  // ── Empty state (whole list empty) ──
   if (entries.length === 0) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-6">
@@ -208,8 +217,22 @@ function ClientCopyReviewInner({ workspaceId, initialExpandedEntryId }: ClientCo
     );
   }
 
+  // ISSUE 2b — solo mode shows only the seeded entry. Mutually exclusive with the whole-empty
+  // EmptyState above (entries.length > 0 here).
+  const visibleEntries = isSolo ? entries.filter(e => e.id === soloEntryId) : entries;
+
+  // Solo not-found: entries loaded but none match the seed (transient pre-hydration window) →
+  // contextual message, not a blank modal.
+  if (isSolo && visibleEntries.length === 0) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-6">
+        <p className="t-body text-[var(--brand-text-muted)] py-8 text-center">Loading review…</p>
+      </div>
+    );
+  }
+
   // ── Group entries by blueprint ──
-  const grouped = entries.reduce<Record<string, { blueprintName: string; items: CopyEntryListItem[] }>>((acc, entry) => {
+  const grouped = visibleEntries.reduce<Record<string, { blueprintName: string; items: CopyEntryListItem[] }>>((acc, entry) => {
     if (!acc[entry.blueprintId]) {
       acc[entry.blueprintId] = { blueprintName: entry.blueprintName, items: [] };
     }
@@ -219,30 +242,34 @@ function ClientCopyReviewInner({ workspaceId, initialExpandedEntryId }: ClientCo
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-      {/* Header */}
-      <div>
-        <h2 className="t-h2 text-[var(--brand-text-bright)]">Copy Review</h2>
-        <p className="t-body text-[var(--brand-text)] mt-1">
-          Review your website copy and approve sections or suggest changes.
-        </p>
-      </div>
+      {/* Header (hidden in solo mode — the modal supplies its own title) */}
+      {!isSolo && (
+        <div>
+          <h2 className="t-h2 text-[var(--brand-text-bright)]">Copy Review</h2>
+          <p className="t-body text-[var(--brand-text)] mt-1">
+            Review your website copy and approve sections or suggest changes.
+          </p>
+        </div>
+      )}
 
-      {/* Summary stats */}
-      <div className="flex gap-4 t-caption text-[var(--brand-text)]">
-        <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-[var(--radius-pill)] bg-teal-500" />
-          {entries.reduce((n, e) => n + e.copyStatus.clientReviewSections, 0)} awaiting your review
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-[var(--radius-pill)] bg-emerald-500" />
-          {entries.reduce((n, e) => n + e.copyStatus.approvedSections, 0)} approved
-        </span>
-      </div>
+      {/* Summary stats (hidden in solo mode) */}
+      {!isSolo && (
+        <div className="flex gap-4 t-caption text-[var(--brand-text)]">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-[var(--radius-pill)] bg-teal-500" />
+            {entries.reduce((n, e) => n + e.copyStatus.clientReviewSections, 0)} awaiting your review
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-[var(--radius-pill)] bg-emerald-500" />
+            {entries.reduce((n, e) => n + e.copyStatus.approvedSections, 0)} approved
+          </span>
+        </div>
+      )}
 
       {/* Entry list grouped by blueprint */}
       {Object.entries(grouped).map(([bpId, { blueprintName, items }]) => (
         <div key={bpId} className="space-y-3">
-          <h3 className="t-label text-[var(--brand-text-bright)] tracking-wider">{blueprintName}</h3>
+          {!isSolo && <h3 className="t-label text-[var(--brand-text-bright)] tracking-wider">{blueprintName}</h3>}
           {items.map((entry, idx) => (
             <EntryCard
               key={entry.id}
