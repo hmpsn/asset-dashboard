@@ -148,7 +148,8 @@ describe('DeliverableDetailModal — approval family (seo_edit, typed items)', (
 
     fireEvent.click(screen.getByRole('button', { name: /implement 2 of 3/i }));
     await waitFor(() => {
-      expect(onApprove).toHaveBeenCalledWith([{ itemId: 'd1', note: '' }]);
+      // Item 2 — onApprove now carries (flaggedItems, editedItems); no edits here → empty edit list.
+      expect(onApprove).toHaveBeenCalledWith([{ itemId: 'd1', note: '' }], []);
     });
   });
 
@@ -156,7 +157,7 @@ describe('DeliverableDetailModal — approval family (seo_edit, typed items)', (
     const onApprove = vi.fn().mockResolvedValue(undefined);
     renderModal(seoDecision, onApprove);
     fireEvent.click(screen.getByRole('button', { name: /implement 3 →/i }));
-    await waitFor(() => expect(onApprove).toHaveBeenCalledWith([]));
+    await waitFor(() => expect(onApprove).toHaveBeenCalledWith([], []));
   });
 });
 
@@ -168,8 +169,9 @@ describe('DeliverableDetailModal — client_action family (payload.items, read-o
     expect(screen.getByText('/old-b')).toBeInTheDocument();
     // No per-item flag UX for the client_action family.
     expect(screen.queryByRole('button', { name: /^flag$/i })).not.toBeInTheDocument();
-    // Whole-action approve CTA (not "implement N").
-    expect(screen.getByRole('button', { name: /^approve →$/i })).toBeInTheDocument();
+    // Item 5 — canonical approve CTA, now shared with the approval family (redirect itemCount=2 →
+    // "implement 2 →"). The client_action family has no typed items to hold, so no "of M" subset.
+    expect(screen.getByRole('button', { name: /^looks good — implement 2 →$/i })).toBeInTheDocument();
   });
 
   it('internal_link deliverable feeds payload.items to the InternalLinkRenderer table', () => {
@@ -340,5 +342,34 @@ describe('DeliverableDetailModal — R3b Apply to Website footer', () => {
     renderModal(seoDecision);
     expect(screen.queryByRole('button', { name: /apply to website/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /implement 3 →/i })).toBeInTheDocument();
+  });
+});
+
+describe('DeliverableDetailModal — item 3: centered resized modal shell', () => {
+  it('uses the centered max-h panel (not the old full-bleed h-full shell)', () => {
+    renderModal(seoDecision);
+    const dialog = screen.getByRole('dialog');
+    // Outer wrapper centers the panel instead of stacking it full-bleed.
+    expect(dialog.className).toContain('items-center');
+    expect(dialog.className).toContain('justify-center');
+    expect(dialog.className).not.toContain('flex-col');
+    // The panel is the centered ~75vw / ≤1200px / ~90vh card, not the old h-full / max-w-3xl shell.
+    const panel = dialog.querySelector('.relative');
+    expect(panel).not.toBeNull();
+    expect(panel!.className).toContain('max-w-[1200px]');
+    expect(panel!.className).toContain('max-h-[90vh]');
+    expect(panel!.className).toContain('sm:w-[75vw]');
+    expect(panel!.className).toContain('rounded-[var(--radius-xl)]');
+    expect(panel!.className).not.toContain('h-full');
+    expect(panel!.className).not.toContain('max-w-3xl');
+  });
+
+  it('backdrop uses the brand-overlay token (SG-3), not raw bg-black/80', () => {
+    renderModal(seoDecision);
+    const dialog = screen.getByRole('dialog');
+    const backdrop = dialog.querySelector('.absolute.inset-0');
+    expect(backdrop).not.toBeNull();
+    expect(backdrop!.className).toContain('bg-[var(--brand-overlay)]');
+    expect(backdrop!.className).not.toContain('bg-black/80');
   });
 });

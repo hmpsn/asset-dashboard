@@ -8,7 +8,7 @@
  *     (Approve / Request changes / Decline), and the verbs call the respond mutation.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import type { ClientDeliverable } from '../../shared/types/client-deliverable';
 
 // ── Mocks ──
@@ -204,7 +204,8 @@ describe('InboxTab unified-inbox flag gating', () => {
 
     // The title appears in both the PriorityStrip item and the DecisionCard.
     expect(screen.getAllByText('Redirect plan for /old').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
+    // Item 5 — canonical approve CTA (redirect default itemCount=1 → "implement 1 →").
+    expect(screen.getByRole('button', { name: 'Looks good — implement 1 →' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Request changes' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Decline' })).toBeInTheDocument();
 
@@ -221,7 +222,7 @@ describe('InboxTab unified-inbox flag gating', () => {
     });
 
     render(<InboxTab {...baseProps} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Looks good — implement 1 →' }));
 
     expect(mockMutateAsync).toHaveBeenCalledWith(
       expect.objectContaining({ deliverableId: 'cd_abc', decision: 'approved' }),
@@ -234,6 +235,118 @@ describe('InboxTab unified-inbox flag gating', () => {
 
     render(<InboxTab {...baseProps} />);
     expect(screen.getByText("You're all caught up")).toBeInTheDocument();
+  });
+
+  // ── Item 1 — Submit-a-request chooser ──
+
+  it('flag ON → the "Submit a request" button is present even when the queue is empty', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseUnifiedInbox.mockReturnValue({ unifiedInbox: true, deliverables: [], isLoading: false });
+
+    render(<InboxTab {...baseProps} />);
+    // Persistent entry point above the (empty) queue.
+    expect(screen.getByRole('button', { name: 'Submit a request' })).toBeInTheDocument();
+  });
+
+  it('flag ON → clicking "Submit a request" opens the chooser with both options', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseUnifiedInbox.mockReturnValue({ unifiedInbox: true, deliverables: [], isLoading: false });
+
+    render(<InboxTab {...baseProps} />);
+    expect(screen.queryByRole('dialog', { name: 'Submit a request' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Submit a request' }));
+    expect(screen.getByRole('dialog', { name: 'Submit a request' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Ask for content/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Send a request/ })).toBeInTheDocument();
+  });
+
+  it('flag ON → chooser → "Send a request" mounts the extracted SubmitRequestForm (pre-filled categories)', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseUnifiedInbox.mockReturnValue({ unifiedInbox: true, deliverables: [], isLoading: false });
+
+    render(<InboxTab {...baseProps} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Submit a request' }));
+    fireEvent.click(screen.getByRole('button', { name: /Send a request/ }));
+
+    // The extracted free-form request form renders, with its pre-filled category select.
+    expect(screen.getByText('Submit a Request')).toBeInTheDocument();
+    const select = screen.getByRole('combobox');
+    const labels = within(select).getAllByRole('option').map((o) => o.textContent);
+    expect(labels).toEqual(['Content Update', 'Design Change', 'Bug Report', 'SEO', 'New Feature', 'Other']);
+  });
+
+  it('flag ON → chooser → "Ask for content" → Continue reuses the pricing flow (setPricingModal, source:client)', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseUnifiedInbox.mockReturnValue({ unifiedInbox: true, deliverables: [], isLoading: false });
+
+    render(<InboxTab {...baseProps} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Submit a request' }));
+    fireEvent.click(screen.getByRole('button', { name: /Ask for content/ }));
+
+    fireEvent.change(screen.getByPlaceholderText(/Topic name/), { target: { value: 'Sedation dentistry benefits' } });
+    fireEvent.change(screen.getByPlaceholderText(/Target keyword/), { target: { value: 'sedation dentistry' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    // Reuses the EXISTING content-topic pricing flow (the same setPricingModal ContentTab calls).
+    expect(baseProps.setPricingModal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        serviceType: 'brief_only',
+        topic: 'Sedation dentistry benefits',
+        targetKeyword: 'sedation dentistry',
+        source: 'client',
+      }),
+    );
+    // The chooser closes so the global PricingConfirmationModal isn't stacked under it.
+    expect(screen.queryByRole('dialog', { name: 'Ask for content' })).not.toBeInTheDocument();
+  });
+
+  it('flag OFF → no "Submit a request" button (legacy layout)', () => {
+    mockUseFeatureFlag.mockImplementation(() => false);
+    render(<InboxTab {...baseProps} />);
+    expect(screen.queryByRole('button', { name: 'Submit a request' })).not.toBeInTheDocument();
+  });
+
+  // ── Item 5 — section headings + vocab reconcile ──
+
+  it('flag ON → the actionable section has a visible "Decisions" heading + subtitle (was aria-only)', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseUnifiedInbox.mockReturnValue({
+      unifiedInbox: true,
+      deliverables: [makeDeliverable()],
+      isLoading: false,
+    });
+
+    render(<InboxTab {...baseProps} />);
+
+    // Visible heading (an <h3>, not just an aria-label) for the actionable section.
+    const heading = screen.getByRole('heading', { name: 'Decisions' });
+    expect(heading).toBeInTheDocument();
+    expect(heading.tagName).toBe('H3');
+    // The one-line "what is this" subtitle.
+    expect(screen.getByText('Items waiting on your decision')).toBeInTheDocument();
+    // Vocab reconcile: "Decisions" appears BOTH as the PriorityStrip chip (span) AND as the section
+    // heading (h3) — the chip and the section it scrolls to now use the same canonical noun.
+    const decisionsNodes = screen.getAllByText('Decisions');
+    expect(decisionsNodes.length).toBeGreaterThanOrEqual(2);
+    expect(decisionsNodes.some((n) => n.tagName === 'H3')).toBe(true);
+    expect(decisionsNodes.some((n) => n.tagName === 'SPAN')).toBe(true);
+  });
+
+  it('flag ON → Ready to publish + Work in progress sections render their subtitles', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseUnifiedInbox.mockReturnValue({
+      unifiedInbox: true,
+      deliverables: [makeReadyToPublishDeliverable(), makeWorkOrderDeliverable()],
+      isLoading: false,
+    });
+
+    render(<InboxTab {...baseProps} />);
+
+    expect(screen.getByRole('heading', { name: 'Ready to publish' })).toBeInTheDocument();
+    expect(screen.getByText('Approved — apply to your live site')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Work in progress' })).toBeInTheDocument();
+    expect(screen.getByText('Work your team is doing for you')).toBeInTheDocument();
   });
 
   it('flag ON → PROJECTED item (content_request) "Review →" opens the in-shell review modal, NOT navigation', () => {
@@ -411,7 +524,7 @@ describe('InboxTab unified-inbox flag gating', () => {
     });
 
     render(<InboxTab {...baseProps} />);
-    expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Looks good — implement 1 →' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Request changes' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Decline' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Review →' })).not.toBeInTheDocument();
@@ -639,13 +752,67 @@ describe('InboxTab unified-inbox flag gating', () => {
     expect(screen.getByText('New title A')).toBeInTheDocument();
     expect(screen.getByText('New desc B')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^View/ })).not.toBeInTheDocument();
-    // The inline subset-approve CTA replaces the bare "Approve" verb.
-    expect(screen.getByRole('button', { name: 'Looks good — implement 2 of 2 →' })).toBeInTheDocument();
+    // The inline subset-approve CTA replaces the bare "Approve" verb (item 5: "implement N →", no "of").
+    expect(screen.getByRole('button', { name: 'Looks good — implement 2 →' })).toBeInTheDocument();
     // Approve forwards the (empty) flagged subset to the respond mutation.
-    fireEvent.click(screen.getByRole('button', { name: 'Looks good — implement 2 of 2 →' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Looks good — implement 2 →' }));
     expect(mockMutateAsync).toHaveBeenCalledWith(
       expect.objectContaining({ deliverableId: 'cd_seo', decision: 'approved', flaggedItems: [] }),
     );
+  });
+
+  // ── Item 2 — edit-before-approve free-tier gate (the unified inbox reads effectiveTier) ──
+
+  const seoEditDeliverable = () =>
+    makeDeliverable({
+      id: 'cd_seo',
+      type: 'seo_edit',
+      kind: 'batch',
+      status: 'awaiting_client',
+      title: 'SEO title updates',
+      summary: '1 change ready for your approval',
+      items: [
+        makeApplyableItem({ id: 'i1', field: 'seoTitle', proposedValue: 'New title A', itemPayload: { pageTitle: 'Home', pageSlug: '/home' } }),
+      ],
+    });
+
+  it('flag ON + GROWTH tier → seoTitle row shows Edit; the edit flows into the respond editedItems', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseUnifiedInbox.mockReturnValue({
+      unifiedInbox: true,
+      deliverables: [seoEditDeliverable()],
+      isLoading: false,
+    });
+
+    render(<InboxTab {...baseProps} effectiveTier="growth" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    const input = screen.getByLabelText('Edit proposed seoTitle');
+    fireEvent.change(input, { target: { value: 'Client-fixed title' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save edit' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Looks good — implement 1 →' }));
+    expect(mockMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        deliverableId: 'cd_seo',
+        decision: 'approved',
+        editedItems: [{ itemId: 'i1', value: 'Client-fixed title' }],
+      }),
+    );
+  });
+
+  it('flag ON + FREE tier → the seoTitle row shows NO Edit affordance (legacy free-tier gate)', () => {
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'unified-inbox');
+    mockUseUnifiedInbox.mockReturnValue({
+      unifiedInbox: true,
+      deliverables: [seoEditDeliverable()],
+      isLoading: false,
+    });
+
+    render(<InboxTab {...baseProps} effectiveTier="free" />);
+    // The substance still renders, but the inline edit affordance is gated off for free tier.
+    expect(screen.getByText('New title A')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
   });
 
   it('flag ON → client_action batch with EMPTY items keeps the DecisionCard write verbs (not InlineApprovalCard)', () => {
@@ -670,11 +837,14 @@ describe('InboxTab unified-inbox flag gating', () => {
     });
 
     render(<InboxTab {...baseProps} />);
-    // DecisionCard uniform verbs render (the inline subset CTA does not).
-    expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
+    // DecisionCard uniform verbs render (the DecisionCard now uses the same canonical approve CTA:
+    // redirect payload.items=3 → "implement 3 →").
+    expect(screen.getByRole('button', { name: 'Looks good — implement 3 →' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Request changes' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Decline' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Looks good/ })).not.toBeInTheDocument();
+    // The DecisionCard-only "View 3 →" modal affordance confirms this routed to DecisionCard, NOT
+    // InlineApprovalCard (which renders substance inline and never shows a "View" button).
+    expect(screen.getByRole('button', { name: 'View 3 →' })).toBeInTheDocument();
   });
 
   it('flag ON → content_decay (kind:decision) keeps the DecisionCard (not InlineApprovalCard)', () => {
@@ -696,8 +866,10 @@ describe('InboxTab unified-inbox flag gating', () => {
     });
 
     render(<InboxTab {...baseProps} />);
-    // content_decay is kind:'decision' → DecisionCard uniform verbs, never the inline subset CTA.
-    expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Looks good/ })).not.toBeInTheDocument();
+    // content_decay is kind:'decision' → DecisionCard uniform verbs (itemCount=1 → "implement 1 →"),
+    // never the InlineApprovalCard inline-substance card. The DecisionCard-only "View →" affordance
+    // confirms the routing (InlineApprovalCard never renders a "View" button).
+    expect(screen.getByRole('button', { name: 'Looks good — implement 1 →' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'View →' })).toBeInTheDocument();
   });
 });

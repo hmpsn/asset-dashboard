@@ -1,14 +1,15 @@
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Inbox, FileText, ListChecks, MessageSquare, UploadCloud, Clock, Loader2, CheckCircle2, Send } from 'lucide-react';
+import { Inbox, FileText, ListChecks, MessageSquare, UploadCloud, Clock, Loader2, CheckCircle2, Send, Plus } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { LoadingState, Button, ConfirmDialog, ErrorState } from '../../ui';
+import { LoadingState, Button, ConfirmDialog, ErrorState, StatusBadge } from '../../ui';
 import { FormTextarea } from '../../ui/forms/FormTextarea';
 import { PriorityStrip, type PriorityItem } from '../PriorityStrip';
 import { DecisionCard } from '../DecisionCard';
 import { DeliverableDetailModal } from '../DeliverableDetailModal';
 import { InlineApprovalCard } from './InlineApprovalCard';
 import { ProjectedReviewModal } from './ProjectedReviewModal';
+import { SubmitRequestChooserModal } from './SubmitRequestChooserModal';
 import { normalizeDeliverable, isProjectedDeliverable } from '../../../lib/decision-adapters';
 import { useUnifiedInbox, useRespondToDeliverable, useApplyDeliverable } from '../../../hooks/client/useUnifiedInbox';
 import { useClientWorkOrderComments, usePostClientWorkOrderComment } from '../../../hooks/client/useWorkOrderConversation';
@@ -35,6 +36,12 @@ export type UnifiedInboxContentTabProps = Omit<
 type UnifiedInboxProps = UnifiedInboxContentTabProps & {
   workspaceId: string;
   setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
+  /**
+   * Item 1 — the logged-in client user (or null for password-only portals). Threaded so the
+   * "Submit a request" chooser can pre-fill the submitter on the free-form request form (matching
+   * the legacy RequestsTab behavior). Optional → password-only portals show the "Your Name" field.
+   */
+  clientUser?: { id: string; name: string; email: string; role: string } | null;
 };
 
 /**
@@ -215,8 +222,10 @@ function WorkOrderTrackCard({
                 <li
                   key={c.id}
                   className={`max-w-[85%] px-3 py-2 ${
+                    // SG-2 — the client's own bubble is BLUE (client context = read-only data per
+                    // BRAND_DESIGN_LANGUAGE.md; teal = actions). The team bubble stays neutral.
                     c.author === 'client'
-                      ? 'ml-auto bg-teal-500/10 border border-teal-500/30'
+                      ? 'ml-auto bg-blue-500/10 border border-blue-500/30'
                       : 'mr-auto bg-[var(--surface-3)] border border-[var(--brand-border)]'
                   }`}
                   style={{ borderRadius: 'var(--radius-md)' }}
@@ -263,6 +272,24 @@ function WorkOrderTrackCard({
 }
 
 /**
+ * SectionHeading — the visible heading + one-line "what is this" subtitle shared by every inbox
+ * section (item 5). Token-styled `t-label` uppercase heading (matching BRAND_DESIGN_LANGUAGE §
+ * "Client Inbox IA — 3-Section Layout") plus a muted subtitle. Used by the actionable "Decisions"
+ * section (which previously had NO visible heading — only an aria-label), "Ready to publish", and
+ * "Work in progress" so all three read consistently and the PriorityStrip chips agree with the
+ * sections they scroll to.
+ */
+function SectionHeading({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div>
+      {/* duplicate-heading-ok -- distinct inbox sections deliberately share the same heading grammar */}
+      <h3 className="t-label text-[var(--brand-text-muted)] uppercase tracking-wide">{title}</h3>
+      <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{subtitle}</p>
+    </div>
+  );
+}
+
+/**
  * UnifiedInbox — the PR-2a unified client inbox (DARK behind the `unified-inbox` flag).
  *
  * Mounts the previously-orphaned `PriorityStrip` as the single prioritized "Needs your attention"
@@ -273,8 +300,14 @@ function WorkOrderTrackCard({
  * This component is only rendered when the flag is ON (InboxTab branches on it); the hook is
  * additionally flag-gated so the fetch never fires with the flag off.
  */
-export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: UnifiedInboxProps) {
+export function UnifiedInbox({ workspaceId, setToast, clientUser, ...contentTabProps }: UnifiedInboxProps) {
   const queryClient = useQueryClient();
+  // Item 2 — edit-before-approve is gated to the non-free tier (legacy ApprovalsTab parity:
+  // edit/approve were behind `effectiveTier !== 'free'`). `effectiveTier` rides in the ContentTab
+  // pass-through props the inbox already receives.
+  const editable = contentTabProps.effectiveTier !== 'free';
+  // Item 1 — the "Submit a request" chooser modal open state.
+  const [chooserOpen, setChooserOpen] = useState(false);
   const { deliverables, isLoading, isError, refetch } = useUnifiedInbox(workspaceId);
   const respond = useRespondToDeliverable(workspaceId);
   const apply = useApplyDeliverable(workspaceId);
@@ -379,10 +412,12 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
     decision: 'approved' | 'changes_requested' | 'declined',
     note?: string,
     flaggedItems?: FlaggedItem[],
+    // Item 2 — the per-item edited proposed values (seoTitle/seoDescription) on an approve.
+    editedItems?: { itemId: string; value: string }[],
   ) => {
     setSubmittingId(d.id);
     try {
-      await respond.mutateAsync({ deliverableId: d.id, decision, note, flaggedItems });
+      await respond.mutateAsync({ deliverableId: d.id, decision, note, flaggedItems, editedItems });
       const heldCount = decision === 'approved' ? flaggedItems?.length ?? 0 : 0;
       setToast({
         message:
@@ -481,6 +516,15 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
 
   return (
     <div className="space-y-6">
+      {/* Item 1 — persistent "Submit a request" entry point. Lives at the TOP of the tree (above the
+          PriorityStrip) so flag-on clients can always initiate a request — even when the queue is
+          empty. Opens the chooser ("Ask for content" vs "Send a request"). */}
+      <div className="flex items-center justify-end">
+        <Button size="sm" variant="primary" icon={Plus} onClick={() => setChooserOpen(true)}>
+          Submit a request
+        </Button>
+      </div>
+
       {/* The single prioritized "Needs your attention" list (PriorityStrip, finally mounted).
           F2 — only claim "all caught up" when there is NO live work below either: an empty actionable
           queue with items in Ready-to-publish or Work-in-progress must NOT show the banner above them. */}
@@ -490,7 +534,8 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
       />
 
       {actionable.length > 0 && (
-        <section aria-label="Needs your attention" className="space-y-3">
+        <section aria-label="Decisions" className="space-y-3">
+          <SectionHeading title="Decisions" subtitle="Items waiting on your decision" />
           {actionable.map((d) => {
             const decision: NormalizedDecision = normalizeDeliverable(d);
             // Projected (copy_section / content_request): render a "Review →" CTA that opens the
@@ -514,7 +559,8 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
                     decision={decision}
                     ageLabel={ageLabel(d.sentAt)}
                     submitting={submittingId === d.id}
-                    onApprove={(f) => void handleRespond(d, 'approved', undefined, f)}
+                    editable={editable}
+                    onApprove={(f, e) => void handleRespond(d, 'approved', undefined, f, e)}
                     onRequestChanges={(n) => void handleRespond(d, 'changes_requested', n || undefined)}
                     onDecline={(n) => void handleRespond(d, 'declined', n || undefined)}
                   />
@@ -569,9 +615,7 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
           (keep the approved card visible with an Apply button gated on the applyability predicate). */}
       {readyToApply.length > 0 && (
         <section aria-label="Ready to publish" className="space-y-3">
-          <h3 className="t-label text-[var(--brand-text-muted)] uppercase tracking-wide">
-            Ready to publish
-          </h3>
+          <SectionHeading title="Ready to publish" subtitle="Approved — apply to your live site" />
           {readyToApply.map((d) => (
             <div
               key={d.id}
@@ -580,9 +624,8 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
               style={{ borderRadius: 'var(--radius-signature-lg)' }}
             >
               <div className="flex items-center gap-2 mb-1">
-                <span className="t-caption-sm font-medium px-2 py-0.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)]">
-                  Approved
-                </span>
+                {/* SG-1 — the "Approved" pill reads as success (emerald), not neutral zinc. */}
+                <StatusBadge domain="approval" status="approved" variant="soft" />
               </div>
               <h4 className="t-body font-semibold text-[var(--brand-text-bright)]">{d.title}</h4>
               {d.summary && (
@@ -620,9 +663,7 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
           container (surface-2 + brand signature radius). */}
       {workOrders.length > 0 && (
         <section aria-label="Work in progress" className="space-y-3">
-          <h3 className="t-label text-[var(--brand-text-muted)] uppercase tracking-wide">
-            Work in progress
-          </h3>
+          <SectionHeading title="Work in progress" subtitle="Work your team is doing for you" />
           {workOrders.map((d) => (
             <WorkOrderTrackCard key={d.id} deliverable={d} workspaceId={workspaceId} />
           ))}
@@ -636,8 +677,9 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
         <DeliverableDetailModal
           decision={normalizeDeliverable(detailDeliverable)}
           submitting={submittingId === detailDeliverable.id}
-          onApprove={(flaggedItems: FlaggedItem[]) =>
-            handleRespond(detailDeliverable, 'approved', undefined, flaggedItems)
+          editable={editable}
+          onApprove={(flaggedItems: FlaggedItem[], editedItems) =>
+            handleRespond(detailDeliverable, 'approved', undefined, flaggedItems, editedItems)
           }
           onRequestChanges={(note) =>
             handleRespond(detailDeliverable, 'changes_requested', note || undefined)
@@ -680,6 +722,19 @@ export function UnifiedInbox({ workspaceId, setToast, ...contentTabProps }: Unif
         onConfirm={() => void confirmApply()}
         onCancel={() => setApplyConfirm(null)}
       />
+
+      {/* Item 1 — the "Submit a request" chooser (free-form request reuse + content-topic pricing
+          reuse). Mounted on demand from the header button. */}
+      {chooserOpen && (
+        <SubmitRequestChooserModal
+          workspaceId={workspaceId}
+          clientUser={clientUser}
+          setToast={setToast}
+          onDismiss={() => setChooserOpen(false)}
+          setPricingModal={contentTabProps.setPricingModal}
+          pricingConfirming={contentTabProps.pricingConfirming}
+        />
+      )}
     </div>
   );
 }

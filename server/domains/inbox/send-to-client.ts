@@ -149,6 +149,15 @@ export interface RespondToDeliverableInput {
    * declined and by the client_action family (whole-action only — no typed items).
    */
   flaggedItems?: { itemId: string; note?: string }[];
+  /**
+   * Item 2 — EDIT-before-approve (APPROVAL-FAMILY ONLY). The per-item edited proposed values the
+   * client typed in the inline editor (seoTitle / seoDescription), each carrying the
+   * `ClientDeliverableItem.id` + the edited value. Persisted as the legacy approval item's
+   * `clientValue` (the Webflow apply path already prefers `clientValue || proposedValue`). Orthogonal
+   * to `flaggedItems`: a client can edit AND approve the same item. Empty/absent → no edits. Ignored
+   * on changes_requested/declined and by the client_action family (no typed items).
+   */
+  editedItems?: { itemId: string; value: string }[];
 }
 
 /**
@@ -199,6 +208,9 @@ export async function respondToDeliverable(
       // approval_batch family consumes it (typed items); the client_action family ignores it
       // (whole-action only).
       flaggedItems: input.flaggedItems,
+      // Item 2: carry the per-item edited proposed values (seoTitle/seoDescription) so the source
+      // write persists each as the legacy item's clientValue (apply already prefers it).
+      editedItems: input.editedItems,
     });
     sourceHandledTeamNotify = result.handled;
   }

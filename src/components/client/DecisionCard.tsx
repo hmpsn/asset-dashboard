@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button, FormInput } from '../ui';
+import { approveCtaLabel } from '../../lib/decision-adapters';
 import type { NormalizedDecision } from '../../../shared/types/decision';
 
 interface DecisionCardProps {
@@ -68,8 +69,10 @@ export function DecisionCard({
     <>
       {!flagging && !declining ? (
         <>
+          {/* Item 5 — canonical approve CTA, consistent across the unified inbox (uniform mode only;
+              the legacy single-action + bulk paths below are unchanged). */}
           <Button size="sm" variant="primary" onClick={onApprove}>
-            Approve
+            {approveCtaLabel(decision.itemCount)}
           </Button>
           <Button size="sm" variant="ghost" onClick={() => setFlagging(true)}>
             Request changes

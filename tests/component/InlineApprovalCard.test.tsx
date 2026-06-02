@@ -85,14 +85,16 @@ describe('InlineApprovalCard', () => {
     expect(screen.getByText('Sent 2 days ago')).toBeInTheDocument();
   });
 
-  it('Approve with no flags → onApprove([]) and CTA reads "implement N of M"', () => {
+  it('Approve with no flags → onApprove([]) and CTA reads the canonical "implement N →" (no "of")', () => {
     const items = [makeItem({ id: 'a' }), makeItem({ id: 'b' })];
     const h = baseHandlers();
     render(<InlineApprovalCard decision={makeDecision(items)} ageLabel={null} submitting={false} {...h} />);
 
-    expect(screen.getByRole('button', { name: 'Looks good — implement 2 of 2 →' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Looks good — implement 2 of 2 →' }));
-    expect(h.onApprove).toHaveBeenCalledWith([]);
+    // Item 5 — no subset held → "implement 2 →" (the redundant "of 2" is dropped by the shared helper).
+    expect(screen.getByRole('button', { name: 'Looks good — implement 2 →' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Looks good — implement 2 →' }));
+    // Item 2 — onApprove now carries (flaggedItems, editedItems); no flags/edits → both empty.
+    expect(h.onApprove).toHaveBeenCalledWith([], []);
   });
 
   it('one flagged → onApprove([{itemId,note}]) and CTA reads "implement N-1 of N"', () => {
@@ -106,10 +108,10 @@ describe('InlineApprovalCard', () => {
     // Submit the flag (no note).
     fireEvent.click(screen.getByRole('button', { name: 'Flag it' }));
 
-    // CTA now reflects the held item.
-    expect(screen.getByRole('button', { name: 'implement 1 of 2 →' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'implement 1 of 2 →' }));
-    expect(h.onApprove).toHaveBeenCalledWith([{ itemId: 'a', note: '' }]);
+    // CTA now reflects the held item (subset held → "N of M" preserved).
+    expect(screen.getByRole('button', { name: 'Looks good — implement 1 of 2 →' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Looks good — implement 1 of 2 →' }));
+    expect(h.onApprove).toHaveBeenCalledWith([{ itemId: 'a', note: '' }], []);
   });
 
   it('Request changes note path → onRequestChanges(note)', () => {
@@ -190,6 +192,41 @@ describe('InlineApprovalCard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Show full ↓' }));
     expect(screen.getByRole('button', { name: 'Show less ↑' })).toBeInTheDocument();
+  });
+
+  // ── Item 2 — edit-before-approve ──
+
+  it('editable + seoTitle → shows the Edit affordance; edited value flows into onApprove editedItems', () => {
+    const items = [makeItem({ id: 'a', field: 'seoTitle', proposedValue: 'Proposed title' })];
+    const h = baseHandlers();
+    render(<InlineApprovalCard decision={makeDecision(items)} ageLabel={null} submitting={false} editable {...h} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    const input = screen.getByLabelText('Edit proposed seoTitle');
+    fireEvent.change(input, { target: { value: 'Fixed title' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save edit' }));
+
+    // The edited value is now shown.
+    expect(screen.getByText('Fixed title')).toBeInTheDocument();
+    // Approve forwards the edit in editedItems (and the empty flagged subset).
+    fireEvent.click(screen.getByRole('button', { name: 'Looks good — implement 1 →' }));
+    expect(h.onApprove).toHaveBeenCalledWith([], [{ itemId: 'a', value: 'Fixed title' }]);
+  });
+
+  it("editable but field:'schema' → NO Edit affordance (legacy hid Edit for schema)", () => {
+    const items = [makeItem({ id: 'a', field: 'schema', proposedValue: '{"@type":"Thing"}' })];
+    const h = baseHandlers();
+    render(<InlineApprovalCard decision={makeDecision(items)} ageLabel={null} submitting={false} editable {...h} />);
+    // schema rows are NOT editable (only seoTitle / seoDescription are).
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+  });
+
+  it('FREE-TIER GATE: editable=false (default) → seoTitle row shows NO Edit affordance', () => {
+    const items = [makeItem({ id: 'a', field: 'seoTitle' })];
+    const h = baseHandlers();
+    // editable omitted → defaults false (free tier). Edit must not appear.
+    render(<InlineApprovalCard decision={makeDecision(items)} ageLabel={null} submitting={false} {...h} />);
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
   });
 
   it('submitting=true → CTA reads "Submitting…" and Approve/Request changes/Decline are disabled', () => {

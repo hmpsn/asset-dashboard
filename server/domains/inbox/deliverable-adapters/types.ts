@@ -37,6 +37,16 @@ export interface RespondToSourceOptions {
    * (whole-deliverable reject) and by the client_action family (no typed items — whole-action only).
    */
   flaggedItems?: { itemId: string; note?: string }[];
+  /**
+   * Item 2 — EDIT-before-approve (APPROVAL-FAMILY ONLY). The per-item edited proposed values the
+   * client typed in the inline editor (seoTitle / seoDescription), each carrying the
+   * `ClientDeliverableItem.id` + the edited value. The approval_batch adapter persists each as the
+   * legacy approval item's `clientValue` (the Webflow apply path already prefers
+   * `clientValue || proposedValue`). Orthogonal to `flaggedItems` — a client can edit AND approve the
+   * same item. Empty/absent → no edits. Ignored on changes_requested/declined and by the
+   * client_action family (no typed items — whole-action only).
+   */
+  editedItems?: { itemId: string; value: string }[];
 }
 
 /** Outcome of a source propagation — `handled` drives the double-notify suppression. */

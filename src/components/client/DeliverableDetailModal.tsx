@@ -28,15 +28,23 @@ import type {
 import type { PageRoleAssignment, CanonicalEntity, SchemaPageRole } from '../../../shared/types/schema-plan';
 import { SCHEMA_ROLE_LABELS } from '../../../shared/types/schema-plan';
 import { ItemDiffRow, AeoRenderer, InternalLinkRenderer, RedirectRenderer } from './decision-renderers';
+import { approveCtaLabel } from '../../lib/decision-adapters';
+
+/** Item 2 — a per-item edited proposed value (seoTitle/seoDescription) forwarded on approve. */
+export interface EditedItem {
+  itemId: string;
+  value: string;
+}
 
 interface DeliverableDetailModalProps {
   decision: NormalizedDecision;
   /**
    * Approve handler. For the approval family, `flaggedItems` carries the per-item flags (the
-   * unflagged items are approved, the flagged ones held). For the client_action family it is always
-   * empty (whole-action approve — no typed items). The parent forwards the ids to /respond.
+   * unflagged items are approved, the flagged ones held) and `editedItems` (item 2) carries the
+   * per-item edited proposed values. For the client_action family both are always empty (whole-action
+   * approve — no typed items). The parent forwards them to /respond.
    */
-  onApprove: (flaggedItems: FlaggedItem[]) => Promise<void> | void;
+  onApprove: (flaggedItems: FlaggedItem[], editedItems: EditedItem[]) => Promise<void> | void;
   /** Request changes on the WHOLE deliverable (with an optional note). */
   onRequestChanges: (note: string) => Promise<void> | void;
   /** Decline the WHOLE deliverable (with an optional note). */
@@ -52,7 +60,18 @@ interface DeliverableDetailModalProps {
   onApply?: () => Promise<void> | void;
   applying?: boolean;
   canApply?: boolean;
+  /**
+   * Item 2 — when true (non-free tier), seoTitle/seoDescription rows show the inline "Edit" editor.
+   * Free tier never sees the editor (legacy free-tier gate parity). Defaults to false.
+   */
+  editable?: boolean;
 }
+
+/**
+ * Item 2 — the ONLY fields that are client-editable before approve (seoTitle / seoDescription).
+ * NEVER `schema` (legacy ApprovalsTab hid Edit for schema — long JSON-LD is not hand-edited).
+ */
+const EDITABLE_FIELDS = new Set(['seoTitle', 'seoDescription']);
 
 /** The approval_batch-family deliverable types whose typed items[] drive the per-item flag UX. */
 const APPROVAL_FAMILY_TYPES = new Set([
@@ -160,8 +179,11 @@ export function DeliverableDetailModal({
   onApply,
   applying = false,
   canApply = false,
+  editable = false,
 }: DeliverableDetailModalProps) {
   const [flaggedItems, setFlaggedItems] = useState<Map<string, string>>(new Map());
+  // Item 2 — per-item edited proposed value (itemId → edited value). Orthogonal to flags.
+  const [editedItems, setEditedItems] = useState<Map<string, string>>(new Map());
   const [noteMode, setNoteMode] = useState<'none' | 'changes' | 'decline'>('none');
   const [note, setNote] = useState('');
 
@@ -174,6 +196,9 @@ export function DeliverableDetailModal({
       m.delete(id);
       return m;
     });
+  }, []);
+  const editItem = useCallback((id: string, value: string) => {
+    setEditedItems((prev) => new Map(prev).set(id, value));
   }, []);
 
   useEffect(() => {
@@ -199,13 +224,15 @@ export function DeliverableDetailModal({
   const items = decision.items ?? [];
   const totalItems = decision.itemCount;
   const flaggedCount = flaggedItems.size;
-  const unflaggedCount = Math.max(totalItems - flaggedCount, 0);
 
   const handleApprove = async () => {
     const flaggedList: FlaggedItem[] = Array.from(flaggedItems.entries()).map(
       ([itemId, n]) => ({ itemId, note: n }),
     );
-    await onApprove(flaggedList);
+    const editedList: EditedItem[] = Array.from(editedItems.entries()).map(
+      ([itemId, value]) => ({ itemId, value }),
+    );
+    await onApprove(flaggedList, editedList);
   };
 
   // ── Body: per-item review (approval family) or read-only diffs (client_action family) ──
@@ -239,6 +266,14 @@ export function DeliverableDetailModal({
             // R3b — in publish mode (canApply) the per-item Flag controls are inert (approve is
             // unreachable), so render this as a read-only review-before-publish view.
             readOnly={canApply}
+            // Item 2 — inline edit for seoTitle/seoDescription only, behind the non-free tier (and
+            // never in publish mode — ItemDiffRow already suppresses the editor when readOnly).
+            onEdit={
+              editable && item.field && EDITABLE_FIELDS.has(item.field)
+                ? (value) => editItem(item.id, value)
+                : undefined
+            }
+            editedValue={editedItems.get(item.id)}
           />
         ))}
       </div>
@@ -269,25 +304,20 @@ export function DeliverableDetailModal({
     );
   }
 
-  const ctaLabel = submitting
-    ? 'Submitting…'
-    : isApprovalFamily && flaggedCount > 0
-      ? `Looks good — implement ${unflaggedCount} of ${totalItems} →`
-      : isApprovalFamily
-        ? `Looks good — implement ${totalItems} →`
-        : 'Approve →';
+  // Item 5 — canonical approve CTA shared across the unified inbox. The approval family carries the
+  // held subset (flaggedCount); the client_action family has no typed items to hold, so heldCount is 0.
+  const ctaLabel = approveCtaLabel(totalItems, isApprovalFamily ? flaggedCount : 0, submitting);
 
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="deliverable-modal-title"
-      className="fixed inset-0 z-[var(--z-modal-fullscreen)] flex flex-col" // fixed-inset-ok — full-screen trust-first panel; escape key + backdrop click handled in component body
+      className="fixed inset-0 z-[var(--z-modal-fullscreen)] flex items-center justify-center p-4" // fixed-inset-ok — centered review dialog; escape key + backdrop click handled in component body
     >
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onDismiss} />
+      <div className="absolute inset-0 bg-[var(--brand-overlay)] backdrop-blur-sm" onClick={onDismiss} />
       <div
-        className="relative z-[var(--z-sticky)] flex flex-col h-full max-w-3xl mx-auto w-full bg-[var(--surface-1)] shadow-2xl overflow-hidden"
-        style={{ borderRadius: `0 0 var(--radius-xl) var(--radius-xl)` }}
+        className="relative z-[var(--z-sticky)] flex flex-col w-[90vw] sm:w-[75vw] max-w-[1200px] max-h-[90vh] bg-[var(--surface-1)] shadow-2xl overflow-hidden rounded-[var(--radius-xl)]"
       >
         {/* Header */}
         <div className="flex items-center gap-3 px-6 py-4 border-b border-[var(--brand-border)] flex-shrink-0">

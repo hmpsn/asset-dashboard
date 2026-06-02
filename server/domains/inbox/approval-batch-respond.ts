@@ -50,6 +50,13 @@ export interface ApprovalItemDecision {
   status: 'approved' | 'rejected';
   /** Optional per-item client note (the flag note); falls back to the batch-level note. */
   note?: string | null;
+  /**
+   * Item 2 — EDIT-before-approve. The client's edited proposed value for this item (seoTitle /
+   * seoDescription). Persisted as the legacy approval item's `clientValue`, which the Webflow apply
+   * path already prefers (`item.clientValue || proposedValue`). Orthogonal to status — a client can
+   * edit AND approve the same item. Absent → the item's `clientValue` is left untouched.
+   */
+  clientValue?: string | null;
 }
 
 export interface RespondToApprovalBatchOptions {
@@ -126,6 +133,9 @@ export function respondToApprovalBatch(
         const result = updateItem(workspaceId, batchId, item.id, {
           status: decisionForItem.status,
           ...(itemNote ? { clientNote: itemNote } : {}),
+          // Item 2 — persist the client's edited proposed value (seoTitle/seoDescription) as
+          // clientValue; the apply path prefers it. Only set when the client actually edited.
+          ...(decisionForItem.clientValue != null ? { clientValue: decisionForItem.clientValue } : {}),
         });
         if (result) {
           updatedBatch = result;
