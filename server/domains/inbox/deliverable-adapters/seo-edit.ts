@@ -15,6 +15,7 @@ import {
   applyDisabledStub,
   approvalBatchSourceRef,
   buildApprovalBatchPayload,
+  respondToApprovalBatchSource,
   validateApprovalBatchSendable,
 } from './approval-batch-shared.js';
 
@@ -29,6 +30,9 @@ export const seoEditAdapter: DeliverableAdapter<ApprovalBatchInput> = {
       applyable: false,
     })),
   sourceRef: (batch) => approvalBatchSourceRef('seo_edit', batch),
+  // R2: propagate the client decision to the legacy approval batch (the source the apply
+  // logic reads). approve → items approved; changes_requested/declined → items rejected.
+  respondToSource: respondToApprovalBatchSource,
   // apply opt-out — D-apply. Stub throws if ever reached.
   applyDeliverable: applyDisabledStub,
 };

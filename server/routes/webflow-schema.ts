@@ -19,7 +19,7 @@ import { getSchemaSnapshot, getSiteTemplate, getOrSeedSiteTemplate, patchSiteTem
 import { generateSchemaSuggestions, generateSchemaForPage } from '../schema-suggester.js';
 import { generateSchemaPlan } from '../schema-plan.js';
 import { deleteBatch } from '../approvals.js';
-import { SCHEMA_ROLE_LABELS, type SchemaPageRole, type SchemaSitePlan } from '../../shared/types/schema-plan.ts';
+import { SCHEMA_ROLE_LABELS, type SchemaPageRole } from '../../shared/types/schema-plan.ts';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { notifyApprovalReady } from '../email.js';
@@ -42,6 +42,7 @@ import { recordSeoChange } from '../seo-change-tracker.js';
 import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { mirrorSchemaPlanToDeliverable } from '../domains/inbox/schema-plan-dual-write.js';
+import { respondToSchemaPlanFeedback } from '../domains/inbox/schema-plan-respond.js';
 import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { listPendingSchemas } from '../schema-queue.js';
 import { createLogger } from '../logger.js';
@@ -886,18 +887,11 @@ router.post('/api/public/schema-plan/:workspaceId/feedback', requireClientPortal
   if (!existing) return res.status(404).json({ error: 'No plan found' });
   if (existing.status !== 'sent_to_client') return res.status(409).json({ error: 'Schema plan is not ready for client feedback' });
 
-  const newStatus = action === 'approve' ? 'client_approved' : 'client_changes_requested';
-  const plan = updateSchemaPlanStatus(ws.webflowSiteId, newStatus as SchemaSitePlan['status']);
-  if (!plan) return res.status(404).json({ error: 'No plan found' });
-
-  const label = action === 'approve' ? 'approved' : 'requested changes on';
-  addActivity(ws.id, 'changes_requested', `Client ${label} schema plan`, note || undefined);
-  broadcastToWorkspace(ws.id, WS_EVENTS.SCHEMA_PLAN_SENT, {
-    siteId: ws.webflowSiteId,
-    action: 'schema_plan_feedback',
-    status: newStatus,
-  });
-  res.json(toClientSchemaView(plan));
+  // Delegate to the shared respondToSchemaPlanFeedback service (R2) so this route and the
+  // unified-inbox respond propagation drive the SAME source write (no divergence).
+  const result = respondToSchemaPlanFeedback(ws.id, ws.webflowSiteId, action, note);
+  if (!result) return res.status(404).json({ error: 'No plan found' });
+  res.json(toClientSchemaView(result.plan));
 });
 
 // ── Pending Schemas (D7: pre-generated schema skeletons) ──

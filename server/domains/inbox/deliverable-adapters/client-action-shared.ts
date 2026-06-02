@@ -45,7 +45,16 @@ import type {
   RedirectProposalPayload,
 } from '../../../../shared/types/client-actions.js';
 import type { ClientDeliverable } from '../../../../shared/types/client-deliverable.js';
-import type { BuiltDeliverablePayload, SendableResult } from './types.js';
+import type {
+  BuiltDeliverablePayload,
+  DeliverableSourceDecision,
+  RespondToSourceOptions,
+  RespondToSourceResult,
+  SendableResult,
+} from './types.js';
+import { createLogger } from '../../../logger.js';
+
+const clientActionRespondLog = createLogger('client-action-shared');
 
 /**
  * The adapter input for every client_action-family type: the persisted `ClientAction` (as
@@ -186,6 +195,78 @@ export async function applyDisabledStub(_deliverable: ClientDeliverable): Promis
   throw new Error(
     'client_action apply is a permanent no-op (D-apply): the redirect / internal_link / aeo_change / content_decay types land in a manual operator queue with no automated apply path',
   );
+}
+
+// ── R2: respond propagation ──────────────────────────────────────────────────────
+
+/**
+ * Read the legacy client_action id off a mirrored deliverable's payload. Every
+ * client_action-family adapter stashes it as `payload.legacyActionId`
+ * (`buildClientActionPayload`), so this is the deliverable → source mapping for the family.
+ */
+function legacyActionId(deliverable: ClientDeliverable): string | null {
+  const id = (deliverable.payload as { legacyActionId?: unknown })?.legacyActionId;
+  return typeof id === 'string' && id.trim() ? id : null;
+}
+
+/**
+ * R2 source propagation for the whole client_action family. Maps the deliverable back to its
+ * legacy `client_action` (via `payload.legacyActionId`) and drives the SHARED
+ * `respondToPublicClientAction` mutation (the existing public respond logic — reused, not
+ * reimplemented):
+ *   - approved                       → client_action status `approved`
+ *     (fires the team-approved email + feedback loop + playbook enqueue, exactly as the
+ *      legacy public respond route does — this is the family's single team-notify owner).
+ *   - changes_requested / declined   → client_action status `changes_requested`
+ *     (the legacy respond mutation does NOT email the team on changes_requested — the known
+ *      B4 gap, explicitly OUT OF SCOPE here; we do NOT add a new email, matching the route).
+ *
+ * Returns `{ handled: true }` so respondToDeliverable suppresses its own deliverable-level
+ * team email for this family — the source path is the single owner of the team-facing
+ * notification (whatever form it takes per decision), so the team is never double-notified.
+ *
+ * A missing payload id or absent/non-pending action is a swallowed best-effort miss (the
+ * deliverable mirror has already moved); we still report `handled: true` so the unified path
+ * does not ALSO email for a family whose canonical surface is the source action.
+ */
+export async function respondToClientActionSource(
+  workspaceId: string,
+  deliverable: ClientDeliverable,
+  decision: DeliverableSourceDecision,
+  opts: RespondToSourceOptions = {},
+): Promise<RespondToSourceResult> {
+  const actionId = legacyActionId(deliverable);
+  if (!actionId) {
+    clientActionRespondLog.warn(
+      { workspaceId, deliverableId: deliverable.id, type: deliverable.type },
+      'client_action respondToSource: no legacyActionId in payload — source not updated',
+    );
+    return { handled: true };
+  }
+  // approve → approved; changes_requested / declined → changes_requested (client_action has no
+  // `declined` status — the family's changes path is its reject path, per the R2 spec).
+  const status = decision === 'approved' ? 'approved' : 'changes_requested';
+  try {
+    // Lazy import to break the module cycle: client-actions-mutations.ts (the reuse target)
+    // imports the dual-write barrel, which imports every adapter (including this leaf). A
+    // static import here would close that loop; the runtime-only dynamic import does not.
+    const { respondToPublicClientAction } = await import('../client-actions-mutations.js'); // dynamic-import-ok: breaks adapter↔mutations cycle (R2)
+    respondToPublicClientAction(
+      workspaceId,
+      actionId,
+      { status, clientNote: opts.note ?? undefined },
+      opts.actor,
+    );
+  } catch (err) {
+    // The legacy mutation throws (404 / 409) when the action is missing or already decided.
+    // The deliverable mirror has already moved; a source miss is best-effort and must not
+    // surface to the unified respond caller (the team-notify ownership is unchanged).
+    clientActionRespondLog.warn(
+      { err, workspaceId, actionId, deliverableId: deliverable.id },
+      'client_action respondToSource: legacy respond mutation failed (swallowed best-effort)',
+    );
+  }
+  return { handled: true };
 }
 
 /** Re-export for the payload union narrowing the adapters need. */

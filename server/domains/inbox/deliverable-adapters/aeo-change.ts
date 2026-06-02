@@ -23,6 +23,7 @@ import {
   applyDisabledStub,
   buildClientActionPayload,
   originPageUrl,
+  respondToClientActionSource,
   validateNonEmptyItems,
 } from './client-action-shared.js';
 
@@ -39,6 +40,8 @@ export const aeoChangeAdapter: DeliverableAdapter<ClientActionInput> = {
     if (pageUrl) return `aeo:${pageUrl}`;
     return action.sourceId ?? null;
   },
+  // R2: propagate the client decision to the legacy client_action. Source path owns the email.
+  respondToSource: respondToClientActionSource,
   // apply opt-out — D-apply (permanent for this family). Stub throws if ever reached.
   applyDeliverable: applyDisabledStub,
 };

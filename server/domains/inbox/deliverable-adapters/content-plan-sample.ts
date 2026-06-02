@@ -14,6 +14,7 @@ import {
   applyDisabledStub,
   approvalBatchSourceRef,
   buildApprovalBatchPayload,
+  respondToApprovalBatchSource,
   validateApprovalBatchSendable,
 } from './approval-batch-shared.js';
 
@@ -26,6 +27,8 @@ export const contentPlanSampleAdapter: DeliverableAdapter<ApprovalBatchInput> = 
       applyable: false,
     })),
   sourceRef: (batch) => approvalBatchSourceRef('content_plan_sample', batch),
+  // R2: propagate the client decision to the legacy approval batch (decision-only).
+  respondToSource: respondToApprovalBatchSource,
   applyDeliverable: applyDisabledStub,
 };
 
