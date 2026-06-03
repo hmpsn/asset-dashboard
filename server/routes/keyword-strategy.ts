@@ -217,8 +217,8 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess(
     const pageMap = listPageKeywords(ws.id);
     const contentGapsFromTable = listContentGaps(ws.id);
     const contentGaps = contentGapsFromTable.length > 0 ? contentGapsFromTable : (strategy?.contentGaps || []);
-    const quickWinsFromTable = listQuickWins(ws.id);
-    const quickWins = quickWinsFromTable.length > 0 ? quickWinsFromTable : (strategy?.quickWins || []);
+    // quickWins is table-only; blob field stripped on every write (topicClusters/cannibalization treatment)
+    const quickWins = listQuickWins(ws.id);
     const keywordGapsFromTable = listKeywordGaps(ws.id);
     const keywordGaps = keywordGapsFromTable.length > 0 ? keywordGapsFromTable : (strategy?.keywordGaps || []);
     // topicClusters and cannibalization are table-only; blob fields stripped on every write + boot-migrated out (#19a)

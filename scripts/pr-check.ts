@@ -7917,7 +7917,7 @@ export const CHECKS: Check[] = [
           for (let j = i + 1; j < lookaheadEnd; j++) {
             if (FUNC_BOUNDARY_RE.test(lines[j])) break; // different function
             if (writeConfigRe.test(lines[j])) {
-              if (!hasHatch(lines, i, '// tracked-keywords-txn-ok') && !hasHatch(lines, j, '// tracked-keywords-txn-ok')) {
+              if (!hasHatch(lines, j, '// tracked-keywords-txn-ok')) {
                 hits.push({ file, line: i + 1, text: lines[i].trim() });
               }
               break;
