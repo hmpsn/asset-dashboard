@@ -14,6 +14,7 @@ import {
   getLocalSeoReadModel,
   getLocalSeoServiceGaps,
   iterateLocalCandidateSignals,
+  listLocalSeoMarkets,
   loadCandidateIterationContext,
   runLocationBackfillJob,
   runLocalSeoRefreshJob,
@@ -398,6 +399,78 @@ describe('local SEO provider selection', () => {
       source: 'local_variant',
       selected: false,
     }));
+  });
+
+  // ── P7.0 attribution contract (real builder, end-to-end) ────────────────────
+  // The slice-assembly tests feed pre-tagged marketId mocks. This exercises the
+  // REAL iterateLocalCandidateSignals → upsertCandidate attribution path through
+  // buildLocalSeoKeywordCandidates with two active markets, locking the contract
+  // documented in the upsertCandidate / localVariantKeywordsByMarket comments:
+  //   (a) a `local_variant` carries its originating market's marketId; and
+  //   (b) a market-agnostic source (tracking) carries null/undefined.
+  it('real builder attributes local_variant to its originating market and leaves market-agnostic sources market-less', () => {
+    setBroadcast(vi.fn(), vi.fn());
+    const ws = createWorkspace('Local SEO Real Attribution Test');
+    cleanupWorkspaceIds.add(ws.id);
+    updateWorkspace(ws.id, {
+      name: 'Swish Dental',
+      liveDomain: 'https://swish.example.com',
+      businessProfile: { address: { street: '123 Congress Ave', city: 'Austin', state: 'TX', country: 'US' } },
+      keywordStrategy: {
+        siteKeywords: ['cosmetic dentist'],
+        opportunities: [],
+        businessContext: 'Dental office offering cosmetic dentistry, veneers, whitening, and implants.',
+        generatedAt: '2026-05-20T10:00:00.000Z',
+      },
+    });
+    updateLocalSeoConfiguration(ws.id, {
+      posture: LOCAL_SEO_POSTURE.LOCAL,
+      markets: [
+        { label: 'Austin, TX', city: 'Austin', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1026201, status: LOCAL_SEO_MARKET_STATUS.ACTIVE },
+        { label: 'Houston, TX', city: 'Houston', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1026339, status: LOCAL_SEO_MARKET_STATUS.ACTIVE },
+      ],
+    }, true);
+    upsertPageKeyword(ws.id, {
+      pagePath: '/services/cosmetic-dentistry',
+      pageTitle: 'Cosmetic Dentistry',
+      primaryKeyword: 'cosmetic dentistry',
+      searchIntent: 'commercial',
+    });
+    // A rank-tracking keyword (market-agnostic source — TrackedKeyword has no
+    // marketId). Distinct from the strategy siteKeyword so its `tracking` source
+    // owns the candidate (strategy=95 would otherwise outscore tracking=90 on a
+    // shared key). Carries local intent ("near me") so it survives the local-intent
+    // filter in the cheap builder.
+    addTrackedKeyword(ws.id, 'teeth whitening near me', { source: TRACKED_KEYWORD_SOURCE.MANUAL });
+
+    // Resolve the real, generated market ids so we assert against actual values.
+    const markets = listLocalSeoMarkets(ws.id);
+    const austin = markets.find(m => m.city === 'Austin');
+    const houston = markets.find(m => m.city === 'Houston');
+    expect(austin).toBeDefined();
+    expect(houston).toBeDefined();
+
+    const candidates = buildLocalSeoKeywordCandidates(ws.id);
+    const byKey = new Map(candidates.map(c => [c.normalizedKeyword, c]));
+
+    // (a) City-scoped local_variant candidates carry their originating market's id.
+    const austinVariant = byKey.get('cosmetic dentistry austin');
+    const houstonVariant = byKey.get('cosmetic dentistry houston');
+    expect(austinVariant).toBeDefined();
+    expect(houstonVariant).toBeDefined();
+    expect(austinVariant!.source).toBe('local_variant');
+    expect(austinVariant!.marketId).toBe(austin!.id);
+    expect(houstonVariant!.source).toBe('local_variant');
+    expect(houstonVariant!.marketId).toBe(houston!.id);
+
+    // (b) A market-agnostic source (rank tracking) carries no marketId. Note the
+    // tracking source (score 90) wins the upsert over any local_variant (~62) for
+    // the same key, so the surviving candidate is market-less — the safe outcome
+    // documented in upsertCandidate.
+    const tracked = byKey.get('teeth whitening near me');
+    expect(tracked).toBeDefined();
+    expect(tracked!.source).toBe('tracking');
+    expect(tracked!.marketId == null).toBe(true);
   });
 
   it('cheap buildLocalSeoKeywordCandidates returns empty reasons[] (no evaluator run)', () => {

@@ -528,7 +528,13 @@ export interface LocalSeoSlice {
     sourceLabel: string;
     pageTitle?: string;
     pagePath?: string;
-    marketId?: string;
+    /**
+     * Originating local market id for market-scoped candidates (local/intent
+     * variants). Market-agnostic candidates (explicit, strategy, tracking, page
+     * assignments, content gaps) carry null/undefined — never fabricated. Drives
+     * per-market stratified sampling + selection in the slice's samplers.
+     */
+    marketId?: string | null;
     volume?: number;
     difficulty?: number;
     score: number;
