@@ -9827,9 +9827,35 @@ describe('Rule: opportunity-money-field-must-be-stripped', () => {
     );
     const strip = write(
       uniqPath('rule-opp-strip', 'server/routes/recommendations.ts'),
-      'const { emvPerWeek: _e, roiPerEffortDay: _r, predictedEmv: _p, ...rest } = r.opportunity;\n',
+      'function stripEmvFromPublicRecs(recs) {\n' +
+        '  const { emvPerWeek: _e, roiPerEffortDay: _r, predictedEmv: _p, ...rest } = r.opportunity;\n' +
+        '}\n',
     );
     expect(runRule(RULE, [types, strip])).toHaveLength(0);
+  });
+
+  it('does NOT count a money field that appears only in a comment outside the strip body', () => {
+    const types = write(
+      uniqPath('rule-opp-strip', 'shared/types/recommendations.ts'),
+      lines(
+        'export interface OpportunityScore {',
+        '  emvPerWeek: number;',
+        '  roiPerEffortDay: number;',
+        '  predictedEmv: number;', // money field NOT in the strip body
+        '}',
+      ),
+    );
+    // predictedEmv is mentioned only in a doc-comment, never destructured → must still flag.
+    const strip = write(
+      uniqPath('rule-opp-strip', 'server/routes/recommendations.ts'),
+      '// NOTE: predictedEmv: is admin-only and handled elsewhere (this is just prose).\n' +
+        'function stripEmvFromPublicRecs(recs) {\n' +
+        '  const { emvPerWeek: _e, roiPerEffortDay: _r, ...rest } = r.opportunity;\n' +
+        '}\n',
+    );
+    const hits = runRule(RULE, [types, strip]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('predictedEmv');
   });
 
   it('respects the // opportunity-strip-ok hatch on the field line', () => {

@@ -138,13 +138,20 @@ non-exhaustive maps (G2 — silent mislabel + distorted calibration + false auto
 - `recommendationOutcomeActionType` (`server/recommendations.ts`) — a real `ActionType` case
   (define new `ActionType`s in `shared/types/outcome-tracking.ts`), **not** the
   `audit_fix_applied` fallback, which feeds `winRateByActionType` and distorts calibration.
+  This function is an **exhaustive `switch` over `RecType` with a `never` default**, so adding
+  a `RecType` to the union is a **compile error** until it gets an explicit outcome case.
 - Frontend label maps: `src/components/admin/outcomes/outcomeConstants.ts`,
   `src/components/client/OutcomeSummary.tsx`, `src/components/client/Briefing/WinsSurface.tsx`.
 - `FixRecommendations.tsx` `typeConfig` (+ `REC_TYPE_TAB`/`TYPE_ICONS` for new `RecType`s).
 - A named intelligence slice (`shared/types/intelligence.ts` field + `assemble*()` read +
   `buildWorkspaceIntelligence()` routing) so AdminChat is not blind (Data-Flow #6).
 
-**This is enforced by pr-check rule `new-rec-type-source-needs-category-and-action-type`.**
+**Enforcement is split by mechanism:** the **source-category lockstep** (RecSourceCategory
+union ↔ `REC_SOURCE_CATEGORIES` array) is enforced by the pr-check rule
+`new-rec-type-source-needs-category-and-action-type`; the **RecType→ActionType** half is
+enforced at compile time by the exhaustive `never` `switch` in `recommendationOutcomeActionType`
+(stronger than a regex). The remaining readers above (frontend label maps, `typeConfig`,
+the intelligence slice) are caught by the §5.1 Consumer Contract Check grep in the P5 PR.
 Both pr-check rules are **forward-looking** — they do not false-positive on current code
 (`predictedEmv` and the new RecTypes/RecSources do not exist yet); they fire the moment a
 later phase introduces the field/value without the lockstep.

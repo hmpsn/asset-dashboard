@@ -7729,7 +7729,9 @@ export const CHECKS: Check[] = [
       'raw $/wk to clients on the public route. Add it to the strip destructure (and the PATCH ' +
       'response). Add // opportunity-strip-ok on the field line if it is intentionally client-safe.',
     severity: 'error',
-    excludeLines: ['opportunity-strip-ok'],
+    // NOTE: the inline `// opportunity-strip-ok` hatch is enforced inside customCheck
+    // (per-field-line `line.includes(...)`), not via top-level excludeLines (which, for
+    // customCheck rules, would filter the synthesized message, not the source line).
     rationale:
       'stripEmvFromPublicRecs destructure-and-spreads, so a new admin-money OpportunityScore field reaches clients unless explicitly stripped (G0b money-leak).',
     claudeMdRef: '#code-conventions',
@@ -7762,8 +7764,14 @@ export const CHECKS: Check[] = [
         const fieldName = m[1];
         if (!moneyNameRe.test(fieldName)) continue;
         // Money field — must be destructured in stripEmvFromPublicRecs.
-        // The strip destructures `<field>: _alias` so look for the field name there.
-        const inStrip = new RegExp(`\\b${fieldName}\\s*:`).test(stripContent);
+        // Scope the "is it stripped?" probe to the stripEmvFromPublicRecs FUNCTION BODY so
+        // an occurrence of the field name in a JSDoc/comment elsewhere in the route file
+        // (e.g. the strip-fn doc-comment that names emvPerWeek/roiPerEffortDay) cannot
+        // false-pass the guard. The strip destructures `<field>: _alias` so look for the
+        // field name there. If the function can't be located, treat as "not stripped".
+        const stripFnMatch = stripContent.match(/function stripEmvFromPublicRecs[\s\S]*?\n\}/);
+        const stripBody = stripFnMatch ? stripFnMatch[0] : '';
+        const inStrip = new RegExp(`\\b${fieldName}\\s*:`).test(stripBody);
         if (inStrip) continue;
         hits.push({
           file: path.join(ROOT, 'shared/types/recommendations.ts'),
@@ -7775,26 +7783,32 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // SEO Generation Quality (forward-looking guardrail). A new recommendation source
-    // category must stay in lockstep across the RecSourceCategory union AND the
+    // SEO Generation Quality (forward-looking guardrail). This rule enforces the
+    // SOURCE-CATEGORY half of the "new rec types / sources" contract: a recommendation
+    // source category must stay in lockstep across the RecSourceCategory union AND the
     // REC_SOURCE_CATEGORIES array in server/recommendations.ts. A union member missing
-    // from the array bypasses the auto-resolve safety check (an empty orphan-read would
-    // bulk auto-resolve previously-surfaced recs — G2). Today the union and array are
-    // identical (6 each), so this returns ZERO hits — it fires only when a later phase
-    // (P5: keyword_gaps/topic_clusters/cannibalization rec sources) adds a category to one
-    // but not the other, or routes a strategy source through the audit_fix_applied
-    // fallback. Escape hatch: // rec-source-lockstep-ok.
+    // from the array makes getRecSourceCategory return null, bypassing the per-category
+    // auto-resolve guard (an empty orphan-read would bulk auto-resolve previously-surfaced
+    // recs — G2). Today the union and array are identical (6 each), so this returns ZERO
+    // hits — it fires only when a later phase (P5: keyword_gaps/topic_clusters/
+    // cannibalization rec sources) adds a category to one side but not the other.
+    // The OTHER half of the contract — a new RecType must get a real
+    // recommendationOutcomeActionType case rather than silently using the
+    // audit_fix_applied fallback — is enforced at COMPILE TIME by the exhaustive
+    // `never` switch in recommendationOutcomeActionType (stronger than a regex), NOT here.
+    // Escape hatch: // rec-source-lockstep-ok.
     // See docs/rules/seo-generation-quality.md → "New rec types / sources".
     name: 'new-rec-type-source-needs-category-and-action-type',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/recommendations.ts',
     message:
       'RecSourceCategory union and REC_SOURCE_CATEGORIES array are out of lockstep. A new rec ' +
-      'source category must be in BOTH (and have a real recommendationOutcomeActionType case — no ' +
-      'audit_fix_applied fallback for strategy sources), or an empty orphan-read bulk auto-resolves ' +
-      'live recs. Add the member to both, or // rec-source-lockstep-ok if intentional.',
+      'source category must be in BOTH, or an empty orphan-read bulk auto-resolves live recs (G2). ' +
+      'Add the member to both, or // rec-source-lockstep-ok if intentional. (The RecType→ActionType ' +
+      'half of this contract is compiler-enforced by the exhaustive switch in recommendationOutcomeActionType.)',
     severity: 'error',
-    excludeLines: ['rec-source-lockstep-ok'],
+    // NOTE: the inline `// rec-source-lockstep-ok` hatch is enforced inside customCheck
+    // (on the array-opener line), not via top-level excludeLines (inert for customCheck rules).
     rationale:
       'A RecSourceCategory present in the union but absent from REC_SOURCE_CATEGORIES makes getRecSourceCategory return null, bypassing the per-category auto-resolve guard (G2 false auto-resolve).',
     claudeMdRef: '#code-conventions',
