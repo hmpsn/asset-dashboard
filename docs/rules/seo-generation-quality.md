@@ -155,6 +155,44 @@ real `content_gaps` table since #365, NOT a JSON blob):**
 `contentGaps` are deleted from the legacy `keywordStrategy` JSON blob in persistence (normalized
 to the table at #365), so `keywordStrategySchema` needs **no** `.optional()` change for `backfilled`.
 
+## Contract 6 — the closed-set membership guarantee + client-signal hard guarantees (P3)
+
+All of Contract 6 is **flag-ON only** (`isFeatureEnabled('seo-generation-quality', ws.id)`). The
+flag-OFF legacy path (`callKeywordStrategyAI` + `parseJsonFallback` batch/master prompts and the
+master throw) is byte-identical to pre-P3 and must stay so.
+
+**Closed-set membership (I1) — the actual guarantee P3's grounded prompting promises.** The OP1
+(`keyword-page-assignment`) and OP2 (`keyword-site-synthesis`) prompts instruct the AI to SELECT a
+`*SourceId` from the enumerated closed candidate set, but the model can hallucinate an id/keyword
+that is not in the set. Trusting it is unsafe because flag-ON `relaxConservatism` disables the
+`business_mismatch` hard-suppressor, so a plausible-but-invented phrase would otherwise survive the
+downstream eligibility filter — and the `sourceId || keyword` preference could let a hallucinated id
+override a correct in-set keyword. The fix, in `server/keyword-strategy-ai-synthesis.ts`:
+- Build `candidateIds = new Set(universeCandidates.map(c => normalizeKeyword(c.keyword)))` ONCE
+  (the candidate id == the normalized keyword == the pool Map key).
+- `resolveClosedSetKeyword(sourceId, keyword)`: accept the AI's `sourceId` only if its normalized
+  form is in `candidateIds`; else fall back to `keyword` only if THAT is in the set; else return
+  `null`.
+- **OP1:** when `resolveClosedSetKeyword` returns `null`, pass the raw keyword through to
+  `postProcessBatch`, whose existing eligibility + per-page-fallback path rejects the hallucination
+  (never admits it, never lets a hallucinated id override a valid in-set keyword).
+- **OP2:** when it returns `null`, DROP the content gap. The synthesis-internal never-emit-empty
+  backfill re-fills `contentGaps` from the universe candidates, so dropping never silently empties
+  the strategy.
+
+**Requested "MUST appear" survives enrichment (M2).** The requested-re-add hard guarantee (Contract
+4 / G4: a client-requested candidate not covered by the page map AND absent from the content gaps is
+injected as a `priority: high` content gap) was silently undone later by
+`enrichKeywordStrategy._removePageCoveredContentGaps` (`server/keyword-strategy-enrichment.ts`),
+which fuzzy-token-subset-prunes gaps whose topic looks "covered" by a page title/slug/keyword. The
+fix: re-added requested gaps carry a **transient `requested: true` marker** on `StrategyContentGap`,
+and `_removePageCoveredContentGaps` SKIPS marked gaps. The marker is **never persisted** — the
+`content_gaps` write path (`server/content-gaps.ts:modelToParams` + the explicit `INSERT` column
+list) omits it, and `contentGaps` are stripped from the `keywordStrategy` JSON blob in persistence —
+so it only survives in-memory through enrichment's prune step. Because the marker is only ever set on
+the flag-ON synthesis path, flag-OFF gaps never carry it and the prune branch is inert there
+(flag-OFF prune byte-identical).
+
 ---
 
 ## New rec types / sources (P5 — orphaned-subsystem wiring)

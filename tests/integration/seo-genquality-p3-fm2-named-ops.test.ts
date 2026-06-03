@@ -21,10 +21,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const aiState = vi.hoisted(() => ({
-  // When false, every callAI returns malformed JSON (the FM-2 condition).
+  // When 'malformed', every callAI returns malformed JSON (the FM-2 condition).
   // When 'requested-omitted', the assignment/synthesis ops return VALID payloads
   // that intentionally omit the requested keyword (client-signal case).
-  mode: 'malformed' as 'malformed' | 'requested-omitted',
+  // When 'out-of-set', the ops return VALID-shape payloads that select a
+  // hallucinated id/keyword NOT in the closed candidate set (I1 membership case).
+  mode: 'malformed' as 'malformed' | 'requested-omitted' | 'out-of-set',
 }));
 
 vi.mock('../../server/ai.js', () => ({
@@ -52,6 +54,43 @@ vi.mock('../../server/ai.js', () => ({
         }),
         tokens: { prompt: 0, completion: 0, total: 0 },
       };
+    }
+    if (aiState.mode === 'out-of-set') {
+      // I1: the model hallucinates an id/keyword NOT in the closed candidate set.
+      if (opts.operation === 'keyword-page-assignment') {
+        return {
+          text: JSON.stringify({
+            assignments: [
+              {
+                pagePath: '/services',
+                pageTitle: 'Services',
+                // BOTH the keyword and the sourceId are invented (not in the set).
+                primaryKeyword: 'totally invented saas growth hack',
+                primaryKeywordSourceId: 'totally invented saas growth hack',
+                secondaryKeywords: [],
+                searchIntent: 'commercial',
+                justification: 'hallucinated',
+              },
+            ],
+          }),
+          tokens: { prompt: 0, completion: 0, total: 0 },
+        };
+      }
+      if (opts.operation === 'keyword-site-synthesis') {
+        return {
+          text: JSON.stringify({
+            siteKeywords: [],
+            opportunities: [],
+            contentGaps: [
+              // Out-of-set target — must be DROPPED by the membership check.
+              { topic: 'Invented topic', targetKeyword: 'fabricated keyword nobody searches', targetKeywordSourceId: 'fabricated keyword nobody searches', intent: 'commercial', priority: 'high', rationale: 'hallucinated' },
+            ],
+            quickWins: [],
+          }),
+          tokens: { prompt: 0, completion: 0, total: 0 },
+        };
+      }
+      return { text: '{}', tokens: { prompt: 0, completion: 0, total: 0 } };
     }
     if (opts.operation === 'keyword-site-synthesis') {
       return {
@@ -171,6 +210,36 @@ describe('P3 FM-2 — malformed AI on the flag-OFF path still THROWS (legacy par
     aiState.mode = 'malformed';
     await expect(synthesizeKeywordStrategy(buildOptions(seeded.workspaceId)))
       .rejects.toBeInstanceOf(KeywordStrategySynthesisError);
+  });
+});
+
+describe('P3 I1 — closed-set membership (flag-ON): hallucinated id/keyword is rejected', () => {
+  it('an out-of-set sourceId/keyword is NOT admitted and does not override a valid in-set keyword', async () => {
+    setWorkspaceFlagOverride('seo-generation-quality', seeded.workspaceId, true);
+    aiState.mode = 'out-of-set';
+
+    const result = await synthesizeKeywordStrategy(buildOptions(seeded.workspaceId));
+    const strategy = result.strategy as {
+      pageMap?: { pagePath: string; primaryKeyword: string }[];
+      contentGaps?: { targetKeyword?: string }[];
+    };
+
+    // OP1: the hallucinated keyword must NOT be the page's primaryKeyword. The
+    // membership check rejected the invented sourceId AND the invented keyword, so
+    // post-processing fell back to a real page-identity/provider signal (or dropped
+    // the page) — never the hallucination.
+    const servicesPage = (strategy.pageMap ?? []).find(pm => pm.pagePath === '/services');
+    const allPrimary = (strategy.pageMap ?? []).map(pm => normalizeKeyword(pm.primaryKeyword));
+    expect(allPrimary).not.toContain(normalizeKeyword('totally invented saas growth hack'));
+    if (servicesPage) {
+      // The page survived with a REAL fallback keyword (the in-set provider term),
+      // not the invented one.
+      expect(normalizeKeyword(servicesPage.primaryKeyword)).not.toBe(normalizeKeyword('totally invented saas growth hack'));
+    }
+
+    // OP2: the out-of-set content-gap target must NOT appear among content gaps.
+    const gapKeys = (strategy.contentGaps ?? []).map(g => normalizeKeyword(g.targetKeyword ?? ''));
+    expect(gapKeys).not.toContain(normalizeKeyword('fabricated keyword nobody searches'));
   });
 });
 

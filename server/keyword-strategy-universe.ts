@@ -166,12 +166,6 @@ export interface BuildKeywordUniverseOptions {
    * per-candidate `voteWeight` annotation (matched by normalized topic == keyword).
    */
   contentGapVotes?: { topic: string; votes: number }[];
-  /**
-   * SEO Generation Quality P3 (G4) — authority-resolved business priorities. Carried
-   * on the universe so the synthesis OP2 prompt can inject them as global (not
-   * per-keyword) context. Not used for per-candidate annotation.
-   */
-  businessPriorities?: string[];
   /** Optional progress reporter (mirrors synthesis `sendProgress`). */
   sendProgress?: (step: string, detail: string, progress: number) => void;
 }
@@ -218,10 +212,8 @@ export async function buildKeywordUniverse(
     competitorDomains,
     evaluationContext,
     contentGapVotes,
-    businessPriorities,
     sendProgress,
   } = opts;
-  void businessPriorities; // carried for the synthesis OP2 prompt, not used here.
 
   // "provider present" → build a real universe; depth defaults to quick when the
   // legacy mode collapsed to 'none' (the MCP-seed path) but a provider exists.

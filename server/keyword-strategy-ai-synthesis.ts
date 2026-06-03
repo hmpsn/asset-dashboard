@@ -80,6 +80,16 @@ export interface StrategyContentGap {
   opportunityScore?: number;
   /** SEO Generation Quality P2 — re-admitted by the deterministic backfill floor. */
   backfilled?: boolean;
+  /**
+   * SEO Generation Quality P3 (M2, flag-ON) — TRANSIENT marker: this gap was injected
+   * by the requested-re-add hard guarantee (the client explicitly asked for this
+   * keyword and no page covers it). `_removePageCoveredContentGaps` SKIPS marked gaps
+   * so the covered-topic prune heuristic cannot silently undo the hard guarantee.
+   * NOT persisted — the `content_gaps` write path uses an explicit field list that
+   * omits this, so it never reaches the DB; it only survives in-memory through
+   * enrichment's prune step.
+   */
+  requested?: boolean;
 }
 
 export interface StrategyQuickWin {
@@ -545,10 +555,11 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
           competitorDomains,
           evaluationContext: strategyKeywordEvaluationContext,
           // SEO Generation Quality P3 (G4) — client-signal contract. Threaded so the
-          // assembler can populate per-candidate `voteWeight` annotations and surface
-          // `businessPriorities` as global OP2 prompt context.
+          // assembler can populate per-candidate `voteWeight` annotations. (M3) The
+          // OP2 prompt sources businessPriorities directly from
+          // `clientSignals.effectiveBusinessPriorities` (businessPrioritiesContext),
+          // so the assembler does NOT take a businessPriorities option.
           contentGapVotes: clientSignals?.contentGapVotes ?? [],
-          businessPriorities: clientSignals?.effectiveBusinessPriorities ?? [],
           sendProgress,
         });
         suppressedUniverseCount = suppressedCount;
@@ -647,6 +658,31 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
     };
     // Global (not per-keyword) business-priorities context for OP2.
     const businessPrioritiesContext = (clientSignals?.effectiveBusinessPriorities ?? []);
+
+    // ── SEO Generation Quality P3 (I1, flag-ON only): closed-set membership guard ──
+    // The grounded prompts (OP1/OP2) tell the AI to SELECT a `*SourceId` from the
+    // closed candidate set, but the model can hallucinate an id that is not in the
+    // set. On the flag-ON path `relaxConservatism` disables the business_mismatch
+    // hard-suppressor, so a plausible-but-invented phrase can otherwise survive the
+    // downstream eligibility filter. Build the closed set ONCE (normalized keyword ==
+    // candidate id) and verify membership before trusting the AI's id/keyword.
+    // Empty on the flag-OFF path (universeCandidates undefined) — never consulted.
+    const candidateIds = new Set(
+      (universeCandidates ?? []).map(c => normalizeKeyword(c.keyword)).filter(Boolean),
+    );
+    // Resolve the AI's selection to an IN-SET keyword: prefer the returned sourceId
+    // if it is a real candidate id; else fall back to the returned keyword ONLY if IT
+    // is in the set; else return null so the caller drops to the synthetic/eligibility
+    // path instead of admitting an out-of-set (hallucinated) keyword. Returns the
+    // NORMALIZED in-set keyword (== the candidate id) so a valid pick short-circuits
+    // the downstream eligibility check exactly as a pool keyword does.
+    const resolveClosedSetKeyword = (sourceId: string | undefined, keyword: string | undefined): string | null => {
+      const normSourceId = normalizeKeyword(sourceId ?? '');
+      if (normSourceId && candidateIds.has(normSourceId)) return normSourceId;
+      const normKeyword = normalizeKeyword(keyword ?? '');
+      if (normKeyword && candidateIds.has(normKeyword)) return normKeyword;
+      return null;
+    };
 
     type PageMapping = {
       pagePath: string;
@@ -767,7 +803,10 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
         return parsed;
       };
 
-      // Synthetic per-page fallback (never empty) — the legacy "invalid JSON" return.
+      // Legacy flag-OFF "invalid JSON" return. NOTE: these rows are tagged
+      // `_parseError:true` and `primaryKeyword:''`, so they are FILTERED OUT of the
+      // final mappings downstream (~:902-908) — i.e. on the legacy path a parse-fail
+      // drops the batch's pages entirely. Flag-OFF preserves this verbatim.
       const syntheticBatchFallback = (): PageMapping[] => batch.map(p => ({
         pagePath: p.path,
         pageTitle: p.title,
@@ -776,6 +815,36 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
         searchIntent: 'informational',
         _parseError: true,
       }));
+
+      // SEO Generation Quality P3 (M1, flag-ON): real per-page fallback that keeps
+      // pages instead of dropping them after a parse-fail. Synthesize each page's
+      // primaryKeyword from its own identity/provider/GSC signal via the existing
+      // findFallbackKeywordForPage — when that yields a keyword the page survives
+      // (validated:false); only when no signal exists at all does the page degrade
+      // to the legacy `_parseError` drop (rare). This is the genuine quality
+      // improvement: the previous flag-ON fallback re-used syntheticBatchFallback,
+      // whose empty/_parseError rows were filtered out → zero surviving pages.
+      const perPageFallbackBatch = (): PageMapping[] => batch.map(p => {
+        const fallbackKeyword = findFallbackKeywordForPage(p.path);
+        if (!fallbackKeyword) {
+          return {
+            pagePath: p.path,
+            pageTitle: p.title,
+            primaryKeyword: '',
+            secondaryKeywords: [],
+            searchIntent: 'informational',
+            _parseError: true,
+          };
+        }
+        return {
+          pagePath: p.path,
+          pageTitle: p.title,
+          primaryKeyword: fallbackKeyword,
+          secondaryKeywords: [],
+          searchIntent: 'informational',
+          validated: false,
+        };
+      });
 
       // ── SEO Generation Quality P3 (flag-ON): closed-set, Zod-validated OP1 ──
       const closedSetBlock = buildClosedSetBlock();
@@ -827,21 +896,31 @@ Rules:
         }
         if (parsedResult.success) {
           sendProgress('ai', `Batch ${batchIdx + 1}/${batches.length} complete (${parsedResult.data.assignments.length} pages)`, 0.55 + ((batchIdx + 1) / batches.length) * 0.20);
-          const mapped: PageMapping[] = parsedResult.data.assignments.map(a => ({
-            pagePath: a.pagePath,
-            pageTitle: a.pageTitle,
-            // Prefer the closed-set id (the normalized keyword the AI selected) so a
-            // valid pick short-circuits the eligibility check in post-processing.
-            primaryKeyword: a.primaryKeywordSourceId || a.primaryKeyword,
-            secondaryKeywords: a.secondaryKeywords,
-            searchIntent: a.searchIntent ?? 'informational',
-          }));
+          const mapped: PageMapping[] = parsedResult.data.assignments.map(a => {
+            // (I1) Verify closed-set membership: accept the AI's sourceId only if it
+            // is a real candidate id; else fall back to the keyword only if THAT is
+            // in the set. An in-set pick (normalized == candidate id) short-circuits
+            // the eligibility check in post-processing. If neither is in the set, pass
+            // the raw keyword through so postProcessBatch's eligibility + per-page
+            // fallback path rejects the hallucination (never admits it, and never
+            // lets a hallucinated id override a valid in-set keyword).
+            const resolved = resolveClosedSetKeyword(a.primaryKeywordSourceId, a.primaryKeyword);
+            return {
+              pagePath: a.pagePath,
+              pageTitle: a.pageTitle,
+              primaryKeyword: resolved ?? a.primaryKeyword,
+              secondaryKeywords: a.secondaryKeywords,
+              searchIntent: a.searchIntent ?? 'informational',
+            };
+          });
           return postProcessBatch(mapped);
         }
-        // Still failing after the retry: fall to the EXISTING per-page synthetic
-        // fallback (never empty) — generation's findFallbackKeywordForPage path.
-        log.error({ workspaceId: ws.id, detail: raw.slice(0, 200) }, `Batch ${batchIdx + 1} closed-set OP1 failed after retry — per-page fallback`);
-        return syntheticBatchFallback();
+        // Still failing after the retry: synthesize a REAL per-page keyword via
+        // findFallbackKeywordForPage so pages are NOT dropped (M1). Unlike the legacy
+        // syntheticBatchFallback (empty/_parseError → filtered out), this keeps pages
+        // with a page-identity/provider/GSC-derived keyword.
+        log.error({ workspaceId: ws.id, detail: raw.slice(0, 200) }, `Batch ${batchIdx + 1} closed-set OP1 failed after retry — real per-page fallback`);
+        return perPageFallbackBatch();
       }
 
       // ── Legacy flag-OFF path — VERBATIM ──
@@ -1305,14 +1384,34 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
       }
       if (masterResult.success) {
         const d = masterResult.data;
+        // (I1) Verify closed-set membership for every content-gap target. Accept the
+        // AI's targetKeywordSourceId only if it is a real candidate id; else fall back
+        // to targetKeyword only if THAT is in the set; else DROP the gap (do not admit
+        // an out-of-set/hallucinated keyword). The never-emit-empty backfill below
+        // re-fills contentGaps from the universe candidates if dropping leaves us
+        // below the floor, so this never silently empties the strategy.
+        let droppedOutOfSetGaps = 0;
+        const validatedGaps = d.contentGaps.flatMap(cg => {
+          const resolved = resolveClosedSetKeyword(cg.targetKeywordSourceId, cg.targetKeyword);
+          if (!resolved) {
+            droppedOutOfSetGaps++;
+            return [];
+          }
+          const { targetKeywordSourceId: _ignored, ...rest } = cg;
+          void _ignored;
+          return [{
+            ...rest,
+            targetKeyword: resolved,
+            topic: cg.topic,
+          } as StrategyContentGap & { targetKeyword: string; topic: string }];
+        });
+        if (droppedOutOfSetGaps > 0) {
+          log.info({ workspaceId: ws.id, droppedOutOfSetGaps }, 'Dropped OP2 content gaps whose targetKeyword/sourceId was not in the closed candidate set');
+        }
         masterData = {
           siteKeywords: d.siteKeywords,
           opportunities: d.opportunities,
-          contentGaps: d.contentGaps.map(cg => ({
-            ...cg,
-            targetKeyword: cg.targetKeyword,
-            topic: cg.topic,
-          })) as Array<StrategyContentGap & { targetKeyword: string; topic: string }>,
+          contentGaps: validatedGaps,
           quickWins: d.quickWins as StrategyQuickWin[],
           keywordFixes: d.keywordFixes as StrategyKeywordFix[],
         };
@@ -1495,6 +1594,9 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
             rationale: 'Client-requested keyword with no existing page coverage — surfaced as a content gap.',
             volume: candidate.volume,
             difficulty: candidate.difficulty,
+            // (M2) Transient marker so enrichment's covered-topic prune SKIPS this gap
+            // and cannot silently undo the requested-re-add hard guarantee. Not persisted.
+            requested: true,
           } as StrategyContentGap & { targetKeyword: string; topic: string },
         ];
         gapKeys.add(key);
