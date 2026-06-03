@@ -122,15 +122,45 @@ export {
   kdClassificationNote,
 } from './authority-context.js';
 
-/** @internal exported for unit testing */
+/**
+ * @internal exported for unit testing
+ *
+ * Maps a recommendation's `type` (+ `source`) to the {@link ActionType} its outcome is
+ * tracked under. This mapping feeds `winRateByActionType` calibration, so a NEW `RecType`
+ * that silently fell through to `audit_fix_applied` would distort calibration (G2). The
+ * `switch` is therefore EXHAUSTIVE over `RecType`: the `never` assignment in `default`
+ * makes adding a `RecType` to the union a COMPILE error until the author either gives it an
+ * explicit outcome case here or consciously adds it to the audit-fix family below. This
+ * compile-time guarantee is stronger than a pr-check rule and is the enforcement the
+ * `docs/rules/seo-generation-quality.md` "new rec types" contract refers to for the
+ * RecType→ActionType half (the source-category lockstep half is the pr-check rule).
+ */
 export function recommendationOutcomeActionType(type: RecType, source: string): ActionType {
-  if (type === 'content_refresh') return 'content_refreshed';
-  if (type === 'metadata') return 'meta_updated';
-  if (type === 'schema') return 'schema_deployed';
-  if (type === 'content') return 'content_published';
-  if (type === 'strategy' && source.startsWith('strategy:content-gap')) return 'content_published';
-  if (type === 'strategy') return 'insight_acted_on';
-  return 'audit_fix_applied';
+  switch (type) {
+    case 'content_refresh':
+      return 'content_refreshed';
+    case 'metadata':
+      return 'meta_updated';
+    case 'schema':
+      return 'schema_deployed';
+    case 'content':
+      return 'content_published';
+    case 'strategy':
+      return source.startsWith('strategy:content-gap') ? 'content_published' : 'insight_acted_on';
+    case 'technical':
+    case 'performance':
+    case 'accessibility':
+    case 'aeo':
+      // Audit-fix family — these map to the generic audit_fix_applied outcome by design.
+      // A new RecType must NOT silently join this family: add an explicit case above unless
+      // it is genuinely an audit fix, in which case add it to this list deliberately.
+      return 'audit_fix_applied';
+    default: {
+      const _exhaustive: never = type;
+      void _exhaustive;
+      return 'audit_fix_applied';
+    }
+  }
 }
 
 function applyRecommendationOutcomeAdjustment(

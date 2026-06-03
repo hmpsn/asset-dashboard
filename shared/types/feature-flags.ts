@@ -100,6 +100,13 @@ export const FEATURE_FLAGS = {
   // by GET /api/public/deliverables/:workspaceId. OFF = the existing new-inbox-ia + legacy
   // layouts render unchanged. Independent of the dual-write read-cutover flags above.
   'unified-inbox': false,
+
+  // SEO Generation Quality (multi-phase keyword-strategy + recommendation quality plan).
+  // Umbrella kill-switch for the P1–P6 generation-quality work (universe assembler,
+  // backfill floor, closed-set prompting, OV-derived tier, orphan-table recs). Dark by
+  // default; per-phase sub-features stay flag-gated and roll out per-workspace via the
+  // P0 per-workspace flag dimension. See docs/plans/2026-06-02-seo-generation-quality-plan.md.
+  'seo-generation-quality': false,
 } as const;
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;
@@ -144,6 +151,7 @@ export const FEATURE_FLAG_GROUP_LABELS = [
   'Local SEO',
   'Schema AI',
   'Unified Send-to-Client',
+  'SEO Generation Quality',
 ] as const;
 
 export type FeatureFlagGroupLabel = (typeof FEATURE_FLAG_GROUP_LABELS)[number];
@@ -794,6 +802,20 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: REVIEWED_AT,
     },
   },
+
+  'seo-generation-quality': {
+    label: 'SEO Generation Quality — umbrella (keyword-strategy + recommendation quality)',
+    group: 'SEO Generation Quality',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-02',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Remove after the P1–P6 generation-quality phases are validated per-workspace and become the only generation/ranking path (no flag-off legacy fallback).',
+      linkedRoadmapItemId: 'seo-genquality-p0-harness',
+      staleAuditCadence: 'weekly',
+      lastReviewedAt: '2026-06-02',
+    },
+  },
 };
 
 export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: FeatureFlagKey[] }> = [
@@ -883,6 +905,10 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
       'unified-deliverables-rest',
       'unified-inbox',
     ],
+  },
+  {
+    label: 'SEO Generation Quality',
+    keys: ['seo-generation-quality'],
   },
 ];
 

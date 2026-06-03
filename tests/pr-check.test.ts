@@ -5117,6 +5117,10 @@ describe('Meta: customCheck rule name registry', () => {
     'no-direct-insert-to-client_deliverable-outside-store',
     'every-active-type-has-an-adapter',
     'unified-send-to-client-bespoke-route',
+    // SEO Generation Quality Phase 0 (2026-06-02) — forward-looking guardrails for
+    // the multi-phase generation-quality plan (no false positives on current code).
+    'opportunity-money-field-must-be-stripped',
+    'new-rec-type-source-needs-category-and-action-type',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -9756,6 +9760,197 @@ describe('Rule: unified-send-to-client-bespoke-route', () => {
     const file = write(
       uniqPath('rule-unified-send', 'server/routes/unrelated.ts'),
       lines("router.post('/api/unrelated/:workspaceId/do-thing', h);"),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: opportunity-money-field-must-be-stripped (forward-looking, SEO gen-quality P0)
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: opportunity-money-field-must-be-stripped', () => {
+  const RULE = 'opportunity-money-field-must-be-stripped';
+
+  // A strip file that destructures emvPerWeek + roiPerEffortDay (the current contract).
+  const STRIP_OK =
+    'function stripEmvFromPublicRecs(recs) {\n' +
+    '  const { emvPerWeek: _e, roiPerEffortDay: _r, ...rest } = r.opportunity;\n' +
+    '}\n';
+
+  it('does NOT flag the current contract (emvPerWeek + roiPerEffortDay both stripped)', () => {
+    const types = write(
+      uniqPath('rule-opp-strip', 'shared/types/recommendations.ts'),
+      lines(
+        'export interface OpportunityScore {',
+        '  value: number;',
+        '  emvPerWeek: number;',
+        '  roiPerEffortDay: number;',
+        '  confidence: number;',
+        '}',
+      ),
+    );
+    const strip = write(uniqPath('rule-opp-strip', 'server/routes/recommendations.ts'), STRIP_OK);
+    expect(runRule(RULE, [types, strip])).toHaveLength(0);
+  });
+
+  it('flags a NEW admin-money field (predictedEmv) that is not stripped', () => {
+    const types = write(
+      uniqPath('rule-opp-strip', 'shared/types/recommendations.ts'),
+      lines(
+        'export interface OpportunityScore {', // 1
+        '  value: number;',                    // 2
+        '  emvPerWeek: number;',               // 3
+        '  roiPerEffortDay: number;',          // 4
+        '  predictedEmv: number;',             // 5 — new money field, NOT stripped
+        '  confidence: number;',               // 6
+        '}',                                   // 7
+      ),
+    );
+    const strip = write(uniqPath('rule-opp-strip', 'server/routes/recommendations.ts'), STRIP_OK);
+    const hits = runRule(RULE, [types, strip]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(5);
+    expect(hits[0].text).toContain('predictedEmv');
+  });
+
+  it('does NOT flag a new money field once it IS added to the strip destructure', () => {
+    const types = write(
+      uniqPath('rule-opp-strip', 'shared/types/recommendations.ts'),
+      lines(
+        'export interface OpportunityScore {',
+        '  emvPerWeek: number;',
+        '  roiPerEffortDay: number;',
+        '  predictedEmv: number;',
+        '}',
+      ),
+    );
+    const strip = write(
+      uniqPath('rule-opp-strip', 'server/routes/recommendations.ts'),
+      'function stripEmvFromPublicRecs(recs) {\n' +
+        '  const { emvPerWeek: _e, roiPerEffortDay: _r, predictedEmv: _p, ...rest } = r.opportunity;\n' +
+        '}\n',
+    );
+    expect(runRule(RULE, [types, strip])).toHaveLength(0);
+  });
+
+  it('does NOT count a money field that appears only in a comment outside the strip body', () => {
+    const types = write(
+      uniqPath('rule-opp-strip', 'shared/types/recommendations.ts'),
+      lines(
+        'export interface OpportunityScore {',
+        '  emvPerWeek: number;',
+        '  roiPerEffortDay: number;',
+        '  predictedEmv: number;', // money field NOT in the strip body
+        '}',
+      ),
+    );
+    // predictedEmv is mentioned only in a doc-comment, never destructured → must still flag.
+    const strip = write(
+      uniqPath('rule-opp-strip', 'server/routes/recommendations.ts'),
+      '// NOTE: predictedEmv: is admin-only and handled elsewhere (this is just prose).\n' +
+        'function stripEmvFromPublicRecs(recs) {\n' +
+        '  const { emvPerWeek: _e, roiPerEffortDay: _r, ...rest } = r.opportunity;\n' +
+        '}\n',
+    );
+    const hits = runRule(RULE, [types, strip]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('predictedEmv');
+  });
+
+  it('respects the // opportunity-strip-ok hatch on the field line', () => {
+    const types = write(
+      uniqPath('rule-opp-strip', 'shared/types/recommendations.ts'),
+      lines(
+        'export interface OpportunityScore {',
+        '  emvPerWeek: number;',
+        '  roiPerEffortDay: number;',
+        '  emvDisplayHint: number; // opportunity-strip-ok — client-safe display hint',
+        '}',
+      ),
+    );
+    const strip = write(uniqPath('rule-opp-strip', 'server/routes/recommendations.ts'), STRIP_OK);
+    expect(runRule(RULE, [types, strip])).toHaveLength(0);
+  });
+
+  it('does NOT flag non-money fields (value, confidence, components)', () => {
+    const types = write(
+      uniqPath('rule-opp-strip', 'shared/types/recommendations.ts'),
+      lines(
+        'export interface OpportunityScore {',
+        '  value: number;',
+        '  confidence: number;',
+        '  components: OpportunityComponent[];',
+        '  calibrationVersion: string;',
+        '  modelVersion: string;',
+        '}',
+      ),
+    );
+    // No strip file provided and no money fields → still zero hits.
+    expect(runRule(RULE, [types])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: new-rec-type-source-needs-category-and-action-type (forward-looking)
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: new-rec-type-source-needs-category-and-action-type', () => {
+  const RULE = 'new-rec-type-source-needs-category-and-action-type';
+
+  const UNION = (...members: string[]): string =>
+    'export type RecSourceCategory =\n' + members.map(m => `  | '${m}'`).join('\n') + ';';
+  const ARRAY = (...members: string[]): string =>
+    'const REC_SOURCE_CATEGORIES: RecSourceCategory[] = [\n' +
+    members.map(m => `  '${m}',`).join('\n') +
+    '\n];';
+
+  it('does NOT flag when the union and array are in lockstep', () => {
+    const file = write(
+      uniqPath('rule-rec-source', 'server/recommendations.ts'),
+      lines(UNION('audit', 'strategy', 'decay'), ARRAY('audit', 'strategy', 'decay')),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags a union member missing from REC_SOURCE_CATEGORIES (G2 false auto-resolve)', () => {
+    const file = write(
+      uniqPath('rule-rec-source', 'server/recommendations.ts'),
+      lines(
+        UNION('audit', 'strategy', 'decay', 'keyword_gap'),
+        ARRAY('audit', 'strategy', 'decay'), // keyword_gap NOT added — the bug
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('keyword_gap');
+    expect(hits[0].text).toContain('missing from REC_SOURCE_CATEGORIES');
+  });
+
+  it('flags an array member missing from the union', () => {
+    const file = write(
+      uniqPath('rule-rec-source', 'server/recommendations.ts'),
+      lines(
+        UNION('audit', 'strategy'),
+        ARRAY('audit', 'strategy', 'topic_cluster'), // topic_cluster not in union
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('topic_cluster');
+    expect(hits[0].text).toContain('not in the RecSourceCategory union');
+  });
+
+  it('respects the // rec-source-lockstep-ok hatch on the array opener line', () => {
+    const file = write(
+      uniqPath('rule-rec-source', 'server/recommendations.ts'),
+      lines(
+        UNION('audit', 'strategy', 'keyword_gap'),
+        "const REC_SOURCE_CATEGORIES: RecSourceCategory[] = [ // rec-source-lockstep-ok",
+        "  'audit',",
+        "  'strategy',",
+        '];',
+      ),
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
   });

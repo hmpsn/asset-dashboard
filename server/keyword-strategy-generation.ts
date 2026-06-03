@@ -27,6 +27,7 @@ import { listTopicClusters } from './topic-clusters.js';
 import { listCannibalizationIssues } from './cannibalization-issues.js';
 import { normalizePageUrl } from './helpers.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
+import type { GenerationQuality } from '../shared/types/generation-quality.js';
 
 // Re-exported for backward compatibility with existing callers.
 export { buildStrategyIntelligenceBlock, computeOpportunityScore, shouldFetchCompetitorData } from './keyword-strategy-helpers.js';
@@ -61,6 +62,12 @@ export interface GenerateKeywordStrategyResult {
   strategy: (KeywordStrategy & { pageMap?: PageKeywordMap[] }) | null;
   upToDate?: boolean;
   freshPageCount?: number;
+  /**
+   * Generation-quality telemetry (SEO Generation Quality P0). Additive + optional —
+   * present on the full-generation path so eval fixtures can assert on it; absent on
+   * the incremental no-op short-circuit. Does NOT change the existing output contract.
+   */
+  generationQuality?: GenerationQuality;
 }
 
 export class KeywordStrategyGenerationError extends Error {
@@ -467,9 +474,22 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
     const responseStrategy = { ...keywordStrategy, pageMap };
     responseSent = true;
 
+    // Generation-quality telemetry (SEO Generation Quality P0). Side-effect-free
+    // w.r.t. output: poolSize + aiReturnedCount are knowable today; the remaining
+    // fields are populated by P1–P2 (un-suppress + deterministic backfill floor).
+    const generationQuality: GenerationQuality = {
+      workspaceId: ws.id,
+      poolSize: keywordPool.size,
+      aiReturnedCount: strategy.contentGaps?.length ?? 0,
+      suppressedCount: 0,
+      backfilledCount: 0,
+      floorHit: false,
+    };
+    log.info({ generationQuality }, 'keyword-strategy/generation-quality');
+
     queueKeywordStrategyPostUpdateFollowOns({ workspaceId: ws.id });
     activeGenerations.delete(ws.id);
-    return { strategy: responseStrategy as KeywordStrategy & { pageMap: PageKeywordMap[] } };
+    return { strategy: responseStrategy as KeywordStrategy & { pageMap: PageKeywordMap[] }, generationQuality };
   } catch (err) {
     activeGenerations.delete(ws.id);
     clearKeepalive();
