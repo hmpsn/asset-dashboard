@@ -743,7 +743,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
 
           {/* ── Quick Wins ── */}
           <div id="quick-wins-section">
-            <QuickWins quickWins={strategy.quickWins || []} />
+            <QuickWins quickWins={strategy.quickWins ?? []} />
           </div>
 
           {/* ── Low-Hanging Fruit ── */}
