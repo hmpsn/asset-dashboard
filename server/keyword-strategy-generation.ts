@@ -27,6 +27,7 @@ import { listTopicClusters } from './topic-clusters.js';
 import { listCannibalizationIssues } from './cannibalization-issues.js';
 import { normalizePageUrl } from './helpers.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
+import { isFeatureEnabled } from './feature-flags.js';
 import type { GenerationQuality } from '../shared/types/generation-quality.js';
 
 // Re-exported for backward compatibility with existing callers.
@@ -126,7 +127,15 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
 
   const businessContext = options.businessContext || ws.keywordStrategy?.businessContext || '';
   const strategyMode = options.mode === 'incremental' ? 'incremental' : 'full'; // 'full' | 'incremental'
-  const seoDataMode = normalizeSeoDataMode(options.seoDataMode);
+  const requestedSeoDataMode = normalizeSeoDataMode(options.seoDataMode);
+  // MCP-seed (G/P1 #8): the MCP/chat path passes a provider but no seoDataMode, so
+  // it collapses to 'none' and discovery is starved. On the flag-ON path, treat
+  // "provider present" as "build a real universe" — promote the collapsed 'none'
+  // to 'quick' so seo-data fetches domain/competitor seeds and the assembler has a
+  // populated pool. Flag-OFF is unchanged (byte-identical).
+  const seoDataMode = (requestedSeoDataMode === 'none' && provider && isFeatureEnabled('seo-generation-quality', ws.id))
+    ? 'quick'
+    : requestedSeoDataMode;
   const competitorDomains = options.competitorDomains ? [...options.competitorDomains] : [...(ws.competitorDomains || [])];
   const rawMaxPages = options.maxPages != null ? Number(options.maxPages) : 500;
   const maxPagesParam = rawMaxPages > 0 ? Math.min(rawMaxPages, KEYWORD_STRATEGY_MAX_PAGE_CAP) : 0; // 0 = no cap
@@ -218,6 +227,7 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       businessContext,
       strategyMode,
       seoDataMode,
+      baseUrl,
       competitorDomains,
       pageInfo,
       preloadedPageKeywords,
@@ -342,6 +352,16 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
     const keywordPool = synthesis.keywordPool;
     const businessSection = synthesis.businessSection;
     const keywordEvaluationContext = synthesis.keywordEvaluationContext;
+    // FAQ enrichment question keywords. On the flag-ON path the legacy
+    // `seoDataMode === 'full'` question prefetch in keyword-strategy-seo-data.ts is
+    // gated off (to avoid a double-fetch), so `allQuestionKws` is empty there; the
+    // keyword-universe assembler instead surfaces the grouped questions (geo +
+    // language threaded) via `synthesis.questionKeywords`. Use those when present so
+    // enrichKeywordStrategy attaches FAQ questions to content gaps exactly as before.
+    // On the flag-OFF path (and the M2 assembler-degradation fallback) the synthesis
+    // value is undefined, so the legacy `allQuestionKws` flows unchanged — flag-OFF
+    // stays byte-identical.
+    const enrichmentQuestionKeywords = synthesis.questionKeywords ?? allQuestionKws;
 
     if (!strategy?.pageMap) {
       const errMsg = 'Strategy generation produced no results';
@@ -383,7 +403,7 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
         ga4EventsByPage,
       },
       domainKeywords: semrushDomainData,
-      questionKeywords: allQuestionKws,
+      questionKeywords: enrichmentQuestionKeywords,
       competitorKeywords: competitorKeywordData,
       provider,
       seoDataMode,
@@ -448,7 +468,9 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       competitorKeywordData,
       topicClusters,
       cannibalization,
-      questionKeywords: allQuestionKws,
+      // Persist the same question keywords FAQ enrichment used: assembler-surfaced
+      // (geo + language threaded) on flag-ON, legacy seo-data prefetch on flag-OFF.
+      questionKeywords: enrichmentQuestionKeywords,
       businessContext,
       seoDataMode,
       seoDataStatus,
@@ -479,9 +501,13 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
     // fields are populated by P1–P2 (un-suppress + deterministic backfill floor).
     const generationQuality: GenerationQuality = {
       workspaceId: ws.id,
+      // poolSize reflects the real universe on the flag-ON path (keywordPool is
+      // populated from buildKeywordUniverse) and the legacy pool on flag-OFF.
       poolSize: keywordPool.size,
       aiReturnedCount: strategy.contentGaps?.length ?? 0,
-      suppressedCount: 0,
+      // suppressedCount is wired from the assembler on the flag-ON path (branded +
+      // declined hard-filter removals); 0 on the legacy path. Backfill fields are P2.
+      suppressedCount: synthesis.suppressedCount ?? 0,
       backfilledCount: 0,
       floorHit: false,
     };

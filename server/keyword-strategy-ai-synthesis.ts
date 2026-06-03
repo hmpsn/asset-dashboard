@@ -11,14 +11,14 @@ import type { KeywordSourceEvidence } from '../shared/types/keywords.js';
 import type { KeywordStrategy, Workspace } from '../shared/types/workspace.js';
 import type { KeywordStrategyPageInfo } from './keyword-strategy-pages.js';
 import type { KeywordStrategySearchData } from './keyword-strategy-search-data.js';
-import type { CompetitorKeywordData } from './keyword-strategy-seo-data.js';
+import type { CompetitorKeywordData, QuestionKeywordGroup } from './keyword-strategy-seo-data.js';
 import type { DomainKeyword, KeywordGapEntry, RelatedKeyword } from './seo-data-provider.js';
 import { buildStrategySignals } from './insight-feedback.js';
 import { filterBrandedKeywords, filterBrandedContentGaps, extractBrandTokens } from './competitor-brand-filter.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { isProgrammingError } from './errors.js';
 import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js';
-import { resolveWorkspaceLocationCode } from './local-seo.js';
+import { resolveWorkspaceLocationCode, resolveWorkspaceLanguageCode } from './local-seo.js';
 import { filterDeclinedFromPool } from './strategy-filters.js';
 import { buildWorkspaceIntelligence, formatPersonasForPrompt, formatKnowledgeBaseForPrompt, formatForPrompt } from './workspace-intelligence.js';
 import { withActiveLocalSeoSlice } from './intelligence/generation-context-builders.js';
@@ -26,6 +26,8 @@ import { buildStrategyIntelligenceBlock, getPagesNeedingAnalysis, isStrategyQual
 import { buildOutcomeLearningStatusNote } from './outcome-learning-default-path.js';
 import { isStrategyPoolEligibleKeyword, normalizeKeyword, type KeywordEvaluationContext } from './keyword-intelligence/index.js';
 import { buildStrategyKeywordEvaluationContext } from './keyword-strategy-context.js';
+import { isFeatureEnabled } from './feature-flags.js';
+import { buildKeywordUniverse } from './keyword-strategy-universe.js';
 
 const log = createLogger('keyword-strategy:synthesis');
 
@@ -116,6 +118,12 @@ interface SynthesizeKeywordStrategyOptions {
   businessContext: string;
   strategyMode: 'full' | 'incremental';
   seoDataMode: 'quick' | 'full' | 'none';
+  /**
+   * Resolved live base URL — threaded so the flag-ON keyword-universe assembler
+   * can derive the site domain for `getKeywordsForSite` discovery. Optional;
+   * unused on the flag-OFF legacy path.
+   */
+  baseUrl?: string;
   competitorDomains: string[];
   pageInfo: KeywordStrategyPageInfo[];
   preloadedPageKeywords: ReturnType<typeof listPageKeywords> | null;
@@ -138,6 +146,22 @@ export interface SynthesizeKeywordStrategyResult {
   keywordEvaluationContext: KeywordEvaluationContext;
   upToDate?: boolean;
   freshPageCount?: number;
+  /**
+   * Candidates the flag-ON keyword-universe assembler removed via the branded +
+   * declined hard filters. Wired to `GenerationQuality.suppressedCount` on the
+   * flag-ON path; undefined (left as 0 by the telemetry emit) on the legacy path.
+   */
+  suppressedCount?: number;
+  /**
+   * Question keywords grouped by seed (geo + language threaded), surfaced by the
+   * flag-ON keyword-universe assembler in the SAME shape the legacy
+   * `seoDataMode === 'full'` prefetch produced. Threaded into `enrichKeywordStrategy`
+   * by generation on the flag-ON path so FAQ questions are attached to content gaps
+   * exactly as before (the legacy prefetch is gated off on flag-ON to avoid a
+   * double-fetch). Undefined on the flag-OFF path (generation falls back to the
+   * legacy seo-data `questionKeywords`, keeping flag-OFF byte-identical).
+   */
+  questionKeywords?: QuestionKeywordGroup[];
 }
 
 export async function callKeywordStrategyAI(
@@ -400,77 +424,119 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
       })
     ).length;
 
-    if (semrushDomainData.length > 0) {
-      // Group domain keywords by URL path for per-page matching
-      for (const k of semrushDomainData) {
-        const eligible = isEligibleStrategyPoolKeyword({ keyword: k.keyword, volume: k.volume, difficulty: k.difficulty, source: provider?.name ?? 'seo-provider' });
-        if (!eligible) continue;
-        const p = normalizePageUrl(k.url);
-        if (!semrushByPath.has(p)) semrushByPath.set(p, []);
-        semrushByPath.get(p)!.push(k);
-        upsertKeywordPoolCandidate(keywordPool, k.keyword, { volume: k.volume, difficulty: k.difficulty, source: provider?.name ?? 'seo-provider' });
-      }
-    }
-    // Add GSC queries to the pool (these are proven search terms)
-    for (const r of gscData) {
-      const q = normalizeKeyword(r.query);
-      if (q.length > 3 && q.split(' ').length >= 2) {
-        upsertKeywordPoolCandidate(keywordPool, q, { volume: r.impressions, difficulty: 0, source: 'gsc' });
-      }
-    }
-    // Add competitor keywords to the pool — these are proven industry terms with real volume
-    for (const ck of competitorKeywordData) {
-      const kw = normalizeKeyword(ck.keyword);
-      if (ck.volume > 0 && isEligibleStrategyPoolKeyword({ keyword: kw, volume: ck.volume, difficulty: ck.difficulty, source: `competitor:${ck.domain}` })) {
-        upsertKeywordPoolCandidate(keywordPool, kw, { volume: ck.volume, difficulty: ck.difficulty, source: `competitor:${ck.domain}` });
-      }
-    }
-    // Add keyword gaps to the pool — highest priority since competitors rank and you don't
-    for (const gap of keywordGaps) {
-      const kw = normalizeKeyword(gap.keyword);
-      if (gap.volume > 0 && isEligibleStrategyPoolKeyword({ keyword: kw, volume: gap.volume, difficulty: gap.difficulty, source: `gap:${gap.competitorDomain}` })) {
-        upsertKeywordPoolCandidate(keywordPool, kw, { volume: gap.volume, difficulty: gap.difficulty, source: `gap:${gap.competitorDomain}` });
-      }
-    }
-    // Add provider discovery keywords to the pool for sparse/low-footprint sites.
-    for (const dk of discoveryKeywords) {
-      const kw = normalizeKeyword(dk.keyword);
-      if (isStrategyQualityDiscoveryKeyword(dk) && isEligibleStrategyPoolKeyword(dk)) {
-        upsertKeywordPoolCandidate(keywordPool, kw, { volume: dk.volume, difficulty: dk.difficulty, source: `discovery:${dk.sourceKind}` });
-      }
-    }
-    // Add related keywords to the pool
-    for (const rk of relatedKws) {
-      const kw = normalizeKeyword(rk.keyword);
-      if (rk.volume > 0 && isEligibleStrategyPoolKeyword({ keyword: kw, volume: rk.volume, difficulty: rk.difficulty, cpc: rk.cpc, source: 'related' })) {
-        upsertKeywordPoolCandidate(keywordPool, kw, { volume: rk.volume, difficulty: rk.difficulty, source: 'related' });
-      }
-    }
-    // Add client-tracked keywords to the pool — these are keywords the client explicitly wants to target
-    const clientTracked = getTrackedKeywords(ws.id);
-    let clientKeywordsAdded = 0;
-    for (const tk of clientTracked) {
-      const kw = normalizeKeyword(tk.query);
-      if (kw.length > 1) {
-        const added = upsertKeywordPoolCandidate(keywordPool, kw, { volume: 0, difficulty: 0, source: 'client' });
-        if (!added) continue;
-        clientKeywordsAdded++;
-      }
-    }
-    // Add client-requested keywords to pool
-    for (const kw of requestedKeywords) {
-      const added = upsertKeywordPoolCandidate(keywordPool, kw, { volume: 0, difficulty: 0, source: 'client' });
-      if (added) {
-        clientKeywordsAdded++;
-      }
-    }
-    // Filter branded competitor keywords from the pool BEFORE feeding to AI
-    const brandedRemoved = filterBrandedKeywords(keywordPool, competitorDomains);
-    // Hard filter: remove declined keywords before the AI sees the pool (prompt instruction is soft)
+    // Declined set — needed by BOTH the flag-ON and flag-OFF pool paths and by
+    // downstream post-generation filters, so it is hoisted above the branch.
     const declinedSet = new Set(declinedKeywords.map(k => normalizeKeyword(k)).filter(Boolean));
-    const declinedPoolRemoved = filterDeclinedFromPool(keywordPool, declinedKeywords);
-    if (declinedPoolRemoved > 0) log.info(`Removed ${declinedPoolRemoved} declined keywords from keyword pool`);
-    log.info(`Keyword pool: ${keywordPool.size} unique terms (${semrushDomainData.length} domain + ${competitorKeywordData.length} competitor + ${keywordGaps.length} gaps + ${discoveryKeywords.length} discovery + ${clientKeywordsAdded} client + GSC)${brandedRemoved > 0 ? ` — removed ${brandedRemoved} branded competitor keywords` : ''}`);
+
+    // ── DARK LAUNCH (P1): buildKeywordUniverse is the single pool builder ──
+    // Flag-ON folds the entire pool build (and the provider discovery fetch) into
+    // the shared assembler — one builder, geo + language threaded, MCP-seedable.
+    // Flag-OFF keeps the legacy block VERBATIM so it is byte-identical to today.
+    const seoGenQualityEnabled = isFeatureEnabled('seo-generation-quality', ws.id);
+    let suppressedUniverseCount = 0;
+    // Prompt-facing count of client-sourced keywords. (M1) On the flag-OFF path
+    // this MUST keep the exact pre-filter increment semantics of origin/staging
+    // (counted as each client keyword is upserted, BEFORE the branded/declined
+    // hard-filters run) so the flag-OFF master-prompt sentence is byte-identical —
+    // it diverges from a post-filter pool-derived count when a client keyword is
+    // also branded/declined. On the flag-ON path we use the universe-derived
+    // (final-pool) count instead. The legacy fold increments this directly.
+    let clientKeywordsAdded = 0;
+    // The assembler built the pool on the flag-ON path (vs the legacy else fold).
+    // Used downstream to thread the resolved language into metrics validation (I4)
+    // without disturbing the flag-OFF path. M2 may flip this back to false if the
+    // assembler throws and we degrade to the legacy fold.
+    let usedKeywordUniverse = false;
+    // Grouped question keywords surfaced by the assembler (flag-ON) so generation
+    // can thread them into FAQ enrichment in place of the legacy prefetch (which is
+    // gated off on flag-ON). Undefined unless the assembler ran successfully — on
+    // the flag-OFF path AND the M2 degradation fallback it stays undefined so
+    // generation uses the legacy seo-data `questionKeywords` (flag-OFF byte-identical).
+    let universeQuestionKeywords: QuestionKeywordGroup[] | undefined;
+    if (seoGenQualityEnabled) {
+      // semrushByPath (per-page provider keyword lookup) is built here on both
+      // paths — the assembler owns the candidate POOL, not per-page assignment.
+      if (semrushDomainData.length > 0) {
+        for (const k of semrushDomainData) {
+          if (!isEligibleStrategyPoolKeyword({ keyword: k.keyword, volume: k.volume, difficulty: k.difficulty, source: provider?.name ?? 'seo-provider' })) continue;
+          const p = normalizePageUrl(k.url);
+          if (!semrushByPath.has(p)) semrushByPath.set(p, []);
+          semrushByPath.get(p)!.push(k);
+        }
+      }
+      // M2 (dark-launch safety): isolate flag-ON failure. The assembler does two
+      // resolver DB reads (geo + language) and the provider discovery fetch; if any
+      // throws we degrade gracefully to the legacy pool build below rather than
+      // aborting the whole generation. The flag-OFF code path is unaffected.
+      try {
+        const siteDomain = options.baseUrl ? (() => { try { return new URL(options.baseUrl).hostname; } catch { return ''; } })() : '';
+        const { pool: universePool, suppressedCount, questionKeywords: universeQuestions } = await buildKeywordUniverse(ws.id, {
+          provider,
+          seoDataMode,
+          siteDomain,
+          priorSiteKeywords: ws.keywordStrategy?.siteKeywords ?? [],
+          gscData,
+          domainKeywords: semrushDomainData,
+          competitorKeywords: competitorKeywordData,
+          keywordGaps,
+          discoveryKeywords,
+          relatedKeywords: relatedKws,
+          requestedKeywords,
+          declinedKeywords,
+          competitorDomains,
+          evaluationContext: strategyKeywordEvaluationContext,
+          sendProgress,
+        });
+        suppressedUniverseCount = suppressedCount;
+        universeQuestionKeywords = universeQuestions;
+        for (const [kw, candidate] of universePool.entries()) {
+          keywordPool.set(kw, candidate);
+        }
+        usedKeywordUniverse = true;
+        // Flag-ON: universe-derived client count = client-sourced rows in the final
+        // (post-filter) pool. (M1 — flag-ON may use the universe-derived count.)
+        clientKeywordsAdded = [...keywordPool.values()].filter(m => m.source === 'client').length;
+        log.info(`Keyword universe (flag-ON): ${keywordPool.size} unique terms (suppressed ${suppressedUniverseCount})`);
+      } catch (err) {
+        log.error({ err, workspaceId: ws.id }, 'buildKeywordUniverse failed — degrading to legacy pool build');
+        // Reset partial state so the legacy fold rebuilds a clean pool.
+        keywordPool.clear();
+        semrushByPath.clear();
+        suppressedUniverseCount = 0;
+        clientKeywordsAdded = 0;
+        runLegacyPoolBuild();
+      }
+    } else {
+      runLegacyPoolBuild();
+    }
+    // Legacy inline pool build (the verbatim pre-P1 `:403-472` logic) — invoked on
+    // the flag-OFF path AND as the M2 graceful-degradation fallback when the
+    // assembler throws. Delegates to the exported `buildLegacyKeywordPool` so the
+    // flag-OFF parity test can drive the SAME code (not a reimplemented copy — I3a).
+    function runLegacyPoolBuild(): void {
+      const legacy = buildLegacyKeywordPool({
+        keywordPool,
+        semrushByPath,
+        domainKeywords: semrushDomainData,
+        gscData,
+        competitorKeywords: competitorKeywordData,
+        keywordGaps,
+        discoveryKeywords,
+        relatedKeywords: relatedKws,
+        clientTracked: getTrackedKeywords(ws.id),
+        requestedKeywords,
+        competitorDomains,
+        declinedKeywords,
+        providerName: provider?.name,
+        isEligible: isEligibleStrategyPoolKeyword,
+      });
+      // (M1) Pre-filter client increment count from the legacy fold.
+      clientKeywordsAdded = legacy.clientKeywordsAdded;
+      const brandedRemoved = legacy.brandedRemoved;
+      const declinedPoolRemoved = legacy.declinedPoolRemoved;
+      if (declinedPoolRemoved > 0) log.info(`Removed ${declinedPoolRemoved} declined keywords from keyword pool`);
+      log.info(`Keyword pool: ${keywordPool.size} unique terms (${semrushDomainData.length} domain + ${competitorKeywordData.length} competitor + ${keywordGaps.length} gaps + ${discoveryKeywords.length} discovery + ${clientKeywordsAdded} client + GSC)${brandedRemoved > 0 ? ` — removed ${brandedRemoved} branded competitor keywords` : ''}`);
+    }
     if (keywordPool.size > 0) {
       // Sort by volume descending and include ALL keywords
       const poolList = [...keywordPool.entries()]
@@ -736,7 +802,12 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
           }
           const uniqueNeeds = [...uniqueNeedsByKey.values()];
           const locationCode = resolveWorkspaceLocationCode(ws.id) ?? undefined;
-          const metrics = await provider.getKeywordMetrics(uniqueNeeds.slice(0, 100), ws.id, undefined, locationCode);
+          // (I4) On the flag-ON path validate page keywords in the resolved
+          // workspace language (matching the universe's resolved-language pool);
+          // flag-OFF passes no languageCode → the provider's 'en' default, so the
+          // flag-OFF request is byte-identical to before.
+          const languageCode = usedKeywordUniverse ? resolveWorkspaceLanguageCode(ws.id) : undefined;
+          const metrics = await provider.getKeywordMetrics(uniqueNeeds.slice(0, 100), ws.id, undefined, locationCode, languageCode);
           const metricMap = new Map(metrics.map(m => [normalizeKeyword(m.keyword), m])); // map-dup-ok
 
           let unvalidated = 0;
@@ -1142,13 +1213,124 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
     }
     log.info(`Final strategy: ${strategy.pageMap?.length ?? 0} pages, ${strategy.siteKeywords?.length ?? 0} site keywords, ${strategy.contentGaps?.length ?? 0} content gaps, ${strategy.quickWins?.length ?? 0} quick wins`);
 
-  return { strategy, pagesToAnalyze, keywordPool, businessSection, keywordEvaluationContext: strategyKeywordEvaluationContext };
+  return { strategy, pagesToAnalyze, keywordPool, businessSection, keywordEvaluationContext: strategyKeywordEvaluationContext, suppressedCount: suppressedUniverseCount, questionKeywords: universeQuestionKeywords };
 }
 
 // ---------------------------------------------------------------------------
 // Pure helper functions — exported for unit testing
 // These are extracted data-transformation utilities with no AI/DB side-effects.
 // ---------------------------------------------------------------------------
+
+export interface BuildLegacyKeywordPoolOptions {
+  /** Canonical pool Map (mutated in place — same Map the caller reads). */
+  keywordPool: KeywordStrategyKeywordPool;
+  /** Per-page provider-keyword lookup (mutated in place for page assignment). */
+  semrushByPath: Map<string, DomainKeyword[]>;
+  domainKeywords: DomainKeyword[];
+  gscData: Array<{ query: string; impressions: number }>;
+  competitorKeywords: CompetitorKeywordData[];
+  keywordGaps: KeywordGapEntry[];
+  discoveryKeywords: KeywordSourceEvidence[];
+  relatedKeywords: RelatedKeyword[];
+  /** Already-resolved client-tracked rows (caller does the `getTrackedKeywords` read). */
+  clientTracked: Array<{ query: string }>;
+  requestedKeywords: string[];
+  competitorDomains: string[];
+  declinedKeywords: string[];
+  providerName?: string;
+  /** The shared admission predicate (closes over the workspace eval context). */
+  isEligible: (k: { keyword: string; volume?: number; difficulty?: number; cpc?: number; source?: string; sourceKind?: string }) => boolean;
+}
+
+export interface BuildLegacyKeywordPoolResult {
+  /** Pre-filter client increment count (M1 semantics — counted before filters). */
+  clientKeywordsAdded: number;
+  brandedRemoved: number;
+  declinedPoolRemoved: number;
+}
+
+/**
+ * The legacy (pre-P1) inline keyword-pool build, extracted VERBATIM so the
+ * flag-OFF code path and the flag-OFF parity test drive the same code (I3a — no
+ * reimplemented "local copy"). Mutates `keywordPool` + `semrushByPath` in place.
+ * Pure with respect to DB/AI: the caller supplies `clientTracked` and `isEligible`.
+ */
+export function buildLegacyKeywordPool(opts: BuildLegacyKeywordPoolOptions): BuildLegacyKeywordPoolResult {
+  const {
+    keywordPool, semrushByPath, domainKeywords, gscData, competitorKeywords,
+    keywordGaps, discoveryKeywords, relatedKeywords, clientTracked,
+    requestedKeywords, competitorDomains, declinedKeywords, providerName, isEligible,
+  } = opts;
+
+  if (domainKeywords.length > 0) {
+    // Group domain keywords by URL path for per-page matching
+    for (const k of domainKeywords) {
+      const eligible = isEligible({ keyword: k.keyword, volume: k.volume, difficulty: k.difficulty, source: providerName ?? 'seo-provider' });
+      if (!eligible) continue;
+      const p = normalizePageUrl(k.url);
+      if (!semrushByPath.has(p)) semrushByPath.set(p, []);
+      semrushByPath.get(p)!.push(k);
+      upsertKeywordPoolCandidate(keywordPool, k.keyword, { volume: k.volume, difficulty: k.difficulty, source: providerName ?? 'seo-provider' });
+    }
+  }
+  // Add GSC queries to the pool (these are proven search terms)
+  for (const r of gscData) {
+    const q = normalizeKeyword(r.query);
+    if (q.length > 3 && q.split(' ').length >= 2) {
+      upsertKeywordPoolCandidate(keywordPool, q, { volume: r.impressions, difficulty: 0, source: 'gsc' });
+    }
+  }
+  // Add competitor keywords to the pool — these are proven industry terms with real volume
+  for (const ck of competitorKeywords) {
+    const kw = normalizeKeyword(ck.keyword);
+    if (ck.volume > 0 && isEligible({ keyword: kw, volume: ck.volume, difficulty: ck.difficulty, source: `competitor:${ck.domain}` })) {
+      upsertKeywordPoolCandidate(keywordPool, kw, { volume: ck.volume, difficulty: ck.difficulty, source: `competitor:${ck.domain}` });
+    }
+  }
+  // Add keyword gaps to the pool — highest priority since competitors rank and you don't
+  for (const gap of keywordGaps) {
+    const kw = normalizeKeyword(gap.keyword);
+    if (gap.volume > 0 && isEligible({ keyword: kw, volume: gap.volume, difficulty: gap.difficulty, source: `gap:${gap.competitorDomain}` })) {
+      upsertKeywordPoolCandidate(keywordPool, kw, { volume: gap.volume, difficulty: gap.difficulty, source: `gap:${gap.competitorDomain}` });
+    }
+  }
+  // Add provider discovery keywords to the pool for sparse/low-footprint sites.
+  for (const dk of discoveryKeywords) {
+    const kw = normalizeKeyword(dk.keyword);
+    if (isStrategyQualityDiscoveryKeyword(dk) && isEligible(dk)) {
+      upsertKeywordPoolCandidate(keywordPool, kw, { volume: dk.volume, difficulty: dk.difficulty, source: `discovery:${dk.sourceKind}` });
+    }
+  }
+  // Add related keywords to the pool
+  for (const rk of relatedKeywords) {
+    const kw = normalizeKeyword(rk.keyword);
+    if (rk.volume > 0 && isEligible({ keyword: kw, volume: rk.volume, difficulty: rk.difficulty, cpc: rk.cpc, source: 'related' })) {
+      upsertKeywordPoolCandidate(keywordPool, kw, { volume: rk.volume, difficulty: rk.difficulty, source: 'related' });
+    }
+  }
+  // Add client-tracked keywords to the pool — these are keywords the client explicitly wants to target
+  let clientKeywordsAdded = 0;
+  for (const tk of clientTracked) {
+    const kw = normalizeKeyword(tk.query);
+    if (kw.length > 1) {
+      const added = upsertKeywordPoolCandidate(keywordPool, kw, { volume: 0, difficulty: 0, source: 'client' });
+      if (!added) continue;
+      clientKeywordsAdded++;
+    }
+  }
+  // Add client-requested keywords to pool
+  for (const kw of requestedKeywords) {
+    const added = upsertKeywordPoolCandidate(keywordPool, kw, { volume: 0, difficulty: 0, source: 'client' });
+    if (added) {
+      clientKeywordsAdded++;
+    }
+  }
+  // Filter branded competitor keywords from the pool BEFORE feeding to AI
+  const brandedRemoved = filterBrandedKeywords(keywordPool, competitorDomains);
+  // Hard filter: remove declined keywords before the AI sees the pool (prompt instruction is soft)
+  const declinedPoolRemoved = filterDeclinedFromPool(keywordPool, declinedKeywords);
+  return { clientKeywordsAdded, brandedRemoved, declinedPoolRemoved };
+}
 
 /**
  * Render the keyword pool into a prompt reference block for batch page analysis.

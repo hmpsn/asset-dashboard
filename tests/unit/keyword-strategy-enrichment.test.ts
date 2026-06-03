@@ -550,6 +550,57 @@ describe('enrichKeywordStrategy', () => {
     expect(mockCallKeywordStrategyAI).not.toHaveBeenCalled();
   });
 
+  it('attaches FAQ question keywords to a content gap from a grouped questionKeywords input (flag-ON parity)', async () => {
+    // P1: on the flag-ON path the assembler surfaces question keywords in the same
+    // `{ seed, questions: { keyword, volume }[] }[]` shape the legacy prefetch
+    // produced; enrichment must attach the matching questions to the content gap
+    // exactly as before. domainKeywords is required so the gap reaches the
+    // question-attach block (it sits behind the `domainKeywords.length > 0` guard).
+    mockMatchesQuestionKeyword.mockImplementation((target: string, question: string) =>
+      target === 'teeth whitening' && question.startsWith('how to teeth whitening'));
+    const opts = makeEnrichOptions({
+      contentGaps: [{ targetKeyword: 'teeth whitening' }],
+    });
+    opts.domainKeywords = [
+      { keyword: 'teeth whitening', volume: 1200, difficulty: 30, cpc: 4, position: 5 },
+    ] as typeof opts.domainKeywords;
+    opts.questionKeywords = [
+      {
+        seed: 'teeth whitening',
+        questions: [
+          { keyword: 'how to teeth whitening at home', volume: 400 },
+          { keyword: 'how to teeth whitening cost', volume: 300 },
+          { keyword: 'unrelated dental question', volume: 200 },
+        ],
+      },
+    ];
+
+    const result = await enrichKeywordStrategy(opts);
+    const gap = result.strategy.contentGaps?.[0];
+    expect(gap?.questionKeywords).toBeDefined();
+    // Only the matching questions are attached (capped at 3), unrelated one excluded.
+    expect(gap?.questionKeywords).toEqual([
+      'how to teeth whitening at home',
+      'how to teeth whitening cost',
+    ]);
+  });
+
+  it('attaches no FAQ question keywords when the grouped input is empty (flag-OFF byte-identical no-op)', async () => {
+    // Flag-OFF when seo-data found no questions (or assembler-degradation fallback):
+    // the empty group must leave the gap's questionKeywords untouched/undefined.
+    mockMatchesQuestionKeyword.mockReturnValue(true);
+    const opts = makeEnrichOptions({
+      contentGaps: [{ targetKeyword: 'teeth whitening' }],
+    });
+    opts.domainKeywords = [
+      { keyword: 'teeth whitening', volume: 1200, difficulty: 30, cpc: 4, position: 5 },
+    ] as typeof opts.domainKeywords;
+    opts.questionKeywords = [];
+
+    const result = await enrichKeywordStrategy(opts);
+    expect(result.strategy.contentGaps?.[0].questionKeywords).toBeUndefined();
+  });
+
   it('enriches GSC position for matching page + keyword pair', async () => {
     const opts = makeEnrichOptions({
       pageMap: [makePageMapEntry({ pagePath: '/about', primaryKeyword: 'dental care austin' })],
