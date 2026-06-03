@@ -29,6 +29,11 @@ export interface Recommendation {
   productPrice?: number;
   status: RecStatus;
   assignedTo?: 'team' | 'client'; // premium → team, growth/free → client
+  /** SEO Gen-Quality P2: true when this rec comes from a deterministic-backfill content
+   *  gap (re-admitted to meet the >=6 floor), so headline counts / "ready for review"
+   *  emails can exclude marginal backfill. Only set (to true) on the flag-ON path —
+   *  absent on every legacy/flag-OFF rec, preserving byte-identical output. */
+  backfilled?: boolean;
   createdAt: string;
   updatedAt: string;
 }

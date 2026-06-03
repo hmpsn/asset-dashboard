@@ -30,7 +30,6 @@ import {
 import { APP_PASSWORD, signAdminToken } from '../middleware.js';
 import { requestUserCanAccessWorkspace, sendWorkspaceAccessDenied, workspaceOwnsWebflowSite } from '../auth.js';
 import { generateRecommendations, loadRecommendations, resolveRecommendationsForPageIds } from '../recommendations.js';
-import { listContentGaps } from '../content-gaps.js';
 import { getBrief } from '../content-brief.js';
 import {
   createContentPostGenerationJob,
@@ -243,13 +242,14 @@ router.post('/api/jobs', async (req, res) => {
                   const dashUrl = getClientPortalUrl(ws);
                   const recSet = loadRecommendations(ws.id);
                   const recs = recSet?.recommendations || [];
-                  // SEO Generation Quality P2(f): de-pad the headline count. Each
-                  // deterministic-backfill content gap produces one content rec, so
-                  // exclude backfilled gaps from the emailed count — clients aren't
-                  // told "12 recommendations" padded with marginal backfill. Flag-OFF
-                  // has zero backfilled gaps, so the count is unchanged.
-                  const backfilledGapCount = listContentGaps(ws.id).filter(g => g.backfilled).length;
-                  const honestRecCount = Math.max(0, recs.length - backfilledGapCount);
+                  // SEO Generation Quality P2(f): the "recommendations ready for review"
+                  // headline counts only what the client will actually act on — ACTIVE recs
+                  // (exclude completed/dismissed carry-forwards) minus deterministic-backfill
+                  // recs (tagged at the source via Recommendation.backfilled). Flag-OFF has no
+                  // backfilled recs and no status pollution change, so the count is unchanged.
+                  const honestRecCount = recs.filter(
+                    r => r.status !== 'completed' && r.status !== 'dismissed' && !r.backfilled,
+                  ).length;
                   if (honestRecCount > 0) {
                     notifyClientRecommendationsReady({ clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: ws.id, recCount: honestRecCount, dashboardUrl: dashUrl });
                   }
