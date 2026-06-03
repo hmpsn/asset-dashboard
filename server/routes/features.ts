@@ -12,6 +12,7 @@ import {
   setFlagOverride,
   setWorkspaceFlagOverride,
 } from '../feature-flags.js';
+import { getWorkspace } from '../workspaces.js';
 import { FEATURE_FLAGS } from '../../shared/types/feature-flags.js';
 import type { FeatureFlagKey } from '../../shared/types/feature-flags.js';
 
@@ -69,6 +70,9 @@ router.get(
   '/api/admin/workspaces/:workspaceId/feature-flags',
   requireAdminAuth,
   (req, res) => {
+    if (!getWorkspace(req.params.workspaceId)) {
+      return res.status(404).json({ error: 'Workspace not found' });
+    }
     res.json(getWorkspaceFlagsWithMeta(req.params.workspaceId));
   },
 );
@@ -93,6 +97,11 @@ router.put(
     const { workspaceId, key } = req.params;
     if (!(key in FEATURE_FLAGS)) {
       return res.status(400).json({ error: `Unknown feature flag: ${key}` });
+    }
+    // Guard against a stale/typo workspaceId inserting an orphan override row
+    // (migration 114 has no FK to workspaces).
+    if (!getWorkspace(workspaceId)) {
+      return res.status(404).json({ error: 'Workspace not found' });
     }
     setWorkspaceFlagOverride(key as FeatureFlagKey, workspaceId, req.body.enabled);
     res.json({ success: true, workspaceId, key, enabled: req.body.enabled });

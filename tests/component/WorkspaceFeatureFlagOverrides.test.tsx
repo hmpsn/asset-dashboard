@@ -82,6 +82,39 @@ describe('WorkspaceFeatureFlagOverrides', () => {
     );
   });
 
+  it('toggling an ON flag OFF calls the set-override mutation with enabled=false', () => {
+    useWorkspaceFeatureFlagsMock.mockReturnValue({
+      data: [flag({ enabled: true, source: 'workspace' })],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+    render(<WorkspaceFeatureFlagOverrides workspaceId="ws-1" />);
+    const toggle = screen.getByRole('switch');
+    fireEvent.click(toggle);
+    expect(mutateMock).toHaveBeenCalledWith(
+      { key: 'seo-generation-quality', enabled: false },
+      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+    );
+  });
+
+  it('clicking the clear button calls the set-override mutation with enabled=null', () => {
+    // source 'workspace' → the RotateCcw clear IconButton is rendered.
+    useWorkspaceFeatureFlagsMock.mockReturnValue({
+      data: [flag({ enabled: true, source: 'workspace' })],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+    render(<WorkspaceFeatureFlagOverrides workspaceId="ws-1" />);
+    const clearButton = screen.getByRole('button', { name: /Clear seo-generation-quality workspace override/i });
+    fireEvent.click(clearButton);
+    expect(mutateMock).toHaveBeenCalledWith(
+      { key: 'seo-generation-quality', enabled: null },
+      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+    );
+  });
+
   it('renders an explicit error state when flags fail to load', () => {
     useWorkspaceFeatureFlagsMock.mockReturnValue({
       data: undefined,

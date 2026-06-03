@@ -8,7 +8,11 @@
  *     resolve ON for THAT workspace only (a second workspace is unaffected; the GLOBAL
  *     resolution via GET /api/feature-flags stays at its default).
  *   - PUT  ... { enabled: null } clears the override → reverts to inherited (default).
+ *   - PUT  ... { enabled: false } force-OFF beats a GLOBAL-ON override for that
+ *     workspace only (a second workspace still inherits the global-ON value).
  *   - PUT  with an unknown key → 400.
+ *   - GET/PUT against a non-existent workspaceId → 404 (no orphan override row;
+ *     migration 114 has no FK to workspaces).
  *   - requireAdminAuth rejects an unauthenticated call (401) when APP_PASSWORD is set.
  *
  * Uses the per-workspace GET endpoint's resolved `enabled` field as the read-path
@@ -70,6 +74,13 @@ describe('GET /api/admin/workspaces/:id/feature-flags', () => {
     expect(flag.inheritedSource).toBe('default');
     expect(typeof flag.label).toBe('string');
     expect(flag.group).toBe('SEO Generation Quality');
+  });
+
+  it('returns 404 for a non-existent workspace', async () => {
+    const res = await authApi('/api/admin/workspaces/ws-does-not-exist-xyz/feature-flags');
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe('Workspace not found');
   });
 });
 
@@ -133,6 +144,63 @@ describe('PUT /api/admin/workspaces/:id/feature-flags/:key', () => {
     const flagA = await getFlag(wsA.workspaceId, FLAG);
     expect(flagA.enabled).toBe(false);
     expect(flagA.source).toBe('default');
+  });
+
+  it('enabled:false force-OFF beats a global-ON override for that workspace only', async () => {
+    // Turn the GLOBAL override ON via the global PUT endpoint.
+    const globalPut = await authApi(`/api/admin/feature-flags/${FLAG}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: true }),
+    });
+    expect(globalPut.status).toBe(200);
+
+    try {
+      // Force the flag OFF for workspace A only.
+      const res = await authApi(`/api/admin/workspaces/${wsA.workspaceId}/feature-flags/${FLAG}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: false }),
+      });
+      expect(res.status).toBe(200);
+
+      // Workspace A: force-OFF wins over global-ON. source 'workspace';
+      // the inherited (global) chain it would revert to is now ON via 'db'.
+      const flagA = await getFlag(wsA.workspaceId, FLAG);
+      expect(flagA.enabled).toBe(false);
+      expect(flagA.source).toBe('workspace');
+      expect(flagA.inheritedEnabled).toBe(true);
+      expect(flagA.inheritedSource).toBe('db');
+
+      // Workspace B: no per-workspace override → inherits the global-ON value.
+      const flagB = await getFlag(wsB.workspaceId, FLAG);
+      expect(flagB.enabled).toBe(true);
+      expect(flagB.source).toBe('db');
+    } finally {
+      // Restore state: clear wsA's override and the global override so we leave
+      // no orphan rows and don't leak global-ON into other suites.
+      await authApi(`/api/admin/workspaces/${wsA.workspaceId}/feature-flags/${FLAG}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: null }),
+      });
+      await authApi(`/api/admin/feature-flags/${FLAG}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: null }),
+      });
+    }
+  });
+
+  it('returns 404 for a non-existent workspace', async () => {
+    const res = await authApi('/api/admin/workspaces/ws-does-not-exist-xyz/feature-flags/' + FLAG, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: true }),
+    });
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe('Workspace not found');
   });
 });
 
