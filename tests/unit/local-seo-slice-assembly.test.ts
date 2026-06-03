@@ -365,6 +365,48 @@ describe('assembleLocalSeo — per-market stratified sampling (P7.0)', () => {
     expect(block).toContain('[market-austin]');
     expect(block).toContain('[market-houston]');
   });
+
+  // ── MINOR-1: single-market parity ──────────────────────────────────────────
+  // The per-market cap (PROMPT_BLOCK_PER_MARKET_CAP = 8) must NOT clip a
+  // single-market workspace. Before this fix, a single market with >8
+  // market-scoped candidates was trimmed to 8, whereas the pre-P7.0 flat path
+  // surfaced up to PROMPT_BLOCK_TOTAL_CAP = 50. Assert a single-market workspace
+  // with >8 market-scoped candidates surfaces >8 (byte-identical to pre-P7.0).
+  it('single-market workspace with >8 market-scoped candidates surfaces >8 (not capped at per-market 8)', async () => {
+    vi.mocked(isFeatureEnabled).mockReturnValue(true);
+    vi.mocked(clientLocationsModule.getClientLocations).mockReturnValue([]);
+    vi.mocked(localSeoModule.listLocalSeoMarkets).mockReturnValue([
+      { id: 'market-austin', label: 'Austin, TX', status: 'active' as const, city: 'Austin', stateOrRegion: 'TX', country: 'US' } as any,
+    ]);
+    // 12 market-scoped candidates for the single active market — more than the
+    // per-market cap of 8, fewer than the total cap of 50.
+    const candidateCount = 12;
+    vi.mocked(localSeoModule.buildLocalSeoKeywordCandidates).mockReturnValue(
+      Array.from({ length: candidateCount }, (_, i) => ({
+        keyword: `austin candidate ${i}`,
+        normalizedKeyword: `austin candidate ${i}`,
+        source: 'local_variant',
+        sourceLabel: 'Local candidate',
+        marketId: 'market-austin',
+        score: 90 - i, // strictly descending so ordering is deterministic
+        selected: false,
+        reasons: [],
+        intent: 'transactional',
+      })) as any,
+    );
+
+    const result = await assembleLocalSeo('ws-single-market-many');
+    const block = result.effectiveLocalSeoBlock;
+
+    // Count how many of the 12 candidates landed in the sampled prompt block.
+    const surfaced = Array.from({ length: candidateCount }, (_, i) => `"austin candidate ${i}"`)
+      .filter(line => block.includes(line)).length;
+
+    // Must surface more than the per-market cap of 8 — all 12 fit under the total
+    // cap of 50, so all 12 should appear (single-market == flat top-N behavior).
+    expect(surfaced).toBeGreaterThan(8);
+    expect(surfaced).toBe(candidateCount);
+  });
 });
 
 // ── assembleLocalSeo tests ────────────────────────────────────────────────────

@@ -1588,6 +1588,10 @@ export function localVariantKeywordsByMarket(baseKeyword: string, markets: Local
   if (!base) return [];
   const variants: LocalVariantKeyword[] = [];
   const seen = new Set<string>();
+  // Dedup is first-market-wins by keyword text: if two markets produce the same
+  // variant string (e.g. a city name shared by two markets), it is attributed to
+  // the first market only. Very low likelihood at LOCAL_SEO_MAX_MARKETS=3;
+  // acknowledged as a known, accepted edge case rather than merged across markets.
   const add = (keyword: string, marketId: string | null) => {
     if (seen.has(keyword)) return;
     seen.add(keyword);
@@ -1976,6 +1980,13 @@ function upsertCandidate(
     reasons,
     intent: signal.intent ?? classifyLocalKeywordIntent(display),
   };
+  // marketId follows whichever signal wins this upsert (higher score, or selected
+  // over not-selected) — it is not merged. This resolves safely only because the
+  // market-agnostic sources (tracking=90 / page_assignment=85, both `selected`)
+  // outscore `local_variant` (~62): a keyword reachable both ways lands on the
+  // agnostic winner and ends up market-LESS, so it stays eligible to all markets
+  // (the safe outcome). A future score retune that lifts `local_variant` above the
+  // agnostic sources could flip this and attribute a shared keyword to one market.
   if (!existing || next.score > existing.score || (next.selected && !existing.selected)) {
     candidates.set(key, next);
   }

@@ -158,9 +158,16 @@ export async function assembleLocalSeo(workspaceId: string): Promise<LocalSeoSli
  * `marketId` and takes the top `perMarket` from each active market, then fills
  * the remaining budget with market-less (unassigned) candidates. Falls back to a
  * flat score-sorted top-N only when NO candidate carries a marketId or there are
- * no active markets — so single-market and market-agnostic data behave exactly as
- * before, while multi-market data gets per-market coverage instead of one market
- * crowding out the others.
+ * no active markets.
+ *
+ * Single-market parity: with exactly one active market the per-market cap is
+ * raised to the total cap, so a single-market workspace surfaces up to `total`
+ * market-scoped candidates — byte-identical to the pre-P7.0 flat path (which
+ * also capped only at `total`). The narrower per-market cap therefore only
+ * constrains MULTI-market workspaces, which is the intended fix: it stops one
+ * high-scoring market from crowding the others out of the prompt block.
+ * Market-agnostic data (no candidate carries a marketId) still takes the flat
+ * fallback above, also unchanged.
  */
 function stratifiedSample(
   candidates: LocalSeoSlice['candidates'],
@@ -173,6 +180,10 @@ function stratifiedSample(
   if (!hasMarketId || activeMarkets.length === 0) {
     return [...candidates].sort((a, b) => b.score - a.score).slice(0, total);
   }
+  // Single active market → use the total cap for that one bucket so single-market
+  // coverage matches the prior flat path exactly. Only multi-market workspaces get
+  // the narrower per-market cap.
+  const effectivePerMarket = activeMarkets.length === 1 ? total : perMarket;
   const byMarket = new Map<string, LocalSeoSlice['candidates'][number][]>();
   for (const market of activeMarkets) byMarket.set(market.id, []);
   const unassigned: LocalSeoSlice['candidates'][number][] = [];
@@ -183,7 +194,7 @@ function stratifiedSample(
   const picked: LocalSeoSlice['candidates'][number][] = [];
   for (const list of byMarket.values()) {
     list.sort((a, b) => b.score - a.score);
-    picked.push(...list.slice(0, perMarket));
+    picked.push(...list.slice(0, effectivePerMarket));
   }
   unassigned.sort((a, b) => b.score - a.score);
   for (const c of unassigned) {
@@ -328,5 +339,8 @@ function visibilityRank(posture: LocalSeoVisibilityPosture): number {
 // market-scoped sources (local/intent variants — see server/local-seo.ts). The
 // stratified sampler provides per-market prompt coverage and
 // `selectRelevantLocalCandidates` scopes selection to the target market when one
-// is resolved. Market-agnostic candidates carry null and fall back to flat
-// score-sorted ordering, so single-market / market-less data is unaffected.
+// is resolved. Single-market workspaces raise the per-market cap to the total
+// cap so their coverage is byte-identical to the pre-P7.0 flat path; only
+// MULTI-market workspaces get the narrower per-market cap. Market-agnostic
+// candidates carry null and fall back to flat score-sorted ordering, so
+// market-less data is also unaffected.
