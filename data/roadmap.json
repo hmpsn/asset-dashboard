@@ -295,6 +295,27 @@
           "priority": "P3",
           "status": "done",
           "notes": "PR4 shipped the data + GET /api/ov-divergence/:workspaceId + a typed api wrapper but deferred the UI panel (no natural admin-per-workspace debug page). Add a minimal SectionCard panel (legacy-#1 vs OV-#1, agree %, top-3 diff, invariant pass-rate) to support the P8 owner review without hitting the endpoint by hand. [DONE 2026-06-02 (PR #1036): admin OvDivergencePanel in the per-workspace Meeting Brief page \u2014 agree-rate headline + red flags (invariant-broken, OV-no-pick) + legacy-vs-OV disagreement detail (top-3 + per-rec deltas), reading the existing /api/ov-divergence endpoint. v1 is per-workspace; a cross-workspace aggregate rollup (new endpoint) is a possible follow-up. This is the instrument for the OV flag-flip decision.]"
+        },
+        {
+          "id": "seo-genquality-per-workspace-flag-toggle",
+          "title": "Per-workspace feature-flag override admin toggle (canary control UI) for seo-generation-quality + any flag",
+          "source": "/CLAUDE.md",
+          "est": "3-5h",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-06-03",
+          "shippedAt": "2026-06-03",
+          "notes": "Admin UI to canary the seo-generation-quality flag (and any flag) per workspace without a shell/CLI, on top of the P0 per-workspace dimension (ov-per-workspace-flag-dimension). Added getWorkspaceFlagsWithMeta(workspaceId) read helper (server/feature-flags.ts) returning per-flag resolved value + a new 'workspace' source (plus inheritedEnabled/inheritedSource = what 'clear' reverts to), typed via WorkspaceFeatureFlagMeta in shared/types/feature-flags.ts (no Record<string,unknown>). Two HMAC-admin endpoints (server/routes/features.ts, requireAdminAuth NOT requireAuth): GET /api/admin/workspaces/:id/feature-flags and PUT /api/admin/workspaces/:id/feature-flags/:key { enabled: boolean|null } (null clears \u2192 reverts to global/env/default; key validated against FEATURE_FLAG_KEYS, 400 otherwise). Client: workspaceFeatureFlags api wrappers (src/api/platform.ts) + useWorkspaceFeatureFlags / useSetWorkspaceFlagOverride hooks (admin- query key via queryKeys.ts, invalidate-on-mutation, no raw fetch). UI: new 'Feature Flags' sub-tab in WorkspaceSettings (WorkspaceFeatureFlagOverrides.tsx) \u2014 Toggle per flag, source badge (Workspace override / Global override / Env var / Default), clear-override button, and inline precedence (workspace > global > env > default) showing what 'clear' inherits. Tests: integration (per-workspace GET resolved+source, PUT true isolates to one workspace, PUT null clears, 401 unauth via APP_PASSWORD-active context), unit (getWorkspaceFlagsWithMeta source attribution), component (toggle + clear + error state). No broadcast (flag changes future generation, not a live client surface)."
+        },
+        {
+          "id": "keyword-surface-dedup-audit",
+          "title": "Audit + streamline keyword/strategy client surfaces (dedup, best-data) after the SEO gen-quality batch",
+          "source": "/CLAUDE.md",
+          "est": "owner-gated",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-06-03",
+          "notes": "After the SEO generation-quality batch (P0\u2013P5, flags seo-generation-quality) is canaried/rolled out, audit every client-facing keyword/strategy surface (Strategy tab, content gaps, RecommendedForYou, FixRecommendations, InsightsEngine, keyword command center, etc.) for DUPLICATED displays of the same data and streamline so each surface shows the single best representation. Trigger: full gen-quality rollout complete."
         }
       ]
     },

@@ -1,0 +1,164 @@
+/**
+ * Integration tests: per-workspace feature-flag override admin routes (canary control).
+ *
+ * Covers:
+ *   - GET  /api/admin/workspaces/:id/feature-flags → 200 with resolved value + source
+ *     (source 'default' before any override).
+ *   - PUT  /api/admin/workspaces/:id/feature-flags/:key { enabled: true } makes the flag
+ *     resolve ON for THAT workspace only (a second workspace is unaffected; the GLOBAL
+ *     resolution via GET /api/feature-flags stays at its default).
+ *   - PUT  ... { enabled: null } clears the override → reverts to inherited (default).
+ *   - PUT  with an unknown key → 400.
+ *   - requireAdminAuth rejects an unauthenticated call (401) when APP_PASSWORD is set.
+ *
+ * Uses the per-workspace GET endpoint's resolved `enabled` field as the read-path
+ * assertion: the server computes it via getWorkspaceFlagsWithMeta() →
+ * isFeatureEnabled(flag, workspaceId), so this exercises the real resolution path.
+ */
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { createTestContext } from './helpers.js';
+import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
+import type { WorkspaceFeatureFlagMeta } from '../../shared/types/feature-flags.js';
+
+const FLAG = 'seo-generation-quality';
+
+// ── Main flow (auth disabled — APP_PASSWORD='' default → requireAdminAuth passes through) ──
+// Ports 13884/13885: next free slots in the 13201–13899 range (13880 is a P4 doc
+// slot, 13881 is owned by seo-genquality-p5).
+const ctx = createTestContext(13884);
+const { api, authApi } = ctx;
+
+let wsA: SeededFullWorkspace;
+let wsB: SeededFullWorkspace;
+
+async function getFlag(workspaceId: string, key: string): Promise<WorkspaceFeatureFlagMeta> {
+  const res = await authApi(`/api/admin/workspaces/${workspaceId}/feature-flags`);
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as WorkspaceFeatureFlagMeta[];
+  const flag = body.find(f => f.key === key);
+  expect(flag).toBeDefined();
+  return flag!;
+}
+
+beforeAll(async () => {
+  await ctx.startServer();
+  ctx.setAuthToken('test-token');
+  wsA = seedWorkspace();
+  wsB = seedWorkspace();
+}, 25_000);
+
+afterAll(async () => {
+  // Best-effort: clear the override we set so we leave no orphan rows.
+  try {
+    await authApi(`/api/admin/workspaces/${wsA.workspaceId}/feature-flags/${FLAG}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: null }),
+    });
+  } catch { /* ignore */ }
+  wsA?.cleanup();
+  wsB?.cleanup();
+  await ctx.stopServer();
+});
+
+describe('GET /api/admin/workspaces/:id/feature-flags', () => {
+  it('returns every flag with a resolved value + source (default before any override)', async () => {
+    const flag = await getFlag(wsA.workspaceId, FLAG);
+    expect(flag.enabled).toBe(false);
+    expect(flag.source).toBe('default');
+    expect(flag.inheritedEnabled).toBe(false);
+    expect(flag.inheritedSource).toBe('default');
+    expect(typeof flag.label).toBe('string');
+    expect(flag.group).toBe('SEO Generation Quality');
+  });
+});
+
+describe('PUT /api/admin/workspaces/:id/feature-flags/:key', () => {
+  it('returns 400 for an unknown flag key', async () => {
+    const res = await authApi(`/api/admin/workspaces/${wsA.workspaceId}/feature-flags/totally_unknown_flag_xyz`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: true }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain('Unknown feature flag');
+  });
+
+  it('returns 400 when enabled field is missing', async () => {
+    const res = await authApi(`/api/admin/workspaces/${wsA.workspaceId}/feature-flags/${FLAG}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('enabled:true makes the flag resolve ON for THAT workspace only', async () => {
+    const res = await authApi(`/api/admin/workspaces/${wsA.workspaceId}/feature-flags/${FLAG}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: true }),
+    });
+    expect(res.status).toBe(200);
+    const putBody = (await res.json()) as { success: boolean; workspaceId: string; key: string; enabled: boolean };
+    expect(putBody).toMatchObject({ success: true, workspaceId: wsA.workspaceId, key: FLAG, enabled: true });
+
+    // Workspace A: resolved ON, source 'workspace', inherited still default OFF.
+    const flagA = await getFlag(wsA.workspaceId, FLAG);
+    expect(flagA.enabled).toBe(true);
+    expect(flagA.source).toBe('workspace');
+    expect(flagA.inheritedEnabled).toBe(false);
+    expect(flagA.inheritedSource).toBe('default');
+
+    // Workspace B: UNAFFECTED — still default OFF.
+    const flagB = await getFlag(wsB.workspaceId, FLAG);
+    expect(flagB.enabled).toBe(false);
+    expect(flagB.source).toBe('default');
+
+    // GLOBAL resolution (no workspaceId) is unchanged — still its default.
+    const globalRes = await api('/api/feature-flags');
+    const globalBody = (await globalRes.json()) as Record<string, boolean>;
+    expect(globalBody[FLAG]).toBe(false);
+  });
+
+  it('enabled:null clears the override → reverts to inherited (default)', async () => {
+    const res = await authApi(`/api/admin/workspaces/${wsA.workspaceId}/feature-flags/${FLAG}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: null }),
+    });
+    expect(res.status).toBe(200);
+
+    const flagA = await getFlag(wsA.workspaceId, FLAG);
+    expect(flagA.enabled).toBe(false);
+    expect(flagA.source).toBe('default');
+  });
+});
+
+// ── Auth rejection (APP_PASSWORD set → admin gate active) ──
+const authCtx = createTestContext(13885, { env: { APP_PASSWORD: 'secret-test-pw' } });
+
+describe('per-workspace feature-flag routes reject unauthenticated calls', () => {
+  beforeAll(async () => {
+    await authCtx.startServer();
+  }, 25_000);
+
+  afterAll(async () => {
+    await authCtx.stopServer();
+  });
+
+  it('GET rejects an unauthenticated call with 401', async () => {
+    const res = await authCtx.api('/api/admin/workspaces/any-ws/feature-flags');
+    expect(res.status).toBe(401);
+  });
+
+  it('PUT rejects an unauthenticated call with 401', async () => {
+    const res = await authCtx.api(`/api/admin/workspaces/any-ws/feature-flags/${FLAG}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: true }),
+    });
+    expect(res.status).toBe(401);
+  });
+});

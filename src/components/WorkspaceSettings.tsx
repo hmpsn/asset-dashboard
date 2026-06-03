@@ -5,6 +5,7 @@ import { useToast } from './Toast';
 import { ConnectionsTab } from './settings/ConnectionsTab';
 import { FeaturesTab } from './settings/FeaturesTab';
 import { ClientDashboardTab } from './settings/ClientDashboardTab';
+import { WorkspaceFeatureFlagOverrides } from './settings/WorkspaceFeatureFlagOverrides';
 import { PublishSettings } from './PublishSettings';
 import { SectionCard, Icon, Button, IconButton, FormInput } from './ui';
 import { get, patch, post } from '../api/client';
@@ -67,11 +68,12 @@ interface Props {
   onUpdate?: (patch: Record<string, unknown>) => void;
 }
 
-type SectionTab = 'connections' | 'features' | 'dashboard' | 'publishing' | 'export' | 'llms-txt';
-const VALID_SECTION_TABS: readonly SectionTab[] = ['connections', 'features', 'dashboard', 'publishing', 'export', 'llms-txt'];
+type SectionTab = 'connections' | 'features' | 'flags' | 'dashboard' | 'publishing' | 'export' | 'llms-txt';
+const VALID_SECTION_TABS: readonly SectionTab[] = ['connections', 'features', 'flags', 'dashboard', 'publishing', 'export', 'llms-txt'];
 const SECTION_TAB_ITEMS: readonly [SectionTab, string][] = [
   ['connections', 'Connections'],
   ['features', 'Features'],
+  ['flags', 'Feature Flags'],
   ['publishing', 'Publishing'],
   ['dashboard', 'Client Dashboard'],
   ['export', 'Data Export'],
@@ -275,6 +277,10 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
           patchWorkspace={patchWorkspace}
           toast={toast}
         />
+      )}
+
+      {tab === 'flags' && (
+        <WorkspaceFeatureFlagOverrides workspaceId={workspaceId} />
       )}
 
       {tab === 'publishing' && (

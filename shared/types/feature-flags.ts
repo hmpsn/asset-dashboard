@@ -113,6 +113,19 @@ export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;
 
 export type FeatureFlagValueSource = 'db' | 'env' | 'default';
 
+/**
+ * Source of a flag's resolved value in a PER-WORKSPACE context.
+ *
+ * Adds a `'workspace'` source on top of the global `FeatureFlagValueSource`
+ * chain: when a per-workspace override row exists in
+ * `feature_flag_workspace_overrides`, the value came from `'workspace'`;
+ * otherwise it falls back to the existing global chain (`'db' | 'env' | 'default'`).
+ *
+ * Precedence (highest → lowest), mirroring `isFeatureEnabled(flag, workspaceId)`:
+ *   workspace → db (global override) → env → default
+ */
+export type WorkspaceFeatureFlagValueSource = FeatureFlagValueSource | 'workspace';
+
 export const FEATURE_FLAG_ROLLOUT_TARGETS = [
   'staging-validation',
   'internal-operators',
@@ -916,6 +929,36 @@ export interface FeatureFlagAdminMeta {
   key: FeatureFlagKey;
   enabled: boolean;
   source: FeatureFlagValueSource;
+  default: boolean;
+  label: string;
+  group: FeatureFlagGroupLabel;
+  lifecycle: FeatureFlagLifecycleMeta;
+}
+
+/**
+ * Per-workspace flag metadata for the per-workspace admin override UI.
+ *
+ * Like `FeatureFlagAdminMeta`, but the resolution is workspace-scoped:
+ *   - `enabled` is the value resolved for THIS workspace
+ *     (`isFeatureEnabled(flag, workspaceId)`).
+ *   - `source` is `'workspace'` when a per-workspace override row exists, else
+ *     the global chain (`'db' | 'env' | 'default'`).
+ *   - `inheritedEnabled` is the value the workspace WOULD resolve to with no
+ *     per-workspace override (`isFeatureEnabled(flag)` — the global chain),
+ *     i.e. what "clear override" reverts to. Always present so the UI can show
+ *     what inherited/global state a clear would fall back to.
+ *   - `inheritedSource` is the source of `inheritedEnabled` (the global chain
+ *     source: `'db' | 'env' | 'default'`).
+ */
+export interface WorkspaceFeatureFlagMeta {
+  key: FeatureFlagKey;
+  enabled: boolean;
+  source: WorkspaceFeatureFlagValueSource;
+  /** Resolved value with NO per-workspace override (global → env → default). What "clear" reverts to. */
+  inheritedEnabled: boolean;
+  /** Source of `inheritedEnabled` — always a global-chain source (never 'workspace'). */
+  inheritedSource: FeatureFlagValueSource;
+  /** The hardcoded compile-time default in FEATURE_FLAGS. */
   default: boolean;
   label: string;
   group: FeatureFlagGroupLabel;

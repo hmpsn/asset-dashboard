@@ -77,7 +77,11 @@ export function createTestContext(port: number, options?: { env?: Record<string,
         // Use 'test' so the server skips file watchers (chokidar) that exhaust
         // open file descriptor limits when multiple test servers run concurrently.
         NODE_ENV: 'test',
-        APP_PASSWORD: '',
+        // Default: admin gate disabled (APP_PASSWORD='') so requireAdminAuth passes
+        // through and tests need no real HMAC token. A test that explicitly wants the
+        // gate ACTIVE (e.g. to assert 401 on unauthenticated admin routes) can pass
+        // options.env.APP_PASSWORD to override this default.
+        APP_PASSWORD: options?.env?.APP_PASSWORD ?? '',
         DATA_DIR: dataDir,
         // startServer watches stdout for the "running on" readiness line. The
         // child stdout is not echoed, so this keeps readiness detection working

@@ -209,6 +209,83 @@ describe('seo-generation-quality umbrella flag', () => {
   });
 });
 
+describe('getWorkspaceFlagsWithMeta', () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  // Same SQL-aware mock used by the per-workspace isFeatureEnabled tests so the
+  // global (feature_flag_overrides) and per-workspace
+  // (feature_flag_workspace_overrides) statements can return distinct rows.
+  async function mockDbBySql(opts: {
+    globalRows?: Array<{ key: string; enabled: number }>;
+    workspaceRows?: Array<{ key: string; enabled: number }>;
+  }): Promise<void> {
+    const dbModule = await import('../../server/db/index.js');
+    const mockDb = dbModule.default as unknown as { prepare: ReturnType<typeof vi.fn> };
+    mockDb.prepare.mockImplementation((sql: string) => {
+      const isWorkspaceTable = /feature_flag_workspace_overrides/.test(sql);
+      return {
+        all: vi.fn(() => (isWorkspaceTable ? (opts.workspaceRows ?? []) : (opts.globalRows ?? []))),
+        get: vi.fn(() => undefined),
+        run: vi.fn(),
+      };
+    });
+  }
+
+  it('returns one entry per flag with resolved value + per-workspace source', async () => {
+    await mockDbBySql({ globalRows: [], workspaceRows: [] });
+    const { getWorkspaceFlagsWithMeta } = await import('../../server/feature-flags.js');
+    const meta = getWorkspaceFlagsWithMeta('ws-1');
+    expect(meta).toHaveLength(FEATURE_FLAG_KEYS.length);
+    for (const entry of meta) {
+      expect(['workspace', 'db', 'env', 'default']).toContain(entry.source);
+      expect(['db', 'env', 'default']).toContain(entry.inheritedSource);
+      expect(typeof entry.enabled).toBe('boolean');
+      expect(typeof entry.inheritedEnabled).toBe('boolean');
+    }
+  });
+
+  it('marks source=workspace and resolves the workspace value when a per-workspace override exists', async () => {
+    delete process.env['FEATURE_COPY_ENGINE'];
+    await mockDbBySql({ globalRows: [], workspaceRows: [{ key: 'copy-engine', enabled: 1 }] });
+    const { getWorkspaceFlagsWithMeta } = await import('../../server/feature-flags.js');
+    const entry = getWorkspaceFlagsWithMeta('ws-1').find(m => m.key === 'copy-engine');
+    expect(entry?.source).toBe('workspace');
+    expect(entry?.enabled).toBe(true);
+    // inherited (clear target) is the global chain → default OFF
+    expect(entry?.inheritedEnabled).toBe(false);
+    expect(entry?.inheritedSource).toBe('default');
+  });
+
+  it('per-workspace OFF override surfaces inheritedEnabled=true when global override is ON', async () => {
+    await mockDbBySql({
+      globalRows: [{ key: 'copy-engine', enabled: 1 }],
+      workspaceRows: [{ key: 'copy-engine', enabled: 0 }],
+    });
+    const { getWorkspaceFlagsWithMeta } = await import('../../server/feature-flags.js');
+    const entry = getWorkspaceFlagsWithMeta('ws-1').find(m => m.key === 'copy-engine');
+    // Workspace forces OFF, but clearing reverts to the global override (ON).
+    expect(entry?.source).toBe('workspace');
+    expect(entry?.enabled).toBe(false);
+    expect(entry?.inheritedEnabled).toBe(true);
+    expect(entry?.inheritedSource).toBe('db');
+  });
+
+  it('falls back to the global chain (source=db) when the workspace has no override', async () => {
+    await mockDbBySql({
+      globalRows: [{ key: 'deep-diagnostics', enabled: 1 }],
+      workspaceRows: [],
+    });
+    const { getWorkspaceFlagsWithMeta } = await import('../../server/feature-flags.js');
+    const entry = getWorkspaceFlagsWithMeta('ws-1').find(m => m.key === 'deep-diagnostics');
+    expect(entry?.source).toBe('db');
+    expect(entry?.enabled).toBe(true);
+    expect(entry?.inheritedEnabled).toBe(true);
+    expect(entry?.inheritedSource).toBe('db');
+  });
+});
+
 describe('getAllFlags', () => {
   beforeEach(() => {
     vi.resetModules();

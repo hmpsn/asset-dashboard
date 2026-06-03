@@ -5,6 +5,7 @@ import {
   type FeatureFlagAdminMeta,
   type FeatureFlagKey,
   type FeatureFlagValueSource,
+  type WorkspaceFeatureFlagMeta,
 } from '../shared/types/feature-flags.js';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
@@ -162,21 +163,63 @@ export function getAllFlags(): Record<FeatureFlagKey, boolean> {
 }
 
 /**
+ * Resolve which layer of the GLOBAL chain (db override → env → default) supplied
+ * a flag's value. Shared by the global and per-workspace meta builders so the
+ * "what does clearing the per-workspace override revert to" answer stays in sync
+ * with isFeatureEnabled()'s global resolution.
+ */
+function resolveGlobalSource(
+  key: FeatureFlagKey,
+  dbOverrides: Partial<Record<FeatureFlagKey, boolean>>,
+): FeatureFlagValueSource {
+  if (key in dbOverrides) return 'db';
+  if (key in envOverrides) return 'env';
+  return 'default';
+}
+
+/**
  * Returns all flags with source metadata for the admin UI.
  * Source indicates where the current value came from.
  */
 export function getAllFlagsWithMeta(): FeatureFlagAdminMeta[] {
   const dbOverrides = loadDbOverrides(); // single DB read shared across all flags and source checks
-  return FEATURE_FLAG_KEYS.map(key => {
-    let source: FeatureFlagValueSource;
-    if (key in dbOverrides) source = 'db';
-    else if (key in envOverrides) source = 'env';
-    else source = 'default';
+  return FEATURE_FLAG_KEYS.map(key => ({
+    key,
+    enabled: resolveFlag(key, dbOverrides),
+    source: resolveGlobalSource(key, dbOverrides),
+    default: FEATURE_FLAGS[key],
+    label: FEATURE_FLAG_CATALOG[key].label,
+    group: FEATURE_FLAG_CATALOG[key].group,
+    lifecycle: FEATURE_FLAG_CATALOG[key].lifecycle,
+  }));
+}
 
+/**
+ * Returns all flags with PER-WORKSPACE source metadata for the per-workspace
+ * admin override UI. For each flag:
+ *   - `enabled` / `source` reflect the workspace-scoped resolution
+ *     (per-workspace override → global db override → env → default). `source` is
+ *     `'workspace'` when a per-workspace override row exists for the flag.
+ *   - `inheritedEnabled` / `inheritedSource` reflect the GLOBAL chain only
+ *     (what the workspace falls back to when the override is cleared).
+ *
+ * Reuses loadWorkspaceOverrides()/loadDbOverrides() so the source attribution is
+ * derived from the same rows isFeatureEnabled() resolves against. Single DB read
+ * per layer shared across all flags.
+ */
+export function getWorkspaceFlagsWithMeta(workspaceId: string): WorkspaceFeatureFlagMeta[] {
+  const dbOverrides = loadDbOverrides();
+  const wsOverrides = loadWorkspaceOverrides(workspaceId);
+  return FEATURE_FLAG_KEYS.map(key => {
+    const hasWsOverride = key in wsOverrides;
+    const inheritedSource = resolveGlobalSource(key, dbOverrides);
+    const inheritedEnabled = resolveFlag(key, dbOverrides);
     return {
       key,
-      enabled: resolveFlag(key, dbOverrides),
-      source,
+      enabled: hasWsOverride ? wsOverrides[key]! : inheritedEnabled,
+      source: hasWsOverride ? 'workspace' : inheritedSource,
+      inheritedEnabled,
+      inheritedSource,
       default: FEATURE_FLAGS[key],
       label: FEATURE_FLAG_CATALOG[key].label,
       group: FEATURE_FLAG_CATALOG[key].group,
