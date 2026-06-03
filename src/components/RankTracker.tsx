@@ -169,7 +169,7 @@ export function RankTracker({ workspaceId, hasGsc, onNavigate }: Props) {
   const [expandedQuery, setExpandedQuery] = useState<string | null>(null);
   const [showTrends, setShowTrends] = useState(false);
   const trackedKeywordsQuery = useQuery({
-    queryKey: queryKeys.admin.rankTrackingKeywordRows(workspaceId),
+    queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId),
     queryFn: () => rankTracking.keywords(workspaceId),
     enabled: !!workspaceId,
     staleTime: 60 * 1000,
@@ -213,7 +213,6 @@ export function RankTracker({ workspaceId, hasGsc, onNavigate }: Props) {
   const addKeywordMutation = useMutation({
     mutationFn: (query: string) => rankTracking.addKeyword(workspaceId, { query }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywordRows(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(workspaceId) });
     },
@@ -222,7 +221,6 @@ export function RankTracker({ workspaceId, hasGsc, onNavigate }: Props) {
   const removeKeywordMutation = useMutation({
     mutationFn: (query: string) => rankTracking.removeKeyword(workspaceId, query),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywordRows(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingHistory(workspaceId) });
@@ -232,7 +230,7 @@ export function RankTracker({ workspaceId, hasGsc, onNavigate }: Props) {
   const togglePinMutation = useMutation({
     mutationFn: (query: string) => rankTracking.togglePin(workspaceId, query),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywordRows(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingHistory(workspaceId) });
     },
@@ -243,7 +241,7 @@ export function RankTracker({ workspaceId, hasGsc, onNavigate }: Props) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingHistory(workspaceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywordRows(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId) });
     },
   });
 
