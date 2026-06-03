@@ -24,7 +24,7 @@ import { isProgrammingError } from './errors.js';
 import { getTrackedKeywords } from './rank-tracking.js';
 import { filterBrandedKeywords } from './competitor-brand-filter.js';
 import { filterDeclinedFromPool } from './strategy-filters.js';
-import { resolveWorkspaceLocationCode, resolveWorkspaceLanguageCode } from './local-seo.js';
+import { resolveWorkspaceLocationCode, resolveWorkspaceLanguageCode, buildLocalSeoKeywordCandidates } from './local-seo.js';
 import {
   upsertKeywordPoolCandidate,
   isStrategyQualityDiscoveryKeyword,
@@ -92,6 +92,12 @@ interface DepthLimits {
   relatedLimit: number;
   questionSeeds: number;
   questionsLimit: number;
+  /**
+   * P7.2 — max local-intent candidates folded in. These are STORED reads (no
+   * provider cost), so the cap only BOUNDS COUNT (keeps the pool from being flooded
+   * with city/near-me variants on quick depth), not provider spend.
+   */
+  localCandidatesLimit: number;
 }
 
 function depthLimits(depth: KeywordUniverseCreditDepth): DepthLimits {
@@ -110,6 +116,7 @@ function depthLimits(depth: KeywordUniverseCreditDepth): DepthLimits {
       relatedLimit: 10,
       questionSeeds: 5,
       questionsLimit: 10,
+      localCandidatesLimit: 50,
     };
   }
   return {
@@ -123,6 +130,7 @@ function depthLimits(depth: KeywordUniverseCreditDepth): DepthLimits {
     relatedLimit: 8,
     questionSeeds: 2,
     questionsLimit: 8,
+    localCandidatesLimit: 25,
   };
 }
 
@@ -166,6 +174,21 @@ export interface BuildKeywordUniverseOptions {
    * per-candidate `voteWeight` annotation (matched by normalized topic == keyword).
    */
   contentGapVotes?: { topic: string; votes: number }[];
+  /**
+   * SEO Generation Quality P7.2 — the local-intent source gate (default false).
+   *
+   * Resolved ONCE by the caller (mirrors P7.1's three-gate in `recommendations.ts`
+   * and how the umbrella `seo-generation-quality` flag is resolved in synthesis and
+   * threaded as a plain boolean — never `isFeatureEnabled` in a hot loop). The caller
+   * sets this true ONLY when ALL THREE hold: (1) the gen-quality umbrella flag is on
+   * for the workspace, (2) posture ∈ {local, hybrid}, and (3) `local-seo-visibility`
+   * is on. When false, NO local source runs → the pool, `sourceCounts`, and
+   * `poolSize` are byte-identical to pre-P7.2 (proven by the parity test). The local
+   * source reads STORED candidates only (`buildLocalSeoKeywordCandidates`) — no
+   * synchronous provider/`getLocalVisibility` call in the strategy path
+   * (docs/rules/local-seo-visibility.md provider-cost + intelligence boundary).
+   */
+  includeLocal?: boolean;
   /** Optional progress reporter (mirrors synthesis `sendProgress`). */
   sendProgress?: (step: string, detail: string, progress: number) => void;
 }
@@ -212,6 +235,7 @@ export async function buildKeywordUniverse(
     competitorDomains,
     evaluationContext,
     contentGapVotes,
+    includeLocal,
     sendProgress,
   } = opts;
 
@@ -317,6 +341,11 @@ export async function buildKeywordUniverse(
   const tag = (norm: string, source: KeywordCandidateSource): void => {
     if (norm && !coarseSource.has(norm)) coarseSource.set(norm, source);
   };
+  // P7.2 — side-map (normalizedKeyword → marketId) for the market-scoped local
+  // candidates. The canonical pool Map value (`KeywordPoolCandidate`) intentionally
+  // carries only {volume,difficulty,source}; marketId rides this side-map and is
+  // threaded onto the typed `KeywordCandidate` during candidate derivation below.
+  const marketByKeyword = new Map<string, string | null>();
 
   // ── (2) Domain organic rows ──
   for (const k of domainKeywords) {
@@ -406,6 +435,43 @@ export async function buildKeywordUniverse(
     }
   }
 
+  // ── (9b) Local-intent candidates (P7.2) — STORED reads only ──
+  // Gated by the caller-resolved `includeLocal` boolean (umbrella gen-quality flag +
+  // posture ∈ {local,hybrid} + `local-seo-visibility`). When false, this block is
+  // skipped entirely so the pool + sourceCounts are byte-identical to pre-P7.2.
+  //
+  // `buildLocalSeoKeywordCandidates` reads STORED local candidates (page-map /
+  // strategy / tracking / content-gap signals) AND synthesizes the city/state/near-me
+  // local-intent variants (via `localVariantKeywordsByMarket` inside its signal
+  // iterator) — purely from the workspace's stored markets + signals. It makes NO
+  // provider/`getLocalVisibility` call, honoring the local-seo-visibility provider-cost
+  // boundary (no synchronous provider work in the strategy path). The depth cap bounds
+  // COUNT only (these reads are free), keeping quick depth from flooding the pool with
+  // variants. Candidates run through the SAME eligibility funnel + branded/declined
+  // hard-filters as every other source (below), and dedupe via the pool Map. P7.0's
+  // per-candidate `marketId` is preserved onto the side-map → the typed candidate.
+  if (includeLocal) {
+    sendProgress?.('seo-data', 'Folding local-intent candidates into the universe...', 0.55);
+    const localCandidates = buildLocalSeoKeywordCandidates(workspaceId).slice(0, limits.localCandidatesLimit);
+    let localAdded = 0;
+    for (const lc of localCandidates) {
+      const kw = normalizeKeyword(lc.keyword);
+      if (!kw) continue;
+      // Same admission funnel as the other sources. Volume/difficulty default to 0
+      // when the stored candidate has none (these are intent terms, not provider rows).
+      if (!eligible({ keyword: kw, volume: lc.volume ?? 0, difficulty: lc.difficulty ?? 0, source: 'local' })) continue;
+      if (upsertKeywordPoolCandidate(pool, kw, { volume: lc.volume ?? 0, difficulty: lc.difficulty ?? 0, source: 'local' })) {
+        tag(kw, KEYWORD_CANDIDATE_SOURCE.LOCAL);
+        localAdded += 1;
+      }
+      // Preserve P7.0 marketId on the side-map even when a higher-priority source
+      // already owns the pool slot — the candidate is still local-relevant. Only set
+      // when the candidate actually carries a market (never fabricate one).
+      if (lc.marketId != null && !marketByKeyword.has(kw)) marketByKeyword.set(kw, lc.marketId);
+    }
+    log.info({ workspaceId, localCandidates: localCandidates.length, localAdded }, 'Folded local-intent candidates into keyword universe');
+  }
+
   // ── (10) Branded competitor filter + (11) declined hard-filter ──
   const sizeBeforeFilters = pool.size;
   const brandedRemoved = filterBrandedKeywords(pool, competitorDomains);
@@ -435,6 +501,9 @@ export async function buildKeywordUniverse(
     const declined = declinedSet.has(kw);
     const voteWeight = voteByKeyword.get(kw);
     const candidate: KeywordCandidate = { keyword: kw, source: m.source, volume: m.volume, difficulty: m.difficulty };
+    // P7.2 — preserve the local market relevance from the local source's side-map.
+    const marketId = marketByKeyword.get(kw);
+    if (marketId != null) candidate.marketId = marketId;
     if (requested) candidate.requested = true;
     if (declined) candidate.declined = true;
     if (voteWeight != null && voteWeight > 0) candidate.voteWeight = voteWeight;

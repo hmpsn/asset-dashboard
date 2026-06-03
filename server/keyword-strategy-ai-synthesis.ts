@@ -18,7 +18,8 @@ import { filterBrandedKeywords, filterBrandedContentGaps, extractBrandTokens } f
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { isProgrammingError } from './errors.js';
 import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js';
-import { resolveWorkspaceLocationCode, resolveWorkspaceLanguageCode } from './local-seo.js';
+import { resolveWorkspaceLocationCode, resolveWorkspaceLanguageCode, getLocalSeoPosture } from './local-seo.js';
+import { LOCAL_SEO_POSTURE } from '../shared/types/local-seo.js';
 import { filterDeclinedFromPool } from './strategy-filters.js';
 import { buildWorkspaceIntelligence, formatPersonasForPrompt, formatKnowledgeBaseForPrompt, formatForPrompt } from './workspace-intelligence.js';
 import { withActiveLocalSeoSlice } from './intelligence/generation-context-builders.js';
@@ -375,6 +376,20 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
     // build, backfill). Do NOT scatter isFeatureEnabled into the per-candidate hot
     // loop. Flag-OFF (false) keeps every downstream path byte-identical to today.
     const seoGenQualityEnabled = isFeatureEnabled('seo-generation-quality', ws.id);
+    // SEO Generation Quality P7.2 — local-intent universe gate (three conjunctive
+    // conditions, mirroring P7.1's local-recs gate in recommendations.ts). Resolved
+    // ONCE here and threaded as a plain boolean into buildKeywordUniverse (no
+    // isFeatureEnabled / posture re-reads inside the assembler's hot loops). The THREE
+    // gates: (1) the umbrella gen-quality flag is on for this workspace, (2) posture is
+    // local OR hybrid (never non_local/unknown), and (3) the local-seo-visibility flag
+    // is on. When ANY gate is false, includeLocal is false → the assembler adds NO local
+    // source → the pool, sourceCounts, and poolSize are byte-identical to pre-P7.2. The
+    // local source reads STORED candidates only — no synchronous getLocalVisibility /
+    // provider call in the strategy path (docs/rules/local-seo-visibility.md boundary).
+    const localPosture = getLocalSeoPosture(ws.id);
+    const includeLocalUniverse = seoGenQualityEnabled
+      && (localPosture === LOCAL_SEO_POSTURE.LOCAL || localPosture === LOCAL_SEO_POSTURE.HYBRID)
+      && isFeatureEnabled('local-seo-visibility');
     const strategyKeywordEvaluationContext = buildStrategyKeywordEvaluationContext({
       workspaceId: ws.id,
       workspaceName: ws.name,
@@ -560,6 +575,8 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
           // `clientSignals.effectiveBusinessPriorities` (businessPrioritiesContext),
           // so the assembler does NOT take a businessPriorities option.
           contentGapVotes: clientSignals?.contentGapVotes ?? [],
+          // P7.2 — caller-resolved local-intent gate (umbrella + posture + local-seo-visibility).
+          includeLocal: includeLocalUniverse,
           sendProgress,
         });
         suppressedUniverseCount = suppressedCount;

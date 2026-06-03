@@ -13,8 +13,8 @@
  *   - the per-workspace monthly credit ceiling reserves a call when a provider is
  *     present (uses FakeSeoProvider so the ceiling + geo/language threading run)
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { addTrackedKeyword } from '../../server/rank-tracking.js';
 import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
 import {
@@ -27,6 +27,11 @@ import { type KeywordPoolCandidate } from '../../server/keyword-strategy-helpers
 import { isStrategyPoolEligibleKeyword, normalizeKeyword } from '../../server/keyword-intelligence/index.js';
 import { getTrackedKeywords } from '../../server/rank-tracking.js';
 import { FakeSeoProvider } from '../../server/providers/fake-seo-provider.js';
+import { updateLocalSeoConfiguration, listLocalSeoMarkets } from '../../server/local-seo.js';
+import { setBroadcast } from '../../server/broadcast.js';
+import { upsertPageKeyword } from '../../server/page-keywords.js';
+import { LOCAL_SEO_POSTURE, LOCAL_SEO_MARKET_STATUS } from '../../shared/types/local-seo.js';
+import { KEYWORD_CANDIDATE_SOURCE } from '../../shared/types/keyword-universe.js';
 import type { DomainKeyword } from '../../server/seo-data-provider.js';
 import type { KeywordSourceEvidence } from '../../shared/types/keywords.js';
 
@@ -315,5 +320,125 @@ describe('buildKeywordUniverse — monthly credit ceiling + provider threading',
     // Reset helper is callable for both forms.
     __resetMonthlyProviderCallCeiling(workspaceId);
     __resetMonthlyProviderCallCeiling();
+  });
+});
+
+// ── SEO Generation Quality P7.2 — local-intent candidates ──────────────────────
+// The `includeLocal` gate (caller-resolved: umbrella gen-quality flag + posture ∈
+// {local,hybrid} + local-seo-visibility) folds STORED local-intent candidates
+// (page-map/strategy/tracking/content-gap signals + city/state/near-me variants)
+// into the universe via `buildLocalSeoKeywordCandidates`. When the gate is false,
+// NO local source runs → the pool + sourceCounts are byte-identical. These are
+// STORED reads only — no synchronous provider/getLocalVisibility call.
+describe('buildKeywordUniverse — P7.2 local-intent candidates', () => {
+  /**
+   * Seed a local/hybrid workspace with an active market + a page-map service
+   * keyword so `buildLocalSeoKeywordCandidates` produces market-scoped
+   * `local_variant` candidates (e.g. "cosmetic dentistry austin" carrying the
+   * Austin market id) plus market-agnostic candidates. Mirrors the local-seo
+   * test-suite fixture pattern.
+   */
+  function seedLocalWorkspace(posture: typeof LOCAL_SEO_POSTURE[keyof typeof LOCAL_SEO_POSTURE]) {
+    setBroadcast(vi.fn(), vi.fn());
+    updateWorkspace(workspaceId, {
+      name: 'Swish Dental',
+      liveDomain: 'https://swish.example.com',
+      businessProfile: { address: { street: '123 Congress Ave', city: 'Austin', state: 'TX', country: 'US' } },
+      keywordStrategy: {
+        siteKeywords: ['cosmetic dentist'],
+        opportunities: [],
+        businessContext: 'Dental office offering cosmetic dentistry, veneers, whitening, and implants.',
+        generatedAt: '2026-05-20T10:00:00.000Z',
+      },
+    });
+    updateLocalSeoConfiguration(workspaceId, {
+      posture,
+      markets: [
+        { label: 'Austin, TX', city: 'Austin', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1026201, status: LOCAL_SEO_MARKET_STATUS.ACTIVE },
+      ],
+    }, true);
+    upsertPageKeyword(workspaceId, {
+      pagePath: '/services/cosmetic-dentistry',
+      pageTitle: 'Cosmetic Dentistry',
+      primaryKeyword: 'cosmetic dentistry',
+      searchIntent: 'commercial',
+    });
+    const austin = listLocalSeoMarkets(workspaceId).find(m => m.city === 'Austin');
+    expect(austin).toBeDefined();
+    return austin!;
+  }
+
+  it('local-ON: includes local-source candidates (city variants) that carry marketId and dedupe into the pool', async () => {
+    const austin = seedLocalWorkspace(LOCAL_SEO_POSTURE.LOCAL);
+
+    const { universe, pool } = await buildKeywordUniverse(workspaceId, baseOpts({ includeLocal: true }));
+
+    // The market-scoped city variant entered the pool tagged source 'local'.
+    const cityVariant = normalizeKeyword('cosmetic dentistry austin');
+    expect(pool.has(cityVariant)).toBe(true);
+    expect(pool.get(cityVariant)?.source).toBe('local');
+
+    // It surfaces as a `local`-source universe candidate carrying the Austin marketId (P7.0).
+    const localCandidates = universe.candidates.filter(c => c.source === 'local');
+    expect(localCandidates.length).toBeGreaterThan(0);
+    const cityCandidate = universe.candidates.find(c => c.keyword === cityVariant);
+    expect(cityCandidate).toBeDefined();
+    expect(cityCandidate?.marketId).toBe(austin.id);
+
+    // The coarse LOCAL source count reflects the folded candidates.
+    expect(universe.sourceCounts[KEYWORD_CANDIDATE_SOURCE.LOCAL]).toBeGreaterThan(0);
+  });
+
+  it('local-ON: a local candidate that ALSO arrives from a higher-priority source dedupes (one pool entry)', async () => {
+    seedLocalWorkspace(LOCAL_SEO_POSTURE.HYBRID);
+
+    // GSC also proves the city variant — the Map dedupes; a higher-priority source
+    // (gsc > local) may own the pool slot, but there is exactly ONE entry.
+    const cityVariant = normalizeKeyword('cosmetic dentistry austin');
+    const { pool } = await buildKeywordUniverse(workspaceId, baseOpts({
+      includeLocal: true,
+      gscData: [{ query: 'cosmetic dentistry austin', impressions: 1500 }],
+    }));
+    expect(pool.has(cityVariant)).toBe(true);
+    // Exactly one pool entry for the keyword (dedup proven by the Map key uniqueness).
+    expect([...pool.keys()].filter(k => k === cityVariant)).toHaveLength(1);
+  });
+
+  it('parity: includeLocal=false on a LOCAL workspace adds NO local source — pool + sourceCounts byte-identical', async () => {
+    seedLocalWorkspace(LOCAL_SEO_POSTURE.LOCAL);
+    const gscData = [{ query: 'cloud backup solutions', impressions: 1200 }];
+
+    const off = await buildKeywordUniverse(workspaceId, baseOpts({ includeLocal: false, gscData }));
+    const undef = await buildKeywordUniverse(workspaceId, baseOpts({ gscData })); // includeLocal omitted (default)
+
+    // No `local`-source candidates on the gate-OFF path.
+    expect(off.universe.candidates.some(c => c.source === 'local')).toBe(false);
+    expect(off.universe.sourceCounts[KEYWORD_CANDIDATE_SOURCE.LOCAL]).toBeUndefined();
+
+    // Omitting the option is identical to passing false (default false gate).
+    expect([...undef.pool.keys()].sort()).toEqual([...off.pool.keys()].sort());
+
+    // And byte-identical to a non-local workspace with the same non-local inputs:
+    // the city variant never enters the pool when the gate is off.
+    expect(off.pool.has(normalizeKeyword('cosmetic dentistry austin'))).toBe(false);
+  });
+
+  it('boundary: the local source is STORED-only — getLocalVisibility (provider) is NEVER called', async () => {
+    seedLocalWorkspace(LOCAL_SEO_POSTURE.LOCAL);
+    const provider = new FakeSeoProvider();
+    const localVisibilitySpy = vi.spyOn(provider, 'getLocalVisibility');
+
+    const { universe } = await buildKeywordUniverse(workspaceId, baseOpts({
+      includeLocal: true,
+      provider,
+      seoDataMode: 'quick',
+    }));
+
+    // Local candidates were folded in (the gate ran)…
+    expect(universe.candidates.some(c => c.source === 'local')).toBe(true);
+    // …but NO synchronous local-visibility provider call happened in the strategy path.
+    expect(localVisibilitySpy).not.toHaveBeenCalled();
+
+    localVisibilitySpy.mockRestore();
   });
 });

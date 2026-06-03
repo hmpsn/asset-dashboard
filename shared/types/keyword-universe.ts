@@ -30,6 +30,16 @@ export const KEYWORD_CANDIDATE_SOURCE = {
   CLIENT_REQUESTED: 'client-requested',
   COMPETITOR_GAP: 'competitor-gap',
   DOMAIN: 'domain',
+  /**
+   * SEO Generation Quality P7.2 — local-intent candidates (stored local candidates
+   * + city/state/near-me variants) folded into the universe ONLY when the workspace
+   * is local/hybrid posture with the gen-quality umbrella AND `local-seo-visibility`
+   * flags on (the `includeLocal` gate, resolved by the caller). Sourced from STORED
+   * candidates via `buildLocalSeoKeywordCandidates` — never a synchronous provider
+   * call in the strategy path (docs/rules/local-seo-visibility.md intelligence +
+   * provider-cost boundary).
+   */
+  LOCAL: 'local',
 } as const;
 
 export type KeywordCandidateSource =
@@ -51,6 +61,15 @@ export interface KeywordCandidate {
   difficulty: number;
   cpc?: number;
   intent?: string;
+  /**
+   * SEO Generation Quality P7.2 — the local market this candidate was generated
+   * for, threaded verbatim from the local SEO candidate engine (P7.0). Set only on
+   * market-scoped `local`-source candidates (city/state variants tied to a specific
+   * market); market-agnostic local candidates and every non-local source leave this
+   * `null`/undefined — never fabricate a market. Gives per-market relevance to the
+   * local terms in the strategy pool. See docs/rules/local-seo-visibility.md.
+   */
+  marketId?: string | null;
   // ── P3 annotations (optional now; populated by the closed-set rewrite) ──
   declined?: boolean;
   requested?: boolean;
