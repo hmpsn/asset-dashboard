@@ -27,4 +27,6 @@ export const ACTION_TYPE_LABELS: Record<ActionType, string> = {
   competitor_gap_closed: 'Keyword Gap Closed',
   cluster_published: 'Cluster Published',
   cannibalization_resolved: 'Cannibalization Resolved',
+  local_visibility_won: 'Local Visibility Won',
+  local_service_added: 'Local Service Targeted',
 };

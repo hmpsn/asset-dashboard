@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Sparkles, ShoppingCart, Image, FileText, Code2, ArrowRightLeft, Wrench, Crown, MessageSquare, ArrowUp, ArrowDown, Eye, MousePointerClick, ChevronDown, Lightbulb, CheckCircle2, Zap, Shield } from 'lucide-react';
+import { Sparkles, ShoppingCart, Image, FileText, Code2, ArrowRightLeft, Wrench, Crown, MessageSquare, ArrowUp, ArrowDown, Eye, MousePointerClick, ChevronDown, Lightbulb, CheckCircle2, Zap, Shield, MapPin } from 'lucide-react';
 import { Button, SectionCard } from '../ui';
 import { Icon } from '../ui/Icon';
 import { useCart } from './useCart';
@@ -246,6 +246,10 @@ const typeConfig: Record<string, { icon: typeof FileText; label: string }> = {
   keyword_gap: { icon: Lightbulb, label: 'Keyword Gaps' },
   topic_cluster: { icon: Sparkles, label: 'Topical Authority' },
   cannibalization: { icon: ArrowRightLeft, label: 'Keyword Cannibalization' },
+  // SEO Gen-Quality P7.1 — explicit entries (no fallback-to-technical) so local recs
+  // render with local-appropriate labels/icons on the client surface.
+  local_visibility: { icon: MapPin, label: 'Local Visibility' },
+  local_service_gap: { icon: MapPin, label: 'Local Service Gaps' },
 };
 
 /** Build FixCategories from server recommendation data */

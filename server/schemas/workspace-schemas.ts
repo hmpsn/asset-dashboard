@@ -346,6 +346,9 @@ export const recommendationSchema = z.object({
     // with RecType (shared/types/recommendations.ts): a new RecType absent from this enum
     // fails validation and is silently DROPPED on every reload (Schema vs stored shape rule).
     'keyword_gap', 'topic_cluster', 'cannibalization',
+    // SEO Gen-Quality P7.1 — first-class local-visibility rec types. Same lockstep rule:
+    // omitting either of these drops every local rec on the next reload (P5's hard-won lesson).
+    'local_visibility', 'local_service_gap',
   ]),
   title: z.string(),
   description: z.string(),

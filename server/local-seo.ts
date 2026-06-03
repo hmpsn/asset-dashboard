@@ -4,6 +4,7 @@ import { z } from 'zod';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonSafeArray } from './db/json-validation.js';
+import { isFeatureEnabled } from './feature-flags.js';
 import { createLogger } from './logger.js';
 import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
@@ -563,6 +564,22 @@ function defaultSettings(workspace: Workspace): LocalSeoWorkspaceSettings {
     updatedAt: new Date().toISOString(),
     keywordsPerRefresh: null,
   };
+}
+
+/**
+ * SEO Gen-Quality P7.1 — the blessed read of a workspace's local SEO posture.
+ *
+ * Resolves the authoritative posture (admin-override-aware, via readSettings) for a
+ * workspace, or `unknown` when the workspace doesn't exist. This is the single getter the
+ * recommendation engine calls ONCE per rec-gen cycle to decide whether to mint local recs
+ * (`useLocalGenQual`). Compare against the exported LOCAL_SEO_POSTURE const (local/hybrid/
+ * non_local/unknown). Does NOT touch the feature flag — that is gated separately at the
+ * call site so the three-gate is explicit.
+ */
+export function getLocalSeoPosture(workspaceId: string): LocalSeoPosture {
+  const workspace = getWorkspace(workspaceId);
+  if (!workspace) return LOCAL_SEO_POSTURE.UNKNOWN;
+  return readSettings(workspace).posture;
 }
 
 function readSettings(workspace: Workspace): LocalSeoWorkspaceSettings {
@@ -2360,6 +2377,30 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
   if (getJob(jobId)?.status === 'cancelled') return;
   notifyLocalSeoUpdated(workspaceId, { action: 'refresh_completed', refreshed, failed, updatedAt: new Date().toISOString() });
   addActivity(workspaceId, 'local_seo_updated', 'Local SEO visibility refreshed', `${refreshed} local visibility checks refreshed`, { source: 'local_seo', refreshed, failed });
+
+  // ── SEO Gen-Quality P7.1 · regen-on-local-refresh (Scope D). ──
+  // Fresh local visibility snapshots are the spine of the local recs (B1/B2/B3). After a refresh
+  // completes, regenerate recommendations so the new evidence surfaces immediately — mirroring the
+  // post-scheduled-audit regen in scheduled-audits.ts. Gated on the SAME three-gate useLocalGenQual
+  // (gen-quality flag + posture local/hybrid + local-seo-visibility flag): when OFF this is a
+  // complete NO-OP, so the legacy refresh path is byte-identical. generateRecommendations
+  // broadcasts + invalidates internally (Bridge rule #3 — NO manual broadcast here). Wrapped in
+  // its own try/catch so a regen failure never fails the refresh job. Dynamic import avoids a
+  // static recommendations.ts ↔ local-seo.ts import cycle (recommendations.ts imports the local
+  // readers statically).
+  const useLocalGenQual = isFeatureEnabled('seo-generation-quality', workspaceId)
+    && (readSettings(workspace).posture === LOCAL_SEO_POSTURE.LOCAL || readSettings(workspace).posture === LOCAL_SEO_POSTURE.HYBRID)
+    && isFeatureEnabled('local-seo-visibility');
+  if (useLocalGenQual) {
+    try {
+      const { generateRecommendations } = await import('./recommendations.js'); // dynamic-import-ok - breaks the recommendations.ts ↔ local-seo.ts cycle (readers imported statically the other way)
+      await generateRecommendations(workspaceId);
+      log.info({ workspaceId }, 'Auto-regenerated recommendations after local SEO refresh');
+    } catch (err) {
+      log.warn({ err, workspaceId }, 'Recommendation regen after local SEO refresh failed (non-fatal)');
+    }
+  }
+
   updateJob(jobId, { status: 'done', progress: total, total, message: `Local visibility refreshed — ${refreshed}/${total} checks`, result });
 }
 
