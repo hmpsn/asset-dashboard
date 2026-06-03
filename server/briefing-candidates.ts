@@ -423,6 +423,13 @@ export function collectAllCandidates(workspaceId: string): Candidate[] {
  * `cannibalizationUrlSetKey()` so the two sides produce identical keys. Best-effort: a load
  * failure leaves both candidates (the safe direction — a visible duplicate, not a hidden
  * issue).
+ *
+ * NOTE (M1, non-load-bearing): this dedupe is DEFENSIVE only. The real guard is the
+ * `briefing-cron.ts` `dispatchableCandidates` filter, which admits a `recommendation`
+ * candidate only when its `id.startsWith('gap-')`. A cannibalization rec candidate's id is
+ * `rec-<id>` (collectRecommendationCandidates), so it can never become a briefing story
+ * regardless of this dedupe. Kept for future-proofing (harmless) in case the cron filter
+ * ever broadens to admit non-`gap-` recommendation candidates.
  */
 function dedupeCannibalization(workspaceId: string, candidates: Candidate[]): Candidate[] {
   let recSet: ReturnType<typeof loadRecommendations>;

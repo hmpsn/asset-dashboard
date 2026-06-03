@@ -1789,7 +1789,17 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         for (const item of issues) {
           const urlSetKey = cannibalizationUrlSetKey(item.pages.map(p => p.path));
           // Skip minting if an active insight already covers the same URL set (cross-link instead).
-          if (insightUrlSets.has(urlSetKey)) continue;
+          // C1: the issue STILL EXISTS (it's in cannibalization_issues) — it merely migrated to the
+          // insight surface. Adding 'cannibalization' to failedCategories protects the category from
+          // the auto-resolve loop this run (same transient-read semantics as the FM-2 catch paths), so
+          // a prior cannibalization:<key> rec for this URL set is carried forward (stays pending) and
+          // its pages are NOT falsely flipped to `live`. Only runs where a dedupe-skip actually
+          // occurs are protected; runs with no insight-covered issue auto-resolve genuinely-fixed
+          // recs normally (a fixed issue lingers at most one extra cycle — errs safe).
+          if (insightUrlSets.has(urlSetKey)) {
+            failedCategories.add('cannibalization');
+            continue;
+          }
           const severity: 'error' | 'warning' | 'info' =
             item.severity === 'high' ? 'error' : item.severity === 'medium' ? 'warning' : 'info';
           const currentClicks = item.pages.reduce((sum, p) => sum + (p.clicks ?? 0), 0);

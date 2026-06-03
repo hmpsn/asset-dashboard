@@ -42,6 +42,7 @@ import { replaceAllKeywordGaps } from '../../server/keyword-gaps.js';
 import { replaceAllTopicClusters } from '../../server/topic-clusters.js';
 import { replaceAllCannibalizationIssues } from '../../server/cannibalization-issues.js';
 import { upsertInsight } from '../../server/analytics-insights-store.js';
+import { getPageState } from '../../server/page-edit-states.js';
 import { collectAllCandidates } from '../../server/briefing-candidates.js';
 import { ACTION_TYPE_LABELS } from '../../src/components/admin/outcomes/outcomeConstants.js';
 import type { KeywordGapItem, TopicCluster, CannibalizationItem } from '../../shared/types/workspace.js';
@@ -349,6 +350,107 @@ describe('P5 cannibalization dedupe vs active insight', () => {
     // The cannibalization REC candidate (rec-rec_cn_dedup) is dropped; the insight candidate stays.
     expect(candidates.some(c => c.referenceType === 'recommendation' && c.referenceId === 'rec_cn_dedup')).toBe(false);
     expect(candidates.some(c => c.referenceType === 'analytics_insight')).toBe(true);
+  });
+});
+
+// ── (C1) run1→run2 — an active insight migrating onto a still-present cannibalization
+//        issue must NOT falsely auto-resolve the prior rec or flip its pages `live` ─────
+
+describe('P5 C1 — active insight on a still-present cannibalization issue does not false-resolve the prior rec', () => {
+  let s: ReturnType<typeof seedWorkspace>;
+
+  beforeEach(() => {
+    s = seedWorkspace({});
+    setMinimalStrategy(s.workspaceId);
+    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, true);
+  });
+
+  afterEach(() => {
+    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, null);
+    cleanupOrphans(s.workspaceId);
+    db.prepare('DELETE FROM page_edit_states WHERE workspace_id = ?').run(s.workspaceId);
+    s.cleanup();
+  });
+
+  it('run1 mints a pending cannibalization rec; run2 (issue still present + active insight now covers it) carries it forward — NOT completed, pages NOT flipped live', async () => {
+    const urlSetKey = cannibalizationUrlSetKey(['/crm', '/crm-software']);
+
+    // ── Run 1: issue present, NO insight → mint a pending cannibalization:<key> rec. ──
+    replaceAllCannibalizationIssues(s.workspaceId, cannibalization());
+    const run1 = await generateRecommendations(s.workspaceId);
+    const cn1 = run1.recommendations.filter(r => r.type === 'cannibalization');
+    expect(cn1.length).toBe(1);
+    expect(cn1[0].status).toBe('pending');
+    expect(cn1[0].source).toBe(`cannibalization:${urlSetKey}`);
+
+    // The auto-resolve path resolves each affectedPage slug to a page id, falling back to the
+    // raw slug. With no real pages seeded, the fallback ids are the raw paths.
+    const affectedPageIds = cn1[0].affectedPages;
+    // Sanity: run1 did NOT flip any page live (no prior rec to auto-resolve).
+    for (const pid of affectedPageIds) {
+      expect(getPageState(s.workspaceId, pid)?.status).not.toBe('live');
+    }
+
+    // ── Run 2: the issue STILL EXISTS in cannibalization_issues, AND an ACTIVE cannibalization
+    //          insight now covers the same URL set. The rec-gen branch dedupe-skips minting,
+    //          but the issue migrated to the insight surface — it is NOT fixed. ──
+    upsertInsight({
+      workspaceId: s.workspaceId,
+      pageId: 'crm-software-cannibalization',
+      insightType: 'cannibalization',
+      data: { query: 'crm software', pages: ['/crm', '/crm-software'], positions: [4, 6], totalImpressions: 1500 },
+      severity: 'warning',
+    });
+    const run2 = await generateRecommendations(s.workspaceId);
+
+    // C1 GUARANTEE: the prior rec is NOT falsely auto-resolved. The dedupe-skip calls
+    // failedCategories.add('cannibalization'), so the auto-resolve loop skips the category this
+    // run — ZERO cannibalization recs are flipped to `completed` and NONE carry the
+    // "Auto-resolved" message (which would lie that the issue is gone). (FM-2 transient-read
+    // semantics: a protected-category rec is not re-minted this run either, so it simply does
+    // not reappear here and returns on the next clean run — but crucially is never marked
+    // completed and its pages are never falsely flipped live.)
+    const cn2completed = run2.recommendations.filter(
+      r => r.type === 'cannibalization' && r.status === 'completed',
+    );
+    expect(cn2completed.length).toBe(0);
+    expect(
+      run2.recommendations.some(r => r.type === 'cannibalization' && /Auto-resolved/.test(r.insight)),
+    ).toBe(false);
+
+    // C1 GUARANTEE: pages were NOT falsely flipped to `live` by the auto-resolve page-state pass.
+    const reload = loadRecommendations(s.workspaceId);
+    const cnAfter = reload!.recommendations.filter(r => r.type === 'cannibalization' && r.status === 'completed');
+    expect(cnAfter.length).toBe(0);
+    for (const pid of affectedPageIds) {
+      expect(getPageState(s.workspaceId, pid)?.status).not.toBe('live');
+    }
+    // No page_edit_states row at all flipped to live for this workspace by the false auto-resolve.
+    const liveRows = db
+      .prepare(`SELECT COUNT(*) AS n FROM page_edit_states WHERE workspace_id = ? AND status = 'live'`)
+      .get(s.workspaceId) as { n: number };
+    expect(liveRows.n).toBe(0);
+  });
+
+  it('a genuinely-gone cannibalization issue (absent from the table, no insight) DOES auto-resolve normally on a clean run', async () => {
+    // Run 1: issue present, no insight → mint a pending cannibalization rec.
+    replaceAllCannibalizationIssues(s.workspaceId, cannibalization());
+    const run1 = await generateRecommendations(s.workspaceId);
+    const cn1 = run1.recommendations.filter(r => r.type === 'cannibalization');
+    expect(cn1.length).toBe(1);
+    expect(cn1[0].status).toBe('pending');
+
+    // Run 2: the issue is genuinely fixed — removed from the table, and NO insight covers it.
+    // No dedupe-skip occurs this run, so 'cannibalization' is NOT added to failedCategories and
+    // the auto-resolve loop runs normally: the prior rec flips to `completed` + Auto-resolved.
+    db.prepare('DELETE FROM cannibalization_issues WHERE workspace_id = ?').run(s.workspaceId);
+    const run2 = await generateRecommendations(s.workspaceId);
+
+    const cnResolved = run2.recommendations.filter(
+      r => r.type === 'cannibalization' && r.status === 'completed',
+    );
+    expect(cnResolved.length).toBe(1);
+    expect(/Auto-resolved/.test(cnResolved[0].insight)).toBe(true);
   });
 });
 
