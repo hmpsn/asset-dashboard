@@ -13,16 +13,6 @@ describe('Page Intelligence + SEO Editor correctness contracts', () => {
     expect(src).toContain('hasProviderMetrics: kwData.hasProviderMetrics');
   });
 
-  it('passes workspace and canonical page identity through legacy KeywordAnalysis analysis', () => {
-    const src = readFileSync('src/components/KeywordAnalysis.tsx', 'utf-8'); // readFile-ok — source contract for legacy keyword analysis caller
-
-    expect(src).toContain('keywords.analyze({');
-    expect(src).toContain('workspaceId,');
-    expect(src).toContain('slug,');
-    expect(src).toContain('pagePath: resolvePagePath(page)');
-    expect(src).toContain('pageTitle: page.title');
-  });
-
   it('uses body-scoped workspace access and guards AI-invented keyword metrics before returning or persisting', () => {
     const src = readFileSync('server/routes/webflow-keywords.ts', 'utf-8'); // readFile-ok — source contract for route auth/guards
 

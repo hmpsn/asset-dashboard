@@ -4872,7 +4872,6 @@ export const CHECKS: Check[] = [
         'src/components/ContentBriefs.tsx',
         'src/components/RevenueDashboard.tsx',
         'src/components/ClientDashboard.tsx',
-        'src/components/KeywordAnalysis.tsx',
         // Already have PageHeader (guard against regression):
         'src/components/WorkspaceHome.tsx',
         'src/components/WorkspaceOverview.tsx',
