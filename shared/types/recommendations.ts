@@ -83,6 +83,14 @@ export interface OpportunityComponent {
 export interface OpportunityScore {
   value: number;                       // 0..100 — written into Recommendation.impactScore
   emvPerWeek: number;                  // expected value/week; $ when CPC-grounded, intent-weighted-clicks proxy otherwise. Admin/AI-only.
+  /** Projected expected value over the OV horizon (emvPerWeek × HORIZON_WEEKS).
+   *  P4 CPC-PROXY PLACEHOLDER — NOT real money: it is the same CPC/intent-weighted-clicks
+   *  proxy as emvPerWeek, scaled to the horizon. Real GA4 `estimatedRevenue` arrives in P6
+   *  (the calibration swap-site is documented in server/scoring/ov-calibration.ts).
+   *  Admin/AI-only: clients never see a raw $/wk figure — it is stripped on every public
+   *  route (stripEmvFromPublicRecs) and snapshotted onto the outcome row (predicted_emv)
+   *  at recordAction time so calibration history accrues even while OV is dark. */
+  predictedEmv: number;                // CPC-proxy placeholder; admin/AI-only (see JSDoc).
   roiPerEffortDay: number;             // internal ROI quantity (pre-normalization)
   confidence: number;                  // 0.4..1.0 — grounded-data vs LLM-adjective provenance
   calibration: number;                 // 0.75..1.25 per-workspace (1.0 until outcomes exist)

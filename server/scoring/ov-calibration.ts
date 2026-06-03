@@ -30,8 +30,12 @@
  * a workspace whose acted-on opportunities realize value more often than not gets a
  * gentle upward nudge (capped at 1.25), and a chronically under-delivering workspace
  * a downward one (floored at 0.75). When realized-EMV-vs-predicted-EMV becomes
- * recoverable (a predicted_emv column or PR4 divergence join), swap the basis here —
- * the clamp + identity-gate contract stays the same.
+ * recoverable, swap the basis here — the clamp + identity-gate contract stays the same.
+ * P4 SHIPPED the `predicted_emv` snapshot (CalibrationOutcome.predictedEmv, from the
+ * tracked_actions.predicted_emv column) so the realized-vs-predicted pairing now accrues,
+ * but P4 deliberately does NOT change the calibration basis — it stays score-weighted
+ * realization until P6 threads GA4 estimatedRevenue into attributed_value and flips this
+ * to median(attributedValue / predictedEmv) per (actionType, difficultyBucket).
  *
  * Pure-ish + safe: the only side-effect-free-violating reads are the flag check and
  * the outcome read; any throw degrades to 1.0 (identity) so calibration can never

@@ -1,0 +1,36 @@
+-- 116-tracked-action-predicted-emv.sql
+-- SEO Generation Quality P4 — snapshot the OV `predictedEmv` (CPC-proxy placeholder)
+-- onto the outcome row at recordAction time so calibration history accrues even while
+-- the OV ranking path is dark (umbrella flag OFF).
+--
+-- WHY a column (not the regenerable rec row): generateRecommendations rebuilds the rec
+-- set on every scheduled audit and buildMergeKey does NOT preserve the old `opportunity`,
+-- so the predicted value would be lost on the next regen. The tracked_actions row is the
+-- durable outcome snapshot; persisting predicted_emv here gives the P6 calibration loop a
+-- realized-vs-predicted pairing once attributed_value lands (mirrors migration 106).
+--
+-- ALWAYS-ON + nullable: the column is additive, default NULL, never feature-gated. It is
+-- invisible to clients (never serialized on a public route). NULL means "no opportunity
+-- was available at record time" (e.g. the outcome-backfill path, which cannot read the
+-- rec's opportunity object). Flag-OFF every NEW row still records predicted_emv when the
+-- write site can read rec.opportunity — calibration history must accrue even dark.
+--
+-- ARCHIVE TWIN (the load-bearing half): the archive table MUST gain predicted_emv too, or
+-- archived rows could not hold the value at all. BUT note the column-ORDER hazard: ALTER TABLE
+-- always appends at the END, so predicted_emv lands AFTER updated_at on tracked_actions yet
+-- AFTER the pre-existing archived_at on the archive (created in migration 041). A positional
+-- `INSERT ... SELECT *, datetime('now')` archive copy would therefore map predicted_emv→archived_at
+-- and datetime('now')→predicted_emv — corrupting the archive. P4 fixes this by converting
+-- archiveOld in server/outcome-tracking.ts to an EXPLICIT column list (order-independent copy),
+-- the same fix migration 106 applied to archiveOldOutcomes. The P4 archive round-trip test
+-- (tests/integration/seo-genquality-p4-ov-coherence.test.ts) pins it.
+--
+-- DB column + mapper lockstep (CLAUDE.md): this migration ships in the SAME commit as
+-- TrackedActionRow.predicted_emv + rowToTrackedAction mapper (server/db/outcome-mappers.ts),
+-- TrackedAction.predictedEmv? (shared/types/outcome-tracking.ts), the recordAction insert
+-- column-list/VALUES/payload + RecordActionParams.predictedEmv? (server/outcome-tracking.ts),
+-- the two write sites (routes/recommendations.ts, outcome-backfill.ts), and the
+-- getCalibrationOutcomes SELECT + CalibrationOutcome.predictedEmv.
+
+ALTER TABLE tracked_actions ADD COLUMN predicted_emv REAL;
+ALTER TABLE tracked_actions_archive ADD COLUMN predicted_emv REAL;

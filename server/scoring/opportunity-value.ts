@@ -332,6 +332,13 @@ export function computeOpportunityValue(input: OpportunityInput, opts: ComputeOp
   return {
     value,
     emvPerWeek: Math.round(emvPerWeek * 100) / 100,
+    // CPC-proxy PLACEHOLDER (P4): weekly EMV projected over the module-private HORIZON_WEEKS.
+    // Same proxy basis as emvPerWeek (CPC/intent-weighted-clicks), NOT real money — P6 swaps
+    // in GA4 estimatedRevenue. Always computed (dark-safe): it is snapshotted onto the outcome
+    // row at recordAction time so calibration history accrues even while OV ranking is off,
+    // and stripped from every public response. Kept inside the scorer so the rec layer never
+    // reaches the private HORIZON_WEEKS const.
+    predictedEmv: Math.round(emvPerWeek * HORIZON_WEEKS),
     roiPerEffortDay: Math.round(roiPerEffortDay * 100) / 100,
     confidence,
     calibration,

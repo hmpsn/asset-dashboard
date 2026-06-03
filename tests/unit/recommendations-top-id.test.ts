@@ -92,7 +92,7 @@ describe('computeRecommendationSummary — topOpportunityRationale (PR6 / SI2)',
     const topRec = makeRec({
       id: 'rec_top', priority: 'fix_now', impactScore: 82, status: 'pending',
       opportunity: {
-        value: 82, emvPerWeek: 1450, roiPerEffortDay: 33, confidence: 0.95, calibration: 1,
+        value: 82, emvPerWeek: 1450, predictedEmv: 17400, roiPerEffortDay: 33, confidence: 0.95, calibration: 1,
         groundedSpine: 'roiScore',
         components: [
           { dimension: 'demand', rawValue: 2400, normalized: 0.8, weight: 0.25, contribution: 0.20, evidence: '2,400 monthly searches' },

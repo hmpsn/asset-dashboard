@@ -34,8 +34,8 @@ const log = createLogger('outcome-tracking');
 
 const stmts = createStmtCache(() => ({
   insert: db.prepare(`
-    INSERT INTO tracked_actions (id, workspace_id, action_type, source_type, source_id, page_url, target_keyword, baseline_snapshot, trailing_history, attribution, measurement_window, source_flag, baseline_confidence, context, created_at, updated_at)
-    VALUES (@id, @workspace_id, @action_type, @source_type, @source_id, @page_url, @target_keyword, @baseline_snapshot, @trailing_history, @attribution, @measurement_window, @source_flag, @baseline_confidence, @context, @created_at, @updated_at)
+    INSERT INTO tracked_actions (id, workspace_id, action_type, source_type, source_id, page_url, target_keyword, baseline_snapshot, trailing_history, attribution, measurement_window, source_flag, baseline_confidence, context, predicted_emv, created_at, updated_at)
+    VALUES (@id, @workspace_id, @action_type, @source_type, @source_id, @page_url, @target_keyword, @baseline_snapshot, @trailing_history, @attribution, @measurement_window, @source_flag, @baseline_confidence, @context, @predicted_emv, @created_at, @updated_at)
   `),
   getById: db.prepare(`SELECT * FROM tracked_actions WHERE id = ?`),
   getByWorkspace: db.prepare(`SELECT * FROM tracked_actions WHERE workspace_id = ? ORDER BY created_at DESC`),
@@ -85,7 +85,7 @@ const stmts = createStmtCache(() => ({
   // counted once). Feeds the OV realized-$ calibration (server/scoring/ov-calibration.ts);
   // read-only and independent of the legacy buildOutcomeAdjustment win-rate path.
   getCalibrationOutcomesByWorkspace: db.prepare(`
-    SELECT ao.score AS score, ao.attributed_value AS attributed_value, ta.action_type AS action_type
+    SELECT ao.score AS score, ao.attributed_value AS attributed_value, ta.action_type AS action_type, ta.predicted_emv AS predicted_emv
     FROM action_outcomes ao
     JOIN tracked_actions ta ON ta.id = ao.action_id
     WHERE ta.workspace_id = ?
@@ -111,8 +111,22 @@ const stmts = createStmtCache(() => ({
   getRecentByWorkspace: db.prepare(`
     SELECT * FROM tracked_actions WHERE workspace_id = ? ORDER BY created_at DESC LIMIT ?
   `),
+  // EXPLICIT column list (NOT SELECT *). P4 added predicted_emv to BOTH tables via ALTER,
+  // but ALTER TABLE always appends at the END: on tracked_actions predicted_emv lands after
+  // updated_at, while on the archive it lands AFTER the pre-existing archived_at (migration 041).
+  // A positional `SELECT *, datetime('now')` would therefore map predicted_emv→archived_at and
+  // datetime('now')→predicted_emv — corrupting the archive (caught by the P4 archive round-trip
+  // test). Naming every column makes the copy order-independent and migration-safe forever, the
+  // same fix migration 106 applied to archiveOldOutcomes.
   archiveOld: db.prepare(`
-    INSERT INTO tracked_actions_archive SELECT *, datetime('now') AS archived_at
+    INSERT INTO tracked_actions_archive
+      (id, workspace_id, action_type, source_type, source_id, page_url, target_keyword,
+       baseline_snapshot, trailing_history, attribution, measurement_window, measurement_complete,
+       source_flag, baseline_confidence, context, created_at, updated_at, predicted_emv, archived_at)
+    SELECT
+       id, workspace_id, action_type, source_type, source_id, page_url, target_keyword,
+       baseline_snapshot, trailing_history, attribution, measurement_window, measurement_complete,
+       source_flag, baseline_confidence, context, created_at, updated_at, predicted_emv, datetime('now')
     FROM tracked_actions
     WHERE measurement_complete = 1 AND updated_at < datetime('now', '-24 months')
   `),
@@ -153,6 +167,11 @@ export interface RecordActionParams {
   sourceFlag?: SourceFlag;
   baselineConfidence?: BaselineConfidence;
   context?: ActionContext;
+  /** SEO Gen-Quality P4: OV `predictedEmv` snapshot (CPC-proxy placeholder). Optional —
+   *  defaults to null. Threaded at the recommendation-completion write site
+   *  (rec.opportunity?.predictedEmv); null on the outcome-backfill path and the
+   *  post/insight recordAction sites (which carry no rec opportunity). */
+  predictedEmv?: number | null;
 }
 
 export function recordAction(params: RecordActionParams): TrackedAction {
@@ -181,6 +200,7 @@ export function recordAction(params: RecordActionParams): TrackedAction {
     source_flag: params.sourceFlag ?? 'live',
     baseline_confidence: params.baselineConfidence ?? 'exact',
     context: JSON.stringify(context),
+    predicted_emv: params.predictedEmv ?? null,
     created_at: now,
     updated_at: now,
   });
@@ -554,6 +574,11 @@ export interface CalibrationOutcome {
   score: OutcomeScore;
   attributedValue: number;
   actionType: string;
+  /** SEO Gen-Quality P4: the OV predicted EMV snapshotted at recordAction time (CPC-proxy
+   *  placeholder; null when none was available). P6 pairs this with attributedValue to learn
+   *  the realized-vs-predicted calibration multiplier. P4 does NOT change the calibration
+   *  basis — it only carries the field so the data accrues. */
+  predictedEmv: number | null;
 }
 
 /**
@@ -566,11 +591,12 @@ export function getCalibrationOutcomes(workspaceId: string): CalibrationOutcome[
     score: string | null;
     attributed_value: number | null;
     action_type: string;
+    predicted_emv: number | null;
   }>;
   return rows
-    .filter((r): r is { score: string; attributed_value: number; action_type: string } =>
+    .filter((r): r is { score: string; attributed_value: number; action_type: string; predicted_emv: number | null } =>
       r.score != null && typeof r.attributed_value === 'number' && Number.isFinite(r.attributed_value))
-    .map(r => ({ score: r.score as OutcomeScore, attributedValue: r.attributed_value, actionType: r.action_type }));
+    .map(r => ({ score: r.score as OutcomeScore, attributedValue: r.attributed_value, actionType: r.action_type, predictedEmv: r.predicted_emv ?? null }));
 }
 
 export function archiveOldActions(): { archived: number } {

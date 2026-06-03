@@ -6,6 +6,7 @@ import { useCart } from './useCart';
 import type { AuditDetail } from './types';
 import { useBetaMode } from './BetaContext';
 import type { ProductType } from '../../../server/payments';
+import type { Recommendation } from '../../../shared/types/recommendations';
 import { getOptional, getSafe } from '../../api/client';
 import { normalizePageUrl } from '../../lib/pathUtils';
 import { fmtMoneyFull } from '../../utils/formatNumbers';
@@ -18,27 +19,13 @@ interface TrafficMap {
   [path: string]: { clicks: number; impressions: number; sessions: number; pageviews: number };
 }
 
-interface ServerRecommendation {
-  id: string;
-  priority: 'fix_now' | 'fix_soon' | 'fix_later' | 'ongoing';
-  type: 'technical' | 'content' | 'schema' | 'metadata' | 'performance' | 'accessibility' | 'strategy';
-  title: string;
-  description: string;
-  insight: string;
-  impact: 'high' | 'medium' | 'low';
-  effort: 'low' | 'medium' | 'high';
-  impactScore: number;
-  source: string;
-  affectedPages: string[];
-  trafficAtRisk: number;
-  impressionsAtRisk: number;
-  estimatedGain: string;
-  actionType: 'automated' | 'manual' | 'content_creation' | 'purchase';
-  productType?: string;
-  productPrice?: number;
-  status: 'pending' | 'in_progress' | 'completed' | 'dismissed';
-  assignedTo?: 'team' | 'client';
-}
+// P4 (Contract 1/3): use the SHARED Recommendation type, not a hand-duplicated copy. The
+// hand-rolled interface drifted from the source of truth (it omitted `aeo`/`content_refresh`
+// types, `opportunity`, and `backfilled`) — the duplicate is the exact reader-divergence the
+// SEO gen-quality contracts warn against. The public route serves a Recommendation with the
+// admin-money OV fields stripped + estimatedGain sanitized (stripEmvFromPublicRecs), so the
+// client never receives a raw $/wk figure; the fields this component reads all survive.
+type ServerRecommendation = Recommendation;
 
 interface FixRecommendationsProps {
   auditDetail: AuditDetail;

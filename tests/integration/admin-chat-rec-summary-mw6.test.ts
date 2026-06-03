@@ -20,6 +20,7 @@ function makeOpportunity(): OpportunityScore {
   return {
     value: 82,
     emvPerWeek: 1450,
+    predictedEmv: 17400,
     roiPerEffortDay: 33,
     confidence: 0.95,
     calibration: 1.0,

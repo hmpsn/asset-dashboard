@@ -204,6 +204,10 @@ export function backfillCompletedRecommendations(workspaceId: string): number {
           },
           sourceFlag: 'backfill',
           baselineConfidence: 'estimated',
+          // P4: the backfill path reconstructs historical completed recs and CANNOT read
+          // the (regenerated, opportunity-less) rec object, so there is no predicted EMV to
+          // snapshot — explicitly null. Documented: historical rows have no OV pairing.
+          predictedEmv: null,
           attribution: 'platform_executed',
         });
         count++;

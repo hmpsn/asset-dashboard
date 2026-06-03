@@ -193,15 +193,22 @@ describe('GET /api/public/briefing/:workspaceId — paid tier, published briefin
     // Whitelist: response should ONLY contain the public-shape fields.
     // Phase 2.5b added issueSummary, issueNumber, and recommendations
     // (all derived at serve time from existing data — no admin fields leak).
+    // SEO Gen-Quality P4 added ovGainActive — the server-resolved per-workspace
+    // umbrella state the client RecommendedForYou gate reads (not an admin field;
+    // a derived boolean, always present, false flag-OFF = all prod).
     const keys = Object.keys(body.briefing!).sort();
     expect(keys).toEqual([
       'issueNumber',
       'issueSummary',
+      'ovGainActive',
       'publishedAt',
       'recommendations',
       'stories',
       'weekOf',
     ]);
+    // Flag-OFF (this workspace has no override) → ovGainActive is false
+    // (the pre-P4 client surface renders byte-identically).
+    expect(body.briefing!.ovGainActive).toBe(false);
 
     // Explicit blacklist (defense in depth)
     expect(body.briefing).not.toHaveProperty('sourceMetadata');
@@ -447,11 +454,13 @@ describe('GET /api/public/briefing/:workspaceId — Phase 2.5e weeklyOpener', ()
     const body = await res.json() as { briefing: Record<string, unknown> | null };
     expect(body.briefing).not.toBeNull();
 
-    // Whitelist: weeklyOpener appears alongside the existing public fields.
+    // Whitelist: weeklyOpener appears alongside the existing public fields
+    // (incl. the P4 ovGainActive server-resolved umbrella boolean).
     const keys = Object.keys(body.briefing!).sort();
     expect(keys).toEqual([
       'issueNumber',
       'issueSummary',
+      'ovGainActive',
       'publishedAt',
       'recommendations',
       'stories',

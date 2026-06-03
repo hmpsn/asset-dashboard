@@ -168,6 +168,17 @@ export interface BriefingClientView {
   issueNumber: number;
   recommendations: BriefingRecommendation[];
   weeklyOpener?: string;
+  /**
+   * SEO Gen-Quality P4 (Contract 3) — server-resolved per-workspace umbrella state
+   * (`isFeatureEnabled('seo-generation-quality', wsId)`). The client has no
+   * per-workspace flag mechanism, so this boolean is the single point of truth
+   * the briefing component reads to decide how to render the recommendation
+   * materiality signal. When TRUE, the opportunity-score badge is the one
+   * OV-EMV-derived signal ("Opportunity NN", no competing volume×0.103 estimate);
+   * when FALSE/absent, the briefing renders the pre-P4 surface byte-identically
+   * ("NN/100" badge + the "est. clicks at rank #3" line).
+   */
+  ovGainActive: boolean;
 }
 
 /** Wire shape returned from /api/public/briefing/:wsId */
@@ -203,4 +214,11 @@ export interface PublishedBriefingResponse {
    * (the rest of `aiPolish` stays admin-only).
    */
   weeklyOpener?: string;
+  /**
+   * SEO Gen-Quality P4 (Contract 3) — per-workspace umbrella state resolved on
+   * the server (`isFeatureEnabled('seo-generation-quality', wsId)`). Gates the
+   * client `RecommendedForYou` materiality signal. Optional so older clients /
+   * responses without it parse cleanly; absent === false === pre-P4 render.
+   */
+  ovGainActive?: boolean;
 }

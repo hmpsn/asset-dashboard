@@ -26,6 +26,7 @@ function makeOpportunity(): OpportunityScore {
   return {
     value: 72,
     emvPerWeek: 1234.56, // the admin/AI-only field that must NOT leak to the public route
+    predictedEmv: 14814, // P4 CPC-proxy placeholder — admin/AI-only, must NOT leak either
     roiPerEffortDay: 88.2,
     confidence: 0.95,
     calibration: 1.0,
@@ -105,9 +106,11 @@ describe('Public recommendations route — emvPerWeek/roiPerEffortDay leak gate'
     const found = body.recommendations.find(r => r.id === 'rec_emv_leak_001');
     expect(found).toBeDefined();
     expect(found!.opportunity).toBeTruthy();
-    // Both admin/AI-only fields must be absent.
+    // All admin/AI-only money fields must be absent (P4 adds predictedEmv).
     expect('emvPerWeek' in (found!.opportunity as object)).toBe(false);
     expect((found!.opportunity as Record<string, unknown>).emvPerWeek).toBeUndefined();
+    expect('predictedEmv' in (found!.opportunity as object)).toBe(false);
+    expect((found!.opportunity as Record<string, unknown>).predictedEmv).toBeUndefined();
     expect('roiPerEffortDay' in (found!.opportunity as object)).toBe(false);
     expect((found!.opportunity as Record<string, unknown>).roiPerEffortDay).toBeUndefined();
     // The client-safe rest of the score must survive (ROI badge + breakdown bars).
@@ -125,6 +128,7 @@ describe('Public recommendations route — emvPerWeek/roiPerEffortDay leak gate'
     expect(res.status).toBe(200);
     const raw = await res.text();
     expect(raw).not.toContain('emvPerWeek');
+    expect(raw).not.toContain('predictedEmv');
     expect(raw).not.toContain('roiPerEffortDay');
   });
 
@@ -137,9 +141,38 @@ describe('Public recommendations route — emvPerWeek/roiPerEffortDay leak gate'
     expect(res.status).toBe(200);
     const raw = await res.text();
     expect(raw).not.toContain('emvPerWeek');
+    expect(raw).not.toContain('predictedEmv'); // M1: symmetry with the GET strip — the PATCH write path must strip it too
     expect(raw).not.toContain('roiPerEffortDay');
     const rec = JSON.parse(raw) as Recommendation;
     expect(rec.opportunity).toBeTruthy();
     expect(rec.opportunity!.value).toBe(72); // client-safe fields survive
+  });
+
+  it('P4: a dollarized estimatedGain is sanitized — no raw $/wk reaches a client (GET + PATCH)', async () => {
+    // Even though the chosen P4 gain form is non-dollarized, the public route is the
+    // always-on safety net: a dollarized estimatedGain (a future P6 variant, or a renderer
+    // that forgets to gate) must never leak a raw money figure. Seed one and assert the
+    // public payload carries NO dollar exposure but still has a non-empty gain string.
+    seed([makeRec({
+      id: 'rec_gain_dollar_001',
+      status: 'pending',
+      estimatedGain: 'Expected to recover $1,450/wk in organic value',
+    })]);
+
+    const getRes = await api(`/api/public/recommendations/${testWsId}`);
+    const getRaw = await getRes.text();
+    expect(getRaw).not.toContain('$1,450');
+    expect(getRaw).not.toContain('/wk');
+    const getBody = JSON.parse(getRaw) as RecommendationSet;
+    const found = getBody.recommendations.find(r => r.id === 'rec_gain_dollar_001');
+    expect(found).toBeDefined();
+    expect(typeof found!.estimatedGain).toBe('string');
+    expect(found!.estimatedGain.length).toBeGreaterThan(0);
+    expect(found!.estimatedGain).not.toMatch(/\$\s?[\d,]/); // no dollarized figure
+
+    const patchRes = await patchJson(`/api/public/recommendations/${testWsId}/rec_gain_dollar_001`, { status: 'in_progress' });
+    const patchRaw = await patchRes.text();
+    expect(patchRaw).not.toContain('$1,450');
+    expect(patchRaw).not.toMatch(/\$\s?[\d,]/);
   });
 });
