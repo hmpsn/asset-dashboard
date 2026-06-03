@@ -214,7 +214,7 @@ export function saveBulkKeywordFeedback(input: SaveBulkKeywordFeedbackInput): {
     }
   });
 
-  insert(input.keywords);
+  insert.immediate(input.keywords);
 
   return {
     response: { updated: input.keywords.length },
