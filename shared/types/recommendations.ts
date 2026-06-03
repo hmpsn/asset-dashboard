@@ -1,7 +1,7 @@
 // ── Recommendation domain types ─────────────────────────────────
 
 export type RecPriority = 'fix_now' | 'fix_soon' | 'fix_later' | 'ongoing';
-export type RecType = 'technical' | 'content' | 'content_refresh' | 'schema' | 'metadata' | 'performance' | 'accessibility' | 'strategy' | 'aeo' | 'keyword_gap' | 'topic_cluster' | 'cannibalization';
+export type RecType = 'technical' | 'content' | 'content_refresh' | 'schema' | 'metadata' | 'performance' | 'accessibility' | 'strategy' | 'aeo' | 'keyword_gap' | 'topic_cluster' | 'cannibalization' | 'local_visibility' | 'local_service_gap';
 export type RecStatus = 'pending' | 'in_progress' | 'completed' | 'dismissed';
 export type RecActionType = 'automated' | 'manual' | 'content_creation' | 'purchase';
 
@@ -104,7 +104,7 @@ export interface OpportunityScore {
  *  fields here and calls computeOpportunityValue. All optional fields mirror the
  *  nullability of their source types (PageKeywordMap / ContentGap are all optional). */
 export interface OpportunityInput {
-  branch: 'quick_win' | 'ranking_opp' | 'content_gap' | 'decay' | 'technical' | 'freshness' | 'diagnostic';
+  branch: 'quick_win' | 'ranking_opp' | 'content_gap' | 'decay' | 'technical' | 'freshness' | 'diagnostic' | 'local';
   volume?: number | null;
   impressions?: number | null;
   currentPosition?: number | null;
@@ -130,6 +130,13 @@ export interface OpportunityInput {
   ctrCurve?: Record<number, number> | null;
   /** Sum of decaying timing boosts over active opportunity events (P7). Default 0. */
   timingBoost?: number | null;
+  /** SEO Gen-Quality P7.1 — local-visibility urgency signal (0..1). A `not_visible`
+   *  local-pack posture in a high-intent market raises urgency. ONLY ever fed from the
+   *  `useLocalGenQual` local rec branches (server/recommendations.ts) — the scorer never
+   *  reads local state itself. Default/absent → 0 → identity multiplier, so the OV value
+   *  is byte-identical for every non-local / flag-OFF rec (mirrors the reserved `timing`
+   *  term). See server/scoring/opportunity-value.ts `localUrgency`. */
+  localVisibilitySignal?: number | null;
 }
 
 /** Per-workspace calibrated dimension weights (P5 workspace_opportunity_weights). */

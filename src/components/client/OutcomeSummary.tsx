@@ -25,6 +25,8 @@ const ACTION_TYPE_LABELS: Record<ActionType, string> = {
   competitor_gap_closed: 'Keyword gap closed',
   cluster_published: 'Topic cluster filled',
   cannibalization_resolved: 'Cannibalization resolved',
+  local_visibility_won: 'Local visibility won',
+  local_service_added: 'Local service targeted',
 };
 
 function TrendIcon({ trend }: { trend: LearningsTrend }) {

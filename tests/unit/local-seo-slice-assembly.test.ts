@@ -22,6 +22,9 @@ vi.mock('../../server/local-seo.js', () => ({
   buildLocalSeoKeywordCandidates: vi.fn().mockReturnValue([]),
   buildLocalSeoKeywordVisibilitySummaryByKey: vi.fn().mockReturnValue(new Map()),
   listLatestLocalVisibilitySnapshots: vi.fn().mockReturnValue([]),
+  // P7.1 — the slice now also reads the service-gap + competitor-brand readers.
+  getLocalSeoServiceGaps: vi.fn().mockReturnValue([]),
+  getLocalSeoCompetitorBrands: vi.fn().mockReturnValue([]),
 }));
 
 vi.mock('../../server/client-locations.js', () => ({

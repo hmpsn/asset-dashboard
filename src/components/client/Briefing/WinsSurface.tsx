@@ -22,6 +22,8 @@ const ACTION_LABELS: Record<ActionType, string> = {
   competitor_gap_closed:  'Closed a competitor keyword gap',
   cluster_published:      'Filled a topic cluster',
   cannibalization_resolved: 'Resolved keyword cannibalization',
+  local_visibility_won:   'Won local pack visibility',
+  local_service_added:    'Started targeting a local service',
 };
 
 function actionLabel(type: ActionType): string {

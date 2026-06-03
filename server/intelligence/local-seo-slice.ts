@@ -38,6 +38,8 @@ export async function assembleLocalSeo(workspaceId: string): Promise<LocalSeoSli
     markets: [],
     visibility: { visible: 0, possibleMatch: 0, notVisible: 0, notChecked: 0, providerDegraded: 0 },
     candidates: [],
+    serviceGaps: [],
+    competitorBrands: [],
     effectiveLocalSeoBlock: enabled
       ? 'Local SEO is enabled but no markets are configured for this workspace.'
       : 'Local SEO is disabled for this workspace.',
@@ -63,6 +65,8 @@ export async function assembleLocalSeo(workspaceId: string): Promise<LocalSeoSli
       buildLocalSeoKeywordCandidates,
       buildLocalSeoKeywordVisibilitySummaryByKey,
       listLatestLocalVisibilitySnapshots,
+      getLocalSeoServiceGaps,
+      getLocalSeoCompetitorBrands,
     } = localSeoModule;
 
     const rawMarkets = listLocalSeoMarkets(workspaceId);
@@ -137,16 +141,44 @@ export async function assembleLocalSeo(workspaceId: string): Promise<LocalSeoSli
       log.debug({ err, workspaceId }, 'latest snapshot lookup failed; leaving null');
     }
 
+    // SEO Gen-Quality P7.1 — surface the local service-gap + competitor-brand readers (the
+    // local_service_gap / local_visibility rec spines) so AdminChat can reason about them. Each
+    // read is best-effort: a failure degrades to an empty list, never blocking the slice.
+    let serviceGaps: LocalSeoSlice['serviceGaps'] = [];
+    try {
+      serviceGaps = getLocalSeoServiceGaps(workspaceId).map(g => ({
+        serviceId: g.serviceId,
+        serviceLabel: g.serviceLabel,
+        starterKeywords: g.starterKeywords,
+      }));
+    } catch (err) {
+      log.debug({ err, workspaceId }, 'service gaps unavailable for local SEO slice; leaving empty');
+    }
+    let competitorBrands: LocalSeoSlice['competitorBrands'] = [];
+    try {
+      competitorBrands = getLocalSeoCompetitorBrands(workspaceId).map(c => ({
+        title: c.title,
+        domain: c.domain,
+        totalAppearances: c.totalAppearances,
+        winsAgainstClient: c.winsAgainstClient,
+        markets: c.markets,
+      }));
+    } catch (err) {
+      log.debug({ err, workspaceId }, 'competitor brands unavailable for local SEO slice; leaving empty');
+    }
+
     const sampledCandidates = stratifiedSample(candidates, markets, PROMPT_BLOCK_PER_MARKET_CAP, PROMPT_BLOCK_TOTAL_CAP);
     const effectiveLocalSeoBlock = renderLocalSeoBlock({
       locations,
       markets,
       visibility,
       sampledCandidates,
+      serviceGaps,
+      competitorBrands,
       latestSnapshotAt,
     });
 
-    return { locations, enabled, markets, visibility, candidates, effectiveLocalSeoBlock, latestSnapshotAt };
+    return { locations, enabled, markets, visibility, candidates, serviceGaps, competitorBrands, effectiveLocalSeoBlock, latestSnapshotAt };
   } catch (err) {
     log.warn({ err, workspaceId }, 'assembleLocalSeo: failed, degrading to empty slice');
     return baseline;
@@ -209,9 +241,11 @@ function renderLocalSeoBlock(args: {
   markets: LocalSeoSlice['markets'];
   visibility: LocalSeoSlice['visibility'];
   sampledCandidates: LocalSeoSlice['candidates'];
+  serviceGaps: LocalSeoSlice['serviceGaps'];
+  competitorBrands: LocalSeoSlice['competitorBrands'];
   latestSnapshotAt: string | null;
 }): string {
-  const { locations, markets, visibility, sampledCandidates, latestSnapshotAt } = args;
+  const { locations, markets, visibility, sampledCandidates, serviceGaps, competitorBrands, latestSnapshotAt } = args;
   const lines: string[] = [];
   if (locations.length > 0) {
     lines.push(`Configured client locations (${locations.length} confirmed):`);
@@ -239,6 +273,22 @@ function renderLocalSeoBlock(args: {
       const where = c.pageTitle ?? c.pagePath ?? c.sourceLabel;
       const market = c.marketId ? ` [${c.marketId}]` : '';
       lines.push(`  - "${c.keyword}"${market} — ${where} (score ${c.score})`);
+    }
+  }
+  if (competitorBrands.length > 0) {
+    lines.push('');
+    lines.push('Repeat local-pack competitors (winsAgainstClient = pack appeared, client absent):');
+    for (const c of competitorBrands.slice(0, PROMPT_BLOCK_MARKET_LIST_CAP)) {
+      const where = c.markets.length > 0 ? ` across ${c.markets.slice(0, 3).join(', ')}` : '';
+      lines.push(`  - ${c.title}${c.domain ? ` (${c.domain})` : ''} — ${c.totalAppearances} appearance(s), ${c.winsAgainstClient} while you were absent${where}`);
+    }
+  }
+  if (serviceGaps.length > 0) {
+    lines.push('');
+    lines.push('Untargeted local services (no active tracking keyword):');
+    for (const g of serviceGaps.slice(0, PROMPT_BLOCK_MARKET_LIST_CAP)) {
+      const starters = g.starterKeywords.slice(0, 3).join(', ');
+      lines.push(`  - ${g.serviceLabel}${starters ? ` (e.g. ${starters})` : ''}`);
     }
   }
   if (latestSnapshotAt) {

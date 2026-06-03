@@ -539,6 +539,23 @@ export interface LocalSeoSlice {
     difficulty?: number;
     score: number;
   }>;
+  /** SEO Gen-Quality P7.1 — services in the workspace's industry taxonomy with no active
+   *  tracking keyword (the local_service_gap rec spine). Surfaced so AdminChat can reason about
+   *  untargeted local services. Empty when flag off / no taxonomy / no gaps. */
+  serviceGaps: ReadonlyArray<{
+    serviceId: string;
+    serviceLabel: string;
+    starterKeywords: ReadonlyArray<string>;
+  }>;
+  /** SEO Gen-Quality P7.1 — competitors that repeatedly appear in the local pack, including how
+   *  often the client was absent while they showed (the local_visibility rec spine). */
+  competitorBrands: ReadonlyArray<{
+    title: string;
+    domain?: string;
+    totalAppearances: number;
+    winsAgainstClient: number;
+    markets: ReadonlyArray<string>;
+  }>;
   /** Pre-formatted prompt block — stratified-sampled internally. Inject directly into prompts. */
   effectiveLocalSeoBlock: string;
   /** ISO timestamp of the latest visibility snapshot reflected here. */
