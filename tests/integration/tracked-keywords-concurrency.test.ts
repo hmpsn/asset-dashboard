@@ -1,23 +1,37 @@
 /**
- * Integration tests: tracked_keywords lost-update race + nesting-safety + reconcile race.
+ * Integration tests: tracked_keywords transaction-safety + nesting behavior + reconcile preservation.
  *
- * T1a — concurrent withTrackedKeywordsTxn: simulate the lost-update race that
- *        occurs when two writers each do readConfig → mutate → writeConfig
- *        without BEGIN IMMEDIATE. With the fix in place, all 10 keywords survive.
- *        We simulate the race by manually performing the read→write steps in an
- *        interleaved order (read A, read B, write A, write B → B overwrites A's data).
- *        Then we verify withTrackedKeywordsTxn prevents it.
+ * ── Honesty note on what is (and isn't) reproducible in-process ──────────────
+ * better-sqlite3 is SYNCHRONOUS and this app uses a SINGLE connection, so two
+ * writers in the same process CANNOT interleave at the JS level — an in-process
+ * `Promise.all` over two writers will never reproduce a lost update. The genuine,
+ * real property that `withTrackedKeywordsTxn`'s `.immediate()` provides is the
+ * deferred→IMMEDIATE SQLITE_BUSY_SNAPSHOT defense (PR #1030): a *deferred*
+ * transaction that reads first takes a read snapshot, and if a SECOND connection
+ * commits a write before it writes, its write fails with SQLITE_BUSY_SNAPSHOT.
+ * `BEGIN IMMEDIATE` takes the write lock upfront and avoids this. To exercise the
+ * real property we therefore open a SECOND raw better-sqlite3 connection to the
+ * same WAL database file.
  *
- * T1b — nesting safety: calling updateTrackedKeywords inside an outer
- *        db.transaction() must NOT throw "cannot start a transaction within
- *        a transaction". The db.inTransaction guard NO-OPs the inner BEGIN.
- *
- * T1c — reconcile vs manual race: seedKeywordStrategyTrackedKeywords (full-array
- *        rebuild) interleaved with addTrackedKeyword; the manually-added keyword
- *        must survive the rebuild when using withTrackedKeywordsTxn.
+ * T1a — IMMEDIATE vs deferred (the real justification for `.immediate()`):
+ *        (1) a SQL-level demonstration using two raw connections, and
+ *        (2) a helper-tied regression that drives the REAL withTrackedKeywordsTxn
+ *            with a second-connection write interposed between its read and write,
+ *            asserting it does NOT throw SQLITE_BUSY_SNAPSHOT. This regresses
+ *            (throws SQLITE_BUSY_SNAPSHOT) if the production line is reverted to
+ *            a deferred / non-immediate transaction.
+ * T1b — nesting behavior: calling updateTrackedKeywords inside an outer
+ *        db.transaction() persists the keyword and the outer commit includes it.
+ *        (better-sqlite3 wrapped txns downgrade to a SAVEPOINT and do NOT throw on
+ *        nesting — only a raw `db.prepare('BEGIN IMMEDIATE')` throws. We assert the
+ *        OBSERVABLE persistence, not a throw.)
+ * T1c — reconcile merge-preservation: a manually-added keyword survives a strategy
+ *        reconcile (NOT a race test — a behavioral preservation assertion).
  *
  * Port: 13886 (allocated for this file; matches the pre-plan audit spec)
  */
+import path from 'path';
+import BetterSqlite3, { type Database as BetterSqlite3Database } from 'better-sqlite3';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
@@ -71,171 +85,233 @@ afterAll(async () => {
   await ctx.stopServer();
 });
 
-// ─── T1a: lost-update race simulation ─────────────────────────────────────────
-// The race: two writers each do (read → mutate → write) without an enclosing
-// BEGIN IMMEDIATE. Writer B reads before Writer A writes, so B's write overwrites
-// A's changes and A's keyword is silently dropped.
-//
-// We simulate this with manual interleaving at the function level:
-//   1. Read state into snapshot A (0 keywords)
-//   2. Read state into snapshot B (0 keywords)
-//   3. Writer A adds kw1 to its snapshot and writes → DB has [kw1]
-//   4. Writer B adds kw2 to its snapshot (still empty!) and writes → DB has [kw2] only
-//
-// withTrackedKeywordsTxn serialises this with BEGIN IMMEDIATE so step 4 would
-// see [kw1] and produce [kw1, kw2].
-describe('T1a: lost-update race — withTrackedKeywordsTxn prevents keyword loss', () => {
-  it('withTrackedKeywordsTxn: all 10 keywords survive N sequential calls (no-op test, verifies API)', async () => {
-    // Import the new safe helper
-    const { withTrackedKeywordsTxn } = await import('../../server/rank-tracking.js');
-    const { getTrackedKeywords } = await import('../../server/rank-tracking.js');
-    const { TRACKED_KEYWORD_SOURCE, TRACKED_KEYWORD_STATUS } = await import('../../shared/types/rank-tracking.js');
+/**
+ * Open a SECOND raw better-sqlite3 connection to the SAME database file the
+ * server's `db` singleton uses. This is the only way to reproduce real
+ * cross-connection write contention (SQLITE_BUSY / SQLITE_BUSY_SNAPSHOT) in a
+ * single-process test — the app's own `db` is one synchronous connection and
+ * cannot contend with itself.
+ *
+ * busy_timeout is set to 0 so contention surfaces immediately as an error
+ * instead of blocking (a blocking second connection would deadlock the single
+ * JS thread when interposed inside the helper's synchronous updater).
+ */
+async function openSecondConnection(): Promise<BetterSqlite3Database> {
+  const dataDir = process.env.DATA_DIR;
+  if (!dataDir) throw new Error('DATA_DIR not set — test infra should have set it');
+  const conn = new BetterSqlite3(path.join(dataDir, 'dashboard.db'));
+  conn.pragma('busy_timeout = 0');
+  return conn;
+}
 
-    const N = 10;
-    const keywords = Array.from({ length: N }, (_, i) => `txn-safe-keyword-${i + 1}`);
+function readKeywordsRaw(conn: BetterSqlite3Database, ws: string): unknown[] {
+  const row = conn
+    .prepare('SELECT tracked_keywords FROM rank_tracking_config WHERE workspace_id = ?')
+    .get(ws) as { tracked_keywords: string } | undefined;
+  return row ? (JSON.parse(row.tracked_keywords) as unknown[]) : [];
+}
 
-    // Run N sequential withTrackedKeywordsTxn calls
-    for (const kw of keywords) {
-      withTrackedKeywordsTxn(workspaceId, existing => [
-        ...existing,
-        {
-          query: kw,
-          pinned: false,
-          addedAt: new Date().toISOString(),
-          source: TRACKED_KEYWORD_SOURCE.MANUAL,
-          status: TRACKED_KEYWORD_STATUS.ACTIVE,
-        },
-      ]);
-    }
+function writeKeywordsRaw(conn: BetterSqlite3Database, ws: string, keywords: unknown[]): void {
+  conn
+    .prepare(`
+      INSERT INTO rank_tracking_config (workspace_id, tracked_keywords)
+      VALUES (?, ?)
+      ON CONFLICT(workspace_id) DO UPDATE SET tracked_keywords = ?
+    `)
+    .run(ws, JSON.stringify(keywords), JSON.stringify(keywords));
+}
 
-    const final = getTrackedKeywords(workspaceId);
-    expect(final.length).toBe(N);
-    for (const kw of keywords) {
-      expect(final.some(k => k.query === kw), `Missing keyword: ${kw}`).toBe(true);
+// ─── T1a: IMMEDIATE vs deferred — the real justification for `.immediate()` ─────
+describe('T1a: deferred→IMMEDIATE SQLITE_BUSY_SNAPSHOT defense (PR #1030)', () => {
+  it('SQL-level demonstration: deferred read→(other-conn write)→write throws SQLITE_BUSY_SNAPSHOT; IMMEDIATE serializes cleanly', async () => {
+    // This is a SQL-level DEMONSTRATION of the property `.immediate()` relies on.
+    // It does NOT route through the helper — it proves the underlying SQLite
+    // semantics directly with two raw connections (connA = the server `db`
+    // singleton, connB = a second raw connection to the same WAL file).
+    const { default: connA } = await import('../../server/db/index.js');
+    const connB = await openSecondConnection();
+    try {
+      // ── DEFERRED: A reads (takes a read snapshot), B writes+commits on the
+      //    other connection, then A writes against its now-stale snapshot. ──
+      writeKeywordsRaw(connA, workspaceId, []);
+      let deferredError: { code?: string } | null = null;
+      try {
+        connA.transaction(() => {
+          const snapA = readKeywordsRaw(connA, workspaceId); // read snapshot
+          writeKeywordsRaw(connB, workspaceId, [...readKeywordsRaw(connB, workspaceId), { query: 'B-kw' }]); // other conn commits
+          writeKeywordsRaw(connA, workspaceId, [...snapA, { query: 'A-kw' }]); // A writes against stale snapshot → conflict
+        }).deferred();
+      } catch (err) {
+        deferredError = err as { code?: string };
+      }
+      expect(
+        deferredError?.code,
+        'deferred read→(other-conn write)→write must fail with SQLITE_BUSY_SNAPSHOT',
+      ).toBe('SQLITE_BUSY_SNAPSHOT');
+
+      // ── IMMEDIATE: A takes the write lock upfront. The other connection
+      //    serializes AFTER A commits; both writes survive, no error. ──
+      writeKeywordsRaw(connA, workspaceId, []);
+      let immediateError: { code?: string } | null = null;
+      try {
+        connA.transaction(() => {
+          const snapA = readKeywordsRaw(connA, workspaceId); // A already holds the write lock
+          writeKeywordsRaw(connA, workspaceId, [...snapA, { query: 'A-kw' }]);
+        }).immediate();
+        // B serializes after A's commit, reads fresh, and appends.
+        writeKeywordsRaw(connB, workspaceId, [...readKeywordsRaw(connB, workspaceId), { query: 'B-kw' }]);
+      } catch (err) {
+        immediateError = err as { code?: string };
+      }
+      expect(immediateError, 'IMMEDIATE-first path must not error').toBeNull();
+      const queries = readKeywordsRaw(connA, workspaceId).map((k) => (k as { query: string }).query);
+      expect(queries).toContain('A-kw');
+      expect(queries).toContain('B-kw');
+    } finally {
+      connB.close();
     }
   });
 
-  it('demonstrates the lost-update race WITHOUT the fix (manual interleaving)', async () => {
-    // This test demonstrates WHY the fix is needed by simulating the race manually.
-    // It does NOT use withTrackedKeywordsTxn — it simulates the old code path.
-    const { default: db } = await import('../../server/db/index.js');
+  it('helper-tied regression: real withTrackedKeywordsTxn does NOT throw SQLITE_BUSY_SNAPSHOT when a second connection writes between its read and write', async () => {
+    // This drives the REAL withTrackedKeywordsTxn. We interpose a second-connection
+    // write inside the updater (which the helper runs between readConfig and
+    // writeConfig). Under the real `.immediate()` wiring, the helper holds the write
+    // lock from the start, so the second connection's write fails fast with
+    // SQLITE_BUSY (busy_timeout=0) and the helper commits cleanly. If the production
+    // line is reverted to a deferred / non-immediate transaction, the second
+    // connection's write SUCCEEDS and commits before the helper writes — and the
+    // helper's writeConfig then throws SQLITE_BUSY_SNAPSHOT.
+    //
+    // PROVEN regression (temporarily reverting `.immediate()` → `.deferred()` in
+    // server/rank-tracking.ts and running this test):
+    //   AssertionError: real withTrackedKeywordsTxn must not surface SQLITE_BUSY_SNAPSHOT
+    //   Expected: null
+    //   Received: { code: 'SQLITE_BUSY_SNAPSHOT', ... }
+    const { withTrackedKeywordsTxn, getTrackedKeywords } = await import('../../server/rank-tracking.js');
     const { TRACKED_KEYWORD_SOURCE, TRACKED_KEYWORD_STATUS } = await import('../../shared/types/rank-tracking.js');
-    const { parseJsonSafeArray } = await import('../../server/db/json-validation.js');
-    const { z } = await import('zod');
+    const connB = await openSecondConnection();
+    try {
+      writeKeywordsRaw((await import('../../server/db/index.js')).default, workspaceId, []);
 
-    // Simple read/write helpers to simulate the old (broken) pattern
-    function rawRead(): Array<{ query: string; pinned: boolean; addedAt: string; source: string; status: string }> {
-      const row = db.prepare('SELECT tracked_keywords FROM rank_tracking_config WHERE workspace_id = ?').get(workspaceId) as { tracked_keywords: string } | undefined;
-      if (!row) return [];
-      return parseJsonSafeArray(row.tracked_keywords, z.object({
-        query: z.string(),
-        pinned: z.boolean().default(false),
-        addedAt: z.string().default(''),
-        source: z.string().default('manual'),
-        status: z.string().default('active'),
-      }), { workspaceId, table: 'test', field: 'tracked_keywords' });
+      let helperError: { code?: string } | null = null;
+      try {
+        withTrackedKeywordsTxn(workspaceId, (existing) => {
+          // Interpose a second-connection write between the helper's read and write.
+          // Under IMMEDIATE this throws SQLITE_BUSY (busy_timeout=0) and is swallowed;
+          // under deferred it succeeds and commits, poisoning the helper's snapshot.
+          try {
+            writeKeywordsRaw(connB, workspaceId, [
+              ...readKeywordsRaw(connB, workspaceId),
+              { query: 'interloper-from-second-connection' },
+            ]);
+          } catch {
+            // Expected under IMMEDIATE: the helper holds the write lock.
+          }
+          return [
+            ...existing,
+            {
+              query: 'helper-written-keyword',
+              pinned: false,
+              addedAt: new Date().toISOString(),
+              source: TRACKED_KEYWORD_SOURCE.MANUAL,
+              status: TRACKED_KEYWORD_STATUS.ACTIVE,
+            },
+          ];
+        });
+      } catch (err) {
+        helperError = err as { code?: string };
+      }
+
+      expect(
+        helperError,
+        `real withTrackedKeywordsTxn must not surface SQLITE_BUSY_SNAPSHOT (got: ${helperError?.code ?? 'none'})`,
+      ).toBeNull();
+
+      // The helper's own write must have landed.
+      const final = getTrackedKeywords(workspaceId, { includeInactive: true });
+      expect(final.some((k) => k.query === 'helper-written-keyword')).toBe(true);
+    } finally {
+      connB.close();
     }
-
-    function rawWrite(keywords: Array<{ query: string; pinned: boolean; addedAt: string; source: string; status: string }>): void {
-      db.prepare(`
-        INSERT INTO rank_tracking_config (workspace_id, tracked_keywords)
-        VALUES (?, ?)
-        ON CONFLICT(workspace_id) DO UPDATE SET tracked_keywords = ?
-      `).run(workspaceId, JSON.stringify(keywords), JSON.stringify(keywords));
-    }
-
-    // Simulate the lost-update race:
-    // Writer A reads (sees [])
-    const snapshotA = rawRead();
-    // Writer B reads (sees []) — B reads BEFORE A writes
-    const snapshotB = rawRead();
-
-    // Writer A mutates its snapshot and writes → DB has [kw-writer-A]
-    snapshotA.push({ query: 'kw-writer-A', pinned: false, addedAt: new Date().toISOString(), source: TRACKED_KEYWORD_SOURCE.MANUAL, status: TRACKED_KEYWORD_STATUS.ACTIVE });
-    rawWrite(snapshotA);
-
-    // Writer B mutates its stale snapshot and writes → DB has [kw-writer-B] ONLY (A's data dropped!)
-    snapshotB.push({ query: 'kw-writer-B', pinned: false, addedAt: new Date().toISOString(), source: TRACKED_KEYWORD_SOURCE.MANUAL, status: TRACKED_KEYWORD_STATUS.ACTIVE });
-    rawWrite(snapshotB);
-
-    // Verify the race: kw-writer-A was LOST
-    const finalRaw = rawRead();
-    expect(finalRaw.some(k => k.query === 'kw-writer-A')).toBe(false); // lost!
-    expect(finalRaw.some(k => k.query === 'kw-writer-B')).toBe(true);  // last writer wins
-  });
-
-  it('withTrackedKeywordsTxn prevents the lost-update race via BEGIN IMMEDIATE', async () => {
-    // Verify that withTrackedKeywordsTxn correctly serialises updates.
-    // We call it 10 times in sequence (each builds on top of the previous result).
-    const { withTrackedKeywordsTxn } = await import('../../server/rank-tracking.js');
-    const { getTrackedKeywords } = await import('../../server/rank-tracking.js');
-    const { TRACKED_KEYWORD_SOURCE, TRACKED_KEYWORD_STATUS } = await import('../../shared/types/rank-tracking.js');
-
-    const N = 10;
-    for (let i = 0; i < N; i++) {
-      const result = withTrackedKeywordsTxn(workspaceId, existing => [
-        ...existing,
-        {
-          query: `safe-kw-${i + 1}`,
-          pinned: false,
-          addedAt: new Date().toISOString(),
-          source: TRACKED_KEYWORD_SOURCE.MANUAL,
-          status: TRACKED_KEYWORD_STATUS.ACTIVE,
-        },
-      ]);
-      // Return value is the post-mutation array (3x-parse fix: no extra read)
-      expect(result.length).toBe(i + 1);
-    }
-
-    const final = getTrackedKeywords(workspaceId);
-    expect(final.length).toBe(N);
   });
 });
 
-// ─── T1b: nesting safety — no throw when inside outer db.transaction() ────────
-describe('T1b: nesting safety — updateTrackedKeywords inside outer db.transaction() must not throw', () => {
-  it('does not throw "cannot start a transaction within a transaction"', async () => {
-    // Import server-side modules directly (this test runs in-process)
+// ─── T1b: nesting behavior — observable persistence inside an outer txn ─────────
+describe('T1b: updateTrackedKeywords inside an outer db.transaction() persists', () => {
+  it('persists the keyword and the outer commit includes it', async () => {
+    // better-sqlite3 WRAPPED transactions (db.transaction(fn)()) downgrade to a
+    // SAVEPOINT when nested and do NOT throw "cannot start a transaction within a
+    // transaction" — only a raw `db.prepare('BEGIN IMMEDIATE').run()` throws. So we
+    // assert the OBSERVABLE behavior: the inner write commits with the outer txn.
     const { default: db } = await import('../../server/db/index.js');
-    const { updateTrackedKeywords } = await import('../../server/rank-tracking.js');
+    const { updateTrackedKeywords, getTrackedKeywords } = await import('../../server/rank-tracking.js');
     const { TRACKED_KEYWORD_SOURCE, TRACKED_KEYWORD_STATUS } = await import('../../shared/types/rank-tracking.js');
 
-    let threw = false;
-    let error: unknown = null;
-
     db.transaction(() => {
-      try {
-        updateTrackedKeywords(workspaceId, keywords => [
+      updateTrackedKeywords(workspaceId, (keywords) => [
+        ...keywords,
+        {
+          query: 'nesting-safe-test-keyword',
+          pinned: false,
+          addedAt: new Date().toISOString(),
+          source: TRACKED_KEYWORD_SOURCE.MANUAL,
+          status: TRACKED_KEYWORD_STATUS.ACTIVE,
+        },
+      ]);
+    })();
+
+    // After the outer commit, the keyword written by the nested call is present.
+    const result = getTrackedKeywords(workspaceId);
+    expect(result.some((k) => k.query === 'nesting-safe-test-keyword')).toBe(true);
+  });
+
+  it('a rolled-back outer transaction discards the nested write (nested call inherits the outer txn)', async () => {
+    // Corollary that PROVES the nested call really inherits the outer transaction
+    // rather than committing independently: if the outer txn throws (rolls back),
+    // the nested write must NOT persist.
+    //
+    // Honesty note: this does NOT regress against the trivial break of removing the
+    // `db.inTransaction` guard — better-sqlite3 wrapped txns nest as a SAVEPOINT that
+    // still rolls back with the outer txn, so that break is harmless. It DOES regress
+    // (the keyword survives the rollback) if the helper escapes the outer txn by
+    // writing through an independent / eagerly-committing connection — the genuinely
+    // harmful failure mode this assertion guards against. PROVEN by patching the
+    // helper to write via a fresh auto-committing connection when db.inTransaction:
+    //   AssertionError: expected true to be false (rolled-back-keyword persisted)
+    const { default: db } = await import('../../server/db/index.js');
+    const { updateTrackedKeywords, getTrackedKeywords } = await import('../../server/rank-tracking.js');
+    const { TRACKED_KEYWORD_SOURCE, TRACKED_KEYWORD_STATUS } = await import('../../shared/types/rank-tracking.js');
+
+    expect(() => {
+      db.transaction(() => {
+        updateTrackedKeywords(workspaceId, (keywords) => [
           ...keywords,
           {
-            query: 'nesting-safe-test-keyword',
+            query: 'rolled-back-keyword',
             pinned: false,
             addedAt: new Date().toISOString(),
             source: TRACKED_KEYWORD_SOURCE.MANUAL,
             status: TRACKED_KEYWORD_STATUS.ACTIVE,
           },
         ]);
-      } catch (err) {
-        threw = true;
-        error = err;
-      }
-    })();
+        throw new Error('force outer rollback');
+      })();
+    }).toThrow('force outer rollback');
 
-    expect(
-      threw,
-      `updateTrackedKeywords threw inside outer transaction: ${error instanceof Error ? error.message : String(error)}`,
-    ).toBe(false);
-
-    // Verify the keyword was actually written
-    const { getTrackedKeywords } = await import('../../server/rank-tracking.js');
-    const result = getTrackedKeywords(workspaceId);
-    expect(result.some(k => k.query === 'nesting-safe-test-keyword')).toBe(true);
+    const result = getTrackedKeywords(workspaceId, { includeInactive: true });
+    expect(result.some((k) => k.query === 'rolled-back-keyword')).toBe(false);
   });
 });
 
-// ─── T1c: reconcile vs manual race — manual keyword survives rebuild ───────────
-describe('T1c: reconcile vs manual race — manually-added keyword survives strategy rebuild', () => {
-  it('manual keyword survives when seedKeywordStrategyTrackedKeywords runs after addTrackedKeyword', async () => {
+// ─── T1c: reconcile merge-preservation (NOT a race test) ───────────────────────
+describe('T1c: reconcile merge-preservation — manual keyword survives strategy rebuild', () => {
+  it('a manually-added keyword survives seedKeywordStrategyTrackedKeywords (reconcile preserve path)', async () => {
+    // This is a behavioral preservation assertion, NOT a concurrency/race test.
+    // reconcileStrategyRankTracking rebuilds the full tracked_keywords array; the
+    // non-strategy (manual) keyword must survive via the `manuallyPreserved` path
+    // (server/rank-tracking-reconciliation.ts: `next.push(existing)` for
+    // non-strategy-owned rows). PROVEN regression: deleting that `next.push(existing)`
+    // line drops the manual keyword and this assertion fails.
     const { addTrackedKeyword, getTrackedKeywords } = await import('../../server/rank-tracking.js');
     const { seedKeywordStrategyTrackedKeywords } = await import('../../server/keyword-strategy-follow-ons.js');
     const { TRACKED_KEYWORD_SOURCE } = await import('../../shared/types/rank-tracking.js');
@@ -243,12 +319,8 @@ describe('T1c: reconcile vs manual race — manually-added keyword survives stra
     const manualKw = 'my-manual-unique-keyword-xyz';
     const strategyKw = 'strategy-primary-keyword-abc';
 
-    // Add manual keyword first
     addTrackedKeyword(workspaceId, manualKw, { source: TRACKED_KEYWORD_SOURCE.MANUAL });
 
-    // Then run reconcile — this does a full updateTrackedKeywords that rebuilds
-    // the array. With the fix, reconcile must merge with existing non-strategy
-    // keywords (manuallyPreserved path).
     seedKeywordStrategyTrackedKeywords({
       workspaceId,
       workspaceName: 'Test Workspace',
@@ -261,7 +333,7 @@ describe('T1c: reconcile vs manual race — manually-added keyword survives stra
     });
 
     const final = getTrackedKeywords(workspaceId, { includeInactive: true });
-    const queries = final.map(k => k.query);
+    const queries = final.map((k) => k.query);
 
     expect(
       queries.includes(manualKw),
@@ -273,11 +345,14 @@ describe('T1c: reconcile vs manual race — manually-added keyword survives stra
     ).toBe(true);
   });
 
-  it('withTrackedKeywordsTxn return value matches post-mutation state (3x-parse fix)', async () => {
+  it('withTrackedKeywordsTxn returns the post-mutation array (3x-parse fix: no extra read)', async () => {
+    // Behavioral assertion: the helper returns the post-mutation state directly so
+    // callers do not need a second getTrackedKeywords() read. Regresses if the
+    // helper stops returning config.trackedKeywords.
     const { withTrackedKeywordsTxn, getTrackedKeywords } = await import('../../server/rank-tracking.js');
     const { TRACKED_KEYWORD_SOURCE, TRACKED_KEYWORD_STATUS } = await import('../../shared/types/rank-tracking.js');
 
-    const result = withTrackedKeywordsTxn(workspaceId, _existing => [
+    const result = withTrackedKeywordsTxn(workspaceId, () => [
       {
         query: 'return-value-test-kw',
         pinned: false,
@@ -287,11 +362,9 @@ describe('T1c: reconcile vs manual race — manually-added keyword survives stra
       },
     ]);
 
-    // Return value must be the post-mutation array (no extra read needed)
     expect(result).toHaveLength(1);
     expect(result[0].query).toBe('return-value-test-kw');
 
-    // And the DB must also have exactly that state
     const fromDb = getTrackedKeywords(workspaceId);
     expect(fromDb).toHaveLength(1);
     expect(fromDb[0].query).toBe('return-value-test-kw');

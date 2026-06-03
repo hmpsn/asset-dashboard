@@ -191,12 +191,15 @@ export function getTrackedKeywords(workspaceId: string, options: GetTrackedKeywo
  * helper to prevent the lost-update race: two concurrent writers both reading the
  * same blob, mutating independently, and last-write-wins silently dropping keywords.
  *
- * Nesting guard: better-sqlite3 throws "cannot start a transaction within a
- * transaction" if db.transaction() is called while db.inTransaction is true.
- * KCC wraps its outer action in db.transaction() before calling updateTrackedKeywords
- * → upsertTrackedKeywordByKey → updateTrackedKeywords → withTrackedKeywordsTxn. The
- * guard below NO-OPs the inner BEGIN when already inside a transaction so nested
- * callers inherit the outer txn's serialisation.
+ * Nesting guard: better-sqlite3 WRAPPED transactions (db.transaction(fn)()) do NOT
+ * throw when nested — they downgrade to a SAVEPOINT and inherit the outer txn. (Only
+ * a raw `db.prepare('BEGIN IMMEDIATE').run()` throws "cannot start a transaction
+ * within a transaction".) So the db.inTransaction guard below is NOT a throw-avoider;
+ * it is an optimisation that skips a needless inner SAVEPOINT and lets nested callers
+ * inherit the outer txn's write lock directly. KCC wraps its outer action in
+ * db.transaction() before calling updateTrackedKeywords → upsertTrackedKeywordByKey
+ * → updateTrackedKeywords → withTrackedKeywordsTxn; the guard NO-OPs the inner BEGIN
+ * so those nested callers run under the outer txn's serialisation.
  *
  * Returns the post-mutation TrackedKeyword[] so callers do NOT need a second
  * getTrackedKeywords() call (the "3×-parse fix").
