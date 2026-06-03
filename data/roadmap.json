@@ -325,6 +325,16 @@
           "status": "pending",
           "createdAt": "2026-06-03",
           "notes": "After the SEO generation-quality batch (P0\u2013P5, flags seo-generation-quality) is canaried/rolled out, audit every client-facing keyword/strategy surface (Strategy tab, content gaps, RecommendedForYou, FixRecommendations, InsightsEngine, keyword command center, etc.) for DUPLICATED displays of the same data and streamline so each surface shows the single best representation. Trigger: full gen-quality rollout complete."
+        },
+        {
+          "id": "seo-genquality-p6-semantic-fit",
+          "title": "P6 (DEFERRED) \u2014 semantic business-fit + GA4 conversion value + winnability (revisit only if bad-fit issues appear post-soak)",
+          "source": "/docs/plans/2026-06-02-seo-generation-quality-plan.md",
+          "est": "L",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-06-03",
+          "notes": "DEFERRED by owner 2026-06-03 \u2014 let P0\u2013P5 soak first; build ONLY if the canaried/rolled-out workspaces show genuine BAD-FIT (off-topic recommendations slipping through). Telemetry-gated by design. Scope when triggered: (1) replace lexical inferBusinessFit (server/keyword-intelligence/rules.ts) with a SEMANTIC embedding relevance score (embed business context + page corpus + candidates, cosine) \u2014 net-new embedding subsystem, the highest-risk/cost item in the plan, NONE exists today; (2) thread GA4 conversion value -> valuePerClick (server/scoring/opportunity-value.ts) which RETIRES the P4 predictedEmv CPC-proxy placeholder; (3) GSC-proven demand -> OV confidence; (4) SERP-feature crowding -> winnability discount; (5) swap calibration basis to median(realized attributed_value / predicted_emv) in server/scoring/ov-calibration.ts (P4 made predicted_emv recoverable). Gate behind seo-generation-quality (or a sub-flag); shadow-diff vs the P2 lexical behavior per-workspace before promotion; P0 eval fixtures gate each sub-change. Before building, do a quick bad-fit check on flagged workspaces to confirm the gap is real \u2014 P1+P2 may have already cleared the relevance bar."
         }
       ]
     },
