@@ -11,7 +11,7 @@ import type { KeywordSourceEvidence } from '../shared/types/keywords.js';
 import type { KeywordStrategy, Workspace } from '../shared/types/workspace.js';
 import type { KeywordStrategyPageInfo } from './keyword-strategy-pages.js';
 import type { KeywordStrategySearchData } from './keyword-strategy-search-data.js';
-import type { CompetitorKeywordData } from './keyword-strategy-seo-data.js';
+import type { CompetitorKeywordData, QuestionKeywordGroup } from './keyword-strategy-seo-data.js';
 import type { DomainKeyword, KeywordGapEntry, RelatedKeyword } from './seo-data-provider.js';
 import { buildStrategySignals } from './insight-feedback.js';
 import { filterBrandedKeywords, filterBrandedContentGaps, extractBrandTokens } from './competitor-brand-filter.js';
@@ -152,6 +152,16 @@ export interface SynthesizeKeywordStrategyResult {
    * flag-ON path; undefined (left as 0 by the telemetry emit) on the legacy path.
    */
   suppressedCount?: number;
+  /**
+   * Question keywords grouped by seed (geo + language threaded), surfaced by the
+   * flag-ON keyword-universe assembler in the SAME shape the legacy
+   * `seoDataMode === 'full'` prefetch produced. Threaded into `enrichKeywordStrategy`
+   * by generation on the flag-ON path so FAQ questions are attached to content gaps
+   * exactly as before (the legacy prefetch is gated off on flag-ON to avoid a
+   * double-fetch). Undefined on the flag-OFF path (generation falls back to the
+   * legacy seo-data `questionKeywords`, keeping flag-OFF byte-identical).
+   */
+  questionKeywords?: QuestionKeywordGroup[];
 }
 
 export async function callKeywordStrategyAI(
@@ -437,6 +447,12 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
     // without disturbing the flag-OFF path. M2 may flip this back to false if the
     // assembler throws and we degrade to the legacy fold.
     let usedKeywordUniverse = false;
+    // Grouped question keywords surfaced by the assembler (flag-ON) so generation
+    // can thread them into FAQ enrichment in place of the legacy prefetch (which is
+    // gated off on flag-ON). Undefined unless the assembler ran successfully — on
+    // the flag-OFF path AND the M2 degradation fallback it stays undefined so
+    // generation uses the legacy seo-data `questionKeywords` (flag-OFF byte-identical).
+    let universeQuestionKeywords: QuestionKeywordGroup[] | undefined;
     if (seoGenQualityEnabled) {
       // semrushByPath (per-page provider keyword lookup) is built here on both
       // paths — the assembler owns the candidate POOL, not per-page assignment.
@@ -454,7 +470,7 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
       // aborting the whole generation. The flag-OFF code path is unaffected.
       try {
         const siteDomain = options.baseUrl ? (() => { try { return new URL(options.baseUrl).hostname; } catch { return ''; } })() : '';
-        const { pool: universePool, suppressedCount } = await buildKeywordUniverse(ws.id, {
+        const { pool: universePool, suppressedCount, questionKeywords: universeQuestions } = await buildKeywordUniverse(ws.id, {
           provider,
           seoDataMode,
           siteDomain,
@@ -472,6 +488,7 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
           sendProgress,
         });
         suppressedUniverseCount = suppressedCount;
+        universeQuestionKeywords = universeQuestions;
         for (const [kw, candidate] of universePool.entries()) {
           keywordPool.set(kw, candidate);
         }
@@ -1196,7 +1213,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
     }
     log.info(`Final strategy: ${strategy.pageMap?.length ?? 0} pages, ${strategy.siteKeywords?.length ?? 0} site keywords, ${strategy.contentGaps?.length ?? 0} content gaps, ${strategy.quickWins?.length ?? 0} quick wins`);
 
-  return { strategy, pagesToAnalyze, keywordPool, businessSection, keywordEvaluationContext: strategyKeywordEvaluationContext, suppressedCount: suppressedUniverseCount };
+  return { strategy, pagesToAnalyze, keywordPool, businessSection, keywordEvaluationContext: strategyKeywordEvaluationContext, suppressedCount: suppressedUniverseCount, questionKeywords: universeQuestionKeywords };
 }
 
 // ---------------------------------------------------------------------------

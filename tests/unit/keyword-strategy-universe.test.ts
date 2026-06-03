@@ -259,6 +259,37 @@ describe('buildKeywordUniverse — monthly credit ceiling + provider threading',
     expect(universe.creditDepth).toBe('full');
   });
 
+  it('surfaces fetched question keywords grouped by seed in the legacy QuestionKeywordGroup shape (FAQ enrichment input)', async () => {
+    // FAQ enrichment (keyword-strategy-enrichment.ts ~:466) consumes
+    // `{ seed, questions: { keyword, volume }[] }[]`. On the flag-ON path the legacy
+    // seo-data prefetch that produced this is gated off, so the assembler must
+    // surface the SAME grouped shape (geo + language threaded) for parity.
+    const provider = new FakeSeoProvider();
+    // questionSeeds require domain keywords with volume > 100 (universe.ts filter).
+    const { questionKeywords } = await buildKeywordUniverse(workspaceId, baseOpts({
+      provider,
+      seoDataMode: 'full',
+      domainKeywords: [{ keyword: 'cloud security', position: 2, volume: 1500, difficulty: 30, cpc: 4, url: 'https://example.com/cloud', traffic: 200, trafficPercent: 12 }],
+    }));
+
+    expect(questionKeywords.length).toBeGreaterThan(0);
+    const group = questionKeywords[0];
+    // Grouped by the domain-keyword seed.
+    expect(group.seed).toBe('cloud security');
+    expect(Array.isArray(group.questions)).toBe(true);
+    expect(group.questions.length).toBeGreaterThan(0);
+    // FakeSeoProvider returns "how to <seed> N" questions.
+    expect(group.questions[0].keyword.startsWith('how to cloud security')).toBe(true);
+    // Each question carries the trimmed { keyword, volume } shape FAQ enrichment reads.
+    expect(typeof group.questions[0].volume).toBe('number');
+    expect(Object.keys(group.questions[0]).sort()).toEqual(['keyword', 'volume']);
+  });
+
+  it('returns an empty questionKeywords group when no provider is present (flag-OFF parity input)', async () => {
+    const { questionKeywords } = await buildKeywordUniverse(workspaceId, baseOpts({ provider: null }));
+    expect(questionKeywords).toEqual([]);
+  });
+
   it('stops fetching once the per-workspace monthly ceiling is exhausted', async () => {
     const provider = new FakeSeoProvider();
     // The ceiling is 60 calls/workspace/month. Run repeatedly until exhausted; the

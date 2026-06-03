@@ -32,7 +32,7 @@ import {
 } from './keyword-strategy-helpers.js';
 import { isStrategyPoolEligibleKeyword, normalizeKeyword, type KeywordEvaluationContext } from './keyword-intelligence/index.js';
 import type { SeoDataProvider, DomainKeyword, KeywordGapEntry, RelatedKeyword } from './seo-data-provider.js';
-import type { CompetitorKeywordData } from './keyword-strategy-seo-data.js';
+import type { CompetitorKeywordData, QuestionKeywordGroup } from './keyword-strategy-seo-data.js';
 import type { KeywordSourceEvidence } from '../shared/types/keywords.js';
 import {
   KEYWORD_CANDIDATE_SOURCE,
@@ -175,6 +175,15 @@ export interface BuildKeywordUniverseResult {
   pool: KeywordStrategyKeywordPool;
   /** Branded + declined candidates removed (wired to telemetry `suppressedCount`). */
   suppressedCount: number;
+  /**
+   * Question keywords grouped by seed — the SAME shape the legacy
+   * `seoDataMode === 'full'` prefetch in `keyword-strategy-seo-data.ts` produced
+   * (`{ seed, questions: { keyword, volume }[] }[]`). The assembler already fetches
+   * these (geo + language threaded) to fold into the pool; surfacing the grouped
+   * result here lets generation thread them into `enrichKeywordStrategy` so FAQ
+   * questions are attached to content gaps on the flag-ON path exactly as before.
+   */
+  questionKeywords: QuestionKeywordGroup[];
 }
 
 // ── Implementation ──────────────────────────────────────────────────────────
@@ -227,6 +236,10 @@ export async function buildKeywordUniverse(
   // locationCode/languageCode args; DataForSEO (the default provider) honors both. (M3)
   const fetchedDiscovery: KeywordSourceEvidence[] = [];
   const fetchedRelated: RelatedKeyword[] = [];
+  // Grouped question keywords (by seed) surfaced for FAQ enrichment — the SAME
+  // shape the legacy seoDataMode === 'full' prefetch produced. The questions also
+  // enter the pool via `fetchedDiscovery` below; this grouping is additive.
+  const questionKeywords: QuestionKeywordGroup[] = [];
   if (provider) {
     sendProgress?.('seo-data', 'Building keyword universe (discovery)...', 0.5);
     const discoverySeeds = [
@@ -276,6 +289,10 @@ export async function buildKeywordUniverse(
     for (const seed of questionSeeds) {
       const questions = await runProviderCall(() =>
         provider.getQuestionKeywords(seed, workspaceId, limits.questionsLimit, undefined, locationCode, languageCode));
+      if (questions.length > 0) {
+        // Grouped-by-seed shape for FAQ enrichment (mirrors the legacy prefetch).
+        questionKeywords.push({ seed, questions: questions.map(q => ({ keyword: q.keyword, volume: q.volume })) });
+      }
       for (const q of questions) {
         fetchedDiscovery.push({
           keyword: q.keyword,
@@ -410,5 +427,5 @@ export async function buildKeywordUniverse(
     creditDepth: depth,
   };
 
-  return { universe, pool, suppressedCount };
+  return { universe, pool, suppressedCount, questionKeywords };
 }

@@ -352,6 +352,16 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
     const keywordPool = synthesis.keywordPool;
     const businessSection = synthesis.businessSection;
     const keywordEvaluationContext = synthesis.keywordEvaluationContext;
+    // FAQ enrichment question keywords. On the flag-ON path the legacy
+    // `seoDataMode === 'full'` question prefetch in keyword-strategy-seo-data.ts is
+    // gated off (to avoid a double-fetch), so `allQuestionKws` is empty there; the
+    // keyword-universe assembler instead surfaces the grouped questions (geo +
+    // language threaded) via `synthesis.questionKeywords`. Use those when present so
+    // enrichKeywordStrategy attaches FAQ questions to content gaps exactly as before.
+    // On the flag-OFF path (and the M2 assembler-degradation fallback) the synthesis
+    // value is undefined, so the legacy `allQuestionKws` flows unchanged — flag-OFF
+    // stays byte-identical.
+    const enrichmentQuestionKeywords = synthesis.questionKeywords ?? allQuestionKws;
 
     if (!strategy?.pageMap) {
       const errMsg = 'Strategy generation produced no results';
@@ -393,7 +403,7 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
         ga4EventsByPage,
       },
       domainKeywords: semrushDomainData,
-      questionKeywords: allQuestionKws,
+      questionKeywords: enrichmentQuestionKeywords,
       competitorKeywords: competitorKeywordData,
       provider,
       seoDataMode,
@@ -458,7 +468,9 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       competitorKeywordData,
       topicClusters,
       cannibalization,
-      questionKeywords: allQuestionKws,
+      // Persist the same question keywords FAQ enrichment used: assembler-surfaced
+      // (geo + language threaded) on flag-ON, legacy seo-data prefetch on flag-OFF.
+      questionKeywords: enrichmentQuestionKeywords,
       businessContext,
       seoDataMode,
       seoDataStatus,
