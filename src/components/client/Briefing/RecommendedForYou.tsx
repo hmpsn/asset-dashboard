@@ -9,7 +9,7 @@
 //   premium → "Generate Brief (included) →" teal CTA with check icon per row
 
 import { useState, type ReactNode } from 'react';
-import { BarChart3, Eye, Sparkles, Check, Swords, MessageCircleQuestion } from 'lucide-react';
+import { BarChart3, Eye, ArrowUpRight, Sparkles, Check, Swords, MessageCircleQuestion } from 'lucide-react';
 import { Badge, SectionCard, Icon, TierGate, Button, type BadgeTone } from '../../ui';
 import { TrendBadge } from '../../ui/TrendBadge';
 import { fmtNum } from '../../../utils/formatNumbers';
@@ -26,6 +26,18 @@ export interface RecommendedForYouProps {
    * client pricing modal flow. Receives the recommendation that was clicked.
    */
   onRequestBrief: (rec: BriefingRecommendation) => void;
+  /**
+   * SEO Gen-Quality P4 (Contract 3) — the per-workspace `seo-generation-quality`
+   * umbrella state, resolved server-side and threaded down via the briefing
+   * response (`ovGainActive`). The client has no per-workspace flag mechanism,
+   * so this prop is the single gate for the recommendation materiality signal.
+   *   ON  → the opportunity-score badge is OV-EMV-derived ("Opportunity NN") and
+   *         the competing `volume × 0.103` "est. clicks at rank #3" estimate is
+   *         suppressed (one basis — no diverging estimator).
+   *   OFF → the pre-P4 surface renders byte-identically: "NN/100" badge + the
+   *         "est. clicks at rank #3" line. Defaults OFF (= all prod today).
+   */
+  ovGainActive?: boolean;
 }
 
 // File-local helpers — NOT shared utils (exclusive file ownership).
@@ -60,6 +72,7 @@ export function RecommendedForYou({
   recommendations,
   tier,
   onRequestBrief,
+  ovGainActive = false,
 }: RecommendedForYouProps): ReactNode {
   const [expanded, setExpanded] = useState(false);
 
@@ -91,12 +104,19 @@ export function RecommendedForYou({
               <div className="flex items-center justify-between">
                 <span className="t-ui font-medium text-[var(--brand-text-bright)]">
                   {rec.topic}
-                  {/* P4 (Contract 3): the opportunity score is now OV-EMV-derived (0..100),
-                      the SAME basis the recommendation queue ranks on — relabeled from the bare
-                      "NN/100" so the client reads it as a relative opportunity strength, not a
-                      raw percentage. blue = data (read-only). */}
+                  {/* P4 (Contract 3): flag-gated on the per-workspace umbrella (ovGainActive).
+                      ON  → the opportunity score is OV-EMV-derived (0..100), the SAME basis the
+                            recommendation queue ranks on — relabeled from the bare "NN/100" so the
+                            client reads it as a relative opportunity strength, not a raw percentage.
+                      OFF → the pre-P4 "NN/100" badge renders byte-identically (default = all prod).
+                      blue = data (read-only). */}
                   {rec.opportunityScore != null && (
-                    <Badge label={`Opportunity ${rec.opportunityScore}`} tone="blue" shape="pill" className="ml-2" />
+                    <Badge
+                      label={ovGainActive ? `Opportunity ${rec.opportunityScore}` : `${rec.opportunityScore}/100`}
+                      tone="blue"
+                      shape="pill"
+                      className="ml-2"
+                    />
                   )}
                 </span>
                 <div className="flex items-center gap-2">
@@ -139,10 +159,22 @@ export function RecommendedForYou({
                       {fmtNum(rec.impressions)} impr
                     </span>
                   )}
-                  {/* P4 (Contract 3): the independent `volume × 0.103` "est. clicks at rank #3"
-                      estimate was killed — it was a separate magic-constant basis that diverged
-                      from the queue's Opportunity Value ranking. The opportunity-score badge above
-                      (now OV-EMV-derived) is the single client-facing materiality signal. */}
+                  {/* P4 (Contract 3): flag-gated on the per-workspace umbrella (ovGainActive).
+                      ON  → the independent `volume × 0.103` "est. clicks at rank #3" estimate is
+                            suppressed — it was a separate magic-constant basis that diverged from
+                            the queue's Opportunity Value ranking; the OV-EMV-derived opportunity
+                            badge above is then the single client-facing materiality signal.
+                      OFF → the pre-P4 est-clicks line renders byte-identically (default = all prod). */}
+                  {!ovGainActive && rec.volume != null && rec.volume > 0 && (() => {
+                    const impact = Math.round(rec.volume * 0.103);
+                    if (impact < 10) return null;
+                    return (
+                      <span className="t-caption-sm text-accent-info flex items-center gap-0.5">
+                        <Icon as={ArrowUpRight} size="sm" className="text-accent-info" />
+                        ~{fmtNum(impact)}/mo est. clicks at rank #3
+                      </span>
+                    );
+                  })()}
                 </div>
 
                 {/* Tier-aware CTA buttons */}

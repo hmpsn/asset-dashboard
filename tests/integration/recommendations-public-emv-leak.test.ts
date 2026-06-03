@@ -141,6 +141,7 @@ describe('Public recommendations route — emvPerWeek/roiPerEffortDay leak gate'
     expect(res.status).toBe(200);
     const raw = await res.text();
     expect(raw).not.toContain('emvPerWeek');
+    expect(raw).not.toContain('predictedEmv'); // M1: symmetry with the GET strip — the PATCH write path must strip it too
     expect(raw).not.toContain('roiPerEffortDay');
     const rec = JSON.parse(raw) as Recommendation;
     expect(rec.opportunity).toBeTruthy();

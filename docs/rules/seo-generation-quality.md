@@ -95,9 +95,28 @@ it to the public strip (no dollarized string may reach a client).
 - Gain renderers: `src/components/client/FixRecommendations.tsx` (switch its hand-duplicated
   `ServerRecommendation` to the shared `Recommendation` type),
   `src/components/client/InsightsEngine.tsx`, `src/components/client/strategy/*`,
-  `src/components/client/Briefing/RecommendedForYou.tsx` (kill its independent
-  `volume × 0.103` clicks estimate + the legacy `/100` badge).
+  `src/components/client/Briefing/RecommendedForYou.tsx` (its independent `volume × 0.103`
+  clicks estimate + the legacy `/100` badge are **flag-gated**, not unconditionally removed —
+  see the client-gate contract below).
 - `server/routes/recommendations.ts` → `stripEmvFromPublicRecs` (must add `estimatedGain`).
+
+**Client-gate contract (`ovGainActive`) — `RecommendedForYou` flag exposure (P4 review C2).**
+The client has **no** per-workspace flag mechanism for `seo-generation-quality`. The two
+client-facing P4 deltas in `RecommendedForYou` (the `Opportunity NN` badge relabel and the
+suppression of the `volume × 0.103` "est. clicks at rank #3" line) must therefore NOT ship
+unconditionally — that would break the umbrella-OFF byte-identity guarantee for all prod
+clients. The blessed mechanism is a **server-resolved boolean** `ovGainActive`:
+- `server/briefing-client-projection.ts:buildBriefingClientView` resolves it ONCE via
+  `isFeatureEnabled('seo-generation-quality', workspaceId)` and returns it on
+  `BriefingClientView`.
+- It is exposed on the public briefing response (`PublishedBriefingResponse.ovGainActive`,
+  served by `GET /api/public/briefing/:wsId` and the admin preview route) — a derived
+  boolean, NOT an admin field (the public-shape whitelist test pins it).
+- `InsightsBriefingPage` threads `briefing.ovGainActive ?? false` into the
+  `RecommendedForYou` `ovGainActive` prop; the component gates BOTH deltas at the narrowest
+  point. Flag-OFF (default = all prod) renders the pre-P4 surface (`NN/100` badge + the
+  est-clicks line) byte-identically; flag-ON shows the OV-EMV surface (`Opportunity NN`, no
+  competing estimator). Pinned by `tests/unit/RecommendedForYou.test.tsx`.
 
 ## Contract 4 — the keyword-universe sources
 

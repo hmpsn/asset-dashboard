@@ -7,6 +7,7 @@ import { getLatestPublishedBriefing, countPublishedBriefingsThrough } from './br
 import { generateIssueSummary } from './briefing-summary.js';
 import { computeOpportunityScore } from './keyword-strategy-generation.js';
 import { listContentGaps } from './content-gaps.js';
+import { isFeatureEnabled } from './feature-flags.js';
 import type { BriefingClientView, BriefingRecommendation } from '../shared/types/briefing.js';
 
 export interface BuildBriefingClientViewOptions {
@@ -93,6 +94,14 @@ export function buildBriefingClientView(
   // public boundary.
   const weeklyOpener = latest.sourceMetadata?.aiPolish?.weeklyOpener;
 
+  // SEO Gen-Quality P4 (Contract 3) — resolve the per-workspace umbrella state once,
+  // server-side, and thread it to the client `RecommendedForYou` component. The client
+  // has no per-workspace flag mechanism, so this boolean is the single point of truth
+  // for whether the OV-EMV-derived opportunity badge replaces the pre-P4 "/100" badge +
+  // "est. clicks at rank #3" estimate. Flag-OFF (default, all prod today) → false → the
+  // client renders the pre-P4 surface byte-identically.
+  const ovGainActive = isFeatureEnabled('seo-generation-quality', workspaceId);
+
   return {
     weekOf: latest.weekOf,
     publishedAt: latest.publishedAt,
@@ -101,5 +110,6 @@ export function buildBriefingClientView(
     issueNumber,
     recommendations,
     weeklyOpener: weeklyOpener || undefined,
+    ovGainActive,
   };
 }

@@ -31,10 +31,11 @@ import {
   deriveOvTier,
   buildOvGainString,
   resolveEstimatedGain,
+  loadRecommendations,
 } from '../../server/recommendations.js';
 import { recordOvDivergence, listOvDivergence, type Top3Entry } from '../../server/ov-divergence.js';
 import { sortRecommendations } from '../../server/recommendations.js';
-import { upsertContentGapsBatch } from '../../server/content-gaps.js';
+import { upsertContentGapsBatch, listContentGaps } from '../../server/content-gaps.js';
 import { recordAction, archiveOldActions } from '../../server/outcome-tracking.js';
 import type { Recommendation, RecPriority, OpportunityScore } from '../../shared/types/recommendations.js';
 import type { ContentGap } from '../../shared/types/workspace.js';
@@ -155,6 +156,49 @@ describe('P4 (3)+(5) one gain basis + flag-OFF byte-identical snapshot', () => {
     // Summary counts derive from the same (legacy) priorities.
     const activeFixNow = set.recommendations.filter(r => r.priority === 'fix_now' && r.status === 'pending').length;
     expect(set.summary.fixNow).toBe(activeFixNow);
+
+    // ── I1: BYTE-IDENTITY pin (not just membership) ──────────────────────────
+    // The legacy content-gap branch maps cg.priority directly: high → fix_soon, else ongoing
+    // (recommendations.ts). These are the FIXED expected tiers for the gaps() fixture — pinned
+    // by title so the assertion is id-stable (rec ids are random per run). If the flag-OFF tier
+    // path drifts (e.g. deriveOvTier leaks into the OFF branch), this fails.
+    // content_gap rec title is `Content Gap: ${topic}` (signal-story-registry), so match on topic.
+    const tierByTitle = new Map(contentRecs.map(r => [r.title, r.priority]));
+    const highRec = contentRecs.find(r => r.title.includes('High demand topic'));
+    const midRec = contentRecs.find(r => r.title.includes('Mid topic'));
+    const lowRec = contentRecs.find(r => r.title.includes('Low topic'));
+    expect(highRec).toBeTruthy();
+    expect(midRec).toBeTruthy();
+    expect(lowRec).toBeTruthy();
+    expect(tierByTitle.get(highRec!.title)).toBe('fix_soon'); // high → fix_soon (legacy)
+    expect(tierByTitle.get(midRec!.title)).toBe('ongoing');   // medium → ongoing (legacy)
+    expect(tierByTitle.get(lowRec!.title)).toBe('ongoing');   // low → ongoing (legacy)
+
+    // content_gaps.opportunity_score is UNTOUCHED by flag-OFF generation (the OV recompute in
+    // keyword-strategy-enrichment is flag-ON only, and generateRecommendations never writes the
+    // content_gaps table). The fixture stored no opportunityScore, so every value stays null.
+    const gapsAfter = listContentGaps(s.workspaceId);
+    expect(gapsAfter.length).toBe(gaps().length);
+    for (const g of gapsAfter) {
+      expect(g.opportunityScore).toBeUndefined(); // null column → mapper drops the key (byte-identical to input)
+    }
+
+    // summary.topRecommendationId equals the id of the #1 active rec in the served order
+    // (the already-sorted recs array). Pinned to its TITLE so the assertion survives random ids,
+    // and asserted EQUAL to the explicitly recomputed #1 — the legacy summary contract.
+    const activeSorted = set.recommendations.filter(r => r.status === 'pending');
+    const expectedTopId = activeSorted[0]?.id ?? null;
+    expect(set.summary.topRecommendationId).toBe(expectedTopId);
+
+    // ── Determinism pin: a SECOND flag-OFF run yields an identical served priority array
+    // (by title) + identical top-rec identity (by title) — proves no flag-OFF drift run-to-run.
+    const set2 = await generateRecommendations(s.workspaceId);
+    const priByTitle = (rs: typeof set) =>
+      rs.recommendations.filter(r => r.source === 'strategy:content-gap').map(r => `${r.title}::${r.priority}`).sort();
+    expect(priByTitle(set2)).toEqual(priByTitle(set));
+    const topTitle = (rs: typeof set) =>
+      rs.recommendations.find(r => r.id === rs.summary.topRecommendationId)?.title ?? null;
+    expect(topTitle(set2)).toEqual(topTitle(set));
   });
 
   it('(3) flag-ON: content_gaps.opportunity_score is OV-derived and the rec gain is the OV phrase', async () => {
@@ -241,6 +285,79 @@ describe('P4 (6) archive round-trip — predicted_emv survives archiveOld', () =
     } finally {
       db.prepare('DELETE FROM tracked_actions_archive WHERE workspace_id = ?').run(s.workspaceId);
       db.prepare('DELETE FROM tracked_actions WHERE workspace_id = ?').run(s.workspaceId);
+      s.cleanup();
+    }
+  });
+});
+
+// ── (C1) backward-compat: a PRE-P4 opportunity blob (no predictedEmv) SURVIVES ──
+//
+// P4 added `predictedEmv` to the CLOSED `opportunityScoreSchema`. Because
+// `recommendationSchema.opportunity` is `opportunityScoreSchema.optional().catch(undefined)`,
+// a REQUIRED `predictedEmv` would make every legacy blob (which has no `predictedEmv` key)
+// fail validation → the WHOLE opportunity object is dropped on read. `.default(0)` lets the
+// legacy blob round-trip with predictedEmv=0 while the rest of `opportunity` survives.
+
+describe('P4 (C1) legacy opportunity blob (no predictedEmv) survives loadRecommendations', () => {
+  it('preserves value/components and back-fills predictedEmv=0 for a pre-P4 stored blob', () => {
+    const s = seedWorkspace({});
+    try {
+      // A pre-P4 opportunity blob: NO `predictedEmv` key (the field did not exist yet).
+      const legacyOpportunity = {
+        value: 72,
+        emvPerWeek: 1234.56,
+        roiPerEffortDay: 88.2,
+        confidence: 0.95,
+        calibration: 1.0,
+        groundedSpine: 'roiScore',
+        components: [
+          { dimension: 'demand', rawValue: 2400, normalized: 0.48, weight: 0.22, contribution: 0.106, evidence: '2,400 monthly searches' },
+        ],
+        calibrationVersion: 'platform-default',
+        modelVersion: 'ov-1',
+      };
+      const legacyRec = makeRec({
+        id: 'rec_legacy_pre_p4',
+        workspaceId: s.workspaceId,
+        // cast: deliberately store a blob shaped like a PRE-P4 OpportunityScore (no predictedEmv).
+        opportunity: legacyOpportunity as unknown as Recommendation['opportunity'],
+      });
+
+      // Write the pre-P4 blob straight into the recommendation_sets row (the actual stored shape).
+      db.prepare(
+        `INSERT INTO recommendation_sets (workspace_id, generated_at, recommendations, summary)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(workspace_id) DO UPDATE SET
+           generated_at = excluded.generated_at, recommendations = excluded.recommendations, summary = excluded.summary`,
+      ).run(
+        s.workspaceId,
+        new Date().toISOString(),
+        JSON.stringify([legacyRec]),
+        JSON.stringify({
+          fixNow: 1, fixSoon: 0, fixLater: 0, ongoing: 0, totalImpactScore: 72,
+          trafficAtRisk: 0, estimatedRecoverableClicks: 0, estimatedRecoverableImpressions: 0,
+          topRecommendationId: 'rec_legacy_pre_p4',
+        }),
+      );
+
+      const loaded = loadRecommendations(s.workspaceId);
+      expect(loaded).not.toBeNull();
+      const rec = loaded!.recommendations.find(r => r.id === 'rec_legacy_pre_p4');
+      expect(rec).toBeDefined();
+
+      // The WHOLE opportunity object must survive (not dropped to undefined by .catch).
+      expect(rec!.opportunity).toBeTruthy();
+      expect(rec!.opportunity!.value).toBe(72);
+      expect(rec!.opportunity!.emvPerWeek).toBe(1234.56);
+      expect(rec!.opportunity!.confidence).toBe(0.95);
+      expect(rec!.opportunity!.groundedSpine).toBe('roiScore');
+      expect(rec!.opportunity!.modelVersion).toBe('ov-1');
+      expect(rec!.opportunity!.components).toHaveLength(1);
+      expect(rec!.opportunity!.components[0].dimension).toBe('demand');
+      // predictedEmv back-fills to 0 (the .default) so the in-memory type stays `number`.
+      expect(rec!.opportunity!.predictedEmv).toBe(0);
+    } finally {
+      db.prepare('DELETE FROM recommendation_sets WHERE workspace_id = ?').run(s.workspaceId);
       s.cleanup();
     }
   });

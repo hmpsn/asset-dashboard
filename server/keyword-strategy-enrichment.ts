@@ -584,6 +584,12 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
           llmLabel: cg.priority === 'high' || cg.priority === 'medium' || cg.priority === 'low' ? cg.priority : null,
         });
         // OV value is 0..100 and EMV-derived; undefined when the gap had no signal at all.
+        // M2 (intentional re-compression): overwriting cg.opportunityScore with the OV `value`
+        // means the rec content_gap branch (recommendations.ts) re-feeds this OV value back as
+        // its `opportunityScore` composite spine into computeOpportunityValue — an f(f(x))
+        // re-compression vs the flag-OFF magnitude basis. This is deliberate and safe: the value
+        // stays in 0..100, ordering is preserved, and nothing breaks (the served tier/gain/badge
+        // all share the one OV basis — Contract 3). Flag-OFF keeps the single-pass legacy score.
         cg.opportunityScore = ov.value > 0 ? ov.value : computeOpportunityScore(cg);
       } else {
         cg.opportunityScore = computeOpportunityScore(cg);
