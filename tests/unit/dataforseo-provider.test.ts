@@ -35,7 +35,7 @@ process.env.DATAFORSEO_LOGIN = 'test-login';
 process.env.DATAFORSEO_PASSWORD = 'test-password';
 
 import fs from 'fs';
-import { DataForSeoProvider } from '../../server/providers/dataforseo-provider.js';
+import { DataForSeoProvider, flushCreditsToDisk } from '../../server/providers/dataforseo-provider.js';
 import { getCachedMetricsBatch, cacheMetricsBatch } from '../../server/keyword-metrics-cache.js';
 
 function mockFetchOnce(json: unknown): void {
@@ -371,7 +371,8 @@ describe('DataForSeoProvider — keyword difficulty endpoint', () => {
     const difficultyPayload = JSON.parse((fetchSpy.mock.calls[1][1] as RequestInit).body as string);
     expect(volumePayload[0].location_code).toBe(1022162);
     expect(difficultyPayload[0].location_code).toBe(1022162);
-    expect(getCachedMetricsBatch).toHaveBeenCalledWith(['teeth whitening'], '1022162', expect.any(Number));
+    // P1: cache region is versioned + language-aware (v2:<locationCode>:<lang>).
+    expect(getCachedMetricsBatch).toHaveBeenCalledWith(['teeth whitening'], 'v2:1022162:en', expect.any(Number));
   });
 
   it('uses keyword_difficulty from keyword_info in getRelatedKeywords', async () => {
@@ -391,6 +392,52 @@ describe('DataForSeoProvider — keyword difficulty endpoint', () => {
 
     const results = await provider.getRelatedKeywords('seo', 'ws-related', 5, 'us');
     expect(results[0].difficulty).toBe(61);
+  });
+
+  // ── P1 / G13: language threading at the pool-path sites ──
+  // Behavioral (fetch-body) assertions — NOT source-text sniffing. Each pool-path
+  // method must send the threaded language_code, not the hardcoded 'en'. A single
+  // fetch spy queued with all responses (no mid-test restore, so credit flushing
+  // is not disturbed); each sub-call's request body is read by call index.
+  it('threads the resolved language_code into pool-path provider requests (not hardcoded en)', async () => {
+    const provider = new DataForSeoProvider();
+    const empty = () => ({ ok: true, json: () => Promise.resolve(dfsTaskResponse([{ items: [] }])) } as Response);
+    const fetchSpy = vi.spyOn(global, 'fetch')
+      // getKeywordMetrics → search_volume + keyword_difficulty
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(dfsTaskResponse([{ keyword: 'k', search_volume: 100, competition_index: 10, cpc: 1, competition: 0.1, monthly_searches: [] }])) } as Response)
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(dfsTaskResponse([{ keyword: 'k', keyword_difficulty: 20 }])) } as Response)
+      .mockResolvedValueOnce(empty())  // getRelatedKeywords
+      .mockResolvedValueOnce(empty())  // getQuestionKeywords
+      .mockResolvedValueOnce(empty())  // getKeywordSuggestions
+      .mockResolvedValueOnce(empty())  // getKeywordIdeas
+      .mockResolvedValueOnce(empty()); // getKeywordsForSite
+
+    const langOf = (call: number) => JSON.parse((fetchSpy.mock.calls[call][1] as RequestInit).body as string)[0].language_code;
+
+    await provider.getKeywordMetrics(['k'], 'ws-de-1', 'us', 2276, 'de');
+    expect(langOf(0)).toBe('de');
+    expect(langOf(1)).toBe('de');
+    await provider.getRelatedKeywords('seo', 'ws-de-2', 5, 'us', 'de');
+    expect(langOf(2)).toBe('de');
+    await provider.getQuestionKeywords('seo', 'ws-de-3', 5, 'us', 'de');
+    expect(langOf(3)).toBe('de');
+    await provider.getKeywordSuggestions('seo', 'ws-de-4', 5, 'us', 'de');
+    expect(langOf(4)).toBe('de');
+    await provider.getKeywordIdeas(['seo'], 'ws-de-5', 5, 'us', 'de');
+    expect(langOf(5)).toBe('de');
+    await provider.getKeywordsForSite('example.com', 'ws-de-6', 5, 'us', 'de');
+    expect(langOf(6)).toBe('de');
+    // Drain queued credit writes now (fs ENOENT mock active) so they don't flush
+    // into a later test whose readFileSync mock returns a non-array cache value.
+    flushCreditsToDisk();
+  });
+
+  it('defaults pool-path language to en when no languageCode is passed', async () => {
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(dfsTaskResponse([{ items: [] }])) } as Response);
+    await provider.getRelatedKeywords('seo', 'ws-default-lang', 5, 'us');
+    const body = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string);
+    expect(body[0].language_code).toBe('en');
   });
 });
 
@@ -435,11 +482,14 @@ describe('DataForSeoProvider — L1 global SQLite cache', () => {
     const results = await provider.getKeywordMetrics(['legacy keyword'], 'ws-legacy-cache', 'us');
 
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(getCachedMetricsBatch).toHaveBeenNthCalledWith(1, ['legacy keyword'], '2840', expect.any(Number));
-    expect(getCachedMetricsBatch).toHaveBeenNthCalledWith(2, ['legacy keyword'], 'us', expect.any(Number));
+    // P1: primary lookup is the versioned/language-aware region; the legacy
+    // fallback now reads the pre-version language-blind geo region (2840) so an
+    // 'en' caller's already-warmed rows stay reachable.
+    expect(getCachedMetricsBatch).toHaveBeenNthCalledWith(1, ['legacy keyword'], 'v2:2840:en', expect.any(Number));
+    expect(getCachedMetricsBatch).toHaveBeenNthCalledWith(2, ['legacy keyword'], '2840', expect.any(Number));
     expect(cacheMetricsBatch).toHaveBeenCalledWith(
       expect.arrayContaining([expect.objectContaining({ keyword: 'legacy keyword', volume: 1200 })]),
-      '2840',
+      'v2:2840:en',
     );
     expect(results[0].volume).toBe(1200);
   });
@@ -471,7 +521,7 @@ describe('DataForSeoProvider — L1 global SQLite cache', () => {
     expect(global.fetch).toHaveBeenCalled();
     expect(cacheSpy).toHaveBeenCalledWith(
       expect.arrayContaining([expect.objectContaining({ keyword: 'l1-write-test-kw', volume: 5000 })]),
-      '2840'
+      'v2:2840:en'
     );
   });
 });

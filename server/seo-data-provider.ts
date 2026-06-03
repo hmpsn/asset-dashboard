@@ -109,12 +109,15 @@ export interface SeoDataProvider {
   init?(): Promise<void>;
 
   // Keyword Intelligence
-  getKeywordMetrics(keywords: string[], workspaceId: string, database?: string, locationCode?: number): Promise<KeywordMetrics[]>;
-  getRelatedKeywords(keyword: string, workspaceId: string, limit?: number, database?: string): Promise<RelatedKeyword[]>;
-  getQuestionKeywords(keyword: string, workspaceId: string, limit?: number, database?: string): Promise<QuestionKeyword[]>;
-  getKeywordIdeas?(keywords: string[], workspaceId: string, limit?: number, database?: string): Promise<KeywordSourceEvidence[]>;
-  getKeywordsForSite?(target: string, workspaceId: string, limit?: number, database?: string): Promise<KeywordSourceEvidence[]>;
-  getKeywordSuggestions?(keyword: string, workspaceId: string, limit?: number, database?: string): Promise<KeywordSourceEvidence[]>;
+  // `languageCode` (optional, defaults to 'en') threads the resolved workspace
+  // language into pool-path provider calls so non-English markets aren't queried
+  // in English (P1 / G13). Omitting it preserves the pre-P1 'en' behavior.
+  getKeywordMetrics(keywords: string[], workspaceId: string, database?: string, locationCode?: number, languageCode?: string): Promise<KeywordMetrics[]>;
+  getRelatedKeywords(keyword: string, workspaceId: string, limit?: number, database?: string, languageCode?: string): Promise<RelatedKeyword[]>;
+  getQuestionKeywords(keyword: string, workspaceId: string, limit?: number, database?: string, languageCode?: string): Promise<QuestionKeyword[]>;
+  getKeywordIdeas?(keywords: string[], workspaceId: string, limit?: number, database?: string, languageCode?: string): Promise<KeywordSourceEvidence[]>;
+  getKeywordsForSite?(target: string, workspaceId: string, limit?: number, database?: string, languageCode?: string): Promise<KeywordSourceEvidence[]>;
+  getKeywordSuggestions?(keyword: string, workspaceId: string, limit?: number, database?: string, languageCode?: string): Promise<KeywordSourceEvidence[]>;
   getKeywordsForKeywords?(keywords: string[], workspaceId: string, limit?: number, database?: string): Promise<KeywordSourceEvidence[]>;
 
   // Domain Analysis

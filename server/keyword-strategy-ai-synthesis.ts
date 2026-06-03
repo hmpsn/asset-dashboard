@@ -26,6 +26,8 @@ import { buildStrategyIntelligenceBlock, getPagesNeedingAnalysis, isStrategyQual
 import { buildOutcomeLearningStatusNote } from './outcome-learning-default-path.js';
 import { isStrategyPoolEligibleKeyword, normalizeKeyword, type KeywordEvaluationContext } from './keyword-intelligence/index.js';
 import { buildStrategyKeywordEvaluationContext } from './keyword-strategy-context.js';
+import { isFeatureEnabled } from './feature-flags.js';
+import { buildKeywordUniverse } from './keyword-strategy-universe.js';
 
 const log = createLogger('keyword-strategy:synthesis');
 
@@ -116,6 +118,12 @@ interface SynthesizeKeywordStrategyOptions {
   businessContext: string;
   strategyMode: 'full' | 'incremental';
   seoDataMode: 'quick' | 'full' | 'none';
+  /**
+   * Resolved live base URL — threaded so the flag-ON keyword-universe assembler
+   * can derive the site domain for `getKeywordsForSite` discovery. Optional;
+   * unused on the flag-OFF legacy path.
+   */
+  baseUrl?: string;
   competitorDomains: string[];
   pageInfo: KeywordStrategyPageInfo[];
   preloadedPageKeywords: ReturnType<typeof listPageKeywords> | null;
@@ -138,6 +146,12 @@ export interface SynthesizeKeywordStrategyResult {
   keywordEvaluationContext: KeywordEvaluationContext;
   upToDate?: boolean;
   freshPageCount?: number;
+  /**
+   * Candidates the flag-ON keyword-universe assembler removed via the branded +
+   * declined hard filters. Wired to `GenerationQuality.suppressedCount` on the
+   * flag-ON path; undefined (left as 0 by the telemetry emit) on the legacy path.
+   */
+  suppressedCount?: number;
 }
 
 export async function callKeywordStrategyAI(
@@ -400,6 +414,50 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
       })
     ).length;
 
+    // Declined set — needed by BOTH the flag-ON and flag-OFF pool paths and by
+    // downstream post-generation filters, so it is hoisted above the branch.
+    const declinedSet = new Set(declinedKeywords.map(k => normalizeKeyword(k)).filter(Boolean));
+
+    // ── DARK LAUNCH (P1): buildKeywordUniverse is the single pool builder ──
+    // Flag-ON folds the entire pool build (and the provider discovery fetch) into
+    // the shared assembler — one builder, geo + language threaded, MCP-seedable.
+    // Flag-OFF keeps the legacy block VERBATIM so it is byte-identical to today.
+    let suppressedUniverseCount = 0;
+    if (isFeatureEnabled('seo-generation-quality', ws.id)) {
+      // semrushByPath (per-page provider keyword lookup) is built here on both
+      // paths — the assembler owns the candidate POOL, not per-page assignment.
+      if (semrushDomainData.length > 0) {
+        for (const k of semrushDomainData) {
+          if (!isEligibleStrategyPoolKeyword({ keyword: k.keyword, volume: k.volume, difficulty: k.difficulty, source: provider?.name ?? 'seo-provider' })) continue;
+          const p = normalizePageUrl(k.url);
+          if (!semrushByPath.has(p)) semrushByPath.set(p, []);
+          semrushByPath.get(p)!.push(k);
+        }
+      }
+      const siteDomain = options.baseUrl ? (() => { try { return new URL(options.baseUrl).hostname; } catch { return ''; } })() : '';
+      const { pool: universePool, suppressedCount } = await buildKeywordUniverse(ws.id, {
+        provider,
+        seoDataMode,
+        siteDomain,
+        priorSiteKeywords: ws.keywordStrategy?.siteKeywords ?? [],
+        gscData,
+        domainKeywords: semrushDomainData,
+        competitorKeywords: competitorKeywordData,
+        keywordGaps,
+        discoveryKeywords,
+        relatedKeywords: relatedKws,
+        requestedKeywords,
+        declinedKeywords,
+        competitorDomains,
+        evaluationContext: strategyKeywordEvaluationContext,
+        sendProgress,
+      });
+      suppressedUniverseCount = suppressedCount;
+      for (const [kw, candidate] of universePool.entries()) {
+        keywordPool.set(kw, candidate);
+      }
+      log.info(`Keyword universe (flag-ON): ${keywordPool.size} unique terms (suppressed ${suppressedUniverseCount})`);
+    } else {
     if (semrushDomainData.length > 0) {
       // Group domain keywords by URL path for per-page matching
       for (const k of semrushDomainData) {
@@ -467,10 +525,14 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
     // Filter branded competitor keywords from the pool BEFORE feeding to AI
     const brandedRemoved = filterBrandedKeywords(keywordPool, competitorDomains);
     // Hard filter: remove declined keywords before the AI sees the pool (prompt instruction is soft)
-    const declinedSet = new Set(declinedKeywords.map(k => normalizeKeyword(k)).filter(Boolean));
     const declinedPoolRemoved = filterDeclinedFromPool(keywordPool, declinedKeywords);
     if (declinedPoolRemoved > 0) log.info(`Removed ${declinedPoolRemoved} declined keywords from keyword pool`);
     log.info(`Keyword pool: ${keywordPool.size} unique terms (${semrushDomainData.length} domain + ${competitorKeywordData.length} competitor + ${keywordGaps.length} gaps + ${discoveryKeywords.length} discovery + ${clientKeywordsAdded} client + GSC)${brandedRemoved > 0 ? ` — removed ${brandedRemoved} branded competitor keywords` : ''}`);
+    }
+    // Prompt-facing count of client-sourced keywords in the FINAL pool — derived
+    // from the canonical Map so it is correct on both the flag-ON and flag-OFF
+    // paths (the legacy `clientKeywordsAdded` counter is else-branch-local).
+    const clientKeywordsAdded = [...keywordPool.values()].filter(m => m.source === 'client').length;
     if (keywordPool.size > 0) {
       // Sort by volume descending and include ALL keywords
       const poolList = [...keywordPool.entries()]
@@ -1142,7 +1204,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
     }
     log.info(`Final strategy: ${strategy.pageMap?.length ?? 0} pages, ${strategy.siteKeywords?.length ?? 0} site keywords, ${strategy.contentGaps?.length ?? 0} content gaps, ${strategy.quickWins?.length ?? 0} quick wins`);
 
-  return { strategy, pagesToAnalyze, keywordPool, businessSection, keywordEvaluationContext: strategyKeywordEvaluationContext };
+  return { strategy, pagesToAnalyze, keywordPool, businessSection, keywordEvaluationContext: strategyKeywordEvaluationContext, suppressedCount: suppressedUniverseCount };
 }
 
 // ---------------------------------------------------------------------------

@@ -311,6 +311,17 @@ const stmts = createStmtCache(() => ({
   getPrimaryMarket: db.prepare(
     "SELECT * FROM local_seo_markets WHERE workspace_id = @workspaceId AND is_primary = 1 AND status = 'active' AND provider_location_code IS NOT NULL LIMIT 1",
   ),
+  // Most-recent snapshot language for the workspace's primary market. The markets
+  // table has no language column (language lives on snapshots), so the resolved
+  // language is the last language that market was actually queried in.
+  getPrimaryMarketLanguage: db.prepare(
+    `SELECT s.language_code AS language_code
+       FROM local_visibility_snapshots s
+       JOIN local_seo_markets m ON m.id = s.market_id
+      WHERE m.workspace_id = @workspaceId AND m.is_primary = 1 AND m.status = 'active'
+      ORDER BY s.captured_at DESC
+      LIMIT 1`,
+  ),
   clearPrimary: db.prepare(
     'UPDATE local_seo_markets SET is_primary = 0 WHERE workspace_id = @workspaceId',
   ),
@@ -586,6 +597,21 @@ export function getPrimaryMarketLocationCode(
 
 export function resolveWorkspaceLocationCode(workspaceId: string): number | null {
   return getPrimaryMarketLocationCode(workspaceId)?.locationCode ?? null;
+}
+
+/**
+ * Resolve the provider query language for a workspace's primary market.
+ *
+ * The `local_seo_markets` table has no language column — language lives on
+ * `local_visibility_snapshots` — so this returns the language the primary market
+ * was most recently queried in, falling back to `DEFAULT_LANGUAGE_CODE` ('en')
+ * when the workspace has no primary-market snapshot yet. Pool-path provider calls
+ * thread this so non-English markets are not queried in English (P1 / G13).
+ */
+export function resolveWorkspaceLanguageCode(workspaceId: string): string {
+  const row = stmts().getPrimaryMarketLanguage.get({ workspaceId }) as { language_code?: string } | undefined;
+  const lang = row?.language_code?.trim().toLowerCase();
+  return lang || DEFAULT_LANGUAGE_CODE;
 }
 
 export function setPrimaryMarket(workspaceId: string, marketId: string): void {
