@@ -6949,9 +6949,33 @@ Admins can set a market as primary from `LocalSeoMarketSetupDrawer`, and Keyword
 
 **Mutual:** Establishes the canonical pattern for surfacing local SEO data per CLAUDE.md Data Flow Rule #6: any new workspace data must surface through `server/intelligence/<name>-slice.ts`. Replaces ad-hoc direct reads of local-seo helpers with a single typed slice that respects the authority-layered-fields rule.
 
-**Boundaries:** No new public routes, no publishing, no live metadata writes, no schema writes, no GBP mutation, no provider calls during intelligence assembly. Slice reads only existing `local-seo.ts` helpers. The `LocalSeoKeywordCandidate` shape does not yet expose `marketId`, so per-market stratification falls back to flat score-sorted top-N until that lands — tracked as `TODO(local-seo-marketId-passthrough)` in the slice file.
+**Boundaries:** No new public routes, no publishing, no live metadata writes, no schema writes, no GBP mutation, no provider calls during intelligence assembly. Slice reads only existing `local-seo.ts` helpers. _(Update — SEO Gen-Quality P7.0)_ `LocalSeoKeywordCandidate` now carries `marketId` for market-scoped sources, so per-market stratification + selection are live; the prior `TODO(local-seo-marketId-passthrough)` is resolved (see the "SEO Gen-Quality P7.0" entry below).
 
 **Files:** `shared/types/intelligence.ts`; `server/intelligence/local-seo-slice.ts`; `server/workspace-intelligence.ts`; `server/intelligence/formatters.ts`; `server/admin-chat-context.ts`; `server/intelligence/generation-context-builders.ts`; `server/mcp/tools/intelligence.ts`; `tests/integration/intelligence-local-seo.test.ts`; `tests/integration/mcp-local-seo.test.ts`; `docs/rules/workspace-intelligence.md`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+## SEO Gen-Quality P7.0 — marketId passthrough onto local keyword candidates
+
+**What it does:** Threads a `marketId` onto local SEO keyword candidates so the `localSeo` intelligence slice can do per-market relevance instead of falling back to flat top-N. Resolves the long-standing `TODO(local-seo-marketId-passthrough)`. This is an always-on data-quality fix that rides the existing global `local-seo-visibility` flag — no new flag, no per-workspace umbrella gating. It is the standalone prerequisite for the P7 local-SEO track and starts none of the rest of P7 (no recs/universe/OV work).
+
+**Defect fixed:** Local keyword candidates were generated without a `marketId`, so the slice's per-market logic (`stratifiedSample`, `selectRelevantLocalCandidates`) fell back to flat top-N. A high-scoring market-A keyword could bleed into a market-B selection — documented as ~27.5% cross-market noise on multi-market workspaces (the Swish case).
+
+**Where marketId originates (per candidate source):**
+- **Market-scoped → carries the originating `marketId`:** `local_variant` candidates. City/state variants come from `localVariantKeywordsByMarket(base, markets)` (new market-tagged helper alongside the existing flat `localVariantKeywords`, which now delegates to it — signature unchanged so its unit tests are untouched), each attributed to the market whose city/state produced it. Intent-modifier variants (`emergency/best/... <service> <city>`) are attributed to the primary market (`markets[0]`) they are built against.
+- **Market-agnostic → carries `null`/undefined (never fabricated):** `explicit`, `strategy`, `tracking` (rank-tracking is workspace-scoped — `TrackedKeyword` has no marketId), `page_assignment`, `content_gap`, and the `"<base> near me"` variant (not tied to a single market).
+
+**Threading:** Added optional `marketId?: string | null` to `CandidateSourceSignal` and `LocalSeoKeywordCandidate` (`server/local-seo.ts`), populated only by the market-scoped emitters in `iterateLocalCandidateSignals` and carried through `upsertCandidate`. Added `marketId?: string | null` to the `LocalSeoSlice['candidates']` element type (`shared/types/intelligence.ts`) and stopped the slice map dropping it (`local-seo-slice.ts`).
+
+**Sampler changes (strict improvement, never a regression):**
+- `stratifiedSample` already bucketed by `marketId` when present — now that real marketId data flows in, multi-market workspaces get per-market prompt coverage (top N per active market) instead of one market crowding the others out. Falls back to flat score-sorted top-N only when no candidate carries a marketId or there are no active markets (single-market / market-agnostic data is unchanged).
+- `selectRelevantLocalCandidates` now scopes selection to the target's market: when the resolved target carries a `marketId`, candidates belonging to a different known market are excluded entirely; market-less (agnostic) candidates stay eligible. When the target itself is market-less, behavior is identical to the prior flat heuristic.
+
+**Regression test:** `tests/unit/local-seo-slice-assembly.test.ts` adds two describe blocks seeded with a Swish-like two-market fixture (Austin vs Houston, with the Houston candidates scored higher to prove the bleed). Asserts: (1) Houston candidates do NOT appear in an Austin-targeted selection and vice-versa; (2) the higher-scored cross-market candidate WOULD win with marketId stripped (proves the fix is load-bearing); (3) a market-less target behaves exactly as the prior flat heuristic; (4) `assembleLocalSeo`'s stratified prompt block surfaces BOTH markets even when one dominates by score. Pure unit test — no port needed.
+
+**Off / market-less behavior unchanged:** When `local-seo-visibility` is OFF (or no markets are configured), `assembleLocalSeo` early-returns the empty-but-valid baseline before any candidate work — confirmed unchanged. Market-less data falls through to the existing flat code paths.
+
+**Constraints honored:** Typed contract only (no `Record<string,unknown>`). Pure in-memory passthrough — no new provider calls, honoring `docs/rules/local-seo-visibility.md` (intelligence-boundary + provider-cost rules).
+
+**Files:** `server/local-seo.ts`; `server/intelligence/local-seo-slice.ts`; `shared/types/intelligence.ts`; `tests/unit/local-seo-slice-assembly.test.ts`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
 
 ## Local SEO Sprint I — Intent Classification, Competitor Tracking, Service Gap Detection
 

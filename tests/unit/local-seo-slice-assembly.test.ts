@@ -37,7 +37,7 @@ import * as clientLocationsModule from '../../server/client-locations.js';
 
 type Candidate = LocalSeoSlice['candidates'][number];
 
-function makeCandidate(keyword: string, score: number, marketId?: string): Candidate {
+function makeCandidate(keyword: string, score: number, marketId?: string | null): Candidate {
   return {
     keyword,
     source: 'test',
@@ -225,6 +225,145 @@ describe('selectRelevantLocalCandidates', () => {
 
     // twoOverlap's extra 100-point overlap bonus exceeds the 40-point score gap.
     expect(results[0].keyword).toBe('austin texas dental');
+  });
+});
+
+// ── P7.0 per-market regression: cross-market candidate noise ──────────────────
+//
+// Mirrors the documented Swish multi-market case (Austin vs Houston). Before the
+// marketId passthrough, market-scoped candidates dropped their marketId, so the
+// slice fell back to flat top-N and a high-scoring Austin keyword could bleed into
+// a Houston-targeted selection (~27.5% cross-market noise). These tests assert
+// that, once candidates carry marketId, market-A candidates do NOT appear in
+// market-B's selection (and vice-versa), while market-less candidates are
+// unaffected.
+
+describe('selectRelevantLocalCandidates — per-market scoping (P7.0)', () => {
+  const AUSTIN = 'market-austin';
+  const HOUSTON = 'market-houston';
+
+  // Two markets, each with its own local-variant candidates, plus a market-less
+  // (market-agnostic) candidate that should remain eligible to either market.
+  function swishLikeCandidates(): LocalSeoSlice['candidates'] {
+    return [
+      // Austin market candidates
+      makeCandidate('dental implants austin', 70, AUSTIN),
+      makeCandidate('emergency dentist austin', 65, AUSTIN),
+      // Houston market candidates — note: a Houston candidate scored HIGHER than
+      // the Austin target, so flat top-N would surface it for an Austin target.
+      makeCandidate('dental implants houston', 95, HOUSTON),
+      makeCandidate('emergency dentist houston', 90, HOUSTON),
+      // Market-agnostic candidate (e.g. tracking/strategy source, or `near me`).
+      makeCandidate('dental implants near me', 50, null),
+    ];
+  }
+
+  it('does NOT bleed market-A (Houston) candidates into a market-B (Austin) selection', () => {
+    const slice = makeSlice(swishLikeCandidates());
+
+    // Target exactly matches an Austin candidate → target resolves to AUSTIN market.
+    const results = selectRelevantLocalCandidates(slice, 'dental implants austin', 5);
+    const keywords = results.map(r => r.keyword);
+
+    // Austin candidates present.
+    expect(keywords).toContain('dental implants austin');
+    expect(keywords).toContain('emergency dentist austin');
+    // Houston candidates excluded entirely — even the higher-scored ones.
+    expect(keywords).not.toContain('dental implants houston');
+    expect(keywords).not.toContain('emergency dentist houston');
+    // Market-agnostic candidate stays eligible.
+    expect(keywords).toContain('dental implants near me');
+  });
+
+  it('does NOT bleed market-B (Austin) candidates into a market-A (Houston) selection', () => {
+    const slice = makeSlice(swishLikeCandidates());
+
+    const results = selectRelevantLocalCandidates(slice, 'dental implants houston', 5);
+    const keywords = results.map(r => r.keyword);
+
+    expect(keywords).toContain('dental implants houston');
+    expect(keywords).toContain('emergency dentist houston');
+    expect(keywords).not.toContain('dental implants austin');
+    expect(keywords).not.toContain('emergency dentist austin');
+    expect(keywords).toContain('dental implants near me');
+  });
+
+  it('without marketId passthrough the higher-scored cross-market candidate WOULD win (proves the fix is load-bearing)', () => {
+    // Same candidates but with marketId stripped — simulates the pre-fix state
+    // where the slice dropped marketId. The Houston candidate (score 95) now
+    // outranks the Austin target (score 70) because nothing scopes by market.
+    const stripped: LocalSeoSlice['candidates'] = swishLikeCandidates().map(c => ({
+      ...c,
+      marketId: undefined,
+    }));
+    const slice = makeSlice(stripped);
+
+    const results = selectRelevantLocalCandidates(slice, 'dental implants austin', 5);
+    const keywords = results.map(r => r.keyword);
+
+    // Pre-fix behavior: the Houston keyword bleeds in (token overlap + higher score).
+    expect(keywords).toContain('dental implants houston');
+  });
+
+  it('market-less target behaves exactly as the prior flat heuristic (no regression)', () => {
+    const slice = makeSlice(swishLikeCandidates());
+
+    // Target is the market-less candidate → targetMarketId is null → no scoping,
+    // so all candidates with token overlap remain eligible (flat behavior).
+    const results = selectRelevantLocalCandidates(slice, 'dental implants near me', 5);
+    const keywords = results.map(r => r.keyword);
+
+    // Both markets' "dental implants" candidates share tokens with the target and
+    // remain eligible — exactly the prior cross-market flat behavior.
+    expect(keywords).toContain('dental implants houston');
+    expect(keywords).toContain('dental implants austin');
+    expect(keywords).toContain('dental implants near me');
+  });
+});
+
+// ── P7.0 per-market regression: stratified prompt sampling ────────────────────
+//
+// stratifiedSample is internal to assembleLocalSeo (it feeds effectiveLocalSeoBlock).
+// We exercise it through assembleLocalSeo with a tight per-market cap so a
+// high-scoring market cannot crowd the other market out of the prompt block.
+
+describe('assembleLocalSeo — per-market stratified sampling (P7.0)', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(isFeatureEnabled).mockReturnValue(true);
+    vi.mocked(localSeoModule.listLocalSeoMarkets).mockReturnValue([]);
+    vi.mocked(localSeoModule.buildLocalSeoKeywordCandidates).mockReturnValue([]);
+    vi.mocked(localSeoModule.buildLocalSeoKeywordVisibilitySummaryByKey).mockReturnValue(new Map());
+    vi.mocked(localSeoModule.listLatestLocalVisibilitySnapshots).mockReturnValue([]);
+    vi.mocked(clientLocationsModule.getClientLocations).mockReturnValue([]);
+  });
+
+  it('surfaces both markets in the prompt block even when one market dominates by score', async () => {
+    vi.mocked(isFeatureEnabled).mockReturnValue(true);
+    vi.mocked(clientLocationsModule.getClientLocations).mockReturnValue([]);
+    vi.mocked(localSeoModule.listLocalSeoMarkets).mockReturnValue([
+      { id: 'market-austin', label: 'Austin, TX', status: 'active' as const, city: 'Austin', stateOrRegion: 'TX', country: 'US' } as any,
+      { id: 'market-houston', label: 'Houston, TX', status: 'active' as const, city: 'Houston', stateOrRegion: 'TX', country: 'US' } as any,
+    ]);
+    // Houston candidates all score higher than Austin's. With flat top-N and a
+    // small cap, Austin would be crowded out. Per-market stratification guarantees
+    // Austin coverage.
+    vi.mocked(localSeoModule.buildLocalSeoKeywordCandidates).mockReturnValue([
+      { keyword: 'dental implants houston', normalizedKeyword: 'dental implants houston', source: 'local_variant', sourceLabel: 'Local candidate', marketId: 'market-houston', score: 95, selected: false, reasons: [], intent: 'transactional' },
+      { keyword: 'emergency dentist houston', normalizedKeyword: 'emergency dentist houston', source: 'local_variant', sourceLabel: 'Local candidate', marketId: 'market-houston', score: 92, selected: false, reasons: [], intent: 'transactional' },
+      { keyword: 'dental implants austin', normalizedKeyword: 'dental implants austin', source: 'local_variant', sourceLabel: 'Local candidate', marketId: 'market-austin', score: 60, selected: false, reasons: [], intent: 'transactional' },
+      { keyword: 'emergency dentist austin', normalizedKeyword: 'emergency dentist austin', source: 'local_variant', sourceLabel: 'Local candidate', marketId: 'market-austin', score: 55, selected: false, reasons: [], intent: 'transactional' },
+    ] as any);
+
+    const result = await assembleLocalSeo('ws-stratified');
+    const block = result.effectiveLocalSeoBlock;
+
+    // Both markets' candidates appear in the sampled prompt block (annotated with
+    // their marketId by renderLocalSeoBlock).
+    expect(block).toContain('dental implants houston');
+    expect(block).toContain('dental implants austin');
+    expect(block).toContain('[market-austin]');
+    expect(block).toContain('[market-houston]');
   });
 });
 
