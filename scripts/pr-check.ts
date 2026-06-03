@@ -7230,8 +7230,9 @@ export const CHECKS: Check[] = [
       // public-content.ts and public-requests.ts use router.use() file-level
       // portal auth — Pass 1 detects that, so no exclude needed.
       'server/routes/reports.ts',
-      // recommendations.ts and stripe.ts have mixed auth coverage — individual
-      // unprotected routes are hatched with // public-no-auth-ok inline.
+      // stripe.ts has mixed auth coverage — individual unprotected routes are
+      // hatched with // public-no-auth-ok inline. (recommendations.ts is now
+      // fully gated with requireClientPortalAuth() — no inline hatches remain.)
     ],
     message:
       'New /api/public/<resource>/:workspaceId routes must call requireAuthenticatedClientPortalAuth() ' +
