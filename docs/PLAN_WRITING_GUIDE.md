@@ -18,6 +18,26 @@ Every plan goes through this sequence. The skills are:
 
 ---
 
+## Plans Are Contract + Test-Centric (read first)
+
+Plans specify **what** a task must achieve and **how it's verified** — not pre-written implementation. This **overrides** the generic `writing-plans` default of "complete implementation code in every step."
+
+**Lock in the plan:**
+- Contracts — function signatures, types, interfaces (the shape the task must produce or preserve)
+- Test cases as concrete assertions — the behavioral spec, written first
+- Constraints / gotchas — concurrency, transaction discipline, CI-coupled deletes, flag boundaries
+- File structure + ownership, the dependency graph, and the exact verification commands
+
+**Do NOT pre-bake in the plan:**
+- The implementation **body** — it is written at *execution* time by an agent that has READ the real current code and runs a real red→green loop.
+- (Exception: trivial one-line edits — dead-code deletes, key renames — may show the exact line.)
+
+**Why.** Implementation written at planning time has no execution feedback, so the TDD loop gets faked (test + impl authored together, "red" never genuinely observed) and the code ships unverified. It is also the project's #1 bug pattern — guessed field names that compile via `as any` but cause silent data loss (CLAUDE.md "read-before-write"). A plan full of concrete code *looks* authoritative, so the executor transcribes it with false confidence.
+
+**Execution discipline (state this in every plan).** For each task: (1) READ the real code; (2) write the failing test from the plan's assertions and RUN it, confirming it fails for the right reason; (3) implement minimally against the real signatures; (4) RUN the test (green) + typecheck; (5) commit. Never transcribe; never skip the red. If the real code contradicts a contract in the plan, STOP and report.
+
+---
+
 ## Step 1: Pre-Plan Audit (when required)
 
 Run the `pre-plan-audit` skill **before writing-plans** for:
