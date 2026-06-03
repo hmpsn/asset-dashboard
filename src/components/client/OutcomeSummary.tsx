@@ -22,6 +22,9 @@ const ACTION_TYPE_LABELS: Record<ActionType, string> = {
   internal_link_added: 'Internal link added',
   meta_updated: 'Meta update',
   voice_calibrated: 'Voice calibrated',
+  competitor_gap_closed: 'Keyword gap closed',
+  cluster_published: 'Topic cluster filled',
+  cannibalization_resolved: 'Cannibalization resolved',
 };
 
 function TrendIcon({ trend }: { trend: LearningsTrend }) {

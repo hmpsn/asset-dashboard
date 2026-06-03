@@ -37,6 +37,9 @@ const REC_TYPE_TAB: Record<RecType, string> = {
   content_refresh: 'seo-briefs',
   strategy: 'seo-strategy',
   aeo: 'seo-audit',
+  keyword_gap: 'seo-strategy',
+  topic_cluster: 'seo-strategy',
+  cannibalization: 'seo-audit',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────
@@ -90,6 +93,9 @@ const TYPE_ICONS: Record<RecType, typeof FileText> = {
   content_refresh: TrendingDown,
   strategy: Target,
   aeo: Sparkles,
+  keyword_gap: Target,
+  topic_cluster: Sparkles,
+  cannibalization: Wrench,
 };
 
 const IMPACT_BADGE: Record<string, { label: string; color: string; bg: string }> = {

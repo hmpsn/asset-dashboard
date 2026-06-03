@@ -342,6 +342,10 @@ export const recommendationSchema = z.object({
   type: z.enum([
     'technical', 'content', 'content_refresh', 'schema', 'metadata',
     'performance', 'accessibility', 'strategy', 'aeo',
+    // SEO Gen-Quality P5 — first-class orphan-subsystem rec types. MUST stay in lockstep
+    // with RecType (shared/types/recommendations.ts): a new RecType absent from this enum
+    // fails validation and is silently DROPPED on every reload (Schema vs stored shape rule).
+    'keyword_gap', 'topic_cluster', 'cannibalization',
   ]),
   title: z.string(),
   description: z.string(),

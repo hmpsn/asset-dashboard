@@ -11,7 +11,10 @@ export type ActionType =
   | 'content_refreshed'
   | 'internal_link_added'
   | 'meta_updated'
-  | 'voice_calibrated';
+  | 'voice_calibrated'
+  | 'competitor_gap_closed'
+  | 'cluster_published'
+  | 'cannibalization_resolved';
 
 export type Attribution =
   | 'platform_executed'

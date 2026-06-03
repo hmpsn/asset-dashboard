@@ -281,6 +281,24 @@ export async function assembleSeoContext(
     log.debug({ err, workspaceId }, 'assembleSeoContext: cannibalization issues optional, degrading gracefully');
   }
 
+  // Keyword gaps — keywords competitors rank for that we don't (SEO Gen-Quality P5).
+  try {
+    const { listKeywordGaps } = await import('../keyword-gaps.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+    const keywordGaps = listKeywordGaps(workspaceId);
+    if (keywordGaps.length > 0) base.keywordGaps = keywordGaps;
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleSeoContext: keyword gaps optional, degrading gracefully');
+  }
+
+  // Topic clusters — topical authority coverage per cluster (SEO Gen-Quality P5).
+  try {
+    const { listTopicClusters } = await import('../topic-clusters.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+    const topicClusters = listTopicClusters(workspaceId);
+    if (topicClusters.length > 0) base.topicClusters = topicClusters;
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleSeoContext: topic clusters optional, degrading gracefully');
+  }
+
   // Top opportunity — the resolved #1 recommendation's Opportunity Value breakdown (SI2/MW6).
   // Dynamic import avoids a static cycle (recommendations.ts → workspace-intelligence.ts →
   // seo-context-slice.ts). Carries emvPerWeek for the ADMIN advisor only; the client

@@ -243,6 +243,9 @@ const typeConfig: Record<string, { icon: typeof FileText; label: string }> = {
   performance: { icon: Zap, label: 'Performance' },
   accessibility: { icon: Shield, label: 'Accessibility' },
   strategy: { icon: Sparkles, label: 'Strategy Opportunities' },
+  keyword_gap: { icon: Lightbulb, label: 'Keyword Gaps' },
+  topic_cluster: { icon: Sparkles, label: 'Topical Authority' },
+  cannibalization: { icon: ArrowRightLeft, label: 'Keyword Cannibalization' },
 };
 
 /** Build FixCategories from server recommendation data */
