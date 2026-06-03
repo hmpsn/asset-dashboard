@@ -357,9 +357,13 @@ export async function buildKeywordUniverse(
   // ineligible-first duplicate (e.g. volume:0 first row) as seen and then drop a
   // later eligible duplicate the legacy fold admits — and would also defeat the
   // higher-volume tiebreak. (C2)
+  // P2(c): on the flag-ON assembler path, admit KD-0 long-tail (difficulty >= 0)
+  // behind the volume floor. `relaxConservatism` rides on the threaded eval context
+  // (true whenever the assembler runs, i.e. the flag is ON).
+  const relaxConservatism = evaluationContext.relaxConservatism ?? false;
   for (const dk of [...discoveryKeywords, ...fetchedDiscovery]) {
     const kw = normalizeKeyword(dk.keyword);
-    if (isStrategyQualityDiscoveryKeyword(dk) && eligible(dk)) {
+    if (isStrategyQualityDiscoveryKeyword(dk, relaxConservatism) && eligible(dk)) {
       if (upsertKeywordPoolCandidate(pool, kw, { volume: dk.volume, difficulty: dk.difficulty, source: `discovery:${dk.sourceKind}` })) {
         tag(kw, dk.sourceKind === 'keyword_suggestions' ? KEYWORD_CANDIDATE_SOURCE.QUESTION : KEYWORD_CANDIDATE_SOURCE.PROVIDER_DISCOVERY);
       }

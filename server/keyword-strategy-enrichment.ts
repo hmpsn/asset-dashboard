@@ -63,6 +63,13 @@ export interface EnrichKeywordStrategyOptions {
   competitorKeywords: CompetitorKeywordData[];
   provider: SeoDataProvider | null;
   seoDataMode: KeywordStrategySeoDataMode;
+  /**
+   * SEO Generation Quality P2 (flag `seo-generation-quality`, per-workspace).
+   * Computed once per generation and threaded in. On flag-ON the page-coverage
+   * prune uses token-subset containment instead of substring `.includes()`.
+   * Flag-OFF (default false) is byte-identical to today.
+   */
+  relaxConservatism?: boolean;
   sendProgress: (step: string, detail: string, progress: number) => void;
 }
 
@@ -71,6 +78,13 @@ export interface EnrichKeywordStrategyResult {
   siteKeywordMetrics: KeywordStrategySiteKeywordMetric[];
   topicClusters: KeywordStrategyTopicCluster[];
   cannibalization: KeywordStrategyCannibalizationIssue[];
+  /**
+   * Content gaps pruned by the page-coverage filter (`_removePageCoveredContentGaps`).
+   * Surfaced so the P2 deterministic backfill floor (in generation) can re-admit the
+   * highest-scoring pruned candidates when the kept list falls below the floor.
+   * Empty on flag-OFF behavior is unchanged; the array is always present (additive).
+   */
+  prunedContentGaps: StrategyContentGap[];
 }
 
 function normalizeTopicKeyword(value: string | undefined): string {
@@ -85,12 +99,32 @@ function hasMultiWordTopicSignal(keyword: string): boolean {
   return _hasMultiWordTopicSignal(keyword);
 }
 
+/**
+ * Token-subset containment: every token of `inner` appears (as a whole token) in
+ * `outer`. SEO Generation Quality P2(b): the flag-ON containment test, replacing
+ * the substring `.includes()` so "dental implants cost" is NOT eaten by a
+ * "/dental-implants" page signal (its `cost` token is absent). Both inputs are
+ * already topic-normalized whitespace-joined strings.
+ */
+function isTokenSubset(inner: string, outer: string): boolean {
+  const innerTokens = inner.split(' ').filter(Boolean);
+  if (innerTokens.length === 0) return false;
+  const outerTokens = new Set(outer.split(' ').filter(Boolean));
+  return innerTokens.every(token => outerTokens.has(token));
+}
+
 export function isTopicKeywordCoveredByPageMap(
   keyword: string,
   pageMap: StrategyPageMapEntry[] | undefined,
+  // P2(b): flag-ON → token-subset containment; flag-OFF → legacy substring .includes().
+  relaxConservatism = false,
 ): boolean {
   const normalizedKeyword = normalizeTopicKeyword(keyword);
   if (!normalizedKeyword || !pageMap?.length) return false;
+  // On flag-ON the multi-word signal still gates the weaker (title/slug) match, but
+  // the containment test itself is token-subset rather than substring.
+  const contains = (outer: string): boolean =>
+    relaxConservatism ? isTokenSubset(normalizedKeyword, outer) : outer.includes(normalizedKeyword);
 
   for (const page of pageMap) {
     const assignedKeywords = [
@@ -100,7 +134,7 @@ export function isTopicKeywordCoveredByPageMap(
 
     if (assignedKeywords.some(assigned =>
       assigned === normalizedKeyword
-      || (hasMultiWordTopicSignal(normalizedKeyword) && assigned.includes(normalizedKeyword))
+      || (hasMultiWordTopicSignal(normalizedKeyword) && contains(assigned))
     )) {
       return true;
     }
@@ -110,7 +144,7 @@ export function isTopicKeywordCoveredByPageMap(
     // without claiming broad one-word terms such as "dentist" are fully covered.
     if (hasMultiWordTopicSignal(normalizedKeyword)) {
       const pageSignal = normalizeTopicKeyword(`${page.pageTitle ?? ''} ${page.pagePath}`);
-      if (pageSignal.includes(normalizedKeyword)) return true;
+      if (contains(pageSignal)) return true;
     }
   }
 
@@ -120,12 +154,14 @@ export function isTopicKeywordCoveredByPageMap(
 export function _removePageCoveredContentGaps(
   contentGaps: StrategyContentGap[] | undefined,
   pageMap: StrategyPageMapEntry[] | undefined,
+  // P2(b): flag-ON → token-subset prune; flag-OFF (default) → byte-identical substring prune.
+  relaxConservatism = false,
 ): { kept: StrategyContentGap[]; removed: StrategyContentGap[] } {
   if (!contentGaps?.length) return { kept: [], removed: [] };
   const kept: StrategyContentGap[] = [];
   const removed: StrategyContentGap[] = [];
   for (const gap of contentGaps) {
-    if (isTopicKeywordCoveredByPageMap(gap.targetKeyword, pageMap)) {
+    if (isTopicKeywordCoveredByPageMap(gap.targetKeyword, pageMap, relaxConservatism)) {
       removed.push(gap);
     } else {
       kept.push(gap);
@@ -230,9 +266,12 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
     competitorKeywords,
     provider,
     seoDataMode,
+    relaxConservatism = false,
     sendProgress,
   } = options;
   const { gscData } = searchData;
+  // P2: pruned-by-page-coverage gaps, surfaced for the deterministic backfill floor.
+  let prunedContentGaps: StrategyContentGap[] = [];
 
   // Enrich pageMap with GSC metrics if available
   sendProgress('enrichment', 'Enriching strategy with ranking data...', 0.90);
@@ -499,13 +538,16 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
   }
 
   if (strategy.contentGaps?.length) {
-    const { kept, removed } = _removePageCoveredContentGaps(strategy.contentGaps, strategy.pageMap);
+    const { kept, removed } = _removePageCoveredContentGaps(strategy.contentGaps, strategy.pageMap, relaxConservatism);
     if (removed.length > 0) {
       log.info({
         workspaceId,
         removed: removed.map(gap => gap.targetKeyword),
       }, 'Removed content gaps already covered by strategy page map');
       strategy.contentGaps = kept;
+      // P2: retain the pruned gaps so the deterministic backfill floor can re-admit
+      // the highest-scoring ones when the kept list is below the floor (flag-ON).
+      prunedContentGaps = removed;
     }
   }
 
@@ -821,5 +863,6 @@ Rules:
     siteKeywordMetrics,
     topicClusters,
     cannibalization,
+    prunedContentGaps,
   };
 }

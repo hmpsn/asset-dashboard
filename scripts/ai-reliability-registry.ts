@@ -617,23 +617,24 @@ export const AI_QUALITY_FIXTURES: AiQualityFixture[] = [
     // SEO Generation Quality (Phase 0) — advisory acceptance bar (a): a sparse,
     // Faros-like provider-backed workspace must produce >= 6 content gaps. RED until
     // P1–P2 land (input-starvation fix + deterministic backfill floor). `soft` so it
-    // surfaces as a `verify:ai-quality` warning, never a hard CI failure. The forward
-    // token `CONTENT_GAP_SOFT_FLOOR` does not exist in the evidence yet, so the allOf
-    // fails today (RED); when P2 introduces the soft-floor constant + wires the bar into
-    // the eval test, this turns green. PROMOTE to severity:'hard' then.
+    // P2 PROMOTION soft→hard: the deterministic backfill floor
+    // (`backfillContentGapsToFloor` / `STRATEGY_CONTENT_GAP_FLOOR`, wired into
+    // server/keyword-strategy-generation.ts) now GUARANTEES contentGaps >= 6 when
+    // real candidates exist, and the contract test asserts it. Both forward tokens
+    // now exist in the evidence, so the allOf passes (GREEN) — flipped to hard.
     id: 'seo-gen-quality-sparse-content-gaps',
     pipelineId: 'content-brief-review',
-    title: 'Sparse workspace produces a populated content-gap set (>= 6) — advisory until P1–P2',
+    title: 'Sparse workspace produces a populated content-gap set (>= 6) — deterministic floor (P2)',
     dimension: 'evidence_grounding',
-    severity: 'soft',
+    severity: 'hard',
     evidenceFiles: [
       'tests/contract/seo-generation-quality-evals.test.ts',
       'server/keyword-strategy-generation.ts',
     ],
     assertions: [
-      { allOf: ['PROMOTE to hard-fail when P1', 'CONTENT_GAP_SOFT_FLOOR'] },
+      { allOf: ['backfillContentGapsToFloor', 'STRATEGY_CONTENT_GAP_FLOOR'] },
     ],
-    notes: 'Encodes the Faros-like sparse-workspace acceptance bar (contentGaps >= 6). RED at P0 (input starvation unresolved); promote to hard when buildKeywordUniverse (P1) + the deterministic backfill floor (P2) land.',
+    notes: 'Encodes the Faros-like sparse-workspace acceptance bar (contentGaps >= 6). GREEN at P2: the deterministic backfill floor guarantees it; promoted soft→hard.',
   },
   {
     // SEO Generation Quality (Phase 0) — advisory acceptance bar (b): a malformed AI

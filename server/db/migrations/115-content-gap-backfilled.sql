@@ -1,0 +1,23 @@
+-- 115-content-gap-backfilled.sql
+-- SEO Generation Quality P2 — `backfilled` honesty flag on content_gaps.
+--
+-- The P2 deterministic backfill floor (server/keyword-strategy-generation.ts)
+-- re-admits the highest-scoring pruned/penalized candidates when post-prune
+-- content gaps fall below the owner-approved soft floor of 6, so a sparse
+-- workspace can never silently ship "2 gaps". Each re-admitted gap is tagged
+-- `backfilled = 1` so the client renderer can sort it after organically-strong
+-- gaps and the recommendations_ready email can exclude it from the headline
+-- count (no inflated "12 recommendations").
+--
+-- Additive column, NOT itself feature-gated: it is always present (default 0).
+-- Only the WRITE of `backfilled = 1` is gated behind the per-workspace
+-- `seo-generation-quality` flag (P0). Flag-OFF every row keeps the default 0,
+-- so the column is byte-identical to a world without backfill.
+--
+-- DB column + mapper lockstep (CLAUDE.md): this migration ships in the SAME
+-- commit as ContentGapRow + rowToModel() + modelToParams() + the INSERT/ON
+-- CONFLICT column list (server/content-gaps.ts), the public field whitelist
+-- (server/routes/public-content.ts), the client ContentGap type
+-- (src/components/client/types.ts) and the renderer
+-- (StrategyContentOpportunitiesSection.tsx).
+ALTER TABLE content_gaps ADD COLUMN backfilled INTEGER NOT NULL DEFAULT 0 CHECK (backfilled IN (0, 1));

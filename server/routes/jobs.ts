@@ -30,6 +30,7 @@ import {
 import { APP_PASSWORD, signAdminToken } from '../middleware.js';
 import { requestUserCanAccessWorkspace, sendWorkspaceAccessDenied, workspaceOwnsWebflowSite } from '../auth.js';
 import { generateRecommendations, loadRecommendations, resolveRecommendationsForPageIds } from '../recommendations.js';
+import { listContentGaps } from '../content-gaps.js';
 import { getBrief } from '../content-brief.js';
 import {
   createContentPostGenerationJob,
@@ -242,8 +243,15 @@ router.post('/api/jobs', async (req, res) => {
                   const dashUrl = getClientPortalUrl(ws);
                   const recSet = loadRecommendations(ws.id);
                   const recs = recSet?.recommendations || [];
-                  if (recs.length > 0) {
-                    notifyClientRecommendationsReady({ clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: ws.id, recCount: recs.length, dashboardUrl: dashUrl });
+                  // SEO Generation Quality P2(f): de-pad the headline count. Each
+                  // deterministic-backfill content gap produces one content rec, so
+                  // exclude backfilled gaps from the emailed count — clients aren't
+                  // told "12 recommendations" padded with marginal backfill. Flag-OFF
+                  // has zero backfilled gaps, so the count is unchanged.
+                  const backfilledGapCount = listContentGaps(ws.id).filter(g => g.backfilled).length;
+                  const honestRecCount = Math.max(0, recs.length - backfilledGapCount);
+                  if (honestRecCount > 0) {
+                    notifyClientRecommendationsReady({ clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: ws.id, recCount: honestRecCount, dashboardUrl: dashUrl });
                   }
                 }
               } catch (recErr) {

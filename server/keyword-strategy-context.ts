@@ -17,6 +17,8 @@ interface KeywordEvaluationContext {
   rejectionReasons?: string[];
   backlinkProfile?: SeoContextSlice['backlinkProfile'];
   strictBusinessFit?: boolean;
+  /** SEO Generation Quality P2 — drops the business_mismatch hard-suppress escalation. */
+  relaxConservatism?: boolean;
   seedKeyword?: string;
   pageMap?: PageKeywordMap[];
 }
@@ -31,6 +33,12 @@ export interface BuildStrategyKeywordEvaluationContextOptions {
   requestedKeywords?: string[];
   approvedKeywords?: string[];
   strictBusinessFit?: boolean;
+  /**
+   * SEO Generation Quality P2 (flag `seo-generation-quality`, per-workspace).
+   * Computed ONCE per generation and threaded here; do NOT call isFeatureEnabled
+   * in the per-candidate hot loop. Flag-OFF (undefined/false) is byte-identical.
+   */
+  relaxConservatism?: boolean;
 }
 
 function compact(values: Array<string | undefined | null>): string[] {
@@ -58,5 +66,6 @@ export function buildStrategyKeywordEvaluationContext(
     rejectionReasons: options.clientSignals?.keywordFeedback.patterns.topRejectionReasons ?? [],
     backlinkProfile: options.seoContext?.backlinkProfile,
     strictBusinessFit: options.strictBusinessFit ?? false,
+    relaxConservatism: options.relaxConservatism ?? false,
   };
 }

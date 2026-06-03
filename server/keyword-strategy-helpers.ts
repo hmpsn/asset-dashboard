@@ -45,10 +45,26 @@ export function upsertKeywordPoolCandidate(
   return true;
 }
 
-export function isStrategyQualityDiscoveryKeyword(keyword: KeywordSourceEvidence): boolean {
-  return keyword.keyword.trim().length > 0
-    && keyword.volume > 0
-    && keyword.difficulty > 0;
+/**
+ * Volume floor for admitting a KD-0 (zero-difficulty) discovery long-tail keyword
+ * on the SEO Generation Quality P2 flag-ON path. Mirrors the existing
+ * `shouldIncludeKeywordCandidate` provider-volume threshold (>= 10) so a real
+ * low-competition long-tail survives but barely-measurable noise does not.
+ */
+export const STRATEGY_QUALITY_KD_ZERO_VOLUME_FLOOR = 10;
+
+/**
+ * @param relaxConservatism SEO Generation Quality P2(c) (flag `seo-generation-quality`).
+ *   Flag-OFF (default false): legacy gate `difficulty > 0` — byte-identical to today.
+ *   Flag-ON: `difficulty >= 0` so KD-0 long-tail survives, behind a volume floor
+ *   (`STRATEGY_QUALITY_KD_ZERO_VOLUME_FLOOR`) so real low-competition long-tail is kept.
+ */
+export function isStrategyQualityDiscoveryKeyword(keyword: KeywordSourceEvidence, relaxConservatism = false): boolean {
+  if (keyword.keyword.trim().length === 0 || keyword.volume <= 0) return false;
+  if (keyword.difficulty > 0) return true;
+  // difficulty === 0 (or negative, defensively): legacy path rejects; flag-ON admits
+  // when the keyword clears the volume floor.
+  return relaxConservatism && keyword.difficulty >= 0 && keyword.volume >= STRATEGY_QUALITY_KD_ZERO_VOLUME_FLOOR;
 }
 
 const PLANNER_GROUPED_VOLUME_FLOOR = 1_000_000;
@@ -89,6 +105,76 @@ export function computeOpportunityScore(cg: {
     cg.trendDirection === 'declining' ? 0.7 : 1.0;
   const raw = (vol * 0.45 + ease * 0.45 + gscBonus * 0.1) * trendMult;
   return Math.min(100, Math.round(raw * 100));
+}
+
+/**
+ * SEO Generation Quality P2 — owner-approved soft floor for the deterministic
+ * content-gap backfill. After pruning, when flag-ON and the kept gap count falls
+ * below this floor, the highest-scoring pruned/penalized candidates are re-admitted
+ * (ordered by score) and tagged `backfilled = true` until the floor is met. If
+ * fewer than this many real candidates exist, we admit what is available (never
+ * fabricate).
+ */
+export const STRATEGY_CONTENT_GAP_FLOOR = 6;
+
+/** Minimal candidate shape the backfill operates on (subset of StrategyContentGap/ContentGap). */
+export interface BackfillContentGapCandidate {
+  targetKeyword: string;
+  volume?: number;
+  difficulty?: number;
+  impressions?: number;
+  trendDirection?: string;
+  opportunityScore?: number;
+  backfilled?: boolean;
+}
+
+/**
+ * Deterministically re-admit pruned/penalized content-gap candidates so a sparse
+ * workspace can never silently ship below the soft floor (default 6). No AI.
+ *
+ * - `kept`: the content gaps that survived pruning (kept order/scores untouched).
+ * - `pruned`: candidates removed by the page-coverage prune, ordered here by their
+ *   computed opportunity score (highest first) and de-duplicated against kept +
+ *   against each other by normalized target keyword.
+ * - Re-admits the top candidates (tagged `backfilled: true`) until `floor` is met
+ *   or candidates run out — whichever comes first (admits what is available).
+ *
+ * Returns the combined list and how many were re-admitted; `floorHit` is true when
+ * any backfill occurred. The function is pure: callers gate it behind the flag.
+ */
+export function backfillContentGapsToFloor<T extends BackfillContentGapCandidate>(
+  kept: T[],
+  pruned: T[],
+  floor: number = STRATEGY_CONTENT_GAP_FLOOR,
+): { gaps: T[]; backfilledCount: number; floorHit: boolean } {
+  if (kept.length >= floor || pruned.length === 0) {
+    return { gaps: kept, backfilledCount: 0, floorHit: false };
+  }
+  const seen = new Set(kept.map(g => keywordComparisonKey(g.targetKeyword)).filter(Boolean));
+  const scored = pruned
+    .map(candidate => ({
+      candidate,
+      key: keywordComparisonKey(candidate.targetKeyword),
+      score: candidate.opportunityScore ?? computeOpportunityScore(candidate) ?? 0,
+    }))
+    .filter(entry => entry.key && !seen.has(entry.key))
+    // Highest score first; deterministic tiebreak on normalized keyword so the
+    // result is stable run-to-run (no Map/insertion-order dependence).
+    .sort((a, b) => b.score - a.score || a.key.localeCompare(b.key));
+
+  const need = floor - kept.length;
+  const admitted: T[] = [];
+  for (const entry of scored) {
+    if (admitted.length >= need) break;
+    if (seen.has(entry.key)) continue; // de-dup pruned-vs-pruned
+    seen.add(entry.key);
+    admitted.push({ ...entry.candidate, backfilled: true });
+  }
+  return {
+    gaps: [...kept, ...admitted],
+    backfilledCount: admitted.length,
+    floorHit: admitted.length > 0,
+  };
 }
 
 export const INCREMENTAL_THRESHOLD_DAYS = 7;

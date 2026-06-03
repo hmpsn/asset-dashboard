@@ -1,14 +1,14 @@
 /**
  * SEO Generation Quality — advisory eval fixtures (Phase 0).
  *
- * These two scenarios encode FUTURE acceptance bars for the keyword-strategy
- * generation pipeline. They are intentionally ADVISORY at P0: the acceptance
- * assertions are `it.todo` (logged, never executed → can never fail CI) until
- * the phase that implements them lands, at which point they are promoted to real
- * assertions. The matching soft fixtures in scripts/ai-reliability-registry.ts
- * (`seo-gen-quality-sparse-content-gaps`, `seo-gen-quality-malformed-ai-throws`)
- * are `severity: 'soft'` so a RED contract surfaces as an advisory warning in
- * `npm run verify:ai-quality`, never a hard CI failure.
+ * These scenarios encode acceptance bars for the keyword-strategy generation
+ * pipeline. As of P2, fixture (a) — "sparse workspace produces contentGaps >= 6" —
+ * is PROMOTED from an advisory `it.todo` to a HARD assertion, because the P2
+ * deterministic backfill floor now guarantees it. Fixture (b) — malformed-AI →
+ * throw — stays advisory (`it.todo`) until P3 lands the Zod-validated named ops.
+ * The matching soft fixture in scripts/ai-reliability-registry.ts
+ * (`seo-gen-quality-sparse-content-gaps`) is promoted soft→hard in lockstep; the
+ * malformed-AI soft fixture stays `severity: 'soft'` until P3.
  *
  * Why advisory at P0: per docs/rules/ai-quality-evals.md, hard quality fixtures
  * are reserved for authority/output-format/evidence-contract breaks; these encode
@@ -21,6 +21,11 @@
 import { describe, expect, it } from 'vitest';
 
 import type { GenerationQuality } from '../../shared/types/generation-quality.js';
+import {
+  backfillContentGapsToFloor,
+  STRATEGY_CONTENT_GAP_FLOOR,
+} from '../../server/keyword-strategy-helpers.js';
+import type { StrategyContentGap } from '../../server/keyword-strategy-ai-synthesis.js';
 
 describe('SEO generation-quality telemetry contract (P0, hard)', () => {
   // The telemetry shape generation emits today. poolSize + aiReturnedCount are
@@ -45,21 +50,38 @@ describe('SEO generation-quality telemetry contract (P0, hard)', () => {
   });
 });
 
-describe('SEO generation-quality acceptance bars (P0, advisory — RED until later phases)', () => {
-  // ── Fixture (a): Faros-like sparse workspace ───────────────────────────────
-  // ACCEPTANCE BAR: a sparse provider-backed workspace must produce at least
-  // SIX content gaps (contentGaps >= 6), not the "2 gaps" starvation symptom.
-  // RED today: input starvation (provider gating + whole-pool-US geo) is not yet
-  // fixed. This is the P1–P2 acceptance bar.
-  //
-  // TODO(P1–P2): PROMOTE to a hard assertion once buildKeywordUniverse (P1) +
-  // the un-suppress/deterministic-backfill-floor (P2) land. Seed a sparse
-  // provider-backed workspace, generate a strategy, and assert
-  // result.strategy.contentGaps.length >= 6 (the soft floor) and
-  // result.generationQuality.poolSize > 0.
-  it.todo(
-    'sparse Faros-like workspace produces contentGaps >= 6 (PROMOTE to hard-fail when P1–P2 land)',
-  );
+describe('SEO generation-quality acceptance bars', () => {
+  // ── Fixture (a): Faros-like sparse workspace — PROMOTED to a HARD assertion ──
+  // ACCEPTANCE BAR: a sparse workspace must produce at least SIX content gaps
+  // (contentGaps >= 6), not the "2 gaps" starvation symptom. P2's deterministic
+  // backfill floor (server/keyword-strategy-helpers.ts:backfillContentGapsToFloor,
+  // wired into generation) GUARANTEES this when >= 6 real candidates exist, so the
+  // P0 it.todo is now a real assertion. The end-to-end generation-path proof lives
+  // in tests/integration/seo-genquality-p2-backfill-floor-generation.test.ts
+  // (flag-ON fills to 6 + tags backfilled; flag-OFF stays at 2). This contract
+  // asserts the deterministic GUARANTEE directly (boot-free) on a Faros-like
+  // fixture of 2 organic + >= 6 prunable candidates.
+  it('sparse Faros-like workspace produces contentGaps >= 6 via the deterministic floor', () => {
+    const organic: StrategyContentGap[] = [
+      { targetKeyword: 'faros analytics platform', topic: 'Analytics platform', volume: 800, difficulty: 30, opportunityScore: 70 },
+      { targetKeyword: 'faros pricing', topic: 'Pricing', volume: 400, difficulty: 15, opportunityScore: 60 },
+    ];
+    const prunable: StrategyContentGap[] = [
+      { targetKeyword: 'faros ci insights', topic: 'CI insights', volume: 1500, difficulty: 25, opportunityScore: 75 },
+      { targetKeyword: 'faros deployment frequency', topic: 'Deployment frequency', volume: 900, difficulty: 20, opportunityScore: 65 },
+      { targetKeyword: 'faros dora metrics', topic: 'DORA metrics', volume: 1200, difficulty: 28, opportunityScore: 62 },
+      { targetKeyword: 'faros engineering benchmarks', topic: 'Benchmarks', volume: 600, difficulty: 22, opportunityScore: 55 },
+      { targetKeyword: 'faros lead time tracking', topic: 'Lead time', volume: 300, difficulty: 18, opportunityScore: 48 },
+      { targetKeyword: 'faros incident cost', topic: 'Incident cost', volume: 150, difficulty: 12, opportunityScore: 40 },
+    ];
+    const result = backfillContentGapsToFloor(organic, prunable, STRATEGY_CONTENT_GAP_FLOOR);
+    expect(result.gaps.length).toBeGreaterThanOrEqual(6);
+    expect(result.gaps.length).toBe(STRATEGY_CONTENT_GAP_FLOOR);
+    expect(result.floorHit).toBe(true);
+    // Organic gaps stay first + untagged; re-admitted gaps are tagged backfilled.
+    expect(result.gaps.slice(0, 2).every(g => !g.backfilled)).toBe(true); // every-ok: length === 6 asserted above
+    expect(result.gaps.slice(2).every(g => g.backfilled === true)).toBe(true); // every-ok: length === 6 asserted above
+  });
 
   // ── Fixture (b): malformed AI response ─────────────────────────────────────
   // ACCEPTANCE BAR: when the synthesis AI returns a malformed / unparseable

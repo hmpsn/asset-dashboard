@@ -28,6 +28,7 @@ import { listCannibalizationIssues } from './cannibalization-issues.js';
 import { normalizePageUrl } from './helpers.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 import { isFeatureEnabled } from './feature-flags.js';
+import { backfillContentGapsToFloor, STRATEGY_CONTENT_GAP_FLOOR } from './keyword-strategy-helpers.js';
 import type { GenerationQuality } from '../shared/types/generation-quality.js';
 
 // Re-exported for backward compatibility with existing callers.
@@ -382,10 +383,17 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       throw new KeywordStrategyGenerationError(500, { error: 'Strategy generation produced no valid page keyword assignments' });
     }
 
+    // SEO Generation Quality P2 (flag `seo-generation-quality`, per-workspace):
+    // compute ONCE here and thread the boolean into enrichment (token-subset prune)
+    // and the deterministic backfill floor below. Do NOT scatter isFeatureEnabled
+    // into hot loops. Flag-OFF (false) keeps pruning/backfill byte-identical.
+    const relaxConservatism = isFeatureEnabled('seo-generation-quality', ws.id);
+
     let {
       siteKeywordMetrics,
       topicClusters,
       cannibalization,
+      prunedContentGaps,
     } = await enrichKeywordStrategy({
       workspaceId: ws.id,
       baseUrl,
@@ -407,6 +415,7 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       competitorKeywords: competitorKeywordData,
       provider,
       seoDataMode,
+      relaxConservatism,
       sendProgress,
     });
 
@@ -443,6 +452,31 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       keywordPool,
       evaluationContext: keywordEvaluationContext,
     });
+
+    // ── SEO Generation Quality P2(d): deterministic backfill floor ──
+    // After pruning, if flag-ON and the kept content-gap count is below the soft
+    // floor (6), re-admit the highest-scoring pruned candidates (ordered by score)
+    // tagged `backfilled = true` until the floor is met. Deterministic — no AI; if
+    // fewer than 6 real candidates exist, admit what is available (never fabricate).
+    // Flag-OFF: skipped entirely → byte-identical (no backfill, no tags).
+    // Count gaps the AI/enrichment produced (post-filter) BEFORE the backfill so the
+    // telemetry's aiReturnedCount stays honest (backfilledCount is tracked separately).
+    const aiReturnedContentGapCount = strategy.contentGaps?.length ?? 0;
+    let backfilledCount = 0;
+    let floorHit = false;
+    if (relaxConservatism && (strategy.contentGaps?.length ?? 0) < STRATEGY_CONTENT_GAP_FLOOR && prunedContentGaps.length > 0) {
+      const result = backfillContentGapsToFloor(
+        strategy.contentGaps ?? [],
+        prunedContentGaps,
+        STRATEGY_CONTENT_GAP_FLOOR,
+      );
+      strategy.contentGaps = result.gaps;
+      backfilledCount = result.backfilledCount;
+      floorHit = result.floorHit;
+      if (backfilledCount > 0) {
+        log.info({ workspaceId: ws.id, backfilledCount, floor: STRATEGY_CONTENT_GAP_FLOOR, total: strategy.contentGaps.length }, 'Deterministic content-gap backfill floor applied');
+      }
+    }
 
     if (strategyMode === 'incremental') {
       const finalPagePaths = new Set((strategy.pageMap ?? []).map(page => normalizePageUrl(page.pagePath)));
@@ -504,12 +538,14 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       // poolSize reflects the real universe on the flag-ON path (keywordPool is
       // populated from buildKeywordUniverse) and the legacy pool on flag-OFF.
       poolSize: keywordPool.size,
-      aiReturnedCount: strategy.contentGaps?.length ?? 0,
+      aiReturnedCount: aiReturnedContentGapCount,
       // suppressedCount is wired from the assembler on the flag-ON path (branded +
-      // declined hard-filter removals); 0 on the legacy path. Backfill fields are P2.
+      // declined hard-filter removals); 0 on the legacy path.
       suppressedCount: synthesis.suppressedCount ?? 0,
-      backfilledCount: 0,
-      floorHit: false,
+      // backfilledCount + floorHit reflect the P2 deterministic backfill floor.
+      // Both stay 0/false on flag-OFF (the backfill block is skipped entirely).
+      backfilledCount,
+      floorHit,
     };
     log.info({ generationQuality }, 'keyword-strategy/generation-quality');
 
