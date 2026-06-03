@@ -7855,6 +7855,80 @@ export const CHECKS: Check[] = [
     },
   },
 
+  {
+    // ── tracked_keywords bare read→write outside withTrackedKeywordsTxn ──
+    //
+    // The tracked_keywords JSON blob is mutated via a read→mutate→write sequence.
+    // Every writer MUST go through withTrackedKeywordsTxn (BEGIN IMMEDIATE) to
+    // prevent the lost-update race: two concurrent writers both reading the same
+    // blob, mutating independently, and last-write-wins silently dropping keywords.
+    //
+    // The old (broken) pattern was:
+    //   const config = readConfig(workspaceId);      // bare read
+    //   config.trackedKeywords = ...;
+    //   writeConfig(workspaceId, config);             // bare write — no serialisation
+    //
+    // The correct pattern routes through withTrackedKeywordsTxn (or updateTrackedKeywords
+    // which delegates to it). Direct readConfig() + writeConfig() calls in the same
+    // function outside withTrackedKeywordsTxn are a race condition.
+    //
+    // Files authorised for internal implementation (they ARE the lock boundary):
+    //   server/rank-tracking.ts — defines withTrackedKeywordsTxn itself
+    //
+    // Escape hatch: `// tracked-keywords-txn-ok` on the flagged line or the line above.
+    name: 'tracked_keywords bare read→write outside withTrackedKeywordsTxn',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/rank-tracking.ts', 'server/db/migrations'],
+    excludeLines: ['// tracked-keywords-txn-ok'],
+    message:
+      'Direct readConfig() + writeConfig() calls for tracked_keywords must be ' +
+      'wrapped in withTrackedKeywordsTxn() (BEGIN IMMEDIATE) to prevent the ' +
+      'lost-update race where concurrent writers silently drop keywords. ' +
+      'Use withTrackedKeywordsTxn() or updateTrackedKeywords() instead. ' +
+      'Add // tracked-keywords-txn-ok if this is an intentional raw access.',
+    severity: 'error',
+    rationale:
+      'Two concurrent tracked_keywords writers both read the same JSON blob, ' +
+      'mutate independently, and last-write-wins silently drops the other writer\'s keywords. ' +
+      'BEGIN IMMEDIATE serialises the read+write so each writer sees the previous writer\'s result.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Detect direct readConfig() followed by writeConfig() in the same function,
+      // outside of withTrackedKeywordsTxn. This is the exact pattern that causes
+      // the lost-update race.
+      const readConfigRe = /\breadConfig\s*\(/;
+      const writeConfigRe = /\bwriteConfig\s*\(/;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (file.includes('/server/rank-tracking.ts')) continue;
+        if (file.includes('/server/db/migrations/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        if (!readConfigRe.test(content) && !writeConfigRe.test(content)) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!readConfigRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// tracked-keywords-txn-ok')) continue;
+          // Look for a writeConfig() within the next 30 lines in the same function
+          const lookaheadEnd = Math.min(lines.length, i + 30);
+          for (let j = i + 1; j < lookaheadEnd; j++) {
+            if (FUNC_BOUNDARY_RE.test(lines[j])) break; // different function
+            if (writeConfigRe.test(lines[j])) {
+              if (!hasHatch(lines, i, '// tracked-keywords-txn-ok') && !hasHatch(lines, j, '// tracked-keywords-txn-ok')) {
+                hits.push({ file, line: i + 1, text: lines[i].trim() });
+              }
+              break;
+            }
+          }
+        }
+      }
+      return hits;
+    },
+  },
+
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
