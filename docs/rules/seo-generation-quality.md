@@ -126,6 +126,35 @@ leave two builders.
   (DataForSEO defaults `2840`/US/`'en'` when omitted).
 - `src/components/KeywordStrategy.tsx` — the `quick`/`full` toggle becomes a credit-depth cap.
 
+## Contract 5 — the `content_gaps.backfilled` honesty flag (P2)
+
+**Producer (P2):** the deterministic backfill floor in `server/keyword-strategy-generation.ts`
+(`backfillContentGapsToFloor`, `STRATEGY_CONTENT_GAP_FLOOR = 6`) tags re-admitted pruned gaps
+`backfilled = true`. Gated behind `isFeatureEnabled('seo-generation-quality', ws.id)` (threaded
+once as `relaxConservatism`). The column is additive (default `0`) and NOT itself gated — only
+the WRITE of `1` is. It distinguishes deterministic backfill from organically-strong gaps so the
+client renderer can sort/label honestly and the email count is not padded.
+
+**Full reader chain (DB column + mapper lockstep — all must move in lockstep; the column is a
+real `content_gaps` table since #365, NOT a JSON blob):**
+- `server/db/migrations/115-content-gap-backfilled.sql` — `ALTER TABLE … ADD COLUMN backfilled`.
+- `server/content-gaps.ts` — `ContentGapRow.backfilled`, `rowToModel()` + `modelToParams()`,
+  and the `INSERT … ON CONFLICT` column list (a mapper or INSERT that ignores it silently drops
+  the flag — TypeScript will not catch it).
+- `server/routes/public-content.ts` — the **explicit public field whitelist** on
+  `GET /api/public/seo-strategy/:id` (an unlisted field is silently dropped on the client read
+  path; this is the spot a §5.1 public-read test must cover).
+- `src/components/client/types.ts` — the client `ContentGap` type.
+- `src/components/client/strategy/StrategyContentOpportunitiesSection.tsx` — the sort (backfilled
+  gaps after organically-strong ones) + the subtle "Expanded pick" affordance (zinc, never purple).
+- `server/routes/jobs.ts` — the `recommendations_ready` email count subtracts backfilled gaps so
+  the headline is honest (a backfilled gap produces one content rec).
+- `shared/types/generation-quality.ts` — `backfilledCount` + `floorHit` telemetry, populated from
+  the real run (0/false on flag-OFF).
+
+`contentGaps` are deleted from the legacy `keywordStrategy` JSON blob in persistence (normalized
+to the table at #365), so `keywordStrategySchema` needs **no** `.optional()` change for `backfilled`.
+
 ---
 
 ## New rec types / sources (P5 — orphaned-subsystem wiring)

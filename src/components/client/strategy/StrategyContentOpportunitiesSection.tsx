@@ -125,6 +125,12 @@ function ContentGapCard({
           {gap.opportunityScore != null && (
             <Badge label={`${gap.opportunityScore}/100`} tone="blue" shape="pill" className="ml-2" />
           )}
+          {gap.backfilled && (
+            // SEO Generation Quality P2: subtle, honest affordance for a
+            // deterministic-floor "expanded" pick (neutral zinc — never purple in
+            // client views). Distinguishes it from organically-strong ideas.
+            <Badge label="Expanded pick" tone="zinc" variant="outline" shape="pill" className="ml-2" />
+          )}
         </span>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {gap.intent && (
@@ -349,7 +355,12 @@ export function StrategyContentOpportunitiesSection({
                   </div>
                   <div className="space-y-2">
                     {[...strategyData.contentGaps]
-                      .sort((a, b) => (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0))
+                      // SEO Generation Quality P2: organically-surfaced gaps sort by
+                      // opportunity score; backfilled (deterministic-floor) gaps sort
+                      // strictly after them so the strongest ideas stay on top.
+                      .sort((a, b) =>
+                        (a.backfilled ? 1 : 0) - (b.backfilled ? 1 : 0)
+                        || (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0))
                       .slice(0, expandedSections.has('new-content-gaps-all') ? undefined : 6)
                       .map((gap, i) => (
                         <ContentGapCard

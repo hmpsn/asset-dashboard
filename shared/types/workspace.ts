@@ -95,6 +95,14 @@ export interface ContentGap {
   serpTargeting?: string[];
   // Composite opportunity score (0–100): volume × ease × GSC signal × trend
   opportunityScore?: number;
+  /**
+   * SEO Generation Quality P2 — true when this gap was re-admitted by the
+   * deterministic backfill floor (post-prune gaps < 6) rather than organically
+   * surfaced. Persisted in the `content_gaps` table (migration 115). Used to
+   * sort backfilled gaps after organically-strong ones and to keep the
+   * recommendations_ready email count honest. Defaults to false/absent.
+   */
+  backfilled?: boolean;
 }
 
 export interface QuickWin {

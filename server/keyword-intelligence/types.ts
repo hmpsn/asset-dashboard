@@ -50,6 +50,15 @@ export interface KeywordEvaluationContext extends KeywordBusinessContext {
   rejectionReasons?: string[];
   backlinkProfile?: SeoContextSlice['backlinkProfile'];
   strictBusinessFit?: boolean;
+  /**
+   * SEO Generation Quality P2 (flag `seo-generation-quality`, per-workspace).
+   * When true, the `business_mismatch` hard-suppress escalation in
+   * `isStrategyPoolEligibleKeyword` is dropped: the `-18` penalty still applies
+   * (narrow-but-real keywords sink in ranking) but they are no longer KILLED,
+   * so synonyms survive into ranking. Token-overlap scoring is unchanged (that's
+   * P6). Defaults to undefined/false → flag-OFF is byte-identical to today.
+   */
+  relaxConservatism?: boolean;
 }
 
 export interface KeywordEvaluationResult {

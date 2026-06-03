@@ -1379,6 +1379,10 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           actionType: 'content_creation',
           status: 'pending',
           assignedTo,
+          // Carry the gap's deterministic-backfill provenance onto the rec (only when
+          // true, so flag-OFF recs are byte-identical) — lets the headline count / email
+          // exclude marginal backfill without a fragile rec→gap key remap.
+          ...(cg.backfilled ? { backfilled: true as const } : {}),
           createdAt: now,
           updatedAt: now,
         });

@@ -75,6 +75,8 @@ export interface StrategyContentGap {
   serpTargeting?: string[];
   questionKeywords?: string[];
   opportunityScore?: number;
+  /** SEO Generation Quality P2 — re-admitted by the deterministic backfill floor. */
+  backfilled?: boolean;
 }
 
 export interface StrategyQuickWin {
@@ -315,6 +317,11 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
       }
     }
 
+    // SEO Generation Quality P2 (flag `seo-generation-quality`, per-workspace):
+    // compute ONCE here and thread the boolean everywhere (eval context, pool
+    // build, backfill). Do NOT scatter isFeatureEnabled into the per-candidate hot
+    // loop. Flag-OFF (false) keeps every downstream path byte-identical to today.
+    const seoGenQualityEnabled = isFeatureEnabled('seo-generation-quality', ws.id);
     const strategyKeywordEvaluationContext = buildStrategyKeywordEvaluationContext({
       workspaceId: ws.id,
       workspaceName: ws.name,
@@ -325,6 +332,9 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
       requestedKeywords,
       approvedKeywords,
       strictBusinessFit: true,
+      // P2(a): on flag-ON, drop the business_mismatch hard-suppress escalation so
+      // narrow-but-real keywords survive into ranking (penalty stays).
+      relaxConservatism: seoGenQualityEnabled,
     });
 
     let strategy: StrategyOutput = {};
@@ -432,7 +442,7 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
     // Flag-ON folds the entire pool build (and the provider discovery fetch) into
     // the shared assembler — one builder, geo + language threaded, MCP-seedable.
     // Flag-OFF keeps the legacy block VERBATIM so it is byte-identical to today.
-    const seoGenQualityEnabled = isFeatureEnabled('seo-generation-quality', ws.id);
+    // (`seoGenQualityEnabled` is computed once above, before the eval context.)
     let suppressedUniverseCount = 0;
     // Prompt-facing count of client-sourced keywords. (M1) On the flag-OFF path
     // this MUST keep the exact pre-filter increment semantics of origin/staging
