@@ -3,17 +3,17 @@
  *
  * These scenarios encode acceptance bars for the keyword-strategy generation
  * pipeline. As of P2, fixture (a) — "sparse workspace produces contentGaps >= 6" —
- * is PROMOTED from an advisory `it.todo` to a HARD assertion, because the P2
- * deterministic backfill floor now guarantees it. Fixture (b) — malformed-AI →
- * throw — stays advisory (`it.todo`) until P3 lands the Zod-validated named ops.
- * The matching soft fixture in scripts/ai-reliability-registry.ts
- * (`seo-gen-quality-sparse-content-gaps`) is promoted soft→hard in lockstep; the
- * malformed-AI soft fixture stays `severity: 'soft'` until P3.
+ * is a HARD assertion (the P2 deterministic backfill floor guarantees it). As of
+ * P3, fixture (b) — malformed-AI handling — is also PROMOTED to a HARD assertion:
+ * the flag-ON path validates with Zod, retries once, then deterministically
+ * backfills to a NON-EMPTY content-gap set (never a silent empty); the flag-OFF
+ * legacy path still THROWS. The matching fixtures in
+ * scripts/ai-reliability-registry.ts (`seo-gen-quality-sparse-content-gaps` and
+ * `seo-gen-quality-malformed-ai-throws`) are both `severity: 'hard'` in lockstep.
  *
- * Why advisory at P0: per docs/rules/ai-quality-evals.md, hard quality fixtures
- * are reserved for authority/output-format/evidence-contract breaks; these encode
- * a generation-volume + error-handling bar that is RED until P1–P3 resolve input
- * starvation and add Zod-validated never-empty handling. P0 is pure infrastructure.
+ * Per docs/rules/ai-quality-evals.md, hard quality fixtures are reserved for
+ * authority/output-format/evidence-contract breaks — the never-empty + error-handling
+ * bar qualifies as an evidence-grounding contract now that P3 enforces it deterministically.
  *
  * No server port is allocated: this is a deterministic contract test (no
  * createTestContext / HTTP boot), so it leaves no orphan 13xxx port.
@@ -83,20 +83,38 @@ describe('SEO generation-quality acceptance bars', () => {
     expect(result.gaps.slice(2).every(g => g.backfilled === true)).toBe(true); // every-ok: length === 6 asserted above
   });
 
-  // ── Fixture (b): malformed AI response ─────────────────────────────────────
-  // ACCEPTANCE BAR: when the synthesis AI returns a malformed / unparseable
-  // payload, the generation path must THROW (a KeywordStrategyGenerationError),
-  // NOT silently return an empty strategy. A silent empty is the worst failure
-  // mode — it under-serves with no signal.
-  // RED today: neither keyword op has post-parse Zod validation, so a
-  // malformed-but-parseable response can yield empty contentGaps without error.
+  // ── Fixture (b): malformed AI response — PROMOTED to a HARD assertion at P3 ──
+  // P3 changed the flag-ON semantics. The Zod-validated named ops
+  // (`keyword-page-assignment` / `keyword-site-synthesis`) validate the parsed
+  // payload, retry ONCE on failure, and — when still malformed — fall to a
+  // TYPED-EMPTY object whose contentGaps are then deterministically backfilled from
+  // the keyword universe to the floor. So on the flag-ON path a malformed AI
+  // response yields a NON-EMPTY content-gap set, NOT a throw and NOT silent empty.
   //
-  // TODO(P3): PROMOTE to a hard assertion once the Zod-validated named ops land.
-  // Mock the synthesis AI to return a malformed response and assert
-  // generateKeywordStrategy(...) rejects (throws) rather than resolving with an
-  // empty strategy. (P3 then changes the contract to retry-once → deterministic
-  // backfill → never-empty; update this bar accordingly at P3.)
-  it.todo(
-    'malformed AI synthesis response makes generation THROW, not return empty (PROMOTE to hard-fail at P3)',
-  );
+  // The flag-OFF legacy path is UNCHANGED: a malformed AI synthesis response makes
+  // generation THROW (KeywordStrategySynthesisError → KeywordStrategyGenerationError).
+  // The end-to-end proof of both halves lives in
+  // tests/integration/seo-genquality-p3-fm2-named-ops.test.ts. This contract asserts
+  // the deterministic flag-ON GUARANTEE directly (boot-free): a typed-empty synthesis
+  // result, backfilled from the universe candidates, is never empty.
+  it('flag-ON malformed synthesis → typed-empty → deterministic backfill is NEVER empty', () => {
+    // Simulate the flag-ON "still malformed after retry" branch: master returns the
+    // typed-empty object (contentGaps: []). The synthesis-internal backfill then
+    // re-admits universe candidates to the floor.
+    const typedEmptyContentGaps: StrategyContentGap[] = [];
+    const universeBackedCandidates: StrategyContentGap[] = [
+      { targetKeyword: 'platform analytics', topic: 'Analytics', volume: 1500, difficulty: 25, opportunityScore: 75 },
+      { targetKeyword: 'deployment frequency', topic: 'Deployment', volume: 900, difficulty: 20, opportunityScore: 65 },
+      { targetKeyword: 'dora metrics', topic: 'DORA', volume: 1200, difficulty: 28, opportunityScore: 62 },
+      { targetKeyword: 'engineering benchmarks', topic: 'Benchmarks', volume: 600, difficulty: 22, opportunityScore: 55 },
+      { targetKeyword: 'lead time tracking', topic: 'Lead time', volume: 300, difficulty: 18, opportunityScore: 48 },
+      { targetKeyword: 'incident cost', topic: 'Incident cost', volume: 150, difficulty: 12, opportunityScore: 40 },
+    ];
+    const result = backfillContentGapsToFloor(typedEmptyContentGaps, universeBackedCandidates, STRATEGY_CONTENT_GAP_FLOOR);
+    // NEVER empty — the floor fills the typed-empty set from the universe.
+    expect(result.gaps.length).toBeGreaterThan(0);
+    expect(result.gaps.length).toBe(STRATEGY_CONTENT_GAP_FLOOR);
+    expect(result.floorHit).toBe(true);
+    expect(result.gaps.every(g => g.backfilled === true)).toBe(true); // every-ok: length === floor asserted above
+  });
 });

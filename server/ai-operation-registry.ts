@@ -193,6 +193,56 @@ export const AI_OPERATION_REGISTRY = {
     defaultTimeoutMs: 90_000,
     defaultResearchMode: false,
   },
+  'keyword-page-assignment': {
+    id: 'keyword-page-assignment',
+    domain: 'analytics-intelligence',
+    feature: 'keyword-page-assignment',
+    providerIntent: 'openai',
+    // SEO Generation Quality P3 — closed-set page→keyword assignment. The flag-ON
+    // prompt diverges from the legacy keyword-strategy batch prompt: it enumerates a
+    // closed candidate set with stable source-row ids + client-signal annotations and
+    // instructs the AI to SELECT + JUSTIFY each pick by id (per
+    // docs/rules/content-quality-grounding.md grounding contract). researchMode is ON
+    // (defaultResearchMode:true) only on the flag-ON path; the flag-OFF legacy path
+    // keeps the `keyword-strategy` op id verbatim (no research-mode divergence).
+    modelIntent: 'closed-set page→keyword assignment with source-grounded selection',
+    outputMode: 'json',
+    parserExpectation: 'parseJsonSafe + zod, retry-once then deterministic backfill',
+    researchMode: 'required',
+    executionMode: 'background-only',
+    retryPolicy: 'standard',
+    timeoutProfile: 'long',
+    defaultProvider: 'openai',
+    defaultModel: 'gpt-5.4-mini',
+    defaultResponseFormat: { type: 'json_object' },
+    defaultMaxRetries: 3,
+    defaultTimeoutMs: 90_000,
+    defaultResearchMode: true,
+  },
+  'keyword-site-synthesis': {
+    id: 'keyword-site-synthesis',
+    domain: 'analytics-intelligence',
+    feature: 'keyword-site-synthesis',
+    providerIntent: 'openai',
+    // SEO Generation Quality P3 — closed-set site-level synthesis (siteKeywords,
+    // opportunities, contentGaps, quickWins). flag-ON-only prompt divergence (closed
+    // candidate set + business-priorities context + select/justify by id) documented
+    // here per the AI-operation-contracts rule; flag-OFF keeps the legacy `keyword-strategy`
+    // master prompt + op id verbatim.
+    modelIntent: 'closed-set site-level strategy synthesis with source-grounded selection',
+    outputMode: 'json',
+    parserExpectation: 'parseJsonSafe + zod, retry-once then deterministic backfill',
+    researchMode: 'required',
+    executionMode: 'background-only',
+    retryPolicy: 'standard',
+    timeoutProfile: 'long',
+    defaultProvider: 'openai',
+    defaultModel: 'gpt-5.4-mini',
+    defaultResponseFormat: { type: 'json_object' },
+    defaultMaxRetries: 3,
+    defaultTimeoutMs: 90_000,
+    defaultResearchMode: true,
+  },
   'meeting-brief': {
     id: 'meeting-brief',
     domain: 'analytics-intelligence',

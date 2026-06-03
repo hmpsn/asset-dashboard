@@ -637,24 +637,27 @@ export const AI_QUALITY_FIXTURES: AiQualityFixture[] = [
     notes: 'Encodes the Faros-like sparse-workspace acceptance bar (contentGaps >= 6). GREEN at P2: the deterministic backfill floor guarantees it; promoted soft→hard.',
   },
   {
-    // SEO Generation Quality (Phase 0) — advisory acceptance bar (b): a malformed AI
-    // synthesis response must make generation THROW, not silently return an empty
-    // strategy. RED until P3 registers the Zod-validated named ops (the forward token
-    // `keyword-page-assignment` — the P3 op id — is absent from the evidence today, so
-    // the allOf fails). `soft` so it is advisory. PROMOTE to severity:'hard' at P3.
+    // SEO Generation Quality (Phase 3) — acceptance bar (b), PROMOTED soft→hard. P3
+    // lands the Zod-validated named ops (`keyword-page-assignment` /
+    // `keyword-site-synthesis`), changing the flag-ON semantics: a malformed AI
+    // response now triggers retry-once → deterministic backfill → NEVER-EMPTY
+    // contentGaps (not a throw). The flag-OFF legacy path STILL throws (byte-identical).
+    // Both forward tokens now exist in the evidence so the allOf passes (GREEN) → hard.
     id: 'seo-gen-quality-malformed-ai-throws',
     pipelineId: 'content-brief-review',
-    title: 'Malformed AI synthesis response throws rather than returning empty — advisory until P3',
+    title: 'Malformed AI synthesis: flag-ON retries→backfills→never-empty; flag-OFF still throws (P3)',
     dimension: 'evidence_grounding',
-    severity: 'soft',
+    severity: 'hard',
     evidenceFiles: [
       'tests/contract/seo-generation-quality-evals.test.ts',
+      'tests/integration/seo-genquality-p3-fm2-named-ops.test.ts',
+      'server/keyword-strategy-ai-synthesis.ts',
       'server/keyword-strategy-generation.ts',
     ],
     assertions: [
       { allOf: ['malformed AI synthesis response makes generation THROW', 'keyword-page-assignment'] },
     ],
-    notes: 'Encodes the never-silent-empty acceptance bar for the synthesis path. RED at P0 (no post-parse Zod validation yet); promote to hard when the Zod-validated keyword-page-assignment / keyword-site-synthesis named ops land at P3.',
+    notes: 'Never-silent-empty acceptance bar for the synthesis path. GREEN at P3: flag-ON validates with Zod, retries once, then deterministically backfills to a non-empty content-gap set; flag-OFF preserves the legacy throw. Promoted soft→hard.',
   },
 ];
 

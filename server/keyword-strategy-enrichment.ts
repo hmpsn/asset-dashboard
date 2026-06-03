@@ -161,7 +161,14 @@ export function _removePageCoveredContentGaps(
   const kept: StrategyContentGap[] = [];
   const removed: StrategyContentGap[] = [];
   for (const gap of contentGaps) {
-    if (isTopicKeywordCoveredByPageMap(gap.targetKeyword, pageMap, relaxConservatism)) {
+    // SEO Generation Quality P3 (M2): gaps marked `requested` were injected by the
+    // requested-re-add hard guarantee (the client explicitly asked for this keyword).
+    // They MUST survive the covered-topic heuristic — never prune them. The marker is
+    // only ever set on the flag-ON synthesis path, so flag-OFF gaps never carry it and
+    // this branch is inert there (flag-OFF prune stays byte-identical).
+    if (gap.requested) {
+      kept.push(gap);
+    } else if (isTopicKeywordCoveredByPageMap(gap.targetKeyword, pageMap, relaxConservatism)) {
       removed.push(gap);
     } else {
       kept.push(gap);
