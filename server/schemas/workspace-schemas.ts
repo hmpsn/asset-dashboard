@@ -314,6 +314,10 @@ export const opportunityComponentSchema = z.object({
 export const opportunityScoreSchema = z.object({
   value: z.number(),
   emvPerWeek: z.number(),
+  // P4 CPC-proxy placeholder. CLOSED schema (no .passthrough()) → without this line the
+  // field is stripped on every rec-set reload, so calibration-snapshot survival would
+  // depend on a value that never round-trips. Admin/AI-only (stripped on public routes).
+  predictedEmv: z.number(),
   roiPerEffortDay: z.number(),
   confidence: z.number(),
   calibration: z.number(),

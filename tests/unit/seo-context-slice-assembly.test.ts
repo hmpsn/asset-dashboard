@@ -1136,7 +1136,7 @@ describe('top opportunity (SI2/MW6)', () => {
           trafficAtRisk: 0, impressionsAtRisk: 0, estimatedGain: 'g', actionType: 'manual',
           status: 'pending', createdAt: 'x', updatedAt: 'x',
           opportunity: {
-            value: 80, emvPerWeek: 999, roiPerEffortDay: 12, confidence: 0.95, calibration: 1,
+            value: 80, emvPerWeek: 999, predictedEmv: 11988, roiPerEffortDay: 12, confidence: 0.95, calibration: 1,
             groundedSpine: 'roiScore',
             components: [
               { dimension: 'demand', rawValue: 2400, normalized: 0.5, weight: 0.2, contribution: 0.1, evidence: '2,400 searches' },
@@ -1189,7 +1189,7 @@ describe('top opportunity (SI2/MW6)', () => {
           trafficAtRisk: 0, impressionsAtRisk: 0, estimatedGain: 'g', actionType: 'manual',
           status: 'completed', createdAt: 'x', updatedAt: 'x',
           opportunity: {
-            value: 90, emvPerWeek: 100, roiPerEffortDay: 1, confidence: 0.9, calibration: 1,
+            value: 90, emvPerWeek: 100, predictedEmv: 1200, roiPerEffortDay: 1, confidence: 0.9, calibration: 1,
             groundedSpine: 'computed', components: [], calibrationVersion: 'v1', modelVersion: 'ov-1',
           },
         },

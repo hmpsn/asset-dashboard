@@ -54,7 +54,7 @@ import { computeOvCalibration } from './scoring/ov-calibration.js';
 // ─── Types ────────────────────────────────────────────────────────
 
 export type { RecPriority, RecType, RecStatus, RecActionType, Recommendation, RecommendationSet } from '../shared/types/recommendations.ts';
-import type { RecPriority, RecType, RecStatus, Recommendation, RecommendationSet } from '../shared/types/recommendations.ts';
+import type { RecPriority, RecType, RecStatus, Recommendation, RecommendationSet, OpportunityScore } from '../shared/types/recommendations.ts';
 import type { ConversionAttributionData, CtrOpportunityData } from '../shared/types/analytics.js';
 import type { LearningsSlice } from '../shared/types/intelligence.js';
 import type { ActionType } from '../shared/types/outcome-tracking.js';
@@ -114,6 +114,54 @@ const RECOVERY_RATES: Record<string, RecoveryRate> = {
 
 export function getRecoveryRate(checkName: string): RecoveryRate {
   return RECOVERY_RATES[checkName] || DEFAULT_RECOVERY;
+}
+
+// ─── SEO Gen-Quality P4 · one gain basis (Contract 3) ───────────────────────
+//
+// The legacy `estimatedGain` strings are static per-check constants (getRecoveryRate),
+// identical for every workspace/page, while ranking already reads the OV value — a live
+// client-facing incoherence. When `useGenQual` is ON, the gain string is derived from the
+// SAME OV figure (predictedEmv, the horizon-projected EMV that also feeds the served tier
+// and content_gaps.opportunity_score), so the client's stated gain, the queue order, and
+// the upsell badge all share ONE basis.
+//
+// CLIENT-SAFE FORM = NON-DOLLARIZED (owner constraint: clients never see a raw $/wk). We
+// render an outcome-oriented RELATIVE-MAGNITUDE phrase, NOT a dollar figure. The public
+// route additionally sanitizes any dollar exposure (stripEmvFromPublicRecs) as defense-
+// in-depth, and the public-read test asserts no dollarized estimatedGain ever leaks.
+//
+// Bands map the horizon EMV proxy to a magnitude word. Owner-tunable (documented in the
+// guardrail doc + PR); deliberately coarse so the proxy's imprecision is never overstated.
+const OV_GAIN_BANDS = { high: 600, medium: 150, low: 1 } as const;
+
+/** Non-dollarized, client-safe gain string derived from the OV horizon EMV proxy.
+ *  Same basis as the served tier + content_gaps.opportunity_score (Contract 3). Returns
+ *  null when no OV is attached (caller keeps the legacy string). @internal exported for testing */
+export function buildOvGainString(opportunity: OpportunityScore | undefined): string | null {
+  if (!opportunity) return null;
+  const emv = opportunity.predictedEmv;
+  if (!Number.isFinite(emv) || emv <= 0) {
+    return 'Modest but real opportunity to recover organic visibility';
+  }
+  if (emv >= OV_GAIN_BANDS.high) {
+    return 'High-value opportunity — among the strongest expected organic gains on the site right now';
+  }
+  if (emv >= OV_GAIN_BANDS.medium) {
+    return 'Solid opportunity — meaningful expected organic gain relative to your other actions';
+  }
+  return 'Worthwhile opportunity — a steady expected organic gain once addressed';
+}
+
+/** Resolve the gain string for a rec given the P4 flag. Flag-OFF (or no OV) returns the
+ *  legacy string unchanged (byte-identical). Flag-ON returns the OV-derived non-dollarized
+ *  phrase. @internal exported for testing */
+export function resolveEstimatedGain(
+  legacyGain: string,
+  opportunity: OpportunityScore | undefined,
+  useGenQual: boolean,
+): string {
+  if (!useGenQual) return legacyGain;
+  return buildOvGainString(opportunity) ?? legacyGain;
 }
 
 export {
@@ -637,6 +685,55 @@ function isCriticalCheck(check: string): boolean {
   return CRITICAL_CHECKS.has(check);
 }
 
+/** Extract the audit check name from a rec `source` string (`audit:title`,
+ *  `audit:site-wide:canonical` → `title` / `canonical`). Returns '' for non-audit
+ *  sources. Mirrors the checkName extraction in computeRecommendationSummary so the
+ *  two stay in lockstep. */
+function checkNameFromSource(source: string | undefined): string {
+  if (!source) return '';
+  if (source.startsWith('audit:site-wide:')) return source.replace('audit:site-wide:', '');
+  if (source.startsWith('audit:')) return source.replace('audit:', '');
+  return '';
+}
+
+// ─── SEO Gen-Quality P4 · OV-derived priority tier (Contract 2) ─────────────
+//
+// When `useGenQual` is ON the served priority TIER is derived from the OV value
+// (which is a normalized read of the EMV/ROI economic quantity) via the bands below,
+// EXCEPT genuine CRITICAL_CHECKS which keep `fix_now` (a broken canonical/robots is
+// urgent regardless of modelled EMV). Flag-OFF this is a no-op — the legacy per-branch
+// tier survives and sortRecommendations/priorityOrder/computeRecommendationSummary are
+// byte-identical (they read rec.priority, which is only overwritten when the flag is on).
+//
+// ⚠️ OWNER-TUNABLE THRESHOLDS (NOT approved for a per-workspace flip in this PR).
+// The bands map the 0..100 OV `value` to a tier. They are deliberately conservative
+// defaults; the owner approves the final thresholds AND the canary cohort before any
+// per-workspace flip. Documented in docs/rules/seo-generation-quality.md (Contract 2)
+// and the PR body. `value` is the OV-pipeline output of normalizeToScore(roiPerEffortDay),
+// itself downstream of emvPerWeek — so the tier shares the one OV/EMV basis (Contract 3).
+const OV_TIER_BANDS = {
+  /** value ≥ this → fix_now (top-of-queue economic opportunity). */
+  fixNow: 70,
+  /** value ≥ this → fix_soon. */
+  fixSoon: 45,
+  /** value ≥ this → fix_later; below → ongoing. */
+  fixLater: 20,
+} as const;
+
+/** Derive the served priority tier from a rec's OV value. CRITICAL_CHECKS short-circuit
+ *  to `fix_now`. Pure: same rec → same tier. @internal exported for unit testing */
+export function deriveOvTier(rec: Pick<Recommendation, 'priority' | 'source' | 'opportunity'>): RecPriority {
+  // Genuine critical audit checks stay urgent regardless of modelled EMV.
+  if (isCriticalCheck(checkNameFromSource(rec.source))) return 'fix_now';
+  // No OV attached (legacy rec) → keep the existing tier untouched.
+  const value = rec.opportunity?.value;
+  if (value == null) return rec.priority;
+  if (value >= OV_TIER_BANDS.fixNow) return 'fix_now';
+  if (value >= OV_TIER_BANDS.fixSoon) return 'fix_soon';
+  if (value >= OV_TIER_BANDS.fixLater) return 'fix_later';
+  return 'ongoing';
+}
+
 export function getTrafficScore(traffic: TrafficMap, slug: string, conversionRate?: number): number {
   const pagePath = normalizePageUrl(slug);
   const t = traffic[pagePath] || traffic[slug];
@@ -967,6 +1064,14 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   // attached (shadow). When ON, the single selector below the sort flips
   // impactScore to opportunity.value — the entire cutover surface.
   const useOv = isFeatureEnabled('opportunity-value-scorer');
+  // ── SEO Gen-Quality P4 cutover flag (per-workspace umbrella). ──
+  // Resolved ONCE per rec-gen cycle and threaded as a plain boolean (no isFeatureEnabled
+  // in loops — mirrors the P2/P3 relaxConservatism pattern). When OFF (umbrella OFF = all
+  // prod today) the OV-derived TIER, the OV-EMV estimatedGain basis, and the
+  // content_gaps.opportunity_score recompute are all NO-OPs, so generation is byte-identical
+  // to pre-P4 (proven by the flag-OFF snapshot test). NOT the global `opportunity-value-scorer`
+  // flag (that gates only impactScore via pickImpactScore — do NOT widen it).
+  const useGenQual = isFeatureEnabled('seo-generation-quality', ws.id);
   const tier = ws.tier || 'free';
   const assignedTo: 'team' | 'client' = tier === 'premium' ? 'team' : 'client';
 
@@ -1884,7 +1989,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   // Always-on, dark; must never break generation. sortRecommendations is injected
   // to avoid a circular import. ──
   try {
-    recordOvDivergence(workspaceId, recs, effectiveBusinessPriorities, sortRecommendations);
+    recordOvDivergence(workspaceId, recs, effectiveBusinessPriorities, sortRecommendations, deriveOvTier);
   } catch (err) {
     log.warn({ workspaceId, err: err instanceof Error ? err.message : String(err) }, 'OV divergence logging failed (non-fatal)');
   }
@@ -1894,6 +1999,20 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   // legacy. With it ON, the ranked impactScore reads from the attached OV value.
   // Score ONLY — estimatedGain is untouched (client-facing, deferred to P5/P6).
   for (const r of recs) r.impactScore = pickImpactScore(r, useOv);
+
+  // ── SEO Gen-Quality P4 · OV-derived tier + one gain basis chokepoint (flag-gated). ──
+  // AFTER pickImpactScore (so impactScore is final) and BEFORE sortRecommendations
+  // (which sorts by rec.priority first). Flag-OFF: NO-OP — the legacy per-branch tier AND
+  // the legacy getRecoveryRate estimatedGain strings survive untouched, so
+  // sortRecommendations / priorityOrder / computeRecommendationSummary AND every gain string
+  // are byte-identical to pre-P4. CRITICAL_CHECKS keep fix_now (handled inside deriveOvTier).
+  // Both the tier (Contract 2) and the gain string (Contract 3) derive from the one OV figure.
+  if (useGenQual) {
+    for (const r of recs) {
+      r.priority = deriveOvTier(r);
+      r.estimatedGain = resolveEstimatedGain(r.estimatedGain, r.opportunity, useGenQual);
+    }
+  }
 
   // ── Sort: tier PRIMARY, impactScore SECONDARY, business-intent alignment as
   // the final within-tier tiebreaker (see sortRecommendations). ──

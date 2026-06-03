@@ -44,6 +44,9 @@ export interface TrackedActionRow {
   source_flag: string;
   baseline_confidence: string;
   context: string;
+  // P4: OV predictedEmv snapshot (CPC-proxy placeholder, nullable). NULL when no
+  // opportunity was available at record time (e.g. outcome-backfill).
+  predicted_emv: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -118,6 +121,7 @@ export function rowToTrackedAction(row: TrackedActionRow): TrackedAction {
     sourceFlag: row.source_flag as TrackedAction['sourceFlag'],
     baselineConfidence: row.baseline_confidence as TrackedAction['baselineConfidence'],
     context: parseJsonSafe(row.context, actionContextSchema, EMPTY_CONTEXT, { field: 'context', table: 'tracked_actions' }),
+    predictedEmv: row.predicted_emv ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

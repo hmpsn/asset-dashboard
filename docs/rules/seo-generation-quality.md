@@ -195,6 +195,64 @@ the flag-ON synthesis path, flag-OFF gaps never carry it and the prune branch is
 
 ---
 
+## P4 as-built — OV coherence (predictedEmv survival + OV tier + one gain basis + brief cache)
+
+P4 honors Contracts 1/2/3. The **flag layering** is the safety crux:
+
+| Change | Gate | Flag-OFF behavior (umbrella OFF = all prod today) |
+|---|---|---|
+| `predictedEmv` computed in `computeOpportunityValue` | **always-on** | admin-only, stripped, never rendered |
+| `predictedEmv` persisted to `tracked_actions` | **always-on** | nullable, invisible — calibration history accrues even dark |
+| `predictedEmv` in Zod schema + public strip | **always-on (safety)** | survival/leak plumbing |
+| `ovClone` re-tier in the divergence log + panel (G1) | **always-on (dark/admin)** | shadow-log only, never served |
+| OV-derived priority TIER feeding the served sort | **`useGenQual`** | legacy tier; `sortRecommendations` byte-identical |
+| `estimatedGain` from OV EMV | **`useGenQual`** | legacy `getRecoveryRate` strings |
+| `content_gaps.opportunity_score` recompute | **`useGenQual`** | legacy `computeOpportunityScore` |
+
+`useGenQual = isFeatureEnabled('seo-generation-quality', ws.id)` — resolved ONCE per rec-gen
+cycle next to `useOv` (NOT the global `opportunity-value-scorer`; do not widen that flag).
+
+**OV → tier band thresholds (OWNER-TUNABLE — `OV_TIER_BANDS` in `server/recommendations.ts`).**
+The served tier maps the 0..100 OV `value` (a normalized read of the EMV/ROI quantity):
+`value ≥ 70 → fix_now`, `≥ 45 → fix_soon`, `≥ 20 → fix_later`, else `ongoing` — EXCEPT genuine
+`CRITICAL_CHECKS`, which keep `fix_now` regardless of modelled EMV (`deriveOvTier`). These are
+**conservative defaults**. The owner approves the final thresholds AND the canary cohort before
+ANY per-workspace flip; no flip is done in the P4 PR. Tune the band constants here.
+
+**Gain-string form = NON-DOLLARIZED (owner constraint: clients never see a raw $/wk).**
+`buildOvGainString(opportunity)` returns an outcome-oriented relative-magnitude phrase keyed on
+`predictedEmv` (bands `high ≥ 600`, `medium ≥ 150`, `low ≥ 1` — also owner-tunable). The public
+route is the always-on safety net: `stripEmvFromPublicRecs` SANITIZES any `$nnn`/`$/wk` run out of
+`estimatedGain` (and strips `emvPerWeek`/`predictedEmv`/`roiPerEffortDay` from `opportunity`), so a
+future dollarized variant (P6) or an ungated renderer can never leak. The public-read test enforces
+no dollarized `estimatedGain`.
+
+**`content_gaps.opportunity_score` recompute — store the OV `value` (0..100), NOT raw EMV.**
+The rec content_gap branch reads `cg.opportunityScore` BACK as its grounded spine
+(`clickDelta = (opportunityScore/100) × …`), so feeding an unbounded EMV would break the `/100`
+math. Storing the OV `value` (which is itself downstream of `emvPerWeek` via `normalizeToScore`)
+gives briefing-candidates, the upsell badge, and the rec layer ONE basis while keeping the spine
+valid and the column in range. Recomputed in `keyword-strategy-enrichment.ts` when `relaxConservatism`
+(the same `seo-generation-quality` flag); flag-OFF keeps `computeOpportunityScore`.
+
+**Part F — brief cache (G8): HASH-FIX ONLY (decision).** `buildPromptHash`
+(`server/meeting-brief-generator.ts`) now keys on a tier-aware `BriefRecSignal`
+(`topRecommendationId` + `topTier`) read from the CACHED rec set, so a re-tier busts the brief
+cache. We deliberately did NOT surface the engine's `topRecommendationId`/title into the brief
+prompt: the brief is a **distinct, insight-sourced narrative surface** (it does not read the rec
+set), and threading the rec set into its prompt would be disproportionate. The §5.2 "#1 brief == #1
+client" invariant is therefore scoped to the rec/client surfaces, not the brief narrative.
+
+**§5.2 one-liner.** The client #1 card AND AdminChat both read `summary.topRecommendationId`
+(shared basis ✅). `mcp/tools/clients.ts get_pending_work` is intentionally OUT-OF-SCOPE of the #1
+equality — it answers pending client *work*, not the top recommendation.
+
+**Carry-forward for P5/P6.** `RecType`→`ActionType` and the `RecSourceCategory` lockstep below still
+apply. P6 swaps the calibration basis to `median(attributedValue / predictedEmv)` at the documented
+`server/scoring/ov-calibration.ts` swap-site (P4 carries `predictedEmv` but does not change the basis).
+
+---
+
 ## New rec types / sources (P5 — orphaned-subsystem wiring)
 
 When P5 surfaces `keyword_gaps` / `topic_clusters` / `cannibalization_issues` as

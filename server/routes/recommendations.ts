@@ -24,19 +24,39 @@ const log = createLogger('routes:recommendations');
 const router = Router();
 
 /**
- * Strip the admin/AI-only dollar/ROI fields from each rec's Opportunity Value
- * before responding on a PUBLIC (client-facing) route. Per owner decision the
- * client sees the ROI badge + relative value + component breakdown bars, never
- * the raw $/wk exposure (`emvPerWeek`) nor the internal ROI quantity
- * (`roiPerEffortDay`). The rest of the OpportunityScore (value, confidence,
- * groundedSpine, components, calibration, calibrationVersion, modelVersion) is
- * preserved so the client #1 card can render its "why this is #1" breakdown.
+ * Strip the admin/AI-only dollar/ROI fields from each rec before responding on a
+ * PUBLIC (client-facing) route. Per owner decision the client sees the ROI badge +
+ * relative value + component breakdown bars, never the raw $/wk exposure
+ * (`emvPerWeek`), the horizon projection (`predictedEmv`, P4 — a CPC-proxy that
+ * would read as a dollar figure), nor the internal ROI quantity (`roiPerEffortDay`).
+ * The rest of the OpportunityScore (value, confidence, groundedSpine, components,
+ * calibration, calibrationVersion, modelVersion) is preserved so the client #1 card
+ * can render its "why this is #1" breakdown.
+ *
+ * `estimatedGain` (P4, Contract 3) is a TOP-LEVEL rec field, NOT inside `opportunity`,
+ * and it renders LIVE at InsightsEngine.tsx. The chosen gain form is NON-DOLLARIZED
+ * (an outcome-oriented relative-magnitude phrase — see buildOvGainString in
+ * server/recommendations.ts), so the client sees a real gain string. This function is
+ * the always-on safety net: it SANITIZES `estimatedGain` by neutralizing any dollar
+ * exposure (a `$nnn` / `$/wk` substring), so even a future dollarized variant (P6) or a
+ * renderer that forgets to gate cannot leak a raw money figure to a client. Non-dollarized
+ * strings pass through unchanged.
  */
+const DOLLAR_EXPOSURE_RE = /\$\s?[\d,.]+(?:\s*\/\s*\w+)?/g;
+function sanitizePublicGain(gain: string): string {
+  // Replace any "$1,234" / "$1,234/wk" run with a neutral, non-dollarized token.
+  const cleaned = gain.replace(DOLLAR_EXPOSURE_RE, 'high-value').trim();
+  return cleaned.length > 0 ? cleaned : 'Estimated to drive meaningful organic growth';
+}
+
 function stripEmvFromPublicRecs(recs: Recommendation[]): Recommendation[] {
   return recs.map(r => {
-    if (!r.opportunity) return r;
-    const { emvPerWeek: _emvPerWeek, roiPerEffortDay: _roiPerEffortDay, ...publicOpportunity } = r.opportunity;
-    return { ...r, opportunity: publicOpportunity as Recommendation['opportunity'] };
+    // Sanitize the top-level gain string (defense-in-depth: no raw $/wk to a client).
+    const safeGain = typeof r.estimatedGain === 'string' ? sanitizePublicGain(r.estimatedGain) : r.estimatedGain;
+    const base: Recommendation = safeGain === r.estimatedGain ? r : { ...r, estimatedGain: safeGain };
+    if (!base.opportunity) return base;
+    const { emvPerWeek: _emvPerWeek, predictedEmv: _predictedEmv, roiPerEffortDay: _roiPerEffortDay, ...publicOpportunity } = base.opportunity;
+    return { ...base, opportunity: publicOpportunity as Recommendation['opportunity'] };
   });
 }
 
@@ -138,6 +158,10 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', requireClientPor
         baselineSnapshot: {
           captured_at: new Date().toISOString(),
         },
+        // P4: snapshot the OV predicted EMV (CPC-proxy placeholder) onto the durable
+        // outcome row so the P6 realized-vs-predicted calibration loop has a pairing.
+        // null when this rec carries no opportunity (legacy row / OV not yet attached).
+        predictedEmv: rec.opportunity?.predictedEmv ?? null,
         attribution: 'platform_executed',
       });
     } catch (err) {

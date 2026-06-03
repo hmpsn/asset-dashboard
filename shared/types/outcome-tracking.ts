@@ -114,6 +114,12 @@ export interface TrackedAction {
   sourceFlag: SourceFlag;
   baselineConfidence: BaselineConfidence;
   context: ActionContext;
+  /** SEO Gen-Quality P4: OV `predictedEmv` snapshotted at recordAction time (CPC-proxy
+   *  placeholder, NOT real money — see OpportunityScore.predictedEmv). Admin/AI-only,
+   *  never client-facing. null when no opportunity was available at record time (e.g.
+   *  the outcome-backfill path, which cannot read the rec's opportunity object). Feeds
+   *  the P6 realized-vs-predicted calibration loop. */
+  predictedEmv?: number | null;
   createdAt: string;
   updatedAt: string;
 }

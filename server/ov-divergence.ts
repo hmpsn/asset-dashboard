@@ -17,7 +17,7 @@ import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonSafeArray } from './db/json-validation.js';
 import { createLogger } from './logger.js';
-import type { Recommendation } from '../shared/types/recommendations.js';
+import type { Recommendation, RecPriority } from '../shared/types/recommendations.js';
 
 const log = createLogger('ov-divergence');
 
@@ -26,6 +26,11 @@ export interface Top3Entry {
   title: string;
   source: string;
   impactScore: number;
+  /** SEO Gen-Quality P4 (G1): the priority TIER this entry carries in the ranked clone.
+   *  For the legacy clone it is the legacy tier; for the OV clone it is the OV-derived tier
+   *  (deriveOvTier, injected). Makes the shadow log + panel see CROSS-TIER reorders, not just
+   *  within-tier impactScore moves. Optional so pre-P4 rows still parse. */
+  priority?: RecPriority;
 }
 
 export interface PerRecDelta {
@@ -71,6 +76,8 @@ const top3EntrySchema = z.object({
   title: z.string(),
   source: z.string(),
   impactScore: z.number(),
+  // P4 (G1): optional so legacy rows (written before the field existed) still parse.
+  priority: z.enum(['fix_now', 'fix_soon', 'fix_later', 'ongoing']).optional(),
 });
 
 const perRecDeltaSchema = z.object({
@@ -144,7 +151,7 @@ function isActive(r: Recommendation): boolean {
   return r.status === 'pending' || r.status === 'in_progress';
 }
 function top3(recs: Recommendation[]): Top3Entry[] {
-  return recs.filter(isActive).slice(0, 3).map(r => ({ id: r.id, title: r.title, source: r.source, impactScore: r.impactScore }));
+  return recs.filter(isActive).slice(0, 3).map(r => ({ id: r.id, title: r.title, source: r.source, impactScore: r.impactScore, priority: r.priority }));
 }
 
 /**
@@ -158,11 +165,22 @@ export function recordOvDivergence(
   recs: Recommendation[],
   priorities: string[],
   sortRecs: (recs: Recommendation[], effectiveBusinessPriorities: string[]) => void,
+  /** SEO Gen-Quality P4 (G1): the OV-derived tier function (deriveOvTier), injected to
+   *  avoid a circular import back into recommendations.ts. ALWAYS-ON (dark): the shadow
+   *  log applies it to the OV clone so the divergence + panel see CROSS-TIER reorders, not
+   *  just within-tier impactScore moves. Never served to clients. */
+  deriveTier: (rec: Pick<Recommendation, 'priority' | 'source' | 'opportunity'>) => RecPriority,
 ): void {
   // Two shallow clones sorted through the SAME canonical ranker, one on the legacy
-  // impactScore and one on the OV value — so "the #1" is computed identically to production.
+  // impactScore + legacy tier, and one on the OV value + OV-derived tier — so "the #1"
+  // is computed identically to a production OV cutover (which re-tiers before sorting).
   const legacyClone = recs.map(r => ({ ...r }));
-  const ovClone = recs.map(r => ({ ...r, impactScore: r.opportunity?.value ?? r.impactScore }));
+  const ovClone = recs.map(r => {
+    const score = r.opportunity?.value ?? r.impactScore;
+    // Mirror the production chokepoint: re-tier on the OV value BEFORE sorting (sortRecs
+    // sorts by priority first), so the shadow #1 reflects a real OV cutover, not the legacy tier.
+    return { ...r, impactScore: score, priority: deriveTier(r) };
+  });
   sortRecs(legacyClone, priorities);
   sortRecs(ovClone, priorities);
 

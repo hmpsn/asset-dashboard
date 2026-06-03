@@ -9,7 +9,7 @@
 //   premium → "Generate Brief (included) →" teal CTA with check icon per row
 
 import { useState, type ReactNode } from 'react';
-import { BarChart3, Eye, ArrowUpRight, Sparkles, Check, Swords, MessageCircleQuestion } from 'lucide-react';
+import { BarChart3, Eye, Sparkles, Check, Swords, MessageCircleQuestion } from 'lucide-react';
 import { Badge, SectionCard, Icon, TierGate, Button, type BadgeTone } from '../../ui';
 import { TrendBadge } from '../../ui/TrendBadge';
 import { fmtNum } from '../../../utils/formatNumbers';
@@ -91,8 +91,12 @@ export function RecommendedForYou({
               <div className="flex items-center justify-between">
                 <span className="t-ui font-medium text-[var(--brand-text-bright)]">
                   {rec.topic}
+                  {/* P4 (Contract 3): the opportunity score is now OV-EMV-derived (0..100),
+                      the SAME basis the recommendation queue ranks on — relabeled from the bare
+                      "NN/100" so the client reads it as a relative opportunity strength, not a
+                      raw percentage. blue = data (read-only). */}
                   {rec.opportunityScore != null && (
-                    <Badge label={`${rec.opportunityScore}/100`} tone="blue" shape="pill" className="ml-2" />
+                    <Badge label={`Opportunity ${rec.opportunityScore}`} tone="blue" shape="pill" className="ml-2" />
                   )}
                 </span>
                 <div className="flex items-center gap-2">
@@ -135,16 +139,10 @@ export function RecommendedForYou({
                       {fmtNum(rec.impressions)} impr
                     </span>
                   )}
-                  {rec.volume != null && rec.volume > 0 && (() => {
-                    const impact = Math.round(rec.volume * 0.103);
-                    if (impact < 10) return null;
-                    return (
-                      <span className="t-caption-sm text-accent-info flex items-center gap-0.5">
-                        <Icon as={ArrowUpRight} size="sm" className="text-accent-info" />
-                        ~{fmtNum(impact)}/mo est. clicks at rank #3
-                      </span>
-                    );
-                  })()}
+                  {/* P4 (Contract 3): the independent `volume × 0.103` "est. clicks at rank #3"
+                      estimate was killed — it was a separate magic-constant basis that diverged
+                      from the queue's Opportunity Value ranking. The opportunity-score badge above
+                      (now OV-EMV-derived) is the single client-facing materiality signal. */}
                 </div>
 
                 {/* Tier-aware CTA buttons */}

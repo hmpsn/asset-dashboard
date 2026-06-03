@@ -14,6 +14,7 @@ import {
   type StrategyOutput,
 } from './keyword-strategy-ai-synthesis.js';
 import { computeOpportunityScore, isSuspiciousPlannerGroupedVolume } from './keyword-strategy-helpers.js';
+import { computeOpportunityValue } from './scoring/opportunity-value.js';
 import { matchesQuestionKeyword } from './strategy-filters.js';
 import { METRICS_SOURCE } from '../shared/types/keywords.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
@@ -558,14 +559,39 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
     }
   }
 
-  // Compute composite opportunity score — all enrichment (volume, KD, impressions, trend) is now done
+  // Compute composite opportunity score — all enrichment (volume, KD, impressions, trend) is now done.
+  // SEO Gen-Quality P4 (Contract 3, flag-ON via relaxConservatism): recompute opportunity_score
+  // from the SAME OV basis the recommendation queue and gain string use, so briefing-candidates,
+  // the upsell badge, and the rec layer all order content gaps by one figure. We store the OV
+  // `value` (0..100) — itself a normalized read of the EMV/ROI economic quantity (downstream of
+  // emvPerWeek), so it: (a) shares the OV/EMV basis (owner decision), (b) stays in the column's
+  // existing 0..100 range, and (c) keeps the rec content_gap branch's grounded spine valid (it
+  // reads cg.opportunityScore back as a 0..100 composite — feeding it an unbounded EMV would
+  // break the `opportunityScore/100` math). Flag-OFF keeps the legacy computeOpportunityScore
+  // (byte-identical).
   if (strategy.contentGaps?.length) {
     for (const cg of strategy.contentGaps) {
-      cg.opportunityScore = computeOpportunityScore(cg);
+      if (relaxConservatism) {
+        const ov = computeOpportunityValue({
+          branch: 'content_gap',
+          opportunityScore: computeOpportunityScore(cg) ?? null, // grounded composite spine
+          volume: cg.volume ?? null,
+          difficulty: cg.difficulty ?? null,
+          trendDirection: (cg.trendDirection as 'rising' | 'declining' | 'stable' | undefined) ?? null,
+          intent: cg.intent === 'transactional' || cg.intent === 'commercial' || cg.intent === 'informational' || cg.intent === 'navigational'
+            ? cg.intent
+            : null,
+          llmLabel: cg.priority === 'high' || cg.priority === 'medium' || cg.priority === 'low' ? cg.priority : null,
+        });
+        // OV value is 0..100 and EMV-derived; undefined when the gap had no signal at all.
+        cg.opportunityScore = ov.value > 0 ? ov.value : computeOpportunityScore(cg);
+      } else {
+        cg.opportunityScore = computeOpportunityScore(cg);
+      }
     }
     // Sort descending so highest-value gaps surface first in the UI
     strategy.contentGaps.sort((a, b) => (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0));
-    log.info({ workspaceId, count: strategy.contentGaps.length }, 'Computed content gap opportunity scores');
+    log.info({ workspaceId, count: strategy.contentGaps.length, basis: relaxConservatism ? 'ov-emv' : 'legacy' }, 'Computed content gap opportunity scores');
   }
 
   // ── Cannibalization Detection + Canonical Recommender ────────
