@@ -15,7 +15,7 @@
  */
 
 import { useMemo, useState } from 'react';
-import { Activity, AlertTriangle, ChevronDown, ChevronUp, ShieldOff } from 'lucide-react';
+import { Activity, AlertTriangle, ArrowRightLeft, ChevronDown, ChevronUp, ShieldOff } from 'lucide-react';
 import { useOvDivergence } from '../../hooks/admin/useOvDivergence';
 import { SectionCard } from '../ui/SectionCard';
 import { CompactStatBar } from '../ui/StatCard';
@@ -63,6 +63,18 @@ function fmtEmv(v: number | null): string {
   return v == null ? '—' : `$${Math.round(v).toLocaleString()}/wk`;
 }
 
+/** Short label for a priority tier (compact divergence display). */
+const TIER_LABEL: Record<NonNullable<Top3Entry['priority']>, string> = {
+  fix_now: 'Fix now',
+  fix_soon: 'Fix soon',
+  fix_later: 'Fix later',
+  ongoing: 'Ongoing',
+};
+
+function fmtTier(p: Top3Entry['priority']): string {
+  return p ? TIER_LABEL[p] : '—';
+}
+
 function Top3Column({ label, entries }: { label: string; entries: Top3Entry[] }) {
   return (
     <div className="min-w-0">
@@ -75,6 +87,10 @@ function Top3Column({ label, entries }: { label: string; entries: Top3Entry[] })
             <li key={e.id} className="flex items-baseline gap-1.5 t-caption-sm">
               <span className="text-[var(--brand-text-muted)] tabular-nums w-3.5 flex-shrink-0">{i + 1}</span>
               <span className="text-[var(--brand-text)] truncate" title={e.title}>{e.title}</span>
+              {/* P4 (G1): the tier this entry carries in the ranked clone — blue = data (read-only). */}
+              {e.priority && (
+                <Badge tone="blue" variant="soft" shape="sm" label={fmtTier(e.priority)} />
+              )}
               <span className="text-[var(--brand-text-muted)] tabular-nums flex-shrink-0 ml-auto">
                 {Math.round(e.impactScore)}
               </span>
@@ -106,6 +122,17 @@ function DisagreementRow({ row }: { row: OvDivergence }) {
               <span className="t-ui text-[var(--brand-text-bright)] truncate" title={ovTitle}>{ovTitle}</span>
             </div>
             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+              {/* P4 (G1): cross-tier reorder badge — surfaces when OV moves the #1 to a
+                  different priority tier than legacy (the divergence the panel exists to catch). */}
+              {legacyPick?.priority && ovPick?.priority && legacyPick.priority !== ovPick.priority && (
+                <Badge
+                  tone="amber"
+                  variant="soft"
+                  shape="sm"
+                  icon={ArrowRightLeft}
+                  label={`tier ${fmtTier(legacyPick.priority)} → ${fmtTier(ovPick.priority)}`}
+                />
+              )}
               {/* OV pick quality signals — blue = data (read-only). */}
               <Badge tone="blue" variant="soft" shape="sm" label={`conf ${fmtConfidence(row.ovTopConfidence)}`} />
               <Badge tone="blue" variant="soft" shape="sm" label={`EMV ${fmtEmv(row.ovTopEmv)}`} />

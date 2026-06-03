@@ -227,6 +227,10 @@ describe('meeting-brief-generator', () => {
     mocks.buildWorkspaceIntelligence.mockResolvedValue(intel);
     const crypto = await import('crypto');
     const relevant = {
+      // P4 (G8): the rec/tier signal leads the hash object. No rec set is loaded for 'ws_1'
+      // (loadRecommendations returns null), so both are null — matching buildBriefRecSignal.
+      topRecommendationId: null,
+      topTier: null,
       topIds: ['top_1:2026-05-25T00:00:00.000Z'],
       siteScore: 81,
       scoreDelta: 5,

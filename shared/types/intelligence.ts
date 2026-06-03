@@ -4,7 +4,7 @@
 
 import type { AnalyticsInsight, InsightType, InsightSeverity } from './analytics.js';
 import type { DiagnosticStatus } from './diagnostics.js';
-import type { KeywordStrategy, AudiencePersona, PageKeywordMap, QuickWin, CannibalizationItem } from './workspace.js';
+import type { KeywordStrategy, AudiencePersona, PageKeywordMap, QuickWin, CannibalizationItem, KeywordGapItem, TopicCluster } from './workspace.js';
 import type { OpportunityComponent } from './recommendations.js';
 import type { BriefingSummary } from './briefing.js';
 import type { PageElementCatalog } from './page-elements.js';
@@ -193,6 +193,18 @@ export interface SeoContextSlice {
    * assembleSeoContext via listCannibalizationIssues().
    */
   cannibalizationIssues?: CannibalizationItem[];
+  /**
+   * Keyword gaps from the keyword_gaps table (SEO Gen-Quality P5) — keywords
+   * competitors rank for that the workspace does not. Optional — only present when
+   * at least one gap exists. Read by assembleSeoContext via listKeywordGaps().
+   */
+  keywordGaps?: KeywordGapItem[];
+  /**
+   * Topic clusters from the topic_clusters table (SEO Gen-Quality P5) — topical
+   * authority coverage per cluster. Optional — only present when at least one
+   * cluster exists. Read by assembleSeoContext via listTopicClusters().
+   */
+  topicClusters?: TopicCluster[];
   /**
    * The resolved #1 recommendation's Opportunity Value breakdown (SI2/MW6),
    * so the advisor recites the same explainable "why this is #1" the client sees.

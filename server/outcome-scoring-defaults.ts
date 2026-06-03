@@ -44,6 +44,23 @@ export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
     primary_metric: 'voice_score',
     thresholds: { strong_win: 85, win: 70, neutral_band: 10 },
   },
+  // ── SEO Gen-Quality P5 · first-class orphan-subsystem recs ──
+  // keyword_gap → competitor_gap_closed: success = we move into a position the competitor held.
+  competitor_gap_closed: {
+    primary_metric: 'position',
+    thresholds: { strong_win: 10, win: 5, neutral_band: 3 },
+  },
+  // topic_cluster → cluster_published: success = the cluster gains organic clicks once filled.
+  cluster_published: {
+    primary_metric: 'clicks',
+    thresholds: { strong_win: 30, win: 15, neutral_band: 10 },
+  },
+  // cannibalization → cannibalization_resolved: success = the canonical page recovers clicks
+  // once the duplicate competition is consolidated.
+  cannibalization_resolved: {
+    primary_metric: 'clicks',
+    thresholds: { strong_win: 30, win: 15, neutral_band: 10 },
+  },
 };
 
 export function resolveScoringConfig(

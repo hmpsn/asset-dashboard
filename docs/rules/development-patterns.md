@@ -305,6 +305,13 @@ if (!isFeatureEnabled('my-new-feature')) {
 }
 ```
 
+`isFeatureEnabled(flag, workspaceId?)` takes an **optional** `workspaceId`. Omit it for
+global resolution (global DB override → env → default — the default for the vast majority
+of call sites). Pass a `workspaceId` for staged per-client rollout — a per-workspace DB
+override (set via `setWorkspaceFlagOverride(flag, workspaceId, enabled|null)`) then takes
+priority over the global chain. See `docs/rules/feature-flag-lifecycle.md` §Per-workspace
+resolution.
+
 ### 4. Enable per environment
 
 Set in Render dashboard env vars:

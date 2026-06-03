@@ -470,6 +470,24 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
     }
   }
 
+  // Keyword gaps — keywords competitors rank for that we don't (P5); standard+ verbosity
+  if (ctx.keywordGaps && ctx.keywordGaps.length > 0 && verbosity !== 'compact') {
+    const limit = verbosity === 'detailed' ? 8 : 4;
+    lines.push('Keyword gaps (competitor ranks, we don\'t):');
+    for (const gap of ctx.keywordGaps.slice(0, limit)) {
+      lines.push(`  - "${gap.keyword}" (vol ${gap.volume}, KD ${gap.difficulty}) — ${gap.competitorDomain} #${gap.competitorPosition}`);
+    }
+  }
+
+  // Topic clusters — topical authority coverage per cluster (P5); standard+ verbosity
+  if (ctx.topicClusters && ctx.topicClusters.length > 0 && verbosity !== 'compact') {
+    const limit = verbosity === 'detailed' ? 6 : 3;
+    lines.push('Topic clusters (weakest coverage first):');
+    for (const cluster of ctx.topicClusters.slice(0, limit)) {
+      lines.push(`  - "${cluster.topic}": ${Math.round(cluster.coveragePercent)}% covered (${cluster.ownedCount}/${cluster.totalCount} keywords)`);
+    }
+  }
+
   // Competitor snapshots (Task 4.2c) — at standard+ verbosity
   if (ctx.competitorSnapshots && ctx.competitorSnapshots.length > 0 && verbosity !== 'compact') {
     if (verbosity === 'detailed') {

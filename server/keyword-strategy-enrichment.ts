@@ -14,6 +14,7 @@ import {
   type StrategyOutput,
 } from './keyword-strategy-ai-synthesis.js';
 import { computeOpportunityScore, isSuspiciousPlannerGroupedVolume } from './keyword-strategy-helpers.js';
+import { computeOpportunityValue } from './scoring/opportunity-value.js';
 import { matchesQuestionKeyword } from './strategy-filters.js';
 import { METRICS_SOURCE } from '../shared/types/keywords.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
@@ -63,6 +64,13 @@ export interface EnrichKeywordStrategyOptions {
   competitorKeywords: CompetitorKeywordData[];
   provider: SeoDataProvider | null;
   seoDataMode: KeywordStrategySeoDataMode;
+  /**
+   * SEO Generation Quality P2 (flag `seo-generation-quality`, per-workspace).
+   * Computed once per generation and threaded in. On flag-ON the page-coverage
+   * prune uses token-subset containment instead of substring `.includes()`.
+   * Flag-OFF (default false) is byte-identical to today.
+   */
+  relaxConservatism?: boolean;
   sendProgress: (step: string, detail: string, progress: number) => void;
 }
 
@@ -71,6 +79,13 @@ export interface EnrichKeywordStrategyResult {
   siteKeywordMetrics: KeywordStrategySiteKeywordMetric[];
   topicClusters: KeywordStrategyTopicCluster[];
   cannibalization: KeywordStrategyCannibalizationIssue[];
+  /**
+   * Content gaps pruned by the page-coverage filter (`_removePageCoveredContentGaps`).
+   * Surfaced so the P2 deterministic backfill floor (in generation) can re-admit the
+   * highest-scoring pruned candidates when the kept list falls below the floor.
+   * Empty on flag-OFF behavior is unchanged; the array is always present (additive).
+   */
+  prunedContentGaps: StrategyContentGap[];
 }
 
 function normalizeTopicKeyword(value: string | undefined): string {
@@ -85,12 +100,32 @@ function hasMultiWordTopicSignal(keyword: string): boolean {
   return _hasMultiWordTopicSignal(keyword);
 }
 
+/**
+ * Token-subset containment: every token of `inner` appears (as a whole token) in
+ * `outer`. SEO Generation Quality P2(b): the flag-ON containment test, replacing
+ * the substring `.includes()` so "dental implants cost" is NOT eaten by a
+ * "/dental-implants" page signal (its `cost` token is absent). Both inputs are
+ * already topic-normalized whitespace-joined strings.
+ */
+function isTokenSubset(inner: string, outer: string): boolean {
+  const innerTokens = inner.split(' ').filter(Boolean);
+  if (innerTokens.length === 0) return false;
+  const outerTokens = new Set(outer.split(' ').filter(Boolean));
+  return innerTokens.every(token => outerTokens.has(token));
+}
+
 export function isTopicKeywordCoveredByPageMap(
   keyword: string,
   pageMap: StrategyPageMapEntry[] | undefined,
+  // P2(b): flag-ON → token-subset containment; flag-OFF → legacy substring .includes().
+  relaxConservatism = false,
 ): boolean {
   const normalizedKeyword = normalizeTopicKeyword(keyword);
   if (!normalizedKeyword || !pageMap?.length) return false;
+  // On flag-ON the multi-word signal still gates the weaker (title/slug) match, but
+  // the containment test itself is token-subset rather than substring.
+  const contains = (outer: string): boolean =>
+    relaxConservatism ? isTokenSubset(normalizedKeyword, outer) : outer.includes(normalizedKeyword);
 
   for (const page of pageMap) {
     const assignedKeywords = [
@@ -100,7 +135,7 @@ export function isTopicKeywordCoveredByPageMap(
 
     if (assignedKeywords.some(assigned =>
       assigned === normalizedKeyword
-      || (hasMultiWordTopicSignal(normalizedKeyword) && assigned.includes(normalizedKeyword))
+      || (hasMultiWordTopicSignal(normalizedKeyword) && contains(assigned))
     )) {
       return true;
     }
@@ -110,7 +145,7 @@ export function isTopicKeywordCoveredByPageMap(
     // without claiming broad one-word terms such as "dentist" are fully covered.
     if (hasMultiWordTopicSignal(normalizedKeyword)) {
       const pageSignal = normalizeTopicKeyword(`${page.pageTitle ?? ''} ${page.pagePath}`);
-      if (pageSignal.includes(normalizedKeyword)) return true;
+      if (contains(pageSignal)) return true;
     }
   }
 
@@ -120,12 +155,21 @@ export function isTopicKeywordCoveredByPageMap(
 export function _removePageCoveredContentGaps(
   contentGaps: StrategyContentGap[] | undefined,
   pageMap: StrategyPageMapEntry[] | undefined,
+  // P2(b): flag-ON → token-subset prune; flag-OFF (default) → byte-identical substring prune.
+  relaxConservatism = false,
 ): { kept: StrategyContentGap[]; removed: StrategyContentGap[] } {
   if (!contentGaps?.length) return { kept: [], removed: [] };
   const kept: StrategyContentGap[] = [];
   const removed: StrategyContentGap[] = [];
   for (const gap of contentGaps) {
-    if (isTopicKeywordCoveredByPageMap(gap.targetKeyword, pageMap)) {
+    // SEO Generation Quality P3 (M2): gaps marked `requested` were injected by the
+    // requested-re-add hard guarantee (the client explicitly asked for this keyword).
+    // They MUST survive the covered-topic heuristic — never prune them. The marker is
+    // only ever set on the flag-ON synthesis path, so flag-OFF gaps never carry it and
+    // this branch is inert there (flag-OFF prune stays byte-identical).
+    if (gap.requested) {
+      kept.push(gap);
+    } else if (isTopicKeywordCoveredByPageMap(gap.targetKeyword, pageMap, relaxConservatism)) {
       removed.push(gap);
     } else {
       kept.push(gap);
@@ -230,9 +274,12 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
     competitorKeywords,
     provider,
     seoDataMode,
+    relaxConservatism = false,
     sendProgress,
   } = options;
   const { gscData } = searchData;
+  // P2: pruned-by-page-coverage gaps, surfaced for the deterministic backfill floor.
+  let prunedContentGaps: StrategyContentGap[] = [];
 
   // Enrich pageMap with GSC metrics if available
   sendProgress('enrichment', 'Enriching strategy with ranking data...', 0.90);
@@ -499,24 +546,58 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
   }
 
   if (strategy.contentGaps?.length) {
-    const { kept, removed } = _removePageCoveredContentGaps(strategy.contentGaps, strategy.pageMap);
+    const { kept, removed } = _removePageCoveredContentGaps(strategy.contentGaps, strategy.pageMap, relaxConservatism);
     if (removed.length > 0) {
       log.info({
         workspaceId,
         removed: removed.map(gap => gap.targetKeyword),
       }, 'Removed content gaps already covered by strategy page map');
       strategy.contentGaps = kept;
+      // P2: retain the pruned gaps so the deterministic backfill floor can re-admit
+      // the highest-scoring ones when the kept list is below the floor (flag-ON).
+      prunedContentGaps = removed;
     }
   }
 
-  // Compute composite opportunity score — all enrichment (volume, KD, impressions, trend) is now done
+  // Compute composite opportunity score — all enrichment (volume, KD, impressions, trend) is now done.
+  // SEO Gen-Quality P4 (Contract 3, flag-ON via relaxConservatism): recompute opportunity_score
+  // from the SAME OV basis the recommendation queue and gain string use, so briefing-candidates,
+  // the upsell badge, and the rec layer all order content gaps by one figure. We store the OV
+  // `value` (0..100) — itself a normalized read of the EMV/ROI economic quantity (downstream of
+  // emvPerWeek), so it: (a) shares the OV/EMV basis (owner decision), (b) stays in the column's
+  // existing 0..100 range, and (c) keeps the rec content_gap branch's grounded spine valid (it
+  // reads cg.opportunityScore back as a 0..100 composite — feeding it an unbounded EMV would
+  // break the `opportunityScore/100` math). Flag-OFF keeps the legacy computeOpportunityScore
+  // (byte-identical).
   if (strategy.contentGaps?.length) {
     for (const cg of strategy.contentGaps) {
-      cg.opportunityScore = computeOpportunityScore(cg);
+      if (relaxConservatism) {
+        const ov = computeOpportunityValue({
+          branch: 'content_gap',
+          opportunityScore: computeOpportunityScore(cg) ?? null, // grounded composite spine
+          volume: cg.volume ?? null,
+          difficulty: cg.difficulty ?? null,
+          trendDirection: (cg.trendDirection as 'rising' | 'declining' | 'stable' | undefined) ?? null,
+          intent: cg.intent === 'transactional' || cg.intent === 'commercial' || cg.intent === 'informational' || cg.intent === 'navigational'
+            ? cg.intent
+            : null,
+          llmLabel: cg.priority === 'high' || cg.priority === 'medium' || cg.priority === 'low' ? cg.priority : null,
+        });
+        // OV value is 0..100 and EMV-derived; undefined when the gap had no signal at all.
+        // M2 (intentional re-compression): overwriting cg.opportunityScore with the OV `value`
+        // means the rec content_gap branch (recommendations.ts) re-feeds this OV value back as
+        // its `opportunityScore` composite spine into computeOpportunityValue — an f(f(x))
+        // re-compression vs the flag-OFF magnitude basis. This is deliberate and safe: the value
+        // stays in 0..100, ordering is preserved, and nothing breaks (the served tier/gain/badge
+        // all share the one OV basis — Contract 3). Flag-OFF keeps the single-pass legacy score.
+        cg.opportunityScore = ov.value > 0 ? ov.value : computeOpportunityScore(cg);
+      } else {
+        cg.opportunityScore = computeOpportunityScore(cg);
+      }
     }
     // Sort descending so highest-value gaps surface first in the UI
     strategy.contentGaps.sort((a, b) => (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0));
-    log.info({ workspaceId, count: strategy.contentGaps.length }, 'Computed content gap opportunity scores');
+    log.info({ workspaceId, count: strategy.contentGaps.length, basis: relaxConservatism ? 'ov-emv' : 'legacy' }, 'Computed content gap opportunity scores');
   }
 
   // ── Cannibalization Detection + Canonical Recommender ────────
@@ -821,5 +902,6 @@ Rules:
     siteKeywordMetrics,
     topicClusters,
     cannibalization,
+    prunedContentGaps,
   };
 }

@@ -6,6 +6,7 @@ import { callAI } from './ai.js';
 import { parseStructuredAIOutput, StructuredAIOutputError } from './ai-structured-output.js';
 import { buildSystemPrompt, getCustomPromptNotes } from './prompt-assembly.js';
 import { getMeetingBriefHash, upsertMeetingBrief } from './meeting-brief-store.js';
+import { loadRecommendations } from './recommendations.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { createLogger } from './logger.js';
@@ -123,11 +124,29 @@ Rules:
 `.trim();
 }
 
-function buildPromptHash(intel: WorkspaceIntelligence, customPromptNotes: string | null): string {
+/** A compact, tier-aware signal of the recommendation #1 for the brief cache hash.
+ *  `null` when there is no active rec set. SEO Gen-Quality P4 (G8): the brief's cache key
+ *  must bust when the recommendation queue RE-TIERS (the OV-derived tier flip), otherwise a
+ *  stale "#1" narrative is served after a re-rank. The brief is insight-sourced and does not
+ *  read the rec set, so the legacy hash had NO rec/tier signal at all. */
+export interface BriefRecSignal {
+  topRecommendationId: string | null;
+  topTier: string | null;
+}
+
+/** @internal exported for testing — pure: same inputs → same hash. */
+export function buildPromptHash(
+  intel: WorkspaceIntelligence,
+  customPromptNotes: string | null,
+  recSignal: BriefRecSignal | null,
+): string {
   // Must cover every signal used by buildBriefPrompt(), assembleMeetingBriefMetrics(),
   // AND buildSystemPrompt() (Layer 3: custom_prompt_notes). Missing any signal → cached
   // brief returned even when that data changed (stale metrics/narrative/framing).
   const relevant = {
+    // P4 (G8): rec #1 id + its tier so a re-tier (OV cutover) busts the brief cache.
+    topRecommendationId: recSignal?.topRecommendationId ?? null,
+    topTier: recSignal?.topTier ?? null,
     // Include computedAt so insight score/severity/data changes bust the cache even when IDs are stable.
     topIds: intel.insights?.topByImpact?.slice(0, 10).map(i => `${i.id}:${i.computedAt}`) ?? [],
     siteScore: intel.siteHealth?.auditScore,
@@ -154,6 +173,16 @@ function buildPromptHash(intel: WorkspaceIntelligence, customPromptNotes: string
   return createHash('sha256').update(JSON.stringify(relevant)).digest('hex');
 }
 
+/** Derive the tier-aware rec #1 signal for the brief cache hash from the CACHED rec set.
+ *  Returns null when no rec set is cached. Read-only — never triggers generation. */
+function buildBriefRecSignal(workspaceId: string): BriefRecSignal | null {
+  const set = loadRecommendations(workspaceId);
+  if (!set) return null;
+  const topId = set.summary.topRecommendationId;
+  const top = topId ? set.recommendations.find(r => r.id === topId) ?? null : null;
+  return { topRecommendationId: topId, topTier: top?.priority ?? null };
+}
+
 /**
  * Generates (or returns cached) meeting brief for a workspace.
  * Skips AI call if intelligence data hash matches the stored brief.
@@ -162,7 +191,10 @@ export async function generateMeetingBrief(workspaceId: string): Promise<Meeting
   const slices = await withActiveLocalSeoSlice(workspaceId, BRIEF_SLICES);
   const intel = await buildWorkspaceIntelligence(workspaceId, { slices });
   const customPromptNotes = getCustomPromptNotes(workspaceId);
-  const hash = buildPromptHash(intel, customPromptNotes);
+  // P4 (G8): read the CACHED rec set (never generate — that would be a heavy side effect on a
+  // read path) to derive the #1 id + its tier for the cache hash, so a re-tier busts the brief.
+  const recSignal = buildBriefRecSignal(workspaceId);
+  const hash = buildPromptHash(intel, customPromptNotes, recSignal);
   const cachedHash = getMeetingBriefHash(workspaceId);
 
   if (hash === cachedHash) {

@@ -109,12 +109,23 @@ export interface SeoDataProvider {
   init?(): Promise<void>;
 
   // Keyword Intelligence
-  getKeywordMetrics(keywords: string[], workspaceId: string, database?: string, locationCode?: number): Promise<KeywordMetrics[]>;
-  getRelatedKeywords(keyword: string, workspaceId: string, limit?: number, database?: string): Promise<RelatedKeyword[]>;
-  getQuestionKeywords(keyword: string, workspaceId: string, limit?: number, database?: string): Promise<QuestionKeyword[]>;
-  getKeywordIdeas?(keywords: string[], workspaceId: string, limit?: number, database?: string): Promise<KeywordSourceEvidence[]>;
-  getKeywordsForSite?(target: string, workspaceId: string, limit?: number, database?: string): Promise<KeywordSourceEvidence[]>;
-  getKeywordSuggestions?(keyword: string, workspaceId: string, limit?: number, database?: string): Promise<KeywordSourceEvidence[]>;
+  // `languageCode` (optional, defaults to 'en') threads the resolved workspace
+  // language into pool-path provider calls so non-English markets aren't queried
+  // in English (P1 / G13). Omitting it preserves the pre-P1 'en' behavior.
+  // NOTE: SemRush is language/geo-blind for discovery — it implements only
+  // getRelatedKeywords/getQuestionKeywords and ignores the extra locationCode/
+  // languageCode args; DataForSEO (the default provider) honors both. (M3)
+  // `locationCode` (optional) threads the resolved workspace geo into pool-path
+  // provider calls so a non-US market is not queried with US-located discovery
+  // (P1 / G13). Omitting it preserves the pre-P1 `locationCodeFromDatabase(database)`
+  // behavior exactly. Mirrors the `getKeywordMetrics` (database?, locationCode?,
+  // languageCode?) parameter shape.
+  getKeywordMetrics(keywords: string[], workspaceId: string, database?: string, locationCode?: number, languageCode?: string): Promise<KeywordMetrics[]>;
+  getRelatedKeywords(keyword: string, workspaceId: string, limit?: number, database?: string, locationCode?: number, languageCode?: string): Promise<RelatedKeyword[]>;
+  getQuestionKeywords(keyword: string, workspaceId: string, limit?: number, database?: string, locationCode?: number, languageCode?: string): Promise<QuestionKeyword[]>;
+  getKeywordIdeas?(keywords: string[], workspaceId: string, limit?: number, database?: string, locationCode?: number, languageCode?: string): Promise<KeywordSourceEvidence[]>;
+  getKeywordsForSite?(target: string, workspaceId: string, limit?: number, database?: string, locationCode?: number, languageCode?: string): Promise<KeywordSourceEvidence[]>;
+  getKeywordSuggestions?(keyword: string, workspaceId: string, limit?: number, database?: string, locationCode?: number, languageCode?: string): Promise<KeywordSourceEvidence[]>;
   getKeywordsForKeywords?(keywords: string[], workspaceId: string, limit?: number, database?: string): Promise<KeywordSourceEvidence[]>;
 
   // Domain Analysis

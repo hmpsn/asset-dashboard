@@ -259,6 +259,10 @@ export function InsightsBriefingPage({
         recommendations={recommendations}
         tier={effectiveTier}
         onRequestBrief={onRequestBrief}
+        // SEO Gen-Quality P4 (Contract 3): per-workspace umbrella state resolved
+        // server-side and surfaced on the briefing response. Absent (legacy/flag-OFF)
+        // → false → the pre-P4 recommendation surface renders byte-identically.
+        ovGainActive={briefing.ovGainActive ?? false}
       />
       {/* allStories is briefing.stories — the early-return at the top
           of the paid-tier block guarantees length ≥ 1 here, so no

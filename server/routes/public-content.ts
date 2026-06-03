@@ -215,6 +215,9 @@ router.get('/api/public/seo-strategy/:workspaceId', async (req, res, next) => {
         competitorProof: g.competitorProof,
         questionKeywords: g.questionKeywords,
         opportunityScore: g.opportunityScore ?? computeOpportunityScore(g),
+        // SEO Generation Quality P2 — surface the honesty flag through the explicit
+        // public whitelist so the client renderer can sort/label backfilled gaps.
+        backfilled: g.backfilled,
       })),
       quickWins: quickWins.map(q => ({
         pagePath: q.pagePath,

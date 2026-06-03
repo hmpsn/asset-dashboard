@@ -19,6 +19,9 @@ const ACTION_LABELS: Record<ActionType, string> = {
   strategy_keyword_added: 'Added keyword to strategy',
   voice_calibrated:       'Calibrated brand voice',
   insight_acted_on:       'Acted on a recommendation',
+  competitor_gap_closed:  'Closed a competitor keyword gap',
+  cluster_published:      'Filled a topic cluster',
+  cannibalization_resolved: 'Resolved keyword cannibalization',
 };
 
 function actionLabel(type: ActionType): string {

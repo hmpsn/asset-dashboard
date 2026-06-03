@@ -10,6 +10,7 @@ import { toAuditFindingPageId } from './helpers.js';
 import { createLogger } from './logger.js';
 import { fireBridge } from './bridge-infrastructure.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { generateRecommendations } from './recommendations.js';
 import type * as AnalyticsInsightsStore from './analytics-insights-store.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
@@ -289,6 +290,18 @@ async function runScheduledAudit(schedule: AuditSchedule) {
 
     // Invalidate intelligence cache so next query gets fresh data
     invalidateIntelligenceCache(ws.id);
+
+    // Auto-regenerate recommendations after a scheduled audit (mirrors routes/jobs.ts).
+    // generateRecommendations broadcasts + invalidates internally (Bridge rule #3 — NO
+    // manual broadcast here). Wrapped in its own try/catch so a regen failure never fails
+    // the audit. This wires the P5 first-class orphan recs (keyword_gaps/topic_clusters/
+    // cannibalization) into the scheduled path the same way the manual job path already does.
+    try {
+      await generateRecommendations(ws.id);
+      log.info(`Auto-regenerated recommendations for ${ws.id} after scheduled audit`);
+    } catch (err) {
+      log.warn({ err, workspaceId: ws.id }, 'Recommendation regen after scheduled audit failed (non-fatal)');
+    }
 
     // Check for score drop using suppressed score
     if (oldScore !== undefined && oldScore > effectiveAudit.siteScore) {

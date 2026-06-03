@@ -314,6 +314,18 @@ export const opportunityComponentSchema = z.object({
 export const opportunityScoreSchema = z.object({
   value: z.number(),
   emvPerWeek: z.number(),
+  // P4 CPC-proxy placeholder. CLOSED schema (no .passthrough()) → without this line the
+  // field is stripped on every rec-set reload, so calibration-snapshot survival would
+  // depend on a value that never round-trips. Admin/AI-only (stripped on public routes).
+  // `.default(0)` (NOT bare `.optional()`): every PRE-P4 stored `opportunity` blob has no
+  // `predictedEmv` key. Because `recommendationSchema.opportunity` is
+  // `opportunityScoreSchema.optional().catch(undefined)`, a REQUIRED `predictedEmv` would
+  // fail validation and drop the WHOLE legacy `opportunity` object on read — degrading the
+  // client OV breakdown, the PATCH calibration snapshot, and the OV-divergence canary until
+  // regen. `.default(0)` lets a legacy blob round-trip (predictedEmv → 0) with the rest of
+  // `opportunity` intact, while keeping the in-memory type `predictedEmv: number` (a bare
+  // `.optional()` would make it `number | undefined` and break the OpportunityScore type).
+  predictedEmv: z.number().default(0),
   roiPerEffortDay: z.number(),
   confidence: z.number(),
   calibration: z.number(),
@@ -330,6 +342,10 @@ export const recommendationSchema = z.object({
   type: z.enum([
     'technical', 'content', 'content_refresh', 'schema', 'metadata',
     'performance', 'accessibility', 'strategy', 'aeo',
+    // SEO Gen-Quality P5 — first-class orphan-subsystem rec types. MUST stay in lockstep
+    // with RecType (shared/types/recommendations.ts): a new RecType absent from this enum
+    // fails validation and is silently DROPPED on every reload (Schema vs stored shape rule).
+    'keyword_gap', 'topic_cluster', 'cannibalization',
   ]),
   title: z.string(),
   description: z.string(),

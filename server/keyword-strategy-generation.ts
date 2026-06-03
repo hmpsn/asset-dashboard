@@ -27,6 +27,9 @@ import { listTopicClusters } from './topic-clusters.js';
 import { listCannibalizationIssues } from './cannibalization-issues.js';
 import { normalizePageUrl } from './helpers.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
+import { isFeatureEnabled } from './feature-flags.js';
+import { backfillContentGapsToFloor, STRATEGY_CONTENT_GAP_FLOOR } from './keyword-strategy-helpers.js';
+import type { GenerationQuality } from '../shared/types/generation-quality.js';
 
 // Re-exported for backward compatibility with existing callers.
 export { buildStrategyIntelligenceBlock, computeOpportunityScore, shouldFetchCompetitorData } from './keyword-strategy-helpers.js';
@@ -61,6 +64,12 @@ export interface GenerateKeywordStrategyResult {
   strategy: (KeywordStrategy & { pageMap?: PageKeywordMap[] }) | null;
   upToDate?: boolean;
   freshPageCount?: number;
+  /**
+   * Generation-quality telemetry (SEO Generation Quality P0). Additive + optional —
+   * present on the full-generation path so eval fixtures can assert on it; absent on
+   * the incremental no-op short-circuit. Does NOT change the existing output contract.
+   */
+  generationQuality?: GenerationQuality;
 }
 
 export class KeywordStrategyGenerationError extends Error {
@@ -119,7 +128,15 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
 
   const businessContext = options.businessContext || ws.keywordStrategy?.businessContext || '';
   const strategyMode = options.mode === 'incremental' ? 'incremental' : 'full'; // 'full' | 'incremental'
-  const seoDataMode = normalizeSeoDataMode(options.seoDataMode);
+  const requestedSeoDataMode = normalizeSeoDataMode(options.seoDataMode);
+  // MCP-seed (G/P1 #8): the MCP/chat path passes a provider but no seoDataMode, so
+  // it collapses to 'none' and discovery is starved. On the flag-ON path, treat
+  // "provider present" as "build a real universe" — promote the collapsed 'none'
+  // to 'quick' so seo-data fetches domain/competitor seeds and the assembler has a
+  // populated pool. Flag-OFF is unchanged (byte-identical).
+  const seoDataMode = (requestedSeoDataMode === 'none' && provider && isFeatureEnabled('seo-generation-quality', ws.id))
+    ? 'quick'
+    : requestedSeoDataMode;
   const competitorDomains = options.competitorDomains ? [...options.competitorDomains] : [...(ws.competitorDomains || [])];
   const rawMaxPages = options.maxPages != null ? Number(options.maxPages) : 500;
   const maxPagesParam = rawMaxPages > 0 ? Math.min(rawMaxPages, KEYWORD_STRATEGY_MAX_PAGE_CAP) : 0; // 0 = no cap
@@ -211,6 +228,7 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       businessContext,
       strategyMode,
       seoDataMode,
+      baseUrl,
       competitorDomains,
       pageInfo,
       preloadedPageKeywords,
@@ -335,6 +353,16 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
     const keywordPool = synthesis.keywordPool;
     const businessSection = synthesis.businessSection;
     const keywordEvaluationContext = synthesis.keywordEvaluationContext;
+    // FAQ enrichment question keywords. On the flag-ON path the legacy
+    // `seoDataMode === 'full'` question prefetch in keyword-strategy-seo-data.ts is
+    // gated off (to avoid a double-fetch), so `allQuestionKws` is empty there; the
+    // keyword-universe assembler instead surfaces the grouped questions (geo +
+    // language threaded) via `synthesis.questionKeywords`. Use those when present so
+    // enrichKeywordStrategy attaches FAQ questions to content gaps exactly as before.
+    // On the flag-OFF path (and the M2 assembler-degradation fallback) the synthesis
+    // value is undefined, so the legacy `allQuestionKws` flows unchanged — flag-OFF
+    // stays byte-identical.
+    const enrichmentQuestionKeywords = synthesis.questionKeywords ?? allQuestionKws;
 
     if (!strategy?.pageMap) {
       const errMsg = 'Strategy generation produced no results';
@@ -355,10 +383,17 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       throw new KeywordStrategyGenerationError(500, { error: 'Strategy generation produced no valid page keyword assignments' });
     }
 
+    // SEO Generation Quality P2 (flag `seo-generation-quality`, per-workspace):
+    // compute ONCE here and thread the boolean into enrichment (token-subset prune)
+    // and the deterministic backfill floor below. Do NOT scatter isFeatureEnabled
+    // into hot loops. Flag-OFF (false) keeps pruning/backfill byte-identical.
+    const relaxConservatism = isFeatureEnabled('seo-generation-quality', ws.id);
+
     let {
       siteKeywordMetrics,
       topicClusters,
       cannibalization,
+      prunedContentGaps,
     } = await enrichKeywordStrategy({
       workspaceId: ws.id,
       baseUrl,
@@ -376,10 +411,11 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
         ga4EventsByPage,
       },
       domainKeywords: semrushDomainData,
-      questionKeywords: allQuestionKws,
+      questionKeywords: enrichmentQuestionKeywords,
       competitorKeywords: competitorKeywordData,
       provider,
       seoDataMode,
+      relaxConservatism,
       sendProgress,
     });
 
@@ -417,6 +453,31 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       evaluationContext: keywordEvaluationContext,
     });
 
+    // ── SEO Generation Quality P2(d): deterministic backfill floor ──
+    // After pruning, if flag-ON and the kept content-gap count is below the soft
+    // floor (6), re-admit the highest-scoring pruned candidates (ordered by score)
+    // tagged `backfilled = true` until the floor is met. Deterministic — no AI; if
+    // fewer than 6 real candidates exist, admit what is available (never fabricate).
+    // Flag-OFF: skipped entirely → byte-identical (no backfill, no tags).
+    // Count gaps the AI/enrichment produced (post-filter) BEFORE the backfill so the
+    // telemetry's aiReturnedCount stays honest (backfilledCount is tracked separately).
+    const aiReturnedContentGapCount = strategy.contentGaps?.length ?? 0;
+    let backfilledCount = 0;
+    let floorHit = false;
+    if (relaxConservatism && (strategy.contentGaps?.length ?? 0) < STRATEGY_CONTENT_GAP_FLOOR && prunedContentGaps.length > 0) {
+      const result = backfillContentGapsToFloor(
+        strategy.contentGaps ?? [],
+        prunedContentGaps,
+        STRATEGY_CONTENT_GAP_FLOOR,
+      );
+      strategy.contentGaps = result.gaps;
+      backfilledCount = result.backfilledCount;
+      floorHit = result.floorHit;
+      if (backfilledCount > 0) {
+        log.info({ workspaceId: ws.id, backfilledCount, floor: STRATEGY_CONTENT_GAP_FLOOR, total: strategy.contentGaps.length }, 'Deterministic content-gap backfill floor applied');
+      }
+    }
+
     if (strategyMode === 'incremental') {
       const finalPagePaths = new Set((strategy.pageMap ?? []).map(page => normalizePageUrl(page.pagePath)));
       for (const page of pagesToAnalyze) {
@@ -441,7 +502,9 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       competitorKeywordData,
       topicClusters,
       cannibalization,
-      questionKeywords: allQuestionKws,
+      // Persist the same question keywords FAQ enrichment used: assembler-surfaced
+      // (geo + language threaded) on flag-ON, legacy seo-data prefetch on flag-OFF.
+      questionKeywords: enrichmentQuestionKeywords,
       businessContext,
       seoDataMode,
       seoDataStatus,
@@ -467,9 +530,28 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
     const responseStrategy = { ...keywordStrategy, pageMap };
     responseSent = true;
 
+    // Generation-quality telemetry (SEO Generation Quality P0). Side-effect-free
+    // w.r.t. output: poolSize + aiReturnedCount are knowable today; the remaining
+    // fields are populated by P1–P2 (un-suppress + deterministic backfill floor).
+    const generationQuality: GenerationQuality = {
+      workspaceId: ws.id,
+      // poolSize reflects the real universe on the flag-ON path (keywordPool is
+      // populated from buildKeywordUniverse) and the legacy pool on flag-OFF.
+      poolSize: keywordPool.size,
+      aiReturnedCount: aiReturnedContentGapCount,
+      // suppressedCount is wired from the assembler on the flag-ON path (branded +
+      // declined hard-filter removals); 0 on the legacy path.
+      suppressedCount: synthesis.suppressedCount ?? 0,
+      // backfilledCount + floorHit reflect the P2 deterministic backfill floor.
+      // Both stay 0/false on flag-OFF (the backfill block is skipped entirely).
+      backfilledCount,
+      floorHit,
+    };
+    log.info({ generationQuality }, 'keyword-strategy/generation-quality');
+
     queueKeywordStrategyPostUpdateFollowOns({ workspaceId: ws.id });
     activeGenerations.delete(ws.id);
-    return { strategy: responseStrategy as KeywordStrategy & { pageMap: PageKeywordMap[] } };
+    return { strategy: responseStrategy as KeywordStrategy & { pageMap: PageKeywordMap[] }, generationQuality };
   } catch (err) {
     activeGenerations.delete(ws.id);
     clearKeepalive();

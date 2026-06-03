@@ -25,6 +25,9 @@ import { getDeclinedKeywords } from './keyword-feedback.js';
 import { listPageKeywords } from './page-keywords.js';
 import { listContentGaps } from './content-gaps.js';
 import { listQuickWins } from './quick-wins.js';
+import { listKeywordGaps } from './keyword-gaps.js';
+import { listTopicClusters } from './topic-clusters.js';
+import { listCannibalizationIssues } from './cannibalization-issues.js';
 import { getInsights } from './analytics-insights-store.js';
 import { listDiagnosticReports } from './diagnostic-store.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
@@ -54,7 +57,7 @@ import { computeOvCalibration } from './scoring/ov-calibration.js';
 // ─── Types ────────────────────────────────────────────────────────
 
 export type { RecPriority, RecType, RecStatus, RecActionType, Recommendation, RecommendationSet } from '../shared/types/recommendations.ts';
-import type { RecPriority, RecType, RecStatus, Recommendation, RecommendationSet } from '../shared/types/recommendations.ts';
+import type { RecPriority, RecType, RecStatus, Recommendation, RecommendationSet, OpportunityScore } from '../shared/types/recommendations.ts';
 import type { ConversionAttributionData, CtrOpportunityData } from '../shared/types/analytics.js';
 import type { LearningsSlice } from '../shared/types/intelligence.js';
 import type { ActionType } from '../shared/types/outcome-tracking.js';
@@ -116,21 +119,108 @@ export function getRecoveryRate(checkName: string): RecoveryRate {
   return RECOVERY_RATES[checkName] || DEFAULT_RECOVERY;
 }
 
+// ─── SEO Gen-Quality P4 · one gain basis (Contract 3) ───────────────────────
+//
+// The legacy `estimatedGain` strings are static per-check constants (getRecoveryRate),
+// identical for every workspace/page, while ranking already reads the OV value — a live
+// client-facing incoherence. When `useGenQual` is ON, the gain string is derived from the
+// SAME OV figure (predictedEmv, the horizon-projected EMV that also feeds the served tier
+// and content_gaps.opportunity_score), so the client's stated gain, the queue order, and
+// the upsell badge all share ONE basis.
+//
+// CLIENT-SAFE FORM = NON-DOLLARIZED (owner constraint: clients never see a raw $/wk). We
+// render an outcome-oriented RELATIVE-MAGNITUDE phrase, NOT a dollar figure. The public
+// route additionally sanitizes any dollar exposure (stripEmvFromPublicRecs) as defense-
+// in-depth, and the public-read test asserts no dollarized estimatedGain ever leaks.
+//
+// Bands map the horizon EMV proxy to a magnitude word. Owner-tunable (documented in the
+// guardrail doc + PR); deliberately coarse so the proxy's imprecision is never overstated.
+const OV_GAIN_BANDS = { high: 600, medium: 150, low: 1 } as const;
+
+/** Non-dollarized, client-safe gain string derived from the OV horizon EMV proxy.
+ *  Same basis as the served tier + content_gaps.opportunity_score (Contract 3). Returns
+ *  null when no OV is attached (caller keeps the legacy string). @internal exported for testing */
+export function buildOvGainString(opportunity: OpportunityScore | undefined): string | null {
+  if (!opportunity) return null;
+  const emv = opportunity.predictedEmv;
+  if (!Number.isFinite(emv) || emv <= 0) {
+    return 'Modest but real opportunity to recover organic visibility';
+  }
+  if (emv >= OV_GAIN_BANDS.high) {
+    return 'High-value opportunity — among the strongest expected organic gains on the site right now';
+  }
+  if (emv >= OV_GAIN_BANDS.medium) {
+    return 'Solid opportunity — meaningful expected organic gain relative to your other actions';
+  }
+  return 'Worthwhile opportunity — a steady expected organic gain once addressed';
+}
+
+/** Resolve the gain string for a rec given the P4 flag. Flag-OFF (or no OV) returns the
+ *  legacy string unchanged (byte-identical). Flag-ON returns the OV-derived non-dollarized
+ *  phrase. @internal exported for testing */
+export function resolveEstimatedGain(
+  legacyGain: string,
+  opportunity: OpportunityScore | undefined,
+  useGenQual: boolean,
+): string {
+  if (!useGenQual) return legacyGain;
+  return buildOvGainString(opportunity) ?? legacyGain;
+}
+
 export {
   adjustKdImpactScore,
   classifyKdGap,
   kdClassificationNote,
 } from './authority-context.js';
 
-/** @internal exported for unit testing */
+/**
+ * @internal exported for unit testing
+ *
+ * Maps a recommendation's `type` (+ `source`) to the {@link ActionType} its outcome is
+ * tracked under. This mapping feeds `winRateByActionType` calibration, so a NEW `RecType`
+ * that silently fell through to `audit_fix_applied` would distort calibration (G2). The
+ * `switch` is therefore EXHAUSTIVE over `RecType`: the `never` assignment in `default`
+ * makes adding a `RecType` to the union a COMPILE error until the author either gives it an
+ * explicit outcome case here or consciously adds it to the audit-fix family below. This
+ * compile-time guarantee is stronger than a pr-check rule and is the enforcement the
+ * `docs/rules/seo-generation-quality.md` "new rec types" contract refers to for the
+ * RecType→ActionType half (the source-category lockstep half is the pr-check rule).
+ */
 export function recommendationOutcomeActionType(type: RecType, source: string): ActionType {
-  if (type === 'content_refresh') return 'content_refreshed';
-  if (type === 'metadata') return 'meta_updated';
-  if (type === 'schema') return 'schema_deployed';
-  if (type === 'content') return 'content_published';
-  if (type === 'strategy' && source.startsWith('strategy:content-gap')) return 'content_published';
-  if (type === 'strategy') return 'insight_acted_on';
-  return 'audit_fix_applied';
+  switch (type) {
+    case 'content_refresh':
+      return 'content_refreshed';
+    case 'metadata':
+      return 'meta_updated';
+    case 'schema':
+      return 'schema_deployed';
+    case 'content':
+      return 'content_published';
+    case 'strategy':
+      return source.startsWith('strategy:content-gap') ? 'content_published' : 'insight_acted_on';
+    // ── SEO Gen-Quality P5 · first-class orphan-subsystem recs ──
+    // Distinct ActionTypes (NOT the audit_fix_applied family) so winRateByActionType stays
+    // honestly calibrated for each subsystem (the contract's "honest calibration" requirement).
+    case 'keyword_gap':
+      return 'competitor_gap_closed';
+    case 'topic_cluster':
+      return 'cluster_published';
+    case 'cannibalization':
+      return 'cannibalization_resolved';
+    case 'technical':
+    case 'performance':
+    case 'accessibility':
+    case 'aeo':
+      // Audit-fix family — these map to the generic audit_fix_applied outcome by design.
+      // A new RecType must NOT silently join this family: add an explicit case above unless
+      // it is genuinely an audit fix, in which case add it to this list deliberately.
+      return 'audit_fix_applied';
+    default: {
+      const _exhaustive: never = type;
+      void _exhaustive;
+      return 'audit_fix_applied';
+    }
+  }
 }
 
 function applyRecommendationOutcomeAdjustment(
@@ -180,7 +270,10 @@ export type RecSourceCategory =
   | 'decay'
   | 'insight:ctr_opportunity'
   | 'insight:freshness_alert'
-  | 'diagnostic';
+  | 'diagnostic'
+  | 'keyword_gap'
+  | 'topic_cluster'
+  | 'cannibalization';
 
 const REC_SOURCE_CATEGORIES: RecSourceCategory[] = [
   'audit',
@@ -189,6 +282,9 @@ const REC_SOURCE_CATEGORIES: RecSourceCategory[] = [
   'insight:ctr_opportunity',
   'insight:freshness_alert',
   'diagnostic',
+  'keyword_gap',
+  'topic_cluster',
+  'cannibalization',
 ];
 
 /** Returns the category prefix for a given source string, or `null` when
@@ -220,6 +316,13 @@ export const RecSource = {
   freshnessAlert:         (pageSlug: string): string => `insight:freshness_alert:${pageSlug}`,
   diagnostic:             (reportId: string, actionIdx: number, actionTitle: string): string =>
     `diagnostic:${reportId}:${actionIdx}:${actionTitle.slice(0, 20)}`,
+  // ── SEO Gen-Quality P5 · first-class orphan-subsystem recs ──
+  // Each key is stable per logical issue (keyword / cluster topic / cannibalization URL-set)
+  // so status carries over between runs and one fix doesn't auto-resolve another. These
+  // categories are NOT `strategy:`-prefixed, so buildMergeKey keys on the source alone.
+  keywordGap:             (keyword: string): string => `keyword_gap:${keyword}`,
+  topicCluster:           (topic: string): string => `topic_cluster:${topic}`,
+  cannibalization:        (urlSetKey: string): string => `cannibalization:${urlSetKey}`,
 };
 
 /** Infer page type from slug path.
@@ -607,6 +710,55 @@ function isCriticalCheck(check: string): boolean {
   return CRITICAL_CHECKS.has(check);
 }
 
+/** Extract the audit check name from a rec `source` string (`audit:title`,
+ *  `audit:site-wide:canonical` → `title` / `canonical`). Returns '' for non-audit
+ *  sources. Mirrors the checkName extraction in computeRecommendationSummary so the
+ *  two stay in lockstep. */
+function checkNameFromSource(source: string | undefined): string {
+  if (!source) return '';
+  if (source.startsWith('audit:site-wide:')) return source.replace('audit:site-wide:', '');
+  if (source.startsWith('audit:')) return source.replace('audit:', '');
+  return '';
+}
+
+// ─── SEO Gen-Quality P4 · OV-derived priority tier (Contract 2) ─────────────
+//
+// When `useGenQual` is ON the served priority TIER is derived from the OV value
+// (which is a normalized read of the EMV/ROI economic quantity) via the bands below,
+// EXCEPT genuine CRITICAL_CHECKS which keep `fix_now` (a broken canonical/robots is
+// urgent regardless of modelled EMV). Flag-OFF this is a no-op — the legacy per-branch
+// tier survives and sortRecommendations/priorityOrder/computeRecommendationSummary are
+// byte-identical (they read rec.priority, which is only overwritten when the flag is on).
+//
+// ⚠️ OWNER-TUNABLE THRESHOLDS (NOT approved for a per-workspace flip in this PR).
+// The bands map the 0..100 OV `value` to a tier. They are deliberately conservative
+// defaults; the owner approves the final thresholds AND the canary cohort before any
+// per-workspace flip. Documented in docs/rules/seo-generation-quality.md (Contract 2)
+// and the PR body. `value` is the OV-pipeline output of normalizeToScore(roiPerEffortDay),
+// itself downstream of emvPerWeek — so the tier shares the one OV/EMV basis (Contract 3).
+const OV_TIER_BANDS = {
+  /** value ≥ this → fix_now (top-of-queue economic opportunity). */
+  fixNow: 70,
+  /** value ≥ this → fix_soon. */
+  fixSoon: 45,
+  /** value ≥ this → fix_later; below → ongoing. */
+  fixLater: 20,
+} as const;
+
+/** Derive the served priority tier from a rec's OV value. CRITICAL_CHECKS short-circuit
+ *  to `fix_now`. Pure: same rec → same tier. @internal exported for unit testing */
+export function deriveOvTier(rec: Pick<Recommendation, 'priority' | 'source' | 'opportunity'>): RecPriority {
+  // Genuine critical audit checks stay urgent regardless of modelled EMV.
+  if (isCriticalCheck(checkNameFromSource(rec.source))) return 'fix_now';
+  // No OV attached (legacy rec) → keep the existing tier untouched.
+  const value = rec.opportunity?.value;
+  if (value == null) return rec.priority;
+  if (value >= OV_TIER_BANDS.fixNow) return 'fix_now';
+  if (value >= OV_TIER_BANDS.fixSoon) return 'fix_soon';
+  if (value >= OV_TIER_BANDS.fixLater) return 'fix_later';
+  return 'ongoing';
+}
+
 export function getTrafficScore(traffic: TrafficMap, slug: string, conversionRate?: number): number {
   const pagePath = normalizePageUrl(slug);
   const t = traffic[pagePath] || traffic[slug];
@@ -671,6 +823,16 @@ export function toPageSlug(url: string): string {
     try { path = new URL(url).pathname; } catch { /* fall through */ }
   }
   return normalizePageUrl(path).replace(/^\//, '');
+}
+
+/** SEO Gen-Quality P5 — build a stable, order-independent key for a cannibalization
+ *  URL set. Normalizes each path to its slug, dedupes, and sorts so the SAME set of
+ *  competing pages always produces the SAME key — used both as the rec source suffix
+ *  (status carries over between runs) and to dedupe a cannibalization rec against an
+ *  active cannibalization insight covering the same pages. Pure / deterministic.
+ *  @internal exported for unit testing */
+export function cannibalizationUrlSetKey(paths: string[]): string {
+  return Array.from(new Set(paths.map(p => toPageSlug(p)))).sort().join('|');
 }
 
 // Source prefixes whose slug portion may have been stored as an absolute URL
@@ -937,6 +1099,14 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   // attached (shadow). When ON, the single selector below the sort flips
   // impactScore to opportunity.value — the entire cutover surface.
   const useOv = isFeatureEnabled('opportunity-value-scorer');
+  // ── SEO Gen-Quality P4 cutover flag (per-workspace umbrella). ──
+  // Resolved ONCE per rec-gen cycle and threaded as a plain boolean (no isFeatureEnabled
+  // in loops — mirrors the P2/P3 relaxConservatism pattern). When OFF (umbrella OFF = all
+  // prod today) the OV-derived TIER, the OV-EMV estimatedGain basis, and the
+  // content_gaps.opportunity_score recompute are all NO-OPs, so generation is byte-identical
+  // to pre-P4 (proven by the flag-OFF snapshot test). NOT the global `opportunity-value-scorer`
+  // flag (that gates only impactScore via pickImpactScore — do NOT widen it).
+  const useGenQual = isFeatureEnabled('seo-generation-quality', ws.id);
   const tier = ws.tier || 'free';
   const assignedTo: 'team' | 'client' = tier === 'premium' ? 'team' : 'client';
 
@@ -1349,6 +1519,10 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           actionType: 'content_creation',
           status: 'pending',
           assignedTo,
+          // Carry the gap's deterministic-backfill provenance onto the rec (only when
+          // true, so flag-OFF recs are byte-identical) — lets the headline count / email
+          // exclude marginal backfill without a fragile rec→gap key remap.
+          ...(cg.backfilled ? { backfilled: true as const } : {}),
           createdAt: now,
           updatedAt: now,
         });
@@ -1477,6 +1651,201 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         createdAt: now,
         updatedAt: now,
       });
+    }
+
+    // ── 2b. SEO Gen-Quality P5 — first-class orphan-subsystem recs (flag-gated). ──
+    // keyword_gaps / topic_clusters / cannibalization_issues are normalized tables that
+    // until now only surfaced in the intelligence slice + strategy UI, never as recs. We
+    // mint them as first-class recs ONLY when the umbrella flag is on, so flag-OFF (= all
+    // prod today) is byte-identical: no new recs/sources, and the merge/auto-resolve loop
+    // below sees exactly the pre-P5 source set. Each orphan read is in its OWN try/catch
+    // calling failedCategories.add(<category>) on catch — a transient empty read must NOT
+    // drop the source from newSources and falsely bulk-auto-resolve prior recs (FM-2/G2).
+    if (useGenQual) {
+      // keyword_gap → ranking_opp branch (competitor outranks us; close the gap).
+      try {
+        const keywordGaps = listKeywordGaps(workspaceId).slice(0, 10);
+        for (const kg of keywordGaps) {
+          if (declinedKeywords.has(keywordComparisonKey(kg.keyword))) continue;
+          const baseScore = adjustKdImpactScore(
+            kg.volume > 0 ? Math.min(70, 40 + Math.round((Math.log10(kg.volume) / 5) * 30)) : 40,
+            kg.difficulty,
+            domainStrength,
+          );
+          const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
+            Math.max(10, Math.min(100, baseScore)),
+            'keyword_gap',
+            RecSource.keywordGap(kg.keyword),
+            outcomeLearnings,
+            kg.difficulty,
+          );
+          recs.push({
+            id: `rec_${crypto.randomBytes(6).toString('hex')}`,
+            workspaceId,
+            priority: 'ongoing',
+            type: 'keyword_gap',
+            title: `Keyword Gap: "${kg.keyword}"`,
+            description: `${kg.competitorDomain} ranks #${kg.competitorPosition} for "${kg.keyword}" (volume ${kg.volume.toLocaleString()}, difficulty ${kg.difficulty}) — you don't. Targeting this term captures demand a competitor already owns.`,
+            insight: `Competitors ranking for high-demand keywords you ignore is lost organic traffic. Building content or optimizing a page for "${kg.keyword}" lets you compete for a term with proven search demand.`,
+            impact: kg.volume > 1000 ? 'high' : kg.volume > 200 ? 'medium' : 'low',
+            effort: 'high',
+            impactScore: adjustedImpactScore,
+            opportunity: computeOpportunityValue({
+              branch: 'ranking_opp',
+              volume: kg.volume,
+              difficulty: kg.difficulty,
+              currentPosition: kg.competitorPosition,
+              authorityStrength: ovAuthority ?? null,
+              ctrCurve: ovCtrCurve,
+              timingBoost: maxBoostForPages(timingBoosts, []),
+            }, { calibration: ovCalibration, weights: ovWeights }),
+            source: RecSource.keywordGap(kg.keyword),
+            affectedPages: [],
+            trafficAtRisk: 0,
+            impressionsAtRisk: 0,
+            estimatedGain: `Capturing "${kg.keyword}" targets a term with ${kg.volume.toLocaleString()} monthly searches a competitor already ranks for`,
+            actionType: 'content_creation',
+            status: 'pending',
+            assignedTo,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+      } catch (err) {
+        failedCategories.add('keyword_gap');
+        log.warn({ err, workspaceId }, 'Keyword gaps unavailable for recommendations');
+      }
+
+      // topic_cluster → content_gap branch. listTopicClusters is coverage-ASC sorted, so
+      // clusters[0] is the WEAKEST cluster. Mint exactly ONE cluster-head rec (the weakest
+      // gap), NOT one per cluster — a single high-leverage "fill this cluster" directive.
+      try {
+        const clusters = listTopicClusters(workspaceId);
+        const cluster = clusters[0];
+        if (cluster) {
+          const opportunityScore = Math.max(0, Math.min(100, 100 - cluster.coveragePercent));
+          const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
+            Math.max(10, Math.min(100, Math.round(opportunityScore))),
+            'topic_cluster',
+            RecSource.topicCluster(cluster.topic),
+            outcomeLearnings,
+          );
+          const gapPreview = cluster.gap.slice(0, 5).join(', ');
+          recs.push({
+            id: `rec_${crypto.randomBytes(6).toString('hex')}`,
+            workspaceId,
+            priority: 'ongoing',
+            type: 'topic_cluster',
+            title: `Build Topical Authority: "${cluster.topic}"`,
+            description: `You cover ${Math.round(cluster.coveragePercent)}% of the "${cluster.topic}" cluster (${cluster.ownedCount}/${cluster.totalCount} keywords). Filling the gaps${gapPreview ? ` (${gapPreview})` : ''} builds the topical depth search engines reward.`,
+            insight: `Topical authority compounds — covering a cluster comprehensively signals expertise and lifts every page in it. "${cluster.topic}" is your weakest cluster, so it has the most room to grow.`,
+            impact: opportunityScore > 60 ? 'high' : opportunityScore > 30 ? 'medium' : 'low',
+            effort: 'high',
+            impactScore: adjustedImpactScore,
+            opportunity: computeOpportunityValue({
+              branch: 'content_gap',
+              opportunityScore,
+              authorityStrength: ovAuthority ?? null,
+              ctrCurve: ovCtrCurve,
+              timingBoost: maxBoostForPages(timingBoosts, []),
+            }, { calibration: ovCalibration, weights: ovWeights }),
+            source: RecSource.topicCluster(cluster.topic),
+            affectedPages: [],
+            trafficAtRisk: 0,
+            impressionsAtRisk: 0,
+            estimatedGain: `Filling the "${cluster.topic}" cluster (currently ${Math.round(cluster.coveragePercent)}% covered) builds topical authority across related pages`,
+            actionType: 'content_creation',
+            status: 'pending',
+            assignedTo,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+      } catch (err) {
+        failedCategories.add('topic_cluster');
+        log.warn({ err, workspaceId }, 'Topic clusters unavailable for recommendations');
+      }
+
+      // cannibalization → technical branch. Cannibalization is ALSO an InsightType, so we
+      // dedupe-vs-insight: an ACTIVE (unresolved) cannibalization insight covering the same
+      // URL set already surfaces the issue — we cross-link rather than mint a duplicate rec.
+      try {
+        const issues = listCannibalizationIssues(workspaceId);
+        // Build the set of URL-set keys already covered by an active cannibalization insight.
+        const insightUrlSets = new Set<string>();
+        try {
+          for (const ins of getInsights(workspaceId, 'cannibalization')) {
+            if (ins.resolutionStatus === 'resolved') continue;
+            const data = ins.data as import('../shared/types/analytics.js').CannibalizationData;
+            const pages = Array.isArray(data?.pages) ? data.pages : [];
+            if (pages.length > 0) insightUrlSets.add(cannibalizationUrlSetKey(pages));
+          }
+        } catch (err) {
+          // Insight read failure → degrade to "no insight coverage" (mint recs). This is the
+          // safe direction: a missed dedupe shows a (linkable) duplicate; a false dedupe would
+          // hide a real issue.
+          log.debug({ err, workspaceId }, 'Cannibalization insight dedupe unavailable — minting recs without cross-link');
+        }
+        for (const item of issues) {
+          const urlSetKey = cannibalizationUrlSetKey(item.pages.map(p => p.path));
+          // Skip minting if an active insight already covers the same URL set (cross-link instead).
+          // C1: the issue STILL EXISTS (it's in cannibalization_issues) — it merely migrated to the
+          // insight surface. Adding 'cannibalization' to failedCategories protects the category from
+          // the auto-resolve loop this run (same transient-read semantics as the FM-2 catch paths), so
+          // a prior cannibalization:<key> rec for this URL set is carried forward (stays pending) and
+          // its pages are NOT falsely flipped to `live`. Only runs where a dedupe-skip actually
+          // occurs are protected; runs with no insight-covered issue auto-resolve genuinely-fixed
+          // recs normally (a fixed issue lingers at most one extra cycle — errs safe).
+          if (insightUrlSets.has(urlSetKey)) {
+            failedCategories.add('cannibalization');
+            continue;
+          }
+          const severity: 'error' | 'warning' | 'info' =
+            item.severity === 'high' ? 'error' : item.severity === 'medium' ? 'warning' : 'info';
+          const currentClicks = item.pages.reduce((sum, p) => sum + (p.clicks ?? 0), 0);
+          const priority: RecPriority = item.severity === 'high' ? 'fix_soon' : 'fix_later';
+          const baseScore = item.severity === 'high' ? 65 : item.severity === 'medium' ? 45 : 30;
+          const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
+            baseScore,
+            'cannibalization',
+            RecSource.cannibalization(urlSetKey),
+            outcomeLearnings,
+          );
+          recs.push({
+            id: `rec_${crypto.randomBytes(6).toString('hex')}`,
+            workspaceId,
+            priority,
+            type: 'cannibalization',
+            title: `Keyword Cannibalization: "${item.keyword}"`,
+            description: `${item.pages.length} pages compete for "${item.keyword}", splitting ranking signals. ${item.recommendation}`,
+            insight: `When multiple pages target the same keyword, search engines struggle to pick a winner — diluting authority and capping rankings. Consolidating to one canonical page recovers the combined strength.`,
+            impact: item.severity === 'high' ? 'high' : item.severity === 'medium' ? 'medium' : 'low',
+            effort: 'medium',
+            impactScore: adjustedImpactScore,
+            opportunity: computeOpportunityValue({
+              branch: 'technical',
+              severity,
+              currentClicks,
+              authorityStrength: ovAuthority ?? null,
+              ctrCurve: ovCtrCurve,
+              timingBoost: maxBoostForPages(timingBoosts, item.pages.map(p => toPageSlug(p.path))),
+            }, { calibration: ovCalibration, weights: ovWeights }),
+            source: RecSource.cannibalization(urlSetKey),
+            affectedPages: item.pages.map(p => p.path),
+            trafficAtRisk: currentClicks,
+            impressionsAtRisk: item.pages.reduce((sum, p) => sum + (p.impressions ?? 0), 0),
+            estimatedGain: `Consolidating ${item.pages.length} competing pages for "${item.keyword}" recovers split ranking signals`,
+            actionType: 'manual',
+            status: 'pending',
+            assignedTo,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+      } catch (err) {
+        failedCategories.add('cannibalization');
+        log.warn({ err, workspaceId }, 'Cannibalization issues unavailable for recommendations');
+      }
     }
   }
 
@@ -1850,7 +2219,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   // Always-on, dark; must never break generation. sortRecommendations is injected
   // to avoid a circular import. ──
   try {
-    recordOvDivergence(workspaceId, recs, effectiveBusinessPriorities, sortRecommendations);
+    recordOvDivergence(workspaceId, recs, effectiveBusinessPriorities, sortRecommendations, deriveOvTier);
   } catch (err) {
     log.warn({ workspaceId, err: err instanceof Error ? err.message : String(err) }, 'OV divergence logging failed (non-fatal)');
   }
@@ -1860,6 +2229,20 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   // legacy. With it ON, the ranked impactScore reads from the attached OV value.
   // Score ONLY — estimatedGain is untouched (client-facing, deferred to P5/P6).
   for (const r of recs) r.impactScore = pickImpactScore(r, useOv);
+
+  // ── SEO Gen-Quality P4 · OV-derived tier + one gain basis chokepoint (flag-gated). ──
+  // AFTER pickImpactScore (so impactScore is final) and BEFORE sortRecommendations
+  // (which sorts by rec.priority first). Flag-OFF: NO-OP — the legacy per-branch tier AND
+  // the legacy getRecoveryRate estimatedGain strings survive untouched, so
+  // sortRecommendations / priorityOrder / computeRecommendationSummary AND every gain string
+  // are byte-identical to pre-P4. CRITICAL_CHECKS keep fix_now (handled inside deriveOvTier).
+  // Both the tier (Contract 2) and the gain string (Contract 3) derive from the one OV figure.
+  if (useGenQual) {
+    for (const r of recs) {
+      r.priority = deriveOvTier(r);
+      r.estimatedGain = resolveEstimatedGain(r.estimatedGain, r.opportunity, useGenQual);
+    }
+  }
 
   // ── Sort: tier PRIMARY, impactScore SECONDARY, business-intent alignment as
   // the final within-tier tiebreaker (see sortRecommendations). ──

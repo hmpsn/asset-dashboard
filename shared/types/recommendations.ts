@@ -1,7 +1,7 @@
 // ── Recommendation domain types ─────────────────────────────────
 
 export type RecPriority = 'fix_now' | 'fix_soon' | 'fix_later' | 'ongoing';
-export type RecType = 'technical' | 'content' | 'content_refresh' | 'schema' | 'metadata' | 'performance' | 'accessibility' | 'strategy' | 'aeo';
+export type RecType = 'technical' | 'content' | 'content_refresh' | 'schema' | 'metadata' | 'performance' | 'accessibility' | 'strategy' | 'aeo' | 'keyword_gap' | 'topic_cluster' | 'cannibalization';
 export type RecStatus = 'pending' | 'in_progress' | 'completed' | 'dismissed';
 export type RecActionType = 'automated' | 'manual' | 'content_creation' | 'purchase';
 
@@ -29,6 +29,11 @@ export interface Recommendation {
   productPrice?: number;
   status: RecStatus;
   assignedTo?: 'team' | 'client'; // premium → team, growth/free → client
+  /** SEO Gen-Quality P2: true when this rec comes from a deterministic-backfill content
+   *  gap (re-admitted to meet the >=6 floor), so headline counts / "ready for review"
+   *  emails can exclude marginal backfill. Only set (to true) on the flag-ON path —
+   *  absent on every legacy/flag-OFF rec, preserving byte-identical output. */
+  backfilled?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -78,6 +83,14 @@ export interface OpportunityComponent {
 export interface OpportunityScore {
   value: number;                       // 0..100 — written into Recommendation.impactScore
   emvPerWeek: number;                  // expected value/week; $ when CPC-grounded, intent-weighted-clicks proxy otherwise. Admin/AI-only.
+  /** Projected expected value over the OV horizon (emvPerWeek × HORIZON_WEEKS).
+   *  P4 CPC-PROXY PLACEHOLDER — NOT real money: it is the same CPC/intent-weighted-clicks
+   *  proxy as emvPerWeek, scaled to the horizon. Real GA4 `estimatedRevenue` arrives in P6
+   *  (the calibration swap-site is documented in server/scoring/ov-calibration.ts).
+   *  Admin/AI-only: clients never see a raw $/wk figure — it is stripped on every public
+   *  route (stripEmvFromPublicRecs) and snapshotted onto the outcome row (predicted_emv)
+   *  at recordAction time so calibration history accrues even while OV is dark. */
+  predictedEmv: number;                // CPC-proxy placeholder; admin/AI-only (see JSDoc).
   roiPerEffortDay: number;             // internal ROI quantity (pre-normalization)
   confidence: number;                  // 0.4..1.0 — grounded-data vs LLM-adjective provenance
   calibration: number;                 // 0.75..1.25 per-workspace (1.0 until outcomes exist)

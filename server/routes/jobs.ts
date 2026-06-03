@@ -242,8 +242,16 @@ router.post('/api/jobs', async (req, res) => {
                   const dashUrl = getClientPortalUrl(ws);
                   const recSet = loadRecommendations(ws.id);
                   const recs = recSet?.recommendations || [];
-                  if (recs.length > 0) {
-                    notifyClientRecommendationsReady({ clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: ws.id, recCount: recs.length, dashboardUrl: dashUrl });
+                  // SEO Generation Quality P2(f): the "recommendations ready for review"
+                  // headline counts only what the client will actually act on — ACTIVE recs
+                  // (exclude completed/dismissed carry-forwards) minus deterministic-backfill
+                  // recs (tagged at the source via Recommendation.backfilled). Flag-OFF has no
+                  // backfilled recs and no status pollution change, so the count is unchanged.
+                  const honestRecCount = recs.filter(
+                    r => r.status !== 'completed' && r.status !== 'dismissed' && !r.backfilled,
+                  ).length;
+                  if (honestRecCount > 0) {
+                    notifyClientRecommendationsReady({ clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: ws.id, recCount: honestRecCount, dashboardUrl: dashUrl });
                   }
                 }
               } catch (recErr) {

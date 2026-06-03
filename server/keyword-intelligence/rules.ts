@@ -331,7 +331,16 @@ export function isStrategyPoolEligibleKeyword(
     result.suppressed = true;
     result.reasons.push({ type: 'noise_pattern', message: 'Blank keyword candidate', weight: -100 });
   }
-  if ((ctx.strictBusinessFit ?? false) && result.reasons.some(reason => reason.type === 'business_mismatch' && reason.weight <= -12)) {
+  // SEO Generation Quality P2 (flag `seo-generation-quality`): on the flag-ON path
+  // (`relaxConservatism`), KEEP the business_mismatch penalty (computed above,
+  // ~-18) but DROP this `suppressed = true` escalation so narrow-but-real keywords
+  // survive into ranking instead of being killed. Flag-OFF (relaxConservatism
+  // falsy) is byte-identical to today.
+  if (
+    !(ctx.relaxConservatism ?? false)
+    && (ctx.strictBusinessFit ?? false)
+    && result.reasons.some(reason => reason.type === 'business_mismatch' && reason.weight <= -12)
+  ) {
     result.suppressed = true;
   }
   return result;
