@@ -24,4 +24,7 @@ export const ACTION_TYPE_LABELS: Record<ActionType, string> = {
   internal_link_added: 'Internal Link',
   meta_updated: 'Meta Update',
   voice_calibrated: 'Voice Calibration',
+  competitor_gap_closed: 'Keyword Gap Closed',
+  cluster_published: 'Cluster Published',
+  cannibalization_resolved: 'Cannibalization Resolved',
 };

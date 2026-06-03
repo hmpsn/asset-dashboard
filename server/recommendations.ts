@@ -25,6 +25,9 @@ import { getDeclinedKeywords } from './keyword-feedback.js';
 import { listPageKeywords } from './page-keywords.js';
 import { listContentGaps } from './content-gaps.js';
 import { listQuickWins } from './quick-wins.js';
+import { listKeywordGaps } from './keyword-gaps.js';
+import { listTopicClusters } from './topic-clusters.js';
+import { listCannibalizationIssues } from './cannibalization-issues.js';
 import { getInsights } from './analytics-insights-store.js';
 import { listDiagnosticReports } from './diagnostic-store.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
@@ -195,6 +198,15 @@ export function recommendationOutcomeActionType(type: RecType, source: string): 
       return 'content_published';
     case 'strategy':
       return source.startsWith('strategy:content-gap') ? 'content_published' : 'insight_acted_on';
+    // ── SEO Gen-Quality P5 · first-class orphan-subsystem recs ──
+    // Distinct ActionTypes (NOT the audit_fix_applied family) so winRateByActionType stays
+    // honestly calibrated for each subsystem (the contract's "honest calibration" requirement).
+    case 'keyword_gap':
+      return 'competitor_gap_closed';
+    case 'topic_cluster':
+      return 'cluster_published';
+    case 'cannibalization':
+      return 'cannibalization_resolved';
     case 'technical':
     case 'performance':
     case 'accessibility':
@@ -258,7 +270,10 @@ export type RecSourceCategory =
   | 'decay'
   | 'insight:ctr_opportunity'
   | 'insight:freshness_alert'
-  | 'diagnostic';
+  | 'diagnostic'
+  | 'keyword_gap'
+  | 'topic_cluster'
+  | 'cannibalization';
 
 const REC_SOURCE_CATEGORIES: RecSourceCategory[] = [
   'audit',
@@ -267,6 +282,9 @@ const REC_SOURCE_CATEGORIES: RecSourceCategory[] = [
   'insight:ctr_opportunity',
   'insight:freshness_alert',
   'diagnostic',
+  'keyword_gap',
+  'topic_cluster',
+  'cannibalization',
 ];
 
 /** Returns the category prefix for a given source string, or `null` when
@@ -298,6 +316,13 @@ export const RecSource = {
   freshnessAlert:         (pageSlug: string): string => `insight:freshness_alert:${pageSlug}`,
   diagnostic:             (reportId: string, actionIdx: number, actionTitle: string): string =>
     `diagnostic:${reportId}:${actionIdx}:${actionTitle.slice(0, 20)}`,
+  // ── SEO Gen-Quality P5 · first-class orphan-subsystem recs ──
+  // Each key is stable per logical issue (keyword / cluster topic / cannibalization URL-set)
+  // so status carries over between runs and one fix doesn't auto-resolve another. These
+  // categories are NOT `strategy:`-prefixed, so buildMergeKey keys on the source alone.
+  keywordGap:             (keyword: string): string => `keyword_gap:${keyword}`,
+  topicCluster:           (topic: string): string => `topic_cluster:${topic}`,
+  cannibalization:        (urlSetKey: string): string => `cannibalization:${urlSetKey}`,
 };
 
 /** Infer page type from slug path.
@@ -798,6 +823,16 @@ export function toPageSlug(url: string): string {
     try { path = new URL(url).pathname; } catch { /* fall through */ }
   }
   return normalizePageUrl(path).replace(/^\//, '');
+}
+
+/** SEO Gen-Quality P5 — build a stable, order-independent key for a cannibalization
+ *  URL set. Normalizes each path to its slug, dedupes, and sorts so the SAME set of
+ *  competing pages always produces the SAME key — used both as the rec source suffix
+ *  (status carries over between runs) and to dedupe a cannibalization rec against an
+ *  active cannibalization insight covering the same pages. Pure / deterministic.
+ *  @internal exported for unit testing */
+export function cannibalizationUrlSetKey(paths: string[]): string {
+  return Array.from(new Set(paths.map(p => toPageSlug(p)))).sort().join('|');
 }
 
 // Source prefixes whose slug portion may have been stored as an absolute URL
@@ -1616,6 +1651,191 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         createdAt: now,
         updatedAt: now,
       });
+    }
+
+    // ── 2b. SEO Gen-Quality P5 — first-class orphan-subsystem recs (flag-gated). ──
+    // keyword_gaps / topic_clusters / cannibalization_issues are normalized tables that
+    // until now only surfaced in the intelligence slice + strategy UI, never as recs. We
+    // mint them as first-class recs ONLY when the umbrella flag is on, so flag-OFF (= all
+    // prod today) is byte-identical: no new recs/sources, and the merge/auto-resolve loop
+    // below sees exactly the pre-P5 source set. Each orphan read is in its OWN try/catch
+    // calling failedCategories.add(<category>) on catch — a transient empty read must NOT
+    // drop the source from newSources and falsely bulk-auto-resolve prior recs (FM-2/G2).
+    if (useGenQual) {
+      // keyword_gap → ranking_opp branch (competitor outranks us; close the gap).
+      try {
+        const keywordGaps = listKeywordGaps(workspaceId).slice(0, 10);
+        for (const kg of keywordGaps) {
+          if (declinedKeywords.has(keywordComparisonKey(kg.keyword))) continue;
+          const baseScore = adjustKdImpactScore(
+            kg.volume > 0 ? Math.min(70, 40 + Math.round((Math.log10(kg.volume) / 5) * 30)) : 40,
+            kg.difficulty,
+            domainStrength,
+          );
+          const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
+            Math.max(10, Math.min(100, baseScore)),
+            'keyword_gap',
+            RecSource.keywordGap(kg.keyword),
+            outcomeLearnings,
+            kg.difficulty,
+          );
+          recs.push({
+            id: `rec_${crypto.randomBytes(6).toString('hex')}`,
+            workspaceId,
+            priority: 'ongoing',
+            type: 'keyword_gap',
+            title: `Keyword Gap: "${kg.keyword}"`,
+            description: `${kg.competitorDomain} ranks #${kg.competitorPosition} for "${kg.keyword}" (volume ${kg.volume.toLocaleString()}, difficulty ${kg.difficulty}) — you don't. Targeting this term captures demand a competitor already owns.`,
+            insight: `Competitors ranking for high-demand keywords you ignore is lost organic traffic. Building content or optimizing a page for "${kg.keyword}" lets you compete for a term with proven search demand.`,
+            impact: kg.volume > 1000 ? 'high' : kg.volume > 200 ? 'medium' : 'low',
+            effort: 'high',
+            impactScore: adjustedImpactScore,
+            opportunity: computeOpportunityValue({
+              branch: 'ranking_opp',
+              volume: kg.volume,
+              difficulty: kg.difficulty,
+              currentPosition: kg.competitorPosition,
+              authorityStrength: ovAuthority ?? null,
+              ctrCurve: ovCtrCurve,
+              timingBoost: maxBoostForPages(timingBoosts, []),
+            }, { calibration: ovCalibration, weights: ovWeights }),
+            source: RecSource.keywordGap(kg.keyword),
+            affectedPages: [],
+            trafficAtRisk: 0,
+            impressionsAtRisk: 0,
+            estimatedGain: `Capturing "${kg.keyword}" targets a term with ${kg.volume.toLocaleString()} monthly searches a competitor already ranks for`,
+            actionType: 'content_creation',
+            status: 'pending',
+            assignedTo,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+      } catch (err) {
+        failedCategories.add('keyword_gap');
+        log.warn({ err, workspaceId }, 'Keyword gaps unavailable for recommendations');
+      }
+
+      // topic_cluster → content_gap branch. listTopicClusters is coverage-ASC sorted, so
+      // clusters[0] is the WEAKEST cluster. Mint exactly ONE cluster-head rec (the weakest
+      // gap), NOT one per cluster — a single high-leverage "fill this cluster" directive.
+      try {
+        const clusters = listTopicClusters(workspaceId);
+        const cluster = clusters[0];
+        if (cluster) {
+          const opportunityScore = Math.max(0, Math.min(100, 100 - cluster.coveragePercent));
+          const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
+            Math.max(10, Math.min(100, Math.round(opportunityScore))),
+            'topic_cluster',
+            RecSource.topicCluster(cluster.topic),
+            outcomeLearnings,
+          );
+          const gapPreview = cluster.gap.slice(0, 5).join(', ');
+          recs.push({
+            id: `rec_${crypto.randomBytes(6).toString('hex')}`,
+            workspaceId,
+            priority: 'ongoing',
+            type: 'topic_cluster',
+            title: `Build Topical Authority: "${cluster.topic}"`,
+            description: `You cover ${Math.round(cluster.coveragePercent)}% of the "${cluster.topic}" cluster (${cluster.ownedCount}/${cluster.totalCount} keywords). Filling the gaps${gapPreview ? ` (${gapPreview})` : ''} builds the topical depth search engines reward.`,
+            insight: `Topical authority compounds — covering a cluster comprehensively signals expertise and lifts every page in it. "${cluster.topic}" is your weakest cluster, so it has the most room to grow.`,
+            impact: opportunityScore > 60 ? 'high' : opportunityScore > 30 ? 'medium' : 'low',
+            effort: 'high',
+            impactScore: adjustedImpactScore,
+            opportunity: computeOpportunityValue({
+              branch: 'content_gap',
+              opportunityScore,
+              authorityStrength: ovAuthority ?? null,
+              ctrCurve: ovCtrCurve,
+              timingBoost: maxBoostForPages(timingBoosts, []),
+            }, { calibration: ovCalibration, weights: ovWeights }),
+            source: RecSource.topicCluster(cluster.topic),
+            affectedPages: [],
+            trafficAtRisk: 0,
+            impressionsAtRisk: 0,
+            estimatedGain: `Filling the "${cluster.topic}" cluster (currently ${Math.round(cluster.coveragePercent)}% covered) builds topical authority across related pages`,
+            actionType: 'content_creation',
+            status: 'pending',
+            assignedTo,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+      } catch (err) {
+        failedCategories.add('topic_cluster');
+        log.warn({ err, workspaceId }, 'Topic clusters unavailable for recommendations');
+      }
+
+      // cannibalization → technical branch. Cannibalization is ALSO an InsightType, so we
+      // dedupe-vs-insight: an ACTIVE (unresolved) cannibalization insight covering the same
+      // URL set already surfaces the issue — we cross-link rather than mint a duplicate rec.
+      try {
+        const issues = listCannibalizationIssues(workspaceId);
+        // Build the set of URL-set keys already covered by an active cannibalization insight.
+        const insightUrlSets = new Set<string>();
+        try {
+          for (const ins of getInsights(workspaceId, 'cannibalization')) {
+            if (ins.resolutionStatus === 'resolved') continue;
+            const data = ins.data as import('../shared/types/analytics.js').CannibalizationData;
+            const pages = Array.isArray(data?.pages) ? data.pages : [];
+            if (pages.length > 0) insightUrlSets.add(cannibalizationUrlSetKey(pages));
+          }
+        } catch (err) {
+          // Insight read failure → degrade to "no insight coverage" (mint recs). This is the
+          // safe direction: a missed dedupe shows a (linkable) duplicate; a false dedupe would
+          // hide a real issue.
+          log.debug({ err, workspaceId }, 'Cannibalization insight dedupe unavailable — minting recs without cross-link');
+        }
+        for (const item of issues) {
+          const urlSetKey = cannibalizationUrlSetKey(item.pages.map(p => p.path));
+          // Skip minting if an active insight already covers the same URL set (cross-link instead).
+          if (insightUrlSets.has(urlSetKey)) continue;
+          const severity: 'error' | 'warning' | 'info' =
+            item.severity === 'high' ? 'error' : item.severity === 'medium' ? 'warning' : 'info';
+          const currentClicks = item.pages.reduce((sum, p) => sum + (p.clicks ?? 0), 0);
+          const priority: RecPriority = item.severity === 'high' ? 'fix_soon' : 'fix_later';
+          const baseScore = item.severity === 'high' ? 65 : item.severity === 'medium' ? 45 : 30;
+          const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
+            baseScore,
+            'cannibalization',
+            RecSource.cannibalization(urlSetKey),
+            outcomeLearnings,
+          );
+          recs.push({
+            id: `rec_${crypto.randomBytes(6).toString('hex')}`,
+            workspaceId,
+            priority,
+            type: 'cannibalization',
+            title: `Keyword Cannibalization: "${item.keyword}"`,
+            description: `${item.pages.length} pages compete for "${item.keyword}", splitting ranking signals. ${item.recommendation}`,
+            insight: `When multiple pages target the same keyword, search engines struggle to pick a winner — diluting authority and capping rankings. Consolidating to one canonical page recovers the combined strength.`,
+            impact: item.severity === 'high' ? 'high' : item.severity === 'medium' ? 'medium' : 'low',
+            effort: 'medium',
+            impactScore: adjustedImpactScore,
+            opportunity: computeOpportunityValue({
+              branch: 'technical',
+              severity,
+              currentClicks,
+              authorityStrength: ovAuthority ?? null,
+              ctrCurve: ovCtrCurve,
+              timingBoost: maxBoostForPages(timingBoosts, item.pages.map(p => toPageSlug(p.path))),
+            }, { calibration: ovCalibration, weights: ovWeights }),
+            source: RecSource.cannibalization(urlSetKey),
+            affectedPages: item.pages.map(p => p.path),
+            trafficAtRisk: currentClicks,
+            impressionsAtRisk: item.pages.reduce((sum, p) => sum + (p.impressions ?? 0), 0),
+            estimatedGain: `Consolidating ${item.pages.length} competing pages for "${item.keyword}" recovers split ranking signals`,
+            actionType: 'manual',
+            status: 'pending',
+            assignedTo,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+      } catch (err) {
+        failedCategories.add('cannibalization');
+        log.warn({ err, workspaceId }, 'Cannibalization issues unavailable for recommendations');
+      }
     }
   }
 

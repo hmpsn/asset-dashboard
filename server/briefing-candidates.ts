@@ -1,6 +1,6 @@
 // server/briefing-candidates.ts
 import { getInsights } from './analytics-insights-store.js';
-import { loadRecommendations } from './recommendations.js';
+import { loadRecommendations, cannibalizationUrlSetKey } from './recommendations.js';
 import { getSchedule } from './scheduled-audits.js';
 import { listContentGaps } from './content-gaps.js';
 import { getActionsByWorkspace, getOutcomesForAction } from './outcome-tracking.js';
@@ -407,7 +407,59 @@ export function collectAllCandidates(workspaceId: string): Candidate[] {
       log.error({ err, workspaceId, source: name }, 'briefing candidate collector failed; skipping source');
     }
   }
-  return out;
+  return dedupeCannibalization(workspaceId, out);
+}
+
+/**
+ * SEO Gen-Quality P5 (G10) cross-source dedup: cannibalization is BOTH a first-class
+ * recommendation (collectRecommendationCandidates) AND an InsightType
+ * (collectInsightCandidates), so the same issue can surface twice in the candidate pool.
+ * Drop a `referenceType:'recommendation'` cannibalization candidate when a matching
+ * `referenceType:'analytics_insight'` cannibalization candidate covers the same URL set —
+ * the insight is the older, narrative-grounded surface (the rec layer cross-links to it).
+ *
+ * Keyed on the cannibalization URL-set: the rec source is `cannibalization:<urlSetKey>`
+ * (the suffix IS the key), and the insight's `data.pages` are normalized through the same
+ * `cannibalizationUrlSetKey()` so the two sides produce identical keys. Best-effort: a load
+ * failure leaves both candidates (the safe direction — a visible duplicate, not a hidden
+ * issue).
+ */
+function dedupeCannibalization(workspaceId: string, candidates: Candidate[]): Candidate[] {
+  let recSet: ReturnType<typeof loadRecommendations>;
+  let insights: ReturnType<typeof getInsights>;
+  try {
+    recSet = loadRecommendations(workspaceId);
+    insights = getInsights(workspaceId, 'cannibalization');
+  } catch (err) {
+    log.error({ err, workspaceId }, 'cannibalization dedup load failed; leaving candidates untouched');
+    return candidates;
+  }
+  if (!recSet?.recommendations?.length) return candidates;
+
+  // URL-set keys already covered by an ACTIVE (unresolved) cannibalization insight.
+  const insightUrlSets = new Set<string>();
+  for (const ins of insights) {
+    if (ins.resolutionStatus === 'resolved') continue;
+    const data = ins.data as import('../shared/types/analytics.js').CannibalizationData;
+    const pages = Array.isArray(data?.pages) ? data.pages : [];
+    if (pages.length > 0) insightUrlSets.add(cannibalizationUrlSetKey(pages));
+  }
+  if (insightUrlSets.size === 0) return candidates;
+
+  // Map each cannibalization REC id → its URL-set key (parsed from the source suffix).
+  const recUrlSetById = new Map<string, string>();
+  for (const r of recSet.recommendations) {
+    if (r.type === 'cannibalization' && r.source.startsWith('cannibalization:')) {
+      recUrlSetById.set(r.id, r.source.slice('cannibalization:'.length));
+    }
+  }
+  if (recUrlSetById.size === 0) return candidates;
+
+  return candidates.filter(c => {
+    if (c.referenceType !== 'recommendation') return true;
+    const key = recUrlSetById.get(c.referenceId);
+    return !(key && insightUrlSets.has(key));
+  });
 }
 
 /** Render a numbered candidate block for the AI prompt. */
