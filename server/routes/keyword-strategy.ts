@@ -221,10 +221,9 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess(
     const quickWins = quickWinsFromTable.length > 0 ? quickWinsFromTable : (strategy?.quickWins || []);
     const keywordGapsFromTable = listKeywordGaps(ws.id);
     const keywordGaps = keywordGapsFromTable.length > 0 ? keywordGapsFromTable : (strategy?.keywordGaps || []);
-    const topicClustersFromTable = listTopicClusters(ws.id);
-    const topicClusters = topicClustersFromTable.length > 0 ? topicClustersFromTable : (strategy?.topicClusters || []);
-    const cannibalizationFromTable = listCannibalizationIssues(ws.id);
-    const cannibalization = cannibalizationFromTable.length > 0 ? cannibalizationFromTable : (strategy?.cannibalization || []);
+    // topicClusters and cannibalization are table-only; blob fields stripped on every write + boot-migrated out (#19a)
+    const topicClusters = listTopicClusters(ws.id);
+    const cannibalization = listCannibalizationIssues(ws.id);
     if (!strategy && pageMap.length === 0 && contentGaps.length === 0 && quickWins.length === 0 && keywordGaps.length === 0 && topicClusters.length === 0 && cannibalization.length === 0) return res.json(null);
     if (!strategy) {
       return res.json({
