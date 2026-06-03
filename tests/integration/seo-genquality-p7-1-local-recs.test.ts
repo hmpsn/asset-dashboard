@@ -95,6 +95,21 @@ function visibilitySummaries(): Map<string, LocalSeoKeywordVisibilitySummary> {
   ]);
 }
 
+/** A single-market LOCAL_PACK_PRESENT summary: a pack DEFINITELY showed and the business was not
+ *  even a possible match — the strongest "absent from a present pack" signal (I-1). */
+function localPackPresentSummaries(): Map<string, LocalSeoKeywordVisibilitySummary> {
+  const localPackOnlyEntry = {
+    keyword: 'root canal', normalizedKeyword: 'root canal',
+    marketId: 'market-austin', marketLabel: 'Austin, TX', capturedAt: '2026-05-26T00:00:00.000Z',
+    posture: LOCAL_SEO_VISIBILITY_POSTURE.LOCAL_PACK_PRESENT, label: 'Local pack present', detail: 'z',
+    localPackPresent: true, businessFound: false, businessMatchConfidence: 'not_found' as const,
+    sourceEndpoint: 'google_organic_serp' as const, provider: 'dataforseo',
+  };
+  return new Map<string, LocalSeoKeywordVisibilitySummary>([
+    ['root canal', { ...localPackOnlyEntry, marketCount: 1, visibleMarketCount: 0, possibleMatchMarketCount: 0, localPackOnlyMarketCount: 1, notVisibleMarketCount: 0, degradedMarketCount: 0, markets: [localPackOnlyEntry] }],
+  ]);
+}
+
 /** A panel read-model whose report state is dark (needs_market) so the dedupe-vs-panel
  *  guard does NOT fire — used by default so the readers' items mint. */
 function darkPanel(): LocalSeoReadResponse {
@@ -381,6 +396,127 @@ describe('P7.1 dedupe-vs-panel', () => {
     expect(set.recommendations.some(r => r.type === 'local_service_gap')).toBe(false);
     expect(set.recommendations.some(r => r.type === 'local_visibility' && r.title.includes('Bright Smiles Dental'))).toBe(false);
     expect(set.recommendations.some(r => r.type === 'local_visibility' && /not showing in the local pack/i.test(r.title))).toBe(true);
+  });
+});
+
+// ── (I-1) B3 LOCAL_PACK_PRESENT mints a not-visible-class rec with the strong copy ────
+
+describe('P7.1 B3 — LOCAL_PACK_PRESENT mints a strong not-visible rec (I-1)', () => {
+  let s: ReturnType<typeof seedWorkspace>;
+
+  beforeEach(() => {
+    s = seedWorkspace({});
+    setMinimalStrategy(s.workspaceId);
+    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, true);
+    setFlagOverride('local-seo-visibility', true);
+  });
+
+  afterEach(() => {
+    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, null);
+    setFlagOverride('local-seo-visibility', null);
+    vi.restoreAllMocks();
+    cleanupRecs(s.workspaceId);
+    s.cleanup();
+  });
+
+  it('a LOCAL_PACK_PRESENT entry mints a B3 local_visibility rec with the STRONG (not-visible) copy variant', async () => {
+    // Only a LOCAL_PACK_PRESENT visibility entry, no service gaps / competitor brands → the single
+    // local_visibility rec must come from B3 and carry the strong, not-the-softer-possible-match copy.
+    installLocalSpies({
+      posture: LOCAL_SEO_POSTURE.LOCAL,
+      gaps: [],
+      brands: [],
+      summaries: localPackPresentSummaries(),
+    });
+    const set = await generateRecommendations(s.workspaceId);
+    const vis = set.recommendations.filter(r => r.type === 'local_visibility');
+
+    // Pre-fix this minted ZERO recs (LOCAL_PACK_PRESENT was omitted from the B3 filter); now exactly one.
+    expect(vis.length).toBe(1);
+    const rec = vis[0];
+    expect(rec.source).toBe('local_visibility:market-austin:root canal');
+    // STRONG variant copy (NOT the softer "possible match" / "might be in the local pack" wording).
+    expect(/not showing in the local pack/i.test(rec.title)).toBe(true);
+    expect(rec.title.toLowerCase()).not.toContain('might be in the local pack');
+    expect(rec.description.toLowerCase()).toContain('a local pack shows');
+    // `impact` is the hand-set field (NOT the OV-derived served `priority`) → 'high' proves the
+    // strong (possible=false) branch was taken, not the softer possible-match 'medium' branch.
+    expect(rec.impact).toBe('high');
+    expect(rec.opportunity).toBeTruthy();
+    expect(rec.opportunity!.value).toBeGreaterThanOrEqual(0);
+    expect(rec.opportunity!.value).toBeLessThanOrEqual(100);
+    // The strong branch feeds localVisibilitySignal=1 (max urgency), which scores strictly higher
+    // than the softer possible-match signal of 0.4 — confirming LOCAL_PACK_PRESENT mapped to strong.
+    const strongOv = computeOpportunityValue({ branch: 'local', intent: 'transactional', localVisibilitySignal: 1 });
+    const softOv = computeOpportunityValue({ branch: 'local', intent: 'transactional', localVisibilitySignal: 0.4 });
+    expect(strongOv.roiPerEffortDay).toBeGreaterThan(softOv.roiPerEffortDay);
+  });
+
+  it('the B3 not-visible-class rec count reconciles with the report/panel "not found" count (NOT_VISIBLE + LOCAL_PACK_PRESENT)', async () => {
+    // One NOT_VISIBLE keyword + one LOCAL_PACK_PRESENT keyword → both fold into the report's
+    // notVisibleCount (server/local-seo.ts:buildLocalSeoReportSummary) AND both must mint a B3 rec.
+    const combined = new Map<string, LocalSeoKeywordVisibilitySummary>([
+      ...visibilitySummaries(), // emergency dentist (NOT_VISIBLE) + dental implants (POSSIBLE_MATCH)
+      ...localPackPresentSummaries(), // root canal (LOCAL_PACK_PRESENT)
+    ]);
+    installLocalSpies({
+      posture: LOCAL_SEO_POSTURE.LOCAL,
+      gaps: [],
+      brands: [],
+      summaries: combined,
+    });
+    const set = await generateRecommendations(s.workspaceId);
+    const vis = set.recommendations.filter(r => r.type === 'local_visibility');
+    // notVisibleCount = NOT_VISIBLE(1) + LOCAL_PACK_PRESENT(1) = 2 strong recs; + POSSIBLE_MATCH(1) soft.
+    const strong = vis.filter(r => /not showing in the local pack/i.test(r.title));
+    const soft = vis.filter(r => /might be in the local pack/i.test(r.title));
+    expect(strong.length).toBe(2); // reconciles with report notVisibleCount
+    expect(soft.length).toBe(1);
+  });
+});
+
+// ── (I-2) dedupe safe-direction — a panel-deduped item does NOT false-resolve a prior local rec ──
+
+describe('P7.1 dedupe safe-direction — panel-dedupe protects the whole category from auto-resolve (I-2)', () => {
+  let s: ReturnType<typeof seedWorkspace>;
+
+  beforeEach(() => {
+    s = seedWorkspace({});
+    setMinimalStrategy(s.workspaceId);
+    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, true);
+    setFlagOverride('local-seo-visibility', true);
+  });
+
+  afterEach(() => {
+    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, null);
+    setFlagOverride('local-seo-visibility', null);
+    vi.restoreAllMocks();
+    cleanupRecs(s.workspaceId);
+    s.cleanup();
+  });
+
+  it('a panel-deduped service gap does NOT false-resolve a prior local_service_gap rec (FM-2 safe direction)', async () => {
+    // Run 1: dark panel → the service-gap rec mints and persists as pending.
+    installLocalSpies({ posture: LOCAL_SEO_POSTURE.LOCAL });
+    const first = await generateRecommendations(s.workspaceId);
+    expect(first.recommendations.filter(r => r.type === 'local_service_gap' && r.status === 'pending').length).toBe(1);
+
+    // Run 2: the panel now ACTIVELY surfaces the same service gap → the reader's gap is panel-deduped
+    // (failedCategories.add('local_service_gap')). The prior rec must NOT be flipped to `completed`:
+    // the category-safe dedupe protects the whole category from auto-resolve that run.
+    vi.restoreAllMocks();
+    const activePanel: LocalSeoReadResponse = {
+      ...darkPanel(),
+      report: { ...darkPanel().report, setupState: 'has_data' },
+      serviceGaps: serviceGaps(),
+      competitorBrands: [],
+    };
+    installLocalSpies({ posture: LOCAL_SEO_POSTURE.LOCAL, panel: activePanel });
+    await generateRecommendations(s.workspaceId);
+
+    const after = loadRecommendations(s.workspaceId);
+    const gapAfter = after!.recommendations.filter(r => r.type === 'local_service_gap');
+    expect(gapAfter.some(r => r.status === 'completed')).toBe(false);
   });
 });
 

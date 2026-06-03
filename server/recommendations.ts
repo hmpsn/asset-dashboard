@@ -1955,10 +1955,18 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       const marketPhrase = primaryMarketLabel ? `in ${primaryMarketLabel}` : 'in your market';
       for (const gap of serviceGaps) {
         // Dedupe-vs-panel: the setup drawer already nudges this service gap to the admin.
+        // Adding the whole category to failedCategories on a successful dedupe-skip intentionally
+        // protects EVERY local_service_gap rec from auto-resolve this run (the FM-2 safe direction,
+        // mirroring P5 cannibalization) — a genuinely-resolved sibling lingers at most one extra
+        // cycle, which is safe; the alternative (false auto-resolve) is not.
         if (panelActive && panelServiceGapIds.has(gap.serviceId)) {
           failedCategories.add('local_service_gap');
           continue;
         }
+        // This starterKeyword→tracked-pool volume lookup rarely yields a positive volume: gap
+        // services by definition have no tracked queries, so their starterKeywords are almost
+        // never already in the tracked pool. The `opportunityScore:60` composite fallback below
+        // normally drives B1's OV — don't treat this volume branch as load-bearing.
         const pooledVolume = gap.starterKeywords
           .map(kw => localVolumeByKeyword.get(keywordComparisonKey(kw)) ?? 0)
           .reduce((max, v) => Math.max(max, v), 0);
@@ -1976,9 +1984,9 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           priority: 'ongoing',
           type: 'local_service_gap',
           title: `You're not targeting ${gap.serviceLabel} ${marketPhrase}`,
-          description: `Nobody is searching and finding you for ${gap.serviceLabel} locally — you have no tracking keywords for it yet. Adding a focused page and local-intent terms${starterPreview ? ` (e.g. ${starterPreview})` : ''} captures local demand you're currently missing.`,
+          description: `You're not targeting ${gap.serviceLabel} locally yet — you have no tracking keywords for it. A focused page plus local-intent terms${starterPreview ? ` (e.g. ${starterPreview})` : ''} captures local demand you're currently missing.`,
           insight: `Local customers search by service and city. When you don't target a service you actually offer, competitors capture those local searches by default. Claiming ${gap.serviceLabel} ${marketPhrase} puts you in front of ready-to-buy local intent.`,
-          impact: pooledVolume > 200 ? 'high' : pooledVolume > 0 ? 'medium' : 'medium',
+          impact: pooledVolume > 200 ? 'high' : 'medium',
           effort: 'medium',
           impactScore: adjustedImpactScore,
           opportunity: computeOpportunityValue({
@@ -2017,6 +2025,10 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         if (comp.winsAgainstClient <= 0) continue; // only those that beat the client in the pack
         const marketKey = keywordComparisonKey(comp.title);
         // Dedupe-vs-panel: the RepeatCompetitorList already surfaces this brand to the admin.
+        // Adding the whole category to failedCategories on a successful dedupe-skip intentionally
+        // protects EVERY local_visibility rec from auto-resolve this run (the FM-2 safe direction,
+        // mirroring P5 cannibalization) — a genuinely-resolved sibling lingers at most one extra
+        // cycle, which is safe; the alternative (false auto-resolve) is not.
         if (panelActive && panelCompetitorTitles.has(comp.title.toLowerCase().trim())) {
           failedCategories.add('local_visibility');
           continue;
@@ -2066,20 +2078,33 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       log.warn({ err, workspaceId }, 'Local competitor brands unavailable for recommendations');
     }
 
-    // ── B3. Not-visible / possible-match local pack → local_visibility rec. ──
-    // For each checked local-intent keyword whose derived posture is not_visible or
-    // possible_match in a market, the client isn't (confidently) in the pack. Mint one rec per
+    // ── B3. Not-visible / local-pack-present / possible-match local pack → local_visibility rec. ──
+    // For each checked local-intent keyword whose derived posture is not_visible, local_pack_present,
+    // or possible_match in a market, the client isn't (confidently) in the pack. Mint one rec per
     // market+keyword. Keyed on the market id so status carries over and one market's fix doesn't
     // auto-resolve another.
+    //
+    // The three not-visible-class postures (see `postureFromSummaryRow` / `localSeoKeywordVisibilityFromSnapshot`):
+    //   - NOT_VISIBLE        — no pack and no match (or a pack we couldn't confirm).
+    //   - LOCAL_PACK_PRESENT — a pack DEFINITELY showed and the business was not even a possible match.
+    //                          This is the STRONGEST "absent from a present pack" signal, so it takes
+    //                          the strong/not-visible copy variant (possible=false), NOT the softer
+    //                          possible-match one. The report's `notVisibleCount` and the admin panel's
+    //                          "Not Found" StatCard already fold LOCAL_PACK_PRESENT into NOT_VISIBLE
+    //                          (server/local-seo.ts:buildLocalSeoReportSummary) — including it here makes
+    //                          the B3 rec count reconcile with that panel/report "not found" count.
+    //   - POSSIBLE_MATCH     — a maybe-match showed; softer copy variant (possible=true).
     try {
       const summaries = buildLocalSeoKeywordVisibilitySummaryByKey(ws.id);
       for (const summary of summaries.values()) {
         for (const entry of summary.markets) {
           if (
             entry.posture !== LOCAL_SEO_VISIBILITY_POSTURE.NOT_VISIBLE
+            && entry.posture !== LOCAL_SEO_VISIBILITY_POSTURE.LOCAL_PACK_PRESENT
             && entry.posture !== LOCAL_SEO_VISIBILITY_POSTURE.POSSIBLE_MATCH
           ) continue;
           const marketKey = `${entry.marketId}:${entry.normalizedKeyword}`;
+          // LOCAL_PACK_PRESENT is a not-visible-class signal → strong (possible=false) variant.
           const possible = entry.posture === LOCAL_SEO_VISIBILITY_POSTURE.POSSIBLE_MATCH;
           const baseScore = possible ? 45 : 55;
           const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
