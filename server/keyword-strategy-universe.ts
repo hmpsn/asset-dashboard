@@ -161,6 +161,17 @@ export interface BuildKeywordUniverseOptions {
   competitorDomains: string[];
   /** Shared keyword-intelligence evaluation context (the admission funnel ctx). */
   evaluationContext: KeywordEvaluationContext;
+  /**
+   * SEO Generation Quality P3 (G4) — client content-gap votes. Mapped onto the
+   * per-candidate `voteWeight` annotation (matched by normalized topic == keyword).
+   */
+  contentGapVotes?: { topic: string; votes: number }[];
+  /**
+   * SEO Generation Quality P3 (G4) — authority-resolved business priorities. Carried
+   * on the universe so the synthesis OP2 prompt can inject them as global (not
+   * per-keyword) context. Not used for per-candidate annotation.
+   */
+  businessPriorities?: string[];
   /** Optional progress reporter (mirrors synthesis `sendProgress`). */
   sendProgress?: (step: string, detail: string, progress: number) => void;
 }
@@ -206,8 +217,11 @@ export async function buildKeywordUniverse(
     declinedKeywords,
     competitorDomains,
     evaluationContext,
+    contentGapVotes,
+    businessPriorities,
     sendProgress,
   } = opts;
+  void businessPriorities; // carried for the synthesis OP2 prompt, not used here.
 
   // "provider present" → build a real universe; depth defaults to quick when the
   // legacy mode collapsed to 'none' (the MCP-seed path) but a provider exists.
@@ -408,11 +422,33 @@ export async function buildKeywordUniverse(
   if (declinedRemoved > 0) log.info({ workspaceId, declinedRemoved }, 'Removed declined keywords from keyword universe');
 
   // ── Derive typed candidates + sourceCounts from the canonical Map ──
+  // SEO Generation Quality P3 (G4): populate the per-candidate annotation fields
+  // (declined/requested/voteWeight/priority) the closed-set prompt consumes. These
+  // were never set before P3. `declined` is computed for completeness (surviving
+  // candidates are post-filter so it is effectively false); `requested` and
+  // `voteWeight` drive the closed-set prompt's prioritization + the synthesis-side
+  // requested re-add hard guarantee.
+  const requestedSet = new Set(requestedKeywords.map(k => normalizeKeyword(k)).filter(Boolean));
+  const declinedSet = new Set(declinedKeywords.map(k => normalizeKeyword(k)).filter(Boolean));
+  const voteByKeyword = new Map<string, number>();
+  for (const vote of contentGapVotes ?? []) {
+    const key = normalizeKeyword(vote.topic);
+    if (key) voteByKeyword.set(key, (voteByKeyword.get(key) ?? 0) + vote.votes);
+  }
   const candidates: KeywordCandidate[] = [];
   const sourceCounts: Partial<Record<KeywordCandidateSource, number>> = {};
   for (const [kw, m] of pool.entries()) {
     const coarse = coarseSource.get(kw);
-    candidates.push({ keyword: kw, source: m.source, volume: m.volume, difficulty: m.difficulty });
+    const requested = requestedSet.has(kw);
+    const declined = declinedSet.has(kw);
+    const voteWeight = voteByKeyword.get(kw);
+    const candidate: KeywordCandidate = { keyword: kw, source: m.source, volume: m.volume, difficulty: m.difficulty };
+    if (requested) candidate.requested = true;
+    if (declined) candidate.declined = true;
+    if (voteWeight != null && voteWeight > 0) candidate.voteWeight = voteWeight;
+    // Coarse priority signal: requested + voted candidates are high priority.
+    if (requested || (voteWeight ?? 0) > 0) candidate.priority = 'high';
+    candidates.push(candidate);
     if (coarse) sourceCounts[coarse] = (sourceCounts[coarse] ?? 0) + 1;
   }
 
