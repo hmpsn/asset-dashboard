@@ -613,6 +613,48 @@ export const AI_QUALITY_FIXTURES: AiQualityFixture[] = [
     ],
     notes: 'Pins the client-chat split between machine-readable intent classification and clean prose rendered with UI action buttons.',
   },
+  {
+    // SEO Generation Quality (Phase 0) — advisory acceptance bar (a): a sparse,
+    // Faros-like provider-backed workspace must produce >= 6 content gaps. RED until
+    // P1–P2 land (input-starvation fix + deterministic backfill floor). `soft` so it
+    // surfaces as a `verify:ai-quality` warning, never a hard CI failure. The forward
+    // token `CONTENT_GAP_SOFT_FLOOR` does not exist in the evidence yet, so the allOf
+    // fails today (RED); when P2 introduces the soft-floor constant + wires the bar into
+    // the eval test, this turns green. PROMOTE to severity:'hard' then.
+    id: 'seo-gen-quality-sparse-content-gaps',
+    pipelineId: 'content-brief-review',
+    title: 'Sparse workspace produces a populated content-gap set (>= 6) — advisory until P1–P2',
+    dimension: 'evidence_grounding',
+    severity: 'soft',
+    evidenceFiles: [
+      'tests/contract/seo-generation-quality-evals.test.ts',
+      'server/keyword-strategy-generation.ts',
+    ],
+    assertions: [
+      { allOf: ['PROMOTE to hard-fail when P1', 'CONTENT_GAP_SOFT_FLOOR'] },
+    ],
+    notes: 'Encodes the Faros-like sparse-workspace acceptance bar (contentGaps >= 6). RED at P0 (input starvation unresolved); promote to hard when buildKeywordUniverse (P1) + the deterministic backfill floor (P2) land.',
+  },
+  {
+    // SEO Generation Quality (Phase 0) — advisory acceptance bar (b): a malformed AI
+    // synthesis response must make generation THROW, not silently return an empty
+    // strategy. RED until P3 registers the Zod-validated named ops (the forward token
+    // `keyword-page-assignment` — the P3 op id — is absent from the evidence today, so
+    // the allOf fails). `soft` so it is advisory. PROMOTE to severity:'hard' at P3.
+    id: 'seo-gen-quality-malformed-ai-throws',
+    pipelineId: 'content-brief-review',
+    title: 'Malformed AI synthesis response throws rather than returning empty — advisory until P3',
+    dimension: 'evidence_grounding',
+    severity: 'soft',
+    evidenceFiles: [
+      'tests/contract/seo-generation-quality-evals.test.ts',
+      'server/keyword-strategy-generation.ts',
+    ],
+    assertions: [
+      { allOf: ['malformed AI synthesis response makes generation THROW', 'keyword-page-assignment'] },
+    ],
+    notes: 'Encodes the never-silent-empty acceptance bar for the synthesis path. RED at P0 (no post-parse Zod validation yet); promote to hard when the Zod-validated keyword-page-assignment / keyword-site-synthesis named ops land at P3.',
+  },
 ];
 
 export function findAiReliabilityRegistryGaps(

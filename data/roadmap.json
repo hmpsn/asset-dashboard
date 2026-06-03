@@ -157,8 +157,18 @@
           "source": "/docs/superpowers/audits/2026-06-01-opportunity-value-model-audit.md",
           "est": "4-6h",
           "priority": "P2",
+          "status": "done",
+          "shippedAt": "2026-06-02",
+          "notes": "feature_flag_overrides is keyed by flag only (global). The design's P8 tiered-client-rollout (client A then B) is not achievable as-is; a flip hits all workspaces at once. Add a per-workspace override dimension so OV can be enabled per client. Do before P8 if staged rollout is wanted. [DONE 2026-06-02 (SEO Gen-Quality P0): delivered as part of seo-genquality-p0-harness — migration 114 feature_flag_workspace_overrides, isFeatureEnabled(flag, workspaceId?) (backward-compatible optional arg, per-workspace DB override → global DB override → env → default), setWorkspaceFlagOverride(). The OV scorer / P4 canary can now be enabled per-workspace.]"
+        },
+        {
+          "id": "seo-genquality-p0-harness",
+          "title": "SEO Generation Quality P0 — quality harness + per-workspace flag + guardrails",
+          "source": "/docs/plans/2026-06-02-seo-generation-quality-plan.md",
+          "est": "M-L",
+          "priority": "P1",
           "status": "pending",
-          "notes": "feature_flag_overrides is keyed by flag only (global). The design's P8 tiered-client-rollout (client A then B) is not achievable as-is; a flip hits all workspaces at once. Add a per-workspace override dimension so OV can be enabled per client. Do before P8 if staged rollout is wanted."
+          "notes": "Phase 0 of the SEO strategy + keyword generation quality plan. Pure additive infrastructure, no generation-output behavior change. Ships: (1) per-workspace feature-flag dimension (isFeatureEnabled(flag, workspaceId?), migration 114, setWorkspaceFlagOverride) — also satisfies ov-per-workspace-flag-dimension; (2) the 'seo-generation-quality' umbrella flag + 'SEO Generation Quality' group + lifecycle catalog entry; (3) a typed GenerationQuality telemetry interface (shared/types/generation-quality.ts) emitted from keyword-strategy-generation.ts (poolSize + aiReturnedCount knowable now; suppressedCount/backfilledCount/floorHit populated by P1-P2); (4) two advisory/soft eval fixtures (sparse-workspace contentGaps>=6, malformed-AI-response throws) — RED until P1-P3, never hard-fail; (5) docs/rules/seo-generation-quality.md guardrail doc + two forward-looking pr-check rules (admin-money field must be stripped; new RecType/RecSource needs category + action-type). Unblocks P1-P6."
         },
         {
           "id": "ov-event-regen-single-flight",
@@ -212,7 +222,7 @@
           "est": "4-6h",
           "priority": "P3",
           "status": "pending",
-          "notes": "Deferred from PR7. Persist the 12-month volume series that trendDirection() currently consumes and drops; emit a 'seasonal' opportunity event (timing boost) when demand rises. Needs >= 1 year of the monthly series before it is useful. [CORRECTION 2026-06-02: title says \"migration 111\" but that number is TAKEN (111/112 = client-deliverable, 113 = work-order-comments). Renumber to migration 114 (next free). Also fix the stale \"migration 111\" comment in server/scoring/opportunity-timing.ts.]"
+          "notes": "Deferred from PR7. Persist the 12-month volume series that trendDirection() currently consumes and drops; emit a 'seasonal' opportunity event (timing boost) when demand rises. Needs >= 1 year of the monthly series before it is useful. [CORRECTION 2026-06-02: title says \"migration 111\" but that number is TAKEN (111/112 = client-deliverable, 113 = work-order-comments, 114 = feature-flag-workspace-overrides from seo-genquality-p0-harness). Renumber to migration 115 (next free). Also fix the stale \"migration 111\" comment in server/scoring/opportunity-timing.ts.]"
         },
         {
           "id": "ov-competitor-defensive-rec-mint",

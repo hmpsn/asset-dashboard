@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **161** — 141 error, 20 warn.
+Total rules: **163** — 143 error, 20 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -157,6 +157,8 @@ advisory but tracked.
 | 139 | Direct callOpenAI/callAnthropic import outside dispatcher | error | custom | `server/` | `direct-ai-helper-ok` | callAI() is the single entry point for all AI calls (~50 sites as of 2026-05-27). Direct imports bypass provider routing, retry logic, and operation registry. |
 | 140 | no-direct-insert-to-client_deliverable-outside-store | error | custom | `server/` | `deliverable-write-ok` | The client_deliverable store is the only writer of the deliverable tables; a bypassing INSERT skips dedup, JSON validation, and item handling. |
 | 141 | unified-send-to-client-bespoke-route | error | custom | `server/routes/` | `unified-send-route-ok` | The unified send service is the single send path (design §3); a new bespoke send route re-creates the five-pipeline divergence the migration removes. |
+| 142 | opportunity-money-field-must-be-stripped | error | custom | `shared/types/recommendations.ts` | `opportunity-strip-ok` | stripEmvFromPublicRecs destructure-and-spreads, so a new admin-money OpportunityScore field reaches clients unless explicitly stripped (G0b money-leak). |
+| 143 | new-rec-type-source-needs-category-and-action-type | error | custom | `server/recommendations.ts` | `rec-source-lockstep-ok` | A RecSourceCategory present in the union but absent from REC_SOURCE_CATEGORIES makes getRecSourceCategory return null, bypassing the per-category auto-resolve guard (G2 false auto-resolve). |
 
 ---
 

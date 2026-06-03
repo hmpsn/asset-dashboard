@@ -7710,6 +7710,137 @@ export const CHECKS: Check[] = [
     },
   },
 
+  {
+    // SEO Generation Quality (forward-looking guardrail). Any admin-money field added to
+    // the OpportunityScore shape (the rec `opportunity` object) MUST appear in
+    // stripEmvFromPublicRecs, or it LEAKS the raw $/wk figure to clients (the field is
+    // destructure-and-spread-stripped — an unlisted field passes through). Today
+    // emvPerWeek + roiPerEffortDay are the only money fields and both are stripped, so
+    // this returns ZERO hits — it fires only when a later phase (P4: predictedEmv) adds a
+    // money field to OpportunityScore without adding it to the strip.
+    // Escape hatch: // opportunity-strip-ok (on the OpportunityScore field line).
+    // See docs/rules/seo-generation-quality.md → Contract 1.
+    name: 'opportunity-money-field-must-be-stripped',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'shared/types/recommendations.ts',
+    message:
+      'An admin-money field on OpportunityScore (matching emv*/roiPer*/*revenue*/predictedEmv) is ' +
+      'not destructured in stripEmvFromPublicRecs (server/routes/recommendations.ts). It would LEAK ' +
+      'raw $/wk to clients on the public route. Add it to the strip destructure (and the PATCH ' +
+      'response). Add // opportunity-strip-ok on the field line if it is intentionally client-safe.',
+    severity: 'error',
+    excludeLines: ['opportunity-strip-ok'],
+    rationale:
+      'stripEmvFromPublicRecs destructure-and-spreads, so a new admin-money OpportunityScore field reaches clients unless explicitly stripped (G0b money-leak).',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Read canonical sources (override with a provided file of the same suffix, for tests).
+      const pickFile = (suffix: string, fallback: string): string => {
+        const provided = files.find(f => f.endsWith(suffix));
+        return readFileOrEmpty(provided ?? path.join(ROOT, fallback));
+      };
+      const typesContent = pickFile('shared/types/recommendations.ts', 'shared/types/recommendations.ts');
+      if (!typesContent) return hits;
+      const stripContent = pickFile('server/routes/recommendations.ts', 'server/routes/recommendations.ts');
+
+      // Isolate the OpportunityScore interface body.
+      const ifaceMatch = typesContent.match(/export interface OpportunityScore\s*\{([\s\S]*?)\n\}/);
+      if (!ifaceMatch) return hits;
+      const bodyStart = typesContent.indexOf(ifaceMatch[0]);
+      const bodyLines = ifaceMatch[1].split('\n');
+      // A field is "admin-money" by name: emv*, *emv*, roiPer*, *revenue*, predictedEmv.
+      const moneyNameRe = /(^|[a-z])emv|roiper|revenue|predictedemv/i;
+      const fieldRe = /^\s*([a-zA-Z_]\w*)\??\s*:/;
+      // Line offset of the interface body within the whole file (for accurate line numbers).
+      const lineOffset = typesContent.slice(0, bodyStart).split('\n').length; // 1-based line of "export interface..."
+      for (let i = 0; i < bodyLines.length; i++) {
+        const line = bodyLines[i];
+        if (line.includes('opportunity-strip-ok')) continue;
+        const m = line.match(fieldRe);
+        if (!m) continue;
+        const fieldName = m[1];
+        if (!moneyNameRe.test(fieldName)) continue;
+        // Money field — must be destructured in stripEmvFromPublicRecs.
+        // The strip destructures `<field>: _alias` so look for the field name there.
+        const inStrip = new RegExp(`\\b${fieldName}\\s*:`).test(stripContent);
+        if (inStrip) continue;
+        hits.push({
+          file: path.join(ROOT, 'shared/types/recommendations.ts'),
+          line: lineOffset + i, // +i: the body's first line is the line after the opener
+          text: `OpportunityScore.${fieldName} is admin-money but not in stripEmvFromPublicRecs`,
+        });
+      }
+      return hits;
+    },
+  },
+  {
+    // SEO Generation Quality (forward-looking guardrail). A new recommendation source
+    // category must stay in lockstep across the RecSourceCategory union AND the
+    // REC_SOURCE_CATEGORIES array in server/recommendations.ts. A union member missing
+    // from the array bypasses the auto-resolve safety check (an empty orphan-read would
+    // bulk auto-resolve previously-surfaced recs — G2). Today the union and array are
+    // identical (6 each), so this returns ZERO hits — it fires only when a later phase
+    // (P5: keyword_gaps/topic_clusters/cannibalization rec sources) adds a category to one
+    // but not the other, or routes a strategy source through the audit_fix_applied
+    // fallback. Escape hatch: // rec-source-lockstep-ok.
+    // See docs/rules/seo-generation-quality.md → "New rec types / sources".
+    name: 'new-rec-type-source-needs-category-and-action-type',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/recommendations.ts',
+    message:
+      'RecSourceCategory union and REC_SOURCE_CATEGORIES array are out of lockstep. A new rec ' +
+      'source category must be in BOTH (and have a real recommendationOutcomeActionType case — no ' +
+      'audit_fix_applied fallback for strategy sources), or an empty orphan-read bulk auto-resolves ' +
+      'live recs. Add the member to both, or // rec-source-lockstep-ok if intentional.',
+    severity: 'error',
+    excludeLines: ['rec-source-lockstep-ok'],
+    rationale:
+      'A RecSourceCategory present in the union but absent from REC_SOURCE_CATEGORIES makes getRecSourceCategory return null, bypassing the per-category auto-resolve guard (G2 false auto-resolve).',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const provided = files.find(f => f.endsWith('server/recommendations.ts'));
+      const content = readFileOrEmpty(provided ?? path.join(ROOT, 'server/recommendations.ts'));
+      if (!content) return hits;
+
+      const literalsOf = (block: string | undefined): string[] =>
+        block ? Array.from(block.matchAll(/'([^']+)'/g)).map(m => m[1]) : [];
+
+      const unionMatch = content.match(/export type RecSourceCategory\s*=([\s\S]*?);/);
+      const arrayMatch = content.match(/REC_SOURCE_CATEGORIES:\s*RecSourceCategory\[\]\s*=\s*\[([\s\S]*?)\]/);
+      // If either anchor is absent the file shape changed — nothing to compare.
+      if (!unionMatch || !arrayMatch) return hits;
+      const unionMembers = new Set(literalsOf(unionMatch[1]));
+      const arrayMembers = new Set(literalsOf(arrayMatch[1]));
+
+      const line = content.slice(0, content.indexOf(arrayMatch[0])).split('\n').length;
+      // Allow an inline hatch on the array opener line.
+      const arrayOpenerLine = content.split('\n')[line - 1] ?? '';
+      if (arrayOpenerLine.includes('rec-source-lockstep-ok')) return hits;
+
+      for (const member of unionMembers) {
+        if (!arrayMembers.has(member)) {
+          hits.push({
+            file: path.join(ROOT, 'server/recommendations.ts'),
+            line,
+            text: `RecSourceCategory '${member}' is in the union but missing from REC_SOURCE_CATEGORIES`,
+          });
+        }
+      }
+      for (const member of arrayMembers) {
+        if (!unionMembers.has(member)) {
+          hits.push({
+            file: path.join(ROOT, 'server/recommendations.ts'),
+            line,
+            text: `REC_SOURCE_CATEGORIES '${member}' is not in the RecSourceCategory union`,
+          });
+        }
+      }
+      return hits;
+    },
+  },
+
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

@@ -124,6 +124,91 @@ describe('isFeatureEnabled', () => {
   });
 });
 
+describe('isFeatureEnabled — per-workspace dimension', () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  // Build a SQL-aware mock so the global (feature_flag_overrides) and per-workspace
+  // (feature_flag_workspace_overrides) prepared statements can return distinct rows.
+  async function mockDbBySql(opts: {
+    globalRows?: Array<{ key: string; enabled: number }>;
+    workspaceRows?: Array<{ key: string; enabled: number }>;
+  }): Promise<void> {
+    const dbModule = await import('../../server/db/index.js');
+    const mockDb = dbModule.default as unknown as { prepare: ReturnType<typeof vi.fn> };
+    mockDb.prepare.mockImplementation((sql: string) => {
+      const isWorkspaceTable = /feature_flag_workspace_overrides/.test(sql);
+      return {
+        all: vi.fn(() => (isWorkspaceTable ? (opts.workspaceRows ?? []) : (opts.globalRows ?? []))),
+        get: vi.fn(() => undefined),
+        run: vi.fn(),
+      };
+    });
+  }
+
+  it('ignores per-workspace overrides when no workspaceId is passed (backward-compatible)', async () => {
+    delete process.env['FEATURE_COPY_ENGINE'];
+    await mockDbBySql({ globalRows: [], workspaceRows: [{ key: 'copy-engine', enabled: 1 }] });
+    const { isFeatureEnabled } = await import('../../server/feature-flags.js');
+    // No workspaceId → per-workspace layer is skipped → global default false.
+    expect(isFeatureEnabled('copy-engine')).toBe(false);
+  });
+
+  it('per-workspace override (enabled) wins over the global default', async () => {
+    delete process.env['FEATURE_COPY_ENGINE'];
+    await mockDbBySql({ globalRows: [], workspaceRows: [{ key: 'copy-engine', enabled: 1 }] });
+    const { isFeatureEnabled } = await import('../../server/feature-flags.js');
+    expect(isFeatureEnabled('copy-engine', 'ws-1')).toBe(true);
+  });
+
+  it('per-workspace override (disabled) wins over a global DB override that enables it', async () => {
+    await mockDbBySql({
+      globalRows: [{ key: 'copy-engine', enabled: 1 }],
+      workspaceRows: [{ key: 'copy-engine', enabled: 0 }],
+    });
+    const { isFeatureEnabled } = await import('../../server/feature-flags.js');
+    // Global says ON, per-workspace says OFF → per-workspace wins for this workspace.
+    expect(isFeatureEnabled('copy-engine', 'ws-1')).toBe(false);
+    // The global resolution (no workspaceId) still reflects the global override.
+    expect(isFeatureEnabled('copy-engine')).toBe(true);
+  });
+
+  it('falls back to the global chain when the workspace has no override for the flag', async () => {
+    await mockDbBySql({
+      globalRows: [{ key: 'copy-engine', enabled: 1 }],
+      workspaceRows: [], // workspace has no per-flag override
+    });
+    const { isFeatureEnabled } = await import('../../server/feature-flags.js');
+    expect(isFeatureEnabled('copy-engine', 'ws-1')).toBe(true);
+  });
+
+  it('setWorkspaceFlagOverride is exported and invokes a DB write', async () => {
+    let lastRun: unknown[] = [];
+    const dbModule = await import('../../server/db/index.js');
+    const mockDb = dbModule.default as unknown as { prepare: ReturnType<typeof vi.fn> };
+    mockDb.prepare.mockImplementation(() => ({
+      all: vi.fn(() => []),
+      get: vi.fn(() => undefined),
+      run: vi.fn((...args: unknown[]) => { lastRun = args; }),
+    }));
+    const { setWorkspaceFlagOverride } = await import('../../server/feature-flags.js');
+    setWorkspaceFlagOverride('copy-engine', 'ws-9', true);
+    expect(lastRun).toEqual(['copy-engine', 'ws-9', 1]);
+    setWorkspaceFlagOverride('copy-engine', 'ws-9', null); // delete path
+    expect(lastRun).toEqual(['copy-engine', 'ws-9']);
+  });
+});
+
+describe('seo-generation-quality umbrella flag', () => {
+  it('is registered, defaults false, and is in the SEO Generation Quality group', () => {
+    expect(FEATURE_FLAGS['seo-generation-quality']).toBe(false);
+    expect(FEATURE_FLAG_CATALOG['seo-generation-quality'].group).toBe('SEO Generation Quality');
+    expect(FEATURE_FLAG_CATALOG['seo-generation-quality'].lifecycle.linkedRoadmapItemId)
+      .toBe('seo-genquality-p0-harness');
+  });
+});
+
 describe('getAllFlags', () => {
   beforeEach(() => {
     vi.resetModules();
