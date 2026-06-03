@@ -61,6 +61,20 @@ export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
     primary_metric: 'clicks',
     thresholds: { strong_win: 30, win: 15, neutral_band: 10 },
   },
+  // ── SEO Gen-Quality P7.1 · first-class local-visibility recs ──
+  // local_visibility → local_visibility_won: success = the business starts appearing in the
+  // local pack (or moves up) for a market+keyword it was previously absent from. We measure
+  // local-pack movement via clicks recovered on the targeted local-intent term.
+  local_visibility_won: {
+    primary_metric: 'clicks',
+    thresholds: { strong_win: 30, win: 15, neutral_band: 10 },
+  },
+  // local_service_gap → local_service_added: success = a newly-targeted service term begins
+  // ranking (a position win) once content/tracking exists for it in the market.
+  local_service_added: {
+    primary_metric: 'position',
+    thresholds: { strong_win: 10, win: 5, neutral_band: 3 },
+  },
 };
 
 export function resolveScoringConfig(

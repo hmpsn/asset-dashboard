@@ -14,7 +14,9 @@ export type ActionType =
   | 'voice_calibrated'
   | 'competitor_gap_closed'
   | 'cluster_published'
-  | 'cannibalization_resolved';
+  | 'cannibalization_resolved'
+  | 'local_visibility_won'
+  | 'local_service_added';
 
 export type Attribution =
   | 'platform_executed'

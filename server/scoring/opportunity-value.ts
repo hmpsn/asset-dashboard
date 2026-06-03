@@ -47,6 +47,10 @@ const DEFAULT_EFFORT_DAYS: Record<OpportunityInput['branch'], number> = {
   technical: 0.5,
   freshness: 0.5,
   diagnostic: 2,
+  // local: targeting a local market (a service page + local-intent content/tracking) is
+  // comparable to a content-gap play in effort — neither a one-line fix nor a multi-week
+  // technical project. Calibration path: P5 derives real time-to-implement from outcomes.
+  local: 4,
 };
 
 /** Lower bound on effort so a zero/negative caller override cannot inflate ROI. */
@@ -113,6 +117,18 @@ const CRITICAL_LIFT_MULT = 1.5;
 
 /** Stale-content recoverable CTR gap (freshness branch). */
 const FRESHNESS_CTR_GAP = 0.02;
+
+/** SEO Gen-Quality P7.1 — local-visibility urgency.
+ *  A `not_visible` local-pack posture in a high-intent market is a present, addressable
+ *  miss (the pack already shows for the query; the business simply isn't in it). The local
+ *  rec branches pass a 0..1 `localVisibilitySignal`; it scales urgency up to +LOCAL_URGENCY_MAX.
+ *  Default/absent → 0 → multiplier 1.0 (identity), so non-local / flag-OFF recs are unchanged.
+ *  Owner-tunable; calibration path: P5 outcome win-rate by local market intent. */
+const LOCAL_URGENCY_MAX = 0.5;
+/** Local-pack capturable click-delta proxy: a market that already surfaces a local pack
+ *  but excludes this business has recoverable local demand. Bounded so a local-pack
+ *  estimate cannot outrank a grounded commercial opportunity of comparable real traffic. */
+const LOCAL_PACK_CLICKDELTA = 8;
 
 /** Repeat-decay tactic penalty: a page that already burned a refresh and kept
  *  declining is a worse bet for the same play (closes MW5). */
@@ -253,6 +269,16 @@ function expectedClickDelta(input: OpportunityInput): number {
     case 'diagnostic': {
       return llmFallback(input.llmLabel);
     }
+    case 'local': {
+      // Local-visibility / service-gap recs. When the local-intent term has provider/pool
+      // volume, treat it like a content_gap play (grounded demand × CTR uplift × winnability);
+      // when only the grounded composite is present use it; otherwise the bounded local-pack
+      // capturable proxy (a pack that excludes this business has recoverable local demand).
+      if (volume != null && volume > 0) return volume * ctrUplift(input) * win;
+      if (opportunityScore != null) return (opportunityScore / 100) * DEMAND_CEILING * win / 10;
+      if (impressionsDelta != null) return impressionsDelta;
+      return LOCAL_PACK_CLICKDELTA * win;
+    }
   }
 }
 
@@ -272,13 +298,18 @@ export function normalizeToScore(roiPerEffortDay: number): number {
 
 function buildComponents(
   input: OpportunityInput,
-  parts: { confidence: number; spine: OpportunityScore['groundedSpine']; effortDays: number; businessFit: number; timing: number },
+  parts: { confidence: number; spine: OpportunityScore['groundedSpine']; effortDays: number; businessFit: number; timing: number; localUrgency: number },
   weights: OpportunityWeights,
 ): OpportunityComponent[] {
   const volume = num(input.volume) ?? num(input.impressions) ?? 0;
   const win = winnability(num(input.difficulty), num(input.authorityStrength));
   const iw = intentWeight(input.intent);
-  const timingActive = parts.timing > 1;
+  // The `timing` dimension surfaces BOTH the opportunity-event timing boost and the P7.1
+  // local-visibility urgency (both are urgency multipliers on the same economic quantity),
+  // so the breakdown never overstates a driver and no new dimension ripples across readers.
+  const urgency = parts.timing * parts.localUrgency;
+  const timingActive = urgency > 1;
+  const localUrgent = parts.localUrgency > 1;
   const comps: Array<{ dimension: OpportunityDimension; rawValue: number | string | null; normalized: number; evidence: string }> = [
     { dimension: 'demand', rawValue: num(input.volume) ?? num(input.impressions), normalized: clamp01(volume / DEMAND_CEILING), evidence: `${fmtInt(volume)} monthly searches/impressions` },
     { dimension: 'winnability', rawValue: num(input.difficulty), normalized: clamp01(win / MAX_WINNABILITY), evidence: input.difficulty != null ? `KD ${input.difficulty} vs domain authority` : 'authority/KD unknown' },
@@ -287,7 +318,7 @@ function buildComponents(
     { dimension: 'businessFit', rawValue: num(input.businessFitAlignment), normalized: clamp01((parts.businessFit - 1) / 0.5), evidence: parts.businessFit > 1 ? 'aligned with stated business priorities' : 'no explicit priority match' },
     // Timing has no score effect until an opportunity event sets timingBoost (P7);
     // report a 0 contribution until then so the breakdown never overstates a driver.
-    { dimension: 'timing', rawValue: num(input.timingBoost) ?? 0, normalized: timingActive ? clamp01(parts.timing - 1) : 0, evidence: timingActive ? 'recent opportunity event raises urgency' : 'no active timing event' },
+    { dimension: 'timing', rawValue: num(input.timingBoost) ?? 0, normalized: timingActive ? clamp01(urgency - 1) : 0, evidence: localUrgent ? 'not visible in a high-intent local market raises urgency' : timingActive ? 'recent opportunity event raises urgency' : 'no active timing event' },
     { dimension: 'evidence', rawValue: parts.spine, normalized: clamp01(parts.confidence), evidence: parts.spine === 'computed' && parts.confidence <= CONFIDENCE.llmLabel ? 'estimated (no provider metrics)' : `grounded in ${parts.spine}` },
   ];
   return comps.map((c) => {
@@ -323,11 +354,15 @@ export function computeOpportunityValue(input: OpportunityInput, opts: ComputeOp
   const emvPerWeek = Number.isFinite(rawEmv) ? rawEmv : 0;
   const businessFit = 1 + 0.5 * clamp01(num(input.businessFitAlignment) ?? 0);
   const timing = 1 + Math.max(0, num(input.timingBoost) ?? 0);
+  // Local-visibility urgency multiplier. Default 0 signal → 1.0 (identity), so every
+  // non-local / flag-OFF rec is byte-identical (mirrors the reserved `timing` term). Only
+  // the local rec branches feed a positive signal — the scorer never reads local state.
+  const localUrgency = 1 + LOCAL_URGENCY_MAX * clamp01(num(input.localVisibilitySignal) ?? 0);
 
-  const roiPerEffortDay = (emvPerWeek * HORIZON_WEEKS * businessFit * confidence * calibration * timing) / effortDays;
+  const roiPerEffortDay = (emvPerWeek * HORIZON_WEEKS * businessFit * confidence * calibration * timing * localUrgency) / effortDays;
   const value = normalizeToScore(roiPerEffortDay);
 
-  const components = buildComponents(input, { confidence, spine, effortDays, businessFit, timing }, weights);
+  const components = buildComponents(input, { confidence, spine, effortDays, businessFit, timing, localUrgency }, weights);
 
   return {
     value,

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonSafeArray } from './db/json-validation.js';
+import { isFeatureEnabled } from './feature-flags.js';
 import { createLogger } from './logger.js';
 import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
@@ -204,6 +205,17 @@ export interface LocalSeoKeywordCandidate {
   detail?: string;
   pagePath?: string;
   pageTitle?: string;
+  /**
+   * The local market this candidate was generated for, when the source is
+   * market-scoped (i.e. local variants tied to a specific market's city/state,
+   * or intent-modifier variants tied to the primary market). Market-agnostic
+   * sources (explicit, strategy, tracking, page assignments, content gaps) leave
+   * this `null`/undefined — never fabricate a market for them. Threaded onto the
+   * `localSeo` intelligence slice so per-market relevance (stratified prompt
+   * sampling, market-scoped candidate selection) works instead of falling back
+   * to flat top-N. See docs/rules/local-seo-visibility.md (intelligence boundary).
+   */
+  marketId?: string | null;
   volume?: number;
   difficulty?: number;
   selected: boolean;
@@ -552,6 +564,22 @@ function defaultSettings(workspace: Workspace): LocalSeoWorkspaceSettings {
     updatedAt: new Date().toISOString(),
     keywordsPerRefresh: null,
   };
+}
+
+/**
+ * SEO Gen-Quality P7.1 — the blessed read of a workspace's local SEO posture.
+ *
+ * Resolves the authoritative posture (admin-override-aware, via readSettings) for a
+ * workspace, or `unknown` when the workspace doesn't exist. This is the single getter the
+ * recommendation engine calls ONCE per rec-gen cycle to decide whether to mint local recs
+ * (`useLocalGenQual`). Compare against the exported LOCAL_SEO_POSTURE const (local/hybrid/
+ * non_local/unknown). Does NOT touch the feature flag — that is gated separately at the
+ * call site so the three-gate is explicit.
+ */
+export function getLocalSeoPosture(workspaceId: string): LocalSeoPosture {
+  const workspace = getWorkspace(workspaceId);
+  if (!workspace) return LOCAL_SEO_POSTURE.UNKNOWN;
+  return readSettings(workspace).posture;
 }
 
 function readSettings(workspace: Workspace): LocalSeoWorkspaceSettings {
@@ -1551,20 +1579,55 @@ const LOCAL_INTENT_PREFIX_CAP_PER_BASE = 3;
 
 const LOCAL_SOURCE_PAGE_BUDGET_FRACTION = 0.20;
 
-export function localVariantKeywords(baseKeyword: string, markets: LocalSeoMarket[]): string[] {
+/**
+ * A locally-modified keyword variant tagged with the market that produced it.
+ *
+ * City/state variants carry the originating market's `marketId`. The
+ * market-agnostic `"<base> near me"` variant carries `marketId: null` — it is
+ * not tied to any single market, so do not fabricate one.
+ */
+export interface LocalVariantKeyword {
+  keyword: string;
+  marketId: string | null;
+}
+
+/**
+ * Market-tagged local variant generation. Yields one entry per generated
+ * variant, attributing city/state variants to their originating market so the
+ * candidate engine can thread `marketId` onto the resulting candidate. The
+ * `near me` variant is market-agnostic and carries `marketId: null`.
+ *
+ * Dedupe is by keyword text: the first market to produce a given variant string
+ * wins its attribution (mirrors the `Set`-based dedupe of the flat helper).
+ */
+export function localVariantKeywordsByMarket(baseKeyword: string, markets: LocalSeoMarket[]): LocalVariantKeyword[] {
   const base = cleanKeywordDisplay(baseKeyword);
   if (!base) return [];
-  const variants = new Set<string>();
+  const variants: LocalVariantKeyword[] = [];
+  const seen = new Set<string>();
+  // Dedup is first-market-wins by keyword text: if two markets produce the same
+  // variant string (e.g. a city name shared by two markets), it is attributed to
+  // the first market only. Very low likelihood at LOCAL_SEO_MAX_MARKETS=3;
+  // acknowledged as a known, accepted edge case rather than merged across markets.
+  const add = (keyword: string, marketId: string | null) => {
+    if (seen.has(keyword)) return;
+    seen.add(keyword);
+    variants.push({ keyword, marketId });
+  };
   for (const market of markets) {
     const city = cleanKeywordDisplay(market.city);
     const state = cleanKeywordDisplay(market.stateOrRegion);
     if (city && !normalizeText(base).includes(normalizeText(city))) {
-      variants.add(`${base} ${city}`);
-      if (state && state.length <= 3) variants.add(`${base} ${city} ${state}`);
+      add(`${base} ${city}`, market.id);
+      if (state && state.length <= 3) add(`${base} ${city} ${state}`, market.id);
     }
   }
-  if (!/\bnear me\b/i.test(base)) variants.add(`${base} near me`);
-  return [...variants];
+  if (!/\bnear me\b/i.test(base)) add(`${base} near me`, null);
+  return variants;
+}
+
+export function localVariantKeywords(baseKeyword: string, markets: LocalSeoMarket[]): string[] {
+  return localVariantKeywordsByMarket(baseKeyword, markets).map(v => v.keyword);
 }
 
 export function candidateSourceScore(source: LocalSeoKeywordCandidate['source']): number {
@@ -1655,6 +1718,13 @@ export interface CandidateSourceSignal {
   detail?: string;
   pagePath?: string;
   pageTitle?: string;
+  /**
+   * Set only by market-scoped signal emitters (local variants and intent-modifier
+   * variants). Carries the originating market's id so downstream consumers can
+   * attribute the candidate to a specific market. Market-agnostic signals leave
+   * this undefined — do not fabricate a market.
+   */
+  marketId?: string | null;
   volume?: number;
   difficulty?: number;
   scoreBoost?: number;
@@ -1795,15 +1865,16 @@ export function* iterateLocalCandidateSignals(
     }
     for (const base of [page.primaryKeyword, page.pageTitle, ...(page.secondaryKeywords ?? [])]) {
       if (!base || !titleLooksLikeServiceKeyword(base) || isNearDuplicateKeyword(base, workspace.name)) continue;
-      for (const variant of localVariantKeywords(base, markets)) {
+      for (const variant of localVariantKeywordsByMarket(base, markets)) {
         yield {
-          keyword: variant,
+          keyword: variant.keyword,
           source: 'local_variant',
           sourceLabel: 'Local candidate',
           detail: page.pageTitle ?? page.pagePath,
           pagePath: page.pagePath,
           pageTitle: page.pageTitle,
-          intent: classifyLocalKeywordIntent(variant),
+          marketId: variant.marketId,
+          intent: classifyLocalKeywordIntent(variant.keyword),
         };
       }
     }
@@ -1827,6 +1898,7 @@ export function* iterateLocalCandidateSignals(
             detail: page.pageTitle ?? page.pagePath,
             pagePath: page.pagePath,
             pageTitle: page.pageTitle,
+            marketId: primaryMarket.id,
             intent: variantIntent,
           };
           intentCount++;
@@ -1850,15 +1922,16 @@ export function* iterateLocalCandidateSignals(
       difficulty: gap.difficulty,
       scoreBoost: gap.priority === 'high' ? 8 : 0,
     };
-    for (const variant of localVariantKeywords(gap.targetKeyword, markets)) {
+    for (const variant of localVariantKeywordsByMarket(gap.targetKeyword, markets)) {
       yield {
-        keyword: variant,
+        keyword: variant.keyword,
         source: 'local_variant',
         sourceLabel: 'Local content candidate',
         detail: gap.topic,
+        marketId: variant.marketId,
         volume: gap.volume,
         difficulty: gap.difficulty,
-        intent: classifyLocalKeywordIntent(variant),
+        intent: classifyLocalKeywordIntent(variant.keyword),
       };
     }
     // Intent modifier variants for content gap bases
@@ -1879,6 +1952,7 @@ export function* iterateLocalCandidateSignals(
             source: 'local_variant',
             sourceLabel: 'Intent candidate',
             detail: gap.topic,
+            marketId: primaryMarket.id,
             volume: gap.volume,
             difficulty: gap.difficulty,
             intent: variantIntent,
@@ -1914,6 +1988,7 @@ function upsertCandidate(
     detail: signal.detail,
     pagePath: signal.pagePath,
     pageTitle: signal.pageTitle,
+    marketId: signal.marketId,
     volume: signal.volume,
     difficulty: signal.difficulty,
     selected: signal.selected
@@ -1922,6 +1997,13 @@ function upsertCandidate(
     reasons,
     intent: signal.intent ?? classifyLocalKeywordIntent(display),
   };
+  // marketId follows whichever signal wins this upsert (higher score, or selected
+  // over not-selected) — it is not merged. This resolves safely only because the
+  // market-agnostic sources (tracking=90 / page_assignment=85, both `selected`)
+  // outscore `local_variant` (~62): a keyword reachable both ways lands on the
+  // agnostic winner and ends up market-LESS, so it stays eligible to all markets
+  // (the safe outcome). A future score retune that lifts `local_variant` above the
+  // agnostic sources could flip this and attribute a shared keyword to one market.
   if (!existing || next.score > existing.score || (next.selected && !existing.selected)) {
     candidates.set(key, next);
   }
@@ -2295,6 +2377,30 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
   if (getJob(jobId)?.status === 'cancelled') return;
   notifyLocalSeoUpdated(workspaceId, { action: 'refresh_completed', refreshed, failed, updatedAt: new Date().toISOString() });
   addActivity(workspaceId, 'local_seo_updated', 'Local SEO visibility refreshed', `${refreshed} local visibility checks refreshed`, { source: 'local_seo', refreshed, failed });
+
+  // ── SEO Gen-Quality P7.1 · regen-on-local-refresh (Scope D). ──
+  // Fresh local visibility snapshots are the spine of the local recs (B1/B2/B3). After a refresh
+  // completes, regenerate recommendations so the new evidence surfaces immediately — mirroring the
+  // post-scheduled-audit regen in scheduled-audits.ts. Gated on the SAME three-gate useLocalGenQual
+  // (gen-quality flag + posture local/hybrid + local-seo-visibility flag): when OFF this is a
+  // complete NO-OP, so the legacy refresh path is byte-identical. generateRecommendations
+  // broadcasts + invalidates internally (Bridge rule #3 — NO manual broadcast here). Wrapped in
+  // its own try/catch so a regen failure never fails the refresh job. Dynamic import avoids a
+  // static recommendations.ts ↔ local-seo.ts import cycle (recommendations.ts imports the local
+  // readers statically).
+  const useLocalGenQual = isFeatureEnabled('seo-generation-quality', workspaceId)
+    && (readSettings(workspace).posture === LOCAL_SEO_POSTURE.LOCAL || readSettings(workspace).posture === LOCAL_SEO_POSTURE.HYBRID)
+    && isFeatureEnabled('local-seo-visibility');
+  if (useLocalGenQual) {
+    try {
+      const { generateRecommendations } = await import('./recommendations.js'); // dynamic-import-ok - breaks the recommendations.ts ↔ local-seo.ts cycle (readers imported statically the other way)
+      await generateRecommendations(workspaceId);
+      log.info({ workspaceId }, 'Auto-regenerated recommendations after local SEO refresh');
+    } catch (err) {
+      log.warn({ err, workspaceId }, 'Recommendation regen after local SEO refresh failed (non-fatal)');
+    }
+  }
+
   updateJob(jobId, { status: 'done', progress: total, total, message: `Local visibility refreshed — ${refreshed}/${total} checks`, result });
 }
 

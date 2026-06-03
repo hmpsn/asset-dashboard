@@ -5,7 +5,7 @@ import {
   TrendingUp, TrendingDown, ShoppingCart, Crown, ChevronDown, ChevronRight,
   CheckCircle2, MousePointerClick, Eye,
   FileText, Code2, Image, Wrench, Target, PenTool, Sparkles,
-  Loader2, XCircle, ArrowUpRight, Shield,
+  Loader2, XCircle, ArrowUpRight, Shield, MapPin,
 } from 'lucide-react';
 import { useCart } from './useCart';
 import type { ProductType } from '../../../shared/types/payments.ts';
@@ -40,6 +40,8 @@ const REC_TYPE_TAB: Record<RecType, string> = {
   keyword_gap: 'seo-strategy',
   topic_cluster: 'seo-strategy',
   cannibalization: 'seo-audit',
+  local_visibility: 'seo-strategy',
+  local_service_gap: 'seo-strategy',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────
@@ -96,6 +98,8 @@ const TYPE_ICONS: Record<RecType, typeof FileText> = {
   keyword_gap: Target,
   topic_cluster: Sparkles,
   cannibalization: Wrench,
+  local_visibility: MapPin,
+  local_service_gap: MapPin,
 };
 
 const IMPACT_BADGE: Record<string, { label: string; color: string; bg: string }> = {

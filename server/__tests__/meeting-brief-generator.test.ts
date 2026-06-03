@@ -138,6 +138,8 @@ describe('buildBriefPrompt', () => {
         ],
         visibility: { visible: 2, possibleMatch: 1, notVisible: 3, notChecked: 4, providerDegraded: 0 },
         candidates: [],
+        serviceGaps: [],
+        competitorBrands: [],
         effectiveLocalSeoBlock: 'Local SEO posture (1 active markets):\n  - Austin, TX (active)\n\nVisibility coverage: 2 visible / 1 possible match / 3 not visible / 4 not checked / 0 provider degraded.',
         latestSnapshotAt: '2026-05-21T00:00:00.000Z',
       },

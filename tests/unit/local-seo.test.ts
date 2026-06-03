@@ -14,13 +14,16 @@ import {
   getLocalSeoReadModel,
   getLocalSeoServiceGaps,
   iterateLocalCandidateSignals,
+  listLocalSeoMarkets,
   loadCandidateIterationContext,
   runLocationBackfillJob,
   runLocalSeoRefreshJob,
   selectLocalIntentKeywords,
   updateLocalSeoConfiguration,
 } from '../../server/local-seo.js';
+import * as recommendationsModule from '../../server/recommendations.js';
 import { setBroadcast } from '../../server/broadcast.js';
+import { setFlagOverride, setWorkspaceFlagOverride } from '../../server/feature-flags.js';
 import { createClientLocation } from '../../server/client-locations.js';
 import { clearCompletedJobs, createJob, getJob } from '../../server/jobs.js';
 import { FakeSeoProvider } from '../../server/providers/fake-seo-provider.js';
@@ -398,6 +401,78 @@ describe('local SEO provider selection', () => {
       source: 'local_variant',
       selected: false,
     }));
+  });
+
+  // ── P7.0 attribution contract (real builder, end-to-end) ────────────────────
+  // The slice-assembly tests feed pre-tagged marketId mocks. This exercises the
+  // REAL iterateLocalCandidateSignals → upsertCandidate attribution path through
+  // buildLocalSeoKeywordCandidates with two active markets, locking the contract
+  // documented in the upsertCandidate / localVariantKeywordsByMarket comments:
+  //   (a) a `local_variant` carries its originating market's marketId; and
+  //   (b) a market-agnostic source (tracking) carries null/undefined.
+  it('real builder attributes local_variant to its originating market and leaves market-agnostic sources market-less', () => {
+    setBroadcast(vi.fn(), vi.fn());
+    const ws = createWorkspace('Local SEO Real Attribution Test');
+    cleanupWorkspaceIds.add(ws.id);
+    updateWorkspace(ws.id, {
+      name: 'Swish Dental',
+      liveDomain: 'https://swish.example.com',
+      businessProfile: { address: { street: '123 Congress Ave', city: 'Austin', state: 'TX', country: 'US' } },
+      keywordStrategy: {
+        siteKeywords: ['cosmetic dentist'],
+        opportunities: [],
+        businessContext: 'Dental office offering cosmetic dentistry, veneers, whitening, and implants.',
+        generatedAt: '2026-05-20T10:00:00.000Z',
+      },
+    });
+    updateLocalSeoConfiguration(ws.id, {
+      posture: LOCAL_SEO_POSTURE.LOCAL,
+      markets: [
+        { label: 'Austin, TX', city: 'Austin', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1026201, status: LOCAL_SEO_MARKET_STATUS.ACTIVE },
+        { label: 'Houston, TX', city: 'Houston', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1026339, status: LOCAL_SEO_MARKET_STATUS.ACTIVE },
+      ],
+    }, true);
+    upsertPageKeyword(ws.id, {
+      pagePath: '/services/cosmetic-dentistry',
+      pageTitle: 'Cosmetic Dentistry',
+      primaryKeyword: 'cosmetic dentistry',
+      searchIntent: 'commercial',
+    });
+    // A rank-tracking keyword (market-agnostic source — TrackedKeyword has no
+    // marketId). Distinct from the strategy siteKeyword so its `tracking` source
+    // owns the candidate (strategy=95 would otherwise outscore tracking=90 on a
+    // shared key). Carries local intent ("near me") so it survives the local-intent
+    // filter in the cheap builder.
+    addTrackedKeyword(ws.id, 'teeth whitening near me', { source: TRACKED_KEYWORD_SOURCE.MANUAL });
+
+    // Resolve the real, generated market ids so we assert against actual values.
+    const markets = listLocalSeoMarkets(ws.id);
+    const austin = markets.find(m => m.city === 'Austin');
+    const houston = markets.find(m => m.city === 'Houston');
+    expect(austin).toBeDefined();
+    expect(houston).toBeDefined();
+
+    const candidates = buildLocalSeoKeywordCandidates(ws.id);
+    const byKey = new Map(candidates.map(c => [c.normalizedKeyword, c]));
+
+    // (a) City-scoped local_variant candidates carry their originating market's id.
+    const austinVariant = byKey.get('cosmetic dentistry austin');
+    const houstonVariant = byKey.get('cosmetic dentistry houston');
+    expect(austinVariant).toBeDefined();
+    expect(houstonVariant).toBeDefined();
+    expect(austinVariant!.source).toBe('local_variant');
+    expect(austinVariant!.marketId).toBe(austin!.id);
+    expect(houstonVariant!.source).toBe('local_variant');
+    expect(houstonVariant!.marketId).toBe(houston!.id);
+
+    // (b) A market-agnostic source (rank tracking) carries no marketId. Note the
+    // tracking source (score 90) wins the upsert over any local_variant (~62) for
+    // the same key, so the surviving candidate is market-less — the safe outcome
+    // documented in upsertCandidate.
+    const tracked = byKey.get('teeth whitening near me');
+    expect(tracked).toBeDefined();
+    expect(tracked!.source).toBe('tracking');
+    expect(tracked!.marketId == null).toBe(true);
   });
 
   it('cheap buildLocalSeoKeywordCandidates returns empty reasons[] (no evaluator run)', () => {
@@ -1469,5 +1544,158 @@ describe('getLocalSeoServiceGaps — dental taxonomy', () => {
 
     const gaps = getLocalSeoServiceGaps(ws.id);
     expect(gaps.length).toBe(12); // no tracked keywords — all gaps
+  });
+});
+
+// ── M-1 Scope D — regen-on-local-refresh hook in runLocalSeoRefreshJob ────────────
+//
+// After a refresh completes, runLocalSeoRefreshJob recomputes the three-gate useLocalGenQual
+// (seo-generation-quality flag + posture ∈ {local,hybrid} + local-seo-visibility flag) and, when
+// all three are ON, dynamic-imports generateRecommendations to surface the fresh evidence. The
+// regen is in its own try/catch — a regen throw must never fail the refresh job. These tests pin:
+//   (a) regen FIRES when all three gates are ON,
+//   (b) regen is a NO-OP when any gate is OFF (umbrella flag / posture non_local / local-seo flag),
+//   (c) a regen THROW does NOT fail the refresh job (it still completes 'done').
+describe('Scope D — recommendation regen after local SEO refresh (M-1)', () => {
+  let regenSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    __setRefreshTimingsForTesting({ itemYieldMs: 0, heapHeadroomThresholdMb: Number.MAX_SAFE_INTEGER });
+    // Stub generateRecommendations so we observe the dynamic-import call without running the real
+    // (heavy, side-effecting) generator. The regen hook dynamic-imports this same module record.
+    regenSpy = vi.spyOn(recommendationsModule, 'generateRecommendations').mockResolvedValue({} as never);
+  });
+
+  afterEach(() => {
+    __resetRefreshTimingsForTesting();
+    vi.restoreAllMocks();
+  });
+
+  /** Seed a refresh-ready local workspace (active market + tracked keyword + fake provider). */
+  function seedRefreshableLocalWorkspace(name: string, posture: typeof LOCAL_SEO_POSTURE[keyof typeof LOCAL_SEO_POSTURE]) {
+    setBroadcast(vi.fn(), vi.fn());
+    const ws = createWorkspace(name);
+    cleanupWorkspaceIds.add(ws.id);
+    updateWorkspace(ws.id, {
+      name: 'Regen Dental',
+      liveDomain: 'https://regen-dental.example.com',
+      seoDataProvider: 'dataforseo',
+      businessProfile: {
+        phone: '(512) 555-0150',
+        address: { street: '1 Regen St', city: 'Austin', state: 'TX', country: 'US' },
+      },
+    });
+    updateLocalSeoConfiguration(ws.id, {
+      posture,
+      markets: [{
+        label: 'Austin, TX',
+        city: 'Austin',
+        stateOrRegion: 'TX',
+        country: 'US',
+        providerLocationCode: 1026201,
+        status: LOCAL_SEO_MARKET_STATUS.ACTIVE,
+      }],
+    }, true);
+    addTrackedKeyword(ws.id, 'Austin Dentist', { source: TRACKED_KEYWORD_SOURCE.MANUAL });
+    registerProvider('dataforseo', new FakeSeoProvider());
+    return ws;
+  }
+
+  it('(a) regen FIRES when all three gates are ON (gen-quality + posture local + local-seo-visibility)', async () => {
+    const ws = seedRefreshableLocalWorkspace('Scope D regen all-gates-ON', LOCAL_SEO_POSTURE.LOCAL);
+    setWorkspaceFlagOverride('seo-generation-quality', ws.id, true);
+    setFlagOverride('local-seo-visibility', true);
+    try {
+      const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, { workspaceId: ws.id, message: 'regen ON' });
+      await runLocalSeoRefreshJob(job.id, ws.id, { keywords: ['Austin Dentist'] });
+
+      expect(getJob(job.id)?.status).toBe('done');
+      expect(regenSpy).toHaveBeenCalledTimes(1);
+      expect(regenSpy).toHaveBeenCalledWith(ws.id);
+    } finally {
+      setWorkspaceFlagOverride('seo-generation-quality', ws.id, null);
+      setFlagOverride('local-seo-visibility', null);
+    }
+  });
+
+  it('(a) regen FIRES for hybrid posture too', async () => {
+    const ws = seedRefreshableLocalWorkspace('Scope D regen hybrid', LOCAL_SEO_POSTURE.HYBRID);
+    setWorkspaceFlagOverride('seo-generation-quality', ws.id, true);
+    setFlagOverride('local-seo-visibility', true);
+    try {
+      const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, { workspaceId: ws.id, message: 'regen hybrid' });
+      await runLocalSeoRefreshJob(job.id, ws.id, { keywords: ['Austin Dentist'] });
+      expect(getJob(job.id)?.status).toBe('done');
+      expect(regenSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      setWorkspaceFlagOverride('seo-generation-quality', ws.id, null);
+      setFlagOverride('local-seo-visibility', null);
+    }
+  });
+
+  it('(b) regen is a NO-OP when the umbrella seo-generation-quality flag is OFF', async () => {
+    const ws = seedRefreshableLocalWorkspace('Scope D regen umbrella OFF', LOCAL_SEO_POSTURE.LOCAL);
+    setWorkspaceFlagOverride('seo-generation-quality', ws.id, false);
+    setFlagOverride('local-seo-visibility', true);
+    try {
+      const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, { workspaceId: ws.id, message: 'umbrella OFF' });
+      await runLocalSeoRefreshJob(job.id, ws.id, { keywords: ['Austin Dentist'] });
+      expect(getJob(job.id)?.status).toBe('done');
+      expect(regenSpy).not.toHaveBeenCalled();
+    } finally {
+      setWorkspaceFlagOverride('seo-generation-quality', ws.id, null);
+      setFlagOverride('local-seo-visibility', null);
+    }
+  });
+
+  it('(b) regen is a NO-OP when posture is non_local', async () => {
+    const ws = seedRefreshableLocalWorkspace('Scope D regen non_local', LOCAL_SEO_POSTURE.NON_LOCAL);
+    setWorkspaceFlagOverride('seo-generation-quality', ws.id, true);
+    setFlagOverride('local-seo-visibility', true);
+    try {
+      const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, { workspaceId: ws.id, message: 'non_local' });
+      await runLocalSeoRefreshJob(job.id, ws.id, { keywords: ['Austin Dentist'] });
+      // The refresh job itself still completes (non_local doesn't block the refresh) — only the
+      // regen hook no-ops on the recomputed gate.
+      expect(getJob(job.id)?.status).toBe('done');
+      expect(regenSpy).not.toHaveBeenCalled();
+    } finally {
+      setWorkspaceFlagOverride('seo-generation-quality', ws.id, null);
+      setFlagOverride('local-seo-visibility', null);
+    }
+  });
+
+  it('(b) regen is a NO-OP when the global local-seo-visibility flag is OFF', async () => {
+    const ws = seedRefreshableLocalWorkspace('Scope D regen local-seo-flag OFF', LOCAL_SEO_POSTURE.LOCAL);
+    setWorkspaceFlagOverride('seo-generation-quality', ws.id, true);
+    setFlagOverride('local-seo-visibility', false);
+    try {
+      const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, { workspaceId: ws.id, message: 'local-seo OFF' });
+      await runLocalSeoRefreshJob(job.id, ws.id, { keywords: ['Austin Dentist'] });
+      expect(getJob(job.id)?.status).toBe('done');
+      expect(regenSpy).not.toHaveBeenCalled();
+    } finally {
+      setWorkspaceFlagOverride('seo-generation-quality', ws.id, null);
+      setFlagOverride('local-seo-visibility', null);
+    }
+  });
+
+  it('(c) a regen throw does NOT fail the refresh job — the job still completes', async () => {
+    const ws = seedRefreshableLocalWorkspace('Scope D regen throw non-fatal', LOCAL_SEO_POSTURE.LOCAL);
+    setWorkspaceFlagOverride('seo-generation-quality', ws.id, true);
+    setFlagOverride('local-seo-visibility', true);
+    regenSpy.mockRejectedValueOnce(new Error('boom: recommendation regen failed'));
+    try {
+      const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, { workspaceId: ws.id, message: 'regen throws' });
+      await runLocalSeoRefreshJob(job.id, ws.id, { keywords: ['Austin Dentist'] });
+      // The regen threw, but its own try/catch swallows it — the refresh job still reaches 'done'.
+      expect(regenSpy).toHaveBeenCalledTimes(1);
+      const finalJob = getJob(job.id);
+      expect(finalJob?.status).toBe('done');
+      expect(finalJob?.error).toBeUndefined();
+    } finally {
+      setWorkspaceFlagOverride('seo-generation-quality', ws.id, null);
+      setFlagOverride('local-seo-visibility', null);
+    }
   });
 });

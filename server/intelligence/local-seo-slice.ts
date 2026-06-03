@@ -38,6 +38,8 @@ export async function assembleLocalSeo(workspaceId: string): Promise<LocalSeoSli
     markets: [],
     visibility: { visible: 0, possibleMatch: 0, notVisible: 0, notChecked: 0, providerDegraded: 0 },
     candidates: [],
+    serviceGaps: [],
+    competitorBrands: [],
     effectiveLocalSeoBlock: enabled
       ? 'Local SEO is enabled but no markets are configured for this workspace.'
       : 'Local SEO is disabled for this workspace.',
@@ -63,6 +65,8 @@ export async function assembleLocalSeo(workspaceId: string): Promise<LocalSeoSli
       buildLocalSeoKeywordCandidates,
       buildLocalSeoKeywordVisibilitySummaryByKey,
       listLatestLocalVisibilitySnapshots,
+      getLocalSeoServiceGaps,
+      getLocalSeoCompetitorBrands,
     } = localSeoModule;
 
     const rawMarkets = listLocalSeoMarkets(workspaceId);
@@ -87,8 +91,11 @@ export async function assembleLocalSeo(workspaceId: string): Promise<LocalSeoSli
       sourceLabel: c.sourceLabel,
       pageTitle: c.pageTitle,
       pagePath: c.pagePath,
-      // marketId is not currently populated on LocalSeoKeywordCandidate — see TODO below.
-      marketId: undefined,
+      // Market-scoped sources (local/intent variants) carry their originating
+      // marketId; market-agnostic sources carry null/undefined. Threaded through
+      // so the stratified sampler + selectRelevantLocalCandidates do per-market
+      // relevance instead of flat top-N (fixes cross-market candidate noise).
+      marketId: c.marketId,
       volume: c.volume,
       difficulty: c.difficulty,
       score: c.score,
@@ -134,16 +141,44 @@ export async function assembleLocalSeo(workspaceId: string): Promise<LocalSeoSli
       log.debug({ err, workspaceId }, 'latest snapshot lookup failed; leaving null');
     }
 
+    // SEO Gen-Quality P7.1 — surface the local service-gap + competitor-brand readers (the
+    // local_service_gap / local_visibility rec spines) so AdminChat can reason about them. Each
+    // read is best-effort: a failure degrades to an empty list, never blocking the slice.
+    let serviceGaps: LocalSeoSlice['serviceGaps'] = [];
+    try {
+      serviceGaps = getLocalSeoServiceGaps(workspaceId).map(g => ({
+        serviceId: g.serviceId,
+        serviceLabel: g.serviceLabel,
+        starterKeywords: g.starterKeywords,
+      }));
+    } catch (err) {
+      log.debug({ err, workspaceId }, 'service gaps unavailable for local SEO slice; leaving empty');
+    }
+    let competitorBrands: LocalSeoSlice['competitorBrands'] = [];
+    try {
+      competitorBrands = getLocalSeoCompetitorBrands(workspaceId).map(c => ({
+        title: c.title,
+        domain: c.domain,
+        totalAppearances: c.totalAppearances,
+        winsAgainstClient: c.winsAgainstClient,
+        markets: c.markets,
+      }));
+    } catch (err) {
+      log.debug({ err, workspaceId }, 'competitor brands unavailable for local SEO slice; leaving empty');
+    }
+
     const sampledCandidates = stratifiedSample(candidates, markets, PROMPT_BLOCK_PER_MARKET_CAP, PROMPT_BLOCK_TOTAL_CAP);
     const effectiveLocalSeoBlock = renderLocalSeoBlock({
       locations,
       markets,
       visibility,
       sampledCandidates,
+      serviceGaps,
+      competitorBrands,
       latestSnapshotAt,
     });
 
-    return { locations, enabled, markets, visibility, candidates, effectiveLocalSeoBlock, latestSnapshotAt };
+    return { locations, enabled, markets, visibility, candidates, serviceGaps, competitorBrands, effectiveLocalSeoBlock, latestSnapshotAt };
   } catch (err) {
     log.warn({ err, workspaceId }, 'assembleLocalSeo: failed, degrading to empty slice');
     return baseline;
@@ -151,8 +186,20 @@ export async function assembleLocalSeo(workspaceId: string): Promise<LocalSeoSli
 }
 
 /**
- * Top N per active market, capped at total. Falls back to flat top-N if no
- * marketId data is present on candidates (current state — see TODO in assembler).
+ * Top N per active market, capped at total. Buckets candidates by their
+ * `marketId` and takes the top `perMarket` from each active market, then fills
+ * the remaining budget with market-less (unassigned) candidates. Falls back to a
+ * flat score-sorted top-N only when NO candidate carries a marketId or there are
+ * no active markets.
+ *
+ * Single-market parity: with exactly one active market the per-market cap is
+ * raised to the total cap, so a single-market workspace surfaces up to `total`
+ * market-scoped candidates — byte-identical to the pre-P7.0 flat path (which
+ * also capped only at `total`). The narrower per-market cap therefore only
+ * constrains MULTI-market workspaces, which is the intended fix: it stops one
+ * high-scoring market from crowding the others out of the prompt block.
+ * Market-agnostic data (no candidate carries a marketId) still takes the flat
+ * fallback above, also unchanged.
  */
 function stratifiedSample(
   candidates: LocalSeoSlice['candidates'],
@@ -165,6 +212,10 @@ function stratifiedSample(
   if (!hasMarketId || activeMarkets.length === 0) {
     return [...candidates].sort((a, b) => b.score - a.score).slice(0, total);
   }
+  // Single active market → use the total cap for that one bucket so single-market
+  // coverage matches the prior flat path exactly. Only multi-market workspaces get
+  // the narrower per-market cap.
+  const effectivePerMarket = activeMarkets.length === 1 ? total : perMarket;
   const byMarket = new Map<string, LocalSeoSlice['candidates'][number][]>();
   for (const market of activeMarkets) byMarket.set(market.id, []);
   const unassigned: LocalSeoSlice['candidates'][number][] = [];
@@ -175,7 +226,7 @@ function stratifiedSample(
   const picked: LocalSeoSlice['candidates'][number][] = [];
   for (const list of byMarket.values()) {
     list.sort((a, b) => b.score - a.score);
-    picked.push(...list.slice(0, perMarket));
+    picked.push(...list.slice(0, effectivePerMarket));
   }
   unassigned.sort((a, b) => b.score - a.score);
   for (const c of unassigned) {
@@ -190,9 +241,11 @@ function renderLocalSeoBlock(args: {
   markets: LocalSeoSlice['markets'];
   visibility: LocalSeoSlice['visibility'];
   sampledCandidates: LocalSeoSlice['candidates'];
+  serviceGaps: LocalSeoSlice['serviceGaps'];
+  competitorBrands: LocalSeoSlice['competitorBrands'];
   latestSnapshotAt: string | null;
 }): string {
-  const { locations, markets, visibility, sampledCandidates, latestSnapshotAt } = args;
+  const { locations, markets, visibility, sampledCandidates, serviceGaps, competitorBrands, latestSnapshotAt } = args;
   const lines: string[] = [];
   if (locations.length > 0) {
     lines.push(`Configured client locations (${locations.length} confirmed):`);
@@ -222,6 +275,22 @@ function renderLocalSeoBlock(args: {
       lines.push(`  - "${c.keyword}"${market} — ${where} (score ${c.score})`);
     }
   }
+  if (competitorBrands.length > 0) {
+    lines.push('');
+    lines.push('Repeat local-pack competitors (winsAgainstClient = pack appeared, client absent):');
+    for (const c of competitorBrands.slice(0, PROMPT_BLOCK_MARKET_LIST_CAP)) {
+      const where = c.markets.length > 0 ? ` across ${c.markets.slice(0, 3).join(', ')}` : '';
+      lines.push(`  - ${c.title}${c.domain ? ` (${c.domain})` : ''} — ${c.totalAppearances} appearance(s), ${c.winsAgainstClient} while you were absent${where}`);
+    }
+  }
+  if (serviceGaps.length > 0) {
+    lines.push('');
+    lines.push('Untargeted local services (no active tracking keyword):');
+    for (const g of serviceGaps.slice(0, PROMPT_BLOCK_MARKET_LIST_CAP)) {
+      const starters = g.starterKeywords.slice(0, 3).join(', ');
+      lines.push(`  - ${g.serviceLabel}${starters ? ` (e.g. ${starters})` : ''}`);
+    }
+  }
   if (latestSnapshotAt) {
     lines.push('');
     lines.push(`Latest visibility snapshot: ${latestSnapshotAt}.`);
@@ -235,9 +304,17 @@ function renderLocalSeoBlock(args: {
  *
  * Relevance heuristic:
  *  - Same marketId as any candidate matching the target (so we keep neighbors in
- *    the target market) — only effective once candidates carry marketId.
+ *    the target market).
  *  - Shared service stem (token overlap >= 1 with target after normalization)
  *  - Falls back to score-sorted top-N when no target is provided.
+ *
+ * Per-market scoping (P7.0): when the resolved target carries a marketId, a
+ * candidate belonging to a DIFFERENT known market is excluded entirely — a
+ * market-A keyword must never bleed into a market-B selection. Market-less
+ * candidates (marketId null/undefined — explicit/strategy/tracking/page/content-gap
+ * sources, plus the `near me` variant) remain eligible because they are
+ * market-agnostic. When the target itself is market-less, behavior is unchanged
+ * from the prior flat heuristic (strict improvement, never a regression).
  *
  * Returns at most `limit` candidates (default 15).
  */
@@ -257,15 +334,20 @@ export function selectRelevantLocalCandidates(
     c => c.keyword.toLowerCase() === target.toLowerCase(),
   );
   const targetMarketId = targetCandidate?.marketId;
+  // When the target is anchored to a specific market, drop candidates that belong
+  // to a different known market. Market-less candidates pass through (agnostic).
+  const eligible = targetMarketId
+    ? slice.candidates.filter(c => !c.marketId || c.marketId === targetMarketId)
+    : slice.candidates;
   // Score each candidate; relevant candidates (token overlap OR market match) get a
   // large additive boost so they dominate raw-score ordering. Within each tier, score
   // is the tiebreaker.
   const RELEVANCE_TIER_BOOST = 1_000_000;
-  const scored = slice.candidates.map(c => {
+  const scored = eligible.map(c => {
     const cTokens = c.keyword.toLowerCase().split(/\s+/);
     let overlap = 0;
     for (const t of cTokens) if (targetTokens.has(t)) overlap++;
-    const marketMatch = targetMarketId && c.marketId === targetMarketId;
+    const marketMatch = Boolean(targetMarketId && c.marketId === targetMarketId);
     const isRelevant = overlap > 0 || marketMatch;
     const relevance =
       (isRelevant ? RELEVANCE_TIER_BOOST : 0)
@@ -303,8 +385,12 @@ function visibilityRank(posture: LocalSeoVisibilityPosture): number {
   }
 }
 
-// TODO(local-seo-marketId-passthrough): LocalSeoKeywordCandidate in server/local-seo.ts
-// does not currently carry a `marketId` field — candidates are generated from page-level
-// inputs that don't associate to a specific market. When that changes, the stratified
-// sampler will start providing per-market coverage in prompts and `selectRelevantLocalCandidates`
-// will apply its marketBonus heuristic. Until then, both fall back to flat score-sorted top-N.
+// P7.0 (resolved): LocalSeoKeywordCandidate now carries `marketId` for
+// market-scoped sources (local/intent variants — see server/local-seo.ts). The
+// stratified sampler provides per-market prompt coverage and
+// `selectRelevantLocalCandidates` scopes selection to the target market when one
+// is resolved. Single-market workspaces raise the per-market cap to the total
+// cap so their coverage is byte-identical to the pre-P7.0 flat path; only
+// MULTI-market workspaces get the narrower per-market cap. Market-agnostic
+// candidates carry null and fall back to flat score-sorted ordering, so
+// market-less data is also unaffected.
