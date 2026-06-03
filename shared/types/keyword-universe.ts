@@ -68,6 +68,10 @@ export interface KeywordCandidate {
    * market); market-agnostic local candidates and every non-local source leave this
    * `null`/undefined — never fabricate a market. Gives per-market relevance to the
    * local terms in the strategy pool. See docs/rules/local-seo-visibility.md.
+   *
+   * Plumbed by P7.2 for a later phase; no current pool consumer reads it yet. The
+   * closed-set prompt builder in `keyword-strategy-ai-synthesis.ts` reads only
+   * keyword/volume/difficulty/requested/declined — `marketId` is write-only today.
    */
   marketId?: string | null;
   // ── P3 annotations (optional now; populated by the closed-set rewrite) ──
