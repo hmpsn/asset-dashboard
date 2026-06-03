@@ -20,7 +20,6 @@
  * are derived from it for the typed {@link KeywordUniverse} contract.
  */
 import { createLogger } from './logger.js';
-import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 import { isProgrammingError } from './errors.js';
 import { getTrackedKeywords } from './rank-tracking.js';
 import { filterBrandedKeywords } from './competitor-brand-filter.js';
@@ -223,6 +222,9 @@ export async function buildKeywordUniverse(
   // Owned by the assembler on the flag-ON path. ALWAYS runs when a provider
   // exists (depth-capped), not gated on on/off. The pre-fetched discovery/related
   // arrays (flag-OFF inputs) are still merged so nothing is lost.
+  // NOTE: SemRush is language/geo-blind for discovery — it implements only
+  // getRelatedKeywords/getQuestionKeywords and ignores the threaded
+  // locationCode/languageCode args; DataForSEO (the default provider) honors both. (M3)
   const fetchedDiscovery: KeywordSourceEvidence[] = [];
   const fetchedRelated: RelatedKeyword[] = [];
   if (provider) {
@@ -246,31 +248,34 @@ export async function buildKeywordUniverse(
       }
     };
 
+    // geo (locationCode) + language are both threaded into every discovery call
+    // (the `database` slot is left undefined so the provider derives geo from the
+    // resolved locationCode, not from a US default). This is the whole-pool-US fix.
     if (provider.getKeywordsForSite && siteDomain) {
       fetchedDiscovery.push(...await runProviderCall(() =>
-        provider.getKeywordsForSite!(siteDomain, workspaceId, limits.keywordsForSiteLimit, undefined, languageCode)));
+        provider.getKeywordsForSite!(siteDomain, workspaceId, limits.keywordsForSiteLimit, undefined, locationCode, languageCode)));
     }
     if (provider.getKeywordIdeas && discoverySeeds.length > 0) {
       fetchedDiscovery.push(...await runProviderCall(() =>
-        provider.getKeywordIdeas!(discoverySeeds, workspaceId, limits.keywordIdeasLimit, undefined, languageCode)));
+        provider.getKeywordIdeas!(discoverySeeds, workspaceId, limits.keywordIdeasLimit, undefined, locationCode, languageCode)));
     }
     if (provider.getKeywordSuggestions) {
       for (const seed of discoverySeeds.slice(0, limits.suggestionSeeds)) {
         fetchedDiscovery.push(...await runProviderCall(() =>
-          provider.getKeywordSuggestions!(seed, workspaceId, limits.suggestionsLimit, undefined, languageCode)));
+          provider.getKeywordSuggestions!(seed, workspaceId, limits.suggestionsLimit, undefined, locationCode, languageCode)));
       }
     }
     // Related
     const relatedSeeds = domainKeywords.filter(k => k.keyword?.trim()).slice(0, limits.relatedSeeds).map(k => k.keyword);
     for (const seed of relatedSeeds) {
       fetchedRelated.push(...await runProviderCall(() =>
-        provider.getRelatedKeywords(seed, workspaceId, limits.relatedLimit, undefined, languageCode)));
+        provider.getRelatedKeywords(seed, workspaceId, limits.relatedLimit, undefined, locationCode, languageCode)));
     }
     // Questions (folded into discovery as a source so they enter the pool too)
     const questionSeeds = domainKeywords.filter(k => k.keyword?.trim() && k.volume > 100).slice(0, limits.questionSeeds).map(k => k.keyword);
     for (const seed of questionSeeds) {
       const questions = await runProviderCall(() =>
-        provider.getQuestionKeywords(seed, workspaceId, limits.questionsLimit, undefined, languageCode));
+        provider.getQuestionKeywords(seed, workspaceId, limits.questionsLimit, undefined, locationCode, languageCode));
       for (const q of questions) {
         fetchedDiscovery.push({
           keyword: q.keyword,
@@ -330,11 +335,12 @@ export async function buildKeywordUniverse(
   }
 
   // ── (6) Provider discovery (pre-fetched flag-OFF input + assembler-fetched) ──
-  const seenDiscovery = new Set<string>();
+  // No local seen-set: dedup is owned by `upsertKeywordPoolCandidate`'s Map exactly
+  // as the legacy `else` fold does. A pre-set short-circuit would mark an
+  // ineligible-first duplicate (e.g. volume:0 first row) as seen and then drop a
+  // later eligible duplicate the legacy fold admits — and would also defeat the
+  // higher-volume tiebreak. (C2)
   for (const dk of [...discoveryKeywords, ...fetchedDiscovery]) {
-    const norm = keywordComparisonKey(dk.keyword);
-    if (!norm || seenDiscovery.has(norm)) continue;
-    seenDiscovery.add(norm);
     const kw = normalizeKeyword(dk.keyword);
     if (isStrategyQualityDiscoveryKeyword(dk) && eligible(dk)) {
       if (upsertKeywordPoolCandidate(pool, kw, { volume: dk.volume, difficulty: dk.difficulty, source: `discovery:${dk.sourceKind}` })) {
@@ -344,11 +350,8 @@ export async function buildKeywordUniverse(
   }
 
   // ── (7) Related keywords (pre-fetched + assembler-fetched) ──
-  const seenRelated = new Set<string>();
+  // Same as (6): rely on the Map dedup + tiebreak, no local seen-set. (C2)
   for (const rk of [...relatedKeywords, ...fetchedRelated]) {
-    const norm = keywordComparisonKey(rk.keyword);
-    if (!norm || seenRelated.has(norm)) continue;
-    seenRelated.add(norm);
     const kw = normalizeKeyword(rk.keyword);
     if (rk.volume > 0 && eligible({ keyword: kw, volume: rk.volume, difficulty: rk.difficulty, cpc: rk.cpc, source: 'related' })) {
       if (upsertKeywordPoolCandidate(pool, kw, { volume: rk.volume, difficulty: rk.difficulty, source: 'related' })) {

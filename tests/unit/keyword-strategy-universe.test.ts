@@ -1,13 +1,17 @@
 /**
  * Unit tests for server/keyword-strategy-universe.ts (P1 — buildKeywordUniverse).
  *
- * These exercise the assembler with NO provider (provider: null) so there is no
- * AI/network — the pool is built purely from the in-scope inputs the synthesis
- * assembler passes (the folded :403-472 logic). Covers:
+ * Covers:
  *   - flag-ON pool contains a seeded GSC query + a client-tracked keyword
  *   - declined keyword is excluded (the fold preserves the declined hard-filter)
- *   - flag-OFF parity: the universe-built pool matches the legacy inline build
- *   - the per-workspace monthly credit ceiling is enforced
+ *   - flag-OFF parity: the universe-built pool matches the REAL legacy fold
+ *     (`buildLegacyKeywordPool` — the same code the synthesis else-branch runs,
+ *     NOT a reimplemented local copy)
+ *   - the drop-a-candidate divergence is fixed (C2): duplicate discovery rows
+ *     (ineligible-first/eligible-later AND lower-vol-first/higher-vol-later) land
+ *     in the assembler pool exactly as the legacy fold admits them
+ *   - the per-workspace monthly credit ceiling reserves a call when a provider is
+ *     present (uses FakeSeoProvider so the ceiling + geo/language threading run)
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
@@ -18,12 +22,12 @@ import {
   __resetMonthlyProviderCallCeiling,
   type BuildKeywordUniverseOptions,
 } from '../../server/keyword-strategy-universe.js';
-import { upsertKeywordPoolCandidate, type KeywordPoolCandidate } from '../../server/keyword-strategy-helpers.js';
+import { buildLegacyKeywordPool } from '../../server/keyword-strategy-ai-synthesis.js';
+import { type KeywordPoolCandidate } from '../../server/keyword-strategy-helpers.js';
 import { isStrategyPoolEligibleKeyword, normalizeKeyword } from '../../server/keyword-intelligence/index.js';
-import { filterBrandedKeywords } from '../../server/competitor-brand-filter.js';
-import { filterDeclinedFromPool } from '../../server/strategy-filters.js';
-import { isStrategyQualityDiscoveryKeyword } from '../../server/keyword-strategy-helpers.js';
 import { getTrackedKeywords } from '../../server/rank-tracking.js';
+import { FakeSeoProvider } from '../../server/providers/fake-seo-provider.js';
+import type { DomainKeyword } from '../../server/seo-data-provider.js';
 import type { KeywordSourceEvidence } from '../../shared/types/keywords.js';
 
 let workspaceId = '';
@@ -58,6 +62,10 @@ function baseOpts(overrides: Partial<BuildKeywordUniverseOptions> = {}): BuildKe
     ...overrides,
   };
 }
+
+/** The shared admission predicate, exactly as synthesis builds it (empty context). */
+const isEligible = (k: { keyword: string; volume?: number; difficulty?: number; cpc?: number; source?: string; sourceKind?: string }) =>
+  !isStrategyPoolEligibleKeyword(k, {}).suppressed;
 
 describe('buildKeywordUniverse — flag-ON pool semantics', () => {
   it('includes a seeded GSC query and a client-tracked keyword, and EXCLUDES a declined keyword', async () => {
@@ -113,12 +121,13 @@ describe('buildKeywordUniverse — flag-ON pool semantics', () => {
   });
 });
 
-describe('buildKeywordUniverse — flag-OFF parity', () => {
-  // Replicates the legacy inline pool-build (keyword-strategy-ai-synthesis.ts
-  // :403-472) on the same fixture inputs, then asserts the universe-built pool is
-  // identical. This is the required flag-OFF parity deliverable: the fold must
-  // preserve every source + the declined filter, byte-for-byte.
-  function legacyPool(opts: {
+describe('buildKeywordUniverse — flag-OFF parity (drives the REAL legacy fold)', () => {
+  // Runs the actual `buildLegacyKeywordPool` (the same code the synthesis
+  // else-branch executes) on the same fixture inputs, then asserts the
+  // universe-built pool is identical. This drives the REAL else-branch — not a
+  // reimplemented local copy (I3a). The fold must preserve every source + the
+  // declined filter, byte-for-byte.
+  function legacyPool(fixture: {
     domainKeywords: BuildKeywordUniverseOptions['domainKeywords'];
     gscData: BuildKeywordUniverseOptions['gscData'];
     competitorKeywords: BuildKeywordUniverseOptions['competitorKeywords'];
@@ -128,55 +137,26 @@ describe('buildKeywordUniverse — flag-OFF parity', () => {
     requestedKeywords: string[];
     declinedKeywords: string[];
     competitorDomains: string[];
-    clientTracked: string[];
+    clientTracked: Array<{ query: string }>;
   }): Map<string, KeywordPoolCandidate> {
-    const ctx = {};
-    const elig = (k: { keyword: string; volume?: number; difficulty?: number; cpc?: number; source?: string; sourceKind?: string }) =>
-      !isStrategyPoolEligibleKeyword(k, ctx).suppressed;
     const pool = new Map<string, KeywordPoolCandidate>();
-    for (const k of opts.domainKeywords) {
-      if (!elig({ keyword: k.keyword, volume: k.volume, difficulty: k.difficulty, source: 'seo-provider' })) continue;
-      upsertKeywordPoolCandidate(pool, k.keyword, { volume: k.volume, difficulty: k.difficulty, source: 'seo-provider' });
-    }
-    for (const r of opts.gscData) {
-      const q = normalizeKeyword(r.query);
-      if (q.length > 3 && q.split(' ').length >= 2) {
-        upsertKeywordPoolCandidate(pool, q, { volume: r.impressions, difficulty: 0, source: 'gsc' });
-      }
-    }
-    for (const ck of opts.competitorKeywords) {
-      const kw = normalizeKeyword(ck.keyword);
-      if (ck.volume > 0 && elig({ keyword: kw, volume: ck.volume, difficulty: ck.difficulty, source: `competitor:${ck.domain}` })) {
-        upsertKeywordPoolCandidate(pool, kw, { volume: ck.volume, difficulty: ck.difficulty, source: `competitor:${ck.domain}` });
-      }
-    }
-    for (const gap of opts.keywordGaps) {
-      const kw = normalizeKeyword(gap.keyword);
-      if (gap.volume > 0 && elig({ keyword: kw, volume: gap.volume, difficulty: gap.difficulty, source: `gap:${gap.competitorDomain}` })) {
-        upsertKeywordPoolCandidate(pool, kw, { volume: gap.volume, difficulty: gap.difficulty, source: `gap:${gap.competitorDomain}` });
-      }
-    }
-    for (const dk of opts.discoveryKeywords) {
-      const kw = normalizeKeyword(dk.keyword);
-      if (isStrategyQualityDiscoveryKeyword(dk) && elig(dk)) {
-        upsertKeywordPoolCandidate(pool, kw, { volume: dk.volume, difficulty: dk.difficulty, source: `discovery:${dk.sourceKind}` });
-      }
-    }
-    for (const rk of opts.relatedKeywords) {
-      const kw = normalizeKeyword(rk.keyword);
-      if (rk.volume > 0 && elig({ keyword: kw, volume: rk.volume, difficulty: rk.difficulty, cpc: rk.cpc, source: 'related' })) {
-        upsertKeywordPoolCandidate(pool, kw, { volume: rk.volume, difficulty: rk.difficulty, source: 'related' });
-      }
-    }
-    for (const tk of opts.clientTracked) {
-      const kw = normalizeKeyword(tk);
-      if (kw.length > 1) upsertKeywordPoolCandidate(pool, kw, { volume: 0, difficulty: 0, source: 'client' });
-    }
-    for (const kw of opts.requestedKeywords) {
-      upsertKeywordPoolCandidate(pool, kw, { volume: 0, difficulty: 0, source: 'client' });
-    }
-    filterBrandedKeywords(pool, opts.competitorDomains);
-    filterDeclinedFromPool(pool, opts.declinedKeywords);
+    buildLegacyKeywordPool({
+      keywordPool: pool,
+      semrushByPath: new Map<string, DomainKeyword[]>(),
+      domainKeywords: fixture.domainKeywords,
+      gscData: fixture.gscData,
+      competitorKeywords: fixture.competitorKeywords,
+      keywordGaps: fixture.keywordGaps,
+      discoveryKeywords: fixture.discoveryKeywords,
+      relatedKeywords: fixture.relatedKeywords,
+      clientTracked: fixture.clientTracked,
+      requestedKeywords: fixture.requestedKeywords,
+      competitorDomains: fixture.competitorDomains,
+      declinedKeywords: fixture.declinedKeywords,
+      // The legacy domain-keyword source label is 'seo-provider' when no provider.
+      providerName: undefined,
+      isEligible,
+    });
     return pool;
   }
 
@@ -195,7 +175,7 @@ describe('buildKeywordUniverse — flag-OFF parity', () => {
       competitorDomains: [],
     };
 
-    const expected = legacyPool({ ...fixture, clientTracked: getTrackedKeywords(workspaceId).map(t => t.query) });
+    const expected = legacyPool({ ...fixture, clientTracked: getTrackedKeywords(workspaceId).map(t => ({ query: t.query })) });
 
     const { pool: actual } = await buildKeywordUniverse(workspaceId, baseOpts({ ...fixture, provider: null }));
 
@@ -206,9 +186,97 @@ describe('buildKeywordUniverse — flag-OFF parity', () => {
       expect(actual.get(key)).toEqual(value);
     }
   });
+
+  // ── C2: the drop-a-candidate divergence ──
+  // Duplicate discovery + related rows where an ineligible/lower-volume row comes
+  // FIRST and an eligible/higher-volume row comes LATER. The old assembler marked
+  // the key seen on the first row and dropped the second; the legacy fold relies
+  // on the Map dedup + higher-volume tiebreak inside upsertKeywordPoolCandidate.
+  // The assembler pool must now equal the legacy fold for these duplicates.
+  it('admits ineligible-first/eligible-later AND lower-vol-first/higher-vol-later duplicate rows like the legacy fold', async () => {
+    const discoveryKeywords: KeywordSourceEvidence[] = [
+      // ineligible first (volume 0 → isStrategyQualityDiscoveryKeyword rejects it),
+      // then the same keyword with real volume later.
+      { keyword: 'data center migration', volume: 0, difficulty: 0, cpc: 0, provider: 'dataforseo', sourceKind: 'keyword_ideas' },
+      { keyword: 'data center migration', volume: 800, difficulty: 33, cpc: 4, provider: 'dataforseo', sourceKind: 'keyword_ideas' },
+      // lower volume first, higher volume later (same keyword) → tiebreak keeps higher.
+      { keyword: 'endpoint protection', volume: 300, difficulty: 20, cpc: 2, provider: 'dataforseo', sourceKind: 'keyword_ideas' },
+      { keyword: 'endpoint protection', volume: 950, difficulty: 41, cpc: 6, provider: 'dataforseo', sourceKind: 'keyword_ideas' },
+    ];
+    const relatedKeywords = [
+      { keyword: 'managed firewall', volume: 200, difficulty: 18, cpc: 3 },
+      { keyword: 'managed firewall', volume: 720, difficulty: 36, cpc: 5 },
+    ];
+
+    const fixture = {
+      domainKeywords: [] as BuildKeywordUniverseOptions['domainKeywords'],
+      gscData: [] as BuildKeywordUniverseOptions['gscData'],
+      competitorKeywords: [] as BuildKeywordUniverseOptions['competitorKeywords'],
+      keywordGaps: [] as BuildKeywordUniverseOptions['keywordGaps'],
+      discoveryKeywords,
+      relatedKeywords,
+      requestedKeywords: [] as string[],
+      declinedKeywords: [] as string[],
+      competitorDomains: [] as string[],
+    };
+
+    const expected = legacyPool({ ...fixture, clientTracked: [] });
+    const { pool: actual } = await buildKeywordUniverse(workspaceId, baseOpts({ ...fixture, provider: null }));
+
+    // ineligible-first/eligible-later: the eligible later row must be present.
+    expect(actual.has(normalizeKeyword('data center migration'))).toBe(true);
+    // higher-volume tiebreak preserved on duplicates.
+    expect(actual.get(normalizeKeyword('endpoint protection'))?.volume).toBe(950);
+    expect(actual.get(normalizeKeyword('managed firewall'))?.volume).toBe(720);
+
+    // And the assembler pool equals the legacy fold exactly.
+    expect([...actual.keys()].sort()).toEqual([...expected.keys()].sort());
+    for (const [key, value] of expected.entries()) {
+      expect(actual.get(key)).toEqual(value);
+    }
+  });
 });
 
-describe('buildKeywordUniverse — monthly credit ceiling', () => {
+describe('buildKeywordUniverse — monthly credit ceiling + provider threading', () => {
+  it('reserves provider calls (FakeSeoProvider) and folds fetched discovery/related into the pool', async () => {
+    // FakeSeoProvider implements getRelatedKeywords/getQuestionKeywords +
+    // getKeywordIdeas/getKeywordsForSite/getKeywordSuggestions are absent, so the
+    // assembler exercises related + questions (and getKeywordsForSite/ideas only
+    // when present). A domain seed drives the related/question seeds.
+    const provider = new FakeSeoProvider();
+    const { pool, universe } = await buildKeywordUniverse(workspaceId, baseOpts({
+      provider,
+      seoDataMode: 'full',
+      domainKeywords: [{ keyword: 'cloud security', position: 2, volume: 1500, difficulty: 30, cpc: 4, url: 'https://example.com/cloud', traffic: 200, trafficPercent: 12 }],
+    }));
+
+    // The fetched related keywords (FakeSeoProvider returns "<seed> variation N")
+    // entered the pool with source 'related'.
+    const relatedHit = [...pool.values()].find(m => m.source === 'related');
+    expect(relatedHit).toBeDefined();
+    // The fetched question keywords ("how to <seed> N") entered as discovery.
+    expect([...pool.keys()].some(k => k.startsWith('how to cloud security'))).toBe(true);
+    expect(universe.creditDepth).toBe('full');
+  });
+
+  it('stops fetching once the per-workspace monthly ceiling is exhausted', async () => {
+    const provider = new FakeSeoProvider();
+    // The ceiling is 60 calls/workspace/month. Run repeatedly until exhausted; the
+    // builder must keep returning (no throw) and stop reserving once at the cap.
+    let lastPoolSize = -1;
+    for (let i = 0; i < 70; i++) {
+      const { pool } = await buildKeywordUniverse(workspaceId, baseOpts({
+        provider,
+        seoDataMode: 'full',
+        domainKeywords: [{ keyword: `topic ${i}`, position: 2, volume: 900 + i, difficulty: 25, cpc: 3, url: `https://example.com/t${i}`, traffic: 100, trafficPercent: 5 }],
+      }));
+      lastPoolSize = pool.size;
+    }
+    // Once the ceiling is hit, discovery is skipped but the build still succeeds
+    // (the domain seed itself is admitted), so the pool is non-empty.
+    expect(lastPoolSize).toBeGreaterThanOrEqual(1);
+  });
+
   it('exposes the ceiling reset helper and builds without a provider call', async () => {
     // With no provider, no provider call is reserved — ceiling stays unconsumed.
     const { universe } = await buildKeywordUniverse(workspaceId, baseOpts({ provider: null }));

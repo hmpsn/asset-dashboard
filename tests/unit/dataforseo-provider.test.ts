@@ -414,18 +414,21 @@ describe('DataForSeoProvider — keyword difficulty endpoint', () => {
 
     const langOf = (call: number) => JSON.parse((fetchSpy.mock.calls[call][1] as RequestInit).body as string)[0].language_code;
 
+    // P1 signature: (..., database?, locationCode?, languageCode?). The 5 discovery
+    // methods now take an explicit locationCode slot before languageCode (mirroring
+    // getKeywordMetrics) — language must thread through regardless of geo.
     await provider.getKeywordMetrics(['k'], 'ws-de-1', 'us', 2276, 'de');
     expect(langOf(0)).toBe('de');
     expect(langOf(1)).toBe('de');
-    await provider.getRelatedKeywords('seo', 'ws-de-2', 5, 'us', 'de');
+    await provider.getRelatedKeywords('seo', 'ws-de-2', 5, 'us', 2276, 'de');
     expect(langOf(2)).toBe('de');
-    await provider.getQuestionKeywords('seo', 'ws-de-3', 5, 'us', 'de');
+    await provider.getQuestionKeywords('seo', 'ws-de-3', 5, 'us', 2276, 'de');
     expect(langOf(3)).toBe('de');
-    await provider.getKeywordSuggestions('seo', 'ws-de-4', 5, 'us', 'de');
+    await provider.getKeywordSuggestions('seo', 'ws-de-4', 5, 'us', 2276, 'de');
     expect(langOf(4)).toBe('de');
-    await provider.getKeywordIdeas(['seo'], 'ws-de-5', 5, 'us', 'de');
+    await provider.getKeywordIdeas(['seo'], 'ws-de-5', 5, 'us', 2276, 'de');
     expect(langOf(5)).toBe('de');
-    await provider.getKeywordsForSite('example.com', 'ws-de-6', 5, 'us', 'de');
+    await provider.getKeywordsForSite('example.com', 'ws-de-6', 5, 'us', 2276, 'de');
     expect(langOf(6)).toBe('de');
     // Drain queued credit writes now (fs ENOENT mock active) so they don't flush
     // into a later test whose readFileSync mock returns a non-array cache value.
@@ -438,6 +441,48 @@ describe('DataForSeoProvider — keyword difficulty endpoint', () => {
     await provider.getRelatedKeywords('seo', 'ws-default-lang', 5, 'us');
     const body = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string);
     expect(body[0].language_code).toBe('en');
+  });
+
+  // ── C1: geo threading at the 5 discovery pool-path sites ──
+  // The whole-pool-US fix: when an explicit non-US locationCode is threaded, it
+  // must reach the request body's location_code for ALL 5 discovery methods (not
+  // the US default derived from the `database` slot).
+  it('threads a non-US locationCode into location_code for all 5 discovery methods', async () => {
+    const provider = new DataForSeoProvider();
+    const empty = () => ({ ok: true, json: () => Promise.resolve(dfsTaskResponse([{ items: [] }])) } as Response);
+    const fetchSpy = vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce(empty())  // getRelatedKeywords
+      .mockResolvedValueOnce(empty())  // getQuestionKeywords
+      .mockResolvedValueOnce(empty())  // getKeywordSuggestions
+      .mockResolvedValueOnce(empty())  // getKeywordIdeas
+      .mockResolvedValueOnce(empty()); // getKeywordsForSite
+
+    const geoOf = (call: number) => JSON.parse((fetchSpy.mock.calls[call][1] as RequestInit).body as string)[0].location_code;
+    const UK = 2826;
+
+    // database='us' is intentionally still passed: the explicit locationCode must
+    // WIN over locationCodeFromDatabase('us')=2840 (the exact whole-pool-US bug).
+    await provider.getRelatedKeywords('seo', 'ws-uk-1', 5, 'us', UK);
+    expect(geoOf(0)).toBe(UK);
+    await provider.getQuestionKeywords('seo', 'ws-uk-2', 5, 'us', UK);
+    expect(geoOf(1)).toBe(UK);
+    await provider.getKeywordSuggestions('seo', 'ws-uk-3', 5, 'us', UK);
+    expect(geoOf(2)).toBe(UK);
+    await provider.getKeywordIdeas(['seo'], 'ws-uk-4', 5, 'us', UK);
+    expect(geoOf(3)).toBe(UK);
+    await provider.getKeywordsForSite('example.com', 'ws-uk-5', 5, 'us', UK);
+    expect(geoOf(4)).toBe(UK);
+    flushCreditsToDisk();
+  });
+
+  it('falls back to locationCodeFromDatabase when no locationCode is passed (flag-OFF parity)', async () => {
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(dfsTaskResponse([{ items: [] }])) } as Response);
+    // No locationCode → location_code derives from database ('us' → 2840), exactly
+    // as the legacy flag-OFF callers (which pass neither locationCode nor database).
+    await provider.getKeywordsForSite('example.com', 'ws-default-geo', 5);
+    const body = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string);
+    expect(body[0].location_code).toBe(2840);
   });
 });
 

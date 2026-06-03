@@ -181,14 +181,20 @@ describe('content gap analysis sub-pipeline — static wiring', () => {
 
 describe('keyword pool — static wiring', () => {
   it('filter runs BEFORE the pool is serialized for the AI prompt', () => {
-    // filterBrandedKeywords must appear before the template literal assignment that
-    // builds the KEYWORD POOL prompt section (semrushBatchRef = `...KEYWORD POOL...`).
-    // Note: `let semrushBatchRef = ''` is the declaration; the actual pool-building
-    // assignment uses a template literal starting with `\n\nKEYWORD POOL`.
+    // The legacy (flag-OFF) pool build — including the branded filter — now lives in
+    // the exported `buildLegacyKeywordPool` and is invoked via `runLegacyPoolBuild()`.
+    // The runtime contract is preserved: `runLegacyPoolBuild()` is called (both on the
+    // flag-OFF branch AND as the M2 degradation fallback) BEFORE the KEYWORD POOL
+    // prompt section is serialized. The brand filter itself runs inside that fold.
     const filterIdx = keywordStrategySynthesisSrc.indexOf('filterBrandedKeywords(keywordPool');
+    expect(filterIdx).toBeGreaterThan(0); // the filter call must exist in the legacy fold
+    // Every `runLegacyPoolBuild()` invocation (flag-OFF + M2 fallback) must precede
+    // the prompt build so the pool fed to the AI is already brand-filtered.
     const promptBuildIdx = keywordStrategySynthesisSrc.indexOf('KEYWORD POOL — VERIFIED search terms');
-    expect(filterIdx).toBeGreaterThan(0);
-    expect(promptBuildIdx).toBeGreaterThan(filterIdx);
+    expect(promptBuildIdx).toBeGreaterThan(0);
+    const lastInvokeIdx = keywordStrategySynthesisSrc.lastIndexOf('runLegacyPoolBuild();');
+    expect(lastInvokeIdx).toBeGreaterThan(0);
+    expect(promptBuildIdx).toBeGreaterThan(lastInvokeIdx);
   });
 
   it('branded keyword removal count is logged', () => {

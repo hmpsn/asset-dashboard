@@ -81,6 +81,19 @@ export function cacheRegionToken(geo: string, languageCode = DEFAULT_LANGUAGE_CO
   return `v2:${geo}:${normalizeLanguageCode(languageCode)}`;
 }
 
+/**
+ * Geo token for the per-workspace discovery file-cache keys.
+ *
+ * When an explicit `locationCode` is threaded (flag-ON, geo-resolved), the cache
+ * is keyed on the resolved location code so a non-US workspace cannot read or
+ * write rows a US (or other-geo) workspace consumes. When no `locationCode` is
+ * supplied (flag-OFF legacy callers + the pre-P1 default), the token stays the
+ * `database` string so flag-OFF cache keys are byte-identical to before.
+ */
+function discoveryGeoToken(database: string, locationCode?: number): string {
+  return locationCode != null ? String(locationCode) : database;
+}
+
 // ── Auth ──
 function getCredentials(): { login: string; password: string } | null {
   const login = process.env.DATAFORSEO_LOGIN;
@@ -872,9 +885,10 @@ export class DataForSeoProvider implements SeoDataProvider {
   }
 
   // ── getRelatedKeywords → related_keywords ──
-  async getRelatedKeywords(keyword: string, workspaceId: string, limit = 20, database = 'us', languageCode?: string): Promise<RelatedKeyword[]> {
+  async getRelatedKeywords(keyword: string, workspaceId: string, limit = 20, database = 'us', locationCode?: number, languageCode?: string): Promise<RelatedKeyword[]> {
+    const resolvedLocationCode = locationCode ?? locationCodeFromDatabase(database);
     const lang = normalizeLanguageCode(languageCode);
-    const cacheKey = `related_${cacheRegionToken(database, lang)}_${keyword.toLowerCase().replace(/\s+/g, '_')}_${limit}`;
+    const cacheKey = `related_${cacheRegionToken(discoveryGeoToken(database, locationCode), lang)}_${keyword.toLowerCase().replace(/\s+/g, '_')}_${limit}`;
     const cached = readCache<RelatedKeyword[]>(workspaceId, cacheKey, CACHE_TTL_RELATED);
     if (cached) {
       logCreditUsage({ credits: 0, endpoint: 'related_keywords', query: keyword, rowsReturned: cached.length, workspaceId, cached: true });
@@ -886,7 +900,7 @@ export class DataForSeoProvider implements SeoDataProvider {
     try {
       const json = await apiCall('dataforseo_labs/google/related_keywords/live', [{
         keyword,
-        location_code: locationCodeFromDatabase(database),
+        location_code: resolvedLocationCode,
         language_code: lang,
         limit,
         depth: 1,
@@ -918,9 +932,10 @@ export class DataForSeoProvider implements SeoDataProvider {
   }
 
   // ── getQuestionKeywords → keyword_suggestions (filtered) ──
-  async getQuestionKeywords(keyword: string, workspaceId: string, limit = 20, database = 'us', languageCode?: string): Promise<QuestionKeyword[]> {
+  async getQuestionKeywords(keyword: string, workspaceId: string, limit = 20, database = 'us', locationCode?: number, languageCode?: string): Promise<QuestionKeyword[]> {
+    const resolvedLocationCode = locationCode ?? locationCodeFromDatabase(database);
     const lang = normalizeLanguageCode(languageCode);
-    const cacheKey = `questions_${cacheRegionToken(database, lang)}_${keyword.toLowerCase().replace(/\s+/g, '_')}_${limit}`;
+    const cacheKey = `questions_${cacheRegionToken(discoveryGeoToken(database, locationCode), lang)}_${keyword.toLowerCase().replace(/\s+/g, '_')}_${limit}`;
     const cached = readCache<QuestionKeyword[]>(workspaceId, cacheKey, CACHE_TTL_RELATED);
     if (cached) {
       logCreditUsage({ credits: 0, endpoint: 'keyword_suggestions', query: keyword, rowsReturned: cached.length, workspaceId, cached: true });
@@ -932,7 +947,7 @@ export class DataForSeoProvider implements SeoDataProvider {
     try {
       const json = await apiCall('dataforseo_labs/google/keyword_suggestions/live', [{
         keyword,
-        location_code: locationCodeFromDatabase(database),
+        location_code: resolvedLocationCode,
         language_code: lang,
         limit,
         filters: ['keyword', 'regex', '^(how|what|why|when|where|who|which|can|does|is|are|do|will|should) '],
@@ -962,12 +977,13 @@ export class DataForSeoProvider implements SeoDataProvider {
     }
   }
 
-  async getKeywordSuggestions(keyword: string, workspaceId: string, limit = 25, database = 'us', languageCode?: string): Promise<KeywordSourceEvidence[]> {
+  async getKeywordSuggestions(keyword: string, workspaceId: string, limit = 25, database = 'us', locationCode?: number, languageCode?: string): Promise<KeywordSourceEvidence[]> {
     const seed = keyword.toLowerCase().trim();
     if (!seed) return [];
+    const resolvedLocationCode = locationCode ?? locationCodeFromDatabase(database);
     const lang = normalizeLanguageCode(languageCode);
     const cappedLimit = Math.min(Math.max(limit, 1), 100);
-    const cacheKey = `discovery_suggestions_${cacheRegionToken(database, lang)}_${cacheKeyPart(seed)}_${cappedLimit}`;
+    const cacheKey = `discovery_suggestions_${cacheRegionToken(discoveryGeoToken(database, locationCode), lang)}_${cacheKeyPart(seed)}_${cappedLimit}`;
     const cached = readCache<KeywordSourceEvidence[]>(workspaceId, cacheKey, CACHE_TTL_DISCOVERY);
     if (cached) {
       logCreditUsage({ credits: 0, endpoint: 'keyword_suggestions_general', query: seed, rowsReturned: cached.length, workspaceId, cached: true });
@@ -979,7 +995,7 @@ export class DataForSeoProvider implements SeoDataProvider {
     try {
       const json = await apiCall('dataforseo_labs/google/keyword_suggestions/live', [{
         keyword: seed,
-        location_code: locationCodeFromDatabase(database),
+        location_code: resolvedLocationCode,
         language_code: lang,
         limit: cappedLimit,
       }], workspaceId);
@@ -1001,12 +1017,13 @@ export class DataForSeoProvider implements SeoDataProvider {
     }
   }
 
-  async getKeywordIdeas(keywords: string[], workspaceId: string, limit = 50, database = 'us', languageCode?: string): Promise<KeywordSourceEvidence[]> {
+  async getKeywordIdeas(keywords: string[], workspaceId: string, limit = 50, database = 'us', locationCode?: number, languageCode?: string): Promise<KeywordSourceEvidence[]> {
     const seeds = normalizeSeedKeywords(keywords, 10);
     if (seeds.length === 0) return [];
+    const resolvedLocationCode = locationCode ?? locationCodeFromDatabase(database);
     const lang = normalizeLanguageCode(languageCode);
     const cappedLimit = Math.min(Math.max(limit, 1), 200);
-    const cacheKey = `discovery_ideas_${cacheRegionToken(database, lang)}_${cacheKeyPart(seeds.join('_'))}_${cappedLimit}`;
+    const cacheKey = `discovery_ideas_${cacheRegionToken(discoveryGeoToken(database, locationCode), lang)}_${cacheKeyPart(seeds.join('_'))}_${cappedLimit}`;
     const cached = readCache<KeywordSourceEvidence[]>(workspaceId, cacheKey, CACHE_TTL_DISCOVERY);
     if (cached) {
       logCreditUsage({ credits: 0, endpoint: 'keyword_ideas', query: seeds.join(',').slice(0, 100), rowsReturned: cached.length, workspaceId, cached: true });
@@ -1018,7 +1035,7 @@ export class DataForSeoProvider implements SeoDataProvider {
     try {
       const json = await apiCall('dataforseo_labs/google/keyword_ideas/live', [{
         keywords: seeds,
-        location_code: locationCodeFromDatabase(database),
+        location_code: resolvedLocationCode,
         language_code: lang,
         limit: cappedLimit,
       }], workspaceId);
@@ -1040,12 +1057,13 @@ export class DataForSeoProvider implements SeoDataProvider {
     }
   }
 
-  async getKeywordsForSite(target: string, workspaceId: string, limit = 50, database = 'us', languageCode?: string): Promise<KeywordSourceEvidence[]> {
+  async getKeywordsForSite(target: string, workspaceId: string, limit = 50, database = 'us', locationCode?: number, languageCode?: string): Promise<KeywordSourceEvidence[]> {
     const cleanTarget = cleanDomain(target);
     if (!cleanTarget) return [];
+    const resolvedLocationCode = locationCode ?? locationCodeFromDatabase(database);
     const lang = normalizeLanguageCode(languageCode);
     const cappedLimit = Math.min(Math.max(limit, 1), 200);
-    const cacheKey = `discovery_site_${cacheRegionToken(database, lang)}_${cacheKeyPart(cleanTarget)}_${cappedLimit}`;
+    const cacheKey = `discovery_site_${cacheRegionToken(discoveryGeoToken(database, locationCode), lang)}_${cacheKeyPart(cleanTarget)}_${cappedLimit}`;
     const cached = readCache<KeywordSourceEvidence[]>(workspaceId, cacheKey, CACHE_TTL_DISCOVERY);
     if (cached) {
       logCreditUsage({ credits: 0, endpoint: 'keywords_for_site', query: cleanTarget, rowsReturned: cached.length, workspaceId, cached: true });
@@ -1057,7 +1075,7 @@ export class DataForSeoProvider implements SeoDataProvider {
     try {
       const json = await apiCall('dataforseo_labs/google/keywords_for_site/live', [{
         target: cleanTarget,
-        location_code: locationCodeFromDatabase(database),
+        location_code: resolvedLocationCode,
         language_code: lang,
         limit: cappedLimit,
       }], workspaceId);

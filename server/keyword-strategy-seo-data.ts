@@ -9,6 +9,7 @@ import type { DomainKeyword, KeywordGapEntry, RelatedKeyword, SeoDataProvider } 
 import type { KeywordSourceEvidence } from '../shared/types/keywords.js';
 import type { SeoDataStatus, Workspace } from '../shared/types/workspace.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
+import { isFeatureEnabled } from './feature-flags.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -243,7 +244,15 @@ export async function fetchAndCacheKeywordStrategySeoData({
     });
   }
 
-  if (seoDataMode === 'full') {
+  // On the flag-ON path the keyword-universe assembler is the SOLE owner of the
+  // discovery/related/question provider fetches (geo + resolved-language threaded).
+  // Running the legacy 'en'-only prefetch here too would (a) double provider credits
+  // for non-en workspaces (different language/limits → cache miss) and (b) seed the
+  // prompt's seoContext discovery block with en keywords while the pool carries
+  // resolved-language ones. On flag-ON we skip it; the prompt still gets discovery
+  // context through the universe-built KEYWORD POOL block. Flag-OFF is unchanged. (I2)
+  const universeOwnsDiscovery = isFeatureEnabled('seo-generation-quality', ws.id);
+  if (seoDataMode === 'full' && !universeOwnsDiscovery) {
     try {
       sendProgress('seo-data', 'Expanding keyword discovery sources...', 0.63);
       const discoverySeedKeywords = [
