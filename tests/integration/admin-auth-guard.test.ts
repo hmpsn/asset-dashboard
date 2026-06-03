@@ -51,9 +51,10 @@ const TEST_APP_PASSWORD = 'test-admin-secret-pw-12345';
 
 // ─── Spawn a server with a real APP_PASSWORD ───
 //
-// The standard createTestContext() helper always starts with APP_PASSWORD='',
-// which disables the gate. This standalone helper spawns a second server
-// instance with a real password so we can exercise the gate logic end-to-end.
+// The standard createTestContext() helper defaults to APP_PASSWORD='' (gate
+// disabled) unless a caller opts in via options.env.APP_PASSWORD. This
+// standalone helper spawns a second server instance with a real password so we
+// can exercise the gate logic end-to-end.
 
 const GATED_PORT = 13342;
 const GATED_BASE = `http://localhost:${GATED_PORT}`;

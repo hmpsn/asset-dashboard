@@ -1,9 +1,10 @@
 // ── Platform foundation API endpoints ────────────────────────────
-import { get, post, del, getSafe, patch } from './client';
+import { get, post, del, getSafe, patch, put } from './client';
 import type { FeaturesData } from '../../shared/types/features';
 import type { WorkspaceIntegrationHealth } from '../../shared/types/integration-health';
 import type { WorkspaceObservabilityReport } from '../../shared/types/platform-observability';
 import type { RoadmapData, RoadmapItem, RoadmapItemPatch } from '../../shared/types/roadmap';
+import type { FeatureFlagKey, WorkspaceFeatureFlagMeta } from '../../shared/types/feature-flags';
 
 // ── Jobs ────────────────────────────────────────────────────────
 export const jobs = {
@@ -32,6 +33,20 @@ export const roadmap = {
 // ── Features ─────────────────────────────────────────────────────
 export const features = {
   get: () => get<FeaturesData>('/api/features'),
+};
+
+// ── Per-workspace feature-flag overrides (admin canary control) ──
+// Admin-only (HMAC). `enabled: null` clears the override → reverts to the
+// global → env → default chain. Mirrors the global feature-flag endpoints.
+export const workspaceFeatureFlags = {
+  list: (wsId: string) =>
+    get<WorkspaceFeatureFlagMeta[]>(`/api/admin/workspaces/${wsId}/feature-flags`),
+
+  setOverride: (wsId: string, key: FeatureFlagKey, enabled: boolean | null) =>
+    put<{ success: true; workspaceId: string; key: string; enabled: boolean | null }>(
+      `/api/admin/workspaces/${wsId}/feature-flags/${key}`,
+      { enabled },
+    ),
 };
 
 // ── Notifications ───────────────────────────────────────────────

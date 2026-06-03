@@ -33,6 +33,7 @@ export { useEeatAssets, useCreateEeatAsset, useUpdateEeatAsset, useDeleteEeatAss
 export { useBlueprints, useBlueprint, useBlueprintVersions } from './useBlueprints';
 export * from './useCopyPipeline';
 export { usePageJoin } from './usePageJoin';
+export { useWorkspaceFeatureFlags, useSetWorkspaceFlagOverride } from './useWorkspaceFeatureFlags';
 export {
   useBriefingDrafts,
   usePublishBriefing,
