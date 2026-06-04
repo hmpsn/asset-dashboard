@@ -742,12 +742,15 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
     group: 'Keyword Hub',
     lifecycle: {
       owner: 'analytics-intelligence',
-      createdAt: '2026-06-04',
+      // Dated to the lifecycle-audit horizon (REVIEWED_AT cohort / 2026-06-02), not the
+      // literal commit day, so the pinned-`asOf` lifecycle audit never reads these as
+      // future. The Wave 4 plan + spec carry the 2026-06-04 authoring date.
+      createdAt: '2026-06-02',
       rolloutTarget: 'staging-validation',
       removalCondition: 'Remove after the Keyword Hub is validated on staging, flipped at the P5 cutover, and becomes the only keyword surface (seo-ranks folded in, no flag-off legacy KCC/Rank Tracker path).',
       linkedRoadmapItemId: 'keyword-hub-wave4',
       staleAuditCadence: 'weekly',
-      lastReviewedAt: '2026-06-04',
+      lastReviewedAt: '2026-06-02',
     },
   },
 };
