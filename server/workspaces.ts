@@ -23,6 +23,7 @@ import {
 } from './schemas/workspace-schemas.js';
 import { scoringConfigOverrideSchema } from './schemas/outcome-schemas.js';
 import { normalizeSocialProfiles } from './social-profiles.js';
+import { normalizeRuntimeSeoDataProvider } from './seo-data-provider.js';
 import { z } from 'zod';
 
 // ── Brand name resolution ──
@@ -200,7 +201,7 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
     const pt = parseJsonSafe(row.publish_target, publishTargetSchema, null, { workspaceId: row.id, field: 'publish_target', table: 'workspaces' });
     if (pt) ws.publishTarget = pt;
   }
-  if (row.seo_data_provider) ws.seoDataProvider = row.seo_data_provider as 'semrush' | 'dataforseo';
+  if (row.seo_data_provider) ws.seoDataProvider = normalizeRuntimeSeoDataProvider(row.seo_data_provider);
   if (row.business_profile) {
     const bp = parseJsonSafe(row.business_profile, businessProfileSchema, null, { workspaceId: row.id, field: 'business_profile', table: 'workspaces' });
     if (bp) ws.businessProfile = bp;
@@ -348,7 +349,7 @@ function workspaceToParams(ws: Workspace) {
     portal_contacts: ws.portalContacts ? JSON.stringify(ws.portalContacts) : null,
     audit_suppressions: ws.auditSuppressions ? JSON.stringify(ws.auditSuppressions) : null,
     publish_target: ws.publishTarget ? JSON.stringify(ws.publishTarget) : null,
-    seo_data_provider: ws.seoDataProvider || null,
+    seo_data_provider: ws.seoDataProvider ? normalizeRuntimeSeoDataProvider(ws.seoDataProvider) : null,
     business_profile: ws.businessProfile ? JSON.stringify(ws.businessProfile) : null,
     intelligence_profile: ws.intelligenceProfile ? JSON.stringify(ws.intelligenceProfile) : null,
     business_priorities: ws.businessPriorities ? JSON.stringify(ws.businessPriorities) : null,

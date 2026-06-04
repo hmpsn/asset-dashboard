@@ -20,8 +20,7 @@ import {
   upsertPageKeyword,
   upsertPageKeywordsBatch,
 } from '../../page-keywords.js';
-import { getConfiguredProvider } from '../../seo-data-provider.js';
-import type { ProviderName } from '../../seo-data-provider.js';
+import { getConfiguredProvider, normalizeRuntimeSeoDataProvider } from '../../seo-data-provider.js';
 import { invalidateIntelligenceCache } from '../../workspace-intelligence.js';
 import { WS_EVENTS } from '../../ws-events.js';
 import { consumeHandle, issueHandle } from '../handles.js';
@@ -99,10 +98,9 @@ async function handleResearchKeywords(
   const workspace = requireWorkspace(workspaceId);
   if ('isError' in workspace) return workspace;
 
-  const preferredProvider: ProviderName | undefined =
-    workspace.seoDataProvider === 'dataforseo' || workspace.seoDataProvider === 'semrush'
-      ? workspace.seoDataProvider
-      : undefined;
+  const preferredProvider = normalizeRuntimeSeoDataProvider(
+    typeof workspace.seoDataProvider === 'string' ? workspace.seoDataProvider : undefined,
+  );
   const provider = getConfiguredProvider(preferredProvider);
   if (!provider) return mcpError('No SEO data provider is configured for this workspace');
 

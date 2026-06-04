@@ -19,7 +19,6 @@ import {
   getUsageByFeature,
 } from '../openai-helpers.js';
 import { callAI } from '../ai.js';
-import { getSemrushUsage, getSemrushByDay } from '../semrush.js';
 import { getDataForSeoUsage, getDataForSeoByDay } from '../providers/dataforseo-provider.js';
 import { getWorkspace } from '../workspaces.js';
 import { checkAIContext } from '../ai-context-check.js';
@@ -123,8 +122,8 @@ router.get('/api/ai/usage', (req, res) => {
   const summary = getTokenUsage(workspaceId, since);
   const daily = getUsageByDay(workspaceId, days);
   const byFeature = getUsageByFeature(workspaceId, since);
-  const semrush = getSemrushUsage(workspaceId, since);
-  const semrushDaily = getSemrushByDay(workspaceId, days);
+  const semrush = { totalCredits: 0, totalCalls: 0, cachedCalls: 0, entries: [] };
+  const semrushDaily: Array<{ date: string; credits: number; calls: number }> = [];
   const dataforseo = getDataForSeoUsage(workspaceId, since);
   const dataforseoDaily = getDataForSeoByDay(workspaceId, days);
   res.json({ ...summary, daily, byFeature, semrush, semrushDaily, dataforseo, dataforseoDaily });

@@ -325,7 +325,7 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
     let keywordMetrics: KeywordMetrics | undefined;
     let relatedKeywords: RelatedKeyword[] | undefined;
     const seoProvider = getConfiguredProvider(ws?.seoDataProvider);
-    const providerLabel = seoProvider ? getProviderDisplayName(seoProvider.name) : 'SEMRush';
+    const providerLabel = seoProvider ? getProviderDisplayName(seoProvider.name) : 'DataForSEO';
     if (seoProvider) {
       try {
         const locationCode = resolveWorkspaceLocationCode(req.params.workspaceId) ?? undefined;

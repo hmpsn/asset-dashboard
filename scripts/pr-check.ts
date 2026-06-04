@@ -1741,6 +1741,28 @@ export const CHECKS: Check[] = [
     severity: 'error',
   },
   {
+    name: 'SemrushProvider runtime import outside legacy files',
+    pattern: 'semrush-provider\\.js',
+    fileGlobs: ['*.ts', '*.tsx'],
+    exclude: [
+      'server/providers/semrush-provider.ts',
+      'tests/unit/semrush-provider.test.ts',
+    ],
+    message: 'Do not add new runtime imports of SemrushProvider. DataForSEO is the canonical SEO provider; keep SEMRush provider references in legacy implementation/tests only.',
+    severity: 'error',
+  },
+  {
+    name: 'registerProvider semrush outside tests',
+    pattern: 'registerProvider\\([\'"]semrush[\'"]',
+    fileGlobs: ['*.ts', '*.tsx'],
+    exclude: [
+      'tests/unit/keyword-strategy-seo-data.test.ts',
+      'tests/unit/seo-provider-routing.test.ts',
+    ],
+    message: 'Do not register SEMRush in runtime code. DataForSEO is the only supported runtime SEO provider in PR1.',
+    severity: 'error',
+  },
+  {
     name: 'Silent bare catch in server files',
     // Matches lines that open a bare catch block with no error variable — the most
     // dangerous pattern: no err reference means isProgrammingError() can never be called.

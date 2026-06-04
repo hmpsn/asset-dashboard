@@ -1,13 +1,14 @@
 /**
- * semrush routes — extracted from server/index.ts
+ * Legacy SEO provider routes.
+ *
+ * PR1 keeps the historical /api/semrush/* URLs for compatibility, but all live
+ * provider reads resolve through the DataForSEO-primary provider registry.
+ * PR2 should rename these URLs to provider-neutral /api/seo/* aliases.
  */
 import { Router } from 'express';
 
 const router = Router();
 
-import {
-  isSemrushConfigured, estimateCreditCost, clearSemrushCache,
-} from '../semrush.js';
 import { getConfiguredProvider, getBacklinksProvider, listProviders, isAnyProviderConfigured } from '../seo-data-provider.js';
 import { listWorkspaces, getWorkspace, updateWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
@@ -136,7 +137,18 @@ router.post('/api/semrush/competitors/:workspaceId', requireWorkspaceAccess('wor
   res.json({ competitors: cleaned });
 });
 
-// --- SEMRush Utilities ---
+function clearSeoProviderCache(workspaceId: string): void {
+  for (const cacheName of ['.dataforseo-cache', '.semrush-cache']) {
+    const cacheDir = path.join(getUploadRoot(), workspaceId, cacheName);
+    try {
+      fs.rmSync(cacheDir, { recursive: true, force: true });
+    } catch (err) {
+      if (isProgrammingError(err)) log.warn({ err, cacheDir }, 'seo-provider/cache-clear: programming error');
+    }
+  }
+}
+
+// --- Legacy provider utility aliases ---
 router.get('/api/semrush/status', (_req, res) => {
   res.json({ configured: isAnyProviderConfigured() });
 });
@@ -147,22 +159,24 @@ router.get('/api/seo-providers/status', (_req, res) => {
 });
 
 router.post('/api/semrush/estimate', (req, res) => {
-  const { mode, competitorCount, keywordCount } = req.body;
-  res.json({ credits: estimateCreditCost({ mode: mode || 'quick', competitorCount, keywordCount }) });
+  const { mode, competitorCount, keywordCount } = req.body as { mode?: string; competitorCount?: number; keywordCount?: number };
+  const depthMultiplier = mode === 'full' ? 2 : 1;
+  const estimatedCalls = Math.max(1, Math.ceil(((competitorCount ?? 0) + (keywordCount ?? 0)) / 100) * depthMultiplier);
+  res.json({ provider: 'dataforseo', estimatedCalls, deprecated: true });
 });
 
 router.delete('/api/semrush/cache/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  clearSemrushCache(req.params.workspaceId);
+  clearSeoProviderCache(req.params.workspaceId);
   res.json({ ok: true });
 });
 
 // GET-based cache clear (browser-friendly — just visit this URL)
 router.get('/api/semrush/clear-cache/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  clearSemrushCache(req.params.workspaceId);
-  res.json({ ok: true, message: 'SEMRush cache cleared. Go back and click Refresh on Competitive Intelligence.' });
+  clearSeoProviderCache(req.params.workspaceId);
+  res.json({ ok: true, message: 'SEO provider cache cleared. Go back and click Refresh on Competitive Intelligence.' });
 });
 
-// --- Diagnostic: verify domain resolution + cache without calling SEMRush API ---
+// --- Diagnostic: verify domain resolution + cache without external provider calls ---
 router.get('/api/semrush/diagnose/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -174,9 +188,9 @@ router.get('/api/semrush/diagnose/:workspaceId', requireWorkspaceAccess('workspa
   );
 
   // Check cache directory for existing entries
-  const cacheDir = path.join(getUploadRoot(), ws.id, '.semrush-cache');
+  const cacheDir = path.join(getUploadRoot(), ws.id, '.dataforseo-cache');
   let cacheFiles: string[] = [];
-  try { cacheFiles = fs.readdirSync(cacheDir).sort(); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'semrush/competitors: programming error'); /* no cache dir */ }
+  try { cacheFiles = fs.readdirSync(cacheDir).sort(); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'seo-provider/diagnose: programming error'); /* no cache dir */ }
 
   const domainOverviewKeys = cacheFiles.filter((f: string) => f.startsWith('domain_overview'));
   const backlinkKeys = cacheFiles.filter((f: string) => f.startsWith('backlinks_'));
@@ -192,7 +206,7 @@ router.get('/api/semrush/diagnose/:workspaceId', requireWorkspaceAccess('workspa
   }
 
   res.json({
-    configured: isSemrushConfigured(),
+    configured: isAnyProviderConfigured(),
     rawLiveDomain: rawDomain,
     resolvedDomain: cleanDomain,
     wwwStripped: rawDomain.includes('www.') && !cleanDomain.includes('www.'),
@@ -203,7 +217,7 @@ router.get('/api/semrush/diagnose/:workspaceId', requireWorkspaceAccess('workspa
     backlinkCacheKeys: backlinkKeys,
     allCacheKeys: cacheFiles,
     cachedData,
-    note: 'This endpoint makes ZERO SEMRush API calls. No credits used.',
+    note: 'This endpoint makes ZERO external SEO provider calls. No credits used.',
   });
 });
 

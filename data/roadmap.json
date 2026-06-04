@@ -1694,7 +1694,7 @@
           "source": "FEATURE_VISION #5",
           "est": "10-15h",
           "priority": "P2",
-          "notes": "Ahrefs/Moz API \u2192 backlink profile \u2192 link gaps \u2192 AI outreach templates. Elevated from P3 \u2014 backlinks are a top-3 ranking factor and this capability justifies premium pricing. Lightweight overview (#213) ships first in Sprint F; this is the full-featured follow-up.",
+          "notes": "Ahrefs/Moz API \u2192 backlink profile \u2192 link gaps \u2192 AI outreach templates. Elevated from P3 \u2014 backlinks are a top-3 ranking factor and this capability justifies premium pricing. Lightweight overview (#213) ships first in Sprint F; this is the full-featured follow-up. 2026-06-04 groundwork: PR1 made DataForSEO the only runtime SEO/backlinks provider, removed SEMRush runtime registration, ungated DataForSEO backlinks, and converted strategy/competitive-intel/backlink UI copy to DataForSEO-first semantics. This item remains the follow-up for richer backlink intelligence (top backlinks, anchors, linked pages, outreach workflows).",
           "status": "pending"
         },
         {

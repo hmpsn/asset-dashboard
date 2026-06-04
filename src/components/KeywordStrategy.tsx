@@ -25,7 +25,6 @@ import { StrategyDiff } from './strategy/StrategyDiff';
 import { IntelligenceSignals } from './strategy/IntelligenceSignals';
 import { LocalSeoVisibilityPanel } from './local-seo/LocalSeoVisibilityPanel';
 import { keywords, rankTracking } from '../api/seo';
-import { workspaces } from '../api';
 import { queryKeys } from '../lib/queryKeys';
 import { keywordTrackingKey } from '../lib/keywordTracking';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
@@ -35,13 +34,13 @@ import { formatDate } from '../utils/formatDates';
 
 /** Minimum monthly search volume to display a strategy card. Cards below this are noise. */
 const VOLUME_THRESHOLD = 10;
-const DEFAULT_SEO_DATA_PROVIDER = 'dataforseo';
+const PRIMARY_SEO_PROVIDER_LABEL = 'DataForSEO';
 
 type SeoProviderOption = { name: string; configured: boolean };
 
 function defaultSeoDataProvider(providers: SeoProviderOption[]): string | undefined {
   const configured = providers.filter(provider => provider.configured);
-  return configured.find(provider => provider.name === DEFAULT_SEO_DATA_PROVIDER)?.name
+  return configured.find(provider => provider.name === 'dataforseo')?.name
     ?? configured[0]?.name;
 }
 
@@ -95,7 +94,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const [discoverError, setDiscoverError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(true);
   const [showNextSteps, setShowNextSteps] = useState(false);
-  const [activeProvider, setActiveProvider] = useState<string | undefined>(undefined);
   const [strategyTab, setStrategyTab] = useState<'analysis' | 'guide'>('analysis');
   const activeStrategyJob = findActiveJob({ type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, workspaceId });
   const completedStartedJob = lastStartedJobId ? jobs.find(job => job.id === lastStartedJobId) : undefined;
@@ -103,10 +101,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const displayedSeoDataMode = strategy?.seoDataMode;
   // Derive providerList before selectedSeoDataProvider so the computed value has access to it
   const providerList = keywordData?.providers ?? [];
-  const selectedSeoDataProvider = activeProvider
-    ?? savedSeoDataProvider
+  const selectedSeoDataProvider = savedSeoDataProvider
     ?? defaultSeoDataProvider(providerList)
-    ?? DEFAULT_SEO_DATA_PROVIDER;
+    ?? 'dataforseo';
 
   // Tracked keywords via React Query — buttons reflect actual server state with keywordTrackingKey normalization.
   // The `rankTrackingKeywords` cache holds the canonical TrackedKeyword[] array (the shape RankTracker
@@ -128,17 +125,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     enabled: !!workspaceId,
     staleTime: 60 * 1000,
   });
-
-  // Reset active provider when workspace changes so the init effect can re-fire with new workspace data
-  useEffect(() => {
-    setActiveProvider(undefined);
-  }, [workspaceId]);
-
-  // Initialize active provider from workspace data when it's not yet set
-  useEffect(() => {
-    const provider = savedSeoDataProvider ?? defaultSeoDataProvider(keywordData?.providers ?? []);
-    if (provider && !activeProvider) setActiveProvider(provider);
-  }, [savedSeoDataProvider, keywordData?.providers, activeProvider]);
 
   // Initialize SEO provider availability from React Query hook
   useEffect(() => {
@@ -435,46 +421,21 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                 </p>
               </div>
             )}
-            {/* SEO Data Provider */}
-            {providerList.filter(p => p.configured).length > 1 && (
-              <div>
-                <div className="flex items-center gap-1.5 mb-2">
-                  <Icon as={BarChart3} size="md" className="text-accent-brand" />
-                  <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">SEO Data Provider</span>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {providerList.filter(p => p.configured).map(p => (
-                    <ClickableRow
-                      key={p.name}
-                      onClick={() => {
-                        const previousProvider = activeProvider;
-                        setActiveProvider(p.name);
-                        setError(null);
-                        workspaces.update(workspaceId, { seoDataProvider: p.name }).catch(() => {
-                          setActiveProvider(previousProvider);
-                          setError('Failed to save SEO data provider');
-                        });
-                      }}
-                      className={`px-3 py-2 rounded-[var(--radius-lg)] border t-caption font-medium transition-all ${
-                        selectedSeoDataProvider === p.name
-                          ? 'border-teal-500/50 bg-teal-500/10 text-accent-brand'
-                          : 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
-                      }`}
-                    >
-                      <div className="font-semibold capitalize">{p.name === 'dataforseo' ? 'DataForSEO' : 'SEMRush'}</div>
-                      <div className="t-caption-sm mt-0.5 opacity-70">
-                        {p.name === 'dataforseo' ? 'Pay-as-you-go' : 'Subscription'}
-                      </div>
-                    </ClickableRow>
-                  ))}
-                </div>
-                <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5">
-                  {selectedSeoDataProvider === 'dataforseo'
-                    ? 'DataForSEO: pay-per-call pricing (~$0.01-0.08/call). Uses same cache layer.'
-                    : 'SEMRush: subscription-based traditional keyword intelligence provider.'}
-                </p>
+            <div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <Icon as={BarChart3} size="md" className="text-accent-brand" />
+                <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">SEO Data Provider</span>
               </div>
-            )}
+              <div className="px-3 py-2 rounded-[var(--radius-lg)] border border-teal-500/40 bg-teal-500/10">
+                <div className="t-caption font-semibold text-accent-brand">{PRIMARY_SEO_PROVIDER_LABEL}</div>
+                <div className="t-caption-sm mt-0.5 text-[var(--brand-text-muted)]">
+                  Primary runtime provider for keyword, competitor, and backlink intelligence.
+                </div>
+              </div>
+              <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5">
+                Strategy generation now uses DataForSEO whenever SEO provider data is enabled. Stored legacy provider preferences are treated as DataForSEO.
+              </p>
+            </div>
 
             {/* SEO Data Mode */}
             {seoDataAvailable && (
@@ -504,9 +465,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                   ))}
                 </div>
                 <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5">
-                  {seoDataMode === 'quick' && 'Enriches keywords with real search volume + difficulty scores from your configured SEO provider.'}
+                  {seoDataMode === 'quick' && 'Enriches keywords with real search volume and difficulty scores from DataForSEO.'}
                   {seoDataMode === 'full' && 'Full competitive analysis: domain keywords, competitor gaps, related keywords, volume + difficulty.'}
-                  {seoDataMode === 'none' && 'Uses AI + Google Search Console data only. No SEO provider credits used.'}
+                  {seoDataMode === 'none' && 'Uses AI and Google Search Console data only. No DataForSEO credits used.'}
                 </p>
               </div>
             )}
@@ -533,7 +494,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                           setDiscoverError('No organic competitors were found for this domain.');
                         }
                       } catch (err: any) {
-                        setDiscoverError(err?.message || 'Failed to discover competitors. Check that your domain is set and an SEO provider is configured.');
+                        setDiscoverError(err?.message || 'Failed to discover competitors. Check that your domain is set and DataForSEO is configured.');
                       } finally {
                         setDiscoveringCompetitors(false);
                       }
@@ -554,7 +515,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                   placeholder="e.g. competitor1.com, competitor2.com"
                   className="w-full t-caption placeholder:text-[var(--brand-text-muted)]"
                 />
-                <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Comma-separated (max 5). Auto-discover uses your configured SEO data provider to find organic competitors. These persist between strategy runs.</p>
+                <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Comma-separated (max 5). Auto-discover uses DataForSEO to find organic competitors. These persist between strategy runs.</p>
                 {discoverError && <p className="t-caption-sm text-accent-danger mt-1">{discoverError}</p>}
               </div>
             )}
@@ -677,7 +638,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
               <Icon as={AlertTriangle} size="md" className="text-accent-warning flex-shrink-0 mt-0.5" />
               <div className="t-caption text-accent-warning leading-relaxed">
                 <strong className="text-accent-warning">This strategy was generated without keyword volume validation.</strong>{' '}
-                Keywords, volume, and difficulty data may not reflect real search demand. Enable an SEO data provider for validated keyword recommendations.
+                Keywords, volume, and difficulty data may not reflect real search demand. Enable DataForSEO for validated keyword recommendations.
               </div>
             </div>
           )}
@@ -836,7 +797,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                 Use <strong className="text-accent-brand">Page Intelligence</strong> to analyze individual pages, edit keywords, and generate SEO copy.
                 {displayedSeoDataMode && displayedSeoDataMode !== 'none' && (
                   <span className="block mt-1 text-accent-orange">
-                    SEO provider data: Keywords enriched with real search volume and difficulty. Cached for 7 days.
+                    DataForSEO data: Keywords enriched with real search volume and difficulty. Cached for 7 days.
                   </span>
                 )}
                 {!(strategy.pageMap ?? []).some((p: PageKeywordMap) => p.currentPosition) && (

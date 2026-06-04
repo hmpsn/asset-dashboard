@@ -82,20 +82,21 @@ describe('SEMRush HTTP routes', () => {
   });
 
   describe('POST /api/semrush/estimate', () => {
-    it('estimates credit cost for quick mode', async () => {
+    it('returns DataForSEO-backed call estimates for quick mode', async () => {
       const res = await postJson('/api/semrush/estimate', {
         mode: 'quick',
         keywordCount: 10,
       });
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body).toHaveProperty('credits');
-      expect(typeof body.credits).toBe('number');
-      // quick mode: keywordCount * 10
-      expect(body.credits).toBe(100);
+      expect(body.provider).toBe('dataforseo');
+      expect(body.deprecated).toBe(true);
+      expect(body).toHaveProperty('estimatedCalls');
+      expect(typeof body.estimatedCalls).toBe('number');
+      expect(body.estimatedCalls).toBe(1);
     });
 
-    it('estimates credit cost for full mode', async () => {
+    it('returns DataForSEO-backed call estimates for full mode', async () => {
       const res = await postJson('/api/semrush/estimate', {
         mode: 'full',
         competitorCount: 2,
@@ -103,17 +104,21 @@ describe('SEMRush HTTP routes', () => {
       });
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body).toHaveProperty('credits');
-      expect(typeof body.credits).toBe('number');
-      expect(body.credits).toBeGreaterThan(0);
+      expect(body.provider).toBe('dataforseo');
+      expect(body.deprecated).toBe(true);
+      expect(body).toHaveProperty('estimatedCalls');
+      expect(typeof body.estimatedCalls).toBe('number');
+      expect(body.estimatedCalls).toBeGreaterThan(0);
     });
 
     it('falls back gracefully when mode is omitted', async () => {
       const res = await postJson('/api/semrush/estimate', {});
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body).toHaveProperty('credits');
-      expect(typeof body.credits).toBe('number');
+      expect(body.provider).toBe('dataforseo');
+      expect(body.deprecated).toBe(true);
+      expect(body).toHaveProperty('estimatedCalls');
+      expect(typeof body.estimatedCalls).toBe('number');
     });
   });
 
@@ -154,7 +159,7 @@ describe('SEMRush HTTP routes', () => {
       expect(body).toHaveProperty('cacheFileCount');
       expect(body).toHaveProperty('allCacheKeys');
       expect(Array.isArray(body.allCacheKeys)).toBe(true);
-      expect(body.note).toContain('ZERO SEMRush API calls');
+      expect(body.note).toContain('ZERO external SEO provider calls');
     });
 
     it('returns 404 for an unknown workspace', async () => {

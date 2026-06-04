@@ -198,6 +198,11 @@ describe('src/api/seo — keywords', () => {
     expect(mockedGetOptional).toHaveBeenCalledWith('/api/semrush/status');
   });
 
+  it('keywords.seoProviderStatus uses getOptional (no args)', async () => {
+    await keywords.seoProviderStatus();
+    expect(mockedGetOptional).toHaveBeenCalledWith('/api/semrush/status');
+  });
+
   it('keywords.saveCompetitors uses post with domains', async () => {
     await keywords.saveCompetitors('ws-1', ['a.com', 'b.com']);
     expect(mockedPost).toHaveBeenCalledWith('/api/semrush/competitors/ws-1', {
