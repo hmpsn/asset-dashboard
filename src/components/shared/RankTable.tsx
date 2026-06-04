@@ -147,6 +147,28 @@ interface ColumnMeta {
   headerTooltip?: ReactNode;
 }
 
+/**
+ * Wave 4 P0 (Gap 10): a generic custom (non-metric) column. Rendered between the
+ * keyword cell and the built-in data columns, wired into the existing SortHeader /
+ * sort machinery, and counted in totalCols so variant/expanded colSpan rows stay
+ * aligned. Absorbs the KCC bespoke columns (Status / Local / Demand / Rank-KD /
+ * Assignment / Next) and the RankTracker bespoke position/change cells without a
+ * built-in KeywordColumnKey. Purely additive — consumers that omit `customColumns`
+ * render byte-identical to before.
+ */
+export interface CustomColumn<T> {
+  /** Stable key (React key + a11y). */
+  key: string;
+  /** Header content. */
+  header: ReactNode;
+  /** Cell alignment. Default 'left'. */
+  align?: 'left' | 'right';
+  /** When set, the header becomes a sortable button emitting this key via onSort. */
+  sortKey?: string;
+  /** Per-row cell renderer. */
+  render: (row: T) => ReactNode;
+}
+
 const COLUMN_META: Record<KeywordColumnKey, ColumnMeta> = {
   position: { key: 'position', label: 'Position' },
   change: { key: 'change', label: 'Change' },
@@ -203,6 +225,11 @@ interface KeywordTableProps<T extends KeywordTableRow> {
    * behaviour for RankTrackingSection / SearchTab tracked rows).
    */
   truncateKeyword?: boolean;
+  /**
+   * Generic custom (non-metric) columns rendered between the keyword cell and the
+   * built-in data columns. Additive — omit for byte-identical legacy behaviour.
+   */
+  customColumns?: CustomColumn<T>[];
   /** Render extra action content after the data columns (pin/remove/open-page, badges). */
   renderActions?: (row: T) => ReactNode;
   /** Render content INSIDE the keyword cell, after the query (source/lifecycle badges, page title). */
@@ -283,6 +310,7 @@ export function KeywordTable<T extends KeywordTableRow>({
   headerTooltips,
   stickyHeader = false,
   truncateKeyword = true,
+  customColumns,
   renderActions,
   renderKeywordMeta,
   isRowExpanded,
@@ -313,9 +341,11 @@ export function KeywordTable<T extends KeywordTableRow>({
   }
 
   const visible = typeof limit === 'number' ? rows.slice(0, limit) : rows;
+  const customCols = customColumns ?? [];
   // Total column count for full-width expanded/variant rows.
   const totalCols =
     1 /* keyword */ +
+    customCols.length +
     columns.length +
     (showLocalSeo ? 1 : 0) +
     (selection ? 1 : 0) +
@@ -328,6 +358,22 @@ export function KeywordTable<T extends KeywordTableRow>({
           <tr className="bg-[var(--surface-1)]/50">
             {selection && <th className="w-8" />}
             <SortHeader label="Keyword" columnKey="keyword" sort={sort} className={`text-left ${TH_BASE}`} />
+            {customCols.map((c) =>
+              c.sortKey ? (
+                <SortHeader
+                  key={c.key}
+                  // SortHeader's label is typed ReactNode-compatible via children.
+                  label={c.header as string}
+                  columnKey={c.sortKey}
+                  sort={sort}
+                  className={`${c.align === 'right' ? 'text-right' : 'text-left'} ${TH_BASE}`}
+                />
+              ) : (
+                <th key={c.key} className={`${c.align === 'right' ? 'text-right' : 'text-left'} ${TH_BASE}`}>
+                  {c.header}
+                </th>
+              ),
+            )}
             {columns.map((c) => {
               const meta = COLUMN_META[c];
               return (
@@ -376,6 +422,11 @@ export function KeywordTable<T extends KeywordTableRow>({
                       {r.query}
                     </td>
                   )}
+                  {customCols.map((c) => (
+                    <td key={c.key} className={`${cell} ${c.align === 'right' ? 'text-right' : 'text-left'}`}>
+                      {c.render(r)}
+                    </td>
+                  ))}
                   {columns.map((c) => (
                     <DataCell key={c} column={c} row={r} cell={cell} changeSign={changeSign} positionFormat={positionFormat} />
                   ))}

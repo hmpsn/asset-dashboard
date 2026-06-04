@@ -295,6 +295,106 @@ describe('KeywordTable — density variant', () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
+// Wave 4 P0 (Gap 10): generic custom-column slot — absorbs the KCC bespoke columns
+// (Status / Local / Demand / Rank-KD / Assignment / Next) and the RankTracker
+// position/change cells WITHOUT a built-in KeywordColumnKey. Additive: every
+// existing consumer (no customColumns) renders byte-identical.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('KeywordTable — generic custom-column slot', () => {
+  it('renders a custom header + per-row cell for each custom column', () => {
+    render(
+      <KeywordTable
+        rows={[makeRow({ query: 'kw-a' })]}
+        columns={[]}
+        customColumns={[
+          { key: 'status', header: 'Status', render: (r) => <span>status:{r.query}</span> },
+          { key: 'assignment', header: 'Assignment', render: () => <span>mapped</span> },
+        ]}
+      />,
+    );
+    expect(screen.getByText('Status')).toBeInTheDocument();
+    expect(screen.getByText('Assignment')).toBeInTheDocument();
+    expect(screen.getByText('status:kw-a')).toBeInTheDocument();
+    expect(screen.getByText('mapped')).toBeInTheDocument();
+  });
+
+  it('custom columns participate in sort — clicking a custom header fires onSort with its sortKey', () => {
+    const onSort = vi.fn();
+    render(
+      <KeywordTable
+        rows={[makeRow()]}
+        columns={[]}
+        sort={{ key: 'keyword', direction: 'asc', onSort }}
+        customColumns={[
+          { key: 'demand', header: 'Demand', sortKey: 'demand', render: () => <span>700</span> },
+        ]}
+      />,
+    );
+    const header = screen.getByRole('button', { name: /demand/i });
+    fireEvent.click(header);
+    expect(onSort).toHaveBeenCalledWith('demand');
+  });
+
+  it('custom columns without a sortKey render a plain (non-button) header even when sort is on', () => {
+    const onSort = vi.fn();
+    render(
+      <KeywordTable
+        rows={[makeRow()]}
+        columns={[]}
+        sort={{ key: 'keyword', direction: 'asc', onSort }}
+        customColumns={[{ key: 'next', header: 'Next', render: () => <span>actions</span> }]}
+      />,
+    );
+    // No sortKey → not a sortable button, just a label.
+    expect(screen.queryByRole('button', { name: /^next$/i })).not.toBeInTheDocument();
+    expect(screen.getByText('Next')).toBeInTheDocument();
+  });
+
+  it('counts custom columns in totalCols so expanded/variant rows still span the full width', () => {
+    const row = makeRow({ query: 'expand-me' });
+    const { container } = render(
+      <KeywordTable
+        rows={[row]}
+        columns={['position', 'change']}
+        selection={{ selected: new Set<string>(), onToggle: vi.fn(), rowId: (r) => r.query }}
+        showLocalSeo
+        renderActions={() => <button>act</button>}
+        customColumns={[
+          { key: 'status', header: 'Status', render: () => <span>S</span> },
+          { key: 'assignment', header: 'Assignment', render: () => <span>A</span> },
+        ]}
+        isRowExpanded={() => true}
+        renderExpanded={() => <div>expanded</div>}
+      />,
+    );
+    // totalCols = 1 keyword + 2 data + 2 custom + 1 localSeo + 1 selection + 1 actions = 8
+    const expandedCell = screen.getByText('expanded').closest('td');
+    expect(expandedCell?.getAttribute('colSpan')).toBe('8');
+    expect(container.querySelector('table')).not.toBeNull();
+  });
+
+  it('renders custom columns between the keyword cell and the built-in data columns', () => {
+    const { container } = render(
+      <KeywordTable
+        rows={[makeRow({ query: 'kw' })]}
+        columns={['position']}
+        customColumns={[{ key: 'status', header: 'Status', render: () => <span>S-cell</span> }]}
+      />,
+    );
+    const headerCells = [...(container.querySelectorAll('thead th') ?? [])].map((th) => th.textContent);
+    // order: Keyword, Status (custom), Position (built-in)
+    expect(headerCells).toEqual(['Keyword', 'Status', 'Position']);
+  });
+
+  it('is fully absent when customColumns is omitted (byte-identical existing consumers)', () => {
+    const { container } = render(<KeywordTable rows={[makeRow()]} columns={['position']} />);
+    const headerCells = [...container.querySelectorAll('thead th')].map((th) => th.textContent);
+    expect(headerCells).toEqual(['Keyword', 'Position']);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
 // RankChange standalone — byte-identical sign convention (change>0 = good)
 // ══════════════════════════════════════════════════════════════════════════════
 
