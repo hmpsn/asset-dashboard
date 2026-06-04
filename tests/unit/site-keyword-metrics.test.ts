@@ -66,6 +66,24 @@ describe('site-keyword-metrics store', () => {
     expect(countSiteKeywordMetrics(ws.id)).toBe(2);
   });
 
+  it('replaceAll with [] CLEARS existing rows (no staleness vs the blob)', () => {
+    const ws = createWorkspace(`SKM EmptyClear ${Date.now()}`);
+    cleanupWorkspaceIds.push(ws.id);
+
+    replaceAllSiteKeywordMetrics(ws.id, [metric({ keyword: 'will be cleared', volume: 500, difficulty: 20 })]);
+    expect(countSiteKeywordMetrics(ws.id)).toBe(1);
+
+    // A subsequent persist whose metrics became empty must DELETE the stale rows,
+    // so the table matches the blob (which writes `undefined` for empty). If the
+    // table kept the old rows, the table-first resolver would serve stale data.
+    replaceAllSiteKeywordMetrics(ws.id, []);
+    expect(countSiteKeywordMetrics(ws.id)).toBe(0);
+    expect(listSiteKeywordMetrics(ws.id)).toEqual([]);
+
+    // And the resolver now correctly falls through to the (empty) blob, not stale rows.
+    expect(resolveSiteKeywordMetrics(ws.id, undefined)).toEqual([]);
+  });
+
   it('deduplicates by normalized_query (keywordComparisonKey), last wins', () => {
     const ws = createWorkspace(`SKM Dedupe ${Date.now()}`);
     cleanupWorkspaceIds.push(ws.id);
