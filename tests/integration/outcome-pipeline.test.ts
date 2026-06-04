@@ -16,9 +16,6 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-// Enable outcome tracking feature flag before server starts
-process.env.FEATURE_OUTCOME_TRACKING = 'true';
-
 const ctx = createTestContext(13250);
 const { api, postJson } = ctx;
 

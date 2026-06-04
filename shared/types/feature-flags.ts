@@ -25,15 +25,6 @@ export const FEATURE_FLAGS = {
   // White-label
   'white-label': false,
 
-  // Outcome Intelligence Engine
-  'outcome-tracking': false,
-  'outcome-dashboard': false,
-  'outcome-ai-injection': false,
-  'outcome-client-reporting': false,
-  'outcome-external-detection': false,
-  'outcome-playbooks': false,
-  'outcome-predictive': false,
-
   // Unified Workspace Intelligence
   'intelligence-shadow-mode': false,
 
@@ -151,7 +142,6 @@ export interface FeatureFlagLifecycleMeta {
 }
 
 export const FEATURE_FLAG_GROUP_LABELS = [
-  'Outcome Intelligence Engine',
   'Copy & Brand Engine',
   'Self-Service Onboarding',
   'Team & Collaboration',
@@ -195,98 +185,6 @@ export const LEGACY_FEATURE_FLAG_ROADMAP_IDS = Object.values(LEGACY_ROADMAP) as 
 const REVIEWED_AT = '2026-05-15';
 
 export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntry> = {
-  'outcome-tracking': {
-    label: 'Action tracking & measurement',
-    group: 'Outcome Intelligence Engine',
-    lifecycle: {
-      owner: 'outcomes-roi',
-      createdAt: '2026-03-10',
-      rolloutTarget: 'tiered-client-rollout',
-      removalCondition: 'Remove after outcome tracking is default-on for all supported tiers for 2 releases.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.outcome,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'outcome-dashboard': {
-    label: 'Outcomes admin dashboard',
-    group: 'Outcome Intelligence Engine',
-    lifecycle: {
-      owner: 'outcomes-roi',
-      createdAt: '2026-03-10',
-      rolloutTarget: 'internal-operators',
-      removalCondition: 'Remove once dashboard behaviors are stable and no rollback path depends on this gate.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.outcome,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'outcome-playbooks': {
-    label: 'Playbook pattern detection',
-    group: 'Outcome Intelligence Engine',
-    lifecycle: {
-      owner: 'outcomes-roi',
-      createdAt: '2026-03-20',
-      rolloutTarget: 'internal-operators',
-      removalCondition: 'Remove after playbook scoring quality and DB migrations are fully settled.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.outcome,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'outcome-external-detection': {
-    label: 'External change detection (weekly)',
-    group: 'Outcome Intelligence Engine',
-    lifecycle: {
-      owner: 'outcomes-roi',
-      createdAt: '2026-03-22',
-      rolloutTarget: 'internal-operators',
-      removalCondition: 'Remove when anomaly ingestion is production-hardened and independent kill-switch is unnecessary.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.outcome,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'outcome-ai-injection': {
-    label: 'Inject outcomes into AI context',
-    group: 'Outcome Intelligence Engine',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: '2026-03-25',
-      rolloutTarget: 'tiered-client-rollout',
-      removalCondition: 'Remove after AI prompts consistently consume outcomes context and no prompt rollback relies on the gate.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.outcome,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'outcome-client-reporting': {
-    label: 'Client-facing outcome reporting',
-    group: 'Outcome Intelligence Engine',
-    lifecycle: {
-      owner: 'outcomes-roi',
-      createdAt: '2026-03-29',
-      rolloutTarget: 'tiered-client-rollout',
-      removalCondition: 'Remove once all supported client plans rely on the new reporting path by default.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.outcome,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'outcome-predictive': {
-    label: 'Predictive scoring (future)',
-    group: 'Outcome Intelligence Engine',
-    lifecycle: {
-      owner: 'outcomes-roi',
-      createdAt: '2026-04-02',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove if predictive scoring does not move to active implementation by the next architecture cycle.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.outcome,
-      staleAuditCadence: 'quarterly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-
   'copy-engine': {
     label: 'Copy Engine — core',
     group: 'Copy & Brand Engine',
@@ -832,18 +730,6 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
 };
 
 export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: FeatureFlagKey[] }> = [
-  {
-    label: 'Outcome Intelligence Engine',
-    keys: [
-      'outcome-tracking',
-      'outcome-dashboard',
-      'outcome-playbooks',
-      'outcome-external-detection',
-      'outcome-ai-injection',
-      'outcome-client-reporting',
-      'outcome-predictive',
-    ],
-  },
   {
     label: 'Copy & Brand Engine',
     keys: ['copy-engine', 'copy-engine-voice', 'copy-engine-pipeline'],

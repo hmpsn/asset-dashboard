@@ -19,9 +19,6 @@
  * - Type filter on /actions list
  */
 
-// ─── Feature flag (must be set before app import) ────────────────────────────
-process.env.FEATURE_OUTCOME_TRACKING = 'true';
-
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import http from 'http';
 import type { AddressInfo } from 'net';

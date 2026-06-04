@@ -23,7 +23,6 @@ import { createTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import db from '../../server/db/index.js';
-import { setFlagOverride } from '../../server/feature-flags.js';
 import { randomUUID } from 'crypto';
 
 const ctx = createTestContext(13366); // port-ok: next free after 13365
@@ -73,7 +72,6 @@ function insertInsight(opts: {
 }
 
 beforeAll(async () => {
-  setFlagOverride('outcome-ai-injection', true);
   await ctx.startServer();
 
   // clientPassword: '' lets public endpoints skip auth cookies (consistent
@@ -206,7 +204,6 @@ beforeAll(async () => {
 }, 25_000);
 
 afterAll(async () => {
-  setFlagOverride('outcome-ai-injection', null);
   for (const id of insertedOutcomeIds) {
     db.prepare('DELETE FROM action_outcomes WHERE id = ?').run(id);
   }

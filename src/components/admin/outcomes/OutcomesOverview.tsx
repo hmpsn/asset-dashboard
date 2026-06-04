@@ -6,7 +6,6 @@ import { useNavigate } from 'react-router-dom';
 import { Minus, AlertTriangle, BarChart3, Activity } from 'lucide-react';
 import { TrendBadge } from '../../ui/TrendBadge';
 import { PageHeader, SectionCard, StatCard, EmptyState, Skeleton, Badge } from '../../ui';
-import { FeatureFlag } from '../../ui/FeatureFlag';
 import { ErrorBoundary } from '../../ErrorBoundary';
 import { useOutcomeOverview } from '../../../hooks/admin/useOutcomes';
 import { adminPath } from '../../../routes';
@@ -201,28 +200,8 @@ export default function OutcomesOverview() {
   );
 
   return (
-    <FeatureFlag
-      flag="outcome-dashboard"
-      fallback={
-        <ErrorBoundary>
-          <div className="space-y-6">
-            <PageHeader
-              title="Outcomes Overview"
-              subtitle="Cross-workspace outcome tracking is currently disabled."
-            />
-            <SectionCard>
-              <EmptyState
-                icon={BarChart3}
-                title="Outcomes overview is unavailable"
-                description="Enable the outcome dashboard feature flag to view cross-workspace win-rate and trend data."
-              />
-            </SectionCard>
-          </div>
-        </ErrorBoundary>
-      }
-    >
-      <ErrorBoundary>
-        <div className="space-y-6">
+    <ErrorBoundary>
+      <div className="space-y-6">
           <PageHeader
             title="Outcomes Overview"
             subtitle="Cross-workspace outcome tracking — win rates, trends, and actions that need attention"
@@ -293,8 +272,7 @@ export default function OutcomesOverview() {
               </SectionCard>
             </>
           )}
-        </div>
-      </ErrorBoundary>
-    </FeatureFlag>
+      </div>
+    </ErrorBoundary>
   );
 }

@@ -2,8 +2,7 @@
  * Unit tests for server/intelligence/learnings-slice.ts
  *
  * Coverage targets:
- *  1. Feature flag disabled — immediate return with disabled shape, no side-effects.
- *  2. Feature flag enabled — availability states (ready / no_data / degraded).
+ *  1. Default-on availability states (ready / no_data / degraded).
  *  3. weCalledIt filtering — strong_win only, 50-action scan limit, 5-entry cap.
  *  4. Lazy cache coherency — getOutcomesForAction called at most once per action ID.
  *  5. scoringConfig population — workspace found vs not-found.
@@ -19,10 +18,6 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 // ── Module mocks (must appear before any real imports) ────────────────────────
 // vi.mock is hoisted to the top of the file by Vitest. Factories must not close
 // over variables declared in the test module — use vi.fn() directly.
-
-vi.mock('../../server/feature-flags.js', () => ({
-  isFeatureEnabled: vi.fn().mockReturnValue(true),
-}));
 
 vi.mock('../../server/workspace-learnings.js', () => ({
   getWorkspaceLearnings: vi.fn().mockReturnValue(null),
@@ -64,7 +59,6 @@ vi.mock('../../server/errors.js', () => ({
 
 // ── Real imports (after mocks) ─────────────────────────────────────────────────
 import { assembleLearnings } from '../../server/intelligence/learnings-slice.js';
-import { isFeatureEnabled } from '../../server/feature-flags.js';
 import { getWorkspaceLearnings } from '../../server/workspace-learnings.js';
 import { getPlaybooks } from '../../server/outcome-playbooks.js';
 import { getActionsByWorkspace, getOutcomesForAction, getTopWinsFromActions } from '../../server/outcome-tracking.js';
@@ -148,8 +142,7 @@ const WS_ID = 'ws-test-1';
 describe('assembleLearnings', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default: flag enabled, no learnings, no actions, no workspace
-    vi.mocked(isFeatureEnabled).mockReturnValue(true);
+    // Default: no learnings, no actions, no workspace
     vi.mocked(getWorkspaceLearnings).mockReturnValue(null);
     vi.mocked(getPlaybooks).mockReturnValue([]);
     vi.mocked(getActionsByWorkspace).mockReturnValue([]);
@@ -159,63 +152,22 @@ describe('assembleLearnings', () => {
     vi.mocked(getWorkspace).mockReturnValue(null);
   });
 
-  // ── 1. Feature flag disabled ─────────────────────────────────────────────────
-
-  describe('feature flag disabled', () => {
-    it('returns disabled shape immediately', async () => {
-      vi.mocked(isFeatureEnabled).mockReturnValue(false);
-      const result = await assembleLearnings(WS_ID);
-      expect(result).toEqual({
-        availability: 'disabled',
-        summary: null,
-        confidence: null,
-        topActionTypes: [],
-        overallWinRate: 0,
-        recentTrend: null,
-        playbooks: [],
-      });
-    });
-
-    it('does not call getWorkspaceLearnings when flag is disabled', async () => {
-      vi.mocked(isFeatureEnabled).mockReturnValue(false);
-      await assembleLearnings(WS_ID);
-      expect(getWorkspaceLearnings).not.toHaveBeenCalled();
-    });
-
-    it('does not call getActionsByWorkspace when flag is disabled', async () => {
-      vi.mocked(isFeatureEnabled).mockReturnValue(false);
-      await assembleLearnings(WS_ID);
-      expect(getActionsByWorkspace).not.toHaveBeenCalled();
-    });
-
-    it('does not call getROIAttributionsRaw when flag is disabled', async () => {
-      vi.mocked(isFeatureEnabled).mockReturnValue(false);
-      await assembleLearnings(WS_ID);
-      expect(getROIAttributionsRaw).not.toHaveBeenCalled();
-    });
-
-    it('does not call getWorkspace when flag is disabled', async () => {
-      vi.mocked(isFeatureEnabled).mockReturnValue(false);
-      await assembleLearnings(WS_ID);
-      expect(getWorkspace).not.toHaveBeenCalled();
-    });
-
-    it('disabled shape has exactly the documented keys (no extra fields)', async () => {
-      vi.mocked(isFeatureEnabled).mockReturnValue(false);
-      const result = await assembleLearnings(WS_ID);
-      expect(Object.keys(result).sort()).toEqual(
-        ['availability', 'confidence', 'overallWinRate', 'playbooks', 'recentTrend', 'summary', 'topActionTypes'],
-      );
-    });
-  });
-
-  // ── 2. Availability states ────────────────────────────────────────────────────
+  // ── 1. Availability states ────────────────────────────────────────────────────
 
   describe('availability states', () => {
     it('returns no_data when getWorkspaceLearnings returns null', async () => {
       vi.mocked(getWorkspaceLearnings).mockReturnValue(null);
       const result = await assembleLearnings(WS_ID);
       expect(result.availability).toBe('no_data');
+    });
+
+    it('attempts all learnings data sources by default', async () => {
+      await assembleLearnings(WS_ID);
+
+      expect(getWorkspaceLearnings).toHaveBeenCalledWith(WS_ID, 'all');
+      expect(getActionsByWorkspace).toHaveBeenCalledWith(WS_ID);
+      expect(getWorkspace).toHaveBeenCalledWith(WS_ID);
+      expect(getROIAttributionsRaw).not.toHaveBeenCalled();
     });
 
     it('returns ready when getWorkspaceLearnings returns a summary', async () => {

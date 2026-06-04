@@ -87,6 +87,82 @@ function uniqPath(ruleId: string, name: string): string {
   return `${ruleId}/case-${counter}/${name}`;
 }
 
+describe('Rule: Retired outcome feature flag key used in flag API', () => {
+  const RULE = 'Retired outcome feature flag key used in flag API';
+
+  it('flags retired keys passed to feature flag helpers', () => {
+    const retiredKey = ['outcome', 'tracking'].join('-');
+    const file = write(
+      uniqPath('rule-retired-outcome-flags', 'helper.ts'),
+      lines(
+        'import { isFeatureEnabled } from "./feature-flags";',
+        `const enabled = isFeatureEnabled('${retiredKey}');`,
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags retired keys passed to FeatureFlag components', () => {
+    const retiredKey = ['outcome', 'dashboard'].join('-');
+    const file = write(
+      uniqPath('rule-retired-outcome-flags', 'component.tsx'),
+      lines(
+        'import { FeatureFlag } from "./FeatureFlag";',
+        `export const Demo = () => <FeatureFlag flag="${retiredKey}">demo</FeatureFlag>;`,
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags retired keys indexed from feature flag catalog objects', () => {
+    const retiredKey = ['outcome', 'client-reporting'].join('-');
+    const file = write(
+      uniqPath('rule-retired-outcome-flags', 'catalog.ts'),
+      lines(
+        'import { FEATURE_FLAG_CATALOG } from "./feature-flags";',
+        `const entry = FEATURE_FLAG_CATALOG['${retiredKey}'];`,
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags retired outcome feature env vars', () => {
+    const retiredEnv = ['FEATURE', 'OUTCOME', 'TRACKING'].join('_');
+    const file = write(
+      uniqPath('rule-retired-outcome-flags', 'env.ts'),
+      lines(
+        `process.env.${retiredEnv} = 'true';`,
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('allows active feature flags and non-flag historical strings', () => {
+    const retiredKey = ['outcome', 'ai-injection'].join('-');
+    const file = write(
+      uniqPath('rule-retired-outcome-flags', 'negative.tsx'),
+      lines(
+        "const active = isFeatureEnabled('copy-engine');",
+        `const historicalNote = '${retiredKey} was retired';`,
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
 // ════════════════════════════════════════════════════════════════════════════
 // Rule 2: Global keydown missing isContentEditable guard
 // ════════════════════════════════════════════════════════════════════════════
@@ -5121,6 +5197,9 @@ describe('Meta: customCheck rule name registry', () => {
     // the multi-phase generation-quality plan (no false positives on current code).
     'opportunity-money-field-must-be-stripped',
     'new-rec-type-source-needs-category-and-action-type',
+    // Outcome feature flag retirement PR1 (2026-06-04) — retired outcome
+    // rollout keys must not re-enter runtime/UI/test flag APIs.
+    'Retired outcome feature flag key used in flag API',
     // keyword-consolidation Wave 1 (2026-06-03) — prevents lost-update race on
     // tracked_keywords JSON blob; enforces withTrackedKeywordsTxn (BEGIN IMMEDIATE).
     'tracked_keywords bare read→write outside withTrackedKeywordsTxn',

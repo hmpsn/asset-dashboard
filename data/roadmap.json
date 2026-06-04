@@ -149,7 +149,7 @@
           "est": "owner-gated",
           "priority": "P1",
           "status": "pending",
-          "notes": "NOT autonomous. Validation gate before flipping opportunity-value-scorer: (1) soak \u2014 let generateRecommendations log divergence; optionally enable -events/-calibration in shadow first; (2) review GET /api/ov-divergence/:workspaceId on both live workspaces \u2014 every OV-#1 != legacy-#1 must be defensibly higher value, invariant_held 100%; (3) confirm outcome-tracking/outcome-ai-injection flag state so calibration fires; (4) flip. WARNING: flag is global (all clients at once) \u2014 staged per-client needs ov-per-workspace-flag-dimension first."
+          "notes": "NOT autonomous. Validation gate before flipping opportunity-value-scorer: (1) soak \u2014 let generateRecommendations log divergence; optionally enable -events/-calibration in shadow first; (2) review GET /api/ov-divergence/:workspaceId on both live workspaces \u2014 every OV-#1 != legacy-#1 must be defensibly higher value, invariant_held 100%; (3) confirm outcome systems are healthy now that outcome tracking/learnings are default-on; (4) flip. WARNING: flag is global (all clients at once) \u2014 staged per-client needs ov-per-workspace-flag-dimension first."
         },
         {
           "id": "ov-per-workspace-flag-dimension",

@@ -1,6 +1,5 @@
 import { useState, lazy, Suspense } from 'react';
 import { PageHeader, TabBar, Skeleton } from '../../ui';
-import { FeatureFlag } from '../../ui/FeatureFlag';
 import { ErrorBoundary } from '../../ErrorBoundary';
 
 // Lazy load sub-panels
@@ -28,24 +27,22 @@ export default function OutcomeDashboard({ workspaceId }: OutcomeDashboardProps)
   ];
 
   return (
-    <FeatureFlag flag="outcome-dashboard">
-      <div className="space-y-6">
-        <PageHeader
-          title="Outcomes"
-          subtitle="Track what's working across all your SEO actions"
-        />
-        {/* tab-deeplink-ok — outcomes tabs are not navigated to via ?tab= from other components */}
-        <TabBar tabs={tabs} active={activeTab} onChange={(t) => setActiveTab(t as OutcomeTab)} />
-        <ErrorBoundary>
-          <Suspense fallback={<Skeleton className="h-64" />}>
-            {activeTab === 'scorecard' && <OutcomeScorecard workspaceId={workspaceId} />}
-            {activeTab === 'actions' && <OutcomeActionFeed workspaceId={workspaceId} />}
-            {activeTab === 'wins' && <OutcomeTopWins workspaceId={workspaceId} />}
-            {activeTab === 'learnings' && <OutcomeLearningsPanel workspaceId={workspaceId} />}
-            {activeTab === 'playbooks' && <OutcomePlaybooks workspaceId={workspaceId} />}
-          </Suspense>
-        </ErrorBoundary>
-      </div>
-    </FeatureFlag>
+    <div className="space-y-6">
+      <PageHeader
+        title="Outcomes"
+        subtitle="Track what's working across all your SEO actions"
+      />
+      {/* tab-deeplink-ok — outcomes tabs are not navigated to via ?tab= from other components */}
+      <TabBar tabs={tabs} active={activeTab} onChange={(t) => setActiveTab(t as OutcomeTab)} />
+      <ErrorBoundary>
+        <Suspense fallback={<Skeleton className="h-64" />}>
+          {activeTab === 'scorecard' && <OutcomeScorecard workspaceId={workspaceId} />}
+          {activeTab === 'actions' && <OutcomeActionFeed workspaceId={workspaceId} />}
+          {activeTab === 'wins' && <OutcomeTopWins workspaceId={workspaceId} />}
+          {activeTab === 'learnings' && <OutcomeLearningsPanel workspaceId={workspaceId} />}
+          {activeTab === 'playbooks' && <OutcomePlaybooks workspaceId={workspaceId} />}
+        </Suspense>
+      </ErrorBoundary>
+    </div>
   );
 }

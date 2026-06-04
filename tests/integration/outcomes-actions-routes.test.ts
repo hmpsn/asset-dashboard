@@ -14,9 +14,6 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-// Enable outcome tracking feature flag before server starts
-process.env.FEATURE_OUTCOME_TRACKING = 'true';
-
 const ctx = createTestContext(13633);
 const { api, postJson } = ctx;
 
@@ -254,10 +251,10 @@ describe('POST /api/outcomes/:workspaceId/actions — valid creation', () => {
   });
 });
 
-// ── Feature flag gate check ───────────────────────────────────────────────────
+// ── Diagnostics check ─────────────────────────────────────────────────────────
 
-describe('Feature flag — outcome-tracking enabled', () => {
-  it('diagnostics confirms feature flag is enabled', async () => {
+describe('Outcome diagnostics', () => {
+  it('confirms outcomes are enabled', async () => {
     const res = await api(`/api/outcomes/${wsId}/diagnostics`);
     expect(res.status).toBe(200);
     const diag = await res.json();

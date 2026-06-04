@@ -5,7 +5,7 @@
  * The 7 dimension weights feed the OV component-breakdown DISPLAY only (never the
  * scored value — see computeOpportunityValue). Default = platform DEFAULT_WEIGHTS,
  * so day-one behavior is unchanged. The monthly ridge-nudge auto-tuning toward the
- * outcome-predictive mix is OUT OF SCOPE for PR5 (deferred): this module ships the
+ * Predictive weighting mix is OUT OF SCOPE for PR5 (deferred): this module ships the
  * table + getOrCreate at platform defaults so the weights round-trip and the
  * scorer reads a per-workspace OpportunityWeights instead of the module const.
  *

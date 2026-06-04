@@ -977,6 +977,47 @@ export const CHECKS: Check[] = [
     severity: 'error',
   },
   {
+    name: 'Retired outcome feature flag key used in flag API',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    exclude: ['server/db/migrations/122-retire-outcome-feature-flags.sql'],
+    message:
+      'Outcome feature flags were retired in PR1; make the enabled behavior unconditional instead of using retired keys.',
+    severity: 'error',
+    rationale:
+      'Retired rollout flags must not re-enter runtime/UI/test flag APIs after their enabled path becomes canonical.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const retired = [
+        'outcome-tracking',
+        'outcome-dashboard',
+        'outcome-playbooks',
+        'outcome-external-detection',
+        'outcome-client-reporting',
+        'outcome-ai-injection',
+        'outcome-predictive',
+      ];
+      const keyPattern = retired.join('|');
+      const helperRe = new RegExp(`\\b(?:isFeatureEnabled|useFeatureFlag|setFlagOverride|setWorkspaceFlagOverride)\\(\\s*['"](?:${keyPattern})['"]`);
+      const componentRe = new RegExp(`<FeatureFlag\\b[^>]*\\bflag=['"](?:${keyPattern})['"]`);
+      const indexedRe = new RegExp(`\\b(?:FEATURE_FLAGS|FEATURE_FLAG_CATALOG)\\[['"](?:${keyPattern})['"]\\]`);
+      const envRe = /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_OUTCOME_(?:TRACKING|DASHBOARD|PLAYBOOKS|EXTERNAL_DETECTION|CLIENT_REPORTING|AI_INJECTION|PREDICTIVE)\b/;
+
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        const lines = readFileOrEmpty(file).split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (helperRe.test(line) || componentRe.test(line) || indexedRe.test(line) || envRe.test(line)) {
+            hits.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+      return hits;
+    },
+  },
+  {
     name: 'Keyword Command Center summary/detail must not use full model',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',

@@ -6,7 +6,6 @@ import { getGA4PeriodComparison } from './google-analytics.js';
 import type { MonthlyDigestData, DigestItem, ROIHighlight } from '../shared/types/narrative.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import type { Workspace } from './workspaces.js';
-import { isFeatureEnabled } from './feature-flags.js';
 import { buildRecommendationGenerationContext } from './intelligence/generation-context-builders.js';
 import { listAllInsightsFromSlice } from './intelligence/insights-slice.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
@@ -180,33 +179,29 @@ async function computeDigest(
   // Fetch workspace learnings for outcome context
   let learningsSummary: string | undefined;
   let recentOutcomesCount: number | undefined;
-  if (isFeatureEnabled('outcome-ai-injection')) {
-    const { intelligence, promptContext } = await buildRecommendationGenerationContext(ws.id, {
-      slices: ['learnings'],
-      learningsDomain: 'all',
-      verbosity: 'detailed',
-      tokenBudget: 1800,
-      includeLocalSeo: false,
-    });
-    if (promptContext.includes('## Outcome Learnings')) {
-      learningsSummary = promptContext;
-      recentOutcomesCount = intelligence.learnings?.summary?.totalScoredActions;
-    }
+  const { intelligence, promptContext } = await buildRecommendationGenerationContext(ws.id, {
+    slices: ['learnings'],
+    learningsDomain: 'all',
+    verbosity: 'detailed',
+    tokenBudget: 1800,
+    includeLocalSeo: false,
+  });
+  if (promptContext.includes('## Outcome Learnings')) {
+    learningsSummary = promptContext;
+    recentOutcomesCount = intelligence.learnings?.summary?.totalScoredActions;
   }
 
   // Top wins from outcome tracking — reuse already-fetched insights, no second DB call
   let topWinsBlock = '';
-  if (isFeatureEnabled('outcome-ai-injection')) {
-    try {
-      const positiveInsights = insights
-        .filter(i => i.severity === 'positive')
-        .sort((a, b) => (b.impactScore ?? 0) - (a.impactScore ?? 0))
-        .slice(0, 3);
-      if (positiveInsights.length > 0) {
-        topWinsBlock = `\nNotable wins this period:\n${positiveInsights.map(i => `- ${i.pageTitle ?? i.insightType}`).join('\n')}`;
-      }
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'monthly-digest: programming error'); /* insights not available — skip */ }
-  }
+  try {
+    const positiveInsights = insights
+      .filter(i => i.severity === 'positive')
+      .sort((a, b) => (b.impactScore ?? 0) - (a.impactScore ?? 0))
+      .slice(0, 3);
+    if (positiveInsights.length > 0) {
+      topWinsBlock = `\nNotable wins this period:\n${positiveInsights.map(i => `- ${i.pageTitle ?? i.insightType}`).join('\n')}`;
+    }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'monthly-digest: programming error'); /* insights not available — skip */ }
 
   const summary = await generateDigestSummary(monthLabel, wins, issuesAddressed, roiHighlights, metrics, learningsSummary, recentOutcomesCount, topWinsBlock, ws.id);
 

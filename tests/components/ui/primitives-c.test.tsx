@@ -537,12 +537,12 @@ describe('FeatureFlag', () => {
     vi.mocked(useFeatureFlag).mockReturnValue(false);
     render(
       withQueryClient(
-        <FeatureFlag flag="outcome-tracking">
+        <FeatureFlag flag="copy-engine">
           <span>X</span>
         </FeatureFlag>,
       ),
     );
-    expect(useFeatureFlag).toHaveBeenCalledWith('outcome-tracking');
+    expect(useFeatureFlag).toHaveBeenCalledWith('copy-engine');
   });
 
   it('renders multiple children when enabled', () => {

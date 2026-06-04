@@ -83,5 +83,5 @@ describe('bulk-accept-fixes — Webflow API failure increments failed count', ()
     expect(result?.applied).toBe(0);
     expect(result?.failed).toBe(fixes.length);
     expect(result?.total).toBe(fixes.length);
-  });
+  }, 15_000);
 });

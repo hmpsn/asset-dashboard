@@ -240,10 +240,9 @@ describe('monthly-digest generation', () => {
     ]);
   });
 
-  it('injects summary contract + learnings context into AI prompt when feature is enabled', async () => {
+  it('injects summary contract + learnings context into AI prompt', async () => {
     const ws = makeWorkspace({ id: 'ws_prompt_contract' });
 
-    mocks.isFeatureEnabled.mockImplementation((flag: string) => flag === 'outcome-ai-injection');
     mocks.learningsTotal = 7;
     mocks.learningsPromptContext = '[Workspace Intelligence]\n## Outcome Learnings (7 tracked outcomes, high confidence)\nLearning A: concise headlines improve CTR.';
     mocks.getInsights.mockReturnValue([

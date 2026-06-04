@@ -58,12 +58,8 @@ vi.mock('../server/intelligence/seo-context-source.js', () => ({
 vi.mock('../server/workspaces.js', () => ({
   getWorkspace: vi.fn(() => ({ id: 'ws-test', personas: [] })),
 }));
-// `assembleLearnings` has an early-return guard on the `outcome-ai-injection`
-// feature flag (server/workspace-intelligence.ts:392). Return `true` so
-// the function proceeds to the `outcome-tracking` dynamic import and our
-// throwing mock is actually hit. Every other flag can stay false.
 vi.mock('../server/feature-flags.js', () => ({
-  isFeatureEnabled: vi.fn((flag: string) => flag === 'outcome-ai-injection'),
+  isFeatureEnabled: vi.fn(() => false),
 }));
 vi.mock('../server/workspace-learnings.js', () => ({
   getWorkspaceLearnings: vi.fn(() => null),

@@ -191,12 +191,7 @@ describe('OLD path vs NEW path — data preservation contracts', () => {
 
   // ── Learnings contract ─────────────────────────────────────────────
 
-  it('learnings: overall win rate preserved', async () => {
-    const featureFlags = await import('../../server/feature-flags.js');
-    vi.mocked(featureFlags.isFeatureEnabled).mockImplementation(
-      (flag: string) => flag === 'outcome-ai-injection',
-    );
-    await invalidateCache();
+  it('learnings: overall win rate preserved', async () => {    await invalidateCache();
     const { buildWorkspaceIntelligence, formatForPrompt } = await import('../../server/workspace-intelligence.js');
     const intel = await buildWorkspaceIntelligence(WS_ID, { slices: ['learnings'] });
     const newOutput = formatForPrompt(intel, { verbosity: 'detailed', sections: ['learnings'] });
@@ -204,24 +199,14 @@ describe('OLD path vs NEW path — data preservation contracts', () => {
     expect(newOutput).toContain('28%'); // strong wins
   });
 
-  it('learnings: totalScoredActions count preserved', async () => {
-    const featureFlags = await import('../../server/feature-flags.js');
-    vi.mocked(featureFlags.isFeatureEnabled).mockImplementation(
-      (flag: string) => flag === 'outcome-ai-injection',
-    );
-    await invalidateCache();
+  it('learnings: totalScoredActions count preserved', async () => {    await invalidateCache();
     const { buildWorkspaceIntelligence, formatForPrompt } = await import('../../server/workspace-intelligence.js');
     const intel = await buildWorkspaceIntelligence(WS_ID, { slices: ['learnings'] });
     const newOutput = formatForPrompt(intel, { verbosity: 'detailed', sections: ['learnings'] });
     expect(newOutput).toContain('25');
   });
 
-  it('learnings: content domain details preserved', async () => {
-    const featureFlags = await import('../../server/feature-flags.js');
-    vi.mocked(featureFlags.isFeatureEnabled).mockImplementation(
-      (flag: string) => flag === 'outcome-ai-injection',
-    );
-    await invalidateCache();
+  it('learnings: content domain details preserved', async () => {    await invalidateCache();
     const { buildWorkspaceIntelligence, formatForPrompt } = await import('../../server/workspace-intelligence.js');
     const intel = await buildWorkspaceIntelligence(WS_ID, { slices: ['learnings'] });
     const newOutput = formatForPrompt(intel, { verbosity: 'detailed', sections: ['learnings'] });
@@ -230,12 +215,7 @@ describe('OLD path vs NEW path — data preservation contracts', () => {
     expect(newOutput).toContain('67%');
   });
 
-  it('learnings: strategy domain details preserved', async () => {
-    const featureFlags = await import('../../server/feature-flags.js');
-    vi.mocked(featureFlags.isFeatureEnabled).mockImplementation(
-      (flag: string) => flag === 'outcome-ai-injection',
-    );
-    await invalidateCache();
+  it('learnings: strategy domain details preserved', async () => {    await invalidateCache();
     const { buildWorkspaceIntelligence, formatForPrompt } = await import('../../server/workspace-intelligence.js');
     const intel = await buildWorkspaceIntelligence(WS_ID, { slices: ['learnings'] });
     const newOutput = formatForPrompt(intel, { verbosity: 'detailed', sections: ['learnings'] });
@@ -244,12 +224,7 @@ describe('OLD path vs NEW path — data preservation contracts', () => {
     expect(newOutput).toContain('500');
   });
 
-  it('learnings: technical domain details preserved', async () => {
-    const featureFlags = await import('../../server/feature-flags.js');
-    vi.mocked(featureFlags.isFeatureEnabled).mockImplementation(
-      (flag: string) => flag === 'outcome-ai-injection',
-    );
-    await invalidateCache();
+  it('learnings: technical domain details preserved', async () => {    await invalidateCache();
     const { buildWorkspaceIntelligence, formatForPrompt } = await import('../../server/workspace-intelligence.js');
     const intel = await buildWorkspaceIntelligence(WS_ID, { slices: ['learnings'] });
     const newOutput = formatForPrompt(intel, { verbosity: 'detailed', sections: ['learnings'] });
@@ -260,12 +235,7 @@ describe('OLD path vs NEW path — data preservation contracts', () => {
 
   // ── Domain filtering contract ──────────────────────────────────────
 
-  it('learnings domain=content: ONLY content details, NOT strategy or technical', async () => {
-    const featureFlags = await import('../../server/feature-flags.js');
-    vi.mocked(featureFlags.isFeatureEnabled).mockImplementation(
-      (flag: string) => flag === 'outcome-ai-injection',
-    );
-    await invalidateCache();
+  it('learnings domain=content: ONLY content details, NOT strategy or technical', async () => {    await invalidateCache();
     const { buildWorkspaceIntelligence, formatForPrompt } = await import('../../server/workspace-intelligence.js');
     const intel = await buildWorkspaceIntelligence(WS_ID, { slices: ['learnings'], learningsDomain: 'content' });
     const newOutput = formatForPrompt(intel, { verbosity: 'detailed', sections: ['learnings'], learningsDomain: 'content' });
@@ -275,12 +245,7 @@ describe('OLD path vs NEW path — data preservation contracts', () => {
     expect(newOutput).not.toContain('Schema types producing');
   });
 
-  it('learnings domain=strategy: ONLY strategy details, NOT content or technical', async () => {
-    const featureFlags = await import('../../server/feature-flags.js');
-    vi.mocked(featureFlags.isFeatureEnabled).mockImplementation(
-      (flag: string) => flag === 'outcome-ai-injection',
-    );
-    await invalidateCache();
+  it('learnings domain=strategy: ONLY strategy details, NOT content or technical', async () => {    await invalidateCache();
     const { buildWorkspaceIntelligence, formatForPrompt } = await import('../../server/workspace-intelligence.js');
     const intel = await buildWorkspaceIntelligence(WS_ID, { slices: ['learnings'], learningsDomain: 'strategy' });
     const newOutput = formatForPrompt(intel, { verbosity: 'detailed', sections: ['learnings'], learningsDomain: 'strategy' });

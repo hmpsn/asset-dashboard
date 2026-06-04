@@ -310,14 +310,6 @@ describe('useFeatureFlag — static defaults (loading state)', () => {
     expect(result.current).toBe(false);
   });
 
-  it('returns false for "outcome-tracking" while loading', () => {
-    const { result } = renderHook(
-      () => useFeatureFlag('outcome-tracking' as FeatureFlagKey),
-      { wrapper: makeWrapper() },
-    );
-    expect(result.current).toBe(false);
-  });
-
   it('returns false for "white-label" while loading', () => {
     const { result } = renderHook(
       () => useFeatureFlag('white-label' as FeatureFlagKey),

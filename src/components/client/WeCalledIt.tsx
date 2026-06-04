@@ -5,7 +5,6 @@
 import { Sparkles, Lightbulb, ArrowUpRight } from 'lucide-react';
 import { SectionCard, EmptyState, Skeleton, TrendBadge } from '../ui';
 import { Icon } from '../ui/Icon';
-import { FeatureFlag } from '../ui/FeatureFlag';
 import { TierGate } from '../ui/TierGate';
 import { useClientOutcomeWins } from '../../hooks/client/useClientOutcomes';
 import type { Tier } from '../ui/TierGate';
@@ -177,12 +176,11 @@ export default function WeCalledIt({ workspaceId, tier }: WeCalledItProps) {
   const { data: wins = [], isLoading } = useClientOutcomeWins(workspaceId);
 
   return (
-    <FeatureFlag flag="outcome-client-reporting">
-      <SectionCard
-        title="We called it"
-        titleIcon={<Icon as={Sparkles} size="md" className="text-accent-brand" />}
-        titleExtra={<span className="t-caption text-[var(--brand-text-muted)]">Recommended, implemented, proven</span>}
-      >
+    <SectionCard
+      title="We called it"
+      titleIcon={<Icon as={Sparkles} size="md" className="text-accent-brand" />}
+      titleExtra={<span className="t-caption text-[var(--brand-text-muted)]">Recommended, implemented, proven</span>}
+    >
 
         {isLoading && (
           <div className="space-y-3">
@@ -225,7 +223,6 @@ export default function WeCalledIt({ workspaceId, tier }: WeCalledItProps) {
             {tier === 'premium' && <PremiumWins wins={wins} />}
           </>
         )}
-      </SectionCard>
-    </FeatureFlag>
+    </SectionCard>
   );
 }
