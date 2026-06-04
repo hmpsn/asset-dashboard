@@ -1,0 +1,30 @@
+-- Wave 3d-ii — the BEHAVIOR-CHANGE half of tracked-keyword provenance.
+--
+-- DECOUPLES strategy-ownership from the `source` enum. Before this column,
+-- reconcile decided "is this keyword strategy-owned (and therefore eligible for
+-- auto-deprecation when it falls off the current strategy targets)?" by READING
+-- the `source` enum (source === strategy_primary || strategy_site_keyword). That
+-- conflated two orthogonal facts — provenance (where a keyword came from) and
+-- ownership (whether reconcile currently manages its lifecycle) — and let the
+-- feedback path LAUNDER a client-approved page_map/topic_cluster keyword into a
+-- STRATEGY_* source, which reconcile then force-DEPRECATED on the next pass.
+-- Client-requested data was silently destroyed on every reconcile.
+--
+-- `strategy_owned` is a three-state flag (0 / 1 / NULL):
+--   * NULL  → ownership UNKNOWN (the conservative default — never auto-deprecated)
+--   * 0     → explicitly NOT strategy-owned (never auto-deprecated)
+--   * 1     → reconcile currently owns this keyword's lifecycle (the SOLE state
+--             that is eligible for auto-deprecation, and only then if it is not
+--             pinned / client / gap / manual protected).
+--
+-- SAFETY MECHANISM (why a direct, flag-less merge is safe): this column has NO
+-- DEFAULT, so every EXISTING row is NULL on migrate. Reconcile auto-deprecation
+-- now fires ONLY on strategy_owned === 1, so on merge auto-deprecation PAUSES for
+-- all existing rows until reconcile re-establishes ownership (=1) for genuine
+-- current targets. NULL is the conservative state.
+--
+-- DO NOT add a backfill UPDATE that sets strategy_owned from the `source` enum —
+-- that would re-bake the exact laundering bug this migration removes. The NULL
+-- default is intentional. Reconcile is the SOLE writer of strategy_owned = 1.
+
+ALTER TABLE tracked_keywords ADD COLUMN strategy_owned INTEGER;

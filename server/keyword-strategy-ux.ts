@@ -108,11 +108,6 @@ function trackingMap(trackedKeywords: TrackedKeyword[]): Map<string, TrackedKeyw
   return new Map(trackedKeywords.map(keyword => [normalizeKeyword(keyword.query), keyword]));
 }
 
-function isStrategyOwned(keyword: TrackedKeyword): boolean {
-  return keyword.source === TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY
-    || keyword.source === TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD;
-}
-
 function isPreserved(keyword: TrackedKeyword): boolean {
   return Boolean(keyword.pinned)
     || keyword.source === TRACKED_KEYWORD_SOURCE.MANUAL
@@ -281,8 +276,11 @@ export function buildKeywordStrategyRefreshSummary(options: BuildSummaryOptions)
 
   const retainedSite = [...currentSite].filter(keyword => previousSite.has(keyword)).length;
   const tracked = options.trackedKeywords ?? [];
-  const retiredInWindow = (keyword: TrackedKeyword, status: string) => isStrategyOwned(keyword)
-    && keyword.status === status
+  // Wave 3d-ii: a tracked keyword reaches DEPRECATED/REPLACED status ONLY via
+  // reconcile's auto-deprecation (the sole writer of those statuses), so keying on
+  // status is equivalent to the old strategy-ownership gate — and works on the
+  // stripped getTrackedKeywords shape (strategyOwned is table-only, not present here).
+  const retiredInWindow = (keyword: TrackedKeyword, status: string) => keyword.status === status
     && wasRetiredInRefresh(keyword, options);
   return {
     previousGeneratedAt: options.previousGeneratedAt,

@@ -1204,9 +1204,10 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
     // (observed on Swish: badge 224 / table 227).
     seedStrategy();
     // Tracked keyword promoted from strategy that isn't already in strategy.siteKeywords
-    // — this is the case that caused the drift on Swish.
-    addTrackedKeyword(workspaceId, 'orthodontics austin', { source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY });
-    addTrackedKeyword(workspaceId, 'family dentist', { source: TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD });
+    // — this is the case that caused the drift on Swish. Wave 3d-ii: IN_STRATEGY now
+    // keys on strategyOwned (set by reconcile), so seed it explicitly.
+    addTrackedKeyword(workspaceId, 'orthodontics austin', { source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY, strategyOwned: true });
+    addTrackedKeyword(workspaceId, 'family dentist', { source: TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD, strategyOwned: true });
     // Approved feedback keyword — also counts as in_strategy via rows path.
     seedFeedback('teeth whitening near me', 'approved');
     // Declined/requested feedback keywords — must NOT count even if they overlap a page.
@@ -1360,10 +1361,26 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
     expect(detail!.row.tracking.hasSignal).toBe(false);
   });
 
-  it('infers UNKNOWN tracking source from strategy.siteKeywords', async () => {
-    // Regression: Swish audit showed 231/235 active-tracked rows had source="unknown"
-    // due to legacy migration. Read-time inference recovers provenance so the row
-    // gets proper source labels and protected-state UI.
+  it('Wave 3d-ii: read-time source inference is RETIRED — an UNKNOWN tracked source stays UNKNOWN at read time', () => {
+    // Regression GUARD: read-time inferTrackedKeywordSources was retired. The boot
+    // backfill stamps legacy UNKNOWN sources ONCE; the read paths must NOT re-infer.
+    // So an UNKNOWN keyword added post-boot keeps source=UNKNOWN when read (its label
+    // detail is suppressed, never the literal "unknown" string).
+    updateWorkspace(workspaceId, {
+      keywordStrategy: {
+        siteKeywords: ['cosmetic dentistry'],
+        siteKeywordMetrics: [],
+        opportunities: [],
+        businessContext: 'Dental',
+        generatedAt: '2026-05-20T10:00:00.000Z',
+      },
+    });
+    addTrackedKeyword(workspaceId, 'cosmetic dentistry', {
+      source: TRACKED_KEYWORD_SOURCE.UNKNOWN,
+    });
+  });
+
+  it('Wave 3d-ii: a strategy-declared UNKNOWN keyword classifies IN_STRATEGY via the strategy match, not a re-inferred source', async () => {
     updateWorkspace(workspaceId, {
       keywordStrategy: {
         siteKeywords: ['cosmetic dentistry'],
@@ -1379,13 +1396,14 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
 
     const detail = await buildKeywordCommandCenterDetail(workspaceId, 'cosmetic dentistry');
     expect(detail).not.toBeNull();
-    expect(detail!.row.tracking.source).toBe(TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD);
-    // Source label detail should no longer be the literal "unknown" string
-    const trackingSourceLabel = detail!.row.sourceLabels.find(s => s.kind === 'tracking');
-    expect(trackingSourceLabel?.detail).toBe('strategy site keyword');
+    // Source is NOT re-inferred at read time — it stays UNKNOWN.
+    expect(detail!.row.tracking.source).toBe(TRACKED_KEYWORD_SOURCE.UNKNOWN);
+    // But the row still classifies IN_STRATEGY because the strategy explanation
+    // (siteKeywords match) drives the lifecycle status, independent of the source enum.
+    expect(detail!.row.lifecycleStatus).toBe(KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY);
   });
 
-  it('infers UNKNOWN tracking source as STRATEGY_PRIMARY when keyword is in siteKeywordMetrics', async () => {
+  it('Wave 3d-ii: an UNKNOWN keyword in siteKeywordMetrics is NOT re-inferred to STRATEGY_PRIMARY at read time', async () => {
     updateWorkspace(workspaceId, {
       keywordStrategy: {
         siteKeywords: [],
@@ -1394,20 +1412,21 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
         generatedAt: '2026-05-20T10:00:00.000Z',
       },
     });
-    // siteKeywordMetrics is table-only post-strip — the source-inference reads the table.
     replaceAllSiteKeywordMetrics(workspaceId, [{ keyword: 'orthodontics', volume: 1200, difficulty: 45 }]);
     addTrackedKeyword(workspaceId, 'orthodontics', { source: TRACKED_KEYWORD_SOURCE.UNKNOWN });
 
     const detail = await buildKeywordCommandCenterDetail(workspaceId, 'orthodontics');
-    expect(detail!.row.tracking.source).toBe(TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY);
+    expect(detail!.row.tracking.source).toBe(TRACKED_KEYWORD_SOURCE.UNKNOWN);
   });
 
-  it('infers UNKNOWN tracking source as CLIENT_REQUESTED when matching requested feedback', async () => {
+  it('Wave 3d-ii: an UNKNOWN keyword matching requested feedback is NOT re-inferred to CLIENT_REQUESTED at read time', async () => {
     addTrackedKeyword(workspaceId, 'invisalign cost', { source: TRACKED_KEYWORD_SOURCE.UNKNOWN });
     seedFeedback('invisalign cost', 'requested', 'Client asked');
 
     const detail = await buildKeywordCommandCenterDetail(workspaceId, 'invisalign cost');
-    expect(detail!.row.tracking.source).toBe(TRACKED_KEYWORD_SOURCE.CLIENT_REQUESTED);
+    // Read-time inference retired — the tracking source stays UNKNOWN. (The feedback
+    // status still surfaces via the feedback channel / lifecycle, not the source enum.)
+    expect(detail!.row.tracking.source).toBe(TRACKED_KEYWORD_SOURCE.UNKNOWN);
   });
 
   it('leaves UNKNOWN tracking source unchanged when no inference hint matches', async () => {

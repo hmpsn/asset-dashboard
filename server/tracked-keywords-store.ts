@@ -62,6 +62,7 @@ export interface TrackedKeywordRow {
   deprecated_at: string | null;
   source_page_id: string | null;
   source_gap_key: string | null;
+  strategy_owned: number | null;
 }
 
 /** A NULL column maps to `undefined` (omitted by JSON.stringify) — never `null` —
@@ -108,6 +109,10 @@ export function rowToTrackedKeyword(row: TrackedKeywordRow): TrackedKeyword {
     replacedBy: nullToUndefined(row.replaced_by),
     deprecatedAt: nullToUndefined(row.deprecated_at),
     sourceGapKey: nullToUndefined(row.source_gap_key),
+    // Wave 3d-ii tri-state: NULL column → undefined (ownership unknown); 1 → true
+    // (reconcile owns it); 0 → false (explicitly not owned). `false` is a real
+    // established value, NOT "empty" — do not collapse it to undefined.
+    strategyOwned: row.strategy_owned === null ? undefined : row.strategy_owned === 1,
   };
 }
 
@@ -144,6 +149,10 @@ function keywordToParams(workspaceId: string, keyword: TrackedKeyword) {
     deprecated_at: undefinedToNull(keyword.deprecatedAt),
     source_page_id: null, // DEFERRED — no stable page_keywords surrogate id (migration 024).
     source_gap_key: undefinedToNull(keyword.sourceGapKey),
+    // Wave 3d-ii tri-state: undefined → NULL (ownership unknown, conservative);
+    // true → 1; false → 0. The ternary is deliberate (not `keyword.strategyOwned
+    // ? 1 : 0`) so an undefined value stays NULL instead of collapsing to 0.
+    strategy_owned: keyword.strategyOwned === undefined ? null : keyword.strategyOwned ? 1 : 0,
   };
 }
 
@@ -169,14 +178,14 @@ const stmts = createStmtCache(() => ({
       strategy_generated_at, last_strategy_seen_at, intent,
       volume, difficulty, cpc, authority_posture,
       baseline_position, baseline_clicks, baseline_impressions,
-      replaced_by, deprecated_at, source_page_id, source_gap_key
+      replaced_by, deprecated_at, source_page_id, source_gap_key, strategy_owned
     ) VALUES (
       @workspace_id, @normalized_query, @query, @pinned, @added_at,
       @source, @status, @page_path, @page_title,
       @strategy_generated_at, @last_strategy_seen_at, @intent,
       @volume, @difficulty, @cpc, @authority_posture,
       @baseline_position, @baseline_clicks, @baseline_impressions,
-      @replaced_by, @deprecated_at, @source_page_id, @source_gap_key
+      @replaced_by, @deprecated_at, @source_page_id, @source_gap_key, @strategy_owned
     )
     ON CONFLICT(workspace_id, normalized_query) DO UPDATE SET
       query = excluded.query,
@@ -199,7 +208,8 @@ const stmts = createStmtCache(() => ({
       replaced_by = excluded.replaced_by,
       deprecated_at = excluded.deprecated_at,
       source_page_id = excluded.source_page_id,
-      source_gap_key = excluded.source_gap_key
+      source_gap_key = excluded.source_gap_key,
+      strategy_owned = excluded.strategy_owned
   `),
 }));
 
@@ -297,9 +307,13 @@ function stripUndefinedKeys(keyword: TrackedKeyword): TrackedKeyword {
     if (value !== undefined) out[key] = value;
   }
   // Provenance strip — these never belong in the general/public read shape, even
-  // when set (a non-undefined sourceGapKey would otherwise survive the loop above).
+  // when set (a non-undefined sourceGapKey / strategyOwned would otherwise survive
+  // the loop above). strategyOwned is TABLE-ONLY (Wave 3d-ii): it gates reconcile's
+  // auto-deprecation and must be read from the table/hydrated shape, never leaked
+  // into getTrackedKeywords or the public payload.
   delete out.sourceGapKey;
   delete out.sourcePageId;
+  delete out.strategyOwned;
   return out as unknown as TrackedKeyword;
 }
 
@@ -344,10 +358,16 @@ export function resolveTrackedKeywords(
 /**
  * Optional source-stamping hook for the boot backfill: given the normalized
  * blob keywords for a workspace, return the same array with UNKNOWN-source rows
- * stamped with an inferred source (the canonical inferTrackedKeywordSources
- * ladder). Injected from server/index.ts to avoid a static import cycle
+ * stamped with an inferred source (the inferTrackedKeywordSources ladder).
+ * Injected from server/index.ts to avoid a static import cycle
  * (rank-tracking → store → keyword-command-center → rank-tracking). When not
  * provided, the backfill stamps nothing (rows keep their stored source).
+ *
+ * Wave 3d-ii: this boot backfill is the SOLE remaining caller of the inference
+ * ladder — a legitimate ONE-TIME legacy stamp at populate time. The three
+ * READ-TIME inference calls in keyword-command-center.ts were retired; KCC read
+ * paths now consume the stored source / strategyOwned directly. Do not re-add a
+ * read-time inference call.
  */
 export type TrackedKeywordSourceStamper = (
   workspaceId: string,

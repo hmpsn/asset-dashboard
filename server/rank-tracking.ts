@@ -40,6 +40,9 @@ export interface AddTrackedKeywordOptions {
   deprecatedAt?: string;
   /** Wave 3d-i ADDITIVE provenance — content-addressed gap key (see TrackedKeyword.sourceGapKey). */
   sourceGapKey?: string;
+  /** Wave 3d-ii ownership flag — see TrackedKeyword.strategyOwned. Reconcile is the
+   *  SOLE writer of `true`; other callers leave it undefined (conservative default). */
+  strategyOwned?: boolean;
 }
 
 export interface GetTrackedKeywordsOptions {
@@ -128,6 +131,12 @@ const trackedKeywordSchema = z.object({
   // shape rule). normalizeTrackedKeywords passes it through via the `...keyword`
   // spread so it survives the read→mutate→write loop.
   sourceGapKey: z.string().optional(),
+  // Wave 3d-ii ownership flag. MUST be .optional() per the same Schema-vs-stored-
+  // shape rule: the stored blob NEVER carries strategyOwned (TABLE-ONLY, stripped
+  // by blobReplacer). It is hydrated from the TABLE into the in-memory set before
+  // the updater runs (hydrateProvenanceFromTable) and persisted via the table
+  // column; the `...keyword` spread carries it through the read→mutate→write loop.
+  strategyOwned: z.boolean().optional(),
 });
 
 function normalizeQuery(query: string): string {
@@ -179,9 +188,11 @@ function writeConfig(workspaceId: string, config: { trackedKeywords: TrackedKeyw
   });
 }
 
-/** Drop provenance-only keys when serializing the blob (see writeConfig). */
+/** Drop provenance/ownership-only keys when serializing the blob (see writeConfig).
+ *  strategyOwned (Wave 3d-ii) is TABLE-ONLY like sourceGapKey — it must never enter
+ *  the blob, or the resolver's blob fallback could leak/round-trip a stale value. */
 function blobReplacer(key: string, value: unknown): unknown {
-  if (key === 'sourceGapKey' || key === 'sourcePageId') return undefined;
+  if (key === 'sourceGapKey' || key === 'sourcePageId' || key === 'strategyOwned') return undefined;
   return value;
 }
 
@@ -231,26 +242,41 @@ export function getTrackedKeywords(workspaceId: string, options: GetTrackedKeywo
  * getTrackedKeywords() call (the "3×-parse fix").
  */
 /**
- * Wave 3d-i: mutate `keywords` in place, filling each row's `sourceGapKey` from
- * the existing tracked_keywords TABLE (keyed by keywordComparisonKey) when the
- * row does not already carry one. FILL-IF-EMPTY: a value already present on the
- * in-memory row (e.g. a fresh gap-approve in the same write) is NOT overwritten by
- * the stored table value. Provenance lives only in the table, so this is how it
- * survives the blob-based read→mutate→write loop.
+ * Wave 3d-i/3d-ii: mutate `keywords` in place, filling each row's TABLE-ONLY
+ * provenance/ownership fields (`sourceGapKey`, `strategyOwned`) from the existing
+ * tracked_keywords TABLE (keyed by keywordComparisonKey) when the in-memory row
+ * does not already carry a value. FILL-IF-EMPTY: a value already present on the
+ * in-memory row (e.g. a fresh gap-approve, or reconcile setting strategyOwned in
+ * the same write) is NOT overwritten by the stored table value. These fields live
+ * ONLY in the table (the blob strips them), so this is how they survive the
+ * blob-based read→mutate→write loop.
+ *
+ * strategyOwned survival guard is `!== undefined`, NOT a truthy check: `false` is a
+ * REAL established value (explicitly not strategy-owned). A truthy guard would
+ * re-hydrate a stored `true` over an intentional in-memory `false`.
  */
 function hydrateProvenanceFromTable(workspaceId: string, keywords: TrackedKeyword[]): void {
   if (keywords.length === 0) return;
   const stored = listTrackedKeywordRows(workspaceId);
   if (stored.length === 0) return;
   const gapKeyByQuery = new Map<string, string>();
+  const ownedByQuery = new Map<string, boolean>();
   for (const row of stored) {
     if (row.sourceGapKey) gapKeyByQuery.set(normalizeQuery(row.query), row.sourceGapKey);
+    if (row.strategyOwned !== undefined) ownedByQuery.set(normalizeQuery(row.query), row.strategyOwned);
   }
-  if (gapKeyByQuery.size === 0) return;
+  if (gapKeyByQuery.size === 0 && ownedByQuery.size === 0) return;
   for (const keyword of keywords) {
-    if (keyword.sourceGapKey) continue; // fill-if-empty — don't clobber a fresh pointer
-    const existing = gapKeyByQuery.get(normalizeQuery(keyword.query));
-    if (existing) keyword.sourceGapKey = existing;
+    const key = normalizeQuery(keyword.query);
+    if (!keyword.sourceGapKey) {
+      const existingGap = gapKeyByQuery.get(key); // fill-if-empty — don't clobber a fresh pointer
+      if (existingGap) keyword.sourceGapKey = existingGap;
+    }
+    if (keyword.strategyOwned === undefined) {
+      // `false` is a real established value — `!== undefined`, never a truthy guard.
+      const existingOwned = ownedByQuery.get(key);
+      if (existingOwned !== undefined) keyword.strategyOwned = existingOwned;
+    }
   }
 }
 
@@ -355,6 +381,7 @@ function addTrackedKeywordToConfig(
     replacedBy: options.replacedBy,
     deprecatedAt: options.deprecatedAt,
     sourceGapKey: options.sourceGapKey, // Wave 3d-i ADDITIVE provenance (gap-approve path).
+    strategyOwned: options.strategyOwned, // Wave 3d-ii ownership (undefined unless reconcile sets it).
   });
   return true;
 }

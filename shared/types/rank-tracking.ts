@@ -60,6 +60,26 @@ export interface TrackedKeyword {
    * written NULL and intentionally NOT projected pending a stable page id.
    */
   sourceGapKey?: string;
+  /**
+   * Wave 3d-ii BEHAVIOR-CHANGE provenance — does reconcile currently OWN this
+   * keyword's lifecycle? This is the decoupled-from-source ownership flag that
+   * gates auto-deprecation. Three-state: `true` = reconcile owns it (the ONLY
+   * state eligible for auto-deprecation, and only if unprotected); `false` =
+   * explicitly not owned (never auto-deprecated); `undefined` = ownership unknown
+   * (the conservative default for every pre-3d-ii row — never auto-deprecated).
+   *
+   * Reconcile is the SOLE writer of `strategyOwned = true`; it sets it on any
+   * keyword that originates from / matches a current strategy target. NEVER infer
+   * it from the `source` enum — that is the laundering bug this field removes.
+   *
+   * TABLE-ONLY: persisted in the tracked_keywords TABLE (column `strategy_owned`)
+   * and read ONLY via the admin/table path (listTrackedKeywordRows) or the in-txn
+   * hydrated rows. getTrackedKeywords, the public serializers, and the blob write
+   * all STRIP it (behavior-preserving — same trust model as sourceGapKey). A
+   * truthiness guard on this field is a BUG: `false` is a real established value,
+   * not "empty".
+   */
+  strategyOwned?: boolean;
 }
 
 export interface RankHistoryEntry {
