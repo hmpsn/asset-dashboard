@@ -70,9 +70,9 @@ export function assembleStoredKeywordStrategy(workspaceId: string): StoredKeywor
     return null;
   }
 
-  // siteKeywordMetrics (#19b, Wave 3b-i): table-first, blob fallback. The blob is
-  // still written (dual-write) and still the fallback (dual-read) — the strip is 3b-ii.
-  const siteKeywordMetrics = resolveSiteKeywordMetrics(workspaceId, strategy?.siteKeywordMetrics);
+  // siteKeywordMetrics (#19b, Wave 3b-ii strip; table-as-truth): resolved from the
+  // site_keyword_metrics table, the sole store. The blob no longer carries it.
+  const siteKeywordMetrics = resolveSiteKeywordMetrics(workspaceId);
 
   return {
     siteKeywords: strategy?.siteKeywords ?? [],

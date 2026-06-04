@@ -9,6 +9,7 @@ import {
   storeRankSnapshot,
 } from '../../server/rank-tracking.js';
 import { reconcileStrategyRankTracking } from '../../server/rank-tracking-reconciliation.js';
+import { replaceAllSiteKeywordMetrics } from '../../server/site-keyword-metrics.js';
 import {
   TRACKED_KEYWORD_SOURCE,
   TRACKED_KEYWORD_STATUS,
@@ -59,12 +60,14 @@ describe('reconcileStrategyRankTracking', () => {
       { query: 'Dentist Austin', position: 4, clicks: 9, impressions: 300, ctr: 0.03 },
     ]);
 
+    // siteKeywordMetrics is table-only post-strip — the reconcile join reads it
+    // from the site_keyword_metrics table, not off the keywordStrategy Pick.
+    replaceAllSiteKeywordMetrics(workspaceId, [{ keyword: 'dentist austin', volume: 900, difficulty: 34 }]);
     const changeSet = reconcileStrategyRankTracking({
       workspaceId,
       generatedAt,
       keywordStrategy: {
         siteKeywords: ['dentist austin'],
-        siteKeywordMetrics: [{ keyword: 'dentist austin', volume: 900, difficulty: 34 }],
         generatedAt,
       },
       pageMap: [

@@ -20,7 +20,10 @@ const recsInFlight = new Set<string>();
 export interface SeedKeywordStrategyTrackedKeywordsOptions {
   workspaceId: string;
   workspaceName: string;
-  keywordStrategy: Pick<KeywordStrategy, 'siteKeywords' | 'siteKeywordMetrics' | 'generatedAt'>;
+  // Wave 3b-ii strip (table-as-truth): siteKeywordMetrics is no longer read here — it
+  // forwards to reconcileStrategyRankTracking, whose Pick is ('siteKeywords' |
+  // 'generatedAt'); reconcile self-sources metrics from the site_keyword_metrics table.
+  keywordStrategy: Pick<KeywordStrategy, 'siteKeywords' | 'generatedAt'>;
   pageMap: PageKeywordMap[];
 }
 

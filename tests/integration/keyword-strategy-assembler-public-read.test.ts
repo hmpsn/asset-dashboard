@@ -17,6 +17,7 @@ import { replaceAllQuickWins } from '../../server/quick-wins.js';
 import { replaceAllKeywordGaps } from '../../server/keyword-gaps.js';
 import { replaceAllTopicClusters } from '../../server/topic-clusters.js';
 import { replaceAllCannibalizationIssues } from '../../server/cannibalization-issues.js';
+import { replaceAllSiteKeywordMetrics } from '../../server/site-keyword-metrics.js';
 import { upsertAndCleanPageKeywords } from '../../server/page-keywords.js';
 import type { KeywordStrategy, ContentGap, QuickWin, KeywordGapItem, TopicCluster, CannibalizationItem, PageKeywordMap } from '../../shared/types/workspace.js';
 
@@ -68,6 +69,8 @@ beforeAll(async () => {
   replaceAllKeywordGaps(wsId, [keywordGap]);
   replaceAllTopicClusters(wsId, [cluster]);
   replaceAllCannibalizationIssues(wsId, [cannibal]);
+  // siteKeywordMetrics is table-only post-strip — populate the table, not the blob.
+  replaceAllSiteKeywordMetrics(wsId, [{ keyword: 'site keyword one', volume: 2000, difficulty: 40 }]);
 }, 25_000);
 
 afterAll(async () => {

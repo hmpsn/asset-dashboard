@@ -1,13 +1,11 @@
 /**
- * Wave 3b-i (#19b) — DUAL-READ fallback gate for siteKeywordMetrics on the REAL
- * public read path `GET /api/public/seo-strategy/:id`.
+ * Wave 3b-ii (#19b) — TABLE-AS-TRUTH read gate for siteKeywordMetrics on the REAL
+ * public read path `GET /api/public/seo-strategy/:id` (post-strip).
  *
  * Asserts the public route returns siteKeywordMetrics:
  *   - from the site_keyword_metrics TABLE when it is populated, AND
- *   - from the legacy blob when the table is empty (fallback survives).
- *
- * This is the additive PR: the blob is still written and still read as the
- * fallback. The strip is the follow-up owner-gated 3b-ii PR.
+ *   - NOTHING when the table is empty (the legacy blob fallback was removed in the
+ *     strip — the table is now the sole source of truth).
  *
  * Port: 13890 (exclusive; 13888/13889 used by Wave-3a assembler tests, 13886
  * reserved for tracked-keywords-concurrency).
@@ -32,8 +30,8 @@ interface PublicStrategy {
 beforeAll(async () => {
   await ctx.startServer();
 
-  // Workspace A: table populated (different values from the blob to prove the
-  // table wins). Blob also kept (dual-write reality).
+  // Workspace A: table populated. A stale legacy blob value is also present to
+  // prove the table wins and the blob is ignored.
   tableWsId = createWorkspace(`SKM Table ${PORT}`).id;
   updateWorkspace(tableWsId, { keywordStrategy: {
     siteKeywords: ['table keyword'],
@@ -43,7 +41,8 @@ beforeAll(async () => {
   } as KeywordStrategy });
   replaceAllSiteKeywordMetrics(tableWsId, [{ keyword: 'table keyword', volume: 9999, difficulty: 88 }]);
 
-  // Workspace B: blob-only legacy state (table empty) — fallback path.
+  // Workspace B: blob-only legacy state (table empty). Post-strip the blob is NO
+  // LONGER a fallback — the public route must return no metrics.
   blobWsId = createWorkspace(`SKM Blob ${PORT}`).id;
   updateWorkspace(blobWsId, { keywordStrategy: {
     siteKeywords: ['blob keyword'],
@@ -59,18 +58,18 @@ afterAll(async () => {
   await ctx.stopServer();
 });
 
-describe('GET /api/public/seo-strategy/:id — siteKeywordMetrics dual-read', () => {
-  it('returns metrics from the TABLE when populated', async () => {
+describe('GET /api/public/seo-strategy/:id — siteKeywordMetrics table-as-truth', () => {
+  it('returns metrics from the TABLE when populated (blob ignored)', async () => {
     const res = await api(`/api/public/seo-strategy/${tableWsId}`);
     expect(res.status).toBe(200);
     const body = await res.json() as PublicStrategy;
     expect(body.siteKeywordMetrics).toEqual([{ keyword: 'table keyword', volume: 9999, difficulty: 88 }]);
   });
 
-  it('falls back to the BLOB when the table is empty', async () => {
+  it('returns NO metrics when the table is empty (blob fallback removed by the strip)', async () => {
     const res = await api(`/api/public/seo-strategy/${blobWsId}`);
     expect(res.status).toBe(200);
     const body = await res.json() as PublicStrategy;
-    expect(body.siteKeywordMetrics).toEqual([{ keyword: 'blob keyword', volume: 700, difficulty: 12 }]);
+    expect(body.siteKeywordMetrics).toBeUndefined();
   });
 });

@@ -17,6 +17,7 @@ import { replaceAllQuickWins } from '../../server/quick-wins.js';
 import { replaceAllKeywordGaps } from '../../server/keyword-gaps.js';
 import { replaceAllTopicClusters } from '../../server/topic-clusters.js';
 import { replaceAllCannibalizationIssues } from '../../server/cannibalization-issues.js';
+import { replaceAllSiteKeywordMetrics } from '../../server/site-keyword-metrics.js';
 import { assembleStoredKeywordStrategy } from '../../server/keyword-strategy-assembler.js';
 import type { KeywordStrategy, ContentGap, QuickWin, KeywordGapItem, TopicCluster, CannibalizationItem } from '../../shared/types/workspace.js';
 
@@ -58,6 +59,8 @@ describe('assembleStoredKeywordStrategy — table-as-truth + fallback', () => {
     replaceAllKeywordGaps(id, [tableKeywordGap]);
     replaceAllTopicClusters(id, [tableCluster]);
     replaceAllCannibalizationIssues(id, [tableCannibal]);
+    // siteKeywordMetrics is table-only post-strip — populate the table, not the blob.
+    replaceAllSiteKeywordMetrics(id, [{ keyword: 'site kw', volume: 900, difficulty: 30 }]);
 
     const result = assembleStoredKeywordStrategy(id);
     expect(result).not.toBeNull();

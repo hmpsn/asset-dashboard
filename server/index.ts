@@ -68,8 +68,12 @@ import { migrateFromJsonBlob as migrateCannibalizationFromJsonBlob } from './can
 migrateCannibalizationFromJsonBlob();
 
 // Backfill keywordStrategy.siteKeywordMetrics from workspace JSON blobs into the
-// site_keyword_metrics table (idempotent, CAS-guarded). Wave 3b-i ADDITIVE: this
-// only POPULATES the table — it does NOT strip the blob array (the strip is 3b-ii).
+// site_keyword_metrics table (idempotent, CAS-guarded). Wave 3b-ii has LANDED: the
+// blob strip is done — the table is now the sole store and every write path forces
+// keywordStrategy.siteKeywordMetrics undefined. This startup backfill therefore only
+// protects LEGACY workspaces whose blob predates the strip and has not yet been
+// re-persisted (a re-persist clears the blob array and seeds the table); once every
+// workspace has regenerated, this backfill is a no-op and can be retired.
 import { migrateSiteKeywordMetricsFromBlob } from './site-keyword-metrics.js';
 migrateSiteKeywordMetricsFromBlob();
 
