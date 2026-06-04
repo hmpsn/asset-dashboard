@@ -16,6 +16,7 @@ import { useContentRequests } from '../../hooks/useContentRequests';
 import { contentPerformance } from '../../api';
 import { PostReviewCard } from './PostReviewCard';
 import { formatDate } from '../../utils/formatDates';
+import { positionColor } from '../ui/constants';
 
 const POST_REVIEW_SEEN_STORAGE_KEY_PREFIX = 'client-post-review-seen';
 
@@ -701,7 +702,7 @@ export function ContentTab({
                           </div>
                           <div className="bg-[var(--surface-1)]/60 rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]/50">
                             <div className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] mb-0.5"><Icon as={TrendingUp} size="sm" /> Avg Position</div>
-                            <div className={`t-page font-semibold ${gsc.position <= 10 ? 'text-accent-success' : gsc.position <= 20 ? 'text-accent-warning' : 'text-[var(--brand-text)]'}`}>{gsc.position}</div>
+                            <div className={`t-page font-semibold ${positionColor(gsc.position)}`}>{gsc.position}</div>
                           </div>
                         </>}
                         {ga4 && !gsc && <>

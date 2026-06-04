@@ -4,26 +4,10 @@ import { ChevronUp, ChevronDown, TrendingUp } from 'lucide-react'; // trend-icon
 import type { LucideIcon } from 'lucide-react';
 
 import { SectionCard, Icon, EmptyState, Checkbox, Button } from '../ui';
-import { CHART_SERIES_ORDER } from '../ui/constants';
+import { CHART_SERIES_ORDER, positionColor as sharedPositionColor } from '../ui/constants';
 import { TableSkeleton } from '../ui/LoadingState';
-import { positionColor as sharedPositionColor } from '../ui/constants';
 import { kdColor as sharedKdColor } from '../page-intelligence/pageIntelligenceDisplay';
 import { fmtNum } from '../../utils/formatNumbers';
-
-// ════════════════════════════════════════════════════════════════════════════
-// positionColor — re-export the canonical T1 authority.
-//
-// Historically this module hosted its own `positionColor` (DEF A in the Wave 2
-// audit): bare-tailwind `text-emerald-400/80` with `font-semibold` baked into ≤3
-// and no undefined guard. As part of folding RankTable into the canonical
-// KeywordTable, the export now delegates to the single ui/constants authority
-// (accent tokens, emerald ≤10, undefined/0 → muted). This is a deliberate,
-// reviewed class-string change (`emerald-400/80` → `text-accent-success`); there
-// are no snapshot tests pinning the old class strings on this surface.
-// ════════════════════════════════════════════════════════════════════════════
-export function positionColor(pos?: number | null): string {
-  return sharedPositionColor(pos);
-}
 
 // ── Rank History Chart (kept as a sibling — NOT folded into KeywordTable) ──
 interface RankHistoryChartProps {

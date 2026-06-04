@@ -9,7 +9,7 @@ import { rankTracking } from '../api/seo';
 import { Badge, EmptyState, SectionCard, Icon, Button, IconButton, PageHeader, FormInput, LoadingState, ErrorState } from './ui';
 import { FeatureFlag } from './ui/FeatureFlag';
 import { cn } from '../lib/utils';
-import { chartGridColor, chartAxisColor, CHART_SERIES_COLORS } from './ui/constants';
+import { chartGridColor, chartAxisColor, CHART_SERIES_COLORS, positionColor } from './ui/constants';
 import { queryKeys } from '../lib/queryKeys';
 import { adminPath } from '../routes';
 import { formatDateShort } from '../utils/formatDates';
@@ -497,7 +497,7 @@ export function RankTracker({ workspaceId, hasGsc, onNavigate }: Props) {
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className={cn('text-sm font-bold', rank.position <= 3 ? 'text-emerald-400' : rank.position <= 10 ? 'text-teal-400' : rank.position <= 20 ? 'text-amber-400' : 'text-[var(--brand-text)]')}>
+                    <span className={cn('text-sm font-bold', positionColor(rank.position))}>
                       {Math.round(rank.position * 10) / 10}
                     </span>
                   </div>

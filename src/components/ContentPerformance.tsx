@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from 'recharts';
 import { Button, ClickableRow, PageHeader, SectionCard, EmptyState, Badge, Icon, StatCard } from './ui';
-import { CHART_SERIES_COLORS } from './ui/constants';
+import { CHART_SERIES_COLORS, positionColor } from './ui/constants';
 import { contentPerformance } from '../api/seo';
 import { capitalize } from '../utils/strings';
 
@@ -298,7 +298,7 @@ export function ContentPerformance({ workspaceId }: Props) {
                             <p className="t-micro text-[var(--brand-text-muted)]">impressions</p>
                           </div>
                           <div className="text-right">
-                            <p className={`t-caption-sm font-medium ${item.gsc.position <= 10 ? 'text-accent-success' : item.gsc.position <= 20 ? 'text-accent-warning' : 'text-[var(--brand-text)]'}`}>
+                            <p className={`t-caption-sm font-medium ${positionColor(item.gsc.position)}`}>
                               #{item.gsc.position.toFixed(1)}
                             </p>
                             <p className="t-micro text-[var(--brand-text-muted)]">position</p>
@@ -350,7 +350,7 @@ export function ContentPerformance({ workspaceId }: Props) {
                                 <p className="t-micro text-[var(--brand-text-muted)]">CTR</p>
                               </div>
                               <div>
-                                <p className={`t-stat-sm ${item.gsc.position <= 10 ? 'text-accent-success' : item.gsc.position <= 20 ? 'text-accent-warning' : 'text-[var(--brand-text-bright)]'}`}>
+                                <p className={`t-stat-sm ${positionColor(item.gsc.position)}`}>
                                   #{item.gsc.position.toFixed(1)}
                                 </p>
                                 <p className="t-micro text-[var(--brand-text-muted)]">Avg Position</p>

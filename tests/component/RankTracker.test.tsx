@@ -437,6 +437,51 @@ describe('RankTracker — "tracked but no rank data" section', () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
+// Position color — Four-Laws fix: teal→emerald (Wave 2b B1)
+// The ≤10 band was previously teal-400; it is now routed through positionColor()
+// which returns text-accent-success (emerald). Teal is reserved for actions.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('RankTracker — position color uses positionColor() authority', () => {
+  it('applies text-accent-success (emerald) for position ≤10, NOT teal-400', async () => {
+    vi.clearAllMocks();
+    await setupMocks([makeKeyword()], [makeRank({ position: 7 })]);
+
+    renderRankTracker(<RankTracker workspaceId="ws-1" hasGsc={true} />);
+
+    await waitFor(() => screen.getByText('7'));
+
+    const positionSpan = screen.getByText('7').closest('span') ?? screen.getByText('7');
+    expect(positionSpan.className).toContain('text-accent-success');
+    expect(positionSpan.className).not.toContain('text-teal-400');
+  });
+
+  it('applies text-accent-warning (amber) for position 11–20', async () => {
+    vi.clearAllMocks();
+    await setupMocks([makeKeyword()], [makeRank({ position: 15 })]);
+
+    renderRankTracker(<RankTracker workspaceId="ws-1" hasGsc={true} />);
+
+    await waitFor(() => screen.getByText('15'));
+
+    const positionSpan = screen.getByText('15').closest('span') ?? screen.getByText('15');
+    expect(positionSpan.className).toContain('text-accent-warning');
+  });
+
+  it('applies text-accent-danger (red) for position >20', async () => {
+    vi.clearAllMocks();
+    await setupMocks([makeKeyword()], [makeRank({ position: 35 })]);
+
+    renderRankTracker(<RankTracker workspaceId="ws-1" hasGsc={true} />);
+
+    await waitFor(() => screen.getByText('35'));
+
+    const positionSpan = screen.getByText('35').closest('span') ?? screen.getByText('35');
+    expect(positionSpan.className).toContain('text-accent-danger');
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
 // PageHeader renders
 // ══════════════════════════════════════════════════════════════════════════════
 

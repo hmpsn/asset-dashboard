@@ -12,6 +12,7 @@ import type {
 } from './types';
 import { capitalize } from '../../utils/strings';
 import { normalizePageUrl } from '../../lib/pathUtils';
+import { positionColor } from '../ui/constants';
 
 interface SearchInsights {
   lowHanging: { query: string; position: number; impressions: number; clicks: number; ctr: number }[];
@@ -219,7 +220,7 @@ export function SearchTab({
                   <td className="py-2.5 px-3 text-right text-accent-info font-semibold">{q.clicks}</td>
                   <td className="py-2.5 px-3 text-right text-[var(--brand-text-muted)]">{q.impressions.toLocaleString()}</td>
                   <td className="py-2.5 px-3 text-right text-accent-success">{q.ctr}%</td>
-                  <td className="py-2.5 px-3 text-right"><span className={q.position <= 10 ? 'text-accent-success' : q.position <= 20 ? 'text-accent-warning' : 'text-accent-danger'}>{q.position}</span></td>
+                  <td className="py-2.5 px-3 text-right"><span className={positionColor(q.position)}>{q.position}</span></td>
                 </tr>
               ))}
               {searchSubTab === 'pages' && sortedPages().map((p, i) => {
@@ -230,7 +231,7 @@ export function SearchTab({
                     <td className="py-2.5 px-3 text-right text-accent-info font-semibold">{p.clicks}</td>
                     <td className="py-2.5 px-3 text-right text-[var(--brand-text-muted)]">{p.impressions.toLocaleString()}</td>
                     <td className="py-2.5 px-3 text-right text-accent-success">{p.ctr}%</td>
-                    <td className="py-2.5 px-3 text-right"><span className={p.position <= 10 ? 'text-accent-success' : p.position <= 20 ? 'text-accent-warning' : 'text-accent-danger'}>{p.position}</span></td>
+                    <td className="py-2.5 px-3 text-right"><span className={positionColor(p.position)}>{p.position}</span></td>
                   </tr>
                 );
               })}

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Search, ExternalLink, ArrowUpDown, Loader2 } from 'lucide-react';
 import { SectionCard, DateRangeSelector, EmptyState, MetricToggleCard, Icon, Button } from './ui';
-import { DATE_PRESETS_SEARCH, CHART_SERIES_COLORS } from './ui/constants';
+import { DATE_PRESETS_SEARCH, CHART_SERIES_COLORS, positionColor } from './ui/constants';
 import type { FeedInsight } from '../../shared/types/insights';
 import { useAdminSearch } from '../hooks/admin';
 import { useInsightFeed } from '../hooks/admin/useInsightFeed';
@@ -318,7 +318,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                         <td className="py-2.5 px-3 text-right text-[var(--brand-text)]">{q.impressions.toLocaleString()}</td>
                         <td className="py-2.5 px-3 text-right text-emerald-400">{q.ctr}%</td>
                         <td className="py-2.5 px-3 text-right">
-                          <span className={q.position <= 10 ? 'text-emerald-400' : q.position <= 20 ? 'text-amber-400' : 'text-red-400'}>
+                          <span className={positionColor(q.position)}>
                             {q.position}
                           </span>
                         </td>
@@ -345,7 +345,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                         <td className="py-2.5 px-3 text-right text-[var(--brand-text)]">{p.impressions.toLocaleString()}</td>
                         <td className="py-2.5 px-3 text-right text-emerald-400">{p.ctr}%</td>
                         <td className="py-2.5 px-3 text-right">
-                          <span className={p.position <= 10 ? 'text-emerald-400' : p.position <= 20 ? 'text-amber-400' : 'text-red-400'}>
+                          <span className={positionColor(p.position)}>
                             {p.position}
                           </span>
                         </td>

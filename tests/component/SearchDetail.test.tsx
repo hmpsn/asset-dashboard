@@ -77,4 +77,15 @@ describe('SearchDetail', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Pages' }));
     expect(screen.getByText('/pricing')).toBeInTheDocument();
   });
+
+  // Wave 2b B1: position color routed to positionColor() authority (accent tokens, not bare tailwind).
+  // Fixture position 7.1 → ≤10 → text-accent-success (NOT bare text-emerald-400).
+  it('uses accent-token class text-accent-success for position ≤10, not bare text-emerald-400', () => {
+    render(<SearchDetail workspaceId="ws-risk" siteId="site-1" gscPropertyUrl="sc-domain:acme.test" />);
+
+    // Query row position 7.1 rendered in a <span>
+    const positionSpan = screen.getByText('7.1').closest('span') ?? screen.getByText('7.1');
+    expect(positionSpan.className).toContain('text-accent-success');
+    expect(positionSpan.className).not.toContain('text-emerald-400');
+  });
 });
