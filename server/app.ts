@@ -41,7 +41,7 @@ import keywordStrategyRoutes from './routes/keyword-strategy.js';
 import keywordCommandCenterRoutes from './routes/keyword-command-center.js';
 import localSeoRoutes from './routes/local-seo.js';
 import eeatAssetsRoutes from './routes/eeat-assets.js';
-import semrushRoutes from './routes/semrush.js';
+import seoProviderRoutes from './routes/seo-provider.js';
 import approvalsRoutes from './routes/approvals.js';
 import requestsRoutes from './routes/requests.js';
 import activityRoutes from './routes/activity.js';
@@ -299,7 +299,7 @@ export function createApp(): express.Express {
   app.use(keywordCommandCenterRoutes);
   app.use(localSeoRoutes);
   app.use(eeatAssetsRoutes);
-  app.use(semrushRoutes);
+  app.use(seoProviderRoutes);
   app.use(approvalsRoutes);
   registerPublicRoutes(app);
   app.use(requestsRoutes);

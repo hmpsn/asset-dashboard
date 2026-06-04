@@ -12,7 +12,7 @@ import { queryKeys } from '../../lib/queryKeys';
 
 interface WorkspaceData {
   competitorDomains?: string[];
-  seoDataProvider?: 'semrush' | 'dataforseo';
+  seoDataProvider?: 'dataforseo';
 }
 
 interface KeywordStrategyData {

@@ -58,9 +58,7 @@ describe('fetchAndCacheKeywordStrategySeoData provider status', () => {
 
   it('marks empty provider responses as degraded and records alternate provider availability', async () => {
     const dataForSeo = makeProvider('dataforseo');
-    const semrush = makeProvider('semrush');
     registerProvider('dataforseo', dataForSeo);
-    registerProvider('semrush', semrush);
 
     const result = await fetchAndCacheKeywordStrategySeoData({
       ws: makeWorkspace(),
@@ -74,7 +72,7 @@ describe('fetchAndCacheKeywordStrategySeoData provider status', () => {
 
     expect(result.seoDataStatus.status).toBe('degraded');
     expect(result.seoDataStatus.provider).toBe('dataforseo');
-    expect(result.seoDataStatus.fallbackProviderAvailable).toBe(true);
+    expect(result.seoDataStatus.fallbackProviderAvailable).toBe(false);
     expect(result.seoDataStatus.reasons).toContain('provider_returned_no_keyword_data');
   });
 

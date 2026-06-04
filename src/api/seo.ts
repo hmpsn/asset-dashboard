@@ -92,20 +92,17 @@ export const keywords = {
   strategyDiff: (wsId: string) =>
     getOptional<StrategyDiff | null>(`/api/webflow/keyword-strategy/${wsId}/diff`),
 
-  semrushStatus: () =>
-    getOptional<{ configured: boolean }>('/api/semrush/status'),
-
-  seoProviderStatus: () =>
-    getOptional<{ configured: boolean }>('/api/semrush/status'),
+  seoStatus: () =>
+    getOptional<{ configured: boolean }>('/api/seo/status'),
 
   providerStatus: () =>
-    getOptional<{ providers: { name: string; configured: boolean }[] }>('/api/seo-providers/status'),
+    getOptional<{ providers: { name: string; configured: boolean }[] }>('/api/seo/providers/status'),
 
   discoverCompetitors: (wsId: string) =>
-    get<{ competitors: Array<{ domain: string; competitorRelevance: number; commonKeywords: number; organicKeywords: number; organicTraffic: number }> }>(`/api/semrush/discover-competitors/${wsId}`),
+    get<{ competitors: Array<{ domain: string; competitorRelevance: number; commonKeywords: number; organicKeywords: number; organicTraffic: number }> }>(`/api/seo/discover-competitors/${wsId}`),
 
   saveCompetitors: (wsId: string, domains: string[]) =>
-    post<{ competitors: string[] }>(`/api/semrush/competitors/${wsId}`, { domains }),
+    post<{ competitors: string[] }>(`/api/seo/competitors/${wsId}`, { domains }),
 
   feedback: (wsId: string) =>
     getSafe<AdminKeywordFeedbackListRow[]>(`/api/webflow/keyword-feedback/${wsId}`, []),

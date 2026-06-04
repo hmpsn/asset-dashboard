@@ -100,7 +100,6 @@ const keywordStrategyStepLabels: Record<string, string> = {
   content: 'Fetching page content',
   search_data: 'Search Console data',
   'seo-data': 'Keyword intelligence',
-  semrush: 'Keyword intelligence',
   ai: 'AI analysis',
   enrichment: 'Enriching data',
   complete: 'Complete',

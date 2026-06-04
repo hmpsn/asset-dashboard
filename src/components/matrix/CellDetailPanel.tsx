@@ -202,7 +202,7 @@ export function CellDetailPanel({
                   <div className="flex items-center gap-2 flex-shrink-0 t-caption-sm text-[var(--brand-text-muted)]">
                     <span>{c.volume}/mo</span>
                     <span>KD {c.difficulty}</span>
-                    <Badge label={c.source === 'pattern' ? 'Pattern' : c.source === 'semrush_related' ? 'SEMRush' : 'AI'} tone={c.source === 'pattern' ? 'zinc' : c.source === 'semrush_related' ? 'blue' : 'teal'} />
+                    <Badge label={c.source === 'pattern' ? 'Pattern' : c.source === 'semrush_related' ? 'Provider' : 'AI'} tone={c.source === 'pattern' ? 'zinc' : c.source === 'semrush_related' ? 'blue' : 'teal'} />
                     {c.authorityAssessment && (
                       <Badge label={authorityLabel(c.authorityAssessment.posture)} tone={authorityTone(c.authorityAssessment.posture)} />
                     )}

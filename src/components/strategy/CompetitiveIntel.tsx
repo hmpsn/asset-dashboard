@@ -94,7 +94,7 @@ export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, c
 
   const { data, isLoading, error, refetch } = useQuery<IntelResponse>({
     queryKey: queryKeys.admin.competitorIntel(workspaceId, competitorKey),
-    queryFn: () => get<IntelResponse>(`/api/semrush/competitive-intel/${workspaceId}?competitors=${encodeURIComponent(competitorKey)}`),
+    queryFn: () => get<IntelResponse>(`/api/seo/competitive-intel/${workspaceId}?competitors=${encodeURIComponent(competitorKey)}`),
     enabled: competitors.length > 0 && seoDataAvailable,
     staleTime: 48 * 60 * 60 * 1000, // 48h — matches server-side cache
     retry: 1,

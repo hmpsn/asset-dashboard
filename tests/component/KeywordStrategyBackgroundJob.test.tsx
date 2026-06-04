@@ -16,13 +16,13 @@ const mocks = vi.hoisted(() => ({
   keywordStrategyData: {
     strategy: null,
     seoDataAvailable: true,
-    providers: [{ name: 'semrush', configured: true }] as Array<{ name: string; configured: boolean }>,
-    workspaceData: { competitorDomains: ['competitor.test'], seoDataProvider: 'semrush' },
+    providers: [{ name: 'dataforseo', configured: true }] as Array<{ name: string; configured: boolean }>,
+    workspaceData: { competitorDomains: ['competitor.test'], seoDataProvider: 'dataforseo' },
   } as {
     strategy: null;
     seoDataAvailable: boolean;
     providers?: Array<{ name: string; configured: boolean }>;
-    workspaceData: { competitorDomains?: string[]; seoDataProvider?: 'semrush' | 'dataforseo' };
+    workspaceData: { competitorDomains?: string[]; seoDataProvider?: 'dataforseo' };
   },
 }));
 
@@ -105,14 +105,14 @@ describe('KeywordStrategyPanel background job wiring', () => {
     mocks.jobs = [];
     mocks.findActiveJob.mockReturnValue(undefined);
     mocks.startJob.mockResolvedValue('job-keyword-1');
-    mocks.providerStatus.mockResolvedValue({ providers: [{ name: 'semrush', configured: true }] });
-    mocks.getWorkspaceById.mockResolvedValue({ seoDataProvider: 'semrush' });
+    mocks.providerStatus.mockResolvedValue({ providers: [{ name: 'dataforseo', configured: true }] });
+    mocks.getWorkspaceById.mockResolvedValue({ seoDataProvider: 'dataforseo' });
     mocks.isAuxLoading = false;
     mocks.keywordStrategyData = {
       strategy: null,
       seoDataAvailable: true,
-      providers: [{ name: 'semrush', configured: true }],
-      workspaceData: { competitorDomains: ['competitor.test'], seoDataProvider: 'semrush' },
+      providers: [{ name: 'dataforseo', configured: true }],
+      workspaceData: { competitorDomains: ['competitor.test'], seoDataProvider: 'dataforseo' },
     };
   });
 
@@ -127,7 +127,7 @@ describe('KeywordStrategyPanel background job wiring', () => {
         workspaceId: 'ws-1',
         businessContext: undefined,
         seoDataMode: 'quick',
-        seoDataProvider: 'semrush',
+        seoDataProvider: 'dataforseo',
         competitorDomains: ['competitor.test'],
         maxPages: 500,
       });
@@ -137,7 +137,7 @@ describe('KeywordStrategyPanel background job wiring', () => {
   it('defaults keyword strategy jobs to DataForSEO when no workspace preference is saved', async () => {
     mocks.providerStatus.mockResolvedValue({
       providers: [
-        { name: 'semrush', configured: true },
+        { name: 'dataforseo', configured: true },
         { name: 'dataforseo', configured: true },
       ],
     });
@@ -146,7 +146,7 @@ describe('KeywordStrategyPanel background job wiring', () => {
       strategy: null,
       seoDataAvailable: true,
       providers: [
-        { name: 'semrush', configured: true },
+        { name: 'dataforseo', configured: true },
         { name: 'dataforseo', configured: true },
       ],
       workspaceData: { competitorDomains: ['competitor.test'] },

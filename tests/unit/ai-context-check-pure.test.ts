@@ -400,18 +400,18 @@ describe('checkAIContext — keyword-strategy source', () => {
 // ---------------------------------------------------------------------------
 // SEO Data Provider source
 // ---------------------------------------------------------------------------
-describe('checkAIContext — semrush/seo-provider source', () => {
+describe('checkAIContext — dataforseo source', () => {
   it('is "missing" when no provider is configured', () => {
     mockGetWorkspace.mockReturnValue(makeWorkspace());
     mockIsAnyProviderConfigured.mockReturnValue(false);
-    const src = checkAIContext('ws-test').sources.find(s => s.key === 'semrush')!;
+    const src = checkAIContext('ws-test').sources.find(s => s.key === 'dataforseo')!;
     expect(src.status).toBe('missing');
   });
 
   it('is "connected" when a provider is configured', () => {
     mockGetWorkspace.mockReturnValue(makeWorkspace());
     mockIsAnyProviderConfigured.mockReturnValue(true);
-    const src = checkAIContext('ws-test').sources.find(s => s.key === 'semrush')!;
+    const src = checkAIContext('ws-test').sources.find(s => s.key === 'dataforseo')!;
     expect(src.status).toBe('connected');
   });
 });

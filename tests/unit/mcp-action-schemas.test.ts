@@ -229,7 +229,7 @@ describe('mcp-action-schemas', () => {
     it('enforces update_workspace allowlist and at least one updates field', () => {
       expect(updateWorkspaceInputSchema.safeParse({
         workspace_id: 'ws-1',
-        updates: { name: 'Renamed Workspace', seo_data_provider: 'semrush' },
+        updates: { name: 'Renamed Workspace', seo_data_provider: 'dataforseo' },
       }).success).toBe(true);
       expect(updateWorkspaceInputSchema.safeParse({
         workspace_id: 'ws-1',

@@ -339,7 +339,7 @@ export interface Workspace {
     fullPostDescription?: string;
   };
   // SEO data provider preference
-  seoDataProvider?: 'semrush' | 'dataforseo';
+  seoDataProvider?: 'dataforseo';
   // Verified business contact info for schema generation (bypasses page-content verification)
   businessProfile?: BusinessProfileContact | null;
   /**
@@ -407,7 +407,7 @@ export interface AdminWorkspaceView {
   pageEditStates?: Record<string, PageEditState>;
   publishTarget?: Workspace['publishTarget'];
   contentPricing?: Workspace['contentPricing'];
-  seoDataProvider?: 'semrush' | 'dataforseo';
+  seoDataProvider?: 'dataforseo';
   businessProfile?: BusinessProfileContact | null;
   businessPriorities?: string[];
   customPromptNotes?: string;

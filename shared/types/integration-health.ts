@@ -7,7 +7,6 @@ export type IntegrationKey =
   | 'google'
   | 'gsc'
   | 'ga4'
-  | 'semrush'
   | 'dataforseo'
   | 'stripe'
   | 'openai'

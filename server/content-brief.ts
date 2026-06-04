@@ -1201,7 +1201,7 @@ export async function generateBrief(
   const eeatAssetBlock = buildEeatAssetBriefBlock(matchedPage?.eeatAssetRecommendations, fallbackEeatRecommendations);
 
   // Build providerLabel early — used in SERP features block and keyword metrics block below.
-  const providerLabel = context.providerLabel ?? 'SEMRush';
+  const providerLabel = context.providerLabel ?? 'DataForSEO';
 
   // SERP feature directives — derived from per-page serpFeatures stored in page_keywords.
   // Provider flags which SERP features are present for the primary keyword; we translate

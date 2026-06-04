@@ -49,7 +49,7 @@ const ICON_MAP: Record<string, typeof Globe> = {
   'brand-voice': MessageSquare,
   personas: Users,
   'keyword-strategy': Map,
-  semrush: Database,
+  dataforseo: Database,
 };
 
 interface Props {

@@ -145,7 +145,7 @@ export function PageIntelligencePageRow({
           )}
           <LocalSeoVisibilityBadge visibility={localSeoVisibility} subtle />
           {strategy?.validated === false && (
-            <span className="t-micro text-accent-warning bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20" title="Keyword not validated in SEMRush">{/* // arbitrary-text-ok */}
+            <span className="t-micro text-accent-warning bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20" title="Keyword not validated in DataForSEO">{/* // arbitrary-text-ok */}
               Unvalidated
             </span>
           )}

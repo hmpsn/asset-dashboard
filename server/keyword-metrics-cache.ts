@@ -3,7 +3,7 @@
  *
  * Keyword volume/difficulty/CPC is the same regardless of which workspace asks,
  * so this shared SQLite table eliminates duplicate provider API calls across workspaces
- * (used by both SEMRush and DataForSEO). Acts as an L1 cache checked after the
+ * (used by SEO data providers). Acts as an L1 cache checked after the
  * per-workspace file cache (L2) and before the external API call.
  */
 import db from './db/index.js';

@@ -1,6 +1,6 @@
 // ── SEO Data Provider Abstraction ──────────────────────────────
-// Unified interface that both SEMRush and DataForSEO implement.
-// Consumers call the registry instead of individual providers.
+// Unified interface for the active SEO provider surface.
+// Consumers call the registry instead of provider-specific modules.
 
 import { createLogger } from './logger.js';
 import type { KeywordSourceEvidence } from '../shared/types/keywords.js';
@@ -112,9 +112,6 @@ export interface SeoDataProvider {
   // `languageCode` (optional, defaults to 'en') threads the resolved workspace
   // language into pool-path provider calls so non-English markets aren't queried
   // in English (P1 / G13). Omitting it preserves the pre-P1 'en' behavior.
-  // NOTE: SemRush is language/geo-blind for discovery — it implements only
-  // getRelatedKeywords/getQuestionKeywords and ignores the extra locationCode/
-  // languageCode args; DataForSEO (the default provider) honors both. (M3)
   // `locationCode` (optional) threads the resolved workspace geo into pool-path
   // provider calls so a non-US market is not queried with US-located discovery
   // (P1 / G13). Omitting it preserves the pre-P1 `locationCodeFromDatabase(database)`
@@ -148,7 +145,7 @@ export interface SeoDataProvider {
 
 // ── Provider Registry ─────────────────────────────────────────
 
-export type ProviderName = 'semrush' | 'dataforseo';
+export type ProviderName = 'dataforseo';
 export const DEFAULT_SEO_DATA_PROVIDER: ProviderName = 'dataforseo';
 
 const providers = new Map<ProviderName, SeoDataProvider>();
@@ -212,9 +209,8 @@ export function _resetRegistryForTest(): void {
   disabledCapabilities.clear();
 }
 
-/** Returns the human-readable display name for a provider. */
 export function getProviderDisplayName(providerName: string): string {
-  return providerName === 'dataforseo' || providerName === 'semrush' ? 'DataForSEO' : 'DataForSEO';
+  return providerName === 'dataforseo' ? 'DataForSEO' : 'DataForSEO';
 }
 
 /**
@@ -240,7 +236,7 @@ export function getProviderForCapability(capability: string, preferred?: Provide
  *
  * Backlinks are intentionally strict: if DataForSEO is selected/default and its
  * backlinks capability is disabled, return null and let callers degrade the
- * optional backlink fields instead of silently spending SEMRush credits.
+ * optional backlink fields instead of silently falling back to an unavailable provider.
  */
 export function getBacklinksProvider(preferred?: ProviderName): SeoDataProvider | null {
   return getProviderForCapability('backlinks', preferred);
@@ -258,7 +254,7 @@ export function listProviders(): { name: ProviderName; configured: boolean }[] {
  * Normalize a provider-supplied date string to ISO-8601.
  *
  * Handles the three formats our providers return:
- *   - SEMRush Unix epoch seconds as a string: "1747509061"
+ *   - Unix epoch seconds as a string: "1747509061"
  *   - Unix epoch milliseconds: "1747509061000"
  *   - DataForSEO "YYYY-MM-DD HH:mm:ss +00:00" (ISO-parseable)
  *   - ISO-8601 pass-through: "2025-05-17T00:00:00.000Z"

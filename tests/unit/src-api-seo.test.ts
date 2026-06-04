@@ -193,19 +193,19 @@ describe('src/api/seo — keywords', () => {
     );
   });
 
-  it('keywords.semrushStatus uses getOptional (no args)', async () => {
-    await keywords.semrushStatus();
-    expect(mockedGetOptional).toHaveBeenCalledWith('/api/semrush/status');
+  it('keywords.seoStatus uses getOptional (no args)', async () => {
+    await keywords.seoStatus();
+    expect(mockedGetOptional).toHaveBeenCalledWith('/api/seo/status');
   });
 
-  it('keywords.seoProviderStatus uses getOptional (no args)', async () => {
-    await keywords.seoProviderStatus();
-    expect(mockedGetOptional).toHaveBeenCalledWith('/api/semrush/status');
+  it('keywords.providerStatus uses getOptional (no args)', async () => {
+    await keywords.providerStatus();
+    expect(mockedGetOptional).toHaveBeenCalledWith('/api/seo/providers/status');
   });
 
   it('keywords.saveCompetitors uses post with domains', async () => {
     await keywords.saveCompetitors('ws-1', ['a.com', 'b.com']);
-    expect(mockedPost).toHaveBeenCalledWith('/api/semrush/competitors/ws-1', {
+    expect(mockedPost).toHaveBeenCalledWith('/api/seo/competitors/ws-1', {
       domains: ['a.com', 'b.com'],
     });
   });

@@ -4,10 +4,10 @@
  *
  * Covers the full lifecycle of competitor domain management and competitive
  * intelligence via:
- *   POST   /api/semrush/competitors/:workspaceId  — save competitor domains
- *   GET    /api/semrush/competitive-intel/:workspaceId — get comparison data
- *   GET    /api/semrush/discover-competitors/:workspaceId — auto-discover
- *   GET    /api/semrush/diagnose/:workspaceId — diagnostic (domain + cache state)
+ *   POST   /api/seo/competitors/:workspaceId  — save competitor domains
+ *   GET    /api/seo/competitive-intel/:workspaceId — get comparison data
+ *   GET    /api/seo/discover-competitors/:workspaceId — auto-discover
+ *   GET    /api/seo/diagnose/:workspaceId — diagnostic (domain + cache state)
  *
  * Architecture: single in-process HTTP server for the file (createApp + http.createServer)
  * so vi.mock interceptors apply to seo-data-provider. Workspaces seeded/cleaned per-suite
@@ -238,7 +238,7 @@ function makeMockProvider(overrides?: {
 // Section 1: Save competitors — valid domains stored and returned
 // ---------------------------------------------------------------------------
 
-describe('POST /api/semrush/competitors/:workspaceId — valid domains stored', () => {
+describe('POST /api/seo/competitors/:workspaceId — valid domains stored', () => {
   let ws: SeededFullWorkspace;
 
   beforeAll(() => {
@@ -254,7 +254,7 @@ describe('POST /api/semrush/competitors/:workspaceId — valid domains stored', 
 
   it('returns 200 with the cleaned domain list', async () => {
     const { status, body } = await postJson(
-      `/api/semrush/competitors/${ws.workspaceId}`,
+      `/api/seo/competitors/${ws.workspaceId}`,
       { domains: ['competitor.com', 'rival.io'] },
     );
     expect(status).toBe(200);
@@ -264,11 +264,11 @@ describe('POST /api/semrush/competitors/:workspaceId — valid domains stored', 
 
   it('saved domains appear in the diagnose response', async () => {
     await postJson(
-      `/api/semrush/competitors/${ws.workspaceId}`,
+      `/api/seo/competitors/${ws.workspaceId}`,
       { domains: ['acme-seo.com'] },
     );
     const { status, body } = await getJson(
-      `/api/semrush/diagnose/${ws.workspaceId}`,
+      `/api/seo/diagnose/${ws.workspaceId}`,
     );
     expect(status).toBe(200);
     const b = body as { competitors: string[] };
@@ -278,7 +278,7 @@ describe('POST /api/semrush/competitors/:workspaceId — valid domains stored', 
 
   it('accepts the legacy "competitors" body key as an alias for "domains"', async () => {
     const { status, body } = await postJson(
-      `/api/semrush/competitors/${ws.workspaceId}`,
+      `/api/seo/competitors/${ws.workspaceId}`,
       { competitors: ['legacy-alias.com'] },
     );
     expect(status).toBe(200);
@@ -291,7 +291,7 @@ describe('POST /api/semrush/competitors/:workspaceId — valid domains stored', 
 // Section 2: Duplicate/idempotent save
 // ---------------------------------------------------------------------------
 
-describe('POST /api/semrush/competitors/:workspaceId — deduplication', () => {
+describe('POST /api/seo/competitors/:workspaceId — deduplication', () => {
   let ws: SeededFullWorkspace;
 
   beforeAll(() => {
@@ -307,7 +307,7 @@ describe('POST /api/semrush/competitors/:workspaceId — deduplication', () => {
 
   it('deduplicates repeated domains in a single payload', async () => {
     const { status, body } = await postJson(
-      `/api/semrush/competitors/${ws.workspaceId}`,
+      `/api/seo/competitors/${ws.workspaceId}`,
       { domains: ['dup.com', 'dup.com', 'unique.com'] },
     );
     expect(status).toBe(200);
@@ -319,11 +319,11 @@ describe('POST /api/semrush/competitors/:workspaceId — deduplication', () => {
 
   it('saving the same domain twice across two requests results in a single entry', async () => {
     await postJson(
-      `/api/semrush/competitors/${ws.workspaceId}`,
+      `/api/seo/competitors/${ws.workspaceId}`,
       { domains: ['stable.com'] },
     );
     const { body: secondBody } = await postJson(
-      `/api/semrush/competitors/${ws.workspaceId}`,
+      `/api/seo/competitors/${ws.workspaceId}`,
       { domains: ['stable.com'] },
     );
     const b = secondBody as { competitors: string[] };
@@ -337,7 +337,7 @@ describe('POST /api/semrush/competitors/:workspaceId — deduplication', () => {
 // Section 3: Remove/replace competitors
 // ---------------------------------------------------------------------------
 
-describe('POST /api/semrush/competitors/:workspaceId — replace/clear list', () => {
+describe('POST /api/seo/competitors/:workspaceId — replace/clear list', () => {
   let ws: SeededFullWorkspace;
 
   beforeAll(() => {
@@ -353,11 +353,11 @@ describe('POST /api/semrush/competitors/:workspaceId — replace/clear list', ()
 
   it('replaces existing domains when a new list is POSTed', async () => {
     await postJson(
-      `/api/semrush/competitors/${ws.workspaceId}`,
+      `/api/seo/competitors/${ws.workspaceId}`,
       { domains: ['old-rival.com'] },
     );
     const { status, body } = await postJson(
-      `/api/semrush/competitors/${ws.workspaceId}`,
+      `/api/seo/competitors/${ws.workspaceId}`,
       { domains: ['new-rival.com'] },
     );
     expect(status).toBe(200);
@@ -369,11 +369,11 @@ describe('POST /api/semrush/competitors/:workspaceId — replace/clear list', ()
 
   it('POSTing an empty array clears the competitor list', async () => {
     await postJson(
-      `/api/semrush/competitors/${ws.workspaceId}`,
+      `/api/seo/competitors/${ws.workspaceId}`,
       { domains: ['to-remove.com'] },
     );
     const { status, body } = await postJson(
-      `/api/semrush/competitors/${ws.workspaceId}`,
+      `/api/seo/competitors/${ws.workspaceId}`,
       { domains: [] },
     );
     expect(status).toBe(200);
@@ -384,7 +384,7 @@ describe('POST /api/semrush/competitors/:workspaceId — replace/clear list', ()
 
   it('returns 400 when body is missing domains and competitors keys', async () => {
     const { status } = await postJson(
-      `/api/semrush/competitors/${ws.workspaceId}`,
+      `/api/seo/competitors/${ws.workspaceId}`,
       { unrelated: 'field' },
     );
     expect(status).toBe(400);
@@ -395,7 +395,7 @@ describe('POST /api/semrush/competitors/:workspaceId — replace/clear list', ()
 // Section 4: List competitors via diagnose endpoint
 // ---------------------------------------------------------------------------
 
-describe('GET /api/semrush/diagnose/:workspaceId — competitor list state', () => {
+describe('GET /api/seo/diagnose/:workspaceId — competitor list state', () => {
   let ws: SeededFullWorkspace;
 
   beforeAll(() => {
@@ -411,7 +411,7 @@ describe('GET /api/semrush/diagnose/:workspaceId — competitor list state', () 
 
   it('returns 200 with a competitors array', async () => {
     const { status, body } = await getJson(
-      `/api/semrush/diagnose/${ws.workspaceId}`,
+      `/api/seo/diagnose/${ws.workspaceId}`,
     );
     expect(status).toBe(200);
     expect(Array.isArray((body as Record<string, unknown>).competitors)).toBe(true);
@@ -419,7 +419,7 @@ describe('GET /api/semrush/diagnose/:workspaceId — competitor list state', () 
 
   it('fresh workspace has an empty competitors array', async () => {
     const { status, body } = await getJson(
-      `/api/semrush/diagnose/${ws.workspaceId}`,
+      `/api/seo/diagnose/${ws.workspaceId}`,
     );
     expect(status).toBe(200);
     const b = body as { competitors: string[] };
@@ -428,11 +428,11 @@ describe('GET /api/semrush/diagnose/:workspaceId — competitor list state', () 
 
   it('stored domains are reflected in the diagnose response', async () => {
     await postJson(
-      `/api/semrush/competitors/${ws.workspaceId}`,
+      `/api/seo/competitors/${ws.workspaceId}`,
       { domains: ['diagnose-test.com'] },
     );
     const { status, body } = await getJson(
-      `/api/semrush/diagnose/${ws.workspaceId}`,
+      `/api/seo/diagnose/${ws.workspaceId}`,
     );
     expect(status).toBe(200);
     const b = body as { competitors: string[] };
@@ -465,11 +465,11 @@ describe('Cross-workspace isolation — competitor domains', () => {
 
   it('domains saved to workspace A do not appear in workspace B diagnose', async () => {
     await postJson(
-      `/api/semrush/competitors/${wsA.workspaceId}`,
+      `/api/seo/competitors/${wsA.workspaceId}`,
       { domains: ['wsa-only.com'] },
     );
     const { body } = await getJson(
-      `/api/semrush/diagnose/${wsB.workspaceId}`,
+      `/api/seo/diagnose/${wsB.workspaceId}`,
     );
     const b = body as { competitors: string[] };
     expect(Array.isArray(b.competitors)).toBe(true);
@@ -478,11 +478,11 @@ describe('Cross-workspace isolation — competitor domains', () => {
 
   it('workspace B can have its own independent competitor list', async () => {
     await postJson(
-      `/api/semrush/competitors/${wsB.workspaceId}`,
+      `/api/seo/competitors/${wsB.workspaceId}`,
       { domains: ['wsb-only.com'] },
     );
     const { body } = await getJson(
-      `/api/semrush/diagnose/${wsB.workspaceId}`,
+      `/api/seo/diagnose/${wsB.workspaceId}`,
     );
     const b = body as { competitors: string[] };
     expect(b.competitors.some((d) => d.includes('wsb-only'))).toBe(true);
@@ -490,15 +490,15 @@ describe('Cross-workspace isolation — competitor domains', () => {
 
   it('saving to workspace A does not overwrite workspace B competitor list', async () => {
     await postJson(
-      `/api/semrush/competitors/${wsB.workspaceId}`,
+      `/api/seo/competitors/${wsB.workspaceId}`,
       { domains: ['wsb-stable.com'] },
     );
     await postJson(
-      `/api/semrush/competitors/${wsA.workspaceId}`,
+      `/api/seo/competitors/${wsA.workspaceId}`,
       { domains: ['wsa-write.com'] },
     );
     const { body } = await getJson(
-      `/api/semrush/diagnose/${wsB.workspaceId}`,
+      `/api/seo/diagnose/${wsB.workspaceId}`,
     );
     const b = body as { competitors: string[] };
     expect(b.competitors.some((d) => d.includes('wsb-stable'))).toBe(true);
@@ -510,7 +510,7 @@ describe('Cross-workspace isolation — competitor domains', () => {
 // Section 6: Competitive-intel endpoint
 // ---------------------------------------------------------------------------
 
-describe('GET /api/semrush/competitive-intel/:workspaceId — comparison data', () => {
+describe('GET /api/seo/competitive-intel/:workspaceId — comparison data', () => {
   let ws: SeededFullWorkspace;
 
   beforeAll(() => {
@@ -526,7 +526,7 @@ describe('GET /api/semrush/competitive-intel/:workspaceId — comparison data', 
 
   it('returns 200 with domains, keywordGaps, and fetchedAt', async () => {
     const { status, body } = await getJson(
-      `/api/semrush/competitive-intel/${ws.workspaceId}?competitors=competitor.com`,
+      `/api/seo/competitive-intel/${ws.workspaceId}?competitors=competitor.com`,
     );
     expect(status).toBe(200);
     const b = body as Record<string, unknown>;
@@ -537,7 +537,7 @@ describe('GET /api/semrush/competitive-intel/:workspaceId — comparison data', 
 
   it('domains array includes own site entry (isOwn: true)', async () => {
     const { status, body } = await getJson(
-      `/api/semrush/competitive-intel/${ws.workspaceId}?competitors=competitor.com`,
+      `/api/seo/competitive-intel/${ws.workspaceId}?competitors=competitor.com`,
     );
     expect(status).toBe(200);
     const b = body as { domains: Array<{ isOwn: boolean }> };
@@ -548,7 +548,7 @@ describe('GET /api/semrush/competitive-intel/:workspaceId — comparison data', 
 
   it('keywordGaps is an array (may be empty or populated)', async () => {
     const { status, body } = await getJson(
-      `/api/semrush/competitive-intel/${ws.workspaceId}?competitors=competitor.com`,
+      `/api/seo/competitive-intel/${ws.workspaceId}?competitors=competitor.com`,
     );
     expect(status).toBe(200);
     expect(Array.isArray((body as Record<string, unknown>).keywordGaps)).toBe(true);
@@ -556,7 +556,7 @@ describe('GET /api/semrush/competitive-intel/:workspaceId — comparison data', 
 
   it('returns 400 when no competitors query param is provided', async () => {
     const { status } = await getJson(
-      `/api/semrush/competitive-intel/${ws.workspaceId}`,
+      `/api/seo/competitive-intel/${ws.workspaceId}`,
     );
     expect(status).toBe(400);
   });
@@ -603,14 +603,14 @@ describe('No live domain configured', () => {
 
   it('competitive-intel returns 400 when workspace has no live domain', async () => {
     const { status } = await getJson(
-      `/api/semrush/competitive-intel/${noDomainWsId}?competitors=rival.com`,
+      `/api/seo/competitive-intel/${noDomainWsId}?competitors=rival.com`,
     );
     expect(status).toBe(400);
   });
 
   it('discover-competitors returns 400 when workspace has no live domain', async () => {
     const { status } = await getJson(
-      `/api/semrush/discover-competitors/${noDomainWsId}`,
+      `/api/seo/discover-competitors/${noDomainWsId}`,
     );
     expect(status).toBe(400);
   });
@@ -620,7 +620,7 @@ describe('No live domain configured', () => {
 // Section 8: Max competitors limit
 // ---------------------------------------------------------------------------
 
-describe('POST /api/semrush/competitors/:workspaceId — MAX_COMPETITORS cap', () => {
+describe('POST /api/seo/competitors/:workspaceId — MAX_COMPETITORS cap', () => {
   let ws: SeededFullWorkspace;
 
   beforeAll(() => {
@@ -639,7 +639,7 @@ describe('POST /api/semrush/competitors/:workspaceId — MAX_COMPETITORS cap', (
       'a.com', 'b.com', 'c.com', 'd.com', 'e.com', 'f.com',
     ];
     const { status, body } = await postJson(
-      `/api/semrush/competitors/${ws.workspaceId}`,
+      `/api/seo/competitors/${ws.workspaceId}`,
       { domains: tooMany },
     );
     expect(status).toBe(200);
@@ -651,7 +651,7 @@ describe('POST /api/semrush/competitors/:workspaceId — MAX_COMPETITORS cap', (
   it('competitive-intel returns 400 when competitors param exceeds MAX_COMPETITORS', async () => {
     const tooManyParam = 'a.com,b.com,c.com,d.com,e.com,f.com';
     const { status } = await getJson(
-      `/api/semrush/competitive-intel/${ws.workspaceId}?competitors=${tooManyParam}`,
+      `/api/seo/competitive-intel/${ws.workspaceId}?competitors=${tooManyParam}`,
     );
     expect(status).toBe(400);
   });
@@ -661,7 +661,7 @@ describe('POST /api/semrush/competitors/:workspaceId — MAX_COMPETITORS cap', (
 // Section 9: Domain format validation
 // ---------------------------------------------------------------------------
 
-describe('POST /api/semrush/competitors/:workspaceId — invalid domain filtering', () => {
+describe('POST /api/seo/competitors/:workspaceId — invalid domain filtering', () => {
   let ws: SeededFullWorkspace;
 
   beforeAll(() => {
@@ -677,7 +677,7 @@ describe('POST /api/semrush/competitors/:workspaceId — invalid domain filterin
 
   it('strips http/https protocol prefix before storing', async () => {
     const { status, body } = await postJson(
-      `/api/semrush/competitors/${ws.workspaceId}`,
+      `/api/seo/competitors/${ws.workspaceId}`,
       { domains: ['https://withprotocol.com'] },
     );
     expect(status).toBe(200);
@@ -690,7 +690,7 @@ describe('POST /api/semrush/competitors/:workspaceId — invalid domain filterin
 
   it('filters out bare words without a TLD (invalid provider-unsafe domains)', async () => {
     const { status, body } = await postJson(
-      `/api/semrush/competitors/${ws.workspaceId}`,
+      `/api/seo/competitors/${ws.workspaceId}`,
       // 'nodot' has no TLD, 'valid.com' is valid
       { domains: ['nodot', 'valid.com'] },
     );
@@ -702,7 +702,7 @@ describe('POST /api/semrush/competitors/:workspaceId — invalid domain filterin
 
   it('filters out generic social/discovery domains (e.g. facebook.com)', async () => {
     const { status, body } = await postJson(
-      `/api/semrush/competitors/${ws.workspaceId}`,
+      `/api/seo/competitors/${ws.workspaceId}`,
       { domains: ['facebook.com', 'legit-competitor.com'] },
     );
     expect(status).toBe(200);
@@ -728,7 +728,7 @@ describe('Unknown workspaceId — 404 responses', () => {
 
   it('POST competitors returns 404 for an unknown workspaceId', async () => {
     const { status } = await postJson(
-      '/api/semrush/competitors/ws_unknown_lifecycle_99',
+      '/api/seo/competitors/ws_unknown_lifecycle_99',
       { domains: ['shouldfail.com'] },
     );
     expect(status).toBe(404);
@@ -736,7 +736,7 @@ describe('Unknown workspaceId — 404 responses', () => {
 
   it('competitive-intel returns 404 for an unknown workspaceId', async () => {
     const { status } = await getJson(
-      '/api/semrush/competitive-intel/ws_unknown_lifecycle_99?competitors=rival.com',
+      '/api/seo/competitive-intel/ws_unknown_lifecycle_99?competitors=rival.com',
     );
     expect(status).toBe(404);
   });
@@ -762,7 +762,7 @@ describe('No SEO provider configured', () => {
 
   it('competitive-intel returns 503 when no provider is configured', async () => {
     const { status, body } = await getJson(
-      `/api/semrush/competitive-intel/${ws.workspaceId}?competitors=rival.com`,
+      `/api/seo/competitive-intel/${ws.workspaceId}?competitors=rival.com`,
     );
     expect(status).toBe(503);
     expect((body as Record<string, unknown>).error).toBeTruthy();
@@ -770,7 +770,7 @@ describe('No SEO provider configured', () => {
 
   it('discover-competitors returns 400 when no provider is configured', async () => {
     const { status } = await getJson(
-      `/api/semrush/discover-competitors/${ws.workspaceId}`,
+      `/api/seo/discover-competitors/${ws.workspaceId}`,
     );
     // The route returns 400 (not 503) when provider is missing for discovery
     expect(status).toBe(400);
@@ -781,7 +781,7 @@ describe('No SEO provider configured', () => {
 // Section 12: Provider returns empty data — graceful empty result
 // ---------------------------------------------------------------------------
 
-describe('GET /api/semrush/competitive-intel — empty provider data', () => {
+describe('GET /api/seo/competitive-intel — empty provider data', () => {
   let ws: SeededFullWorkspace;
 
   beforeAll(() => {
@@ -802,14 +802,14 @@ describe('GET /api/semrush/competitive-intel — empty provider data', () => {
 
   it('returns 200 even when provider returns no overview data', async () => {
     const { status } = await getJson(
-      `/api/semrush/competitive-intel/${ws.workspaceId}?competitors=empty-rival.com`,
+      `/api/seo/competitive-intel/${ws.workspaceId}?competitors=empty-rival.com`,
     );
     expect(status).toBe(200);
   });
 
   it('keywordGaps is an empty array when provider returns nothing', async () => {
     const { status, body } = await getJson(
-      `/api/semrush/competitive-intel/${ws.workspaceId}?competitors=empty-rival.com`,
+      `/api/seo/competitive-intel/${ws.workspaceId}?competitors=empty-rival.com`,
     );
     expect(status).toBe(200);
     const b = body as { keywordGaps: unknown[] };
@@ -819,7 +819,7 @@ describe('GET /api/semrush/competitive-intel — empty provider data', () => {
 
   it('domains array is still returned (with nulled overview) when provider has no data', async () => {
     const { status, body } = await getJson(
-      `/api/semrush/competitive-intel/${ws.workspaceId}?competitors=empty-rival.com`,
+      `/api/seo/competitive-intel/${ws.workspaceId}?competitors=empty-rival.com`,
     );
     expect(status).toBe(200);
     const b = body as { domains: Array<{ domain: string; overview: unknown }> };

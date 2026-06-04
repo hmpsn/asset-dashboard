@@ -1098,8 +1098,8 @@ function strategyInsight(type: 'content_gap' | 'quick_win' | 'keyword_gap', item
  * score, not a zero multiplier.
  *
  * API-credit note: the underlying `provider.getDomainOverview` call is cached
- * at the provider layer (SQLite with TTL — see `CACHE_TTL_DOMAIN_OVERVIEW` in
- * `server/semrush.ts`). First call per domain per TTL window costs ~10 credits;
+ * at the provider layer (SQLite with TTL in the active SEO provider). First
+ * call per domain per TTL window costs provider credits;
  * subsequent calls within the window cost 0. Isolating the call in this helper
  * means there is exactly one call site per rec-gen cycle, regardless of how
  * many individual recs consult `domainStrength`.
