@@ -19,6 +19,7 @@ import { listQuickWins, replaceAllQuickWins } from '../quick-wins.js';
 import { listKeywordGaps, replaceAllKeywordGaps } from '../keyword-gaps.js';
 import { listTopicClusters, replaceAllTopicClusters } from '../topic-clusters.js';
 import { listCannibalizationIssues, replaceAllCannibalizationIssues } from '../cannibalization-issues.js';
+import { assembleStoredKeywordStrategy } from '../keyword-strategy-assembler.js';
 import { validate, z } from '../middleware/validate.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
@@ -81,14 +82,11 @@ function serializeKeywordStrategy(
   cannibalization: CannibalizationItem[],
   strategyUx?: Awaited<ReturnType<typeof buildKeywordStrategyUxPayload>>,
 ) {
-  // Strip any stale table-backed and legacy alias fields left in the blob
-  // in favor of canonical table-backed sources and provider-neutral naming.
+  // The five table-backed arrays are supplied by assembleStoredKeywordStrategy and
+  // re-attached explicitly below, so they no longer need stripping here (the explicit
+  // keys win over the spread). Only the legacy `semrushMode` alias must still be
+  // dropped — it has no canonical replacement key and would otherwise leak.
   const rest: Record<string, unknown> = { ...strategy };
-  delete rest.contentGaps;
-  delete rest.quickWins;
-  delete rest.keywordGaps;
-  delete rest.topicClusters;
-  delete rest.cannibalization;
   delete rest.semrushMode;
   const seoDataStatus = strategy.seoDataStatus;
   return {
@@ -214,17 +212,11 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess(
     const ws = getWorkspace(req.params.workspaceId);
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });
     const strategy = ws.keywordStrategy;
-    const pageMap = listPageKeywords(ws.id);
-    const contentGapsFromTable = listContentGaps(ws.id);
-    const contentGaps = contentGapsFromTable.length > 0 ? contentGapsFromTable : (strategy?.contentGaps || []);
-    // quickWins is table-only; blob field stripped on every write (topicClusters/cannibalization treatment)
-    const quickWins = listQuickWins(ws.id);
-    const keywordGapsFromTable = listKeywordGaps(ws.id);
-    const keywordGaps = keywordGapsFromTable.length > 0 ? keywordGapsFromTable : (strategy?.keywordGaps || []);
-    // topicClusters and cannibalization are table-only; blob fields stripped on every write + boot-migrated out (#19a)
-    const topicClusters = listTopicClusters(ws.id);
-    const cannibalization = listCannibalizationIssues(ws.id);
-    if (!strategy && pageMap.length === 0 && contentGaps.length === 0 && quickWins.length === 0 && keywordGaps.length === 0 && topicClusters.length === 0 && cannibalization.length === 0) return res.json(null);
+    // Single read-path assembler (#2): table-as-truth + table-or-blob fallback,
+    // returning null on the existing short-circuit (no blob + all tables empty).
+    const assembled = assembleStoredKeywordStrategy(ws.id);
+    if (!assembled) return res.json(null);
+    const { pageMap, contentGaps, quickWins, keywordGaps, topicClusters, cannibalization } = assembled;
     if (!strategy) {
       return res.json({
         siteKeywords: [],
