@@ -21,6 +21,7 @@ import { Sidebar } from './components/layout/Sidebar';
 import { Breadcrumbs } from './components/layout/Breadcrumbs';
 import { ScannerReveal } from './components/ui/ScannerReveal';
 import { FeatureFlag } from './components/ui/FeatureFlag';
+import { useFeatureFlag } from './hooks/useFeatureFlag';
 import { EmptyState } from './components/ui/EmptyState';
 import { TabBar } from './components/ui/TabBar';
 import { Activity, Clipboard, Globe, Sparkles } from 'lucide-react';
