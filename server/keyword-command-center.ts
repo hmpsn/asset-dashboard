@@ -2,8 +2,7 @@ import db from './db/index.js';
 import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { listContentGaps } from './content-gaps.js';
-import { listKeywordGaps } from './keyword-gaps.js';
+import { assembleStoredKeywordStrategy } from './keyword-strategy-assembler.js';
 import {
   buildLocalSeoKeywordCandidates,
   countLocalSeoKeywordCandidates,
@@ -1140,8 +1139,12 @@ async function buildKeywordCommandCenterModel(
   const pageMap = options.includeStrategyUx === false
     ? listPageKeywordsLite(workspace.id)
     : listPageKeywords(workspace.id);
-  const contentGaps = listContentGaps(workspace.id);
-  const keywordGaps = listKeywordGaps(workspace.id);
+  // contentGaps + keywordGaps via the single assembler (#2). strategy stays the
+  // raw blob (siteKeywords/siteKeywordMetrics/generatedAt) and pageMap keeps the
+  // Lite/full page_keywords path above — KCC only needs the two gap arrays here.
+  const assembled = assembleStoredKeywordStrategy(workspace.id);
+  const contentGaps = assembled?.contentGaps ?? [];
+  const keywordGaps = assembled?.keywordGaps ?? [];
   const rawTrackedKeywords = getTrackedKeywords(workspace.id, { includeInactive: true });
   const latestRanks = getLatestSnapshotRanks(workspace.id);
   const feedback = readFeedback(workspace.id);
@@ -1276,14 +1279,17 @@ export async function buildKeywordCommandCenterSummary(
     }
   }
 
-  const contentGaps = listContentGaps(workspace.id);
+  // contentGaps + keywordGaps via the single assembler (#2); siteKeywords/
+  // siteKeywordMetrics above stay blob-sourced (workspace.keywordStrategy).
+  const summaryAssembled = assembleStoredKeywordStrategy(workspace.id);
+  const contentGaps = summaryAssembled?.contentGaps ?? [];
   for (const gap of contentGaps) {
     addKey(contentKeys, gap.targetKeyword);
     addKey(inStrategyKeys, gap.targetKeyword);
     markVolume(gap.targetKeyword, gap.volume);
   }
 
-  const keywordGaps = listKeywordGaps(workspace.id);
+  const keywordGaps = summaryAssembled?.keywordGaps ?? [];
   for (const gap of keywordGaps) {
     addKey(rawEvidenceKeys, gap.keyword);
     markVolume(gap.keyword, gap.volume);
@@ -1867,8 +1873,11 @@ function buildFilteredBundle(input: {
 }): CommandCenterSourceBundle & { keys: Set<string> | null } {
   const strategy = input.workspace.keywordStrategy;
   const pageMap = listPageKeywordsLite(input.workspace.id);
-  const contentGaps = listContentGaps(input.workspace.id);
-  const keywordGaps = listKeywordGaps(input.workspace.id);
+  // contentGaps + keywordGaps via the single assembler (#2); strategy stays the
+  // raw blob and pageMap keeps the Lite page_keywords path.
+  const filteredAssembled = assembleStoredKeywordStrategy(input.workspace.id);
+  const contentGaps = filteredAssembled?.contentGaps ?? [];
+  const keywordGaps = filteredAssembled?.keywordGaps ?? [];
   const trackedKeywords = getTrackedKeywords(input.workspace.id, { includeInactive: true });
   const latestRanks = getLatestSnapshotRanks(input.workspace.id);
   const feedback = readFeedback(input.workspace.id);
@@ -2085,8 +2094,11 @@ export async function buildKeywordCommandCenterDetail(
   const workspace = getWorkspace(workspaceId);
   if (!workspace) return null;
   const pageMap = listPageKeywordsLite(workspace.id).filter(page => pageMatchesKeyword(page, normalized));
-  const contentGaps = listContentGaps(workspace.id).filter(gap => keywordComparisonKey(gap.targetKeyword) === normalized);
-  const keywordGaps = listKeywordGaps(workspace.id).filter(gap => keywordComparisonKey(gap.keyword) === normalized);
+  // contentGaps + keywordGaps via the single assembler (#2), filtered to the
+  // requested keyword; pageMap keeps the Lite page_keywords path above.
+  const detailAssembled = assembleStoredKeywordStrategy(workspace.id);
+  const contentGaps = (detailAssembled?.contentGaps ?? []).filter(gap => keywordComparisonKey(gap.targetKeyword) === normalized);
+  const keywordGaps = (detailAssembled?.keywordGaps ?? []).filter(gap => keywordComparisonKey(gap.keyword) === normalized);
   const rawTrackedKeywords = getTrackedKeywords(workspace.id, { includeInactive: true }).filter(entry => keywordComparisonKey(entry.query) === normalized);
   // Load all ranks for variant aggregation — populateDraftRows uses variantParentMap to
   // cluster GSC query variants (e.g. "teeth whitening san antonio") under their canonical
