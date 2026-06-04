@@ -133,26 +133,21 @@ describe('Wave 3d-ii anti-laundering: client page_map/topic_cluster approvals su
 
 describe('Wave 3d-ii strategyOwned round-trip + reconcile-sets-it', () => {
   it('reconcile establishes strategyOwned=true for a genuine target and deprecates it on drift', async () => {
-    const { getTrackedKeywords } = await import('../../server/rank-tracking.js');
+    const { addTrackedKeyword, getTrackedKeywords } = await import('../../server/rank-tracking.js');
     const { reconcileStrategyRankTracking } = await import('../../server/rank-tracking-reconciliation.js');
     const { listTrackedKeywordRows } = await import('../../server/tracked-keywords-store.js');
-    const { TRACKED_KEYWORD_STATUS } = await import('../../shared/types/rank-tracking.js');
+    const { TRACKED_KEYWORD_SOURCE, TRACKED_KEYWORD_STATUS } = await import('../../shared/types/rank-tracking.js');
     const { keywordComparisonKey } = await import('../../shared/keyword-normalization.js');
-    const { default: db } = await import('../../server/db/index.js');
 
     const keyword = 'reconcile owned keyword';
 
-    // Add WITHOUT strategyOwned, as an un-provenanced (UNKNOWN-source) tracked keyword
-    // — the realistic "ownership unknown, not protected" case (a plain manual add would
+    // Wave 3c-iii-b: seed via the TABLE writer (the blob is no longer a store). Add
+    // WITHOUT strategyOwned, as an un-provenanced (UNKNOWN-source) tracked keyword —
+    // the realistic "ownership unknown, not protected" case (a plain manual add would
     // default to MANUAL source, which is hard-protected and intentionally never owned).
-    db.prepare(`
-      INSERT INTO rank_tracking_config (workspace_id, tracked_keywords)
-      VALUES (?, ?)
-      ON CONFLICT(workspace_id) DO UPDATE SET tracked_keywords = excluded.tracked_keywords
-    `).run(workspaceId, JSON.stringify([{ query: keyword, addedAt: '2026-06-01T00:00:00.000Z' }]));
-    // Ownership unknown at seed time (the blob never carries strategyOwned). The first
-    // reconcile's RMW reads the blob, adopts the strategy source, sets strategyOwned=true,
-    // and dual-writes the table.
+    // The first reconcile's RMW reads the FULL ROW from the table, adopts the strategy
+    // source, sets strategyOwned=true, and re-persists the table.
+    addTrackedKeyword(workspaceId, keyword, { source: TRACKED_KEYWORD_SOURCE.UNKNOWN });
     const seeded = getTrackedKeywords(workspaceId, { includeInactive: true }).find(
       k => keywordComparisonKey(k.query) === keywordComparisonKey(keyword),
     );

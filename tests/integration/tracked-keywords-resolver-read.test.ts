@@ -86,8 +86,8 @@ afterAll(async () => {
 // ════════════════════════════════════════════════════════════════════════════════
 // (1) ORDER-SENSITIVE FULL PARITY (table vs blob), incl. the REAL public endpoints
 // ════════════════════════════════════════════════════════════════════════════════
-describe('(1) order-sensitive parity — table read is byte-identical to blob incl. order', () => {
-  it('getTrackedKeywords / getRankHistory / getLatestRanks + public endpoints all match', async () => {
+describe('(1) golden order — table-only read keeps the seeded order via sort_order', () => {
+  it('getTrackedKeywords / getRankHistory / getLatestRanks + public endpoints all keep golden order TABLE-ONLY', async () => {
     const { default: db } = await import('../../server/db/index.js');
     const { createWorkspace } = await import('../../server/workspaces.js');
     const { getTrackedKeywords, getRankHistory, getLatestRanks, storeRankSnapshot } =
@@ -101,10 +101,13 @@ describe('(1) order-sensitive parity — table read is byte-identical to blob in
     const ws = createWorkspace(`TK Resolver Order ${Date.now()}`);
     cleanupWorkspaceIds.push(ws.id);
 
-    // Blob insertion order is zebra, apple, mango — but addedAt is NON-monotonic
-    // with array position (apple=01, mango=02, zebra=03). So the table, ordered by
-    // (added_at, normalized_query), lists apple, mango, zebra — a DIFFERENT order.
-    // A correct Option-A reorder must restore the BLOB order (zebra, apple, mango).
+    // Wave 3c-iii-b: the blob is no longer a STORE — but it is still the legitimate
+    // SEED for the boot backfill (legacy-workspace migration). Insertion order is
+    // zebra, apple, mango, (retired) — addedAt is NON-monotonic with array position
+    // (apple=01, mango=02, zebra=03), so the table's natural (added_at,
+    // normalized_query) order DIFFERS. The boot backfill stamps sort_order = the blob
+    // array index, so the TABLE-ONLY read must restore the SEED order from sort_order
+    // alone (no blob read at runtime). After this seed step, the blob can be ignored.
     const blob = [
       { query: 'zebra dental', pinned: false, addedAt: '2026-01-03T00:00:00.000Z', source: 'manual', status: 'active' },
       { query: 'apple braces', pinned: true, addedAt: '2026-01-01T00:00:00.000Z', source: 'strategy_primary', status: 'active', pagePath: '/braces', pageTitle: 'Braces', volume: 100, difficulty: 5 },
@@ -126,32 +129,19 @@ describe('(1) order-sensitive parity — table read is byte-identical to blob in
       { query: 'mango whitening', position: 6, clicks: 6, impressions: 85, ctr: 0.07 },
     ]);
 
-    // ── PHASE A: table EMPTY → readers serve the BLOB (capture the golden output). ──
+    // ── Populate the TABLE from the seed blob via the boot backfill (sort_order =
+    //    blob array index). The table is the SOLE store from here on. ──
     deleteAllTrackedKeywordRows(ws.id);
     expect(countTrackedKeywordRows(ws.id)).toBe(0);
-
-    const blobTrackedAll = getTrackedKeywords(ws.id, { includeInactive: true });
-    const blobTrackedActive = getTrackedKeywords(ws.id, { includeInactive: false });
-    const blobHistory = getRankHistory(ws.id);
-    const blobLatest = getLatestRanks(ws.id);
-
-    // The blob path preserves insertion order: zebra, apple, mango, (retired).
-    expect(blobTrackedAll.map(k => k.query)).toEqual(['zebra dental', 'apple braces', 'mango whitening', 'retired kw']);
-
-    const blobPublicTracked = await (await api(`/api/public/tracked-keywords/${ws.id}`)).json() as { keywords: { query: string }[] };
-    const blobPublicStrategy = await (await api(`/api/public/seo-strategy/${ws.id}`)).json() as { trackedKeywords?: { query: string }[] } | null;
-
-    // ── PHASE B: populate the TABLE from the blob (backfill), then re-read. ──
     migrateTrackedKeywordsFromConfigBlob();
     expect(countTrackedKeywordRows(ws.id)).toBe(4);
 
-    // Prove the TABLE's natural order DIFFERS from the blob order (so the reorder
-    // is actually doing work, not a no-op).
+    // Prove the TABLE's NATURAL (added_at, normalized_query) order DIFFERS from the
+    // seed order — so sort_order is genuinely doing the ordering work, not a no-op.
     const rawTableOrder = (db.prepare(
       'SELECT query FROM tracked_keywords WHERE workspace_id = ? ORDER BY added_at ASC, normalized_query ASC',
     ).all(ws.id) as { query: string }[]).map(r => r.query);
     expect(rawTableOrder).toEqual(['apple braces', 'mango whitening', 'zebra dental', 'retired kw']);
-    expect(rawTableOrder).not.toEqual(blobTrackedAll.map(k => k.query));
 
     const tableTrackedAll = getTrackedKeywords(ws.id, { includeInactive: true });
     const tableTrackedActive = getTrackedKeywords(ws.id, { includeInactive: false });
@@ -159,19 +149,18 @@ describe('(1) order-sensitive parity — table read is byte-identical to blob in
     const tableLatest = getLatestRanks(ws.id);
 
     const tablePublicTracked = await (await api(`/api/public/tracked-keywords/${ws.id}`)).json() as { keywords: { query: string }[] };
-    const tablePublicStrategy = await (await api(`/api/public/seo-strategy/${ws.id}`)).json() as { trackedKeywords?: { query: string }[] } | null;
 
-    // ── PARITY: byte-identical via JSON.stringify, NO per-query re-sort (guards order). ──
-    expect(JSON.stringify(tableTrackedAll)).toBe(JSON.stringify(blobTrackedAll));
-    expect(JSON.stringify(tableTrackedActive)).toBe(JSON.stringify(blobTrackedActive));
-    expect(JSON.stringify(tableHistory)).toBe(JSON.stringify(blobHistory));
-    expect(JSON.stringify(tableLatest)).toBe(JSON.stringify(blobLatest));
-    expect(JSON.stringify(tablePublicTracked)).toBe(JSON.stringify(blobPublicTracked));
-    expect(JSON.stringify(tablePublicStrategy)).toBe(JSON.stringify(blobPublicStrategy));
-
-    // And explicitly: the resolved order matches the BLOB order, not the raw table order.
+    // ── GOLDEN ORDER (table-only via sort_order): the SEED insertion order is restored
+    //    — zebra, apple, mango, (retired) — NOT the raw (added_at) table order. ──
     expect(tableTrackedAll.map(k => k.query)).toEqual(['zebra dental', 'apple braces', 'mango whitening', 'retired kw']);
+    expect(tableTrackedActive.map(k => k.query)).toEqual(['zebra dental', 'apple braces', 'mango whitening']);
+    expect(tableTrackedAll.map(k => k.query)).not.toEqual(rawTableOrder);
     expect(tablePublicTracked.keywords.map(k => k.query)).toEqual(['zebra dental', 'apple braces', 'mango whitening']);
+
+    // getRankHistory / getLatestRanks read the same table-only tracked set; spot-check
+    // they joined the snapshots and surfaced the active keywords.
+    expect(tableHistory.length).toBeGreaterThan(0);
+    expect(tableLatest.map(k => k.query)).toEqual(expect.arrayContaining(['apple braces', 'zebra dental', 'mango whitening']));
   });
 });
 
@@ -327,25 +316,28 @@ describe('(1b) sort_order backfill — equals the blob array index per key (+ ap
 
     // And the RESOLVER (the read path) emits the new array order — proving sort_order
     // drives ordering. With sort_order left NULL on reinsert, this scrambles to the
-    // (added_at, normalized_query) tiebreaker (one, two, three) and FAILS — RED-proof (b).
-    const resolved = resolveTrackedKeywords(ws.id, []);
+    // (added_at, normalized_query) tiebreaker (one, two, three) and FAILS. Wave 3c-iii-b:
+    // the resolver is now TABLE-ONLY (no blobKeywords param).
+    const resolved = resolveTrackedKeywords(ws.id);
     expect(resolved.map(k => k.query)).toEqual(['three', 'one', 'two']);
   });
 });
 
 // ════════════════════════════════════════════════════════════════════════════════
-// (2) BLOB-FALLBACK fires when the table is empty
+// (2) NO BLOB FALLBACK (Wave 3c-iii-b strip) — empty table → readers return EMPTY,
+//     even with a stale legacy blob written directly out-of-band.
 // ════════════════════════════════════════════════════════════════════════════════
-describe('(2) blob-fallback — empty table → readers return the blob', () => {
-  it('getTrackedKeywords + public endpoint serve the blob when the table is empty', async () => {
+describe('(2) no blob-fallback — empty table → readers return EMPTY (strip removed the fallback)', () => {
+  it('getTrackedKeywords + public endpoint return EMPTY when the table is empty, ignoring a stale blob', async () => {
     const { createWorkspace } = await import('../../server/workspaces.js');
     const { getTrackedKeywords } = await import('../../server/rank-tracking.js');
     const { deleteAllTrackedKeywordRows, countTrackedKeywordRows } =
       await import('../../server/tracked-keywords-store.js');
 
-    const ws = createWorkspace(`TK Resolver Fallback ${Date.now()}`);
+    const ws = createWorkspace(`TK Resolver NoFallback ${Date.now()}`);
     cleanupWorkspaceIds.push(ws.id);
 
+    // Write a non-empty legacy blob directly, then ensure the table is empty.
     await writeBlobDirect(ws.id, [
       { query: 'fallback alpha', pinned: false, addedAt: '2026-02-01T00:00:00.000Z', source: 'manual', status: 'active' },
       { query: 'fallback beta', pinned: true, addedAt: '2026-02-02T00:00:00.000Z', source: 'manual', status: 'active' },
@@ -353,13 +345,14 @@ describe('(2) blob-fallback — empty table → readers return the blob', () => 
     deleteAllTrackedKeywordRows(ws.id);
     expect(countTrackedKeywordRows(ws.id)).toBe(0);
 
+    // The strip removed the empty-table blob fallback: reads return EMPTY.
     const resolved = getTrackedKeywords(ws.id, { includeInactive: true });
-    expect(resolved.map(k => k.query)).toEqual(['fallback alpha', 'fallback beta']);
+    expect(resolved).toEqual([]);
 
     const publicRes = await api(`/api/public/tracked-keywords/${ws.id}`);
     expect(publicRes.status).toBe(200);
     const body = await publicRes.json() as { keywords: { query: string }[] };
-    expect(body.keywords.map(k => k.query)).toEqual(['fallback alpha', 'fallback beta']);
+    expect(body.keywords).toEqual([]);
   });
 });
 
@@ -446,20 +439,27 @@ describe('(4) reconcile deletion-set parity — changeset identical regardless o
     });
   }
 
-  it('cold table (blob fallback, no established ownership) conservatively does NOT auto-deprecate a strategy-sourced keyword', async () => {
+  it('strategy-sourced keyword WITHOUT established ownership is conservatively NOT auto-deprecated', async () => {
     const { createWorkspace } = await import('../../server/workspaces.js');
-    const { deleteAllTrackedKeywordRows, countTrackedKeywordRows } = await import('../../server/tracked-keywords-store.js');
-
-    const seed = [
-      { query: 'old strategy kw', pinned: false, addedAt: '2026-04-01T00:00:00.000Z', source: 'strategy_primary', status: 'active', pagePath: '/old', pageTitle: 'Old' },
-      { query: 'manual stay', pinned: false, addedAt: '2026-04-01T01:00:00.000Z', source: 'manual', status: 'active' },
-    ];
+    const { addTrackedKeyword } = await import('../../server/rank-tracking.js');
+    const { countTrackedKeywordRows } = await import('../../server/tracked-keywords-store.js');
+    const { TRACKED_KEYWORD_SOURCE } = await import('../../shared/types/rank-tracking.js');
 
     const ws = createWorkspace(`TK Reconcile ColdTable ${Date.now()}`);
     cleanupWorkspaceIds.push(ws.id);
-    await writeBlobDirect(ws.id, seed);
-    deleteAllTrackedKeywordRows(ws.id);
-    expect(countTrackedKeywordRows(ws.id)).toBe(0);
+
+    // Wave 3c-iii-b: seed via the TABLE writer (the blob is no longer a store). The
+    // keyword carries a STRATEGY_* source but NO established ownership (strategyOwned
+    // unset) — the migration-safety case. Ownership lives ONLY in the table column,
+    // and reconcile is its sole writer, so a strategy-sourced-but-unowned row must NOT
+    // be auto-deprecated.
+    addTrackedKeyword(ws.id, 'old strategy kw', {
+      source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
+      pagePath: '/old',
+      pageTitle: 'Old',
+    });
+    addTrackedKeyword(ws.id, 'manual stay', { source: TRACKED_KEYWORD_SOURCE.MANUAL });
+    expect(countTrackedKeywordRows(ws.id)).toBe(2);
 
     // Reconcile WITHOUT 'old strategy kw' as a target. With no table-resident
     // ownership, it is preserved (not deprecated) — the migration safety pause.
@@ -472,9 +472,9 @@ describe('(4) reconcile deletion-set parity — changeset identical regardless o
     const { createWorkspace } = await import('../../server/workspaces.js');
     const { deleteAllTrackedKeywordRows, countTrackedKeywordRows } = await import('../../server/tracked-keywords-store.js');
 
-    // ── Run A: establish ownership, then DROP the table so the measured reconcile's
-    // read falls back to the blob (the blob carries no ownership, but the in-txn
-    // hydrate re-reads the table — which we deleted — so this exercises the cold path). ──
+    // Wave 3c-iii-b: both runs seed via reconcile (the table writer) and the table
+    // is the SOLE store for the measured reconcile — there is no blob involvement.
+    // ── Run A: establish ownership; the table stays populated for the measured reconcile. ──
     const wsA = createWorkspace(`TK Reconcile Empty ${Date.now()}`);
     cleanupWorkspaceIds.push(wsA.id);
     await runEstablish(wsA.id); // populates table with strategyOwned=true
@@ -494,8 +494,8 @@ describe('(4) reconcile deletion-set parity — changeset identical regardless o
     expect(changesetPopulated.deprecated).toEqual(['old strategy kw']);
     expect(changesetPopulated.added).toEqual(['kept site kw']);
 
-    // Confirm the dropped table state still produces a deterministic set: deleting the
-    // table then reconciling falls back to the blob (no ownership) → conservative.
+    // Dropping the table clears the store (no blob fallback): a subsequent read/reconcile
+    // sees an empty store.
     deleteAllTrackedKeywordRows(wsA.id);
     expect(countTrackedKeywordRows(wsA.id)).toBe(0);
   });

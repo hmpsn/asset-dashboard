@@ -1,7 +1,6 @@
 import db from './db/index.js';
-import { parseJsonFallback, parseJsonSafeArray } from './db/json-validation.js';
+import { parseJsonFallback } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { z } from 'zod';
 import {
   TRACKED_KEYWORD_SOURCE,
   TRACKED_KEYWORD_STATUS,
@@ -51,11 +50,6 @@ export interface GetTrackedKeywordsOptions {
 
 // ── SQLite row shapes ──
 
-interface ConfigRow {
-  workspace_id: string;
-  tracked_keywords: string;
-}
-
 interface SnapshotRow {
   id: number;
   workspace_id: string;
@@ -64,9 +58,11 @@ interface SnapshotRow {
 }
 
 const stmts = createStmtCache(() => ({
-  getConfig: db.prepare(
-    `SELECT * FROM rank_tracking_config WHERE workspace_id = ?`,
-  ),
+  // Wave 3c-iii-b: getConfig (the blob reader) was removed with readConfig — the
+  // tracked_keywords TABLE is the SOLE store and the only blob read remaining is the
+  // boot backfill's own SELECT in tracked-keywords-store.ts. upsertConfig stays:
+  // writeConfig keeps the config row alive by upserting `'[]'` (kept-but-empty for
+  // rollback safety; the column/table are NOT dropped).
   upsertConfig: db.prepare(
     `INSERT INTO rank_tracking_config (workspace_id, tracked_keywords)
          VALUES (@workspace_id, @tracked_keywords)
@@ -89,55 +85,6 @@ const stmts = createStmtCache(() => ({
          )`,
   ),
 }));
-
-const trackedKeywordSchema = z.object({
-  query: z.string(),
-  pinned: z.boolean().default(false),
-  addedAt: z.string().default(''),
-  source: z.enum([
-    TRACKED_KEYWORD_SOURCE.MANUAL,
-    TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
-    TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD,
-    TRACKED_KEYWORD_SOURCE.CLIENT_REQUESTED,
-    TRACKED_KEYWORD_SOURCE.CONTENT_GAP,
-    TRACKED_KEYWORD_SOURCE.RECOMMENDATION,
-    TRACKED_KEYWORD_SOURCE.UNKNOWN,
-  ]).optional(),
-  status: z.enum([
-    TRACKED_KEYWORD_STATUS.ACTIVE,
-    TRACKED_KEYWORD_STATUS.PAUSED,
-    TRACKED_KEYWORD_STATUS.DEPRECATED,
-    TRACKED_KEYWORD_STATUS.REPLACED,
-  ]).optional(),
-  pagePath: z.string().optional(),
-  pageTitle: z.string().optional(),
-  strategyGeneratedAt: z.string().optional(),
-  lastStrategySeenAt: z.string().optional(),
-  intent: z.string().optional(),
-  volume: z.number().optional(),
-  difficulty: z.number().optional(),
-  cpc: z.number().optional(),
-  authorityPosture: z.enum(['authority_unknown', 'within_current_authority_range', 'requires_authority_building']).optional(),
-  baselinePosition: z.number().optional(),
-  baselineClicks: z.number().optional(),
-  baselineImpressions: z.number().optional(),
-  replacedBy: z.string().optional(),
-  deprecatedAt: z.string().optional(),
-  // Wave 3d-i ADDITIVE provenance. MUST be .optional(): the stored blob does NOT
-  // carry sourceGapKey (it lives in the tracked_keywords TABLE, projected only via
-  // the admin path; the blob will not carry it until a later wave). A REQUIRED
-  // field absent from the stored blob makes every parseJsonSafeArray item fall to
-  // its fallback — silently destroying all tracked-keyword data (Schema-vs-stored-
-  // shape rule). normalizeTrackedKeywords passes it through via the `...keyword`
-  // spread so it survives the read→mutate→write loop.
-  sourceGapKey: z.string().optional(),
-  // Wave 3d-ii ownership flag. MUST be .optional() per the same Schema-vs-stored-
-  // shape rule: the stored blob NEVER carries strategyOwned (TABLE-ONLY, stripped
-  // by blobReplacer). It is hydrated from the TABLE into the in-memory set before
-  // the updater runs (hydrateProvenanceFromTable) and persisted via the table
-  // column; the `...keyword` spread carries it through the read→mutate→write loop.
-  strategyOwned: z.boolean().optional(),
-});
 
 function normalizeQuery(query: string): string {
   return keywordComparisonKey(query);
@@ -164,36 +111,19 @@ export function normalizeTrackedKeywords(keywords: Array<Partial<TrackedKeyword>
   return normalized;
 }
 
-function readConfig(workspaceId: string): { trackedKeywords: TrackedKeyword[] } {
-  const row = stmts().getConfig.get(workspaceId) as ConfigRow | undefined;
-  return row
-    ? {
-        trackedKeywords: normalizeTrackedKeywords(parseJsonSafeArray(row.tracked_keywords, trackedKeywordSchema, {
-          workspaceId,
-          table: 'rank_tracking_config',
-          field: 'tracked_keywords',
-        })),
-      }
-    : { trackedKeywords: [] };
-}
-
-function writeConfig(workspaceId: string, config: { trackedKeywords: TrackedKeyword[] }) {
+function writeConfig(workspaceId: string) {
+  // Wave 3c-iii-b STRIP: the tracked_keywords row table is now the SOLE store. The
+  // blob is NO LONGER written as a data array — we write the clean empty sentinel
+  // `'[]'` (parseJsonSafeArray + migrate-json's `IS NOT NULL AND != ''` filter both
+  // tolerate it). The config row still UPSERTS so it exists (for rollback safety and
+  // so the column/table stay around), just with an empty array. The real keyword set
+  // is dual-written into the TABLE via replaceAllTrackedKeywordRows by
+  // withTrackedKeywordsTxn, which is the authoritative store — so writeConfig takes
+  // only the workspace id (it has nothing to serialize into the blob).
   stmts().upsertConfig.run({
     workspace_id: workspaceId,
-    // Wave 3d-i: provenance (sourceGapKey) lives ONLY in the tracked_keywords
-    // TABLE, never the blob. Strip it here so the blob stays byte-identical to
-    // pre-3d — the resolver fallback (empty table or blob-only key) must not be
-    // able to leak provenance, and the 3c-i/3c-ii parity suites stay green.
-    tracked_keywords: JSON.stringify(config.trackedKeywords, blobReplacer),
+    tracked_keywords: '[]',
   });
-}
-
-/** Drop provenance/ownership-only keys when serializing the blob (see writeConfig).
- *  strategyOwned (Wave 3d-ii) is TABLE-ONLY like sourceGapKey — it must never enter
- *  the blob, or the resolver's blob fallback could leak/round-trip a stale value. */
-function blobReplacer(key: string, value: unknown): unknown {
-  if (key === 'sourceGapKey' || key === 'sourcePageId' || key === 'strategyOwned') return undefined;
-  return value;
 }
 
 function readSnapshots(workspaceId: string): RankSnapshot[] {
@@ -211,12 +141,11 @@ function readRecentSnapshots(workspaceId: string, limit: number): RankSnapshot[]
 // --- Public API ---
 
 export function getTrackedKeywords(workspaceId: string, options: GetTrackedKeywordsOptions = {}): TrackedKeyword[] {
-  // Wave 3c-ii READ-SWITCH: resolve through the TABLE-FIRST/BLOB-FALLBACK resolver
-  // (resolve first, filter second). The resolver returns the table rows reordered
-  // into blob insertion order (byte-identical to today) or the blob verbatim when
-  // the table is empty. The includeInactive short-circuit + active-status filter
-  // below are UNCHANGED.
-  const keywords = resolveTrackedKeywords(workspaceId, readConfig(workspaceId).trackedKeywords);
+  // Wave 3c-iii-b TABLE-ONLY: resolve through the table-only resolver (resolve
+  // first, filter second). The resolver returns the table rows in sort_order, or an
+  // EMPTY array when the table is empty (no blob fallback). The includeInactive
+  // short-circuit + active-status filter below are UNCHANGED.
+  const keywords = resolveTrackedKeywords(workspaceId);
   if (options.includeInactive) return keywords;
   return keywords.filter(keyword => (keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE);
 }
@@ -241,71 +170,35 @@ export function getTrackedKeywords(workspaceId: string, options: GetTrackedKeywo
  * Returns the post-mutation TrackedKeyword[] so callers do NOT need a second
  * getTrackedKeywords() call (the "3×-parse fix").
  */
-/**
- * Wave 3d-i/3d-ii: mutate `keywords` in place, filling each row's TABLE-ONLY
- * provenance/ownership fields (`sourceGapKey`, `strategyOwned`) from the existing
- * tracked_keywords TABLE (keyed by keywordComparisonKey) when the in-memory row
- * does not already carry a value. FILL-IF-EMPTY: a value already present on the
- * in-memory row (e.g. a fresh gap-approve, or reconcile setting strategyOwned in
- * the same write) is NOT overwritten by the stored table value. These fields live
- * ONLY in the table (the blob strips them), so this is how they survive the
- * blob-based read→mutate→write loop.
- *
- * strategyOwned survival guard is `!== undefined`, NOT a truthy check: `false` is a
- * REAL established value (explicitly not strategy-owned). A truthy guard would
- * re-hydrate a stored `true` over an intentional in-memory `false`.
- */
-function hydrateProvenanceFromTable(workspaceId: string, keywords: TrackedKeyword[]): void {
-  if (keywords.length === 0) return;
-  const stored = listTrackedKeywordRows(workspaceId);
-  if (stored.length === 0) return;
-  const gapKeyByQuery = new Map<string, string>();
-  const ownedByQuery = new Map<string, boolean>();
-  for (const row of stored) {
-    if (row.sourceGapKey) gapKeyByQuery.set(normalizeQuery(row.query), row.sourceGapKey);
-    if (row.strategyOwned !== undefined) ownedByQuery.set(normalizeQuery(row.query), row.strategyOwned);
-  }
-  if (gapKeyByQuery.size === 0 && ownedByQuery.size === 0) return;
-  for (const keyword of keywords) {
-    const key = normalizeQuery(keyword.query);
-    if (!keyword.sourceGapKey) {
-      const existingGap = gapKeyByQuery.get(key); // fill-if-empty — don't clobber a fresh pointer
-      if (existingGap) keyword.sourceGapKey = existingGap;
-    }
-    if (keyword.strategyOwned === undefined) {
-      // `false` is a real established value — `!== undefined`, never a truthy guard.
-      const existingOwned = ownedByQuery.get(key);
-      if (existingOwned !== undefined) keyword.strategyOwned = existingOwned;
-    }
-  }
-}
-
 export function withTrackedKeywordsTxn(
   workspaceId: string,
   updater: (current: TrackedKeyword[]) => TrackedKeyword[],
 ): TrackedKeyword[] {
   function run(): TrackedKeyword[] {
-    const config = readConfig(workspaceId);
-    // Wave 3d-i FILL-IF-EMPTY: the blob does NOT carry provenance (writeConfig
-    // strips sourceGapKey), so hydrate it from the TABLE into the in-memory set
-    // BEFORE the updater runs. This makes any existing pointer survive the
-    // read→mutate→write loop: a status-only / reconcile updater (which copies the
-    // current rows through) preserves it, while a gap-approve updater overwrites
-    // it. replaceAllTrackedKeywordRows is delete-then-reinsert, so the in-memory
-    // value is the ONLY source of truth on reinsert — without this hydrate a later
-    // write would null out the provenance.
-    hydrateProvenanceFromTable(workspaceId, config.trackedKeywords);
-    config.trackedKeywords = normalizeTrackedKeywords(updater(config.trackedKeywords));
-    writeConfig(workspaceId, config);
-    // DUAL-WRITE (Wave 3c-i shadow): mirror the post-mutation set into the
-    // tracked_keywords row table so the table stays in sync with the blob after
-    // every write — including the empty-clear case (replaceAll with [] clears).
-    // This runs INSIDE the same txn (BEGIN IMMEDIATE here, or the KCC outer txn
-    // via the db.inTransaction guard below — a wrapped db.transaction nests as a
-    // SAVEPOINT). The blob write above is KEPT (shadow, not strip); READS stay on
-    // the blob — getTrackedKeywords and every consumer are unchanged this PR.
-    replaceAllTrackedKeywordRows(workspaceId, config.trackedKeywords);
-    return config.trackedKeywords;
+    // Wave 3c-iii-b TABLE-ONLY READ-SWITCH (ATOMIC PAIR with the writeConfig strip):
+    // the txn-start read is now a FULL-ROW TABLE read via listTrackedKeywordRows,
+    // which projects sourceGapKey + strategyOwned (full provenance — NOT the stripped
+    // public shape from resolveTrackedKeywords). This is load-bearing: writeConfig now
+    // writes `'[]'`, so if this still read the blob it would get [] and the updater
+    // would receive nothing → replaceAllTrackedKeywordRows([]) would WIPE the table.
+    //
+    // Because the read carries full provenance, the previous hydrateProvenanceFromTable
+    // step is REDUNDANT and removed. FILL-IF-EMPTY still holds: a status-only /
+    // reconcile updater copies the current rows through (preserving the read's
+    // sourceGapKey/strategyOwned), while a fresh same-write gap-approve (sourceGapKey)
+    // / reconcile (strategyOwned=true) sets the in-memory value directly — the only
+    // source of truth on reinsert, never clobbered by the read. replaceAllTrackedKeywordRows
+    // re-stamps sort_order from the new array position, so order survives too.
+    const trackedKeywords = normalizeTrackedKeywords(updater(listTrackedKeywordRows(workspaceId)));
+    // Wave 3c-iii-b: the blob is no longer a store — writeConfig writes `'[]'` (the
+    // config row is kept-but-empty for rollback safety). The AUTHORITATIVE write is
+    // replaceAllTrackedKeywordRows into the tracked_keywords TABLE below, which runs
+    // INSIDE the same txn (BEGIN IMMEDIATE here, or the KCC outer txn via the
+    // db.inTransaction guard — a wrapped db.transaction nests as a SAVEPOINT). The
+    // empty-clear case (replaceAll with []) clears the table.
+    writeConfig(workspaceId);
+    replaceAllTrackedKeywordRows(workspaceId, trackedKeywords);
+    return trackedKeywords;
   }
 
   // If we are already inside a transaction (e.g. KCC outer db.transaction()),
@@ -451,9 +344,9 @@ export function getRankHistory(
 ): { date: string; positions: Record<string, number> }[] {
   const snapshots = readSnapshots(workspaceId);
   const recent = snapshots.slice(-limit);
-  // Wave 3c-ii: route the direct readConfig read through the TABLE-FIRST resolver.
+  // Wave 3c-iii-b: read tracked keywords through the TABLE-ONLY resolver.
   // Order-safe — the inline active filter + normalizeQuery Map below are unchanged.
-  const trackedKeywords = resolveTrackedKeywords(workspaceId, readConfig(workspaceId).trackedKeywords);
+  const trackedKeywords = resolveTrackedKeywords(workspaceId);
   const tracked = queryFilter
     ? queryFilter
         .map(query => ({ lookup: normalizeQuery(query), output: query.trim() }))
@@ -483,9 +376,9 @@ function buildLatestRanks(workspaceId: string, options: { includeUntracked?: boo
   const previousByQuery = new Map(
     (prev?.queries ?? []).map(query => [normalizeQuery(query.query), query]),
   );
-  // Wave 3c-ii: route the direct readConfig read through the TABLE-FIRST resolver.
+  // Wave 3c-iii-b: read tracked keywords through the TABLE-ONLY resolver.
   // Order-safe — the inline active filter + normalizeQuery Map below are unchanged.
-  const trackedKeywords = resolveTrackedKeywords(workspaceId, readConfig(workspaceId).trackedKeywords);
+  const trackedKeywords = resolveTrackedKeywords(workspaceId);
   const hasConfiguredKeywords = trackedKeywords.length > 0;
   const trackedEntries = new Map(
     trackedKeywords

@@ -75,9 +75,11 @@ beforeAll(async () => {
 }, 40_000);
 
 beforeEach(async () => {
-  // Clear tracked keywords between tests
+  // Clear tracked keywords between tests — both the (now kept-but-empty) config row
+  // and the tracked_keywords TABLE (the SOLE store post-strip / the contended writer).
   const { default: db } = await import('../../server/db/index.js');
   db.prepare('DELETE FROM rank_tracking_config WHERE workspace_id = ?').run(workspaceId);
+  db.prepare('DELETE FROM tracked_keywords WHERE workspace_id = ?').run(workspaceId);
 });
 
 afterAll(async () => {
@@ -104,21 +106,33 @@ async function openSecondConnection(): Promise<BetterSqlite3Database> {
   return conn;
 }
 
-function readKeywordsRaw(conn: BetterSqlite3Database, ws: string): unknown[] {
-  const row = conn
-    .prepare('SELECT tracked_keywords FROM rank_tracking_config WHERE workspace_id = ?')
-    .get(ws) as { tracked_keywords: string } | undefined;
-  return row ? (JSON.parse(row.tracked_keywords) as unknown[]) : [];
+// Wave 3c-iii-b: the contended writer is now the tracked_keywords TABLE (the SOLE
+// store — the blob is `'[]'` and no longer read). Retarget the raw read/write helpers
+// (used to interpose a second-connection write between the real helper's read and
+// write) to the TABLE so the contention is on the genuinely-contended row, keeping
+// the deferred→IMMEDIATE SQLITE_BUSY_SNAPSHOT regression faithful to production.
+function readKeywordsRaw(conn: BetterSqlite3Database, ws: string): { query: string }[] {
+  return conn
+    .prepare('SELECT query FROM tracked_keywords WHERE workspace_id = ? ORDER BY sort_order ASC, added_at ASC')
+    .all(ws) as { query: string }[];
 }
 
-function writeKeywordsRaw(conn: BetterSqlite3Database, ws: string, keywords: unknown[]): void {
-  conn
-    .prepare(`
-      INSERT INTO rank_tracking_config (workspace_id, tracked_keywords)
-      VALUES (?, ?)
-      ON CONFLICT(workspace_id) DO UPDATE SET tracked_keywords = ?
-    `)
-    .run(ws, JSON.stringify(keywords), JSON.stringify(keywords));
+function writeKeywordsRaw(conn: BetterSqlite3Database, ws: string, keywords: Array<{ query: string }>): void {
+  // Delete-then-reinsert (mirrors replaceAllTrackedKeywordRows) so a second-connection
+  // write is a real contended write against the same workspace's rows.
+  const del = conn.prepare('DELETE FROM tracked_keywords WHERE workspace_id = ?');
+  const ins = conn.prepare(`
+    INSERT INTO tracked_keywords (workspace_id, normalized_query, query, pinned, added_at, source, status, sort_order)
+    VALUES (?, ?, ?, 0, ?, 'manual', 'active', ?)
+    ON CONFLICT(workspace_id, normalized_query) DO UPDATE SET query = excluded.query, sort_order = excluded.sort_order
+  `);
+  del.run(ws);
+  const now = new Date().toISOString();
+  keywords.forEach((k, i) => {
+    const normalized = k.query.trim().toLowerCase();
+    if (!normalized) return;
+    ins.run(ws, normalized, k.query, now, i);
+  });
 }
 
 // ─── T1a: IMMEDIATE vs deferred — the real justification for `.immediate()` ─────
@@ -174,13 +188,14 @@ describe('T1a: deferred→IMMEDIATE SQLITE_BUSY_SNAPSHOT defense (PR #1030)', ()
 
   it('helper-tied regression: real withTrackedKeywordsTxn does NOT throw SQLITE_BUSY_SNAPSHOT when a second connection writes between its read and write', async () => {
     // This drives the REAL withTrackedKeywordsTxn. We interpose a second-connection
-    // write inside the updater (which the helper runs between readConfig and
-    // writeConfig). Under the real `.immediate()` wiring, the helper holds the write
-    // lock from the start, so the second connection's write fails fast with
-    // SQLITE_BUSY (busy_timeout=0) and the helper commits cleanly. If the production
-    // line is reverted to a deferred / non-immediate transaction, the second
-    // connection's write SUCCEEDS and commits before the helper writes — and the
-    // helper's writeConfig then throws SQLITE_BUSY_SNAPSHOT.
+    // write to the tracked_keywords TABLE (the SOLE store post-strip) inside the
+    // updater (which the helper runs between its table read and its table write).
+    // Under the real `.immediate()` wiring, the helper holds the write lock from the
+    // start, so the second connection's write fails fast with SQLITE_BUSY
+    // (busy_timeout=0) and the helper commits cleanly. If the production line is
+    // reverted to a deferred / non-immediate transaction, the second connection's
+    // write SUCCEEDS and commits before the helper writes — and the helper's table
+    // write then throws SQLITE_BUSY_SNAPSHOT.
     //
     // PROVEN regression (temporarily reverting `.immediate()` → `.deferred()` in
     // server/rank-tracking.ts and running this test):

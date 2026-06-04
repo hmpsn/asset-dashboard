@@ -304,23 +304,20 @@ export function deleteAllTrackedKeywordRows(workspaceId: string): void {
 }
 
 /**
- * Resolver — TABLE-FIRST / BLOB-FALLBACK (Wave 3c-ii read-switch; Wave 3c-iii-a
- * order-source switch). The ADDITIVE form, NOT the table-only strip (3c-iii-b).
+ * Resolver — TABLE-ONLY (Wave 3c-iii-b strip). The blob is NO LONGER a store: the
+ * tracked_keywords row table is the SOLE source of both data AND order, and
+ * writeConfig now writes `'[]'` (the blob is kept-but-empty for rollback safety).
  *
- * Logic:
- *   - countTrackedKeywordRows(workspaceId) === 0 → return `blobKeywords` (the table
- *     is empty: a legacy workspace not yet dual-written; fall back to the blob).
- *     This empty-table BLOB FALLBACK is KEPT this PR — the strip is 3c-iii-b.
- *   - otherwise → return the TABLE rows in their NATURAL ORDER, which is now the
- *     sort_order ASC sequence (listByWs orders by sort_order — the old blob array
- *     index, backfilled from the LIVE blob + re-stamped on every write). Each row is
- *     run through stripUndefinedKeys for blob-object-shape parity.
+ * Logic: return the TABLE rows in their NATURAL ORDER, which is the sort_order ASC
+ * sequence (listByWs orders by sort_order — the old blob array index, backfilled
+ * from the LIVE blob by the boot backfill + re-stamped on every write). An empty
+ * table returns an EMPTY array — there is NO blob fallback anymore. Each row is run
+ * through stripUndefinedKeys for blob-object-shape parity.
  *
- * Wave 3c-iii-a removed the Option-A blob-order reorder loop: ORDERING no longer
- * borrows the blob array index — sort_order does it directly. `blobKeywords` is
- * STILL passed (and still used) for the empty-table fallback above; the parameter
- * and signature are unchanged so callers are untouched. Net effect: data AND order
- * from the TABLE (sort_order), with the blob as the safety net only when empty.
+ * Wave 3c-iii-b removed the `blobKeywords` parameter and the
+ * countTrackedKeywordRows===0 blob fallback (3c-iii-a kept them; the strip removes
+ * them). sort_order is now populated (the boot backfill ran while the blob still had
+ * data), so reads keep exact order from the table alone.
  *
  * PROVENANCE STRIP (Wave 3d-i parity-safety mechanism): rowToTrackedKeyword NOW
  * projects source_gap_key into `sourceGapKey` (the ADDITIVE provenance pointer),
@@ -332,14 +329,12 @@ export function deleteAllTrackedKeywordRows(workspaceId: string): void {
  *
  * Object-shape parity: rowToTrackedKeyword assigns EVERY optional field, so a NULL
  * column becomes an OWN property whose value is `undefined`. The blob path instead
- * STRIPS undefined keys (writeConfig JSON.stringify omits them; readConfig
- * JSON.parse never re-adds them), so a blob-sourced object has NO own property for
- * an absent field. JSON.stringify hides this difference, but `Object.keys` /
- * `toHaveProperty` (and existing reconcile tests) do not. To stay behavior-
- * identical we run each TABLE-sourced row through the SAME JSON round-trip the blob
- * path applies, dropping undefined-valued keys. Blob-sourced rows (fallback +
- * blob-only keys) already came through that round-trip in readConfig, so they are
- * passed through untouched.
+ * STRIPPED undefined keys (the legacy blob JSON.stringify omitted them; JSON.parse
+ * never re-added them), so a blob-sourced object had NO own property for an absent
+ * field. JSON.stringify hides this difference, but `Object.keys` / `toHaveProperty`
+ * (and existing reconcile tests) do not. To stay behavior-identical we run each
+ * TABLE-sourced row through the SAME JSON round-trip the blob path applied, dropping
+ * undefined-valued keys.
  */
 function stripUndefinedKeys(keyword: TrackedKeyword): TrackedKeyword {
   const out: Record<string, unknown> = {};
@@ -357,20 +352,14 @@ function stripUndefinedKeys(keyword: TrackedKeyword): TrackedKeyword {
   return out as unknown as TrackedKeyword;
 }
 
-export function resolveTrackedKeywords(
-  workspaceId: string,
-  blobKeywords: TrackedKeyword[],
-): TrackedKeyword[] {
-  // Empty-table BLOB FALLBACK (KEPT until 3c-iii-b): a legacy workspace not yet
-  // dual-written/backfilled falls back to the blob verbatim, blob order and all.
-  if (countTrackedKeywordRows(workspaceId) === 0) return blobKeywords;
-
-  // Wave 3c-iii-a: data AND order from the TABLE. listTrackedKeywordRows already
-  // orders by sort_order ASC (the old blob array index, backfilled from the live
-  // blob + re-stamped on every write), so the natural row order IS the verbatim
-  // client-facing order — no blob-order reorder loop needed. Each row is run through
-  // stripUndefinedKeys for blob-object-shape parity (drops undefined keys +
-  // strips provenance/ownership-only fields).
+export function resolveTrackedKeywords(workspaceId: string): TrackedKeyword[] {
+  // Wave 3c-iii-b TABLE-ONLY: data AND order from the TABLE — the SOLE store.
+  // listTrackedKeywordRows already orders by sort_order ASC (the old blob array
+  // index, backfilled from the live blob + re-stamped on every write), so the
+  // natural row order IS the verbatim client-facing order. An empty table returns
+  // an EMPTY array — there is no blob fallback (the strip removed it). Each row is
+  // run through stripUndefinedKeys for blob-object-shape parity (drops undefined
+  // keys + strips provenance/ownership-only fields).
   return listTrackedKeywordRows(workspaceId).map(stripUndefinedKeys);
 }
 

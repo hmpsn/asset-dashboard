@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import db from '../../server/db/index.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import {
   addTrackedKeyword,
@@ -307,11 +306,12 @@ describe('reconcileStrategyRankTracking', () => {
   });
 
   it('normalizes legacy tracked keyword rows and preserves active rank output metadata', () => {
-    db.prepare(`
-      INSERT INTO rank_tracking_config (workspace_id, tracked_keywords)
-      VALUES (?, ?)
-      ON CONFLICT(workspace_id) DO UPDATE SET tracked_keywords = excluded.tracked_keywords
-    `).run(workspaceId, JSON.stringify([{ query: 'Legacy Keyword', addedAt: '2026-05-01T00:00:00.000Z' }]));
+    // Wave 3c-iii-b: the row table is the SOLE store — seed via the table writer
+    // (a legacy UNKNOWN-source keyword) instead of a raw blob INSERT (the blob is no
+    // longer read).
+    addTrackedKeyword(workspaceId, 'Legacy Keyword', {
+      source: TRACKED_KEYWORD_SOURCE.UNKNOWN,
+    });
 
     expect(getTrackedKeywords(workspaceId)).toEqual([
       expect.objectContaining({
@@ -360,11 +360,12 @@ describe('reconcileStrategyRankTracking', () => {
     // conservative default (strategy_owned NULL is never auto-deprecated).
     const firstRun = '2026-05-19T10:00:00.000Z';
     const secondRun = '2026-05-20T10:00:00.000Z';
-    db.prepare(`
-      INSERT INTO rank_tracking_config (workspace_id, tracked_keywords)
-      VALUES (?, ?)
-      ON CONFLICT(workspace_id) DO UPDATE SET tracked_keywords = excluded.tracked_keywords
-    `).run(workspaceId, JSON.stringify([{ query: 'Legacy Manual Keyword', addedAt: '2026-05-01T00:00:00.000Z' }]));
+    // Wave 3c-iii-b: seed the legacy UNKNOWN keyword via the table writer (the blob
+    // is no longer a store). UNKNOWN source + no strategyOwned = the realistic
+    // "ownership unknown, not a strategy target" case this test exercises.
+    addTrackedKeyword(workspaceId, 'Legacy Manual Keyword', {
+      source: TRACKED_KEYWORD_SOURCE.UNKNOWN,
+    });
 
     // First reconcile: the legacy keyword is NOT among the targets, so reconcile
     // leaves it untouched (manually preserved) and never establishes ownership.
@@ -418,11 +419,12 @@ describe('reconcileStrategyRankTracking', () => {
     // is the intended decoupled-ownership behavior, NOT the old source-conflation.
     const firstRun = '2026-05-19T10:00:00.000Z';
     const secondRun = '2026-05-20T10:00:00.000Z';
-    db.prepare(`
-      INSERT INTO rank_tracking_config (workspace_id, tracked_keywords)
-      VALUES (?, ?)
-      ON CONFLICT(workspace_id) DO UPDATE SET tracked_keywords = excluded.tracked_keywords
-    `).run(workspaceId, JSON.stringify([{ query: 'Adopted Keyword', addedAt: '2026-05-01T00:00:00.000Z' }]));
+    // Wave 3c-iii-b: seed the legacy UNKNOWN keyword via the table writer (the blob
+    // is no longer a store). The display form differs in case from the strategy
+    // target ('adopted keyword') to exercise the canonical-variant match below.
+    addTrackedKeyword(workspaceId, 'Adopted Keyword', {
+      source: TRACKED_KEYWORD_SOURCE.UNKNOWN,
+    });
 
     reconcileStrategyRankTracking({
       workspaceId,
