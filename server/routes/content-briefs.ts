@@ -242,7 +242,7 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
     let keywordMetrics: KeywordMetrics | undefined;
     let relatedKeywords: RelatedKeyword[] | undefined;
     const seoProvider = getConfiguredProvider(ws?.seoDataProvider);
-    const providerLabel = seoProvider ? getProviderDisplayName(seoProvider.name) : 'SEMRush';
+    const providerLabel = seoProvider ? getProviderDisplayName(seoProvider.name) : 'DataForSEO';
     if (seoProvider) {
       try {
         const locationCode = resolveWorkspaceLocationCode(req.params.workspaceId) ?? undefined;

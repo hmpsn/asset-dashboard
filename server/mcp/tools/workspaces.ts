@@ -20,6 +20,7 @@ import { listRequests } from '../../requests.js';
 import { countPendingClientActions } from '../../client-actions.js';
 import { toAdminWorkspaceView } from '../../serializers/admin-workspace-view.js';
 import { normalizeSocialProfiles } from '../../social-profiles.js';
+import { normalizeRuntimeSeoDataProvider } from '../../seo-data-provider.js';
 import { WS_EVENTS, ADMIN_EVENTS } from '../../ws-events.js';
 import { invalidateIntelligenceCache } from '../../workspace-intelligence.js';
 import { createLogger } from '../../logger.js';
@@ -204,7 +205,7 @@ async function handleUpdateWorkspace(
     ...(updates.onboarding_enabled !== undefined ? { onboardingEnabled: updates.onboarding_enabled } : {}),
     ...(updates.onboarding_completed !== undefined ? { onboardingCompleted: updates.onboarding_completed } : {}),
     ...(updates.publish_target !== undefined ? { publishTarget: updates.publish_target } : {}),
-    ...(updates.seo_data_provider !== undefined ? { seoDataProvider: updates.seo_data_provider } : {}),
+    ...(updates.seo_data_provider !== undefined ? { seoDataProvider: normalizeRuntimeSeoDataProvider(updates.seo_data_provider) } : {}),
     ...(updates.business_profile !== undefined ? { businessProfile } : {}),
     ...(updates.intelligence_profile !== undefined ? { intelligenceProfile: updates.intelligence_profile } : {}),
   };

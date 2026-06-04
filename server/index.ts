@@ -26,7 +26,6 @@ import { isStripeConfigured } from './stripe.js';
 import { DATA_BASE } from './data-dir.js';
 import { createLogger } from './logger.js';
 import { flushToDisk as flushOpenAIUsage } from './openai-helpers.js';
-import { flushCreditsToDisk as flushSemrushCredits } from './semrush.js';
 import { flushAll as flushEmailQueue } from './email-queue.js';
 import { listJobs, markRunningJobsInterrupted } from './jobs.js';
 import { setShuttingDown } from './routes/health.js';
@@ -148,7 +147,6 @@ function gracefulShutdown(signal: string) {
 
     // 5. Flush pending data to disk
     try { flushOpenAIUsage(); } catch (err) { log.error({ err }, 'Failed to flush OpenAI usage during shutdown'); }
-    try { flushSemrushCredits(); } catch (err) { log.error({ err }, 'Failed to flush SEMRush credits during shutdown'); }
     try { await flushEmailQueue(); } catch (err) { log.error({ err }, 'Failed to flush email queue during shutdown'); }
 
     // 6. Close SQLite database (flushes WAL)

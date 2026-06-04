@@ -495,8 +495,8 @@ describe('useKeywordStrategy', () => {
 
   it('returns keyword strategy data shape when API resolves', async () => {
     mockGet.mockResolvedValue({ targetKeywords: [], pageMap: {} });
-    mockKeywordsProviderStatus.mockResolvedValue({ providers: [{ name: 'semrush', configured: true }] });
-    mockWorkspacesGetById.mockResolvedValue({ competitorDomains: [], seoDataProvider: 'semrush' });
+    mockKeywordsProviderStatus.mockResolvedValue({ providers: [{ name: 'dataforseo', configured: true }] });
+    mockWorkspacesGetById.mockResolvedValue({ competitorDomains: [], seoDataProvider: 'dataforseo' });
     const { result } = renderHook(
       () => useKeywordStrategy('ws-1'),
       { wrapper: makeWrapper() },
@@ -509,7 +509,7 @@ describe('useKeywordStrategy', () => {
   it('does not block core strategy render while auxiliary metadata is still loading', async () => {
     mockGet.mockResolvedValue({ targetKeywords: ['core-keyword'], pageMap: {} });
     mockKeywordsProviderStatus.mockReturnValue(new Promise(() => {}));
-    mockWorkspacesGetById.mockResolvedValue({ competitorDomains: [], seoDataProvider: 'semrush' });
+    mockWorkspacesGetById.mockResolvedValue({ competitorDomains: [], seoDataProvider: 'dataforseo' });
     const { result } = renderHook(
       () => useKeywordStrategy('ws-1'),
       { wrapper: makeWrapper() },

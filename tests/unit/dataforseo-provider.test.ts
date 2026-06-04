@@ -811,10 +811,10 @@ describe('DataForSeoProvider — init() capability probe', () => {
     _resetRegistryForTest();
   });
 
-  it('marks backlinks disabled when probe returns subscription error', async () => {
+  it('does not probe or disable backlinks when a subscription error would previously be returned', async () => {
     const provider = new DataForSeoProvider();
 
-    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({
         tasks: [{ status_code: 40204, status_message: 'subscription required — 40204', cost: 0 }],
@@ -823,7 +823,8 @@ describe('DataForSeoProvider — init() capability probe', () => {
 
     await provider.init();
 
-    expect(isCapabilityDisabled('dataforseo', 'backlinks')).toBe(true);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(isCapabilityDisabled('dataforseo', 'backlinks')).toBe(false);
   });
 
   it('does not mark backlinks disabled when probe succeeds', async () => {
@@ -858,34 +859,33 @@ describe('DataForSeoProvider — init() capability probe', () => {
     }
   });
 
-  it('skips API probe when a recent probe result exists on disk', async () => {
+  it('ignores legacy recent probe cache files and leaves backlinks enabled', async () => {
     const provider = new DataForSeoProvider();
     const fresh = { outcome: 'backlinks-disabled', probedAt: new Date().toISOString() };
 
-    // readFileSync returns a fresh cached probe result → init() must not call fetch.
     vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(fresh));
     const fetchSpy = vi.spyOn(global, 'fetch');
 
     await provider.init();
 
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(isCapabilityDisabled('dataforseo', 'backlinks')).toBe(true);
+    expect(isCapabilityDisabled('dataforseo', 'backlinks')).toBe(false);
   });
 
-  it('re-probes when the cached probe result is older than the 24h TTL', async () => {
+  it('ignores legacy stale probe cache files and does not re-probe', async () => {
     const provider = new DataForSeoProvider();
     const stale = { outcome: 'backlinks-disabled', probedAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString() };
 
     vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(stale));
     vi.spyOn(fs, 'writeFileSync').mockReturnValue(undefined);
-    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve(dfsTaskResponse([{ target: 'example.com', backlinks: 0 }])),
     } as Response);
 
     await provider.init();
 
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).not.toHaveBeenCalled();
     expect(isCapabilityDisabled('dataforseo', 'backlinks')).toBe(false);
   });
 });

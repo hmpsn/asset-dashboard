@@ -48,7 +48,7 @@ router.post('/api/webflow/keyword-analysis', requireWorkspaceAccessFromBody(), a
   let kwBlock = '';
   const kwWs = workspaceId ? getWorkspace(workspaceId) : null;
   const kwProvider = getConfiguredProvider(kwWs?.seoDataProvider);
-  const kwProviderLabel = kwProvider ? getProviderDisplayName(kwProvider.name) : 'SEMRush';
+  const kwProviderLabel = kwProvider ? getProviderDisplayName(kwProvider.name) : 'DataForSEO';
   if (kwProvider && workspaceId) {
     try {
       const seedKeyword = seoTitle || pageTitle;

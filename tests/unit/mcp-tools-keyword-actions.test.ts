@@ -33,6 +33,7 @@ vi.mock('../../server/page-keywords.js', () => ({
 
 vi.mock('../../server/seo-data-provider.js', () => ({
   getConfiguredProvider: h.getConfiguredProvider,
+  normalizeRuntimeSeoDataProvider: (provider?: string | null) => provider === 'dataforseo' || provider === 'semrush' ? 'dataforseo' : 'dataforseo',
 }));
 
 vi.mock('../../server/workspace-intelligence.js', () => ({
@@ -231,14 +232,14 @@ describe('mcp keyword action tools', () => {
     expect(providerErr.content[0].text).toContain('Keyword research failed: provider exploded');
   });
 
-  it('covers semrush provider selection and page/url fallback branches', async () => {
+  it('normalizes legacy semrush provider preference and covers page/url fallback branches', async () => {
     h.getWorkspace.mockReturnValueOnce({ id: 'ws-1', seoDataProvider: 'semrush' });
     const semrush = await handleKeywordActionTool('research_keywords', {
       workspace_id: 'ws-1',
       terms: ['hvac'],
     });
     expect(semrush.isError).toBeUndefined();
-    expect(h.getConfiguredProvider).toHaveBeenLastCalledWith('semrush');
+    expect(h.getConfiguredProvider).toHaveBeenLastCalledWith('dataforseo');
 
     const rootPath = await handleKeywordActionTool('add_keyword_to_strategy', {
       workspace_id: 'ws-1',
@@ -267,7 +268,7 @@ describe('mcp keyword action tools', () => {
       workspace_id: 'ws-1',
       terms: ['hvac'],
     });
-    expect(h.getConfiguredProvider).toHaveBeenLastCalledWith(undefined);
+    expect(h.getConfiguredProvider).toHaveBeenLastCalledWith('dataforseo');
 
     h.getWorkspace.mockReturnValueOnce(undefined);
     const missingWs = await handleKeywordActionTool('add_keyword_to_strategy', {

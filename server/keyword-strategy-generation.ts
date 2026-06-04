@@ -3,7 +3,7 @@
  *
  * Shared by the direct keyword strategy route and background job worker.
  */
-import { DEFAULT_SEO_DATA_PROVIDER, getConfiguredProvider, type ProviderName } from './seo-data-provider.js';
+import { DEFAULT_SEO_DATA_PROVIDER, getConfiguredProvider, normalizeRuntimeSeoDataProvider, type ProviderName } from './seo-data-provider.js';
 import { incrementIfAllowed, decrementUsage } from './usage-tracking.js';
 import { updateWorkspace, getWorkspace, getTokenForSite } from './workspaces.js';
 import { createLogger } from './logger.js';
@@ -94,7 +94,7 @@ function normalizeSeoDataMode(mode: string | undefined): 'quick' | 'full' | 'non
 }
 
 function normalizeSeoDataProvider(provider: string | undefined): ProviderName | undefined {
-  return provider === 'dataforseo' || provider === 'semrush' ? provider : undefined;
+  return provider ? normalizeRuntimeSeoDataProvider(provider) : undefined;
 }
 
 export async function generateKeywordStrategy(options: GenerateKeywordStrategyOptions): Promise<GenerateKeywordStrategyResult> {
@@ -123,7 +123,7 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
   }
 
   const providerPreference = normalizeSeoDataProvider(options.seoDataProvider)
-    ?? ws.seoDataProvider
+    ?? normalizeSeoDataProvider(ws.seoDataProvider)
     ?? DEFAULT_SEO_DATA_PROVIDER;
   const provider = getConfiguredProvider(providerPreference);
 

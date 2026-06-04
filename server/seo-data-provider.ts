@@ -162,18 +162,13 @@ export function getProvider(name: ProviderName): SeoDataProvider | undefined {
   return providers.get(name);
 }
 
-export function getConfiguredProvider(preferred?: ProviderName): SeoDataProvider | null {
-  // If a preferred provider is specified and configured, use it
-  if (preferred) {
-    const p = providers.get(preferred);
-    if (p?.isConfigured()) return p;
-  }
-  // Fall back to any configured provider (DataForSEO is now the primary provider)
-  for (const name of [DEFAULT_SEO_DATA_PROVIDER, 'semrush'] as ProviderName[]) {
-    const p = providers.get(name);
-    if (p?.isConfigured()) return p;
-  }
-  return null;
+export function normalizeRuntimeSeoDataProvider(_provider?: string | null): ProviderName {
+  return DEFAULT_SEO_DATA_PROVIDER;
+}
+
+export function getConfiguredProvider(_preferred?: ProviderName): SeoDataProvider | null {
+  const provider = providers.get(DEFAULT_SEO_DATA_PROVIDER);
+  return provider?.isConfigured() ? provider : null;
 }
 
 // ── Per-provider capability flags ──
@@ -219,7 +214,7 @@ export function _resetRegistryForTest(): void {
 
 /** Returns the human-readable display name for a provider. */
 export function getProviderDisplayName(providerName: string): string {
-  return providerName === 'dataforseo' ? 'DataForSEO' : 'SEMRush';
+  return providerName === 'dataforseo' || providerName === 'semrush' ? 'DataForSEO' : 'DataForSEO';
 }
 
 /**
@@ -233,7 +228,7 @@ export function getProviderForCapability(capability: string, preferred?: Provide
   if (!primary) return null;
 
   const primaryName = [...providers.entries()].find(([, p]) => p === primary)?.[0];
-  if (primaryName && isCapabilityDisabled(primaryName, capability)) {
+  if (capability !== 'backlinks' && primaryName && isCapabilityDisabled(primaryName, capability)) {
     return null;
   }
 
@@ -252,10 +247,7 @@ export function getBacklinksProvider(preferred?: ProviderName): SeoDataProvider 
 }
 
 export function isAnyProviderConfigured(): boolean {
-  for (const p of providers.values()) {
-    if (p.isConfigured()) return true;
-  }
-  return false;
+  return providers.get(DEFAULT_SEO_DATA_PROVIDER)?.isConfigured() ?? false;
 }
 
 export function listProviders(): { name: ProviderName; configured: boolean }[] {

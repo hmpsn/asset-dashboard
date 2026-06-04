@@ -108,8 +108,8 @@ export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, c
         <div className="flex items-center gap-3 py-6 justify-center">
           <Icon as={Target} size="lg" className="text-[var(--brand-text-muted)]" />
           <div>
-            <p className="t-body text-[var(--brand-text)]">Competitive Intelligence requires an SEO data provider</p>
-            <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">Configure SEMRush or DataForSEO in Settings to unlock this feature.</p>
+            <p className="t-body text-[var(--brand-text)]">Competitive Intelligence requires DataForSEO</p>
+            <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">Configure DataForSEO to unlock live domain, keyword, and backlink comparisons.</p>
           </div>
         </div>
       </SectionCard>

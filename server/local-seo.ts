@@ -15,7 +15,7 @@ import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js
 import { isStrategyPoolEligibleKeyword, isNearDuplicateKeyword } from './keyword-intelligence/rules.js';
 import { listPageKeywords } from './page-keywords.js';
 import { getTrackedKeywords } from './rank-tracking.js';
-import { DEFAULT_SEO_DATA_PROVIDER, getProvider, isCapabilityDisabled, type ProviderName, type SeoDataProvider } from './seo-data-provider.js';
+import { DEFAULT_SEO_DATA_PROVIDER, getProvider, isCapabilityDisabled, normalizeRuntimeSeoDataProvider, type SeoDataProvider } from './seo-data-provider.js';
 import { getTaxonomyForIndustry } from './service-taxonomy.js';
 import { getWorkspace } from './workspaces.js';
 import { WS_EVENTS } from './ws-events.js';
@@ -2229,7 +2229,7 @@ export function createLocalSeoRefreshPlan(workspaceId: string, request: LocalSeo
 }
 
 function resolveLocalVisibilityProvider(workspace: Workspace): SeoDataProvider | null {
-  const providerName = (workspace.seoDataProvider as ProviderName | undefined) ?? DEFAULT_SEO_DATA_PROVIDER;
+  const providerName = normalizeRuntimeSeoDataProvider(workspace.seoDataProvider ?? DEFAULT_SEO_DATA_PROVIDER);
   if (isCapabilityDisabled(providerName, 'local_visibility')) return null;
   const provider = getProvider(providerName);
   if (!provider?.isConfigured()) return null;
@@ -2237,7 +2237,7 @@ function resolveLocalVisibilityProvider(workspace: Workspace): SeoDataProvider |
 }
 
 function resolveLocalLocationProvider(workspace: Workspace): SeoDataProvider | null {
-  const providerName = (workspace.seoDataProvider as ProviderName | undefined) ?? DEFAULT_SEO_DATA_PROVIDER;
+  const providerName = normalizeRuntimeSeoDataProvider(workspace.seoDataProvider ?? DEFAULT_SEO_DATA_PROVIDER);
   if (isCapabilityDisabled(providerName, 'local_visibility')) return null;
   const provider = getProvider(providerName);
   if (!provider?.isConfigured()) return null;

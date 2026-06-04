@@ -68,7 +68,7 @@ export function BacklinkProfile({ workspaceId }: Props) {
         <SectionCard noPadding>
           <div className="px-4 py-4 flex items-center gap-2 text-[var(--brand-text-muted)] t-caption">
             <Icon as={AlertTriangle} size="md" className="text-amber-400" />
-            <span>Backlink data requires an SEO provider. Set <code className="text-[var(--brand-text)]">SEMRUSH_API_KEY</code> or <code className="text-[var(--brand-text)]">DATAFORSEO_LOGIN</code> in environment to enable.</span>
+            <span>Backlink data requires DataForSEO. Set <code className="text-[var(--brand-text)]">DATAFORSEO_LOGIN</code> and <code className="text-[var(--brand-text)]">DATAFORSEO_PASSWORD</code> in the environment to enable it.</span>
           </div>
         </SectionCard>
       );

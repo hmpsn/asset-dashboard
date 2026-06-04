@@ -37,7 +37,7 @@ import type {
   BacklinksOverview,
   ReferringDomain,
 } from '../seo-data-provider.js';
-import { markCapabilityDisabled, normalizeProviderDate } from '../seo-data-provider.js';
+import { normalizeProviderDate } from '../seo-data-provider.js';
 import { fetchProviderJson, isExternalFetchError } from '../external-fetch.js';
 import { normalizeDomainValue } from '../domain-normalization.js';
 
@@ -156,52 +156,6 @@ function markCreditsExhausted(): void {
 
 function areCreditsExhausted(): boolean {
   return Date.now() < creditExhaustedUntil;
-}
-
-// ── Backlinks subscription detection ──
-// DataForSEO backlinks is a separate paid subscription (error 40204).
-// Once detected, we mark the capability disabled on the registry (with a 24h TTL)
-// so optional backlink enrichment can degrade without spending provider credits.
-// The registry itself handles TTL expiry and auto-re-enables the capability.
-
-const BACKLINK_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
-
-function markBacklinksDisabled(): void {
-  markCapabilityDisabled('dataforseo', 'backlinks', BACKLINK_COOLDOWN_MS);
-}
-
-// ── Probe result persistence (avoids billable probe on every server restart) ──
-// The in-memory registry's 24h capability TTL resets on restart. Frequently-restarting
-// deploys (rolling updates, dev reloads) would otherwise consume a probe credit per restart.
-// Cache the probe outcome to disk with the same 24h TTL; refresh only when stale or absent.
-
-interface ProbeResult {
-  /** 'backlinks-disabled' | 'backlinks-available' */
-  outcome: 'backlinks-disabled' | 'backlinks-available';
-  probedAt: string;
-}
-
-function getProbeCachePath(): string {
-  return path.join(CREDIT_DIR, 'probe-result.json');
-}
-
-function readProbeCache(): ProbeResult | null {
-  try {
-    const raw = fs.readFileSync(getProbeCachePath(), 'utf-8');
-    const parsed = JSON.parse(raw) as ProbeResult;
-    const age = Date.now() - new Date(parsed.probedAt).getTime();
-    if (age > BACKLINK_COOLDOWN_MS) return null;
-    return parsed;
-  } catch { return null; }
-}
-
-function writeProbeCache(outcome: ProbeResult['outcome']): void {
-  try {
-    fs.writeFileSync(
-      getProbeCachePath(),
-      JSON.stringify({ outcome, probedAt: new Date().toISOString() } satisfies ProbeResult, null, 2),
-    );
-  } catch (err) { log.warn({ err }, 'Failed to persist DataForSEO probe result'); }
 }
 
 function isSubscriptionError(err: unknown): boolean {
@@ -701,32 +655,7 @@ export class DataForSeoProvider implements SeoDataProvider {
   }
 
   async init(): Promise<void> {
-    if (!this.isConfigured()) return;
-
-    // Reuse a recent probe result from disk so rolling restarts don't spend a credit per boot.
-    const cached = readProbeCache();
-    if (cached) {
-      if (cached.outcome === 'backlinks-disabled') {
-        markBacklinksDisabled();
-        log.info({ probedAt: cached.probedAt }, 'DataForSEO backlinks disabled (cached probe)');
-      }
-      return;
-    }
-
-    try {
-      await apiCall('backlinks/summary/live', [{ target: 'example.com', include_subdomains: false }]);
-      writeProbeCache('backlinks-available');
-    } catch (err) {
-      // Only 40204 is a reliable signal in the cold-start probe context
-      const errMsg = err instanceof Error ? err.message : String(err);
-      if (errMsg.includes('40204')) {
-        markBacklinksDisabled();
-        writeProbeCache('backlinks-disabled');
-        log.info('DataForSEO backlinks subscription not available — backlink enrichment disabled');
-      }
-      // Non-subscription errors (network, rate limit) are silently ignored — reactive detection
-      // handles them, and we deliberately don't cache them so transient issues get retried next boot.
-    }
+    return;
   }
 
   // ── getKeywordMetrics → search_volume ──
@@ -1615,18 +1544,20 @@ export class DataForSeoProvider implements SeoDataProvider {
       }
 
       const totalBacklinks = (data.backlinks as number) ?? 0;
-      const refLinksAttrs = data.referring_links_attributes as Record<string, number> | undefined;
-      const nofollowLinks = refLinksAttrs?.nofollow ?? 0;
+      const refLinksTypes = data.referring_links_types as Record<string, number> | undefined;
+      const nofollowLinks = (data.referring_pages_nofollow as number | undefined)
+        ?? (data.referring_domains_nofollow as number | undefined)
+        ?? 0;
 
       const overview: BacklinksOverview = {
         totalBacklinks,
         referringDomains: (data.referring_domains as number) ?? 0,
-        followLinks: totalBacklinks - nofollowLinks,
+        followLinks: Math.max(0, totalBacklinks - nofollowLinks),
         nofollowLinks,
-        textLinks: 0, // Not directly provided by DataForSEO summary
-        imageLinks: 0,
-        formLinks: 0,
-        frameLinks: 0,
+        textLinks: refLinksTypes?.anchor ?? 0,
+        imageLinks: refLinksTypes?.image ?? 0,
+        formLinks: refLinksTypes?.form ?? 0,
+        frameLinks: refLinksTypes?.frame ?? 0,
       };
 
       logCreditUsage({ credits: cost, endpoint: 'backlinks_summary', query: target, rowsReturned: 1, workspaceId, cached: false });
@@ -1634,7 +1565,7 @@ export class DataForSeoProvider implements SeoDataProvider {
       return overview;
     } catch (err) {
       if (isSubscriptionError(err)) {
-        markBacklinksDisabled();
+        log.warn({ err }, `DataForSEO backlinks summary unavailable for "${target}"`);
         return null;
       }
       log.error({ err }, `DataForSEO backlinks summary error for "${target}"`);
@@ -1683,7 +1614,7 @@ export class DataForSeoProvider implements SeoDataProvider {
       return results;
     } catch (err) {
       if (isSubscriptionError(err)) {
-        markBacklinksDisabled();
+        log.warn({ err }, `DataForSEO referring domains unavailable for "${target}"`);
         return [];
       }
       log.error({ err }, `DataForSEO referring domains error for "${target}"`);

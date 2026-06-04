@@ -44,6 +44,7 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { hasActiveJob } from '../jobs.js';
 import { generateKeywordStrategy, KeywordStrategyGenerationError, KEYWORD_STRATEGY_MAX_PAGE_CAP } from '../keyword-strategy-generation.js';
+import { normalizeRuntimeSeoDataProvider } from '../seo-data-provider.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import {
   adminBulkKeywordFeedbackSchema,
@@ -70,7 +71,7 @@ function readSeoDataMode(body: unknown): string | undefined {
 function readSeoDataProvider(body: unknown): string | undefined {
   if (!body || typeof body !== 'object') return undefined;
   const candidate = (body as { seoDataProvider?: unknown }).seoDataProvider;
-  return typeof candidate === 'string' ? candidate : undefined;
+  return typeof candidate === 'string' ? normalizeRuntimeSeoDataProvider(candidate) : undefined;
 }
 
 function serializeKeywordStrategy(

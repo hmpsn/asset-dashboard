@@ -95,6 +95,9 @@ export const keywords = {
   semrushStatus: () =>
     getOptional<{ configured: boolean }>('/api/semrush/status'),
 
+  seoProviderStatus: () =>
+    getOptional<{ configured: boolean }>('/api/semrush/status'),
+
   providerStatus: () =>
     getOptional<{ providers: { name: string; configured: boolean }[] }>('/api/seo-providers/status'),
 
