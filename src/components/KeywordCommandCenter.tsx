@@ -15,7 +15,6 @@ import { adminPath } from '../routes';
 import {
   Badge,
   Button,
-  Checkbox,
   ConfirmDialog,
   EmptyState,
   FormInput,
@@ -44,9 +43,13 @@ import { LocalSeoVisibilityPanel } from './local-seo/LocalSeoVisibilityPanel';
 import { KeywordBulkActionBar } from './keyword-command-center/KeywordBulkActionBar';
 import { KeywordBulkConfirmDialog } from './keyword-command-center/KeywordBulkConfirmDialog';
 import { KeywordDetailDrawer } from './keyword-command-center/KeywordDetailDrawer';
-import { KeywordRow } from './keyword-command-center/KeywordRow';
+import {
+  kccCustomColumns,
+  renderKccExpanded,
+  renderKccKeywordMeta,
+} from './keyword-command-center/KeywordRow';
 import { SummaryMetric } from './keyword-command-center/SummaryMetric';
-import { KEYWORD_ROW_GRID } from './keyword-command-center/VariantSubRow';
+import { KeywordTable } from './shared/RankTable';
 import {
   FILTER_ICONS,
   filterCountLabel,
@@ -290,11 +293,22 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
     runServerAction(row, action);
   };
 
-  const toggleBulkKey = (row: KeywordCommandCenterRow, checked: boolean) => {
+  // Pure toggle-by-id for the KeywordTable selection slot (membership is derived
+  // from selectedBulkKeys, so a plain add/remove toggle is sufficient).
+  const toggleBulkKeyById = (key: string) => {
     setSelectedBulkKeys(previous => {
       const next = new Set(previous);
-      if (checked) next.add(row.normalizedKeyword);
-      else next.delete(row.normalizedKeyword);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleVariants = (key: string) => {
+    setExpandedVariants(previous => {
+      const next = new Set(previous);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   };
@@ -496,64 +510,42 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
         </div>
 
         <div className="overflow-x-auto">
-          <div className="min-w-[1080px]">
-            <div className={`hidden md:grid ${KEYWORD_ROW_GRID} gap-3 px-4 py-2 border-b border-[var(--brand-border)] bg-[var(--surface-3)]/30`}>
-              <Checkbox
-                checked={allVisibleSelected}
-                onChange={toggleVisibleRows}
-                label={someVisibleSelected && !allVisibleSelected ? 'Select all visible keywords' : 'Select visible keywords'}
-                srOnlyLabel
-              />
-              <p className="t-label uppercase tracking-wider text-[var(--brand-text-muted)]">Keyword</p>
-              <p className="t-label uppercase tracking-wider text-[var(--brand-text-muted)]">Status</p>
-              <p className="t-label uppercase tracking-wider text-[var(--brand-text-muted)]">Local</p>
-              <p className="t-label uppercase tracking-wider text-[var(--brand-text-muted)]">
-                <span>Demand</span>
-                {summaryData?.geoLabel && (
-                  <span className="ml-1 normal-case t-caption-sm text-[var(--brand-text-muted)]">
-                    - {summaryData.geoLabel}
-                  </span>
-                )}
-              </p>
-              <p className="t-label uppercase tracking-wider text-[var(--brand-text-muted)]">Rank/KD</p>
-              <p className="t-label uppercase tracking-wider text-[var(--brand-text-muted)]">Assignment</p>
-              <p className="t-label uppercase tracking-wider text-[var(--brand-text-muted)] text-right">Next</p>
-            </div>
-
-            {rowsResult.isFetching ? (
-              <TableSkeleton rows={8} columns={7} />
-            ) : rows.length === 0 ? (
-              <EmptyState
-                icon={Search}
-                title="No keywords match this view"
-                description="Try a different filter or search term. Raw provider evidence is capped so the operating list stays useful."
-              />
-            ) : (
-              <div className="max-h-[680px] overflow-y-auto">
-                {rows.map(row => (
-                  <KeywordRow
-                    key={row.normalizedKeyword}
-                    row={row}
-                    active={selectedRow?.normalizedKeyword === row.normalizedKeyword}
-                    selected={selectedBulkKeys.has(row.normalizedKeyword)}
-                    onSelect={() => setSelectedKey(row.normalizedKeyword)}
-                    onToggleSelected={checked => toggleBulkKey(row, checked)}
-                    variantsExpanded={expandedVariants.has(row.normalizedKeyword)}
-                    onToggleVariants={() => {
-                      setExpandedVariants(previous => {
-                        const next = new Set(previous);
-                        if (next.has(row.normalizedKeyword)) {
-                          next.delete(row.normalizedKeyword);
-                        } else {
-                          next.add(row.normalizedKeyword);
-                        }
-                        return next;
-                      });
-                    }}
-                  />
-                ))}
-              </div>
-            )}
+          <div className="min-w-[1080px] max-h-[680px] overflow-y-auto">
+            <KeywordTable<KeywordCommandCenterRow>
+              rows={rows}
+              columns={[]}
+              loading={rowsResult.isFetching}
+              density="comfortable"
+              stickyHeader
+              truncateKeyword
+              emptyState={{
+                icon: Search,
+                title: 'No keywords match this view',
+                description: 'Try a different filter or search term. Raw provider evidence is capped so the operating list stays useful.',
+              }}
+              selection={{
+                selected: selectedBulkKeys,
+                onToggle: toggleBulkKeyById,
+                rowId: row => row.normalizedKeyword,
+                label: row => `Select ${row.keyword}`,
+                header: {
+                  checked: allVisibleSelected,
+                  onToggle: toggleVisibleRows,
+                  label: someVisibleSelected && !allVisibleSelected ? 'Select all visible keywords' : 'Select visible keywords',
+                },
+              }}
+              customColumns={kccCustomColumns(summaryData?.geoLabel)}
+              keywordText={row => row.keyword}
+              renderKeywordMeta={renderKccKeywordMeta}
+              onRowClick={row => setSelectedKey(row.normalizedKeyword)}
+              isRowActive={row => selectedRow?.normalizedKeyword === row.normalizedKeyword}
+              isRowExpanded={row => (row.variantCount ?? 0) > 0}
+              renderExpanded={row => renderKccExpanded(
+                row,
+                expandedVariants.has(row.normalizedKeyword),
+                () => toggleVariants(row.normalizedKeyword),
+              )}
+            />
           </div>
         </div>
 

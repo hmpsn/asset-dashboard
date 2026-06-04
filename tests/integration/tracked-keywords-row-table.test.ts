@@ -467,6 +467,14 @@ describe('(e) sourceGapKey provenance — persist / fill-if-empty / strip / admi
     expect(Object.prototype.hasOwnProperty.call(publicRow, 'sourceGapKey')).toBe(false);
     // And it never leaks as a serialized substring either.
     expect(JSON.stringify(body)).not.toContain('sourceGapKey');
+
+    // Wave 4 P0 NO-LEAK (spec §Risks #3): strategyOwned is admin-only. The general
+    // read path strips it (tracked-keywords-store.ts `delete out.strategyOwned`) AND
+    // the public endpoint must never echo it — neither as an own property nor as a
+    // serialized substring.
+    expect(Object.prototype.hasOwnProperty.call(generalRow, 'strategyOwned')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(publicRow, 'strategyOwned')).toBe(false);
+    expect(JSON.stringify(body)).not.toContain('strategyOwned');
   });
 
   // (4) ADMIN-SEES-IT — the KCC tracking row exposes sourceGapKey.
@@ -487,6 +495,26 @@ describe('(e) sourceGapKey provenance — persist / fill-if-empty / strip / admi
     const row = result?.rows.find(r => keywordComparisonKey(r.keyword) === keywordComparisonKey('porcelain veneers'));
     expect(row).toBeDefined();
     expect(row?.tracking.sourceGapKey).toBe(keywordComparisonKey('porcelain veneers'));
+  });
+
+  // (5) Wave 4 P0 ADMIN-SEES-IT — the KCC tracking row exposes strategyOwned when
+  // strategy_owned = 1 (additive, admin-only). Sibling to the sourceGapKey admin test.
+  it('admin — the KCC tracking row exposes strategyOwned when strategy_owned=1', async () => {
+    const { addTrackedKeyword } = await import('../../server/rank-tracking.js');
+    const { buildKeywordCommandCenterRows } = await import('../../server/keyword-command-center.js');
+    const { keywordComparisonKey } = await import('../../shared/keyword-normalization.js');
+    const { TRACKED_KEYWORD_SOURCE } = await import('../../shared/types/rank-tracking.js');
+
+    addTrackedKeyword(wsId, 'dental bridge cost', {
+      source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
+      strategyOwned: true,
+    });
+
+    const result = await buildKeywordCommandCenterRows(wsId, {});
+    expect(result).not.toBeNull();
+    const row = result?.rows.find(r => keywordComparisonKey(r.keyword) === keywordComparisonKey('dental bridge cost'));
+    expect(row).toBeDefined();
+    expect(row?.tracking.strategyOwned).toBe(true);
   });
 });
 

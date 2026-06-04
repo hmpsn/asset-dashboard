@@ -347,6 +347,32 @@ describe('KeywordCommandCenter', () => {
     expect(screen.getAllByText('Visible #2').length).toBeGreaterThan(0);
   });
 
+  it('migration-equivalence: renders the bespoke KCC columns + affordances through the canonical KeywordTable', () => {
+    const { container } = renderCommandCenter();
+
+    // Column headers (now KeywordTable custom-column headers) — scoped to the table head.
+    const thead = container.querySelector('table thead')!;
+    const headerText = thead.textContent ?? '';
+    for (const label of ['Keyword', 'Status', 'Local', 'Demand', 'Rank/KD', 'Assignment', 'Next']) {
+      expect(headerText).toContain(label);
+    }
+
+    // Status badge (lifecycle), demand value, rank value, assignment text.
+    expect(screen.getAllByText('In Strategy').length).toBeGreaterThan(0);
+    expect(screen.getByText('#6.0')).toBeInTheDocument(); // currentPosition 6 → #6.0
+    expect(screen.getAllByText('Cosmetic Dentistry').length).toBeGreaterThan(0); // assignment page title
+
+    // Amber "Not yet mapped" assignment for an in-strategy row missing an assignment.
+    // (the seeded in-strategy row HAS an assignment, so assert the unmapped fallback
+    // surfaces for raw-evidence/needs-review rows that lack one is covered by the
+    // assignment cell rendering; here we assert the variant + next-action badges.)
+    expect(screen.getAllByText(/Refresh local|View rankings/).length).toBeGreaterThan(0);
+
+    // Header select-all checkbox + per-row selection checkbox (a11y labels preserved).
+    expect(screen.getByLabelText(/select (all )?visible keywords/i)).toBeInTheDocument();
+    expect(screen.getByLabelText('Select cosmetic dentistry')).toBeInTheDocument();
+  });
+
   it('defers local visibility panel mount until after the first rows render', () => {
     renderCommandCenter();
     expect(screen.getByText('Local visibility summary will load after the keyword rows are ready.')).toBeInTheDocument();

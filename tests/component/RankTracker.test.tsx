@@ -272,6 +272,48 @@ describe('RankTracker — keyword rankings table', () => {
       expect(screen.getByText('Services Page')).toBeInTheDocument();
     });
   });
+
+  // ── Wave 4 P0-T3 migration-equivalence: pin / expand-sparkline / pinned-first sort
+  //    survive the KeywordTable migration. ──
+  it('migration-equivalence: pin toggle + expand-to-sparkline + remove affordances survive', async () => {
+    await setupMocks([makeKeyword()], [makeRank({ query: 'seo tips', pinned: false })]);
+    const { patch } = await import('../../src/api/client');
+    renderRankTracker(<RankTracker workspaceId="ws-1" hasGsc={true} />);
+
+    await waitFor(() => screen.getByText('seo tips'));
+
+    // Pin toggle fires the togglePin PATCH.
+    const pinBtn = screen.getByRole('button', { name: /pin keyword/i });
+    fireEvent.click(pinBtn);
+    await waitFor(() => expect(vi.mocked(patch)).toHaveBeenCalled());
+
+    // Clicking the keyword (row-open affordance) expands the sparkline section
+    // (history empty in the mock → "Not enough snapshots for trend").
+    fireEvent.click(screen.getByText('seo tips'));
+    await waitFor(() => {
+      expect(screen.getByText(/not enough snapshots for trend/i)).toBeInTheDocument();
+    });
+
+    // Remove affordance present.
+    expect(screen.getByRole('button', { name: /remove keyword/i })).toBeInTheDocument();
+  });
+
+  it('migration-equivalence: pinned keyword sorts before an unpinned better-ranked keyword', async () => {
+    await setupMocks(
+      [makeKeyword({ query: 'pinned kw' }), makeKeyword({ query: 'unpinned kw' })],
+      [
+        makeRank({ query: 'unpinned kw', position: 2, pinned: false }),
+        makeRank({ query: 'pinned kw', position: 18, pinned: true }),
+      ],
+    );
+    const { container } = renderRankTracker(<RankTracker workspaceId="ws-1" hasGsc={true} />);
+
+    await waitFor(() => screen.getByText('pinned kw'));
+
+    // Pinned-first ordering preserved: 'pinned kw' appears before 'unpinned kw' in DOM order.
+    const bodyText = container.querySelector('table tbody')!.textContent ?? '';
+    expect(bodyText.indexOf('pinned kw')).toBeLessThan(bodyText.indexOf('unpinned kw'));
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════════════════

@@ -65,6 +65,14 @@ export const FEATURE_FLAGS = {
   // default; per-phase sub-features stay flag-gated and roll out per-workspace via the
   // P0 per-workspace flag dimension. See docs/plans/2026-06-02-seo-generation-quality-plan.md.
   'seo-generation-quality': false,
+
+  // Keyword Hub (Wave 4). Umbrella kill-switch for the multi-phase consolidation of the
+  // admin Keyword Command Center (seo-keywords) and the standalone Rank Tracker (seo-ranks)
+  // into one keyword-first Hub. Dark by default; the whole Hub surface mounts behind this
+  // flag and is flipped only at the P5 cutover (owner-gated). P0 ships behavior-preserving
+  // foundation (table-renderer migration + additive strategyOwned exposure) with the flag
+  // OFF. See docs/superpowers/plans/2026-06-04-keyword-hub.md.
+  'keyword-hub': false,
 } as const;
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;
@@ -121,6 +129,7 @@ export const FEATURE_FLAG_GROUP_LABELS = [
   'Schema AI',
   'Unified Send-to-Client',
   'SEO Generation Quality',
+  'Keyword Hub',
 ] as const;
 
 export type FeatureFlagGroupLabel = (typeof FEATURE_FLAG_GROUP_LABELS)[number];
@@ -418,6 +427,23 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: '2026-06-02',
     },
   },
+
+  'keyword-hub': {
+    label: 'Keyword Hub — unified keyword surface (KCC + Rank Tracker consolidation)',
+    group: 'Keyword Hub',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      // Dated to the lifecycle-audit horizon (REVIEWED_AT cohort / 2026-06-02), not the
+      // literal commit day, so the pinned-`asOf` lifecycle audit never reads these as
+      // future. The Wave 4 plan + spec carry the 2026-06-04 authoring date.
+      createdAt: '2026-06-02',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Remove after the Keyword Hub is validated on staging, flipped at the P5 cutover, and becomes the only keyword surface (seo-ranks folded in, no flag-off legacy KCC/Rank Tracker path).',
+      linkedRoadmapItemId: 'keyword-hub-wave4',
+      staleAuditCadence: 'weekly',
+      lastReviewedAt: '2026-06-02',
+    },
+  },
 };
 
 export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: FeatureFlagKey[] }> = [
@@ -473,6 +499,10 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   {
     label: 'SEO Generation Quality',
     keys: ['seo-generation-quality'],
+  },
+  {
+    label: 'Keyword Hub',
+    keys: ['keyword-hub'],
   },
 ];
 

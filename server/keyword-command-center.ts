@@ -1141,6 +1141,11 @@ function finalizeDraftRow(row: DraftRow, context: RowFinalizeContext): KeywordCo
       // Wave 3d-i ADDITIVE provenance (admin-only). Merged onto bundle.trackedKeywords
       // from the provenance-bearing table read (mergeTrackedKeywordProvenance).
       sourceGapKey: row.tracking.sourceGapKey,
+      // Wave 4 P0 ADDITIVE ownership (admin-only, three-state). Merged onto row.tracking
+      // by mergeTrackedKeywordProvenance from the provenance-bearing read. Project the
+      // raw value — NEVER Boolean()/?? false (undefined = ownership unknown, a real state).
+      // Stripped from getTrackedKeywords / the public endpoint, so it never leaks.
+      strategyOwned: row.tracking.strategyOwned,
       // True when any rank/GSC signal has materialized for the row. Distinguishes
       // active-with-data ("Active") from active-but-empty ("Awaiting data") in the UI.
       // Audit on Swish found ~75% of active-tracked rows had no rank/clicks/impressions —

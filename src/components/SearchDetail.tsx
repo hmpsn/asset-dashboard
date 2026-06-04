@@ -297,7 +297,9 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                     }}
                     emptyState={{ icon: Search, title: 'No queries data', description: 'No search query data available for this period.' }}
                     renderKeywordMeta={(r) => {
-                      const badge = badgeMap.get(r.query);
+                      // SearchDetail rows always carry `query` (the base field is now
+                      // optional only to admit superset rows like KCC's `keyword`).
+                      const badge = badgeMap.get(r.query ?? '');
                       return badge ? (
                         <span className={`t-micro font-semibold px-1 py-0.5 rounded-[var(--radius-sm)] ${badge.color} ${badge.bgColor} ml-1 whitespace-nowrap`}>
                           {badge.label}

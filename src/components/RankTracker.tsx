@@ -7,6 +7,7 @@ import {
 import { get } from '../api/client';
 import { rankTracking } from '../api/seo';
 import { Badge, EmptyState, SectionCard, Icon, Button, IconButton, PageHeader, FormInput, LoadingState, ErrorState } from './ui';
+import { KeywordTable } from './shared/RankTable';
 import { FeatureFlag } from './ui/FeatureFlag';
 import { cn } from '../lib/utils';
 import { chartGridColor, chartAxisColor, CHART_SERIES_COLORS, positionColor } from './ui/constants';
@@ -430,112 +431,127 @@ export function RankTracker({ workspaceId, hasGsc, onNavigate }: Props) {
         <LoadingState message="Loading pinned keyword trend history..." size="sm" className="py-8" />
       )}
 
-      {/* Rankings table */}
+      {/* Rankings table (migrated onto the canonical KeywordTable primitive,
+          behavior-preserving — Wave 4 P0-T3). */}
       {sorted.length > 0 ? (
         // pr-check-disable-next-line -- brand asymmetric signature on RankTracker rank-table card; non-SectionCard chrome
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
-          <div className="grid grid-cols-[1fr_80px_80px_80px_80px_60px] gap-2 px-4 py-2 t-caption font-medium text-[var(--brand-text-muted)] uppercase tracking-wider border-b border-[var(--brand-border)]">
-            <span>Keyword</span>
-            <span className="text-right">Position</span>
-            <span className="text-right">Change</span>
-            <span className="text-right">Clicks</span>
-            <span className="text-right">Impressions</span>
-            <span></span>
-          </div>
-          {sorted.map(rank => {
-            const isExpanded = expandedQuery === rank.query;
-            return (
-              <div key={rank.query}>
-                <div
-                  className="grid grid-cols-[1fr_80px_80px_80px_80px_60px] gap-2 px-4 py-2.5 items-center border-b border-[var(--brand-border)]/50 last:border-0 hover:bg-[var(--surface-3)]/20 cursor-pointer"
-                  onClick={() => toggleExpand(rank.query)}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <IconButton
-                      onClick={(e) => { e.stopPropagation(); togglePin(rank.query); }}
-                      icon={Pin}
-                      label={rank.pinned ? 'Unpin keyword' : 'Pin keyword'}
-                      size="sm"
-                      variant="ghost"
-                      className={cn('flex-shrink-0', rank.pinned ? 'text-amber-400' : 'text-[var(--brand-border-hover)] hover:text-[var(--brand-text)]')}
-                    />
-                    <Icon as={ChevronDown} size="sm" className={cn('text-[var(--brand-text-dim)] flex-shrink-0 transition-transform', isExpanded && 'rotate-180')} />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-xs text-[var(--brand-text-bright)] truncate">{rank.query}</span>
-                        {rank.source?.startsWith('strategy_') && <Badge tone="teal" size="sm" label="Strategy" />}
-                        {rank.source === 'client_requested' && <Badge tone="blue" size="sm" label="Client" />}
-                      </div>
-                      {rank.pagePath && (
-                        <div className="mt-0.5 flex items-center gap-2 min-w-0">
-                          <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{rank.pageTitle || rank.pagePath}</div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="px-1.5 py-0.5 t-caption-sm text-accent-brand flex-shrink-0"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              if (onNavigate) {
-                                onNavigate(adminPath(workspaceId, 'page-intelligence'), {
-                                  state: {
-                                    fixContext: {
-                                      targetRoute: 'page-intelligence',
-                                      pageSlug: rank.pagePath,
-                                      pageName: rank.pageTitle || rank.pagePath,
-                                    },
-                                  },
-                                });
-                                return;
-                              }
-                              window.location.assign(adminPath(workspaceId, 'page-intelligence'));
-                            }}
-                          >
-                            Open page
-                          </Button>
-                        </div>
-                      )}
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-x-auto rounded-[var(--radius-signature-lg)]">
+          <KeywordTable<LatestRank>
+            rows={sorted}
+            columns={[]}
+            density="compact"
+            truncateKeyword
+            renderKeywordMeta={(rank) => {
+              const isExpanded = expandedQuery === rank.query;
+              return (
+                <div className="flex items-center gap-2 min-w-0 mt-0.5">
+                  <IconButton
+                    onClick={(e) => { e.stopPropagation(); togglePin(rank.query); }}
+                    icon={Pin}
+                    label={rank.pinned ? 'Unpin keyword' : 'Pin keyword'}
+                    size="sm"
+                    variant="ghost"
+                    className={cn('flex-shrink-0', rank.pinned ? 'text-amber-400' : 'text-[var(--brand-border-hover)] hover:text-[var(--brand-text)]')}
+                  />
+                  <Icon as={ChevronDown} size="sm" className={cn('text-[var(--brand-text-dim)] flex-shrink-0 transition-transform', isExpanded && 'rotate-180')} />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      {rank.source?.startsWith('strategy_') && <Badge tone="teal" size="sm" label="Strategy" />}
+                      {rank.source === 'client_requested' && <Badge tone="blue" size="sm" label="Client" />}
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <span className={cn('text-sm font-bold', positionColor(rank.position))}>
-                      {Math.round(rank.position * 10) / 10}
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    {rank.change != null ? (
-                      <span className={cn('flex items-center justify-end gap-0.5 text-xs font-medium', rank.change < 0 ? 'text-emerald-400' : rank.change > 0 ? 'text-red-400' : 'text-[var(--brand-text-muted)]')}>
-                        {rank.change < 0 ? <Icon as={ArrowUp} size="sm" /> : rank.change > 0 ? <Icon as={ArrowDown} size="sm" /> : <Icon as={Minus} size="sm" />}
-                        {rank.change !== 0 ? Math.abs(Math.round(rank.change * 10) / 10) : '—'}
-                      </span>
-                    ) : (
-                      <span className="t-caption text-[var(--brand-text-muted)]">—</span>
+                    {rank.pagePath && (
+                      <div className="mt-0.5 flex items-center gap-2 min-w-0">
+                        <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{rank.pageTitle || rank.pagePath}</div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="px-1.5 py-0.5 t-caption-sm text-accent-brand flex-shrink-0"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            if (onNavigate) {
+                              onNavigate(adminPath(workspaceId, 'page-intelligence'), {
+                                state: {
+                                  fixContext: {
+                                    targetRoute: 'page-intelligence',
+                                    pageSlug: rank.pagePath,
+                                    pageName: rank.pageTitle || rank.pagePath,
+                                  },
+                                },
+                              });
+                              return;
+                            }
+                            window.location.assign(adminPath(workspaceId, 'page-intelligence'));
+                          }}
+                        >
+                          Open page
+                        </Button>
+                      </div>
                     )}
-                  </div>
-                  <div className="text-right text-xs text-[var(--brand-text)]">{rank.clicks}</div>
-                  <div className="text-right text-xs text-[var(--brand-text-muted)]">{rank.impressions.toLocaleString()}</div>
-                  <div className="text-right">
-                    <IconButton
-                      onClick={(e) => { e.stopPropagation(); removeKeyword(rank.query); }}
-                      icon={Trash2}
-                      label="Remove keyword"
-                      size="sm"
-                      variant="ghost"
-                      className="text-[var(--brand-border-hover)] hover:text-red-400"
-                    />
                   </div>
                 </div>
-                {isExpanded && (
-                  <div className="px-4 py-3 border-b border-[var(--brand-border)]/50 bg-[var(--surface-1)]/40">
-                    {historyLoading ? (
-                      <LoadingState message="Loading position history..." size="sm" className="py-2" />
-                    ) : (
-                      <PositionSparkline data={queryHistory} />
-                    )}
-                  </div>
+              );
+            }}
+            onRowClick={(rank) => toggleExpand(rank.query)}
+            customColumns={[
+              {
+                key: 'position',
+                header: 'Position',
+                align: 'right',
+                render: (rank) => (
+                  <span className={cn('text-sm font-bold', positionColor(rank.position))}>
+                    {Math.round(rank.position * 10) / 10}
+                  </span>
+                ),
+              },
+              {
+                key: 'change',
+                header: 'Change',
+                align: 'right',
+                render: (rank) => (
+                  rank.change != null ? (
+                    <span className={cn('flex items-center justify-end gap-0.5 text-xs font-medium', rank.change < 0 ? 'text-emerald-400' : rank.change > 0 ? 'text-red-400' : 'text-[var(--brand-text-muted)]')}>
+                      {rank.change < 0 ? <Icon as={ArrowUp} size="sm" /> : rank.change > 0 ? <Icon as={ArrowDown} size="sm" /> : <Icon as={Minus} size="sm" />}
+                      {rank.change !== 0 ? Math.abs(Math.round(rank.change * 10) / 10) : '—'}
+                    </span>
+                  ) : (
+                    <span className="t-caption text-[var(--brand-text-muted)]">—</span>
+                  )
+                ),
+              },
+              {
+                key: 'clicks',
+                header: 'Clicks',
+                align: 'right',
+                render: (rank) => <span className="text-xs text-[var(--brand-text)]">{rank.clicks}</span>,
+              },
+              {
+                key: 'impressions',
+                header: 'Impressions',
+                align: 'right',
+                render: (rank) => <span className="text-xs text-[var(--brand-text-muted)]">{rank.impressions.toLocaleString()}</span>,
+              },
+            ]}
+            renderActions={(rank) => (
+              <IconButton
+                onClick={(e) => { e.stopPropagation(); removeKeyword(rank.query); }}
+                icon={Trash2}
+                label="Remove keyword"
+                size="sm"
+                variant="ghost"
+                className="text-[var(--brand-border-hover)] hover:text-red-400"
+              />
+            )}
+            isRowExpanded={(rank) => expandedQuery === rank.query}
+            renderExpanded={() => (
+              <div className="px-4 py-3 border-b border-[var(--brand-border)]/50 bg-[var(--surface-1)]/40">
+                {historyLoading ? (
+                  <LoadingState message="Loading position history..." size="sm" className="py-2" />
+                ) : (
+                  <PositionSparkline data={queryHistory} />
                 )}
               </div>
-            );
-          })}
+            )}
+          />
         </div>
       ) : keywords.length > 0 ? (
         <EmptyState
