@@ -21,6 +21,7 @@ import { Sidebar } from './components/layout/Sidebar';
 import { Breadcrumbs } from './components/layout/Breadcrumbs';
 import { ScannerReveal } from './components/ui/ScannerReveal';
 import { FeatureFlag } from './components/ui/FeatureFlag';
+import { useFeatureFlag } from './hooks/useFeatureFlag';
 import { EmptyState } from './components/ui/EmptyState';
 import { TabBar } from './components/ui/TabBar';
 import { Activity, Clipboard, Globe, Sparkles } from 'lucide-react';
@@ -48,6 +49,7 @@ const WorkspaceHome = lazyWithRetry(() => import('./components/WorkspaceHome').t
 const SeoEditorWrapper = lazyWithRetry(() => import('./components/SeoEditorWrapper').then(m => ({ default: m.SeoEditorWrapper })));
 const KeywordStrategyPanel = lazyWithRetry(() => import('./components/KeywordStrategy').then(m => ({ default: m.KeywordStrategyPanel })));
 const KeywordCommandCenter = lazyWithRetry(() => import('./components/KeywordCommandCenter').then(m => ({ default: m.KeywordCommandCenter })));
+const KeywordHub = lazyWithRetry(() => import('./components/KeywordHub').then(m => ({ default: m.KeywordHub })));
 const PageIntelligence = lazyWithRetry(() => import('./components/PageIntelligence').then(m => ({ default: m.PageIntelligence })));
 const SchemaSuggester = lazyWithRetry(() => import('./components/SchemaSuggester').then(m => ({ default: m.SchemaSuggester })));
 const ContentBriefs = lazyWithRetry(() => import('./components/ContentBriefs').then(m => ({ default: m.ContentBriefs })));
@@ -241,6 +243,9 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   const [clipboardStatus, setClipboardStatus] = useState<string | null>(null);
   const [pendingContentRequests, setPendingContentRequests] = useState(0);
   const [requestsSubTab, setRequestsSubTab] = useState<'signals' | 'requests' | 'actions' | 'deliverables'>('deliverables');
+  // Keyword Hub (Wave 4): when ON, the `seo-keywords` tab renders the unified Hub
+  // instead of the legacy Keyword Command Center. Dark (OFF) until P5 cutover.
+  const keywordHubEnabled = useFeatureFlag('keyword-hub');
 
   // Reset requests sub-tab when workspace changes so stale state doesn't persist
   useEffect(() => { setRequestsSubTab('deliverables'); }, [urlWorkspaceId]); // effect-layout-ok — state reset on workspace switch, not layout derivation
@@ -427,6 +432,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'seo-audit') return <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} siteName={selected.webflowSiteName || selected.name} />;
     if (tab === 'seo-editor') return <SeoEditorWrapper key={`editor-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} />;
     if (tab === 'seo-strategy') return <KeywordStrategyPanel key={`strategy-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId!} />;
+    if (tab === 'seo-keywords' && keywordHubEnabled) return <KeywordHub key={`hub-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'seo-keywords') return <KeywordCommandCenter key={`keywords-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'page-intelligence') return <PageIntelligence key={`pageintel-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId!} fixContext={fixContext} />;
     if (tab === 'links') return <LinksPanel key={`links-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} />;
