@@ -1,12 +1,8 @@
 import { describe, it, expect, afterEach, afterAll } from 'vitest';
 import db from '../../server/db/index.js';
-import { setFlagOverride } from '../../server/feature-flags.js';
 // The barrel self-registers the five family adapters the mirror resolves.
 import '../../server/domains/inbox/deliverable-adapters/index.js';
-import {
-  mirrorApprovalBatchToDeliverable,
-  APPROVAL_FAMILY_FLAG,
-} from '../../server/domains/inbox/approval-batch-dual-write.js';
+import { mirrorApprovalBatchToDeliverable } from '../../server/domains/inbox/approval-batch-dual-write.js';
 import { listDeliverables } from '../../server/client-deliverables.js';
 import type { ApprovalBatch, ApprovalItem } from '../../shared/types/approvals.js';
 
@@ -43,7 +39,6 @@ function batch(over: Partial<ApprovalBatch> = {}): ApprovalBatch {
 }
 
 afterEach(() => {
-  setFlagOverride(APPROVAL_FAMILY_FLAG, null); // revert to default (off)
   db.prepare('DELETE FROM client_deliverable WHERE workspace_id = ?').run(WS);
 });
 
@@ -52,14 +47,7 @@ afterAll(() => {
 });
 
 describe('approval-batch dual-write mirror', () => {
-  it('flag OFF (default) → mirror is a no-op, NO client_deliverable row written', () => {
-    const result = mirrorApprovalBatchToDeliverable(WS, batch());
-    expect(result).toBeNull();
-    expect(listDeliverables(WS)).toHaveLength(0);
-  });
-
-  it('flag ON → mirrors a client_deliverable row with the correct type + items', () => {
-    setFlagOverride(APPROVAL_FAMILY_FLAG, true);
+  it('mirrors a client_deliverable row with the correct type + items', () => {
     const b = batch({
       name: 'SEO Editor — 2 pages',
       items: [
@@ -80,8 +68,7 @@ describe('approval-batch dual-write mirror', () => {
     expect(rows[0].id).toBe(mirrored!.id);
   });
 
-  it('flag ON → respects an explicit content_plan type (content-plan seams)', () => {
-    setFlagOverride(APPROVAL_FAMILY_FLAG, true);
+  it('respects an explicit content_plan type (content-plan seams)', () => {
     const b = batch({
       name: 'Content Plan: Spring — Sample Review (2 pages)',
       items: [item({ field: 'content_plan_sample' }), item({ pageId: 'p2', field: 'content_plan_sample' })],
@@ -91,8 +78,7 @@ describe('approval-batch dual-write mirror', () => {
     expect(mirrored!.sourceRef).toBe(`content_plan_sample:${b.id}`);
   });
 
-  it('flag ON → mirror is idempotent (re-mirroring the same batch updates one row)', () => {
-    setFlagOverride(APPROVAL_FAMILY_FLAG, true);
+  it('is idempotent (re-mirroring the same batch updates one row)', () => {
     const b = batch();
     const first = mirrorApprovalBatchToDeliverable(WS, b);
     const second = mirrorApprovalBatchToDeliverable(WS, b);
@@ -100,8 +86,7 @@ describe('approval-batch dual-write mirror', () => {
     expect(listDeliverables(WS)).toHaveLength(1);
   });
 
-  it('flag ON → an empty batch is rejected by validateSendable (no row, no throw)', () => {
-    setFlagOverride(APPROVAL_FAMILY_FLAG, true);
+  it('rejects an empty batch via validateSendable (no row, no throw)', () => {
     const result = mirrorApprovalBatchToDeliverable(WS, batch({ items: [] }));
     expect(result).toBeNull();
     expect(listDeliverables(WS)).toHaveLength(0);

@@ -23,7 +23,7 @@
       "name": "\ud83d\udcec Unified Send-to-Client \u2014 Spine + Strangler-Fig Migration",
       "hours": "phased",
       "rationale": "Replace the five bespoke 'send to client' pipelines with one ClientDeliverable model + one sendToClient() service + one client inbox + one admin inbox, via a per-type strangler-fig cutover production never feels. Adding a reviewable work type later becomes an adapter, not a sixth subsystem.",
-      "notes": "Design: docs/designs/2026-06-01-unified-send-to-client-design.md. Pre-plan audit: docs/superpowers/audits/2026-06-01-unified-send-to-client-audit.md. Plan: docs/superpowers/plans/2026-06-01-unified-send-to-client.md. Phase 0 lands the shared spine dark behind three phase-group flags (unified-deliverables-approval-family / -broken-family / -rest, all default false).",
+      "notes": "Design: docs/designs/2026-06-01-unified-send-to-client-design.md. Pre-plan audit: docs/superpowers/audits/2026-06-01-unified-send-to-client-audit.md. Plan: docs/superpowers/plans/2026-06-01-unified-send-to-client.md. [UPDATE 2026-06-04: the temporary rollout flags (`new-inbox-ia`, `unified-inbox`, and the three `unified-deliverables-*` phase-group flags) are retired. The unified inbox and deliverables surfaces are now canonical runtime behavior.]",
       "items": [
         {
           "id": "unified-deliverables-phase-0-contracts",

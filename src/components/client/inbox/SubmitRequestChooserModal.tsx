@@ -1,8 +1,7 @@
 // src/components/client/inbox/SubmitRequestChooserModal.tsx
 //
-// Item 1 — the "Submit a request" chooser (DARK; mounted only from UnifiedInbox behind the
-// `unified-inbox` flag). Flag-on clients previously had NO way to initiate a request. This modal
-// opens from the persistent "Submit a request" primary button and offers BOTH paths the owner chose:
+// Item 1 — the "Submit a request" chooser, mounted from UnifiedInbox. This modal opens from the
+// persistent "Submit a request" primary button and offers BOTH paths the owner chose:
 //
 //   - "Ask for content"  → REUSES the existing topic-submission + pricing flow. A small topic form
 //                           (topic / target keyword / notes / brief-vs-full-post) calls the SAME

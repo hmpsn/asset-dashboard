@@ -2,29 +2,17 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { publicDeliverables } from '../../api/deliverables';
 import type { DeliverableResponseDecision } from '../../api/deliverables';
 import { queryKeys } from '../../lib/queryKeys';
-import { useFeatureFlag } from '../useFeatureFlag';
 import type { ClientDeliverable } from '../../../shared/types/client-deliverable';
 
-/**
- * useUnifiedInbox — the client unified deliverable inbox read hook (PR-2a, DARK).
- *
- * Reads GET /api/public/deliverables/:workspaceId via the typed api wrapper (no raw fetch).
- * Gated on the `unified-inbox` feature flag: the query is DISABLED unless the flag is on, so the
- * flag-off path never fires the request (production behavior unchanged). The hook reads the flag
- * itself so callers don't have to thread it through — but also AND-gates on a caller `enabled`.
- *
- * Returns the list plus the flag state so the consumer (InboxTab) can branch its rendering.
- */
+/** Reads GET `/api/public/deliverables/:workspaceId` via the typed API wrapper. */
 export function useUnifiedInbox(workspaceId: string, enabled = true) {
-  const unifiedInbox = useFeatureFlag('unified-inbox');
   const query = useQuery({
     queryKey: queryKeys.client.unifiedInbox(workspaceId),
     queryFn: () => publicDeliverables.list(workspaceId),
-    enabled: !!workspaceId && enabled && unifiedInbox,
+    enabled: !!workspaceId && enabled,
     staleTime: 30_000,
   });
   return {
-    unifiedInbox,
     deliverables: query.data?.deliverables ?? [],
     isLoading: query.isLoading,
     isError: query.isError,
@@ -83,12 +71,8 @@ export interface ApplyDeliverableVars {
 }
 
 /**
- * useApplyDeliverable — R3b "Apply to Website" mutation (DARK; only reachable behind `unified-inbox`).
- *
- * Calls the SAME proven legacy apply route via the typed wrapper (no new apply logic). On success it
- * invalidates the unified inbox query — the applied deliverable flips to `applied`, which is filtered
- * OUT of the client-facing list, so the item leaves the inbox (intended post-apply UX). Sibling of
- * useRespondToDeliverable.
+ * Calls the same legacy apply route via the typed wrapper. On success it invalidates the unified
+ * inbox query so the applied deliverable leaves the client-facing list.
  */
 export function useApplyDeliverable(workspaceId: string) {
   const queryClient = useQueryClient();

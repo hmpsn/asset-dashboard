@@ -6231,14 +6231,14 @@ Bug hardening included:
 
 **PR:** #663
 
-### 399. Client Inbox IA Redesign — 3-Section Layout (`new-inbox-ia` flag)
-**What it does:** Restructures InboxTab into three named sections (Decisions / Reviews / Conversations) behind the `new-inbox-ia` feature flag. Decisions = schema changes and action cards requiring approval without note. Reviews = briefs and posts requiring editorial review. Conversations = client requests and action cards where client left a note. Legacy `?tab=` URL params remain supported via `LEGACY_FILTER_MAP` (`CLIENT_INBOX_ALIASES` in `shared/types/routes.ts`). The old single-list layout renders when flag is off. SchemaReviewModal and ClientActionDetailModal are exposed within this layout.
+### 399. Client Inbox IA Redesign — 3-Section Layout
+**What it does:** Establishes the canonical client inbox routing model around Decisions / Reviews / Conversations. Decisions = schema changes and action cards requiring approval without note. Reviews = briefs and posts requiring editorial review. Conversations = client requests and action cards where the client or team left a note. Legacy `?tab=` URL params remain supported via `LEGACY_FILTER_MAP` (`CLIENT_INBOX_ALIASES` in `shared/types/routes.ts`). The pre-cutover fallback layout and the `new-inbox-ia` rollout flag have been retired; `InboxTab` now delegates directly to the unified inbox flow while preserving deep-link aliases.
 
 **Agency value:** Clearer signal routing — each inbox section maps to a distinct client workflow, reducing context-switching in account management.
 
 **Client value:** Simplified navigation — clients see three clear buckets instead of a mixed action queue; section headers communicate what kind of response is expected.
 
-**Mutual:** LEGACY_FILTER_MAP provides backward-compat for bookmarked URLs; pr-check rule `inbox-action-queue-strip` prevents ActionQueueStrip from re-entering InboxTab.
+**Mutual:** LEGACY_FILTER_MAP provides backward-compat for bookmarked URLs; pr-check rule `inbox-action-queue-strip` prevents ActionQueueStrip from re-entering InboxTab; pr-check rule `Retired unified inbox feature flag key used in flag API` prevents the retired rollout keys from being reintroduced.
 
 **Files:** `src/components/client/InboxTab.tsx`; `shared/types/client-inbox.ts`; `shared/types/routes.ts` (InboxFilter type, CLIENT_INBOX_ALIASES); `tests/unit/inbox-filter-values.test.ts`; `tests/contract/tab-deep-link-wiring.test.ts`.
 

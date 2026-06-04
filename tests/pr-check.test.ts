@@ -257,6 +257,83 @@ describe('Rule: Retired bridge/opportunity feature flag key used in flag API', (
   });
 });
 
+describe('Rule: Retired unified inbox feature flag key used in flag API', () => {
+  const RULE = 'Retired unified inbox feature flag key used in flag API';
+
+  it('flags retired unified inbox keys passed to feature flag helpers', () => {
+    const retiredKey = ['unified', 'inbox'].join('-');
+    const file = write(
+      uniqPath('rule-retired-unified-inbox-flags', 'helper.ts'),
+      lines(
+        'import { useFeatureFlag } from "./feature-flags";',
+        `const enabled = useFeatureFlag('${retiredKey}');`,
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags retired unified inbox keys passed to FeatureFlag components', () => {
+    const retiredKey = ['new', 'inbox', 'ia'].join('-');
+    const file = write(
+      uniqPath('rule-retired-unified-inbox-flags', 'component.tsx'),
+      lines(
+        'import { FeatureFlag } from "./FeatureFlag";',
+        `export const Demo = () => <FeatureFlag flag="${retiredKey}">demo</FeatureFlag>;`,
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags retired unified inbox env vars', () => {
+    const retiredEnv = ['FEATURE', 'UNIFIED', 'DELIVERABLES', 'REST'].join('_');
+    const file = write(
+      uniqPath('rule-retired-unified-inbox-flags', 'env.ts'),
+      lines(
+        `process.env.${retiredEnv} = 'true';`,
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('flags retired keys re-added to the shared feature flag registry', () => {
+    const retiredKey = ['unified', 'deliverables', 'approval', 'family'].join('-');
+    const file = write(
+      'shared/types/feature-flags.ts',
+      lines(
+        'export const FEATURE_FLAGS = {',
+        `  '${retiredKey}': false,`,
+        '};',
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('allows active feature flags and historical unified-inbox strings', () => {
+    const retiredKey = ['unified', 'inbox'].join('-');
+    const file = write(
+      uniqPath('rule-retired-unified-inbox-flags', 'negative.tsx'),
+      lines(
+        "const active = useFeatureFlag('copy-engine');",
+        `const note = '${retiredKey} was retired after cutover';`,
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
 // ════════════════════════════════════════════════════════════════════════════
 // Rule 2: Global keydown missing isContentEditable guard
 // ════════════════════════════════════════════════════════════════════════════
@@ -5297,6 +5374,9 @@ describe('Meta: customCheck rule name registry', () => {
     // Feature flag retirement PR2 (2026-06-04) — bridge/opportunity source
     // identifiers remain valid, but retired keys cannot be used as flags.
     'Retired bridge/opportunity feature flag key used in flag API',
+    // Feature flag retirement PR3 (2026-06-04) — unified inbox / deliverables
+    // cutover removed the rollout keys, so they cannot re-enter flag APIs.
+    'Retired unified inbox feature flag key used in flag API',
     // keyword-consolidation Wave 1 (2026-06-03) — prevents lost-update race on
     // tracked_keywords JSON blob; enforces withTrackedKeywordsTxn (BEGIN IMMEDIATE).
     'tracked_keywords bare read→write outside withTrackedKeywordsTxn',

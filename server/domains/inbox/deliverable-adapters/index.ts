@@ -1,50 +1,41 @@
 /**
- * Deliverable adapter registry barrel (Phase 0, dark — empty).
+ * Deliverable adapter registry barrel.
  *
  * Each Phase-1 type PR appends ONE line here: `import './<type>.js';` (append-only,
  * the only shared edit across the parallel type PRs). Importing this module triggers
  * each adapter's module-scope `registerAdapter()` call, populating the registry in
- * `./types.js`. Phase 0 ships zero adapters — the send path is dark until the flags flip.
+ * `./types.js`.
  *
  * Re-export the registry surface so callers `import { getAdapter } from '.../deliverable-adapters/index.js'`
  * and get a fully-populated registry (the adapter imports above have run first).
  */
 
-// --- Phase-1 adapter registrations go below this line (append-only) ---
-// PR-1a: approval_batch family (seo_edit / audit_issue / schema_item / content_plan_*).
-// DARK — these self-register on import but are only mirrored when the
-// `unified-deliverables-approval-family` flag is on (default off → no-op).
+// --- Adapter registrations ---
+// approval_batch family (seo_edit / audit_issue / schema_item / content_plan_*).
 import './seo-edit.js';
 import './audit-issue.js';
 import './schema-item.js';
 import './content-plan-sample.js';
 import './content-plan-template.js';
-// PR-1b: client_action family (redirect / internal_link / aeo_change / content_decay).
-// DARK — these self-register on import but are only mirrored when the
-// `unified-deliverables-broken-family` flag is on (default off → no-op).
+// client_action family (redirect / internal_link / aeo_change / content_decay).
 import './redirect.js';
 import './internal-link.js';
 import './aeo-change.js';
 import './content-decay.js';
-// PR-1c: schema_plan (the per-site schema STRATEGY review artifact — distinct from the
-// PR-1a schema_item per-page batches). DARK — self-registers on import but is only mirrored
-// when the `unified-deliverables-rest` flag is on (default off → no-op).
+// schema_plan (the per-site schema STRATEGY review artifact — distinct from the PR-1a
+// schema_item per-page batches).
 import './schema-plan.js';
-// PR-1d: copy_section — the FIRST PROJECTED type (D-hybrid). Its source tables (copy_sections,
-// copy_metadata) are RETAINED; the adapter exposes a copy ENTRY through the unified interface at
-// READ time via projectFromSource() (no dual-write, no backfill). DARK — self-registers on import
-// but is consumed only by the Phase-2 inbox/rollup (gated by `unified-deliverables-rest`).
+// copy_section — projected type. Its source tables (copy_sections, copy_metadata) are retained;
+// the adapter exposes a copy entry through the unified interface at read time via
+// `projectFromSource()` (no dual-write, no backfill).
 import './copy-section.js';
-// PR-1e: content_request — the SECOND PROJECTED type (D-hybrid). Its source table
-// (content_topic_requests) is RETAINED; the adapter exposes a content REQUEST (brief/post review)
-// through the unified interface at READ time via projectFromSource() (no dual-write, no backfill).
-// DARK — self-registers on import but is consumed only by the Phase-2 inbox/rollup (gated by
-// `unified-deliverables-rest`).
+// content_request — projected type. Its source table (content_topic_requests) is retained; the
+// adapter exposes a content request (brief/post review) through the unified interface at read
+// time via `projectFromSource()` (no dual-write, no backfill).
 import './content-request.js';
-// PR-1fg: work_order (kind='order') + briefing (kind='notification') — the final two Phase-1
-// type adapters. NET-NEW additive types. DARK — both self-register on import but are only mirrored
-// when the `unified-deliverables-rest` flag is on (default off → no-op). work_order is dual-written
-// at the createWorkOrder/updateWorkOrder seams; briefing at the publish seams (manual + auto).
+// work_order (kind='order') + briefing (kind='notification') are the final physical types.
+// work_order is dual-written at the createWorkOrder/updateWorkOrder seams; briefing at the
+// publish seams (manual + auto).
 import './work-order.js';
 import './briefing.js';
 

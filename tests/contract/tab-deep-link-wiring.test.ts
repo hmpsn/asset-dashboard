@@ -354,9 +354,24 @@ describe('?tab= deep-link wiring contract', () => {
 
       try {
         const content = readFileSync(componentFile, 'utf8'); // readFile-ok — intentional static analysis of tab IDs
+        const inboxTabUsesSharedResolver =
+          relative(ROOT, componentFile) === 'src/components/client/InboxTab.tsx' &&
+          content.includes('resolveInboxFilter(');
+        const inboxTabKnownValues = new Set([
+          'all',
+          'decisions',
+          'reviews',
+          'conversations',
+          'approvals',
+          'requests',
+          'copy',
+          'content-plan',
+          'completed',
+        ]);
         // Check if the tab value appears as a string literal in the file
         // (in a type union like 'calendar' | 'briefs' or a TABS array)
         if (
+          !(inboxTabUsesSharedResolver && inboxTabKnownValues.has(sender.tabValue)) &&
           !content.includes(`'${sender.tabValue}'`) &&
           !content.includes(`"${sender.tabValue}"`)
         ) {

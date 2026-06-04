@@ -173,15 +173,14 @@ test.describe('Client workflow smoke pack', () => {
     await gotoClientRouteWithFallback(page, `/client/${workspaceId}/inbox?tab=conversations`);
     await dismissOnboardingIfPresent(page);
     await expect(page).toHaveURL(new RegExp(`/client/${workspaceId}/inbox\\?tab=conversations`));
-    await expect(page.getByRole('button', { name: /^Conversations/ })).toBeVisible();
+    await expect(page.getByText('Everything that needs your attention — all in one place.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Submit a request' })).toBeVisible();
 
     await gotoClientRouteWithFallback(page, `/client/${workspaceId}/inbox?tab=reviews`);
     await dismissOnboardingIfPresent(page);
     await expect(page).toHaveURL(new RegExp(`/client/${workspaceId}/inbox\\?tab=reviews`));
-    const reviewsVisible = await page.getByRole('button', { name: /^Reviews/ }).isVisible().catch(() => false);
-    if (!reviewsVisible) {
-      await expect(page.getByRole('button', { name: /^Decisions/ })).toBeVisible();
-    }
+    await expect(page.getByText('Everything that needs your attention — all in one place.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Submit a request' })).toBeVisible();
   });
 
   test('client smoke: free tier public workspace + tier endpoints stay coherent', async ({ request }) => {

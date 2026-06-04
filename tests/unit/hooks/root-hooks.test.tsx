@@ -302,9 +302,9 @@ describe('useFeatureFlag — static defaults (loading state)', () => {
     expect(result.current).toBe(false);
   });
 
-  it('returns false for "new-inbox-ia" while loading', () => {
+  it('returns false for "white-label" while loading', () => {
     const { result } = renderHook(
-      () => useFeatureFlag('new-inbox-ia' as FeatureFlagKey),
+      () => useFeatureFlag('white-label' as FeatureFlagKey),
       { wrapper: makeWrapper() },
     );
     expect(result.current).toBe(false);
@@ -359,7 +359,7 @@ describe('useFeatureFlag — server response overrides defaults', () => {
     });
 
     const { result } = renderHook(
-      () => useFeatureFlag('new-inbox-ia' as FeatureFlagKey),
+      () => useFeatureFlag('white-label' as FeatureFlagKey),
       { wrapper: makeWrapper() },
     );
 

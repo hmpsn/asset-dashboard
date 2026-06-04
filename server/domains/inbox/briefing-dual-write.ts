@@ -1,11 +1,10 @@
 /**
- * briefing dual-write mirror (PR-1fg, DARK behind the flag).
+ * briefing dual-write mirror.
  *
  * At the briefing PUBLISH seams (manual publish — `server/routes/briefing.ts`; auto-publish —
- * `server/briefing-cron.ts`, both call `markPublished` then run the publish side-effects), when
- * the `unified-deliverables-rest` flag is ON we ALSO mirror the just-published `BriefingDraft`
- * into the unified `client_deliverable` model via the registered `briefing` adapter +
- * `upsertDeliverable`. Default off → this is a no-op (NO production behavior change).
+ * `server/briefing-cron.ts`, both call `markPublished` then run the publish side-effects), mirror
+ * the just-published `BriefingDraft` into the unified `client_deliverable` model via the
+ * registered `briefing` adapter + `upsertDeliverable`.
  *
  * A published briefing is a DELIVERED one-way NOTIFICATION (kind='notification'): the client reads
  * it but cannot approve/decline it. The mirrored row is born in a TERMINAL canonical status
@@ -17,36 +16,28 @@
  * disabled (notification — nothing to approve; the publish side-effects live in the source path).
  *
  * The mirror is best-effort and MUST NEVER break the live publish: any failure is logged and
- * swallowed (the briefing is already published + the client already notified by the seam). The
- * flag being off makes this unreachable, so a dark bug can never reach prod.
+ * swallowed (the briefing is already published + the client already notified by the seam).
  *
  * Leaf rule: imports the registry + the store + the flag reader; not imported back by them. The
  * `BriefingDraft` carries its own `workspaceId`, so the seam passes it straight through.
  */
 import type { BriefingDraft } from '../../../shared/types/briefing.js';
 import type { ClientDeliverable } from '../../../shared/types/client-deliverable.js';
-import { isFeatureEnabled } from '../../feature-flags.js';
 import { upsertDeliverable } from '../../client-deliverables.js';
 import { getAdapter } from './deliverable-adapters/index.js';
 import { createLogger } from '../../logger.js';
 
 const log = createLogger('briefing-dual-write');
 
-/** The flag that gates the entire briefing dual-write. GLOBAL flag, default false (dark). */
-export const BRIEFING_FLAG = 'unified-deliverables-rest' as const;
-
 /**
- * Mirror a just-published briefing into `client_deliverable` IFF the flag is on. Called at the
- * publish seams (manual + auto) right after `markPublished` succeeds. Returns the mirrored
- * deliverable, or null when the flag is off (no-op), the briefing is not published, or the mirror
- * was skipped/failed. Never throws — the live publish must not be affected.
+ * Mirror a just-published briefing into `client_deliverable`. Called at the publish seams
+ * (manual + auto) right after `markPublished` succeeds. Returns the mirrored deliverable, or null
+ * when the briefing is not published or the mirror was skipped/failed. Never throws — the live
+ * publish must not be affected.
  *
  * @param draft the just-published BriefingDraft (status `published`).
  */
 export function mirrorBriefingToDeliverable(draft: BriefingDraft): ClientDeliverable | null {
-  // Flag default false → dark no-op. The single gate for the whole machinery.
-  if (!isFeatureEnabled(BRIEFING_FLAG)) return null;
-
   // Only a PUBLISHED briefing carries a client-facing notification. A non-published draft slipping
   // through the seam is not mirrored (defensive — the seams only call this after markPublished).
   if (draft.status !== 'published') {

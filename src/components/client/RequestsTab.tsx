@@ -18,15 +18,28 @@ interface RequestsTabProps {
   clientUser: { id: string; name: string; email: string; role: string } | null;
   loadRequests: (wsId: string) => void;
   setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
+  embedded?: boolean;
 }
 
-export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser, loadRequests, setToast }: RequestsTabProps) {
+export function RequestsTab({
+  workspaceId,
+  requests,
+  requestsLoading,
+  clientUser,
+  loadRequests,
+  setToast,
+  embedded = false,
+}: RequestsTabProps) {
   const [showNewRequest, setShowNewRequest] = useState(false);
   const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
   const [reqNoteInput, setReqNoteInput] = useState('');
   const [sendingNote, setSendingNote] = useState(false);
   const [noteFiles, setNoteFiles] = useState<File[]>([]);
   const noteFileRef = useRef<HTMLInputElement>(null);
+
+  if (embedded && !requestsLoading && requests.length === 0) {
+    return null;
+  }
 
   const sendReqNote = async (requestId: string) => {
     if (!reqNoteInput.trim() && noteFiles.length === 0) return;
@@ -48,16 +61,18 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
 
   return (<>
     <div className="space-y-8">
-      <PageHeader
-        title="Requests"
-        subtitle={`Submit requests for ${STUDIO_NAME} to action on.`}
-        icon={<Icon as={MessageSquare} size="lg" className="text-accent-brand" />}
-        actions={<Button onClick={() => setShowNewRequest(!showNewRequest)} icon={Plus} size="sm" className="rounded-[var(--radius-lg)]">New Request</Button>}
-      />
+      {!embedded && (
+        <PageHeader
+          title="Requests"
+          subtitle={`Submit requests for ${STUDIO_NAME} to action on.`}
+          icon={<Icon as={MessageSquare} size="lg" className="text-accent-brand" />}
+          actions={<Button onClick={() => setShowNewRequest(!showNewRequest)} icon={Plus} size="sm" className="rounded-[var(--radius-lg)]">New Request</Button>}
+        />
+      )}
 
       {/* New request form — extracted to SubmitRequestForm (item 1) so the unified-inbox chooser
           modal reuses the SAME form. RequestsTab renders it identically (additive extraction). */}
-      {showNewRequest && (
+      {!embedded && showNewRequest && (
         <SubmitRequestForm
           workspaceId={workspaceId}
           clientUser={clientUser}
@@ -73,7 +88,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
       )}
 
       {/* Empty state */}
-      {!requestsLoading && requests.length === 0 && !showNewRequest && (
+      {!embedded && !requestsLoading && requests.length === 0 && !showNewRequest && (
         <div className="text-center py-16">
           {/* pr-check-disable-next-line -- Brand signature radius intentional */}
           <div className="w-16 h-16 bg-[var(--surface-2)] border border-[var(--brand-border)] flex items-center justify-center mx-auto mb-4" style={{ borderRadius: 'var(--radius-signature-lg)' }}>

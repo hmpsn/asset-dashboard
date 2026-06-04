@@ -40,24 +40,8 @@ export const FEATURE_FLAGS = {
   // Page-Element Catalog (schema AI extractors)
   'schema-ai-element-classifier': false,
 
-  // Client IA Redesign Phase 1 (PRs 1.2 + 1.3)
-  'new-inbox-ia': false,
-
   // Local SEO Visibility
   'local-seo-visibility': false,
-
-  // Unified Send-to-Client (strangler-fig, per phase group; dark by default).
-  // Finer per-type cutover granularity lives in a DB/env read-routing table keyed by
-  // type string, NOT the flag system (a per-type dynamic key is inexpressible against
-  // the closed FeatureFlagKey union — audit §C.3).
-  'unified-deliverables-approval-family': false,
-  'unified-deliverables-broken-family': false,
-  'unified-deliverables-rest': false,
-  // PR-2a — the client-facing unified inbox (Pillar 2). When ON, InboxTab renders the
-  // new unified PriorityStrip + uniform Approve / Request changes / Decline path backed
-  // by GET /api/public/deliverables/:workspaceId. OFF = the existing new-inbox-ia + legacy
-  // layouts render unchanged. Independent of the dual-write read-cutover flags above.
-  'unified-inbox': false,
 
   // SEO Generation Quality (multi-phase keyword-strategy + recommendation quality plan).
   // Umbrella kill-switch for the P1–P6 generation-quality work (universe assembler,
@@ -124,10 +108,8 @@ export const FEATURE_FLAG_GROUP_LABELS = [
   'Deep Diagnostics',
   'Platform Intelligence Enhancements',
   'Client Insights Briefing',
-  'Client IA Redesign',
   'Local SEO',
   'Schema AI',
-  'Unified Send-to-Client',
   'SEO Generation Quality',
   'Keyword Hub',
 ] as const;
@@ -149,7 +131,6 @@ const LEGACY_ROADMAP = {
   briefing: 'legacy-client-briefing-v2',
   deepDiagnostics: 'legacy-deep-diagnostics',
   schema: 'legacy-schema-ai',
-  inboxIa: 'legacy-client-inbox-ia',
   localSeo: 'intel-quality-local-pack-visibility-foundation',
   platformIntelligenceEnhancements: 'legacy-platform-intelligence-enhancements',
 } as const;
@@ -320,20 +301,6 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: REVIEWED_AT,
     },
   },
-
-  'new-inbox-ia': {
-    label: 'New 3-section inbox layout (Decisions / Reviews / Conversations)',
-    group: 'Client IA Redesign',
-    lifecycle: {
-      owner: 'inbox',
-      createdAt: '2026-05-08',
-      rolloutTarget: 'tiered-client-rollout',
-      removalCondition: 'Remove once new inbox IA is the only maintained client inbox layout.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.inboxIa,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
   'local-seo-visibility': {
     label: 'Local SEO visibility',
     group: 'Local SEO',
@@ -356,59 +323,6 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       rolloutTarget: 'staging-validation',
       removalCondition: 'Remove once AI classifier quality is stable and schema extraction no longer needs a hard kill-switch.',
       linkedRoadmapItemId: LEGACY_ROADMAP.schema,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-
-  'unified-deliverables-approval-family': {
-    label: 'Unified deliverables — approval-batch family read cutover (seo_edit / audit_issue / schema_item / content_plan_*)',
-    group: 'Unified Send-to-Client',
-    lifecycle: {
-      owner: 'inbox-platform',
-      createdAt: REVIEWED_AT,
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove after the approval-batch family reads client_deliverable in production for 2 releases with shadow-compare parity holding, and the old approval_batches read path is deleted.',
-      linkedRoadmapItemId: 'unified-deliverables-phase-0-contracts',
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'unified-deliverables-broken-family': {
-    label: 'Unified deliverables — client_action family read cutover (redirect / internal_link / aeo_change / content_decay)',
-    group: 'Unified Send-to-Client',
-    lifecycle: {
-      owner: 'inbox-platform',
-      createdAt: REVIEWED_AT,
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove after the client_action family reads client_deliverable in production for 2 releases with shadow-compare parity holding, and the old client_actions read path is deleted.',
-      linkedRoadmapItemId: 'unified-deliverables-phase-0-contracts',
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'unified-deliverables-rest': {
-    label: 'Unified deliverables — remaining types read cutover (schema_plan / copy / content_request / work_order / briefing)',
-    group: 'Unified Send-to-Client',
-    lifecycle: {
-      owner: 'inbox-platform',
-      createdAt: REVIEWED_AT,
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove after the remaining deliverable types read the unified model (or projected source) in production for 2 releases and the bespoke read paths are deleted.',
-      linkedRoadmapItemId: 'unified-deliverables-phase-0-contracts',
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'unified-inbox': {
-    label: 'Unified client inbox (PriorityStrip + uniform Approve / Request changes / Decline)',
-    group: 'Unified Send-to-Client',
-    lifecycle: {
-      owner: 'inbox-platform',
-      createdAt: REVIEWED_AT,
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove after the unified client inbox is the only maintained client inbox layout and the new-inbox-ia + legacy InboxTab layouts are torn down (Phase 3).',
-      linkedRoadmapItemId: 'unified-deliverables-phase-2a-client-inbox',
       staleAuditCadence: 'monthly',
       lastReviewedAt: REVIEWED_AT,
     },
@@ -476,25 +390,12 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
     keys: ['client-briefing-v2', 'client-briefing-v2-ai-polish'],
   },
   {
-    label: 'Client IA Redesign',
-    keys: ['new-inbox-ia'],
-  },
-  {
     label: 'Local SEO',
     keys: ['local-seo-visibility'],
   },
   {
     label: 'Schema AI',
     keys: ['schema-ai-element-classifier'],
-  },
-  {
-    label: 'Unified Send-to-Client',
-    keys: [
-      'unified-deliverables-approval-family',
-      'unified-deliverables-broken-family',
-      'unified-deliverables-rest',
-      'unified-inbox',
-    ],
   },
   {
     label: 'SEO Generation Quality',

@@ -1108,6 +1108,81 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    name: 'Retired unified inbox feature flag key used in flag API',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    exclude: ['server/db/migrations/124-retire-unified-inbox-feature-flags.sql'],
+    message:
+      'Unified inbox / deliverables rollout flags were retired in PR3; make the unified behavior unconditional instead of using retired keys.',
+    severity: 'error',
+    rationale:
+      'Retired inbox/deliverable rollout flags must not re-enter runtime/UI/test flag APIs after the unified path becomes canonical.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const retired = [
+        'new-inbox-ia',
+        'unified-deliverables-approval-family',
+        'unified-deliverables-broken-family',
+        'unified-deliverables-rest',
+        'unified-inbox',
+      ];
+      const keyPattern = retired.join('|');
+      const helperRe = new RegExp(`\\b(?:isFeatureEnabled|useFeatureFlag|setFlagOverride|setWorkspaceFlagOverride)\\(\\s*['"](?:${keyPattern})['"]`, 'gs');
+      const componentRe = new RegExp(`<FeatureFlag\\b[\\s\\S]{0,200}?\\bflag\\s*=\\s*['"](?:${keyPattern})['"]`, 'g');
+      const indexedRe = new RegExp(`\\b(?:FEATURE_FLAGS|FEATURE_FLAG_CATALOG)\\s*\\[\\s*['"](?:${keyPattern})['"]\\s*\\]`, 'gs');
+      const featureFlagLiteralRe = new RegExp(`['"](?:${keyPattern})['"]\\s*:`, 'g');
+      const envRe = /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_(?:NEW_INBOX_IA|UNIFIED_DELIVERABLES_(?:APPROVAL_FAMILY|BROKEN_FAMILY|REST)|UNIFIED_INBOX)\b/;
+
+      function lineNumberForIndex(content: string, index: number): number {
+        return content.slice(0, index).split('\n').length;
+      }
+
+      function pushMatch(file: string, content: string, index: number, fallback: string): void {
+        const line = lineNumberForIndex(content, index);
+        const text = content.split('\n')[line - 1]?.trim() || fallback.trim();
+        hits.push({ file, line, text });
+      }
+
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        const lines = content.split('\n');
+
+        for (const match of content.matchAll(helperRe)) {
+          pushMatch(file, content, match.index ?? 0, match[0]);
+        }
+        for (const match of content.matchAll(componentRe)) {
+          pushMatch(file, content, match.index ?? 0, match[0]);
+        }
+        for (const match of content.matchAll(indexedRe)) {
+          pushMatch(file, content, match.index ?? 0, match[0]);
+        }
+        if (file.endsWith('shared/types/feature-flags.ts')) {
+          for (const match of content.matchAll(featureFlagLiteralRe)) {
+            pushMatch(file, content, match.index ?? 0, match[0]);
+          }
+        }
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (envRe.test(line)) {
+            hits.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+
+      const deduped: CustomCheckMatch[] = [];
+      const seen = new Set<string>();
+      for (const hit of hits) {
+        const key = `${hit.file}:${hit.line}:${hit.text}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        deduped.push(hit);
+      }
+      return deduped;
+    },
+  },
+  {
     name: 'Keyword Command Center summary/detail must not use full model',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
@@ -7747,55 +7822,52 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // Unified Send-to-Client: every ACTIVE deliverable type (one whose phase-group flag
-    // is enabled) must have a registered adapter file under deliverable-adapters/. Starts
-    // as `warn` (Phase 0: all flags default false, so this never fires until a flag flips).
-    // Projected (copy_section/content_request) and notification (briefing) types are exempt
-    // — they implement projectFromSource / have no client transitions but still ship an
-    // adapter file when active, so they ARE required here too once their flag is on.
+    // Unified Send-to-Client: every deliverable type must have a registered adapter file under
+    // deliverable-adapters/. PR3 retired the phase-group flags, so this now checks the full
+    // canonical type list unconditionally.
     // Escape hatch: // deliverable-adapter-ok
     name: 'every-active-type-has-an-adapter',
     fileGlobs: ['*.ts'],
     pathFilter: 'shared/types/client-deliverable.ts',
     message:
-      'A deliverable type whose phase-group flag is enabled has no adapter file under ' +
+      'A deliverable type has no adapter file under ' +
       'server/domains/inbox/deliverable-adapters/<type>.ts. Add the adapter (with registerAdapter) ' +
       'and its import line in deliverable-adapters/index.ts. Add // deliverable-adapter-ok if intentional.',
     severity: 'warn',
     excludeLines: ['deliverable-adapter-ok'],
     rationale:
-      'sendToClient() resolves an adapter per type; an active type without one throws at send time. Phase-aware so it only fires once a flag group is enabled.',
+      'sendToClient() resolves an adapter per type; any deliverable type without one throws at send time.',
     claudeMdRef: '#code-conventions',
     customCheck: () => {
       const hits: CustomCheckMatch[] = [];
-      // Read the active flag groups + type→group mapping statically. In Phase 0 every
-      // flag defaults false, so no group is active and this returns no hits.
-      const ACTIVE_GROUPS: Record<string, string[]> = {
-        'unified-deliverables-approval-family': [
-          'seo_edit', 'audit_issue', 'schema_item', 'content_plan_sample', 'content_plan_template',
-        ],
-        'unified-deliverables-broken-family': ['redirect', 'internal_link', 'aeo_change', 'content_decay'],
-        'unified-deliverables-rest': ['schema_plan', 'copy_section', 'content_request', 'work_order', 'briefing'],
-      };
-      const flagsFile = readFileOrEmpty(path.join(ROOT, 'shared/types/feature-flags.ts'));
+      const deliverableTypes = [
+        'seo_edit',
+        'audit_issue',
+        'schema_item',
+        'schema_plan',
+        'redirect',
+        'internal_link',
+        'aeo_change',
+        'content_decay',
+        'content_plan_sample',
+        'content_plan_template',
+        'work_order',
+        'briefing',
+        'copy_section',
+        'content_request',
+      ];
       const adaptersDir = path.join(ROOT, 'server/domains/inbox/deliverable-adapters');
-      for (const [flag, types] of Object.entries(ACTIVE_GROUPS)) {
-        // A flag is "active" only if its default literal in FEATURE_FLAGS is true.
-        const enabled = new RegExp(`'${flag}'\\s*:\\s*true`).test(flagsFile);
-        if (!enabled) continue;
-        for (const type of types) {
-          // Adapter files use the hyphenated convention (copy_section → copy-section.ts,
-          // schema_plan → schema-plan.ts, …), so normalize the underscore type id before
-          // resolving the file. (Without this the rule false-positives for every multi-word
-          // type once its flag flips, even though the adapter exists.)
-          const adapterPath = path.join(adaptersDir, `${type.replace(/_/g, '-')}.ts`);
-          if (!existsSync(adapterPath)) {
-            hits.push({
-              file: path.join(ROOT, 'shared/types/client-deliverable.ts'),
-              line: 1,
-              text: `active deliverable type '${type}' (flag ${flag}) has no adapter file`,
-            });
-          }
+      for (const type of deliverableTypes) {
+        // Adapter files use the hyphenated convention (copy_section → copy-section.ts,
+        // schema_plan → schema-plan.ts, …), so normalize the underscore type id before
+        // resolving the file.
+        const adapterPath = path.join(adaptersDir, `${type.replace(/_/g, '-')}.ts`);
+        if (!existsSync(adapterPath)) {
+          hits.push({
+            file: path.join(ROOT, 'shared/types/client-deliverable.ts'),
+            line: 1,
+            text: `deliverable type '${type}' has no adapter file`,
+          });
         }
       }
       return hits;

@@ -9,11 +9,7 @@ import {
 import { saveSchemaPlan } from '../../server/schema-store.js';
 import { listDeliverables } from '../../server/client-deliverables.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
-import { setFlagOverride } from '../../server/feature-flags.js';
-import {
-  mirrorSchemaPlanToDeliverable,
-  SCHEMA_PLAN_FLAG,
-} from '../../server/domains/inbox/schema-plan-dual-write.js';
+import { mirrorSchemaPlanToDeliverable } from '../../server/domains/inbox/schema-plan-dual-write.js';
 import type { SchemaSitePlan } from '../../shared/types/schema-plan.js';
 
 const wsA = createWorkspace('backfill-schema-plan-A', 'site-bsp-a');
@@ -50,7 +46,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  setFlagOverride(SCHEMA_PLAN_FLAG, null);
   db.prepare('DELETE FROM schema_site_plans').run();
   db.prepare('DELETE FROM client_deliverable WHERE workspace_id IN (?, ?)').run(WS_A, WS_B);
 });
@@ -116,7 +111,6 @@ describe('backfill-deliverables-schema-plan', () => {
   });
 
   it('CROSS-PATH: a dual-written deliverable + a backfill of the same site collapse to ONE', () => {
-    setFlagOverride(SCHEMA_PLAN_FLAG, true);
     // Fresh send via DUAL-WRITE → one schema_plan:<siteId> deliverable.
     const mirrored = mirrorSchemaPlanToDeliverable(WS_A, plan({ id: 'plan_fresh' }));
     expect(mirrored!.sourceRef).toBe(`schema_plan:${SITE_A}`);

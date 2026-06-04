@@ -19,12 +19,11 @@ import {
   deleteBatch,
 } from '../approvals.js';
 import { broadcastToWorkspace } from '../broadcast.js';
-import { APPROVAL_FAMILY_FLAG, mirrorApprovalBatchToDeliverable } from '../domains/inbox/approval-batch-dual-write.js';
+import { mirrorApprovalBatchToDeliverable } from '../domains/inbox/approval-batch-dual-write.js';
 import { respondToApprovalBatch } from '../domains/inbox/approval-batch-respond.js';
 import { classifyApprovalBatch } from '../domains/inbox/deliverable-adapters/approval-batch-classifier.js';
 import { markDeliverableApplied } from '../domains/inbox/send-to-client.js';
 import { findBySourceRef } from '../client-deliverables.js';
-import { isFeatureEnabled } from '../feature-flags.js';
 import { isClientApplyableFields } from '../../shared/applyability.js';
 import { notifyApprovalReady, notifyTeamActionApproved, notifyTeamChangesRequested } from '../email.js';
 import { getClientActor, requireClientPortalAuth } from '../middleware.js';
@@ -472,20 +471,18 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
       { batchId: req.params.batchId, appliedCount: appliedIds.length });
   }
 
-  // R3b mirror-flip (DARK): when the unified approval-family mirror exists, move it to `applied`
-  // so the unified inbox reflects the publish. Gated on APPROVAL_FAMILY_FLAG (the flag that governs
-  // mirror EXISTENCE — NOT unified-inbox). The Webflow write already succeeded above; a mirror miss
-  // must never fail this response, so the whole block is best-effort (log + swallow). isFeatureEnabled
-  // is single-arg/global (no workspaceId). With the flag off this is byte-identical to before.
+  // R3b mirror-flip: when the unified approval-family mirror exists, move it to `applied` so the
+  // unified inbox reflects the publish. The Webflow write already succeeded above; a mirror miss
+  // must never fail this response, so the whole block is best-effort (log + swallow).
   //
-  // Flip ONLY on a FULLY-successful apply (`failed === 0 && every approved item applied`). On a
+  // Flip ONLY on a fully successful apply (`failed === 0 && every approved item applied`). On a
   // partial/total Webflow failure `markBatchApplied` marks only the succeeded items `applied` and the
   // legacy batch stays retryable; flipping the WHOLE mirror to `applied` (terminal — filtered out of
   // the client list) would strand the still-`approved` failed items. Leaving the mirror `approved`
   // keeps it in "Ready to publish" so re-clicking Apply re-applies only the failed items — matching
   // the legacy batch's retry semantics.
   const failed = results.length - appliedIds.length;
-  if (failed === 0 && appliedIds.length === approved.length && isFeatureEnabled(APPROVAL_FAMILY_FLAG)) {
+  if (failed === 0 && appliedIds.length === approved.length) {
     try {
       const type = classifyApprovalBatch(batch);
       const mirror = findBySourceRef(req.params.workspaceId, type, `${type}:${req.params.batchId}`);

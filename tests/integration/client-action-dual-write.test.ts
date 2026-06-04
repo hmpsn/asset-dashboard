@@ -1,12 +1,8 @@
 import { describe, it, expect, afterEach, afterAll } from 'vitest';
 import db from '../../server/db/index.js';
-import { setFlagOverride } from '../../server/feature-flags.js';
 // The barrel self-registers the four family adapters the mirror resolves.
 import '../../server/domains/inbox/deliverable-adapters/index.js';
-import {
-  mirrorClientActionToDeliverable,
-  CLIENT_ACTION_FAMILY_FLAG,
-} from '../../server/domains/inbox/client-action-dual-write.js';
+import { mirrorClientActionToDeliverable } from '../../server/domains/inbox/client-action-dual-write.js';
 import { listDeliverables } from '../../server/client-deliverables.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import type { ClientAction, ClientActionPayload, ClientActionSourceType } from '../../shared/types/client-actions.js';
@@ -33,7 +29,6 @@ function makeAction(over: Partial<ClientAction> = {}): ClientAction {
 }
 
 afterEach(() => {
-  setFlagOverride(CLIENT_ACTION_FAMILY_FLAG, null); // revert to default (off)
   db.prepare('DELETE FROM client_deliverable WHERE workspace_id = ?').run(WS);
 });
 
@@ -43,14 +38,7 @@ afterAll(() => {
 });
 
 describe('client-action dual-write mirror', () => {
-  it('flag OFF (default) → mirror is a no-op, NO client_deliverable row written', () => {
-    const result = mirrorClientActionToDeliverable(WS, makeAction());
-    expect(result).toBeNull();
-    expect(listDeliverables(WS)).toHaveLength(0);
-  });
-
-  it('flag ON → mirrors a redirect deliverable with the stable site sourceRef', () => {
-    setFlagOverride(CLIENT_ACTION_FAMILY_FLAG, true);
+  it('mirrors a redirect deliverable with the stable site sourceRef', () => {
     const mirrored = mirrorClientActionToDeliverable(WS, makeAction());
     expect(mirrored).not.toBeNull();
     expect(mirrored!.type).toBe('redirect'); // redirect_proposal → redirect
@@ -60,8 +48,7 @@ describe('client-action dual-write mirror', () => {
     expect(listDeliverables(WS)).toHaveLength(1);
   });
 
-  it('flag ON → content_decay mirrors as a decision kind', () => {
-    setFlagOverride(CLIENT_ACTION_FAMILY_FLAG, true);
+  it('mirrors content_decay as a decision kind', () => {
     const action = makeAction({
       sourceType: 'content_decay',
       sourceId: 'content-decay:/blog/x',
@@ -74,8 +61,7 @@ describe('client-action dual-write mirror', () => {
     expect(mirrored!.sourceRef).toBe('content_decay:/blog/x');
   });
 
-  it('flag ON → mirror is idempotent for the same site (two redirect sends → one row)', () => {
-    setFlagOverride(CLIENT_ACTION_FAMILY_FLAG, true);
+  it('is idempotent for the same site (two redirect sends → one row)', () => {
     // Two distinct actions (different timestamp-keyed legacy ids) for the same site.
     const first = mirrorClientActionToDeliverable(WS, makeAction({ sourceId: 'redirects:t1' }));
     const second = mirrorClientActionToDeliverable(WS, makeAction({ sourceId: 'redirects:t2' }));
@@ -83,8 +69,7 @@ describe('client-action dual-write mirror', () => {
     expect(listDeliverables(WS)).toHaveLength(1);
   });
 
-  it('flag ON → a content_decay action with no targetKeyword is rejected (B13, no row, no throw)', () => {
-    setFlagOverride(CLIENT_ACTION_FAMILY_FLAG, true);
+  it('rejects a content_decay action with no targetKeyword (B13, no row, no throw)', () => {
     const action = makeAction({
       sourceType: 'content_decay',
       sourceId: 'content-decay:/p',
@@ -95,8 +80,7 @@ describe('client-action dual-write mirror', () => {
     expect(listDeliverables(WS)).toHaveLength(0);
   });
 
-  it('flag ON → an empty redirect array is rejected by validateSendable (no row, no throw)', () => {
-    setFlagOverride(CLIENT_ACTION_FAMILY_FLAG, true);
+  it('rejects an empty redirect array via validateSendable (no row, no throw)', () => {
     const result = mirrorClientActionToDeliverable(WS, makeAction({ payload: { redirects: [] } as ClientActionPayload }));
     expect(result).toBeNull();
     expect(listDeliverables(WS)).toHaveLength(0);

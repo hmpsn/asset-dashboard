@@ -545,10 +545,9 @@ async function runBriefingForWorkspaceInner(
   ) {
     const published = markPublished(workspaceId, draft.id, { autoPublished: true });
     if (published) {
-      // DARK dual-write (PR-1fg): mirror the just-auto-published briefing into client_deliverable
-      // as a one-way notification when the `unified-deliverables-rest` flag is on (default off →
-      // no-op). Best-effort/never-throws so it can never break the live auto-publish. Idempotent
-      // on briefing:<id>.
+      // Mirror the just-auto-published briefing into client_deliverable as a one-way notification.
+      // Best-effort/never-throws so it can never break the live auto-publish. Idempotent on
+      // `briefing:<id>`.
       mirrorBriefingToDeliverable(published);
       addActivity(
         workspaceId,
