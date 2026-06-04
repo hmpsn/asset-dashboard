@@ -36,6 +36,15 @@ export function dedupeByNormalizedKeyword<T extends { keyword: string }>(items: 
 }
 
 /**
+ * Trim and drop empty/non-string values from a string list.
+ */
+export function compactStrings(values: Array<string | undefined | null | false>): string[] {
+  return values
+    .map(value => (typeof value === 'string' ? value.trim() : ''))
+    .filter((value): value is string => value.length > 0);
+}
+
+/**
  * Return unique strings from `values`.
  *
  * Options:

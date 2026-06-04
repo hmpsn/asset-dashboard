@@ -219,7 +219,7 @@ grep -n "SET status" server/*.ts server/routes/*.ts | grep -v 'WHERE\|CASE'
 - `server/competitor-schema.ts:54,155` — 2 JSON columns
 - `server/email-queue.ts:68` — event queue
 
-**Acceptable (non-DB) JSON.parse:** `server/db/json-validation.ts` (the implementation itself), `server/db/json-column.ts` (generic helper), `server/db/migrate-json.ts` (one-time migration), `server/processor.ts` (file metadata), `server/stripe-config.ts` (encrypted config file with try-catch), AI response parsers (content-posts-ai, keyword-strategy, etc.).
+**Acceptable (non-DB) JSON.parse:** `server/db/json-validation.ts` (the implementation itself), `server/db/migrate-json.ts` (one-time migration), `server/processor.ts` (file metadata), `server/stripe-config.ts` (encrypted config file with try-catch), AI response parsers (content-posts-ai, keyword-strategy, etc.).
 
 **Detection command:**
 ```bash
@@ -732,7 +732,7 @@ Add to the existing pr-check script:
 
 Migrate all 92 bare `JSON.parse` calls on DB columns to `parseJsonSafe`/`parseJsonFallback`/`parseJsonSafeArray`. This is a **code change**, not a test — it's the prerequisite for Batch 6 tests to be meaningful. Testing bare `JSON.parse` for graceful fallback is testing code you know will crash.
 
-**Scope:** 35 files (see FM-6 list above). Exclude already-safe files: `json-validation.ts`, `json-column.ts`, `migrate-json.ts`, `stripe-config.ts`, AI response parsers.
+**Scope:** 35 files (see FM-6 list above). Exclude already-safe files: `json-validation.ts`, `migrate-json.ts`, `stripe-config.ts`, AI response parsers.
 
 **Model assignment:** Haiku — this is mechanical find-and-replace with type awareness. Each file: read the `JSON.parse(row.X)` call, determine the fallback type (empty array, empty object, null), replace with `parseJsonSafe(row.X, schema, context)` or `parseJsonFallback(row.X, fallback)`.
 

@@ -978,16 +978,9 @@ Find `PageData` (around line 41). Add:
 
 - [ ] **Step 2: Update `extractPageData` to populate the new fields**
 
-Add helper functions before `extractPageData`:
+Add helper functions before `extractPageData`. Use `capitalizeWord` from `server/utils/strings.ts` when deriving human-readable slug labels so known acronyms remain uppercase:
 
 ```typescript
-/** Capitalize a slug segment for human-readable output. */
-function capitalizeSlugSegment(slug: string): string {
-  return slug
-    .replace(/-/g, ' ')
-    .replace(/\b\w/g, c => c.toUpperCase());
-}
-
 /** Derive the leaf URL slug (e.g. "/services/development" → "development"). */
 function leafSlug(publishedPath: string): string | undefined {
   const segs = publishedPath.replace(/^\/|\/$/g, '').split('/').filter(Boolean);
@@ -1024,7 +1017,7 @@ export function extractPageData(input: ExtractInput): PageData {
 
   // Derive Service.serviceType from URL slug.
   const slug = leafSlug(input.pageMeta.publishedPath);
-  const serviceType = slug ? capitalizeSlugSegment(slug) : undefined;
+  const serviceType = slug ? slug.replace(/-/g, ' ').replace(/\b\w+\b/g, word => capitalizeWord(word)) : undefined;
 
   return {
     // ... existing fields ...
@@ -1069,8 +1062,8 @@ WorkspaceSchemaInput gains siteKeywordsForKnowsAbout?: string[].
 PageData gains keywords?, areaServed?, serviceType?, knowsAbout?.
 
 extractPageData populates each from the typed input + helpers
-(formatAreaServed for "City, State" composition, capitalizeSlugSegment
-for serviceType derivation). All three generator call sites threaded
+(formatAreaServed for "City, State" composition, capitalizeWord-backed
+slug labels for serviceType derivation). All three generator call sites threaded
 through. No template emits the new fields yet — Tasks 9-11 wire them.
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
@@ -2223,7 +2216,7 @@ EOF
 
 ### Not exported (internal to PR1)
 
-- `formatAreaServed`, `capitalizeSlugSegment`, `leafSlug` helpers in `data-sources.ts` — internal.
+- `formatAreaServed`, `capitalizeWord`-backed slug-label derivation, `leafSlug` helpers in `data-sources.ts` — internal.
 - `SchemaContext._siteHasSearch` internal field — only the schema feature reads.
 
 ---
@@ -2233,7 +2226,7 @@ EOF
 ### Shared utilities extracted
 
 - `formatAreaServed(address)` — single source of truth for "City, State" composition. Reused by Service + LocalBusiness templates via `pageData.areaServed`.
-- `capitalizeSlugSegment(slug)` — humanizes URL slug for `serviceType` derivation. Internal to `data-sources.ts`.
+- `capitalizeWord(word)` — humanizes slug labels for `serviceType` derivation while preserving known acronyms.
 - `ValidationFinding` type — single source of truth for the typed validator return shape. Future Pillar 3 schemarama integration consumes this.
 
 ### pr-check rules added

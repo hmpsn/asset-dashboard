@@ -25,12 +25,12 @@ This is not a sudden jump to 80-90% global coverage. It is a ratchet.
 
 `scripts/report-coverage-ratchet.ts` currently enforces:
 
-- Lines: `52.95%`
-- Statements: `50.65%`
-- Branches: `42.68%`
-- Functions: `43.90%`
+- Lines: `61.33%`
+- Statements: `58.75%`
+- Branches: `49.44%`
+- Functions: `53.29%`
 
-These floors are intentionally set `2.00` points below the latest global baseline (`2026-05-25`) and should only move up.
+These floors are intentionally set `2.00` points below the latest global baseline (`2026-06-04`) and should only move up.
 
 ## Domain Signal Guardrails (Advisory)
 

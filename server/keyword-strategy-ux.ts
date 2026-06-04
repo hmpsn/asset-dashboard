@@ -7,6 +7,7 @@ import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js
 import { buildStrategyKeywordEvaluationContext } from './keyword-strategy-context.js';
 import { evaluateKeywordCandidate, normalizeKeyword } from './keyword-intelligence/rules.js';
 import { getTrackedKeywords } from './rank-tracking.js';
+import { compactStrings } from './utils/collections.js';
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
 import {
   TRACKED_KEYWORD_SOURCE,
@@ -81,10 +82,6 @@ interface BuildSummaryOptions {
   currentPageMap?: Array<{ pagePath: string; primaryKeyword: string }>;
   trackedKeywords?: TrackedKeyword[];
   skipped?: number;
-}
-
-function compact(values: Array<string | undefined | null | false>): string[] {
-  return values.map(value => typeof value === 'string' ? value.trim() : '').filter(Boolean);
 }
 
 function uniq(values: string[]): string[] {
@@ -393,7 +390,7 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
       keyword,
       role: 'site_keyword',
       surface,
-      sourceEvidence: compact([
+      sourceEvidence: compactStrings([
         'Selected strategy keyword',
         metric?.volume != null ? `${metric.volume.toLocaleString()} monthly searches` : null,
         metric?.difficulty != null ? `Difficulty ${metric.difficulty}` : null,
@@ -417,7 +414,7 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
       role: 'page_keyword',
       surface,
       page,
-      sourceEvidence: compact([
+      sourceEvidence: compactStrings([
         `Mapped to ${page.pageTitle || page.pagePath}`,
         page.currentPosition != null ? `Current rank around #${Math.round(page.currentPosition)}` : null,
         page.impressions != null ? `${page.impressions.toLocaleString()} impressions` : null,
@@ -442,7 +439,7 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
       role: 'content_gap',
       surface,
       contentGap: gap,
-      sourceEvidence: compact([
+      sourceEvidence: compactStrings([
         `${gap.priority} priority content gap`,
         gap.competitorProof,
         gap.impressions != null ? `${gap.impressions.toLocaleString()} impressions` : null,
@@ -466,7 +463,7 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
         role: 'competitor_gap',
         surface,
         keywordGap: gap,
-        sourceEvidence: compact([
+        sourceEvidence: compactStrings([
           'Raw competitor/provider evidence',
           `${gap.competitorDomain} ranks #${gap.competitorPosition}`,
           gap.volume != null ? `${gap.volume.toLocaleString()} monthly searches` : null,

@@ -92,12 +92,12 @@ Full site lists captured in roadmap items `audit-drift-score-color-adoption-swee
 
 | Item | Files |
 |---|---|
-| Retire `server/db/json-column.ts:parseJsonColumn` in favor of `parseJsonFallback` | `server/db/json-column.ts:9` vs `server/db/json-validation.ts:90` |
-| Collapse `titleCaseWord` / `capitalize` / `capitalizeSlugSegment` | `server/insight-enrichment.ts:37`, `server/schema/data-sources.ts:146,324` |
-| Collapse `compact()` siblings | `server/keyword-strategy-context.ts:36`, `server/keyword-strategy-ux.ts:85` |
+| Retire legacy JSON column shim | Completed 2026-06-04 — `server/db/json-column.ts` removed; JSON reads use `server/db/json-validation.ts` |
+| Collapse title-casing helpers | Completed 2026-06-04 — server callsites use `server/utils/strings.ts:capitalizeWord`; frontend insight feed uses `src/utils/strings.ts:capitalizeWord` |
+| Collapse `compact()` siblings | Completed 2026-06-04 — keyword strategy callsites use `server/utils/collections.ts:compactStrings` |
 | `useDebouncedValue` hook missing | `KeywordCommandCenter.tsx:116-131`, `useAutoSave.ts`, `ui/overlay/Tooltip.tsx:110` (audit `useAutoSave` shared-timer contract before migrating) |
 | `daysSince(iso)` helper missing | `schema/SchemaPageCard.tsx:95`, `client/Briefing/WinsSurface.tsx:32` |
-| `sleep(ms)` only one copy but commonly re-rolled | `server/local-seo.ts:156` |
+| `sleep(ms)` only one copy but commonly re-rolled | Completed 2026-06-04 — shared helper lives in `server/helpers.ts` |
 | Typed shape for `matchedPage` / `meta` | `server/schema-suggester.ts:692-876` (8+ `as Record<string,unknown>` casts) |
 
 ## Corrections Applied During Verification

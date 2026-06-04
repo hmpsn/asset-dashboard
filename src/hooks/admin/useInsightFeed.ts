@@ -11,20 +11,11 @@ import { getSafe } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
 import { STALE_TIMES } from '../../lib/queryClient';
 import { fmtNum } from '../../utils/formatNumbers';
-import { capitalize } from '../../utils/strings';
+import { capitalizeWord } from '../../utils/strings';
 import { INSIGHT_FILTER_KEYS, type AnalyticsInsight } from '../../../shared/types/analytics.js';
 import type { FeedInsight, SummaryCount } from '../../../shared/types/insights.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-/** Known acronyms that should be fully uppercased — mirrors server/insight-enrichment.ts. */
-const ACRONYMS = new Set(['ai', 'ui', 'ux', 'seo', 'ctr', 'gsc', 'ga4', 'api', 'url', 'roi', 'cms']);
-
-function titleCaseWord(word: string): string {
-  return ACRONYMS.has(word.toLowerCase())
-    ? word.toUpperCase()
-    : capitalize(word);
-}
 
 /** GA4/GSC placeholder values that should be treated as missing (no real title). */
 const GA_PLACEHOLDER_RE = /^\((not set|not provided|other)\)$/i;
@@ -47,7 +38,7 @@ export function cleanSlugToTitle(url: string | null): string {
     return slug
       .replace(/[-_]/g, ' ')
       .split(' ')
-      .map(titleCaseWord)
+      .map(word => capitalizeWord(word))
       .join(' ')
       .trim() || 'Home';
   } catch {
@@ -58,7 +49,7 @@ export function cleanSlugToTitle(url: string | null): string {
     return slug
       .replace(/[-_]/g, ' ')
       .split(' ')
-      .map(titleCaseWord)
+      .map(word => capitalizeWord(word))
       .join(' ')
       .trim() || 'Home';
   }

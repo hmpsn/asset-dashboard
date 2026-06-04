@@ -1,6 +1,6 @@
 /**
  * Pure unit tests for DB JSON column parsing helpers.
- * Covers both server/db/json-validation.ts and server/db/json-column.ts.
+ * Covers server/db/json-validation.ts.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { z } from 'zod';
@@ -16,7 +16,6 @@ vi.mock('../../server/logger.js', () => ({
 }));
 
 import { parseJsonSafe, parseJsonSafeArray, parseJsonFallback } from '../../server/db/json-validation.js';
-import { parseJsonColumn, stringifyJsonColumn } from '../../server/db/json-column.js';
 
 // ── Shared test schema ──
 const idSchema = z.object({ id: z.string() });
@@ -287,129 +286,6 @@ describe('parseJsonFallback', () => {
 
     it('returns fallback for bare text', () => {
       expect(parseJsonFallback('not json', [])).toEqual([]);
-    });
-  });
-});
-
-// ── parseJsonColumn (server/db/json-column.ts) ──
-
-describe('parseJsonColumn', () => {
-  describe('valid inputs', () => {
-    it('parses a valid JSON object string', () => {
-      const raw = JSON.stringify({ key: 'value', count: 3 });
-      expect(parseJsonColumn<{ key: string; count: number }>(raw, { key: '', count: 0 })).toEqual({
-        key: 'value',
-        count: 3,
-      });
-    });
-
-    it('parses a valid JSON array string', () => {
-      expect(parseJsonColumn<string[]>('["a","b","c"]', [])).toEqual(['a', 'b', 'c']);
-    });
-
-    it('parses a JSON number', () => {
-      expect(parseJsonColumn<number>('42', 0)).toBe(42);
-    });
-
-    it('parses a JSON boolean', () => {
-      expect(parseJsonColumn<boolean>('true', false)).toBe(true);
-    });
-  });
-
-  describe('null inputs', () => {
-    it('returns fallback for null', () => {
-      expect(parseJsonColumn<string[]>(null, [])).toEqual([]);
-    });
-
-    it('returns fallback for undefined', () => {
-      expect(parseJsonColumn<string[]>(undefined, [])).toEqual([]);
-    });
-  });
-
-  describe('malformed JSON', () => {
-    it('returns fallback for invalid JSON (does not throw)', () => {
-      expect(parseJsonColumn<Record<string, unknown>>('{bad', {})).toEqual({});
-    });
-
-    it('returns fallback for bare text', () => {
-      expect(parseJsonColumn<number[]>('not-json', [])).toEqual([]);
-    });
-
-    it('returns fallback for truncated JSON', () => {
-      expect(parseJsonColumn<Record<string, unknown>>('{"key":', {})).toEqual({});
-    });
-  });
-
-  describe('fallback is returned by reference', () => {
-    it('returns the exact fallback object for null input', () => {
-      const fallback = { a: 1 };
-      expect(parseJsonColumn(null, fallback)).toBe(fallback);
-    });
-
-    it('returns the exact fallback array for invalid JSON', () => {
-      const fallback: string[] = [];
-      expect(parseJsonColumn('{bad', fallback)).toBe(fallback);
-    });
-  });
-});
-
-// ── stringifyJsonColumn (server/db/json-column.ts) ──
-
-describe('stringifyJsonColumn', () => {
-  describe('valid values', () => {
-    it('stringifies a plain object', () => {
-      expect(stringifyJsonColumn({ id: 'abc', score: 95 })).toBe('{"id":"abc","score":95}');
-    });
-
-    it('stringifies an array', () => {
-      expect(stringifyJsonColumn([1, 2, 3])).toBe('[1,2,3]');
-    });
-
-    it('stringifies a string', () => {
-      expect(stringifyJsonColumn('hello')).toBe('"hello"');
-    });
-
-    it('stringifies a number', () => {
-      expect(stringifyJsonColumn(42)).toBe('42');
-    });
-
-    it('stringifies a boolean', () => {
-      expect(stringifyJsonColumn(true)).toBe('true');
-    });
-
-    it('stringifies an empty object', () => {
-      expect(stringifyJsonColumn({})).toBe('{}');
-    });
-
-    it('stringifies an empty array', () => {
-      expect(stringifyJsonColumn([])).toBe('[]');
-    });
-  });
-
-  describe('null / undefined inputs', () => {
-    it('returns null for null input', () => {
-      expect(stringifyJsonColumn(null)).toBeNull();
-    });
-
-    it('returns null for undefined input', () => {
-      expect(stringifyJsonColumn(undefined)).toBeNull();
-    });
-  });
-
-  describe('round-trip contract', () => {
-    it('round-trips an object through stringify then parse', () => {
-      const original = { name: 'test', values: [1, 2, 3], nested: { ok: true } };
-      const stringified = stringifyJsonColumn(original);
-      expect(stringified).not.toBeNull();
-      const parsed = parseJsonColumn<typeof original>(stringified!, original);
-      expect(parsed).toEqual(original);
-    });
-
-    it('returns null from stringify → parseJsonColumn with null returns fallback', () => {
-      const fallback = { default: true };
-      const stringified = stringifyJsonColumn(null); // → null
-      const result = parseJsonColumn<typeof fallback>(stringified, fallback);
-      expect(result).toBe(fallback);
     });
   });
 });

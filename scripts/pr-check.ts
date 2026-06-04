@@ -1085,7 +1085,6 @@ export const CHECKS: Check[] = [
       'server/competitor-schema.ts', // HTTP fetch response (JSON-LD from HTML) + disk cache file (not DB columns)
       'server/storage-stats.ts', // disk files: workspace storage stat files (not DB columns)
       'server/db/migrate-json.ts', // disk files: one-time migration tool reads legacy flat-file JSON stores (not DB columns)
-      'server/db/json-column.ts', // safe JSON column helper — implements the wrapper, not a raw DB read
       'server/email-queue.ts', // disk file: email queue persistence file (not DB columns)
       'server/routes/seo-provider.ts', // disk cache files: provider response cache (not DB columns)
       'server/routes/reports.ts', // disk files: report output files served via API (not DB columns)
@@ -1660,7 +1659,7 @@ export const CHECKS: Check[] = [
     pattern: 'JSON\\.parse\\(row\\.',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
-    exclude: ['server/db/json-validation.ts', 'server/db/json-column.ts', 'server/db/migrate-json.ts'],
+    exclude: ['server/db/json-validation.ts', 'server/db/migrate-json.ts'],
     message: 'Use parseJsonSafe(row.column, schema, fallback) or parseJsonFallback(row.column, fallback). Bare JSON.parse on DB columns crashes on malformed data.',
     severity: 'error',
   },
