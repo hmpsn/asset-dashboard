@@ -1,5 +1,6 @@
 import db from './db/index.js';
-import { parseJsonFallback } from './db/json-validation.js';
+import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
+import { strategyHistoryStrategySchema, strategyHistoryPageMapSchema, type StrategyHistoryStrategy } from './schemas/workspace-schemas.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { createLogger } from './logger.js';
 import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js';
@@ -31,6 +32,10 @@ import type {
 const log = createLogger('keyword-strategy-ux');
 
 const RAW_EVIDENCE_NOTE = 'Raw provider evidence is useful context, but it is filtered separately before a keyword becomes a selected strategy action.';
+
+// Typed empty fallback for parseJsonSafe so a missing/malformed strategy_history
+// blob degrades to {} while keeping the schema's optional fields visible to TS.
+const EMPTY_STRATEGY_HISTORY: StrategyHistoryStrategy = {};
 
 const stmts = createStmtCache(() => ({
   feedback: db.prepare<[workspaceId: string]>(
@@ -303,18 +308,24 @@ export function buildLatestKeywordStrategyRefreshSummary(options: {
 }): KeywordStrategyRefreshSummary | undefined {
   if (!options.strategy) return undefined;
   const prev = stmts().latestHistory.get(options.workspaceId) as StrategyHistoryRow | undefined;
-  type PrevStrategyShape = {
-    siteKeywords?: string[];
-    contentGaps?: { targetKeyword: string }[];
-  };
-  const prevStrategy = prev ? parseJsonFallback<PrevStrategyShape>(prev.strategy_json, {}) : {};
-  const prevPageMap = prev ? parseJsonFallback<Array<{ pagePath: string; primaryKeyword: string }>>(prev.page_map_json, []) : [];
+  // parseJsonSafe returns the fallback for null/empty raw, so passing
+  // prev?.strategy_json (possibly undefined) degrades to {} without a guard. The
+  // typed empty fallback keeps the result's optional fields visible to TS.
+  const prevStrategy = parseJsonSafe(
+    prev?.strategy_json,
+    strategyHistoryStrategySchema,
+    EMPTY_STRATEGY_HISTORY,
+    { workspaceId: options.workspaceId, field: 'strategy_json', table: 'strategy_history' },
+  );
+  const prevPageMap = parseJsonSafeArray(prev?.page_map_json, strategyHistoryPageMapSchema, {
+    workspaceId: options.workspaceId, field: 'page_map_json', table: 'strategy_history',
+  });
   return buildKeywordStrategyRefreshSummary({
     previousGeneratedAt: prev?.generated_at,
     currentGeneratedAt: options.strategy.generatedAt,
     previousSiteKeywords: prevStrategy.siteKeywords ?? [],
     currentSiteKeywords: options.strategy.siteKeywords ?? [],
-    previousContentGapKeywords: prevStrategy.contentGaps?.map(gap => gap.targetKeyword) ?? [],
+    previousContentGapKeywords: prevStrategy.contentGaps?.flatMap(gap => (gap.targetKeyword ? [gap.targetKeyword] : [])) ?? [],
     currentContentGapKeywords: options.contentGaps.map(gap => gap.targetKeyword),
     previousPageMap: prevPageMap,
     currentPageMap: options.pageMap,

@@ -172,6 +172,43 @@ export const keywordStrategySchema = z.object({
   }).passthrough().optional(),
 }).passthrough();
 
+// strategy_history.strategy_json (migration 030, FK-rebuilt in 119) stores the
+// FULL prior KeywordStrategy blob spread with the five table-backed arrays that
+// the live blob strips (contentGaps/quickWins/keywordGaps/topicClusters/
+// cannibalization — see keyword-strategy-persistence.ts history INSERT). The
+// stored shape can be a SPARSE patch-built blob, so — like keywordStrategySchema
+// — EVERY field is .optional() and the object is .passthrough(); a too-strict
+// schema would silently return the fallback and break /diff + the refresh
+// summary (Schema-vs-stored-shape rule). Consumers only read siteKeywords +
+// contentGaps[].targetKeyword, but we keep the arrays passthrough so unrelated
+// item fields survive validation.
+export const strategyHistoryStrategySchema = keywordStrategySchema.extend({
+  contentGaps: z.array(z.object({
+    targetKeyword: z.string().optional(),
+  }).passthrough()).optional(),
+  quickWins: z.array(z.object({}).passthrough()).optional(),
+  keywordGaps: z.array(z.object({}).passthrough()).optional(),
+  topicClusters: z.array(z.object({}).passthrough()).optional(),
+  cannibalization: z.array(z.object({}).passthrough()).optional(),
+}).passthrough();
+
+export type StrategyHistoryStrategy = z.infer<typeof strategyHistoryStrategySchema>;
+
+// strategy_history.page_map_json stores the prior page_keywords snapshot. In
+// practice this is full PageKeywordMap rows (from listPageKeywords), but legacy /
+// manually-seeded history rows can be MINIMAL ({ pagePath, primaryKeyword } only)
+// — and both consumers (/diff + refresh summary) read only those two fields. Per
+// the Schema-vs-stored-shape rule the schema must reflect what is stored, not the
+// richest in-memory shape: a too-strict reuse of pageKeywordMapSchema (which
+// requires pageTitle + secondaryKeywords) would drop minimal rows and silently
+// break the page-map diff. So only the two consumed fields are required; the rest
+// passes through. parseJsonSafeArray validates each item individually so one
+// malformed row does not drop the whole snapshot.
+export const strategyHistoryPageMapSchema = z.object({
+  pagePath: z.string(),
+  primaryKeyword: z.string(),
+}).passthrough();
+
 // ── Personas ──
 
 export const audiencePersonaSchema = z.object({

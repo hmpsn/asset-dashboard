@@ -23,7 +23,8 @@ import { assembleStoredKeywordStrategy } from '../keyword-strategy-assembler.js'
 import { validate, z } from '../middleware/validate.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
-import { parseJsonFallback } from '../db/json-validation.js';
+import { parseJsonSafe, parseJsonSafeArray } from '../db/json-validation.js';
+import { strategyHistoryStrategySchema, strategyHistoryPageMapSchema, type StrategyHistoryStrategy } from '../schemas/workspace-schemas.js';
 import { getInsights } from '../analytics-insights-store.js';
 import type { KeywordStrategy, ContentGap, QuickWin, KeywordGapItem, TopicCluster, CannibalizationItem } from '../../shared/types/workspace.js';
 import { buildStrategySignals } from '../insight-feedback.js';
@@ -266,12 +267,13 @@ router.get('/api/webflow/keyword-strategy/:workspaceId/diff', requireWorkspaceAc
     const prev = db.prepare('SELECT strategy_json, page_map_json, generated_at FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC LIMIT 1').get(ws.id) as { strategy_json: string; page_map_json: string; generated_at: string } | undefined;
     if (!prev) return res.json(null);
 
-    type PrevStrategyShape = {
-      siteKeywords?: string[];
-      contentGaps?: { targetKeyword: string }[];
-    };
-    const prevStrategy = parseJsonFallback<PrevStrategyShape>(prev.strategy_json, {});
-    const prevPageMap = parseJsonFallback<Array<{ pagePath: string; primaryKeyword: string }>>(prev.page_map_json, []);
+    const emptyPrevStrategy: StrategyHistoryStrategy = {};
+    const prevStrategy = parseJsonSafe(prev.strategy_json, strategyHistoryStrategySchema, emptyPrevStrategy, {
+      workspaceId: ws.id, field: 'strategy_json', table: 'strategy_history',
+    });
+    const prevPageMap = parseJsonSafeArray(prev.page_map_json, strategyHistoryPageMapSchema, {
+      workspaceId: ws.id, field: 'page_map_json', table: 'strategy_history',
+    });
     const currentPageMap = listPageKeywords(ws.id);
     const trackedKeywords = getTrackedKeywords(ws.id, { includeInactive: true });
 
@@ -286,7 +288,7 @@ router.get('/api/webflow/keyword-strategy/:workspaceId/diff', requireWorkspaceAc
     // Current gaps come from the live content_gaps table - the blob no longer
     // carries them after #365 normalization.
     const currentContentGaps = listContentGaps(ws.id);
-    const prevGapKws = new Set<string>((prevStrategy.contentGaps || []).map((g: { targetKeyword: string }) => g.targetKeyword));
+    const prevGapKws = new Set<string>((prevStrategy.contentGaps || []).flatMap((g) => (g.targetKeyword ? [g.targetKeyword] : [])));
     const currGapKws = new Set<string>(currentContentGaps.map((g) => g.targetKeyword));
     const newGaps = [...currGapKws].filter((k: string) => !prevGapKws.has(k));
     const resolvedGaps = [...prevGapKws].filter((k: string) => !currGapKws.has(k));
@@ -316,7 +318,7 @@ router.get('/api/webflow/keyword-strategy/:workspaceId/diff', requireWorkspaceAc
       currentGeneratedAt: current.generatedAt,
       previousSiteKeywords: prevStrategy.siteKeywords ?? [],
       currentSiteKeywords: current.siteKeywords ?? [],
-      previousContentGapKeywords: prevStrategy.contentGaps?.map(gap => gap.targetKeyword) ?? [],
+      previousContentGapKeywords: prevStrategy.contentGaps?.flatMap(gap => (gap.targetKeyword ? [gap.targetKeyword] : [])) ?? [],
       currentContentGapKeywords: currentContentGaps.map(gap => gap.targetKeyword),
       previousPageMap: prevPageMap,
       currentPageMap,
