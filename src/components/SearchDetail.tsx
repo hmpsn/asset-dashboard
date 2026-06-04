@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Search, ExternalLink, ArrowUpDown, Loader2 } from 'lucide-react';
+import { Search, ExternalLink, Loader2 } from 'lucide-react';
 import { SectionCard, DateRangeSelector, EmptyState, MetricToggleCard, Icon, Button } from './ui';
 import { DATE_PRESETS_SEARCH, CHART_SERIES_COLORS } from './ui/constants';
 import type { FeedInsight } from '../../shared/types/insights';
@@ -12,7 +12,8 @@ import { InsightFeed } from './insights';
 import { AnnotatedTrendChart } from './charts/AnnotatedTrendChart';
 import type { TrendLine, ChartCallout } from './charts/AnnotatedTrendChart';
 import { fmtNum } from '../utils/formatNumbers';
-import { capitalize } from '../utils/strings';
+import { KeywordTable } from './shared/RankTable';
+import type { KeywordTableRow } from './shared/RankTable';
 
 interface Props {
   siteId: string;
@@ -59,15 +60,6 @@ function buildBadgeMap(feed: FeedInsight[]): Map<string, InsightBadge> {
   return map;
 }
 
-// ── Severity tint for table rows ──
-
-function rowTint(badge: InsightBadge | undefined): string {
-  if (!badge) return '';
-  if (badge.color.includes('red')) return 'bg-red-500/[0.03]';
-  if (badge.color.includes('amber')) return 'bg-amber-500/[0.03]';
-  if (badge.color.includes('emerald')) return 'bg-emerald-500/[0.03]';
-  return '';
-}
 
 export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
   const [tableView, setTableView] = useState<'queries' | 'pages'>('queries');
@@ -278,61 +270,67 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                 </Button>
               </div>
 
+              {/* Wave 2b B2 (fixed): raw table → KeywordTable.
+                  - position is a first-class sortable column via positionFormat="raw"
+                  - stickyHeader restores the sticky thead for the scrollable container
+                  - truncateKeyword={false} on queries restores full query text display
+                  - renderActions removed; position now in columns={[...,'position']}
+                  - renderKeywordMeta kept for insight badges (queries) + ExternalLink (pages) */}
               <div className="overflow-y-auto flex-1 min-h-0">
-              <table className="w-full text-xs">
-                <thead className="sticky top-0 bg-[var(--surface-2)] z-[var(--z-sticky)]">
-                  <tr className="border-b border-[var(--brand-border)]">
-                    <th className="text-left py-3 px-4 text-[var(--brand-text-muted)] font-medium">
-                      {tableView === 'queries' ? 'Query' : 'Page'}
-                    </th>
-                    {(['clicks', 'impressions', 'ctr', 'position'] as SortKey[]).map(key => (
-                      <th key={key} className="text-right py-3 px-3 text-[var(--brand-text-muted)] font-medium">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleSort(key)}
-                          className="gap-1 ml-auto px-0 py-0 rounded-none bg-transparent hover:bg-transparent hover:text-[var(--brand-text-bright)]"
-                        >
-                          {key === 'ctr' ? 'CTR' : capitalize(key)}
-                          {sortKey === key && <Icon as={ArrowUpDown} size="sm" />}
-                        </Button>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {tableView === 'queries' && sortByKey(overview.topQueries).map((q, i) => {
-                    const badge = badgeMap.get(q.query);
-                    return (
-                      <tr key={i} className={`border-b border-[var(--brand-border)]/50 hover:bg-[var(--surface-3)]/30 ${rowTint(badge)}`}>
-                        <td className="py-2.5 px-4 text-[var(--brand-text-bright)] font-medium">
-                          {q.query}
-                          {badge && (
-                            <span className={`t-micro font-semibold px-1 py-0.5 rounded-[var(--radius-sm)] ${badge.color} ${badge.bgColor} ml-1 whitespace-nowrap`}>
-                              {badge.label}
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-3 text-right text-blue-400 font-semibold">{q.clicks}</td>
-                        <td className="py-2.5 px-3 text-right text-[var(--brand-text)]">{q.impressions.toLocaleString()}</td>
-                        <td className="py-2.5 px-3 text-right text-emerald-400">{q.ctr}%</td>
-                        <td className="py-2.5 px-3 text-right">
-                          <span className={q.position <= 10 ? 'text-emerald-400' : q.position <= 20 ? 'text-amber-400' : 'text-red-400'}>
-                            {q.position}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {tableView === 'pages' && sortByKey(overview.topPages).map((p, i) => {
-                    const pagePath = normalizePageUrl(p.page);
-                    const badge = badgeMap.get(p.page);
-                    return (
-                      <tr key={i} className={`border-b border-[var(--brand-border)]/50 hover:bg-[var(--surface-3)]/30 ${rowTint(badge)}`}>
-                        <td className="py-2.5 px-4 text-[var(--brand-text-bright)] font-medium max-w-xs truncate">
-                          <a href={p.page} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-teal-400 transition-colors">
-                            {pagePath}
+                {tableView === 'queries' && (
+                  <KeywordTable<KeywordTableRow>
+                    rows={sortByKey(overview.topQueries).map(q => ({
+                      query: q.query,
+                      position: q.position,
+                      clicks: q.clicks,
+                      impressions: q.impressions,
+                      ctr: q.ctr,
+                    }))}
+                    columns={['clicks', 'impressions', 'ctr', 'position']}
+                    positionFormat="raw"
+                    stickyHeader
+                    truncateKeyword={false}
+                    sort={{
+                      key: sortKey,
+                      direction: sortAsc ? 'asc' : 'desc',
+                      onSort: (k) => handleSort(k as SortKey),
+                    }}
+                    emptyState={{ icon: Search, title: 'No queries data', description: 'No search query data available for this period.' }}
+                    renderKeywordMeta={(r) => {
+                      const badge = badgeMap.get(r.query);
+                      return badge ? (
+                        <span className={`t-micro font-semibold px-1 py-0.5 rounded-[var(--radius-sm)] ${badge.color} ${badge.bgColor} ml-1 whitespace-nowrap`}>
+                          {badge.label}
+                        </span>
+                      ) : null;
+                    }}
+                    className="rounded-none border-0"
+                  />
+                )}
+                {tableView === 'pages' && (
+                  <KeywordTable<KeywordTableRow & { _page: string }>
+                    rows={sortByKey(overview.topPages).map(p => ({
+                      query: normalizePageUrl(p.page),
+                      position: p.position,
+                      clicks: p.clicks,
+                      impressions: p.impressions,
+                      ctr: p.ctr,
+                      _page: p.page,
+                    }))}
+                    columns={['clicks', 'impressions', 'ctr', 'position']}
+                    positionFormat="raw"
+                    stickyHeader
+                    sort={{
+                      key: sortKey,
+                      direction: sortAsc ? 'asc' : 'desc',
+                      onSort: (k) => handleSort(k as SortKey),
+                    }}
+                    emptyState={{ icon: Search, title: 'No pages data', description: 'No page data available for this period.' }}
+                    renderKeywordMeta={(r) => {
+                      const badge = badgeMap.get(r._page);
+                      return (
+                        <>
+                          <a href={r._page} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-teal-400 transition-colors ml-1">
                             <Icon as={ExternalLink} size="sm" className="flex-shrink-0 text-[var(--brand-text-muted)]" />
                           </a>
                           {badge && (
@@ -340,26 +338,12 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                               {badge.label}
                             </span>
                           )}
-                        </td>
-                        <td className="py-2.5 px-3 text-right text-blue-400 font-semibold">{p.clicks}</td>
-                        <td className="py-2.5 px-3 text-right text-[var(--brand-text)]">{p.impressions.toLocaleString()}</td>
-                        <td className="py-2.5 px-3 text-right text-emerald-400">{p.ctr}%</td>
-                        <td className="py-2.5 px-3 text-right">
-                          <span className={p.position <= 10 ? 'text-emerald-400' : p.position <= 20 ? 'text-amber-400' : 'text-red-400'}>
-                            {p.position}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {tableView === 'queries' && overview.topQueries.length === 0 && (
-                    <tr><td colSpan={5} className="py-8"><EmptyState icon={Search} title="No queries data" description="No search query data available for this period." /></td></tr>
-                  )}
-                  {tableView === 'pages' && overview.topPages.length === 0 && (
-                    <tr><td colSpan={5} className="py-8"><EmptyState icon={Search} title="No pages data" description="No page data available for this period." /></td></tr>
-                  )}
-                </tbody>
-              </table>
+                        </>
+                      );
+                    }}
+                    className="rounded-none border-0"
+                  />
+                )}
               </div>
             </div>
 

@@ -6,8 +6,10 @@ import {
   kdColor,
   kdLabel,
   opportunityScore,
-  positionColor,
 } from '../../src/components/page-intelligence/pageIntelligenceDisplay';
+// Wave 2b B1: positionColor moved from pageIntelligenceDisplay to the canonical
+// ui/constants authority. Test now imports from the true source.
+import { positionColor } from '../../src/components/ui/constants';
 import type { PageKeywordMap } from '../../shared/types/workspace.js';
 
 function page(overrides: Partial<PageKeywordMap>): PageKeywordMap {

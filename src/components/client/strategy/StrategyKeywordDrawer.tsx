@@ -1,6 +1,7 @@
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import { ChevronDown, X } from 'lucide-react';
 import { Badge, Button, IconButton } from '../../ui';
+import { positionColor } from '../../ui/constants';
 import { kdFraming } from '../../../lib/kdFraming.js';
 import {
   ROLE_DISPLAY_LABELS,
@@ -139,13 +140,13 @@ export function StrategyKeywordDrawer({
                 {drawerRow.currentPosition != null && (
                   <div className="bg-[var(--surface-3)] rounded-[var(--radius-lg)] px-3 py-2.5">
                     <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Current rank</div>
-                    <div className={`t-page font-semibold ${
-                      drawerRow.currentPosition <= 10 ? 'text-emerald-400' :
-                      drawerRow.currentPosition <= 30 ? 'text-amber-400' :
-                      'text-[var(--brand-text)]'
-                    }`}>#{drawerRow.currentPosition}</div>
+                    <div className={`t-page font-semibold ${positionColor(drawerRow.currentPosition)}`}>#{drawerRow.currentPosition}</div>
                     <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
-                      {drawerRow.currentPosition <= 10 ? 'On page 1' :
+                      {/* Label reconciled to authority bands (3/10/20) so color and label agree:
+                          ≤10 → emerald "Page 1"; ≤20 → amber "Top of page 2"; >20 → red "Page 2+".
+                          Old color used a unique ≤30 amber band that was inconsistent with the ≤20
+                          "Page 2+" label boundary — fixed here by aligning both to the 10/20 authority. */}
+                      {drawerRow.currentPosition <= 10 ? 'Page 1' :
                        drawerRow.currentPosition <= 20 ? 'Top of page 2' : 'Page 2+'}
                     </div>
                   </div>

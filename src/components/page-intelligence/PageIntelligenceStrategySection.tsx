@@ -2,7 +2,8 @@ import { BarChart3, Check, DollarSign, Pencil, Shield, X } from 'lucide-react';
 import type { UnifiedPage } from '../../../shared/types/page-join';
 import { Button, FormInput, Icon, IconButton } from '../ui';
 import { SeoCopyPanel } from '../strategy/SeoCopyPanel';
-import { kdColor, kdLabel, positionColor } from './pageIntelligenceDisplay';
+import { kdColor, kdLabel } from './pageIntelligenceDisplay';
+import { positionColor } from '../ui/constants';
 import type { KeywordEditDraft, SeoCopy } from './pageIntelligenceTypes';
 import { PageIntelligenceTrackKeywordButton } from './PageIntelligenceTrackKeywordButton';
 

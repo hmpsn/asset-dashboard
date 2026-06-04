@@ -4,26 +4,10 @@ import { ChevronUp, ChevronDown, TrendingUp } from 'lucide-react'; // trend-icon
 import type { LucideIcon } from 'lucide-react';
 
 import { SectionCard, Icon, EmptyState, Checkbox, Button } from '../ui';
-import { CHART_SERIES_ORDER } from '../ui/constants';
+import { CHART_SERIES_ORDER, positionColor as sharedPositionColor } from '../ui/constants';
 import { TableSkeleton } from '../ui/LoadingState';
-import { positionColor as sharedPositionColor } from '../ui/constants';
 import { kdColor as sharedKdColor } from '../page-intelligence/pageIntelligenceDisplay';
 import { fmtNum } from '../../utils/formatNumbers';
-
-// ════════════════════════════════════════════════════════════════════════════
-// positionColor — re-export the canonical T1 authority.
-//
-// Historically this module hosted its own `positionColor` (DEF A in the Wave 2
-// audit): bare-tailwind `text-emerald-400/80` with `font-semibold` baked into ≤3
-// and no undefined guard. As part of folding RankTable into the canonical
-// KeywordTable, the export now delegates to the single ui/constants authority
-// (accent tokens, emerald ≤10, undefined/0 → muted). This is a deliberate,
-// reviewed class-string change (`emerald-400/80` → `text-accent-success`); there
-// are no snapshot tests pinning the old class strings on this surface.
-// ════════════════════════════════════════════════════════════════════════════
-export function positionColor(pos?: number | null): string {
-  return sharedPositionColor(pos);
-}
 
 // ── Rank History Chart (kept as a sibling — NOT folded into KeywordTable) ──
 interface RankHistoryChartProps {
@@ -103,6 +87,7 @@ export type KeywordColumnKey =
   | 'change'
   | 'clicks'
   | 'impressions'
+  | 'ctr'
   | 'volume'
   | 'difficulty';
 
@@ -158,6 +143,8 @@ interface ColumnMeta {
   label: string;
   /** Sort key emitted to onSort; defaults to the column key. */
   sortKey?: string;
+  /** Optional tooltip rendered next to the header label (e.g. an Explainer). */
+  headerTooltip?: ReactNode;
 }
 
 const COLUMN_META: Record<KeywordColumnKey, ColumnMeta> = {
@@ -165,6 +152,7 @@ const COLUMN_META: Record<KeywordColumnKey, ColumnMeta> = {
   change: { key: 'change', label: 'Change' },
   clicks: { key: 'clicks', label: 'Clicks' },
   impressions: { key: 'impressions', label: 'Impressions' },
+  ctr: { key: 'ctr', label: 'CTR' },
   volume: { key: 'volume', label: 'Volume' },
   difficulty: { key: 'difficulty', label: 'KD' },
 };
@@ -178,6 +166,13 @@ interface KeywordTableProps<T extends KeywordTableRow> {
   limit?: number;
   /** Sign convention for the change indicator. Default matches legacy RankChange. */
   changeSign?: ChangeSign;
+  /**
+   * How the position column renders its value.
+   * - 'rounded' (default) — existing behaviour: #N rounded integer with positionColor.
+   * - 'raw'               — raw decimal (e.g. 6.3) wrapped in positionColor.
+   *   Use 'raw' for GSC surfaces (SearchDetail / SearchTab) where decimal precision matters.
+   */
+  positionFormat?: 'rounded' | 'raw';
   /** Column-level, flag-gated local-seo column (opt-in). */
   showLocalSeo?: boolean;
   /** Density of body rows. */
@@ -190,6 +185,24 @@ interface KeywordTableProps<T extends KeywordTableRow> {
   selection?: SelectionConfig<T>;
   /** Optional sortable headers. */
   sort?: SortConfig;
+  /**
+   * Per-column header tooltips (e.g. an <Explainer>). Merged with the built-in
+   * COLUMN_META so individual columns can add or override tooltips without re-specifying
+   * the whole column list.
+   */
+  headerTooltips?: Partial<Record<KeywordColumnKey, ReactNode>>;
+  /**
+   * Sticky thead — applies `sticky top-0` to the <thead> so the header remains
+   * visible while scrolling the table body. Useful for long tables inside an
+   * overflow-y-auto container (SearchDetail, B3/B4 surfaces). Default: false.
+   */
+  stickyHeader?: boolean;
+  /**
+   * When false, opts out of the `max-w-[200px] truncate` applied to the keyword
+   * cell so long query text renders in full. Default: true (preserves existing
+   * behaviour for RankTrackingSection / SearchTab tracked rows).
+   */
+  truncateKeyword?: boolean;
   /** Render extra action content after the data columns (pin/remove/open-page, badges). */
   renderActions?: (row: T) => ReactNode;
   /** Render content INSIDE the keyword cell, after the query (source/lifecycle badges, page title). */
@@ -214,14 +227,21 @@ function SortHeader({
   columnKey,
   sort,
   className,
+  tooltip,
 }: {
   label: string;
   columnKey: string;
   sort?: SortConfig;
   className: string;
+  tooltip?: ReactNode;
 }) {
   if (!sort) {
-    return <th className={className}>{label}</th>;
+    return (
+      <th className={className}>
+        {label}
+        {tooltip && <span className="ml-0.5 inline-flex items-center">{tooltip}</span>}
+      </th>
+    );
   }
   const active = sort.key === columnKey;
   const directionIcon = active
@@ -231,16 +251,19 @@ function SortHeader({
     : undefined;
   return (
     <th className={className}>
-      <Button
-        variant="ghost"
-        size="sm"
-        icon={directionIcon}
-        iconPosition="right"
-        onClick={() => sort.onSort(columnKey)}
-        className="px-1 py-0.5 font-medium text-[var(--brand-text-muted)]"
-      >
-        {label}
-      </Button>
+      <span className="inline-flex items-center gap-0.5">
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={directionIcon}
+          iconPosition="right"
+          onClick={() => sort.onSort(columnKey)}
+          className="px-1 py-0.5 font-medium text-[var(--brand-text-muted)]"
+        >
+          {label}
+        </Button>
+        {tooltip && <span className="inline-flex items-center">{tooltip}</span>}
+      </span>
     </th>
   );
 }
@@ -250,12 +273,16 @@ export function KeywordTable<T extends KeywordTableRow>({
   columns = DEFAULT_COLUMNS,
   limit,
   changeSign = 'higherIsBetter',
+  positionFormat = 'rounded',
   showLocalSeo = false,
   density = 'comfortable',
   loading = false,
   emptyState,
   selection,
   sort,
+  headerTooltips,
+  stickyHeader = false,
+  truncateKeyword = true,
   renderActions,
   renderKeywordMeta,
   isRowExpanded,
@@ -297,7 +324,7 @@ export function KeywordTable<T extends KeywordTableRow>({
   return (
     <div className={`overflow-hidden rounded-[var(--radius-sm)] border border-[var(--brand-border)] ${className ?? ''}`}>
       <table className="w-full t-caption">
-        <thead>
+        <thead className={stickyHeader ? 'sticky top-0 z-[var(--z-sticky)] bg-[var(--surface-1)]' : undefined}>
           <tr className="bg-[var(--surface-1)]/50">
             {selection && <th className="w-8" />}
             <SortHeader label="Keyword" columnKey="keyword" sort={sort} className={`text-left ${TH_BASE}`} />
@@ -310,6 +337,7 @@ export function KeywordTable<T extends KeywordTableRow>({
                   columnKey={meta.sortKey ?? meta.key}
                   sort={sort}
                   className={`text-right ${TH_BASE}`}
+                  tooltip={headerTooltips?.[c]}
                 />
               );
             })}
@@ -336,20 +364,20 @@ export function KeywordTable<T extends KeywordTableRow>({
                     </td>
                   )}
                   {renderKeywordMeta ? (
-                    <td className={`${cell} text-[var(--brand-text-bright)] max-w-[200px]`}>
-                      <span className="truncate block">{r.query}</span>
+                    <td className={`${cell} text-[var(--brand-text-bright)]${truncateKeyword ? ' max-w-[200px]' : ''}`}>
+                      <span className={truncateKeyword ? 'truncate block' : 'block'}>{r.query}</span>
                       {renderKeywordMeta(r)}
                     </td>
                   ) : (
                     // Byte-identical to the legacy RankTable keyword cell: query inline
                     // with `truncate` on the <td>, no wrapping span (preserves SearchTab
                     // /RankTrackingSection DOM exactly).
-                    <td className={`${cell} text-[var(--brand-text-bright)] truncate max-w-[200px]`}>
+                    <td className={`${cell} text-[var(--brand-text-bright)]${truncateKeyword ? ' truncate max-w-[200px]' : ''}`}>
                       {r.query}
                     </td>
                   )}
                   {columns.map((c) => (
-                    <DataCell key={c} column={c} row={r} cell={cell} changeSign={changeSign} />
+                    <DataCell key={c} column={c} row={r} cell={cell} changeSign={changeSign} positionFormat={positionFormat} />
                   ))}
                   {showLocalSeo && (
                     <td className={`${cell} text-right text-[var(--brand-text-muted)]`}>
@@ -386,18 +414,24 @@ function DataCell<T extends KeywordTableRow>({
   row,
   cell,
   changeSign,
+  positionFormat = 'rounded',
 }: {
   column: KeywordColumnKey;
   row: T;
   cell: string;
   changeSign: ChangeSign;
+  positionFormat?: 'rounded' | 'raw';
 }) {
   switch (column) {
     case 'position':
       return (
         <td className={`${cell} text-right`}>
           {row.position != null ? (
-            <span className={sharedPositionColor(row.position)}>#{Math.round(row.position)}</span>
+            positionFormat === 'raw' ? (
+              <span className={sharedPositionColor(row.position)}>{row.position}</span>
+            ) : (
+              <span className={sharedPositionColor(row.position)}>#{Math.round(row.position)}</span>
+            )
           ) : (
             <span className="text-[var(--brand-text-muted)]">—</span>
           )}
@@ -411,6 +445,12 @@ function DataCell<T extends KeywordTableRow>({
       );
     case 'clicks':
       return <td className={`${cell} text-right text-blue-400`}>{row.clicks ?? 0}</td>;
+    case 'ctr':
+      return (
+        <td className={`${cell} text-right text-emerald-400`}>
+          {row.ctr != null ? `${row.ctr}%` : '—'}
+        </td>
+      );
     case 'impressions':
       return (
         <td className={`${cell} text-right text-[var(--brand-text-muted)]`}>

@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **164** — 144 error, 20 warn.
+Total rules: **165** — 145 error, 20 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -160,6 +160,7 @@ advisory but tracked.
 | 142 | opportunity-money-field-must-be-stripped | error | custom | `shared/types/recommendations.ts` | — | stripEmvFromPublicRecs destructure-and-spreads, so a new admin-money OpportunityScore field reaches clients unless explicitly stripped (G0b money-leak). |
 | 143 | new-rec-type-source-needs-category-and-action-type | error | custom | `server/recommendations.ts` | — | A RecSourceCategory present in the union but absent from REC_SOURCE_CATEGORIES makes getRecSourceCategory return null, bypassing the per-category auto-resolve guard (G2 false auto-resolve). |
 | 144 | tracked_keywords bare read→write outside withTrackedKeywordsTxn | error | custom | `server/` | `// tracked-keywords-txn-ok` | Two concurrent tracked_keywords writers both read the same JSON blob, mutate independently, and last-write-wins silently drops the other writer's keywords. BEGIN IMMEDIATE serialises the read+write so each writer sees the previous writer's result. |
+| 145 | positionColor/positionTone redefinition outside authority | error | custom | `src/ (excluding src/components/ui/constants.ts)` | `// position-color-authority-ok` | A locally-defined positionColor/positionTone bypasses the canonical color authority, causing silent palette drift when rank-color thresholds or accent tokens change. |
 
 ---
 
