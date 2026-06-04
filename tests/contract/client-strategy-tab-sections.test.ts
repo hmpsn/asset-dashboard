@@ -21,9 +21,11 @@ describe('client StrategyTab section split', () => {
     expect(displaySrc).toContain('export interface StrategyKeywordTableRow');
     expect(displaySrc).toContain('export const ROLE_DISPLAY_LABELS');
     expect(displaySrc).toContain('export const SIGNAL_LABELS');
-    expect(displaySrc).toContain('export const fmtNum');
+    // Wave 2 T2: fmtNum and kdColor are now canonical authorities in formatNumbers.ts and
+    // pageIntelligenceDisplay.ts respectively — they are no longer defined in strategyKeywordDisplay.
+    expect(displaySrc).not.toContain('export const fmtNum');
+    expect(displaySrc).not.toContain('export const kdColor');
     expect(displaySrc).toContain('export const intentColor');
-    expect(displaySrc).toContain('export const kdColor');
     expect(displaySrc).toContain('export function fmtAudience');
     expect(displaySrc).toContain('export function fmtMomentum');
     expect(displaySrc).toContain('export function confidenceStatement');

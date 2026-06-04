@@ -3,7 +3,7 @@ import { ChartNoAxesCombined, ChevronDown, MessageCircle, Zap } from 'lucide-rea
 import { post } from '../../../api';
 import { Badge, Button, Icon, SectionCard } from '../../ui';
 import type { ClientKeywordStrategy } from '../types';
-import { kdColor } from './strategyKeywordDisplay';
+import { kdColor } from '../../page-intelligence/pageIntelligenceDisplay';
 
 type PageMapItem = ClientKeywordStrategy['pageMap'][number];
 

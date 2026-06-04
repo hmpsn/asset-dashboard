@@ -9,6 +9,7 @@ import {
   Eye, MousePointerClick, Trophy, AlertTriangle, Plus, Check,
 } from 'lucide-react';
 import { Badge, StatCard, SectionCard, AIContextIndicator, TabBar, ErrorState, ProgressIndicator, NextStepsCard, LoadingState, Icon, PageHeader, Button, ClickableRow, IconButton, FormInput, FormTextarea, positionColor } from './ui';
+import { kdColor } from './page-intelligence/pageIntelligenceDisplay';
 import { KeywordStrategyGuide } from './strategy/KeywordStrategyGuide';
 import { useKeywordStrategy } from '../hooks/admin';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -237,13 +238,8 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     }
   }, [trackedKeywords, workspaceId, queryClient]);
 
-  const difficultyColor = (kd?: number) => {
-    if (kd === undefined) return 'text-[var(--brand-text-muted)]';
-    if (kd <= 30) return 'text-accent-success';
-    if (kd <= 50) return 'text-accent-warning';
-    if (kd <= 70) return 'text-accent-orange';
-    return 'text-accent-danger';
-  };
+  // Wave 2 T2: difficultyColor was byte-identical to canonical kdColor (30/50/70, tokens).
+  // Removed and replaced with the imported canonical kdColor authority.
 
   const intentColor = (intent?: string) => {
     switch (intent) {
@@ -745,7 +741,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           <ContentGaps contentGaps={strategy.contentGaps || []} workspaceId={workspaceId} intentColor={intentColor} />
 
           {/* Keyword Gaps */}
-          <KeywordGaps keywordGaps={strategy.keywordGaps || []} difficultyColor={difficultyColor} />
+          <KeywordGaps keywordGaps={strategy.keywordGaps || []} difficultyColor={kdColor} />
 
           {/* ── Reference & Analysis ── */}
           <div className="border-t border-[var(--brand-border)] my-6 flex items-center gap-3">
@@ -792,7 +788,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                     {metrics && (metrics.volume > 0 || metrics.difficulty > 0) && (
                       <>
                         {metrics.volume > 0 && <span className="t-caption-sm text-[var(--brand-text-muted)] font-mono">{metrics.volume.toLocaleString()}/mo</span>}
-                        {metrics.difficulty > 0 && <span className={`t-caption-sm font-mono ${difficultyColor(metrics.difficulty)}`}>KD {metrics.difficulty}%</span>}
+                        {metrics.difficulty > 0 && <span className={`t-caption-sm font-mono ${kdColor(metrics.difficulty)}`}>KD {metrics.difficulty}%</span>}
                       </>
                     )}
                     <IconButton

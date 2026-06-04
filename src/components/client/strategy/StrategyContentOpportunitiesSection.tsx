@@ -3,7 +3,8 @@ import { BarChart3, Ban, CheckCircle2, ChevronDown, Eye, FileText, Layers, Spark
 import { kdFraming, kdTooltip } from '../../../lib/kdFraming.js';
 import { Badge, Button, ClickableRow, Icon, SectionCard, TierGate, TrendBadge, type BadgeTone, type Tier } from '../../ui';
 import type { ClientContentRequest, ClientKeywordStrategy } from '../types';
-import { fmtNum, kdColor } from './strategyKeywordDisplay';
+import { fmtNum } from '../../../utils/formatNumbers';
+import { kdColor } from '../../page-intelligence/pageIntelligenceDisplay';
 import { keywordComparisonKey } from '../../../../shared/keyword-normalization';
 
 type ContentGap = NonNullable<ClientKeywordStrategy['contentGaps']>[number];

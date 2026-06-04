@@ -14,7 +14,7 @@ import { STUDIO_NAME } from '../../constants';
 import { get, post, patch, del } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
 import { Button } from '../ui/Button';
-import { fmtMoneyFull } from '../../utils/formatNumbers';
+import { fmtMoneyFull, fmtNum } from '../../utils/formatNumbers';
 import { Icon } from '../ui/Icon';
 
 // ─── Props ────────────────────────────────────────────────────────
@@ -48,7 +48,9 @@ const REC_TYPE_TAB: Record<RecType, string> = {
 
 const fmt = fmtMoneyFull;
 
-const num = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString();
+// Wave 2 T2: num was a lowercase-k dup. Now delegating to the canonical UPPERCASE-K fmtNum.
+// Visible change: "8.6k" → "8.6K" (reviewed cosmetic — uppercase is canonical).
+const num = fmtNum;
 
 const PRIORITY_CONFIG: Record<RecPriority, { label: string; icon: typeof Zap; color: string; bg: string; border: string; description: string }> = {
   fix_now: {

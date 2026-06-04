@@ -1,5 +1,6 @@
 import type { KeywordStrategyExplanation } from '../../../../shared/types/keyword-strategy-ux.js';
 import { keywordComparisonKey } from '../../../../shared/keyword-normalization';
+import { fmtNum as _fmtNum } from '../../../utils/formatNumbers';
 
 export type PriorityKeywordStatus = 'client' | 'strategy' | 'suggested';
 export type StrategyKeywordRole = 'strategy' | 'page' | 'content' | 'idea';
@@ -59,8 +60,6 @@ export const SIGNAL_LABELS: Record<string, string> = {
   'Competitor gap': "Competitors rank here — you don't yet",
 };
 
-export const fmtNum = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString();
-
 export const intentColor = (intent?: string) => {
   switch (intent) {
     case 'commercial': return 'text-accent-info bg-blue-500/10 border-blue-500/20';
@@ -71,20 +70,17 @@ export const intentColor = (intent?: string) => {
   }
 };
 
-export const kdColor = (kd?: number) =>
-  !kd
-    ? 'text-[var(--brand-text-muted)]'
-    : kd <= 30
-      ? 'text-accent-success'
-      : kd <= 60
-        ? 'text-accent-warning'
-        : 'text-accent-danger';
-
+// Wave 2 T2: fmtNum and kdColor have been deleted from this module.
+// The canonical authorities are:
+//   volume → src/utils/formatNumbers.ts:fmtNum (UPPERCASE K/M)
+//   kd     → pageIntelligenceDisplay.ts:kdColor / kdLabel (30/50/70 bands)
+// Direct importers that previously used strategyKeywordDisplay for these should
+// import from the canonical modules directly.
 export function fmtAudience(volume?: number): string {
   if (volume == null) return 'Gathering…';
   if (volume === 0) return 'Very niche or emerging term';
   if (volume < 100) return 'Small, focused audience';
-  return `~${fmtNum(volume)} searches/month`;
+  return `~${_fmtNum(volume)} searches/month`;
 }
 
 export function fmtMomentum(direction?: 'rising' | 'declining' | 'stable'): string {

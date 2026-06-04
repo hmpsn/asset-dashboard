@@ -9,12 +9,12 @@ import {
   confidenceStatement,
   fmtAudience,
   fmtMomentum,
-  fmtNum,
   intentColor,
   roleBadgeClass,
   type PriorityKeywordItem,
   type StrategyKeywordTableRow,
 } from './strategyKeywordDisplay';
+import { fmtNum } from '../../../utils/formatNumbers';
 
 interface StrategyKeywordDrawerProps {
   drawerRow: StrategyKeywordTableRow;
