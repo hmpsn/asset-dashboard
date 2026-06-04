@@ -27,17 +27,22 @@ Concrete failures: every cross-surface jump lands on an unfiltered list (no keyw
 **One keyword-first Hub** — *"the Rank Tracker grows up into the Keyword Hub."* The Command Center and the standalone Rank Tracker fuse into a single admin surface. The list keeps the Rank-Tracker table the owner likes (the canonical `KeywordTable` primitive); the lifecycle states you jump between today become **segments of that one list**; every row opens into the keyword's **full journey**.
 
 ### Decisions locked
-- **Plan stays upstream.** The *generation* work — content gaps, topic clusters, cannibalization, "generate strategy" — remains the **Strategy** surface. Strategy *proposes* keywords; the Hub owns each keyword's *life*. Strategy deep-links into the Hub per-keyword.
+- **Plan stays upstream.** The *generation* work — content gaps, topic clusters, cannibalization, "generate strategy" — remains the **Strategy** surface. Strategy *proposes* keywords; the Hub owns each keyword's *life*.
+- **Strategy keeps its fast on-ramp.** On the Strategy surface each keyword keeps its one-click **Track** toggle (the fast path from the plan) *and* gains a **"View in Hub →"** deep-link. The Hub owns the full lifecycle; Strategy stays the quick way to start tracking.
+- **Nav label: "Keyword Hub."** Replaces today's "Keywords" (Command Center) + "Rank Tracker" nav entries.
 - **Admin-first.** Build the admin Hub (where the three-surface confusion is worst). A client-facing read-only "your keywords" view is a **fast follow** (out of scope here).
 - **Remove = Retire (soft) by default; Delete (hard) is separate + confirmed.** Reconciles the KCC's soft `retire` (status→`deprecated`, restorable) with the Rank Tracker's hard `removeTrackedKeyword`. Retire is the primary, auditable "remove"; a distinct, red, confirmed **"Delete permanently"** stays available for genuine mistakes (manual/client keywords).
 - **Local keywords are an annotation layer in the Hub** — a segment + filter + market dimension — not a separate keyword manager. (This is the explicit product contract, `docs/rules/local-seo-visibility.md:9,62,64`.)
 
 ### 2a. The unified list
 Built on the canonical `KeywordTable`/`RankTable` primitive (`src/components/shared/RankTable.tsx`, the Wave-2 consolidation) — which already supports interactive column-sort, multi-select, expand, `showLocalSeo`, density. Neither KCC nor RankTracker uses it yet; unifying onto it IS the consolidation.
-- **Segments** (the KCC lifecycle filters as pills): `All · In Strategy · Tracked · Needs Review · Retired` + a **`Local`** segment (with the local sub-states behind it: visible / possible / not-visible / not-checked / provider-degraded). Sourced from `KEYWORD_COMMAND_CENTER_FILTERS`.
+- **Segments — curated, not all 18.** ~5–6 **primary** pills (`All · In Strategy · Tracked · Needs Review · Retired · 📍 Local`); the remaining `KEYWORD_COMMAND_CENTER_FILTERS` (local sub-states visible/possible/not-visible/not-checked/provider-degraded, raw evidence, declined, lost-visibility, page-assigned) move behind an **"Advanced filters"** control so the primary row stays legible.
 - **Search** (debounced, keyword + page) and **interactive column sort** (position / change / clicks / volume / difficulty / date) — the Hub *adds* interactive sort that today's Rank Tracker lacks entirely.
 - **Multi-select + bulk action bar** (`KeywordBulkActionBar`): the five bulk-capable actions.
 - **Columns:** keyword · source badge · national position · Δ · clicks · **📍 Local** (roll-up, e.g. "3/4 markets") · trend sparkline · row action menu.
+- **Preserve the Rank Tracker's distinct features** — snapshot capture (a Hub action), the pinned-trends view (a segment/sort), and the history sparkline (in-row + drawer). The consolidation must not quietly drop functionality.
+- **Scale** — keep the Command Center's server-side pagination; virtualize the table for workspaces with hundreds of keywords. No perf regression.
+- **The list universe** — the Hub's `All` is the Command Center's existing merged keyword universe (strategy keywords + tracked + evidence + gaps), segment-filtered. No new "what counts as a keyword" definition.
 
 ### 2b. The keyword journey drawer (the deep-dive)
 Expanding a row (or opening the drawer — evolving `KeywordDetailDrawer`) shows the keyword's full story:
@@ -84,7 +89,7 @@ This is the biggest visual change in the consolidation, so it ships **dark behin
 ---
 
 ## 5. Out of scope
-- The **client-facing** Hub (read-only) — fast follow.
+- The **client-facing** Hub (read-only) — fast follow. **Consequence to set expectations:** the *client's* "tracked vs all queries" confusion (the hardcoded caption in `SearchTab.tsx`) is on the client surface, so it **persists** until that fast-follow — this admin wave does not fix it.
 - **Geo-grid** local tracking — `docs/rules/local-seo-visibility.md:74` defers it; the Hub uses the existing explicit-markets model.
 - Redesigning the **Strategy** generation surface — it stays as-is upstream (only gains keyword-targeted deep-links into the Hub).
 - The **plan analytics** (topic clusters, cannibalization) stay on Strategy.
@@ -97,6 +102,8 @@ This is the biggest visual change in the consolidation, so it ships **dark behin
 3. **`strategyOwned` exposure** — it's stripped from `getTrackedKeywords`/public by design; the Hub reads it via the admin KCC bundle, never the public read path (keep it admin-only).
 4. **Local = annotation, not a second manager** — honor the contract; the Hub annotates rows + a Local segment; market *setup* stays its own surface.
 5. **`?tab=` two-halves contract** — every new deep-link's receiver must read `useSearchParams` (enforced by `tests/contract/tab-deep-link-wiring.test.ts` + pr-check).
+6. **P0 table migration may be *extension*, not a swap** — the Command Center row is bespoke (lifecycle + local + evidence columns); migrating it onto `KeywordTable` likely means extending the primitive (or a Hub-specific row config), not a clean drop-in. The plan scopes this honestly rather than assuming a one-line swap.
+7. **Mobile + a11y** — a dense table + drawer must degrade to card rows / a full-screen sheet on mobile, with proper keyboard nav + ARIA (CLAUDE.md UI/UX rules) — part of each phase's DoD, not an afterthought.
 
 ---
 
