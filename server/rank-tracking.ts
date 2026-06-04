@@ -11,6 +11,7 @@ import {
   type TrackedKeywordStatus,
 } from '../shared/types/rank-tracking.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
+import { replaceAllTrackedKeywordRows } from './tracked-keywords-store.js';
 
 export interface RankSnapshot {
   date: string; // YYYY-MM-DD
@@ -212,6 +213,14 @@ export function withTrackedKeywordsTxn(
     const config = readConfig(workspaceId);
     config.trackedKeywords = normalizeTrackedKeywords(updater(config.trackedKeywords));
     writeConfig(workspaceId, config);
+    // DUAL-WRITE (Wave 3c-i shadow): mirror the post-mutation set into the
+    // tracked_keywords row table so the table stays in sync with the blob after
+    // every write — including the empty-clear case (replaceAll with [] clears).
+    // This runs INSIDE the same txn (BEGIN IMMEDIATE here, or the KCC outer txn
+    // via the db.inTransaction guard below — a wrapped db.transaction nests as a
+    // SAVEPOINT). The blob write above is KEPT (shadow, not strip); READS stay on
+    // the blob — getTrackedKeywords and every consumer are unchanged this PR.
+    replaceAllTrackedKeywordRows(workspaceId, config.trackedKeywords);
     return config.trackedKeywords;
   }
 

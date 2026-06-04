@@ -73,6 +73,16 @@ migrateCannibalizationFromJsonBlob();
 import { migrateSiteKeywordMetricsFromBlob } from './site-keyword-metrics.js';
 migrateSiteKeywordMetricsFromBlob();
 
+// Backfill rank_tracking_config.tracked_keywords blobs into the tracked_keywords
+// row table (idempotent, CAS-guarded). Wave 3c-i ADDITIVE SHADOW: this only
+// POPULATES the table — it does NOT strip the blob and does NOT switch any read
+// (reads stay on the blob). The source stamper recovers provenance for legacy
+// UNKNOWN-source rows once via the canonical inference ladder (injected from KCC
+// to avoid a static import cycle). The read-switch + strip are later PRs (3c-ii).
+import { migrateTrackedKeywordsFromConfigBlob } from './tracked-keywords-store.js';
+import { inferTrackedKeywordSourcesForWorkspace } from './keyword-command-center.js';
+migrateTrackedKeywordsFromConfigBlob(inferTrackedKeywordSourcesForWorkspace);
+
 // Create and configure the Express app (middleware + routes)
 const app = createApp();
 

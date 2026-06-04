@@ -359,6 +359,30 @@ function inferTrackedKeywordSources(
 }
 
 /**
+ * Assemble the same inference context the live KCC read paths build (strategy
+ * blob with site_keyword_metrics resolved table-first, assembled contentGaps,
+ * feedback map) and run the canonical inferTrackedKeywordSources ladder ONCE.
+ *
+ * Injected into the tracked_keywords boot backfill (Wave 3c-i) so the table is
+ * stamped with recovered sources for legacy UNKNOWN-source rows at populate time,
+ * using the exact same ladder the read paths use — without coupling the store to
+ * KCC (which would create a static import cycle rank-tracking → store → KCC →
+ * rank-tracking). The ladder CANNOT recover MANUAL/RECOMMENDATION — those stay
+ * UNKNOWN explicitly (never guessed).
+ */
+export function inferTrackedKeywordSourcesForWorkspace(
+  workspaceId: string,
+  trackedKeywords: TrackedKeyword[],
+): TrackedKeyword[] {
+  const workspace = getWorkspace(workspaceId);
+  if (!workspace) return trackedKeywords;
+  const strategy = withResolvedSiteKeywordMetrics(workspaceId, workspace.keywordStrategy);
+  const contentGaps = assembleStoredKeywordStrategy(workspaceId)?.contentGaps ?? [];
+  const feedback = readFeedback(workspaceId);
+  return inferTrackedKeywordSources(trackedKeywords, { strategy, contentGaps, feedback });
+}
+
+/**
  * Friendly label for the addSource `detail` field. Avoids displaying the raw
  * "unknown" enum value as if it were real provenance.
  */
