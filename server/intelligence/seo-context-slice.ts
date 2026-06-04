@@ -1,4 +1,5 @@
 import type { IntelligenceOptions, SeoContextSlice, SerpFeatures } from '../../shared/types/intelligence.js';
+import type { StoredKeywordStrategy } from '../../shared/types/keyword-strategy.js';
 import type { RankEntry } from '../rank-tracking.js';
 import { getPrimaryMarketLocationCode } from '../local-seo.js';
 import { createLogger } from '../logger.js';
@@ -33,23 +34,32 @@ export async function assembleSeoContext(
     log.warn({ err: pkErr, workspaceId }, 'assembleSeoContext: listPageKeywords failed, falling back to stored pageMap');
   }
 
-  // contentGaps now live in the content_gaps table (post-#365 normalization).
-  // The stored keyword_strategy blob has them stripped, so always reassemble
-  // from the table here.
-  let liveContentGaps: Awaited<ReturnType<typeof import('../content-gaps.js').listContentGaps>> = [];
+  // The table-backed arrays (contentGaps/quickWins/keywordGaps/topicClusters/
+  // cannibalization) live in their own tables (post-#365–368 normalization) — the
+  // stored keyword_strategy blob has them stripped. Route them through the single
+  // assembler (#2) so the AI context sees the real table state. Without this the
+  // slice spread the blob (empty arrays for migrated workspaces) and only overrode
+  // contentGaps — a latent bug that left the other four arrays empty in AI context.
+  let assembled: StoredKeywordStrategy | null = null;
   try {
-    const { listContentGaps } = await import('../content-gaps.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-    liveContentGaps = listContentGaps(workspaceId);
-  } catch (cgErr) {
-    log.warn({ err: cgErr, workspaceId }, 'assembleSeoContext: listContentGaps failed, content gaps unavailable');
+    const { assembleStoredKeywordStrategy } = await import('../keyword-strategy-assembler.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+    assembled = assembleStoredKeywordStrategy(workspaceId);
+  } catch (asmErr) {
+    log.warn({ err: asmErr, workspaceId }, 'assembleSeoContext: assembleStoredKeywordStrategy failed, strategy arrays unavailable');
   }
 
   const base: SeoContextSlice = {
     strategy: workspace?.keywordStrategy
       ? {
           ...workspace.keywordStrategy,
+          // pageMap retains the slice's existing blob fallback (the assembler is
+          // table-only); the assembler supplies the five normalized arrays.
           pageMap: livePageMap.length > 0 ? livePageMap : workspace.keywordStrategy.pageMap,
-          contentGaps: liveContentGaps,
+          contentGaps: assembled?.contentGaps ?? [],
+          quickWins: assembled?.quickWins ?? [],
+          keywordGaps: assembled?.keywordGaps ?? [],
+          topicClusters: assembled?.topicClusters ?? [],
+          cannibalization: assembled?.cannibalization ?? [],
         }
       : workspace?.keywordStrategy,
     // Store RAW brand voice value (no headers) for legacy read-only consumers that need

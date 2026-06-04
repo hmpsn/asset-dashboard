@@ -22,11 +22,7 @@ import { normalizePageUrl, sanitizeString, validateEnum } from '../helpers.js';
 import { sanitizeRichText, sanitizePlainText } from '../html-sanitize.js';
 import { countHtmlWords } from '../content-posts-ai.js';
 import { getPageKeyword, listPageKeywords } from '../page-keywords.js';
-import { listContentGaps } from '../content-gaps.js';
-import { listQuickWins } from '../quick-wins.js';
-import { listKeywordGaps } from '../keyword-gaps.js';
-import { listTopicClusters } from '../topic-clusters.js';
-import { listCannibalizationIssues } from '../cannibalization-issues.js';
+import { assembleStoredKeywordStrategy } from '../keyword-strategy-assembler.js';
 import { getClientActor, requireClientPortalAuth } from '../middleware.js';
 import { getPageTrend, getQueryPageData } from '../search-console.js';
 import { getWorkspace } from '../workspaces.js';
@@ -127,36 +123,13 @@ router.get('/api/public/seo-strategy/:workspaceId', async (req, res, next) => {
     const ws = getWorkspace(req.params.workspaceId);
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });
     const strategy = ws.keywordStrategy;
-    // Reassemble pageMap from page_keywords table
-    const fullPageMap = listPageKeywords(ws.id);
-    // Reassemble contentGaps from content_gaps table (post-#365 normalization)
-    const contentGapsList = listContentGaps(ws.id);
-    const contentGaps = contentGapsList.length > 0 ? contentGapsList : (strategy?.contentGaps || []);
-    // Reassemble quickWins from quick_wins table (post-#367 normalization).
-    // Fallback to blob data for legacy workspaces that have not been migrated yet.
-    const quickWinsList = listQuickWins(ws.id);
-    const quickWins = quickWinsList.length > 0 ? quickWinsList : (strategy?.quickWins || []);
-    // Reassemble keywordGaps from keyword_gaps table (post-#368 normalization).
-    // Fallback to blob data for legacy workspaces that have not been migrated yet.
-    const keywordGapsList = listKeywordGaps(ws.id);
-    const keywordGaps = keywordGapsList.length > 0 ? keywordGapsList : (strategy?.keywordGaps || []);
-    // Reassemble topicClusters and cannibalization from normalized tables.
-    // Fallback to blob data for legacy workspaces that have not been migrated yet.
-    const topicClustersList = listTopicClusters(ws.id);
-    const topicClusters = topicClustersList.length > 0 ? topicClustersList : (strategy?.topicClusters || []);
-    const cannibalizationList = listCannibalizationIssues(ws.id);
-    const cannibalization = cannibalizationList.length > 0 ? cannibalizationList : (strategy?.cannibalization || []);
-    if (
-      !strategy
-      && fullPageMap.length === 0
-      && contentGaps.length === 0
-      && quickWins.length === 0
-      && keywordGaps.length === 0
-      && topicClusters.length === 0
-      && cannibalization.length === 0
-    ) {
-      return res.json(null);
-    }
+    // Single read-path assembler (#2): table-as-truth + table-or-blob fallback for
+    // each array, returning null on the existing short-circuit (no blob + all
+    // tables empty). The client-safe whitelist projection below is unchanged — the
+    // assembler returns the full internal shape and the whitelist trims it.
+    const assembled = assembleStoredKeywordStrategy(ws.id);
+    if (!assembled) return res.json(null);
+    const { pageMap: fullPageMap, contentGaps, quickWins, keywordGaps, topicClusters, cannibalization } = assembled;
     // Return client-safe subset (no SEO data mode/provider internals)
     const trackedKeywords = getTrackedKeywords(ws.id, { includeInactive: true });
     const strategyUx = await buildKeywordStrategyUxPayload({
