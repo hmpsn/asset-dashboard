@@ -625,7 +625,7 @@ describe('local SEO provider selection', () => {
     expect(plan?.keywords).toEqual(['cosmetic dentistry austin']);
   });
 
-  it('does not fall back to DataForSEO when the workspace selected SEMRush for local visibility', async () => {
+  it('normalizes a legacy SEMRush workspace preference to DataForSEO for local visibility', async () => {
     setBroadcast(vi.fn(), vi.fn());
     const ws = createWorkspace('Local SEO Provider Strictness Test');
     cleanupWorkspaceIds.add(ws.id);
@@ -663,8 +663,13 @@ describe('local SEO provider selection', () => {
     await runLocalSeoRefreshJob(job.id, ws.id);
 
     expect(getJob(job.id)).toEqual(expect.objectContaining({
-      status: 'error',
-      error: 'No configured local visibility provider',
+      status: 'done',
+      result: expect.objectContaining({
+        refreshed: 1,
+        failed: 0,
+        skipped: 0,
+        workspaceId: ws.id,
+      }),
     }));
   });
 

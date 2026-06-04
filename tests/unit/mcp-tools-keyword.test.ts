@@ -4,6 +4,9 @@ import { __resetPaidCallCounterForTests } from '../../server/mcp/paid-call-count
 
 vi.mock('../../server/seo-data-provider.js', () => ({
   getConfiguredProvider: vi.fn(),
+  normalizeRuntimeSeoDataProvider: vi.fn((provider?: string | null) => (
+    provider === 'dataforseo' || provider === 'semrush' ? 'dataforseo' : 'dataforseo'
+  )),
 }));
 vi.mock('../../server/workspaces.js', () => ({
   getWorkspace: vi.fn(),

@@ -4,7 +4,7 @@
  * Tests the full HTTP request/response cycle for:
  * - GET /api/semrush/status      — no auth / no workspace required
  * - GET /api/seo-providers/status — no auth / no workspace required
- * - GET /api/semrush/diagnose/:workspaceId — diagnostic (zero SEMRush API calls)
+ * - GET /api/semrush/diagnose/:workspaceId — diagnostic (zero provider API calls)
  *
  * Deliberately excluded: /api/semrush/competitive-intel and
  * /api/semrush/discover-competitors — they make real external API calls.
@@ -71,8 +71,8 @@ describe('GET /api/semrush/diagnose/:workspaceId', () => {
     // Fresh workspace has no competitors
     expect(Array.isArray(body.competitors)).toBe(true);
 
-    // The note confirms no SEMRush API calls are made
-    expect(body.note).toContain('ZERO SEMRush API calls');
+    // The note confirms no external SEO provider calls are made
+    expect(body.note).toContain('ZERO external SEO provider calls');
   });
 
   it('returns 404 for an unknown workspaceId', async () => {
