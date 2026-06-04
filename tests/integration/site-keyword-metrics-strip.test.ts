@@ -15,8 +15,10 @@
  *  - Reconcile baseline: volume/difficulty still attach to STRATEGY_SITE_KEYWORD
  *    targets via the reconcile join after the strip.
  *
- * Port: 13891 (exclusive; 13890 is the table-as-truth public-read gate, 13886
- * reserved for tracked-keywords-concurrency).
+ * Port: 13892 (exclusive; 13890 is the table-as-truth public-read gate, 13886
+ * reserved for tracked-keywords-concurrency). NOTE: 13891 was vacated — it now
+ * collides with tracked-keywords-row-table.test.ts (merged to staging via
+ * 3c-i/#1062 after this branch was cut). 13892 is verified free on staging.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
@@ -31,7 +33,7 @@ import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
 import type { KeywordStrategy } from '../../shared/types/workspace.js';
 import type { KeywordStrategySiteKeywordMetric } from '../../server/keyword-strategy-enrichment.js';
 
-const PORT = 13891;
+const PORT = 13892;
 const ctx = createTestContext(PORT);
 const { api } = ctx;
 
