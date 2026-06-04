@@ -77,14 +77,24 @@ describe('KeywordMetricCell', () => {
       expect(innerBadge!.className).toContain('amber');
     });
 
-    it('renders dash Badge when position is undefined in badge mode', () => {
+    it('renders NO position badge when position is undefined in badge mode', () => {
+      // Fix 1 (Wave 2 whole-wave review): badge mode with undefined position must be
+      // suppressed entirely — symmetry with span mode. Pre-fix this rendered a zinc "—" Badge.
       const { container } = render(
         <KeywordMetricCell volume={500} difficulty={60} mode="badge" kdForm="difficulty" />,
       );
-      // When no position: renders "—" zinc badge
-      const wrapper = container.querySelector('span[data-testid="position-badge"]');
-      expect(wrapper).not.toBeNull();
-      expect(wrapper!.textContent).toBe('—');
+      // No position-badge wrapper at all
+      expect(container.querySelector('span[data-testid="position-badge"]')).toBeNull();
+      // And no "—" text from a dash badge
+      expect(container.textContent).not.toContain('—');
+    });
+
+    it('renders NO position badge when position is null/undefined (confirming dash is absent)', () => {
+      // Explicit confirmation that the "—" dash is absent — the old code rendered it.
+      const { container } = render(
+        <KeywordMetricCell mode="badge" kdForm="difficulty" />,
+      );
+      expect(container.querySelector('span[data-testid="position-badge"]')).toBeNull();
     });
   });
 

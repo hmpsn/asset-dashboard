@@ -77,6 +77,25 @@ describe('ContentGapRow — briefing audience (FLAG-SENSITIVE, gen-quality Contr
   });
 });
 
+describe('ContentGapRow — volume===0 gate (Fix 2: briefing renders, strategy-tab suppresses)', () => {
+  // Pre-fix: briefing with volume===0 was suppressed (same as strategy-tab) — incorrect.
+  // Post-fix: only strategy-tab requires volume>0; briefing (and admin) render at volume===0.
+  it('briefing + volume===0 → "0/mo" cell renders (was suppressed pre-fix)', () => {
+    render(<ContentGapRow audience="briefing" data={gap({ volume: 0 })} intentTone={clientIntentTone} />);
+    expect(screen.getByText('0/mo')).toBeInTheDocument();
+  });
+
+  it('admin + volume===0 → "0/mo" cell renders (unchanged from pre-fix behaviour)', () => {
+    render(<ContentGapRow audience="admin" data={gap({ volume: 0 })} intentTone={adminIntentTone} />);
+    expect(screen.getByText('0/mo')).toBeInTheDocument();
+  });
+
+  it('strategy-tab + volume===0 → volume cell suppressed (unchanged from pre-fix behaviour)', () => {
+    render(<ContentGapRow audience="strategy-tab" data={gap({ volume: 0 })} intentTone={clientIntentTone} />);
+    expect(screen.queryByText('0/mo')).not.toBeInTheDocument();
+  });
+});
+
 describe('ContentGapRow — admin audience', () => {
   it('renders the "KD NN" prefix', () => {
     render(<ContentGapRow audience="admin" data={gap()} intentTone={adminIntentTone} />);

@@ -279,7 +279,7 @@ export function ContentGapRow({
   const metrics = (
     <div className={`flex items-center gap-${audience === 'strategy-tab' ? '3' : '2'} flex-wrap${audience === 'strategy-tab' ? ' mb-1.5' : ''}`}>
       <span className={chrome.targetKeywordClass}>{chrome.targetKeyword(data.targetKeyword)}</span>
-      {volume != null && (audience === 'admin' ? true : volume > 0) && (
+      {volume != null && (audience === 'strategy-tab' ? volume > 0 : true) && (
         <span className={chrome.volumeClass}>
           <Icon as={BarChart3} size="sm" />
           {fmtNum(volume)}/mo

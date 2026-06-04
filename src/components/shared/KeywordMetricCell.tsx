@@ -3,7 +3,7 @@
  *
  * Renders the volume + KD + position triple, consuming the canonical authorities:
  *   - positionColor / positionTone  from ui/constants
- *   - kdColor / kdLabel             from pageIntelligenceDisplay
+ *   - kdColor                       from pageIntelligenceDisplay
  *   - fmtNum                        from utils/formatNumbers
  *
  * Props:
@@ -95,17 +95,15 @@ export function KeywordMetricCell({
           </span>
         ) : null
       ) : (
-        <span data-testid="position-badge">
-          {position ? (
+        position != null ? (
+          <span data-testid="position-badge">
             <Badge
               label={`#${Math.round(position)}`}
               tone={positionTone(position)}
               className="font-mono"
             />
-          ) : (
-            <Badge label="—" tone="zinc" className="font-mono" />
-          )}
-        </span>
+          </span>
+        ) : null
       )}
     </span>
   );
