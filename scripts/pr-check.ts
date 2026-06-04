@@ -7929,6 +7929,70 @@ export const CHECKS: Check[] = [
     },
   },
 
+  {
+    // ── positionColor / positionTone authority guard ──
+    //
+    // `positionColor()` and `positionTone()` are the ONLY sanctioned rank-color
+    // helpers for this codebase. Their single definitions live in
+    // `src/components/ui/constants.ts`. This rule prevents a future contributor
+    // from re-introducing a local rank-color helper instead of importing the
+    // authority.
+    //
+    // Detects a DEFINITION (function declaration or const arrow) of a function
+    // named positionColor or positionTone in any src/ file OTHER than the
+    // canonical authority. Import/call sites are NOT flagged.
+    //
+    // Escape hatch: `// position-color-authority-ok` on the definition line
+    // (or the line immediately above it) for a legitimately distinct helper.
+    name: 'positionColor/positionTone redefinition outside authority',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    displayScope: 'src/ (excluding src/components/ui/constants.ts)',
+    severity: 'error',
+    message:
+      'positionColor() and positionTone() are defined exclusively in ' +
+      'src/components/ui/constants.ts. Import from there instead of ' +
+      'defining a local rank-color helper. Add ' +
+      '// position-color-authority-ok on the definition line (or the line ' +
+      'above it) if this is intentionally a distinct helper.',
+    rationale:
+      'A locally-defined positionColor/positionTone bypasses the canonical ' +
+      'color authority, causing silent palette drift when rank-color thresholds ' +
+      'or accent tokens change.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+    excludeLines: ['// position-color-authority-ok'],
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Regex: catches `function positionColor`, `function positionTone`,
+      // `const positionColor =`, and `const positionTone =`.
+      // Does NOT match import statements or call expressions.
+      const DEFN_RE = /\b(?:function|const)\s+position(?:Color|Tone)\b/;
+      const HATCH = '// position-color-authority-ok';
+
+      for (const file of files) {
+        // Only scan src/ files
+        const normalised = file.replace(/\\/g, '/');
+        if (!normalised.includes('/src/')) continue;
+        // Exclude the canonical authority itself
+        if (normalised.endsWith('src/components/ui/constants.ts') ||
+            normalised.endsWith('src/components/ui/constants.js')) continue;
+
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!DEFN_RE.test(lines[i])) continue;
+          // Check inline hatch on the same line or the line immediately above
+          if (lines[i].includes(HATCH)) continue;
+          if (i > 0 && lines[i - 1].includes(HATCH)) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

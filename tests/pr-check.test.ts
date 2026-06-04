@@ -5124,6 +5124,10 @@ describe('Meta: customCheck rule name registry', () => {
     // keyword-consolidation Wave 1 (2026-06-03) — prevents lost-update race on
     // tracked_keywords JSON blob; enforces withTrackedKeywordsTxn (BEGIN IMMEDIATE).
     'tracked_keywords bare read→write outside withTrackedKeywordsTxn',
+    // keyword-consolidation Wave 2b Task B5 (2026-06-03) — forward-looking guard
+    // banning new positionColor/positionTone definitions outside the canonical
+    // authority (src/components/ui/constants.ts).
+    'positionColor/positionTone redefinition outside authority',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -10057,5 +10061,154 @@ describe('Rule: tracked_keywords bare read→write outside withTrackedKeywordsTx
       )
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: positionColor/positionTone redefinition outside authority
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: positionColor/positionTone redefinition outside authority', () => {
+  const RULE = 'positionColor/positionTone redefinition outside authority';
+
+  // (a) Trigger: defining positionColor outside the canonical authority → FLAGGED
+  it('flags a const positionColor definition outside the authority file', () => {
+    const file = write(
+      uniqPath('pos-color-authority', 'src/components/SomeComponent.tsx'),
+      lines(
+        "// Local rank color helper",
+        "const positionColor = (pos: number) => pos <= 10 ? 'text-accent-success' : pos <= 20 ? 'text-accent-warning' : 'text-accent-danger';",
+        "",
+        "export function MyWidget({ pos }: { pos: number }) {",
+        "  return <span className={positionColor(pos)}>{pos}</span>;",
+        "}",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  // (a) Trigger: function declaration form → FLAGGED
+  it('flags a function positionColor declaration outside the authority file', () => {
+    const file = write(
+      uniqPath('pos-color-authority', 'src/hooks/useRankColor.ts'),
+      lines(
+        "export function positionColor(pos?: number | null): string {",
+        "  if (!pos) return 'text-muted';",
+        "  return pos <= 10 ? 'text-green-500' : 'text-red-500';",
+        "}",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  // (a) Trigger: positionTone variant → FLAGGED
+  it('flags a const positionTone definition outside the authority file', () => {
+    const file = write(
+      uniqPath('pos-color-authority', 'src/components/AnotherWidget.tsx'),
+      lines(
+        "const positionTone = (pos: number) => pos <= 10 ? 'emerald' : 'red';",
+        "export const Widget = () => <span>{positionTone(5)}</span>;",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  // (b) Escape hatch inline → NOT flagged
+  it('respects the inline // position-color-authority-ok escape hatch', () => {
+    const file = write(
+      uniqPath('pos-color-authority', 'src/components/HatchInline.tsx'),
+      lines(
+        "// position-color-authority-ok — intentionally distinct scale for print export",
+        "const positionColor = (pos: number) => pos <= 5 ? 'text-accent-success' : 'text-accent-danger';",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+
+  // (b) Escape hatch on same line → NOT flagged
+  it('respects the inline escape hatch on the same line', () => {
+    const file = write(
+      uniqPath('pos-color-authority', 'src/components/HatchSameLine.tsx'),
+      lines(
+        "const positionColor = (pos: number) => pos <= 10 ? 'text-green' : 'text-red'; // position-color-authority-ok — print palette",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+
+  // (c) Import/call site only → NOT flagged
+  it('does not flag a file that only imports and calls positionColor', () => {
+    const file = write(
+      uniqPath('pos-color-authority', 'src/components/ImportOnly.tsx'),
+      lines(
+        "import { positionColor, positionTone } from '../ui/constants';",
+        "",
+        "export function RankCell({ pos }: { pos: number }) {",
+        "  return <span className={positionColor(pos)}>{pos}</span>;",
+        "}",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+
+  // (d) The authority file itself → NOT flagged
+  it('does not flag the canonical authority file (src/components/ui/constants.ts)', () => {
+    const file = write(
+      uniqPath('pos-color-authority', 'src/components/ui/constants.ts'),
+      lines(
+        "export function positionColor(pos?: number | null): string {",
+        "  if (!pos) return 'text-[var(--brand-text-muted)]';",
+        "  if (pos <= 10) return 'text-accent-success';",
+        "  if (pos <= 20) return 'text-accent-warning';",
+        "  return 'text-accent-danger';",
+        "}",
+        "export function positionTone(pos?: number | null): string {",
+        "  if (!pos) return 'zinc';",
+        "  if (pos <= 10) return 'emerald';",
+        "  return 'red';",
+        "}",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+
+  // (e) scoreColor definition → NOT flagged (different concept)
+  it('does not flag a scoreColor or scoreColorClass definition (different concept)', () => {
+    const file = write(
+      uniqPath('pos-color-authority', 'src/components/SomeScoreHelper.ts'),
+      lines(
+        "export function scoreColor(score: number): string {",
+        "  return score >= 80 ? '#34d399' : score >= 60 ? '#fbbf24' : '#f87171';",
+        "}",
+        "export function scoreColorClass(score: number): string {",
+        "  return score >= 80 ? 'text-emerald-400' : score >= 60 ? 'text-amber-400' : 'text-red-400';",
+        "}",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+
+  // Additional negative: a variable that contains 'positionColor' in a string → NOT flagged
+  it('does not flag string references or comments containing positionColor', () => {
+    const file = write(
+      uniqPath('pos-color-authority', 'src/docs/ColorDocs.ts'),
+      lines(
+        "// positionColor is used in KeywordMetricCell",
+        "const description = 'Use positionColor() from ui/constants for rank colors';",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
   });
 });
