@@ -11,7 +11,7 @@ import {
   type TrackedKeywordStatus,
 } from '../shared/types/rank-tracking.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
-import { replaceAllTrackedKeywordRows } from './tracked-keywords-store.js';
+import { replaceAllTrackedKeywordRows, resolveTrackedKeywords } from './tracked-keywords-store.js';
 
 export interface RankSnapshot {
   date: string; // YYYY-MM-DD
@@ -180,7 +180,12 @@ function readRecentSnapshots(workspaceId: string, limit: number): RankSnapshot[]
 // --- Public API ---
 
 export function getTrackedKeywords(workspaceId: string, options: GetTrackedKeywordsOptions = {}): TrackedKeyword[] {
-  const keywords = readConfig(workspaceId).trackedKeywords;
+  // Wave 3c-ii READ-SWITCH: resolve through the TABLE-FIRST/BLOB-FALLBACK resolver
+  // (resolve first, filter second). The resolver returns the table rows reordered
+  // into blob insertion order (byte-identical to today) or the blob verbatim when
+  // the table is empty. The includeInactive short-circuit + active-status filter
+  // below are UNCHANGED.
+  const keywords = resolveTrackedKeywords(workspaceId, readConfig(workspaceId).trackedKeywords);
   if (options.includeInactive) return keywords;
   return keywords.filter(keyword => (keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE);
 }
@@ -360,12 +365,14 @@ export function getRankHistory(
 ): { date: string; positions: Record<string, number> }[] {
   const snapshots = readSnapshots(workspaceId);
   const recent = snapshots.slice(-limit);
-  const config = readConfig(workspaceId);
+  // Wave 3c-ii: route the direct readConfig read through the TABLE-FIRST resolver.
+  // Order-safe — the inline active filter + normalizeQuery Map below are unchanged.
+  const trackedKeywords = resolveTrackedKeywords(workspaceId, readConfig(workspaceId).trackedKeywords);
   const tracked = queryFilter
     ? queryFilter
         .map(query => ({ lookup: normalizeQuery(query), output: query.trim() }))
         .filter(query => query.lookup && query.output)
-    : config.trackedKeywords
+    : trackedKeywords
       .filter(k => (k.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE)
       .map(k => ({ lookup: normalizeQuery(k.query), output: k.query }));
 
@@ -390,10 +397,12 @@ function buildLatestRanks(workspaceId: string, options: { includeUntracked?: boo
   const previousByQuery = new Map(
     (prev?.queries ?? []).map(query => [normalizeQuery(query.query), query]),
   );
-  const config = readConfig(workspaceId);
-  const hasConfiguredKeywords = config.trackedKeywords.length > 0;
+  // Wave 3c-ii: route the direct readConfig read through the TABLE-FIRST resolver.
+  // Order-safe — the inline active filter + normalizeQuery Map below are unchanged.
+  const trackedKeywords = resolveTrackedKeywords(workspaceId, readConfig(workspaceId).trackedKeywords);
+  const hasConfiguredKeywords = trackedKeywords.length > 0;
   const trackedEntries = new Map(
-    config.trackedKeywords
+    trackedKeywords
       .filter(k => (k.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE)
       .map(k => [normalizeQuery(k.query), k]),
   );

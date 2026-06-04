@@ -240,6 +240,90 @@ export function deleteAllTrackedKeywordRows(workspaceId: string): void {
 }
 
 /**
+ * Resolver — TABLE-FIRST / BLOB-FALLBACK (Wave 3c-ii; the ADDITIVE 3b-i form,
+ * NOT the 3b-ii table-only strip). Mirrors resolveSiteKeywordMetrics' additive
+ * shape, but with an Option-A reorder because tracked keywords are ORDER-SENSITIVE
+ * (the blob array is in insertion/append order; readers map by normalizeQuery and
+ * the public payload serializes the array as-is).
+ *
+ * Logic:
+ *   - countTrackedKeywordRows(workspaceId) === 0 → return `blobKeywords` (the table
+ *     is empty: a legacy workspace not yet dual-written; fall back to the blob).
+ *   - otherwise → return the TABLE rows (data from the table) REORDERED to match
+ *     the BLOB insertion order (order from the blob), so the result is
+ *     byte-identical to today including ordering.
+ *
+ * Option-A reorder: listTrackedKeywordRows orders by (added_at, normalized_query),
+ * which is NOT identical to blob insertion order for backfilled workspaces. We
+ * therefore key the table rows by keywordComparisonKey(query) (the same
+ * normalization the PK and normalizeQuery use) and emit one entry per blob element
+ * IN BLOB ORDER, substituting the table row for that key (falling back to the blob
+ * element only if a key is somehow absent from the table). Any table rows whose key
+ * is NOT present in the blob are appended deterministically (added_at then
+ * normalized_query — already the list order) — under dual-write parity there are
+ * none. Net effect: data from the TABLE, order from the BLOB.
+ *
+ * source_page_id / source_gap_key are NOT projected (rowToTrackedKeyword omits them
+ * — keep it that way; they are 3d, and projecting them would break byte-identity).
+ *
+ * Object-shape parity: rowToTrackedKeyword assigns EVERY optional field, so a NULL
+ * column becomes an OWN property whose value is `undefined`. The blob path instead
+ * STRIPS undefined keys (writeConfig JSON.stringify omits them; readConfig
+ * JSON.parse never re-adds them), so a blob-sourced object has NO own property for
+ * an absent field. JSON.stringify hides this difference, but `Object.keys` /
+ * `toHaveProperty` (and existing reconcile tests) do not. To stay behavior-
+ * identical we run each TABLE-sourced row through the SAME JSON round-trip the blob
+ * path applies, dropping undefined-valued keys. Blob-sourced rows (fallback +
+ * blob-only keys) already came through that round-trip in readConfig, so they are
+ * passed through untouched.
+ */
+function stripUndefinedKeys(keyword: TrackedKeyword): TrackedKeyword {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(keyword)) {
+    if (value !== undefined) out[key] = value;
+  }
+  return out as unknown as TrackedKeyword;
+}
+
+export function resolveTrackedKeywords(
+  workspaceId: string,
+  blobKeywords: TrackedKeyword[],
+): TrackedKeyword[] {
+  if (countTrackedKeywordRows(workspaceId) === 0) return blobKeywords;
+
+  // Table is the data source. Key its rows by the same normalization the PK uses.
+  // Each table row is normalized to the blob's object shape (undefined keys dropped).
+  const tableByKey = new Map<string, TrackedKeyword>();
+  const tableRows = listTrackedKeywordRows(workspaceId).map(stripUndefinedKeys);
+  for (const row of tableRows) {
+    tableByKey.set(keywordComparisonKey(row.query), row);
+  }
+
+  // Order from the blob: emit one entry per blob element, IN BLOB ORDER, using the
+  // table row for that key (fall back to the blob element only if absent).
+  const emittedKeys = new Set<string>();
+  const ordered: TrackedKeyword[] = [];
+  for (const blobKeyword of blobKeywords) {
+    const key = keywordComparisonKey(blobKeyword.query);
+    emittedKeys.add(key);
+    ordered.push(tableByKey.get(key) ?? blobKeyword);
+  }
+
+  // Deterministically append any table rows whose key is NOT in the blob. Under
+  // dual-write parity this is empty; listTrackedKeywordRows is already sorted by
+  // (added_at, normalized_query), so iterating tableRows preserves that order.
+  for (const row of tableRows) {
+    const key = keywordComparisonKey(row.query);
+    if (!emittedKeys.has(key)) {
+      emittedKeys.add(key);
+      ordered.push(row);
+    }
+  }
+
+  return ordered;
+}
+
+/**
  * Optional source-stamping hook for the boot backfill: given the normalized
  * blob keywords for a workspace, return the same array with UNKNOWN-source rows
  * stamped with an inferred source (the canonical inferTrackedKeywordSources
