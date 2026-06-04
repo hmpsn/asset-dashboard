@@ -20,6 +20,8 @@ describe('client StrategyTab content opportunity split', () => {
     expect(sectionSrc).toContain("setPricingModal({ serviceType: 'brief_only'");
     expect(sectionSrc).toContain("submitFeedback(gap.targetKeyword, 'approved', 'content_gap')");
 
-    expect(displaySrc).toContain('export const kdColor');
+    // Wave 2 T2: kdColor is now the canonical authority in pageIntelligenceDisplay.ts —
+    // it is no longer defined in strategyKeywordDisplay.
+    expect(displaySrc).not.toContain('export const kdColor');
   });
 });

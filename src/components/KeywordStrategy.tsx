@@ -8,7 +8,8 @@ import {
   BarChart3, Users, Search, FileText,
   Eye, MousePointerClick, Trophy, AlertTriangle, Plus, Check,
 } from 'lucide-react';
-import { Badge, StatCard, SectionCard, AIContextIndicator, TabBar, ErrorState, ProgressIndicator, NextStepsCard, LoadingState, Icon, PageHeader, Button, ClickableRow, IconButton, FormInput, FormTextarea } from './ui';
+import { Badge, StatCard, SectionCard, AIContextIndicator, TabBar, ErrorState, ProgressIndicator, NextStepsCard, LoadingState, Icon, PageHeader, Button, ClickableRow, IconButton, FormInput, FormTextarea, positionColor } from './ui';
+import { kdColor } from './page-intelligence/pageIntelligenceDisplay';
 import { KeywordStrategyGuide } from './strategy/KeywordStrategyGuide';
 import { useKeywordStrategy } from '../hooks/admin';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -19,7 +20,7 @@ import { QuickWins } from './strategy/QuickWins';
 import { KeywordGaps } from './strategy/KeywordGaps';
 import { LowHangingFruit } from './strategy/LowHangingFruit';
 import { TopicClusters } from './strategy/TopicClusters';
-import { CannibalizationAlert } from './strategy/CannibalizationAlert';
+import { CannibalizationAlert } from './ui/CannibalizationAlert';
 import { StrategyDiff } from './strategy/StrategyDiff';
 import { IntelligenceSignals } from './strategy/IntelligenceSignals';
 import { LocalSeoVisibilityPanel } from './local-seo/LocalSeoVisibilityPanel';
@@ -237,21 +238,8 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     }
   }, [trackedKeywords, workspaceId, queryClient]);
 
-  const positionColor = (pos?: number) => {
-    if (!pos) return 'text-[var(--brand-text-muted)]';
-    if (pos <= 3) return 'text-accent-success';
-    if (pos <= 10) return 'text-accent-brand';
-    if (pos <= 20) return 'text-accent-warning';
-    return 'text-accent-danger';
-  };
-
-  const difficultyColor = (kd?: number) => {
-    if (kd === undefined) return 'text-[var(--brand-text-muted)]';
-    if (kd <= 30) return 'text-accent-success';
-    if (kd <= 50) return 'text-accent-warning';
-    if (kd <= 70) return 'text-accent-orange';
-    return 'text-accent-danger';
-  };
+  // Wave 2 T2: difficultyColor was byte-identical to canonical kdColor (30/50/70, tokens).
+  // Removed and replaced with the imported canonical kdColor authority.
 
   const intentColor = (intent?: string) => {
     switch (intent) {
@@ -747,13 +735,13 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           </div>
 
           {/* ── Low-Hanging Fruit ── */}
-          <LowHangingFruit pages={lowHangingFruit} positionColor={positionColor} />
+          <LowHangingFruit pages={lowHangingFruit} />
 
           {/* ── Content Gaps ── */}
           <ContentGaps contentGaps={strategy.contentGaps || []} workspaceId={workspaceId} intentColor={intentColor} />
 
           {/* Keyword Gaps */}
-          <KeywordGaps keywordGaps={strategy.keywordGaps || []} difficultyColor={difficultyColor} />
+          <KeywordGaps keywordGaps={strategy.keywordGaps || []} difficultyColor={kdColor} />
 
           {/* ── Reference & Analysis ── */}
           <div className="border-t border-[var(--brand-border)] my-6 flex items-center gap-3">
@@ -768,7 +756,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
 
           {/* ── Cannibalization Alert ── */}
           {strategy.cannibalization && strategy.cannibalization.length > 0 && (
-            <CannibalizationAlert items={strategy.cannibalization} />
+            <CannibalizationAlert entries={strategy.cannibalization} />
           )}
 
           {/* ── What Changed (Strategy Diff) ── */}
@@ -800,7 +788,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                     {metrics && (metrics.volume > 0 || metrics.difficulty > 0) && (
                       <>
                         {metrics.volume > 0 && <span className="t-caption-sm text-[var(--brand-text-muted)] font-mono">{metrics.volume.toLocaleString()}/mo</span>}
-                        {metrics.difficulty > 0 && <span className={`t-caption-sm font-mono ${difficultyColor(metrics.difficulty)}`}>KD {metrics.difficulty}%</span>}
+                        {metrics.difficulty > 0 && <span className={`t-caption-sm font-mono ${kdColor(metrics.difficulty)}`}>KD {metrics.difficulty}%</span>}
                       </>
                     )}
                     <IconButton

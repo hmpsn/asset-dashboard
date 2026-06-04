@@ -778,6 +778,29 @@ export interface CannibalizationWarning {
   severity: 'low' | 'medium' | 'high';
 }
 
+/**
+ * Superset normalized type for the unified CannibalizationAlert component (Wave 2 T5).
+ *
+ * Subsumes both `CannibalizationItem` (strategy, object pages) and `CannibalizationWarning`
+ * (admin pipeline, string pages). Admin string-path entries map via `{ path }`.
+ * `CannibalizationItem` / `CannibalizationWarning` are NOT deleted — server and other
+ * consumers still reference them directly. This type is additive.
+ */
+export interface CannibalizationEntry {
+  keyword: string;
+  severity: 'high' | 'medium' | 'low';
+  pages: {
+    path: string;
+    position?: number;
+    impressions?: number;
+    clicks?: number;
+    source?: 'keyword_map' | 'gsc';
+  }[];
+  recommendation?: string;
+  action?: 'canonical_tag' | 'redirect_301' | 'differentiate' | 'noindex';
+  canonicalPath?: string;
+}
+
 export interface RedirectDetail {
   url: string;
   target: string;

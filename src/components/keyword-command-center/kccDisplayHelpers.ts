@@ -25,6 +25,7 @@ import {
   type KeywordCommandCenterNextAction,
   type KeywordCommandCenterRow,
 } from '../../../shared/types/keyword-command-center';
+import { fmtNum } from '../../utils/formatNumbers';
 
 export const FILTER_ICONS: Record<KeywordCommandCenterFilter, LucideIcon> = {
   [KEYWORD_COMMAND_CENTER_FILTERS.ALL]: SlidersHorizontal,
@@ -52,10 +53,20 @@ export function filterCountLabel(filterId: KeywordCommandCenterFilter, count: nu
   return compactNumber(count);
 }
 
-export function compactNumber(value: number | undefined): string {
+/**
+ * Null-safe compact number formatter for KCC volume columns.
+ * Returns '-' sentinel for null/undefined (callers depend on this for empty cells).
+ * For sub-1000 values, returns Math.round(value) as a string (no decimal, matching
+ * the original KCC behaviour). For ≥1000, delegates to the canonical fmtNum (UPPERCASE K/M).
+ *
+ * NOTE (Wave 2 T2): the UPPERCASE K/M form was already what this function produced before
+ * T2 (compactNumber and fmtNum agreed on uppercase). The only change is the sub-1000 path:
+ * compactNumber used Math.round while fmtNum uses toLocaleString — we preserve Math.round
+ * here so KCC cell rendering stays pixel-identical.
+ */
+export function compactNumber(value: number | undefined | null): string {
   if (value == null) return '-';
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+  if (value >= 1_000) return fmtNum(value);
   return String(Math.round(value));
 }
 

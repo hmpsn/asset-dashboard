@@ -25,7 +25,11 @@ describe('PageIntelligence display helpers', () => {
     expect(positionColor()).toBe('text-[var(--brand-text-muted)]');
     expect(positionColor(0)).toBe('text-[var(--brand-text-muted)]');
     expect(positionColor(3)).toBe('text-accent-success');
-    expect(positionColor(10)).toBe('text-accent-brand');
+    // INTENTIONAL VISUAL CHANGE (Wave 2 T1 — Four-Laws fix):
+    // positionColor(10) was 'text-accent-brand' (teal). Teal is reserved for action/CTA
+    // surfaces; rank position is a read-only metric → must use emerald (success), NOT teal.
+    // This is a deliberate, reviewed visual change — the only intended behavior diff in Wave 2.
+    expect(positionColor(10)).toBe('text-accent-success');
     expect(positionColor(20)).toBe('text-accent-warning');
     expect(positionColor(21)).toBe('text-accent-danger');
   });
