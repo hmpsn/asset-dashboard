@@ -1,9 +1,7 @@
 /**
- * Legacy SEO provider routes.
+ * Provider-neutral SEO routes.
  *
- * PR1 keeps the historical /api/semrush/* URLs for compatibility, but all live
- * provider reads resolve through the DataForSEO-primary provider registry.
- * PR2 should rename these URLs to provider-neutral /api/seo/* aliases.
+ * All live SEO reads resolve through the DataForSEO-primary provider registry.
  */
 import { Router } from 'express';
 
@@ -16,11 +14,12 @@ import { getUploadRoot } from '../data-dir.js';
 import { MAX_COMPETITORS } from '../constants.js';
 import { cleanCompetitorDomains, filterDiscoveredCompetitors } from '../competitor-domain-filter.js';
 import { requireWorkspaceAccess } from '../auth.js';
+import { parseJsonFallback } from '../db/json-validation.js';
 import fs from 'fs';
 import path from 'path';
 import { isProgrammingError } from '../errors.js';
 
-const log = createLogger('semrush-routes');
+const log = createLogger('seo-provider-routes');
 
 function parseCsvQuery(rawValue: unknown): string[] {
   const rawParts = Array.isArray(rawValue) ? rawValue : [rawValue];
@@ -39,7 +38,7 @@ function parseCsvQuery(rawValue: unknown): string[] {
  * this fetch + caches the result, then add an MCP start_* tool wrapper.
  * TODO(mcp-actions): see docs/superpowers/specs/2026-05-25-mcp-actions-keyword-and-content-design.md
  */
-router.get('/api/semrush/competitive-intel/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+router.get('/api/seo/competitive-intel/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { workspaceId } = req.params;
   const competitors = parseCsvQuery(req.query.competitors);
   if (competitors.length === 0) return res.status(400).json({ error: 'competitors query param required (comma-separated domains)' });
@@ -58,8 +57,7 @@ router.get('/api/semrush/competitive-intel/:workspaceId', requireWorkspaceAccess
 
   try {
     // Fetch domain overviews in parallel (my domain + configured competitor cap).
-    // Backlinks are optional; if DataForSEO is selected/default but backlinks are disabled,
-    // omit backlink fields instead of silently falling back to SEMRush.
+    // Backlinks are optional; if they are unavailable, omit backlink fields.
     const blProvider = getBacklinksProvider(ws.seoDataProvider);
     // Sanitize and validate competitor domains before sending to the provider.
     // Bare names without TLDs (e.g. "theaustindentist") pass the CSV parser but cause
@@ -101,7 +99,7 @@ router.get('/api/semrush/competitive-intel/:workspaceId', requireWorkspaceAccess
 });
 
 // --- Competitor Auto-Discovery ---
-router.get('/api/semrush/discover-competitors/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+router.get('/api/seo/discover-competitors/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
@@ -122,7 +120,7 @@ router.get('/api/semrush/discover-competitors/:workspaceId', requireWorkspaceAcc
 });
 
 // --- Save competitor domains to workspace ---
-router.post('/api/semrush/competitors/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
+router.post('/api/seo/competitors/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
@@ -138,8 +136,13 @@ router.post('/api/semrush/competitors/:workspaceId', requireWorkspaceAccess('wor
 });
 
 function clearSeoProviderCache(workspaceId: string): void {
-  for (const cacheName of ['.dataforseo-cache', '.semrush-cache']) {
-    const cacheDir = path.join(getUploadRoot(), workspaceId, cacheName);
+  const workspaceRoot = path.join(getUploadRoot(), workspaceId);
+  const cacheDirs = fs.existsSync(workspaceRoot)
+    ? fs.readdirSync(workspaceRoot)
+      .filter(name => name.startsWith('.') && name.endsWith('-cache'))
+      .map(name => path.join(workspaceRoot, name))
+    : [path.join(workspaceRoot, '.dataforseo-cache')];
+  for (const cacheDir of cacheDirs) {
     try {
       fs.rmSync(cacheDir, { recursive: true, force: true });
     } catch (err) {
@@ -148,36 +151,33 @@ function clearSeoProviderCache(workspaceId: string): void {
   }
 }
 
-// --- Legacy provider utility aliases ---
-router.get('/api/semrush/status', (_req, res) => {
+router.get('/api/seo/status', (_req, res) => {
   res.json({ configured: isAnyProviderConfigured() });
 });
 
-// Unified SEO data provider status
-router.get('/api/seo-providers/status', (_req, res) => {
+router.get('/api/seo/providers/status', (_req, res) => {
   res.json({ providers: listProviders() });
 });
 
-router.post('/api/semrush/estimate', (req, res) => {
+router.post('/api/seo/estimate', (req, res) => {
   const { mode, competitorCount, keywordCount } = req.body as { mode?: string; competitorCount?: number; keywordCount?: number };
   const depthMultiplier = mode === 'full' ? 2 : 1;
   const estimatedCalls = Math.max(1, Math.ceil(((competitorCount ?? 0) + (keywordCount ?? 0)) / 100) * depthMultiplier);
-  res.json({ provider: 'dataforseo', estimatedCalls, deprecated: true });
+  res.json({ provider: 'dataforseo', estimatedCalls });
 });
 
-router.delete('/api/semrush/cache/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
+router.delete('/api/seo/cache/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   clearSeoProviderCache(req.params.workspaceId);
   res.json({ ok: true });
 });
 
-// GET-based cache clear (browser-friendly — just visit this URL)
-router.get('/api/semrush/clear-cache/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
+router.get('/api/seo/clear-cache/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   clearSeoProviderCache(req.params.workspaceId);
   res.json({ ok: true, message: 'SEO provider cache cleared. Go back and click Refresh on Competitive Intelligence.' });
 });
 
 // --- Diagnostic: verify domain resolution + cache without external provider calls ---
-router.get('/api/semrush/diagnose/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
+router.get('/api/seo/diagnose/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
@@ -200,7 +200,10 @@ router.get('/api/semrush/diagnose/:workspaceId', requireWorkspaceAccess('workspa
   const inspectKeys = [...domainOverviewKeys, ...backlinkKeys].slice(0, 10);
   for (const f of inspectKeys) {
     try {
-      const raw = JSON.parse(fs.readFileSync(path.join(cacheDir, f), 'utf-8'));
+      const raw = parseJsonFallback<{ cachedAt?: unknown; data?: unknown }>(
+        fs.readFileSync(path.join(cacheDir, f), 'utf-8'),
+        {},
+      );
       cachedData[f] = { cachedAt: raw.cachedAt, data: raw.data };
     } catch (err) { cachedData[f] = 'unreadable'; }
   }

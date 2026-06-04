@@ -247,14 +247,6 @@ function buildCriticalSyncs(
       detail: 'workspace_metrics_snapshots.computed_at',
     },
     {
-      key: 'semrush',
-      label: 'SEMRush Provider',
-      lastSuccessAt: byProvider.get('semrush')?.lastSuccessAt ?? null,
-      detail: byProvider.get('semrush')
-        ? `${byProvider.get('semrush')!.failedCalls}/${byProvider.get('semrush')!.totalCalls} failures in window`
-        : 'No telemetry in selected window',
-    },
-    {
       key: 'dataforseo',
       label: 'DataForSEO Provider',
       lastSuccessAt: byProvider.get('dataforseo')?.lastSuccessAt ?? null,

@@ -151,7 +151,7 @@ describe('rowToWorkspace mapper completeness', () => {
       brandAccentColor: '#00bcd4',
       tier: 'growth',
       trialEndsAt,
-      seoDataProvider: 'semrush',
+      seoDataProvider: 'dataforseo',
       autoReports: true,
       autoReportFrequency: 'weekly',
       clientPortalEnabled: true,

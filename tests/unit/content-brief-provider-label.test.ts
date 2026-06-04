@@ -82,7 +82,7 @@ describe('generateBrief — provider label', () => {
 
     await generateBrief(WS_ID, 'has results kw', {
       keywordMetrics: { keyword: 'has results kw', volume: 1000, difficulty: 30, cpc: 0.5, competition: 0.3, results: 4500000, trend: [] },
-      providerLabel: 'SEMRush',
+      providerLabel: 'DataForSEO',
     }).catch(() => {});
 
     const promptArg = JSON.stringify(mockCallOpenAI.mock.calls[0]);

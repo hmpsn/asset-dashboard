@@ -122,11 +122,9 @@ router.get('/api/ai/usage', (req, res) => {
   const summary = getTokenUsage(workspaceId, since);
   const daily = getUsageByDay(workspaceId, days);
   const byFeature = getUsageByFeature(workspaceId, since);
-  const semrush = { totalCredits: 0, totalCalls: 0, cachedCalls: 0, entries: [] };
-  const semrushDaily: Array<{ date: string; credits: number; calls: number }> = [];
   const dataforseo = getDataForSeoUsage(workspaceId, since);
   const dataforseoDaily = getDataForSeoByDay(workspaceId, days);
-  res.json({ ...summary, daily, byFeature, semrush, semrushDaily, dataforseo, dataforseoDaily });
+  res.json({ ...summary, daily, byFeature, dataforseo, dataforseoDaily });
 });
 
 // --- Time Saved Metric ---

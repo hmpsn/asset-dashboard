@@ -2,12 +2,12 @@
  * Integration tests for SEMRush / SEO-provider status endpoints.
  *
  * Tests the full HTTP request/response cycle for:
- * - GET /api/semrush/status      — no auth / no workspace required
- * - GET /api/seo-providers/status — no auth / no workspace required
- * - GET /api/semrush/diagnose/:workspaceId — diagnostic (zero provider API calls)
+ * - GET /api/seo/status      — no auth / no workspace required
+ * - GET /api/seo/providers/status — no auth / no workspace required
+ * - GET /api/seo/diagnose/:workspaceId — diagnostic (zero provider API calls)
  *
- * Deliberately excluded: /api/semrush/competitive-intel and
- * /api/semrush/discover-competitors — they make real external API calls.
+ * Deliberately excluded: /api/seo/competitive-intel and
+ * /api/seo/discover-competitors — they make real external API calls.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
@@ -28,9 +28,9 @@ afterAll(async () => {
   await ctx.stopServer();
 });
 
-describe('GET /api/semrush/status', () => {
+describe('GET /api/seo/status', () => {
   it('returns 200 with a configured boolean field', async () => {
-    const res = await api('/api/semrush/status');
+    const res = await api('/api/seo/status');
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toHaveProperty('configured');
@@ -38,9 +38,9 @@ describe('GET /api/semrush/status', () => {
   });
 });
 
-describe('GET /api/seo-providers/status', () => {
+describe('GET /api/seo/providers/status', () => {
   it('returns 200 with a providers object', async () => {
-    const res = await api('/api/seo-providers/status');
+    const res = await api('/api/seo/providers/status');
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toHaveProperty('providers');
@@ -50,9 +50,9 @@ describe('GET /api/seo-providers/status', () => {
   });
 });
 
-describe('GET /api/semrush/diagnose/:workspaceId', () => {
+describe('GET /api/seo/diagnose/:workspaceId', () => {
   it('returns 200 with diagnostic object for valid workspace', async () => {
-    const res = await api(`/api/semrush/diagnose/${wsId}`);
+    const res = await api(`/api/seo/diagnose/${wsId}`);
     expect(res.status).toBe(200);
     const body = await res.json();
 
@@ -76,7 +76,7 @@ describe('GET /api/semrush/diagnose/:workspaceId', () => {
   });
 
   it('returns 404 for an unknown workspaceId', async () => {
-    const res = await api('/api/semrush/diagnose/nonexistent-workspace-id');
+    const res = await api('/api/seo/diagnose/nonexistent-workspace-id');
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body).toHaveProperty('error');

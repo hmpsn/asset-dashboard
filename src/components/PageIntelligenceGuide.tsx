@@ -21,7 +21,7 @@ const SECTIONS = [
         desc: 'Clicks, impressions, average position, and CTR — how Google actually sees and ranks each page right now.',
       },
       {
-        label: 'SEMRush',
+        label: 'DataForSEO',
         desc: 'Keyword volume, difficulty scores, competitor keyword gaps, and monthly organic traffic estimates.',
       },
       {

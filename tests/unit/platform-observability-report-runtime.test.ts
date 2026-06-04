@@ -183,9 +183,8 @@ describe('buildWorkspaceObservabilityReport', () => {
     expect(report.operationTraces).toHaveLength(80);
     expect(report.operationTraces[0]?.operation).toBe('GET /api/r/94');
 
-    const semrushSync = report.criticalSyncs.find(s => s.key === 'semrush');
-    expect(semrushSync?.detail).toBe('1/2 failures in window');
-
+    const dataforseoSync = report.criticalSyncs.find(s => s.key === 'dataforseo');
+    expect(dataforseoSync?.detail).toBe('0/1 failures in window');
     const metricsSync = report.criticalSyncs.find(s => s.key === 'metrics-snapshot');
     expect(metricsSync?.lastSuccessAt).toBe('2026-05-24T08:30:00.000Z');
   });
@@ -224,8 +223,6 @@ describe('buildWorkspaceObservabilityReport', () => {
     expect(report.slowRoutes).toEqual([]);
     expect(report.operationTraces).toEqual([]);
 
-    const semrushSync = report.criticalSyncs.find(s => s.key === 'semrush');
-    expect(semrushSync?.detail).toBe('No telemetry in selected window');
     const dataforseoSync = report.criticalSyncs.find(s => s.key === 'dataforseo');
     expect(dataforseoSync?.detail).toBe('No telemetry in selected window');
 

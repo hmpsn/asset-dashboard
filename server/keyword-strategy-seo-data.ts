@@ -172,15 +172,13 @@ export async function fetchAndCacheKeywordStrategySeoData({
   if (fetchCompetitors && competitorDomains.length > 0) {
     try {
       const compLimit = seoDataMode === 'full' ? 200 : 50;
-      const fetchMultiplier = provider.name === 'semrush' ? 2 : 1;
-      const fetchLimit = compLimit * fetchMultiplier;
+      const fetchLimit = compLimit;
 
       const cappedCompetitorDomains = competitorDomains.slice(0, MAX_COMPETITORS);
       sendProgress('seo-data', `Fetching competitor keywords (${cappedCompetitorDomains.length} competitors)...`, 0.58);
       for (const comp of cappedCompetitorDomains) {
         const cleanComp = comp.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
         try {
-          // cache-miss-ok: fetchLimit intentionally differs from compLimit for SEMRush overfetch.
           const rawKws = await provider.getDomainKeywords(cleanComp, ws.id, fetchLimit);
           const compKws = [...rawKws]
             .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))

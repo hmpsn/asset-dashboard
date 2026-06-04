@@ -199,7 +199,7 @@ export async function assembleSeoContext(
     log.debug({ err, workspaceId }, 'assembleSeoContext: strategy history table optional, degrading gracefully');
   }
 
-  // Backlink profile — opt-in only (network call, costs SEMRush credits)
+  // Backlink profile — opt-in only (network call, costs provider credits)
   // Gate with opts.enrichWithBacklinks to avoid hitting the hot-path for the
   // ~16 callers that don't need backlink data (briefs, rewrites, audits, etc.)
   if (opts?.enrichWithBacklinks) {
@@ -208,8 +208,8 @@ export async function assembleSeoContext(
       const domain = workspace?.liveDomain?.replace(/^https?:\/\//, '').replace(/\/$/, '') ?? '';
       if (domain) {
         // Pass workspace.seoDataProvider so provider selection respects the per-workspace
-        // preference. If DataForSEO is selected/default but backlinks are disabled, backlink
-        // enrichment is omitted instead of silently spending SEMRush credits.
+        // preference. If backlinks are unavailable, enrichment is omitted instead of
+        // silently spending provider credits on a fallback path.
         const provider = getBacklinksProvider(workspace?.seoDataProvider);
         if (provider?.isConfigured()) {
           const overview = await provider.getBacklinksOverview(domain, workspaceId);

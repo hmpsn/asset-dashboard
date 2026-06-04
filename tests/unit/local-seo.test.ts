@@ -625,13 +625,13 @@ describe('local SEO provider selection', () => {
     expect(plan?.keywords).toEqual(['cosmetic dentistry austin']);
   });
 
-  it('normalizes a legacy SEMRush workspace preference to DataForSEO for local visibility', async () => {
+  it('refreshes local visibility through DataForSEO when the workspace uses the canonical provider', async () => {
     setBroadcast(vi.fn(), vi.fn());
     const ws = createWorkspace('Local SEO Provider Strictness Test');
     cleanupWorkspaceIds.add(ws.id);
     updateWorkspace(ws.id, {
       liveDomain: 'https://local-dental.example.com',
-      seoDataProvider: 'semrush',
+      seoDataProvider: 'dataforseo',
       businessProfile: {
         address: {
           street: '123 Congress Ave',

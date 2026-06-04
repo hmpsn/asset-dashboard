@@ -126,7 +126,7 @@ const baseContext = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockGetWorkspace.mockReturnValue({ id: 'ws_test', seoDataProvider: 'semrush' });
+  mockGetWorkspace.mockReturnValue({ id: 'ws_test', seoDataProvider: 'dataforseo' });
   mockGetKeywordMetrics.mockResolvedValue([
     { keyword: 'emergency plumber austin', volume: 300, difficulty: 42, cpc: 18 },
   ]);

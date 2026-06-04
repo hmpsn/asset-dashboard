@@ -109,7 +109,7 @@ describe('intelligence crons', () => {
     vi.setSystemTime(new Date('2026-05-26T12:00:00.000Z')); // Tuesday
 
     mocks.listWorkspaces.mockReturnValue([
-      { id: 'ws_1', liveDomain: 'https://example.com', competitorDomains: ['competitor.com'], seoDataProvider: 'semrush' },
+      { id: 'ws_1', liveDomain: 'https://example.com', competitorDomains: ['competitor.com'], seoDataProvider: 'dataforseo' },
     ]);
 
     startCompetitorMonitoringCron();
@@ -123,7 +123,7 @@ describe('intelligence crons', () => {
   it('cleans stale competitor insights when provider is missing or unconfigured', async () => {
     mocks.listWorkspaces.mockReturnValue([
       { id: 'ws_missing', liveDomain: 'https://a.com', competitorDomains: ['a.org'] },
-      { id: 'ws_unconfigured', liveDomain: 'https://b.com', competitorDomains: ['b.org'], seoDataProvider: 'semrush' },
+      { id: 'ws_unconfigured', liveDomain: 'https://b.com', competitorDomains: ['b.org'], seoDataProvider: 'dataforseo' },
     ]);
     mocks.getConfiguredProvider.mockReturnValue({
       isConfigured: () => false,
@@ -145,7 +145,7 @@ describe('intelligence crons', () => {
         id: 'ws_1',
         liveDomain: 'https://example.com',
         competitorDomains: ['competitor.com'],
-        seoDataProvider: 'semrush',
+        seoDataProvider: 'dataforseo',
       },
     ]);
     mocks.getConfiguredProvider.mockReturnValue({
@@ -172,7 +172,7 @@ describe('intelligence crons', () => {
         id: 'ws_1',
         liveDomain: 'https://example.com',
         competitorDomains: ['broken.com', 'healthy.com'],
-        seoDataProvider: 'semrush',
+        seoDataProvider: 'dataforseo',
       },
     ]);
     mocks.getConfiguredProvider.mockReturnValue({
@@ -212,7 +212,7 @@ describe('intelligence crons', () => {
         id: 'ws_1',
         liveDomain: 'https://example.com',
         competitorDomains: ['competitor.com'],
-        seoDataProvider: 'semrush',
+        seoDataProvider: 'dataforseo',
       },
     ]);
     mocks.getConfiguredProvider.mockReturnValue({
@@ -253,13 +253,13 @@ describe('intelligence crons', () => {
         id: 'ws_ineligible',
         liveDomain: '',
         competitorDomains: ['skip.com'],
-        seoDataProvider: 'semrush',
+        seoDataProvider: 'dataforseo',
       },
       {
         id: 'ws_eligible',
         liveDomain: 'https://example.com',
         competitorDomains: ['competitor.com'],
-        seoDataProvider: 'semrush',
+        seoDataProvider: 'dataforseo',
       },
     ]);
 

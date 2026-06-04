@@ -1079,7 +1079,7 @@ export const CHECKS: Check[] = [
       'server/meeting-brief-generator.ts', // AI response text parser, not DB columns
       'server/openai-helpers.ts', // disk-based usage log files + AI response text parser, not DB columns
       'server/__tests__/openai-helpers-format.test.ts', // parsing mock fetch request body in tests, not DB columns
-      'server/semrush.ts', // disk files: SEMRush API usage log + credit log files (not DB columns)
+      'server/semrush.ts', // legacy disk files: SEMRush API usage log + credit log files (not DB columns)
       'server/providers/dataforseo-provider.ts', // disk files: DataForSEO credit log files (not DB columns)
       'server/monthly-report.ts', // disk files: sent-report tracking + report output files (not DB columns)
       'server/competitor-schema.ts', // HTTP fetch response (JSON-LD from HTML) + disk cache file (not DB columns)
@@ -1087,7 +1087,7 @@ export const CHECKS: Check[] = [
       'server/db/migrate-json.ts', // disk files: one-time migration tool reads legacy flat-file JSON stores (not DB columns)
       'server/db/json-column.ts', // safe JSON column helper — implements the wrapper, not a raw DB read
       'server/email-queue.ts', // disk file: email queue persistence file (not DB columns)
-      'server/routes/semrush.ts', // disk cache files: SEMRush response cache (not DB columns)
+      'server/routes/seo-provider.ts', // disk cache files: provider response cache (not DB columns)
       'server/routes/reports.ts', // disk files: report output files served via API (not DB columns)
       'server/routes/roadmap.ts', // disk files: roadmap.json + runtime status files (not DB columns)
       'server/routes/content-publish.ts', // AI response text parser: parses Claude field-mapping suggestion (not DB columns)
@@ -1720,8 +1720,8 @@ export const CHECKS: Check[] = [
     severity: 'error',
   },
   {
-    // Excludes: function/method definitions, interface declarations, and existing pre-PR callers
-    // that go via the provider abstraction (routes/backlinks.ts, routes/semrush.ts)
+    // Excludes: function/method definitions, interface declarations, and existing callers
+    // that go via the provider abstraction (routes/backlinks.ts, routes/seo-provider.ts)
     name: 'getBacklinksOverview called outside workspace intelligence SEO context',
     pattern: 'getBacklinksOverview\\s*\\(',
     fileGlobs: ['*.ts'],
@@ -1735,7 +1735,7 @@ export const CHECKS: Check[] = [
       'server/providers/dataforseo-provider.ts', // provider implementation
       'server/providers/fake-seo-provider.ts',   // local fake provider implementation
       'server/routes/backlinks.ts',              // pre-existing caller via provider abstraction
-      'server/routes/semrush.ts',                // pre-existing caller via provider abstraction
+      'server/routes/seo-provider.ts',           // route caller via provider abstraction
     ],
     message: 'getBacklinksOverview() is an expensive external API call. Only call it from the workspace intelligence SEO context path where caching and rate-limiting are enforced.',
     severity: 'error',

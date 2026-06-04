@@ -53,7 +53,7 @@ const SECTIONS: GuideSection[] = [
       },
       {
         label: 'Validate Keywords',
-        detail: 'Each brief can have its keyword validated against SEMRush data — see volume, difficulty, and CPC before committing to a topic.',
+        detail: 'Each brief can have its keyword validated against DataForSEO data — see volume, difficulty, and CPC before committing to a topic.',
       },
       {
         label: 'Review & Refine',

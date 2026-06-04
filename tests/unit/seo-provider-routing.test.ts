@@ -44,9 +44,7 @@ describe('getProviderForCapability', () => {
 
   it('ignores legacy backlinks disable flags and stays on DataForSEO', () => {
     const dfs = makeProvider('dataforseo');
-    const semrush = makeProvider('semrush');
     registerProvider('dataforseo', dfs);
-    registerProvider('semrush', semrush);
 
     markCapabilityDisabled('dataforseo', 'backlinks');
 
@@ -56,9 +54,7 @@ describe('getProviderForCapability', () => {
 
   it('keeps DataForSEO for backlinks even if a legacy disable flag exists', () => {
     const dfs = makeProvider('dataforseo');
-    const unconfiguredSemrush = makeProvider('semrush', false);
     registerProvider('dataforseo', dfs);
-    registerProvider('semrush', unconfiguredSemrush);
 
     markCapabilityDisabled('dataforseo', 'backlinks');
 
@@ -68,9 +64,7 @@ describe('getProviderForCapability', () => {
 
   it('getBacklinksProvider stays on DataForSEO instead of falling back', () => {
     const dfs = makeProvider('dataforseo');
-    const semrush = makeProvider('semrush');
     registerProvider('dataforseo', dfs);
-    registerProvider('semrush', semrush);
 
     markCapabilityDisabled('dataforseo', 'backlinks');
     const provider = getBacklinksProvider('dataforseo');
@@ -79,11 +73,9 @@ describe('getProviderForCapability', () => {
 
   it('treats legacy semrush backlink preference as DataForSEO', () => {
     const dfs = makeProvider('dataforseo');
-    const semrush = makeProvider('semrush');
     registerProvider('dataforseo', dfs);
-    registerProvider('semrush', semrush);
 
-    const provider = getBacklinksProvider('semrush');
+    const provider = getBacklinksProvider('semrush' as unknown as ProviderName);
     expect(provider).toBe(dfs);
   });
 });
@@ -94,20 +86,16 @@ describe('getConfiguredProvider', () => {
   });
 
   it('defaults to DataForSEO when both providers are configured and no preference is supplied', () => {
-    const semrush = makeProvider('semrush');
     const dfs = makeProvider('dataforseo');
-    registerProvider('semrush', semrush);
     registerProvider('dataforseo', dfs);
 
     expect(getConfiguredProvider()).toBe(dfs);
   });
 
   it('treats legacy semrush preference as DataForSEO', () => {
-    const semrush = makeProvider('semrush');
     const dfs = makeProvider('dataforseo');
-    registerProvider('semrush', semrush);
     registerProvider('dataforseo', dfs);
 
-    expect(getConfiguredProvider('semrush')).toBe(dfs);
+    expect(getConfiguredProvider('semrush' as unknown as ProviderName)).toBe(dfs);
   });
 });

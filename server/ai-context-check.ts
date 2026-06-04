@@ -151,14 +151,14 @@ export function checkAIContext(workspaceId: string): ContextCompleteness {
     fixAction: 'seo-strategy',
   });
 
-  // 8. SEO Data Provider (SEMRush or DataForSEO)
+  // 8. SEO Data Provider
   const hasSeoProvider = isAnyProviderConfigured();
   sources.push({
-    key: 'semrush',
-    label: 'SEO Data Provider',
+    key: 'dataforseo',
+    label: 'DataForSEO',
     status: hasSeoProvider ? 'connected' : 'missing',
     detail: hasSeoProvider
-      ? 'SEO data provider configured'
+      ? 'DataForSEO credentials configured'
       : 'Not configured — briefs use estimated metrics instead of real data',
     impacts: ['strategy', 'briefs'],
     fixAction: 'settings',

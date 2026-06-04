@@ -448,7 +448,7 @@ export const updateWorkspaceInputSchema = z.object({
     onboarding_enabled: z.boolean().optional(),
     onboarding_completed: z.boolean().optional(),
     publish_target: publishTargetSchema.optional(),
-    seo_data_provider: z.enum(['semrush', 'dataforseo']).optional(),
+    seo_data_provider: z.literal('dataforseo').optional(),
     business_profile: businessProfileContactSchema.nullable().optional(),
     intelligence_profile: intelligenceProfileSchema.optional(),
   }).strict().refine(
@@ -522,7 +522,7 @@ export const startKeywordStrategyGenerationInputSchema = z.object({
   workspace_id: workspaceIdSchema,
   options: z.object({
     mode: z.enum(['full', 'incremental']).optional(),
-    seoDataProvider: z.enum(['dataforseo', 'semrush']).optional(),
+    seoDataProvider: z.literal('dataforseo').optional(),
     competitorDomains: z.array(z.string()).optional(),
     maxPages: z.number().int().positive().optional(),
   }).optional(),
