@@ -176,6 +176,164 @@ describe('(1) order-sensitive parity — table read is byte-identical to blob in
 });
 
 // ════════════════════════════════════════════════════════════════════════════════
+// (1b) Wave 3c-iii-a — sort_order EQUALS the blob array index after backfill
+//      (the load-bearing invariant: the order moves to sort_order, sourced from the
+//       live blob index; includes the append-fallback tail for table-only rows).
+// ════════════════════════════════════════════════════════════════════════════════
+describe('(1b) sort_order backfill — equals the blob array index per key (+ append-fallback tail)', () => {
+  it('never-backfilled (case A): boot backfill stamps sort_order = blob array index', async () => {
+    const { default: db } = await import('../../server/db/index.js');
+    const { createWorkspace } = await import('../../server/workspaces.js');
+    const {
+      migrateTrackedKeywordsFromConfigBlob,
+      countTrackedKeywordRows,
+      deleteAllTrackedKeywordRows,
+    } = await import('../../server/tracked-keywords-store.js');
+
+    const ws = createWorkspace(`TK SortOrder CaseA ${Date.now()}`);
+    cleanupWorkspaceIds.push(ws.id);
+
+    // Blob order is gamma(0), alpha(1), beta(2), delta(3) — NON-monotonic addedAt so
+    // the table's natural (added_at, normalized_query) order would NOT match.
+    const blob = [
+      { query: 'gamma kw', pinned: false, addedAt: '2026-05-03T00:00:00.000Z', source: 'manual', status: 'active' },
+      { query: 'alpha kw', pinned: false, addedAt: '2026-05-01T00:00:00.000Z', source: 'manual', status: 'active' },
+      { query: 'beta kw', pinned: false, addedAt: '2026-05-02T00:00:00.000Z', source: 'manual', status: 'active' },
+      { query: 'delta kw', pinned: false, addedAt: '2026-05-04T00:00:00.000Z', source: 'manual', status: 'active' },
+    ];
+    await writeBlobDirect(ws.id, blob);
+    deleteAllTrackedKeywordRows(ws.id);
+    expect(countTrackedKeywordRows(ws.id)).toBe(0);
+
+    migrateTrackedKeywordsFromConfigBlob();
+    expect(countTrackedKeywordRows(ws.id)).toBe(4);
+
+    // Each row's sort_order MUST equal its position in the blob array.
+    const rows = db.prepare(
+      'SELECT query, sort_order FROM tracked_keywords WHERE workspace_id = ? ORDER BY sort_order ASC',
+    ).all(ws.id) as { query: string; sort_order: number }[];
+    expect(rows.map(r => r.query)).toEqual(['gamma kw', 'alpha kw', 'beta kw', 'delta kw']);
+    const indexByQuery = new Map(blob.map((k, i) => [k.query, i]));
+    for (const r of rows) {
+      expect(r.sort_order).toBe(indexByQuery.get(r.query));
+    }
+  });
+
+  it('already-backfilled (case B): NULL sort_order rows are stamped from the blob index, table-only rows append after blob.length', async () => {
+    const { default: db } = await import('../../server/db/index.js');
+    const { createWorkspace } = await import('../../server/workspaces.js');
+    const { keywordComparisonKey } = await import('../../shared/keyword-normalization.js');
+    const {
+      migrateTrackedKeywordsFromConfigBlob,
+      countTrackedKeywordRows,
+      deleteAllTrackedKeywordRows,
+    } = await import('../../server/tracked-keywords-store.js');
+
+    const ws = createWorkspace(`TK SortOrder CaseB ${Date.now()}`);
+    cleanupWorkspaceIds.push(ws.id);
+
+    // Blob carries three keys in a specific order.
+    const blob = [
+      { query: 'zulu kw', addedAt: '2026-05-13T00:00:00.000Z' },
+      { query: 'xray kw', addedAt: '2026-05-11T00:00:00.000Z' },
+      { query: 'whiskey kw', addedAt: '2026-05-12T00:00:00.000Z' },
+    ];
+    await writeBlobDirect(ws.id, blob);
+    deleteAllTrackedKeywordRows(ws.id);
+
+    // Simulate the 3c-i state: rows already exist WITH NULL sort_order. We insert the
+    // three blob keys PLUS one table-only key ('tango kw') that is NOT in the blob —
+    // it must receive the append-fallback tail index (blob.length + 0).
+    const seedRows = [
+      { query: 'zulu kw', added_at: '2026-05-13T00:00:00.000Z' },
+      { query: 'xray kw', added_at: '2026-05-11T00:00:00.000Z' },
+      { query: 'whiskey kw', added_at: '2026-05-12T00:00:00.000Z' },
+      { query: 'tango kw', added_at: '2026-05-10T00:00:00.000Z' }, // table-only, earliest addedAt
+    ];
+    const insertNullSort = db.prepare(
+      `INSERT INTO tracked_keywords (workspace_id, normalized_query, query, pinned, added_at, source, status, sort_order)
+       VALUES (?, ?, ?, 0, ?, 'manual', 'active', NULL)`,
+    );
+    const insertMany = db.transaction(() => {
+      for (const r of seedRows) {
+        insertNullSort.run(ws.id, keywordComparisonKey(r.query), r.query, r.added_at);
+      }
+    });
+    insertMany();
+    expect(countTrackedKeywordRows(ws.id)).toBe(4);
+    // Pre-condition: all sort_order NULL.
+    const nullCount = (db.prepare(
+      'SELECT COUNT(*) AS c FROM tracked_keywords WHERE workspace_id = ? AND sort_order IS NULL',
+    ).get(ws.id) as { c: number }).c;
+    expect(nullCount).toBe(4);
+
+    // Run the backfill — case B path (count > 0): stamps sort_order WHERE NULL.
+    migrateTrackedKeywordsFromConfigBlob();
+
+    const rows = db.prepare(
+      'SELECT query, sort_order FROM tracked_keywords WHERE workspace_id = ? ORDER BY sort_order ASC',
+    ).all(ws.id) as { query: string; sort_order: number }[];
+    // Blob keys keep their blob index; the table-only 'tango kw' appends at blob.length (3).
+    expect(rows).toEqual([
+      { query: 'zulu kw', sort_order: 0 },
+      { query: 'xray kw', sort_order: 1 },
+      { query: 'whiskey kw', sort_order: 2 },
+      { query: 'tango kw', sort_order: 3 },
+    ]);
+
+    // Idempotent: a second run touches nothing (all sort_order now non-NULL).
+    migrateTrackedKeywordsFromConfigBlob();
+    const rows2 = db.prepare(
+      'SELECT query, sort_order FROM tracked_keywords WHERE workspace_id = ? ORDER BY sort_order ASC',
+    ).all(ws.id) as { query: string; sort_order: number }[];
+    expect(rows2).toEqual(rows);
+  });
+
+  it('write path re-stamps sort_order from the array position (delete-then-reinsert preserves order)', async () => {
+    const { default: db } = await import('../../server/db/index.js');
+    const { createWorkspace } = await import('../../server/workspaces.js');
+    const { replaceAllTrackedKeywordRows, resolveTrackedKeywords } = await import('../../server/tracked-keywords-store.js');
+    const { TRACKED_KEYWORD_SOURCE, TRACKED_KEYWORD_STATUS } = await import('../../shared/types/rank-tracking.js');
+
+    const ws = createWorkspace(`TK SortOrder Write ${Date.now()}`);
+    cleanupWorkspaceIds.push(ws.id);
+
+    const mk = (query: string, addedAt: string) => ({
+      query, pinned: false, addedAt,
+      source: TRACKED_KEYWORD_SOURCE.MANUAL, status: TRACKED_KEYWORD_STATUS.ACTIVE,
+    });
+
+    // First write: order A.
+    replaceAllTrackedKeywordRows(ws.id, [mk('one', '2026-05-01'), mk('two', '2026-05-02'), mk('three', '2026-05-03')]);
+    const after1 = db.prepare(
+      'SELECT query, sort_order FROM tracked_keywords WHERE workspace_id = ? ORDER BY sort_order ASC',
+    ).all(ws.id) as { query: string; sort_order: number }[];
+    expect(after1).toEqual([
+      { query: 'one', sort_order: 0 },
+      { query: 'two', sort_order: 1 },
+      { query: 'three', sort_order: 2 },
+    ]);
+
+    // Re-persist with a DIFFERENT array order: sort_order must follow the new positions.
+    replaceAllTrackedKeywordRows(ws.id, [mk('three', '2026-05-03'), mk('one', '2026-05-01'), mk('two', '2026-05-02')]);
+    const after2 = db.prepare(
+      'SELECT query, sort_order FROM tracked_keywords WHERE workspace_id = ? ORDER BY sort_order ASC',
+    ).all(ws.id) as { query: string; sort_order: number }[];
+    expect(after2).toEqual([
+      { query: 'three', sort_order: 0 },
+      { query: 'one', sort_order: 1 },
+      { query: 'two', sort_order: 2 },
+    ]);
+
+    // And the RESOLVER (the read path) emits the new array order — proving sort_order
+    // drives ordering. With sort_order left NULL on reinsert, this scrambles to the
+    // (added_at, normalized_query) tiebreaker (one, two, three) and FAILS — RED-proof (b).
+    const resolved = resolveTrackedKeywords(ws.id, []);
+    expect(resolved.map(k => k.query)).toEqual(['three', 'one', 'two']);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════════
 // (2) BLOB-FALLBACK fires when the table is empty
 // ════════════════════════════════════════════════════════════════════════════════
 describe('(2) blob-fallback — empty table → readers return the blob', () => {

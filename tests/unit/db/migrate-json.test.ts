@@ -91,6 +91,7 @@ afterEach(() => {
   db.prepare("DELETE FROM roi_snapshots WHERE workspace_id LIKE 'tmig-%'").run();
   db.prepare("DELETE FROM rank_tracking_config WHERE workspace_id LIKE 'tmig-%'").run();
   db.prepare("DELETE FROM rank_snapshots WHERE workspace_id LIKE 'tmig-%'").run();
+  db.prepare("DELETE FROM tracked_keywords WHERE workspace_id LIKE 'tmig-%'").run();
   db.prepare("DELETE FROM recommendation_sets WHERE workspace_id LIKE 'tmig-%'").run();
   db.prepare("DELETE FROM audit_schedules WHERE workspace_id LIKE 'tmig-%'").run();
   // Clean up temp fixture files so each test starts fresh
@@ -1119,7 +1120,7 @@ describe('migrateRoiHistory', () => {
 // ═══════════════════════════════════════════════════════════════════
 
 describe('migrateRankTracking', () => {
-  it('tmig-rt-001: config inserted using trackedKeywords', async () => {
+  it('tmig-rt-001: config inserted using trackedKeywords (blob AND table dual-write)', async () => {
     const wsDir = path.join(mockPaths.uploads, 'tmig-ws-rt');
     const rtDir = path.join(wsDir, '.rank-tracking');
     fs.mkdirSync(rtDir, { recursive: true });
@@ -1129,8 +1130,40 @@ describe('migrateRankTracking', () => {
 
     await runMigration();
 
+    // Blob is still written (KEPT — strip is 3c-iii-b).
     const row = db.prepare("SELECT tracked_keywords FROM rank_tracking_config WHERE workspace_id = 'tmig-ws-rt'").get() as { tracked_keywords: string };
     expect(JSON.parse(row.tracked_keywords)).toEqual(['seo tools', 'keyword research']);
+
+    // Wave 3c-iii-a DUAL-WRITE: the tracked_keywords TABLE is ALSO populated, with
+    // sort_order = the blob array index (so reads survive the later blob strip).
+    const tableRows = db.prepare(
+      "SELECT query, sort_order FROM tracked_keywords WHERE workspace_id = 'tmig-ws-rt' ORDER BY sort_order ASC",
+    ).all() as { query: string; sort_order: number }[];
+    expect(tableRows).toEqual([
+      { query: 'seo tools', sort_order: 0 },
+      { query: 'keyword research', sort_order: 1 },
+    ]);
+  });
+
+  it('tmig-rt-001b: table dual-write is idempotent (second import re-stamps the same order)', async () => {
+    const wsDir = path.join(mockPaths.uploads, 'tmig-ws-rt1b');
+    const rtDir = path.join(wsDir, '.rank-tracking');
+    fs.mkdirSync(rtDir, { recursive: true });
+    writeJson(path.join(rtDir, 'config.json'), {
+      trackedKeywords: ['first kw', 'second kw', 'third kw'],
+    });
+
+    await runMigration();
+    await runMigration();
+
+    const tableRows = db.prepare(
+      "SELECT query, sort_order FROM tracked_keywords WHERE workspace_id = 'tmig-ws-rt1b' ORDER BY sort_order ASC",
+    ).all() as { query: string; sort_order: number }[];
+    expect(tableRows).toEqual([
+      { query: 'first kw', sort_order: 0 },
+      { query: 'second kw', sort_order: 1 },
+      { query: 'third kw', sort_order: 2 },
+    ]);
   });
 
   it('tmig-rt-002: config falls back to config.keywords when trackedKeywords absent', async () => {

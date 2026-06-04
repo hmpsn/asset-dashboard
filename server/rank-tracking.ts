@@ -143,7 +143,7 @@ function normalizeQuery(query: string): string {
   return keywordComparisonKey(query);
 }
 
-function normalizeTrackedKeywords(keywords: Array<Partial<TrackedKeyword> & { query: string }>): TrackedKeyword[] {
+export function normalizeTrackedKeywords(keywords: Array<Partial<TrackedKeyword> & { query: string }>): TrackedKeyword[] {
   const seen = new Set<string>();
   const normalized: TrackedKeyword[] = [];
   const now = new Date().toISOString();
