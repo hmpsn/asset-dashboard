@@ -8,7 +8,7 @@ import { ContentBriefs } from './ContentBriefs';
 import { ContentManager } from './ContentManager';
 import { ContentSubscriptions } from './ContentSubscriptions';
 import { AiSuggested } from './pipeline/AiSuggested';
-import { CannibalizationAlert } from './admin/CannibalizationAlert';
+import { CannibalizationAlert } from './ui/CannibalizationAlert';
 import { WorkflowStepper } from './ui';
 import { adminPath } from '../routes';
 import { useWorkspaceIntelligence } from '../hooks/admin';
@@ -165,9 +165,13 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
         </div>
       )}
 
-      {/* Cannibalization warnings from intelligence */}
+      {/* Cannibalization warnings from intelligence — string-path entries mapped to CannibalizationEntry[] */}
       <CannibalizationAlert
-        warnings={intel?.contentPipeline?.cannibalizationWarnings}
+        entries={(intel?.contentPipeline?.cannibalizationWarnings ?? []).map(w => ({
+          keyword: w.keyword,
+          severity: w.severity,
+          pages: w.pages.map(p => ({ path: p })),
+        }))}
         tier={workspaceTier}
       />
 

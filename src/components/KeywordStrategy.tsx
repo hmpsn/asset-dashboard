@@ -20,7 +20,7 @@ import { QuickWins } from './strategy/QuickWins';
 import { KeywordGaps } from './strategy/KeywordGaps';
 import { LowHangingFruit } from './strategy/LowHangingFruit';
 import { TopicClusters } from './strategy/TopicClusters';
-import { CannibalizationAlert } from './strategy/CannibalizationAlert';
+import { CannibalizationAlert } from './ui/CannibalizationAlert';
 import { StrategyDiff } from './strategy/StrategyDiff';
 import { IntelligenceSignals } from './strategy/IntelligenceSignals';
 import { LocalSeoVisibilityPanel } from './local-seo/LocalSeoVisibilityPanel';
@@ -756,7 +756,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
 
           {/* ── Cannibalization Alert ── */}
           {strategy.cannibalization && strategy.cannibalization.length > 0 && (
-            <CannibalizationAlert items={strategy.cannibalization} />
+            <CannibalizationAlert entries={strategy.cannibalization} />
           )}
 
           {/* ── What Changed (Strategy Diff) ── */}
