@@ -11,7 +11,7 @@ import {
   type TrackedKeywordStatus,
 } from '../shared/types/rank-tracking.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
-import { replaceAllTrackedKeywordRows, resolveTrackedKeywords } from './tracked-keywords-store.js';
+import { listTrackedKeywordRows, replaceAllTrackedKeywordRows, resolveTrackedKeywords } from './tracked-keywords-store.js';
 
 export interface RankSnapshot {
   date: string; // YYYY-MM-DD
@@ -38,6 +38,8 @@ export interface AddTrackedKeywordOptions {
   baselineImpressions?: number;
   replacedBy?: string;
   deprecatedAt?: string;
+  /** Wave 3d-i ADDITIVE provenance — content-addressed gap key (see TrackedKeyword.sourceGapKey). */
+  sourceGapKey?: string;
 }
 
 export interface GetTrackedKeywordsOptions {
@@ -118,6 +120,14 @@ const trackedKeywordSchema = z.object({
   baselineImpressions: z.number().optional(),
   replacedBy: z.string().optional(),
   deprecatedAt: z.string().optional(),
+  // Wave 3d-i ADDITIVE provenance. MUST be .optional(): the stored blob does NOT
+  // carry sourceGapKey (it lives in the tracked_keywords TABLE, projected only via
+  // the admin path; the blob will not carry it until a later wave). A REQUIRED
+  // field absent from the stored blob makes every parseJsonSafeArray item fall to
+  // its fallback — silently destroying all tracked-keyword data (Schema-vs-stored-
+  // shape rule). normalizeTrackedKeywords passes it through via the `...keyword`
+  // spread so it survives the read→mutate→write loop.
+  sourceGapKey: z.string().optional(),
 });
 
 function normalizeQuery(query: string): string {
@@ -161,8 +171,18 @@ function readConfig(workspaceId: string): { trackedKeywords: TrackedKeyword[] } 
 function writeConfig(workspaceId: string, config: { trackedKeywords: TrackedKeyword[] }) {
   stmts().upsertConfig.run({
     workspace_id: workspaceId,
-    tracked_keywords: JSON.stringify(config.trackedKeywords),
+    // Wave 3d-i: provenance (sourceGapKey) lives ONLY in the tracked_keywords
+    // TABLE, never the blob. Strip it here so the blob stays byte-identical to
+    // pre-3d — the resolver fallback (empty table or blob-only key) must not be
+    // able to leak provenance, and the 3c-i/3c-ii parity suites stay green.
+    tracked_keywords: JSON.stringify(config.trackedKeywords, blobReplacer),
   });
+}
+
+/** Drop provenance-only keys when serializing the blob (see writeConfig). */
+function blobReplacer(key: string, value: unknown): unknown {
+  if (key === 'sourceGapKey' || key === 'sourcePageId') return undefined;
+  return value;
 }
 
 function readSnapshots(workspaceId: string): RankSnapshot[] {
@@ -210,12 +230,45 @@ export function getTrackedKeywords(workspaceId: string, options: GetTrackedKeywo
  * Returns the post-mutation TrackedKeyword[] so callers do NOT need a second
  * getTrackedKeywords() call (the "3×-parse fix").
  */
+/**
+ * Wave 3d-i: mutate `keywords` in place, filling each row's `sourceGapKey` from
+ * the existing tracked_keywords TABLE (keyed by keywordComparisonKey) when the
+ * row does not already carry one. FILL-IF-EMPTY: a value already present on the
+ * in-memory row (e.g. a fresh gap-approve in the same write) is NOT overwritten by
+ * the stored table value. Provenance lives only in the table, so this is how it
+ * survives the blob-based read→mutate→write loop.
+ */
+function hydrateProvenanceFromTable(workspaceId: string, keywords: TrackedKeyword[]): void {
+  if (keywords.length === 0) return;
+  const stored = listTrackedKeywordRows(workspaceId);
+  if (stored.length === 0) return;
+  const gapKeyByQuery = new Map<string, string>();
+  for (const row of stored) {
+    if (row.sourceGapKey) gapKeyByQuery.set(normalizeQuery(row.query), row.sourceGapKey);
+  }
+  if (gapKeyByQuery.size === 0) return;
+  for (const keyword of keywords) {
+    if (keyword.sourceGapKey) continue; // fill-if-empty — don't clobber a fresh pointer
+    const existing = gapKeyByQuery.get(normalizeQuery(keyword.query));
+    if (existing) keyword.sourceGapKey = existing;
+  }
+}
+
 export function withTrackedKeywordsTxn(
   workspaceId: string,
   updater: (current: TrackedKeyword[]) => TrackedKeyword[],
 ): TrackedKeyword[] {
   function run(): TrackedKeyword[] {
     const config = readConfig(workspaceId);
+    // Wave 3d-i FILL-IF-EMPTY: the blob does NOT carry provenance (writeConfig
+    // strips sourceGapKey), so hydrate it from the TABLE into the in-memory set
+    // BEFORE the updater runs. This makes any existing pointer survive the
+    // read→mutate→write loop: a status-only / reconcile updater (which copies the
+    // current rows through) preserves it, while a gap-approve updater overwrites
+    // it. replaceAllTrackedKeywordRows is delete-then-reinsert, so the in-memory
+    // value is the ONLY source of truth on reinsert — without this hydrate a later
+    // write would null out the provenance.
+    hydrateProvenanceFromTable(workspaceId, config.trackedKeywords);
     config.trackedKeywords = normalizeTrackedKeywords(updater(config.trackedKeywords));
     writeConfig(workspaceId, config);
     // DUAL-WRITE (Wave 3c-i shadow): mirror the post-mutation set into the
@@ -266,6 +319,10 @@ function addTrackedKeywordToConfig(
     const definedOptions = Object.fromEntries(
       Object.entries(options).filter(([, value]) => value !== undefined),
     ) as AddTrackedKeywordOptions;
+    // Wave 3d-i FILL-IF-EMPTY: never overwrite an existing non-empty sourceGapKey.
+    // (existing.sourceGapKey is already hydrated from the table by withTrackedKeywordsTxn.)
+    // Drop it from the blind spread; re-apply only when the row has none yet.
+    delete definedOptions.sourceGapKey;
     Object.assign(existing, {
       ...definedOptions,
       pinned: existing.pinned || Boolean(options.pinned),
@@ -274,6 +331,7 @@ function addTrackedKeywordToConfig(
       replacedBy: nextStatus === TRACKED_KEYWORD_STATUS.ACTIVE ? undefined : existing.replacedBy,
       deprecatedAt: nextStatus === TRACKED_KEYWORD_STATUS.ACTIVE ? undefined : existing.deprecatedAt,
     });
+    if (!existing.sourceGapKey && options.sourceGapKey) existing.sourceGapKey = options.sourceGapKey;
     return true;
   }
   config.trackedKeywords.push({
@@ -296,6 +354,7 @@ function addTrackedKeywordToConfig(
     baselineImpressions: options.baselineImpressions,
     replacedBy: options.replacedBy,
     deprecatedAt: options.deprecatedAt,
+    sourceGapKey: options.sourceGapKey, // Wave 3d-i ADDITIVE provenance (gap-approve path).
   });
   return true;
 }

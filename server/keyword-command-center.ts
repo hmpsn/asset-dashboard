@@ -23,6 +23,7 @@ import {
   updateTrackedKeywords,
   type AddTrackedKeywordOptions,
 } from './rank-tracking.js';
+import { listTrackedKeywordRows } from './tracked-keywords-store.js';
 import { getWorkspace } from './workspaces.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { buildKeywordStrategyUxPayload } from './keyword-strategy-ux.js';
@@ -354,6 +355,31 @@ function inferTrackedKeywordSources(
     if (fb?.status === 'requested') return { ...keyword, source: TRACKED_KEYWORD_SOURCE.CLIENT_REQUESTED };
     if (contentGapKeys.has(normalized)) return { ...keyword, source: TRACKED_KEYWORD_SOURCE.CONTENT_GAP };
     return keyword;
+  });
+}
+
+/**
+ * Wave 3d-i ADMIN exposure: getTrackedKeywords STRIPS provenance (sourceGapKey) so
+ * the general/public read path stays byte-identical. KCC is admin-authed, so it
+ * may surface provenance — read it from the provenance-bearing table
+ * (listTrackedKeywordRows, which uses rowToTrackedKeyword directly, NOT the
+ * stripping resolver) and merge sourceGapKey back onto the tracked keywords keyed
+ * by keywordComparisonKey. Returns NEW objects (never mutates the input) so callers
+ * downstream of getTrackedKeywords are unaffected.
+ */
+function mergeTrackedKeywordProvenance(
+  workspaceId: string,
+  trackedKeywords: TrackedKeyword[],
+): TrackedKeyword[] {
+  if (trackedKeywords.length === 0) return trackedKeywords;
+  const gapKeyByQuery = new Map<string, string>();
+  for (const row of listTrackedKeywordRows(workspaceId)) {
+    if (row.sourceGapKey) gapKeyByQuery.set(keywordComparisonKey(row.query), row.sourceGapKey);
+  }
+  if (gapKeyByQuery.size === 0) return trackedKeywords;
+  return trackedKeywords.map(keyword => {
+    const gapKey = gapKeyByQuery.get(keywordComparisonKey(keyword.query));
+    return gapKey ? { ...keyword, sourceGapKey: gapKey } : keyword;
   });
 }
 
@@ -1092,6 +1118,9 @@ function finalizeDraftRow(row: DraftRow, context: RowFinalizeContext): KeywordCo
       pageTitle: row.tracking.pageTitle,
       replacedBy: row.tracking.replacedBy,
       deprecatedAt: row.tracking.deprecatedAt,
+      // Wave 3d-i ADDITIVE provenance (admin-only). Merged onto bundle.trackedKeywords
+      // from the provenance-bearing table read (mergeTrackedKeywordProvenance).
+      sourceGapKey: row.tracking.sourceGapKey,
       // True when any rank/GSC signal has materialized for the row. Distinguishes
       // active-with-data ("Active") from active-but-empty ("Awaiting data") in the UI.
       // Audit on Swish found ~75% of active-tracked rows had no rank/clicks/impressions —
@@ -1189,7 +1218,13 @@ async function buildKeywordCommandCenterModel(
   const assembled = assembleStoredKeywordStrategy(workspace.id);
   const contentGaps = assembled?.contentGaps ?? [];
   const keywordGaps = assembled?.keywordGaps ?? [];
-  const rawTrackedKeywords = getTrackedKeywords(workspace.id, { includeInactive: true });
+  // Wave 3d-i: getTrackedKeywords strips provenance; merge sourceGapKey back from
+  // the provenance-bearing table read (KCC is admin-authed) so the tracking row can
+  // expose it.
+  const rawTrackedKeywords = mergeTrackedKeywordProvenance(
+    workspace.id,
+    getTrackedKeywords(workspace.id, { includeInactive: true }),
+  );
   const latestRanks = getLatestSnapshotRanks(workspace.id);
   const feedback = readFeedback(workspace.id);
   const lostVisibilityRows = safeLostVisibilityRows(workspace.id);
@@ -1926,7 +1961,12 @@ function buildFilteredBundle(input: {
   const filteredAssembled = assembleStoredKeywordStrategy(input.workspace.id);
   const contentGaps = filteredAssembled?.contentGaps ?? [];
   const keywordGaps = filteredAssembled?.keywordGaps ?? [];
-  const trackedKeywords = getTrackedKeywords(input.workspace.id, { includeInactive: true });
+  // Wave 3d-i: merge sourceGapKey back from the provenance-bearing table read
+  // (getTrackedKeywords strips it; KCC is admin-authed so it may surface it).
+  const trackedKeywords = mergeTrackedKeywordProvenance(
+    input.workspace.id,
+    getTrackedKeywords(input.workspace.id, { includeInactive: true }),
+  );
   const latestRanks = getLatestSnapshotRanks(input.workspace.id);
   const feedback = readFeedback(input.workspace.id);
   const lostVisibilityRows = safeLostVisibilityRows(input.workspace.id);
@@ -2147,7 +2187,12 @@ export async function buildKeywordCommandCenterDetail(
   const detailAssembled = assembleStoredKeywordStrategy(workspace.id);
   const contentGaps = (detailAssembled?.contentGaps ?? []).filter(gap => keywordComparisonKey(gap.targetKeyword) === normalized);
   const keywordGaps = (detailAssembled?.keywordGaps ?? []).filter(gap => keywordComparisonKey(gap.keyword) === normalized);
-  const rawTrackedKeywords = getTrackedKeywords(workspace.id, { includeInactive: true }).filter(entry => keywordComparisonKey(entry.query) === normalized);
+  // Wave 3d-i: merge sourceGapKey back from the provenance-bearing table read
+  // (getTrackedKeywords strips it) so the admin detail drawer can expose it.
+  const rawTrackedKeywords = mergeTrackedKeywordProvenance(
+    workspace.id,
+    getTrackedKeywords(workspace.id, { includeInactive: true }),
+  ).filter(entry => keywordComparisonKey(entry.query) === normalized);
   // Load all ranks for variant aggregation — populateDraftRows uses variantParentMap to
   // cluster GSC query variants (e.g. "teeth whitening san antonio") under their canonical
   // keyword. Filtering to exact matches here would prevent variant metrics from rolling up.
