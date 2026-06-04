@@ -129,7 +129,7 @@ router.get('/api/public/seo-strategy/:workspaceId', async (req, res, next) => {
     // assembler returns the full internal shape and the whitelist trims it.
     const assembled = assembleStoredKeywordStrategy(ws.id);
     if (!assembled) return res.json(null);
-    const { pageMap: fullPageMap, contentGaps, quickWins, keywordGaps, topicClusters, cannibalization } = assembled;
+    const { pageMap: fullPageMap, contentGaps, quickWins, keywordGaps, topicClusters, cannibalization, siteKeywordMetrics } = assembled;
     // Return client-safe subset (no SEO data mode/provider internals)
     const trackedKeywords = getTrackedKeywords(ws.id, { includeInactive: true });
     const strategyUx = await buildKeywordStrategyUxPayload({
@@ -155,7 +155,8 @@ router.get('/api/public/seo-strategy/:workspaceId', async (req, res, next) => {
     });
     res.json({
       siteKeywords: strategy?.siteKeywords || [],
-      siteKeywordMetrics: strategy?.siteKeywordMetrics || undefined,
+      // #19b dual-read: table-first via the assembler, blob fallback. Strip is 3b-ii.
+      siteKeywordMetrics: siteKeywordMetrics && siteKeywordMetrics.length > 0 ? siteKeywordMetrics : undefined,
       pageMap: fullPageMap.map(p => ({
         pagePath: p.pagePath,
         pageTitle: p.pageTitle,

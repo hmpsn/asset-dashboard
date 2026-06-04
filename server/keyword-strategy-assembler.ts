@@ -2,7 +2,8 @@
  * keyword-strategy-assembler — the single read-path assembler (#2).
  *
  * @reads workspaces (keyword_strategy blob), page_keywords, content_gaps,
- *        quick_wins, keyword_gaps, topic_clusters, cannibalization_issues
+ *        quick_wins, keyword_gaps, topic_clusters, cannibalization_issues,
+ *        site_keyword_metrics (#19b — table-first, blob fallback)
  *
  * Collapses the five historically-divergent keyword-strategy read paths onto
  * ONE function with ONE fallback policy:
@@ -34,6 +35,7 @@ import { listQuickWins } from './quick-wins.js';
 import { listKeywordGaps } from './keyword-gaps.js';
 import { listTopicClusters } from './topic-clusters.js';
 import { listCannibalizationIssues } from './cannibalization-issues.js';
+import { resolveSiteKeywordMetrics } from './site-keyword-metrics.js';
 import type { StoredKeywordStrategy } from '../shared/types/keyword-strategy.js';
 
 /** table-as-truth with a table-or-blob fallback (kept until the forced-strip PR). */
@@ -68,10 +70,14 @@ export function assembleStoredKeywordStrategy(workspaceId: string): StoredKeywor
     return null;
   }
 
+  // siteKeywordMetrics (#19b, Wave 3b-i): table-first, blob fallback. The blob is
+  // still written (dual-write) and still the fallback (dual-read) — the strip is 3b-ii.
+  const siteKeywordMetrics = resolveSiteKeywordMetrics(workspaceId, strategy?.siteKeywordMetrics);
+
   return {
     siteKeywords: strategy?.siteKeywords ?? [],
     opportunities: strategy?.opportunities ?? [],
-    siteKeywordMetrics: strategy?.siteKeywordMetrics,
+    siteKeywordMetrics: siteKeywordMetrics.length > 0 ? siteKeywordMetrics : undefined,
     pageMap,
     contentGaps,
     quickWins,

@@ -26,8 +26,9 @@ import type {
   SeoDataStatus,
 } from './workspace.ts';
 
-/** The per-keyword SEMRush metric shape carried in the strategy blob. Stays
- *  blob-sourced until #19b normalizes it out into its own table. */
+/** The per-keyword SEMRush metric shape. As of #19b (Wave 3b-i) this is backed
+ *  by the `site_keyword_metrics` table (table-first, blob fallback); the blob
+ *  array is still written and read as the fallback until the 3b-ii strip. */
 export type SiteKeywordMetric = NonNullable<KeywordStrategy['siteKeywordMetrics']>[number];
 
 export interface StoredKeywordStrategy {
@@ -35,7 +36,8 @@ export interface StoredKeywordStrategy {
   siteKeywords: string[];
   /** Keyword gaps / untapped opportunities (blob-sourced). */
   opportunities: string[];
-  /** SEMRush data for site keywords (blob-sourced; stays in the blob until #19b). */
+  /** SEMRush data for site keywords — `site_keyword_metrics` table (#19b),
+   *  table-first with blob fallback (the blob is kept until the 3b-ii strip). */
   siteKeywordMetrics?: SiteKeywordMetric[];
   /** Per-page keyword assignments — `page_keywords` table (table-only, no blob fallback). */
   pageMap: PageKeywordMap[];
