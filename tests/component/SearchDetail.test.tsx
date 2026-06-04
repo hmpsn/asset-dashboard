@@ -83,9 +83,40 @@ describe('SearchDetail', () => {
   it('uses accent-token class text-accent-success for position ≤10, not bare text-emerald-400', () => {
     render(<SearchDetail workspaceId="ws-risk" siteId="site-1" gscPropertyUrl="sc-domain:acme.test" />);
 
-    // Query row position 7.1 rendered in a <span>
+    // Query row position 7.1 rendered in a <span> via renderActions
     const positionSpan = screen.getByText('7.1').closest('span') ?? screen.getByText('7.1');
     expect(positionSpan.className).toContain('text-accent-success');
     expect(positionSpan.className).not.toContain('text-emerald-400');
+  });
+
+  // Wave 2b B2: KeywordTable migration — query rows render via KeywordTable, CTR column present.
+  it('renders query rows via KeywordTable with clicks, impressions, CTR columns', () => {
+    render(<SearchDetail workspaceId="ws-risk" siteId="site-1" gscPropertyUrl="sc-domain:acme.test" />);
+
+    // Query text rendered
+    expect(screen.getByText('acme seo')).toBeInTheDocument();
+    // Clicks column (blue-400 in KeywordTable)
+    expect(screen.getByText('44')).toBeInTheDocument();
+    // Impressions column
+    expect(screen.getByText('900')).toBeInTheDocument();
+    // CTR column — KeywordTable 'ctr' column renders as "{value}%"
+    expect(screen.getByText('4.9%')).toBeInTheDocument();
+    // Position still rendered via renderActions as raw decimal
+    expect(screen.getByText('7.1')).toBeInTheDocument();
+  });
+
+  // Wave 2b B2: query↔page toggle still switches data sets.
+  it('query↔page toggle switches between query and page datasets', () => {
+    render(<SearchDetail workspaceId="ws-risk" siteId="site-1" gscPropertyUrl="sc-domain:acme.test" />);
+
+    // Default: queries view — query is visible
+    expect(screen.getByText('acme seo')).toBeInTheDocument();
+
+    // Switch to pages
+    fireEvent.click(screen.getByRole('button', { name: 'Pages' }));
+    // Page path rendered (normalized URL)
+    expect(screen.getByText('/pricing')).toBeInTheDocument();
+    // Query text no longer visible
+    expect(screen.queryByText('acme seo')).not.toBeInTheDocument();
   });
 });

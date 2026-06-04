@@ -87,6 +87,7 @@ export type KeywordColumnKey =
   | 'change'
   | 'clicks'
   | 'impressions'
+  | 'ctr'
   | 'volume'
   | 'difficulty';
 
@@ -149,6 +150,7 @@ const COLUMN_META: Record<KeywordColumnKey, ColumnMeta> = {
   change: { key: 'change', label: 'Change' },
   clicks: { key: 'clicks', label: 'Clicks' },
   impressions: { key: 'impressions', label: 'Impressions' },
+  ctr: { key: 'ctr', label: 'CTR' },
   volume: { key: 'volume', label: 'Volume' },
   difficulty: { key: 'difficulty', label: 'KD' },
 };
@@ -395,6 +397,12 @@ function DataCell<T extends KeywordTableRow>({
       );
     case 'clicks':
       return <td className={`${cell} text-right text-blue-400`}>{row.clicks ?? 0}</td>;
+    case 'ctr':
+      return (
+        <td className={`${cell} text-right text-emerald-400`}>
+          {row.ctr != null ? `${row.ctr}%` : '—'}
+        </td>
+      );
     case 'impressions':
       return (
         <td className={`${cell} text-right text-[var(--brand-text-muted)]`}>
