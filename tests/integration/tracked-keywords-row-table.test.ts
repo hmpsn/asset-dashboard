@@ -344,6 +344,152 @@ describe('(c) nesting — write inside an outer KCC-style db.transaction() write
   });
 });
 
+// ─── (e) Wave 3d-i: ADDITIVE provenance pointer sourceGapKey ────────────────────
+describe('(e) sourceGapKey provenance — persist / fill-if-empty / strip / admin', () => {
+  let wsId: string;
+
+  beforeEach(async () => {
+    const { createWorkspace } = await import('../../server/workspaces.js');
+    wsId = createWorkspace(`TKRows GapKey ${Date.now()}-${Math.random().toString(36).slice(2)}`).id;
+    cleanupWorkspaceIds.push(wsId);
+  });
+
+  // (1) ROUND-TRIP — persist via the feedback gap-approve path → read back via the
+  // provenance-bearing admin read (listTrackedKeywordRows) → sourceGapKey present + correct.
+  it('persists sourceGapKey via the feedback gap-approve path and reads it back from the table', async () => {
+    const { saveKeywordFeedback } = await import('../../server/keyword-feedback.js');
+    const { listTrackedKeywordRows } = await import('../../server/tracked-keywords-store.js');
+    const { keywordComparisonKey } = await import('../../shared/keyword-normalization.js');
+
+    saveKeywordFeedback({
+      workspaceId: wsId,
+      keyword: 'Dental Implants Cost',
+      status: 'approved',
+      source: 'content_gap',
+    });
+
+    const rows = listTrackedKeywordRows(wsId);
+    const row = rows.find(r => r.query === 'Dental Implants Cost');
+    expect(row).toBeDefined();
+    // The gap key is the content-addressed normalized form of the display keyword
+    // (content_gaps PK = (workspace_id, target_keyword)).
+    expect(row?.sourceGapKey).toBe(keywordComparisonKey('Dental Implants Cost'));
+    expect(row?.source).toBe('content_gap');
+
+    // A non-gap surface (e.g. opportunity) leaves sourceGapKey undefined.
+    saveKeywordFeedback({
+      workspaceId: wsId,
+      keyword: 'opportunity keyword',
+      status: 'approved',
+      source: 'opportunity',
+    });
+    const oppRow = listTrackedKeywordRows(wsId).find(r => r.query === 'opportunity keyword');
+    expect(oppRow).toBeDefined();
+    expect(oppRow?.sourceGapKey).toBeUndefined();
+  });
+
+  it('also persists sourceGapKey for the keyword_gap surface', async () => {
+    const { saveKeywordFeedback } = await import('../../server/keyword-feedback.js');
+    const { listTrackedKeywordRows } = await import('../../server/tracked-keywords-store.js');
+    const { keywordComparisonKey } = await import('../../shared/keyword-normalization.js');
+
+    saveKeywordFeedback({
+      workspaceId: wsId,
+      keyword: 'invisalign vs braces',
+      status: 'approved',
+      source: 'keyword_gap',
+    });
+    const row = listTrackedKeywordRows(wsId).find(r => r.query === 'invisalign vs braces');
+    expect(row?.sourceGapKey).toBe(keywordComparisonKey('invisalign vs braces'));
+  });
+
+  // (2) FILL-IF-EMPTY — re-persist the SAME keyword WITHOUT a sourceGapKey (a
+  // status-only update / reconcile) → the existing sourceGapKey is NOT overwritten.
+  it('fill-if-empty — a later status-only write does not overwrite an existing sourceGapKey', async () => {
+    const { saveKeywordFeedback } = await import('../../server/keyword-feedback.js');
+    const { listTrackedKeywordRows } = await import('../../server/tracked-keywords-store.js');
+    const { addTrackedKeyword, updateTrackedKeywords } = await import('../../server/rank-tracking.js');
+    const { keywordComparisonKey } = await import('../../shared/keyword-normalization.js');
+    const { TRACKED_KEYWORD_STATUS } = await import('../../shared/types/rank-tracking.js');
+
+    // First: approve from a content_gap surface → sourceGapKey is set.
+    saveKeywordFeedback({
+      workspaceId: wsId,
+      keyword: 'teeth whitening',
+      status: 'approved',
+      source: 'content_gap',
+    });
+    const expected = keywordComparisonKey('teeth whitening');
+    expect(listTrackedKeywordRows(wsId).find(r => r.query === 'teeth whitening')?.sourceGapKey).toBe(expected);
+
+    // Re-add the SAME keyword WITHOUT a sourceGapKey (e.g. a client re-track / manual add).
+    addTrackedKeyword(wsId, 'teeth whitening', {});
+    expect(listTrackedKeywordRows(wsId).find(r => r.query === 'teeth whitening')?.sourceGapKey).toBe(expected);
+
+    // A status-only mutate (pause then re-activate) through the read→mutate→write loop
+    // also preserves it (the blob does not carry provenance — it is hydrated from the table).
+    updateTrackedKeywords(wsId, keywords =>
+      keywords.map(k =>
+        keywordComparisonKey(k.query) === expected
+          ? { ...k, status: TRACKED_KEYWORD_STATUS.PAUSED }
+          : k,
+      ),
+    );
+    expect(listTrackedKeywordRows(wsId).find(r => r.query === 'teeth whitening')?.sourceGapKey).toBe(expected);
+  });
+
+  // (3) STRIP / NO-LEAK — getTrackedKeywords does NOT include sourceGapKey, AND the
+  // PUBLIC endpoint GET /api/public/tracked-keywords/:id does NOT echo it.
+  it('strip / no-leak — getTrackedKeywords and the public endpoint never echo sourceGapKey', async () => {
+    const { saveKeywordFeedback } = await import('../../server/keyword-feedback.js');
+    const { getTrackedKeywords } = await import('../../server/rank-tracking.js');
+
+    saveKeywordFeedback({
+      workspaceId: wsId,
+      keyword: 'root canal',
+      status: 'approved',
+      source: 'content_gap',
+    });
+
+    // General read path: no own property `sourceGapKey` (Object-shape parity — not
+    // merely undefined-valued).
+    const general = getTrackedKeywords(wsId, { includeInactive: true });
+    const generalRow = general.find(k => k.query === 'root canal');
+    expect(generalRow).toBeDefined();
+    expect(Object.prototype.hasOwnProperty.call(generalRow, 'sourceGapKey')).toBe(false);
+
+    // PUBLIC endpoint: exercise the actual client-facing serialization.
+    const res = await api(`/api/public/tracked-keywords/${wsId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { keywords: Array<Record<string, unknown>> };
+    const publicRow = body.keywords.find(k => k.query === 'root canal');
+    expect(publicRow).toBeDefined();
+    expect(Object.prototype.hasOwnProperty.call(publicRow, 'sourceGapKey')).toBe(false);
+    // And it never leaks as a serialized substring either.
+    expect(JSON.stringify(body)).not.toContain('sourceGapKey');
+  });
+
+  // (4) ADMIN-SEES-IT — the KCC tracking row exposes sourceGapKey.
+  it('admin — the KCC tracking row exposes sourceGapKey', async () => {
+    const { saveKeywordFeedback } = await import('../../server/keyword-feedback.js');
+    const { buildKeywordCommandCenterRows } = await import('../../server/keyword-command-center.js');
+    const { keywordComparisonKey } = await import('../../shared/keyword-normalization.js');
+
+    saveKeywordFeedback({
+      workspaceId: wsId,
+      keyword: 'porcelain veneers',
+      status: 'approved',
+      source: 'content_gap',
+    });
+
+    const result = await buildKeywordCommandCenterRows(wsId, {});
+    expect(result).not.toBeNull();
+    const row = result?.rows.find(r => keywordComparisonKey(r.keyword) === keywordComparisonKey('porcelain veneers'));
+    expect(row).toBeDefined();
+    expect(row?.tracking.sourceGapKey).toBe(keywordComparisonKey('porcelain veneers'));
+  });
+});
+
 // ─── (d) Schema: columns + CASCADE ──────────────────────────────────────────────
 describe('(d) tracked_keywords schema — columns + CASCADE', () => {
   it('has every expected column (incl. additive provenance columns)', async () => {

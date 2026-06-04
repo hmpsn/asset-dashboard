@@ -75,9 +75,16 @@ function nullToUndefined<T>(value: T | null): T | undefined {
  * path: every optional column that is NULL becomes `undefined`, so the JSON
  * payload matches what readConfig() produces from the blob.
  *
- * Note: source_page_id / source_gap_key are intentionally NOT projected — they
- * are not part of the TrackedKeyword shape yet (added in 3d). Projecting them
- * here would diverge the shadow from the blob and break the parity invariant.
+ * Wave 3d-i: source_gap_key IS now projected into `sourceGapKey` (the ADDITIVE
+ * provenance pointer). This is the ADMIN/provenance-bearing read shape —
+ * listTrackedKeywordRows uses this mapper directly, so it keeps sourceGapKey.
+ * The general read path (getTrackedKeywords) goes through resolveTrackedKeywords,
+ * which STRIPS sourceGapKey so getTrackedKeywords + the public serializers stay
+ * byte-identical to today (no provenance leak).
+ *
+ * source_page_id remains DEFERRED and intentionally NOT projected — page_keywords
+ * has no stable surrogate id (its PK is (workspace_id, page_path), migration 024),
+ * and the only stable id is the mutable page_path, which the contract forbids.
  */
 export function rowToTrackedKeyword(row: TrackedKeywordRow): TrackedKeyword {
   return {
@@ -100,6 +107,7 @@ export function rowToTrackedKeyword(row: TrackedKeywordRow): TrackedKeyword {
     baselineImpressions: nullToUndefined(row.baseline_impressions),
     replacedBy: nullToUndefined(row.replaced_by),
     deprecatedAt: nullToUndefined(row.deprecated_at),
+    sourceGapKey: nullToUndefined(row.source_gap_key),
   };
 }
 
@@ -108,8 +116,9 @@ function undefinedToNull<T>(value: T | undefined): T | null {
   return value === undefined ? null : value;
 }
 
-/** Map a TrackedKeyword to insert params. Provenance columns are left NULL this
- *  PR (populated in 3d). */
+/** Map a TrackedKeyword to insert params. source_gap_key is now persisted from
+ *  keyword.sourceGapKey (Wave 3d-i); source_page_id stays NULL (DEFERRED — no
+ *  stable page_keywords surrogate id; see rowToTrackedKeyword). */
 function keywordToParams(workspaceId: string, keyword: TrackedKeyword) {
   return {
     workspace_id: workspaceId,
@@ -133,8 +142,8 @@ function keywordToParams(workspaceId: string, keyword: TrackedKeyword) {
     baseline_impressions: undefinedToNull(keyword.baselineImpressions),
     replaced_by: undefinedToNull(keyword.replacedBy),
     deprecated_at: undefinedToNull(keyword.deprecatedAt),
-    source_page_id: null,
-    source_gap_key: null,
+    source_page_id: null, // DEFERRED — no stable page_keywords surrogate id (migration 024).
+    source_gap_key: undefinedToNull(keyword.sourceGapKey),
   };
 }
 
@@ -263,8 +272,13 @@ export function deleteAllTrackedKeywordRows(workspaceId: string): void {
  * normalized_query — already the list order) — under dual-write parity there are
  * none. Net effect: data from the TABLE, order from the BLOB.
  *
- * source_page_id / source_gap_key are NOT projected (rowToTrackedKeyword omits them
- * — keep it that way; they are 3d, and projecting them would break byte-identity).
+ * PROVENANCE STRIP (Wave 3d-i parity-safety mechanism): rowToTrackedKeyword NOW
+ * projects source_gap_key into `sourceGapKey` (the ADDITIVE provenance pointer),
+ * but the GENERAL read path (getTrackedKeywords + the public serializers) must
+ * stay BYTE-IDENTICAL to today — no provenance may leak into it. So this resolver
+ * STRIPS sourceGapKey (and the deferred sourcePageId) from every TABLE-sourced row
+ * it returns. Provenance is read ONLY via the admin path (listTrackedKeywordRows /
+ * rowToTrackedKeyword directly), which does NOT go through this resolver.
  *
  * Object-shape parity: rowToTrackedKeyword assigns EVERY optional field, so a NULL
  * column becomes an OWN property whose value is `undefined`. The blob path instead
@@ -282,6 +296,10 @@ function stripUndefinedKeys(keyword: TrackedKeyword): TrackedKeyword {
   for (const [key, value] of Object.entries(keyword)) {
     if (value !== undefined) out[key] = value;
   }
+  // Provenance strip — these never belong in the general/public read shape, even
+  // when set (a non-undefined sourceGapKey would otherwise survive the loop above).
+  delete out.sourceGapKey;
+  delete out.sourcePageId;
   return out as unknown as TrackedKeyword;
 }
 

@@ -44,6 +44,22 @@ export interface TrackedKeyword {
   baselineImpressions?: number;
   replacedBy?: string;
   deprecatedAt?: string;
+  /**
+   * Wave 3d-i ADDITIVE provenance pointer — the content-addressed gap key this
+   * keyword was approved from (content_gap / keyword_gap surface). Equals
+   * keywordComparisonKey(displayKeyword), matching content_gaps PK
+   * (workspace_id, target_keyword). Persisted in the tracked_keywords TABLE and
+   * read ONLY via the admin path (listTrackedKeywordRows / KCC) — getTrackedKeywords
+   * and the public serializers STRIP it (behavior-preserving). FILL-IF-EMPTY: once
+   * set, it is never overwritten by a later status-only/reconcile write.
+   *
+   * NOTE: the sibling provenance pointer `sourcePageId` is DEFERRED. The contract
+   * wanted a STABLE page_keywords PK, but page_keywords has PRIMARY KEY
+   * (workspace_id, page_path) with no surrogate id (migration 024) — the only
+   * stable id is the mutable page_path, which the contract forbids. The column is
+   * written NULL and intentionally NOT projected pending a stable page id.
+   */
+  sourceGapKey?: string;
 }
 
 export interface RankHistoryEntry {

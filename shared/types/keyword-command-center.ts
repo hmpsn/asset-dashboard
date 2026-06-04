@@ -134,6 +134,13 @@ export interface KeywordCommandCenterTrackingState {
   replacedBy?: string;
   deprecatedAt?: string;
   /**
+   * Wave 3d-i ADDITIVE provenance pointer (admin-only). The content-addressed gap
+   * key the keyword was approved from (content_gap / keyword_gap surface). Sourced
+   * from the provenance-bearing read (listTrackedKeywordRows), NOT getTrackedKeywords
+   * (which strips provenance). Undefined when the keyword has no gap provenance.
+   */
+  sourceGapKey?: string;
+  /**
    * True when the row has any rank/clicks/impressions data, false when the keyword
    * is `active` (or paused) but no rank snapshot or GSC signal has materialized.
    *
