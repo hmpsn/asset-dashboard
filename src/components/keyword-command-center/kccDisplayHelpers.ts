@@ -75,6 +75,20 @@ export function percent(value: number | undefined): string {
   return `${(value * 100).toFixed(1)}%`;
 }
 
+/**
+ * Wave 4 P2 (Keyword Journey Drawer — Origin section). Renders a content-addressed
+ * `sourceGapKey` provenance pointer (e.g. `gap:dental-implants-austin`) into a
+ * short, human-readable label. Returns null when there is no gap key, so the
+ * caller can omit the line entirely. The raw key prefix (`gap:` / `keyword_gap:` /
+ * `content_gap:`) is stripped; remaining separators become spaces.
+ */
+export function formatSourceGapKey(sourceGapKey: string | undefined): string | null {
+  if (!sourceGapKey) return null;
+  const withoutPrefix = sourceGapKey.replace(/^(gap|keyword_gap|content_gap):/i, '');
+  const cleaned = withoutPrefix.replace(/[-_]+/g, ' ').trim();
+  return cleaned.length > 0 ? cleaned : sourceGapKey;
+}
+
 export function localPriorityTone(priority: NonNullable<KeywordCommandCenterRow['localSeoState']>['priority']): 'teal' | 'blue' | 'emerald' | 'amber' | 'red' | 'zinc' {
   if (priority === KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY.HIGH_OPPORTUNITY) return 'teal';
   if (priority === KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY.DEFEND) return 'emerald';
