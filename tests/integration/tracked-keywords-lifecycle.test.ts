@@ -96,6 +96,9 @@ function deleteJson(path: string, body: unknown): Promise<Response> {
 
 function cleanupWorkspaceData(id: string): void {
   db.prepare('DELETE FROM rank_tracking_config WHERE workspace_id = ?').run(id);
+  // Wave 3c-ii: reads now resolve TABLE-FIRST, so the row table must be cleared
+  // too — clearing only the blob would leave stale rows the resolver serves.
+  db.prepare('DELETE FROM tracked_keywords WHERE workspace_id = ?').run(id);
   db.prepare('DELETE FROM activity_log WHERE workspace_id = ?').run(id);
 }
 
