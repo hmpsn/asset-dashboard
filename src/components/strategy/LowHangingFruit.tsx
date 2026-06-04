@@ -1,4 +1,4 @@
-import { Icon } from '../ui';
+import { Icon, positionColor } from '../ui';
 import { Zap } from 'lucide-react';
 
 interface PageKeywordMap {
@@ -18,10 +18,9 @@ interface PageKeywordMap {
 
 export interface LowHangingFruitProps {
   pages: PageKeywordMap[];
-  positionColor: (pos?: number) => string;
 }
 
-export function LowHangingFruit({ pages, positionColor }: LowHangingFruitProps) {
+export function LowHangingFruit({ pages }: LowHangingFruitProps) {
   if (pages.length === 0) return null;
 
   return (

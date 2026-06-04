@@ -8,7 +8,7 @@ import {
   BarChart3, Users, Search, FileText,
   Eye, MousePointerClick, Trophy, AlertTriangle, Plus, Check,
 } from 'lucide-react';
-import { Badge, StatCard, SectionCard, AIContextIndicator, TabBar, ErrorState, ProgressIndicator, NextStepsCard, LoadingState, Icon, PageHeader, Button, ClickableRow, IconButton, FormInput, FormTextarea } from './ui';
+import { Badge, StatCard, SectionCard, AIContextIndicator, TabBar, ErrorState, ProgressIndicator, NextStepsCard, LoadingState, Icon, PageHeader, Button, ClickableRow, IconButton, FormInput, FormTextarea, positionColor } from './ui';
 import { KeywordStrategyGuide } from './strategy/KeywordStrategyGuide';
 import { useKeywordStrategy } from '../hooks/admin';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -236,14 +236,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       // silently ignore duplicates — server deduplicates
     }
   }, [trackedKeywords, workspaceId, queryClient]);
-
-  const positionColor = (pos?: number) => {
-    if (!pos) return 'text-[var(--brand-text-muted)]';
-    if (pos <= 3) return 'text-accent-success';
-    if (pos <= 10) return 'text-accent-brand';
-    if (pos <= 20) return 'text-accent-warning';
-    return 'text-accent-danger';
-  };
 
   const difficultyColor = (kd?: number) => {
     if (kd === undefined) return 'text-[var(--brand-text-muted)]';
@@ -747,7 +739,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           </div>
 
           {/* ── Low-Hanging Fruit ── */}
-          <LowHangingFruit pages={lowHangingFruit} positionColor={positionColor} />
+          <LowHangingFruit pages={lowHangingFruit} />
 
           {/* ── Content Gaps ── */}
           <ContentGaps contentGaps={strategy.contentGaps || []} workspaceId={workspaceId} intentColor={intentColor} />

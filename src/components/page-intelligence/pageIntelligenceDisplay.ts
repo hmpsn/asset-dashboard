@@ -1,12 +1,17 @@
 import type { PageKeywordMap } from '../../../shared/types/workspace.js';
+import { positionColor as _positionColor } from '../ui/constants';
 
-export function positionColor(pos?: number): string {
-  // Search positions are 1-based; 0 and undefined both mean no ranking data in this view.
-  if (!pos) return 'text-[var(--brand-text-muted)]';
-  if (pos <= 3) return 'text-accent-success';
-  if (pos <= 10) return 'text-accent-brand';
-  if (pos <= 20) return 'text-accent-warning';
-  return 'text-accent-danger';
+/**
+ * Re-exports the canonical positionColor authority from ui/constants.ts.
+ * Kept here so existing barrel imports and the page-intelligence-display unit test
+ * contract continue to work without changes to callers.
+ *
+ * FOUR-LAWS FIX (Wave 2 T1): the ≤10 band is now emerald (text-accent-success),
+ * NOT teal (text-accent-brand). Teal is reserved for actions; rank position is
+ * read-only data. This is a deliberate, reviewed visual change.
+ */
+export function positionColor(pos?: number | null): string {
+  return _positionColor(pos);
 }
 
 export function kdColor(kd?: number): string {
