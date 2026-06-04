@@ -10,6 +10,8 @@ import fs from 'fs';
 import path from 'path';
 import { getDataDir, getUploadRoot } from '../data-dir.js';
 import db, { runMigrations } from './index.js';
+import { normalizeTrackedKeywords } from '../rank-tracking.js';
+import { replaceAllTrackedKeywordRows } from '../tracked-keywords-store.js';
 
 // Ensure schema is up to date before migrating data
 runMigrations();
@@ -1021,11 +1023,34 @@ function migrateRankTracking(): number {
       if (fs.existsSync(configFile)) {
         try {
           const config = JSON.parse(fs.readFileSync(configFile, 'utf-8'));
+          const rawKeywords: unknown[] = config.trackedKeywords || config.keywords || [];
           const info = insertConfig.run({
             workspace_id: wsId,
-            tracked_keywords: JSON.stringify(config.trackedKeywords || config.keywords || []),
+            tracked_keywords: JSON.stringify(rawKeywords),
           });
           total += info.changes;
+
+          // Wave 3c-iii-a DUAL-WRITE: a fresh CLI import must populate BOTH the blob
+          // (above) AND the tracked_keywords TABLE — otherwise, after the 3c-iii-b
+          // blob strip, an imported workspace would read zero keywords. Normalize the
+          // serialized entries (string[] or {query}-shaped objects) into
+          // TrackedKeyword[] and replace the table rows; replaceAllTrackedKeywordRows
+          // stamps sort_order from the array position and nests as a SAVEPOINT under
+          // this outer txn (idempotent — INSERT OR IGNORE leaves the blob unchanged on
+          // re-run, and the table replace re-stamps the same order).
+          const normalized = normalizeTrackedKeywords(
+            (Array.isArray(rawKeywords) ? rawKeywords : [])
+              .map(entry =>
+                typeof entry === 'string'
+                  ? { query: entry }
+                  : (entry && typeof entry === 'object' ? entry as { query?: string } : null),
+              )
+              .filter((entry): entry is { query: string } =>
+                entry !== null && typeof entry.query === 'string' && entry.query.trim() !== '',
+              ),
+          );
+          replaceAllTrackedKeywordRows(wsId, normalized);
+
           console.log(`[migrate] rank-tracking config for ${wsId}`);
         } catch { /* skip corrupt config */ }
       }

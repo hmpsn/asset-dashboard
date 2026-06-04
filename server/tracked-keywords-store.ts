@@ -63,6 +63,12 @@ export interface TrackedKeywordRow {
   source_page_id: string | null;
   source_gap_key: string | null;
   strategy_owned: number | null;
+  // Wave 3c-iii-a INTERNAL ordering column — the old blob array index. Read into the
+  // row shape so listByWs can ORDER BY it, but NEVER projected into the returned
+  // TrackedKeyword by rowToTrackedKeyword (it is not in the TrackedKeyword type and
+  // must never leak to clients). NULLABLE/no-default: populated by the boot backfill
+  // (from the live blob order) and re-stamped on every write from the array index.
+  sort_order: number | null;
 }
 
 /** A NULL column maps to `undefined` (omitted by JSON.stringify) — never `null` —
@@ -123,8 +129,13 @@ function undefinedToNull<T>(value: T | undefined): T | null {
 
 /** Map a TrackedKeyword to insert params. source_gap_key is now persisted from
  *  keyword.sourceGapKey (Wave 3d-i); source_page_id stays NULL (DEFERRED — no
- *  stable page_keywords surrogate id; see rowToTrackedKeyword). */
-function keywordToParams(workspaceId: string, keyword: TrackedKeyword) {
+ *  stable page_keywords surrogate id; see rowToTrackedKeyword).
+ *
+ *  Wave 3c-iii-a: `sortOrder` is the POSITIONAL array index from the writer loop —
+ *  NOT a field on the TrackedKeyword object (it is internal ordering only). The
+ *  caller threads in the loop index so a delete-then-reinsert re-stamps order from
+ *  the canonical array position on every replace. */
+function keywordToParams(workspaceId: string, keyword: TrackedKeyword, sortOrder: number | null) {
   return {
     workspace_id: workspaceId,
     normalized_query: keywordComparisonKey(keyword.query),
@@ -153,6 +164,9 @@ function keywordToParams(workspaceId: string, keyword: TrackedKeyword) {
     // true → 1; false → 0. The ternary is deliberate (not `keyword.strategyOwned
     // ? 1 : 0`) so an undefined value stays NULL instead of collapsing to 0.
     strategy_owned: keyword.strategyOwned === undefined ? null : keyword.strategyOwned ? 1 : 0,
+    // Wave 3c-iii-a: positional array index from the writer loop (NULL only on the
+    // backfill UPDATE path, which sets it via a dedicated statement, not this insert).
+    sort_order: sortOrder,
   };
 }
 
@@ -160,13 +174,31 @@ function keywordToParams(workspaceId: string, keyword: TrackedKeyword) {
 
 const stmts = createStmtCache(() => ({
   listByWs: db.prepare<[workspaceId: string]>(
-    'SELECT * FROM tracked_keywords WHERE workspace_id = ? ORDER BY added_at ASC, normalized_query ASC',
+    // Wave 3c-iii-a: order by the internal sort_order (the old blob array index),
+    // with (added_at, normalized_query) as a deterministic tiebreaker for any
+    // transiently-NULL sort_order (NULLs sort first under SQLite ASC; the write path
+    // re-stamps within the same txn, so a persisted NULL is a transient state only).
+    'SELECT * FROM tracked_keywords WHERE workspace_id = ? ORDER BY sort_order ASC, added_at ASC, normalized_query ASC',
   ),
   deleteAll: db.prepare<[workspaceId: string]>(
     'DELETE FROM tracked_keywords WHERE workspace_id = ?',
   ),
   countByWs: db.prepare<[workspaceId: string]>(
     'SELECT COUNT(*) as cnt FROM tracked_keywords WHERE workspace_id = ?',
+  ),
+  // Wave 3c-iii-a backfill (case B — already-backfilled workspaces whose rows
+  // predate the sort_order column): stamp sort_order from the live blob's array
+  // index for a single (workspace, normalized_query). IDEMPOTENT: only touches rows
+  // whose sort_order IS NULL, so a re-run or a write-stamped row is a no-op.
+  setSortOrderIfNull: db.prepare<[sortOrder: number, workspaceId: string, normalizedQuery: string]>(
+    'UPDATE tracked_keywords SET sort_order = ? WHERE workspace_id = ? AND normalized_query = ? AND sort_order IS NULL',
+  ),
+  // Append-fallback (case B): rows present in the table but ABSENT from the blob —
+  // still NULL after the blob-index pass above. Order them by (added_at,
+  // normalized_query) so the assigned tail indices match the resolver ORDER BY
+  // tiebreaker exactly, then assign sort_order = blob.length + i.
+  listNullSortOrderByWs: db.prepare<[workspaceId: string]>(
+    'SELECT normalized_query FROM tracked_keywords WHERE workspace_id = ? AND sort_order IS NULL ORDER BY added_at ASC, normalized_query ASC',
   ),
   // ON CONFLICT DO UPDATE is defensive — JS dedup upstream guarantees no PK
   // conflicts on valid data, but a malformed legacy blob could in theory carry a
@@ -178,14 +210,16 @@ const stmts = createStmtCache(() => ({
       strategy_generated_at, last_strategy_seen_at, intent,
       volume, difficulty, cpc, authority_posture,
       baseline_position, baseline_clicks, baseline_impressions,
-      replaced_by, deprecated_at, source_page_id, source_gap_key, strategy_owned
+      replaced_by, deprecated_at, source_page_id, source_gap_key, strategy_owned,
+      sort_order
     ) VALUES (
       @workspace_id, @normalized_query, @query, @pinned, @added_at,
       @source, @status, @page_path, @page_title,
       @strategy_generated_at, @last_strategy_seen_at, @intent,
       @volume, @difficulty, @cpc, @authority_posture,
       @baseline_position, @baseline_clicks, @baseline_impressions,
-      @replaced_by, @deprecated_at, @source_page_id, @source_gap_key, @strategy_owned
+      @replaced_by, @deprecated_at, @source_page_id, @source_gap_key, @strategy_owned,
+      @sort_order
     )
     ON CONFLICT(workspace_id, normalized_query) DO UPDATE SET
       query = excluded.query,
@@ -209,13 +243,18 @@ const stmts = createStmtCache(() => ({
       deprecated_at = excluded.deprecated_at,
       source_page_id = excluded.source_page_id,
       source_gap_key = excluded.source_gap_key,
-      strategy_owned = excluded.strategy_owned
+      strategy_owned = excluded.strategy_owned,
+      -- Wave 3c-iii-a: re-stamp ordering from the array position on EVERY replace.
+      -- Delete-then-reinsert clobbers order otherwise; the conflict path (defensive,
+      -- for a duplicate normalized_query) must also re-stamp so order stays canonical.
+      sort_order = excluded.sort_order
   `),
 }));
 
 // ── Public API ──
 
-/** All tracked-keyword rows for a workspace (added_at ASC, then normalized_query). */
+/** All tracked-keyword rows for a workspace, in sort_order ASC (the old blob array
+ *  index), with (added_at, normalized_query) as a transient-NULL tiebreaker. */
 export function listTrackedKeywordRows(workspaceId: string): TrackedKeyword[] {
   const rows = stmts().listByWs.all(workspaceId) as TrackedKeywordRow[];
   return rows.map(rowToTrackedKeyword);
@@ -244,10 +283,16 @@ export function replaceAllTrackedKeywordRows(workspaceId: string, keywords: Trac
   const run = db.transaction(() => {
     stmts().deleteAll.run(workspaceId);
     const upsert = stmts().upsert;
+    // Wave 3c-iii-a: `keywords` IS the canonical order (mirroring the old blob array).
+    // `position` is a monotonic counter incremented ONLY on an actual insert, so a
+    // defensively-dropped blank does not leave the surviving rows' sort_order out of
+    // step with the boot-backfill semantics (blob array index of surviving entries).
+    let position = 0;
     for (const keyword of keywords) {
       const normalized = keywordComparisonKey(keyword.query);
       if (!normalized) continue; // mirror the blob path's blank-drop defensively
-      upsert.run(keywordToParams(workspaceId, keyword));
+      upsert.run(keywordToParams(workspaceId, keyword, position));
+      position++;
     }
   });
   run();
@@ -259,28 +304,23 @@ export function deleteAllTrackedKeywordRows(workspaceId: string): void {
 }
 
 /**
- * Resolver — TABLE-FIRST / BLOB-FALLBACK (Wave 3c-ii; the ADDITIVE 3b-i form,
- * NOT the 3b-ii table-only strip). Mirrors resolveSiteKeywordMetrics' additive
- * shape, but with an Option-A reorder because tracked keywords are ORDER-SENSITIVE
- * (the blob array is in insertion/append order; readers map by normalizeQuery and
- * the public payload serializes the array as-is).
+ * Resolver — TABLE-FIRST / BLOB-FALLBACK (Wave 3c-ii read-switch; Wave 3c-iii-a
+ * order-source switch). The ADDITIVE form, NOT the table-only strip (3c-iii-b).
  *
  * Logic:
  *   - countTrackedKeywordRows(workspaceId) === 0 → return `blobKeywords` (the table
  *     is empty: a legacy workspace not yet dual-written; fall back to the blob).
- *   - otherwise → return the TABLE rows (data from the table) REORDERED to match
- *     the BLOB insertion order (order from the blob), so the result is
- *     byte-identical to today including ordering.
+ *     This empty-table BLOB FALLBACK is KEPT this PR — the strip is 3c-iii-b.
+ *   - otherwise → return the TABLE rows in their NATURAL ORDER, which is now the
+ *     sort_order ASC sequence (listByWs orders by sort_order — the old blob array
+ *     index, backfilled from the LIVE blob + re-stamped on every write). Each row is
+ *     run through stripUndefinedKeys for blob-object-shape parity.
  *
- * Option-A reorder: listTrackedKeywordRows orders by (added_at, normalized_query),
- * which is NOT identical to blob insertion order for backfilled workspaces. We
- * therefore key the table rows by keywordComparisonKey(query) (the same
- * normalization the PK and normalizeQuery use) and emit one entry per blob element
- * IN BLOB ORDER, substituting the table row for that key (falling back to the blob
- * element only if a key is somehow absent from the table). Any table rows whose key
- * is NOT present in the blob are appended deterministically (added_at then
- * normalized_query — already the list order) — under dual-write parity there are
- * none. Net effect: data from the TABLE, order from the BLOB.
+ * Wave 3c-iii-a removed the Option-A blob-order reorder loop: ORDERING no longer
+ * borrows the blob array index — sort_order does it directly. `blobKeywords` is
+ * STILL passed (and still used) for the empty-table fallback above; the parameter
+ * and signature are unchanged so callers are untouched. Net effect: data AND order
+ * from the TABLE (sort_order), with the blob as the safety net only when empty.
  *
  * PROVENANCE STRIP (Wave 3d-i parity-safety mechanism): rowToTrackedKeyword NOW
  * projects source_gap_key into `sourceGapKey` (the ADDITIVE provenance pointer),
@@ -321,38 +361,17 @@ export function resolveTrackedKeywords(
   workspaceId: string,
   blobKeywords: TrackedKeyword[],
 ): TrackedKeyword[] {
+  // Empty-table BLOB FALLBACK (KEPT until 3c-iii-b): a legacy workspace not yet
+  // dual-written/backfilled falls back to the blob verbatim, blob order and all.
   if (countTrackedKeywordRows(workspaceId) === 0) return blobKeywords;
 
-  // Table is the data source. Key its rows by the same normalization the PK uses.
-  // Each table row is normalized to the blob's object shape (undefined keys dropped).
-  const tableByKey = new Map<string, TrackedKeyword>();
-  const tableRows = listTrackedKeywordRows(workspaceId).map(stripUndefinedKeys);
-  for (const row of tableRows) {
-    tableByKey.set(keywordComparisonKey(row.query), row);
-  }
-
-  // Order from the blob: emit one entry per blob element, IN BLOB ORDER, using the
-  // table row for that key (fall back to the blob element only if absent).
-  const emittedKeys = new Set<string>();
-  const ordered: TrackedKeyword[] = [];
-  for (const blobKeyword of blobKeywords) {
-    const key = keywordComparisonKey(blobKeyword.query);
-    emittedKeys.add(key);
-    ordered.push(tableByKey.get(key) ?? blobKeyword);
-  }
-
-  // Deterministically append any table rows whose key is NOT in the blob. Under
-  // dual-write parity this is empty; listTrackedKeywordRows is already sorted by
-  // (added_at, normalized_query), so iterating tableRows preserves that order.
-  for (const row of tableRows) {
-    const key = keywordComparisonKey(row.query);
-    if (!emittedKeys.has(key)) {
-      emittedKeys.add(key);
-      ordered.push(row);
-    }
-  }
-
-  return ordered;
+  // Wave 3c-iii-a: data AND order from the TABLE. listTrackedKeywordRows already
+  // orders by sort_order ASC (the old blob array index, backfilled from the live
+  // blob + re-stamped on every write), so the natural row order IS the verbatim
+  // client-facing order — no blob-order reorder loop needed. Each row is run through
+  // stripUndefinedKeys for blob-object-shape parity (drops undefined keys +
+  // strips provenance/ownership-only fields).
+  return listTrackedKeywordRows(workspaceId).map(stripUndefinedKeys);
 }
 
 /**
@@ -438,23 +457,56 @@ function normalizeBlobKeyword(raw: RawBlobKeyword, seen: Set<string>): TrackedKe
 }
 
 /**
+ * Wave 3c-iii-a — sort_order backfill for an ALREADY-populated workspace (case B).
+ * Builds keywordComparisonKey(query) -> blob array index from the normalized blob
+ * and stamps sort_order for every still-NULL row. Append-fallback: table rows absent
+ * from the blob (still NULL after the index pass) get sort_order = blob.length + i
+ * ordered by (added_at, normalized_query) — matching the listByWs ORDER BY tail.
+ * MUST be called inside the per-workspace write txn (it issues UPDATEs). Idempotent:
+ * the UPDATE only touches sort_order IS NULL rows.
+ */
+function backfillSortOrderFromBlob(workspaceId: string, normalized: TrackedKeyword[]): void {
+  const setSortOrderIfNull = stmts().setSortOrderIfNull;
+  for (let i = 0; i < normalized.length; i++) {
+    const key = keywordComparisonKey(normalized[i].query);
+    if (!key) continue;
+    setSortOrderIfNull.run(i, workspaceId, key);
+  }
+  // Append-fallback tail: rows in the table but NOT in the blob remain NULL. Order
+  // them deterministically (the resolver tiebreaker) and append after the blob tail.
+  const remaining = stmts().listNullSortOrderByWs.all(workspaceId) as { normalized_query: string }[];
+  for (let i = 0; i < remaining.length; i++) {
+    setSortOrderIfNull.run(normalized.length + i, workspaceId, remaining[i].normalized_query);
+  }
+}
+
+/**
  * Boot backfill — populate tracked_keywords from each workspace's
  * rank_tracking_config.tracked_keywords blob.
  *
- * POPULATE-ONLY and CAS-guarded per the audit's lost-update hazard: the
- * per-workspace transaction runs as BEGIN IMMEDIATE and re-checks
- * `countTrackedKeywordRows(...) === 0` after acquiring the write lock, so a
- * concurrent dual-write that already populated the table cannot be double-
- * inserted. Idempotent: skips workspaces whose table already has rows.
+ * CAS-guarded per the audit's lost-update hazard: the per-workspace transaction runs
+ * as BEGIN IMMEDIATE and re-checks countTrackedKeywordRows under the write lock, so a
+ * concurrent dual-write that already populated the table cannot be double-inserted.
  *
- * ADDITIVE SHADOW: this step ONLY populates the table. It does NOT strip the
- * blob (shadow, not strip) and does NOT switch any read. There is no CAS on the
- * tracked_keywords blob column because the blob is left untouched.
+ * ADDITIVE SHADOW: this step ONLY populates the table (rows + sort_order). It does
+ * NOT strip the blob (shadow, not strip) and does NOT switch any read. There is no
+ * CAS on the tracked_keywords blob column because the blob is left untouched.
  *
  * Source recovery: when a `stampSources` hook is provided, it runs ONCE per
- * workspace to stamp `source` for UNKNOWN-source rows via the canonical
- * inference ladder. It CANNOT recover MANUAL or RECOMMENDATION — those stay
- * UNKNOWN explicitly (never guessed). Provenance columns are left NULL this PR.
+ * workspace to stamp `source` for UNKNOWN-source rows via the canonical inference
+ * ladder. It CANNOT recover MANUAL or RECOMMENDATION — those stay UNKNOWN explicitly
+ * (never guessed). The deferred provenance columns are left NULL.
+ *
+ * Wave 3c-iii-a — sort_order population FROM THE LIVE BLOB ORDER (the load-bearing
+ * step; must run WHILE the blob still has data, before the 3c-iii-b strip). Two
+ * cases, distinguished by the CAS count under the write lock:
+ *   (A) NEVER-BACKFILLED (table empty): insert each row with sort_order = its blob
+ *       array index (the normalized-array position), in the row-insert path.
+ *   (B) ALREADY-BACKFILLED (rows exist, sort_order IS NULL — the 3c-i case): the
+ *       row-insert path is CAS-SKIPPED, but the sort_order UPDATE still runs (via
+ *       backfillSortOrderFromBlob). This is the restructure the contract calls for:
+ *       case B must run EVEN when countTrackedKeywordRows > 0 — those are exactly the
+ *       rows needing sort_order — while the row-insert path stays CAS-guarded.
  */
 export function migrateTrackedKeywordsFromConfigBlob(stampSources?: TrackedKeywordSourceStamper): void {
   const rows = db.prepare(`
@@ -490,10 +542,19 @@ export function migrateTrackedKeywordsFromConfigBlob(stampSources?: TrackedKeywo
       const migrateOne = db.transaction((): 'migrated' | 'already-migrated' => {
         // CAS re-check under the write lock: a concurrent dual-write may have
         // populated the table between the unlocked read above and now.
-        if (countTrackedKeywordRows(row.workspace_id) > 0) return 'already-migrated';
+        if (countTrackedKeywordRows(row.workspace_id) > 0) {
+          // Wave 3c-iii-a CASE B — table already populated (the 3c-i backfill ran
+          // before this column existed). The row-insert path is CAS-skipped, but the
+          // sort_order UPDATE MUST still run here: these are exactly the rows that
+          // need stamping. Only touch sort_order IS NULL rows (idempotent).
+          backfillSortOrderFromBlob(row.workspace_id, normalized);
+          return 'already-migrated';
+        }
+        // Wave 3c-iii-a CASE A — never-backfilled: insert each row with its blob
+        // array index as sort_order (the canonical order position).
         const upsert = stmts().upsert;
-        for (const keyword of normalized) {
-          upsert.run(keywordToParams(row.workspace_id, keyword));
+        for (let i = 0; i < normalized.length; i++) {
+          upsert.run(keywordToParams(row.workspace_id, normalized[i], i));
         }
         return 'migrated';
       });
