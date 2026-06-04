@@ -119,7 +119,7 @@
       "id": "sprint-recommendation-intelligence-opportunity-value-2026-06-01",
       "name": "\ud83e\udde0 Recommendation Intelligence \u2014 Integrity Remediation + Opportunity Value Re-Architecture",
       "hours": "shipped + follow-ups",
-      "rationale": "Two read-only audits (foundational integrity, intelligence quality) drove a remediation wave then a full re-architecture of the recommendation scoring engine onto one grounded Opportunity Value model. Build is complete and dark; this sprint tracks the owner-gated cutover and the deferred hardening.",
+      "rationale": "Two read-only audits (foundational integrity, intelligence quality) drove a remediation wave then a full re-architecture of the recommendation scoring engine onto one grounded Opportunity Value model. The build is complete, the runtime cutover is now canonical, and this sprint tracks the remaining hardening/history items.",
       "notes": "Audits: docs/audits/2026-05-31-foundational-integrity-audit.md, docs/audits/2026-05-31-intelligence-quality-audit.md. Design: docs/designs/2026-05-31-opportunity-value-model.md. Plan: docs/superpowers/plans/2026-06-01-opportunity-value-model.md. Pre-plan audit: docs/superpowers/audits/2026-06-01-opportunity-value-model-audit.md.",
       "items": [
         {
@@ -134,13 +134,13 @@
         },
         {
           "id": "ov-rearchitecture-build",
-          "title": "Unified Opportunity Value scorer \u2014 7-phase build (DARK behind flags)",
+          "title": "Unified Opportunity Value scorer \u2014 7-phase build",
           "source": "/docs/designs/2026-05-31-opportunity-value-model.md",
           "est": "shipped",
           "priority": "P0",
           "status": "done",
           "shippedAt": "2026-06-01",
-          "notes": "PRs #1001-#1007. computeOpportunityValue (server/scoring/) + CTR-curve; opportunity persistence (Zod lockstep); Spine-A wiring behind a flag-off selector; shadow divergence logging (ov_divergence, migration 107); referring-domains authority + realized-outcome calibration + weights (migrations 108/109); advisor+client coherence (client sees ROI badge, never $); opportunity_events ledger + decaying Timing + decay/competitor/rank-drop detectors (migration 110). All dark behind opportunity-value-scorer / -calibration / -events (default false). FEATURE_AUDIT #468. Each phase adversarially reviewed; review caught 6 criticals (incl. roiScore-discarded, 2 client-$-leaks)."
+          "notes": "PRs #1001-#1007. computeOpportunityValue (server/scoring/) + CTR-curve; opportunity persistence (Zod lockstep); Spine-A wiring via the legacy\u2194OV selector chokepoint; shadow divergence logging (ov_divergence, migration 107); referring-domains authority + realized-outcome calibration + weights (migrations 108/109); advisor+client coherence (client sees ROI badge, never $); opportunity_events ledger + decaying Timing + decay/competitor/rank-drop detectors (migration 110). Originally shipped dark behind `opportunity-value-scorer` / `-calibration` / `-events`; those rollout flags were retired in the 2026-06-04 feature-flag retirement PR2, making Opportunity Value and event timing the canonical runtime path. FEATURE_AUDIT #468. Each phase adversarially reviewed; review caught 6 criticals (incl. roiScore-discarded, 2 client-$-leaks)."
         },
         {
           "id": "ov-flag-flip-cutover",
@@ -148,8 +148,9 @@
           "source": "/docs/designs/2026-05-31-opportunity-value-model.md",
           "est": "owner-gated",
           "priority": "P1",
-          "status": "pending",
-          "notes": "NOT autonomous. Validation gate before flipping opportunity-value-scorer: (1) soak \u2014 let generateRecommendations log divergence; optionally enable -events/-calibration in shadow first; (2) review GET /api/ov-divergence/:workspaceId on both live workspaces \u2014 every OV-#1 != legacy-#1 must be defensibly higher value, invariant_held 100%; (3) confirm outcome systems are healthy now that outcome tracking/learnings are default-on; (4) flip. WARNING: flag is global (all clients at once) \u2014 staged per-client needs ov-per-workspace-flag-dimension first."
+          "status": "done",
+          "shippedAt": "2026-06-04",
+          "notes": "Completed in the Feature Flag Retirement epic PR2 on 2026-06-04. The temporary rollout flags (`opportunity-value-scorer`, `opportunity-value-calibration`, `opportunity-value-events`) were retired, Opportunity Value became the canonical impactScore/runtime path, and event-driven timing became default-on. Historical shadow-divergence review artifacts remain for audit/debugging, but a runtime flip is no longer pending."
         },
         {
           "id": "ov-per-workspace-flag-dimension",

@@ -212,7 +212,7 @@ export function startOutcomeCrons() {
   // Thin cron wrapper around runDecayDetector (see opportunity-detectors.ts): reads
   // the PERSISTED decay analysis (no crawl), emits DECAYING `decay` events for
   // critical / repeat-decay pages, and enqueues a debounced regen. ENTIRELY gated by
-  // the `opportunity-value-events` flag inside the detector — flag OFF is a no-op.
+  // the default-on detector path — an empty event ledger remains a natural no-op.
   // Loaded via dynamic import so the cron module doesn't pull the detector's
   // transitive deps at startup.
   const runDecayScan = async () => {

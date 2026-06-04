@@ -15,7 +15,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
 const mocks = vi.hoisted(() => ({
-  isFeatureEnabled: vi.fn((_flag: string) => true),
   broadcastToWorkspace: vi.fn(),
   WS_EVENTS: { INSIGHT_BRIDGE_UPDATED: 'insight_bridge_updated' },
   log: {
@@ -34,7 +33,6 @@ const mocks = vi.hoisted(() => ({
   parseJsonFallback: vi.fn((_raw: unknown, fallback: unknown) => fallback),
 }));
 
-vi.mock('../../server/feature-flags.js', () => ({ isFeatureEnabled: mocks.isFeatureEnabled }));
 vi.mock('../../server/logger.js', () => ({ createLogger: vi.fn(() => mocks.log) }));
 vi.mock('../../server/db/index.js', () => ({ default: mocks.db }));
 vi.mock('../../server/db/stmt-cache.js', () => ({
@@ -300,7 +298,6 @@ describe('bridge source immunity — bridgeSource param pattern', () => {
 describe('executeBridge — additional parameter scenarios', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.isFeatureEnabled.mockReturnValue(true);
   });
 
   it('executes callback once per call (no implicit batching)', async () => {
@@ -369,7 +366,6 @@ describe('executeBridge — additional parameter scenarios', () => {
 describe('fireBridge — additional scenarios', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.isFeatureEnabled.mockReturnValue(true);
   });
 
   it('returns undefined immediately even when callback is async', () => {
@@ -378,13 +374,11 @@ describe('fireBridge — additional scenarios', () => {
     expect(result).toBeUndefined();
   });
 
-  it('handles flag-gated skip gracefully (flag OFF)', async () => {
-    mocks.isFeatureEnabled.mockReturnValue(false);
-    const cb = vi.fn();
+  it('eventually executes async callbacks as fire-and-forget work', async () => {
+    const cb = vi.fn().mockResolvedValue({ modified: 3 });
     fireBridge(FLAG, WORKSPACE, cb);
-    // Allow microtask queue to flush
     await new Promise(r => setTimeout(r, 10));
-    expect(cb).not.toHaveBeenCalled();
+    expect(cb).toHaveBeenCalledOnce();
   });
 });
 
@@ -422,15 +416,10 @@ describe('getBridgeFlags — comprehensive enumeration', () => {
     expect(Object.keys(flags1).length).toBe(Object.keys(flags2).length);
   });
 
-  it('values change when isFeatureEnabled mock changes mid-test', () => {
-    mocks.isFeatureEnabled.mockReturnValue(true);
-    const flagsOn = getBridgeFlags();
-    mocks.isFeatureEnabled.mockReturnValue(false);
-    const flagsOff = getBridgeFlags();
-
-    for (const key of Object.keys(flagsOn)) {
-      expect(flagsOn[key]).toBe(true);
-      expect(flagsOff[key]).toBe(false);
+  it('marks every registered bridge source as active', () => {
+    const flags = getBridgeFlags();
+    for (const key of Object.keys(flags)) {
+      expect(flags[key]).toBe(true);
     }
   });
 });

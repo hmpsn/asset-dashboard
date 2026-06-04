@@ -1,8 +1,8 @@
 /**
  * PR7 · Spine B — wiring contract tests (source-level greps, no server boot).
  *
- * Verifies that the event-driven re-ranking detectors + apply tail are wired and
- * gated by the `opportunity-value-events` flag, and that the regen helper breaks the
+ * Verifies that the event-driven re-ranking detectors + apply tail are wired in
+ * their default-on posture, and that the regen helper breaks the
  * recommendations.ts ↔ event-store cycle via a dynamic import.
  */
 import { readFileSync } from 'fs';
@@ -11,8 +11,8 @@ import { describe, expect, it } from 'vitest';
 describe('competitor cron → opportunity event + regen', () => {
   const src = readFileSync('server/intelligence-crons.ts', 'utf-8'); // readFile-ok - wiring contract
 
-  it('gates the competitor event write on the events flag', () => {
-    expect(src).toContain("isFeatureEnabled('opportunity-value-events')");
+  it('writes competitor events without an extra runtime feature gate', () => {
+    expect(src).not.toContain("isFeatureEnabled('opportunity-value-events')");
   });
   it('writes a competitor opportunity event', () => {
     expect(src).toContain("type: 'competitor'");
@@ -31,11 +31,10 @@ describe('competitor cron → opportunity event + regen', () => {
 describe('apply tail → opportunity regen', () => {
   const src = readFileSync('server/recommendations.ts', 'utf-8'); // readFile-ok - wiring contract
 
-  it('triggers a debounced regen on resolveRecommendationsForChange (events flag-gated)', () => {
+  it('triggers a debounced regen on resolveRecommendationsForChange', () => {
     const fnStart = src.indexOf('export function resolveRecommendationsForChange');
     expect(fnStart).toBeGreaterThan(0);
     const fnSrc = src.slice(fnStart, src.indexOf('export function resolveRecommendationsForPageIds'));
-    expect(fnSrc).toContain("isFeatureEnabled('opportunity-value-events')");
     expect(fnSrc).toContain('triggerOpportunityRegen(workspaceId)');
   });
 
@@ -62,7 +61,7 @@ describe('opportunity-regen breaks the recommendations cycle', () => {
     expect(src).toContain("await import('../recommendations.js')");
     expect(src).not.toContain("from '../recommendations.js'");
   });
-  it('is built on debounceBridge with the events flag', () => {
+  it('is built on debounceBridge with the opportunity event source id', () => {
     expect(src).toContain("debounceBridge('opportunity-value-events'");
   });
 });

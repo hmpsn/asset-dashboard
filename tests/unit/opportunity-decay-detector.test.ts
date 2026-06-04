@@ -3,9 +3,9 @@
  *
  * Calls the extracted detectors (server/scoring/opportunity-detectors.ts) directly
  * with real DB-backed dependencies mocked at the source-read layer. Verifies:
- *   1. Flag OFF → writes NO opportunity events and triggers NO regen.
- *   2. Flag ON → writes a `decay` / `rank_drop` event for each high-urgency row and
- *      enqueues exactly one debounced regen per affected workspace.
+ *   1. Default-on runtime writes a `decay` / `rank_drop` event for each high-urgency
+ *      row and enqueues exactly one debounced regen per affected workspace.
+ *   2. Non-qualifying decay/rank rows are skipped.
  *
  * triggerOpportunityRegen is mocked (its debounce/dynamic-import behaviour is
  * covered by opportunity-regen-debounce.test.ts) so the detector test asserts the
@@ -14,7 +14,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  isFeatureEnabled: vi.fn(),
   listWorkspaces: vi.fn(),
   loadDecayAnalysis: vi.fn(),
   getLatestRanks: vi.fn(),
@@ -25,7 +24,6 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../server/logger.js', () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }));
-vi.mock('../../server/feature-flags.js', () => ({ isFeatureEnabled: mocks.isFeatureEnabled }));
 vi.mock('../../server/workspaces.js', () => ({ listWorkspaces: mocks.listWorkspaces }));
 vi.mock('../../server/content-decay.js', () => ({ loadDecayAnalysis: mocks.loadDecayAnalysis }));
 vi.mock('../../server/rank-tracking.js', () => ({ getLatestRanks: mocks.getLatestRanks }));
@@ -56,16 +54,7 @@ beforeEach(() => {
 afterEach(() => vi.clearAllMocks());
 
 describe('runDecayDetector', () => {
-  it('writes NO events and triggers NO regen when the events flag is OFF', () => {
-    mocks.isFeatureEnabled.mockReturnValue(false);
-    const result = runDecayDetector();
-    expect(result).toEqual({ workspacesWithEvents: 0, totalEvents: 0 });
-    expect(mocks.insertOpportunityEvent).not.toHaveBeenCalled();
-    expect(mocks.triggerOpportunityRegen).not.toHaveBeenCalled();
-  });
-
-  it('writes a decay event for critical + repeat-decay pages and triggers one regen when ON', () => {
-    mocks.isFeatureEnabled.mockReturnValue(true);
+  it('writes a decay event for critical + repeat-decay pages and triggers one regen', () => {
     const result = runDecayDetector();
 
     // critical + repeat-decay = 2; the 'watch' page is skipped.
@@ -85,14 +74,12 @@ describe('runDecayDetector', () => {
   });
 
   it('gives a repeat-decay page a higher boost than a plain critical page', () => {
-    mocks.isFeatureEnabled.mockReturnValue(true);
     runDecayDetector();
     const byPage = new Map(mocks.insertOpportunityEvent.mock.calls.map(c => [c[0].pagePath, c[0].boost]));
     expect(byPage.get('/blog/old')!).toBeGreaterThan(byPage.get('/services/hvac')!);
   });
 
   it('does nothing for a workspace with no persisted decay analysis', () => {
-    mocks.isFeatureEnabled.mockReturnValue(true);
     mocks.loadDecayAnalysis.mockReturnValue(null);
     const result = runDecayDetector();
     expect(result).toEqual({ workspacesWithEvents: 0, totalEvents: 0 });
@@ -101,17 +88,7 @@ describe('runDecayDetector', () => {
 });
 
 describe('runRankDeclineDetector', () => {
-  it('writes NO events when the events flag is OFF', () => {
-    mocks.isFeatureEnabled.mockReturnValue(false);
-    mocks.getLatestRanks.mockReturnValue([
-      { query: 'hvac', position: 12, change: -5, pagePath: '/services/hvac', clicks: 0, impressions: 0, ctr: 0 },
-    ]);
-    expect(runRankDeclineDetector()).toEqual({ workspacesWithEvents: 0, totalEvents: 0 });
-    expect(mocks.insertOpportunityEvent).not.toHaveBeenCalled();
-  });
-
   it('emits a rank_drop event only for crossings past the threshold', () => {
-    mocks.isFeatureEnabled.mockReturnValue(true);
     mocks.getLatestRanks.mockReturnValue([
       // change = prev − current; NEGATIVE = dropped. -5 ≤ -RANK_DROP_MIN_DELTA → crossing.
       { query: 'big drop', position: 12, change: -5, pagePath: '/services/hvac', clicks: 0, impressions: 0, ctr: 0 },

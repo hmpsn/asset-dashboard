@@ -530,15 +530,12 @@ export function resolveRecommendationsForChange(
   broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { resolved });
   log.info(`Resolved ${resolved} recommendation(s) in-place for ${workspaceId} (${changedPages.size} changed page(s))`);
 
-  // ── PR7 · Spine B — reprioritize-on-apply tail (events flag, try/catch). ──
+  // ── PR7 · Spine B — reprioritize-on-apply tail (try/catch). ──
   // Completing a rec (e.g. the #1) frees its page; a debounced regen re-ranks the
-  // queue so the next-best opportunity is promoted with fresh timing boosts. Flag
-  // OFF → no event store touched and the bridge no-ops, so the legacy apply path
-  // (above) is byte-identical. Never let the regen trigger break the apply.
+  // queue so the next-best opportunity is promoted with fresh timing boosts.
+  // Never let the regen trigger break the apply.
   try {
-    if (isFeatureEnabled('opportunity-value-events')) {
-      triggerOpportunityRegen(workspaceId);
-    }
+    triggerOpportunityRegen(workspaceId);
   } catch (err) {
     log.warn({ workspaceId, err: err instanceof Error ? err.message : String(err) }, 'opportunity regen trigger failed on apply (non-fatal)');
   }
@@ -1127,18 +1124,13 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
 
   const now = new Date().toISOString();
   const recs: Recommendation[] = [];
-  // Opportunity Value cutover flag. Resolved once per rec-gen cycle. When OFF
-  // (default), every rec keeps its legacy impactScore and the OV value is only
-  // attached (shadow). When ON, the single selector below the sort flips
-  // impactScore to opportunity.value — the entire cutover surface.
-  const useOv = isFeatureEnabled('opportunity-value-scorer');
+  // Opportunity Value is the canonical impactScore selector.
+  const useOv = true;
   // ── SEO Gen-Quality P4 cutover flag (per-workspace umbrella). ──
   // Resolved ONCE per rec-gen cycle and threaded as a plain boolean (no isFeatureEnabled
-  // in loops — mirrors the P2/P3 relaxConservatism pattern). When OFF (umbrella OFF = all
-  // prod today) the OV-derived TIER, the OV-EMV estimatedGain basis, and the
-  // content_gaps.opportunity_score recompute are all NO-OPs, so generation is byte-identical
-  // to pre-P4 (proven by the flag-OFF snapshot test). NOT the global `opportunity-value-scorer`
-  // flag (that gates only impactScore via pickImpactScore — do NOT widen it).
+  // in loops — mirrors the P2/P3 relaxConservatism pattern). When OFF, the OV-derived
+  // TIER, the OV-EMV estimatedGain basis, and the content_gaps.opportunity_score
+  // recompute are all NO-OPs, so generation stays byte-identical to the pre-P4 path.
   const useGenQual = isFeatureEnabled('seo-generation-quality', ws.id);
   // ── SEO Gen-Quality P7.1 · local-recs gate (three conjunctive conditions). ──
   // Resolved ONCE per rec-gen cycle and threaded as a plain boolean (no isFeatureEnabled in
@@ -1207,11 +1199,10 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   // intelligence SEO-context path (enrichWithBacklinks) — no duplicate API call.
   const ovAuthority = resolveOvAuthorityStrength(workspaceId, backlinkProfile);
 
-  // ── PR7 · Spine B — decaying Timing boosts (OV path; dark behind the events flag). ──
+  // ── PR7 · Spine B — decaying Timing boosts (OV path). ──
   // Resolved ONCE per rec-gen cycle: Map<pageSlug, decaying boost> aggregated from the
-  // active opportunity-event ledger. When the `opportunity-value-events` flag is OFF this
-  // is an EMPTY map → maxBoostForPages() is 0 → timingBoost 0 → timing multiplier 1 →
-  // computeOpportunityValue output byte-identical to the pre-PR7 frozen snapshot.
+  // active opportunity-event ledger. When the ledger is empty this is an EMPTY map
+  // → maxBoostForPages() is 0 → timingBoost 0 → timing multiplier 1.
   const nowDate = new Date(now);
   const timingBoosts = computeTimingBoosts(workspaceId, nowDate);
 

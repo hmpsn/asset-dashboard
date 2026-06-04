@@ -2,8 +2,8 @@
  * Pure-logic unit tests for server/bridge-infrastructure.ts
  *
  * Tests focus on:
- *  - executeBridge: flag gating, dryRun, timeout, sync/async callback routing,
- *    error isolation, auto-broadcast when modified > 0
+ *  - executeBridge: dryRun, timeout, sync/async callback routing, error
+ *    isolation, auto-broadcast when modified > 0
  *  - fireBridge: fire-and-forget wrapper (delegates to executeBridge)
  *  - debounceBridge: last-call-wins collapsing within a workspace, separate
  *    workspace isolation
@@ -16,7 +16,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // ── Module-level mocks (hoisted before imports) ────────────────────────────
 
 const mocks = vi.hoisted(() => ({
-  isFeatureEnabled: vi.fn((flag: string) => true),
   broadcastToWorkspace: vi.fn(),
   WS_EVENTS: { INSIGHT_BRIDGE_UPDATED: 'insight_bridge_updated' },
   log: {
@@ -29,7 +28,6 @@ const mocks = vi.hoisted(() => ({
   parseJsonFallback: vi.fn((_raw: unknown, fallback: unknown) => fallback),
 }));
 
-vi.mock('../../server/feature-flags.js', () => ({ isFeatureEnabled: mocks.isFeatureEnabled }));
 vi.mock('../../server/logger.js', () => ({ createLogger: vi.fn(() => mocks.log) }));
 vi.mock('../../server/db/index.js', () => ({ default: mocks.db }));
 vi.mock('../../server/db/stmt-cache.js', () => ({
@@ -60,20 +58,12 @@ function flushTimers() {
 
 // ── executeBridge ──────────────────────────────────────────────────────────
 
-describe('executeBridge — flag gating', () => {
+describe('executeBridge', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.isFeatureEnabled.mockReturnValue(true);
   });
 
-  it('skips callback when feature flag is OFF', async () => {
-    mocks.isFeatureEnabled.mockReturnValue(false);
-    const cb = vi.fn();
-    await executeBridge(FLAG, WORKSPACE, cb);
-    expect(cb).not.toHaveBeenCalled();
-  });
-
-  it('executes callback when feature flag is ON', async () => {
+  it('executes callback by default', async () => {
     const cb = vi.fn().mockReturnValue(undefined);
     await executeBridge(FLAG, WORKSPACE, cb);
     expect(cb).toHaveBeenCalledOnce();
@@ -93,10 +83,9 @@ describe('executeBridge — flag gating', () => {
 describe('executeBridge — dryRun', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.isFeatureEnabled.mockReturnValue(true);
   });
 
-  it('skips execution in dryRun mode even when flag is ON', async () => {
+  it('skips execution in dryRun mode', async () => {
     const cb = vi.fn();
     await executeBridge(FLAG, WORKSPACE, cb, { dryRun: true });
     expect(cb).not.toHaveBeenCalled();
@@ -115,7 +104,6 @@ describe('executeBridge — dryRun', () => {
 describe('executeBridge — sync callbacks', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.isFeatureEnabled.mockReturnValue(true);
   });
 
   it('handles synchronous void return', async () => {
@@ -144,7 +132,6 @@ describe('executeBridge — sync callbacks', () => {
 describe('executeBridge — async callbacks', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.isFeatureEnabled.mockReturnValue(true);
   });
 
   it('awaits async callback', async () => {
@@ -180,7 +167,6 @@ describe('executeBridge — async callbacks', () => {
 describe('executeBridge — timeout handling', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.isFeatureEnabled.mockReturnValue(true);
   });
 
   it('times out and swallows when async callback hangs past timeoutMs', async () => {
@@ -199,7 +185,6 @@ describe('executeBridge — timeout handling', () => {
 describe('fireBridge', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.isFeatureEnabled.mockReturnValue(true);
   });
 
   it('returns void synchronously', () => {
@@ -230,7 +215,6 @@ describe('debounceBridge', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.isFeatureEnabled.mockReturnValue(true);
   });
 
   it('collapses multiple rapid calls into one execution (last-call wins)', async () => {
@@ -341,8 +325,7 @@ describe('getBridgeFlags', () => {
     vi.clearAllMocks();
   });
 
-  it('returns an object keyed by bridge flag names', () => {
-    mocks.isFeatureEnabled.mockReturnValue(true);
+  it('returns an object keyed by bridge source names', () => {
     const flags = getBridgeFlags();
     expect(typeof flags).toBe('object');
     expect(flags).not.toBeNull();
@@ -350,7 +333,6 @@ describe('getBridgeFlags', () => {
   });
 
   it('each value is a boolean', () => {
-    mocks.isFeatureEnabled.mockReturnValue(false);
     const flags = getBridgeFlags();
     for (const val of Object.values(flags)) {
       expect(typeof val).toBe('boolean');
@@ -367,16 +349,7 @@ describe('getBridgeFlags', () => {
     expect(keys).toContain('bridge-client-signal');
   });
 
-  it('reflects the current feature-flag state (all OFF)', () => {
-    mocks.isFeatureEnabled.mockReturnValue(false);
-    const flags = getBridgeFlags();
-    for (const val of Object.values(flags)) {
-      expect(val).toBe(false);
-    }
-  });
-
-  it('reflects the current feature-flag state (all ON)', () => {
-    mocks.isFeatureEnabled.mockReturnValue(true);
+  it('marks every registered bridge source as active', () => {
     const flags = getBridgeFlags();
     for (const val of Object.values(flags)) {
       expect(val).toBe(true);

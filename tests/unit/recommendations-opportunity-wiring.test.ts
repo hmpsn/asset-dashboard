@@ -1,12 +1,9 @@
 /**
  * PR3 (Spine A) — Opportunity Value wiring.
  *
- * Proves the no-op boundary and the single cutover surface:
- *   1. Flag OFF (default): every rec carries an attached `opportunity`
- *      (modelVersion 'ov-1'), and impactScore is the LEGACY value (the OV value
- *      is shadow-only, NOT applied to impactScore).
- *   2. Flag ON (DB override for the test workspace): impactScore === opportunity.value
- *      for every rec that has an attached opportunity.
+ * Proves the canonical cutover surface:
+ *   1. Every pending rec carries an attached `opportunity` (modelVersion 'ov-1').
+ *   2. impactScore === opportunity.value for every rec with an attached opportunity.
  *
  * Uses the same in-process `generateRecommendations` + injected-insight pattern
  * as recommendations-ctr-gap.test.ts so a real producer branch fires and we can
@@ -57,7 +54,6 @@ vi.mock('../../server/analytics-insights-store.js', async (importOriginal) => {
 // ── Imports (after mock declarations) ────────────────────────────────────────
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { generateRecommendations } from '../../server/recommendations.js';
-import { setFlagOverride } from '../../server/feature-flags.js';
 
 describe('generateRecommendations — Opportunity Value wiring (PR3)', () => {
   let wsId: string;
@@ -70,17 +66,10 @@ describe('generateRecommendations — Opportunity Value wiring (PR3)', () => {
   });
 
   afterAll(() => {
-    setFlagOverride('opportunity-value-scorer', null); // revert to default (off)
     cleanup();
   });
 
-  beforeEach(() => {
-    // Ensure each test starts from a known flag state.
-    setFlagOverride('opportunity-value-scorer', null);
-  });
-
-  it('flag OFF: every rec has an attached opportunity (modelVersion ov-1) AND impactScore stays the legacy value', async () => {
-    setFlagOverride('opportunity-value-scorer', false);
+  it('attaches an OV payload to every pending recommendation', async () => {
     const set = await generateRecommendations(wsId);
 
     expect(set.recommendations.length).toBeGreaterThan(0);
@@ -92,20 +81,10 @@ describe('generateRecommendations — Opportunity Value wiring (PR3)', () => {
       expect(rec.opportunity, `rec ${rec.source} should have opportunity attached`).toBeTruthy();
       expect(rec.opportunity!.modelVersion).toBe('ov-1');
       expect(typeof rec.opportunity!.value).toBe('number');
-
-      // No-op boundary: with the flag OFF, impactScore is the LEGACY value (the OV
-      // value is computed + attached in shadow only).
-      if (rec.source.startsWith('insight:ctr_opportunity:')) {
-        // PR3-review fix: the CTR rec now consumes its grounded estimatedClickGap,
-        // so its OV value is > 0 (previously impressions-only collapsed it to 0).
-        expect(rec.opportunity!.value).toBeGreaterThan(0);
-        expect(rec.impactScore).toBeGreaterThan(0); // legacy score, flag still off
-      }
     }
   });
 
-  it('flag ON: impactScore === opportunity.value for every rec with an attached opportunity', async () => {
-    setFlagOverride('opportunity-value-scorer', true);
+  it('uses opportunity.value as the canonical impactScore', async () => {
     const set = await generateRecommendations(wsId);
 
     expect(set.recommendations.length).toBeGreaterThan(0);
@@ -119,21 +98,12 @@ describe('generateRecommendations — Opportunity Value wiring (PR3)', () => {
     expect(checked).toBeGreaterThan(0);
   });
 
-  it('flag flip changes the CTR rec impactScore from legacy to OV value', async () => {
-    setFlagOverride('opportunity-value-scorer', false);
-    const offSet = await generateRecommendations(wsId);
-    const offCtr = offSet.recommendations.find(r => r.source.startsWith('insight:ctr_opportunity:'));
-    expect(offCtr).toBeDefined();
-    const legacyScore = offCtr!.impactScore;
-    const ovValue = offCtr!.opportunity!.value;
-
-    setFlagOverride('opportunity-value-scorer', true);
-    const onSet = await generateRecommendations(wsId);
-    const onCtr = onSet.recommendations.find(r => r.source.startsWith('insight:ctr_opportunity:'));
-    expect(onCtr).toBeDefined();
-
-    expect(onCtr!.impactScore).toBe(ovValue);
-    // Sanity: the flag actually moved the score (legacy ≠ OV for this rec).
-    expect(legacyScore).not.toBe(ovValue);
+  it('keeps grounded CTR opportunities positive end-to-end', async () => {
+    const set = await generateRecommendations(wsId);
+    const ctrRec = set.recommendations.find(r => r.source.startsWith('insight:ctr_opportunity:'));
+    expect(ctrRec).toBeDefined();
+    expect(ctrRec!.opportunity).toBeTruthy();
+    expect(ctrRec!.opportunity!.value).toBeGreaterThan(0);
+    expect(ctrRec!.impactScore).toBe(ctrRec!.opportunity!.value);
   });
 });

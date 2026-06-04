@@ -419,8 +419,8 @@ describe('client action mutation safety', () => {
     const completeRes = await patchJson(`/api/client-actions/${wsId}/${created.id}`, { status: 'completed' });
     expect(completeRes.status).toBe(200);
 
-    expect(getInsightById(ambiguousA.id, wsId)?.resolutionStatus).toBeNull();
-    expect(getInsightById(ambiguousB.id, wsId)?.resolutionStatus).toBeNull();
+    expect(getInsightById(ambiguousA.id, wsId)?.resolutionStatus).not.toBe('resolved');
+    expect(getInsightById(ambiguousB.id, wsId)?.resolutionStatus).not.toBe('resolved');
 
     const upgradedSource = getActionByWorkspaceAndSource(wsId, 'content_decay', '/decay-page');
     expect(upgradedSource?.attribution).toBe('platform_executed');
