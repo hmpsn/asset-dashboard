@@ -1,9 +1,8 @@
 import type { RefObject } from 'react';
-import { BarChart3, Ban, CheckCircle2, ChevronDown, Eye, FileText, Layers, Sparkles, Target, ThumbsDown, ThumbsUp, Undo2 } from 'lucide-react';
-import { kdFraming, kdTooltip } from '../../../lib/kdFraming.js';
-import { Badge, Button, ClickableRow, Icon, SectionCard, TierGate, TrendBadge, type BadgeTone, type Tier } from '../../ui';
+import { Ban, CheckCircle2, ChevronDown, FileText, Layers, Sparkles, Target, ThumbsDown, ThumbsUp, Undo2 } from 'lucide-react';
+import { Badge, Button, ClickableRow, Icon, SectionCard, TierGate, type BadgeTone, type Tier } from '../../ui';
+import { ContentGapRow } from '../../shared/ContentGapRow';
 import type { ClientContentRequest, ClientKeywordStrategy } from '../types';
-import { fmtNum } from '../../../utils/formatNumbers';
 import { kdColor } from '../../page-intelligence/pageIntelligenceDisplay';
 import { keywordComparisonKey } from '../../../../shared/keyword-normalization';
 
@@ -68,13 +67,6 @@ interface StrategyContentOpportunitiesSectionProps {
   onTabChange?: (tab: string) => void;
 }
 
-const SERP_FEATURE_LABELS: Record<string, string> = {
-  featured_snippet: 'Featured snippet',
-  people_also_ask: 'People also ask',
-  video: 'Video results',
-  local_pack: 'Local results',
-};
-
 function requestStatusLabel(status?: ClientContentRequest['status']) {
   if (status === 'published') return { icon: CheckCircle2, text: 'Published', tone: 'emerald' as const };
   if (status === 'delivered') return { icon: CheckCircle2, text: 'In Production', tone: 'teal' as const };
@@ -115,77 +107,14 @@ function ContentGapCard({
   const alreadyRequested = isContentGapAlreadyRequested(contentRequests, requestedTopics, gap.targetKeyword);
   const planStatus = contentPlanKeywords?.get(targetKeywordKey);
   const pageType = gap.suggestedPageType || 'blog';
-  const isDataValidated = (gap.volume != null && gap.volume > 0) || (gap.impressions != null && gap.impressions > 0);
-  const hasTrendOrSerp = gap.trendDirection || (Array.isArray(gap.serpFeatures) && gap.serpFeatures.length > 0) || gap.competitorProof;
 
-  return (
-    <div className="px-3 py-2.5 bg-[var(--surface-3)]/40 rounded-[var(--radius-lg)] border border-[var(--brand-border)] hover:border-teal-500/20 transition-colors">
-      <div className="flex items-start justify-between gap-2 mb-1">
-        <span className="t-body font-semibold text-[var(--brand-text-bright)]">
-          {gap.topic}
-          {gap.opportunityScore != null && (
-            <Badge label={`${gap.opportunityScore}/100`} tone="blue" shape="pill" className="ml-2" />
-          )}
-          {gap.backfilled && (
-            // SEO Generation Quality P2: subtle, honest affordance for a
-            // deterministic-floor "expanded" pick (neutral zinc — never purple in
-            // client views). Distinguishes it from organically-strong ideas.
-            <Badge label="Expanded pick" tone="zinc" variant="outline" shape="pill" className="ml-2" />
-          )}
-        </span>
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          {gap.intent && (
-            <Badge label={gap.intent} tone={intentTone(gap.intent)} variant="outline" shape="pill" className="uppercase" />
-          )}
-          {pageType !== 'blog' && (
-            <Badge label={pageType} tone="teal" variant="outline" className="capitalize" />
-          )}
-        </div>
-      </div>
+  // Header-right widget after the shared intent badge: page-type badge (strategy-tab chrome — no priority widget).
+  const headerRight = pageType !== 'blog' ? (
+    <Badge label={pageType} tone="teal" variant="outline" className="capitalize" />
+  ) : undefined;
 
-      <div className="flex items-center gap-3 flex-wrap mb-1.5">
-        <span className="t-caption-sm text-accent-brand">&ldquo;{gap.targetKeyword}&rdquo;</span>
-        {gap.volume != null && gap.volume > 0 && (
-          <span className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-0.5"><Icon as={BarChart3} size="sm" />{fmtNum(gap.volume)}/mo</span>
-        )}
-        {gap.difficulty != null && gap.difficulty > 0 && (
-          <>
-            <span className={`t-caption-sm font-medium ${kdColor(gap.difficulty)} cursor-help`} title={kdTooltip(gap.difficulty)}>Difficulty {gap.difficulty}</span>
-            {kdFraming(gap.difficulty) && (
-              <span className="t-caption-sm text-[var(--brand-text-muted)]">{kdFraming(gap.difficulty)}</span>
-            )}
-          </>
-        )}
-        {gap.impressions != null && gap.impressions > 0 && (
-          <span className="t-caption-sm text-accent-info flex items-center gap-0.5"><Icon as={Eye} size="sm" />{fmtNum(gap.impressions)} impressions</span>
-        )}
-        {isDataValidated && (
-          <span className="t-caption-sm text-accent-success">Data-backed</span>
-        )}
-      </div>
-
-      {hasTrendOrSerp && (
-        <div className="flex items-center gap-2 flex-wrap mb-1.5">
-          {gap.trendDirection === 'rising' && (
-            <span className="flex items-center gap-0.5 t-caption-sm text-accent-success font-medium"><TrendBadge value={1} suffix="" iconOnly />Rising</span>
-          )}
-          {gap.trendDirection === 'declining' && (
-            <span className="flex items-center gap-0.5 t-caption-sm text-accent-danger font-medium"><TrendBadge value={-1} suffix="" iconOnly />Declining</span>
-          )}
-          {gap.trendDirection === 'stable' && gap.volume && gap.volume > 0 && (
-            <span className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text-muted)] font-medium"><TrendBadge value={0} hideOnZero={false} suffix="" iconOnly />Stable</span>
-          )}
-          {Array.isArray(gap.serpFeatures) && gap.serpFeatures.length > 0 && gap.serpFeatures.map(feat => (
-            <Badge key={feat} label={SERP_FEATURE_LABELS[feat] ?? feat} tone="blue" variant="outline" />
-          ))}
-          {gap.competitorProof && (
-            <span className="t-caption-sm text-accent-warning font-medium">{gap.competitorProof}</span>
-          )}
-        </div>
-      )}
-
-      <div className="t-caption-sm text-[var(--brand-text-muted)] leading-snug mb-2">{gap.rationale}</div>
-
+  // Feedback + pricing footer (strategy-tab chrome).
+  const footer = (
       <div className="flex items-center justify-between gap-2 flex-wrap">
         {workspaceId && (() => {
           const fbStatus = getFeedbackStatus(gap.targetKeyword);
@@ -282,7 +211,16 @@ function ContentGapCard({
           </div>
         ))}
       </div>
-    </div>
+  );
+
+  return (
+    <ContentGapRow
+      audience="strategy-tab"
+      data={gap}
+      intentTone={intentTone}
+      headerRight={headerRight}
+      footer={footer}
+    />
   );
 }
 

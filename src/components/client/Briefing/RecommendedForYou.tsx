@@ -9,11 +9,9 @@
 //   premium → "Generate Brief (included) →" teal CTA with check icon per row
 
 import { useState, type ReactNode } from 'react';
-import { BarChart3, Eye, ArrowUpRight, Sparkles, Check, Swords, MessageCircleQuestion } from 'lucide-react';
-import { Badge, SectionCard, Icon, TierGate, Button, type BadgeTone } from '../../ui';
-import { TrendBadge } from '../../ui/TrendBadge';
-import { fmtNum } from '../../../utils/formatNumbers';
-import { kdFraming, kdTooltip } from '../../../lib/kdFraming';
+import { Sparkles, Check } from 'lucide-react';
+import { Badge, SectionCard, TierGate, Button, type BadgeTone } from '../../ui';
+import { ContentGapRow } from '../../shared/ContentGapRow';
 import type { BriefingRecommendation } from '../../../../shared/types/briefing';
 import type { Tier } from '../../ui';
 
@@ -39,17 +37,6 @@ export interface RecommendedForYouProps {
    */
   ovGainActive?: boolean;
 }
-
-// File-local helpers — NOT shared utils (exclusive file ownership).
-// Ported verbatim from src/components/strategy/ContentGaps.tsx.
-const kdColor = (kd?: number) =>
-  !kd
-    ? 'text-[var(--brand-text-muted)]'
-    : kd <= 30
-    ? 'text-accent-success'
-    : kd <= 60
-    ? 'text-accent-warning'
-    : 'text-accent-danger';
 
 const intentTone = (intent?: string): BadgeTone => {
   switch (intent) {
@@ -95,187 +82,55 @@ export function RecommendedForYou({
       <SectionCard title="RECOMMENDED FOR YOU" variant="default">
       <div className="space-y-2">
         {visible.map((rec) => {
-          return (
-            <div
-              key={rec.targetKeyword}
-              className="px-3 py-2.5 bg-[var(--surface-3)]/40 rounded-[var(--radius-lg)] border border-[var(--brand-border)]"
-            >
-              {/* Row 1: topic + opportunity score + intent/priority/pageType badges */}
-              <div className="flex items-center justify-between">
-                <span className="t-ui font-medium text-[var(--brand-text-bright)]">
-                  {rec.topic}
-                  {/* P4 (Contract 3): flag-gated on the per-workspace umbrella (ovGainActive).
-                      ON  → the opportunity score is OV-EMV-derived (0..100), the SAME basis the
-                            recommendation queue ranks on — relabeled from the bare "NN/100" so the
-                            client reads it as a relative opportunity strength, not a raw percentage.
-                      OFF → the pre-P4 "NN/100" badge renders byte-identically (default = all prod).
-                      blue = data (read-only). */}
-                  {rec.opportunityScore != null && (
-                    <Badge
-                      label={ovGainActive ? `Opportunity ${rec.opportunityScore}` : `${rec.opportunityScore}/100`}
-                      tone="blue"
-                      shape="pill"
-                      className="ml-2"
-                    />
-                  )}
-                </span>
-                <div className="flex items-center gap-2">
-                  <Badge label={rec.intent ?? ''} tone={intentTone(rec.intent)} variant="outline" shape="pill" className="uppercase" />
-                  <Badge label={rec.priority ?? ''} tone={rec.priority === 'high' ? 'red' : rec.priority === 'medium' ? 'amber' : 'zinc'} variant="outline" />
-                  {rec.suggestedPageType && rec.suggestedPageType !== 'blog' && (
-                    <Badge label={rec.suggestedPageType} tone="teal" variant="outline" className="capitalize" />
-                  )}
-                </div>
-              </div>
-
-              {/* Row 2: target keyword + metrics + tier-aware CTA */}
-              <div className="flex items-center justify-between mt-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="t-caption-sm text-accent-brand">
-                    Target keyword: &ldquo;{rec.targetKeyword}&rdquo;
-                  </span>
-                  {rec.volume != null && (
-                    <span className="t-caption-sm text-[var(--brand-text)] flex items-center gap-0.5">
-                      <Icon as={BarChart3} size="sm" />
-                      {fmtNum(rec.volume)}/mo
-                    </span>
-                  )}
-                  {rec.difficulty != null && rec.difficulty > 0 && (
-                    <span
-                      className={`t-caption-sm font-medium ${kdColor(rec.difficulty)} cursor-help`}
-                      title={kdTooltip(rec.difficulty)}
-                    >
-                      KD {rec.difficulty}
-                    </span>
-                  )}
-                  {rec.difficulty != null && rec.difficulty > 0 && kdFraming(rec.difficulty) && (
-                    <span className="t-caption-sm text-[var(--brand-text-muted)] leading-none">
-                      {kdFraming(rec.difficulty)}
-                    </span>
-                  )}
-                  {rec.impressions != null && rec.impressions > 0 && (
-                    <span className="t-caption-sm text-accent-info flex items-center gap-0.5">
-                      <Icon as={Eye} size="sm" className="text-accent-info" />
-                      {fmtNum(rec.impressions)} impr
-                    </span>
-                  )}
-                  {/* P4 (Contract 3): flag-gated on the per-workspace umbrella (ovGainActive).
-                      ON  → the independent `volume × 0.103` "est. clicks at rank #3" estimate is
-                            suppressed — it was a separate magic-constant basis that diverged from
-                            the queue's Opportunity Value ranking; the OV-EMV-derived opportunity
-                            badge above is then the single client-facing materiality signal.
-                      OFF → the pre-P4 est-clicks line renders byte-identically (default = all prod). */}
-                  {!ovGainActive && rec.volume != null && rec.volume > 0 && (() => {
-                    const impact = Math.round(rec.volume * 0.103);
-                    if (impact < 10) return null;
-                    return (
-                      <span className="t-caption-sm text-accent-info flex items-center gap-0.5">
-                        <Icon as={ArrowUpRight} size="sm" className="text-accent-info" />
-                        ~{fmtNum(impact)}/mo est. clicks at rank #3
-                      </span>
-                    );
-                  })()}
-                </div>
-
-                {/* Tier-aware CTA buttons */}
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  {tier === 'premium' ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      icon={Check}
-                      onClick={() => onRequestBrief(rec)}
-                      className="rounded-[var(--radius-lg)] bg-teal-600/20 border-teal-500/30 text-accent-brand hover:bg-teal-600/40"
-                    >
-                      Generate Brief (included) &rarr;
-                    </Button>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      icon={Sparkles}
-                      onClick={() => onRequestBrief(rec)}
-                      className="rounded-[var(--radius-lg)] bg-teal-600/20 border-teal-500/30 text-accent-brand hover:bg-teal-600/40"
-                    >
-                      Generate Brief &rarr;
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-              {/* Row 3: trend + SERP features + competitor proof */}
-              <div className="flex items-center gap-2 flex-wrap mt-1">
-                {rec.trendDirection === 'rising' && (
-                  <span className="flex items-center gap-0.5 t-caption-sm text-accent-success font-medium">
-                    <TrendBadge value={1} suffix="" iconOnly /> Rising
-                  </span>
-                )}
-                {rec.trendDirection === 'declining' && (
-                  <span className="flex items-center gap-0.5 t-caption-sm text-accent-danger font-medium">
-                    <TrendBadge value={-1} suffix="" iconOnly /> Declining
-                  </span>
-                )}
-                {rec.trendDirection === 'stable' && rec.volume != null && rec.volume > 0 && (
-                  <span className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text)] font-medium">
-                    <TrendBadge value={0} hideOnZero={false} suffix="" iconOnly /> Stable
-                  </span>
-                )}
-                {Array.isArray(rec.serpFeatures) && rec.serpFeatures.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {rec.serpFeatures.includes('featured_snippet') && (
-                      <Badge label="⬜ Snippet" tone="blue" variant="outline" />
-                    )}
-                    {rec.serpFeatures.includes('people_also_ask') && (
-                      <Badge label="❓ PAA" tone="blue" variant="outline" />
-                    )}
-                    {rec.serpFeatures.includes('video') && (
-                      <Badge label="▶ Video" tone="blue" variant="outline" />
-                    )}
-                    {rec.serpFeatures.includes('local_pack') && (
-                      <Badge label="📍 Local" tone="blue" variant="outline" />
-                    )}
-                  </div>
-                )}
-                {rec.competitorProof && (
-                  <span className="flex items-center gap-0.5 t-caption-sm text-accent-warning font-medium">
-                    <Icon as={Swords} size="sm" className="text-accent-warning" />
-                    {rec.competitorProof}
-                  </span>
-                )}
-              </div>
-
-              {/* Row 4: SERP targeting tips. Amber = warning/medium-priority
-                  per the palette; replaces admin's yellow which isn't on the
-                  Four Laws palette for client-facing components. */}
-              {rec.serpTargeting && rec.serpTargeting.length > 0 && (
-                <div className="mt-1.5 pl-2 border-l-2 border-amber-500/20">
-                  {rec.serpTargeting.map((tip) => (
-                    <div key={tip} className="t-caption-sm text-accent-warning leading-relaxed">
-                      &rarr; {tip}
-                    </div>
-                  ))}
-                </div>
+          // Header-right widgets after the shared intent badge: priority + page-type (briefing chrome).
+          const headerRight = (
+            <>
+              <Badge label={rec.priority ?? ''} tone={rec.priority === 'high' ? 'red' : rec.priority === 'medium' ? 'amber' : 'zinc'} variant="outline" />
+              {rec.suggestedPageType && rec.suggestedPageType !== 'blog' && (
+                <Badge label={rec.suggestedPageType} tone="teal" variant="outline" className="capitalize" />
               )}
-
-              {/* Row 5: question keywords. Muted text — these are content
-                  metadata, not navigational data (cyan would mis-key the
-                  semantic per BRAND_DESIGN_LANGUAGE). */}
-              {rec.questionKeywords && rec.questionKeywords.length > 0 && (
-                <div className="flex items-center gap-1.5 flex-wrap mt-1">
-                  <Icon as={MessageCircleQuestion} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
-                  {rec.questionKeywords.map((q) => (
-                    <span key={q} className="t-caption-sm text-[var(--brand-text-muted)] italic">
-                      &ldquo;{q}&rdquo;
-                    </span>
-                  ))}
-                </div>
+            </>
+          );
+          // Tier-aware CTA footer.
+          const footer = (
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {tier === 'premium' ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  icon={Check}
+                  onClick={() => onRequestBrief(rec)}
+                  className="rounded-[var(--radius-lg)] bg-teal-600/20 border-teal-500/30 text-accent-brand hover:bg-teal-600/40"
+                >
+                  Generate Brief (included) &rarr;
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  icon={Sparkles}
+                  onClick={() => onRequestBrief(rec)}
+                  className="rounded-[var(--radius-lg)] bg-teal-600/20 border-teal-500/30 text-accent-brand hover:bg-teal-600/40"
+                >
+                  Generate Brief &rarr;
+                </Button>
               )}
-
-              {/* Row 6: rationale */}
-              <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{rec.rationale}</div>
             </div>
+          );
+          return (
+            <ContentGapRow
+              key={rec.targetKeyword}
+              audience="briefing"
+              data={rec}
+              intentTone={intentTone}
+              // P4 (Contract 3): server-resolved per-workspace umbrella, threaded as-is.
+              // Flag-OFF (default = all prod) renders the pre-P4 surface byte-identically.
+              ovGainActive={ovGainActive}
+              headerRight={headerRight}
+              footer={footer}
+            />
           );
         })}
       </div>
