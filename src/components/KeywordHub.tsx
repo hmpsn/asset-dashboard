@@ -181,6 +181,14 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
     );
   };
 
+  // Reset all active filters (segment → 'all', search → '', advanced → null).
+  // Distinct from clearSelection, which only empties the multi-select Set.
+  const handleResetFilters = () => {
+    hub.setSegment('all');
+    hub.setSearchTerm('');
+    hub.setAdvancedFilter(null);
+  };
+
   const visibleKeys = useMemo(
     () => rows.map((r) => r.normalizedKeyword),
     [rows],
@@ -239,6 +247,7 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
           isBulkPending={bulkAction.isPending}
           onBulkAction={handleBulkAction}
           onClearSelection={hub.clearSelection}
+          onResetFilters={handleResetFilters}
           showLocalSeo={showLocalSeo}
         />
       </SectionCard>

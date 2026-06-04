@@ -108,33 +108,33 @@ describe('Keyword Hub list — real KCC rows read path', () => {
   it('filter=tracked returns only active-tracking rows', async () => {
     const body = await fetchRows('filter=tracked&page=1&pageSize=50');
     expect(body.rows.length).toBeGreaterThan(0);
-    expect(body.rows.every((r) => r.tracking.status === 'active')).toBe(true);
+    expect(body.rows.every((r) => r.tracking.status === 'active')).toBe(true); // every-ok: guarded by toBeGreaterThan(0) on prior line
   });
 
   it('filter=in_strategy returns only in-strategy rows', async () => {
     const body = await fetchRows('filter=in_strategy&page=1&pageSize=50');
     expect(body.rows.length).toBeGreaterThan(0);
-    expect(body.rows.every((r) => r.lifecycleStatus === 'in_strategy')).toBe(true);
+    expect(body.rows.every((r) => r.lifecycleStatus === 'in_strategy')).toBe(true); // every-ok: guarded by toBeGreaterThan(0) on prior line
   });
 
   it('filter=retired returns only retired rows', async () => {
     const body = await fetchRows('filter=retired&page=1&pageSize=50');
     expect(body.rows.length).toBeGreaterThan(0);
-    expect(body.rows.every((r) => r.lifecycleStatus === 'retired')).toBe(true);
+    expect(body.rows.every((r) => r.lifecycleStatus === 'retired')).toBe(true); // every-ok: guarded by toBeGreaterThan(0) on prior line
   });
 
   it('filter=local returns only rows carrying local-SEO data', async () => {
     const body = await fetchRows('filter=local&page=1&pageSize=50');
     // Local data is environment-dependent; assert the invariant only when present.
     if (body.rows.length > 0) {
-      expect(body.rows.every((r) => Boolean(r.localSeo || r.localSeoState))).toBe(true);
+      expect(body.rows.every((r) => Boolean(r.localSeo || r.localSeoState))).toBe(true); // every-ok: guarded by if (body.rows.length > 0) on prior line
     }
   });
 
   it('search matches the normalized keyword case-insensitively', async () => {
     const body = await fetchRows('filter=all&search=TRACK%20ALPHA&page=1&pageSize=50');
     expect(body.rows.length).toBeGreaterThan(0);
-    expect(body.rows.every((r) => r.normalizedKeyword.includes('track alpha'))).toBe(true);
+    expect(body.rows.every((r) => r.normalizedKeyword.includes('track alpha'))).toBe(true); // every-ok: guarded by toBeGreaterThan(0) on prior line
   });
 
   it('sort=rank returns rows in non-decreasing position order', async () => {
@@ -159,8 +159,9 @@ describe('Keyword Hub list — real KCC rows read path', () => {
       expect(page2.pageInfo.page).toBe(2);
       expect(page2.pageInfo.hasPreviousPage).toBe(true);
       // No overlap between page 1 and page 2 keyword identities.
+      expect(page2.rows.length).toBeGreaterThan(0);
       const p1Keys = new Set(page1.rows.map((r) => r.normalizedKeyword));
-      expect(page2.rows.every((r) => !p1Keys.has(r.normalizedKeyword))).toBe(true);
+      expect(page2.rows.every((r) => !p1Keys.has(r.normalizedKeyword))).toBe(true); // every-ok: guarded by toBeGreaterThan(0) above
     }
   });
 
@@ -168,11 +169,11 @@ describe('Keyword Hub list — real KCC rows read path', () => {
     const body = await fetchRows('filter=all&page=1&pageSize=50');
     expect(body.rows.length).toBeGreaterThan(0);
     expect(
-      body.rows.every(
+      body.rows.every( // every-ok: guarded by toBeGreaterThan(0) above
         (r) => typeof r.normalizedKeyword === 'string' && r.normalizedKeyword.length > 0,
       ),
     ).toBe(true);
-    expect(body.rows.every((r) => typeof r.tracking.status === 'string')).toBe(true);
+    expect(body.rows.every((r) => typeof r.tracking.status === 'string')).toBe(true); // every-ok: guarded by toBeGreaterThan(0) above
   });
 
   it('any row that carries tracking.sourceGapKey carries it as a string', async () => {
@@ -180,7 +181,7 @@ describe('Keyword Hub list — real KCC rows read path', () => {
     expect(body.rows.length).toBeGreaterThan(0);
     const withGap = body.rows.filter((r) => r.tracking.sourceGapKey !== undefined);
     // No assertion that any exist — only that, when present, they are valid strings.
-    expect(withGap.every((r) => typeof r.tracking.sourceGapKey === 'string')).toBe(true);
+    expect(withGap.every((r) => typeof r.tracking.sourceGapKey === 'string')).toBe(true); // every-ok: intentional type-when-present check on a possibly-empty filter result
   });
 
   it('GET summary returns the KeywordCommandCenterCounts shape', async () => {

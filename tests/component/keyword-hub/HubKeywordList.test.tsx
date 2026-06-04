@@ -142,6 +142,7 @@ function defaultProps(overrides: Partial<React.ComponentProps<typeof HubKeywordL
     isBulkPending: false,
     onBulkAction: vi.fn(),
     onClearSelection: vi.fn(),
+    onResetFilters: vi.fn(),
     showLocalSeo: false,
     ...overrides,
   };
@@ -217,11 +218,19 @@ describe('HubKeywordList — empty state', () => {
     expect(screen.getByTestId('keyword-table-empty')).toBeInTheDocument();
   });
 
-  it('empty state has a clear/action button', () => {
-    render(<HubKeywordList {...defaultProps({ rows: [], isLoading: false, isError: false })} />);
-    // The empty state should include an action (clear filters button)
+  it('empty state "Clear filters" button calls onResetFilters (resets segment/search/advanced — NOT the multi-select)', () => {
+    const onResetFilters = vi.fn();
+    const onClearSelection = vi.fn();
+    render(
+      <HubKeywordList
+        {...defaultProps({ rows: [], isLoading: false, isError: false, onResetFilters, onClearSelection })}
+      />,
+    );
     const emptyEl = screen.getByTestId('keyword-table-empty');
     expect(emptyEl).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /clear filters/i }));
+    expect(onResetFilters).toHaveBeenCalledTimes(1);
+    expect(onClearSelection).not.toHaveBeenCalled();
   });
 });
 

@@ -8,7 +8,7 @@
  *   provider_degraded · requested · declined · lost_visibility
  *
  * ARIA: <details>/<summary> pattern with role="listbox" + aria-expanded.
- * - No violet/indigo/rose/pink/text-green-400 (Four Laws of Color).
+ * - No violet/indigo/rose/pink; no green-* success colors — emerald only (Four Laws of Color).
  * - Uses only src/components/ui primitives.
  *
  * Owned by P1-T2. Must NOT touch KeywordHub.tsx or useKeywordHubState.ts.
@@ -16,6 +16,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { ChevronDown, SlidersHorizontal, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { IconButton } from '../ui/IconButton';
 import type { KeywordCommandCenterFilter, KeywordCommandCenterFilterMeta } from '../../../shared/types/keyword-command-center';
 import { KEYWORD_COMMAND_CENTER_FILTERS } from '../../../shared/types/keyword-command-center';
 
@@ -116,14 +117,14 @@ export function HubAdvancedFilters({
           <SlidersHorizontal aria-hidden="true" className="w-3 h-3 shrink-0" />
           <span>{hasActiveFilter ? activeFilterMeta.label : 'Filters'}</span>
           {hasActiveFilter ? (
-            <button
-              type="button"
+            <IconButton
+              icon={X}
+              size="sm"
+              variant="ghost"
               onClick={handleClear}
-              aria-label="Clear filter"
-              className="inline-flex items-center justify-center rounded-full hover:bg-teal-500/20 transition-colors p-0.5 ml-0.5"
-            >
-              <X aria-hidden="true" className="w-3 h-3" />
-            </button>
+              label="Clear filter"
+              className="ml-0.5 w-5 h-5 hover:bg-teal-500/20 text-teal-400"
+            />
           ) : (
             <ChevronDown aria-hidden="true" className="w-3 h-3 shrink-0" />
           )}
@@ -148,7 +149,7 @@ export function HubAdvancedFilters({
             nonPrimaryFilters.map((meta) => {
               const isSelected = meta.id === activeAdvancedFilter;
               return (
-                <button
+                <button // button-ok: listbox option with role="option"/aria-selected semantics the Button primitive does not model
                   key={meta.id}
                   type="button"
                   role="option"

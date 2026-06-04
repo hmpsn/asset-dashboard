@@ -5,7 +5,7 @@
  * - Active pill uses teal styling (Four Laws: teal for actions/active state).
  * - Counts shown as <Badge>; shows <Skeleton> while loading; "—" when undefined.
  * - Local segment shows a MapPin icon when active.
- * - No violet/indigo/rose/pink/text-green-400.
+ * - No violet/indigo/rose/pink; no green-* success colors — emerald only.
  *
  * Owned by P1-T2. Must NOT touch KeywordHub.tsx or useKeywordHubState.ts.
  */
@@ -71,7 +71,7 @@ export function HubSegmentBar({
         const showIcon = isActive && IconComponent != null;
 
         return (
-          <button
+          <button // button-ok: segment pill toggle with aria-pressed (bespoke toggle semantics the Button primitive does not model)
             key={seg.id}
             type="button"
             onClick={() => onChange(seg.id)}

@@ -5,7 +5,7 @@
  *   - columns: position, change, clicks, volume, difficulty
  *   - changeSign="lowerIsBetter" (rank position: lower = better)
  *   - showLocalSeo from prop
- *   - sort wired to onSort (translates HubSortKey → KeywordCommandCenterSort)
+ *   - sort wired to onSort (emits raw HubSortKey column keys; the shell translates to KeywordCommandCenterSort)
  *   - selection by normalizedKeyword
  *   - renderKeywordMeta → <HubKeywordRowMeta>
  *   - action-oriented EmptyState with Clear-filters affordance
@@ -18,7 +18,7 @@
  * `localSeoLabel` slot on KeywordTableRow for the local-SEO column.
  *
  * Four Laws of Color enforced: teal=actions, blue=data, emerald=success, amber/red=warn.
- * No violet/indigo/rose/pink/text-green-400.
+ * No violet/indigo/rose/pink; no green-* success colors — emerald only.
  *
  * TODO: virtualize when rows > 200 (react-virtual)
  */
@@ -53,6 +53,8 @@ export interface HubKeywordListProps {
   isBulkPending: boolean;
   onBulkAction: (action: KeywordCommandCenterBulkActionType) => void;
   onClearSelection: () => void;
+  /** Resets the active segment/search/advanced-filter (NOT the multi-select). Wired to the empty-state "Clear filters" CTA. */
+  onResetFilters: () => void;
   showLocalSeo: boolean;
 }
 
@@ -116,12 +118,13 @@ export function HubKeywordList({
   isBulkPending,
   onBulkAction,
   onClearSelection,
+  onResetFilters,
   showLocalSeo,
 }: HubKeywordListProps) {
-  // Translate HubSortKey → KCC sort key for the SortConfig
+  // Passthrough: the table emits raw column keys (HubSortKey values); forward
+  // them unchanged to the Hub sort handler. The HubSortKey → KeywordCommandCenterSort
+  // translation for the server query lives in the KeywordHub shell (`hubSortToKccSort`).
   const handleSort = (rawKey: string) => {
-    // The table emits column keys; we pass them straight to the Hub sort handler
-    // which interprets them as HubSortKey values
     onSort(rawKey as HubSortKey);
   };
 
@@ -181,7 +184,7 @@ export function HubKeywordList({
             <Button
               variant="ghost"
               size="sm"
-              onClick={onClearSelection}
+              onClick={onResetFilters}
               aria-label="Clear filters"
             >
               Clear filters
