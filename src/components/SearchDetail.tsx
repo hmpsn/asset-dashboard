@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Search, ExternalLink, Loader2 } from 'lucide-react';
 import { SectionCard, DateRangeSelector, EmptyState, MetricToggleCard, Icon, Button } from './ui';
-import { DATE_PRESETS_SEARCH, CHART_SERIES_COLORS, positionColor } from './ui/constants';
+import { DATE_PRESETS_SEARCH, CHART_SERIES_COLORS } from './ui/constants';
 import type { FeedInsight } from '../../shared/types/insights';
 import { useAdminSearch } from '../hooks/admin';
 import { useInsightFeed } from '../hooks/admin/useInsightFeed';
@@ -270,21 +270,26 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                 </Button>
               </div>
 
-              {/* Wave 2b B2: raw table → KeywordTable. Chrome changes noted:
-                  1. Sticky thead removed (KeywordTable uses overflow-hidden; parent scroll still works).
-                  2. Per-row insight tinting (rowTint) removed (KeywordTable has no per-row bg slot).
-                  3. Position shows raw decimal with positionColor via renderActions (not rounded #N).
-                  4. Page keyword cell shows path + ExternalLink icon via renderKeywordMeta (not a full anchor). */}
+              {/* Wave 2b B2 (fixed): raw table → KeywordTable.
+                  - position is a first-class sortable column via positionFormat="raw"
+                  - stickyHeader restores the sticky thead for the scrollable container
+                  - truncateKeyword={false} on queries restores full query text display
+                  - renderActions removed; position now in columns={[...,'position']}
+                  - renderKeywordMeta kept for insight badges (queries) + ExternalLink (pages) */}
               <div className="overflow-y-auto flex-1 min-h-0">
                 {tableView === 'queries' && (
                   <KeywordTable<KeywordTableRow>
                     rows={sortByKey(overview.topQueries).map(q => ({
                       query: q.query,
+                      position: q.position,
                       clicks: q.clicks,
                       impressions: q.impressions,
                       ctr: q.ctr,
                     }))}
-                    columns={['clicks', 'impressions', 'ctr']}
+                    columns={['clicks', 'impressions', 'ctr', 'position']}
+                    positionFormat="raw"
+                    stickyHeader
+                    truncateKeyword={false}
                     sort={{
                       key: sortKey,
                       direction: sortAsc ? 'asc' : 'desc',
@@ -299,10 +304,6 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                         </span>
                       ) : null;
                     }}
-                    renderActions={(r) => {
-                      const q = overview.topQueries.find(x => x.query === r.query);
-                      return q ? <span className={positionColor(q.position)}>{q.position}</span> : null;
-                    }}
                     className="rounded-none border-0"
                   />
                 )}
@@ -310,12 +311,15 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                   <KeywordTable<KeywordTableRow & { _page: string }>
                     rows={sortByKey(overview.topPages).map(p => ({
                       query: normalizePageUrl(p.page),
+                      position: p.position,
                       clicks: p.clicks,
                       impressions: p.impressions,
                       ctr: p.ctr,
                       _page: p.page,
                     }))}
-                    columns={['clicks', 'impressions', 'ctr']}
+                    columns={['clicks', 'impressions', 'ctr', 'position']}
+                    positionFormat="raw"
+                    stickyHeader
                     sort={{
                       key: sortKey,
                       direction: sortAsc ? 'asc' : 'desc',
@@ -336,10 +340,6 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                           )}
                         </>
                       );
-                    }}
-                    renderActions={(r) => {
-                      const p = overview.topPages.find(x => normalizePageUrl(x.page) === r.query);
-                      return p ? <span className={positionColor(p.position)}>{p.position}</span> : null;
                     }}
                     className="rounded-none border-0"
                   />

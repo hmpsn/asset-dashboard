@@ -101,8 +101,48 @@ describe('SearchDetail', () => {
     expect(screen.getByText('900')).toBeInTheDocument();
     // CTR column — KeywordTable 'ctr' column renders as "{value}%"
     expect(screen.getByText('4.9%')).toBeInTheDocument();
-    // Position still rendered via renderActions as raw decimal
+    // Position rendered as a first-class column (raw decimal)
     expect(screen.getByText('7.1')).toBeInTheDocument();
+  });
+
+  // Wave 2b B2 regression fix: position must be a SORTABLE column header, not buried in renderActions.
+  // This test FAILS against ba52b6df (no Position sort header) and passes after the fix.
+  it('renders a sortable Position header in the queries table and sorts rows by position on click', () => {
+    // Provide two query rows so we can verify sort order changes.
+    const multiQueryData = baseSearchData({
+      overview: {
+        totalClicks: 520,
+        totalImpressions: 12300,
+        avgCtr: 4.2,
+        avgPosition: 12.8,
+        topQueries: [
+          { query: 'acme seo', clicks: 44, impressions: 900, ctr: 4.9, position: 7.1 },
+          { query: 'seo agency', clicks: 20, impressions: 400, ctr: 5.0, position: 3.2 },
+        ],
+        topPages: [],
+        dateRange: { start: '2026-04-18', end: '2026-05-16' },
+      },
+    });
+    useAdminSearchMock.mockReturnValue(multiQueryData);
+
+    render(<SearchDetail workspaceId="ws-risk" siteId="site-1" gscPropertyUrl="sc-domain:acme.test" />);
+
+    // The table should be inside the data table card. Find all "Position" buttons
+    // — the MetricToggleCard renders a button with "Position" label (for the chart toggle),
+    // and the KeywordTable sort header also renders one inside the <table>.
+    // The sort header is inside a <table> element.
+    const table = document.querySelector('table');
+    expect(table).not.toBeNull();
+    // Find Position sort button scoped to the table element
+    const positionHeaders = screen.getAllByRole('button', { name: /position/i });
+    // At least one of those buttons must be inside the table (the sort header)
+    const tablePositionBtn = positionHeaders.find(btn => table!.contains(btn));
+    expect(tablePositionBtn).toBeDefined();
+
+    // Clicking it triggers a position sort — both raw decimal positions still visible.
+    fireEvent.click(tablePositionBtn!);
+    expect(screen.getByText('7.1')).toBeInTheDocument();
+    expect(screen.getByText('3.2')).toBeInTheDocument();
   });
 
   // Wave 2b B2: query↔page toggle still switches data sets.

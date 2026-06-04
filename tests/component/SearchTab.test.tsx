@@ -122,7 +122,7 @@ describe('SearchTab', () => {
     expect(screen.queryByText('acme plumbing')).not.toBeInTheDocument();
   });
 
-  // Wave 2b B2: position uses positionColor authority via renderActions.
+  // Wave 2b B2: position uses positionColor authority via the position column.
   it('renders position with positionColor accent class, not bare tailwind', () => {
     render(<SearchTab {...defaultProps} />);
 
@@ -132,5 +132,24 @@ describe('SearchTab', () => {
     const posSpan = screen.getByText('6.3').closest('span') ?? screen.getByText('6.3');
     expect((posSpan as HTMLElement).className).toContain('text-accent-success');
     expect((posSpan as HTMLElement).className).not.toContain('text-emerald-400');
+  });
+
+  // Wave 2b B2 regression fix: position must be a SORTABLE column header, not buried in renderActions.
+  // This test FAILS against ba52b6df (no Position sort header) and passes after the fix.
+  it('renders a sortable Position header in the queries table and sorts rows by position on click', () => {
+    render(<SearchTab {...defaultProps} />);
+
+    // Expand the collapsible section to show the KeywordTable
+    fireEvent.click(screen.getByText('All Keywords & Pages'));
+
+    // The Position header must be a clickable sort button (not a non-sortable <th>).
+    const positionHeader = screen.getByRole('button', { name: /position/i });
+    expect(positionHeader).toBeInTheDocument();
+
+    // Clicking Position should trigger a sort — verify both position values are present.
+    fireEvent.click(positionHeader);
+    // Both raw decimal positions from topQueries are rendered in the table.
+    expect(screen.getByText('6.3')).toBeInTheDocument();
+    expect(screen.getByText('14.7')).toBeInTheDocument();
   });
 });

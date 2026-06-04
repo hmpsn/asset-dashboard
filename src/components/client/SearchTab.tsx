@@ -12,7 +12,6 @@ import type {
   SearchOverview, PerformanceTrend, SearchComparison, SortKey,
 } from './types';
 import { normalizePageUrl } from '../../lib/pathUtils';
-import { positionColor } from '../ui/constants';
 
 interface SearchInsights {
   lowHanging: { query: string; position: number; impressions: number; clicks: number; ctr: number }[];
@@ -170,10 +169,10 @@ export function SearchTab({
     )}
 
     {/* Detailed keyword/page tables — collapsible, secondary */}
-    {/* Wave 2b B2: raw table → KeywordTable. Chrome changes noted:
-        1. Column header Explainer tooltips removed (KeywordTable SortHeader has no Explainer slot).
-        2. Position shows raw decimal with positionColor via renderActions (not rounded #N).
-        3. Empty query/page table now shows EmptyState (improvement over silent empty tbody). */}
+    {/* Wave 2b B2 (fixed): raw table → KeywordTable.
+        - position is a first-class sortable column via positionFormat="raw"
+        - Explainer header tooltips restored via headerTooltips prop
+        - Empty query/page table now shows EmptyState (improvement over silent empty tbody) */}
     <SectionCard noPadding>
       <ClickableRow
         onClick={() => setShowRawData(!showRawData)}
@@ -210,21 +209,25 @@ export function SearchTab({
             <KeywordTable<KeywordTableRow>
               rows={sortedQueries().map(q => ({
                 query: q.query,
+                position: q.position,
                 clicks: q.clicks,
                 impressions: q.impressions,
                 ctr: q.ctr,
               }))}
-              columns={['clicks', 'impressions', 'ctr']}
+              columns={['clicks', 'impressions', 'ctr', 'position']}
+              positionFormat="raw"
               sort={{
                 key: sortKey,
                 direction: sortAsc ? 'asc' : 'desc',
                 onSort: (k) => handleSort(k as SortKey),
               }}
-              emptyState={{ icon: Search, title: 'No queries data', description: 'No search query data available for this period.' }}
-              renderActions={(r) => {
-                const q = overview!.topQueries.find(x => x.query === r.query);
-                return q ? <span className={positionColor(q.position)}>{q.position}</span> : null;
+              headerTooltips={{
+                clicks: <Explainer term="clicks" />,
+                impressions: <Explainer term="impressions" />,
+                ctr: <Explainer term="ctr" />,
+                position: <Explainer term="position" />,
               }}
+              emptyState={{ icon: Search, title: 'No queries data', description: 'No search query data available for this period.' }}
               className="rounded-none border-x-0 border-b-0"
             />
           )}
@@ -232,22 +235,26 @@ export function SearchTab({
             <KeywordTable<KeywordTableRow>
               rows={sortedPages().map(p => ({
                 query: normalizePageUrl(p.page),
+                position: p.position,
                 clicks: p.clicks,
                 impressions: p.impressions,
                 ctr: p.ctr,
                 pagePath: p.page,
               }))}
-              columns={['clicks', 'impressions', 'ctr']}
+              columns={['clicks', 'impressions', 'ctr', 'position']}
+              positionFormat="raw"
               sort={{
                 key: sortKey,
                 direction: sortAsc ? 'asc' : 'desc',
                 onSort: (k) => handleSort(k as SortKey),
               }}
-              emptyState={{ icon: Search, title: 'No pages data', description: 'No page data available for this period.' }}
-              renderActions={(r) => {
-                const p = overview!.topPages.find(x => normalizePageUrl(x.page) === r.query);
-                return p ? <span className={positionColor(p.position)}>{p.position}</span> : null;
+              headerTooltips={{
+                clicks: <Explainer term="clicks" />,
+                impressions: <Explainer term="impressions" />,
+                ctr: <Explainer term="ctr" />,
+                position: <Explainer term="position" />,
               }}
+              emptyState={{ icon: Search, title: 'No pages data', description: 'No page data available for this period.' }}
               className="rounded-none border-x-0 border-b-0"
             />
           )}
