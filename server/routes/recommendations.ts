@@ -9,6 +9,7 @@ import { recordAction, getActionBySource } from '../outcome-tracking.js';
 import {
   generateRecommendations,
   loadRecommendations,
+  computeRecommendationSummary,
   updateRecommendationStatus,
   dismissRecommendation,
 } from '../recommendations.js';
@@ -66,8 +67,11 @@ function toPublicRecommendationSet(set: RecommendationSet, recs: Recommendation[
 }
 
 // ─── Recommendation Engine ─────────────────────────────────────────
-// Generate (or re-generate) prioritized recommendations for a workspace
-router.post('/api/public/recommendations/:workspaceId/generate', async (req, res) => { // public-no-auth-ok: deferred to audit-drift-public-route-auth-sweep-followup
+// Generate (or re-generate) prioritized recommendations for a workspace.
+// Soft-gated (requireClientPortalAuth): password-set workspaces require a
+// session; passwordless/demo portals pass through (the client calls this with a
+// cookie-only fetch). Matches the sibling PATCH/DELETE routes below.
+router.post('/api/public/recommendations/:workspaceId/generate', requireClientPortalAuth(), async (req, res) => {
   try {
     const set = await generateRecommendations(req.params.workspaceId);
     res.json(toPublicRecommendationSet(set, set.recommendations));
@@ -76,13 +80,35 @@ router.post('/api/public/recommendations/:workspaceId/generate', async (req, res
   }
 });
 
-// List current recommendations (returns cached set, or generates if none exist)
-router.get('/api/public/recommendations/:workspaceId', async (req, res) => { // public-no-auth-ok: deferred to audit-drift-public-route-auth-sweep-followup
+// List current recommendations — returns the last-known/empty set.
+//
+// COST: this read path must NEVER run the heavy generateRecommendations()
+// pipeline inline (it holds the HTTP connection through a multi-step
+// audit/AI/store walk). The SEO_AUDIT background job already regenerates the
+// set post-audit (server/routes/jobs.ts), and POST .../generate is the explicit
+// regenerate path. On a cache-miss we return an empty set quickly; an unknown
+// workspace is an honest 404 (previously a 500 thrown from inline generation).
+//
+// Soft-gated (requireClientPortalAuth): password-set workspaces require a
+// session; passwordless/demo portals pass through so the client InsightsEngine /
+// useRecommendations hook keeps working without a token.
+router.get('/api/public/recommendations/:workspaceId', requireClientPortalAuth(), (req, res) => {
   try {
-    let set = loadRecommendations(req.params.workspaceId);
+    const { workspaceId } = req.params;
+    let set = loadRecommendations(workspaceId);
     if (!set) {
-      // Auto-generate on first request
-      set = await generateRecommendations(req.params.workspaceId);
+      // No cached set. Distinguish unknown workspace (honest 404) from a known
+      // workspace that simply hasn't generated yet (return an empty set — do NOT
+      // generate inline).
+      if (!getWorkspace(workspaceId)) {
+        return res.status(404).json({ error: 'Workspace not found' });
+      }
+      set = {
+        workspaceId,
+        generatedAt: new Date().toISOString(),
+        recommendations: [],
+        summary: computeRecommendationSummary([]),
+      };
     }
     // Filter by status if requested
     const status = req.query.status as string | undefined;

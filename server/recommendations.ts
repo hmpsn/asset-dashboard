@@ -1434,9 +1434,8 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   );
 
   if (strategy) {
-    // Quick wins → fix_now or fix_soon
-    const strategyQuickWins = listQuickWins(workspaceId);
-    const quickWins = strategyQuickWins.length > 0 ? strategyQuickWins : (strategy.quickWins || []);
+    // Quick wins → fix_now or fix_soon (table-only; blob field stripped on every write + boot-migrated out)
+    const quickWins = listQuickWins(workspaceId);
     if (quickWins.length > 0) {
       for (const qw of quickWins) {
         // 2C: skip if the current keyword was declined

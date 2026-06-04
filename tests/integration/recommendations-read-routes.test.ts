@@ -3,9 +3,10 @@
  * Covers GET list endpoint and status/filter validation.
  * Avoids calling generate (POST) since that calls AI services.
  *
- * Note: GET /api/public/recommendations/:workspaceId auto-generates on first call
- * when no cached set exists. For an unknown workspace, generateRecommendations
- * throws "Workspace not found" which the route handler catches as 500.
+ * Note: as of Task 3 (#13) the GET no longer auto-generates inline on a
+ * cache-miss (cost fix). A known workspace with no cached set returns 200 with
+ * an empty set; an unknown workspace returns an honest 404 (previously a 500
+ * thrown from the inline generateRecommendations() fallback).
  *
  * Port: 13689 (assigned range 13688–13695 for wave-24-a12)
  */
@@ -29,12 +30,14 @@ afterAll(async () => {
 });
 
 describe('Recommendations — GET list endpoint', () => {
-  it('returns 200 with recommendations array for a fresh workspace', async () => {
+  it('returns 200 with an empty recommendations array for a fresh workspace (no inline generation)', async () => {
     const res = await api(`/api/public/recommendations/${wsId}`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toHaveProperty('recommendations');
     expect(Array.isArray(body.recommendations)).toBe(true);
+    // Cost fix: a cache-miss returns an empty set, it does NOT run generation.
+    expect(body.recommendations.length).toBe(0);
   });
 
   it('returns a workspaceId field matching the requested workspace', async () => {
@@ -68,9 +71,9 @@ describe('Recommendations — GET list endpoint', () => {
     }
   });
 
-  it('returns 500 for an unknown workspaceId (generateRecommendations throws)', async () => {
+  it('returns 404 for an unknown workspaceId (no inline generation to throw a 500)', async () => {
     const res = await api('/api/public/recommendations/ws_nonexistent_rec_99999');
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(404);
     const body = await res.json();
     expect(body).toHaveProperty('error');
   });

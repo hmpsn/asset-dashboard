@@ -107,11 +107,15 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     ?? defaultSeoDataProvider(providerList)
     ?? DEFAULT_SEO_DATA_PROVIDER;
 
-  // Tracked keywords via React Query — buttons reflect actual server state with keywordTrackingKey normalization
+  // Tracked keywords via React Query — buttons reflect actual server state with keywordTrackingKey normalization.
+  // The `rankTrackingKeywords` cache holds the canonical TrackedKeyword[] array (the shape RankTracker
+  // consumes — both components share this key). `select` derives the normalized Set this component needs
+  // WITHOUT mutating the cached shape, so a tab switch between this panel and RankTracker can't read a Set
+  // where an array is expected (or vice versa).
   const { data: trackedKeywordsData } = useQuery({
     queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId),
-    queryFn: () => rankTracking.keywords(workspaceId)
-      .then(kws => new Set((kws || []).map(k => keywordTrackingKey(k.query)))),
+    queryFn: () => rankTracking.keywords(workspaceId),
+    select: (rows) => new Set((rows ?? []).map(k => keywordTrackingKey(k.query))),
     staleTime: 5 * 60 * 1000,
     enabled: !!workspaceId,
   });
@@ -221,10 +225,13 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     if (!key || trackedKeywords.has(key)) return;
     try {
       await rankTracking.addKeyword(workspaceId, { query: kw });
-      queryClient.setQueryData(
-        queryKeys.admin.rankTrackingKeywords(workspaceId),
-        (old: Set<string> | undefined) => new Set([...(old ?? []), key]),
-      );
+      // The rankTrackingKeywords cache holds TrackedKeyword[] (shared with RankTracker). addKeyword
+      // returns `unknown`, so we cannot synthesize a faithful TrackedKeyword (pinned/addedAt/source/etc.)
+      // for an optimistic array append. Invalidate instead — correctness over a micro-optimization; the
+      // refetch is cheap and keeps the canonical array shape intact for both consumers.
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId),
+      });
     } catch {
       // silently ignore duplicates — server deduplicates
     }
@@ -736,7 +743,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
 
           {/* ── Quick Wins ── */}
           <div id="quick-wins-section">
-            <QuickWins quickWins={strategy.quickWins || []} />
+            <QuickWins quickWins={strategy.quickWins ?? []} />
           </div>
 
           {/* ── Low-Hanging Fruit ── */}

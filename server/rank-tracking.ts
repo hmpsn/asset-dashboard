@@ -184,14 +184,52 @@ export function getTrackedKeywords(workspaceId: string, options: GetTrackedKeywo
   return keywords.filter(keyword => (keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE);
 }
 
+/**
+ * Nesting-safe, BEGIN IMMEDIATE wrapper for tracked_keywords read→mutate→write.
+ *
+ * Every writer that touches the tracked_keywords JSON blob MUST go through this
+ * helper to prevent the lost-update race: two concurrent writers both reading the
+ * same blob, mutating independently, and last-write-wins silently dropping keywords.
+ *
+ * Nesting guard: better-sqlite3 WRAPPED transactions (db.transaction(fn)()) do NOT
+ * throw when nested — they downgrade to a SAVEPOINT and inherit the outer txn. (Only
+ * a raw `db.prepare('BEGIN IMMEDIATE').run()` throws "cannot start a transaction
+ * within a transaction".) So the db.inTransaction guard below is NOT a throw-avoider;
+ * it is an optimisation that skips a needless inner SAVEPOINT and lets nested callers
+ * inherit the outer txn's write lock directly. KCC wraps its outer action in
+ * db.transaction() before calling updateTrackedKeywords → upsertTrackedKeywordByKey
+ * → updateTrackedKeywords → withTrackedKeywordsTxn; the guard NO-OPs the inner BEGIN
+ * so those nested callers run under the outer txn's serialisation.
+ *
+ * Returns the post-mutation TrackedKeyword[] so callers do NOT need a second
+ * getTrackedKeywords() call (the "3×-parse fix").
+ */
+export function withTrackedKeywordsTxn(
+  workspaceId: string,
+  updater: (current: TrackedKeyword[]) => TrackedKeyword[],
+): TrackedKeyword[] {
+  function run(): TrackedKeyword[] {
+    const config = readConfig(workspaceId);
+    config.trackedKeywords = normalizeTrackedKeywords(updater(config.trackedKeywords));
+    writeConfig(workspaceId, config);
+    return config.trackedKeywords;
+  }
+
+  // If we are already inside a transaction (e.g. KCC outer db.transaction()),
+  // run the read+write directly — the outer txn provides the lock.
+  if (db.inTransaction) {
+    return run();
+  }
+  // Otherwise, open a BEGIN IMMEDIATE transaction to acquire a write lock
+  // immediately, preventing concurrent readers from racing ahead of us.
+  return db.transaction(run).immediate();
+}
+
 export function updateTrackedKeywords(
   workspaceId: string,
   updater: (keywords: TrackedKeyword[]) => TrackedKeyword[],
 ): TrackedKeyword[] {
-  const config = readConfig(workspaceId);
-  config.trackedKeywords = normalizeTrackedKeywords(updater(config.trackedKeywords));
-  writeConfig(workspaceId, config);
-  return config.trackedKeywords;
+  return withTrackedKeywordsTxn(workspaceId, updater);
 }
 
 function addTrackedKeywordToConfig(
@@ -256,39 +294,40 @@ export function addTrackedKeyword(
   const options: AddTrackedKeywordOptions = typeof pinnedOrOptions === 'boolean'
     ? { pinned: pinnedOrOptions, source: TRACKED_KEYWORD_SOURCE.MANUAL }
     : pinnedOrOptions;
-  const config = readConfig(workspaceId);
-  if (addTrackedKeywordToConfig(config, query, options)) writeConfig(workspaceId, config);
-  return getTrackedKeywords(workspaceId);
+  return withTrackedKeywordsTxn(workspaceId, existing => {
+    const config = { trackedKeywords: existing };
+    addTrackedKeywordToConfig(config, query, options);
+    return config.trackedKeywords;
+  }).filter(keyword => (keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE);
 }
 
 export function addTrackedKeywords(
   workspaceId: string,
   entries: Array<{ query: string; options?: AddTrackedKeywordOptions }>,
 ): TrackedKeyword[] {
-  const config = readConfig(workspaceId);
-  let changed = false;
-  for (const entry of entries) {
-    changed = addTrackedKeywordToConfig(config, entry.query, entry.options ?? {}) || changed;
-  }
-  if (changed) writeConfig(workspaceId, config);
-  return getTrackedKeywords(workspaceId);
+  return withTrackedKeywordsTxn(workspaceId, existing => {
+    const config = { trackedKeywords: existing };
+    for (const entry of entries) {
+      addTrackedKeywordToConfig(config, entry.query, entry.options ?? {});
+    }
+    return config.trackedKeywords;
+  }).filter(keyword => (keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE);
 }
 
 export function removeTrackedKeyword(workspaceId: string, query: string): TrackedKeyword[] {
   const normalizedQuery = normalizeQuery(query);
-  const config = readConfig(workspaceId);
-  config.trackedKeywords = config.trackedKeywords.filter(k => normalizeQuery(k.query) !== normalizedQuery);
-  writeConfig(workspaceId, config);
-  return getTrackedKeywords(workspaceId);
+  return withTrackedKeywordsTxn(workspaceId, existing =>
+    existing.filter(k => normalizeQuery(k.query) !== normalizedQuery),
+  ).filter(keyword => (keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE);
 }
 
 export function togglePinKeyword(workspaceId: string, query: string): TrackedKeyword[] {
   const normalizedQuery = normalizeQuery(query);
-  const config = readConfig(workspaceId);
-  const kw = config.trackedKeywords.find(k => normalizeQuery(k.query) === normalizedQuery);
-  if (kw) kw.pinned = !kw.pinned;
-  writeConfig(workspaceId, config);
-  return getTrackedKeywords(workspaceId);
+  return withTrackedKeywordsTxn(workspaceId, existing => {
+    const kw = existing.find(k => normalizeQuery(k.query) === normalizedQuery);
+    if (kw) kw.pinned = !kw.pinned;
+    return existing;
+  }).filter(keyword => (keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE);
 }
 
 export function storeRankSnapshot(

@@ -4,6 +4,8 @@
 
 import { randomUUID } from 'crypto';
 import db from '../../server/db/index.js';
+import { replaceAllQuickWins } from '../../server/quick-wins.js';
+import { replaceAllContentGaps } from '../../server/content-gaps.js';
 
 export interface SeededStrategy {
   workspaceId: string;
@@ -78,6 +80,12 @@ export function seedStrategyData(): SeededStrategy {
   db.prepare(`
     UPDATE workspaces SET keyword_strategy = ? WHERE id = ?
   `).run(JSON.stringify(keywordStrategy), workspaceId);
+
+  // Also populate the normalized tables so routes that read table-only (e.g. listQuickWins,
+  // listContentGaps) return the fixture data. This is additive — the blob UPDATE above is
+  // kept for tests that read via getWorkspace() / the JSON blob path (journey tests).
+  replaceAllQuickWins(workspaceId, keywordStrategy.quickWins);
+  replaceAllContentGaps(workspaceId, keywordStrategy.contentGaps);
 
   const cleanup = () => {
     db.prepare('DELETE FROM workspaces WHERE id = ?').run(workspaceId);

@@ -375,7 +375,6 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.keywordFeedback(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywordRows(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingHistory(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
@@ -390,7 +389,6 @@ export function useWsInvalidation(workspaceId: string | undefined) {
     [WS_EVENTS.RANK_TRACKING_UPDATED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywordRows(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingHistory(workspaceId) });

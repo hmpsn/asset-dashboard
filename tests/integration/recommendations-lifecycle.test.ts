@@ -186,18 +186,16 @@ describe('GET /api/public/recommendations/:workspaceId — with seeded data', ()
   it('returns an empty recommendations array when no set is saved for a fresh workspace', async () => {
     const freshWs = createWorkspace('Rec Lifecycle Fresh WS');
     try {
-      // Don't seed anything — the GET will try to auto-generate, which may
-      // fail in test env (no OpenAI key). Either way we just need to confirm
-      // no cross-workspace data leaks.
+      // Cost fix (Task #13): don't seed anything — the GET returns an empty set
+      // deterministically (no inline generation, no OpenAI key needed). Confirm
+      // it's 200-empty and that no cross-workspace data leaks.
       const res = await api(`/api/public/recommendations/${freshWs.id}`);
-      // 200 (empty set from gen or mocked) or 500 (no OpenAI key) are both acceptable
-      expect([200, 500]).toContain(res.status);
-      if (res.status === 200) {
-        const body = await res.json() as RecommendationSet;
-        // Must not contain recs belonging to the other workspace
-        const ids = body.recommendations.map((r) => r.id);
-        expect(ids).not.toContain(seededRecId);
-      }
+      expect(res.status).toBe(200);
+      const body = await res.json() as RecommendationSet;
+      expect(body.recommendations.length).toBe(0);
+      // Must not contain recs belonging to the other workspace
+      const ids = body.recommendations.map((r) => r.id);
+      expect(ids).not.toContain(seededRecId);
     } finally {
       deleteWorkspace(freshWs.id);
     }

@@ -5121,6 +5121,9 @@ describe('Meta: customCheck rule name registry', () => {
     // the multi-phase generation-quality plan (no false positives on current code).
     'opportunity-money-field-must-be-stripped',
     'new-rec-type-source-needs-category-and-action-type',
+    // keyword-consolidation Wave 1 (2026-06-03) — prevents lost-update race on
+    // tracked_keywords JSON blob; enforces withTrackedKeywordsTxn (BEGIN IMMEDIATE).
+    'tracked_keywords bare read→write outside withTrackedKeywordsTxn',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -9951,6 +9954,107 @@ describe('Rule: new-rec-type-source-needs-category-and-action-type', () => {
         "  'strategy',",
         '];',
       ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: tracked_keywords bare read→write outside withTrackedKeywordsTxn
+// (T1d from keyword-consolidation Wave 1)
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: tracked_keywords bare read→write outside withTrackedKeywordsTxn', () => {
+  const RULE = 'tracked_keywords bare read→write outside withTrackedKeywordsTxn';
+
+  it('flags a direct readConfig() + writeConfig() call pair in a server file', () => {
+    const file = write(
+      uniqPath('rule-tracked-kw-txn', 'server/bad-writer.ts'),
+      lines(
+        "import db from './db/index.js';",                                                // 1
+        "export function unsafeWrite(wsId: string) {",                                   // 2
+        "  const config = readConfig(wsId);",                                            // 3 — flagged
+        "  config.trackedKeywords = config.trackedKeywords.filter(k => k.pinned);",      // 4
+        "  writeConfig(wsId, config);",                                                  // 5
+        "}",                                                                             // 6
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  it('respects // tracked-keywords-txn-ok hatch on the readConfig line', () => {
+    const file = write(
+      uniqPath('rule-tracked-kw-txn', 'server/hatch-inline.ts'),
+      lines(
+        "import db from './db/index.js';",
+        "export function rawAccess(wsId: string) {",
+        "  const config = readConfig(wsId); // tracked-keywords-txn-ok",
+        "  config.trackedKeywords = [];",
+        "  writeConfig(wsId, config);",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // tracked-keywords-txn-ok on the line above readConfig', () => {
+    const file = write(
+      uniqPath('rule-tracked-kw-txn', 'server/hatch-above.ts'),
+      lines(
+        "import db from './db/index.js';",
+        "export function rawAccess(wsId: string) {",
+        "  // tracked-keywords-txn-ok — this is an internal helper",
+        "  const config = readConfig(wsId);",
+        "  config.trackedKeywords = [];",
+        "  writeConfig(wsId, config);",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag code that calls withTrackedKeywordsTxn (correct pattern)', () => {
+    const file = write(
+      uniqPath('rule-tracked-kw-txn', 'server/correct-writer.ts'),
+      lines(
+        "import { withTrackedKeywordsTxn } from './rank-tracking.js';",
+        "export function safeWrite(wsId: string) {",
+        "  return withTrackedKeywordsTxn(wsId, existing =>",
+        "    existing.filter(k => k.pinned),",
+        "  );",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag code that only reads (no writeConfig call)', () => {
+    const file = write(
+      uniqPath('rule-tracked-kw-txn', 'server/read-only.ts'),
+      lines(
+        "export function getKeywords(wsId: string) {",
+        "  const config = readConfig(wsId);",
+        "  return config.trackedKeywords;",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag server/rank-tracking.ts (the implementation file itself)', () => {
+    // The rule excludes server/rank-tracking.ts since it defines the primitive
+    const file = write(
+      uniqPath('rule-tracked-kw-txn', 'server/rank-tracking.ts'),
+      lines(
+        "export function withTrackedKeywordsTxn(wsId: string, updater: Function) {",
+        "  const config = readConfig(wsId);",
+        "  config.trackedKeywords = updater(config.trackedKeywords);",
+        "  writeConfig(wsId, config);",
+        "  return config.trackedKeywords;",
+        "}",
+      )
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
