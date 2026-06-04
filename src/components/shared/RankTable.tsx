@@ -3,7 +3,7 @@ import { Fragment } from 'react';
 import { ChevronUp, ChevronDown, TrendingUp } from 'lucide-react'; // trend-icon-ok — sort-direction chevrons + decorative section icon, not metric trend indicators
 import type { LucideIcon } from 'lucide-react';
 
-import { SectionCard, Icon, EmptyState, Checkbox, Button } from '../ui';
+import { SectionCard, Icon, EmptyState, Checkbox, Button, ClickableRow } from '../ui';
 import { CHART_SERIES_ORDER, positionColor as sharedPositionColor } from '../ui/constants';
 import { TableSkeleton } from '../ui/LoadingState';
 import { kdColor as sharedKdColor } from '../page-intelligence/pageIntelligenceDisplay';
@@ -462,14 +462,14 @@ export function KeywordTable<T extends KeywordTableRow>({
                   {renderKeywordMeta ? (
                     <td className={`${cell} text-[var(--brand-text-bright)]${truncateKeyword ? ' max-w-[200px]' : ''}`}>
                       {onRowClick ? (
-                        <button
-                          type="button"
+                        <ClickableRow
+                          active={false}
                           onClick={() => onRowClick(r)}
-                          className="block w-full text-left bg-transparent hover:bg-transparent focus-visible:outline-offset-4 min-w-0"
+                          className="bg-transparent hover:bg-transparent focus-visible:outline-offset-4 min-w-0 p-0"
                         >
                           <span className={truncateKeyword ? 'truncate block font-semibold' : 'block font-semibold'}>{keyText}</span>
                           {renderKeywordMeta(r)}
-                        </button>
+                        </ClickableRow>
                       ) : (
                         <>
                           <span className={truncateKeyword ? 'truncate block' : 'block'}>{keyText}</span>
