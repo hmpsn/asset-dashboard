@@ -1,7 +1,6 @@
 import type { IntelligenceOptions, LearningsSlice, ROIAttribution, WeCalledItEntry } from '../../shared/types/intelligence.js';
 import type { ActionOutcome, TopWin } from '../../shared/types/outcome-tracking.js';
 import { createLogger } from '../logger.js';
-import { isFeatureEnabled } from '../feature-flags.js';
 import { isProgrammingError } from '../errors.js';
 
 const log = createLogger('workspace-intelligence/learnings');
@@ -10,19 +9,6 @@ export async function assembleLearnings(
   workspaceId: string,
   opts?: IntelligenceOptions,
 ): Promise<LearningsSlice> {
-  // Only assemble if feature flag is enabled
-  if (!isFeatureEnabled('outcome-ai-injection')) {
-    return {
-      availability: 'disabled',
-      summary: null,
-      confidence: null,
-      topActionTypes: [],
-      overallWinRate: 0,
-      recentTrend: null,
-      playbooks: [],
-    };
-  }
-
   let summary: ReturnType<Awaited<typeof import('../workspace-learnings.js')>['getWorkspaceLearnings']> | undefined;
   let playbooks: ReturnType<Awaited<typeof import('../outcome-playbooks.js')>['getPlaybooks']> = [];
   let availability: LearningsSlice['availability'] = 'no_data';

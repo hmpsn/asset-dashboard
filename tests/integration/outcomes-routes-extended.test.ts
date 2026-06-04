@@ -29,9 +29,6 @@ import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 
-// Enable the feature flag before the server process starts
-process.env.FEATURE_OUTCOME_TRACKING = 'true';
-
 const ctx = createTestContext(13371); // port-ok: unique, confirmed free
 const { api, postJson } = ctx;
 

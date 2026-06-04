@@ -27,7 +27,7 @@ export interface BriefingInstructionsInput {
   workspaceName: string;
   weekLabel: string;          // e.g. "Week of April 27"
   candidateBlock?: string;    // already-formatted candidate list (from briefing-candidates.ts)
-  learningsContext?: string;  // optional outcome-ai-injection block
+  learningsContext?: string;  // optional outcome learnings block
 }
 
 /**

@@ -393,17 +393,3 @@ describe('slices/sections consistency — learnings section requires learnings s
     });
   }
 });
-
-// ── assembleLearnings feature flag gate ──────────────────────────────────────
-
-describe('assembleLearnings feature flag gate', () => {
-  it('learnings-slice.ts: assembleLearnings checks outcome-ai-injection flag before assembling', () => {
-    const src = readFileSync(resolve(serverDir, 'intelligence/learnings-slice.ts'), 'utf-8'); // readFile-ok — contract guard: asserts assembleLearnings checks the outcome-ai-injection feature flag before expensive DB calls, preserving behavioral parity with the old buildSeoContext() gate.
-    // Feature flag gate must appear INSIDE assembleLearnings, before the expensive DB calls.
-    // This ensures behavioral parity with old buildSeoContext() which also gated on this flag.
-    const fnStart = src.indexOf('async function assembleLearnings(');
-    const fnEnd = src.indexOf('\nasync function ', fnStart + 1);
-    const fnBody = src.slice(fnStart, fnEnd > 0 ? fnEnd : fnStart + 2000);
-    expect(fnBody).toContain("isFeatureEnabled('outcome-ai-injection')");
-  });
-});

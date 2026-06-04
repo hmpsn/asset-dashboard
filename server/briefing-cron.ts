@@ -11,7 +11,7 @@
 //   to MAX_DEFERRALS times by writing a placeholder draft with an incremented
 //   `preflightDeferralCount`. On the next run after MAX_DEFERRALS, generate
 //   anyway (better stale than silent).
-// - Soft-degrades when `outcome-ai-injection` is OFF: skip the learnings
+// - Soft-degrades when outcome learnings are unavailable: skip the learnings
 //   context block but still generate.
 // - Auto-publishes when ws.autoPublishBriefings && ws.autoPublishAfterHours === 0.
 //

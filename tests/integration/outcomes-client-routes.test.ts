@@ -19,9 +19,6 @@ import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 
-// Enable outcome tracking feature flag before server starts
-process.env.FEATURE_OUTCOME_TRACKING = 'true';
-
 const ctx = createTestContext(13386); // port-ok: next free after 13385
 const { api, postJson } = ctx;
 

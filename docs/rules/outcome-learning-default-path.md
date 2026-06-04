@@ -9,8 +9,7 @@ Purpose: make workspace outcome learnings a first-class input to recommendation 
    - Shared generation builders may also return `'not_requested'` when a caller intentionally omitted the `learnings` slice. That state is builder-local control-plane metadata, not a slice state.
    - Callers must distinguish:
      - `ready`: real learnings exist and may influence scoring/prompts
-     - `disabled`: feature flag is off
-     - `no_data`: feature is on, but the workspace has not accumulated enough measured outcomes yet
+     - `no_data`: the workspace has not accumulated enough measured outcomes yet
      - `degraded`: the learnings subsystem failed for this run and callers should continue safely
      - `not_requested`: the caller chose not to request learnings, so no fallback note or scoring adjustment should be inferred from that omission
 
@@ -18,7 +17,7 @@ Purpose: make workspace outcome learnings a first-class input to recommendation 
    - Content/recommendation consumers should prefer:
      - `buildContentGenerationContext()`
      - `buildRecommendationGenerationContext()`
-   - These builders now return `learningsAvailability` alongside `promptContext` so callers can explain why learnings are absent without re-reading feature flags or ad hoc helpers.
+   - These builders now return `learningsAvailability` alongside `promptContext` so callers can explain why learnings are absent without ad hoc helpers.
 
 3. Outcome-based scoring must flow through the typed seam.
    - Recommendation engines should use:
@@ -30,15 +29,14 @@ Purpose: make workspace outcome learnings a first-class input to recommendation 
    - When a content/recommendation prompt normally benefits from learnings but the builder returns no learnings block, callers should add a short status note from `buildOutcomeLearningStatusNote(...)`.
    - This keeps the model from over-assuming prior wins while preserving a graceful fallback to general best practices.
 
-## Scope for PR5
+## Scope
 
-This phase intentionally does **not**:
-- flip `outcome-ai-injection` on by default
+This path intentionally does **not**:
 - change tier gating
 - promise that every workspace has learnings
 - rebuild the full outcome engine
 
-This phase **does**:
+This path **does**:
 - make learnings availability visible to shared builders
 - route high-value recommendation scoring through a typed outcome-adjustment seam
 - remove ad hoc learnings injection from builder-backed content brief paths
@@ -59,4 +57,4 @@ At minimum, PRs touching this path should prove:
 2. disabled / empty / degraded states do not crash prompt assembly
 3. recommendation scoring uses the shared outcome-adjustment seam
 4. strong prior wins can boost scores and weak history can down-rank them
-5. no rollout behavior changes unless a separate PR explicitly changes the feature flag policy
+5. no rollout behavior changes unless a separate PR explicitly changes the outcome-learning availability contract

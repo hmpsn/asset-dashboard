@@ -5,7 +5,6 @@ import { Router } from 'express';
 import { requireWorkspaceAccess } from '../auth.js';
 import { requireClientPortalAuth } from '../middleware.js';
 import { validate, z } from '../middleware/validate.js';
-import { isFeatureEnabled } from '../feature-flags.js';
 import { createLogger } from '../logger.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { withWorkspaceLock } from '../bridge-infrastructure.js';
@@ -41,16 +40,6 @@ import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 const log = createLogger('outcomes');
 
 const router = Router();
-
-// ── Feature flag guard ──
-router.use('/api/outcomes', (_req, res, next) => {
-  if (!isFeatureEnabled('outcome-tracking')) return res.status(404).json({ error: 'Not found' });
-  next();
-});
-router.use('/api/public/outcomes', (_req, res, next) => {
-  if (!isFeatureEnabled('outcome-tracking')) return res.status(404).json({ error: 'Not found' });
-  next();
-});
 
 // ── Helpers ──
 
@@ -484,7 +473,7 @@ router.get('/api/outcomes/:workspaceId/diagnostics', requireWorkspaceAccess('wor
 
     res.json({
       workspaceId: wsId,
-      featureEnabled: isFeatureEnabled('outcome-tracking'),
+      featureEnabled: true,
       tableCounts: {
         trackedActions: counts.total,
         scored: counts.scored,

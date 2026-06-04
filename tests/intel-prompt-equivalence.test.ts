@@ -122,26 +122,8 @@ describe('buildIntelPrompt behavioral equivalence', () => {
     expect(detailedResult).toContain('enterprise seo');
   });
 
-  // 5. Learnings slice safely returns empty/no-op when feature flag is off
-  it('learnings slice produces no-op output when outcome-ai-injection flag is disabled', async () => {
-    const featureFlags = await import('../server/feature-flags.js');
-    vi.mocked(featureFlags.isFeatureEnabled).mockReturnValue(false);
-
-    const { buildIntelPrompt } = await import('../server/workspace-intelligence.js');
-    // Should not crash; result is a string (may be cold-start message or seoContext only)
-    const result = await buildIntelPrompt(WS_ID, ['learnings']);
-    expect(typeof result).toBe('string');
-    // The learnings section must not appear — empty learnings slice produces no section
-    expect(result).not.toContain('## Outcome Learnings');
-  });
-
-  // 6. Learnings slice returns content when feature flag is on
-  it('learnings slice includes learnings content when outcome-ai-injection is enabled', async () => {
-    const featureFlags = await import('../server/feature-flags.js');
-    vi.mocked(featureFlags.isFeatureEnabled).mockImplementation(
-      (flag: string) => flag === 'outcome-ai-injection',
-    );
-
+  // 5. Learnings slice returns content by default
+  it('learnings slice includes learnings content when data is available', async () => {
     const workspaceLearnings = await import('../server/workspace-learnings.js');
     vi.mocked(workspaceLearnings.getWorkspaceLearnings).mockReturnValue({
       workspaceId: WS_ID,
@@ -168,13 +150,8 @@ describe('buildIntelPrompt behavioral equivalence', () => {
     expect(result).toContain('75%');
   });
 
-  // 7. slices parameter controls what's included
+  // 6. slices parameter controls what's included
   it('requesting only seoContext excludes learnings section', async () => {
-    const featureFlags = await import('../server/feature-flags.js');
-    vi.mocked(featureFlags.isFeatureEnabled).mockImplementation(
-      (flag: string) => flag === 'outcome-ai-injection',
-    );
-
     await invalidateCache();
 
     const { buildIntelPrompt } = await import('../server/workspace-intelligence.js');
@@ -184,7 +161,7 @@ describe('buildIntelPrompt behavioral equivalence', () => {
     expect(result).not.toContain('win rate');
   });
 
-  // 8. Cold-start detection — empty workspace returns fallback message, not crash
+  // 7. Cold-start detection — empty workspace returns fallback message, not crash
   it('returns cold-start message for workspace with no data', async () => {
     const seoContextSource = await import('../server/intelligence/seo-context-source.js');
     const workspaces = await import('../server/workspaces.js');

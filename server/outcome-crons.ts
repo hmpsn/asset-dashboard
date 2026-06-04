@@ -3,7 +3,6 @@
 // Registered at startup via startOutcomeCrons(); safe to call multiple times (idempotent).
 
 import { createLogger } from './logger.js';
-import { isFeatureEnabled } from './feature-flags.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { queueKeywordStrategyPostUpdateFollowOns } from './keyword-strategy-follow-ons.js';
 import { runBackfill } from './outcome-backfill.js';
@@ -37,10 +36,6 @@ let rankDeclineScanInterval: ReturnType<typeof setInterval> | null = null;
 let startupTimeouts: ReturnType<typeof setTimeout>[] = [];
 
 export function startOutcomeCrons() {
-  if (!isFeatureEnabled('outcome-tracking')) {
-    log.info('Outcome tracking disabled — skipping cron registration');
-    return;
-  }
   if (measureInterval) return; // already started
 
   const runMeasure = async () => {
@@ -176,7 +171,6 @@ export function startOutcomeCrons() {
   };
 
   const runDetection = async () => {
-    if (!isFeatureEnabled('outcome-external-detection')) return;
     try {
       const { detectExternalExecutions }: typeof ExternalDetection = await import('./external-detection.js'); // dynamic-import-ok
       await detectExternalExecutions();
@@ -186,7 +180,6 @@ export function startOutcomeCrons() {
   };
 
   const runPlaybooks = async () => {
-    if (!isFeatureEnabled('outcome-playbooks')) return;
     try {
       const { detectAllWorkspacePlaybooks }: typeof OutcomePlaybooks = await import('./outcome-playbooks.js'); // dynamic-import-ok
       await detectAllWorkspacePlaybooks();

@@ -4,7 +4,6 @@
 import { ArrowUp, ArrowDown, Minus, BarChart3, CheckCircle2, Clock, Trophy } from 'lucide-react';
 import { SectionCard, EmptyState, Skeleton, StatCard } from '../ui';
 import { Icon } from '../ui/Icon';
-import { FeatureFlag } from '../ui/FeatureFlag';
 import { TierGate } from '../ui/TierGate';
 import { useClientOutcomeSummary } from '../../hooks/client/useClientOutcomes';
 // scoreColor helpers used locally via winRateColor()
@@ -203,16 +202,15 @@ export default function OutcomeSummary({ workspaceId, tier }: OutcomeSummaryProp
   const { data: scorecard, isLoading } = useClientOutcomeSummary(workspaceId);
 
   return (
-    <FeatureFlag flag="outcome-client-reporting">
-      <SectionCard
-        title="Your results"
-        titleIcon={<Icon as={Trophy} size="md" className="text-accent-brand" />}
-        action={
-          <span className="t-caption text-[var(--brand-text-muted)] flex items-center gap-1">
-            <Icon as={Clock} size="sm" /> Measured over 90 days
-          </span>
-        }
-      >
+    <SectionCard
+      title="Your results"
+      titleIcon={<Icon as={Trophy} size="md" className="text-accent-brand" />}
+      action={
+        <span className="t-caption text-[var(--brand-text-muted)] flex items-center gap-1">
+          <Icon as={Clock} size="sm" /> Measured over 90 days
+        </span>
+      }
+    >
 
         {isLoading && (
           <div className="space-y-3">
@@ -274,7 +272,6 @@ export default function OutcomeSummary({ workspaceId, tier }: OutcomeSummaryProp
             )}
           </>
         )}
-      </SectionCard>
-    </FeatureFlag>
+    </SectionCard>
   );
 }

@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  isFeatureEnabled: vi.fn(),
   getWorkspaceLearnings: vi.fn(),
   getPlaybooks: vi.fn(),
   getActionsByWorkspace: vi.fn(),
@@ -11,10 +10,6 @@ const mocks = vi.hoisted(() => ({
   isProgrammingError: vi.fn(),
   logWarn: vi.fn(),
   logDebug: vi.fn(),
-}));
-
-vi.mock('../../server/feature-flags.js', () => ({
-  isFeatureEnabled: mocks.isFeatureEnabled,
 }));
 
 vi.mock('../../server/workspace-learnings.js', () => ({
@@ -53,7 +48,6 @@ const { assembleLearnings } = await import('../../server/intelligence/learnings-
 beforeEach(() => {
   vi.clearAllMocks();
 
-  mocks.isFeatureEnabled.mockReturnValue(true);
   mocks.getWorkspaceLearnings.mockReturnValue({
     confidence: 'high',
     overall: {
@@ -163,24 +157,29 @@ describe('assembleLearnings', () => {
     });
   });
 
-  it('returns disabled baseline when feature flag is off', async () => {
-    mocks.isFeatureEnabled.mockReturnValue(false);
+  it('returns default-on no_data baseline when learnings are unavailable', async () => {
+    mocks.getWorkspaceLearnings.mockReturnValue(null);
+    mocks.getPlaybooks.mockReturnValue([]);
+    mocks.getActionsByWorkspace.mockReturnValue([]);
+    mocks.getTopWinsFromActions.mockReturnValue([]);
+    mocks.getWorkspace.mockReturnValue(null);
 
-    const result = await assembleLearnings('ws_disabled');
+    const result = await assembleLearnings('ws_no_data');
 
-    expect(result).toEqual({
-      availability: 'disabled',
-      summary: null,
-      confidence: null,
-      topActionTypes: [],
-      overallWinRate: 0,
-      recentTrend: null,
-      playbooks: [],
-    });
-    expect(mocks.getWorkspaceLearnings).not.toHaveBeenCalled();
-    expect(mocks.getPlaybooks).not.toHaveBeenCalled();
-    // roi_attributions no longer consulted (Task 2.3) — getActionsByWorkspace provides the data
-    expect(mocks.getActionsByWorkspace).not.toHaveBeenCalled();
+    expect(result.availability).toBe('no_data');
+    expect(result.summary).toBeNull();
+    expect(result.confidence).toBeNull();
+    expect(result.topActionTypes).toEqual([]);
+    expect(result.overallWinRate).toBe(0);
+    expect(result.recentTrend).toBeNull();
+    expect(result.playbooks).toEqual([]);
+    expect(result.roiAttribution).toEqual([]);
+    expect(result.topWins).toEqual([]);
+    expect(result.weCalledIt).toEqual([]);
+    expect(result.winRateByActionType).toEqual({});
+    expect(result.scoringConfig).toBeUndefined();
+    expect(mocks.getWorkspaceLearnings).toHaveBeenCalledWith('ws_no_data', 'all');
+    expect(mocks.getActionsByWorkspace).toHaveBeenCalledWith('ws_no_data');
   });
 
   it('degrades core load failures and preserves stable defaults', async () => {

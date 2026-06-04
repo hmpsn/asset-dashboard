@@ -2,8 +2,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-process.env.FEATURE_OUTCOME_TRACKING = 'true';
-
 const ctx = createTestContext(13740);
 const { api } = ctx;
 
