@@ -286,19 +286,18 @@ export function protectedReason(keyword: TrackedKeyword | undefined): string | u
 }
 
 /**
- * #19b dual-read (Wave 3b-i): return the strategy with its `siteKeywordMetrics`
- * resolved table-first (site_keyword_metrics table), falling back to the blob
- * array carried on the strategy. All KCC consumers read `strategy.siteKeywordMetrics`
- * off this object, so overriding it once at each entry point repoints every
- * downstream read. The blob is still written/read as the fallback — the strip is
- * the follow-up 3b-ii PR.
+ * #19b table-as-truth (Wave 3b-ii strip): return the strategy with its
+ * `siteKeywordMetrics` resolved from the site_keyword_metrics table, the sole
+ * store. All KCC consumers read `strategy.siteKeywordMetrics` off this object, so
+ * overriding it once at each entry point repoints every downstream read. The blob
+ * no longer carries siteKeywordMetrics.
  */
 function withResolvedSiteKeywordMetrics(
   workspaceId: string,
   strategy: KeywordStrategy | null | undefined,
 ): KeywordStrategy | null | undefined {
   if (!strategy) return strategy;
-  const resolved = resolveSiteKeywordMetrics(workspaceId, strategy.siteKeywordMetrics);
+  const resolved = resolveSiteKeywordMetrics(workspaceId);
   return { ...strategy, siteKeywordMetrics: resolved.length > 0 ? resolved : undefined };
 }
 

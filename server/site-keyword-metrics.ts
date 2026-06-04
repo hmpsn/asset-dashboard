@@ -5,13 +5,13 @@
  * into indexed SQLite rows keyed by (workspace_id, normalized_query) where
  * normalized_query = keywordComparisonKey(keyword).
  *
- * Wave 3b-i is the ADDITIVE half: this module is wired in as a DUAL-WRITE (the
- * persist path keeps writing the blob too) and a DUAL-READ source (readers read
- * the table first, falling back to the blob via `resolveSiteKeywordMetrics`).
- * The blob write at keyword-strategy-persistence.ts:102 and every read fallback
- * are KEPT. The forced strip (cut the blob write + the generation
- * `existingStrategy?.siteKeywordMetrics` source + remove the fallbacks) is the
- * follow-up owner-gated 3b-ii PR.
+ * Wave 3b-ii is the STRIP half (table-as-truth): this table is now the SOLE
+ * store for siteKeywordMetrics. The blob `siteKeywordMetrics` write has been cut
+ * from keyword-strategy-persistence.ts, the generation carry-forward source reads
+ * from the table, and `resolveSiteKeywordMetrics` is table-only (no blob
+ * fallback). Only the boot backfill `migrateSiteKeywordMetricsFromBlob` still
+ * reads legacy blobs — it is populate-only/idempotent and protects any legacy
+ * workspace whose table is still empty (not yet re-persisted post-strip).
  */
 import db from './db/index.js';
 import { createLogger } from './logger.js';
@@ -128,18 +128,17 @@ export function deleteAllSiteKeywordMetrics(workspaceId: string): void {
 }
 
 /**
- * DUAL-READ resolver — table-first, blob fallback.
+ * Resolver — table-only (Wave 3b-ii strip; table-as-truth).
  *
- * Returns the table rows when the table is populated; otherwise the legacy blob
- * array (so un-migrated legacy workspaces don't lose data before the forced
- * strip). The fallback is removed only in the 3b-ii strip PR, never here.
+ * Returns the site_keyword_metrics rows for the workspace unconditionally. The
+ * legacy blob fallback was removed in the 3b-ii strip PR — the table is now the
+ * sole source of truth. Any legacy workspace not yet re-persisted is covered by
+ * the populate-only boot backfill `migrateSiteKeywordMetricsFromBlob`.
  */
 export function resolveSiteKeywordMetrics(
   workspaceId: string,
-  blobMetrics: KeywordStrategySiteKeywordMetric[] | undefined,
 ): KeywordStrategySiteKeywordMetric[] {
-  const fromTable = listSiteKeywordMetrics(workspaceId);
-  return fromTable.length > 0 ? fromTable : (blobMetrics ?? []);
+  return listSiteKeywordMetrics(workspaceId);
 }
 
 /**
@@ -151,9 +150,12 @@ export function resolveSiteKeywordMetrics(
  * acquiring the write lock, so a concurrent persist that already populated the
  * table cannot be double-inserted.
  *
- * ADDITIVE: this step ONLY populates the table. It does NOT strip the blob
- * `siteKeywordMetrics` array (that is the 3b-ii strip). There is no CAS on the
- * `keyword_strategy` column because the blob is left untouched.
+ * POPULATE-ONLY: this step ONLY populates the table from any legacy blob that
+ * still carries `siteKeywordMetrics`. Post-3b-ii the persist path no longer
+ * writes that blob key, but pre-strip rows may still carry it — this backfill is
+ * the migration bridge for those legacy workspaces. It does NOT mutate the
+ * `keyword_strategy` column (no CAS needed) and never overwrites a populated
+ * table (idempotent guard below).
  */
 export function migrateSiteKeywordMetricsFromBlob(): void {
   const rows = db.prepare(`

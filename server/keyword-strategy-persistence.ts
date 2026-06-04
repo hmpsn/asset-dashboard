@@ -100,7 +100,12 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
   delete strategyMeta.cannibalization;
   const keywordStrategy = {
     ...strategyMeta,
-    siteKeywordMetrics: siteKeywordMetrics.length > 0 ? siteKeywordMetrics : undefined,
+    // siteKeywordMetrics is NOT written to the blob (Wave 3b-ii strip; table-as-truth).
+    // It is persisted solely to the site_keyword_metrics table via
+    // replaceAllSiteKeywordMetrics below. If `strategyMeta` carries a stale
+    // siteKeywordMetrics key forward from a previous blob, drop it so the column
+    // never re-acquires the array.
+    siteKeywordMetrics: undefined,
     competitorKeywordData: competitorKeywordData.length > 0 ? competitorKeywordData.slice(0, 150) : undefined,
     questionKeywords: questionKeywords.length > 0 ? questionKeywords : undefined,
     businessContext: businessContext || undefined,
@@ -151,9 +156,11 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
     replaceAllKeywordGaps(ws.id, keywordGaps);
     replaceAllTopicClusters(ws.id, topicClusters);
     replaceAllCannibalizationIssues(ws.id, cannibalization);
-    // DUAL-WRITE (#19b, Wave 3b-i): keep the site_keyword_metrics table current
-    // on every persist. The blob siteKeywordMetrics write below (in keywordStrategy)
-    // is KEPT — this is the additive half; the strip is the 3b-ii PR.
+    // SOLE STORE (#19b, Wave 3b-ii strip; table-as-truth): the
+    // site_keyword_metrics table is now the only persisted home for
+    // siteKeywordMetrics. The blob siteKeywordMetrics write was cut above
+    // (keywordStrategy.siteKeywordMetrics is forced undefined) — this table write
+    // is the source of truth every reader resolves through.
     replaceAllSiteKeywordMetrics(ws.id, siteKeywordMetrics);
 
     const previousStrategy = ws.keywordStrategy;

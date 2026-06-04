@@ -18,6 +18,7 @@ import {
 } from './keyword-strategy-ai-synthesis.js';
 import { enrichKeywordStrategy } from './keyword-strategy-enrichment.js';
 import { persistKeywordStrategy } from './keyword-strategy-persistence.js';
+import { resolveSiteKeywordMetrics } from './site-keyword-metrics.js';
 import { sanitizeKeywordStrategyDerivedArtifacts, sanitizeKeywordStrategyKeywordGaps, sanitizeKeywordStrategyOutput } from './keyword-strategy-sanitizer.js';
 import { queueKeywordStrategyPostUpdateFollowOns, seedKeywordStrategyTrackedKeywords, workspaceHasStrategyOwnedRankTracking } from './keyword-strategy-follow-ons.js';
 import { listContentGaps } from './content-gaps.js';
@@ -304,7 +305,13 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
           pagesToAnalyze: [],
           extraPagePaths: noOpUpdatedPagePaths,
           removedPagePaths: noOpRemovedPagePaths,
-          siteKeywordMetrics: existingStrategy?.siteKeywordMetrics ?? [],
+          // Wave 3b-ii strip (table-as-truth): `existingStrategy` is `ws.keywordStrategy`,
+          // a RAW blob read (workspaces.ts rowToWorkspace → parseJsonSafe of keyword_strategy).
+          // The blob no longer carries siteKeywordMetrics, so reading it off `existingStrategy`
+          // would carry forward an empty array and silently drop the metrics on every
+          // incremental no-op re-persist. Source from the table — the sole store — instead,
+          // so the closed loop survives.
+          siteKeywordMetrics: resolveSiteKeywordMetrics(ws.id),
           keywordGaps: sanitizedNoOpKeywordGaps,
           competitorKeywordData: existingStrategy?.competitorKeywordData ?? competitorKeywordData,
           topicClusters: listTopicClusters(ws.id),

@@ -1,13 +1,14 @@
 /**
- * Wave 3b-i (#19b) — site_keyword_metrics store + boot backfill + dual-write +
- * dual-read fallback + reconcile baseline + CASCADE.
+ * Wave 3b-ii (#19b) — site_keyword_metrics store + boot backfill + table-only
+ * resolver + reconcile baseline + CASCADE (table-as-truth, post-strip).
  *
- * ADDITIVE half: the blob `siteKeywordMetrics` write is KEPT (dual-write); the
- * read fallback is KEPT (dual-read). The strip is the follow-up 3b-ii PR.
+ * STRIP half: the blob `siteKeywordMetrics` write is CUT (persist no longer
+ * writes it); the resolver is table-only (no blob fallback). The boot backfill
+ * still reads legacy blobs — it is the populate-only migration bridge.
  *
- * In-process DB store/migration coverage. The public-read dual-read fallback is
- * separately exercised through the real HTTP route in the integration test
- * `tests/integration/site-keyword-metrics-public-read.test.ts` (port 13890).
+ * In-process DB store/migration coverage. The closed-loop survival through the
+ * real HTTP public-read route is exercised in the integration test
+ * `tests/integration/site-keyword-metrics-strip.test.ts`.
  */
 import { describe, it, expect, afterAll, beforeAll } from 'vitest';
 import db from '../../server/db/index.js';
@@ -73,15 +74,14 @@ describe('site-keyword-metrics store', () => {
     replaceAllSiteKeywordMetrics(ws.id, [metric({ keyword: 'will be cleared', volume: 500, difficulty: 20 })]);
     expect(countSiteKeywordMetrics(ws.id)).toBe(1);
 
-    // A subsequent persist whose metrics became empty must DELETE the stale rows,
-    // so the table matches the blob (which writes `undefined` for empty). If the
-    // table kept the old rows, the table-first resolver would serve stale data.
+    // A subsequent persist whose metrics became empty must DELETE the stale rows.
+    // The table is now the sole store, so leaving stale rows would serve stale data.
     replaceAllSiteKeywordMetrics(ws.id, []);
     expect(countSiteKeywordMetrics(ws.id)).toBe(0);
     expect(listSiteKeywordMetrics(ws.id)).toEqual([]);
 
-    // And the resolver now correctly falls through to the (empty) blob, not stale rows.
-    expect(resolveSiteKeywordMetrics(ws.id, undefined)).toEqual([]);
+    // The table-only resolver returns [] — no blob fallback.
+    expect(resolveSiteKeywordMetrics(ws.id)).toEqual([]);
   });
 
   it('deduplicates by normalized_query (keywordComparisonKey), last wins', () => {
@@ -99,10 +99,10 @@ describe('site-keyword-metrics store', () => {
   });
 });
 
-// ── (a) Dual-write: a persist keeps the table current AND keeps the blob ──
+// ── (a) Strip-write: a persist populates the table and STRIPS the blob ──
 
-describe('site-keyword-metrics dual-write via persistKeywordStrategy', () => {
-  it('populates the table on persist (and still writes the blob)', () => {
+describe('site-keyword-metrics strip-write via persistKeywordStrategy', () => {
+  it('populates the table on persist AND strips siteKeywordMetrics from the blob', () => {
     const ws = createWorkspace(`SKM DualWrite ${Date.now()}`);
     cleanupWorkspaceIds.push(ws.id);
 
@@ -128,14 +128,21 @@ describe('site-keyword-metrics dual-write via persistKeywordStrategy', () => {
       searchData: { deviceBreakdown: [], countryBreakdown: [], periodComparison: undefined, organicLandingPages: [], organicOverview: undefined },
     });
 
-    // Table is current (dual-write).
+    // Table is the sole store.
     const rows = listSiteKeywordMetrics(ws.id);
     expect(rows.map(r => r.keyword).sort()).toEqual(['emergency dentist', 'invisalign cost']);
 
-    // Blob STILL carries siteKeywordMetrics (NO strip — additive PR).
+    // Blob NO LONGER carries siteKeywordMetrics (Wave 3b-ii strip).
     const reloaded = getWorkspace(ws.id);
-    expect(reloaded?.keywordStrategy?.siteKeywordMetrics).toBeDefined();
-    expect((reloaded?.keywordStrategy?.siteKeywordMetrics ?? []).map(m => m.keyword).sort())
+    expect(reloaded?.keywordStrategy?.siteKeywordMetrics).toBeUndefined();
+
+    // Belt-and-suspenders: assert the raw stored JSON column has no such key.
+    const rawRow = db.prepare('SELECT keyword_strategy FROM workspaces WHERE id = ?').get(ws.id) as { keyword_strategy: string | null };
+    expect(rawRow.keyword_strategy).toBeTruthy();
+    expect(JSON.parse(rawRow.keyword_strategy as string)).not.toHaveProperty('siteKeywordMetrics');
+
+    // But the resolver still serves the metrics from the table.
+    expect(resolveSiteKeywordMetrics(ws.id).map(m => m.keyword).sort())
       .toEqual(['emergency dentist', 'invisalign cost']);
   });
 });
@@ -179,28 +186,27 @@ describe('migrateSiteKeywordMetricsFromBlob (boot backfill)', () => {
   });
 });
 
-// ── (c) Dual-read fallback: resolveSiteKeywordMetrics is table-first, blob-fallback ──
+// ── (c) Table-only resolver: resolveSiteKeywordMetrics reads the table, no fallback ──
 
-describe('resolveSiteKeywordMetrics (table-first, blob fallback)', () => {
+describe('resolveSiteKeywordMetrics (table-only, no blob fallback)', () => {
   it('returns table values when the table is populated', () => {
     const ws = createWorkspace(`SKM ResolveTable ${Date.now()}`);
     cleanupWorkspaceIds.push(ws.id);
     replaceAllSiteKeywordMetrics(ws.id, [metric({ keyword: 'from table', volume: 10, difficulty: 5 })]);
-    const blob = [{ keyword: 'from blob', volume: 99, difficulty: 99 }];
-    expect(resolveSiteKeywordMetrics(ws.id, blob)).toEqual([{ keyword: 'from table', volume: 10, difficulty: 5 }]);
+    expect(resolveSiteKeywordMetrics(ws.id)).toEqual([{ keyword: 'from table', volume: 10, difficulty: 5 }]);
   });
 
-  it('falls back to the blob when the table is empty', () => {
-    const ws = createWorkspace(`SKM ResolveBlob ${Date.now()}`);
-    cleanupWorkspaceIds.push(ws.id);
-    const blob = [{ keyword: 'from blob', volume: 99, difficulty: 99 }];
-    expect(resolveSiteKeywordMetrics(ws.id, blob)).toEqual(blob);
-  });
-
-  it('returns [] when both table and blob are empty', () => {
+  it('returns [] when the table is empty (NO blob fallback after the strip)', () => {
     const ws = createWorkspace(`SKM ResolveEmpty ${Date.now()}`);
     cleanupWorkspaceIds.push(ws.id);
-    expect(resolveSiteKeywordMetrics(ws.id, undefined)).toEqual([]);
+    // Even if a legacy blob still carried metrics, the resolver ignores it.
+    updateWorkspace(ws.id, { keywordStrategy: {
+      siteKeywords: ['ignored'],
+      siteKeywordMetrics: [{ keyword: 'from blob', volume: 99, difficulty: 99 }],
+      opportunities: [],
+      generatedAt: '2026-01-01T00:00:00.000Z',
+    } as KeywordStrategy });
+    expect(resolveSiteKeywordMetrics(ws.id)).toEqual([]);
   });
 });
 
@@ -211,15 +217,13 @@ describe('reconcile baseline attaches volume/difficulty from metrics', () => {
     const ws = createWorkspace(`SKM Reconcile ${Date.now()}`);
     cleanupWorkspaceIds.push(ws.id);
 
-    // The reconcile join reads siteKeywordMetrics off the keywordStrategy Pick it
-    // is given. We feed it the resolved (table-or-blob) source — here from the table.
+    // The reconcile join resolves siteKeywordMetrics from the table (table-as-truth).
     replaceAllSiteKeywordMetrics(ws.id, [{ keyword: 'site keyword one', volume: 4444, difficulty: 27 }]);
 
     reconcileStrategyRankTracking({
       workspaceId: ws.id,
       keywordStrategy: {
         siteKeywords: ['site keyword one'],
-        siteKeywordMetrics: resolveSiteKeywordMetrics(ws.id, undefined),
         generatedAt: '2026-06-01T00:00:00.000Z',
       },
       pageMap: [],

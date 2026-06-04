@@ -2,11 +2,12 @@
  * Wave 3a — KCC assembler swap byte-identity guard.
  *
  * The four KCC reassembly sites read contentGaps + keywordGaps off their own
- * tables (siteKeywords/siteKeywordMetrics/generatedAt stay blob-sourced, pageMap
- * stays on the Lite/full page_keywords path). After routing those two array reads
- * through assembleStoredKeywordStrategy, a table-backed workspace must produce the
- * same rows/summary: the content-gap and keyword-gap keywords still appear, the
- * Lite-path pageMap keyword still appears, and the blob siteKeyword still appears.
+ * tables (siteKeywords/generatedAt stay blob-sourced; siteKeywordMetrics is now
+ * table-sourced post-3b-ii strip; pageMap stays on the Lite/full page_keywords
+ * path). After routing those two array reads through assembleStoredKeywordStrategy,
+ * a table-backed workspace must produce the same rows/summary: the content-gap and
+ * keyword-gap keywords still appear, the Lite-path pageMap keyword still appears,
+ * and the blob siteKeyword still appears.
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import { createWorkspace, updateWorkspace, deleteWorkspace } from '../../server/workspaces.js';

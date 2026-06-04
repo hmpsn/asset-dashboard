@@ -39,7 +39,9 @@ export interface StrategyRankTrackingChangeSet {
 
 export interface ReconcileStrategyRankTrackingOptions {
   workspaceId: string;
-  keywordStrategy: Pick<KeywordStrategy, 'siteKeywords' | 'siteKeywordMetrics' | 'generatedAt'>;
+  // siteKeywordMetrics is no longer read off the blob (Wave 3b-ii strip) — the
+  // reconcile join resolves volume/difficulty from the site_keyword_metrics table.
+  keywordStrategy: Pick<KeywordStrategy, 'siteKeywords' | 'generatedAt'>;
   pageMap: PageKeywordMap[];
   generatedAt?: string;
 }
@@ -65,11 +67,10 @@ function buildTargets(
   const targets = new Map<string, StrategyRankTrackingTarget>();
   const skipped: StrategyRankTrackingChangeSet['skipped'] = [];
 
-  // #19b dual-read: join from the site_keyword_metrics table first, falling back
-  // to the blob `siteKeywordMetrics` carried on the keywordStrategy Pick. Keeps
-  // the volume/difficulty baseline attaching to STRATEGY_SITE_KEYWORD targets
-  // even after the table becomes the source of truth. Strip is the 3b-ii PR.
-  const siteKeywordMetrics = resolveSiteKeywordMetrics(workspaceId, keywordStrategy.siteKeywordMetrics);
+  // #19b table-as-truth (Wave 3b-ii strip): join from the site_keyword_metrics
+  // table, the sole store. The volume/difficulty baseline keeps attaching to
+  // STRATEGY_SITE_KEYWORD targets through the table.
+  const siteKeywordMetrics = resolveSiteKeywordMetrics(workspaceId);
 
   for (const keyword of keywordStrategy.siteKeywords ?? []) {
     const query = normalizeQuery(keyword);

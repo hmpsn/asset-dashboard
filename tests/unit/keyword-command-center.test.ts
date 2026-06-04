@@ -10,6 +10,7 @@ import {
 } from '../../server/keyword-command-center.js';
 import { replaceAllContentGaps } from '../../server/content-gaps.js';
 import { replaceAllKeywordGaps } from '../../server/keyword-gaps.js';
+import { replaceAllSiteKeywordMetrics } from '../../server/site-keyword-metrics.js';
 import { upsertPageKeyword } from '../../server/page-keywords.js';
 import { addTrackedKeyword, getTrackedKeywords, storeRankSnapshot } from '../../server/rank-tracking.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
@@ -170,6 +171,8 @@ function seedStrategy() {
     generatedAt,
   };
   updateWorkspace(workspaceId, { keywordStrategy: strategy });
+  // siteKeywordMetrics is table-only post-strip — populate the table to match the blob.
+  replaceAllSiteKeywordMetrics(workspaceId, [{ keyword: 'Cosmetic Dentist', volume: 900, difficulty: 38 }]);
   upsertPageKeyword(workspaceId, {
     pagePath: '/services/cosmetic-dentistry',
     pageTitle: 'Cosmetic Dentistry',
@@ -1386,12 +1389,13 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
     updateWorkspace(workspaceId, {
       keywordStrategy: {
         siteKeywords: [],
-        siteKeywordMetrics: [{ keyword: 'orthodontics', volume: 1200, difficulty: 45 }],
         opportunities: [],
         businessContext: 'Dental',
         generatedAt: '2026-05-20T10:00:00.000Z',
       },
     });
+    // siteKeywordMetrics is table-only post-strip — the source-inference reads the table.
+    replaceAllSiteKeywordMetrics(workspaceId, [{ keyword: 'orthodontics', volume: 1200, difficulty: 45 }]);
     addTrackedKeyword(workspaceId, 'orthodontics', { source: TRACKED_KEYWORD_SOURCE.UNKNOWN });
 
     const detail = await buildKeywordCommandCenterDetail(workspaceId, 'orthodontics');
