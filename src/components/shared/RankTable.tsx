@@ -98,7 +98,13 @@ export type KeywordColumnKey =
  * (RankTracker). All metric fields are optional so any surface can map onto it.
  */
 export interface KeywordTableRow {
-  query: string;
+  /**
+   * The keyword text. Optional so superset rows that key their keyword under a
+   * different field (e.g. KCC's `keyword`/`normalizedKeyword`) can satisfy the
+   * constraint; such consumers supply `keywordText` + `selection.rowId`/`label` to
+   * resolve display + identity. Existing consumers always set `query` (unchanged).
+   */
+  query?: string;
   position?: number;
   previousPosition?: number;
   change?: number;
@@ -123,6 +129,21 @@ interface SelectionConfig<T> {
   onToggle: (id: string) => void;
   /** Stable per-row id used for selection membership + onToggle. */
   rowId: (row: T) => string;
+  /**
+   * Accessible label for the per-row checkbox. Defaults to `row.query`. KCC passes
+   * `Select <keyword>` to preserve its exact a11y contract.
+   */
+  label?: (row: T) => string;
+  /**
+   * Optional header select-all checkbox. When provided, the selection header cell
+   * renders a checkbox instead of an empty `<th>`. Additive — omit for the legacy
+   * empty header.
+   */
+  header?: {
+    checked: boolean;
+    onToggle: (checked: boolean) => void;
+    label: string;
+  };
 }
 
 interface SortConfig {
@@ -232,8 +253,21 @@ interface KeywordTableProps<T extends KeywordTableRow> {
   customColumns?: CustomColumn<T>[];
   /** Render extra action content after the data columns (pin/remove/open-page, badges). */
   renderActions?: (row: T) => ReactNode;
+  /**
+   * Resolves the keyword text shown in the keyword cell. Defaults to `row.query`.
+   * Superset rows that store the keyword elsewhere (KCC: `row.keyword`) pass this.
+   */
+  keywordText?: (row: T) => ReactNode;
   /** Render content INSIDE the keyword cell, after the query (source/lifecycle badges, page title). */
   renderKeywordMeta?: (row: T) => ReactNode;
+  /**
+   * When provided, the keyword cell becomes a clickable button invoking this with the
+   * row (KCC drawer-open affordance). The selection checkbox stays in its own cell,
+   * outside the button. Additive — omit for non-interactive rows.
+   */
+  onRowClick?: (row: T) => void;
+  /** Highlight the active (open) row. */
+  isRowActive?: (row: T) => boolean;
   /** Per-row expand predicate. When it returns true, renderExpanded output is shown below the row. */
   isRowExpanded?: (row: T) => boolean;
   /** Per-row expanded detail (sparkline / GSC grid). */
@@ -311,8 +345,11 @@ export function KeywordTable<T extends KeywordTableRow>({
   stickyHeader = false,
   truncateKeyword = true,
   customColumns,
+  keywordText,
   renderActions,
   renderKeywordMeta,
+  onRowClick,
+  isRowActive,
   isRowExpanded,
   renderExpanded,
   renderVariant,
@@ -356,7 +393,18 @@ export function KeywordTable<T extends KeywordTableRow>({
       <table className="w-full t-caption">
         <thead className={stickyHeader ? 'sticky top-0 z-[var(--z-sticky)] bg-[var(--surface-1)]' : undefined}>
           <tr className="bg-[var(--surface-1)]/50">
-            {selection && <th className="w-8" />}
+            {selection && (
+              <th className={`w-8 ${TH_BASE}`}>
+                {selection.header && (
+                  <Checkbox
+                    checked={selection.header.checked}
+                    onChange={selection.header.onToggle}
+                    label={selection.header.label}
+                    srOnlyLabel
+                  />
+                )}
+              </th>
+            )}
             <SortHeader label="Keyword" columnKey="keyword" sort={sort} className={`text-left ${TH_BASE}`} />
             {customCols.map((c) =>
               c.sortKey ? (
@@ -393,33 +441,48 @@ export function KeywordTable<T extends KeywordTableRow>({
         </thead>
         <tbody>
           {visible.map((r, i) => {
-            const rowId = selection?.rowId(r) ?? r.query;
+            const rowId = selection?.rowId(r) ?? r.query ?? String(i);
+            const keyText = keywordText ? keywordText(r) : r.query;
             const variants = renderVariant ? (r.variants ?? []) : [];
             const expanded = isRowExpanded?.(r) && renderExpanded;
+            const active = isRowActive?.(r) ?? false;
             return (
               <Fragment key={rowId ?? i}>
-                <tr className="border-t border-[var(--brand-border)]/50">
+                <tr className={`border-t border-[var(--brand-border)]/50${active ? ' bg-[var(--surface-3)]/60' : ''}`}>
                   {selection && (
                     <td className={cell}>
                       <Checkbox
                         checked={selection.selected.has(rowId)}
                         onChange={() => selection.onToggle(rowId)}
-                        label={r.query}
+                        label={selection.label?.(r) ?? r.query ?? ''}
                         srOnlyLabel
                       />
                     </td>
                   )}
                   {renderKeywordMeta ? (
                     <td className={`${cell} text-[var(--brand-text-bright)]${truncateKeyword ? ' max-w-[200px]' : ''}`}>
-                      <span className={truncateKeyword ? 'truncate block' : 'block'}>{r.query}</span>
-                      {renderKeywordMeta(r)}
+                      {onRowClick ? (
+                        <button
+                          type="button"
+                          onClick={() => onRowClick(r)}
+                          className="block w-full text-left bg-transparent hover:bg-transparent focus-visible:outline-offset-4 min-w-0"
+                        >
+                          <span className={truncateKeyword ? 'truncate block font-semibold' : 'block font-semibold'}>{keyText}</span>
+                          {renderKeywordMeta(r)}
+                        </button>
+                      ) : (
+                        <>
+                          <span className={truncateKeyword ? 'truncate block' : 'block'}>{keyText}</span>
+                          {renderKeywordMeta(r)}
+                        </>
+                      )}
                     </td>
                   ) : (
                     // Byte-identical to the legacy RankTable keyword cell: query inline
                     // with `truncate` on the <td>, no wrapping span (preserves SearchTab
                     // /RankTrackingSection DOM exactly).
                     <td className={`${cell} text-[var(--brand-text-bright)]${truncateKeyword ? ' truncate max-w-[200px]' : ''}`}>
-                      {r.query}
+                      {keyText}
                     </td>
                   )}
                   {customCols.map((c) => (
