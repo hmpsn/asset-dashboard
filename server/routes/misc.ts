@@ -10,7 +10,6 @@ import path from 'path';
 import { broadcast } from '../broadcast.js';
 import type * as OpenAIMod from 'openai';
 import type { default as SharpConstructor } from 'sharp';
-import type { execFileSync as ExecFileSyncFn } from 'child_process';
 import { getUploadRoot } from '../data-dir.js';
 import { getAuditTrafficForWorkspace } from '../helpers.js';
 import { upload, moveUploadedFiles, requireClientPortalAuth } from '../middleware.js';
@@ -229,21 +228,18 @@ router.post('/api/upload/:workspaceId/clipboard', requireWorkspaceAccess('worksp
 
   try {
     // Resize to 2x for HDPI: halve dimensions so it's crisp at 2x
-    const { execFileSync }: { execFileSync: typeof ExecFileSyncFn } = await import('child_process'); // dynamic-import-ok
-    // Get current dimensions
-    const sipsInfo = execFileSync('sips', ['-g', 'pixelWidth', '-g', 'pixelHeight', file.path], { encoding: 'utf-8' });
-    const widthMatch = sipsInfo.match(/pixelWidth:\s*(\d+)/);
-    const heightMatch = sipsInfo.match(/pixelHeight:\s*(\d+)/);
-
-    if (widthMatch && heightMatch) {
-      const w = Math.round(parseInt(widthMatch[1]) / 2);
-      const h = Math.round(parseInt(heightMatch[1]) / 2);
-      execFileSync('sips', ['-z', String(h), String(w), file.path, '--out', targetPath], { stdio: 'pipe' });
+    const sharp: typeof SharpConstructor = (await import('sharp')).default; // dynamic-import-ok
+    const image = sharp(file.path);
+    const metadata = await image.metadata();
+    if (metadata.width && metadata.height) {
+      await image
+        .resize(Math.round(metadata.width / 2), Math.round(metadata.height / 2), { fit: 'inside', withoutEnlargement: true })
+        .toFile(targetPath);
     } else {
       fs.renameSync(file.path, targetPath);
     }
   } catch (err) {
-    log.debug({ err }, 'misc: image resize via sips failed, falling back to move without resize');
+    log.debug({ err }, 'misc: clipboard image resize failed, falling back to move without resize');
     fs.renameSync(file.path, targetPath);
   }
 

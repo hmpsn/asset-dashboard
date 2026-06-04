@@ -570,6 +570,20 @@ describe('extractPageData — serviceType hardening', () => {
     expect(out.serviceType).toBe('Managed Services');
   });
 
+  it('keeps acronyms uppercase in fallback service slugs', () => {
+    const out = extractPageData({
+      ...baseInput,
+      pageMeta: {
+        ...baseInput.pageMeta,
+        title: '',
+        slug: 'seo-audit',
+        publishedPath: '/seo-audit',
+      },
+      html: '<html><body></body></html>',
+    });
+    expect(out.serviceType).toBe('SEO Audit');
+  });
+
   it('keeps non-brand managed-services prefixes in fallback slugs', () => {
     const out = extractPageData({
       ...baseInput,

@@ -21,6 +21,7 @@ import { getWorkspace } from './workspaces.js';
 import { WS_EVENTS } from './ws-events.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { normalizeDomainValue } from './domain-normalization.js';
+import { sleep } from './helpers.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 import { buildDataForSeoLocationName } from '../shared/local-seo-location.js';
 import {
@@ -153,10 +154,6 @@ export function __resetRefreshTimingsForTesting(): void {
   refreshTimings.heapHeadroomThresholdMb = DEFAULT_HEAP_HEADROOM_THRESHOLD_MB;
   refreshTimings.heapHeadroomWaitMs = DEFAULT_HEAP_HEADROOM_WAIT_MS;
   refreshTimings.heapHeadroomMaxWaits = DEFAULT_HEAP_HEADROOM_MAX_WAITS;
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /**
