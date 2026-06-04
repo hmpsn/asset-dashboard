@@ -283,6 +283,10 @@ export function protectedReason(keyword: TrackedKeyword | undefined): string | u
   if (keyword.pinned) return 'Pinned keyword';
   if (keyword.source === TRACKED_KEYWORD_SOURCE.CLIENT_REQUESTED) return 'Client-requested keyword';
   if (keyword.source === TRACKED_KEYWORD_SOURCE.MANUAL) return 'Manual keyword';
+  // Wave 3d-ii (Decision B): any gap-provenanced approval (sourceGapKey present) is
+  // hard-protected — a client approved it off a content/keyword gap surface, so it
+  // must never be auto-deprecated regardless of its current source label.
+  if (keyword.sourceGapKey) return 'Gap-approved keyword';
   return undefined;
 }
 
@@ -359,13 +363,15 @@ function inferTrackedKeywordSources(
 }
 
 /**
- * Wave 3d-i ADMIN exposure: getTrackedKeywords STRIPS provenance (sourceGapKey) so
- * the general/public read path stays byte-identical. KCC is admin-authed, so it
- * may surface provenance — read it from the provenance-bearing table
- * (listTrackedKeywordRows, which uses rowToTrackedKeyword directly, NOT the
- * stripping resolver) and merge sourceGapKey back onto the tracked keywords keyed
- * by keywordComparisonKey. Returns NEW objects (never mutates the input) so callers
- * downstream of getTrackedKeywords are unaffected.
+ * Wave 3d-i/3d-ii ADMIN exposure: getTrackedKeywords STRIPS the TABLE-ONLY fields
+ * (sourceGapKey, strategyOwned) so the general/public read path stays byte-identical.
+ * KCC is admin-authed, so it may surface them — read from the table
+ * (listTrackedKeywordRows, which uses rowToTrackedKeyword directly, NOT the stripping
+ * resolver) and merge sourceGapKey + strategyOwned back onto the tracked keywords
+ * keyed by keywordComparisonKey. strategyOwned is REQUIRED here so KCC's IN_STRATEGY
+ * classification (lifecycleStatus + trackedKeywordMatchesFilter) sees real ownership
+ * instead of undefined → false (which would under-count). Returns NEW objects (never
+ * mutates the input) so callers downstream of getTrackedKeywords are unaffected.
  */
 function mergeTrackedKeywordProvenance(
   workspaceId: string,
@@ -373,13 +379,23 @@ function mergeTrackedKeywordProvenance(
 ): TrackedKeyword[] {
   if (trackedKeywords.length === 0) return trackedKeywords;
   const gapKeyByQuery = new Map<string, string>();
+  const ownedByQuery = new Map<string, boolean>();
   for (const row of listTrackedKeywordRows(workspaceId)) {
-    if (row.sourceGapKey) gapKeyByQuery.set(keywordComparisonKey(row.query), row.sourceGapKey);
+    const key = keywordComparisonKey(row.query);
+    if (row.sourceGapKey) gapKeyByQuery.set(key, row.sourceGapKey);
+    // `!== undefined` tri-state guard: `false` is a real value, not "absent".
+    if (row.strategyOwned !== undefined) ownedByQuery.set(key, row.strategyOwned);
   }
-  if (gapKeyByQuery.size === 0) return trackedKeywords;
+  if (gapKeyByQuery.size === 0 && ownedByQuery.size === 0) return trackedKeywords;
   return trackedKeywords.map(keyword => {
-    const gapKey = gapKeyByQuery.get(keywordComparisonKey(keyword.query));
-    return gapKey ? { ...keyword, sourceGapKey: gapKey } : keyword;
+    const key = keywordComparisonKey(keyword.query);
+    const gapKey = gapKeyByQuery.get(key);
+    const owned = ownedByQuery.get(key);
+    if (gapKey === undefined && owned === undefined) return keyword;
+    const next = { ...keyword };
+    if (gapKey !== undefined) next.sourceGapKey = gapKey;
+    if (owned !== undefined) next.strategyOwned = owned;
+    return next;
   });
 }
 
@@ -423,7 +439,11 @@ export function lifecycleStatus(row: DraftRow): KeywordCommandCenterStatus {
   if (row.feedback?.status === 'requested') return KEYWORD_COMMAND_CENTER_STATUS.NEEDS_REVIEW;
   if (row.explanation && row.explanation.role !== 'competitor_gap') return KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY;
   if (row.assignment && row.assignment.role !== 'raw_evidence') return KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY;
-  if (row.tracking?.source === TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY || row.tracking?.source === TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD) {
+  // Wave 3d-ii: classify "In Strategy" off the decoupled ownership flag, NOT the
+  // source enum. row.tracking carries strategyOwned via mergeTrackedKeywordProvenance
+  // (the table-bearing read); a client-approved keyword that is not strategy-owned is
+  // no longer mis-labelled In Strategy.
+  if (row.tracking?.strategyOwned === true) {
     return KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY;
   }
   if (row.tracking && (row.tracking.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE) {
@@ -1221,7 +1241,12 @@ async function buildKeywordCommandCenterModel(
   // Wave 3d-i: getTrackedKeywords strips provenance; merge sourceGapKey back from
   // the provenance-bearing table read (KCC is admin-authed) so the tracking row can
   // expose it.
-  const rawTrackedKeywords = mergeTrackedKeywordProvenance(
+  // Wave 3d-ii: read the table-bearing shape (sourceGapKey + strategyOwned merged
+  // back). Ownership/classification now reads strategyOwned directly — the read-time
+  // inferTrackedKeywordSources call was RETIRED (the boot backfill still stamps legacy
+  // UNKNOWN sources one-time). sourceKeysForRows + trackedKeywordMatchesFilter +
+  // protectedReason all agree on this merged shape.
+  const trackedKeywords = mergeTrackedKeywordProvenance(
     workspace.id,
     getTrackedKeywords(workspace.id, { includeInactive: true }),
   );
@@ -1229,10 +1254,6 @@ async function buildKeywordCommandCenterModel(
   const feedback = readFeedback(workspace.id);
   const lostVisibilityRows = safeLostVisibilityRows(workspace.id);
   const lostVisibilityKeys = new Set(lostVisibilityRows.map(row => keywordComparisonKey(row.query)).filter(Boolean));
-  // Recover provenance for legacy UNKNOWN-source tracked keywords by cross-referencing
-  // current strategy / content gaps / requested feedback. Applied at bundle level so
-  // sourceKeysForRows + trackedKeywordMatchesFilter + protectedReason agree.
-  const trackedKeywords = inferTrackedKeywordSources(rawTrackedKeywords, { strategy, contentGaps, feedback });
   mark('sourceLoadingMs');
   const localVisibilityByKeyword = options.includeLocalSeo
     ? options.includeLocalSeoDetails
@@ -1376,16 +1397,15 @@ export async function buildKeywordCommandCenterSummary(
     markVolume(gap.keyword, gap.volume);
   }
 
-  // Load feedback early so it can hint the tracking-source inference.
   const feedback = readFeedback(workspace.id);
-  const rawTrackedKeywords = getTrackedKeywords(workspace.id, { includeInactive: true });
-  // Recover provenance for legacy UNKNOWN-source tracked keywords via cross-reference.
-  // Applied at this level so trackedKeywordMatchesFilter (used below) sees inferred sources.
-  const trackedKeywords = inferTrackedKeywordSources(rawTrackedKeywords, {
-    strategy: summaryStrategy,
-    contentGaps,
-    feedback,
-  });
+  // Wave 3d-ii: merge the table-bearing shape so trackedKeywordMatchesFilter (used
+  // below) sees strategyOwned — getTrackedKeywords STRIPS it, so without this merge
+  // the IN_STRATEGY summary count would read undefined → false → zero. Read-time
+  // inferTrackedKeywordSources was retired here too.
+  const trackedKeywords = mergeTrackedKeywordProvenance(
+    workspace.id,
+    getTrackedKeywords(workspace.id, { includeInactive: true }),
+  );
   for (const tracked of trackedKeywords) {
     addKey(allKeys, tracked.query);
     markVolume(tracked.query, tracked.volume);
@@ -1538,10 +1558,11 @@ export function trackedKeywordMatchesFilter(keyword: TrackedKeyword, filter: Key
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.TRACKED) return status === TRACKED_KEYWORD_STATUS.ACTIVE;
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.RETIRED) return status !== TRACKED_KEYWORD_STATUS.ACTIVE;
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY) {
-    return status === TRACKED_KEYWORD_STATUS.ACTIVE && (
-      keyword.source === TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY
-      || keyword.source === TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD
-    );
+    // Wave 3d-ii: In Strategy = active + reconcile-owned (strategyOwned===true),
+    // decoupled from the source enum. The caller must pass the table-bearing shape
+    // (mergeTrackedKeywordProvenance) — the stripped getTrackedKeywords output would
+    // see strategyOwned===undefined and count zero.
+    return status === TRACKED_KEYWORD_STATUS.ACTIVE && keyword.strategyOwned === true;
   }
   return true;
 }
@@ -2187,9 +2208,10 @@ export async function buildKeywordCommandCenterDetail(
   const detailAssembled = assembleStoredKeywordStrategy(workspace.id);
   const contentGaps = (detailAssembled?.contentGaps ?? []).filter(gap => keywordComparisonKey(gap.targetKeyword) === normalized);
   const keywordGaps = (detailAssembled?.keywordGaps ?? []).filter(gap => keywordComparisonKey(gap.keyword) === normalized);
-  // Wave 3d-i: merge sourceGapKey back from the provenance-bearing table read
-  // (getTrackedKeywords strips it) so the admin detail drawer can expose it.
-  const rawTrackedKeywords = mergeTrackedKeywordProvenance(
+  // Wave 3d-i/3d-ii: merge sourceGapKey + strategyOwned back from the table read
+  // (getTrackedKeywords strips them) so the admin detail drawer exposes accurate
+  // provenance, ownership, and protected-state UI. Read-time inference retired.
+  const trackedKeywords = mergeTrackedKeywordProvenance(
     workspace.id,
     getTrackedKeywords(workspace.id, { includeInactive: true }),
   ).filter(entry => keywordComparisonKey(entry.query) === normalized);
@@ -2206,9 +2228,6 @@ export async function buildKeywordCommandCenterDetail(
     withResolvedSiteKeywordMetrics(workspace.id, workspace.keywordStrategy),
     normalized,
   );
-  // Recover provenance for legacy UNKNOWN-source tracked keywords so the drawer
-  // shows accurate source labels and protected-state UI for legacy data.
-  const trackedKeywords = inferTrackedKeywordSources(rawTrackedKeywords, { strategy, contentGaps, feedback });
   const localVisibility = options.includeLocalSeo
     ? buildLocalSeoKeywordVisibilityForKeyword(workspace.id, normalized)
     : undefined;

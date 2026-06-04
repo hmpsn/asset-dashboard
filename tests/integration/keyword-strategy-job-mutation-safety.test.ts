@@ -529,6 +529,9 @@ describe('keyword strategy job mutation safety', () => {
     }]);
     addTrackedKeyword(workspace.workspaceId, 'paper tiger', {
       source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
+      // Wave 3d-ii: reconcile-ownership is carried by strategyOwned (set by a prior
+      // reconcile); seed it so this strategy keyword is eligible for auto-retirement.
+      strategyOwned: true,
       pagePath: '/services/local-seo',
       strategyGeneratedAt: generatedAt,
       lastStrategySeenAt: generatedAt,
@@ -656,6 +659,9 @@ describe('keyword strategy job mutation safety', () => {
     });
     addTrackedKeyword(workspace.workspaceId, 'paper tiger', {
       source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
+      // Wave 3d-ii: reconcile-ownership is carried by strategyOwned (set by a prior
+      // reconcile); seed it so this strategy keyword is eligible for auto-retirement.
+      strategyOwned: true,
       pagePath: '/stale-dropped',
       strategyGeneratedAt: generatedAt,
       lastStrategySeenAt: generatedAt,

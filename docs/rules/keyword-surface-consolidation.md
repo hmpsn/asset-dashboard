@@ -123,11 +123,14 @@ records a **non-remapped** origin + persists `sourcePageId`/`sourceGapKey`.
 - `server/keyword-command-center.ts:2222,2275` (KCC upsert/retire).
 - `server/keyword-feedback.ts:213` (feedback approve → `addTrackedKeywords`).
 - `server/rank-tracking-reconciliation.ts:159` (reconcile; runs from `keyword-strategy-generation.ts:328`, **outside** the persist txn).
-- `server/keyword-feedback-tracking.ts:10-24` — the `trackedKeywordSourceForFeedback` remap that currently launders `page_map`→`STRATEGY_PRIMARY`. **Stop the laundering**; record true origin + a separate lifecycle-owner flag (`isStrategyOwned` keys off this for **destructive** auto-deprecation).
+- `server/keyword-feedback-tracking.ts` — the `trackedKeywordSourceForFeedback` remap. **DE-LAUNDERED (Wave 3d-ii):** `page_map`/`topic_cluster` approvals now map to `CLIENT_REQUESTED` (protected), NOT `STRATEGY_*`. Lifecycle ownership is carried by the decoupled `strategyOwned` flag (table column `strategy_owned`, three-state 0/1/NULL), of which `reconcileStrategyRankTracking` is the SOLE writer of `=1`. `isStrategyOwned` (reconciliation) and KCC `IN_STRATEGY` classification read `strategyOwned === true` — never the source enum — for **destructive** auto-deprecation. NEVER backfill `strategy_owned` from the source enum (re-bakes the bug).
 
 **Equality:** all keyword joins use `keywordComparisonKey` / `normalizeKeywordForComparison`
-(`shared/keyword-normalization.ts`) — retire `inferTrackedKeywordSources` (`keyword-command-center.ts:307,1153`) and ad-hoc `normalizeQuery` variants. This **is** the
-`intel-quality-keyword-normalization-route-reliability-hardening` roadmap item.
+(`shared/keyword-normalization.ts`) and ad-hoc `normalizeQuery` variants. The read-time
+`inferTrackedKeywordSources` calls in KCC were **retired (Wave 3d-ii)** — KCC now reads the
+stored source / `strategyOwned` directly; the inference ladder survives ONLY as the one-time
+boot backfill stamp (`inferTrackedKeywordSourcesForWorkspace`, injected at `server/index.ts`).
+This **is** the `intel-quality-keyword-normalization-route-reliability-hardening` roadmap item.
 
 **Invariants:** never revert the persist `IMMEDIATE` upgrade; #1 (`IMMEDIATE`) ships before
 #12 (row table); preserve pinned/manual/client retirement protection + inactive-row
