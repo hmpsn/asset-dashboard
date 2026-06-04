@@ -1,7 +1,7 @@
 /**
  * R3b — Apply to Website (DARK). Verifies that the SEPARATE client "Apply to Website" step reuses
  * the PROVEN legacy `/api/public/approvals/:workspaceId/:batchId/apply` route (no new apply logic),
- * and that — behind APPROVAL_FAMILY_FLAG — the unified deliverable MIRROR flips to `applied` after
+ * and that the unified deliverable mirror flips to `applied` after
  * the legacy apply. Mirror status is asserted via `getDeliverable` DIRECTLY, never the public client
  * list (which filters `applied` out).
  *
@@ -13,8 +13,8 @@
  *
  * In-process harness (createApp + vi.mock) — the proven pattern for apply-route tests
  * (seo-apply-resolves-recommendations.test.ts): the spawned-server helper cannot apply `vi.mock`
- * for the Webflow boundary, and this test must (a) mock Webflow, (b) toggle the flag in-process,
- * (c) drive the mirror, and (d) read `getDeliverable` directly. Uses an ephemeral port (listen(0)),
+ * for the Webflow boundary, and this test must (a) mock Webflow, (b) drive the mirror, and
+ * (c) read `getDeliverable` directly. Uses an ephemeral port (listen(0)),
  * so no fixed-port allocation is needed (the 13201–13899 range is for the spawned-server helper).
  */
 import http from 'http';
@@ -49,9 +49,8 @@ import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { createBatch, getBatch } from '../../server/approvals.js';
 import { getDeliverable } from '../../server/client-deliverables.js';
-import { mirrorApprovalBatchToDeliverable, APPROVAL_FAMILY_FLAG } from '../../server/domains/inbox/approval-batch-dual-write.js';
+import { mirrorApprovalBatchToDeliverable } from '../../server/domains/inbox/approval-batch-dual-write.js';
 import { markDeliverableApplied, respondToDeliverable } from '../../server/domains/inbox/send-to-client.js';
-import { setFlagOverride } from '../../server/feature-flags.js';
 import type { ClientDeliverable } from '../../shared/types/client-deliverable.js';
 
 let server: http.Server | null = null;
@@ -92,7 +91,6 @@ beforeAll(async () => {
 }, 25_000);
 
 afterAll(async () => {
-  setFlagOverride(APPROVAL_FAMILY_FLAG, null);
   if (server) await new Promise<void>((resolve) => server!.close(() => resolve()));
 });
 
@@ -105,13 +103,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  setFlagOverride(APPROVAL_FAMILY_FLAG, null);
   ws.cleanup();
 });
 
 describe('R3b — Apply to Website (legacy route reuse + mirror flip)', () => {
   it('applies an approved static seoTitle deliverable and flips the mirror to applied', async () => {
-    setFlagOverride(APPROVAL_FAMILY_FLAG, true);
     const batch = createBatch(ws.workspaceId, ws.webflowSiteId, 'SEO Changes', [{
       pageId: 'page-static-1',
       pageTitle: 'Home',
@@ -142,7 +138,6 @@ describe('R3b — Apply to Website (legacy route reuse + mirror flip)', () => {
   });
 
   it('does not apply a subset-held item; only the approved item is applied; mirror still flips', async () => {
-    setFlagOverride(APPROVAL_FAMILY_FLAG, true);
     const batch = createBatch(ws.workspaceId, ws.webflowSiteId, 'SEO Changes', [
       { pageId: 'page-A', pageTitle: 'A', pageSlug: '/a', field: 'seoTitle', currentValue: 'oa', proposedValue: 'na' },
       { pageId: 'page-B', pageTitle: 'B', pageSlug: '/b', field: 'seoDescription', currentValue: 'ob', proposedValue: 'nb' },
@@ -182,7 +177,6 @@ describe('R3b — Apply to Website (legacy route reuse + mirror flip)', () => {
   });
 
   it('rejects a schema_item batch at the route gate (400) and does not flip the mirror', async () => {
-    setFlagOverride(APPROVAL_FAMILY_FLAG, true);
     const batch = createBatch(ws.workspaceId, ws.webflowSiteId, 'Schema Review', [{
       pageId: 'page-schema-1',
       pageTitle: 'Schema Page',
@@ -203,40 +197,11 @@ describe('R3b — Apply to Website (legacy route reuse + mirror flip)', () => {
     expect(getDeliverable(mirror.id)?.status).toBe('approved');
   });
 
-  it('flag OFF: apply response is byte-identical and the mirror is not flipped', async () => {
-    setFlagOverride(APPROVAL_FAMILY_FLAG, true);
-    const batch = createBatch(ws.workspaceId, ws.webflowSiteId, 'SEO Changes', [{
-      pageId: 'page-flagoff-1',
-      pageTitle: 'Home',
-      pageSlug: '/home',
-      field: 'seoTitle',
-      currentValue: 'Old',
-      proposedValue: 'New',
-    }]);
-    const mirror = mirrorApprovalBatchToDeliverable(ws.workspaceId, batch)!;
-    await respondToDeliverable(ws.workspaceId, mirror.id, { decision: 'approved' });
-    expect(getDeliverable(mirror.id)?.status).toBe('approved');
-
-    // Turn the flag OFF — the apply route must not touch the mirror.
-    setFlagOverride(APPROVAL_FAMILY_FLAG, false);
-
-    const res = await postJson(`/api/public/approvals/${ws.workspaceId}/${batch.id}/apply`, {});
-    expect(res.status).toBe(200);
-    const body = await res.json() as { applied: number; failed: number; results: unknown[] };
-    expect(body.applied).toBe(1);
-    expect(body.failed).toBe(0);
-    expect(body.results).toHaveLength(1);
-
-    // Mirror NOT flipped (the gate is off) — stays approved, never applied.
-    expect(getDeliverable(mirror.id)?.status).toBe('approved');
-  });
-
   it('total Webflow write failure: applied:0/failed:1 (HTTP 200), item NOT applied, mirror stays approved (flip skipped)', async () => {
     // FM-2 external-API-error test: mock the Webflow SEO write to FAIL at runtime. The legacy /apply
     // route catches the failure per-item and falls through to res.json with applied:0/failed:N — a
-    // success-shaped HTTP 200 envelope, NOT a 4xx. The mirror-flip gate (FIX 2) must therefore see
-    // failed > 0 and SKIP the flip, leaving the mirror `approved` so the client can retry.
-    setFlagOverride(APPROVAL_FAMILY_FLAG, true);
+    // success-shaped HTTP 200 envelope, NOT a 4xx. The mirror flip must therefore see failed > 0
+    // and skip the transition, leaving the mirror `approved` so the client can retry.
     webflowState.seoResult = { success: false, error: 'Webflow API write failed' };
 
     const batch = createBatch(ws.workspaceId, ws.webflowSiteId, 'SEO Changes', [{
@@ -272,7 +237,6 @@ describe('R3b — Apply to Website (legacy route reuse + mirror flip)', () => {
   });
 
   it('markDeliverableApplied is idempotent (a second call does not throw)', async () => {
-    setFlagOverride(APPROVAL_FAMILY_FLAG, true);
     const batch = createBatch(ws.workspaceId, ws.webflowSiteId, 'SEO Changes', [{
       pageId: 'page-idem-1',
       pageTitle: 'Home',

@@ -706,8 +706,7 @@ router.post('/api/webflow/schema-plan/:siteId/send-to-client', requireWorkspaceS
     // Update plan status — no approval batch; client reviews in the Schema tab
     const updated = updateSchemaPlanStatus(req.params.siteId, 'sent_to_client');
 
-    // DARK dual-write (PR-1c): mirror the sent plan into the unified client_deliverable model
-    // when `unified-deliverables-rest` is ON. Default off → no-op. Best-effort + swallowed: it
+    // Mirror the sent plan into the unified client_deliverable model. Best-effort + swallowed: it
     // can NEVER break the legacy send (the status is already persisted above). The OWNING
     // workspace is read straight off the plan (plan.workspaceId === ws.id) — not guessed.
     mirrorSchemaPlanToDeliverable(ws.id, updated || plan);

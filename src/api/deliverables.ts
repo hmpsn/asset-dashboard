@@ -10,12 +10,12 @@ interface UnifiedInboxResponse {
 }
 
 /**
- * Typed client wrapper for the unified send-to-client deliverable endpoints (PR-2a, DARK).
+ * Typed client wrapper for the canonical send-to-client deliverable endpoints.
  *
  *   GET   /api/public/deliverables/:workspaceId            — the client-facing unified list
  *   PATCH /api/public/deliverables/:workspaceId/:id/respond — approve / request-changes / decline
  *
- * No raw fetch in components (CLAUDE.md). Consumed only behind the `unified-inbox` flag.
+ * No raw fetch in components (CLAUDE.md).
  */
 export const publicDeliverables = {
   list: (wsId: string) =>
@@ -50,10 +50,10 @@ export const publicDeliverables = {
     ),
 
   /**
-   * R3b — Apply to Website (DARK). Calls the SAME proven legacy apply route the legacy
+   * R3b — Apply to Website. Calls the SAME proven legacy apply route the legacy
    * ApprovalBatchCard uses (no new apply logic): it does the Webflow writes + server-side
-   * applyability gate + markBatchApplied + activity + outcome tracking + broadcasts, and (behind
-   * APPROVAL_FAMILY_FLAG) flips the unified mirror to `applied`. `legacyBatchId` is read off the
+   * applyability gate + markBatchApplied + activity + outcome tracking + broadcasts, and flips the
+   * unified mirror to `applied`. `legacyBatchId` is read off the
    * deliverable's `payload.legacyBatchId`. Return shape matches the route at approvals.ts.
    */
   applyApproval: (wsId: string, legacyBatchId: string) =>
@@ -65,14 +65,14 @@ export const publicDeliverables = {
 };
 
 /**
- * Typed client wrapper for the ADMIN unified send-to-client endpoints (PR-2b, DARK).
+ * Typed client wrapper for the admin send-to-client endpoints.
  *
  *   GET  /api/deliverables/:workspaceId            — the operator "Client Deliverables" pane list
  *                                                    (every status, annotated with the status axis
  *                                                    + stale flag)
  *   POST /api/deliverables/:workspaceId/:id/remind — re-nudge the client about an awaiting item
  *
- * No raw fetch in components (CLAUDE.md). Consumed only behind the `unified-inbox` flag.
+ * No raw fetch in components (CLAUDE.md).
  */
 export const adminDeliverables = {
   list: (wsId: string) => get<AdminDeliverablesResponse>(`/api/deliverables/${wsId}`),

@@ -1,7 +1,7 @@
 // src/components/client/inbox/InlineApprovalCard.tsx
 //
-// ISSUE 1 — Inline approval-review card (DARK; mounted ONLY from UnifiedInbox behind the
-// `unified-inbox` flag). SEO/approval-family deliverables (typed items[]) previously hid their
+// ISSUE 1 — Inline approval-review card, mounted from UnifiedInbox. SEO/approval-family
+// deliverables (typed items[]) previously hid their
 // current→proposed substance behind the full-screen DeliverableDetailModal ("View N →"). This card
 // renders that substance INLINE so the client can quick-approve in place — no modal.
 //

@@ -1,5 +1,5 @@
 /**
- * ClientDeliverablesPane — the admin "Client Deliverables" inbox pane (PR-2b, DARK).
+ * ClientDeliverablesPane — the admin "Client Deliverables" inbox pane.
  *
  * The single operator view of everything sent to a client, across all five "send to client" types
  * (audit §E1/E2/E6/E7; design §6). Groups the workspace's deliverables by the OPERATOR STATUS AXIS
@@ -9,8 +9,7 @@
  *
  * Color (Four Laws): teal for actions, amber for the awaiting nudge queue, orange for changes,
  * emerald for approved, red for stale. NO purple — this is an operator status view, not an admin-AI
- * surface. Rendered only behind the `unified-inbox` flag (App.tsx branches; the hook also gates the
- * fetch). Uses shared primitives (SectionCard / Badge / EmptyState / Button / Skeleton).
+ * surface. Uses shared primitives (SectionCard / Badge / EmptyState / Button / Skeleton).
  */
 import { useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';

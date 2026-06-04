@@ -328,7 +328,7 @@ describe('FEATURE_FLAGS constants', () => {
 
   it('contains expected flag keys', () => {
     expect('copy-engine' in FEATURE_FLAGS).toBe(true);
-    expect('new-inbox-ia' in FEATURE_FLAGS).toBe(true);
+    expect('white-label' in FEATURE_FLAGS).toBe(true);
     expect('local-seo-visibility' in FEATURE_FLAGS).toBe(true);
   });
 });

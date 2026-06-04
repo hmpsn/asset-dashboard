@@ -65,8 +65,8 @@ describe('feature-flags shared types', () => {
     expect(FEATURE_FLAGS['copy-engine']).toBe(false);
   });
 
-  it('known flag new-inbox-ia defaults to false', () => {
-    expect(FEATURE_FLAGS['new-inbox-ia']).toBe(false);
+  it('known flag white-label defaults to false', () => {
+    expect(FEATURE_FLAGS['white-label']).toBe(false);
   });
 });
 

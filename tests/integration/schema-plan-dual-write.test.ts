@@ -1,12 +1,8 @@
 import { describe, it, expect, afterEach, afterAll } from 'vitest';
 import db from '../../server/db/index.js';
-import { setFlagOverride } from '../../server/feature-flags.js';
 // The barrel self-registers the schema_plan adapter the mirror resolves.
 import '../../server/domains/inbox/deliverable-adapters/index.js';
-import {
-  mirrorSchemaPlanToDeliverable,
-  SCHEMA_PLAN_FLAG,
-} from '../../server/domains/inbox/schema-plan-dual-write.js';
+import { mirrorSchemaPlanToDeliverable } from '../../server/domains/inbox/schema-plan-dual-write.js';
 import { listDeliverables, upsertDeliverable } from '../../server/client-deliverables.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import type { SchemaSitePlan } from '../../shared/types/schema-plan.js';
@@ -36,7 +32,6 @@ function makePlan(over: Partial<SchemaSitePlan> = {}): SchemaSitePlan {
 }
 
 afterEach(() => {
-  setFlagOverride(SCHEMA_PLAN_FLAG, null); // revert to default (off)
   db.prepare('DELETE FROM client_deliverable WHERE workspace_id = ?').run(WS);
 });
 
@@ -46,14 +41,7 @@ afterAll(() => {
 });
 
 describe('schema-plan dual-write mirror', () => {
-  it('flag OFF (default) → mirror is a no-op, NO client_deliverable row written', () => {
-    const result = mirrorSchemaPlanToDeliverable(WS, makePlan());
-    expect(result).toBeNull();
-    expect(listDeliverables(WS)).toHaveLength(0);
-  });
-
-  it('flag ON → mirrors ONE schema_plan deliverable (kind review, externalRef = siteId)', () => {
-    setFlagOverride(SCHEMA_PLAN_FLAG, true);
+  it('mirrors one schema_plan deliverable (kind review, externalRef = siteId)', () => {
     const mirrored = mirrorSchemaPlanToDeliverable(WS, makePlan());
     expect(mirrored).not.toBeNull();
     expect(mirrored!.type).toBe('schema_plan');
@@ -66,23 +54,20 @@ describe('schema-plan dual-write mirror', () => {
     expect(listDeliverables(WS)).toHaveLength(1);
   });
 
-  it('flag ON → mirror is idempotent (two sends of the same site → one row)', () => {
-    setFlagOverride(SCHEMA_PLAN_FLAG, true);
+  it('is idempotent (two sends of the same site → one row)', () => {
     const first = mirrorSchemaPlanToDeliverable(WS, makePlan({ id: 'plan_v1' }));
     const second = mirrorSchemaPlanToDeliverable(WS, makePlan({ id: 'plan_v2' }));
     expect(second!.id).toBe(first!.id);
     expect(listDeliverables(WS)).toHaveLength(1);
   });
 
-  it('flag ON → an empty plan is rejected by validateSendable (no row, no throw)', () => {
-    setFlagOverride(SCHEMA_PLAN_FLAG, true);
+  it('rejects an empty plan via validateSendable (no row, no throw)', () => {
     const result = mirrorSchemaPlanToDeliverable(WS, makePlan({ pageRoles: [], canonicalEntities: [] }));
     expect(result).toBeNull();
     expect(listDeliverables(WS)).toHaveLength(0);
   });
 
-  it('flag ON → resolves parentDeliverableId when the schema_item deliverable exists', () => {
-    setFlagOverride(SCHEMA_PLAN_FLAG, true);
+  it('resolves parentDeliverableId when the schema_item deliverable exists', () => {
     const BATCH_ID = 'batch-dw';
     const parent = upsertDeliverable({
       workspaceId: WS,
@@ -98,8 +83,7 @@ describe('schema-plan dual-write mirror', () => {
     expect(mirrored!.payload.clientPreviewBatchId).toBe(BATCH_ID);
   });
 
-  it('flag ON → leaves parentDeliverableId null when the schema_item batch is not mirrored (dark)', () => {
-    setFlagOverride(SCHEMA_PLAN_FLAG, true);
+  it('leaves parentDeliverableId null when the schema_item batch is not mirrored', () => {
     const mirrored = mirrorSchemaPlanToDeliverable(WS, makePlan({ clientPreviewBatchId: 'unmirrored' }));
     expect(mirrored!.parentDeliverableId).toBeNull();
     // The raw soft-FK is stashed so linkage is never lost.

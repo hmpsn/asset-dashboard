@@ -6,11 +6,7 @@ import { backfillWorkOrderDeliverables } from '../../scripts/backfill-deliverabl
 import { createWorkOrder } from '../../server/work-orders.js';
 import { listDeliverables } from '../../server/client-deliverables.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
-import { setFlagOverride } from '../../server/feature-flags.js';
-import {
-  mirrorWorkOrderToDeliverable,
-  WORK_ORDER_FLAG,
-} from '../../server/domains/inbox/work-order-dual-write.js';
+import { mirrorWorkOrderToDeliverable } from '../../server/domains/inbox/work-order-dual-write.js';
 
 const wsA = createWorkspace('backfill-work-order-A', 'site-bwo-a');
 const WS_A = wsA.id;
@@ -23,7 +19,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  setFlagOverride(WORK_ORDER_FLAG, null);
   db.prepare('DELETE FROM work_orders').run();
   db.prepare('DELETE FROM client_deliverable WHERE workspace_id = ?').run(WS_A);
 });
@@ -36,8 +31,8 @@ afterAll(() => {
 
 describe('backfill-deliverables-work-order', () => {
   it('backfills an order into a work_order deliverable with the stable sourceRef', () => {
-    // Flag off → createWorkOrder's dual-write is a no-op, so the order is seeded WITHOUT a mirror.
     const order = createWorkOrder(WS_A, { paymentId: 'pay_1', productType: 'fix_meta', pageIds: ['p1'] });
+    db.prepare('DELETE FROM client_deliverable WHERE workspace_id = ?').run(WS_A);
     expect(listDeliverables(WS_A)).toHaveLength(0);
 
     const result = backfillWorkOrderDeliverables();
@@ -54,6 +49,7 @@ describe('backfill-deliverables-work-order', () => {
 
   it('is idempotent — re-running the backfill inserts nothing new', () => {
     createWorkOrder(WS_A, { paymentId: 'pay_2', productType: 'fix_alt', pageIds: [] });
+    db.prepare('DELETE FROM client_deliverable WHERE workspace_id = ?').run(WS_A);
     const first = backfillWorkOrderDeliverables();
     expect(first.inserted).toBe(1);
 
@@ -65,6 +61,7 @@ describe('backfill-deliverables-work-order', () => {
 
   it('--dry-run counts but writes nothing', () => {
     createWorkOrder(WS_A, { paymentId: 'pay_3', productType: 'fix_redirect', pageIds: [] });
+    db.prepare('DELETE FROM client_deliverable WHERE workspace_id = ?').run(WS_A);
     const result = backfillWorkOrderDeliverables({ dryRun: true });
     expect(result.total).toBe(1);
     expect(result.inserted).toBe(1); // would-insert count
@@ -73,13 +70,13 @@ describe('backfill-deliverables-work-order', () => {
 
   it('reflects the order lifecycle status (in_progress) at backfill time', () => {
     const order = createWorkOrder(WS_A, { paymentId: 'pay_4', productType: 'fix_meta', status: 'in_progress', pageIds: [] });
+    db.prepare('DELETE FROM client_deliverable WHERE workspace_id = ?').run(WS_A);
     backfillWorkOrderDeliverables();
     const row = listDeliverables(WS_A).find((r) => r.sourceRef === `work_order:${order.id}`)!;
     expect(row.status).toBe('in_progress');
   });
 
   it('CROSS-PATH: a dual-written deliverable + a backfill of the same order collapse to ONE', () => {
-    setFlagOverride(WORK_ORDER_FLAG, true);
     // A fresh order mirror via dual-write → one work_order:<id> deliverable.
     const order = createWorkOrder(WS_A, { paymentId: 'pay_5', productType: 'fix_meta', pageIds: [] });
     // createWorkOrder already mirrored it (flag on); confirm.

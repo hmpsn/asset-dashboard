@@ -1,5 +1,5 @@
 /**
- * deliverables — thin HTTP adapter for the unified send-to-client spine (Phase 0, dark).
+ * deliverables — thin HTTP adapter for the canonical send-to-client spine.
  *
  * Lives under server/routes/ so pr-check rule #135 (public-route client-portal auth)
  * actually scans it (design §6, audit minor-2). Domain logic lives in
@@ -11,8 +11,8 @@
  *   POST  /api/deliverables/:workspaceId/:id/remind            (admin)
  *     → requireWorkspaceAccess (HMAC-gated admin route; never requireAuth — auth conventions).
  *
- * A per-type guard resolver (requireClientCopyReviewAuth for copy, etc.) is added when
- * those types cut over in Phase 1d/1e; Phase 0 ships the single base guard.
+ * A per-type guard resolver (requireClientCopyReviewAuth for copy, etc.) is added where a
+ * type needs stricter client access than the base guard.
  */
 import { Router } from 'express';
 import { requireWorkspaceAccess } from '../auth.js';
@@ -168,12 +168,11 @@ router.get(
   },
 );
 
-// GET /api/deliverables/:workspaceId — the admin "Client Deliverables" pane (PR-2b, DARK).
+// GET /api/deliverables/:workspaceId — the admin "Client Deliverables" pane.
 // Admin-only (requireWorkspaceAccess — HMAC-gated, NOT requireAuth per auth conventions). Returns
 // EVERY deliverable in the workspace (all statuses, physical + projected) annotated with the
-// operator status axis + a derived `stale` flag (design §6). The pane only fetches this behind the
-// `unified-inbox` flag; the read itself is inert (empty physical table) until cutover, so it's
-// exercised here with seeded rows regardless of flag state.
+// operator status axis + a derived `stale` flag (design §6). The read is exercised here with
+// seeded rows regardless of how the UI arrives at the pane.
 router.get(
   '/api/deliverables/:workspaceId',
   requireWorkspaceAccess('workspaceId'),

@@ -251,9 +251,9 @@ When the `client-briefing-v2` feature flag is on, the client Insights tab swaps 
 
 **Two-halves contract:** The action chips deep-link via `?tab=<InboxFilter>` to `<InboxTab>` — the Inbox MUST read `useSearchParams().get('tab')` and validate against the `InboxFilter` union for the deep-link to work. Same contract applies to hero/secondary `drillIn.tab` (currently optional / unused by receivers in Phase 2; Phase 4 will wire receivers as the briefing AI starts populating it).
 
-#### Client Inbox IA — 3-Section Layout (`new-inbox-ia` flag)
+#### Client Inbox IA — 3-Section Layout
 
-When the `new-inbox-ia` feature flag is on, InboxTab renders three named sections. Section headers use existing design system patterns — no new color families introduced.
+InboxTab renders three named sections in the canonical client inbox routing model. Section headers use existing design system patterns — no new color families introduced.
 
 | Element | Color | Rationale |
 |---------|-------|-----------|
@@ -264,7 +264,7 @@ When the `new-inbox-ia` feature flag is on, InboxTab renders three named section
 | **SchemaReviewModal / ClientActionDetailModal** backdrop | `bg-[var(--brand-overlay)]` | Token-only — no raw `bg-black/X` |
 | Modal close ("✕") | `text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]` | Standard muted-to-default step |
 
-**Flag-off:** Legacy single-list InboxTab renders unchanged. No color changes in the flag-off path.
+The legacy single-list fallback and the `new-inbox-ia` rollout flag are retired.
 
 ##### Phase 2.5b — investor-briefing reading rhythm
 
