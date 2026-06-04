@@ -392,10 +392,9 @@ function clamp01(v: number): number {
 }
 
 /**
- * Strangler-fig selector — the single chokepoint for the legacy↔OV cutover.
- * Returns the OV value only when the caller resolves the `opportunity-value-scorer`
- * flag ON for the workspace (resolution wired in P3); otherwise the legacy score.
- * Pure: the flag boolean is passed in, never read here.
+ * Impact-score selector. Returns the OV value when the caller opts into it and an
+ * opportunity payload is present; otherwise falls back to the legacy impactScore.
+ * Pure: the selection boolean is passed in, never read here.
  */
 export function pickImpactScore(rec: Pick<Recommendation, 'impactScore' | 'opportunity'>, useOpportunityValue: boolean): number {
   if (useOpportunityValue && rec.opportunity) return rec.opportunity.value;

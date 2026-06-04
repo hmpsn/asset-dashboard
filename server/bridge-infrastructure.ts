@@ -1,17 +1,15 @@
 /**
  * Bridge infrastructure — shared execution, debouncing, locking, and flag utilities.
  * All event bridges route through executeBridge() for consistent logging,
- * feature-flag gating, timeout, and error isolation.
+ * timeout, and error isolation.
  *
  * Spec: docs/superpowers/specs/unified-workspace-intelligence.md §24-27
  */
 
 import { createLogger } from './logger.js';
-import { isFeatureEnabled } from './feature-flags.js';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback } from './db/json-validation.js';
-import type { FeatureFlagKey } from '../shared/types/feature-flags.js';
 import type * as Broadcast from './broadcast.js';
 import type * as WsEvents from './ws-events.js';
 
@@ -19,7 +17,7 @@ const log = createLogger('bridge-infrastructure');
 
 // ── Bridge flag keys ───────────────────────────────────────────────────
 
-const BRIDGE_FLAGS: FeatureFlagKey[] = [
+export const BRIDGE_SOURCES = [
   'bridge-outcome-reweight',
   'bridge-decay-suggested-brief',
   'bridge-strategy-invalidate',
@@ -35,8 +33,11 @@ const BRIDGE_FLAGS: FeatureFlagKey[] = [
   'bridge-annotation-to-insight',
   'bridge-audit-site-health',
   'bridge-audit-auto-resolve',
+  'bridge-briefing-candidate-refresh',
   'bridge-client-signal',
-];
+] as const;
+
+export type BridgeSource = (typeof BRIDGE_SOURCES)[number] | 'opportunity-value-events';
 
 // ── executeBridge ──────────────────────────────────────────────────────
 
@@ -56,7 +57,7 @@ export interface BridgeResult {
 type BridgeCallback = () => Promise<BridgeResult | void> | BridgeResult | void;
 
 /**
- * Execute a bridge function with feature-flag gating, timeout, error isolation, and logging.
+ * Execute a bridge function with timeout, error isolation, and logging.
  * Bridges NEVER throw — errors are logged and swallowed to protect the triggering mutation.
  *
  * Returns a Promise, but callers in SYNC functions (recordAction, saveSnapshot) should use
@@ -66,16 +67,11 @@ type BridgeCallback = () => Promise<BridgeResult | void> | BridgeResult | void;
  * automatically — bridge callbacks no longer need to handle their own broadcasts.
  */
 export async function executeBridge(
-  flag: FeatureFlagKey,
+  flag: BridgeSource,
   workspaceId: string,
   fn: BridgeCallback,
   opts?: BridgeOptions,
 ): Promise<void> {
-  if (!isFeatureEnabled(flag)) {
-    log.debug({ flag, workspaceId }, 'Bridge skipped — flag OFF');
-    return;
-  }
-
   if (opts?.dryRun) {
     log.info({ flag, workspaceId, dryRun: true }, 'Bridge dry-run — would execute');
     return;
@@ -136,7 +132,7 @@ export async function executeBridge(
  * Safe because executeBridge internally catches all errors.
  */
 export function fireBridge(
-  flag: FeatureFlagKey,
+  flag: BridgeSource,
   workspaceId: string,
   fn: BridgeCallback,
   opts?: BridgeOptions,
@@ -153,7 +149,7 @@ export function fireBridge(
  * Returns a function: (workspaceId, fn) => void
  */
 export function debounceBridge(
-  flag: FeatureFlagKey,
+  flag: BridgeSource,
   delayMs: number,
 ): (workspaceId: string, fn: BridgeCallback) => void {
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -214,13 +210,13 @@ export async function withWorkspaceLock<T>(
 // ── getBridgeFlags ─────────────────────────────────────────────────────
 
 /**
- * Returns an object with all bridge flag states. Useful for health endpoints
- * and admin debug views.
+ * Returns bridge source states for health endpoints and admin debug views.
+ * Bridge rollout flags are retired, so every registered source is active.
  */
 export function getBridgeFlags(): Record<string, boolean> {
   const result: Record<string, boolean> = {};
-  for (const flag of BRIDGE_FLAGS) {
-    result[flag] = isFeatureEnabled(flag);
+  for (const flag of BRIDGE_SOURCES) {
+    result[flag] = true;
   }
   return result;
 }

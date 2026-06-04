@@ -5,8 +5,8 @@
  * `backlinkProfileToAuthorityStrength`) for the Opportunity Value scoring path.
  * This REPLACES the organic-keyword-count `domainStrength` proxy on the OV path
  * ONLY — the legacy `resolveDomainStrength` / `adjustKdImpactScore` path is left
- * byte-identical (it still feeds the production impactScore). All of this is dark
- * while the `opportunity-value-scorer` flag is OFF (OV value is shadow-only).
+ * intact for the explicit legacy fallback path, while the canonical runtime now
+ * serves Opportunity Value as the impactScore basis.
  *
  * Lockstep (CLAUDE.md DB column + mapper): migration 108 + row interface +
  * rowToWorkspaceAuthority + getOrCreate + upsert + Zod schema, all here.

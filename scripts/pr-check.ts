@@ -1018,6 +1018,96 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    name: 'Retired bridge/opportunity feature flag key used in flag API',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    exclude: ['server/db/migrations/123-retire-bridge-opportunity-feature-flags.sql'],
+    message:
+      'Bridge/opportunity feature flags were retired in PR2; keep bridge source identifiers but do not use retired keys in flag APIs.',
+    severity: 'error',
+    rationale:
+      'Retired bridge/opportunity rollout flags must not re-enter runtime/UI/test flag APIs after their enabled path becomes canonical.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const retired = [
+        'intelligence-shadow-mode',
+        'opportunity-value-scorer',
+        'opportunity-value-calibration',
+        'opportunity-value-events',
+        'bridge-outcome-reweight',
+        'bridge-decay-suggested-brief',
+        'bridge-strategy-invalidate',
+        'bridge-insight-to-action',
+        'bridge-page-analysis-invalidate',
+        'bridge-action-auto-resolve',
+        'bridge-content-to-insight',
+        'bridge-schema-to-insight',
+        'bridge-anomaly-boost',
+        'bridge-settings-cascade',
+        'bridge-audit-page-health',
+        'bridge-action-annotation',
+        'bridge-annotation-to-insight',
+        'bridge-audit-site-health',
+        'bridge-audit-auto-resolve',
+        'bridge-briefing-candidate-refresh',
+        'bridge-client-signal',
+      ];
+      const keyPattern = retired.join('|');
+      const helperRe = new RegExp(`\\b(?:isFeatureEnabled|useFeatureFlag|setFlagOverride|setWorkspaceFlagOverride)\\(\\s*['"](?:${keyPattern})['"]`, 'gs');
+      const componentRe = new RegExp(`<FeatureFlag\\b[\\s\\S]{0,200}?\\bflag\\s*=\\s*['"](?:${keyPattern})['"]`, 'g');
+      const indexedRe = new RegExp(`\\b(?:FEATURE_FLAGS|FEATURE_FLAG_CATALOG)\\s*\\[\\s*['"](?:${keyPattern})['"]\\s*\\]`, 'gs');
+      const featureFlagLiteralRe = new RegExp(`['"](?:${keyPattern})['"]\\s*:`, 'g');
+      const envRe = /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_(?:INTELLIGENCE_SHADOW_MODE|OPPORTUNITY_VALUE_(?:SCORER|CALIBRATION|EVENTS)|BRIDGE_(?:OUTCOME_REWEIGHT|DECAY_SUGGESTED_BRIEF|STRATEGY_INVALIDATE|INSIGHT_TO_ACTION|PAGE_ANALYSIS_INVALIDATE|ACTION_AUTO_RESOLVE|CONTENT_TO_INSIGHT|SCHEMA_TO_INSIGHT|ANOMALY_BOOST|SETTINGS_CASCADE|AUDIT_PAGE_HEALTH|ACTION_ANNOTATION|ANNOTATION_TO_INSIGHT|AUDIT_SITE_HEALTH|AUDIT_AUTO_RESOLVE|BRIEFING_CANDIDATE_REFRESH|CLIENT_SIGNAL))\b/;
+
+      function lineNumberForIndex(content: string, index: number): number {
+        return content.slice(0, index).split('\n').length;
+      }
+
+      function pushMatch(file: string, content: string, index: number, fallback: string): void {
+        const line = lineNumberForIndex(content, index);
+        const text = content.split('\n')[line - 1]?.trim() || fallback.trim();
+        hits.push({ file, line, text });
+      }
+
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        const lines = content.split('\n');
+
+        for (const match of content.matchAll(helperRe)) {
+          pushMatch(file, content, match.index ?? 0, match[0]);
+        }
+        for (const match of content.matchAll(componentRe)) {
+          pushMatch(file, content, match.index ?? 0, match[0]);
+        }
+        for (const match of content.matchAll(indexedRe)) {
+          pushMatch(file, content, match.index ?? 0, match[0]);
+        }
+        if (file.endsWith('shared/types/feature-flags.ts')) {
+          for (const match of content.matchAll(featureFlagLiteralRe)) {
+            pushMatch(file, content, match.index ?? 0, match[0]);
+          }
+        }
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (envRe.test(line)) {
+            hits.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+      const deduped: CustomCheckMatch[] = [];
+      const seen = new Set<string>();
+      for (const hit of hits) {
+        const key = `${hit.file}:${hit.line}:${hit.text}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        deduped.push(hit);
+      }
+      return deduped;
+    },
+  },
+  {
     name: 'Keyword Command Center summary/detail must not use full model',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',

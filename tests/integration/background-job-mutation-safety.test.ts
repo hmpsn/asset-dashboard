@@ -301,8 +301,14 @@ describe('background job mutation safety for action playbooks', () => {
     expect(countActivitiesForAction(action.id, 'client_action_approved')).toBe(1);
     expect(countActivitiesForAction(action.id, 'client_action_completed')).toBe(0);
 
-    expect(broadcastState.calls).toEqual([
+    expect(broadcastState.calls).toEqual(expect.arrayContaining([
       { workspaceId: wsId, event: WS_EVENTS.CLIENT_ACTION_UPDATE, payload: { actionId: action.id, action: 'responded' } },
-    ]);
+    ]));
+    expect(broadcastState.calls.find(call => call.event === WS_EVENTS.CONTENT_UPDATED)).toBeUndefined();
+    expect(
+      broadcastState.calls.find(
+        call => call.event === WS_EVENTS.CLIENT_ACTION_UPDATE && call.payload?.action === 'completed',
+      ),
+    ).toBeUndefined();
   });
 });

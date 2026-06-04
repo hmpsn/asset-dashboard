@@ -163,6 +163,100 @@ describe('Rule: Retired outcome feature flag key used in flag API', () => {
   });
 });
 
+describe('Rule: Retired bridge/opportunity feature flag key used in flag API', () => {
+  const RULE = 'Retired bridge/opportunity feature flag key used in flag API';
+
+  it('flags retired opportunity keys passed to feature flag helpers', () => {
+    const retiredKey = ['opportunity', 'value', 'scorer'].join('-');
+    const file = write(
+      uniqPath('rule-retired-bridge-opportunity-flags', 'helper.ts'),
+      lines(
+        'import { isFeatureEnabled } from "./feature-flags";',
+        `const enabled = isFeatureEnabled('${retiredKey}');`,
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags retired bridge keys passed to FeatureFlag components', () => {
+    const retiredKey = ['bridge', 'anomaly', 'boost'].join('-');
+    const file = write(
+      uniqPath('rule-retired-bridge-opportunity-flags', 'component.tsx'),
+      lines(
+        'import { FeatureFlag } from "./FeatureFlag";',
+        `export const Demo = () => <FeatureFlag flag="${retiredKey}">demo</FeatureFlag>;`,
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags retired bridge/opportunity env vars', () => {
+    const retiredEnv = ['FEATURE', 'OPPORTUNITY', 'VALUE', 'EVENTS'].join('_');
+    const file = write(
+      uniqPath('rule-retired-bridge-opportunity-flags', 'env.ts'),
+      lines(
+        `process.env.${retiredEnv} = 'true';`,
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('flags multiline retired helper calls', () => {
+    const retiredKey = ['bridge', 'anomaly', 'boost'].join('-');
+    const file = write(
+      uniqPath('rule-retired-bridge-opportunity-flags', 'multiline-helper.ts'),
+      lines(
+        'import { isFeatureEnabled } from "./feature-flags";',
+        'const enabled = isFeatureEnabled(',
+        `  '${retiredKey}',`,
+        ');',
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags retired keys re-added to the shared feature flag registry', () => {
+    const retiredKey = ['opportunity', 'value', 'events'].join('-');
+    const file = write(
+      'shared/types/feature-flags.ts',
+      lines(
+        'export const FEATURE_FLAGS = {',
+        `  '${retiredKey}': false,`,
+        '};',
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('allows bridge source identifiers outside feature flag APIs', () => {
+    const bridgeSource = ['bridge', 'audit', 'page', 'health'].join('-');
+    const file = write(
+      uniqPath('rule-retired-bridge-opportunity-flags', 'negative.ts'),
+      lines(
+        `fireBridge('${bridgeSource}', workspaceId, fn);`,
+        `const historicalNote = '${bridgeSource} is a bridge source';`,
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
 // ════════════════════════════════════════════════════════════════════════════
 // Rule 2: Global keydown missing isContentEditable guard
 // ════════════════════════════════════════════════════════════════════════════
@@ -5200,6 +5294,9 @@ describe('Meta: customCheck rule name registry', () => {
     // Outcome feature flag retirement PR1 (2026-06-04) — retired outcome
     // rollout keys must not re-enter runtime/UI/test flag APIs.
     'Retired outcome feature flag key used in flag API',
+    // Feature flag retirement PR2 (2026-06-04) — bridge/opportunity source
+    // identifiers remain valid, but retired keys cannot be used as flags.
+    'Retired bridge/opportunity feature flag key used in flag API',
     // keyword-consolidation Wave 1 (2026-06-03) — prevents lost-update race on
     // tracked_keywords JSON blob; enforces withTrackedKeywordsTxn (BEGIN IMMEDIATE).
     'tracked_keywords bare read→write outside withTrackedKeywordsTxn',

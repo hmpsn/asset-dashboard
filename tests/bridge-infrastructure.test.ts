@@ -1,22 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// Mock feature-flags before importing bridge infrastructure
-vi.mock('../server/feature-flags.js', () => ({
-  isFeatureEnabled: vi.fn().mockReturnValue(false),
-}));
-
 describe('bridge-infrastructure', () => {
   let executeBridge: typeof import('../server/bridge-infrastructure.js').executeBridge;
   let fireBridge: typeof import('../server/bridge-infrastructure.js').fireBridge;
   let debounceBridge: typeof import('../server/bridge-infrastructure.js').debounceBridge;
   let withWorkspaceLock: typeof import('../server/bridge-infrastructure.js').withWorkspaceLock;
   let getBridgeFlags: typeof import('../server/bridge-infrastructure.js').getBridgeFlags;
-  let isFeatureEnabled: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     vi.useFakeTimers();
-    const flags = await import('../server/feature-flags.js');
-    isFeatureEnabled = flags.isFeatureEnabled as ReturnType<typeof vi.fn>;
     const mod = await import('../server/bridge-infrastructure.js');
     executeBridge = mod.executeBridge;
     fireBridge = mod.fireBridge;
@@ -31,22 +23,13 @@ describe('bridge-infrastructure', () => {
   });
 
   describe('executeBridge', () => {
-    it('skips execution when feature flag is OFF', async () => {
-      isFeatureEnabled.mockReturnValue(false);
-      const fn = vi.fn();
-      await executeBridge('bridge-strategy-invalidate', 'ws-1', fn);
-      expect(fn).not.toHaveBeenCalled();
-    });
-
-    it('executes bridge function when flag is ON', async () => {
-      isFeatureEnabled.mockReturnValue(true);
+    it('executes bridge function by default', async () => {
       const fn = vi.fn().mockResolvedValue(undefined);
       await executeBridge('bridge-strategy-invalidate', 'ws-1', fn);
       expect(fn).toHaveBeenCalledOnce();
     });
 
     it('catches and logs errors without throwing', async () => {
-      isFeatureEnabled.mockReturnValue(true);
       const fn = vi.fn().mockRejectedValue(new Error('bridge failed'));
       // Should not throw
       await executeBridge('bridge-strategy-invalidate', 'ws-1', fn);
@@ -54,7 +37,6 @@ describe('bridge-infrastructure', () => {
     });
 
     it('respects timeout and aborts long-running bridges', async () => {
-      isFeatureEnabled.mockReturnValue(true);
       const fn = vi.fn().mockImplementation(() => new Promise(resolve => setTimeout(resolve, 10_000)));
       const promise = executeBridge('bridge-strategy-invalidate', 'ws-1', fn, { timeoutMs: 100 });
       vi.advanceTimersByTime(200);
@@ -65,7 +47,6 @@ describe('bridge-infrastructure', () => {
 
   describe('debounceBridge', () => {
     it('collapses multiple calls within debounce window', async () => {
-      isFeatureEnabled.mockReturnValue(true);
       const fn = vi.fn().mockResolvedValue(undefined);
       const debounced = debounceBridge('bridge-strategy-invalidate', 300);
 
@@ -82,7 +63,6 @@ describe('bridge-infrastructure', () => {
     });
 
     it('executes separately for different workspaces', async () => {
-      isFeatureEnabled.mockReturnValue(true);
       const fn1 = vi.fn().mockResolvedValue(undefined);
       const fn2 = vi.fn().mockResolvedValue(undefined);
       const debounced = debounceBridge('bridge-strategy-invalidate', 300);
@@ -133,10 +113,9 @@ describe('bridge-infrastructure', () => {
 
   describe('getBridgeFlags', () => {
     it('returns object with all bridge flag states', () => {
-      isFeatureEnabled.mockReturnValue(false);
       const flags = getBridgeFlags();
       expect(flags).toHaveProperty('bridge-strategy-invalidate');
-      expect(flags['bridge-strategy-invalidate']).toBe(false);
+      expect(flags['bridge-strategy-invalidate']).toBe(true);
     });
   });
 });

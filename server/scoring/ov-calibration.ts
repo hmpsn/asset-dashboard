@@ -6,11 +6,9 @@
  * scorer applies to roiPerEffortDay (computeOpportunityValue opts.calibration).
  *
  * ══ IDENTITY-SAFE (day-one no-op) ══
- * Returns 1.0 (identity) when EITHER:
- *   - the `opportunity-value-calibration` flag is OFF, OR
- *   - there are fewer than MIN_OUTCOMES (5) qualifying outcomes for the workspace.
- * So enabling Spine C changes nothing until a workspace has accrued real outcomes,
- * and the whole thing is dark while the scorer flag itself is OFF (OV is shadow).
+ * Returns 1.0 (identity) when there are fewer than MIN_OUTCOMES (5) qualifying
+ * outcomes for the workspace. Calibration is default-on but remains inert until
+ * a workspace has accrued real outcomes.
  *
  * ══ CALIBRATION BASIS (documented choice) ══
  * The design's preferred basis is median(realized attributed_value / predicted EMV)
@@ -41,7 +39,6 @@
  * the outcome read; any throw degrades to 1.0 (identity) so calibration can never
  * break or skew rec generation.
  */
-import { isFeatureEnabled } from '../feature-flags.js';
 import { getCalibrationOutcomes } from '../outcome-tracking.js';
 import { createLogger } from '../logger.js';
 
@@ -71,12 +68,10 @@ function clamp(v: number, lo: number, hi: number): number {
 
 /**
  * Per-workspace OV calibration multiplier in [0.75, 1.25]. Identity (1.0) when the
- * calibration flag is off OR there are fewer than MIN_OUTCOMES qualifying outcomes.
+ * there are fewer than MIN_OUTCOMES qualifying outcomes.
  */
 export function computeOvCalibration(workspaceId: string): number {
   try {
-    if (!isFeatureEnabled('opportunity-value-calibration')) return 1.0;
-
     const outcomes = getCalibrationOutcomes(workspaceId);
     if (outcomes.length < MIN_OUTCOMES) return 1.0;
 

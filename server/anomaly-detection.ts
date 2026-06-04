@@ -28,7 +28,6 @@ import { notifyAnomalyAlert } from './email.js';
 import { createLogger } from './logger.js';
 import { upsertAnomalyDigestInsight, getInsight, getInsights, upsertInsight, cloneInsightParams } from './analytics-insights-store.js';
 import { debouncedAnomalyBoost, withWorkspaceLock } from './bridge-infrastructure.js';
-import { isFeatureEnabled } from './feature-flags.js';
 import { applyScoreAdjustment } from './insight-score-adjustments.js';
 import { computeImpactScore } from './insight-enrichment.js';
 import type * as AnalyticsInsightsStore from './analytics-insights-store.js';
@@ -229,10 +228,9 @@ export function acknowledgeAnomaly(workspaceId: string, id: string): boolean {
  * waiting for the next periodic scan. Uses applyScoreAdjustment with delta=0 to remove
  * the 'anomaly' key from _scoreAdjustments, which restores the original base score.
  *
- * ── bridge-anomaly-boost feature flag checklist ──
- * All functions that apply or reverse anomaly boosts MUST gate on
- * isFeatureEnabled('bridge-anomaly-boost'). When adding a new boost/reversal
- * code path, add the gate and update this list:
+ * ── anomaly boost path checklist ──
+ * Anomaly boosts are default-on. When adding a new boost/reversal code path,
+ * keep it isolated and update this list:
  *   1. reverseAnomalyBoostIfNoneRemain() — dismiss-triggered reversal (below)
  *   2. debouncedAnomalyBoost() call in runAnomalyScan() — boost application
  *   3. Bridge #10 reversal loop in runAnomalyScan() — periodic scan reversal
@@ -240,9 +238,6 @@ export function acknowledgeAnomaly(workspaceId: string, id: string): boolean {
  * Exported for testing — not intended for direct use outside this module.
  */
 export function reverseAnomalyBoostIfNoneRemain(workspaceId: string): number {
-  // Respect the feature flag — if boost behavior is disabled, skip reversal too
-  if (!isFeatureEnabled('bridge-anomaly-boost')) return 0;
-
   // Only consider anomalies detected within the last 24h — older undismissed anomalies
   // are stale and should not keep boosts alive indefinitely.
   // listAnomalies(_, false) already returns only undismissed (dismissed_at IS NULL),
@@ -772,10 +767,6 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
   // For every workspace, check if recent (<24h) anomalies still exist.
   // If none remain AND insights have an 'anomaly' score adjustment, reverse it (delta=0).
   // This prevents stale +10 boosts from lingering indefinitely after anomalies resolve.
-  // Gated behind same feature flag as the boost itself — no point reversing if boosts were never applied.
-  if (!isFeatureEnabled('bridge-anomaly-boost')) {
-    log.debug('Bridge #10 reversal skipped — bridge-anomaly-boost flag OFF');
-  } else
   for (const ws of workspaces) {
     try {
       const recentForWs = listAnomalies(ws.id, false)

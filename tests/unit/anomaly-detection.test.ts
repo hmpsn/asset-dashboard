@@ -13,7 +13,6 @@ import db from '../../server/db/index.js';
 
 // --- Hoist mock function references so they are available before vi.mock hoisting ---
 const {
-  mockIsFeatureEnabled,
   mockGetInsights,
   mockUpsertInsight,
   mockCloneInsightParams,
@@ -22,7 +21,6 @@ const {
   mockApplyScoreAdjustment,
   mockInvalidateIntelligenceCache,
 } = vi.hoisted(() => ({
-  mockIsFeatureEnabled: vi.fn().mockReturnValue(true),
   mockGetInsights: vi.fn().mockReturnValue([]),
   mockUpsertInsight: vi.fn(),
   mockCloneInsightParams: vi.fn((i: unknown) => ({ ...(i as object) })),
@@ -44,9 +42,6 @@ vi.mock('../../server/logger.js', () => ({
     debug: vi.fn(),
     error: vi.fn(),
   }),
-}));
-vi.mock('../../server/feature-flags.js', () => ({
-  isFeatureEnabled: mockIsFeatureEnabled,
 }));
 vi.mock('../../server/analytics-insights-store.js', () => ({
   getInsights: mockGetInsights,
@@ -148,7 +143,6 @@ beforeEach(() => {
   cleanAnomalies(wsA.workspaceId);
   cleanAnomalies(wsB.workspaceId);
   vi.clearAllMocks();
-  mockIsFeatureEnabled.mockReturnValue(true);
   mockGetInsights.mockReturnValue([]);
   mockApplyScoreAdjustment.mockReturnValue({ data: {}, adjustedScore: 50 });
   mockCloneInsightParams.mockImplementation((i: unknown) => ({ ...(i as object) }));
@@ -465,14 +459,6 @@ describe('acknowledgeAnomaly', () => {
 // ═══════════════════════════════════════════════════════════
 
 describe('reverseAnomalyBoostIfNoneRemain', () => {
-  it('returns 0 immediately when bridge-anomaly-boost feature flag is disabled', () => {
-    mockIsFeatureEnabled.mockReturnValue(false);
-
-    const result = reverseAnomalyBoostIfNoneRemain(ws.workspaceId);
-    expect(result).toBe(0);
-    expect(mockGetInsights).not.toHaveBeenCalled();
-  });
-
   it('returns 0 when there is a recent undismissed anomaly (within last 24h)', () => {
     // 23h ago — within 24h window, should block reversal
     const recentDetectedAt = new Date(Date.now() - 23 * 3600 * 1000).toISOString();

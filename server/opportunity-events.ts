@@ -6,8 +6,9 @@
  * server/scoring/opportunity-timing.ts reads the ACTIVE events and aggregates the
  * DECAYING boost per page (boost · exp(−ageDays/halfLifeDays)) into
  * OpportunityInput.timingBoost, which lifts the timing multiplier in
- * computeOpportunityValue. The whole pipeline is dark while the
- * `opportunity-value-events` flag is OFF (no rows written, empty boost map).
+ * computeOpportunityValue. This pipeline is now default-on: detectors and apply
+ * tails write events directly, and timing consumers degrade naturally to an
+ * empty boost map when no active events exist.
  *
  * Workspace-scoped. Lockstep (CLAUDE.md DB column + mapper): migration 110 +
  * row interface + rowToOpportunityEvent + insertOpportunityEvent +
