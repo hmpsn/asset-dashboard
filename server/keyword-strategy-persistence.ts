@@ -7,6 +7,7 @@ import { listQuickWins, replaceAllQuickWins } from './quick-wins.js';
 import { listKeywordGaps, replaceAllKeywordGaps } from './keyword-gaps.js';
 import { listTopicClusters, replaceAllTopicClusters } from './topic-clusters.js';
 import { listCannibalizationIssues, replaceAllCannibalizationIssues } from './cannibalization-issues.js';
+import { replaceAllSiteKeywordMetrics } from './site-keyword-metrics.js';
 import db from './db/index.js';
 import { recordAction, getActionBySource } from './outcome-tracking.js';
 import { broadcastToWorkspace } from './broadcast.js';
@@ -150,6 +151,10 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
     replaceAllKeywordGaps(ws.id, keywordGaps);
     replaceAllTopicClusters(ws.id, topicClusters);
     replaceAllCannibalizationIssues(ws.id, cannibalization);
+    // DUAL-WRITE (#19b, Wave 3b-i): keep the site_keyword_metrics table current
+    // on every persist. The blob siteKeywordMetrics write below (in keywordStrategy)
+    // is KEPT — this is the additive half; the strip is the 3b-ii PR.
+    replaceAllSiteKeywordMetrics(ws.id, siteKeywordMetrics);
 
     const previousStrategy = ws.keywordStrategy;
     if (previousStrategy?.generatedAt) {

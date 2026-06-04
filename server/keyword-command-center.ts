@@ -3,6 +3,7 @@ import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { assembleStoredKeywordStrategy } from './keyword-strategy-assembler.js';
+import { resolveSiteKeywordMetrics } from './site-keyword-metrics.js';
 import {
   buildLocalSeoKeywordCandidates,
   countLocalSeoKeywordCandidates,
@@ -282,6 +283,23 @@ export function protectedReason(keyword: TrackedKeyword | undefined): string | u
   if (keyword.source === TRACKED_KEYWORD_SOURCE.CLIENT_REQUESTED) return 'Client-requested keyword';
   if (keyword.source === TRACKED_KEYWORD_SOURCE.MANUAL) return 'Manual keyword';
   return undefined;
+}
+
+/**
+ * #19b dual-read (Wave 3b-i): return the strategy with its `siteKeywordMetrics`
+ * resolved table-first (site_keyword_metrics table), falling back to the blob
+ * array carried on the strategy. All KCC consumers read `strategy.siteKeywordMetrics`
+ * off this object, so overriding it once at each entry point repoints every
+ * downstream read. The blob is still written/read as the fallback — the strip is
+ * the follow-up 3b-ii PR.
+ */
+function withResolvedSiteKeywordMetrics(
+  workspaceId: string,
+  strategy: KeywordStrategy | null | undefined,
+): KeywordStrategy | null | undefined {
+  if (!strategy) return strategy;
+  const resolved = resolveSiteKeywordMetrics(workspaceId, strategy.siteKeywordMetrics);
+  return { ...strategy, siteKeywordMetrics: resolved.length > 0 ? resolved : undefined };
 }
 
 /**
@@ -1135,13 +1153,16 @@ async function buildKeywordCommandCenterModel(
   const workspace = getWorkspace(workspaceId);
   if (!workspace) return null;
 
-  const strategy = workspace.keywordStrategy;
+  // #19b: siteKeywordMetrics resolved table-first (blob fallback). siteKeywords/
+  // generatedAt stay blob-sourced.
+  const strategy = withResolvedSiteKeywordMetrics(workspace.id, workspace.keywordStrategy);
   const pageMap = options.includeStrategyUx === false
     ? listPageKeywordsLite(workspace.id)
     : listPageKeywords(workspace.id);
   // contentGaps + keywordGaps via the single assembler (#2). strategy stays the
-  // raw blob (siteKeywords/siteKeywordMetrics/generatedAt) and pageMap keeps the
-  // Lite/full page_keywords path above — KCC only needs the two gap arrays here.
+  // raw blob (siteKeywords/generatedAt) with siteKeywordMetrics table-resolved
+  // above, and pageMap keeps the Lite/full page_keywords path above — KCC only
+  // needs the two gap arrays here.
   const assembled = assembleStoredKeywordStrategy(workspace.id);
   const contentGaps = assembled?.contentGaps ?? [];
   const keywordGaps = assembled?.keywordGaps ?? [];
@@ -1261,11 +1282,13 @@ export async function buildKeywordCommandCenterSummary(
     keysWithVolume.add(key);
   };
 
-  for (const metric of workspace.keywordStrategy?.siteKeywordMetrics ?? []) {
+  // #19b: siteKeywordMetrics resolved table-first (blob fallback).
+  const summaryStrategy = withResolvedSiteKeywordMetrics(workspace.id, workspace.keywordStrategy);
+  for (const metric of summaryStrategy?.siteKeywordMetrics ?? []) {
     addKey(inStrategyKeys, metric.keyword);
     markVolume(metric.keyword, metric.volume);
   }
-  for (const keyword of workspace.keywordStrategy?.siteKeywords ?? []) addKey(inStrategyKeys, keyword);
+  for (const keyword of summaryStrategy?.siteKeywords ?? []) addKey(inStrategyKeys, keyword);
 
   for (const page of listPageKeywordsLite(workspace.id)) {
     addKey(pageAssignedKeys, page.primaryKeyword);
@@ -1301,7 +1324,7 @@ export async function buildKeywordCommandCenterSummary(
   // Recover provenance for legacy UNKNOWN-source tracked keywords via cross-reference.
   // Applied at this level so trackedKeywordMatchesFilter (used below) sees inferred sources.
   const trackedKeywords = inferTrackedKeywordSources(rawTrackedKeywords, {
-    strategy: workspace.keywordStrategy,
+    strategy: summaryStrategy,
     contentGaps,
     feedback,
   });
@@ -1871,10 +1894,12 @@ function buildFilteredBundle(input: {
   filter: KeywordCommandCenterFilter;
   localVisibility: Map<string, LocalSeoKeywordVisibilitySummary>;
 }): CommandCenterSourceBundle & { keys: Set<string> | null } {
-  const strategy = input.workspace.keywordStrategy;
+  // #19b: siteKeywordMetrics resolved table-first (blob fallback).
+  const strategy = withResolvedSiteKeywordMetrics(input.workspace.id, input.workspace.keywordStrategy);
   const pageMap = listPageKeywordsLite(input.workspace.id);
   // contentGaps + keywordGaps via the single assembler (#2); strategy stays the
-  // raw blob and pageMap keeps the Lite page_keywords path.
+  // raw blob (with siteKeywordMetrics table-resolved) and pageMap keeps the Lite
+  // page_keywords path.
   const filteredAssembled = assembleStoredKeywordStrategy(input.workspace.id);
   const contentGaps = filteredAssembled?.contentGaps ?? [];
   const keywordGaps = filteredAssembled?.keywordGaps ?? [];
@@ -2108,7 +2133,11 @@ export async function buildKeywordCommandCenterDetail(
   const latestRanks = allLatestRanks.filter(rank => keywordComparisonKey(rank.query) === normalized);
   const feedback = filterMapByKeys(readFeedback(workspace.id), new Set([normalized]));
   const lostVisibilityRows = safeLostVisibilityRows(workspace.id).filter(row => keywordComparisonKey(row.query) === normalized);
-  const strategy = filterStrategyForSingleKeyword(workspace.keywordStrategy, normalized);
+  // #19b: resolve siteKeywordMetrics table-first (blob fallback) before filtering.
+  const strategy = filterStrategyForSingleKeyword(
+    withResolvedSiteKeywordMetrics(workspace.id, workspace.keywordStrategy),
+    normalized,
+  );
   // Recover provenance for legacy UNKNOWN-source tracked keywords so the drawer
   // shows accurate source labels and protected-state UI for legacy data.
   const trackedKeywords = inferTrackedKeywordSources(rawTrackedKeywords, { strategy, contentGaps, feedback });

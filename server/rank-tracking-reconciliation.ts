@@ -10,6 +10,7 @@ import {
   type TrackedKeyword,
 } from '../shared/types/rank-tracking.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
+import { resolveSiteKeywordMetrics } from './site-keyword-metrics.js';
 import type { KeywordStrategy, PageKeywordMap } from '../shared/types/workspace.js';
 
 export interface StrategyRankTrackingTarget {
@@ -57,11 +58,18 @@ export function hasStrategyOwnedTrackedKeywords(workspaceId: string): boolean {
 }
 
 function buildTargets(
+  workspaceId: string,
   keywordStrategy: ReconcileStrategyRankTrackingOptions['keywordStrategy'],
   pageMap: PageKeywordMap[],
 ): { targets: Map<string, StrategyRankTrackingTarget>; skipped: StrategyRankTrackingChangeSet['skipped'] } {
   const targets = new Map<string, StrategyRankTrackingTarget>();
   const skipped: StrategyRankTrackingChangeSet['skipped'] = [];
+
+  // #19b dual-read: join from the site_keyword_metrics table first, falling back
+  // to the blob `siteKeywordMetrics` carried on the keywordStrategy Pick. Keeps
+  // the volume/difficulty baseline attaching to STRATEGY_SITE_KEYWORD targets
+  // even after the table becomes the source of truth. Strip is the 3b-ii PR.
+  const siteKeywordMetrics = resolveSiteKeywordMetrics(workspaceId, keywordStrategy.siteKeywordMetrics);
 
   for (const keyword of keywordStrategy.siteKeywords ?? []) {
     const query = normalizeQuery(keyword);
@@ -69,7 +77,7 @@ function buildTargets(
       skipped.push({ query: keyword, reason: 'blank_site_keyword' });
       continue;
     }
-    const metrics = keywordStrategy.siteKeywordMetrics?.find(metric => normalizeQuery(metric.keyword) === query);
+    const metrics = siteKeywordMetrics.find(metric => normalizeQuery(metric.keyword) === query);
     targets.set(query, {
       query: keyword.trim(),
       source: TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD,
@@ -139,7 +147,7 @@ export function reconcileStrategyRankTracking(
   options: ReconcileStrategyRankTrackingOptions,
 ): StrategyRankTrackingChangeSet {
   const generatedAt = options.generatedAt ?? options.keywordStrategy.generatedAt ?? new Date().toISOString();
-  const { targets, skipped } = buildTargets(options.keywordStrategy, options.pageMap);
+  const { targets, skipped } = buildTargets(options.workspaceId, options.keywordStrategy, options.pageMap);
   const targetsByPage = new Map<string, StrategyRankTrackingTarget>();
   for (const target of targets.values()) {
     if (target.pagePath && !targetsByPage.has(target.pagePath)) targetsByPage.set(target.pagePath, target);

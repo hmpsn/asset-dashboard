@@ -67,6 +67,12 @@ migrateTopicClustersFromJsonBlob();
 import { migrateFromJsonBlob as migrateCannibalizationFromJsonBlob } from './cannibalization-issues.js';
 migrateCannibalizationFromJsonBlob();
 
+// Backfill keywordStrategy.siteKeywordMetrics from workspace JSON blobs into the
+// site_keyword_metrics table (idempotent, CAS-guarded). Wave 3b-i ADDITIVE: this
+// only POPULATES the table — it does NOT strip the blob array (the strip is 3b-ii).
+import { migrateSiteKeywordMetricsFromBlob } from './site-keyword-metrics.js';
+migrateSiteKeywordMetricsFromBlob();
+
 // Create and configure the Express app (middleware + routes)
 const app = createApp();
 
