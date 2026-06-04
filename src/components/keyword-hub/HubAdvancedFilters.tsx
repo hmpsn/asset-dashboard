@@ -16,6 +16,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { ChevronDown, SlidersHorizontal, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { Button } from '../ui/Button';
 import { IconButton } from '../ui/IconButton';
 import type { KeywordCommandCenterFilter, KeywordCommandCenterFilterMeta } from '../../../shared/types/keyword-command-center';
 import { KEYWORD_COMMAND_CENTER_FILTERS } from '../../../shared/types/keyword-command-center';
@@ -149,17 +150,18 @@ export function HubAdvancedFilters({
             nonPrimaryFilters.map((meta) => {
               const isSelected = meta.id === activeAdvancedFilter;
               return (
-                <button // button-ok: listbox option with role="option"/aria-selected semantics the Button primitive does not model
+                <Button
                   key={meta.id}
-                  type="button"
+                  variant="ghost"
+                  size="sm"
                   role="option"
                   aria-selected={isSelected}
                   onClick={() => handleSelect(meta.id)}
                   className={cn(
-                    'w-full flex items-center justify-between gap-2',
-                    'px-3 py-2 t-caption text-left transition-colors',
+                    'w-full justify-between gap-2 rounded-none',
+                    'px-3 py-2 t-caption text-left',
                     isSelected
-                      ? 'bg-teal-600/10 text-teal-400'
+                      ? 'bg-teal-600/10 text-teal-400 hover:bg-teal-600/10'
                       : 'text-[var(--brand-text)] hover:bg-[var(--surface-3)]',
                   )}
                 >
@@ -176,7 +178,7 @@ export function HubAdvancedFilters({
                       {meta.count}
                     </span>
                   )}
-                </button>
+                </Button>
               );
             })
           )}

@@ -13,6 +13,7 @@ import { MapPin } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
 import { Skeleton } from '../ui/Skeleton';
 import type { HubSegment } from '../../hooks/admin/useKeywordHubState';
 
@@ -71,26 +72,23 @@ export function HubSegmentBar({
         const showIcon = isActive && IconComponent != null;
 
         return (
-          <button // button-ok: segment pill toggle with aria-pressed (bespoke toggle semantics the Button primitive does not model)
+          <Button
             key={seg.id}
-            type="button"
+            variant="ghost"
+            size="sm"
+            // Render the segment's icon (e.g. MapPin on Local) only when active.
+            icon={showIcon ? IconComponent : undefined}
             onClick={() => onChange(seg.id)}
             aria-pressed={isActive}
             aria-label={`${seg.label} segment${typeof seg.count === 'number' ? `, ${seg.count} keywords` : ''}`}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] px-3 py-1.5',
-              't-caption font-medium transition-colors whitespace-nowrap',
+              'gap-1.5 rounded-[var(--radius-pill)] px-3 py-1.5',
+              't-caption font-medium whitespace-nowrap',
               isActive
-                ? 'bg-teal-600 text-white'
+                ? 'bg-teal-600 text-white hover:bg-teal-600'
                 : 'bg-[var(--surface-2)] text-[var(--brand-text-muted)] hover:bg-[var(--surface-3)] hover:text-[var(--brand-text)]',
             )}
           >
-            {showIcon && (
-              <IconComponent
-                aria-hidden="true"
-                className="w-3 h-3 shrink-0"
-              />
-            )}
             <span>{seg.label}</span>
             {isLoading ? (
               <Skeleton className="w-6 h-3.5 rounded-[var(--radius-pill)]" />
@@ -113,7 +111,7 @@ export function HubSegmentBar({
                 —
               </span>
             )}
-          </button>
+          </Button>
         );
       })}
     </nav>
