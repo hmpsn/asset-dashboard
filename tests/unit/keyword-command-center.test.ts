@@ -1361,6 +1361,29 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
     expect(detail!.row.tracking.hasSignal).toBe(false);
   });
 
+  it('Wave 4 P0: tracking.strategyOwned is projected onto the emitted KCC row when strategy_owned=1', async () => {
+    // Wave 3d-ii merges strategyOwned onto row.tracking via mergeTrackedKeywordProvenance,
+    // but finalizeDraftRow did NOT project it onto the emitted bundle row. P0-T2 opens
+    // the projection gate (admin-only). Three-state: true is a real, projected value.
+    addTrackedKeyword(workspaceId, 'owned strategy keyword', {
+      source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
+      strategyOwned: true,
+    });
+
+    const detail = await buildKeywordCommandCenterDetail(workspaceId, 'owned strategy keyword');
+    expect(detail!.row.tracking.strategyOwned).toBe(true);
+  });
+
+  it('Wave 4 P0: tracking.strategyOwned is undefined (NOT false) when ownership is unknown', async () => {
+    // Three-state discipline: a row seeded WITHOUT strategyOwned must read back as
+    // `undefined` (ownership unknown), never coerced to `false`. A truthiness/`?? false`
+    // guard would mislabel every pre-reconcile row as "explicitly not owned".
+    addTrackedKeyword(workspaceId, 'unowned manual keyword', { source: TRACKED_KEYWORD_SOURCE.MANUAL });
+
+    const detail = await buildKeywordCommandCenterDetail(workspaceId, 'unowned manual keyword');
+    expect(detail!.row.tracking.strategyOwned).toBeUndefined();
+  });
+
   it('Wave 3d-ii: read-time source inference is RETIRED — an UNKNOWN tracked source stays UNKNOWN at read time', () => {
     // Regression GUARD: read-time inferTrackedKeywordSources was retired. The boot
     // backfill stamps legacy UNKNOWN sources ONCE; the read paths must NOT re-infer.

@@ -141,6 +141,17 @@ export interface KeywordCommandCenterTrackingState {
    */
   sourceGapKey?: string;
   /**
+   * Wave 4 P0 ADDITIVE ownership flag (admin-only). True when reconcile owns this
+   * keyword (`strategy_owned = 1`) — i.e. it is part of the active managed strategy
+   * set. Sourced from the provenance-bearing read (mergeTrackedKeywordProvenance →
+   * listTrackedKeywordRows), NOT getTrackedKeywords / the public endpoint (both STRIP
+   * it via `delete out.strategyOwned`). THREE-STATE: `true` = explicitly owned,
+   * `false` = explicitly not owned, `undefined` = ownership unknown (pre-reconcile).
+   * A truthiness / `?? false` guard is a bug — coercing `undefined`→`false` would
+   * mislabel every pre-reconcile row as "explicitly not owned".
+   */
+  strategyOwned?: boolean;
+  /**
    * True when the row has any rank/clicks/impressions data, false when the keyword
    * is `active` (or paused) but no rank snapshot or GSC signal has materialized.
    *
