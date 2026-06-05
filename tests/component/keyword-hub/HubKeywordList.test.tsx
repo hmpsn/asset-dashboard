@@ -141,8 +141,13 @@ function defaultProps(overrides: Partial<React.ComponentProps<typeof HubKeywordL
     onPageChange: vi.fn(),
     isBulkPending: false,
     onBulkAction: vi.fn(),
+    onRowAction: vi.fn(),
+    onDeleteHard: vi.fn(),
+    isRowActionPending: false,
     onClearSelection: vi.fn(),
     onResetFilters: vi.fn(),
+    onRowClick: vi.fn(),
+    activeKeyword: null,
     showLocalSeo: false,
     ...overrides,
   };

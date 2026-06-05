@@ -19,20 +19,26 @@
  *
  * Four Laws of Color enforced via the shared primitives. No violet/indigo/rose/pink.
  */
-import { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { FormInput, PageHeader, SectionCard } from './ui';
 import { KeywordBulkConfirmDialog } from './keyword-command-center/KeywordBulkConfirmDialog';
+import { KeywordDetailDrawer } from './keyword-command-center/KeywordDetailDrawer';
 import { summarizeBulkAction, type KeywordBulkActionSummary } from './keyword-command-center/kccActionHelpers';
+import { isServerAction } from './keyword-command-center/kccDisplayHelpers';
 import { queryKeys } from '../lib/queryKeys';
 import { WS_EVENTS } from '../lib/wsEvents';
+import { readHubDeepLink } from '../lib/keywordHubDeepLink';
+import { adminPath } from '../routes';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
+import { useLocalSeoRefresh } from '../hooks/admin/useLocalSeo';
 import {
   useKeywordCommandCenterAction,
   useKeywordCommandCenterBulkAction,
+  useKeywordCommandCenterDetail,
   useKeywordCommandCenterRows,
   useKeywordCommandCenterSummary,
   useKeywordHardDelete,
@@ -51,6 +57,7 @@ import type {
   KeywordCommandCenterBulkActionResult,
   KeywordCommandCenterBulkActionType,
   KeywordCommandCenterCounts,
+  KeywordCommandCenterNextAction,
   KeywordCommandCenterSort,
 } from '../../shared/types/keyword-command-center';
 
@@ -120,14 +127,25 @@ function segmentCount(
 
 export function KeywordHub({ workspaceId }: KeywordHubProps) {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  // ?tab= two-halves contract: seed the initial segment from the URL.
-  const initialSegment = searchParams.get('tab');
+  // Deep-link receiver (the two-halves contract's receiving half). Read ONCE on
+  // mount via a ref so the params seed initial state without a useEffect that
+  // would fight later user input. `?tab=` seeds the segment; `?q=` seeds the
+  // search AND (below) opens the drawer on the matching row.
+  const deepLink = useRef(readHubDeepLink(searchParams)).current;
 
-  const hub = useKeywordHubState({ initialSegment });
+  const hub = useKeywordHubState({
+    initialSegment: searchParams.get('tab'),
+    initialSearch: deepLink.query ?? undefined,
+  });
 
   const showLocalSeo = useFeatureFlag('local-seo-visibility');
+
+  // Journey drawer (P2): the selected row opens the per-keyword detail drawer.
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const detail = useKeywordCommandCenterDetail(workspaceId, selectedKey);
 
   // Data --------------------------------------------------------------------
   const summary = useKeywordCommandCenterSummary(workspaceId);
@@ -152,6 +170,32 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
   const bulkAction = useKeywordCommandCenterBulkAction(workspaceId);
   const rowAction = useKeywordCommandCenterAction(workspaceId);
   const hardDelete = useKeywordHardDelete(workspaceId);
+  const localRefresh = useLocalSeoRefresh(workspaceId);
+
+  // The selected row for the drawer: the freshly-fetched detail row when it
+  // arrives, otherwise the list row as an instant preview (mirrors KCC).
+  const selectedPreviewRow = useMemo(
+    () => (selectedKey ? rows.find((r) => r.normalizedKeyword === selectedKey) ?? null : null),
+    [rows, selectedKey],
+  );
+  const selectedRow = detail.data?.row ?? selectedPreviewRow;
+
+  // Deep-link `?q=` open-on-mount: once rows load, open the drawer on the row
+  // matching the normalized query. Guarded ref → fires at most once and never
+  // fights later user navigation; no-op when there is no `q` or no match.
+  const deepLinkOpenedRef = useRef(false);
+  useEffect(() => {
+    if (deepLinkOpenedRef.current) return;
+    if (!deepLink.query) {
+      deepLinkOpenedRef.current = true;
+      return;
+    }
+    if (rows.length === 0) return;
+    const match = rows.find((r) => r.normalizedKeyword === deepLink.query);
+    if (match) setSelectedKey(match.normalizedKeyword);
+    deepLinkOpenedRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only deep-link open; deepLink is a stable ref value
+  }, [rows]);
 
   // WebSocket: invalidate on rank/strategy mutations (both-halves contract).
   const wsHandlers = useMemo(
@@ -224,6 +268,63 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
     hardDelete.mutate({ keyword });
   };
 
+  // Drawer action dispatcher (P2 journey drawer). The drawer emits a
+  // KeywordCommandCenterNextAction from the selected row's nextActions; route
+  // every type the same way KCC's handleAction does so no drawer button is a
+  // silent no-op (navigation actions navigate, local-visibility refreshes,
+  // lifecycle actions hit the action mutation).
+  const handleDrawerAction = (action: KeywordCommandCenterNextAction) => {
+    const row = selectedRow;
+    if (!row) return;
+    if (action.type === 'view_rankings') {
+      // National rank lives in this drawer's own section — it is already open.
+      setSelectedKey(row.normalizedKeyword);
+      return;
+    }
+    if (action.type === 'review_page') {
+      navigate(adminPath(workspaceId, 'page-intelligence'), {
+        state: {
+          fixContext: {
+            targetRoute: 'page-intelligence',
+            pageSlug: action.pagePath,
+            pageName: row.assignment?.pageTitle,
+            primaryKeyword: row.keyword,
+          },
+        },
+      });
+      return;
+    }
+    if (action.type === 'generate_brief') {
+      navigate(adminPath(workspaceId, 'content-pipeline'), {
+        state: {
+          fixContext: {
+            targetRoute: 'content-pipeline',
+            primaryKeyword: row.keyword,
+            pageType: row.assignment?.role === 'content_gap' ? 'blog' : undefined,
+          },
+        },
+      });
+      return;
+    }
+    if (action.type === 'check_local_visibility') {
+      localRefresh.mutate({ keywords: [row.keyword] });
+      return;
+    }
+    if (!isServerAction(action.type)) return;
+    // Protected keywords (client-requested, strategy-owned, gap-sourced, pinned)
+    // come back with `disabledReason` set on their lifecycle actions — but NOT
+    // `disabled` — so the drawer renders them as live buttons. The server rejects
+    // an UNFORCED protected mutation, so force-flag exactly as the list's
+    // KeywordActionMenu does (`a.disabledReason ? { force: true }`); otherwise a
+    // protected retire/decline/pause would throw instead of applying.
+    rowAction.mutate({
+      action: action.type,
+      keyword: row.keyword,
+      pagePath: action.pagePath,
+      force: action.disabledReason ? true : undefined,
+    });
+  };
+
   // Reset all active filters (segment → 'all', search → '', advanced → null).
   // Distinct from clearSelection, which only empties the multi-select Set.
   const handleResetFilters = () => {
@@ -237,6 +338,16 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
     [rows],
   );
   const allSelected = hub.allSelected(visibleKeys);
+
+  // Surface a failed row/drawer/local action (mirrors KCC's actionErrorMessage).
+  // Without this a thrown mutation — e.g. a server-rejected lifecycle move — would
+  // fail silently in the Hub.
+  const firstError = rowAction.error ?? hardDelete.error ?? localRefresh.error ?? bulkAction.error;
+  const actionErrorMessage = firstError instanceof Error
+    ? firstError.message
+    : firstError
+      ? 'Keyword action failed. Try again or refresh the page.'
+      : null;
 
   return (
     <div className="space-y-4">
@@ -254,6 +365,15 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
           </div>
         }
       />
+
+      {actionErrorMessage && (
+        <div
+          role="alert"
+          className="rounded-[var(--radius-xl)] border border-red-500/40 bg-red-500/10 px-4 py-3"
+        >
+          <p className="t-caption font-semibold text-red-400">{actionErrorMessage}</p>
+        </div>
+      )}
 
       <SectionCard noPadding variant="subtle">
         <div className="px-3 py-3 border-b border-[var(--brand-border)] flex flex-wrap items-center gap-2">
@@ -294,9 +414,23 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
           isRowActionPending={rowAction.isPending || hardDelete.isPending}
           onClearSelection={hub.clearSelection}
           onResetFilters={handleResetFilters}
+          onRowClick={(row) => setSelectedKey(row.normalizedKeyword)}
+          activeKeyword={selectedKey}
           showLocalSeo={showLocalSeo}
         />
       </SectionCard>
+
+      {/* Per-keyword journey drawer (P2): origin → tracking → national rank →
+          local-per-market → lifecycle, plus the deep-link back-links. */}
+      <KeywordDetailDrawer
+        open={!!selectedKey}
+        row={selectedRow}
+        workspaceId={workspaceId}
+        isLoading={detail.isFetching && !!selectedKey && !detail.data}
+        loadingAction={localRefresh.isPending ? 'check_local_visibility' : rowAction.isPending ? rowAction.variables?.action : undefined}
+        onAction={handleDrawerAction}
+        onClose={() => setSelectedKey(null)}
+      />
 
       {/* Per-item bulk result summary (applied / skipped / failed). */}
       {bulkResult && (
