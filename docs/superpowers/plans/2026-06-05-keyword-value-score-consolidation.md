@@ -152,8 +152,8 @@ describe('OV intent parity after full-derive consolidation', () => {
 **Contract (exact swaps — confirm line numbers at execution against `8f9c7751`+):**
 - `recommendations.ts:1482`: `intent: toOpportunityIntent(pm.searchIntent)` → `intent: deriveValueIntent(pm.primaryKeyword, pm.searchIntent)` (**weight-changing**: `comparison`/absent).
 - `recommendations.ts:1539`: `intent: toOpportunityIntent(pk.searchIntent)` → `intent: deriveValueIntent(pk.primaryKeyword, pk.searchIntent)` (**weight-changing**).
-- `recommendations.ts:1420`: `intent: cg.intent ?? null` → `intent: deriveValueIntent(cg.targetKeyword, cg.intent)` (**value-inert** — `cg.intent` is strict 4-bucket).
-- `keyword-strategy-enrichment.ts:611`: inline 4-bucket coercion → `deriveValueIntent(cg.targetKeyword, cg.intent)` (**value-inert**).
+- `recommendations.ts:1420`: `intent: cg.intent ?? null` → `intent: deriveValueIntent(cg.targetKeyword, cg.intent)` (**value-inert** — `cg` here is from `listContentGaps`, whose `rowToContentGap` mapper coerces to the strict 4-bucket, so `deriveValueIntent` always equals `cg.intent`).
+- `keyword-strategy-enrichment.ts:611`: inline 4-bucket coercion → `deriveValueIntent(cg.targetKeyword, cg.intent)` (**WEIGHT-CHANGING** — `cg` here is a freshly AI-synthesized `StrategyContentGap` whose `intent` is **free-form**, so `comparison`/absent reclassify; this shifts `cg.opportunityScore` on every strategy generation via the canonical `relaxConservatism=true` path. Must be tested — see Task 1.3b).
 - Delete `toOpportunityIntent` (`recommendations.ts:242-251`); add `import { deriveValueIntent } from './scoring/keyword-value-score.js';` (recommendations.ts already imports `computeOpportunityValue` from `./scoring/opportunity-value.js` at `:54`, so the scoring-module import direction is established — no cycle: `keyword-value-score` → `opportunity-value`, neither imports `server/recommendations`).
 
 **Constraints:** all four sites + the `toOpportunityIntent` deletion land in **one commit** (CLAUDE.md cross-cutting-constraint rule). `pm`/`pk` are `PageKeywordMap` — the keyword field is `primaryKeyword` (NOT `.keyword`). Do NOT touch hardcoded-intent local branches or no-keyword branches. Do NOT alter EMV/ROI/effort/calibration math or re-introduce any legacy/`pickImpactScore` path.
@@ -163,6 +163,17 @@ describe('OV intent parity after full-derive consolidation', () => {
 - [ ] **Step 3: Implement** the 4 swaps + delete `toOpportunityIntent` per the contract.
 - [ ] **Step 4: Run green** — `npx vitest run tests/unit/recommendations-intent-parity.test.ts tests/unit/recommendations*.test.ts tests/unit/opportunity-value*.test.ts` PASS; `npm run typecheck` 0 (a leftover `toOpportunityIntent` reference would error). **Revert-confirm-red:** restore one site to `toOpportunityIntent`, confirm the comparison-parity test goes RED, restore.
 - [ ] **Step 5: Commit** — `git commit -am "refactor(scoring): one keyword intent classifier (deriveValueIntent); retire toOpportunityIntent (full-derive)"`
+
+### Task 1.3b: Test the enrichment `:611` weight-change (content-gap synthesis path)
+
+**Files:**
+- Test: extend the existing content-gap enrichment test (Phase 2 added `tests/integration/keyword-value-scoring-content-gaps.test.ts`) or add a focused case.
+
+`keyword-strategy-enrichment.ts:611` is **not** value-inert: `StrategyContentGap.intent` is free-form, so under full-derive a `comparison`/non-4-bucket intent reclassifies and shifts `cg.opportunityScore`. Prove the intended new behavior on the real enrichment path.
+
+- [ ] **Step 1: Write the test** — run `enrichKeywordStrategy` over a `StrategyContentGap` with `intent: 'comparison'` (and one with absent/`undefined` intent) and assert the resulting `cg.opportunityScore` reflects the commercial/regex-derived classification — i.e. it differs from (is ≥) the score the old `null`→`DEFAULT_INTENT_WEIGHT` 0.5 coercion produced for the same gap. Use the existing enrichment harness (`makeEnrichOptions`/`makeStrategy` pattern from the Phase 2 test).
+- [ ] **Step 2: Run red on the pre-migration code** (if testing the delta) or assert the intended-new value directly; **Step 3:** green on the migrated code.
+- [ ] **Step 4: Commit** — `git commit -am "test(scoring): enrichment content-gap intent reclassifies under full-derive (not value-inert)"`
 
 ### Task 1.4: Cross-layer consistency test + contract documentation
 
