@@ -6,7 +6,7 @@ import {
   Loader2, Target, ChevronDown, ChevronRight, RefreshCw,
   Sparkles, Briefcase,
   BarChart3, Users, Search, FileText,
-  Eye, MousePointerClick, Trophy, AlertTriangle, Plus, Check,
+  Eye, MousePointerClick, Trophy, AlertTriangle, Plus, Check, ArrowUpRight,
 } from 'lucide-react';
 import { Badge, StatCard, SectionCard, AIContextIndicator, TabBar, ErrorState, ProgressIndicator, NextStepsCard, LoadingState, Icon, PageHeader, Button, ClickableRow, IconButton, FormInput, FormTextarea, positionColor } from './ui';
 import { kdColor } from './page-intelligence/pageIntelligenceDisplay';
@@ -27,6 +27,8 @@ import { LocalSeoVisibilityPanel } from './local-seo/LocalSeoVisibilityPanel';
 import { keywords, rankTracking } from '../api/seo';
 import { queryKeys } from '../lib/queryKeys';
 import { keywordTrackingKey } from '../lib/keywordTracking';
+import { buildHubDeepLinkQuery } from '../lib/keywordHubDeepLink';
+import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
 import { adminPath } from '../routes';
@@ -69,6 +71,10 @@ interface Props {
 export function KeywordStrategyPanel({ workspaceId }: Props) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  // Wave 4 P4 — the per-keyword "View in Hub" deep-link affordance + the "Track"
+  // relabel are gated behind `keyword-hub` so the Strategy chip is BYTE-IDENTICAL
+  // flag-OFF (no extra button, legacy "Track in Rank Tracker" copy preserved).
+  const keywordHubEnabled = useFeatureFlag('keyword-hub');
   const { jobs, startJob, findActiveJob } = useBackgroundTasks();
   const [startingStrategyJob, setStartingStrategyJob] = useState(false);
   const [lastStartedJobId, setLastStartedJobId] = useState<string | null>(null);
@@ -754,13 +760,24 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                     )}
                     <IconButton
                       onClick={() => trackKeyword(kw)}
-                      title={tracked ? 'Tracking' : 'Track in Rank Tracker'}
-                      label={tracked ? 'Tracking' : 'Track in Rank Tracker'}
+                      title={tracked ? 'Tracking' : keywordHubEnabled ? 'Track' : 'Track in Rank Tracker'}
+                      label={tracked ? 'Tracking' : keywordHubEnabled ? 'Track' : 'Track in Rank Tracker'}
                       icon={tracked ? Check : Plus}
                       size="sm"
                       variant="ghost"
                       className={`ml-0.5 ${tracked ? 'text-accent-success' : 'text-[var(--brand-text-muted)] hover:text-accent-brand'}`}
                     />
+                    {keywordHubEnabled && (
+                      <IconButton
+                        onClick={() => navigate(adminPath(workspaceId, 'seo-keywords') + buildHubDeepLinkQuery({ keyword: kw }))}
+                        title="View in Hub"
+                        label="View in Hub"
+                        icon={ArrowUpRight}
+                        size="sm"
+                        variant="ghost"
+                        className="ml-0.5 text-[var(--brand-text-muted)] hover:text-accent-brand"
+                      />
+                    )}
                   </div>
                 );
               })}
