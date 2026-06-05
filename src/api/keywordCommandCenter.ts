@@ -26,6 +26,7 @@ export const keywordCommandCenter = {
     if (query.filter) params.set('filter', query.filter);
     if (query.search) params.set('search', query.search);
     if (query.sort) params.set('sort', query.sort);
+    if (query.direction) params.set('direction', query.direction);
     if (query.page) params.set('page', String(query.page));
     if (query.pageSize) params.set('pageSize', String(query.pageSize));
     const suffix = params.toString();
