@@ -48,6 +48,13 @@ export const FEATURE_FLAGS = {
   // foundation (table-renderer migration + additive strategyOwned exposure) with the flag
   // OFF. See docs/superpowers/plans/2026-06-04-keyword-hub.md.
   'keyword-hub': false,
+  // Keyword universe overhaul: gates the COVERAGE EXPANSION — remove the row caps,
+  // include every GSC-clicked/impressed query (full ranking coverage), keep all
+  // not-yet-ranking discovery — behind a flag so old-vs-new is comparable on
+  // staging and rollback is one switch. Junk gate + sort + window fixes ship
+  // unflagged. OFF = today's capped behavior, byte-identical.
+  // See docs/superpowers/plans/2026-06-05-keyword-universe-overhaul.md.
+  'keyword-universe-full': false,
 } as const;
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;
@@ -278,6 +285,19 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: '2026-06-02',
     },
   },
+  'keyword-universe-full': {
+    label: 'Keyword Universe — full coverage (uncap, all GSC-clicked/impressed + discovery)',
+    group: 'Keyword Hub',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-02',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Remove after the full keyword universe (uncapped coverage + junk gate) is validated on staging and becomes the default; the cap-based path is then deleted.',
+      linkedRoadmapItemId: 'keyword-universe-overhaul',
+      staleAuditCadence: 'weekly',
+      lastReviewedAt: '2026-06-02',
+    },
+  },
 };
 
 export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: FeatureFlagKey[] }> = [
@@ -315,7 +335,7 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   },
   {
     label: 'Keyword Hub',
-    keys: ['keyword-hub'],
+    keys: ['keyword-hub', 'keyword-universe-full'],
   },
 ];
 

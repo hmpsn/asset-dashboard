@@ -1717,6 +1717,10 @@ interface RowCandidateKey {
   demand: number;
   rank?: number;
   searchText?: string;
+  /** GSC clicks (28-day) — populated for ranking candidates; enables the clicks sort + filter. */
+  clicks?: number;
+  /** Keyword difficulty (0–100) — populated where the source has it; enables the difficulty sort. */
+  difficulty?: number;
 }
 
 function addCandidateKey(
@@ -1726,6 +1730,8 @@ function addCandidateKey(
   demand = 0,
   rank?: number,
   searchText?: string,
+  clicks?: number,
+  difficulty?: number,
 ): void {
   const key = keywordComparisonKey(keyword ?? '');
   if (!key) return;
@@ -1736,7 +1742,7 @@ function addCandidateKey(
     || sourcePriority < existing.sourcePriority
     || (sourcePriority === existing.sourcePriority && demand > existing.demand)
   ) {
-    candidates.set(key, { key, keyword: displayKeyword, sourcePriority, demand, rank, searchText });
+    candidates.set(key, { key, keyword: displayKeyword, sourcePriority, demand, rank, searchText, clicks, difficulty });
   } else if (searchText) {
     existing.searchText = [...new Set([...(existing.searchText?.split(' ') ?? []), ...searchText.split(' ')].filter(Boolean))].join(' ');
   }

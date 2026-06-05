@@ -261,7 +261,7 @@ export interface KeywordCommandCenterResponse {
   generatedAt?: string | null;
 }
 
-export type KeywordCommandCenterSort = 'priority' | 'keyword' | 'demand' | 'rank';
+export type KeywordCommandCenterSort = 'priority' | 'keyword' | 'demand' | 'rank' | 'clicks' | 'difficulty';
 
 export interface KeywordCommandCenterSummaryResponse {
   counts: KeywordCommandCenterCounts;
@@ -277,6 +277,8 @@ export interface KeywordCommandCenterRowsQuery {
   filter?: KeywordCommandCenterFilter;
   search?: string;
   sort?: KeywordCommandCenterSort;
+  /** Sort direction. Absent → each sort's natural default (demand/clicks/difficulty desc, rank/keyword asc). */
+  direction?: 'asc' | 'desc';
   page?: number;
   pageSize?: number;
 }
