@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **471 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **479 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 479. Keyword value score consolidation — one intent classifier + Layer-1 component interface (PR 1 + PR 2)
+
+**What it does:** Establishes the keystone foundation for the `kwv-one-score-everywhere` sprint. PR 1 makes `deriveValueIntent` (`server/scoring/keyword-value-score.ts`) the single keyword intent classifier for both Layer 1 (Hub value score) and Layer 2 (recommendation OV scorer), retiring `toOpportunityIntent` and the inline copy in `keyword-strategy-enrichment.ts`. Closes the `comparison`-intent drift: a `comparison` keyword was weighted 0.7 in the Hub but 0.5 in recs — both now map to `commercial` (0.7) via the shared classifier. PR 2 (this entry) adds `computeKeywordValueComponents(input, ctx): { score, components }` — a sibling to `computeKeywordValueScore` that exposes the internal `KeywordValueComponents` interface (`commercialValue / demand / winnability / localMultiplier / intent`). `computeKeywordValueScore` becomes a thin wrapper (`.score`) so the 4 existing scalar callers are byte-identical. Signal-gate parity is hard: a gated-out input returns `{ score: undefined, components: undefined }` — locked by test.
+
+**Agency value:** One intent classifier means the Hub and recommendation scorer can never disagree on a keyword's value tier again. The component interface gives the upcoming `kwv-value-breakdown` render layer one vocabulary to work from instead of reverse-engineering the scorer's internal math.
+
+**Client value:** Indirect — the comparison-intent correction ensures a keyword like "invisalign vs braces" scores with commercial weight on both the Hub and recommendation surfaces, so high-intent comparison searches surface correctly in prioritized recommendations.
+
+**Mutual:** Purely additive / output-neutral in PR 2. Provides the shared input-resolution seam that `kwv-real-cpc`, `kwv-value-breakdown`, and the surface re-ranking (`kwv-one-score-everywhere`) will build on. No render change; no flag.
+
+**Files (PR 2):** `server/scoring/keyword-value-score.ts` (`KeywordValueComponents` interface + `computeKeywordValueComponents` sibling + thin `computeKeywordValueScore` wrapper), `tests/unit/keyword-value-score.test.ts` (3 new component-interface tests incl. gated-undefined parity).
 
 ---
 
