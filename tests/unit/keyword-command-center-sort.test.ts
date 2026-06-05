@@ -321,3 +321,70 @@ describe('keyword-command-center — candidate/row DATA parity', () => {
     await assertMetricParity(b);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 1 Task 1.1 — intent symmetry. The candidate resolver and the row stage
+// must resolve `intent` from the SAME three sources in the SAME source order
+// (pageMap.searchIntent → contentGaps.intent → trackedKeywords.intent), so
+// last-writer-wins resolves identically on both sides. Drives the SAME parity
+// probe (extended to expose intent) so a one-sided source add fails loudly.
+// ---------------------------------------------------------------------------
+
+describe('keyword-command-center — intent symmetry (Task 1.1)', () => {
+  it('carries intent from trackedKeywords, pageMap.searchIntent, and contentGaps on BOTH stages', async () => {
+    const b = bundle({
+      trackedKeywords: [trackedKeyword('tracked kw', { volume: 100, intent: 'commercial' })],
+      pageMap: [{
+        pagePath: '/page-kw',
+        pageTitle: 'Page KW',
+        primaryKeyword: 'page kw',
+        secondaryKeywords: [],
+        searchIntent: 'transactional',
+        volume: 200,
+        difficulty: 40,
+      }],
+      contentGaps: [
+        { topic: 'Guide', targetKeyword: 'gap kw', intent: 'informational', priority: 'high', rationale: 'x', volume: 300, difficulty: 55 },
+      ],
+    });
+    const { candidate, row } = await __candidateRowMetricParityForTest(b);
+
+    const trackedKey = keywordComparisonKey('tracked kw');
+    const pageKey = keywordComparisonKey('page kw');
+    const gapKey = keywordComparisonKey('gap kw');
+
+    // candidate side
+    expect(candidate.get(trackedKey)?.intent).toBe('commercial');
+    expect(candidate.get(pageKey)?.intent).toBe('transactional');   // searchIntent → intent
+    expect(candidate.get(gapKey)?.intent).toBe('informational');
+    // row side — symmetric
+    expect(row.get(trackedKey)?.intent).toBe('commercial');
+    expect(row.get(pageKey)?.intent).toBe('transactional');
+    expect(row.get(gapKey)?.intent).toBe('informational');
+
+    // and the probe-wide parity assertion still holds with intent in the projection
+    await assertMetricParity(b);
+  });
+
+  it('last-writer-wins: trackedKeywords.intent overrides pageMap.searchIntent for the same key (both stages agree)', async () => {
+    // The same key appears as both a page primary keyword (searchIntent) AND a
+    // tracked keyword (intent). trackedKeywords merge LAST in both stages, so its
+    // intent must win on BOTH sides.
+    const b = bundle({
+      pageMap: [{
+        pagePath: '/shared',
+        pageTitle: 'Shared',
+        primaryKeyword: 'shared intent kw',
+        secondaryKeywords: [],
+        searchIntent: 'informational',
+        volume: 200,
+      }],
+      trackedKeywords: [trackedKeyword('shared intent kw', { volume: 200, intent: 'transactional' })],
+    });
+    const { candidate, row } = await __candidateRowMetricParityForTest(b);
+    const key = keywordComparisonKey('shared intent kw');
+    expect(candidate.get(key)?.intent).toBe('transactional'); // tracked wins
+    expect(row.get(key)?.intent).toBe('transactional');
+    await assertMetricParity(b);
+  });
+});

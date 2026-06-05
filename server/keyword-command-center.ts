@@ -1088,6 +1088,7 @@ async function populateDraftRows(rows: Map<string, DraftRow>, bundle: CommandCen
       mergeMetrics(row, {
         volume: page.volume,
         difficulty: page.difficulty,
+        intent: page.searchIntent, // NOTE field name: pageMap carries intent as `searchIntent`
       });
     }
   }
@@ -1103,6 +1104,7 @@ async function populateDraftRows(rows: Map<string, DraftRow>, bundle: CommandCen
     mergeMetrics(row, {
       volume: gap.volume,
       difficulty: gap.difficulty,
+      intent: gap.intent,
     });
   }
 
@@ -1160,6 +1162,7 @@ async function populateDraftRows(rows: Map<string, DraftRow>, bundle: CommandCen
       volume: keyword.volume,
       difficulty: keyword.difficulty,
       cpc: keyword.cpc,
+      intent: keyword.intent,
       currentPosition: keyword.baselinePosition,
       clicks: keyword.baselineClicks,
       impressions: keyword.baselineImpressions,
@@ -2175,6 +2178,11 @@ function addCandidateKeysFromBundle(
     candidate.clicks = metrics.clicks;
     candidate.rank = metrics.currentPosition;
     candidate.difficulty = metrics.difficulty;
+    // Phase 1: cpc + intent are resolver-parity-guaranteed (resolveBundleMetrics
+    // merges them in the SAME source order as populateDraftRows), so copying them
+    // here keeps the candidate value-score inputs identical to the row stage.
+    candidate.cpc = metrics.cpc;
+    candidate.intent = metrics.intent;
   }
 }
 
@@ -2223,13 +2231,13 @@ function resolveBundleMetrics(
     for (const keyword of [page.primaryKeyword, ...(page.secondaryKeywords ?? [])].filter(Boolean)) {
       const row = ensure(keyword);
       if (!row) continue;
-      merge(row, { volume: page.volume, difficulty: page.difficulty });
+      merge(row, { volume: page.volume, difficulty: page.difficulty, intent: page.searchIntent });
     }
   }
   for (const gap of bundle.contentGaps) {
     const row = ensure(gap.targetKeyword);
     if (!row) continue;
-    merge(row, { volume: gap.volume, difficulty: gap.difficulty });
+    merge(row, { volume: gap.volume, difficulty: gap.difficulty, intent: gap.intent });
   }
   for (const gap of bundle.keywordGaps) {
     const row = ensure(gap.keyword);
@@ -2244,6 +2252,7 @@ function resolveBundleMetrics(
       volume: keyword.volume,
       difficulty: keyword.difficulty,
       cpc: keyword.cpc,
+      intent: keyword.intent,
       currentPosition: keyword.baselinePosition,
       clicks: keyword.baselineClicks,
       impressions: keyword.baselineImpressions,
@@ -2361,9 +2370,18 @@ export function candidateSortForQuery(
  * clicks/rank/difficulty/demand — catching DATA divergence the comparator-only
  * guard cannot. Exported for tests; not used by the request path.
  */
+interface CandidateRowMetricProjection {
+  demand: number;
+  clicks?: number;
+  rank?: number;
+  difficulty?: number;
+  cpc?: number;
+  intent?: string;
+}
+
 export interface CandidateRowMetricParity {
-  candidate: Map<string, { demand: number; clicks?: number; rank?: number; difficulty?: number }>;
-  row: Map<string, { demand: number; clicks?: number; rank?: number; difficulty?: number }>;
+  candidate: Map<string, CandidateRowMetricProjection>;
+  row: Map<string, CandidateRowMetricProjection>;
 }
 
 /**
@@ -2387,20 +2405,22 @@ export async function __candidateRowMetricParityForTest(
 ): Promise<CandidateRowMetricParity> {
   const candidates = new Map<string, RowCandidateKey>();
   addCandidateKeysFromBundle(candidates, { ...bundle, includeStrategyUx: false }, localVisibility);
-  const candidate = new Map<string, { demand: number; clicks?: number; rank?: number; difficulty?: number }>();
+  const candidate = new Map<string, CandidateRowMetricProjection>();
   for (const c of candidates.values()) {
-    candidate.set(c.key, { demand: c.demand, clicks: c.clicks, rank: c.rank, difficulty: c.difficulty });
+    candidate.set(c.key, { demand: c.demand, clicks: c.clicks, rank: c.rank, difficulty: c.difficulty, cpc: c.cpc, intent: c.intent });
   }
 
   const rows = new Map<string, DraftRow>();
   await populateDraftRows(rows, { ...bundle, includeStrategyUx: false });
-  const row = new Map<string, { demand: number; clicks?: number; rank?: number; difficulty?: number }>();
+  const row = new Map<string, CandidateRowMetricProjection>();
   for (const r of rows.values()) {
     row.set(r.normalizedKeyword, {
       demand: r.metrics.volume ?? r.metrics.impressions ?? 0,
       clicks: r.metrics.clicks,
       rank: r.metrics.currentPosition,
       difficulty: r.metrics.difficulty,
+      cpc: r.metrics.cpc,
+      intent: r.metrics.intent,
     });
   }
   return { candidate, row };
