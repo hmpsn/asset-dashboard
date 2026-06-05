@@ -2,6 +2,7 @@ import { TrendingUp } from 'lucide-react'; // trend-icon-ok — title/empty-stat
 import { useNavigate } from 'react-router-dom';
 import { SectionCard, EmptyState, Icon, TrendBadge, Button } from '../ui';
 import { adminPath } from '../../routes';
+import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 
 interface RankEntry {
   query: string;
@@ -19,6 +20,11 @@ interface RankingsSnapshotProps {
 
 export function RankingsSnapshot({ ranks, gscPropertyUrl, workspaceId, className }: RankingsSnapshotProps) {
   const navigate = useNavigate();
+  // Wave 4 P4: the standalone Rank Tracker folds into the Keyword Hub when ON;
+  // route to seo-keywords (with the tracked segment) instead of seo-ranks.
+  // Flag-OFF byte-identical: still navigates to seo-ranks.
+  const keywordHubEnabled = useFeatureFlag('keyword-hub');
+  const ranksTab = keywordHubEnabled ? 'seo-keywords' : 'seo-ranks';
   return (
     <SectionCard
       title="Top Rankings"
@@ -27,7 +33,7 @@ export function RankingsSnapshot({ ranks, gscPropertyUrl, workspaceId, className
         <Button
           variant="link"
           size="sm"
-          onClick={() => navigate(adminPath(workspaceId, 'seo-ranks'))}
+          onClick={() => navigate(adminPath(workspaceId, ranksTab))}
           className="no-underline text-teal-400 hover:text-teal-300"
         >
           View All →

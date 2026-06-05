@@ -99,6 +99,9 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
   const listRef = useRef<HTMLDivElement>(null);
   // Copy Engine (Brand Hub) is dark-launched; filter the 'brand' nav item out until the flag flips on.
   const copyEngineEnabled = useFeatureFlag('copy-engine');
+  // Keyword Hub (Wave 4 P4): when ON, fold the standalone Rank Tracker nav entry
+  // into the Hub and relabel "Keywords" -> "Keyword Hub". Flag-OFF byte-identical.
+  const keywordHubEnabled = useFeatureFlag('keyword-hub');
 
   // ⌘K / Ctrl+K to toggle
   // keydown-ok: this handler intentionally fires from input fields. The
@@ -143,9 +146,12 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
     // Navigation items
     for (const nav of NAV_ITEMS) {
       if (nav.id === 'brand' && !copyEngineEnabled) continue;
+      // Wave 4 P4: the standalone Rank Tracker entry folds into the Hub when ON.
+      if (nav.id === 'seo-ranks' && keywordHubEnabled) continue;
+      const label = nav.id === 'seo-keywords' && keywordHubEnabled ? 'Keyword Hub' : nav.label;
       result.push({
         id: `nav:${nav.id}`,
-        label: nav.label,
+        label,
         sub: nav.group || undefined,
         icon: nav.icon,
         type: 'nav',
@@ -229,7 +235,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
     }
 
     return result;
-  }, [workspaces, selectedWorkspace, onSelectWorkspace, navigate, copyEngineEnabled]);
+  }, [workspaces, selectedWorkspace, onSelectWorkspace, navigate, copyEngineEnabled, keywordHubEnabled]);
 
   // Filter items by query
   const filtered = useMemo(() => {

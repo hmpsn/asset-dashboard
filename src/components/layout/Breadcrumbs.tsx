@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { type Page, adminPath } from '../../routes';
 import type { Workspace } from '../WorkspaceSelector';
+import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { Button, ClickableRow, Icon, IconButton } from '../ui';
 import { ArrowLeft, ChevronRight, Search, MessageSquare } from 'lucide-react';
 
@@ -25,6 +26,11 @@ export function Breadcrumbs({
   workspaces, selected, tab, pendingContentRequests,
 }: BreadcrumbsProps) {
   const navigate = useNavigate();
+  // Wave 4 P4: relabel the seo-keywords crumb to "Keyword Hub" when ON.
+  // Flag-OFF byte-identical: the static TAB_LABELS map is unchanged.
+  const keywordHubEnabled = useFeatureFlag('keyword-hub');
+  const tabLabel = (t: Page): string =>
+    keywordHubEnabled && t === 'seo-keywords' ? 'Keyword Hub' : (TAB_LABELS[t] || t);
 
   return (
     <div className="flex items-center gap-1.5 px-5 py-2 border-b border-[var(--brand-border)] t-caption-sm min-h-[36px]">
@@ -73,7 +79,7 @@ export function Breadcrumbs({
             <>
               <span className="text-[var(--brand-text-dim)]">/</span>
               <span className="text-[var(--brand-text-muted)]">
-                {TAB_LABELS[tab] || tab}
+                {tabLabel(tab)}
               </span>
             </>
           )}
@@ -83,7 +89,7 @@ export function Breadcrumbs({
         <>
           <span className="text-[var(--brand-text-dim)]">/</span>
           <span className="text-[var(--brand-text-muted)]">
-            {TAB_LABELS[tab] || tab}
+            {tabLabel(tab)}
           </span>
         </>
       )}

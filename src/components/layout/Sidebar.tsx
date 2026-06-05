@@ -55,7 +55,7 @@ interface SidebarProps {
 
 const ALL_GROUP_LABELS = ['MONITORING', 'SITE HEALTH', 'SEO STRATEGY', 'OPTIMIZATION', 'CONTENT', 'ADMIN'];
 
-function buildNavGroups(copyEngineEnabled: boolean, diagnosticsEnabled: boolean): NavGroup[] {
+function buildNavGroups(copyEngineEnabled: boolean, diagnosticsEnabled: boolean, keywordHubEnabled: boolean): NavGroup[] {
   return [
     { label: '', items: [
       { id: 'home', label: 'Home', icon: LayoutDashboard, desc: 'Workspace overview and quick actions' },
@@ -64,7 +64,8 @@ function buildNavGroups(copyEngineEnabled: boolean, diagnosticsEnabled: boolean)
       activeBg: 'bg-blue-500/10', activeText: 'text-blue-300', activeIcon: 'text-blue-400', inactiveIcon: 'text-[var(--brand-text-muted)]', hoverBg: 'hover:bg-blue-500/5', hoverText: 'hover:text-blue-300',
       items: [
       { id: 'analytics-hub', label: 'Search & Traffic', icon: BarChart3, needsSite: true, desc: 'Unified analytics: search performance, traffic, insights, and annotations' },
-      { id: 'seo-ranks', label: 'Rank Tracker', icon: TrendingUp, needsSite: true, desc: 'Track keyword rankings over time' },
+      // Wave 4 P4: the standalone Rank Tracker folds into the Keyword Hub when ON.
+      { id: 'seo-ranks', label: 'Rank Tracker', icon: TrendingUp, needsSite: true, hidden: keywordHubEnabled, desc: 'Track keyword rankings over time' },
       { id: 'outcomes', label: 'Action Results', icon: Trophy, desc: 'Track what\'s working across all your SEO actions' },
     ]},
     { label: 'SITE HEALTH', groupIcon: Shield, groupColor: 'text-emerald-400',
@@ -79,7 +80,7 @@ function buildNavGroups(copyEngineEnabled: boolean, diagnosticsEnabled: boolean)
       activeBg: 'bg-teal-500/10', activeText: 'text-teal-300', activeIcon: 'text-teal-400', inactiveIcon: 'text-[var(--brand-text-muted)]', hoverBg: 'hover:bg-teal-500/5', hoverText: 'hover:text-teal-300',
       items: [
       { id: 'seo-strategy', label: 'Strategy', icon: Target, needsSite: true, desc: 'Keyword strategy with page-keyword mapping' },
-      { id: 'seo-keywords', label: 'Keywords', icon: ListChecks, needsSite: true, desc: 'Command center for keyword lifecycle, evidence, tracking, and handoffs' },
+      { id: 'seo-keywords', label: keywordHubEnabled ? 'Keyword Hub' : 'Keywords', icon: ListChecks, needsSite: true, desc: keywordHubEnabled ? 'Unified keyword surface: lifecycle, tracking, national + local rank, and handoffs' : 'Command center for keyword lifecycle, evidence, tracking, and handoffs' },
       { id: 'page-intelligence', label: 'Page Intelligence', icon: Search, needsSite: true, desc: 'Per-page keyword analysis, metrics, and optimization' },
     ]},
     { label: 'OPTIMIZATION', groupIcon: Sparkles, groupColor: 'text-teal-400',
@@ -136,7 +137,8 @@ export function Sidebar({
 
   const copyEngineEnabled = useFeatureFlag('copy-engine');
   const diagnosticsEnabled = useFeatureFlag('deep-diagnostics');
-  const navGroups = buildNavGroups(copyEngineEnabled, diagnosticsEnabled);
+  const keywordHubEnabled = useFeatureFlag('keyword-hub');
+  const navGroups = buildNavGroups(copyEngineEnabled, diagnosticsEnabled, keywordHubEnabled);
 
   // Auto-expand sidebar group containing active tab (#160)
   useEffect(() => { // effect-layout-ok — intentional post-render tab-group expansion

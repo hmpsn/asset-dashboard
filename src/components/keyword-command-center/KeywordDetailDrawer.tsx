@@ -258,13 +258,18 @@ export function KeywordDetailDrawer({
                         )}
                       </div>
                       {origin.kind === 'gap' && (
-                        // TODO P4: wire the real href to the originating strategy gap.
-                        // Unwired in P2 — renders the affordance but must NOT navigate.
+                        // P4-T3: the Hub->Strategy back-link. Navigate to the
+                        // strategy surface carrying the keyword + sourceGapKey
+                        // (an action = teal) so the user lands on the originating
+                        // gap context.
                         <Button
                           variant="ghost"
                           size="sm"
                           icon={ArrowUpRight}
                           data-testid="view-in-strategy-link"
+                          onClick={() => navigate(adminPath(workspaceId, 'seo-strategy'), {
+                            state: { keyword: row.keyword, sourceGapKey: row.tracking.sourceGapKey },
+                          })}
                         >
                           View in Strategy
                         </Button>
@@ -354,16 +359,9 @@ export function KeywordDetailDrawer({
                         </p>
                       )}
                     </div>
-                    {row.tracking.status !== 'not_tracked' && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        icon={History}
-                        onClick={() => navigate(adminPath(workspaceId, 'seo-ranks'))}
-                      >
-                        Rank Tracker
-                      </Button>
-                    )}
+                    {/* P4-T3: the old "Rank Tracker" jump is retired — rank now
+                        lives in the in-drawer National rank section below
+                        (P2's nationalRank journey section). */}
                   </div>
                   {/* Three-state: ONLY strategyOwned === true shows the note; false/undefined omit it. */}
                   {hubEnabled && row.tracking.strategyOwned === true && (
