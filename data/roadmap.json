@@ -32,7 +32,7 @@
           "est": "phased",
           "priority": "P1",
           "status": "in_progress",
-          "notes": "Phase 0 (contracts: flag + pure scoring module + shared types) in progress. Phase 1 (Hub wiring) and Phase 2 (content-gap wiring) pending. Dark behind keyword-value-scoring flag (default OFF, byte-identical to today)."
+          "notes": "Phase 0 (flag + pure scoring module + types) done. Phase 1 (Hub wiring: intent resolution, ScoringContext, precomputed valueScore, flag-selected accessor, parity probe) done. Phase 2 (content-gap opportunity spine swap) done. All shipped DARK behind keyword-value-scoring flag (default OFF, byte-identical when OFF). Owner-gated: flip per-workspace on staging to verify value-first ordering (transactional local leads, national-informational demoted under local posture), then merge staging→main."
         }
       ]
     },
