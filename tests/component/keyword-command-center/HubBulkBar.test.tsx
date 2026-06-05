@@ -49,9 +49,14 @@ vi.mock('../../../src/hooks/admin/useKeywordCommandCenter', () => ({
     isLoading: false,
     isError: false,
   }),
-  useKeywordCommandCenterBulkAction: () => ({ mutate: bulkMutateMock, isPending: false }),
-  useKeywordCommandCenterAction: () => ({ mutate: vi.fn(), isPending: false }),
-  useKeywordHardDelete: () => ({ mutate: vi.fn(), isPending: false }),
+  useKeywordCommandCenterBulkAction: () => ({ mutate: bulkMutateMock, isPending: false, error: null }),
+  useKeywordCommandCenterAction: () => ({ mutate: vi.fn(), isPending: false, error: null, variables: undefined }),
+  useKeywordHardDelete: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+  useKeywordCommandCenterDetail: () => ({ data: undefined, isFetching: false }),
+}));
+
+vi.mock('../../../src/hooks/admin/useLocalSeo', () => ({
+  useLocalSeoRefresh: () => ({ mutate: vi.fn(), isPending: false, error: null }),
 }));
 
 function renderHub() {

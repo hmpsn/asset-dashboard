@@ -62,8 +62,30 @@ export interface HubKeywordListProps {
   onClearSelection: () => void;
   /** Resets the active segment/search/advanced-filter (NOT the multi-select). Wired to the empty-state "Clear filters" CTA. */
   onResetFilters: () => void;
+  /** Opens the per-keyword journey drawer for a row (P2 drawer wiring). */
+  onRowClick: (row: KeywordCommandCenterRow) => void;
+  /** normalizedKeyword of the row whose drawer is currently open — drives the active-row highlight. */
+  activeKeyword?: string | null;
   showLocalSeo: boolean;
 }
+
+/**
+ * The KeywordTable primitive renders its built-in metric columns from FLAT row
+ * fields (`row.position`, `row.clicks`, `row.volume`, `row.difficulty`) and the
+ * local column from `row.localSeoLabel`. A KeywordCommandCenterRow instead nests
+ * its metrics under `row.metrics` (`currentPosition`, etc.). This adapter lifts
+ * those onto the flat fields the table reads so the cells render real values —
+ * without it every metric/local cell silently renders a dash. (`change` has no
+ * per-row source on a KCC row, so the Hub does not render a change column; the
+ * rank journey lives in the drawer.)
+ */
+type HubKeywordTableRow = KeywordCommandCenterRow & {
+  position?: number;
+  clicks?: number;
+  volume?: number;
+  difficulty?: number;
+  localSeoLabel?: string;
+};
 
 // ---------------------------------------------------------------------------
 // Pure helper — localSeoColumnLabel
@@ -129,6 +151,8 @@ export function HubKeywordList({
   isRowActionPending,
   onClearSelection,
   onResetFilters,
+  onRowClick,
+  activeKeyword,
   showLocalSeo,
 }: HubKeywordListProps) {
   // Passthrough: the table emits raw column keys (HubSortKey values); forward
@@ -139,6 +163,19 @@ export function HubKeywordList({
   };
 
   const visibleKeys = rows.map((r) => r.normalizedKeyword);
+
+  // Adapt KCC rows onto the flat shape the KeywordTable primitive reads (see
+  // HubKeywordTableRow). Preserves the full row (keyword/normalizedKeyword/
+  // metrics/tracking/...) so the selection, meta, action, and row-click slots
+  // still receive a complete KeywordCommandCenterRow.
+  const tableRows: HubKeywordTableRow[] = rows.map((r) => ({
+    ...r,
+    position: r.metrics.currentPosition,
+    clicks: r.metrics.clicks,
+    volume: r.metrics.volume,
+    difficulty: r.metrics.difficulty,
+    localSeoLabel: localSeoColumnLabel(r),
+  }));
 
   // Error state — rendered before the table so it's always visible
   if (isError) {
@@ -156,11 +193,12 @@ export function HubKeywordList({
   return (
     <div className="overflow-y-auto">
       {/* TODO: virtualize when rows > 200 (react-virtual) */}
-      <KeywordTable<KeywordCommandCenterRow>
-        rows={rows}
-        columns={['position', 'change', 'clicks', 'volume', 'difficulty']}
-        changeSign="lowerIsBetter"
+      <KeywordTable<HubKeywordTableRow>
+        rows={tableRows}
+        columns={['position', 'clicks', 'volume', 'difficulty']}
         showLocalSeo={showLocalSeo}
+        onRowClick={onRowClick}
+        isRowActive={(r) => !!activeKeyword && r.normalizedKeyword === activeKeyword}
         sort={{
           key: sort.key,
           direction: sort.direction,

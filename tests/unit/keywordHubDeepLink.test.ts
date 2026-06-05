@@ -16,10 +16,11 @@ describe('keywordHubDeepLink', () => {
   });
 
   describe('isKeywordHubSegment', () => {
-    it('accepts a real filter id', () => {
-      expect(isKeywordHubSegment('tracked')).toBe(true);
-      expect(isKeywordHubSegment('in_strategy')).toBe(true);
-      expect(isKeywordHubSegment('retired')).toBe(true);
+    it('accepts every one of the six segments the Hub honors', () => {
+      // The value-space MUST equal the receiver's HubSegment ids.
+      for (const seg of ['all', 'in_strategy', 'tracked', 'needs_review', 'retired', 'local']) {
+        expect(isKeywordHubSegment(seg)).toBe(true);
+      }
     });
     it('rejects an unknown value', () => {
       expect(isKeywordHubSegment('nope')).toBe(false);
@@ -27,6 +28,27 @@ describe('keywordHubDeepLink', () => {
     it('rejects null / undefined', () => {
       expect(isKeywordHubSegment(null)).toBe(false);
       expect(isKeywordHubSegment(undefined)).toBe(false);
+    });
+    it('rejects valid KeywordCommandCenterFilter values that are NOT Hub segments (#4)', () => {
+      // These are real filter ids (the KCC summary emits them) but the Hub does
+      // not render them as segment pills — a deep link with one would silently
+      // fall back to the default segment, so the sender must never emit it.
+      expect(isKeywordHubSegment('content')).toBe(false);
+      expect(isKeywordHubSegment('page_assigned')).toBe(false);
+      expect(isKeywordHubSegment('lost_visibility')).toBe(false);
+      expect(isKeywordHubSegment('raw_evidence')).toBe(false);
+    });
+  });
+
+  describe('value-space contract (#4): sender accepts only what the receiver honors', () => {
+    it('buildHubDeepLinkQuery omits tab for a valid-but-non-Hub filter', () => {
+      // @ts-expect-error — 'content' is a real filter but outside the Hub set
+      const qs = buildHubDeepLinkQuery({ keyword: 'x', segment: 'content' });
+      expect(qs).not.toContain('tab=');
+    });
+    it('readHubDeepLink drops a valid-but-non-Hub tab', () => {
+      const result = readHubDeepLink(new URLSearchParams('q=foo&tab=content'));
+      expect(result).toEqual({ query: 'foo', segment: undefined });
     });
   });
 

@@ -115,12 +115,19 @@ interface UseKeywordHubStateOptions {
    * Invalid or missing values fall back to 'all'.
    */
   initialSegment?: HubSegment | string | null;
+  /**
+   * Seed search term — derived by the caller from the `?q=` deep-link param
+   * (the receiving half of the keyword deep-link contract). Missing/empty → `''`,
+   * identical to the no-deep-link default. Seeded into `searchTerm` so the first
+   * rows query is filtered, not a flash of the full list.
+   */
+  initialSearch?: string | null;
 }
 
 export function useKeywordHubState(
   options: UseKeywordHubStateOptions = {},
 ): UseKeywordHubStateReturn {
-  const { initialSegment } = options;
+  const { initialSegment, initialSearch } = options;
 
   // Validate and resolve the initial segment
   const resolvedInitial: HubSegment = isValidSegment(initialSegment)
@@ -130,7 +137,7 @@ export function useKeywordHubState(
   // Core state
   const [segment, setSegmentRaw] = useState<HubSegment>(resolvedInitial);
   const [advancedFilter, setAdvancedFilterRaw] = useState<KeywordCommandCenterFilter | null>(null);
-  const [searchTerm, setSearchTermRaw] = useState('');
+  const [searchTerm, setSearchTermRaw] = useState(initialSearch ?? '');
   const [sort, setSortRaw] = useState<HubSortState>({ key: 'keyword', direction: 'asc' });
   const [page, setPageRaw] = useState(1);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
