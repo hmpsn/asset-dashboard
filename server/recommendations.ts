@@ -52,6 +52,7 @@ import {
   kdClassificationNote,
 } from './authority-context.js';
 import { computeOpportunityValue } from './scoring/opportunity-value.js';
+import { deriveValueIntent } from './scoring/keyword-value-score.js';
 import { computeTimingBoosts, maxBoostForPages } from './scoring/opportunity-timing.js';
 import { triggerOpportunityRegen } from './scoring/opportunity-regen.js';
 import { buildCtrCurve, type GscKeywordObservation } from './scoring/ctr-curve.js';
@@ -237,17 +238,6 @@ export function recommendationOutcomeActionType(type: RecType, source: string): 
       return 'audit_fix_applied';
     }
   }
-}
-
-/** Coerce a free-form search-intent string (PageKeywordMap.searchIntent) to the
- *  strict OpportunityInput.intent union, or null when it isn't one of the four
- *  recognised intents. Keeps the OV scorer's intent map total. */
-function toOpportunityIntent(
-  intent: string | null | undefined,
-): 'transactional' | 'commercial' | 'informational' | 'navigational' | null {
-  return intent === 'transactional' || intent === 'commercial' || intent === 'informational' || intent === 'navigational'
-    ? intent
-    : null;
 }
 
 // ─── Recommendation source keys ────────────────────────────────────
@@ -1417,7 +1407,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           difficulty: cg.difficulty ?? null,
           trendDirection: cg.trendDirection ?? null,
           llmLabel: cg.priority,
-          intent: cg.intent ?? null,
+          intent: deriveValueIntent(cg.targetKeyword, cg.intent),
           authorityStrength: ovAuthority ?? null,
           ctrCurve: ovCtrCurve,
           timingBoost: maxBoostForPages(timingBoosts, []),
@@ -1479,7 +1469,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
             difficulty: pm.difficulty ?? null,
             impressions: pm.impressions ?? null,
             cpc: pm.cpc ?? null,
-            intent: toOpportunityIntent(pm.searchIntent),
+            intent: deriveValueIntent(pm.primaryKeyword, pm.searchIntent),
             authorityStrength: ovAuthority ?? null,
             ctrCurve: ovCtrCurve,
             timingBoost: maxBoostForPages(timingBoosts, [pm.pagePath.replace(/^\//, '')]),
@@ -1536,7 +1526,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         difficulty: pk.difficulty ?? null,
         impressions: pk.impressions ?? null,
         cpc: pk.cpc ?? null,
-        intent: toOpportunityIntent(pk.searchIntent),
+        intent: deriveValueIntent(pk.primaryKeyword, pk.searchIntent),
         authorityStrength: ovAuthority ?? null,
         ctrCurve: ovCtrCurve,
         timingBoost: maxBoostForPages(timingBoosts, [pageSlug]),

@@ -162,3 +162,38 @@ describe('content-gap opportunityScore — flag-gated value-first spine swap', (
     expect(infoScore).not.toBe(computeOpportunityScore(INFO_GAP));
   });
 });
+
+// ── Full-derive intent at enrichment:611 (score-consolidation PR 1 — review fix) ──────────
+// StrategyContentGap.intent is a FREE-FORM AI-synthesized string (NOT the strict 4-bucket
+// ContentGap.intent), so under the consolidated single classifier a 'comparison' intent
+// reclassifies to commercial (0.7) instead of the old inline coercion's null → 0.5 default.
+// This runs on the canonical relaxConservatism=true path, so it shifts cg.opportunityScore
+// on every strategy generation. Proves the site is NOT value-inert.
+describe('content-gap intent — full-derive at enrichment:611', () => {
+  function strategyWith(...gaps: StrategyContentGap[]): StrategyOutput {
+    return { pageMap: [], contentGaps: gaps.map(g => ({ ...g })), quickWins: [], siteKeywords: [] };
+  }
+  // Same volume/difficulty, non-local keywords — isolate the provided intent as the only variable.
+  const COMPARISON_GAP: StrategyContentGap = { targetKeyword: 'widget comparison guide', intent: 'comparison', priority: 'medium', volume: 1000, difficulty: 40 };
+  const COMMERCIAL_GAP: StrategyContentGap = { targetKeyword: 'premium widget options', intent: 'commercial', priority: 'medium', volume: 1000, difficulty: 40 };
+  const INFORMATIONAL_GAP: StrategyContentGap = { targetKeyword: 'widget facts overview', intent: 'informational', priority: 'medium', volume: 1000, difficulty: 40 };
+
+  it('a comparison-intent gap scores identically to a commercial-intent gap (comparison→commercial)', async () => {
+    // relaxConservatism=true exercises the :611 intent through computeOpportunityValue.
+    const result = await enrichKeywordStrategy(makeEnrichOptions(workspaceId, strategyWith(COMPARISON_GAP, COMMERCIAL_GAP), true));
+    const gaps = result.strategy.contentGaps!;
+    const cmp = gaps.find(g => g.targetKeyword === 'widget comparison guide')!.opportunityScore!;
+    const com = gaps.find(g => g.targetKeyword === 'premium widget options')!.opportunityScore!;
+    // PRE-MIGRATION: comparison→null→0.5 weight ≠ commercial→0.7 weight → different score.
+    // POST-MIGRATION: both derive to 'commercial' → identical score.
+    expect(cmp).toBe(com);
+  });
+
+  it('a comparison-intent gap outranks an informational gap (commercial 0.7 > informational 0.3)', async () => {
+    const result = await enrichKeywordStrategy(makeEnrichOptions(workspaceId, strategyWith(COMPARISON_GAP, INFORMATIONAL_GAP), true));
+    const gaps = result.strategy.contentGaps!;
+    const cmp = gaps.find(g => g.targetKeyword === 'widget comparison guide')!.opportunityScore!;
+    const inf = gaps.find(g => g.targetKeyword === 'widget facts overview')!.opportunityScore!;
+    expect(cmp).toBeGreaterThan(inf);
+  });
+});
