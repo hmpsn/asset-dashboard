@@ -261,7 +261,7 @@ export interface KeywordCommandCenterResponse {
   generatedAt?: string | null;
 }
 
-export type KeywordCommandCenterSort = 'priority' | 'keyword' | 'demand' | 'rank' | 'clicks' | 'difficulty';
+export type KeywordCommandCenterSort = 'priority' | 'keyword' | 'demand' | 'rank' | 'clicks' | 'difficulty' | 'opportunity';
 
 export interface KeywordCommandCenterSummaryResponse {
   counts: KeywordCommandCenterCounts;

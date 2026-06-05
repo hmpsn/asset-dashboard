@@ -82,6 +82,8 @@ export interface KeywordHubProps {
  */
 function hubSortToKccSort(key: HubSortKey): KeywordCommandCenterSort {
   switch (key) {
+    case 'opportunity':
+      return 'opportunity';
     case 'keyword':
       return 'keyword';
     case 'position':
