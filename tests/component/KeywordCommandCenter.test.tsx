@@ -152,7 +152,7 @@ const payload: KeywordCommandCenterResponse = {
       },
       nextActions: [
         { type: 'check_local_visibility', label: 'Refresh local', detail: 'Refresh local visibility.', tone: 'teal', keyword: 'cosmetic dentistry' },
-        { type: 'view_rankings', label: 'View rankings', detail: 'Open Rank Tracker.', tone: 'blue', keyword: 'cosmetic dentistry', targetTab: 'seo-ranks' },
+        { type: 'view_rankings', label: 'View rankings', detail: 'Open the keyword drawer rank section.', tone: 'blue', keyword: 'cosmetic dentistry' },
         { type: 'review_page', label: 'Review page', detail: 'Open Page Intelligence.', tone: 'teal', keyword: 'cosmetic dentistry', pagePath: '/services/cosmetic-dentistry', targetTab: 'page-intelligence' },
       ],
       isProtected: false,
@@ -560,5 +560,20 @@ describe('KeywordCommandCenter', () => {
       pagePath: undefined,
       force: true,
     });
+  });
+
+  it('view_rankings opens the drawer in-place and never navigates to seo-ranks (P4-T3)', () => {
+    renderCommandCenter();
+
+    // Open the cosmetic-dentistry drawer (its nextActions include view_rankings).
+    fireEvent.click(screen.getAllByText('cosmetic dentistry')[0]);
+    const actionSection = screen.getByText('Safe Next Actions').closest('div')!.parentElement!;
+    fireEvent.click(within(actionSection).getByRole('button', { name: /view rankings/i }));
+
+    // Must NOT navigate away to the standalone seo-ranks surface.
+    for (const call of navigateMock.mock.calls) {
+      const arg = call[0];
+      if (typeof arg === 'string') expect(arg).not.toContain('seo-ranks');
+    }
   });
 });

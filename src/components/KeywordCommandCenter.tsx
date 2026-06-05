@@ -278,7 +278,11 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
   const handleAction = (row: KeywordCommandCenterRow | null, action: KeywordCommandCenterNextAction) => {
     if (!row) return;
     if (action.type === 'view_rankings') {
-      navigate(adminPath(workspaceId, 'seo-ranks'));
+      // P4-T3: rank now lives in the keyword's drawer (the national-rank
+      // section), so "view rankings" opens the drawer in-place instead of
+      // navigating away to the standalone Rank Tracker surface (folded into the
+      // Hub at P4-T4).
+      setSelectedKey(row.normalizedKeyword);
       return;
     }
     if (action.type === 'review_page') {
