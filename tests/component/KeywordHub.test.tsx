@@ -33,6 +33,8 @@ import { WS_EVENTS } from '../../src/lib/wsEvents';
 const summaryHookMock = vi.fn();
 const rowsHookMock = vi.fn();
 const bulkMutateMock = vi.fn();
+const rowActionMutateMock = vi.fn();
+const hardDeleteMutateMock = vi.fn();
 const featureFlagMock = vi.fn();
 const workspaceEventsMock = vi.fn();
 
@@ -40,6 +42,8 @@ vi.mock('../../src/hooks/admin/useKeywordCommandCenter', () => ({
   useKeywordCommandCenterSummary: (...args: unknown[]) => summaryHookMock(...args),
   useKeywordCommandCenterRows: (...args: unknown[]) => rowsHookMock(...args),
   useKeywordCommandCenterBulkAction: () => ({ mutate: bulkMutateMock, isPending: false }),
+  useKeywordCommandCenterAction: () => ({ mutate: rowActionMutateMock, isPending: false }),
+  useKeywordHardDelete: () => ({ mutate: hardDeleteMutateMock, isPending: false }),
 }));
 
 vi.mock('../../src/hooks/useFeatureFlag', () => ({

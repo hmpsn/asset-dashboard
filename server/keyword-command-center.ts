@@ -20,10 +20,12 @@ import { isSuspiciousPlannerGroupedVolume } from './keyword-strategy-helpers.js'
 import {
   getLatestSnapshotRanks,
   getTrackedKeywords,
+  removeTrackedKeyword,
   updateTrackedKeywords,
   type AddTrackedKeywordOptions,
 } from './rank-tracking.js';
 import { listTrackedKeywordRows } from './tracked-keywords-store.js';
+import { TRACKED_KEYWORD_TRANSITIONS, validateTransition } from './state-machines.js';
 import { getWorkspace } from './workspaces.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { buildKeywordStrategyUxPayload } from './keyword-strategy-ux.js';
@@ -2483,24 +2485,36 @@ function applyKeywordCommandCenterActionInternal(
       case KEYWORD_COMMAND_CENTER_ACTIONS.PAUSE_TRACKING:
         if (!existing) throw new Error('Keyword is not tracked');
         if (!protectedCheck.ok) throw new Error(protectedCheck.reason);
+        // protection guard → transition guard → write. `existing.status` (read pre-txn
+        // via findTracked) is the authoritative `from`; an illegal move throws inside the
+        // txn so retireTrackedKeyword never runs (no partial write, no broadcast).
+        validateTransition('tracked_keyword', TRACKED_KEYWORD_TRANSITIONS, existing.status ?? TRACKED_KEYWORD_STATUS.ACTIVE, TRACKED_KEYWORD_STATUS.PAUSED);
         trackedKeywords = retireTrackedKeyword(workspace.id, keyword, TRACKED_KEYWORD_STATUS.PAUSED);
         message = `"${keyword}" was paused from active tracking.`;
         break;
       case KEYWORD_COMMAND_CENTER_ACTIONS.RETIRE:
         if (!existing) throw new Error('Keyword is not tracked');
         if (!protectedCheck.ok) throw new Error(protectedCheck.reason);
+        validateTransition('tracked_keyword', TRACKED_KEYWORD_TRANSITIONS, existing.status ?? TRACKED_KEYWORD_STATUS.ACTIVE, TRACKED_KEYWORD_STATUS.DEPRECATED);
         trackedKeywords = retireTrackedKeyword(workspace.id, keyword, TRACKED_KEYWORD_STATUS.DEPRECATED);
         message = `"${keyword}" was retired from active strategy-owned tracking.`;
         break;
       case KEYWORD_COMMAND_CENTER_ACTIONS.DECLINE:
         if (!protectedCheck.ok) throw new Error(protectedCheck.reason);
         upsertFeedback(workspace.id, keyword, 'declined', request.reason ?? 'Declined from Keyword Command Center');
+        // Only the tracked-branch of DECLINE changes an existing row's status; guard it.
         if (existing && !protectedReason(existing)) {
+          validateTransition('tracked_keyword', TRACKED_KEYWORD_TRANSITIONS, existing.status ?? TRACKED_KEYWORD_STATUS.ACTIVE, TRACKED_KEYWORD_STATUS.DEPRECATED);
           trackedKeywords = retireTrackedKeyword(workspace.id, keyword, TRACKED_KEYWORD_STATUS.DEPRECATED);
         }
         message = `"${keyword}" was declined for future strategy consideration.`;
         break;
       case KEYWORD_COMMAND_CENTER_ACTIONS.RESTORE:
+        // RESTORE revives a paused/deprecated row to active (an insert-style upsert when
+        // not tracked). Guard the transition only when restoring an EXISTING inactive row.
+        if (existing && (existing.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) !== TRACKED_KEYWORD_STATUS.ACTIVE) {
+          validateTransition('tracked_keyword', TRACKED_KEYWORD_TRANSITIONS, existing.status ?? TRACKED_KEYWORD_STATUS.ACTIVE, TRACKED_KEYWORD_STATUS.ACTIVE);
+        }
         deleteFeedbackByKeywordKey(workspace.id, keyword);
         trackedKeywords = upsertTrackedKeywordByKey(workspace.id, displayKeyword, {
           source: existing?.source ?? TRACKED_KEYWORD_SOURCE.MANUAL,
@@ -2542,6 +2556,78 @@ export function applyKeywordCommandCenterAction(
   request: KeywordCommandCenterActionRequest,
 ): KeywordCommandCenterActionResult {
   return applyKeywordCommandCenterActionInternal(workspaceId, request);
+}
+
+/**
+ * Narrow hard-delete eligibility predicate (P3-3c). DELIBERATELY NOT a blind
+ * `protectedReason` reuse: `protectedReason` flags MANUAL as protected, but MANUAL is
+ * the design's delete-eligible class (genuine mistakes the operator wants gone). Hard
+ * delete drops rank history too and is irreversible, so it is ONLY allowed for a MANUAL,
+ * UNPINNED keyword with NO strategy/client provenance. Everything else (pinned /
+ * CLIENT_REQUESTED / a gap-provenanced row via sourceGapKey) must be RETIRED (soft,
+ * restorable), never deleted — `force` overrides for the dedicated route.
+ */
+export function isHardDeleteEligible(existing: TrackedKeyword | undefined): boolean {
+  if (!existing) return false;
+  if (existing.pinned) return false;
+  if (existing.source === TRACKED_KEYWORD_SOURCE.CLIENT_REQUESTED) return false;
+  if (existing.sourceGapKey) return false;
+  return existing.source === TRACKED_KEYWORD_SOURCE.MANUAL;
+}
+
+/**
+ * Hard-delete a tracked keyword (P3-3c) — the THIRD, Hub-specific wrapper over
+ * `removeTrackedKeyword`. Unlike the bare rank-tracking function (which broadcasts/logs
+ * nothing — the rank route wraps it) this wrapper owns BOTH halves of the data-flow
+ * contract: RANK_TRACKING_UPDATED action='deleted' broadcast + an activity row. This is a
+ * SEPARATE channel from the lifecycle action enum — it is never a default/bulk action and
+ * never lands in `KEYWORD_COMMAND_CENTER_ACTIONS`. Ineligible rows (see
+ * `isHardDeleteEligible`) throw without `force`. Delete also drops rank history.
+ */
+export function deleteKeywordHard(
+  workspaceId: string,
+  keyword: string,
+  options: { force?: boolean } = {},
+): { ok: true; keyword: string; trackedKeywords: TrackedKeyword[] } {
+  const workspace = getWorkspace(workspaceId);
+  if (!workspace) throw new Error('Workspace not found');
+  const normalized = keywordComparisonKey(keyword);
+  if (!normalized) throw new Error('keyword required');
+
+  // Resolve from the PROVENANCE-BEARING table read (listTrackedKeywordRows), NOT
+  // getTrackedKeywords/findTracked — the latter STRIPS sourceGapKey, which would make
+  // a gap-provenanced keyword look eligible and silently bypass the retire-not-delete rule.
+  const existing = listTrackedKeywordRows(workspace.id).find(
+    entry => keywordComparisonKey(entry.query) === normalized,
+  );
+  if (!existing) throw new Error('Keyword is not tracked');
+
+  if (!options.force && !isHardDeleteEligible(existing)) {
+    throw new Error('Keyword is not eligible for permanent deletion — retire it instead.');
+  }
+
+  const now = new Date().toISOString();
+  let trackedKeywords: TrackedKeyword[] = [];
+  const run = db.transaction(() => {
+    removeTrackedKeyword(workspace.id, normalized);
+    trackedKeywords = getTrackedKeywords(workspace.id, { includeInactive: true });
+  });
+  run();
+
+  invalidateIntelligenceCache(workspace.id);
+  broadcastToWorkspace(workspace.id, WS_EVENTS.RANK_TRACKING_UPDATED, {
+    keyword: normalized,
+    action: 'deleted',
+    source: 'keyword_hub',
+    updatedAt: now,
+  });
+  addActivity(workspace.id, 'rank_tracking_updated', 'Keyword permanently deleted', `"${normalized}" was permanently deleted (rank history dropped).`, {
+    keyword: normalized,
+    action: 'deleted',
+    source: 'keyword_hub',
+  });
+
+  return { ok: true, keyword: normalized, trackedKeywords };
 }
 
 function bulkActionLabel(action: KeywordCommandCenterBulkActionRequest['action']): string {

@@ -67,3 +67,23 @@ export function useKeywordCommandCenterBulkAction(workspaceId: string) {
     },
   });
 }
+
+/**
+ * Hard delete (P3-3c) — its OWN mutation, separate from the lifecycle action enum.
+ * Invalidates the same caches as the lifecycle action so the row vanishes everywhere.
+ */
+export function useKeywordHardDelete(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { keyword: string; force?: boolean }) =>
+      keywordCommandCenter.deleteHard(workspaceId, vars.keyword, { force: vars.force }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingHistory(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+    },
+  });
+}

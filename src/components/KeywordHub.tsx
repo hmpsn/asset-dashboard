@@ -19,19 +19,23 @@
  *
  * Four Laws of Color enforced via the shared primitives. No violet/indigo/rose/pink.
  */
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { FormInput, PageHeader, SectionCard } from './ui';
+import { KeywordBulkConfirmDialog } from './keyword-command-center/KeywordBulkConfirmDialog';
+import { summarizeBulkAction, type KeywordBulkActionSummary } from './keyword-command-center/kccActionHelpers';
 import { queryKeys } from '../lib/queryKeys';
 import { WS_EVENTS } from '../lib/wsEvents';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import {
+  useKeywordCommandCenterAction,
   useKeywordCommandCenterBulkAction,
   useKeywordCommandCenterRows,
   useKeywordCommandCenterSummary,
+  useKeywordHardDelete,
 } from '../hooks/admin/useKeywordCommandCenter';
 import { useKeywordHubState } from '../hooks/admin/useKeywordHubState';
 import type { HubSortKey } from '../hooks/admin/useKeywordHubState';
@@ -43,6 +47,8 @@ import {
 import { HubAdvancedFilters } from './keyword-hub/HubAdvancedFilters';
 import { HubKeywordList } from './keyword-hub/HubKeywordList';
 import type {
+  KeywordCommandCenterActionType,
+  KeywordCommandCenterBulkActionResult,
   KeywordCommandCenterBulkActionType,
   KeywordCommandCenterCounts,
   KeywordCommandCenterSort,
@@ -144,6 +150,8 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
   const pageInfo = rowsResult.data?.pageInfo;
 
   const bulkAction = useKeywordCommandCenterBulkAction(workspaceId);
+  const rowAction = useKeywordCommandCenterAction(workspaceId);
+  const hardDelete = useKeywordHardDelete(workspaceId);
 
   // WebSocket: invalidate on rank/strategy mutations (both-halves contract).
   const wsHandlers = useMemo(
@@ -171,14 +179,49 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
     [counts],
   );
 
-  // Bulk action handler -----------------------------------------------------
-  const handleBulkAction = (action: KeywordCommandCenterBulkActionType) => {
-    const keywords = Array.from(hub.selectedKeys);
-    if (keywords.length === 0) return;
+  // Bulk action handler (P3-3d) ---------------------------------------------
+  // Reuses summarizeBulkAction + KeywordBulkConfirmDialog: a selection with a protected
+  // row (or a retire/decline) requires confirmation before mutating. Per-item results
+  // (applied / skipped_protected / skipped_not_tracked / error) render as a summary.
+  const [pendingBulk, setPendingBulk] = useState<KeywordBulkActionSummary | null>(null);
+  const [bulkResult, setBulkResult] = useState<KeywordCommandCenterBulkActionResult | null>(null);
+
+  // The currently-selected rows (for protection/tracking-state summarization).
+  const selectedBulkRows = useMemo(
+    () => rows.filter((r) => hub.selectedKeys.has(r.normalizedKeyword)),
+    [rows, hub.selectedKeys],
+  );
+
+  const runBulkAction = (summary: KeywordBulkActionSummary, force: boolean) => {
+    setBulkResult(null);
     bulkAction.mutate(
-      { action, keywords },
-      { onSuccess: () => hub.clearSelection() },
+      { action: summary.action, keywords: summary.keywords, force: force || undefined },
+      {
+        onSuccess: (result) => {
+          setBulkResult(result);
+          setPendingBulk(null);
+          hub.clearSelection();
+        },
+      },
     );
+  };
+
+  const handleBulkAction = (action: KeywordCommandCenterBulkActionType) => {
+    const summary = summarizeBulkAction(selectedBulkRows, action);
+    if (summary.total === 0) return;
+    if (summary.requiresConfirmation) {
+      setPendingBulk(summary);
+      return;
+    }
+    runBulkAction(summary, false);
+  };
+
+  // Per-row lifecycle action + the separate hard-delete channel (P3-3b/3c).
+  const handleRowAction = (keyword: string, action: KeywordCommandCenterActionType, opts?: { force?: boolean }) => {
+    rowAction.mutate({ action, keyword, force: opts?.force });
+  };
+  const handleDeleteHard = (keyword: string) => {
+    hardDelete.mutate({ keyword });
   };
 
   // Reset all active filters (segment → 'all', search → '', advanced → null).
@@ -246,11 +289,39 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
           onPageChange={hub.setPage}
           isBulkPending={bulkAction.isPending}
           onBulkAction={handleBulkAction}
+          onRowAction={handleRowAction}
+          onDeleteHard={handleDeleteHard}
+          isRowActionPending={rowAction.isPending || hardDelete.isPending}
           onClearSelection={hub.clearSelection}
           onResetFilters={handleResetFilters}
           showLocalSeo={showLocalSeo}
         />
       </SectionCard>
+
+      {/* Per-item bulk result summary (applied / skipped / failed). */}
+      {bulkResult && (
+        <div
+          role="status"
+          className="rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-3)]/40 px-4 py-3"
+        >
+          <p className="t-caption font-semibold text-[var(--brand-text-bright)]">{bulkResult.message}</p>
+          {(bulkResult.skipped > 0 || bulkResult.failed > 0) && (
+            <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">
+              {bulkResult.skipped > 0 ? `${bulkResult.skipped} skipped by protection or tracking state. ` : ''}
+              {bulkResult.failed > 0 ? `${bulkResult.failed} failed — review the selected keywords and try again.` : ''}
+            </p>
+          )}
+        </div>
+      )}
+
+      <KeywordBulkConfirmDialog
+        summary={pendingBulk}
+        isPending={bulkAction.isPending}
+        onConfirm={(force) => {
+          if (pendingBulk) runBulkAction(pendingBulk, force);
+        }}
+        onCancel={() => setPendingBulk(null)}
+      />
     </div>
   );
 }

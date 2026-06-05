@@ -1,4 +1,4 @@
-import { get, post } from './client';
+import { del, get, post } from './client';
 import type {
   KeywordCommandCenterActionRequest,
   KeywordCommandCenterActionResult,
@@ -9,6 +9,13 @@ import type {
   KeywordCommandCenterRowsResponse,
   KeywordCommandCenterSummaryResponse,
 } from '../../shared/types/keyword-command-center';
+import type { TrackedKeyword } from '../../shared/types/rank-tracking';
+
+export interface KeywordHardDeleteResult {
+  ok: true;
+  keyword: string;
+  trackedKeywords: TrackedKeyword[];
+}
 
 export const keywordCommandCenter = {
   summary: (wsId: string) =>
@@ -37,4 +44,12 @@ export const keywordCommandCenter = {
 
   bulkAction: (wsId: string, body: KeywordCommandCenterBulkActionRequest) =>
     post<KeywordCommandCenterBulkActionResult>(`/api/webflow/keyword-command-center/${wsId}/actions/bulk`, body),
+
+  // Hard delete — its OWN channel (never a lifecycle action). `force` overrides the
+  // eligibility guard (pinned / client / gap provenance) — the UI only sends it from a
+  // separate confirm path; the default Hub Delete affordance never sets it.
+  deleteHard: (wsId: string, keyword: string, opts: { force?: boolean } = {}) =>
+    del<KeywordHardDeleteResult>(
+      `/api/webflow/keyword-command-center/${wsId}/keywords/${encodeURIComponent(keyword)}${opts.force ? '?force=true' : ''}`,
+    ),
 };
