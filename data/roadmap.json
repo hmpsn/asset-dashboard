@@ -41,7 +41,7 @@
       "name": "🎯 Keyword Value — propagation, money, GSC signals, client display",
       "hours": "phased",
       "rationale": "Phase 0–2 of keyword-value-scoring shipped the value-first score into the Hub sort + content-gap spine, but a wiring audit found the new score is still siloed: it does NOT propagate to briefs / content-gen / titles-metas / schema / internal-linking / content-plan / AI-context, and the client briefing actively demotes it (sorts by raw volume). This sprint propagates ONE consistent value score everywhere, turns it into dollars, surfaces the per-keyword GSC data already collected-but-discarded (striking-distance, momentum), and builds the client-facing layer — all additive, reusing signals already in hand, no new data collection.",
-      "notes": "Sequenced by effort-to-value with dependencies (item titles tagged Wave 1–5). Wave 1 makes the score honest+legible+consistent (foundation, unblocks the client display); Wave 2 = dollars; Wave 3 = surface discarded GSC signals (one per-keyword join → 3 surfaces); Wave 4 = the client keyword display layer; Wave 5 = opportunistic/deeper. Each item runs the established brainstorm→spec→plan→phased-PR flow and is flag-gated where it changes ranking/output. Audit source: 2026-06-05 conversation (10-agent wiring audit + diverse-lens ideation).",
+      "notes": "Sequenced by effort-to-value with dependencies (item titles tagged Wave 1–5). Wave 1 makes the score honest+legible+consistent (foundation, unblocks the client display); Wave 2 = dollars; Wave 3 = surface discarded GSC signals (one per-keyword join → 3 surfaces); Wave 4 = the client keyword display layer; Wave 5 = opportunistic/deeper. Each item runs the established brainstorm→spec→plan→phased-PR flow and is flag-gated where it changes ranking/output. Audit source: 2026-06-05 conversation (10-agent wiring audit + diverse-lens ideation). || 2026-06-05 ANTI-DUPLICATION PLACEMENT AUDIT (6-surface inventory): each item annotated with its canonical HOME + verdict (exists / fold-into / new). DROPPED kwv-client-wins-this-month — the named rank-movement win already ships end-to-end (ranking-mover.ts -> signal-story-registry.ts:410 -> InsightsBriefingPage DataSpread); its only real need (value-rank which named win leads) merged into kwv-one-score-everywhere. ADDED kwv-titles-metas-schema-priority + kwv-internal-linking-value-priority to capture wiring-audit surfaces not yet tracked. Rule: enrich existing Insights/Wins/Recommendations/ROI/StrategyKeywordDrawer/PageKeywordMapContent surfaces — NO new client keyword tab, NO second dollar engine. KEYSTONE = kwv-one-score-everywhere (reconcile keyword-value-score vs opportunity-value into one source of truth) — brainstorm first.",
       "items": [
         {
           "id": "kwv-value-breakdown",
@@ -50,7 +50,7 @@
           "est": "small",
           "priority": "P1",
           "status": "pending",
-          "notes": "Wave 1 (foundation). computeKeywordValueScore already computes commercialValue (intent × CPC), demand, winnability, and the local multiplier internally, then discards them. Return + label them so the Hub/brief/client show WHY a low-volume keyword outranks a high-volume one ('commercial intent, $9 CPC, winnable KD 24, local 1.5×'). Unblocks the client display (kwv-client-why-worth-it) and richer briefs. No new data."
+          "notes": "Wave 1 (foundation). computeKeywordValueScore already computes commercialValue (intent × CPC), demand, winnability, and the local multiplier internally, then discards them. Return + label them so the Hub/brief/client show WHY a low-volume keyword outranks a high-volume one ('commercial intent, $9 CPC, winnable KD 24, local 1.5×'). Unblocks the client display (kwv-client-why-worth-it) and richer briefs. No new data. || PLACEMENT [exists-pattern]: OpportunityScore.components (buildComponents) already computes+renders this client-side ('Why this is #1' OverviewTab, StrategyKeywordDrawer 'See the numbers'). Work = expose the SAME components on the Hub valueScore (drawer), not a new breakdown. Depends on the score-consolidation decision (kwv-one-score-everywhere)."
         },
         {
           "id": "kwv-real-cpc",
@@ -59,7 +59,7 @@
           "est": "small",
           "priority": "P1",
           "status": "pending",
-          "notes": "Wave 1. keyword-strategy-enrichment hard-passes cpc:undefined into computeKeywordValueScore, so every content-gap value score uses the CPC_UNKNOWN=0.5 mid-band proxy instead of real money. ContentGap + the matched pageMap entry already carry cpc. Pass it through so commercial gaps reflect commercial value. Correctness fix that makes the score honest before propagating it."
+          "notes": "Wave 1. keyword-strategy-enrichment hard-passes cpc:undefined into computeKeywordValueScore, so every content-gap value score uses the CPC_UNKNOWN=0.5 mid-band proxy instead of real money. ContentGap + the matched pageMap entry already carry cpc. Pass it through so commercial gaps reflect commercial value. Correctness fix that makes the score honest before propagating it. || PLACEMENT [new, ~1-line]: populate OpportunityInput.cpc for the content_gap branch (cpc plumbing already exists in opportunity-value.ts/roi.ts). No surface."
         },
         {
           "id": "kwv-one-score-everywhere",
@@ -68,7 +68,7 @@
           "est": "medium",
           "priority": "P1",
           "status": "pending",
-          "notes": "Wave 1. Four surfaces rank the SAME keywords four contradictory ways: Hub uses valueScore, content-plan uses legacy opportunityScore (keyword-recommendations.ts:159), the client briefing sorts by raw VOLUME buckets (briefing-client-projection.ts:81, demoting high-value low-volume gaps), titles/metas lead by strategy slot order. Make them all rank by the single Hub valueScore. HIGHEST-PRIORITY — fixes the client briefing sort, the exact surface the client keyword display sits on. Flag-gated where it changes ranking."
+          "notes": "Wave 1. Four surfaces rank the SAME keywords four contradictory ways: Hub uses valueScore, content-plan uses legacy opportunityScore (keyword-recommendations.ts:159), the client briefing sorts by raw VOLUME buckets (briefing-client-projection.ts:81, demoting high-value low-volume gaps), titles/metas lead by strategy slot order. Make them all rank by the single Hub valueScore. HIGHEST-PRIORITY — fixes the client briefing sort, the exact surface the client keyword display sits on. Flag-gated where it changes ranking. || PLACEMENT [KEYSTONE — architecture decision, brainstorm first]: reconcile the new keyword-value-score vs the existing opportunity-value OV model (two value models today — Hub valueScore is a bare number; OV exposes components + is what client surfaces render). Decide ONE source of truth, then unify ranking across content-plan (keyword-recommendations.ts:159), titles/metas, briefs, client-briefing (fix the volume-bucket sort briefing-client-projection.ts:81), internal-linking. ALSO absorbs the only real need of the DROPPED kwv-client-wins-this-month: re-rank named rank-movement wins on InsightsBriefingPage so the most valuable named mover leads."
         },
         {
           "id": "kwv-dollar-value",
@@ -77,7 +77,7 @@
           "est": "small-medium",
           "priority": "P1",
           "status": "pending",
-          "notes": "Wave 2 (money; biggest client wow). Per-keyword '#7 → page-1 ≈ +$340/mo' = CTR-curve uplift (ctr-curve.ts) × monthly volume × valuePerClick (cpc × INTENT_WEIGHT, opportunity-value.ts). Plus a portfolio headline 'close your top N gaps ≈ $X/mo (~$Y/yr ad-equivalent)' reusing roi.ts adSpendEquivalent. Pure reuse of the existing EMV math + CTR curve — no GA4/provider call. Surfaces on Hub, briefs, client briefing, AI context."
+          "notes": "Wave 2 (money; biggest client wow). Per-keyword '#7 → page-1 ≈ +$340/mo' = CTR-curve uplift (ctr-curve.ts) × monthly volume × valuePerClick (cpc × INTENT_WEIGHT, opportunity-value.ts). Plus a portfolio headline 'close your top N gaps ≈ $X/mo (~$Y/yr ad-equivalent)' reusing roi.ts adSpendEquivalent. Pure reuse of the existing EMV math + CTR curve — no GA4/provider call. Surfaces on Hub, briefs, client briefing, AI context. || PLACEMENT [mostly exists]: ROIDashboard/computeROI is the ONE client $ engine (organicTrafficValue, adSpendEquivalent, per-page trafficValue/mo). DO NOT build a second dollar engine. NEW = only a per-KEYWORD $/mo line (StrategyKeywordDrawer + a Hub $ column) reusing roi.ts avgCPC + the OV CTR-uplift. Watch the contradictory-$ trap next to milestone-attribution.ts."
         },
         {
           "id": "kwv-gsc-per-keyword-context",
@@ -86,7 +86,7 @@
           "est": "small-medium",
           "priority": "P2",
           "status": "pending",
-          "notes": "Wave 3 (enabling join). seo-context-slice reads full per-keyword GSC (getLatestRanks: position/change/clicks/impressions) then collapses to 'N improved, M declined' before any prompt. Keep a top-N per-keyword breakdown (keyword, position, change, clicks, impressions, valueScore) on RankTrackingSummary so AdminChat + generation-context builders can NAME which keyword moved/gained clicks. Foundation for striking-distance + momentum."
+          "notes": "Wave 3 (enabling join). seo-context-slice reads full per-keyword GSC (getLatestRanks: position/change/clicks/impressions) then collapses to 'N improved, M declined' before any prompt. Keep a top-N per-keyword breakdown (keyword, position, change, clicks, impressions, valueScore) on RankTrackingSummary so AdminChat + generation-context builders can NAME which keyword moved/gained clicks. Foundation for striking-distance + momentum. || PLACEMENT [new slice enrichment]: seoContext/RankTrackingSummary AI-context (named per-keyword movers into prompts). ranking_mover is already in the insights slice for AI — wire from existing data, keep top-N named breakdown."
         },
         {
           "id": "kwv-striking-distance",
@@ -95,7 +95,7 @@
           "est": "medium",
           "priority": "P1",
           "status": "pending",
-          "notes": "Wave 3. 'You have 14 keywords ranking #11-20 — one push moves them to page 1.' Highest-conviction SEO move; nothing names them today (data in getLatestRanks, value via in-hand valueScore). Surface in Hub, recommendations (which mint ZERO recs from rank_tracking today), and the client briefing. Distinct from the GSC-query-derived rankingOpportunities (this is rank_tracking-backed + value-ranked, survives into recs + client)."
+          "notes": "Wave 3. 'You have 14 keywords ranking #11-20 — one push moves them to page 1.' Highest-conviction SEO move; nothing names them today (data in getLatestRanks, value via in-hand valueScore). Surface in Hub, recommendations (which mint ZERO recs from rank_tracking today), and the client briefing. Distinct from the GSC-query-derived rankingOpportunities (this is rank_tracking-backed + value-ranked, survives into recs + client). || PLACEMENT [exists]: ranking_opportunity insight (pos 4-20, value-ranked) + SearchTab 'Low-Hanging Fruit' + PageKeywordMap 'Ranking' filter already cover this. NEW = at most a position-band (#11-20) filter/view in the admin Hub (none today). Reuse the insight; relabel/filter, do not add an InsightType."
         },
         {
           "id": "kwv-momentum-and-rank-recs",
@@ -104,7 +104,7 @@
           "est": "medium",
           "priority": "P2",
           "status": "pending",
-          "notes": "Wave 3. Named risers/fallers ('emergency dentist #19→#8 +340 impr; [service] near me #4→#9 — defend it') from getLatestRanks change + getRankHistory 90-day slope. AND mint defend/push recommendations from tracked movement — the rec surface is 100% blind to rank movement today (ranking_mover insight exists but is never converted to a Recommendation). Reuses kwv-gsc-per-keyword-context."
+          "notes": "Wave 3. Named risers/fallers ('emergency dentist #19→#8 +340 impr; [service] near me #4→#9 — defend it') from getLatestRanks change + getRankHistory 90-day slope. AND mint defend/push recommendations from tracked movement — the rec surface is 100% blind to rank movement today (ranking_mover insight exists but is never converted to a Recommendation). Reuses kwv-gsc-per-keyword-context. || PLACEMENT [split]: named risers/fallers ALREADY ship — ranking_mover insight + ranking-mover.ts client win story (signal-story-registry.ts:410 -> InsightsBriefingPage). The genuinely-NEW half = defend/push RECOMMENDATIONS: add a rank/defend/push RecType + RecActionType + RecSourceCategory via the four-line contract in recommendations.ts (overlaps the existing strategy:ranking-opportunity source). Do NOT re-render named movers as a new surface."
         },
         {
           "id": "kwv-client-why-worth-it",
@@ -113,16 +113,7 @@
           "est": "small",
           "priority": "P1",
           "status": "pending",
-          "notes": "Wave 4 (client display). Turn the opaque 0-100 into a human reason: 'High-value: people searching this are ready to buy (commercial intent), it's local to your area, and it's winnable — competitors aren't strong here.' Reuses kwv-value-breakdown + ScoringContext posture/city/state already computed per request. Build alongside the client keyword display."
-        },
-        {
-          "id": "kwv-client-wins-this-month",
-          "title": "Client: 'Your wins this month' named rank-movement strip",
-          "source": "/docs/superpowers/specs/2026-06-05-keyword-value-scoring-design.md (2026-06-05 wiring audit + a-ha ideation)",
-          "est": "small",
-          "priority": "P2",
-          "status": "pending",
-          "notes": "Wave 4 (client display). First thing the client sees: a named win, not a chart — \"'invisalign Austin' jumped from #9 to #3 this month, and that page's clicks are up.\" Reuses computeRankingMovers (already computed, reaches the briefing pool as a ranking_mover insight but dies there) + LatestRank change/clicks/pageTitle."
+          "notes": "Wave 4 (client display). Turn the opaque 0-100 into a human reason: 'High-value: people searching this are ready to buy (commercial intent), it's local to your area, and it's winnable — competitors aren't strong here.' Reuses kwv-value-breakdown + ScoringContext posture/city/state already computed per request. Build alongside the client keyword display. || PLACEMENT [exists]: StrategyKeywordDrawer 'Why it's in the strategy' + buildOvGainString phrases + 'Why this is #1' bars already render plain-language reasons. Fold reason badges into those existing rows (and OutcomeWinEntry/ranking-mover narratives), not a new card."
         },
         {
           "id": "kwv-client-rank-x-missing-y",
@@ -131,7 +122,7 @@
           "est": "medium",
           "priority": "P1",
           "status": "pending",
-          "notes": "Wave 4 (client display). Per important page: 'Your Teeth Whitening page ranks #4 for \"teeth whitening\" (320 visits/mo) — but you're invisible for \"teeth whitening cost\", which 1,200 people search every month.' Joins persisted PageKeywordMap primaryKeyword+position+clicks with the per-page ContentGap the page is NOT ranking for. Both sides exist; never paired per-page on a client surface."
+          "notes": "Wave 4 (client display). Per important page: 'Your Teeth Whitening page ranks #4 for \"teeth whitening\" (320 visits/mo) — but you're invisible for \"teeth whitening cost\", which 1,200 people search every month.' Joins persisted PageKeywordMap primaryKeyword+position+clicks with the per-page ContentGap the page is NOT ranking for. Both sides exist; never paired per-page on a client surface. || PLACEMENT [fold-in]: 'rank for X' already in PageKeywordMapContent (per-page primary kw + GSC rank/impr/clicks); 'missing Y' is the existing competitor_gap insight. Add a per-page gap badge/row INSIDE PageKeywordMapContent, do not build a new client view."
         },
         {
           "id": "kwv-intent-branded-split",
@@ -140,7 +131,7 @@
           "est": "small",
           "priority": "P3",
           "status": "pending",
-          "notes": "Wave 5 (framing). '82% of your targeted keywords are informational, only 6% commercial — that's why traffic is up but leads aren't.' + 'Branded clicks are 68%; non-branded (new demand) is 32% and flat.' Buckets existing per-keyword intent (deriveValueIntent adapter) + partitions existing GSC clicks/impr by brand-name regex. Zero new data; agency-report staples."
+          "notes": "Wave 5 (framing). '82% of your targeted keywords are informational, only 6% commercial — that's why traffic is up but leads aren't.' + 'Branded clicks are 68%; non-branded (new demand) is 32% and flat.' Buckets existing per-keyword intent (deriveValueIntent adapter) + partitions existing GSC clicks/impr by brand-name regex. Zero new data; agency-report staples. || PLACEMENT [rollup new on Hub]: per-keyword intent already renders in 3 client places + isBrandedQuery branded-detection already exists in analytics-intelligence. NEW = only the workspace-level PORTFOLIO rollup (intent-mix + branded share) as a Hub header strip — not a per-page card/insight."
         },
         {
           "id": "kwv-brief-per-page-metrics",
@@ -149,7 +140,7 @@
           "est": "small-medium",
           "priority": "P2",
           "status": "pending",
-          "notes": "Wave 5. formatPageMapForPrompt emits only keyword strings, dropping each page's searchIntent/volume/difficulty/cpc; render the metrics already on each entry so the brief can lead with the highest-value term. AND prepare_brief_context (MCP) threads no pagePath/targetKeyword, so the external brief model never gets the per-page match — pass topic→targetKeyword through the existing builder."
+          "notes": "Wave 5. formatPageMapForPrompt emits only keyword strings, dropping each page's searchIntent/volume/difficulty/cpc; render the metrics already on each entry so the brief can lead with the highest-value term. AND prepare_brief_context (MCP) threads no pagePath/targetKeyword, so the external brief model never gets the per-page match — pass topic→targetKeyword through the existing builder. || PLACEMENT [new, brief-side wiring]: content-brief.ts formatPageMapForPrompt is lossy (drops per-page searchIntent/volume/KD/CPC) + MCP prepare_brief_context threads no topic->page. Render the metrics already on each entry + thread the page; also surface the value score as first-class (today only laundered through opportunityScore). NOTE: content/post GENERATION inherits keyword targeting via the brief, so wiring the brief covers generation — no separate content-gen item needed."
         },
         {
           "id": "kwv-cannibalization-click-winner",
@@ -158,7 +149,7 @@
           "est": "medium",
           "priority": "P3",
           "status": "pending",
-          "notes": "Wave 5. Instead of a generic 'medium' conflict: 'Page A (#4, 120 clicks) and Page B (#9, 8 clicks) compete for \"invisalign cost\" — consolidate into A.' cannibalization-detection sets severity from structural type only, ignoring rank; join the competing pages' existing tracked ranks/clicks (getLatestRanks) to pick the winner."
+          "notes": "Wave 5. Instead of a generic 'medium' conflict: 'Page A (#4, 120 clicks) and Page B (#9, 8 clicks) compete for \"invisalign cost\" — consolidate into A.' cannibalization-detection sets severity from structural type only, ignoring rank; join the competing pages' existing tracked ranks/clicks (getLatestRanks) to pick the winner. || PLACEMENT [fold-in]: enrich the EXISTING cannibalization insight (+clickWinnerPage / per-page clicks field, weight selection in computeCannibalizationInsights, surface in the existing projector). Not a new surface."
         },
         {
           "id": "kwv-conversion-grounded-vpc",
@@ -167,7 +158,25 @@
           "est": "medium",
           "priority": "P2",
           "status": "pending",
-          "notes": "Wave 5 (deepest money win; after kwv-dollar-value proves out). Join GA4 getGA4LandingPages conversions/sessions per page (already an insight) with the page's keywords via GSC QueryPageRow, so a low-CPC-but-high-converting keyword outranks a flashy high-CPC one that never converts. Uplifts opportunity-value.ts valuePerClick and fills the estimatedRevenue:null stub (analytics-intelligence.ts:423)."
+          "notes": "Wave 5 (deepest money win; after kwv-dollar-value proves out). Join GA4 getGA4LandingPages conversions/sessions per page (already an insight) with the page's keywords via GSC QueryPageRow, so a low-CPC-but-high-converting keyword outranks a flashy high-CPC one that never converts. Uplifts opportunity-value.ts valuePerClick and fills the estimatedRevenue:null stub (analytics-intelligence.ts:423). || PLACEMENT [fold-in / planned]: enrich the EXISTING conversion_attribution insight AND take the reserved 'P6' swap point already commented in opportunity-value.ts:370-376 (valuePerClick CPC-proxy -> GA4 estimatedRevenue). A scoring swap behind existing surfaces, not a new VPC insight."
+        },
+        {
+          "id": "kwv-titles-metas-schema-priority",
+          "title": "Titles/metas/schema: lead with the highest-value keyword + revive the dead schema searchIntent field",
+          "source": "/docs/superpowers/specs/2026-06-05-keyword-value-scoring-design.md (2026-06-05 wiring audit + a-ha ideation)",
+          "est": "small-medium",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Wave 5 (wiring-audit gap). Title/meta + schema generation ARE keyword-targeted per page but get NO prioritization signal — they lead by strategy slot order, not value, and SchemaContext.searchIntent is declared (schema-suggester.ts:314) but never populated or consumed (dead field). Make seo-copy + buildSchemaContext lead with the highest-value target keyword and use intent to shape schema (Article vs Service/FAQ). HOME: existing seo-copy + buildSchemaContext (server/helpers.ts). PLACEMENT [enrich existing generation path]."
+        },
+        {
+          "id": "kwv-internal-linking-value-priority",
+          "title": "Internal linking: prioritize equity toward high-value / under-optimized pages",
+          "source": "/docs/superpowers/specs/2026-06-05-keyword-value-scoring-design.md (2026-06-05 wiring audit + a-ha ideation)",
+          "est": "medium",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "Wave 5 (wiring-audit gap). Internal-linking prioritization is topicCluster-only and ignores per-page value, optimizationScore, and tracked rank — so it can't steer linking equity to high-value or weak pages. Join the existing valueScore + PageKeywordMap.optimizationScore + tracked rank to weight link suggestions. HOME: existing internal-links module. PLACEMENT [enrich existing module]."
         }
       ]
     },
