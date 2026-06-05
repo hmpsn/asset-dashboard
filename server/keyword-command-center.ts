@@ -25,7 +25,7 @@ import {
   type AddTrackedKeywordOptions,
 } from './rank-tracking.js';
 import { listTrackedKeywordRows } from './tracked-keywords-store.js';
-import { TRACKED_KEYWORD_TRANSITIONS, validateTransition } from './state-machines.js';
+import { InvalidTransitionError, TRACKED_KEYWORD_TRANSITIONS, validateTransition } from './state-machines.js';
 import { getWorkspace } from './workspaces.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { buildKeywordStrategyUxPayload } from './keyword-strategy-ux.js';
@@ -2677,7 +2677,16 @@ export function applyKeywordCommandCenterBulkAction(
       applied++;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      if (message.includes('requires explicit confirmation')) {
+      if (err instanceof InvalidTransitionError) {
+        // The keyword is already in — or cannot legally leave — the target state
+        // (e.g. RETIRE/PAUSE/DECLINE over a selection that already contains a
+        // retired keyword: deprecated→deprecated). A bulk action over a mixed
+        // selection routinely includes such no-ops; pre-P3 they were silent
+        // idempotent successes. The P3 state-machine guard turned them into a
+        // spurious "N failed". Classify as a benign skip, never a failure.
+        items.push({ keyword, status: 'skipped_noop', error: message });
+        skipped++;
+      } else if (message.includes('requires explicit confirmation')) {
         items.push({ keyword, status: 'skipped_protected', error: message });
         skipped++;
       } else if (message === 'Keyword is not tracked') {
