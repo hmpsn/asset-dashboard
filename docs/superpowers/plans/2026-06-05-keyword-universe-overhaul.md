@@ -27,7 +27,7 @@ The keyword universe is the **union of three populations**, each kept **in full*
 
 | Population | Sources | Inclusion rule | Junk gating |
 |---|---|---|---|
-| **A. Ranking (empirical)** | GSC snapshot queries the site ranks for | **Every query with `clicks > 0` OR `impressions > 0`** (today: capped at top-50-by-impressions — REMOVE the cap) | **Tier-1 only** (malformed-string). These are real searches; never drop for low value. |
+| **A. Ranking (empirical)** | GSC snapshot queries the site ranks for | **Every query with `clicks > 0` OR `impressions > 0`** (today: capped at top-50-by-impressions — REMOVE the cap) | **Tier-1 only** (malformed-string). These are real searches; **never** relevance-gated. *Rationale: a brand-new site ranking "teeth cleaning sarasota" at position 70 with a few impressions and 0 clicks MUST appear — knowing you rank at all is the whole point. The relevance heuristic could mis-drop it, so it is not applied to empirical ranking data.* |
 | **B. Curated (chosen)** | strategy keywords, tracked keywords, client feedback (approved/requested) | **All** (already uncapped) | **Tier-1 only.** Human/strategy-chosen; never relevance-gated. |
 | **C. Discovery (opportunity, NOT-yet-ranking)** | competitor `keyword_gaps`, provider keyword research/ideas, AI `content_gaps` | **All that pass both gates** | **Tier-1 AND Tier-2** (relevance). This is where boolean-query junk + low-value noise lives. |
 
@@ -135,6 +135,7 @@ The keyword universe is the **union of three populations**, each kept **in full*
 - **HEADLINE (the owner's invariant):** seed a competitor-gap keyword `{ keyword: 'invisalign cost', volume: 1900, difficulty: 40, competitorPosition: 4 }` with **0 clicks/0 impressions** → it **appears** in `GET .../rows?filter=all` (not-yet-ranking discovery is retained).
 - Seed a `keyword_gaps`/content-gap row with `keyword: '"teeth whitening" "new patient" discount or special or package or offer'` → it is **absent** from rows (Tier-1 dropped).
 - Seed a GSC ranking query `{ query: 'cosmetic dental specials', clicks: 12 }` that would FAIL the relevance heuristic → it **still appears** (Tier-2 NOT applied to ranking population).
+- **IMPRESSION-ONLY invariant (the owner's "teeth cleaning sarasota" case):** seed a GSC ranking query `{ query: 'teeth cleaning sarasota', clicks: 0, impressions: 4, position: 70 }` → it **appears** (impression-only empirical ranking is retained; Tier-1 passes; Tier-2 not applied).
 - Seed a low-actionability provider gap matching `LOW_ACTIONABILITY_PHRASES` → **absent** (Tier-2 dropped).
 - *Unit* (extend `tests/unit/keyword-command-center.test.ts` or NEW pure test): the per-population gating predicate returns the right keep/drop for one fixture of each population.
 
@@ -154,13 +155,14 @@ The keyword universe is the **union of three populations**, each kept **in full*
 - Flag ON:
   - **GSC ranks (population A):** replace the `top-50-by-impressions` `.slice(0, RANK_EVIDENCE_ROW_LIMIT)` (`:1777-1779`) with: include **every** snapshot query with `clicks > 0 OR impressions > 0` (junk-gated by Task 2), up to a generous safety ceiling `UNIVERSE_SAFETY_CEILING = 2000`.
   - **Raw evidence (`RAW_EVIDENCE_ROW_LIMIT`, `:1183`) and local candidates (`:1272-1286`):** raise to the same safety ceiling (or remove the per-bucket cap and rely on the global ceiling).
+  - **`UNIVERSE_SAFETY_CEILING = 2000` truncates by VALUE, not arbitrarily:** when the post-gate candidate count exceeds the ceiling, sort candidates by value (demand = volume‖impressions, then clicks) DESC and keep the top 2000 — the high-value head is retained, the low-value tail is dropped. (Confirmed owner intent: "as long as we're filtering for high-value queries.")
   - **Honest count:** `rawEvidenceReturned`/the page total must reflect the true post-gate universe size; if the safety ceiling truncates, `rawEvidenceTotal > rawEvidenceReturned` so the banner (Task 4) fires.
 - Performance guard: the candidate Map may now hold thousands of cheap `RowCandidateKey`s — that is fine (strings+numbers). Evaluation stays page-bounded (the skinny path). The MODEL path (`LOCAL_CANDIDATES` filter, full eval) keeps a cap to avoid OOM — document this exception inline.
 
 **Test assertions** (`tests/integration/keyword-universe-coverage.test.ts`, NEW, port **13904**):
 - Seed 60 GSC ranking queries with clicks (above the old 50-cap). Flag **ON** → all 60 appear across pages (`pageInfo.totalRows >= 60`). Flag **OFF** → ≤50 (old behavior preserved).
 - Flag ON, a clicked query that was rank #80-by-impressions (previously dropped by the 50-cap) is present.
-- Flag ON with >2000 candidates → `pageInfo.totalRows === 2000` and `rawEvidenceTotal > rawEvidenceReturned` (ceiling honestly disclosed).
+- Flag ON with >2000 candidates → `pageInfo.totalRows === 2000` and `rawEvidenceTotal > rawEvidenceReturned` (ceiling honestly disclosed). Seed one high-value keyword (`demand: 5000`) and one lowest-value keyword (`demand: 1`) among 2001 candidates → the high-value one is present, the lowest-value one is the one dropped (ceiling truncates the low-value tail, not arbitrarily).
 - Performance smoke: seed ~1500 candidates, assert `GET .../rows?page=1&pageSize=50` returns within a generous time budget and evaluates only ~50 rows (assert via a row-count side-channel or that detail-only fields are absent on list rows).
 
 **Constraints:** flag-OFF parity is the hard bar (a flag-OFF integration assertion proving identical output to pre-change). The safety ceiling is a backstop, not the product cap — log when hit.
