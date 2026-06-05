@@ -131,7 +131,7 @@ interface LostVisibilityQuery {
   totalImpressions: number;
 }
 
-interface CommandCenterSourceBundle {
+export interface CommandCenterSourceBundle {
   workspaceId: string;
   workspaceName?: string;
   strategy?: KeywordStrategy | null;
@@ -164,7 +164,15 @@ function addSource(row: DraftRow, source: KeywordCommandCenterSourceLabel): void
   row.sourceLabels.push(source);
 }
 
-function mergeMetrics(row: DraftRow, metrics: KeywordCommandCenterMetrics): void {
+/**
+ * Last-writer-wins metric merge over a bare metrics object, with the planner
+ * sentinel guard. Shared by the row stage (`mergeMetrics`) and the candidate
+ * stage's metric resolver (`resolveBundleMetrics`) so the two stages compute
+ * IDENTICAL clicks/rank/difficulty/demand per key — the invariant that keeps
+ * page-1 == global-top-N. `keyword` is the RAW display keyword (the sentinel
+ * guard is keyword-aware).
+ */
+function mergeMetricsInto(keyword: string, target: KeywordCommandCenterMetrics, metrics: KeywordCommandCenterMetrics): KeywordCommandCenterMetrics {
   // Filter DataForSEO planner-grouped bucket sentinels before merging.
   // The Google Ads planner returns 1,000,000 as a grouped-forecast bucket value
   // paired with difficulty=21 when it can't pin granular data. Letting this through
@@ -173,14 +181,18 @@ function mergeMetrics(row: DraftRow, metrics: KeywordCommandCenterMetrics): void
   // sources over earlier ones, so a sentinel write after a real value wins).
   // See server/keyword-strategy-helpers.ts:isSuspiciousPlannerGroupedVolume.
   const filtered: KeywordCommandCenterMetrics = { ...metrics };
-  if (isSuspiciousPlannerGroupedVolume(row.keyword, filtered.volume)) {
+  if (isSuspiciousPlannerGroupedVolume(keyword, filtered.volume)) {
     filtered.volume = undefined;
     filtered.difficulty = undefined; // 21 is the paired sentinel difficulty — drop both
   }
-  row.metrics = {
-    ...row.metrics,
+  return {
+    ...target,
     ...Object.fromEntries(Object.entries(filtered).filter(([, value]) => value != null)),
   };
+}
+
+function mergeMetrics(row: DraftRow, metrics: KeywordCommandCenterMetrics): void {
+  row.metrics = mergeMetricsInto(row.keyword, row.metrics, metrics);
 }
 
 function readFeedbackRows(workspaceId: string): FeedbackRow[] {
@@ -678,25 +690,103 @@ export function sortRows(a: KeywordCommandCenterRow, b: KeywordCommandCenterRow)
   return a.keyword.localeCompare(b.keyword);
 }
 
-export function sortRowsForQuery(sort: KeywordCommandCenterSort | undefined): (a: KeywordCommandCenterRow, b: KeywordCommandCenterRow) => number {
-  if (sort === 'keyword') return (a, b) => a.keyword.localeCompare(b.keyword);
-  if (sort === 'demand') {
+// ---------------------------------------------------------------------------
+// Unified sort comparator (single source of truth for BOTH stages)
+//
+// The page-bounded pipeline sorts cheap candidate keys pre-pagination
+// (`candidateSortForQuery`) and full rows post-evaluation (`sortRowsForQuery`).
+// If the two comparators disagree, page-1 ≠ global-top-N. To make drift
+// impossible, both consume the SAME `keywordSortComparator` via type-specific
+// field accessors. Only the accessors differ between the two stages.
+// ---------------------------------------------------------------------------
+
+/** The explicit, directioned sorts handled by the shared comparator core. */
+type ExplicitSort = 'keyword' | 'demand' | 'rank' | 'clicks' | 'difficulty';
+
+/** Per-type field readers. `null`/`undefined` numeric values mean "missing". */
+interface SortFieldAccessors<T> {
+  keyword: (item: T) => string;
+  demand: (item: T) => number | null | undefined;
+  rank: (item: T) => number | null | undefined;
+  clicks: (item: T) => number | null | undefined;
+  difficulty: (item: T) => number | null | undefined;
+}
+
+/**
+ * Natural sort directions when `direction` is absent. `keyword`/`rank` ascend
+ * (A→Z, position 1 first); `demand`/`clicks`/`difficulty` descend (biggest
+ * first). An explicit `direction` always overrides these.
+ */
+const NATURAL_SORT_DIRECTION: Record<ExplicitSort, 'asc' | 'desc'> = {
+  keyword: 'asc',
+  rank: 'asc',
+  demand: 'desc',
+  clicks: 'desc',
+  difficulty: 'desc',
+};
+
+/**
+ * Compare two possibly-missing numeric metric values such that missing values
+ * ALWAYS sort last regardless of direction. Returns a directioned comparison
+ * for two present values, and a sign that pushes the missing one last.
+ */
+function compareMetric(
+  a: number | null | undefined,
+  b: number | null | undefined,
+  direction: 'asc' | 'desc',
+): number {
+  const aMissing = a == null || Number.isNaN(a);
+  const bMissing = b == null || Number.isNaN(b);
+  if (aMissing && bMissing) return 0;
+  if (aMissing) return 1; // a goes after b
+  if (bMissing) return -1; // b goes after a
+  return direction === 'asc' ? a - b : b - a;
+}
+
+/**
+ * The shared comparator for the explicit, directioned sorts. Tiebreak is ALWAYS
+ * `keyword.localeCompare` (ascending) in both stages — identical tiebreak →
+ * identical order → page-1 == global-top-N.
+ */
+function keywordSortComparator<T>(
+  sort: ExplicitSort,
+  direction: 'asc' | 'desc' | undefined,
+  accessors: SortFieldAccessors<T>,
+): (a: T, b: T) => number {
+  const dir = direction ?? NATURAL_SORT_DIRECTION[sort];
+  const tiebreak = (a: T, b: T) => accessors.keyword(a).localeCompare(accessors.keyword(b));
+  if (sort === 'keyword') {
     return (a, b) => {
-      const aDemand = a.metrics.volume ?? a.metrics.impressions ?? 0;
-      const bDemand = b.metrics.volume ?? b.metrics.impressions ?? 0;
-      if (aDemand !== bDemand) return bDemand - aDemand;
-      return sortRows(a, b);
+      const cmp = accessors.keyword(a).localeCompare(accessors.keyword(b));
+      return dir === 'asc' ? cmp : -cmp;
     };
   }
-  if (sort === 'rank') {
-    return (a, b) => {
-      const aRank = a.metrics.currentPosition ?? Number.POSITIVE_INFINITY;
-      const bRank = b.metrics.currentPosition ?? Number.POSITIVE_INFINITY;
-      if (aRank !== bRank) return aRank - bRank;
-      return sortRows(a, b);
-    };
-  }
-  return sortRows;
+  const read: (item: T) => number | null | undefined =
+    sort === 'demand' ? accessors.demand
+      : sort === 'rank' ? accessors.rank
+        : sort === 'clicks' ? accessors.clicks
+          : accessors.difficulty;
+  return (a, b) => {
+    const cmp = compareMetric(read(a), read(b), dir);
+    if (cmp !== 0) return cmp;
+    return tiebreak(a, b);
+  };
+}
+
+const ROW_SORT_ACCESSORS: SortFieldAccessors<KeywordCommandCenterRow> = {
+  keyword: (row) => row.keyword,
+  demand: (row) => row.metrics.volume ?? row.metrics.impressions,
+  rank: (row) => row.metrics.currentPosition,
+  clicks: (row) => row.metrics.clicks,
+  difficulty: (row) => row.metrics.difficulty,
+};
+
+export function sortRowsForQuery(
+  sort: KeywordCommandCenterSort | undefined,
+  direction?: 'asc' | 'desc',
+): (a: KeywordCommandCenterRow, b: KeywordCommandCenterRow) => number {
+  if (sort === undefined || sort === 'priority') return sortRows;
+  return keywordSortComparator(sort, direction, ROW_SORT_ACCESSORS);
 }
 
 export function matchesFilter(row: KeywordCommandCenterRow, filter: KeywordCommandCenterFilter): boolean {
@@ -1710,7 +1800,7 @@ function filterUsesLocalVisibilityRows(filter: KeywordCommandCenterFilter): bool
     || filter === KEYWORD_COMMAND_CENTER_FILTERS.PROVIDER_DEGRADED;
 }
 
-interface RowCandidateKey {
+export interface RowCandidateKey {
   key: string;
   keyword: string;
   sourcePriority: number;
@@ -1737,14 +1827,38 @@ function addCandidateKey(
   if (!key) return;
   const displayKeyword = keyword?.trim() || key;
   const existing = candidates.get(key);
+  const mergeSearchText = (a: string | undefined, b: string | undefined): string | undefined => {
+    const merged = [...new Set([...(a?.split(' ') ?? []), ...(b?.split(' ') ?? [])].filter(Boolean))].join(' ');
+    return merged || undefined;
+  };
   if (
     !existing
     || sourcePriority < existing.sourcePriority
     || (sourcePriority === existing.sourcePriority && demand > existing.demand)
   ) {
-    candidates.set(key, { key, keyword: displayKeyword, sourcePriority, demand, rank, searchText, clicks, difficulty });
-  } else if (searchText) {
-    existing.searchText = [...new Set([...(existing.searchText?.split(' ') ?? []), ...searchText.split(' ')].filter(Boolean))].join(' ');
+    // New entry wins the priority/demand contest and becomes the surviving
+    // candidate identity. Metrics are SOURCE-AGNOSTIC: keep any clicks/difficulty/
+    // rank the displaced candidate carried that the winner lacks, so a tracked
+    // keyword (priority 1) that is ALSO a GSC ranking query (priority 2) still
+    // surfaces its empirical clicks. This mirrors the row stage's mergeMetrics
+    // and is what keeps the candidate sort from drifting from the row sort.
+    candidates.set(key, {
+      key,
+      keyword: displayKeyword,
+      sourcePriority,
+      demand,
+      rank: rank ?? existing?.rank,
+      searchText: mergeSearchText(existing?.searchText, searchText),
+      clicks: clicks ?? existing?.clicks,
+      difficulty: difficulty ?? existing?.difficulty,
+    });
+  } else {
+    // Existing entry keeps its identity; enrich it with any metric this lower-
+    // priority source supplies that the winner is still missing.
+    if (existing.rank === undefined && rank !== undefined) existing.rank = rank;
+    if (existing.clicks === undefined && clicks !== undefined) existing.clicks = clicks;
+    if (existing.difficulty === undefined && difficulty !== undefined) existing.difficulty = difficulty;
+    if (searchText) existing.searchText = mergeSearchText(existing.searchText, searchText);
   }
 }
 
@@ -1761,7 +1875,8 @@ function addCandidateKeysFromBundle(
     feedback: bundle.feedback,
   });
   for (const metric of bundle.strategy?.siteKeywordMetrics ?? []) {
-    addCandidateKey(candidates, metric.keyword, 0, metric.volume ?? 0);
+    // siteKeywordMetrics carry provider difficulty (SiteKeywordMetric.difficulty).
+    addCandidateKey(candidates, metric.keyword, 0, metric.volume ?? 0, undefined, undefined, undefined, metric.difficulty);
   }
   for (const keyword of bundle.strategy?.siteKeywords ?? []) {
     addCandidateKey(candidates, keyword, 0);
@@ -1772,20 +1887,24 @@ function addCandidateKeysFromBundle(
     for (const secondary of page.secondaryKeywords ?? []) addCandidateKey(candidates, secondary, 1, page.volume ?? 0, undefined, pageSearchText);
   }
   for (const gap of bundle.contentGaps) {
-    addCandidateKey(candidates, gap.targetKeyword, 1, gap.volume ?? 0);
+    // ContentGap.difficulty (0–100) is optional provider enrichment.
+    addCandidateKey(candidates, gap.targetKeyword, 1, gap.volume ?? 0, undefined, undefined, undefined, gap.difficulty);
   }
   for (const keyword of bundle.trackedKeywords) {
-    addCandidateKey(candidates, keyword.query, keyword.status === TRACKED_KEYWORD_STATUS.ACTIVE ? 1 : 5, keyword.volume ?? keyword.baselineImpressions ?? 0);
+    // TrackedKeyword.difficulty is optional provider enrichment.
+    addCandidateKey(candidates, keyword.query, keyword.status === TRACKED_KEYWORD_STATUS.ACTIVE ? 1 : 5, keyword.volume ?? keyword.baselineImpressions ?? 0, undefined, undefined, undefined, keyword.difficulty);
   }
   for (const row of bundle.feedback.values()) {
     addCandidateKey(candidates, row.keyword, row.status === 'requested' ? 2 : row.status === 'declined' ? 6 : 1);
   }
   for (const rank of bundle.latestRanks) {
     if (findVariantParentKey(keywordComparisonKey(rank.query), variantParentKeys)) continue;
-    addCandidateKey(candidates, rank.query, 2, rank.impressions ?? 0, rank.position);
+    // LatestRank carries empirical GSC clicks (28-day) — feeds the clicks sort.
+    addCandidateKey(candidates, rank.query, 2, rank.impressions ?? 0, rank.position, undefined, rank.clicks);
   }
   for (const gap of bundle.keywordGaps) {
-    addCandidateKey(candidates, gap.keyword, 4, gap.volume ?? 0);
+    // KeywordGapItem.difficulty (competitor-gap KD) is required on the type.
+    addCandidateKey(candidates, gap.keyword, 4, gap.volume ?? 0, undefined, undefined, undefined, gap.difficulty);
   }
   for (const visibility of localVisibility.values()) {
     addCandidateKey(candidates, visibility.keyword, 2);
@@ -1793,31 +1912,235 @@ function addCandidateKeysFromBundle(
   for (const lost of bundle.lostVisibilityRows ?? []) {
     addCandidateKey(candidates, lost.query, 2, lost.totalImpressions, lost.lastPosition ?? undefined);
   }
+
+  // DRIFT FIX (Task 1): the loops above seed candidate IDENTITY (sourcePriority /
+  // demand contest) and search text, but their per-source metric carryover is
+  // FIRST-writer-wins and skips self-ranks + variant aggregation — so it diverges
+  // from the row stage's LAST-writer-wins `mergeMetrics` + variant rollup. Replay
+  // the EXACT row-stage metric assembly (`resolveBundleMetrics`) and overwrite each
+  // surviving candidate's SORT metrics with the row-accurate values, so
+  // candidate {demand,clicks,rank,difficulty} == row {volume??impressions,clicks,
+  // currentPosition,difficulty} for every key. Identity/replacement is untouched.
+  const resolved = resolveBundleMetrics(bundle, localVisibility);
+  for (const candidate of candidates.values()) {
+    const metrics = resolved.get(candidate.key);
+    if (!metrics) continue;
+    candidate.demand = metrics.volume ?? metrics.impressions ?? 0;
+    candidate.clicks = metrics.clicks;
+    candidate.rank = metrics.currentPosition;
+    candidate.difficulty = metrics.difficulty;
+  }
 }
 
-function candidateSortForQuery(sort: KeywordCommandCenterSort | undefined): (a: RowCandidateKey, b: RowCandidateKey) => number {
-  if (sort === 'keyword') return (a, b) => a.keyword.localeCompare(b.keyword);
-  if (sort === 'demand') {
-    return (a, b) => {
-      if (a.demand !== b.demand) return b.demand - a.demand;
-      if (a.sourcePriority !== b.sourcePriority) return a.sourcePriority - b.sourcePriority;
-      return a.keyword.localeCompare(b.keyword);
-    };
-  }
-  if (sort === 'rank') {
-    return (a, b) => {
-      const aRank = a.rank ?? Number.POSITIVE_INFINITY;
-      const bRank = b.rank ?? Number.POSITIVE_INFINITY;
-      if (aRank !== bRank) return aRank - bRank;
-      if (a.sourcePriority !== b.sourcePriority) return a.sourcePriority - b.sourcePriority;
-      return a.keyword.localeCompare(b.keyword);
-    };
-  }
-  return (a, b) => {
-    if (a.sourcePriority !== b.sourcePriority) return a.sourcePriority - b.sourcePriority;
-    if (a.demand !== b.demand) return b.demand - a.demand;
-    return a.keyword.localeCompare(b.keyword);
+/**
+ * Compute the SORT-relevant metrics each evaluated row will carry, per
+ * normalized key, WITHOUT building full rows. This is a numbers-only mirror of
+ * `populateDraftRows`: it replays the same `mergeMetricsInto` passes in the same
+ * source order (last-writer-wins), the same `rows.has(...)`-guarded self-rank
+ * application, and the same variant aggregation (sum clicks/impressions, MIN
+ * position) — guaranteeing the candidate stage and the row stage agree.
+ *
+ * It intentionally omits the strategyUx explanation pass: the candidate stage
+ * always runs with `includeStrategyUx: false`, so that pass contributes no
+ * row-stage metrics either. Difficulty added by the explanation loop only
+ * re-applies content-gap difficulty already merged here.
+ */
+function resolveBundleMetrics(
+  bundle: CommandCenterSourceBundle,
+  localVisibility: Map<string, LocalSeoKeywordVisibilitySummary>,
+): Map<string, KeywordCommandCenterMetrics> {
+  const strategy = bundle.strategy;
+  // key -> { keyword (raw display, for the sentinel guard), metrics, rawEvidenceOnly }
+  const rows = new Map<string, { keyword: string; metrics: KeywordCommandCenterMetrics; rawEvidenceOnly: boolean }>();
+  const ensure = (keyword: string | null | undefined): { keyword: string; metrics: KeywordCommandCenterMetrics; rawEvidenceOnly: boolean } | null => {
+    const key = keywordComparisonKey(keyword ?? '');
+    if (!key) return null;
+    const existing = rows.get(key);
+    if (existing) return existing;
+    const created = { keyword: (keyword ?? '').trim() || key, metrics: {} as KeywordCommandCenterMetrics, rawEvidenceOnly: false };
+    rows.set(key, created);
+    return created;
   };
+  const merge = (target: { keyword: string; metrics: KeywordCommandCenterMetrics }, metrics: KeywordCommandCenterMetrics): void => {
+    target.metrics = mergeMetricsInto(target.keyword, target.metrics, metrics);
+  };
+
+  for (const metric of strategy?.siteKeywordMetrics ?? []) {
+    const row = ensure(metric.keyword);
+    if (!row) continue;
+    merge(row, { volume: metric.volume, difficulty: metric.difficulty });
+  }
+  for (const keyword of strategy?.siteKeywords ?? []) {
+    ensure(keyword); // identity-only in the row stage; carries no numeric metrics
+  }
+  for (const page of bundle.pageMap) {
+    for (const keyword of [page.primaryKeyword, ...(page.secondaryKeywords ?? [])].filter(Boolean)) {
+      const row = ensure(keyword);
+      if (!row) continue;
+      merge(row, { volume: page.volume, difficulty: page.difficulty });
+    }
+  }
+  for (const gap of bundle.contentGaps) {
+    const row = ensure(gap.targetKeyword);
+    if (!row) continue;
+    merge(row, { volume: gap.volume, difficulty: gap.difficulty });
+  }
+  for (const gap of bundle.keywordGaps) {
+    const row = ensure(gap.keyword);
+    if (!row) continue;
+    row.rawEvidenceOnly = true; // matches populateDraftRows: keywordGaps are raw evidence
+    merge(row, { volume: gap.volume, difficulty: gap.difficulty });
+  }
+  for (const keyword of bundle.trackedKeywords) {
+    const row = ensure(keyword.query);
+    if (!row) continue;
+    merge(row, {
+      volume: keyword.volume,
+      difficulty: keyword.difficulty,
+      cpc: keyword.cpc,
+      currentPosition: keyword.baselinePosition,
+      clicks: keyword.baselineClicks,
+      impressions: keyword.baselineImpressions,
+    });
+  }
+  for (const row of bundle.feedback.values()) {
+    ensure(row.keyword); // identity-only in the row stage; carries no numeric metrics
+  }
+  for (const lost of bundle.lostVisibilityRows ?? []) {
+    const row = ensure(lost.query);
+    if (!row) continue;
+    row.rawEvidenceOnly = true;
+    merge(row, { currentPosition: lost.lastPosition ?? undefined, impressions: lost.totalImpressions });
+  }
+
+  // Variant parenting — identical to populateDraftRows: only ranks that are NOT
+  // already a row and CAN be parented by a non-raw-evidence strategy key become
+  // variants; the rest are eligible GSC-only filler rows (capped at
+  // RANK_EVIDENCE_ROW_LIMIT by impressions, matching the row stage).
+  const strategyKeys = [...rows.entries()]
+    .filter(([, row]) => row.rawEvidenceOnly !== true)
+    .map(([key]) => key);
+  const metricsMap = new Map(strategyKeys.map(key => [key, rows.get(key)?.metrics.impressions ?? 0]));
+  const variantParentMap = new Map<string, string>();
+  for (const rank of bundle.latestRanks) {
+    const normalizedQuery = keywordComparisonKey(rank.query);
+    if (!normalizedQuery || rows.has(normalizedQuery)) continue;
+    const parent = findBestParent(normalizedQuery, strategyKeys, metricsMap);
+    if (parent) variantParentMap.set(normalizedQuery, parent);
+  }
+
+  const rankedUntracked = bundle.latestRanks
+    .filter(rank => !rows.has(keywordComparisonKey(rank.query)))
+    .filter(rank => !variantParentMap.has(keywordComparisonKey(rank.query)))
+    .sort((a, b) => (b.impressions ?? 0) - (a.impressions ?? 0))
+    .slice(0, RANK_EVIDENCE_ROW_LIMIT);
+  for (const rank of rankedUntracked) {
+    const row = ensure(rank.query);
+    if (!row) continue;
+    merge(row, { currentPosition: rank.position, clicks: rank.clicks, impressions: rank.impressions, ctr: rank.ctr });
+  }
+
+  // Self-rank: a GSC rank whose own key IS a row applies its metrics to ITS OWN
+  // row (the defect was the candidate loop `continue`-ing these as false variants).
+  for (const rank of bundle.latestRanks) {
+    const row = rows.get(keywordComparisonKey(rank.query));
+    if (!row) continue;
+    merge(row, { currentPosition: rank.position, clicks: rank.clicks, impressions: rank.impressions, ctr: rank.ctr });
+  }
+
+  // True-variant aggregation: SUM clicks/impressions, take MIN position onto parent.
+  for (const rank of bundle.latestRanks) {
+    const normalizedQuery = keywordComparisonKey(rank.query);
+    const parentKey = variantParentMap.get(normalizedQuery);
+    if (!parentKey) continue;
+    const parentRow = rows.get(parentKey);
+    if (!parentRow) continue;
+    parentRow.metrics.impressions = (parentRow.metrics.impressions ?? 0) + rank.impressions;
+    parentRow.metrics.clicks = (parentRow.metrics.clicks ?? 0) + rank.clicks;
+    if (parentRow.metrics.currentPosition == null || rank.position < parentRow.metrics.currentPosition) {
+      parentRow.metrics.currentPosition = rank.position;
+    }
+  }
+
+  for (const candidate of localVisibility.values()) {
+    ensure(candidate.keyword); // visibility rows carry no sort metrics in the candidate path
+  }
+  for (const candidate of bundle.localCandidates ?? []) {
+    const row = ensure(candidate.keyword);
+    if (!row) continue;
+    merge(row, { volume: candidate.volume, difficulty: candidate.difficulty });
+  }
+
+  const result = new Map<string, KeywordCommandCenterMetrics>();
+  for (const [key, row] of rows) result.set(key, row.metrics);
+  return result;
+}
+
+const CANDIDATE_SORT_ACCESSORS: SortFieldAccessors<RowCandidateKey> = {
+  keyword: (c) => c.keyword,
+  demand: (c) => c.demand,
+  rank: (c) => c.rank,
+  clicks: (c) => c.clicks,
+  difficulty: (c) => c.difficulty,
+};
+
+/**
+ * Candidate-stage sorter. The `priority`/default branch keeps its original,
+ * candidate-specific behavior (sourcePriority then demand then keyword) — it is
+ * byte-identical to before this task. The explicit, directioned sorts delegate
+ * to the SAME `keywordSortComparator` the row stage uses (via
+ * `CANDIDATE_SORT_ACCESSORS`) so the two stages cannot drift.
+ */
+export function candidateSortForQuery(
+  sort: KeywordCommandCenterSort | undefined,
+  direction?: 'asc' | 'desc',
+): (a: RowCandidateKey, b: RowCandidateKey) => number {
+  if (sort === undefined || sort === 'priority') {
+    return (a, b) => {
+      if (a.sourcePriority !== b.sourcePriority) return a.sourcePriority - b.sourcePriority;
+      if (a.demand !== b.demand) return b.demand - a.demand;
+      return a.keyword.localeCompare(b.keyword);
+    };
+  }
+  return keywordSortComparator(sort, direction, CANDIDATE_SORT_ACCESSORS);
+}
+
+/**
+ * Test-only DATA-parity probe. Builds, for the SAME bundle, both the candidate
+ * sort-metric map (post `addCandidateKeysFromBundle`) and the evaluated-row
+ * sort-metric map (post `populateDraftRows` + finalize), keyed by normalized
+ * keyword. The drift guard in the unit test asserts these agree per key for
+ * clicks/rank/difficulty/demand — catching DATA divergence the comparator-only
+ * guard cannot. Exported for tests; not used by the request path.
+ */
+export interface CandidateRowMetricParity {
+  candidate: Map<string, { demand: number; clicks?: number; rank?: number; difficulty?: number }>;
+  row: Map<string, { demand: number; clicks?: number; rank?: number; difficulty?: number }>;
+}
+
+export async function __candidateRowMetricParityForTest(
+  bundle: CommandCenterSourceBundle,
+  localVisibility: Map<string, LocalSeoKeywordVisibilitySummary> = new Map(),
+): Promise<CandidateRowMetricParity> {
+  const candidates = new Map<string, RowCandidateKey>();
+  addCandidateKeysFromBundle(candidates, { ...bundle, includeStrategyUx: false }, localVisibility);
+  const candidate = new Map<string, { demand: number; clicks?: number; rank?: number; difficulty?: number }>();
+  for (const c of candidates.values()) {
+    candidate.set(c.key, { demand: c.demand, clicks: c.clicks, rank: c.rank, difficulty: c.difficulty });
+  }
+
+  const rows = new Map<string, DraftRow>();
+  await populateDraftRows(rows, { ...bundle, includeStrategyUx: false });
+  const row = new Map<string, { demand: number; clicks?: number; rank?: number; difficulty?: number }>();
+  for (const r of rows.values()) {
+    row.set(r.normalizedKeyword, {
+      demand: r.metrics.volume ?? r.metrics.impressions ?? 0,
+      clicks: r.metrics.clicks,
+      rank: r.metrics.currentPosition,
+      difficulty: r.metrics.difficulty,
+    });
+  }
+  return { candidate, row };
 }
 
 function rowCandidateKeysForQuery(
@@ -1836,7 +2159,7 @@ function rowCandidateKeysForQuery(
       || (normalizedSearch ? candidate.key.includes(normalizedSearch) : false)
       || candidate.searchText?.includes(rawSearch)
     )
-    .sort(candidateSortForQuery(query.sort));
+    .sort(candidateSortForQuery(query.sort, query.direction));
   const pageSize = Math.min(Math.max(query.pageSize ?? DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE);
   const requestedPage = Math.max(query.page ?? 1, 1);
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -2092,7 +2415,7 @@ async function buildKeywordCommandCenterRowsViaModel(
   const filtered = payload.rows
     .filter(row => matchesFilter(row, filter))
     .filter(row => matchesSearch(row, query.search))
-    .sort(sortRowsForQuery(query.sort));
+    .sort(sortRowsForQuery(query.sort, query.direction));
   const page = paginateRows(filtered.map(stripRowForList), query);
   return {
     rows: page.rows,
@@ -2149,7 +2472,7 @@ async function buildKeywordCommandCenterRowsSkinny(
   const filtered = finalized.rows
     .filter(row => matchesFilter(row, filter))
     .filter(row => matchesSearch(row, query.search))
-    .sort(sortRowsForQuery(query.sort));
+    .sort(sortRowsForQuery(query.sort, query.direction));
 
   log.info({
     workspaceId,

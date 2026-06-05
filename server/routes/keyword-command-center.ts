@@ -72,7 +72,8 @@ const rowsQuerySchema = z.object({
     KEYWORD_COMMAND_CENTER_FILTERS.LOST_VISIBILITY,
   ]).optional(),
   search: z.string().optional(),
-  sort: z.enum(['priority', 'keyword', 'demand', 'rank']).optional(),
+  sort: z.enum(['priority', 'keyword', 'demand', 'rank', 'clicks', 'difficulty']).optional(),
+  direction: z.enum(['asc', 'desc']).optional(),
   page: z.coerce.number().int().min(1).optional(),
   pageSize: z.coerce.number().int().min(1).max(100).optional(),
 }).strict();
