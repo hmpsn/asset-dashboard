@@ -11,10 +11,12 @@ import {
   buildLocalSeoKeywordVisibilityForKeyword,
   buildLocalSeoKeywordVisibilitySummaryByKey,
   buildLocalSeoKeywordVisibilityByKey,
+  getLocalSeoPosture,
   getPrimaryMarketLocationCode,
   listLocalSeoMarkets,
   type LocalSeoKeywordCandidate,
 } from './local-seo.js';
+import { computeKeywordValueScore, type ScoringContext } from './scoring/keyword-value-score.js';
 import { createLogger } from './logger.js';
 import { listPageKeywords, listPageKeywordsLite } from './page-keywords.js';
 import { computeOpportunityScore, isSuspiciousPlannerGroupedVolume } from './keyword-strategy-helpers.js';
@@ -96,6 +98,17 @@ const UNIVERSE_SAFETY_CEILING = 2000;
 const log = createLogger('keyword-command-center');
 
 const KEYWORD_UNIVERSE_FULL_FLAG = 'keyword-universe-full' as const;
+const KEYWORD_VALUE_SCORING_FLAG = 'keyword-value-scoring' as const;
+
+/**
+ * Phase 1: per-request transient carrier for a finalized row's precomputed
+ * value-first score. Kept OFF the public `KeywordCommandCenterRow` type (it must
+ * never serialize to the client) — the `opportunity` accessor reads it as a
+ * trivial field read when the flag is ON. A WeakMap so finalized rows that fall
+ * out of scope are collected without leaking. `undefined` (key absent) flows
+ * through `compareMetric` as missing-last, exactly like a no-signal score.
+ */
+const rowValueScore = new WeakMap<KeywordCommandCenterRow, number>();
 
 /**
  * The SINGLE "select ranked-untracked GSC queries" function. Given the ranks that
@@ -211,11 +224,46 @@ export interface CommandCenterSourceBundle {
   includeWorkspaceIntelligence?: boolean;
 }
 
+/**
+ * Per-request value-scoring gate (Phase 1). Built ONCE per request in the
+ * rows-build entry points. `ctx` is present ONLY when `on` is true — when the
+ * flag is OFF we skip the getLocalSeoPosture/listLocalSeoMarkets DB reads
+ * entirely, so the flag-OFF path does no extra DB work and stays byte-identical.
+ * The SAME config (same `ctx`) is threaded into both the candidate merge-back
+ * (Task 1.3) and the row finalize (Task 1.4), so the two stages compute the
+ * identical valueScore per key by construction.
+ */
+interface ValueScoringConfig {
+  on: boolean;
+  ctx?: ScoringContext;
+}
+
+/**
+ * Build the per-request value-scoring config. When the flag is OFF, returns
+ * `{ on: false }` WITHOUT touching the DB (no getLocalSeoPosture /
+ * listLocalSeoMarkets). When ON, fetches posture + markets ONCE and captures the
+ * business-profile city/state — never per keyword.
+ */
+function buildValueScoringConfig(workspace: Workspace): ValueScoringConfig {
+  if (!isFeatureEnabled(KEYWORD_VALUE_SCORING_FLAG, workspace.id)) return { on: false };
+  return {
+    on: true,
+    ctx: {
+      posture: getLocalSeoPosture(workspace.id),
+      markets: listLocalSeoMarkets(workspace.id),
+      city: workspace.businessProfile?.address?.city?.toLowerCase(),
+      state: workspace.businessProfile?.address?.state?.toLowerCase(),
+    },
+  };
+}
+
 interface RowFinalizeContext {
   workspaceId: string;
   localVisibilityByKeyword: Map<string, LocalSeoKeywordVisibilitySummary>;
   activeLocalMarketCount: number;
   lostVisibilityKeys?: Set<string>;
+  /** Phase 1: when present + on, finalize computes the row valueScore once per key. */
+  valueScoring?: ValueScoringConfig;
 }
 
 interface FinalizedRows {
@@ -1286,7 +1334,7 @@ function finalizeDraftRow(row: DraftRow, context: RowFinalizeContext): KeywordCo
   const isProtected = Boolean(protection);
   const localSeo = context.localVisibilityByKeyword.get(row.normalizedKeyword);
   const localSeoState = buildLocalSeoState(row, status, localSeo, context.activeLocalMarketCount);
-  return {
+  const finalized: KeywordCommandCenterRow = {
     keyword: row.keyword,
     normalizedKeyword: row.normalizedKeyword,
     lifecycleStatus: status,
@@ -1345,6 +1393,25 @@ function finalizeDraftRow(row: DraftRow, context: RowFinalizeContext): KeywordCo
     })),
     isLostVisibility: context.lostVisibilityKeys?.has(row.normalizedKeyword) ?? false,
   };
+  // Phase 1: precompute the row value score ONCE per key (flag ON only) from the
+  // fully-merged row.metrics, using the SAME computeKeywordValueScore + SAME
+  // per-request ScoringContext as the candidate merge-back — so candidate and row
+  // scores are identical by construction. Stored on the WeakMap (never serialized).
+  if (context.valueScoring?.on && context.valueScoring.ctx) {
+    const score = computeKeywordValueScore(
+      {
+        keyword: finalized.keyword,
+        volume: finalized.metrics.volume,
+        impressions: finalized.metrics.impressions,
+        difficulty: finalized.metrics.difficulty,
+        cpc: finalized.metrics.cpc,
+        intent: finalized.metrics.intent,
+      },
+      context.valueScoring.ctx,
+    );
+    if (score !== undefined) rowValueScore.set(finalized, score);
+  }
+  return finalized;
 }
 
 function finalizeDraftRows(rows: Map<string, DraftRow>, context: RowFinalizeContext): FinalizedRows {
@@ -1500,6 +1567,9 @@ async function buildKeywordCommandCenterModel(
     localVisibilityByKeyword,
     activeLocalMarketCount,
     lostVisibilityKeys,
+    // Phase 1: precompute row valueScore in finalize when the flag is ON (no DB
+    // reads when OFF). The model path's row sort selects the accessor by the same flag.
+    valueScoring: buildValueScoringConfig(workspace),
   });
   const finalRows = finalized.rows;
   mark('rowIndexMs');
@@ -2086,6 +2156,7 @@ function addCandidateKeysFromBundle(
   candidates: Map<string, RowCandidateKey>,
   bundle: CommandCenterSourceBundle,
   localVisibility: Map<string, LocalSeoKeywordVisibilitySummary>,
+  valueScoring: ValueScoringConfig = { on: false },
 ): void {
   const variantParentKeys = parentableVariantKeys({
     strategy: bundle.strategy,
@@ -2183,6 +2254,22 @@ function addCandidateKeysFromBundle(
     // here keeps the candidate value-score inputs identical to the row stage.
     candidate.cpc = metrics.cpc;
     candidate.intent = metrics.intent;
+    // Precompute the value score ONCE per key (flag ON only), with the SAME
+    // function + SAME per-request ScoringContext as the row finalize — so
+    // candidate.valueScore === row valueScore for every key by construction.
+    if (valueScoring.on && valueScoring.ctx) {
+      candidate.valueScore = computeKeywordValueScore(
+        {
+          keyword: candidate.keyword,
+          volume: metrics.volume,
+          impressions: metrics.impressions,
+          difficulty: metrics.difficulty,
+          cpc: metrics.cpc,
+          intent: metrics.intent,
+        },
+        valueScoring.ctx,
+      );
+    }
   }
 }
 
@@ -2430,9 +2517,10 @@ function rowCandidateKeysForQuery(
   bundle: CommandCenterSourceBundle,
   localVisibility: Map<string, LocalSeoKeywordVisibilitySummary>,
   query: KeywordCommandCenterRowsQuery,
+  valueScoring: ValueScoringConfig = { on: false },
 ): { keys: Set<string>; page: number; pageSize: number; totalRows: number; totalPages: number } {
   const candidates = new Map<string, RowCandidateKey>();
-  addCandidateKeysFromBundle(candidates, bundle, localVisibility);
+  addCandidateKeysFromBundle(candidates, bundle, localVisibility, valueScoring);
   const rawSearch = query.search?.trim().toLowerCase();
   const normalizedSearch = keywordComparisonKey(query.search ?? '');
   const filtered = [...candidates.values()]
@@ -2729,6 +2817,10 @@ async function buildKeywordCommandCenterRowsSkinny(
   const startedAt = Date.now();
   const workspace = getWorkspace(workspaceId);
   if (!workspace) return null;
+  // Phase 1: read the flag + build the ScoringContext ONCE per request (no DB
+  // reads when the flag is OFF). The SAME config is threaded into the candidate
+  // merge-back and the row finalize so both stages score identically per key.
+  const valueScoring = buildValueScoringConfig(workspace);
   const filter = query.filter ?? KEYWORD_COMMAND_CENTER_FILTERS.ALL;
   const localVisibilityByKeyword = localVisibilityByFilter(workspace.id, filter, options.includeLocalSeo);
   const activeLocalMarketCount = options.includeLocalSeo
@@ -2747,7 +2839,7 @@ async function buildKeywordCommandCenterRowsSkinny(
       feedback: new Map<string, FeedbackRow>(),
     }
     : bundle;
-  const pageSelection = rowCandidateKeysForQuery(candidateBundle, localVisibilityByKeyword, query);
+  const pageSelection = rowCandidateKeysForQuery(candidateBundle, localVisibilityByKeyword, query, valueScoring);
   const pagedBundle = filterBundleToKeys(bundle, pageSelection.keys);
   const pagedLocalVisibility = filterMapByKeys(localVisibilityByKeyword, pageSelection.keys);
   const lostVisibilityKeys = safeLostVisibilityKeys(workspace.id);
@@ -2759,6 +2851,7 @@ async function buildKeywordCommandCenterRowsSkinny(
     localVisibilityByKeyword: pagedLocalVisibility,
     activeLocalMarketCount,
     lostVisibilityKeys,
+    valueScoring,
   });
   const filtered = finalized.rows
     .filter(row => matchesFilter(row, filter))
