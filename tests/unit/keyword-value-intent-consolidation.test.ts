@@ -25,4 +25,15 @@ describe('deriveValueIntent — the single keyword intent classifier', () => {
     expect(deriveValueIntent('anything', 'garbage-not-a-bucket')).not.toBeNull();
     expect(DEFAULT_INTENT_WEIGHT).toBe(0.5); // sanity: the value the OLD toOpportunityIntent leaked to
   });
+
+  it('Hub and recs agree on a comparison keyword (drift closed)', () => {
+    const kw = 'invisalign vs braces';
+    // Layer 1 (Hub, computeKeywordValueScore's internal deriveValueIntent) and Layer 2
+    // (recs, the migrated call sites) both derive 'commercial' from a 'comparison' intent.
+    // The OLD recs path (toOpportunityIntent) returned null → DEFAULT_INTENT_WEIGHT (0.5);
+    // the single source now yields commercial → INTENT_WEIGHT.commercial (0.7) on both sides.
+    expect(deriveValueIntent(kw, 'comparison')).toBe('commercial');
+    expect(valueIntentWeight(deriveValueIntent(kw, 'comparison'))).toBe(INTENT_WEIGHT.commercial);
+    expect(valueIntentWeight(deriveValueIntent(kw, 'comparison'))).not.toBe(DEFAULT_INTENT_WEIGHT);
+  });
 });

@@ -26,6 +26,19 @@ The Keyword Command Center is the admin operating layer for keyword lifecycle ma
 - When the flag is **OFF**, `valueScore` is never populated and the accessor is exactly today's `computeOpportunityScore({ volume, difficulty })` for both stages — rows, order, and scores are **byte-identical** to pre-flag. The flag-OFF path does **no** extra DB work (`buildValueScoringConfig` skips the posture/markets reads).
 - Drift guard: `__candidateRowMetricParityForTest` asserts candidate/row **key-set equality** AND per-key `valueScore` parity (it calls `ensureLocalVisibilityRows` on the row side to mirror the skinny path). A one-sided source addition or a per-stage scoring divergence fails it loudly.
 
+## Value Scoring Layers (the Layer 1 / Layer 2 contract)
+
+The platform has **two distinct value scorers**, by design. They share the same value DNA (intent × commercial value × demand × winnability × local) but answer different questions and must never be merged:
+
+- **Layer 1 — `computeKeywordValueScore`** (`server/scoring/keyword-value-score.ts`): a keyword's *intrinsic worth* — a cheap, drift-free, position-agnostic relative 0–100. This is the **Hub** scorer (the `opportunity` sort above) and the **content-gap spine** input.
+- **Layer 2 — `computeOpportunityValue`** (`server/scoring/opportunity-value.ts`): a recommendation's *action ROI* — an EMV/ROI model (`emvPerWeek × HorizonWeeks × businessFit × confidence × calibration ÷ effort`) with explainability components. **As of #1100 it is the *sole* canonical recommendation scorer** (the legacy `pickImpactScore` fallback was removed — never re-introduce it; pr-check rule `recommendation impactScore must flow from canonical OV scorer` guards this). `Recommendation.impactScore` flows only from `OpportunityScore.value`.
+
+**Layer 1 → Layer 2 grounded spine.** For keyword-bearing content-gap branches, the Layer-1 keyword value `base` is fed into Layer 2 as the `opportunityScore` composite spine (`keyword-strategy-enrichment.ts`). This is the documented spine; it does **not** force the spine onto branches that legitimately use direct provider deltas (`ranking_opp` CTR-uplift, `ctr_opportunity` direct gap).
+
+**One classifier — `deriveValueIntent`** (`server/scoring/keyword-value-score.ts`). All keyword intent — on BOTH layers — goes through this single function: provided-intent-first (`comparison → commercial`, 4-bucket passthrough via `toValueIntent`), else a deterministic `classifyLocalKeywordIntent` regex fallback from the keyword. It is **non-null by construction**. **Never add a parallel intent coercion** (the retired `toOpportunityIntent` + its inline copy are gone) — a second path re-opens the Hub-vs-recs `comparison` drift (0.7 vs the old 0.5 default) by construction. Call sites pass the keyword string (`PageKeywordMap.primaryKeyword` — NOT `.keyword`; `ContentGap.targetKeyword`) so the regex fallback can fire when `searchIntent` is absent.
+
+**Surface ownership.** Keyword-ranking surfaces (Hub, content-plan, the keyword side of briefs/titles) render **Layer 1**; action/recommendation surfaces (recs, client briefing, ROI) render **Layer 2**. Post-#1100, Layer 2 is the sole canonical rec score, so this ownership is unambiguous.
+
 ## Mutation Rules
 
 - No hard deletes from the Command Center. "Remove" means lifecycle retirement or feedback suppression.
