@@ -15,7 +15,7 @@ import {
 } from './keyword-strategy-ai-synthesis.js';
 import { computeOpportunityScore, isSuspiciousPlannerGroupedVolume } from './keyword-strategy-helpers.js';
 import { computeOpportunityValue } from './scoring/opportunity-value.js';
-import { computeKeywordValueScore } from './scoring/keyword-value-score.js';
+import { computeKeywordValueScore, deriveValueIntent } from './scoring/keyword-value-score.js';
 import { matchesQuestionKeyword } from './strategy-filters.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { getWorkspace } from './workspaces.js';
@@ -608,9 +608,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
           volume: cg.volume ?? null,
           difficulty: cg.difficulty ?? null,
           trendDirection: (cg.trendDirection as 'rising' | 'declining' | 'stable' | undefined) ?? null,
-          intent: cg.intent === 'transactional' || cg.intent === 'commercial' || cg.intent === 'informational' || cg.intent === 'navigational'
-            ? cg.intent
-            : null,
+          intent: deriveValueIntent(cg.targetKeyword, cg.intent),
           llmLabel: cg.priority === 'high' || cg.priority === 'medium' || cg.priority === 'low' ? cg.priority : null,
         });
         // OV value is 0..100 and EMV-derived; undefined when the gap had no signal at all.
