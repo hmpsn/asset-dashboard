@@ -8234,6 +8234,63 @@ export const CHECKS: Check[] = [
       return hits;
     },
   },
+  {
+    // Post-flip OV cleanup: recommendation ranking now has ONE scoring authority
+    // (`computeOpportunityValue()` + deriveCanonicalRecommendationFields()). A new
+    // inline `impactScore` bucket inside server/recommendations.ts silently forks
+    // queue ordering away from the canonical scorer.
+    //
+    // This rule intentionally stays narrow: it governs only recommendation runtime
+    // scoring in server/recommendations.ts, not other bounded contexts that have
+    // their own impactScore concepts (e.g. insight enrichment).
+    //
+    // Escape hatch: // rec-impactscore-ok
+    name: 'recommendation impactScore must flow from canonical OV scorer',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/recommendations.ts',
+    message:
+      'Do not hand-roll recommendation impactScore math in server/recommendations.ts. ' +
+      'Route scoring through computeOpportunityValue() and write `impactScore` from the ' +
+      'canonical OV fields (`scoring.impactScore` / `opportunity.value`). Add ' +
+      '`// rec-impactscore-ok` only for a tightly-justified exception.',
+    severity: 'error',
+    rationale:
+      'Inline recommendation impactScore buckets drift from computeOpportunityValue() and silently fork ranking behavior from the canonical Opportunity Value scorer.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const provided = files.find(f => f.endsWith('server/recommendations.ts'));
+      const content = readFileOrEmpty(provided ?? path.join(ROOT, 'server/recommendations.ts'));
+      if (!content) return hits;
+
+      const lines = content.split('\n');
+      const localImpactScoreRe = /\b(?:const|let)\s+(?:adjustedImpactScore|impactScore)\s*=/;
+      const objectImpactScoreRe = /\bimpactScore:\s*/;
+      const assignmentImpactScoreRe = /\br\.impactScore\s*=/;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
+        if (trimmed.startsWith('//') || trimmed.startsWith('*') || line.includes('rec-impactscore-ok')) continue;
+
+        if (localImpactScoreRe.test(line)) {
+          hits.push({ file: path.join(ROOT, 'server/recommendations.ts'), line: i + 1, text: trimmed });
+          continue;
+        }
+
+        if (objectImpactScoreRe.test(line) && !/\bimpactScore:\s*(?:scoring\.impactScore|opportunity\.value)\b/.test(line)) {
+          hits.push({ file: path.join(ROOT, 'server/recommendations.ts'), line: i + 1, text: trimmed });
+          continue;
+        }
+
+        if (assignmentImpactScoreRe.test(line) && !/\br\.impactScore\s*=\s*scoring\.impactScore\b/.test(line)) {
+          hits.push({ file: path.join(ROOT, 'server/recommendations.ts'), line: i + 1, text: trimmed });
+        }
+      }
+
+      return hits;
+    },
+  },
 
   {
     // ── tracked_keywords bare read→write outside withTrackedKeywordsTxn ──

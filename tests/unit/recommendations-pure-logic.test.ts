@@ -1,8 +1,7 @@
 /**
  * Pure-logic unit tests for server/recommendations.ts
  *
- * Covers: getRecoveryRate, computeImpactScore, determinePriority,
- * migrateSourceKey, buildMergeKey, pageImportanceMultiplier,
+ * Covers: getRecoveryRate, migrateSourceKey, buildMergeKey, pageImportanceMultiplier,
  * checkToRecType, mapToProduct, auditInsight, getTrafficScore (base formula)
  *
  * All functions under test are pure / non-async / non-DB.
@@ -10,8 +9,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   getRecoveryRate,
-  computeImpactScore,
-  determinePriority,
   migrateSourceKey,
   buildMergeKey,
   pageImportanceMultiplier,
@@ -94,117 +91,6 @@ describe('getRecoveryRate', () => {
     const r = getRecoveryRate('redirect-chains');
     expect(r.perRec).toBe('5-15%');
     expect(r.summary).toBe(0.10);
-  });
-});
-
-// ─── computeImpactScore ───────────────────────────────────────────────────────
-
-describe('computeImpactScore', () => {
-  it('error severity with no traffic and not critical → base 60', () => {
-    expect(computeImpactScore('error', false, 0, 100)).toBe(60);
-  });
-
-  it('warning severity with no traffic and not critical → base 35', () => {
-    expect(computeImpactScore('warning', false, 0, 100)).toBe(35);
-  });
-
-  it('info severity with no traffic and not critical → base 15', () => {
-    expect(computeImpactScore('info', false, 0, 100)).toBe(15);
-  });
-
-  it('isCritical adds +20 bonus on top of severity base', () => {
-    expect(computeImpactScore('error', true, 0, 100)).toBe(80);  // 60+20
-    expect(computeImpactScore('warning', true, 0, 100)).toBe(55); // 35+20
-    expect(computeImpactScore('info', true, 0, 100)).toBe(35);   // 15+20
-  });
-
-  it('traffic multiplier is 0 when maxTrafficScore=0 (no division by zero)', () => {
-    expect(computeImpactScore('error', false, 1000, 0)).toBe(60);
-    expect(computeImpactScore('warning', true, 9999, 0)).toBe(55);
-  });
-
-  it('traffic multiplier is 20 when trafficScore equals maxTrafficScore', () => {
-    // 35 (warning) + 0 (not critical) + 20 (full traffic) = 55
-    expect(computeImpactScore('warning', false, 100, 100)).toBe(55);
-  });
-
-  it('traffic multiplier is proportional between 0 and 20', () => {
-    // 35 + 0 + 10 = 45 (traffic is half of max)
-    expect(computeImpactScore('warning', false, 50, 100)).toBe(45);
-  });
-
-  it('result is capped at 100', () => {
-    // error(60) + critical(20) + max-traffic(20) = 100
-    expect(computeImpactScore('error', true, 100, 100)).toBe(100);
-    // Even beyond: error(60) + critical(20) + over-max traffic would still be 100
-    expect(computeImpactScore('error', true, 200, 100)).toBe(100);
-  });
-
-  it('rounds the result to the nearest integer', () => {
-    // 35 + 0 + (33/100)*20 = 35 + 6.6 → round to 42
-    const score = computeImpactScore('warning', false, 33, 100);
-    expect(Number.isInteger(score)).toBe(true);
-    expect(score).toBe(42); // Math.round(35 + 6.6) = 42
-  });
-
-  it('trafficScore=0 with non-zero maxTrafficScore → multiplier is 0', () => {
-    expect(computeImpactScore('error', false, 0, 500)).toBe(60);
-  });
-});
-
-// ─── determinePriority ────────────────────────────────────────────────────────
-
-describe('determinePriority', () => {
-  it('returns "fix_now" when impactScore >= 70', () => {
-    expect(determinePriority(70, 'warning', 0)).toBe('fix_now');
-    expect(determinePriority(71, 'info', 0)).toBe('fix_now');
-    expect(determinePriority(100, 'info', 0)).toBe('fix_now');
-  });
-
-  it('returns "fix_now" when severity is error AND trafficScore > 0 (even low score)', () => {
-    expect(determinePriority(20, 'error', 1)).toBe('fix_now');
-    expect(determinePriority(0, 'error', 100)).toBe('fix_now');
-    expect(determinePriority(44, 'error', 50)).toBe('fix_now');
-  });
-
-  it('does NOT return "fix_now" for error severity with trafficScore = 0 and low impactScore', () => {
-    // impactScore < 70 AND error severity AND trafficScore = 0 → fix_soon (because of severity=error)
-    expect(determinePriority(60, 'error', 0)).toBe('fix_soon');
-  });
-
-  it('returns "fix_soon" when impactScore >= 45 (non-error severity)', () => {
-    expect(determinePriority(45, 'warning', 0)).toBe('fix_soon');
-    expect(determinePriority(69, 'warning', 0)).toBe('fix_soon');
-    expect(determinePriority(55, 'info', 0)).toBe('fix_soon');
-  });
-
-  it('returns "fix_soon" for error severity with zero traffic and impactScore < 70', () => {
-    // error severity alone (no traffic) → fix_soon
-    expect(determinePriority(30, 'error', 0)).toBe('fix_soon');
-    expect(determinePriority(0, 'error', 0)).toBe('fix_soon');
-  });
-
-  it('returns "fix_later" when impactScore >= 20 (non-error, low traffic)', () => {
-    expect(determinePriority(20, 'warning', 0)).toBe('fix_later');
-    expect(determinePriority(44, 'info', 0)).toBe('fix_later');
-    expect(determinePriority(30, 'info', 0)).toBe('fix_later');
-  });
-
-  it('returns "fix_later" for low impactScore regardless of severity', () => {
-    // impactScore < 20 and not error → fix_later
-    expect(determinePriority(19, 'warning', 0)).toBe('fix_later');
-    expect(determinePriority(0, 'info', 0)).toBe('fix_later');
-    expect(determinePriority(10, 'warning', 0)).toBe('fix_later');
-  });
-
-  it('fix_now threshold is exactly 70 (not 69)', () => {
-    expect(determinePriority(69, 'warning', 0)).toBe('fix_soon');
-    expect(determinePriority(70, 'warning', 0)).toBe('fix_now');
-  });
-
-  it('fix_soon threshold is exactly 45 (not 44)', () => {
-    expect(determinePriority(44, 'warning', 0)).toBe('fix_later');
-    expect(determinePriority(45, 'warning', 0)).toBe('fix_soon');
   });
 });
 

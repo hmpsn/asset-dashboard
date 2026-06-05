@@ -5550,6 +5550,9 @@ describe('Meta: customCheck rule name registry', () => {
     // Feature flag retirement PR5 (2026-06-05) — SEO/runtime rollout keys
     // became canonical and cannot re-enter runtime/UI/test flag APIs.
     'Retired SEO/runtime feature flag key used in flag API',
+    // OV cleanup PR2 (2026-06-05) — recommendation runtime scoring must flow
+    // from the canonical Opportunity Value scorer, not local impact buckets.
+    'recommendation impactScore must flow from canonical OV scorer',
     // keyword-consolidation Wave 1 (2026-06-03) — prevents lost-update race on
     // tracked_keywords JSON blob; enforces withTrackedKeywordsTxn (BEGIN IMMEDIATE).
     'tracked_keywords bare read→write outside withTrackedKeywordsTxn',
@@ -10386,6 +10389,59 @@ describe('Rule: new-rec-type-source-needs-category-and-action-type', () => {
         "  'audit',",
         "  'strategy',",
         '];',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: recommendation impactScore must flow from canonical OV scorer
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: recommendation impactScore must flow from canonical OV scorer', () => {
+  const RULE = 'recommendation impactScore must flow from canonical OV scorer';
+
+  it('does NOT flag canonical OV writes', () => {
+    const file = write(
+      uniqPath('rule-rec-impactscore', 'server/recommendations.ts'),
+      lines(
+        'function ok(opportunity: { value: number }) {',
+        '  const scoring = { impactScore: opportunity.value };',
+        '  const rec = {',
+        '    impactScore: scoring.impactScore,',
+        '  };',
+        '  rec.impactScore = scoring.impactScore;',
+        '  return rec;',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags local legacy impactScore math in recommendations runtime', () => {
+    const file = write(
+      uniqPath('rule-rec-impactscore', 'server/recommendations.ts'),
+      lines(
+        'function bad() {',
+        '  const impactScore = 75;',
+        '  return { impactScore: 75 };',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(2);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('respects // rec-impactscore-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-rec-impactscore', 'server/recommendations.ts'),
+      lines(
+        'function allowed() {',
+        '  const impactScore = 75; // rec-impactscore-ok',
+        '  return { impactScore }; // rec-impactscore-ok',
+        '}',
       ),
     );
     expect(runRule(RULE, [file])).toHaveLength(0);

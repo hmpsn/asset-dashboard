@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   computeOpportunityValue,
   normalizeToScore,
-  pickImpactScore,
   DEFAULT_WEIGHTS,
   MODEL_VERSION,
 } from '../../server/scoring/opportunity-value.js';
@@ -116,15 +115,6 @@ describe('normalizeToScore', () => {
     expect(normalizeToScore(100)).toBeLessThanOrEqual(100);
     expect(normalizeToScore(1000)).toBeGreaterThan(normalizeToScore(100));
     expect(normalizeToScore(1e9)).toBe(100);
-  });
-});
-
-describe('pickImpactScore (strangler-fig selector)', () => {
-  const rec = { impactScore: 50, opportunity: { value: 90 } as any };
-  it('returns OV value only when the flag is on and opportunity exists', () => {
-    expect(pickImpactScore(rec, true)).toBe(90);
-    expect(pickImpactScore(rec, false)).toBe(50);
-    expect(pickImpactScore({ impactScore: 50 }, true)).toBe(50); // no opportunity → legacy
   });
 });
 

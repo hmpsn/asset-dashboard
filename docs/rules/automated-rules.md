@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **172** — 152 error, 20 warn.
+Total rules: **173** — 153 error, 20 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -166,8 +166,9 @@ advisory but tracked.
 | 148 | unified-send-to-client-bespoke-route | error | custom | `server/routes/` | `unified-send-route-ok` | The unified send service is the single send path (design §3); a new bespoke send route re-creates the five-pipeline divergence the migration removes. |
 | 149 | opportunity-money-field-must-be-stripped | error | custom | `shared/types/recommendations.ts` | — | stripEmvFromPublicRecs destructure-and-spreads, so a new admin-money OpportunityScore field reaches clients unless explicitly stripped (G0b money-leak). |
 | 150 | new-rec-type-source-needs-category-and-action-type | error | custom | `server/recommendations.ts` | — | A RecSourceCategory present in the union but absent from REC_SOURCE_CATEGORIES makes getRecSourceCategory return null, bypassing the per-category auto-resolve guard (G2 false auto-resolve). |
-| 151 | tracked_keywords bare read→write outside withTrackedKeywordsTxn | error | custom | `server/` | `// tracked-keywords-txn-ok` | Two concurrent tracked_keywords writers both read the same JSON blob, mutate independently, and last-write-wins silently drops the other writer's keywords. BEGIN IMMEDIATE serialises the read+write so each writer sees the previous writer's result. |
-| 152 | positionColor/positionTone redefinition outside authority | error | custom | `src/ (excluding src/components/ui/constants.ts)` | `// position-color-authority-ok` | A locally-defined positionColor/positionTone bypasses the canonical color authority, causing silent palette drift when rank-color thresholds or accent tokens change. |
+| 151 | recommendation impactScore must flow from canonical OV scorer | error | custom | `server/recommendations.ts` | — | Inline recommendation impactScore buckets drift from computeOpportunityValue() and silently fork ranking behavior from the canonical Opportunity Value scorer. |
+| 152 | tracked_keywords bare read→write outside withTrackedKeywordsTxn | error | custom | `server/` | `// tracked-keywords-txn-ok` | Two concurrent tracked_keywords writers both read the same JSON blob, mutate independently, and last-write-wins silently drops the other writer's keywords. BEGIN IMMEDIATE serialises the read+write so each writer sees the previous writer's result. |
+| 153 | positionColor/positionTone redefinition outside authority | error | custom | `src/ (excluding src/components/ui/constants.ts)` | `// position-color-authority-ok` | A locally-defined positionColor/positionTone bypasses the canonical color authority, causing silent palette drift when rank-color thresholds or accent tokens change. |
 
 ---
 

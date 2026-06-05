@@ -12,8 +12,6 @@
  *   - checkToRecType
  *   - mapToProduct
  *   - inferSchemaTypes
- *   - computeImpactScore
- *   - determinePriority
  *   - inferPageType (extended cases)
  *   - isIntentMismatch (product page case)
  */
@@ -31,8 +29,6 @@ import {
   checkToRecType,
   mapToProduct,
   inferSchemaTypes,
-  computeImpactScore,
-  determinePriority,
   inferPageType,
   isIntentMismatch,
   saveRecommendations,
@@ -600,94 +596,6 @@ describe('inferSchemaTypes', () => {
   it('deduplicates types when multiple slugs map to the same type', () => {
     const result = inferSchemaTypes(['blog/post-1', 'blog/post-2']);
     expect(result).toBe('Article');
-  });
-});
-
-// ─── computeImpactScore ──────────────────────────────────────────────────────
-
-describe('computeImpactScore', () => {
-  it('error severity gives base 60', () => {
-    const score = computeImpactScore('error', false, 0, 0);
-    expect(score).toBe(60);
-  });
-
-  it('warning severity gives base 35', () => {
-    const score = computeImpactScore('warning', false, 0, 0);
-    expect(score).toBe(35);
-  });
-
-  it('info severity gives base 15', () => {
-    const score = computeImpactScore('info', false, 0, 0);
-    expect(score).toBe(15);
-  });
-
-  it('critical check adds +20 bonus', () => {
-    const nonCrit = computeImpactScore('error', false, 0, 0);
-    const crit = computeImpactScore('error', true, 0, 0);
-    expect(crit - nonCrit).toBe(20);
-  });
-
-  it('traffic multiplier adds up to 20 for max traffic', () => {
-    const score = computeImpactScore('warning', false, 100, 100);
-    // 35 + 0 + 20 = 55
-    expect(score).toBe(55);
-  });
-
-  it('traffic multiplier is 0 when maxTrafficScore is 0', () => {
-    const score = computeImpactScore('warning', false, 50, 0);
-    expect(score).toBe(35);
-  });
-
-  it('caps at 100', () => {
-    const score = computeImpactScore('error', true, 1000, 1);
-    expect(score).toBe(100);
-  });
-
-  it('partial traffic gives proportional multiplier', () => {
-    // 50% of max → +10 traffic bonus; error + critical = 80; + 10 = 90
-    const score = computeImpactScore('error', true, 50, 100);
-    expect(score).toBe(90);
-  });
-});
-
-// ─── determinePriority ───────────────────────────────────────────────────────
-
-describe('determinePriority', () => {
-  it('returns "fix_now" for impact score >= 70', () => {
-    expect(determinePriority(70, 'warning', 0)).toBe('fix_now');
-    expect(determinePriority(100, 'info', 0)).toBe('fix_now');
-  });
-
-  it('returns "fix_now" for error severity with traffic > 0', () => {
-    expect(determinePriority(50, 'error', 100)).toBe('fix_now');
-    expect(determinePriority(30, 'error', 1)).toBe('fix_now');
-  });
-
-  it('returns "fix_soon" for impact score 45-69', () => {
-    expect(determinePriority(45, 'warning', 0)).toBe('fix_soon');
-    expect(determinePriority(69, 'info', 0)).toBe('fix_soon');
-  });
-
-  it('returns "fix_soon" for error severity with zero traffic (impact < 70)', () => {
-    // error with no traffic and score < 70: impactScore < 70 so first check fails,
-    // second check: error with trafficScore=0 fails, then impactScore >= 45 may apply
-    // score=60 with error, trafficScore=0: 60 < 70, not (error AND traffic>0), 60>=45 → fix_soon
-    expect(determinePriority(60, 'error', 0)).toBe('fix_soon');
-  });
-
-  it('returns "fix_soon" for pure error severity regardless of impact score (second clause)', () => {
-    // impact=30 < 45, but severity=error → fix_soon
-    expect(determinePriority(30, 'error', 0)).toBe('fix_soon');
-  });
-
-  it('returns "fix_later" for impact score 20-44 with non-error severity', () => {
-    expect(determinePriority(20, 'warning', 0)).toBe('fix_later');
-    expect(determinePriority(44, 'info', 0)).toBe('fix_later');
-  });
-
-  it('returns "fix_later" for impact score below 20', () => {
-    expect(determinePriority(10, 'info', 0)).toBe('fix_later');
-    expect(determinePriority(0, 'warning', 0)).toBe('fix_later');
   });
 });
 

@@ -54,9 +54,10 @@ going forward (P5).
   Expect `poolSize` up sharply vs. before; `floorHit:true` only on genuinely sparse sites.
 - **Content gaps** — the client Strategy tab: **Faros 2 → ≥6**; non-US site shows
   correct-country volumes; gaps tagged "Expanded pick" are the backfill (honest).
-- **OV-divergence shadow log / `OvDivergencePanel`** (admin) — inspect the legacy-vs-OV
-  ordering AND the new tier-level divergence. Confirm the re-tiered **#1 is sane** (not an
-  absurd promotion). This is the gate for the OV→tier thresholds.
+- **OV-divergence shadow log / `OvDivergencePanel`** (admin) — for historical canary
+  review rows only. Fresh runtime rows stopped writing once the legacy scorer was removed
+  on 2026-06-05, but older rows still show the legacy-vs-OV ordering and tier-level
+  divergence that gated the OV→tier thresholds.
 - **New rec types** — `keyword_gap` / `topic_cluster` / `cannibalization` recs appear with
   correct labels/icons (not "Technical Fixes").
 - **No leak / no error** — client never sees a raw `$/wk` or `predictedEmv`; no empty

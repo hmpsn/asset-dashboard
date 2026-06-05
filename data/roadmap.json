@@ -439,8 +439,9 @@
           "source": "/docs/superpowers/plans/2026-06-01-opportunity-value-model.md",
           "est": "3-5h",
           "priority": "P3",
-          "status": "pending",
-          "notes": "After the OV flag is flipped + stable for 2 releases, delete the legacy magic-constant scorers (computeImpactScore branches, 75/55/35 etc.) and the 11 applyRecommendationOutcomeAdjustment call sites that were intentionally kept for the flag-off no-op path. Keep behind the kill-switch for one release first."
+          "status": "done",
+          "shippedAt": "2026-06-05",
+          "notes": "Closed in PR2 of the OV cleanup sprint. Removed the legacy recommendation scorer tail from `server/recommendations.ts`: the old `computeImpactScore`/`determinePriority` helpers, the 11 `applyRecommendationOutcomeAdjustment` call sites, and the per-branch magic `impactScore` buckets no longer participate in runtime recommendation generation. Recommendation sets now sync `impactScore` from `opportunity.value`, derive `priority` from `deriveOvTier(rec)`, and resolve `estimatedGain` from the same OV basis in one canonical post-pass. Outcome learnings are no longer read in recommendation generation; calibration stays inside `computeOpportunityValue()` / `computeOvCalibration()`. Because the legacy scorer is now gone, fresh runtime `ov_divergence` rows are intentionally no longer written; the divergence panel remains available for historical/debug review only."
         },
         {
           "id": "ov-magic-scale-prcheck-rule",
@@ -448,8 +449,9 @@
           "source": "/docs/superpowers/plans/2026-06-01-opportunity-value-model.md",
           "est": "1-2h",
           "priority": "P3",
-          "status": "pending",
-          "notes": "Deferred from PR3: the rule would flag the legacy magic that is intentionally still present. Add it together with (or after) ov-legacy-scorer-removal-postflip so it doesn't false-positive. Mirrors the systemic-root-cause fix: one scorer chokepoint enforced like callAI()/buildWorkspaceIntelligence()."
+          "status": "done",
+          "shippedAt": "2026-06-05",
+          "notes": "Closed alongside `ov-legacy-scorer-removal-postflip`. Added pr-check rule `recommendation impactScore must flow from canonical OV scorer`, which blocks new local `impactScore` buckets/object writes in `server/recommendations.ts` unless they route through the canonical OV scoring helper (or carry an explicit hatch). Added dedicated fixture coverage plus verified-clean allowlist documentation."
         },
         {
           "id": "ov-estimatedgain-real-attribution",
@@ -503,7 +505,7 @@
           "est": "2-4h",
           "priority": "P3",
           "status": "done",
-          "notes": "PR4 shipped the data + GET /api/ov-divergence/:workspaceId + a typed api wrapper but deferred the UI panel (no natural admin-per-workspace debug page). Add a minimal SectionCard panel (legacy-#1 vs OV-#1, agree %, top-3 diff, invariant pass-rate) to support the P8 owner review without hitting the endpoint by hand. [DONE 2026-06-02 (PR #1036): admin OvDivergencePanel in the per-workspace Meeting Brief page — agree-rate headline + red flags (invariant-broken, OV-no-pick) + legacy-vs-OV disagreement detail (top-3 + per-rec deltas), reading the existing /api/ov-divergence endpoint. v1 is per-workspace; a cross-workspace aggregate rollup (new endpoint) is a possible follow-up. This is the instrument for the OV flag-flip decision.]"
+          "notes": "PR4 shipped the data + GET /api/ov-divergence/:workspaceId + a typed api wrapper but deferred the UI panel (no natural admin-per-workspace debug page). Add a minimal SectionCard panel (legacy-#1 vs OV-#1, agree %, top-3 diff, invariant pass-rate) to support the P8 owner review without hitting the endpoint by hand. [DONE 2026-06-02 (PR #1036): admin OvDivergencePanel in the per-workspace Meeting Brief page — agree-rate headline + red flags (invariant-broken, OV-no-pick) + legacy-vs-OV disagreement detail (top-3 + per-rec deltas), reading the existing /api/ov-divergence endpoint. v1 is per-workspace; a cross-workspace aggregate rollup (new endpoint) is a possible follow-up. This is the instrument for the OV flag-flip decision. UPDATE 2026-06-05: runtime writes were intentionally retired once the legacy scorer was removed; the panel now serves historical/debug review rather than a live rollout gate.]"
         },
         {
           "id": "seo-genquality-per-workspace-flag-toggle",
