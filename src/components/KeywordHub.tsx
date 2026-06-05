@@ -71,23 +71,28 @@ export interface KeywordHubProps {
 
 /**
  * Maps a HubSortKey to the server's KeywordCommandCenterSort capability.
- * Verified against KeywordCommandCenterSort = 'priority' | 'keyword' | 'demand' | 'rank'.
- *   keyword           → keyword
- *   position | change → rank
- *   volume | difficulty → demand
- *   date | clicks     → priority (fallback — no dedicated server sort)
+ * Verified against
+ *   KeywordCommandCenterSort = 'priority' | 'keyword' | 'demand' | 'rank' | 'clicks' | 'difficulty'.
+ *   keyword     → keyword
+ *   position    → rank
+ *   clicks      → clicks   (dedicated server sort, Task 1)
+ *   volume      → demand
+ *   difficulty  → difficulty (dedicated server sort, Task 1)
+ *   change | date → priority (not rendered as sortable columns — harmless default)
  */
 function hubSortToKccSort(key: HubSortKey): KeywordCommandCenterSort {
   switch (key) {
     case 'keyword':
       return 'keyword';
     case 'position':
-    case 'change':
       return 'rank';
-    case 'volume':
-    case 'difficulty':
-      return 'demand';
     case 'clicks':
+      return 'clicks';
+    case 'volume':
+      return 'demand';
+    case 'difficulty':
+      return 'difficulty';
+    case 'change':
     case 'date':
     default:
       return 'priority';
@@ -157,10 +162,11 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
       filter: hub.activeKccFilter,
       search: hub.debouncedSearch.trim() || undefined,
       sort: hubSortToKccSort(hub.sort.key),
+      direction: hub.sort.direction,
       page: hub.page,
       pageSize: 50,
     }),
-    [hub.activeKccFilter, hub.debouncedSearch, hub.sort.key, hub.page],
+    [hub.activeKccFilter, hub.debouncedSearch, hub.sort.key, hub.sort.direction, hub.page],
   );
 
   const rowsResult = useKeywordCommandCenterRows(workspaceId, rowsQuery);

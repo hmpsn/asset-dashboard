@@ -70,6 +70,7 @@ vi.mock('../../src/components/keyword-hub/HubKeywordList', () => ({
     showLocalSeo: boolean;
     onToggleKey: (k: string) => void;
     onBulkAction: (action: string) => void;
+    onSort: (key: string) => void;
   }) => (
     <div data-testid="hub-keyword-list">
       <span data-testid="list-loading">{props.isLoading ? 'loading' : 'ready'}</span>
@@ -87,6 +88,10 @@ vi.mock('../../src/components/keyword-hub/HubKeywordList', () => ({
         onClick={() => props.onBulkAction(KEYWORD_COMMAND_CENTER_ACTIONS.TRACK)}
       >
         bulk
+      </button>
+      {/* Drives the real useKeywordHubState.setSort, exercising the direction toggle. */}
+      <button data-testid="sort-clicks" onClick={() => props.onSort('clicks')}>
+        sort clicks
       </button>
     </div>
   ),
@@ -281,6 +286,20 @@ describe('KeywordHub', () => {
       }),
       expect.anything(),
     );
+  });
+
+  it('maps the Clicks column to sort=clicks and threads the toggled direction into rowsQuery', () => {
+    renderHub();
+    // First click on a new column → sort=clicks, direction resets to 'asc'.
+    fireEvent.click(screen.getByTestId('sort-clicks'));
+    const afterFirst = rowsHookMock.mock.calls.at(-1);
+    expect(afterFirst?.[1]).toMatchObject({ sort: 'clicks', direction: 'asc' });
+
+    // Clicking the same column again flips the direction → 'desc', proving the
+    // toggle is wired all the way into the rows query (not stuck on the default).
+    fireEvent.click(screen.getByTestId('sort-clicks'));
+    const afterSecond = rowsHookMock.mock.calls.at(-1);
+    expect(afterSecond?.[1]).toMatchObject({ sort: 'clicks', direction: 'desc' });
   });
 
   it('resets to page 1 when the segment changes', () => {
