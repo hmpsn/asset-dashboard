@@ -121,6 +121,28 @@ describe('keyword-command-center sort — difficulty', () => {
   });
 });
 
+describe('keyword-command-center sort — opportunity (the Hub default)', () => {
+  // opportunity = volume-weighted × ease(1 − difficulty). alpha (demand 100, KD 10)
+  // is the most winnable; bravo (demand 400, KD 80) is high-volume but hard, so it
+  // scores LOW — opportunity must NOT collapse to volume.
+  it('leads with the most winnable keyword (high value × low difficulty), not the highest volume', () => {
+    const desc = rowOrder('opportunity');
+    expect(desc[0]).toBe('alpha');            // best opportunity, despite low volume
+    expect(desc[desc.length - 1]).toBe('bravo'); // worst opportunity, despite high volume
+  });
+
+  it("direction:'asc' reverses the opportunity order", () => {
+    const asc = rowOrder('opportunity', 'asc');
+    expect(asc[0]).toBe('bravo');
+    expect(asc[asc.length - 1]).toBe('alpha');
+  });
+
+  it('candidate order === row order for opportunity (drift guard, both directions)', () => {
+    expect(candidateOrder('opportunity')).toEqual(rowOrder('opportunity'));
+    expect(candidateOrder('opportunity', 'asc')).toEqual(rowOrder('opportunity', 'asc'));
+  });
+});
+
 describe('keyword-command-center sort — rank', () => {
   it('puts position 1 before 9 and missing position LAST', () => {
     // position: bravo 1, charlie 3, echo 3 (keyword tiebreak), alpha 9, delta missing → last

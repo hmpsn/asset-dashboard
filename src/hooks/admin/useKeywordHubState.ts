@@ -29,6 +29,7 @@ export type HubSegment =
   | 'local';
 
 export type HubSortKey =
+  | 'opportunity'
   | 'keyword'
   | 'position'
   | 'change'
@@ -138,7 +139,9 @@ export function useKeywordHubState(
   const [segment, setSegmentRaw] = useState<HubSegment>(resolvedInitial);
   const [advancedFilter, setAdvancedFilterRaw] = useState<KeywordCommandCenterFilter | null>(null);
   const [searchTerm, setSearchTermRaw] = useState(initialSearch ?? '');
-  const [sort, setSortRaw] = useState<HubSortState>({ key: 'keyword', direction: 'asc' });
+  // Default to opportunity value (highest first) so the most valuable, winnable
+  // keywords lead on load rather than the low-value long-tail.
+  const [sort, setSortRaw] = useState<HubSortState>({ key: 'opportunity', direction: 'desc' });
   const [page, setPageRaw] = useState(1);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
 

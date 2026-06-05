@@ -36,7 +36,7 @@ describe('useKeywordHubState', () => {
     expect(result.current.segment).toBe('all');
     expect(result.current.searchTerm).toBe('');
     expect(result.current.debouncedSearch).toBe('');
-    expect(result.current.sort).toEqual({ key: 'keyword', direction: 'asc' });
+    expect(result.current.sort).toEqual({ key: 'opportunity', direction: 'desc' });
     expect(result.current.page).toBe(1);
     expect(result.current.selectedKeys.size).toBe(0);
     expect(result.current.someSelected).toBe(false);
@@ -167,6 +167,8 @@ describe('useKeywordHubState', () => {
   it('setSort same key toggles asc→desc→asc', () => {
     const { result } = renderHook(() => useKeywordHubState());
 
+    // Select a fresh column first (default is now opportunity/desc); a new key → asc.
+    act(() => result.current.setSort('keyword'));
     expect(result.current.sort).toEqual({ key: 'keyword', direction: 'asc' });
 
     act(() => result.current.setSort('keyword'));

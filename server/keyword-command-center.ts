@@ -17,7 +17,7 @@ import {
 } from './local-seo.js';
 import { createLogger } from './logger.js';
 import { listPageKeywords, listPageKeywordsLite } from './page-keywords.js';
-import { isSuspiciousPlannerGroupedVolume } from './keyword-strategy-helpers.js';
+import { computeOpportunityScore, isSuspiciousPlannerGroupedVolume } from './keyword-strategy-helpers.js';
 import {
   getLatestSnapshotRanks,
   getTrackedKeywords,
@@ -766,7 +766,7 @@ export function sortRows(a: KeywordCommandCenterRow, b: KeywordCommandCenterRow)
 // ---------------------------------------------------------------------------
 
 /** The explicit, directioned sorts handled by the shared comparator core. */
-type ExplicitSort = 'keyword' | 'demand' | 'rank' | 'clicks' | 'difficulty';
+type ExplicitSort = 'keyword' | 'demand' | 'rank' | 'clicks' | 'difficulty' | 'opportunity';
 
 /** Per-type field readers. `null`/`undefined` numeric values mean "missing". */
 interface SortFieldAccessors<T> {
@@ -775,6 +775,8 @@ interface SortFieldAccessors<T> {
   rank: (item: T) => number | null | undefined;
   clicks: (item: T) => number | null | undefined;
   difficulty: (item: T) => number | null | undefined;
+  /** Opportunity score (0–100): volume-weighted × ease. The DEFAULT Hub sort. */
+  opportunity: (item: T) => number | null | undefined;
 }
 
 /**
@@ -788,6 +790,7 @@ const NATURAL_SORT_DIRECTION: Record<ExplicitSort, 'asc' | 'desc'> = {
   demand: 'desc',
   clicks: 'desc',
   difficulty: 'desc',
+  opportunity: 'desc',
 };
 
 /**
@@ -830,7 +833,8 @@ function keywordSortComparator<T>(
     sort === 'demand' ? accessors.demand
       : sort === 'rank' ? accessors.rank
         : sort === 'clicks' ? accessors.clicks
-          : accessors.difficulty;
+          : sort === 'opportunity' ? accessors.opportunity
+            : accessors.difficulty;
   return (a, b) => {
     const cmp = compareMetric(read(a), read(b), dir);
     if (cmp !== 0) return cmp;
@@ -844,6 +848,11 @@ const ROW_SORT_ACCESSORS: SortFieldAccessors<KeywordCommandCenterRow> = {
   rank: (row) => row.metrics.currentPosition,
   clicks: (row) => row.metrics.clicks,
   difficulty: (row) => row.metrics.difficulty,
+  // Opportunity from demand + difficulty ONLY (the exact fields the Task-1
+  // resolver keeps identical between candidate and row) so the two sort stages
+  // cannot drift. computeOpportunityScore returns undefined with no signal →
+  // those keywords sort last (compareMetric missing-last).
+  opportunity: (row) => computeOpportunityScore({ volume: row.metrics.volume ?? row.metrics.impressions, difficulty: row.metrics.difficulty }),
 };
 
 export function sortRowsForQuery(
@@ -2312,6 +2321,9 @@ const CANDIDATE_SORT_ACCESSORS: SortFieldAccessors<RowCandidateKey> = {
   rank: (c) => c.rank,
   clicks: (c) => c.clicks,
   difficulty: (c) => c.difficulty,
+  // Same fields + same formula as ROW_SORT_ACCESSORS.opportunity → identical
+  // score per key → no candidate↔row drift.
+  opportunity: (c) => computeOpportunityScore({ volume: c.demand, difficulty: c.difficulty }),
 };
 
 /**
