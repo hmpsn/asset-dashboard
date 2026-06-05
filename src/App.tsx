@@ -179,7 +179,8 @@ function AdminApp() {
   return <div className={theme === 'light' ? 'dashboard-light' : ''}><Dashboard onLogout={auth.logout} theme={theme} toggleTheme={toggleTheme} /></div>;
 }
 
-function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; theme: 'dark' | 'light'; toggleTheme: () => void }) {
+// Exported for the P4 seo-ranks fold-in redirect test (real routing logic).
+export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; theme: 'dark' | 'light'; toggleTheme: () => void }) {
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -462,6 +463,12 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
         <BrandHub key={`brand-${selected.id}`} workspaceId={selected.id} webflowSiteId={selected.webflowSiteId} />
       </FeatureFlag>
     );
+    // Keyword Hub (Wave 4 P4): when ON, the standalone Rank Tracker folds into
+    // the unified Hub — `seo-ranks` redirects to `seo-keywords` (mirror the
+    // calendar redirect template) so bookmarks resolve, not 404. Flag-OFF stays
+    // BYTE-IDENTICAL: the standalone <RankTracker> still renders. The Page-union
+    // value + RankTracker import are retained for P5 (removed at cutover).
+    if (tab === 'seo-ranks' && keywordHubEnabled) return <Navigate to={adminPath(selected.id, 'seo-keywords')} replace />;
     if (tab === 'seo-ranks') return <RankTracker key={`ranks-${selected.id}`} workspaceId={selected.id} hasGsc={!!selected.gscPropertyUrl} onNavigate={navigate} />;
     if (tab === 'analytics-hub') return <AnalyticsHub key={`analytics-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId} gscPropertyUrl={selected.gscPropertyUrl} ga4PropertyId={selected.ga4PropertyId} />;
     if (tab === 'performance') return <Performance key={`perf-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} />;

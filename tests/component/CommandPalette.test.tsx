@@ -94,4 +94,28 @@ describe('CommandPalette', () => {
     expect(onSelectWorkspace).toHaveBeenCalledWith(ws);
     expect(navigateMock).toHaveBeenCalledWith(adminPath('ws-1'));
   });
+
+  // ── Wave 4 P4: Keyword Hub nav fold-in (flag-gated) ──────────────────────────
+  describe('keyword-hub nav fold-in', () => {
+    function open() {
+      render(<CommandPalette workspaces={[ws]} selectedWorkspace={ws} onSelectWorkspace={vi.fn()} />);
+      fireEvent.keyDown(window, { key: 'k', metaKey: true });
+    }
+
+    it('flag OFF (byte-identical): NAV_ITEMS show "Keywords" + "Rank Tracker", no "Keyword Hub"', () => {
+      useFeatureFlagMock.mockReturnValue(false);
+      open();
+      expect(screen.getByText('Keywords')).toBeInTheDocument();
+      expect(screen.getByText('Rank Tracker')).toBeInTheDocument();
+      expect(screen.queryByText('Keyword Hub')).not.toBeInTheDocument();
+    });
+
+    it('flag ON: NAV_ITEMS show "Keyword Hub", no "Rank Tracker" / "Keywords"', () => {
+      useFeatureFlagMock.mockReturnValue(true);
+      open();
+      expect(screen.getByText('Keyword Hub')).toBeInTheDocument();
+      expect(screen.queryByText('Rank Tracker')).not.toBeInTheDocument();
+      expect(screen.queryByText('Keywords')).not.toBeInTheDocument();
+    });
+  });
 });

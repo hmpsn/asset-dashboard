@@ -10,6 +10,13 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useNavigate: () => mockNavigate };
 });
 
+// useFeatureFlag uses React Query; stub it so it doesn't need a QueryClientProvider.
+// Default OFF (keyword-hub) → byte-identical legacy labels.
+const featureFlagMock = vi.fn((_flag: string) => false);
+vi.mock('../../src/hooks/useFeatureFlag', () => ({
+  useFeatureFlag: (...args: unknown[]) => featureFlagMock(...args),
+}));
+
 // NotificationBell was removed from Breadcrumbs (moved to Sidebar only).
 
 const WORKSPACES: Workspace[] = [
@@ -33,7 +40,10 @@ function renderBreadcrumbs(overrides = {}) {
 }
 
 describe('Breadcrumbs', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    featureFlagMock.mockImplementation((_flag: string) => false);
+  });
 
   it('renders Command Center link', () => {
     renderBreadcrumbs();
@@ -108,5 +118,21 @@ describe('Breadcrumbs', () => {
     expect(TAB_LABELS['analytics-hub']).toBe('Search & Traffic');
     expect(TAB_LABELS['settings']).toBe('Settings');
     expect(TAB_LABELS['revenue']).toBe('Revenue');
+  });
+
+  // ── Wave 4 P4: seo-keywords crumb relabel (flag-gated) ──────────────────────
+  it('flag OFF (byte-identical): seo-keywords crumb reads "Keywords"', () => {
+    featureFlagMock.mockImplementation((_flag: string) => false);
+    renderBreadcrumbs({ tab: 'seo-keywords' });
+    expect(screen.getByText('Keywords')).toBeInTheDocument();
+    expect(screen.queryByText('Keyword Hub')).not.toBeInTheDocument();
+    // Static map stays unchanged (byte-identical).
+    expect(TAB_LABELS['seo-keywords']).toBe('Keywords');
+  });
+
+  it('flag ON: seo-keywords crumb reads "Keyword Hub"', () => {
+    featureFlagMock.mockImplementation((flag: string) => flag === 'keyword-hub');
+    renderBreadcrumbs({ tab: 'seo-keywords' });
+    expect(screen.getByText('Keyword Hub')).toBeInTheDocument();
   });
 });

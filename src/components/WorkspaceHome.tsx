@@ -20,6 +20,7 @@ import { useAuditSummary } from '../hooks/useAuditSummary';
 import { AnomalyAlerts } from './AnomalyAlerts';
 import { SeoWorkStatus, ActivityFeed, RankingsSnapshot, ActiveRequestsAnnotations, SeoChangeImpact, WeeklyAccomplishments } from './workspace-home';
 import { type Page, adminPath, clientPath } from '../routes';
+import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { useWorkspaceHomeData, useAdminROI, useWorkspaceIntelligence } from '../hooks/admin';
 import { queryKeys } from '../lib/queryKeys';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
@@ -59,6 +60,10 @@ type HomeTab = 'overview' | 'meeting-brief';
 export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webflowSiteName, gscPropertyUrl, ga4PropertyId }: WorkspaceHomeProps) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  // Wave 4 P4: the standalone Rank Tracker folds into the Keyword Hub when ON;
+  // rank-related drill-ins route to seo-keywords. Flag-OFF byte-identical.
+  const keywordHubEnabled = useFeatureFlag('keyword-hub');
+  const ranksTab: Page = keywordHubEnabled ? 'seo-keywords' : 'seo-ranks';
   const queryClient = useQueryClient();
   const { summary: seoStatus } = usePageEditStates(workspaceId);
   const { audit } = useAuditSummary(workspaceId);
@@ -204,7 +209,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   }
   if (pendingContent.length > 0) actions.push({ label: `${pendingContent.length} content brief${pendingContent.length > 1 ? 's' : ''} awaiting review`, sub: 'Approve or edit briefs', color: 'amber', icon: FileText, tab: 'content-pipeline', priority: 2 });
   if (audit && audit.errors > 0) actions.push({ label: `${audit.errors} SEO error${audit.errors > 1 ? 's' : ''} found in audit`, sub: `${audit.warnings} warnings · Score ${audit.siteScore}`, color: audit.errors > 5 ? 'red' : 'amber', icon: AlertTriangle, tab: 'seo-audit', priority: 2 });
-  if (rankDown > 3) actions.push({ label: `${rankDown} keywords dropped in position`, sub: `${rankUp} improved`, color: 'amber', icon: TrendingDown, tab: 'seo-ranks', priority: 2 });
+  if (rankDown > 3) actions.push({ label: `${rankDown} keywords dropped in position`, sub: `${rankUp} improved`, color: 'amber', icon: TrendingDown, tab: ranksTab, priority: 2 });
   if (contentPipeline && contentPipeline.reviewCells > 0) actions.push({ label: `${contentPipeline.reviewCells} content plan page${contentPipeline.reviewCells > 1 ? 's' : ''} need${contentPipeline.reviewCells === 1 ? 's' : ''} review`, sub: 'Client flagged or awaiting approval', color: 'teal', icon: Layers, tab: 'content-pipeline', priority: 2 });
   if (!webflowSiteId) actions.push({ label: 'No Webflow site linked', sub: 'Link a site to enable SEO tools', color: 'amber', icon: Globe, tab: 'workspace-settings', priority: 3 });
   if (!gscPropertyUrl) actions.push({ label: 'Google Search Console not connected', sub: 'Connect GSC for search data', color: 'amber', icon: Search, tab: 'workspace-settings', priority: 3 });
@@ -445,7 +450,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
           icon={TrendingUp}
           iconColor={rankUp > rankDown ? '#4ade80' : rankDown > rankUp ? '#f87171' : themeColor('#71717a', '#94a3b8')}
           sub={ranks.length > 0 ? `${rankUp} ↑ · ${rankDown} ↓ · ${ranks.length - rankUp - rankDown} =` : 'No keywords tracked'}
-          onClick={ranks.length > 0 ? () => navigate(adminPath(workspaceId, 'seo-ranks')) : undefined}
+          onClick={ranks.length > 0 ? () => navigate(adminPath(workspaceId, ranksTab)) : undefined}
           size="hero"
           staggerIndex={3}
         />
