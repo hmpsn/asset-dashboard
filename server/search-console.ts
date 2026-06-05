@@ -7,6 +7,7 @@ import { getValidToken } from './google-auth.js';
 import type { CustomDateRange } from './google-analytics.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
+import { GSC_METRIC_WINDOW_DAYS } from '../shared/keyword-window.js';
 
 
 const log = createLogger('search-console');
@@ -193,7 +194,7 @@ export async function listGscSites(siteId: string): Promise<Array<{ siteUrl: str
 export async function getSearchOverview(
   siteId: string,
   gscSiteUrl: string,
-  days: number = 28,
+  days: number = GSC_METRIC_WINDOW_DAYS,
   options: { queryLimit?: number; pageLimit?: number; startRow?: number; searchType?: string } = {},
   dateRange?: CustomDateRange,
 ): Promise<SearchOverview> {
@@ -299,7 +300,7 @@ export async function getSearchOverview(
 export async function getSearchQueryObservations(
   siteId: string,
   gscSiteUrl: string,
-  days: number = 28,
+  days: number = GSC_METRIC_WINDOW_DAYS,
   options: { maxRows?: number; searchType?: string } = {},
   dateRange?: CustomDateRange,
 ): Promise<SearchQueryObservation[]> {

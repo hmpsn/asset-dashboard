@@ -21,6 +21,7 @@ import { getWorkspace } from '../workspaces.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
+import { GSC_METRIC_WINDOW_DAYS } from '../../shared/keyword-window.js';
 
 const router = Router();
 
@@ -95,7 +96,11 @@ router.post('/api/rank-tracking/:workspaceId/snapshot', requireWorkspaceAccess('
     const ws = getWorkspace(req.params.workspaceId);
     if (!ws?.gscPropertyUrl) return res.status(400).json({ error: 'No GSC property linked' });
     if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked — connect a site in Workspace Settings to enable rank tracking' });
-    const overview = await getSearchOverview(ws.webflowSiteId, ws.gscPropertyUrl, 7);
+    // Use the SAME window as the daily scheduler (GSC_METRIC_WINDOW_DAYS) so a
+    // manual capture cannot silently swing the displayed clicks/impressions vs
+    // the scheduled snapshot — both UPSERT into rank_snapshots under the same
+    // date key (kills the ~4× swing the 7-vs-28 mismatch caused).
+    const overview = await getSearchOverview(ws.webflowSiteId, ws.gscPropertyUrl, GSC_METRIC_WINDOW_DAYS);
     const date = new Date().toISOString().split('T')[0];
     const queries = overview.topQueries.map(q => ({
       query: q.query, position: q.position, clicks: q.clicks, impressions: q.impressions, ctr: q.ctr,

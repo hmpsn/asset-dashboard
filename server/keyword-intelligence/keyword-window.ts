@@ -1,12 +1,9 @@
 /**
- * Single source of truth for the GSC metric window used across the keyword
- * surfaces. Clicks/impressions are a SUM over this rolling window; position is
- * the window AVERAGE. Both the daily snapshot scheduler and the manual
- * "Capture snapshot" route MUST use these constants so the two paths never
- * disagree (a manual capture on a different window silently swings the
- * displayed clicks/impressions). Surfaced to the user as a "last N days" label.
+ * GSC metric-window constants for the keyword surfaces.
+ *
+ * The single source of truth now lives in `shared/keyword-window.ts` so the
+ * client can import the same values (the server module cannot be imported by
+ * the client). This module re-exports them for back-compat with existing
+ * server-side importers.
  */
-export const GSC_METRIC_WINDOW_DAYS = 28;
-
-/** GSC finalizes data ~3 days late; the window ends at today − this many days. */
-export const GSC_DATA_LAG_DAYS = 3;
+export { GSC_METRIC_WINDOW_DAYS, GSC_DATA_LAG_DAYS } from '../../shared/keyword-window.js';
