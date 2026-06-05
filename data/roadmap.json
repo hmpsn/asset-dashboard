@@ -24,6 +24,15 @@
           "priority": "P1",
           "status": "in_progress",
           "notes": "Phase-per-PR. Task 0 (shared contracts: sort enum +clicks/difficulty, rows direction param, RowCandidateKey clicks/difficulty, isJunkKeywordString Tier-1 gate, GSC_METRIC_WINDOW_DAYS constant, keyword-universe-full flag) done. Tasks 1 sort / 2 junk gate / 3 uncap (flag-gated) / 4 window+banner / 5 normalizer pending."
+        },
+        {
+          "id": "keyword-value-scoring",
+          "title": "Keyword Value Scoring — value-first, posture-driven opportunity score (Hub sort + content-gap spine)",
+          "source": "/docs/superpowers/plans/2026-06-05-keyword-value-scoring.md",
+          "est": "phased",
+          "priority": "P1",
+          "status": "in_progress",
+          "notes": "Phase 0 (contracts: flag + pure scoring module + shared types) in progress. Phase 1 (Hub wiring) and Phase 2 (content-gap wiring) pending. Dark behind keyword-value-scoring flag (default OFF, byte-identical to today)."
         }
       ]
     },

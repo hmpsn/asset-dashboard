@@ -65,13 +65,13 @@ const UNGROUNDED_MIN_EFFORT_DAYS = 5;
 
 /** Intent → value-per-click weight. Commercial-value (rubric dim 3). When CPC is
  *  present, valuePerClick = cpc × intentWeight; otherwise intentWeight is the proxy. */
-const INTENT_WEIGHT: Record<NonNullable<OpportunityInput['intent']>, number> = {
+export const INTENT_WEIGHT: Record<NonNullable<OpportunityInput['intent']>, number> = {
   transactional: 1.0,
   commercial: 0.7,
   informational: 0.3,
   navigational: 0.2,
 };
-const DEFAULT_INTENT_WEIGHT = 0.5;
+export const DEFAULT_INTENT_WEIGHT = 0.5;
 
 /** KD-vs-authority winnability multiplier, reused from the authority module so
  *  the OV scorer and the existing adjustKdImpactScore agree. Mirrors

@@ -105,6 +105,8 @@ export interface KeywordCommandCenterMetrics {
   volume?: number;
   difficulty?: number;
   cpc?: number;
+  /** Raw keyword intent string from any source (trackedKeyword.intent, pageMap.searchIntent, contentGap.intent). */
+  intent?: string;
   currentPosition?: number;
   clicks?: number;
   impressions?: number;
