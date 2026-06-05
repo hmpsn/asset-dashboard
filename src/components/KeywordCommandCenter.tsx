@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Archive,
   ArrowUpRight,
@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 
 import { adminPath } from '../routes';
+import { readHubDeepLink } from '../lib/keywordHubDeepLink';
 import {
   Badge,
   Button,
@@ -115,11 +116,22 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
   const actionMutation = useKeywordCommandCenterAction(workspaceId);
   const bulkActionMutation = useKeywordCommandCenterBulkAction(workspaceId);
   const localRefresh = useLocalSeoRefresh(workspaceId);
-  const [filter, setFilter] = useState<KeywordCommandCenterFilter>(KEYWORD_COMMAND_CENTER_FILTERS.ALL);
-  const [searchTerm, setSearchTerm] = useState('');
+  // Wave 4 P4 — deep-link receiver (?q= keyword + ?tab= segment), the two-halves
+  // contract's receiving half. Read ONCE on mount via lazy initializers so the
+  // param seeds initial filter + search WITHOUT a useEffect that would fight
+  // user clicks. Flag-OFF + no params → byte-identical to the legacy default
+  // (filter=ALL, searchTerm=''). The normalized `q` is also used (mount-only) to
+  // open the drawer on the matching row.
+  const [searchParams] = useSearchParams();
+  const deepLink = useRef(readHubDeepLink(searchParams)).current;
+  const [filter, setFilter] = useState<KeywordCommandCenterFilter>(
+    deepLink.segment ?? KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+  );
+  const [searchTerm, setSearchTerm] = useState(deepLink.query ?? '');
   const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
   const [page, setPage] = useState(1);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const deepLinkOpenedRef = useRef(false);
   const [selectedBulkKeys, setSelectedBulkKeys] = useState<Set<string>>(new Set());
   const [pendingProtectedAction, setPendingProtectedAction] = useState<{
     row: KeywordCommandCenterRow;
@@ -152,6 +164,19 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
   const rowsResult = useKeywordCommandCenterRows(workspaceId, rowsQuery);
   const detail = useKeywordCommandCenterDetail(workspaceId, selectedKey);
   const rows = rowsResult.data?.rows ?? [];
+
+  // P4 deep-link: once rows load, open the drawer on the row matching the
+  // normalized `q`. Mount-only (guarded ref) so it never fights later user
+  // navigation; no-op when there is no `q` or no matching visible row.
+  useEffect(() => {
+    if (deepLinkOpenedRef.current) return;
+    if (!deepLink.query) { deepLinkOpenedRef.current = true; return; }
+    if (rows.length === 0) return;
+    const match = rows.find(row => row.normalizedKeyword === deepLink.query);
+    if (match) setSelectedKey(match.normalizedKeyword);
+    deepLinkOpenedRef.current = true;
+  }, [rows, deepLink.query]);
+
   const summaryData = summary.data;
   const summaryErrorMessage = summary.error instanceof Error
     ? summary.error.message
