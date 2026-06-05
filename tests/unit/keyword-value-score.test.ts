@@ -103,6 +103,13 @@ describe('computeKeywordValueScore', () => {
     const hard = computeKeywordValueScore({ keyword: 'service b', volume: 200, difficulty: 90, intent: 'transactional' }, NON_LOCAL)!;
     expect(easy).toBeGreaterThan(hard);
   });
+  it('impression-only keyword (volume 0) takes its demand from impressions, not 0', () => {
+    // volume:0 (providers coerce absent volume to 0) must NOT mask real impressions —
+    // within-tier, higher impressions ⇒ higher score for a not-yet-ranking keyword.
+    const hiImpr = computeKeywordValueScore({ keyword: 'service a', volume: 0, impressions: 8000, difficulty: 30, intent: 'transactional' }, NON_LOCAL)!;
+    const loImpr = computeKeywordValueScore({ keyword: 'service b', volume: 0, impressions: 50, difficulty: 30, intent: 'transactional' }, NON_LOCAL)!;
+    expect(hiImpr).toBeGreaterThan(loImpr);
+  });
   it('is bounded 0..100', () => {
     const s = computeKeywordValueScore({ keyword: 'dentist near me', volume: 999999, difficulty: 0, cpc: 999, intent: 'transactional' }, LOCAL)!;
     expect(s).toBeGreaterThanOrEqual(0);

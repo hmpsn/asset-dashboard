@@ -98,7 +98,8 @@ tiebreakers).** All factors normalized to `[0,1]`; the only term that may exceed
 
 ```
 commercialValue = valueIntentWeight(intent) × cpcFactor(cpc)              // PRIMARY driver, ∈ (0,1]
-demand          = min( log10(1 + (volume ?? impressions ?? 0)) / log10(1 + DEMAND_REF), 1 )   // secondary
+demandSignal    = (volume > 0) ? volume : (impressions ?? 0)              // volume:0 (provider-coerced) must not mask real impressions
+demand          = min( log10(1 + demandSignal) / log10(1 + DEMAND_REF), 1 )   // secondary
 winnability     = 1 − (difficulty ?? 50)/100                              // secondary
 tiebreak        = W_DEMAND·demand + W_WIN·winnability                     // ∈ [0,1], W_DEMAND+W_WIN = 1 (0.4 / 0.6)
 

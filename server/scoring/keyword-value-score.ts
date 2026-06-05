@@ -192,7 +192,9 @@ export function computeKeywordValueScore(
   const commercialValue = valueIntentWeight(resolvedIntent) * cpcFactor;
 
   // 4. Demand + winnability (within-tier tiebreakers)
-  const signal = volume ?? impressions ?? 0;
+  //    volume===0 (providers coerce absent volume to 0) must NOT mask real impressions —
+  //    an impression-only / not-yet-ranking keyword takes its demand from impressions.
+  const signal = volume && volume > 0 ? volume : impressions ?? 0;
   const demand = Math.min(
     Math.log10(1 + signal) / Math.log10(1 + DEMAND_REF),
     1,
