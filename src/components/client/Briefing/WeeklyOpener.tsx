@@ -1,7 +1,7 @@
 // CLIENT-FACING
 // Phase 2.5e — Premium-only AI-generated "letter from the editor".
 // Renders ABOVE the DateLine on premium briefings when the
-// `client-briefing-v2-ai-polish` flag is on AND the AI call succeeded.
+// AI weekly opener text, when the premium polish pass succeeded.
 // On any fail-soft path the parent composer skips this component entirely
 // (props arrive only when the wire response carries the field).
 

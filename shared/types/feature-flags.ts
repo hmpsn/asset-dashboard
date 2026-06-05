@@ -5,16 +5,11 @@
  *   Server: FEATURE_<FLAG_NAME_UPPERCASED_WITH_UNDERSCORES>=true
  *   Frontend: VITE_FEATURE_<FLAG_NAME_UPPERCASED_WITH_UNDERSCORES>=true
  *
- * Example: to enable 'copy-engine' in production, set:
- *   FEATURE_COPY_ENGINE=true  (server)
- *   VITE_FEATURE_COPY_ENGINE=true  (Vite build)
+ * Example: to enable 'keyword-hub' in production, set:
+ *   FEATURE_KEYWORD_HUB=true  (server)
+ *   VITE_FEATURE_KEYWORD_HUB=true  (Vite build)
  */
 export const FEATURE_FLAGS = {
-  // Copy & Brand Engine (3-phase feature)
-  'copy-engine': false,
-  'copy-engine-voice': false,
-  'copy-engine-pipeline': false,
-
   // Self-service onboarding
   'self-service-onboarding': false,
   'self-service-gsc-ga4': false,
@@ -27,15 +22,11 @@ export const FEATURE_FLAGS = {
 
   // Platform Intelligence Enhancements
   'smart-placeholders': false,
-  'client-brand-section': false,
 
   // Client Insights Briefing (5-phase feature)
   'client-briefing-v2': false,
   // Phase 2.5e — Premium-only AI polish (hero-headline punch + weekly opener).
   'client-briefing-v2-ai-polish': false,
-
-  // Deep Diagnostics
-  'deep-diagnostics': false,
 
   // Page-Element Catalog (schema AI extractors)
   'schema-ai-element-classifier': false,
@@ -101,11 +92,9 @@ export interface FeatureFlagLifecycleMeta {
 }
 
 export const FEATURE_FLAG_GROUP_LABELS = [
-  'Copy & Brand Engine',
   'Self-Service Onboarding',
   'Team & Collaboration',
   'White-Label',
-  'Deep Diagnostics',
   'Platform Intelligence Enhancements',
   'Client Insights Briefing',
   'Local SEO',
@@ -123,13 +112,11 @@ export interface FeatureFlagCatalogEntry {
 }
 
 const LEGACY_ROADMAP = {
-  copyEngine: 'legacy-copy-engine',
   selfServe: 'legacy-self-service-onboarding',
   team: 'legacy-team-collaboration',
   whiteLabel: 'legacy-white-label',
   outcome: 'legacy-outcome-intelligence',
   briefing: 'legacy-client-briefing-v2',
-  deepDiagnostics: 'legacy-deep-diagnostics',
   schema: 'legacy-schema-ai',
   localSeo: 'intel-quality-local-pack-visibility-foundation',
   platformIntelligenceEnhancements: 'legacy-platform-intelligence-enhancements',
@@ -140,46 +127,6 @@ export const LEGACY_FEATURE_FLAG_ROADMAP_IDS = Object.values(LEGACY_ROADMAP) as 
 const REVIEWED_AT = '2026-05-15';
 
 export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntry> = {
-  'copy-engine': {
-    label: 'Copy Engine — core',
-    group: 'Copy & Brand Engine',
-    lifecycle: {
-      owner: 'content-pipeline',
-      createdAt: '2026-02-14',
-      rolloutTarget: 'pilot-clients',
-      removalCondition: 'Remove when Copy Engine core is stable and becomes the only production path.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.copyEngine,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'copy-engine-voice': {
-    label: 'Copy Engine — voice calibration',
-    group: 'Copy & Brand Engine',
-    lifecycle: {
-      owner: 'content-pipeline',
-      createdAt: '2026-02-20',
-      rolloutTarget: 'pilot-clients',
-      removalCondition: 'Remove when voice calibration is permanently enabled for eligible workspaces.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.copyEngine,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'copy-engine-pipeline': {
-    label: 'Copy Engine — pipeline',
-    group: 'Copy & Brand Engine',
-    lifecycle: {
-      owner: 'content-pipeline',
-      createdAt: '2026-02-27',
-      rolloutTarget: 'pilot-clients',
-      removalCondition: 'Remove once pipeline side-effects and rollback paths are fully validated.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.copyEngine,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-
   'self-service-onboarding': {
     label: 'Self-service Webflow onboarding',
     group: 'Self-Service Onboarding',
@@ -235,20 +182,6 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
     },
   },
 
-  'deep-diagnostics': {
-    label: 'Deep diagnostics mode',
-    group: 'Deep Diagnostics',
-    lifecycle: {
-      owner: 'seo-health',
-      createdAt: '2026-04-19',
-      rolloutTarget: 'tiered-client-rollout',
-      removalCondition: 'Remove once deep diagnostics is generally available and rollback path no longer depends on a flag.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.deepDiagnostics,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-
   'smart-placeholders': {
     label: 'Smart placeholders (admin chips + client ghost text)',
     group: 'Platform Intelligence Enhancements',
@@ -257,19 +190,6 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       createdAt: '2026-05-06',
       rolloutTarget: 'staging-validation',
       removalCondition: 'Remove when placeholder behavior has no fallback branch and is default-on for all supported paths.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.platformIntelligenceEnhancements,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'client-brand-section': {
-    label: 'Client portal — Brand tab (business profile)',
-    group: 'Platform Intelligence Enhancements',
-    lifecycle: {
-      owner: 'inbox',
-      createdAt: '2026-05-06',
-      rolloutTarget: 'tiered-client-rollout',
-      removalCondition: 'Remove when client Brand tab is default for all eligible workspaces with no split rendering path.',
       linkedRoadmapItemId: LEGACY_ROADMAP.platformIntelligenceEnhancements,
       staleAuditCadence: 'monthly',
       lastReviewedAt: REVIEWED_AT,
@@ -362,10 +282,6 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
 
 export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: FeatureFlagKey[] }> = [
   {
-    label: 'Copy & Brand Engine',
-    keys: ['copy-engine', 'copy-engine-voice', 'copy-engine-pipeline'],
-  },
-  {
     label: 'Self-Service Onboarding',
     keys: ['self-service-onboarding', 'self-service-gsc-ga4'],
   },
@@ -378,12 +294,8 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
     keys: ['white-label'],
   },
   {
-    label: 'Deep Diagnostics',
-    keys: ['deep-diagnostics'],
-  },
-  {
     label: 'Platform Intelligence Enhancements',
-    keys: ['smart-placeholders', 'client-brand-section'],
+    keys: ['smart-placeholders'],
   },
   {
     label: 'Client Insights Briefing',

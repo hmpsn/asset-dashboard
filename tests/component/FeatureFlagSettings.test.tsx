@@ -36,23 +36,6 @@ vi.mock('@tanstack/react-query', async () => {
                 lastReviewedAt: '2026-05-15',
               },
             },
-            {
-              key: 'client-brand-section',
-              enabled: false,
-              source: 'default',
-              default: false,
-              label: 'Client portal — Brand tab (business profile)',
-              group: 'Platform Intelligence Enhancements',
-              lifecycle: {
-                owner: 'inbox',
-                createdAt: '2026-05-06',
-                rolloutTarget: 'tiered-client-rollout',
-                removalCondition: 'Remove when Brand tab is default for eligible workspaces.',
-                linkedRoadmapItemId: 'platform-intelligence-enhancements-phase-1',
-                staleAuditCadence: 'monthly',
-                lastReviewedAt: '2026-05-15',
-              },
-            },
           ],
           isLoading: false,
           isError: false,
@@ -100,11 +83,6 @@ describe('FeatureFlagSettings', () => {
     expect(screen.getByText(/Smart placeholders/i)).toBeInTheDocument();
   });
 
-  it('renders client-brand-section flag with human-readable label', () => {
-    render(<FeatureFlagSettings />);
-    expect(screen.getByText(/Brand tab/i)).toBeInTheDocument();
-  });
-
   it('displays all platform-enhancement flags under the same group', () => {
     render(<FeatureFlagSettings />);
 
@@ -114,7 +92,7 @@ describe('FeatureFlagSettings', () => {
 
     // Verify both labels are present after the group header
     expect(screen.getByText(/Smart placeholders/i)).toBeInTheDocument();
-    expect(screen.getByText(/Brand tab/i)).toBeInTheDocument();
+    expect(screen.getByText(/Smart placeholders/i)).toBeInTheDocument();
   });
 
   it('does not render flags in the Other bucket if all are properly grouped', () => {
@@ -127,7 +105,6 @@ describe('FeatureFlagSettings', () => {
     if (otherSections.length > 0) {
       const otherSection = otherSections[0];
       expect(otherSection.parentElement).not.toHaveTextContent('smart-placeholders');
-      expect(otherSection.parentElement).not.toHaveTextContent('client-brand-section');
     }
   });
 

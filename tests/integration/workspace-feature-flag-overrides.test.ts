@@ -25,6 +25,13 @@ import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-s
 import type { WorkspaceFeatureFlagMeta } from '../../shared/types/feature-flags.js';
 
 const FLAG = 'seo-generation-quality';
+const RETIRED_PRODUCT_UI_FLAGS = [
+  'copy-engine',
+  'copy-engine-voice',
+  'copy-engine-pipeline',
+  'deep-diagnostics',
+  'client-brand-section',
+] as const;
 
 // ── Main flow (auth disabled — APP_PASSWORD='' default → requireAdminAuth passes through) ──
 // Ports 13884/13885: next free slots in the 13201–13899 range (13880 is a P4 doc
@@ -94,6 +101,19 @@ describe('PUT /api/admin/workspaces/:id/feature-flags/:key', () => {
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error: string };
     expect(body.error).toContain('Unknown feature flag');
+  });
+
+  it('returns 400 for retired product/UI flag keys', async () => {
+    for (const key of RETIRED_PRODUCT_UI_FLAGS) {
+      const res = await authApi(`/api/admin/workspaces/${wsA.workspaceId}/feature-flags/${key}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: true }),
+      });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toContain('Unknown feature flag');
+    }
   });
 
   it('returns 400 when enabled field is missing', async () => {

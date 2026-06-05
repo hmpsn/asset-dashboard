@@ -103,6 +103,6 @@ describe('BlueprintDetail', () => {
     expect(screen.getByText('Core Pages Blueprint')).toBeInTheDocument();
     expect(screen.getByText('No pages in scope yet. Add one above.')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Pages' })).toBeInTheDocument();
-    expect(screen.queryByRole('tab', { name: 'Copy Pipeline' })).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Copy Pipeline' })).toBeInTheDocument();
   });
 });

@@ -14,7 +14,6 @@ interface BuildClientDashboardNavOptions {
   ws: WorkspaceInfo;
   effectiveTier: Tier;
   betaMode: boolean;
-  brandTabEnabled: boolean;
   contentPlanSummary: { totalCells: number } | null;
   strategyData: unknown;
 }
@@ -23,7 +22,6 @@ export function buildClientDashboardNav({
   ws,
   effectiveTier,
   betaMode,
-  brandTabEnabled,
   contentPlanSummary,
   strategyData,
 }: BuildClientDashboardNavOptions): ClientNavItem[] {
@@ -44,7 +42,7 @@ export function buildClientDashboardNav({
     ...(isPaid ? [{ id: 'inbox' as const, label: 'Inbox', icon: Zap, locked: false }] : []),
     ...(!betaMode && !isExternalBilling ? [{ id: 'plans' as const, label: 'Plans', icon: CreditCard, locked: false }] : []),
     ...(isPaid && !betaMode && strategyData ? [{ id: 'roi' as const, label: 'ROI', icon: Trophy, locked: false }] : []),
-    ...(brandTabEnabled ? [{ id: 'brand' as const, label: 'Brand', icon: Building2, locked: false }] : []),
+    { id: 'brand' as const, label: 'Brand', icon: Building2, locked: false },
   ];
 }
 

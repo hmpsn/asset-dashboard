@@ -283,58 +283,45 @@ function renderDashboard(
 
 describe('resolveClientTab', () => {
   it('returns overview for undefined input', () => {
-    expect(resolveClientTab(undefined, false)).toBe('overview');
+    expect(resolveClientTab(undefined)).toBe('overview');
   });
 
   it('returns overview for null input', () => {
-    expect(resolveClientTab(null, false)).toBe('overview');
+    expect(resolveClientTab(null)).toBe('overview');
   });
 
   it('returns overview for an empty string', () => {
-    expect(resolveClientTab('', false)).toBe('overview');
+    expect(resolveClientTab('')).toBe('overview');
   });
 
   it('returns overview for an unknown tab', () => {
-    expect(resolveClientTab('completely-unknown-tab', false)).toBe('overview');
+    expect(resolveClientTab('completely-unknown-tab')).toBe('overview');
   });
 
   it('maps legacy "search" alias to performance', () => {
-    expect(resolveClientTab('search', false)).toBe('performance');
+    expect(resolveClientTab('search')).toBe('performance');
   });
 
   it('maps legacy "analytics" alias to performance', () => {
-    expect(resolveClientTab('analytics', false)).toBe('performance');
+    expect(resolveClientTab('analytics')).toBe('performance');
   });
 
   it('maps retired "schema-review" to inbox', () => {
-    expect(resolveClientTab('schema-review', false)).toBe('inbox');
+    expect(resolveClientTab('schema-review')).toBe('inbox');
   });
 
-  it('resolves "brand" to overview when feature flag is off', () => {
-    expect(resolveClientTab('brand', false)).toBe('overview');
+  it('passes through "brand"', () => {
+    expect(resolveClientTab('brand')).toBe('brand');
   });
 
-  it('resolves "brand" to brand when feature flag is on', () => {
-    expect(resolveClientTab('brand', true)).toBe('brand');
-  });
-
-  it('passes through every known tab unchanged (flag=false)', () => {
-    const flaggedTabs = new Set(['brand']);
+  it('passes through every known tab unchanged', () => {
     for (const tab of KNOWN_CLIENT_TABS) {
-      if (!flaggedTabs.has(tab)) {
-        expect(resolveClientTab(tab, false)).toBe(tab);
-      }
+      expect(resolveClientTab(tab)).toBe(tab);
     }
   });
 
-  it('passes through every known tab unchanged (flag=true)', () => {
-    for (const tab of KNOWN_CLIENT_TABS) {
-      expect(resolveClientTab(tab, true)).toBe(tab);
-    }
-  });
-
-  it('KNOWN_CLIENT_TABS excludes brand (it is feature-flagged, not pass-through)', () => {
-    expect(KNOWN_CLIENT_TABS).not.toContain('brand');
+  it('KNOWN_CLIENT_TABS includes brand', () => {
+    expect(KNOWN_CLIENT_TABS).toContain('brand');
   });
 
   it('KNOWN_CLIENT_TABS excludes search and analytics (they are aliases)', () => {
@@ -557,35 +544,14 @@ describe('ClientDashboard — tab content', () => {
   });
 });
 
-// ── Component: feature-flag gating ───────────────────────────────────────────
-
-describe('ClientDashboard — feature flag gating', () => {
+describe('ClientDashboard — brand tab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
     mockGetOptional.mockResolvedValue(null);
   });
 
-  it('does NOT render brand tab when client-brand-section flag is false', async () => {
-    const { useFeatureFlag } = await import('../../src/hooks/useFeatureFlag');
-    vi.mocked(useFeatureFlag).mockReturnValue(false);
-
-    const ws = makeWorkspace({ tier: 'growth' });
-    mockGet.mockResolvedValue(ws);
-
-    renderDashboard({ initialTab: 'brand' });
-
-    await waitFor(() => {
-      // brand resolves to overview when flag is off
-      expect(screen.getByTestId('overview-tab')).toBeInTheDocument();
-    });
-    expect(screen.queryByTestId('brand-tab')).not.toBeInTheDocument();
-  });
-
-  it('renders brand tab when client-brand-section flag is true', async () => {
-    const { useFeatureFlag } = await import('../../src/hooks/useFeatureFlag');
-    vi.mocked(useFeatureFlag).mockReturnValue(true);
-
+  it('renders brand tab when selected directly', async () => {
     const ws = makeWorkspace({ tier: 'premium' });
     mockGet.mockResolvedValue(ws);
 

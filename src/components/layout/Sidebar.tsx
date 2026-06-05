@@ -55,7 +55,7 @@ interface SidebarProps {
 
 const ALL_GROUP_LABELS = ['MONITORING', 'SITE HEALTH', 'SEO STRATEGY', 'OPTIMIZATION', 'CONTENT', 'ADMIN'];
 
-function buildNavGroups(copyEngineEnabled: boolean, diagnosticsEnabled: boolean, keywordHubEnabled: boolean): NavGroup[] {
+function buildNavGroups(keywordHubEnabled: boolean): NavGroup[] {
   return [
     { label: '', items: [
       { id: 'home', label: 'Home', icon: LayoutDashboard, desc: 'Workspace overview and quick actions' },
@@ -88,8 +88,7 @@ function buildNavGroups(copyEngineEnabled: boolean, diagnosticsEnabled: boolean,
       items: [
       { id: 'seo-editor', label: 'SEO Editor', icon: Pencil, needsSite: true, desc: 'Edit titles, descriptions, and meta tags' },
       { id: 'seo-schema', label: 'Schema', icon: Code2, needsSite: true, desc: 'Structured data and schema markup' },
-      // Copy Engine (Brand Hub) is phase-per-PR dark-launched; hide from nav until `copy-engine` flag is enabled.
-      { id: 'brand', label: 'Brand & AI', icon: Sparkles, needsSite: true, hidden: !copyEngineEnabled, desc: 'Brand voice, knowledge base, and audience personas' },
+      { id: 'brand', label: 'Brand & AI', icon: Sparkles, needsSite: true, desc: 'Brand voice, knowledge base, and audience personas' },
       { id: 'rewrite', label: 'Page Rewriter', icon: Pencil, needsSite: true, desc: 'AI-assisted page rewriting with playbook instructions' },
     ]},
     { label: 'CONTENT', groupIcon: BookOpen, groupColor: 'text-amber-400',
@@ -107,7 +106,7 @@ function buildNavGroups(copyEngineEnabled: boolean, diagnosticsEnabled: boolean,
       { id: 'ai-usage', label: 'AI Usage', icon: Activity, desc: 'AI token usage and costs' },
       { id: 'roadmap', label: 'Roadmap', icon: Map, desc: 'Product roadmap and sprint tracking' },
       { id: 'features', label: 'Features', icon: Layers, desc: 'Feature library and changelog' },
-      { id: 'diagnostics', label: 'Diagnostics', icon: FileSearch, desc: 'Deep diagnostic investigation reports', hidden: !diagnosticsEnabled },
+      { id: 'diagnostics', label: 'Diagnostics', icon: FileSearch, desc: 'Deep diagnostic investigation reports' },
     ]},
   ];
 }
@@ -135,10 +134,8 @@ export function Sidebar({
     });
   }, []);
 
-  const copyEngineEnabled = useFeatureFlag('copy-engine');
-  const diagnosticsEnabled = useFeatureFlag('deep-diagnostics');
   const keywordHubEnabled = useFeatureFlag('keyword-hub');
-  const navGroups = buildNavGroups(copyEngineEnabled, diagnosticsEnabled, keywordHubEnabled);
+  const navGroups = buildNavGroups(keywordHubEnabled);
 
   // Auto-expand sidebar group containing active tab (#160)
   useEffect(() => { // effect-layout-ok — intentional post-render tab-group expansion

@@ -485,7 +485,7 @@ describe('FeatureFlag', () => {
     vi.mocked(useFeatureFlag).mockReturnValue(true);
     render(
       withQueryClient(
-        <FeatureFlag flag="copy-engine">
+        <FeatureFlag flag="keyword-hub">
           <span>Feature content</span>
         </FeatureFlag>,
       ),
@@ -497,7 +497,7 @@ describe('FeatureFlag', () => {
     vi.mocked(useFeatureFlag).mockReturnValue(false);
     const { container } = render(
       withQueryClient(
-        <FeatureFlag flag="copy-engine">
+        <FeatureFlag flag="keyword-hub">
           <span>Feature content</span>
         </FeatureFlag>,
       ),
@@ -511,7 +511,7 @@ describe('FeatureFlag', () => {
     vi.mocked(useFeatureFlag).mockReturnValue(false);
     render(
       withQueryClient(
-        <FeatureFlag flag="copy-engine" fallback={<span>Coming soon</span>}>
+        <FeatureFlag flag="keyword-hub" fallback={<span>Coming soon</span>}>
           <span>Feature content</span>
         </FeatureFlag>,
       ),
@@ -524,7 +524,7 @@ describe('FeatureFlag', () => {
     vi.mocked(useFeatureFlag).mockReturnValue(true);
     render(
       withQueryClient(
-        <FeatureFlag flag="copy-engine" fallback={<span>Coming soon</span>}>
+        <FeatureFlag flag="keyword-hub" fallback={<span>Coming soon</span>}>
           <span>Feature content</span>
         </FeatureFlag>,
       ),
@@ -537,19 +537,19 @@ describe('FeatureFlag', () => {
     vi.mocked(useFeatureFlag).mockReturnValue(false);
     render(
       withQueryClient(
-        <FeatureFlag flag="copy-engine">
+        <FeatureFlag flag="keyword-hub">
           <span>X</span>
         </FeatureFlag>,
       ),
     );
-    expect(useFeatureFlag).toHaveBeenCalledWith('copy-engine');
+    expect(useFeatureFlag).toHaveBeenCalledWith('keyword-hub');
   });
 
   it('renders multiple children when enabled', () => {
     vi.mocked(useFeatureFlag).mockReturnValue(true);
     render(
       withQueryClient(
-        <FeatureFlag flag="copy-engine">
+        <FeatureFlag flag="keyword-hub">
           <span>First</span>
           <span>Second</span>
         </FeatureFlag>,

@@ -20,11 +20,9 @@ import { CommandPalette } from './components/CommandPalette';
 import { Sidebar } from './components/layout/Sidebar';
 import { Breadcrumbs } from './components/layout/Breadcrumbs';
 import { ScannerReveal } from './components/ui/ScannerReveal';
-import { FeatureFlag } from './components/ui/FeatureFlag';
 import { useFeatureFlag } from './hooks/useFeatureFlag';
-import { EmptyState } from './components/ui/EmptyState';
 import { TabBar } from './components/ui/TabBar';
-import { Activity, Clipboard, Globe, Sparkles } from 'lucide-react';
+import { Clipboard, Globe } from 'lucide-react';
 
 // ── Lazy-loaded route-level chunks ──
 const ClientDashboard = lazyWithRetry(() => import('./components/ClientDashboard').then(m => ({ default: m.ClientDashboard })));
@@ -415,20 +413,7 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
     if (tab === 'home') return <WorkspaceHome key={`home-${selected.id}`} workspaceId={selected.id} workspaceName={selected.webflowSiteName || selected.name} webflowSiteId={selected.webflowSiteId} webflowSiteName={selected.webflowSiteName} gscPropertyUrl={selected.gscPropertyUrl} ga4PropertyId={selected.ga4PropertyId} />;
     // 'brief' kept for backward compat — WorkspaceHome tab is the primary discovery path
     if (tab === 'brief') return <MeetingBriefPage key={`brief-${selected.id}`} workspaceId={selected.id} onNavigate={navigate} />;
-    if (tab === 'diagnostics') return (
-      <FeatureFlag
-        flag="deep-diagnostics"
-        fallback={
-          <EmptyState
-            icon={Activity}
-            title="Deep Diagnostics is rolling out"
-            description="This feature is not yet available for your workspace. Check back soon."
-          />
-        }
-      >
-        <DiagnosticReportPage key={`diagnostics-${selected.id}`} workspaceId={selected.id} />
-      </FeatureFlag>
-    );
+    if (tab === 'diagnostics') return <DiagnosticReportPage key={`diagnostics-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'media') return <MediaTab key={selected.folder} siteId={selected.webflowSiteId} workspaceId={selected.id} workspaceFolder={selected.folder} queue={workspaceQueue} />;
     if (tab === 'seo-audit') return <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} siteName={selected.webflowSiteName || selected.name} />;
     if (tab === 'seo-editor') return <SeoEditorWrapper key={`editor-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} />;
@@ -443,26 +428,7 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
     if (tab === 'content') return <ContentManager key={`content-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'calendar') return <Navigate to={adminPath(selected.id, 'content-pipeline') + '?tab=calendar'} replace />;
     if (tab === 'subscriptions') return <ContentSubscriptions key={`subs-${selected.id}`} workspaceId={selected.id} />;
-    if (tab === 'brand') return (
-      // Double-gated: Sidebar already hides the nav entry when the flag is
-      // off, but a user who deep-links to /ws/:id/brand directly would hit
-      // this route. Without a fallback, `<FeatureFlag>` renders null and the
-      // content pane goes blank with no explanation. Ship an EmptyState so
-      // the deep-link path degrades gracefully instead of looking broken.
-      // (PR #168 scaled-review UX polish.)
-      <FeatureFlag
-        flag="copy-engine"
-        fallback={
-          <EmptyState
-            icon={Sparkles}
-            title="Brand Hub is rolling out"
-            description="The Copy & Brand Engine is still rolling out to workspaces. Check back soon, or reach out if you'd like early access."
-          />
-        }
-      >
-        <BrandHub key={`brand-${selected.id}`} workspaceId={selected.id} webflowSiteId={selected.webflowSiteId} />
-      </FeatureFlag>
-    );
+    if (tab === 'brand') return <BrandHub key={`brand-${selected.id}`} workspaceId={selected.id} webflowSiteId={selected.webflowSiteId} />;
     // Keyword Hub (Wave 4 P4): when ON, the standalone Rank Tracker folds into
     // the unified Hub — `seo-ranks` redirects to `seo-keywords` (mirror the
     // calendar redirect template) so bookmarks resolve, not 404. Flag-OFF stays

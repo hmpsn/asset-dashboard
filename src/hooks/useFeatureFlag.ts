@@ -16,7 +16,7 @@ async function fetchFeatureFlags(): Promise<Record<FeatureFlagKey, boolean>> {
  * Falls back to the static default in FEATURE_FLAGS while loading.
  *
  * Usage:
- *   const enabled = useFeatureFlag('copy-engine');
+ *   const enabled = useFeatureFlag('keyword-hub');
  */
 export function useFeatureFlag(flag: FeatureFlagKey): boolean {
   const { data } = useQuery({

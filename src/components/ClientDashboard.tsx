@@ -47,7 +47,6 @@ import {
 } from '../hooks/client/useClientQueries';
 import { usePayments } from '../hooks/usePayments';
 import { useToast } from '../hooks/useToast';
-import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { ClientAuthGate } from './client/ClientAuthGate';
 import { EmailCaptureGate } from './client/EmailCaptureGate';
 import { ClientChatWidget, type ClientChatWidgetApi } from './client/ClientChatWidget';
@@ -88,7 +87,6 @@ function LazyClientTabPanel({ children }: { children: ReactNode }) {
 
 export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: { workspaceId: string; betaMode?: boolean; initialTab?: string }) {
   const queryClient = useQueryClient();
-  const brandTabEnabled = useFeatureFlag('client-brand-section');
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     try { return (localStorage.getItem('dashboard-theme') as 'dark' | 'light') || 'dark'; } catch { return 'dark'; }
   });
@@ -333,7 +331,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   // ── UI-only state ──
   const clientNavigate = useNavigate();
   const initialTabId = initialTab?.split('/')[0];
-  const tab: ResolvedClientTab = resolveClientTab(initialTabId, brandTabEnabled);
+  const tab: ResolvedClientTab = resolveClientTab(initialTabId);
   const setTab = (t: ClientTab) => {
     clientNavigate(clientPath(workspaceId, t, betaMode));
   };
@@ -609,7 +607,6 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     ws,
     effectiveTier,
     betaMode,
-    brandTabEnabled,
     contentPlanSummary,
     strategyData,
   });
@@ -777,7 +774,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                 </ErrorBoundary>
               </LazyClientTabPanel>
             ),
-            brand: brandTabEnabled ? (
+            brand: (
               <LazyClientTabPanel>
                 <ErrorBoundary label="Brand">
                   <BrandTab
@@ -791,7 +788,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                   />
                 </ErrorBoundary>
               </LazyClientTabPanel>
-            ) : null,
+            ),
           }}
         />
 
