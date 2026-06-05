@@ -52,10 +52,6 @@ import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
 
-// ── Feature flag: enable local-seo-visibility before app loads ────────────────
-
-process.env.FEATURE_LOCAL_SEO_VISIBILITY = 'true';
-
 // ── In-process server setup ───────────────────────────────────────────────────
 
 let baseUrl = '';

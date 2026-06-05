@@ -14,21 +14,11 @@ let workspaceId = '';
 
 beforeAll(async () => {
   await ctx.startServer();
-  await api('/api/admin/feature-flags/local-seo-visibility', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ enabled: true }),
-  });
   workspaceId = createWorkspace('Keyword Command Center Route Test').id;
 }, 25_000);
 
 afterAll(async () => {
   deleteWorkspace(workspaceId);
-  await api('/api/admin/feature-flags/local-seo-visibility', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ enabled: null }),
-  });
   await ctx.stopServer();
 });
 

@@ -58,7 +58,6 @@ import { computeTimingBoosts, maxBoostForPages } from './scoring/opportunity-tim
 import { triggerOpportunityRegen } from './scoring/opportunity-regen.js';
 import { recordOvDivergence } from './ov-divergence.js';
 import { buildCtrCurve, type GscKeywordObservation } from './scoring/ctr-curve.js';
-import { isFeatureEnabled } from './feature-flags.js';
 import { resolveOvAuthorityStrength } from './workspace-authority.js';
 import { getOrCreateWorkspaceWeights } from './opportunity-weights.js';
 import { computeOvCalibration } from './scoring/ov-calibration.js';
@@ -1126,25 +1125,11 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   const recs: Recommendation[] = [];
   // Opportunity Value is the canonical impactScore selector.
   const useOv = true;
-  // ── SEO Gen-Quality P4 cutover flag (per-workspace umbrella). ──
-  // Resolved ONCE per rec-gen cycle and threaded as a plain boolean (no isFeatureEnabled
-  // in loops — mirrors the P2/P3 relaxConservatism pattern). When OFF, the OV-derived
-  // TIER, the OV-EMV estimatedGain basis, and the content_gaps.opportunity_score
-  // recompute are all NO-OPs, so generation stays byte-identical to the pre-P4 path.
-  const useGenQual = isFeatureEnabled('seo-generation-quality', ws.id);
-  // ── SEO Gen-Quality P7.1 · local-recs gate (three conjunctive conditions). ──
-  // Resolved ONCE per rec-gen cycle and threaded as a plain boolean (no isFeatureEnabled in
-  // loops, no posture re-reads). The THREE gates: (1) the umbrella gen-quality flag is on for
-  // this workspace, (2) the workspace posture is local OR hybrid (never non_local/unknown),
-  // and (3) the local-seo-visibility feature flag is on. When ANY gate is false, useLocalGenQual
-  // is false → the local rec branches are skipped entirely → ZERO local recs/sources are
-  // produced and the merge/auto-resolve loop sees exactly the pre-P7.1 source set, so generation
-  // is byte-identical to pre-P7.1 (proven by the posture-gated parity test). The scorer never
-  // reads local state — the local OV term is only fed from inside these gated branches.
+  // Generation-quality scoring is now canonical. Local recommendation minting remains
+  // posture-gated so non-local workspaces keep the existing non-local source set.
+  const useGenQual = true;
   const localPosture = getLocalSeoPosture(ws.id);
-  const useLocalGenQual = useGenQual
-    && (localPosture === LOCAL_SEO_POSTURE.LOCAL || localPosture === LOCAL_SEO_POSTURE.HYBRID)
-    && isFeatureEnabled('local-seo-visibility');
+  const useLocalGenQual = localPosture === LOCAL_SEO_POSTURE.LOCAL || localPosture === LOCAL_SEO_POSTURE.HYBRID;
   const tier = ws.tier || 'free';
   const assignedTo: 'team' | 'client' = tier === 'premium' ? 'team' : 'client';
 
@@ -1885,11 +1870,10 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     }
   }
 
-  // ── 2c. SEO Gen-Quality P7.1 — first-class local-visibility recs (posture-gated). ──
-  // Minted ONLY when useLocalGenQual (gen-quality flag ON + posture local/hybrid +
-  // local-seo-visibility flag ON). When OFF (non-local / flag-off / local-flag-off) this whole
-  // block is skipped → ZERO local recs/sources, so the merge/auto-resolve loop below sees
-  // exactly the pre-P7.1 source set and generation is byte-identical (posture-gated parity test).
+  // ── 2c. First-class local-visibility recs (posture-gated). ──
+  // Minted only when the canonical local-SEO posture gate is on. When OFF
+  // (non-local posture) this whole block is skipped → zero local recs/sources, so
+  // the merge/auto-resolve loop below sees the non-local source set.
   // NOT nested in `if (audit)` — local visibility is provider-snapshot-sourced, independent of the
   // Webflow audit. Each reader is in its OWN try/catch calling failedCategories.add(<category>)
   // on catch — a transient empty/throwing read must NOT drop the source from newSources and

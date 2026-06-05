@@ -10,19 +10,9 @@ let wsId = '';
 beforeAll(async () => {
   await ctx.startServer();
   wsId = createWorkspace('Fixture Keyword Command Center').id;
-  await api('/api/admin/feature-flags/local-seo-visibility', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ enabled: true }),
-  });
 });
 
 afterAll(async () => {
-  await api('/api/admin/feature-flags/local-seo-visibility', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ enabled: null }),
-  });
   deleteWorkspace(wsId);
   await ctx.stopServer();
 });

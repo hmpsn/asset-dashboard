@@ -329,7 +329,7 @@ describe('FEATURE_FLAGS constants', () => {
   it('contains expected flag keys', () => {
     expect('keyword-hub' in FEATURE_FLAGS).toBe(true);
     expect('white-label' in FEATURE_FLAGS).toBe(true);
-    expect('local-seo-visibility' in FEATURE_FLAGS).toBe(true);
+    expect('client-briefing-v2' in FEATURE_FLAGS).toBe(true);
   });
 });
 

@@ -6,8 +6,6 @@ import { getClientLocations } from '../../server/client-locations.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import { createTestContext } from './helpers.js';
 
-process.env.FEATURE_LOCAL_SEO_VISIBILITY = 'true';
-
 // Coverage signal for background-job-coverage-contract:
 // POST/PUT/DELETE locations endpoints enqueue BACKGROUND_JOB_TYPES.LOCAL_SEO_LOCATION_BACKFILL
 void BACKGROUND_JOB_TYPES.LOCAL_SEO_LOCATION_BACKFILL;

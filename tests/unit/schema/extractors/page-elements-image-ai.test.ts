@@ -2,12 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createAiBudget } from '../../../../server/schema/extractors/page-elements/ai-budget.js';
 import type { PageImage } from '../../../../shared/types/page-elements.js';
 
-// We mock the OpenAI client + image-fetch + feature-flag at the boundary the
+// We mock the OpenAI client + image-fetch at the boundary the
 // classifier uses. The classifier imports a `getOpenAIClient` lazy accessor
 // (defined in image-ai-classifier.ts) so the test can swap in a fake.
-vi.mock('../../../../server/feature-flags.js', () => ({
-  isFeatureEnabled: vi.fn(),
-}));
 vi.mock('../../../../server/schema/extractors/page-elements/image-fetch.js', () => ({
   fetchImageAsBase64: vi.fn(),
 }));
@@ -24,7 +21,6 @@ vi.mock('../../../../server/schema/extractors/page-elements/image-ai-classifier.
   };
 });
 
-import { isFeatureEnabled } from '../../../../server/feature-flags.js';
 import { fetchImageAsBase64 } from '../../../../server/schema/extractors/page-elements/image-fetch.js';
 import { aiClassifyImages, __setOpenAIClientForTest } from '../../../../server/schema/extractors/page-elements/image-ai-classifier.js';
 
@@ -54,8 +50,7 @@ describe('aiClassifyImages', () => {
     mockCreate.mockReset();
   });
 
-  it('returns unchanged when feature flag is OFF (no AI calls)', async () => {
-    vi.mocked(isFeatureEnabled).mockReturnValue(false);
+  it('returns unchanged when image fetch fails before AI classification', async () => {
     const budget = createAiBudget(100);
     const result = await aiClassifyImages([ambiguousImage], { budget, workspaceId: 'ws-1' });
     expect(result).toEqual([ambiguousImage]);
@@ -63,7 +58,6 @@ describe('aiClassifyImages', () => {
   });
 
   it('returns unchanged when budget is 0', async () => {
-    vi.mocked(isFeatureEnabled).mockReturnValue(true);
     const budget = createAiBudget(0);
     const result = await aiClassifyImages([ambiguousImage], { budget, workspaceId: 'ws-1' });
     expect(result).toEqual([ambiguousImage]);
@@ -71,7 +65,6 @@ describe('aiClassifyImages', () => {
   });
 
   it('skips images that are not ambiguous (roleSource !== "fallback")', async () => {
-    vi.mocked(isFeatureEnabled).mockReturnValue(true);
     const ruleClassified: PageImage = { ...ambiguousImage, roleSource: 'rule', role: 'hero' };
     const budget = createAiBudget(100);
     const result = await aiClassifyImages([ruleClassified], { budget, workspaceId: 'ws-1' });
@@ -81,7 +74,6 @@ describe('aiClassifyImages', () => {
   });
 
   it('upgrades roleSource to "ai" + uses returned role on successful call', async () => {
-    vi.mocked(isFeatureEnabled).mockReturnValue(true);
     vi.mocked(fetchImageAsBase64).mockResolvedValue('data:image/jpeg;base64,abc');
     mockCreate.mockResolvedValue(fakeChatResponse('{"role":"informative"}'));
     const budget = createAiBudget(100);
@@ -92,7 +84,6 @@ describe('aiClassifyImages', () => {
   });
 
   it('reclassifies decorative based on AI response', async () => {
-    vi.mocked(isFeatureEnabled).mockReturnValue(true);
     vi.mocked(fetchImageAsBase64).mockResolvedValue('data:image/jpeg;base64,abc');
     mockCreate.mockResolvedValue(fakeChatResponse('{"role":"decorative"}'));
     const budget = createAiBudget(100);
@@ -102,7 +93,6 @@ describe('aiClassifyImages', () => {
   });
 
   it('leaves image unchanged on AI parse error (invalid JSON)', async () => {
-    vi.mocked(isFeatureEnabled).mockReturnValue(true);
     vi.mocked(fetchImageAsBase64).mockResolvedValue('data:image/jpeg;base64,abc');
     mockCreate.mockResolvedValue(fakeChatResponse('not json'));
     const budget = createAiBudget(100);
@@ -113,7 +103,6 @@ describe('aiClassifyImages', () => {
   });
 
   it('leaves image unchanged on invalid role label', async () => {
-    vi.mocked(isFeatureEnabled).mockReturnValue(true);
     vi.mocked(fetchImageAsBase64).mockResolvedValue('data:image/jpeg;base64,abc');
     mockCreate.mockResolvedValue(fakeChatResponse('{"role":"nonsense"}'));
     const budget = createAiBudget(100);
@@ -122,7 +111,6 @@ describe('aiClassifyImages', () => {
   });
 
   it('falls through (no AI call) when fetchImageAsBase64 returns null', async () => {
-    vi.mocked(isFeatureEnabled).mockReturnValue(true);
     vi.mocked(fetchImageAsBase64).mockResolvedValue(null);
     const budget = createAiBudget(100);
     const result = await aiClassifyImages([ambiguousImage], { budget, workspaceId: 'ws-1' });
@@ -133,7 +121,6 @@ describe('aiClassifyImages', () => {
   });
 
   it('stops calling AI once budget exhausts mid-loop', async () => {
-    vi.mocked(isFeatureEnabled).mockReturnValue(true);
     vi.mocked(fetchImageAsBase64).mockResolvedValue('data:image/jpeg;base64,abc');
     mockCreate.mockResolvedValue(fakeChatResponse('{"role":"informative"}'));
     const budget = createAiBudget(2);

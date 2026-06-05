@@ -2,7 +2,7 @@
  * AI image-role classifier (PR2). Wraps the rule-based output of
  * extractImages() and re-classifies images flagged as ambiguous
  * (roleSource === 'fallback'). Budgeted: consumes one AiBudget slot
- * per image. Behind the schema-ai-element-classifier feature flag.
+ * per image.
  *
  * Calls OpenAI's chat.completions.create() directly with vision content.
  * Bypasses callAI/callOpenAI because both stringify message content arrays
@@ -21,7 +21,6 @@
  */
 import OpenAI from 'openai';
 import type { PageImage } from '../../../../shared/types/page-elements.js';
-import { isFeatureEnabled } from '../../../feature-flags.js';
 import { logTokenUsage } from '../../../openai-helpers.js';
 import { fetchImageAsBase64 } from './image-fetch.js';
 import { tryConsumeAiBudget } from './ai-budget.js';
@@ -67,8 +66,6 @@ export async function aiClassifyImages(
   images: PageImage[],
   opts: AiClassifyImagesOpts,
 ): Promise<PageImage[]> {
-  if (!isFeatureEnabled('schema-ai-element-classifier')) return images;
-
   const result: PageImage[] = [];
   for (const image of images) {
     if (image.roleSource !== 'fallback') {

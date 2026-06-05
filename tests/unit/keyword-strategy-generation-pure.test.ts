@@ -25,6 +25,7 @@ import {
   KeywordStrategyGenerationError,
   hasActiveKeywordStrategyGeneration,
   KEYWORD_STRATEGY_MAX_PAGE_CAP,
+  reconcileSeoDataStatusAfterCanonicalDiscovery,
 } from '../../server/keyword-strategy-generation.js';
 import {
   computeOpportunityScore,
@@ -85,6 +86,52 @@ describe('hasActiveKeywordStrategyGeneration', () => {
   it('returns false for a workspace not in the active set', () => {
     // The set is module-private; we can only observe the exported guard.
     expect(hasActiveKeywordStrategyGeneration('ws_nonexistent')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// reconcileSeoDataStatusAfterCanonicalDiscovery
+// ---------------------------------------------------------------------------
+describe('reconcileSeoDataStatusAfterCanonicalDiscovery', () => {
+  it('clears provider_returned_no_keyword_data when canonical discovery produced provider-backed terms', () => {
+    const result = reconcileSeoDataStatusAfterCanonicalDiscovery(
+      {
+        mode: 'quick',
+        provider: 'dataforseo',
+        status: 'degraded',
+        reasons: ['provider_returned_no_keyword_data'],
+        fallbackProviderAvailable: false,
+      },
+      new Map([
+        ['austin dental implants', { source: 'discovery:keywords_for_site' }],
+      ]),
+    );
+
+    expect(result).toEqual({
+      mode: 'quick',
+      provider: 'dataforseo',
+      status: 'available',
+      reasons: [],
+      fallbackProviderAvailable: false,
+    });
+  });
+
+  it('keeps degraded status when the keyword pool has only client or GSC data', () => {
+    const result = reconcileSeoDataStatusAfterCanonicalDiscovery(
+      {
+        mode: 'quick',
+        provider: 'dataforseo',
+        status: 'degraded',
+        reasons: ['provider_returned_no_keyword_data'],
+      },
+      new Map([
+        ['client keyword', { source: 'client' }],
+        ['gsc keyword', { source: 'gsc' }],
+      ]),
+    );
+
+    expect(result.status).toBe('degraded');
+    expect(result.reasons).toEqual(['provider_returned_no_keyword_data']);
   });
 });
 

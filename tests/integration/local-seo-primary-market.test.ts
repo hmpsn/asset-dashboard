@@ -3,8 +3,6 @@ import { createTestContext } from './helpers.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import type { LocalSeoReadResponse } from '../../shared/types/local-seo.js';
 
-process.env.FEATURE_LOCAL_SEO_VISIBILITY = 'true';
-
 const ctx = createTestContext(13363); // port-ok: next free after 13362
 const { api } = ctx;
 
@@ -22,11 +20,6 @@ async function readLocalSeo(): Promise<LocalSeoReadResponse> {
 describe('Local SEO primary market', () => {
   beforeAll(async () => {
     await ctx.startServer();
-    await api('/api/admin/feature-flags/local-seo-visibility', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled: true }),
-    });
     seeded = seedWorkspace({ seoDataProvider: 'dataforseo' });
     workspaceId = seeded.workspaceId;
 
@@ -64,11 +57,6 @@ describe('Local SEO primary market', () => {
 
   afterAll(async () => {
     seeded.cleanup();
-    await api('/api/admin/feature-flags/local-seo-visibility', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled: null }),
-    });
     await ctx.stopServer();
   });
 
@@ -155,26 +143,13 @@ describe('Local SEO primary market', () => {
     expect(localSeo.markets.find(market => market.id === market2Id)?.isPrimary).toBe(false);
   });
 
-  it('PUT /set-primary returns 403 while Local SEO visibility is disabled', async () => {
-    await api('/api/admin/feature-flags/local-seo-visibility', {
+  it('PUT /set-primary remains available without a feature-flag precondition', async () => {
+    const res = await api(`/api/local-seo/${workspaceId}/markets/${market1Id}/set-primary`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled: false }),
+      body: JSON.stringify({}),
     });
-    try {
-      const res = await api(`/api/local-seo/${workspaceId}/markets/${market1Id}/set-primary`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-      expect(res.status).toBe(403);
-    } finally {
-      await api('/api/admin/feature-flags/local-seo-visibility', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: true }),
-      });
-    }
+    expect(res.status).toBe(200);
   });
 
   it('PUT /set-primary with unknown marketId returns 404', async () => {

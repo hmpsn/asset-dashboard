@@ -30,7 +30,6 @@ import { FakeSeoProvider } from '../../server/providers/fake-seo-provider.js';
 import { updateLocalSeoConfiguration, listLocalSeoMarkets, getLocalSeoPosture } from '../../server/local-seo.js';
 import { setBroadcast } from '../../server/broadcast.js';
 import { upsertPageKeyword } from '../../server/page-keywords.js';
-import { isFeatureEnabled, setFlagOverride, setWorkspaceFlagOverride } from '../../server/feature-flags.js';
 import { LOCAL_SEO_POSTURE, LOCAL_SEO_MARKET_STATUS } from '../../shared/types/local-seo.js';
 import { KEYWORD_CANDIDATE_SOURCE } from '../../shared/types/keyword-universe.js';
 import type { DomainKeyword } from '../../server/seo-data-provider.js';
@@ -452,27 +451,14 @@ describe('buildKeywordUniverse — P7.2 local-intent candidates', () => {
 //
 //   const includeLocalUniverse = seoGenQualityEnabled
 //     && (posture === LOCAL || posture === HYBRID)
-//     && isFeatureEnabled('local-seo-visibility');
-//
 // Driving the FULL synthesis path to exercise it is disproportionately heavy (it
 // requires mocking callAI, buildWorkspaceIntelligence, provider data, page info,
-// and the downstream AI batching). So — per the P7.2 review's offered alternative —
-// this is a FOCUSED test of the gate expression that drives the REAL gate INPUTS:
-// `getLocalSeoPosture` (seeded via updateLocalSeoConfiguration) and the REAL
-// `isFeatureEnabled` resolution (seeded via flag overrides). It mirrors P7.1's
-// posture-gated parity matrix (tests/integration/seo-genquality-p7-1-local-recs.test.ts):
-// the gate is FALSE when ANY of the three conditions is off and TRUE only when all
-// three are on. The assembler-side `includeLocal:false` byte-identity path is
-// covered by the parity test above. Because the synthesis const is not exported,
-// this mirrors the same conjunction here — keep the two in lockstep if either moves.
-describe('P7.2 caller-side includeLocal gate (3-condition conjunction, real inputs)', () => {
-  /** The exact synthesis-side gate, recomputed from the REAL posture + flag resolvers. */
+// and the downstream AI batching). So this is a focused test of the posture-based
+// gate that drives the real includeLocal input.
+describe('P7.2 caller-side includeLocal gate (posture-based, real inputs)', () => {
   function resolveIncludeLocalGate(wsId: string): boolean {
-    const seoGenQualityEnabled = isFeatureEnabled('seo-generation-quality', wsId);
     const posture = getLocalSeoPosture(wsId);
-    return seoGenQualityEnabled
-      && (posture === LOCAL_SEO_POSTURE.LOCAL || posture === LOCAL_SEO_POSTURE.HYBRID)
-      && isFeatureEnabled('local-seo-visibility');
+    return posture === LOCAL_SEO_POSTURE.LOCAL || posture === LOCAL_SEO_POSTURE.HYBRID;
   }
 
   function setPosture(posture: typeof LOCAL_SEO_POSTURE[keyof typeof LOCAL_SEO_POSTURE]) {
@@ -481,43 +467,20 @@ describe('P7.2 caller-side includeLocal gate (3-condition conjunction, real inpu
   }
 
   afterEach(() => {
-    // Drop both overrides so the gate matrix can't leak across cases / files.
-    setWorkspaceFlagOverride('seo-generation-quality', workspaceId, null);
-    setFlagOverride('local-seo-visibility', null);
   });
 
-  it('all three ON (gen-quality + posture LOCAL + local-seo-visibility) → gate TRUE', () => {
+  it('LOCAL posture → gate TRUE', () => {
     setPosture(LOCAL_SEO_POSTURE.LOCAL);
-    setWorkspaceFlagOverride('seo-generation-quality', workspaceId, true);
-    setFlagOverride('local-seo-visibility', true);
     expect(resolveIncludeLocalGate(workspaceId)).toBe(true);
   });
 
-  it('all three ON with HYBRID posture → gate TRUE (hybrid is in-scope like local)', () => {
+  it('HYBRID posture → gate TRUE', () => {
     setPosture(LOCAL_SEO_POSTURE.HYBRID);
-    setWorkspaceFlagOverride('seo-generation-quality', workspaceId, true);
-    setFlagOverride('local-seo-visibility', true);
     expect(resolveIncludeLocalGate(workspaceId)).toBe(true);
   });
 
-  it('gen-quality ON + local-seo-visibility ON but posture NON_LOCAL → gate FALSE', () => {
+  it('NON_LOCAL posture → gate FALSE', () => {
     setPosture(LOCAL_SEO_POSTURE.NON_LOCAL);
-    setWorkspaceFlagOverride('seo-generation-quality', workspaceId, true);
-    setFlagOverride('local-seo-visibility', true);
-    expect(resolveIncludeLocalGate(workspaceId)).toBe(false);
-  });
-
-  it('posture LOCAL + local-seo-visibility ON but gen-quality OFF → gate FALSE', () => {
-    setPosture(LOCAL_SEO_POSTURE.LOCAL);
-    setWorkspaceFlagOverride('seo-generation-quality', workspaceId, false);
-    setFlagOverride('local-seo-visibility', true);
-    expect(resolveIncludeLocalGate(workspaceId)).toBe(false);
-  });
-
-  it('gen-quality ON + posture LOCAL but local-seo-visibility OFF → gate FALSE', () => {
-    setPosture(LOCAL_SEO_POSTURE.LOCAL);
-    setWorkspaceFlagOverride('seo-generation-quality', workspaceId, true);
-    setFlagOverride('local-seo-visibility', false);
     expect(resolveIncludeLocalGate(workspaceId)).toBe(false);
   });
 });

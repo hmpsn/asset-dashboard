@@ -25,15 +25,14 @@ export interface RecommendedForYouProps {
    */
   onRequestBrief: (rec: BriefingRecommendation) => void;
   /**
-   * SEO Gen-Quality P4 (Contract 3) — the per-workspace `seo-generation-quality`
-   * umbrella state, resolved server-side and threaded down via the briefing
-   * response (`ovGainActive`). The client has no per-workspace flag mechanism,
-   * so this prop is the single gate for the recommendation materiality signal.
+   * `ovGainActive` is resolved server-side and threaded down via the briefing
+   * response. The client has no per-workspace flag mechanism, so this prop is
+   * the single gate for the recommendation materiality signal.
    *   ON  → the opportunity-score badge is OV-EMV-derived ("Opportunity NN") and
    *         the competing `volume × 0.103` "est. clicks at rank #3" estimate is
    *         suppressed (one basis — no diverging estimator).
-   *   OFF → the pre-P4 surface renders byte-identically: "NN/100" badge + the
-   *         "est. clicks at rank #3" line. Defaults OFF (= all prod today).
+   *   OFF → the legacy surface renders for older payload compatibility:
+   *         "NN/100" badge + the "est. clicks at rank #3" line.
    */
   ovGainActive?: boolean;
 }

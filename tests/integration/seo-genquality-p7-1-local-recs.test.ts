@@ -34,7 +34,6 @@ vi.mock('../../server/broadcast.js', () => ({
 
 import db from '../../server/db/index.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
-import { setWorkspaceFlagOverride, setFlagOverride } from '../../server/feature-flags.js';
 import {
   generateRecommendations,
   recommendationOutcomeActionType,
@@ -204,7 +203,7 @@ describe('P7.1 Scope C — local OV branch + identity local term', () => {
 
 // ── (1) posture-gated parity — ANY gate false → ZERO local recs ─────────────────
 
-describe('P7.1 posture-gated parity (byte-identical when any gate is false)', () => {
+describe('P7.1 posture-gated parity', () => {
   let s: ReturnType<typeof seedWorkspace>;
 
   beforeEach(() => {
@@ -213,8 +212,6 @@ describe('P7.1 posture-gated parity (byte-identical when any gate is false)', ()
   });
 
   afterEach(() => {
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, null);
-    setFlagOverride('local-seo-visibility', null);
     vi.restoreAllMocks();
     cleanupRecs(s.workspaceId);
     s.cleanup();
@@ -227,54 +224,24 @@ describe('P7.1 posture-gated parity (byte-identical when any gate is false)', ()
     expect(recs.some(r => r.source.startsWith('local_service_gap:'))).toBe(false);
   }
 
-  it('gen-quality OFF + local-flag OFF + non-local posture → ZERO local recs', async () => {
+  it('non-local posture → ZERO local recs', async () => {
     installLocalSpies({ posture: LOCAL_SEO_POSTURE.NON_LOCAL });
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, false);
-    setFlagOverride('local-seo-visibility', false);
-    const set = await generateRecommendations(s.workspaceId);
-    expectNoLocalRecs(set.recommendations);
-  });
-
-  it('gen-quality ON + local-flag ON but posture NON_LOCAL → ZERO local recs', async () => {
-    installLocalSpies({ posture: LOCAL_SEO_POSTURE.NON_LOCAL });
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, true);
-    setFlagOverride('local-seo-visibility', true);
-    const set = await generateRecommendations(s.workspaceId);
-    expectNoLocalRecs(set.recommendations);
-  });
-
-  it('gen-quality ON + posture LOCAL but local-seo-visibility flag OFF → ZERO local recs', async () => {
-    installLocalSpies({ posture: LOCAL_SEO_POSTURE.LOCAL });
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, true);
-    setFlagOverride('local-seo-visibility', false);
-    const set = await generateRecommendations(s.workspaceId);
-    expectNoLocalRecs(set.recommendations);
-  });
-
-  it('local-seo-visibility ON + posture LOCAL but gen-quality flag OFF → ZERO local recs', async () => {
-    installLocalSpies({ posture: LOCAL_SEO_POSTURE.LOCAL });
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, false);
-    setFlagOverride('local-seo-visibility', true);
     const set = await generateRecommendations(s.workspaceId);
     expectNoLocalRecs(set.recommendations);
   });
 });
 
-// ── (2) flag-ON minting (all three gates true) ──────────────────────────────────
+// ── (2) local/hybrid minting ─────────────────────────────────────────────────────
 
-describe('P7.1 all-gates-ON minting', () => {
+describe('P7.1 local/hybrid minting', () => {
   let s: ReturnType<typeof seedWorkspace>;
 
   beforeEach(() => {
     s = seedWorkspace({});
     setMinimalStrategy(s.workspaceId);
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, true);
-    setFlagOverride('local-seo-visibility', true);
   });
 
   afterEach(() => {
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, null);
-    setFlagOverride('local-seo-visibility', null);
     vi.restoreAllMocks();
     cleanupRecs(s.workspaceId);
     s.cleanup();
@@ -327,13 +294,9 @@ describe('P7.1 FM-2 — throwing local reader does not bulk auto-resolve prior l
   beforeEach(() => {
     s = seedWorkspace({});
     setMinimalStrategy(s.workspaceId);
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, true);
-    setFlagOverride('local-seo-visibility', true);
   });
 
   afterEach(() => {
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, null);
-    setFlagOverride('local-seo-visibility', null);
     vi.restoreAllMocks();
     cleanupRecs(s.workspaceId);
     s.cleanup();
@@ -368,13 +331,9 @@ describe('P7.1 dedupe-vs-panel', () => {
   beforeEach(() => {
     s = seedWorkspace({});
     setMinimalStrategy(s.workspaceId);
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, true);
-    setFlagOverride('local-seo-visibility', true);
   });
 
   afterEach(() => {
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, null);
-    setFlagOverride('local-seo-visibility', null);
     vi.restoreAllMocks();
     cleanupRecs(s.workspaceId);
     s.cleanup();
@@ -407,13 +366,9 @@ describe('P7.1 B3 — LOCAL_PACK_PRESENT mints a strong not-visible rec (I-1)', 
   beforeEach(() => {
     s = seedWorkspace({});
     setMinimalStrategy(s.workspaceId);
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, true);
-    setFlagOverride('local-seo-visibility', true);
   });
 
   afterEach(() => {
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, null);
-    setFlagOverride('local-seo-visibility', null);
     vi.restoreAllMocks();
     cleanupRecs(s.workspaceId);
     s.cleanup();
@@ -483,13 +438,9 @@ describe('P7.1 dedupe safe-direction — panel-dedupe protects the whole categor
   beforeEach(() => {
     s = seedWorkspace({});
     setMinimalStrategy(s.workspaceId);
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, true);
-    setFlagOverride('local-seo-visibility', true);
   });
 
   afterEach(() => {
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, null);
-    setFlagOverride('local-seo-visibility', null);
     vi.restoreAllMocks();
     cleanupRecs(s.workspaceId);
     s.cleanup();
@@ -534,8 +485,6 @@ describe('P7.1 public-leak — local recs strip money fields + no dollarized gai
     const workspaceId = ws.id;
     try {
       setMinimalStrategy(workspaceId);
-      setWorkspaceFlagOverride('seo-generation-quality', workspaceId, true);
-      setFlagOverride('local-seo-visibility', true);
       installLocalSpies({ posture: LOCAL_SEO_POSTURE.LOCAL });
       await generateRecommendations(workspaceId);
 
@@ -553,8 +502,6 @@ describe('P7.1 public-leak — local recs strip money fields + no dollarized gai
         expect(r.opportunity && 'predictedEmv' in r.opportunity).toBeFalsy();
       }
     } finally {
-      setWorkspaceFlagOverride('seo-generation-quality', workspaceId, null);
-      setFlagOverride('local-seo-visibility', null);
       vi.restoreAllMocks();
       cleanupRecs(workspaceId);
       deleteWorkspace(workspaceId);

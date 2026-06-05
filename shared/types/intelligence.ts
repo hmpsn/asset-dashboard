@@ -503,7 +503,7 @@ export interface LocalSeoSlice {
     stateOrRegion?: string;
     pageTargetPath?: string;
   }>;
-  /** Whether the local-seo-visibility feature flag is enabled. */
+  /** Whether local SEO is active for this workspace read model. */
   enabled: boolean;
   /** Configured local markets and their status. Not capped. */
   markets: ReadonlyArray<{

@@ -19,13 +19,6 @@ describe('Fixture local SEO location-lookup route', () => {
   beforeAll(async () => {
     await ctx.startServer();
 
-    const featureEnable = await api('/api/admin/feature-flags/local-seo-visibility', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled: true }),
-    });
-    expect(featureEnable.status).toBe(200);
-
     seeded = seedWorkspace({ seoDataProvider: 'dataforseo' });
     workspaceId = seeded.workspaceId;
     scopedAuth = await seedAuthData();
@@ -50,12 +43,6 @@ describe('Fixture local SEO location-lookup route', () => {
   afterAll(async () => {
     if (seeded) seeded.cleanup();
     if (scopedAuth) scopedAuth.cleanup();
-
-    await api('/api/admin/feature-flags/local-seo-visibility', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled: null }),
-    });
 
     await ctx.stopServer();
   });

@@ -18,13 +18,6 @@ describe('Fixture-based local SEO routes', () => {
   beforeAll(async () => {
     await ctx.startServer();
 
-    const featureEnable = await api('/api/admin/feature-flags/local-seo-visibility', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled: true }),
-    });
-    expect(featureEnable.status).toBe(200);
-
     seeded = seedWorkspace({ seoDataProvider: 'dataforseo' });
     workspaceId = seeded.workspaceId;
 
@@ -57,12 +50,6 @@ describe('Fixture-based local SEO routes', () => {
   afterAll(async () => {
     if (seeded) seeded.cleanup();
     foreignAuth?.cleanup();
-
-    await api('/api/admin/feature-flags/local-seo-visibility', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled: null }),
-    });
 
     await ctx.stopServer();
   });

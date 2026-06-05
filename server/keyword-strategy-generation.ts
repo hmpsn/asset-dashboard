@@ -7,7 +7,7 @@ import { DEFAULT_SEO_DATA_PROVIDER, getConfiguredProvider, normalizeRuntimeSeoDa
 import { incrementIfAllowed, decrementUsage } from './usage-tracking.js';
 import { updateWorkspace, getWorkspace, getTokenForSite } from './workspaces.js';
 import { createLogger } from './logger.js';
-import type { PageKeywordMap, KeywordStrategy } from '../shared/types/workspace.js';
+import type { PageKeywordMap, KeywordStrategy, SeoDataStatus } from '../shared/types/workspace.js';
 import { fetchAndCacheKeywordStrategySeoData } from './keyword-strategy-seo-data.js';
 import { discoverKeywordStrategyPages } from './keyword-strategy-pages.js';
 import { fetchKeywordStrategySearchData } from './keyword-strategy-search-data.js';
@@ -28,7 +28,6 @@ import { listTopicClusters } from './topic-clusters.js';
 import { listCannibalizationIssues } from './cannibalization-issues.js';
 import { normalizePageUrl } from './helpers.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
-import { isFeatureEnabled } from './feature-flags.js';
 import { backfillContentGapsToFloor, STRATEGY_CONTENT_GAP_FLOOR } from './keyword-strategy-helpers.js';
 import type { GenerationQuality } from '../shared/types/generation-quality.js';
 
@@ -97,6 +96,38 @@ function normalizeSeoDataProvider(provider: string | undefined): ProviderName | 
   return provider ? normalizeRuntimeSeoDataProvider(provider) : undefined;
 }
 
+function hasProviderBackedKeywordPoolData(
+  keywordPool: Map<string, { source: string }>,
+): boolean {
+  for (const metric of keywordPool.values()) {
+    if (metric.source !== 'client' && metric.source !== 'gsc' && metric.source !== 'local') {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function reconcileSeoDataStatusAfterCanonicalDiscovery(
+  seoDataStatus: SeoDataStatus | undefined,
+  keywordPool: Map<string, { source: string }>,
+): SeoDataStatus | undefined {
+  if (!seoDataStatus) return seoDataStatus;
+  if (
+    seoDataStatus.status !== 'degraded'
+    || !seoDataStatus.reasons?.includes('provider_returned_no_keyword_data')
+    || !hasProviderBackedKeywordPoolData(keywordPool)
+  ) {
+    return seoDataStatus;
+  }
+
+  const reasons = seoDataStatus.reasons.filter(reason => reason !== 'provider_returned_no_keyword_data');
+  return {
+    ...seoDataStatus,
+    status: reasons.length > 0 ? 'degraded' : 'available',
+    reasons,
+  };
+}
+
 export async function generateKeywordStrategy(options: GenerateKeywordStrategyOptions): Promise<GenerateKeywordStrategyResult> {
   const ws = getWorkspace(options.workspaceId);
   if (!ws) throw new KeywordStrategyGenerationError(404, { error: 'Workspace not found' });
@@ -130,12 +161,10 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
   const businessContext = options.businessContext || ws.keywordStrategy?.businessContext || '';
   const strategyMode = options.mode === 'incremental' ? 'incremental' : 'full'; // 'full' | 'incremental'
   const requestedSeoDataMode = normalizeSeoDataMode(options.seoDataMode);
-  // MCP-seed (G/P1 #8): the MCP/chat path passes a provider but no seoDataMode, so
-  // it collapses to 'none' and discovery is starved. On the flag-ON path, treat
-  // "provider present" as "build a real universe" — promote the collapsed 'none'
-  // to 'quick' so seo-data fetches domain/competitor seeds and the assembler has a
-  // populated pool. Flag-OFF is unchanged (byte-identical).
-  const seoDataMode = (requestedSeoDataMode === 'none' && provider && isFeatureEnabled('seo-generation-quality', ws.id))
+  // The MCP/chat path may pass a provider but no seoDataMode, which otherwise
+  // collapses to 'none' and starves discovery. Promote that case to 'quick' so
+  // the canonical universe path always has real provider-backed seeds.
+  const seoDataMode = (requestedSeoDataMode === 'none' && provider)
     ? 'quick'
     : requestedSeoDataMode;
   const competitorDomains = options.competitorDomains ? [...options.competitorDomains] : [...(ws.competitorDomains || [])];
@@ -252,6 +281,10 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       provider,
       sendProgress,
     });
+    const reconciledSeoDataStatus = reconcileSeoDataStatusAfterCanonicalDiscovery(seoDataStatus, synthesis.keywordPool);
+    if (reconciledSeoDataStatus) {
+      seoDataStatus = reconciledSeoDataStatus;
+    }
 
     if (synthesis.upToDate) {
       const noOpStrategy = (synthesis.strategy ?? { pageMap: [] }) as StrategyOutput;
@@ -390,11 +423,8 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       throw new KeywordStrategyGenerationError(500, { error: 'Strategy generation produced no valid page keyword assignments' });
     }
 
-    // SEO Generation Quality P2 (flag `seo-generation-quality`, per-workspace):
-    // compute ONCE here and thread the boolean into enrichment (token-subset prune)
-    // and the deterministic backfill floor below. Do NOT scatter isFeatureEnabled
-    // into hot loops. Flag-OFF (false) keeps pruning/backfill byte-identical.
-    const relaxConservatism = isFeatureEnabled('seo-generation-quality', ws.id);
+    // The generation-quality enrichment path is now canonical.
+    const relaxConservatism = true;
 
     let {
       siteKeywordMetrics,

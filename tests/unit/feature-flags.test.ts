@@ -200,12 +200,12 @@ describe('isFeatureEnabled — per-workspace dimension', () => {
   });
 });
 
-describe('seo-generation-quality umbrella flag', () => {
-  it('is registered, defaults false, and is in the SEO Generation Quality group', () => {
-    expect(FEATURE_FLAGS['seo-generation-quality']).toBe(false);
-    expect(FEATURE_FLAG_CATALOG['seo-generation-quality'].group).toBe('SEO Generation Quality');
-    expect(FEATURE_FLAG_CATALOG['seo-generation-quality'].lifecycle.linkedRoadmapItemId)
-      .toBe('seo-genquality-p0-harness');
+describe('keyword-hub catalog entry', () => {
+  it('is registered, defaults false, and is in the Keyword Hub group', () => {
+    expect(FEATURE_FLAGS['keyword-hub']).toBe(false);
+    expect(FEATURE_FLAG_CATALOG['keyword-hub'].group).toBe('Keyword Hub');
+    expect(FEATURE_FLAG_CATALOG['keyword-hub'].lifecycle.linkedRoadmapItemId)
+      .toBe('keyword-hub-wave4');
   });
 });
 

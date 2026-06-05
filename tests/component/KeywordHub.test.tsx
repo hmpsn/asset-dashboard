@@ -9,7 +9,7 @@
  *   - search input updates searchTerm (debounced → rows query)
  *   - renders HubAdvancedFilters
  *   - loading state when rows pending; rows when loaded
- *   - showLocalSeo true/false per `local-seo-visibility` flag
+ *   - showLocalSeo stays enabled for the canonical local SEO surface
  *   - changing segment resets to page 1
  *   - useWorkspaceEvents registered for RANK_TRACKING_UPDATED + STRATEGY_UPDATED
  *   - bulk action mutation called when emitted from the list
@@ -35,7 +35,6 @@ const rowsHookMock = vi.fn();
 const bulkMutateMock = vi.fn();
 const rowActionMutateMock = vi.fn();
 const hardDeleteMutateMock = vi.fn();
-const featureFlagMock = vi.fn();
 const workspaceEventsMock = vi.fn();
 
 vi.mock('../../src/hooks/admin/useKeywordCommandCenter', () => ({
@@ -49,10 +48,6 @@ vi.mock('../../src/hooks/admin/useKeywordCommandCenter', () => ({
 
 vi.mock('../../src/hooks/admin/useLocalSeo', () => ({
   useLocalSeoRefresh: () => ({ mutate: vi.fn(), isPending: false }),
-}));
-
-vi.mock('../../src/hooks/useFeatureFlag', () => ({
-  useFeatureFlag: (...args: unknown[]) => featureFlagMock(...args),
 }));
 
 vi.mock('../../src/hooks/useWorkspaceEvents', () => ({
@@ -152,7 +147,7 @@ const rowsPayload: KeywordCommandCenterRowsResponse = {
   },
 };
 
-function setupHooks(opts: { rowsLoading?: boolean; localFlag?: boolean } = {}) {
+function setupHooks(opts: { rowsLoading?: boolean } = {}) {
   summaryHookMock.mockReturnValue({ data: summaryPayload, isLoading: false, error: null });
   rowsHookMock.mockReturnValue({
     data: opts.rowsLoading ? undefined : rowsPayload,
@@ -160,9 +155,6 @@ function setupHooks(opts: { rowsLoading?: boolean; localFlag?: boolean } = {}) {
     isError: false,
     error: null,
   });
-  featureFlagMock.mockImplementation((flag: string) =>
-    flag === 'local-seo-visibility' ? (opts.localFlag ?? false) : false,
-  );
 }
 
 function renderHub(initialEntries: string[] = ['/ws/ws-1/seo-keywords']) {
@@ -241,16 +233,9 @@ describe('KeywordHub', () => {
     expect(screen.getByTestId('list-loading')).toHaveTextContent('loading');
   });
 
-  it('passes showLocalSeo=true only when local-seo-visibility flag is on', () => {
-    setupHooks({ localFlag: true });
+  it('passes showLocalSeo=true for the canonical local SEO surface', () => {
     renderHub();
     expect(screen.getByTestId('list-show-local')).toHaveTextContent('true');
-  });
-
-  it('passes showLocalSeo=false when local-seo-visibility flag is off', () => {
-    setupHooks({ localFlag: false });
-    renderHub();
-    expect(screen.getByTestId('list-show-local')).toHaveTextContent('false');
   });
 
   it('updates the search term and feeds debouncedSearch to the rows query', () => {

@@ -1,5 +1,9 @@
 # Local SEO Visibility
 
+> Rollout note: the `local-seo-visibility` feature flag has been retired. Local SEO
+> behavior described here is now canonical runtime behavior; historical flag references
+> elsewhere in this document are archival rollout context only.
+
 Local SEO visibility is a market-specific evidence layer for service-area and physical-location businesses. It complements the keyword operating loop; it does not replace Rank Tracker, Keyword Strategy, Page Intelligence, or the Keyword Command Center.
 
 ## Product Boundary

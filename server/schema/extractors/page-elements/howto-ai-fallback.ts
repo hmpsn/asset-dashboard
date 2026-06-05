@@ -4,7 +4,7 @@
  * heading match (i.e. it WAS rejected by the rule-based extractor).
  *
  * Shares the same AiBudget as image classifier; consumes 1 slot per
- * disambiguation. Behind schema-ai-element-classifier feature flag.
+ * disambiguation.
  *
  * `itemsByList` is a parallel array aligned to `lists` by index — each
  * inner array contains the corresponding list's `<li>` text values. The
@@ -19,7 +19,6 @@
  * falls through to no-op for that index.
  */
 import type { PageList, HowToStep } from '../../../../shared/types/page-elements.js';
-import { isFeatureEnabled } from '../../../feature-flags.js';
 import { callAI } from '../../../ai.js';
 import { tryConsumeAiBudget } from './ai-budget.js';
 import type { AiBudget } from './ai-budget.js';
@@ -51,7 +50,6 @@ export async function aiDisambiguateHowTo(
   itemsByList: string[][],
   opts: AiDisambiguateHowToOpts,
 ): Promise<PageList[]> {
-  if (!isFeatureEnabled('schema-ai-element-classifier')) return lists;
   if (lists.length === 0) return lists;
   // Caller didn't pass parallel item text — can't disambiguate
   if (itemsByList.length === 0) return lists;
