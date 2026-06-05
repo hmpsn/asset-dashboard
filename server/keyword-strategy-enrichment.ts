@@ -1,7 +1,7 @@
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { normalizePageUrl } from './helpers.js';
-import { resolveWorkspaceLocationCode } from './local-seo.js';
+import { resolveWorkspaceLocationCode, getLocalSeoPosture, listLocalSeoMarkets } from './local-seo.js';
 import { trendDirection, hasSerpOpportunity } from './seo-provider-signals.js';
 import type { SeoDataProvider, DomainKeyword } from './seo-data-provider.js';
 import type { CompetitorKeywordData, QuestionKeywordGroup, KeywordStrategySeoDataMode } from './keyword-strategy-seo-data.js';
@@ -15,7 +15,10 @@ import {
 } from './keyword-strategy-ai-synthesis.js';
 import { computeOpportunityScore, isSuspiciousPlannerGroupedVolume } from './keyword-strategy-helpers.js';
 import { computeOpportunityValue } from './scoring/opportunity-value.js';
+import { computeKeywordValueScore } from './scoring/keyword-value-score.js';
 import { matchesQuestionKeyword } from './strategy-filters.js';
+import { isFeatureEnabled } from './feature-flags.js';
+import { getWorkspace } from './workspaces.js';
 import { METRICS_SOURCE } from '../shared/types/keywords.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 
@@ -567,14 +570,41 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
   // emvPerWeek), so it: (a) shares the OV/EMV basis (owner decision), (b) stays in the column's
   // existing 0..100 range, and (c) keeps the rec content_gap branch's grounded spine valid (it
   // reads cg.opportunityScore back as a 0..100 composite — feeding it an unbounded EMV would
-  // break the `opportunityScore/100` math). Flag-OFF keeps the legacy computeOpportunityScore
-  // (byte-identical).
+  // break the `opportunityScore/100` math).
+  //
+  // Phase 2 (keyword-value-scoring flag): build the base score ONCE at the top of the per-gap
+  // loop so all three computeOpportunityScore sites (spine input, OV fallback, P4-OFF write) use
+  // the same value. Flag-OFF keeps the legacy computeOpportunityScore (byte-identical regardless
+  // of the P4 / relaxConservatism state). ctx is built once per enrichment run, never per gap.
   if (strategy.contentGaps?.length) {
+    // Build ctx once per enrichment run — only when the flag is ON (avoids extra DB reads on the
+    // flag-OFF path, preserving byte-identity and perf).
+    const valueScoringOn = isFeatureEnabled('keyword-value-scoring', workspaceId);
+    const scoringCtx = valueScoringOn ? (() => {
+      const ws = getWorkspace(workspaceId);
+      return {
+        posture: getLocalSeoPosture(workspaceId),
+        markets: listLocalSeoMarkets(workspaceId),
+        city: ws?.businessProfile?.address?.city?.toLowerCase(),
+        state: ws?.businessProfile?.address?.state?.toLowerCase(),
+      };
+    })() : null;
+
     for (const cg of strategy.contentGaps) {
+      // base = value-first score when the flag is ON; legacy score when OFF.
+      // computeKeywordValueScore may return undefined (signal gate) — fall back to
+      // computeOpportunityScore in that case so a gap is never silently dropped.
+      const base: number | undefined = valueScoringOn && scoringCtx != null
+        ? (computeKeywordValueScore(
+            { keyword: cg.targetKeyword, volume: cg.volume, difficulty: cg.difficulty, cpc: undefined, intent: cg.intent },
+            scoringCtx,
+          ) ?? computeOpportunityScore(cg))
+        : computeOpportunityScore(cg);
+
       if (relaxConservatism) {
         const ov = computeOpportunityValue({
           branch: 'content_gap',
-          opportunityScore: computeOpportunityScore(cg) ?? null, // grounded composite spine
+          opportunityScore: base ?? null, // grounded composite spine (was: computeOpportunityScore(cg))
           volume: cg.volume ?? null,
           difficulty: cg.difficulty ?? null,
           trendDirection: (cg.trendDirection as 'rising' | 'declining' | 'stable' | undefined) ?? null,
@@ -590,9 +620,9 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
         // re-compression vs the flag-OFF magnitude basis. This is deliberate and safe: the value
         // stays in 0..100, ordering is preserved, and nothing breaks (the served tier/gain/badge
         // all share the one OV basis — Contract 3). Flag-OFF keeps the single-pass legacy score.
-        cg.opportunityScore = ov.value > 0 ? ov.value : computeOpportunityScore(cg);
+        cg.opportunityScore = ov.value > 0 ? ov.value : base; // was: computeOpportunityScore(cg)
       } else {
-        cg.opportunityScore = computeOpportunityScore(cg);
+        cg.opportunityScore = base; // was: computeOpportunityScore(cg)
       }
     }
     // Sort descending so highest-value gaps surface first in the UI
