@@ -2,6 +2,7 @@ import db from './db/index.js';
 import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { isFeatureEnabled } from './feature-flags.js';
 import { assembleStoredKeywordStrategy } from './keyword-strategy-assembler.js';
 import { resolveSiteKeywordMetrics } from './site-keyword-metrics.js';
 import {
@@ -81,7 +82,69 @@ const LOCAL_CANDIDATE_ROW_LIMIT = 75;
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 100;
 
+/**
+ * Universe-full safety ceiling (Task 3). When the `keyword-universe-full` flag is
+ * ON the per-bucket caps (rank-evidence 50, raw-evidence 75, local 75) are lifted;
+ * this is the single global backstop that protects the candidate Map from a
+ * pathological GSC snapshot. It is a BACKSTOP, not the product cap — when it bites,
+ * we keep the top-N BY VALUE (high-value head retained, low-value tail dropped) and
+ * disclose the truncation honestly (rawEvidenceTotal > rawEvidenceReturned). Logged
+ * at Pino debug when it truncates.
+ */
+const UNIVERSE_SAFETY_CEILING = 2000;
+
 const log = createLogger('keyword-command-center');
+
+const KEYWORD_UNIVERSE_FULL_FLAG = 'keyword-universe-full' as const;
+
+/**
+ * The SINGLE "select ranked-untracked GSC queries" function. Given the ranks that
+ * have already passed each site's own exclusion predicate (not-already-a-row,
+ * not-a-variant, etc.), apply the flag-derived selection so all five rank-evidence
+ * sites stay in lockstep:
+ *
+ *  - Flag OFF: keep the top-50 BY IMPRESSIONS (byte-identical to the pre-Task-3
+ *    `.sort((a,b)=>impressions desc).slice(0, RANK_EVIDENCE_ROW_LIMIT)`).
+ *  - Flag ON: keep EVERY query with clicks>0 OR impressions>0 (impression-only
+ *    ranking IS retained — owner decision), ordered BY VALUE
+ *    (demand=impressions, then clicks, desc), capped at UNIVERSE_SAFETY_CEILING.
+ *    When the cap bites, the low-value tail is dropped (value-ordered truncation).
+ *
+ * `total` is the TRUE pre-ceiling count of selected ranks (post value-filter), so
+ * callers can disclose ceiling truncation honestly. `workspaceId` may be undefined
+ * (defensive — resolves to flag-OFF/global behavior).
+ */
+function selectRankEvidence(
+  filteredRanks: LatestRank[],
+  workspaceId: string | undefined,
+): { selected: LatestRank[]; total: number } {
+  if (!isFeatureEnabled(KEYWORD_UNIVERSE_FULL_FLAG, workspaceId)) {
+    const selected = [...filteredRanks]
+      .sort((a, b) => (b.impressions ?? 0) - (a.impressions ?? 0))
+      .slice(0, RANK_EVIDENCE_ROW_LIMIT);
+    return { selected, total: Math.min(filteredRanks.length, RANK_EVIDENCE_ROW_LIMIT) };
+  }
+  // Flag ON: empirical-ranking universe — every query the site ranks for.
+  const valued = filteredRanks
+    .filter(rank => (rank.clicks ?? 0) > 0 || (rank.impressions ?? 0) > 0)
+    .sort((a, b) => {
+      // Value order: demand (impressions, the empirical-ranking demand proxy) then
+      // clicks, descending. Mirrors the candidate-stage value sort so the page-1
+      // selection equals the global value-ordered head.
+      const demandDelta = (b.impressions ?? 0) - (a.impressions ?? 0);
+      if (demandDelta !== 0) return demandDelta;
+      return (b.clicks ?? 0) - (a.clicks ?? 0);
+    });
+  const total = valued.length;
+  const selected = valued.slice(0, UNIVERSE_SAFETY_CEILING);
+  if (total > UNIVERSE_SAFETY_CEILING) {
+    log.debug(
+      { workspaceId, total, kept: UNIVERSE_SAFETY_CEILING, dropped: total - UNIVERSE_SAFETY_CEILING },
+      'keyword-command-center universe safety ceiling truncated rank evidence (value-ordered)',
+    );
+  }
+  return { selected, total };
+}
 
 const stmts = createStmtCache(() => ({
   feedback: db.prepare<[workspaceId: string]>(
@@ -149,6 +212,7 @@ export interface CommandCenterSourceBundle {
 }
 
 interface RowFinalizeContext {
+  workspaceId: string;
   localVisibilityByKeyword: Map<string, LocalSeoKeywordVisibilitySummary>;
   activeLocalMarketCount: number;
   lostVisibilityKeys?: Set<string>;
@@ -1134,11 +1198,10 @@ async function populateDraftRows(rows: Map<string, DraftRow>, bundle: CommandCen
     if (parent) variantParentMap.set(normalizedQuery, parent);
   }
 
-  const rankedUntracked = bundle.latestRanks
+  const rankedUntrackedFiltered = bundle.latestRanks
     .filter(rank => !rows.has(keywordComparisonKey(rank.query)))
-    .filter(rank => !variantParentMap.has(keywordComparisonKey(rank.query)))
-    .sort((a, b) => (b.impressions ?? 0) - (a.impressions ?? 0))
-    .slice(0, RANK_EVIDENCE_ROW_LIMIT);
+    .filter(rank => !variantParentMap.has(keywordComparisonKey(rank.query)));
+  const { selected: rankedUntracked } = selectRankEvidence(rankedUntrackedFiltered, bundle.workspaceId);
   for (const rank of rankedUntracked) {
     const row = ensureRow(rows, rank.query);
     if (!row) continue;
@@ -1274,10 +1337,16 @@ function finalizeDraftRow(row: DraftRow, context: RowFinalizeContext): KeywordCo
 
 function finalizeDraftRows(rows: Map<string, DraftRow>, context: RowFinalizeContext): FinalizedRows {
   const rawEvidenceRows = [...rows.values()].filter(row => row.rawEvidenceOnly && !row.tracking && !row.feedback && !row.localCandidate);
+  // Flag-derived raw-evidence cap: 75 (flag OFF, byte-identical) → the universe
+  // safety ceiling (flag ON). Still value-ordered (volume desc) so the cap keeps
+  // the high-value head — the row stage's equivalent of selectRankEvidence.
+  const rawEvidenceLimit = isFeatureEnabled(KEYWORD_UNIVERSE_FULL_FLAG, context.workspaceId)
+    ? UNIVERSE_SAFETY_CEILING
+    : RAW_EVIDENCE_ROW_LIMIT;
   const allowedRawEvidence = new Set(
     rawEvidenceRows
       .sort((a, b) => (b.metrics.volume ?? 0) - (a.metrics.volume ?? 0))
-      .slice(0, RAW_EVIDENCE_ROW_LIMIT)
+      .slice(0, rawEvidenceLimit)
       .map(row => row.normalizedKeyword),
   );
 
@@ -1383,6 +1452,13 @@ async function buildKeywordCommandCenterModel(
           ...all.filter(c => !c.selected),
           ...all.filter(c => c.selected),
         ];
+        // Task 3 OOM EXCEPTION: the universe-full flag does NOT lift this cap.
+        // localCandidates feed the LOCAL_CANDIDATES filter, which takes the MODEL
+        // path (buildKeywordCommandCenterModel → full per-row evaluation, not the
+        // page-bounded skinny path). Lifting this to UNIVERSE_SAFETY_CEILING would
+        // force thousands of full row evaluations into memory at once (the exact
+        // OOM regression docs/rules/keyword-command-center.md guards against), so it
+        // stays at LOCAL_CANDIDATE_ROW_LIMIT regardless of the flag.
         return sorted.slice(0, LOCAL_CANDIDATE_ROW_LIMIT);
       })()
     : [];
@@ -1408,6 +1484,7 @@ async function buildKeywordCommandCenterModel(
   ensureLocalVisibilityRows(rows, localVisibilityByKeyword);
   mark('strategyUxMs');
   const finalized = finalizeDraftRows(rows, {
+    workspaceId: workspace.id,
     localVisibilityByKeyword,
     activeLocalMarketCount,
     lostVisibilityKeys,
@@ -1555,12 +1632,16 @@ export async function buildKeywordCommandCenterSummary(
   const lostVisibilityKeys = new Set(lostVisibilityRows.map(row => keywordComparisonKey(row.query)).filter(Boolean));
   for (const key of lostVisibilityKeys) allKeys.add(key);
   const rankEvidenceKeys = new Set<string>();
-  for (const rank of latestRanks
-    .filter(rank => !allKeys.has(keywordComparisonKey(rank.query)))
-    .sort((a, b) => (b.impressions ?? 0) - (a.impressions ?? 0))
-    .slice(0, RANK_EVIDENCE_ROW_LIMIT)) {
+  // The pre-ceiling count of selected rank-evidence queries — drives honest
+  // truncation disclosure (rawEvidenceTotal) when the safety ceiling bites.
+  const rankEvidenceFiltered = latestRanks.filter(
+    rank => !allKeys.has(keywordComparisonKey(rank.query)),
+  );
+  const rankEvidence = selectRankEvidence(rankEvidenceFiltered, workspace.id);
+  for (const rank of rankEvidence.selected) {
     addKey(rankEvidenceKeys, rank.query);
   }
+  const rankEvidenceTotal = rankEvidence.total;
 
   const activeTracked = trackedKeywords.filter(keyword => (keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE);
   const inactiveTracked = trackedKeywords.filter(keyword => (keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) !== TRACKED_KEYWORD_STATUS.ACTIVE);
@@ -1655,11 +1736,23 @@ export async function buildKeywordCommandCenterSummary(
     log.debug({ err, workspaceId }, 'KCC summary geo label lookup failed; omitting');
   }
 
+  // Honest truncation disclosure (Task 3). The rank-evidence selection above is
+  // already ceiling-capped (post-ceiling) and feeds rawEvidenceOnlyKeys, so
+  // rawEvidenceOnlyKeys.size is the RETURNED universe. The TRUE pre-ceiling size
+  // adds back the value-ordered tail the ceiling dropped, so when the ceiling bites
+  // rawEvidenceTotal > rawEvidenceReturned and the Task-4 banner fires. Flag OFF:
+  // droppedRankEvidenceTail is 0 (the 50-cap leaves no tail) and the raw cap stays
+  // RAW_EVIDENCE_ROW_LIMIT (75) — byte-identical to today.
+  const droppedRankEvidenceTail = Math.max(0, rankEvidenceTotal - rankEvidence.selected.length);
+  const rawEvidenceReturnedCap = isFeatureEnabled(KEYWORD_UNIVERSE_FULL_FLAG, workspace.id)
+    ? UNIVERSE_SAFETY_CEILING
+    : RAW_EVIDENCE_ROW_LIMIT;
+
   return {
     counts,
     filters: buildFilterFacetsFromCounts(filterCounts),
-    rawEvidenceTotal: rawEvidenceOnlyKeys.size,
-    rawEvidenceReturned: Math.min(counts.evidence, RAW_EVIDENCE_ROW_LIMIT),
+    rawEvidenceTotal: rawEvidenceOnlyKeys.size + droppedRankEvidenceTail,
+    rawEvidenceReturned: Math.min(counts.evidence, rawEvidenceReturnedCap),
     generatedAt: workspace.keywordStrategy?.generatedAt ?? null,
     summarizedAt: new Date().toISOString(),
     geoLabel,
@@ -2148,11 +2241,10 @@ function resolveBundleMetrics(
     if (parent) variantParentMap.set(normalizedQuery, parent);
   }
 
-  const rankedUntracked = bundle.latestRanks
+  const rankedUntrackedFiltered = bundle.latestRanks
     .filter(rank => !rows.has(keywordComparisonKey(rank.query)))
-    .filter(rank => !variantParentMap.has(keywordComparisonKey(rank.query)))
-    .sort((a, b) => (b.impressions ?? 0) - (a.impressions ?? 0))
-    .slice(0, RANK_EVIDENCE_ROW_LIMIT);
+    .filter(rank => !variantParentMap.has(keywordComparisonKey(rank.query)));
+  const { selected: rankedUntracked } = selectRankEvidence(rankedUntrackedFiltered, bundle.workspaceId);
   for (const rank of rankedUntracked) {
     const row = ensure(rank.query);
     if (!row) continue;
@@ -2309,6 +2401,7 @@ function rowCandidateKeysForQuery(
 }
 
 function sourceKeysForRows(input: {
+  workspaceId: string;
   filter: KeywordCommandCenterFilter;
   strategy: KeywordStrategy | null | undefined;
   pageMap: PageKeywordMap[];
@@ -2365,14 +2458,14 @@ function sourceKeysForRows(input: {
       for (const row of input.feedback.values()) add(row.keyword);
       for (const key of input.localVisibility.keys()) keys.add(key);
       for (const key of lostVisibilityKeys) keys.add(key);
-      for (const rank of input.latestRanks
-        .filter(rank => {
+      {
+        const filtered = input.latestRanks.filter(rank => {
           const key = keywordComparisonKey(rank.query);
           if (findVariantParentKey(key, variantParentKeys)) return false;
           return key && !keys.has(key) && !rawEvidenceKeys.has(key);
-        })
-        .sort((a, b) => (b.impressions ?? 0) - (a.impressions ?? 0))
-        .slice(0, RANK_EVIDENCE_ROW_LIMIT)) add(rank.query);
+        });
+        for (const rank of selectRankEvidence(filtered, input.workspaceId).selected) add(rank.query);
+      }
       return keys;
     case KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY:
       addStrategyKeys(keys, input.strategy);
@@ -2391,14 +2484,14 @@ function sourceKeysForRows(input: {
       return keys;
     case KEYWORD_COMMAND_CENTER_FILTERS.NEEDS_REVIEW:
       for (const row of input.feedback.values()) if (row.status === 'requested') add(row.keyword);
-      for (const rank of input.latestRanks
-        .filter(rank => {
+      {
+        const filtered = input.latestRanks.filter(rank => {
           const key = keywordComparisonKey(rank.query);
           if (findVariantParentKey(key, variantParentKeys)) return false;
           return key && !selectedOrTrackedOrFeedbackKeys.has(key) && !rawEvidenceKeys.has(key);
-        })
-        .sort((a, b) => (b.impressions ?? 0) - (a.impressions ?? 0))
-        .slice(0, RANK_EVIDENCE_ROW_LIMIT)) add(rank.query);
+        });
+        for (const rank of selectRankEvidence(filtered, input.workspaceId).selected) add(rank.query);
+      }
       return keys;
     case KEYWORD_COMMAND_CENTER_FILTERS.CONTENT:
       for (const gap of input.contentGaps) {
@@ -2474,6 +2567,7 @@ function buildFilteredBundle(input: {
     feedback,
   });
   const keys = sourceKeysForRows({
+    workspaceId: input.workspace.id,
     filter: input.filter,
     strategy,
     pageMap,
@@ -2604,6 +2698,7 @@ async function buildKeywordCommandCenterRowsSkinny(
   await populateDraftRows(rows, pagedBundle);
   ensureLocalVisibilityRows(rows, pagedLocalVisibility);
   const finalized = finalizeDraftRows(rows, {
+    workspaceId: workspace.id,
     localVisibilityByKeyword: pagedLocalVisibility,
     activeLocalMarketCount,
     lostVisibilityKeys,
@@ -2753,6 +2848,7 @@ export async function buildKeywordCommandCenterDetail(
   ensureLocalVisibilityRows(rows, localVisibilityByKeyword);
   const row = rows.get(normalized)
     ? finalizeDraftRow(rows.get(normalized)!, {
+      workspaceId: workspace.id,
       localVisibilityByKeyword,
       activeLocalMarketCount,
       lostVisibilityKeys: safeLostVisibilityKeys(workspace.id),
