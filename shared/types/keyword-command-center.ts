@@ -105,7 +105,12 @@ export interface KeywordCommandCenterMetrics {
   volume?: number;
   difficulty?: number;
   cpc?: number;
-  /** Raw keyword intent string from any source (trackedKeyword.intent, pageMap.searchIntent, contentGap.intent). */
+  /**
+   * Raw keyword intent string from any source (trackedKeyword.intent, pageMap.searchIntent, contentGap.intent).
+   * Additive metrics metadata, like `cpc`: populated whenever a source carries intent, independent of the
+   * `keyword-value-scoring` flag. It feeds the value-first score when that flag is ON but is not read by any sort
+   * accessor when OFF, so rows/order/scores stay byte-identical with the flag OFF.
+   */
   intent?: string;
   currentPosition?: number;
   clicks?: number;

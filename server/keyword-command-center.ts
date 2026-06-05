@@ -11,10 +11,12 @@ import {
   buildLocalSeoKeywordVisibilityForKeyword,
   buildLocalSeoKeywordVisibilitySummaryByKey,
   buildLocalSeoKeywordVisibilityByKey,
+  getLocalSeoPosture,
   getPrimaryMarketLocationCode,
   listLocalSeoMarkets,
   type LocalSeoKeywordCandidate,
 } from './local-seo.js';
+import { computeKeywordValueScore, type ScoringContext } from './scoring/keyword-value-score.js';
 import { createLogger } from './logger.js';
 import { listPageKeywords, listPageKeywordsLite } from './page-keywords.js';
 import { computeOpportunityScore, isSuspiciousPlannerGroupedVolume } from './keyword-strategy-helpers.js';
@@ -96,6 +98,17 @@ const UNIVERSE_SAFETY_CEILING = 2000;
 const log = createLogger('keyword-command-center');
 
 const KEYWORD_UNIVERSE_FULL_FLAG = 'keyword-universe-full' as const;
+const KEYWORD_VALUE_SCORING_FLAG = 'keyword-value-scoring' as const;
+
+/**
+ * Phase 1: per-request transient carrier for a finalized row's precomputed
+ * value-first score. Kept OFF the public `KeywordCommandCenterRow` type (it must
+ * never serialize to the client) — the `opportunity` accessor reads it as a
+ * trivial field read when the flag is ON. A WeakMap so finalized rows that fall
+ * out of scope are collected without leaking. `undefined` (key absent) flows
+ * through `compareMetric` as missing-last, exactly like a no-signal score.
+ */
+const rowValueScore = new WeakMap<KeywordCommandCenterRow, number>();
 
 /**
  * The SINGLE "select ranked-untracked GSC queries" function. Given the ranks that
@@ -211,11 +224,46 @@ export interface CommandCenterSourceBundle {
   includeWorkspaceIntelligence?: boolean;
 }
 
+/**
+ * Per-request value-scoring gate (Phase 1). Built ONCE per request in the
+ * rows-build entry points. `ctx` is present ONLY when `on` is true — when the
+ * flag is OFF we skip the getLocalSeoPosture/listLocalSeoMarkets DB reads
+ * entirely, so the flag-OFF path does no extra DB work and stays byte-identical.
+ * The SAME config (same `ctx`) is threaded into both the candidate merge-back
+ * (Task 1.3) and the row finalize (Task 1.4), so the two stages compute the
+ * identical valueScore per key by construction.
+ */
+interface ValueScoringConfig {
+  on: boolean;
+  ctx?: ScoringContext;
+}
+
+/**
+ * Build the per-request value-scoring config. When the flag is OFF, returns
+ * `{ on: false }` WITHOUT touching the DB (no getLocalSeoPosture /
+ * listLocalSeoMarkets). When ON, fetches posture + markets ONCE and captures the
+ * business-profile city/state — never per keyword.
+ */
+function buildValueScoringConfig(workspace: Workspace): ValueScoringConfig {
+  if (!isFeatureEnabled(KEYWORD_VALUE_SCORING_FLAG, workspace.id)) return { on: false };
+  return {
+    on: true,
+    ctx: {
+      posture: getLocalSeoPosture(workspace.id),
+      markets: listLocalSeoMarkets(workspace.id),
+      city: workspace.businessProfile?.address?.city?.toLowerCase(),
+      state: workspace.businessProfile?.address?.state?.toLowerCase(),
+    },
+  };
+}
+
 interface RowFinalizeContext {
   workspaceId: string;
   localVisibilityByKeyword: Map<string, LocalSeoKeywordVisibilitySummary>;
   activeLocalMarketCount: number;
   lostVisibilityKeys?: Set<string>;
+  /** Phase 1: when present + on, finalize computes the row valueScore once per key. */
+  valueScoring?: ValueScoringConfig;
 }
 
 interface FinalizedRows {
@@ -855,12 +903,29 @@ const ROW_SORT_ACCESSORS: SortFieldAccessors<KeywordCommandCenterRow> = {
   opportunity: (row) => computeOpportunityScore({ volume: row.metrics.volume ?? row.metrics.impressions, difficulty: row.metrics.difficulty }),
 };
 
+/**
+ * Phase 1 (flag ON): the `opportunity` accessor is a FIELD READ of the value
+ * score precomputed once per key in finalizeDraftRow (stored on the rowValueScore
+ * WeakMap) — NEVER recomputed inside the comparator. `undefined` (no signal /
+ * key absent) flows through compareMetric as missing-last, identical to the
+ * flag-OFF computeOpportunityScore(undefined). Every other accessor is identical
+ * to ROW_SORT_ACCESSORS — only opportunity differs.
+ */
+const ROW_SORT_ACCESSORS_VALUE_FIRST: SortFieldAccessors<KeywordCommandCenterRow> = {
+  ...ROW_SORT_ACCESSORS,
+  opportunity: (row) => rowValueScore.get(row),
+};
+
 export function sortRowsForQuery(
   sort: KeywordCommandCenterSort | undefined,
   direction?: 'asc' | 'desc',
+  valueScoringOn = false,
 ): (a: KeywordCommandCenterRow, b: KeywordCommandCenterRow) => number {
   if (sort === undefined || sort === 'priority') return sortRows;
-  return keywordSortComparator(sort, direction, ROW_SORT_ACCESSORS);
+  // One conditional at dispatch selects the accessor SET by the request flag —
+  // no per-comparison recompute, no buildSortAccessors factory.
+  const accessors = valueScoringOn ? ROW_SORT_ACCESSORS_VALUE_FIRST : ROW_SORT_ACCESSORS;
+  return keywordSortComparator(sort, direction, accessors);
 }
 
 export function matchesFilter(row: KeywordCommandCenterRow, filter: KeywordCommandCenterFilter): boolean {
@@ -1088,6 +1153,7 @@ async function populateDraftRows(rows: Map<string, DraftRow>, bundle: CommandCen
       mergeMetrics(row, {
         volume: page.volume,
         difficulty: page.difficulty,
+        intent: page.searchIntent, // NOTE field name: pageMap carries intent as `searchIntent`
       });
     }
   }
@@ -1103,6 +1169,7 @@ async function populateDraftRows(rows: Map<string, DraftRow>, bundle: CommandCen
     mergeMetrics(row, {
       volume: gap.volume,
       difficulty: gap.difficulty,
+      intent: gap.intent,
     });
   }
 
@@ -1160,6 +1227,7 @@ async function populateDraftRows(rows: Map<string, DraftRow>, bundle: CommandCen
       volume: keyword.volume,
       difficulty: keyword.difficulty,
       cpc: keyword.cpc,
+      intent: keyword.intent,
       currentPosition: keyword.baselinePosition,
       clicks: keyword.baselineClicks,
       impressions: keyword.baselineImpressions,
@@ -1283,7 +1351,7 @@ function finalizeDraftRow(row: DraftRow, context: RowFinalizeContext): KeywordCo
   const isProtected = Boolean(protection);
   const localSeo = context.localVisibilityByKeyword.get(row.normalizedKeyword);
   const localSeoState = buildLocalSeoState(row, status, localSeo, context.activeLocalMarketCount);
-  return {
+  const finalized: KeywordCommandCenterRow = {
     keyword: row.keyword,
     normalizedKeyword: row.normalizedKeyword,
     lifecycleStatus: status,
@@ -1342,6 +1410,25 @@ function finalizeDraftRow(row: DraftRow, context: RowFinalizeContext): KeywordCo
     })),
     isLostVisibility: context.lostVisibilityKeys?.has(row.normalizedKeyword) ?? false,
   };
+  // Phase 1: precompute the row value score ONCE per key (flag ON only) from the
+  // fully-merged row.metrics, using the SAME computeKeywordValueScore + SAME
+  // per-request ScoringContext as the candidate merge-back — so candidate and row
+  // scores are identical by construction. Stored on the WeakMap (never serialized).
+  if (context.valueScoring?.on && context.valueScoring.ctx) {
+    const score = computeKeywordValueScore(
+      {
+        keyword: finalized.keyword,
+        volume: finalized.metrics.volume,
+        impressions: finalized.metrics.impressions,
+        difficulty: finalized.metrics.difficulty,
+        cpc: finalized.metrics.cpc,
+        intent: finalized.metrics.intent,
+      },
+      context.valueScoring.ctx,
+    );
+    if (score !== undefined) rowValueScore.set(finalized, score);
+  }
+  return finalized;
 }
 
 function finalizeDraftRows(rows: Map<string, DraftRow>, context: RowFinalizeContext): FinalizedRows {
@@ -1497,6 +1584,9 @@ async function buildKeywordCommandCenterModel(
     localVisibilityByKeyword,
     activeLocalMarketCount,
     lostVisibilityKeys,
+    // Phase 1: precompute row valueScore in finalize when the flag is ON (no DB
+    // reads when OFF). The model path's row sort selects the accessor by the same flag.
+    valueScoring: buildValueScoringConfig(workspace),
   });
   const finalRows = finalized.rows;
   mark('rowIndexMs');
@@ -2083,6 +2173,7 @@ function addCandidateKeysFromBundle(
   candidates: Map<string, RowCandidateKey>,
   bundle: CommandCenterSourceBundle,
   localVisibility: Map<string, LocalSeoKeywordVisibilitySummary>,
+  valueScoring: ValueScoringConfig = { on: false },
 ): void {
   const variantParentKeys = parentableVariantKeys({
     strategy: bundle.strategy,
@@ -2175,6 +2266,27 @@ function addCandidateKeysFromBundle(
     candidate.clicks = metrics.clicks;
     candidate.rank = metrics.currentPosition;
     candidate.difficulty = metrics.difficulty;
+    // Phase 1: cpc + intent are resolver-parity-guaranteed (resolveBundleMetrics
+    // merges them in the SAME source order as populateDraftRows), so copying them
+    // here keeps the candidate value-score inputs identical to the row stage.
+    candidate.cpc = metrics.cpc;
+    candidate.intent = metrics.intent;
+    // Precompute the value score ONCE per key (flag ON only), with the SAME
+    // function + SAME per-request ScoringContext as the row finalize — so
+    // candidate.valueScore === row valueScore for every key by construction.
+    if (valueScoring.on && valueScoring.ctx) {
+      candidate.valueScore = computeKeywordValueScore(
+        {
+          keyword: candidate.keyword,
+          volume: metrics.volume,
+          impressions: metrics.impressions,
+          difficulty: metrics.difficulty,
+          cpc: metrics.cpc,
+          intent: metrics.intent,
+        },
+        valueScoring.ctx,
+      );
+    }
   }
 }
 
@@ -2223,13 +2335,13 @@ function resolveBundleMetrics(
     for (const keyword of [page.primaryKeyword, ...(page.secondaryKeywords ?? [])].filter(Boolean)) {
       const row = ensure(keyword);
       if (!row) continue;
-      merge(row, { volume: page.volume, difficulty: page.difficulty });
+      merge(row, { volume: page.volume, difficulty: page.difficulty, intent: page.searchIntent });
     }
   }
   for (const gap of bundle.contentGaps) {
     const row = ensure(gap.targetKeyword);
     if (!row) continue;
-    merge(row, { volume: gap.volume, difficulty: gap.difficulty });
+    merge(row, { volume: gap.volume, difficulty: gap.difficulty, intent: gap.intent });
   }
   for (const gap of bundle.keywordGaps) {
     const row = ensure(gap.keyword);
@@ -2244,6 +2356,7 @@ function resolveBundleMetrics(
       volume: keyword.volume,
       difficulty: keyword.difficulty,
       cpc: keyword.cpc,
+      intent: keyword.intent,
       currentPosition: keyword.baselinePosition,
       clicks: keyword.baselineClicks,
       impressions: keyword.baselineImpressions,
@@ -2333,15 +2446,29 @@ const CANDIDATE_SORT_ACCESSORS: SortFieldAccessors<RowCandidateKey> = {
 };
 
 /**
+ * Phase 1 (flag ON): the candidate `opportunity` accessor is a FIELD READ of the
+ * precomputed candidate.valueScore (set once per key at merge-back with the SAME
+ * fn + SAME ctx as the row finalize). Identical to ROW_SORT_ACCESSORS_VALUE_FIRST
+ * except for the carrier (candidate.valueScore vs the row WeakMap) — same value
+ * per key → no candidate↔row drift.
+ */
+const CANDIDATE_SORT_ACCESSORS_VALUE_FIRST: SortFieldAccessors<RowCandidateKey> = {
+  ...CANDIDATE_SORT_ACCESSORS,
+  opportunity: (c) => c.valueScore,
+};
+
+/**
  * Candidate-stage sorter. The `priority`/default branch keeps its original,
  * candidate-specific behavior (sourcePriority then demand then keyword) — it is
  * byte-identical to before this task. The explicit, directioned sorts delegate
  * to the SAME `keywordSortComparator` the row stage uses (via
- * `CANDIDATE_SORT_ACCESSORS`) so the two stages cannot drift.
+ * `CANDIDATE_SORT_ACCESSORS`) so the two stages cannot drift. When the flag is
+ * ON, BOTH stages select the *_VALUE_FIRST set from the SAME request flag.
  */
 export function candidateSortForQuery(
   sort: KeywordCommandCenterSort | undefined,
   direction?: 'asc' | 'desc',
+  valueScoringOn = false,
 ): (a: RowCandidateKey, b: RowCandidateKey) => number {
   if (sort === undefined || sort === 'priority') {
     return (a, b) => {
@@ -2350,7 +2477,8 @@ export function candidateSortForQuery(
       return a.keyword.localeCompare(b.keyword);
     };
   }
-  return keywordSortComparator(sort, direction, CANDIDATE_SORT_ACCESSORS);
+  const accessors = valueScoringOn ? CANDIDATE_SORT_ACCESSORS_VALUE_FIRST : CANDIDATE_SORT_ACCESSORS;
+  return keywordSortComparator(sort, direction, accessors);
 }
 
 /**
@@ -2361,9 +2489,19 @@ export function candidateSortForQuery(
  * clicks/rank/difficulty/demand — catching DATA divergence the comparator-only
  * guard cannot. Exported for tests; not used by the request path.
  */
+interface CandidateRowMetricProjection {
+  demand: number;
+  clicks?: number;
+  rank?: number;
+  difficulty?: number;
+  cpc?: number;
+  intent?: string;
+  valueScore?: number;
+}
+
 export interface CandidateRowMetricParity {
-  candidate: Map<string, { demand: number; clicks?: number; rank?: number; difficulty?: number }>;
-  row: Map<string, { demand: number; clicks?: number; rank?: number; difficulty?: number }>;
+  candidate: Map<string, CandidateRowMetricProjection>;
+  row: Map<string, CandidateRowMetricProjection>;
 }
 
 /**
@@ -2385,22 +2523,53 @@ export async function __candidateRowMetricParityForTest(
   bundle: CommandCenterSourceBundle,
   localVisibility: Map<string, LocalSeoKeywordVisibilitySummary> = new Map(),
 ): Promise<CandidateRowMetricParity> {
+  // Run the probe with value scoring ON so candidate.valueScore and the row
+  // valueScore are populated and can be compared per key. The ScoringContext is a
+  // pure request constant (no DB) — a fixed posture/markets is sufficient for the
+  // drift guard (the SAME ctx feeds both stages, which is all parity requires).
+  const valueScoring: ValueScoringConfig = { on: true, ctx: { posture: 'non_local', markets: [] } };
+
   const candidates = new Map<string, RowCandidateKey>();
-  addCandidateKeysFromBundle(candidates, { ...bundle, includeStrategyUx: false }, localVisibility);
-  const candidate = new Map<string, { demand: number; clicks?: number; rank?: number; difficulty?: number }>();
+  addCandidateKeysFromBundle(candidates, { ...bundle, includeStrategyUx: false }, localVisibility, valueScoring);
+  const candidate = new Map<string, CandidateRowMetricProjection>();
   for (const c of candidates.values()) {
-    candidate.set(c.key, { demand: c.demand, clicks: c.clicks, rank: c.rank, difficulty: c.difficulty });
+    candidate.set(c.key, { demand: c.demand, clicks: c.clicks, rank: c.rank, difficulty: c.difficulty, cpc: c.cpc, intent: c.intent, valueScore: c.valueScore });
   }
 
   const rows = new Map<string, DraftRow>();
   await populateDraftRows(rows, { ...bundle, includeStrategyUx: false });
-  const row = new Map<string, { demand: number; clicks?: number; rank?: number; difficulty?: number }>();
+  // CRITICAL: the real skinny path calls ensureLocalVisibilityRows AFTER
+  // populateDraftRows (keyword-command-center.ts:2797-2798). Without this, a
+  // localVisibility-only key exists on the candidate side (addCandidateKeysFromBundle
+  // adds it) but is ABSENT on the row side — a false key-set divergence. Mirror
+  // production exactly so the key sets match for real, not by papering over a bug.
+  ensureLocalVisibilityRows(rows, localVisibility);
+  const row = new Map<string, CandidateRowMetricProjection>();
   for (const r of rows.values()) {
+    // The row valueScore is computed in finalizeDraftRow from finalized.metrics,
+    // which is row.metrics verbatim — so computing it here from r.metrics with the
+    // SAME fn + SAME ctx is byte-identical to production's finalize computation.
+    const rowValue = valueScoring.ctx
+      ? computeKeywordValueScore(
+          {
+            keyword: r.keyword,
+            volume: r.metrics.volume,
+            impressions: r.metrics.impressions,
+            difficulty: r.metrics.difficulty,
+            cpc: r.metrics.cpc,
+            intent: r.metrics.intent,
+          },
+          valueScoring.ctx,
+        )
+      : undefined;
     row.set(r.normalizedKeyword, {
       demand: r.metrics.volume ?? r.metrics.impressions ?? 0,
       clicks: r.metrics.clicks,
       rank: r.metrics.currentPosition,
       difficulty: r.metrics.difficulty,
+      cpc: r.metrics.cpc,
+      intent: r.metrics.intent,
+      valueScore: rowValue,
     });
   }
   return { candidate, row };
@@ -2410,9 +2579,10 @@ function rowCandidateKeysForQuery(
   bundle: CommandCenterSourceBundle,
   localVisibility: Map<string, LocalSeoKeywordVisibilitySummary>,
   query: KeywordCommandCenterRowsQuery,
+  valueScoring: ValueScoringConfig = { on: false },
 ): { keys: Set<string>; page: number; pageSize: number; totalRows: number; totalPages: number } {
   const candidates = new Map<string, RowCandidateKey>();
-  addCandidateKeysFromBundle(candidates, bundle, localVisibility);
+  addCandidateKeysFromBundle(candidates, bundle, localVisibility, valueScoring);
   const rawSearch = query.search?.trim().toLowerCase();
   const normalizedSearch = keywordComparisonKey(query.search ?? '');
   const filtered = [...candidates.values()]
@@ -2422,7 +2592,7 @@ function rowCandidateKeysForQuery(
       || (normalizedSearch ? candidate.key.includes(normalizedSearch) : false)
       || candidate.searchText?.includes(rawSearch)
     )
-    .sort(candidateSortForQuery(query.sort, query.direction));
+    .sort(candidateSortForQuery(query.sort, query.direction, valueScoring.on));
   const pageSize = Math.min(Math.max(query.pageSize ?? DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE);
   const requestedPage = Math.max(query.page ?? 1, 1);
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -2681,11 +2851,15 @@ async function buildKeywordCommandCenterRowsViaModel(
     timingLabel: 'rows-local-candidate',
   });
   if (!payload) return null;
+  // Phase 1: the model builder already precomputed row valueScore in finalize
+  // when the flag is ON; the sort here selects the field-read accessor by the
+  // same flag (a cheap cached read — no extra DB work, no ScoringContext needed).
+  const valueScoringOn = isFeatureEnabled(KEYWORD_VALUE_SCORING_FLAG, workspaceId);
   const filter = query.filter ?? KEYWORD_COMMAND_CENTER_FILTERS.ALL;
   const filtered = payload.rows
     .filter(row => matchesFilter(row, filter))
     .filter(row => matchesSearch(row, query.search))
-    .sort(sortRowsForQuery(query.sort, query.direction));
+    .sort(sortRowsForQuery(query.sort, query.direction, valueScoringOn));
   const page = paginateRows(filtered.map(stripRowForList), query);
   return {
     rows: page.rows,
@@ -2709,6 +2883,10 @@ async function buildKeywordCommandCenterRowsSkinny(
   const startedAt = Date.now();
   const workspace = getWorkspace(workspaceId);
   if (!workspace) return null;
+  // Phase 1: read the flag + build the ScoringContext ONCE per request (no DB
+  // reads when the flag is OFF). The SAME config is threaded into the candidate
+  // merge-back and the row finalize so both stages score identically per key.
+  const valueScoring = buildValueScoringConfig(workspace);
   const filter = query.filter ?? KEYWORD_COMMAND_CENTER_FILTERS.ALL;
   const localVisibilityByKeyword = localVisibilityByFilter(workspace.id, filter, options.includeLocalSeo);
   const activeLocalMarketCount = options.includeLocalSeo
@@ -2727,7 +2905,7 @@ async function buildKeywordCommandCenterRowsSkinny(
       feedback: new Map<string, FeedbackRow>(),
     }
     : bundle;
-  const pageSelection = rowCandidateKeysForQuery(candidateBundle, localVisibilityByKeyword, query);
+  const pageSelection = rowCandidateKeysForQuery(candidateBundle, localVisibilityByKeyword, query, valueScoring);
   const pagedBundle = filterBundleToKeys(bundle, pageSelection.keys);
   const pagedLocalVisibility = filterMapByKeys(localVisibilityByKeyword, pageSelection.keys);
   const lostVisibilityKeys = safeLostVisibilityKeys(workspace.id);
@@ -2739,11 +2917,12 @@ async function buildKeywordCommandCenterRowsSkinny(
     localVisibilityByKeyword: pagedLocalVisibility,
     activeLocalMarketCount,
     lostVisibilityKeys,
+    valueScoring,
   });
   const filtered = finalized.rows
     .filter(row => matchesFilter(row, filter))
     .filter(row => matchesSearch(row, query.search))
-    .sort(sortRowsForQuery(query.sort, query.direction));
+    .sort(sortRowsForQuery(query.sort, query.direction, valueScoring.on));
 
   log.info({
     workspaceId,
