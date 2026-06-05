@@ -31,7 +31,7 @@ import { getWorkspace } from './workspaces.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { buildKeywordStrategyUxPayload } from './keyword-strategy-ux.js';
 import { WS_EVENTS } from './ws-events.js';
-import { findBestParent, isJunkKeywordString, keywordComparisonKey } from '../shared/keyword-normalization.js';
+import { createVariantParentIndex, findBestParent, isJunkKeywordString, keywordComparisonKey, type VariantParentIndex } from '../shared/keyword-normalization.js';
 import { isStrategyPoolEligibleKeyword } from './keyword-intelligence/rules.js';
 import {
   getLostVisibilityKeys,
@@ -1819,9 +1819,28 @@ function parentableVariantKeys(input: {
   return [...keys];
 }
 
+/**
+ * Per-array memoized parent index. `findVariantParentKey` is called once per GSC
+ * rank across several full-universe passes, always against the SAME `parentKeys`
+ * array (the one `parentableVariantKeys` returned for that bundle). Building a
+ * token-inverted index once per array — instead of an O(parents) brute-force
+ * scan per query — turns the dominant O(ranks × parents) variant-matching cost
+ * into O(ranks × tokens). Keyed on array IDENTITY via a WeakMap, so callers that
+ * already share one `parentKeys` array (every per-rank loop in a request) share
+ * one index for free; the entry is GC'd with the array, so there is no lifetime
+ * management. The index is byte-identical to the brute-force result (see
+ * createVariantParentIndex + its fuzz parity test).
+ */
+const variantParentIndexCache = new WeakMap<string[], VariantParentIndex>();
+
 function findVariantParentKey(query: string, parentKeys: string[]): string | null {
   if (parentKeys.length === 0) return null;
-  return findBestParent(query, parentKeys, new Map(parentKeys.map(key => [key, 0])));
+  let index = variantParentIndexCache.get(parentKeys);
+  if (!index) {
+    index = createVariantParentIndex(parentKeys);
+    variantParentIndexCache.set(parentKeys, index);
+  }
+  return index.lookup(query);
 }
 
 function filterStrategyForKeys(strategy: KeywordStrategy | null | undefined, keys: Set<string> | null): KeywordStrategy | null | undefined {
