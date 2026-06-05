@@ -11,6 +11,7 @@ import { createLogger } from './logger.js';
 import { listWorkspaces } from './workspaces.js';
 import { getSearchOverview, getSearchQueryObservations } from './search-console.js';
 import { storeRankSnapshot } from './rank-tracking.js';
+import { GSC_METRIC_WINDOW_DAYS } from '../shared/keyword-window.js';
 import {
   detectLostVisibility,
   upsertDiscoveredQueries,
@@ -41,8 +42,8 @@ export async function runRankTrackingSnapshots(workspaceIds?: string[]): Promise
 
     try {
       const [overview, observedQueries] = await Promise.all([
-        getSearchOverview(ws.webflowSiteId, ws.gscPropertyUrl, 28, { queryLimit: 5000 }),
-        getSearchQueryObservations(ws.webflowSiteId, ws.gscPropertyUrl, 28, { maxRows: 5000 }),
+        getSearchOverview(ws.webflowSiteId, ws.gscPropertyUrl, GSC_METRIC_WINDOW_DAYS, { queryLimit: 5000 }),
+        getSearchQueryObservations(ws.webflowSiteId, ws.gscPropertyUrl, GSC_METRIC_WINDOW_DAYS, { maxRows: 5000 }),
       ]);
       const date = new Date().toISOString().split('T')[0];
       const queries = overview.topQueries.map(q => ({

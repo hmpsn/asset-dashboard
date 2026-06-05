@@ -24,6 +24,7 @@ import {
   type KeywordCommandCenterRowsResponse,
   type KeywordCommandCenterSummaryResponse,
 } from '../../shared/types/keyword-command-center';
+import { GSC_METRIC_WINDOW_DAYS } from '../../shared/keyword-window';
 import { WS_EVENTS } from '../../src/lib/wsEvents';
 
 // ---------------------------------------------------------------------------
@@ -147,8 +148,17 @@ const rowsPayload: KeywordCommandCenterRowsResponse = {
   },
 };
 
-function setupHooks(opts: { rowsLoading?: boolean } = {}) {
-  summaryHookMock.mockReturnValue({ data: summaryPayload, isLoading: false, error: null });
+function setupHooks(
+  opts: {
+    rowsLoading?: boolean;
+    summary?: Partial<KeywordCommandCenterSummaryResponse>;
+  } = {},
+) {
+  summaryHookMock.mockReturnValue({
+    data: { ...summaryPayload, ...opts.summary },
+    isLoading: false,
+    error: null,
+  });
   rowsHookMock.mockReturnValue({
     data: opts.rowsLoading ? undefined : rowsPayload,
     isLoading: opts.rowsLoading ?? false,
@@ -293,5 +303,32 @@ describe('KeywordHub', () => {
     fireEvent.click(screen.getByLabelText(/Retired segment/));
     const lastRowsCall = rowsHookMock.mock.calls.at(-1);
     expect(lastRowsCall?.[1]).toMatchObject({ filter: 'retired', page: 1 });
+  });
+
+  // ── Trust signals (Task 4) ──────────────────────────────────────────────────
+
+  it('renders the metric-window label sourced from GSC_METRIC_WINDOW_DAYS whenever rows render', () => {
+    renderHub();
+    // The "28" must come from the shared constant, not be hard-coded twice.
+    expect(GSC_METRIC_WINDOW_DAYS).toBe(28);
+    const label = screen.getByText(
+      new RegExp(`last ${GSC_METRIC_WINDOW_DAYS} days`, 'i'),
+    );
+    expect(label).toBeInTheDocument();
+  });
+
+  it('renders the truncation honesty banner when rawEvidenceTotal > rawEvidenceReturned', () => {
+    setupHooks({ summary: { rawEvidenceTotal: 120, rawEvidenceReturned: 75 } });
+    renderHub();
+    // 120 - 75 = 45 more keywords hidden by the display cap.
+    const banner = screen.getByRole('status', { name: /more keywords/i });
+    expect(banner).toBeInTheDocument();
+    expect(banner).toHaveTextContent(/45 more/);
+  });
+
+  it('does NOT render the truncation banner when rawEvidenceTotal === rawEvidenceReturned', () => {
+    setupHooks({ summary: { rawEvidenceTotal: 75, rawEvidenceReturned: 75 } });
+    renderHub();
+    expect(screen.queryByRole('status', { name: /more keywords/i })).not.toBeInTheDocument();
   });
 });

@@ -32,6 +32,7 @@ import { queryKeys } from '../lib/queryKeys';
 import { WS_EVENTS } from '../lib/wsEvents';
 import { readHubDeepLink } from '../lib/keywordHubDeepLink';
 import { adminPath } from '../routes';
+import { GSC_METRIC_WINDOW_DAYS } from '../../shared/keyword-window';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { useLocalSeoRefresh } from '../hooks/admin/useLocalSeo';
 import {
@@ -157,6 +158,17 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
   const summary = useKeywordCommandCenterSummary(workspaceId);
   const counts = summary.data?.counts;
   const filterMetas = summary.data?.filters ?? [];
+
+  // Trust signals (Task 4) --------------------------------------------------
+  // The universe is truncated by the display cap whenever the true post-gate
+  // total exceeds the returned/displayed count. We disclose the hidden tail
+  // honestly rather than silently dropping it. (Under keyword-universe-full the
+  // total can include rank-evidence beyond the value-ceiling, so the copy is a
+  // generic "N more keywords below the cap" — accurate for both cases.)
+  const rawEvidenceTotal = summary.data?.rawEvidenceTotal ?? 0;
+  const rawEvidenceReturned = summary.data?.rawEvidenceReturned ?? 0;
+  const hiddenByCap = Math.max(0, rawEvidenceTotal - rawEvidenceReturned);
+  const isTruncated = rawEvidenceTotal > rawEvidenceReturned;
 
   const rowsQuery = useMemo(
     () => ({
@@ -398,6 +410,30 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
             />
           </div>
         </div>
+
+        {/* Metric-window label (Task 4). Read-only data context → muted/blue per the
+            Four Laws (no actionable hue). The "N days" is sourced from the shared
+            GSC_METRIC_WINDOW_DAYS constant, never hard-coded. */}
+        <p className="px-3 py-2 border-b border-[var(--brand-border)] t-caption text-[var(--brand-text-muted)]">
+          Clicks &amp; impressions: last {GSC_METRIC_WINDOW_DAYS} days
+          {' · '}rank: {GSC_METRIC_WINDOW_DAYS}-day avg
+          {' · '}volume: provider estimate
+        </p>
+
+        {/* Truncation honesty banner (Task 4): the universe is capped for display;
+            disclose the hidden tail rather than silently dropping it. */}
+        {isTruncated && (
+          <div
+            role="status"
+            aria-label={`${hiddenByCap} more keywords hidden by the display cap`}
+            className="px-3 py-2 border-b border-[var(--brand-border)] bg-[var(--surface-3)]/20"
+          >
+            <p className="t-caption-sm text-[var(--brand-text-muted)]">
+              Showing the highest-value keywords. {hiddenByCap.toLocaleString()} more lower-value{' '}
+              {hiddenByCap === 1 ? 'keyword is' : 'keywords are'} below the display cap.
+            </p>
+          </div>
+        )}
 
         <HubKeywordList
           workspaceId={workspaceId}
