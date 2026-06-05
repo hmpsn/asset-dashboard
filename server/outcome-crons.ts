@@ -75,9 +75,8 @@ export function startOutcomeCrons() {
       }
 
       // Enqueue a recommendation regen for each measured workspace so ranking
-      // reflects the new outcomes. NOTE: recsInFlight only dedupes concurrent
-      // regens for the SAME workspace — this loop still issues one regen per
-      // distinct measured workspace, bounded by the number measured this run
+      // reflects the new outcomes. The shared scheduler serializes per workspace,
+      // while this loop still issues one refresh per distinct measured workspace
       // (a handful at current scale, acceptable). If the client count grows
       // materially, add cross-workspace concurrency limiting/staggering here.
       for (const wsId of workspaceIds) {
@@ -159,9 +158,10 @@ export function startOutcomeCrons() {
       }
 
       // Enqueue a recommendation regen after the learnings update. As above,
-      // recsInFlight dedupes only per-workspace; this issues one regen per
-      // distinct affected workspace (bounded by the run, acceptable at current
-      // scale — revisit with concurrency limiting if client count grows).
+      // the shared scheduler only serializes per workspace; this still issues
+      // one refresh per distinct affected workspace (bounded by the run,
+      // acceptable at current scale — revisit with concurrency limiting if
+      // client count grows).
       for (const wsId of affectedWsIds) {
         queueKeywordStrategyPostUpdateFollowOns({ workspaceId: wsId });
       }

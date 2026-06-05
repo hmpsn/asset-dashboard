@@ -14,7 +14,7 @@
  * Events whose decayed contribution is below NEGLIGIBLE_BOOST are skipped.
  *
  * ═══ DEFERRED (out of scope for PR7 — documented per the plan) ═══
- *  • SEASONAL events + keyword_monthly_volumes (migration 111): a monthly seasonal
+ *  • SEASONAL events + keyword_monthly_volumes (migration 115): a monthly seasonal
  *    `timing` boost needs ≥1yr of the 12-month volume series that trendDirection()
  *    currently drops (seo-provider-signals.ts). Deferred until that series is
  *    persisted and ≥1yr of data has accrued.
