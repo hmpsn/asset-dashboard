@@ -24,13 +24,18 @@ import { createTestContext } from './helpers.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import type { WorkspaceFeatureFlagMeta } from '../../shared/types/feature-flags.js';
 
-const FLAG = 'seo-generation-quality';
+const FLAG = 'keyword-hub';
 const RETIRED_PRODUCT_UI_FLAGS = [
   'copy-engine',
   'copy-engine-voice',
   'copy-engine-pipeline',
   'deep-diagnostics',
   'client-brand-section',
+] as const;
+const RETIRED_SEO_RUNTIME_FLAGS = [
+  'local-seo-visibility',
+  'schema-ai-element-classifier',
+  'seo-generation-quality',
 ] as const;
 
 // ── Main flow (auth disabled — APP_PASSWORD='' default → requireAdminAuth passes through) ──
@@ -80,7 +85,7 @@ describe('GET /api/admin/workspaces/:id/feature-flags', () => {
     expect(flag.inheritedEnabled).toBe(false);
     expect(flag.inheritedSource).toBe('default');
     expect(typeof flag.label).toBe('string');
-    expect(flag.group).toBe('SEO Generation Quality');
+    expect(flag.group).toBe('Keyword Hub');
   });
 
   it('returns 404 for a non-existent workspace', async () => {
@@ -105,6 +110,19 @@ describe('PUT /api/admin/workspaces/:id/feature-flags/:key', () => {
 
   it('returns 400 for retired product/UI flag keys', async () => {
     for (const key of RETIRED_PRODUCT_UI_FLAGS) {
+      const res = await authApi(`/api/admin/workspaces/${wsA.workspaceId}/feature-flags/${key}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: true }),
+      });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toContain('Unknown feature flag');
+    }
+  });
+
+  it('returns 400 for retired SEO/runtime flag keys', async () => {
+    for (const key of RETIRED_SEO_RUNTIME_FLAGS) {
       const res = await authApi(`/api/admin/workspaces/${wsA.workspaceId}/feature-flags/${key}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

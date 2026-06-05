@@ -2,14 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createAiBudget } from '../../../../server/schema/extractors/page-elements/ai-budget.js';
 import type { PageList } from '../../../../shared/types/page-elements.js';
 
-vi.mock('../../../../server/feature-flags.js', () => ({
-  isFeatureEnabled: vi.fn(),
-}));
 vi.mock('../../../../server/ai.js', () => ({
   callAI: vi.fn(),
 }));
 
-import { isFeatureEnabled } from '../../../../server/feature-flags.js';
 import { callAI } from '../../../../server/ai.js';
 import { aiDisambiguateHowTo } from '../../../../server/schema/extractors/page-elements/howto-ai-fallback.js';
 
@@ -34,16 +30,7 @@ describe('aiDisambiguateHowTo', () => {
     vi.clearAllMocks();
   });
 
-  it('returns unchanged when feature flag is OFF', async () => {
-    vi.mocked(isFeatureEnabled).mockReturnValue(false);
-    const budget = createAiBudget(20);
-    const result = await aiDisambiguateHowTo([ambiguousOrderedList], itemsByList, { budget, workspaceId: 'ws-1' });
-    expect(result).toEqual([ambiguousOrderedList]);
-    expect(callAI).not.toHaveBeenCalled();
-  });
-
   it('returns unchanged when budget is 0', async () => {
-    vi.mocked(isFeatureEnabled).mockReturnValue(true);
     const budget = createAiBudget(0);
     const result = await aiDisambiguateHowTo([ambiguousOrderedList], itemsByList, { budget, workspaceId: 'ws-1' });
     expect(result).toEqual([ambiguousOrderedList]);
@@ -51,7 +38,6 @@ describe('aiDisambiguateHowTo', () => {
   });
 
   it('skips lists already flagged isHowToLike=true', async () => {
-    vi.mocked(isFeatureEnabled).mockReturnValue(true);
     const already: PageList = { ...ambiguousOrderedList, isHowToLike: true, steps: [] };
     const budget = createAiBudget(20);
     const result = await aiDisambiguateHowTo([already], itemsByList, { budget, workspaceId: 'ws-1' });
@@ -60,7 +46,6 @@ describe('aiDisambiguateHowTo', () => {
   });
 
   it('skips unordered lists', async () => {
-    vi.mocked(isFeatureEnabled).mockReturnValue(true);
     const unordered: PageList = { ...ambiguousOrderedList, kind: 'unordered' };
     const budget = createAiBudget(20);
     const result = await aiDisambiguateHowTo([unordered], itemsByList, { budget, workspaceId: 'ws-1' });
@@ -69,7 +54,6 @@ describe('aiDisambiguateHowTo', () => {
   });
 
   it('skips lists with fewer than 3 items', async () => {
-    vi.mocked(isFeatureEnabled).mockReturnValue(true);
     const tiny: PageList = { ...ambiguousOrderedList, itemCount: 2 };
     const budget = createAiBudget(20);
     const result = await aiDisambiguateHowTo([tiny], [itemsByList[0].slice(0, 2)], { budget, workspaceId: 'ws-1' });
@@ -78,7 +62,6 @@ describe('aiDisambiguateHowTo', () => {
   });
 
   it('flips isHowToLike + populates steps when AI returns howTo:true', async () => {
-    vi.mocked(isFeatureEnabled).mockReturnValue(true);
     vi.mocked(callAI).mockResolvedValue({
       text: '{"howTo":true}',
       tokens: { prompt: 100, completion: 5, total: 105 },
@@ -96,7 +79,6 @@ describe('aiDisambiguateHowTo', () => {
   });
 
   it('leaves list unchanged when AI returns howTo:false', async () => {
-    vi.mocked(isFeatureEnabled).mockReturnValue(true);
     vi.mocked(callAI).mockResolvedValue({
       text: '{"howTo":false}',
       tokens: { prompt: 100, completion: 5, total: 105 },
@@ -108,7 +90,6 @@ describe('aiDisambiguateHowTo', () => {
   });
 
   it('leaves list unchanged on AI parse error', async () => {
-    vi.mocked(isFeatureEnabled).mockReturnValue(true);
     vi.mocked(callAI).mockResolvedValue({ text: 'not json', tokens: { prompt: 100, completion: 5, total: 105 } });
     const budget = createAiBudget(20);
     const result = await aiDisambiguateHowTo([ambiguousOrderedList], itemsByList, { budget, workspaceId: 'ws-1' });
@@ -118,7 +99,6 @@ describe('aiDisambiguateHowTo', () => {
   it('multi-list: each list sees its OWN items in the prompt (regression guard)', async () => {
     // Review-caught bug: a flat orderedItemsRaw[] would send list 0's items as
     // the prompt for list 1 too. The string[][] shape pins one entry per list.
-    vi.mocked(isFeatureEnabled).mockReturnValue(true);
     const aiCalls: string[] = [];
     vi.mocked(callAI).mockImplementation(async (opts) => {
       const content = (opts.messages[0]?.content as string) ?? '';
@@ -146,7 +126,6 @@ describe('aiDisambiguateHowTo', () => {
   });
 
   it('skips list when its parallel items array is empty (caller missing extraction)', async () => {
-    vi.mocked(isFeatureEnabled).mockReturnValue(true);
     const budget = createAiBudget(20);
     const result = await aiDisambiguateHowTo([ambiguousOrderedList], [[]], { budget, workspaceId: 'ws-1' });
     expect(callAI).not.toHaveBeenCalled();
@@ -154,7 +133,6 @@ describe('aiDisambiguateHowTo', () => {
   });
 
   it('treats empty AI content as no-op (does not crash on JSON.parse(""))', async () => {
-    vi.mocked(isFeatureEnabled).mockReturnValue(true);
     vi.mocked(callAI).mockResolvedValue({ text: '', tokens: { prompt: 100, completion: 0, total: 100 } });
     const budget = createAiBudget(20);
     const result = await aiDisambiguateHowTo([ambiguousOrderedList], itemsByList, { budget, workspaceId: 'ws-1' });

@@ -8,7 +8,6 @@ import { get } from '../api/client';
 import { rankTracking } from '../api/seo';
 import { Badge, EmptyState, SectionCard, Icon, Button, IconButton, PageHeader, FormInput, LoadingState, ErrorState } from './ui';
 import { KeywordTable } from './shared/RankTable';
-import { FeatureFlag } from './ui/FeatureFlag';
 import { cn } from '../lib/utils';
 import { chartGridColor, chartAxisColor, CHART_SERIES_COLORS, positionColor } from './ui/constants';
 import { queryKeys } from '../lib/queryKeys';
@@ -369,21 +368,19 @@ export function RankTracker({ workspaceId, hasGsc, onNavigate }: Props) {
         </div>
       )}
 
-      <FeatureFlag flag="local-seo-visibility">
-        <SectionCard variant="subtle">
-          <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-[var(--radius-lg)] border border-blue-500/20 bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-              <Icon as={MapPin} size="md" className="text-blue-400" />
-            </div>
-            <div>
-              <p className="t-caption font-semibold text-[var(--brand-text-bright)]">Rank Tracker is Search Console measurement</p>
-              <p className="t-caption-sm text-[var(--brand-text-muted)]">
-                Local SEO visibility is measured separately by market and local-pack evidence. Use Keywords for local visibility posture; use this page for GSC query positions, clicks, and impressions.
-              </p>
-            </div>
+      <SectionCard variant="subtle">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-[var(--radius-lg)] border border-blue-500/20 bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+            <Icon as={MapPin} size="md" className="text-blue-400" />
           </div>
-        </SectionCard>
-      </FeatureFlag>
+          <div>
+            <p className="t-caption font-semibold text-[var(--brand-text-bright)]">Rank Tracker is Search Console measurement</p>
+            <p className="t-caption-sm text-[var(--brand-text-muted)]">
+              Local SEO visibility is measured separately by market and local-pack evidence. Use Keywords for local visibility posture; use this page for GSC query positions, clicks, and impressions.
+            </p>
+          </div>
+        </div>
+      </SectionCard>
 
       {effectiveError && (
         <ErrorState

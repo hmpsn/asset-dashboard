@@ -193,9 +193,9 @@ describe('GET /api/public/briefing/:workspaceId — paid tier, published briefin
     // Whitelist: response should ONLY contain the public-shape fields.
     // Phase 2.5b added issueSummary, issueNumber, and recommendations
     // (all derived at serve time from existing data — no admin fields leak).
-    // SEO Gen-Quality P4 added ovGainActive — the server-resolved per-workspace
-    // umbrella state the client RecommendedForYou gate reads (not an admin field;
-    // a derived boolean, always present, false flag-OFF = all prod).
+    // SEO recommendation opportunity rendering includes `ovGainActive` as a
+    // server-resolved compatibility boolean for the canonical OV-based briefing
+    // surface. It is public-safe derived state, not an admin field.
     const keys = Object.keys(body.briefing!).sort();
     expect(keys).toEqual([
       'issueNumber',
@@ -206,9 +206,7 @@ describe('GET /api/public/briefing/:workspaceId — paid tier, published briefin
       'stories',
       'weekOf',
     ]);
-    // Flag-OFF (this workspace has no override) → ovGainActive is false
-    // (the pre-P4 client surface renders byte-identically).
-    expect(body.briefing!.ovGainActive).toBe(false);
+    expect(body.briefing!.ovGainActive).toBe(true);
 
     // Explicit blacklist (defense in depth)
     expect(body.briefing).not.toHaveProperty('sourceMetadata');

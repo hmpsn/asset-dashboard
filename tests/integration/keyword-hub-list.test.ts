@@ -31,14 +31,6 @@ const base = () => `/api/webflow/keyword-command-center/${workspaceId}`;
 
 beforeAll(async () => {
   await ctx.startServer();
-  // Local-SEO visibility ON so the rows endpoint includes localSeo annotation
-  // and the `local` filter has real data to return.
-  await api('/api/admin/feature-flags/local-seo-visibility', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ enabled: true }),
-  });
-
   workspaceId = createWorkspace('Keyword Hub List Integration').id;
 
   // 1) Tracked keywords (active tracking → lifecycleStatus 'tracked').
@@ -75,11 +67,6 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (workspaceId) deleteWorkspace(workspaceId);
-  await api('/api/admin/feature-flags/local-seo-visibility', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ enabled: null }),
-  });
   await ctx.stopServer();
 });
 

@@ -1,5 +1,9 @@
 # SEO Generation Quality — Cross-Phase Contracts
 
+> Rollout note: the `seo-generation-quality` feature flag has been retired. The
+> generation-quality path described here is now canonical runtime behavior; flag-off
+> references are historical rollout context only.
+
 > Guardrail reference for the multi-phase SEO strategy + keyword-generation quality
 > feature. Written **before** the first contract change (CLAUDE.md Session-Protocol #7).
 > Plan: `docs/plans/2026-06-02-seo-generation-quality-plan.md`. Umbrella flag:

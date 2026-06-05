@@ -1,24 +1,24 @@
-// SHARED PRIMITIVE — Wave 2 T4 (#5, FLAG-SENSITIVE)
+// SHARED PRIMITIVE — Wave 2 T4 (#5)
 //
 // ONE audience-parameterized content-gap / recommendation row, subsuming the
 // metric-and-badge body previously hand-rolled three times:
 //   - admin       → src/components/strategy/ContentGaps.tsx
 //   - strategy-tab → src/components/client/strategy/StrategyContentOpportunitiesSection.tsx (ContentGapCard)
-//   - briefing     → src/components/client/Briefing/RecommendedForYou.tsx  (FLAG-SENSITIVE)
+//   - briefing     → src/components/client/Briefing/RecommendedForYou.tsx
 //
 // The component is parameterized by SIX axes (audit §ContentGapRow):
 //   (a) KD prefix          — 'KD' | 'Difficulty'
 //   (b) SERP label set     — 'plain' | 'descriptive' | 'emoji'
 //   (c) intentTone map     — supplied per surface (admin and client diverge)
-//   (d) est-clicks mode    — 'always' | 'flag-gated' | 'never'
-//   (e) ovGainActive       — briefing-only; DEFAULT false (triple OFF-default contract)
+//   (d) est-clicks mode    — 'always' | 'conditional' | 'never'
+//   (e) ovGainActive       — briefing-only compatibility boolean; default false
 //   (f) backfilled slot    — field-presence-driven 'Expanded pick' affordance
 //
 // Each surface keeps its own card chrome (SectionCard / signature card) and its own
 // header-right widgets + action footer via the `headerRight` / `footer` render slots —
 // the shared part is strictly the metric-and-badge body.
 //
-// FLAG-OFF BYTE-IDENTITY (HARD — gen-quality Contract 3, audit §flag-OFF):
+// Briefing compatibility behavior:
 //   Δ1 opportunity badge: ovGainActive ? `Opportunity ${score}` : `${score}/100`
 //                         (Badge tone="blue", shape="pill", className="ml-2").
 //   Δ2 est-clicks line  : !ovGainActive && volume>0 → `~{fmtNum(round(volume*0.103))}/mo

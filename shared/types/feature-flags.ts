@@ -28,19 +28,6 @@ export const FEATURE_FLAGS = {
   // Phase 2.5e — Premium-only AI polish (hero-headline punch + weekly opener).
   'client-briefing-v2-ai-polish': false,
 
-  // Page-Element Catalog (schema AI extractors)
-  'schema-ai-element-classifier': false,
-
-  // Local SEO Visibility
-  'local-seo-visibility': false,
-
-  // SEO Generation Quality (multi-phase keyword-strategy + recommendation quality plan).
-  // Umbrella kill-switch for the P1–P6 generation-quality work (universe assembler,
-  // backfill floor, closed-set prompting, OV-derived tier, orphan-table recs). Dark by
-  // default; per-phase sub-features stay flag-gated and roll out per-workspace via the
-  // P0 per-workspace flag dimension. See docs/plans/2026-06-02-seo-generation-quality-plan.md.
-  'seo-generation-quality': false,
-
   // Keyword Hub (Wave 4). Umbrella kill-switch for the multi-phase consolidation of the
   // admin Keyword Command Center (seo-keywords) and the standalone Rank Tracker (seo-ranks)
   // into one keyword-first Hub. Dark by default; the whole Hub surface mounts behind this
@@ -104,9 +91,6 @@ export const FEATURE_FLAG_GROUP_LABELS = [
   'White-Label',
   'Platform Intelligence Enhancements',
   'Client Insights Briefing',
-  'Local SEO',
-  'Schema AI',
-  'SEO Generation Quality',
   'Keyword Hub',
 ] as const;
 
@@ -125,7 +109,6 @@ const LEGACY_ROADMAP = {
   outcome: 'legacy-outcome-intelligence',
   briefing: 'legacy-client-briefing-v2',
   schema: 'legacy-schema-ai',
-  localSeo: 'intel-quality-local-pack-visibility-foundation',
   platformIntelligenceEnhancements: 'legacy-platform-intelligence-enhancements',
 } as const;
 
@@ -228,47 +211,6 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: REVIEWED_AT,
     },
   },
-  'local-seo-visibility': {
-    label: 'Local SEO visibility',
-    group: 'Local SEO',
-    lifecycle: {
-      owner: 'seo-health',
-      createdAt: '2026-05-15',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove once local SEO reporting is validated and the admin visibility foundation no longer needs a kill-switch.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.localSeo,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'schema-ai-element-classifier': {
-    label: 'Schema AI — page-element role classifier',
-    group: 'Schema AI',
-    lifecycle: {
-      owner: 'schema',
-      createdAt: '2026-05-11',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove once AI classifier quality is stable and schema extraction no longer needs a hard kill-switch.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.schema,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-
-  'seo-generation-quality': {
-    label: 'SEO Generation Quality — umbrella (keyword-strategy + recommendation quality)',
-    group: 'SEO Generation Quality',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: '2026-06-02',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove after the P1–P6 generation-quality phases are validated per-workspace and become the only generation/ranking path (no flag-off legacy fallback).',
-      linkedRoadmapItemId: 'seo-genquality-p0-harness',
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: '2026-06-02',
-    },
-  },
-
   'keyword-hub': {
     label: 'Keyword Hub — unified keyword surface (KCC + Rank Tracker consolidation)',
     group: 'Keyword Hub',
@@ -320,18 +262,6 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   {
     label: 'Client Insights Briefing',
     keys: ['client-briefing-v2', 'client-briefing-v2-ai-polish'],
-  },
-  {
-    label: 'Local SEO',
-    keys: ['local-seo-visibility'],
-  },
-  {
-    label: 'Schema AI',
-    keys: ['schema-ai-element-classifier'],
-  },
-  {
-    label: 'SEO Generation Quality',
-    keys: ['seo-generation-quality'],
   },
   {
     label: 'Keyword Hub',

@@ -15,7 +15,7 @@
  *
  * Gate: rendered only when the 'keyword-hub' feature flag is ON — the gate lives
  * in App.tsx, NOT here (per plan: "the component is NOT itself wrapped in
- * <FeatureFlag>"). `showLocalSeo` is gated narrowly on `local-seo-visibility`.
+ * <FeatureFlag>"). `showLocalSeo` now reflects the canonical local SEO surface.
  *
  * Four Laws of Color enforced via the shared primitives. No violet/indigo/rose/pink.
  */
@@ -32,7 +32,6 @@ import { queryKeys } from '../lib/queryKeys';
 import { WS_EVENTS } from '../lib/wsEvents';
 import { readHubDeepLink } from '../lib/keywordHubDeepLink';
 import { adminPath } from '../routes';
-import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { useLocalSeoRefresh } from '../hooks/admin/useLocalSeo';
 import {
@@ -146,7 +145,7 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
     initialSearch: deepLink.query ?? undefined,
   });
 
-  const showLocalSeo = useFeatureFlag('local-seo-visibility');
+  const showLocalSeo = true;
 
   // Journey drawer (P2): the selected row opens the per-keyword detail drawer.
   const [selectedKey, setSelectedKey] = useState<string | null>(null);

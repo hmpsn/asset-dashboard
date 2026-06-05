@@ -131,78 +131,13 @@ describe('P4 (3)+(5) one gain basis + flag-OFF byte-identical snapshot', () => {
   });
 
   afterEach(() => {
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, null);
     db.prepare('DELETE FROM ov_divergence WHERE workspace_id = ?').run(s.workspaceId);
     db.prepare('DELETE FROM content_gaps WHERE workspace_id = ?').run(s.workspaceId);
     db.prepare('DELETE FROM recommendation_sets WHERE workspace_id = ?').run(s.workspaceId);
     s.cleanup();
   });
 
-  it('(5) flag-OFF: priorities + estimatedGain + summary + topRecommendationId match the legacy baseline', async () => {
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, false);
-    const set = await generateRecommendations(s.workspaceId);
-    const contentRecs = set.recommendations.filter(r => r.source === 'strategy:content-gap');
-    expect(contentRecs.length).toBeGreaterThan(0);
-
-    // Legacy gain strings are the buildRecommendationStory output — NOT the OV phrases.
-    for (const r of contentRecs) {
-      expect(buildOvGainStringPhrases()).not.toContain(r.estimatedGain);
-    }
-    // Legacy content-gap tiers are fix_soon (high priority) or ongoing — NEVER fix_now
-    // (the legacy content-gap branch never mints fix_now).
-    for (const r of contentRecs) {
-      expect(['fix_soon', 'ongoing']).toContain(r.priority);
-    }
-    // Summary counts derive from the same (legacy) priorities.
-    const activeFixNow = set.recommendations.filter(r => r.priority === 'fix_now' && r.status === 'pending').length;
-    expect(set.summary.fixNow).toBe(activeFixNow);
-
-    // ── I1: BYTE-IDENTITY pin (not just membership) ──────────────────────────
-    // The legacy content-gap branch maps cg.priority directly: high → fix_soon, else ongoing
-    // (recommendations.ts). These are the FIXED expected tiers for the gaps() fixture — pinned
-    // by title so the assertion is id-stable (rec ids are random per run). If the flag-OFF tier
-    // path drifts (e.g. deriveOvTier leaks into the OFF branch), this fails.
-    // content_gap rec title is `Content Gap: ${topic}` (signal-story-registry), so match on topic.
-    const tierByTitle = new Map(contentRecs.map(r => [r.title, r.priority]));
-    const highRec = contentRecs.find(r => r.title.includes('High demand topic'));
-    const midRec = contentRecs.find(r => r.title.includes('Mid topic'));
-    const lowRec = contentRecs.find(r => r.title.includes('Low topic'));
-    expect(highRec).toBeTruthy();
-    expect(midRec).toBeTruthy();
-    expect(lowRec).toBeTruthy();
-    expect(tierByTitle.get(highRec!.title)).toBe('fix_soon'); // high → fix_soon (legacy)
-    expect(tierByTitle.get(midRec!.title)).toBe('ongoing');   // medium → ongoing (legacy)
-    expect(tierByTitle.get(lowRec!.title)).toBe('ongoing');   // low → ongoing (legacy)
-
-    // content_gaps.opportunity_score is UNTOUCHED by flag-OFF generation (the OV recompute in
-    // keyword-strategy-enrichment is flag-ON only, and generateRecommendations never writes the
-    // content_gaps table). The fixture stored no opportunityScore, so every value stays null.
-    const gapsAfter = listContentGaps(s.workspaceId);
-    expect(gapsAfter.length).toBe(gaps().length);
-    for (const g of gapsAfter) {
-      expect(g.opportunityScore).toBeUndefined(); // null column → mapper drops the key (byte-identical to input)
-    }
-
-    // summary.topRecommendationId equals the id of the #1 active rec in the served order
-    // (the already-sorted recs array). Pinned to its TITLE so the assertion survives random ids,
-    // and asserted EQUAL to the explicitly recomputed #1 — the legacy summary contract.
-    const activeSorted = set.recommendations.filter(r => r.status === 'pending');
-    const expectedTopId = activeSorted[0]?.id ?? null;
-    expect(set.summary.topRecommendationId).toBe(expectedTopId);
-
-    // ── Determinism pin: a SECOND flag-OFF run yields an identical served priority array
-    // (by title) + identical top-rec identity (by title) — proves no flag-OFF drift run-to-run.
-    const set2 = await generateRecommendations(s.workspaceId);
-    const priByTitle = (rs: typeof set) =>
-      rs.recommendations.filter(r => r.source === 'strategy:content-gap').map(r => `${r.title}::${r.priority}`).sort();
-    expect(priByTitle(set2)).toEqual(priByTitle(set));
-    const topTitle = (rs: typeof set) =>
-      rs.recommendations.find(r => r.id === rs.summary.topRecommendationId)?.title ?? null;
-    expect(topTitle(set2)).toEqual(topTitle(set));
-  });
-
-  it('(3) flag-ON: content_gaps.opportunity_score is OV-derived and the rec gain is the OV phrase', async () => {
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, true);
+  it('(3) canonical path: content_gaps.opportunity_score is OV-derived and the rec gain is the OV phrase', async () => {
     const set = await generateRecommendations(s.workspaceId);
     const contentRecs = set.recommendations.filter(r => r.source === 'strategy:content-gap');
     expect(contentRecs.length).toBeGreaterThan(0);

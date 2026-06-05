@@ -9,7 +9,6 @@ import type { DomainKeyword, KeywordGapEntry, RelatedKeyword, SeoDataProvider } 
 import type { KeywordSourceEvidence } from '../shared/types/keywords.js';
 import type { SeoDataStatus, Workspace } from '../shared/types/workspace.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
-import { isFeatureEnabled } from './feature-flags.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -249,7 +248,7 @@ export async function fetchAndCacheKeywordStrategySeoData({
   // prompt's seoContext discovery block with en keywords while the pool carries
   // resolved-language ones. On flag-ON we skip it; the prompt still gets discovery
   // context through the universe-built KEYWORD POOL block. Flag-OFF is unchanged. (I2)
-  const universeOwnsDiscovery = isFeatureEnabled('seo-generation-quality', ws.id);
+  const universeOwnsDiscovery = true;
   if (seoDataMode === 'full' && !universeOwnsDiscovery) {
     try {
       sendProgress('seo-data', 'Expanding keyword discovery sources...', 0.63);

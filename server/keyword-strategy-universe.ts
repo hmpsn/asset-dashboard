@@ -175,18 +175,13 @@ export interface BuildKeywordUniverseOptions {
    */
   contentGapVotes?: { topic: string; votes: number }[];
   /**
-   * SEO Generation Quality P7.2 — the local-intent source gate (default false).
+   * Local-intent source gate (default false).
    *
-   * Resolved ONCE by the caller (mirrors P7.1's three-gate in `recommendations.ts`
-   * and how the umbrella `seo-generation-quality` flag is resolved in synthesis and
-   * threaded as a plain boolean — never `isFeatureEnabled` in a hot loop). The caller
-   * sets this true ONLY when ALL THREE hold: (1) the gen-quality umbrella flag is on
-   * for the workspace, (2) posture ∈ {local, hybrid}, and (3) `local-seo-visibility`
-   * is on. When false, NO local source runs → the pool, `sourceCounts`, and
-   * `poolSize` are byte-identical to pre-P7.2 (proven by the parity test). The local
-   * source reads STORED candidates only (`buildLocalSeoKeywordCandidates`) — no
-   * synchronous provider/`getLocalVisibility` call in the strategy path
-   * (docs/rules/local-seo-visibility.md provider-cost + intelligence boundary).
+   * Resolved once by the caller and threaded as a plain boolean — never computed
+   * inside the hot loop. When false, no local source runs and the pool remains
+   * byte-identical to the non-local path. The local source reads STORED candidates
+   * only (`buildLocalSeoKeywordCandidates`) — no synchronous provider visibility
+   * call in the strategy path.
    */
   includeLocal?: boolean;
   /** Optional progress reporter (mirrors synthesis `sendProgress`). */

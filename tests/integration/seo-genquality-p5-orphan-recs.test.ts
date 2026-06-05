@@ -128,11 +128,9 @@ describe('P5 flag-ON minting', () => {
     replaceAllKeywordGaps(s.workspaceId, keywordGaps());
     replaceAllTopicClusters(s.workspaceId, topicClusters());
     replaceAllCannibalizationIssues(s.workspaceId, cannibalization());
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, true);
   });
 
   afterEach(() => {
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, null);
     cleanupOrphans(s.workspaceId);
     s.cleanup();
   });
@@ -186,33 +184,6 @@ describe('P5 flag-ON minting', () => {
   });
 });
 
-// ── (1) flag-OFF byte-identical ──────────────────────────────────────────────────
-
-describe('P5 flag-OFF byte-identical', () => {
-  it('umbrella OFF mints NO keyword_gap/topic_cluster/cannibalization recs/sources', async () => {
-    const s = seedWorkspace({});
-    try {
-      setMinimalStrategy(s.workspaceId);
-      replaceAllKeywordGaps(s.workspaceId, keywordGaps());
-      replaceAllTopicClusters(s.workspaceId, topicClusters());
-      replaceAllCannibalizationIssues(s.workspaceId, cannibalization());
-      setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, false);
-
-      const set = await generateRecommendations(s.workspaceId);
-      expect(set.recommendations.some(r => r.type === 'keyword_gap')).toBe(false);
-      expect(set.recommendations.some(r => r.type === 'topic_cluster')).toBe(false);
-      expect(set.recommendations.some(r => r.type === 'cannibalization')).toBe(false);
-      expect(set.recommendations.some(r => r.source.startsWith('keyword_gap:'))).toBe(false);
-      expect(set.recommendations.some(r => r.source.startsWith('topic_cluster:'))).toBe(false);
-      expect(set.recommendations.some(r => r.source.startsWith('cannibalization:'))).toBe(false);
-    } finally {
-      setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, null);
-      cleanupOrphans(s.workspaceId);
-      s.cleanup();
-    }
-  });
-});
-
 // ── (4) FM-2 guard: a throwing orphan reader must NOT bulk auto-resolve prior recs ──
 
 describe('P5 FM-2 — throwing orphan reader is failedCategories-guarded', () => {
@@ -221,7 +192,6 @@ describe('P5 FM-2 — throwing orphan reader is failedCategories-guarded', () =>
     try {
       setMinimalStrategy(s.workspaceId);
       replaceAllKeywordGaps(s.workspaceId, keywordGaps());
-      setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, true);
 
       // Run 1: real keyword_gap recs persist.
       const first = await generateRecommendations(s.workspaceId);
@@ -252,7 +222,6 @@ describe('P5 FM-2 — throwing orphan reader is failedCategories-guarded', () =>
       // proving the throw was isolated to the keyword_gap category (not a total-generation abort).
       expect(after!.recommendations.length).toBeGreaterThanOrEqual(0);
     } finally {
-      setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, null);
       cleanupOrphans(s.workspaceId);
       s.cleanup();
     }
@@ -268,11 +237,9 @@ describe('P5 cannibalization dedupe vs active insight', () => {
     s = seedWorkspace({});
     setMinimalStrategy(s.workspaceId);
     replaceAllCannibalizationIssues(s.workspaceId, cannibalization());
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, true);
   });
 
   afterEach(() => {
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, null);
     cleanupOrphans(s.workspaceId);
     s.cleanup();
   });
@@ -362,11 +329,9 @@ describe('P5 C1 — active insight on a still-present cannibalization issue does
   beforeEach(() => {
     s = seedWorkspace({});
     setMinimalStrategy(s.workspaceId);
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, true);
   });
 
   afterEach(() => {
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, null);
     cleanupOrphans(s.workspaceId);
     db.prepare('DELETE FROM page_edit_states WHERE workspace_id = ?').run(s.workspaceId);
     s.cleanup();
@@ -473,7 +438,6 @@ describe('P5 public-leak — new recs strip money fields + no dollarized gain', 
       replaceAllKeywordGaps(workspaceId, keywordGaps());
       replaceAllTopicClusters(workspaceId, topicClusters());
       replaceAllCannibalizationIssues(workspaceId, cannibalization());
-      setWorkspaceFlagOverride('seo-generation-quality', workspaceId, true);
       await generateRecommendations(workspaceId);
 
       const res = await ctx.api(`/api/public/recommendations/${workspaceId}`);
@@ -492,7 +456,6 @@ describe('P5 public-leak — new recs strip money fields + no dollarized gain', 
         expect(r.opportunity && 'predictedEmv' in r.opportunity).toBeFalsy();
       }
     } finally {
-      setWorkspaceFlagOverride('seo-generation-quality', workspaceId, null);
       cleanupOrphans(workspaceId);
       deleteWorkspace(workspaceId);
       await ctx.stopServer();

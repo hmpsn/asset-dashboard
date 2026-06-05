@@ -10,7 +10,6 @@ import { PageHeader, SectionCard, TabBar, ErrorState, NextStepsCard, ProgressInd
 import { ErrorBoundary } from './ErrorBoundary';
 import { workspaces } from '../api';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
-import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { queryKeys } from '../lib/queryKeys';
 import { inlineMarkdownToHtml } from '../lib/inline-markdown';
 import { resolveTabSearchParam } from '../lib/tab-search-param';
@@ -231,8 +230,8 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
   const queryClient = useQueryClient();
   const { jobs, startJob, findActiveJob } = useBackgroundTasks();
   const [searchParams] = useSearchParams();
-  const localSeoVisibilityEnabled = useFeatureFlag('local-seo-visibility');
-  const validBrandTabs = localSeoVisibilityEnabled ? BRAND_TABS_WITH_LOCATIONS : BASE_BRAND_TABS;
+  const localSeoVisibilityEnabled = true;
+  const validBrandTabs = BRAND_TABS_WITH_LOCATIONS;
 
   // Active tab
   const [activeTab, setActiveTab] = useState<BrandHubTab>(() => resolveTabSearchParam<BrandHubTab>(searchParams.get('tab'), {

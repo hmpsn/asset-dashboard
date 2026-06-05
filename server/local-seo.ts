@@ -4,7 +4,6 @@ import { z } from 'zod';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonSafeArray } from './db/json-validation.js';
-import { isFeatureEnabled } from './feature-flags.js';
 import { createLogger } from './logger.js';
 import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
@@ -2375,19 +2374,16 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
   notifyLocalSeoUpdated(workspaceId, { action: 'refresh_completed', refreshed, failed, updatedAt: new Date().toISOString() });
   addActivity(workspaceId, 'local_seo_updated', 'Local SEO visibility refreshed', `${refreshed} local visibility checks refreshed`, { source: 'local_seo', refreshed, failed });
 
-  // ── SEO Gen-Quality P7.1 · regen-on-local-refresh (Scope D). ──
   // Fresh local visibility snapshots are the spine of the local recs (B1/B2/B3). After a refresh
   // completes, regenerate recommendations so the new evidence surfaces immediately — mirroring the
-  // post-scheduled-audit regen in scheduled-audits.ts. Gated on the SAME three-gate useLocalGenQual
-  // (gen-quality flag + posture local/hybrid + local-seo-visibility flag): when OFF this is a
-  // complete NO-OP, so the legacy refresh path is byte-identical. generateRecommendations
+  // post-scheduled-audit regen in scheduled-audits.ts. This remains posture-gated so non-local
+  // workspaces avoid unnecessary local-aware recommendation churn. `generateRecommendations`
   // broadcasts + invalidates internally (Bridge rule #3 — NO manual broadcast here). Wrapped in
   // its own try/catch so a regen failure never fails the refresh job. Dynamic import avoids a
   // static recommendations.ts ↔ local-seo.ts import cycle (recommendations.ts imports the local
   // readers statically).
-  const useLocalGenQual = isFeatureEnabled('seo-generation-quality', workspaceId)
-    && (readSettings(workspace).posture === LOCAL_SEO_POSTURE.LOCAL || readSettings(workspace).posture === LOCAL_SEO_POSTURE.HYBRID)
-    && isFeatureEnabled('local-seo-visibility');
+  const useLocalGenQual = readSettings(workspace).posture === LOCAL_SEO_POSTURE.LOCAL
+    || readSettings(workspace).posture === LOCAL_SEO_POSTURE.HYBRID;
   if (useLocalGenQual) {
     try {
       const { generateRecommendations } = await import('./recommendations.js'); // dynamic-import-ok - breaks the recommendations.ts ↔ local-seo.ts cycle (readers imported statically the other way)
