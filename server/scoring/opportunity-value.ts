@@ -26,7 +26,6 @@ import type {
   OpportunityComponent,
   OpportunityWeights,
   OpportunityDimension,
-  Recommendation,
 } from '../../shared/types/recommendations.js';
 import { classifyKdGap } from '../authority-context.js';
 import { ctrAt } from './ctr-curve.js';
@@ -389,14 +388,4 @@ function clamp(v: number, lo: number, hi: number): number {
 }
 function clamp01(v: number): number {
   return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0;
-}
-
-/**
- * Impact-score selector. Returns the OV value when the caller opts into it and an
- * opportunity payload is present; otherwise falls back to the legacy impactScore.
- * Pure: the selection boolean is passed in, never read here.
- */
-export function pickImpactScore(rec: Pick<Recommendation, 'impactScore' | 'opportunity'>, useOpportunityValue: boolean): number {
-  if (useOpportunityValue && rec.opportunity) return rec.opportunity.value;
-  return rec.impactScore;
 }
