@@ -146,7 +146,7 @@ function ServiceGapNudge({ gap }: { gap: LocalSeoServiceGap }) {
 
 function BusinessLocationsShortcut({ workspaceId }: { workspaceId: string }) {
   const { data: locations, isLoading } = useLocalSeoLocations(workspaceId);
-  const brandLocationsUrl = `${adminPath(workspaceId, 'brand')}?tab=locations`;
+  const brandLocationsUrl = `${adminPath(workspaceId, 'brand')}?tab=business-footprint&focus=locations-section`;
 
   if (isLoading) {
     return (

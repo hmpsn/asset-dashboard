@@ -26,7 +26,7 @@ interface FieldGroup {
 
 export function SchemaCompletenessWidget({ pages, workspaceId }: SchemaCompletenessWidgetProps) {
   const navigate = useNavigate();
-  const brandScopedTabs = new Set(['business-profile', 'intelligence-profile', 'eeat-assets', 'locations']);
+  const brandScopedTabs = new Set(['business-footprint', 'intelligence-profile', 'eeat-assets']);
 
   const { groups, completenessPct, totalPages, fullyClean, pagesWithFindings } = useMemo(() => {
     const findingsByField = new Map<string, { severity: 'error' | 'warning'; pages: Set<string> }>();

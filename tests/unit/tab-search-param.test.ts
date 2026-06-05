@@ -23,6 +23,15 @@ describe('tab-search-param helpers', () => {
     expect(resolved).toBe('conversations');
   });
 
+  it('supports Brand Hub legacy aliases resolving to business-footprint', () => {
+    const resolved = resolveTabSearchParam<'overview' | 'business-footprint'>('business-profile', {
+      validValues: ['overview', 'business-footprint'],
+      fallback: 'overview',
+      legacyAliases: { 'business-profile': 'business-footprint', locations: 'business-footprint' },
+    });
+    expect(resolved).toBe('business-footprint');
+  });
+
   it('falls back when value is unknown', () => {
     const resolved = resolveTabSearchParam<'x' | 'y'>('z', {
       validValues: ['x', 'y'],
