@@ -9,6 +9,7 @@ import {
   keywordComparisonKey,
   isVariantOf,
   findBestParent,
+  createVariantParentIndex,
 } from '../../shared/keyword-normalization.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -458,5 +459,90 @@ describe('findBestParent', () => {
       metrics,
     );
     expect(result).toBe('teeth whitening austin tx'); // 4 tokens beats 3 and 2
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// createVariantParentIndex (perf-refactor: must be byte-identical to the
+// brute-force findVariantParentKey path, which is findBestParent over the parent
+// set with an all-zero impressions map)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('createVariantParentIndex', () => {
+  /** The exact semantics the index must reproduce: the production findVariantParentKey. */
+  function bruteForce(query: string, parentKeys: string[]): string | null {
+    if (parentKeys.length === 0) return null;
+    return findBestParent(query, parentKeys, new Map(parentKeys.map((key) => [key, 0])));
+  }
+
+  it('returns null on an empty parent set', () => {
+    const index = createVariantParentIndex([]);
+    expect(index.lookup('teeth whitening austin')).toBeNull();
+  });
+
+  it('picks the longest-token parent (matches brute force)', () => {
+    const parents = ['teeth whitening', 'teeth whitening austin', 'teeth whitening austin tx'];
+    const index = createVariantParentIndex(parents);
+    const query = 'teeth whitening austin tx special';
+    expect(index.lookup(query)).toBe('teeth whitening austin tx');
+    expect(index.lookup(query)).toBe(bruteForce(query, parents));
+  });
+
+  it('breaks token-count ties lexically (smaller key wins), matching brute force', () => {
+    // Two distinct 2-token parents both fully contained in the query → tie on token
+    // count → the lexically-smaller key must win in BOTH paths.
+    const parents = ['whitening teeth', 'teeth whitening'];
+    const index = createVariantParentIndex(parents);
+    const query = 'teeth whitening near me';
+    expect(index.lookup(query)).toBe(bruteForce(query, parents));
+    expect(index.lookup(query)).toBe('teeth whitening'); // 't' < 'w'
+  });
+
+  it('ignores single-token parents (never variant-parents), matching brute force', () => {
+    const parents = ['teeth', 'whitening', 'teeth whitening'];
+    const index = createVariantParentIndex(parents);
+    const query = 'teeth whitening cost';
+    expect(index.lookup(query)).toBe('teeth whitening');
+    expect(index.lookup(query)).toBe(bruteForce(query, parents));
+  });
+
+  it('returns null when no parent is fully contained in the query', () => {
+    const parents = ['dental implants', 'root canal'];
+    const index = createVariantParentIndex(parents);
+    const query = 'teeth whitening austin';
+    expect(index.lookup(query)).toBeNull();
+    expect(index.lookup(query)).toBe(bruteForce(query, parents));
+  });
+
+  it('FUZZ: agrees with brute force across randomized parent sets and queries', () => {
+    const vocab = [
+      'teeth', 'whitening', 'austin', 'tx', 'dental', 'implants', 'cost',
+      'near', 'me', 'best', 'cheap', 'cleaning', 'sarasota', 'invisalign',
+    ];
+    const pick = (seed: number) => vocab[Math.abs(seed) % vocab.length];
+    // Deterministic LCG so the fuzz is reproducible across runs.
+    let state = 123456789;
+    const rand = () => {
+      state = (state * 1103515245 + 12345) & 0x7fffffff;
+      return state;
+    };
+    const phrase = (minLen: number, maxLen: number) => {
+      const len = minLen + (rand() % (maxLen - minLen + 1));
+      const tokens: string[] = [];
+      for (let i = 0; i < len; i++) tokens.push(pick(rand()));
+      return [...new Set(tokens)].join(' '); // dedupe tokens to mirror real keys
+    };
+
+    for (let trial = 0; trial < 400; trial++) {
+      const parentCount = 1 + (rand() % 12);
+      const parentKeys = [
+        ...new Set(Array.from({ length: parentCount }, () => phrase(1, 4))),
+      ].filter(Boolean);
+      const index = createVariantParentIndex(parentKeys);
+      for (let q = 0; q < 6; q++) {
+        const query = phrase(1, 5);
+        expect(index.lookup(query)).toBe(bruteForce(query, parentKeys));
+      }
+    }
   });
 });

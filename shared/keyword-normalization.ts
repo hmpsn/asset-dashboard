@@ -1,4 +1,22 @@
 /**
+ * Memoization cache for `normalizeKeywordForComparison`.
+ *
+ * `normalizeKeywordForComparison` is a PURE function (same input → same output),
+ * so caching is provably output-identical. The Keyword Command Center calls it
+ * on the order of a million times per `/rows` request (ranks × strategy keys ×
+ * tokens, across several redundant passes), re-normalizing the same `(query,
+ * key)` pairs dozens of times — the dominant cost of the 10-15s Hub load on a
+ * ~1800-keyword workspace. Memoizing collapses that to one regex pass per
+ * distinct raw string.
+ *
+ * Bounded (FIFO eviction at `NORMALIZE_CACHE_MAX`) so a pathological input
+ * stream can't grow it without limit; the working set for a single workspace is
+ * a few thousand distinct strings, well under the cap.
+ */
+const NORMALIZE_CACHE_MAX = 50_000;
+const normalizeCache = new Map<string, string>();
+
+/**
  * Canonical semantic keyword comparison for the keyword operating loop.
  *
  * Use this for equality, dedupe, feedback joins, strategy/tracking joins, and
@@ -6,11 +24,22 @@
  * or provider/cache keys where exact raw keyword text is contract-sensitive.
  */
 export function normalizeKeywordForComparison(keyword: string | null | undefined): string {
-  return String(keyword ?? '')
+  const raw = keyword == null ? '' : String(keyword);
+  const cached = normalizeCache.get(raw);
+  if (cached !== undefined) return cached;
+  const normalized = raw
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+  if (normalizeCache.size >= NORMALIZE_CACHE_MAX) {
+    // FIFO eviction: drop the oldest insertion. Cheap and keeps memory bounded;
+    // exact eviction policy is irrelevant to correctness (the function is pure).
+    const oldest = normalizeCache.keys().next().value;
+    if (oldest !== undefined) normalizeCache.delete(oldest);
+  }
+  normalizeCache.set(raw, normalized);
+  return normalized;
 }
 
 export function keywordComparisonKey(keyword: string | null | undefined): string {
@@ -102,4 +131,92 @@ export function findBestParent(
   }
 
   return best;
+}
+
+/**
+ * A reusable, query-by-query parent matcher built ONCE over a fixed parent-key
+ * set. `lookup(query)` returns the same result as
+ * `findBestParent(query, parentKeys, zeroMetricsMap)` for that set, but in
+ * ~O(query tokens × parents-sharing-a-token) instead of O(parents) per query.
+ *
+ * Why this is byte-identical to the brute-force scan: `isVariantOf` matches a
+ * parent only when EVERY token of the (≥2-token) parent appears in the query's
+ * token set — so any true match necessarily shares at least one token with the
+ * query. An inverted `token → parents` index therefore yields a SUPERSET of the
+ * true matches; we then run the IDENTICAL winner-selection over that narrowed
+ * superset. Parents that share no query token could never have passed
+ * `isVariantOf`, so excluding them cannot change the winner. Single-token
+ * parents are excluded up front (they never satisfy `isVariantOf`).
+ *
+ * The impressions tie-breaker is fixed at 0 for every parent, matching
+ * `findVariantParentKey`'s `new Map(parentKeys.map(key => [key, 0]))` — the only
+ * call site that needs this index. With equal (zero) impressions the tie-break
+ * reduces to: more tokens wins, then lexically-smaller key wins.
+ */
+export interface VariantParentIndex {
+  lookup(query: string): string | null;
+}
+
+export function createVariantParentIndex(parentKeys: string[]): VariantParentIndex {
+  // token -> list of parent keys whose normalized form contains that token.
+  const tokenToParents = new Map<string, string[]>();
+  // parent key -> { tokens (as a Set, for the every() check), tokenCount }.
+  const parentMeta = new Map<string, { tokens: Set<string>; tokenCount: number }>();
+
+  for (const key of parentKeys) {
+    if (parentMeta.has(key)) continue; // dedupe (the real call path passes a Set-derived array)
+    const normalized = normalizeKeywordForComparison(key);
+    if (!normalized) continue;
+    const tokens = normalized.split(' ');
+    if (tokens.length < 2) continue; // single-token parents never satisfy isVariantOf
+    const tokenSet = new Set(tokens);
+    parentMeta.set(key, { tokens: tokenSet, tokenCount: tokens.length });
+    for (const token of tokenSet) {
+      const bucket = tokenToParents.get(token);
+      if (bucket) bucket.push(key);
+      else tokenToParents.set(token, [key]);
+    }
+  }
+
+  return {
+    lookup(query: string): string | null {
+      const normalizedQuery = normalizeKeywordForComparison(query);
+      if (!normalizedQuery) return null;
+      const queryTokens = new Set(normalizedQuery.split(' '));
+
+      // Gather the candidate parents that share at least one query token.
+      // Dedupe via a Set because a parent can be reached through several tokens.
+      const candidates = new Set<string>();
+      for (const token of queryTokens) {
+        const bucket = tokenToParents.get(token);
+        if (!bucket) continue;
+        for (const key of bucket) candidates.add(key);
+      }
+      if (candidates.size === 0) return null;
+
+      // IDENTICAL winner-selection to findBestParent (impressions fixed at 0):
+      // more tokens wins; equal tokens → lexically-smaller key wins.
+      let best: string | null = null;
+      let bestTokenCount = 0;
+      for (const key of candidates) {
+        const meta = parentMeta.get(key);
+        if (!meta) continue;
+        // isVariantOf: every parent token must be in the query token set.
+        let isVariant = true;
+        for (const token of meta.tokens) {
+          if (!queryTokens.has(token)) { isVariant = false; break; }
+        }
+        if (!isVariant) continue;
+        const tokenCount = meta.tokenCount;
+        if (
+          tokenCount > bestTokenCount
+          || (tokenCount === bestTokenCount && (best === null || key < best))
+        ) {
+          best = key;
+          bestTokenCount = tokenCount;
+        }
+      }
+      return best;
+    },
+  };
 }
