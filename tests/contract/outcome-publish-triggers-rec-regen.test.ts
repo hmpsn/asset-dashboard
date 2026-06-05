@@ -5,9 +5,9 @@
  * every publish/measure path that changes workspace SEO state calls
  * queueKeywordStrategyPostUpdateFollowOns so recommendations stay fresh.
  *
- * The debounce guard (recsInFlight Set in keyword-strategy-follow-ons.ts)
- * prevents N concurrent generateRecommendations calls when a bulk publish
- * touches N workspaces — this test confirms the guard is present.
+ * The shared recommendation regen scheduler prevents overlapping per-workspace
+ * generateRecommendations calls when bulk publish/measure flows touch the same
+ * workspace repeatedly — this test confirms the shared authority is present.
  */
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
@@ -46,14 +46,19 @@ describe('outcome-crons: measure/learnings enqueue rec regen', () => {
   });
 });
 
-describe('keyword-strategy-follow-ons: per-workspace debounce guard is present', () => {
+describe('keyword-strategy-follow-ons: per-workspace regen scheduler is present', () => {
   const followOnsSrc = readFileSync('server/keyword-strategy-follow-ons.ts', 'utf-8'); // readFile-ok - debounce contract
+  const schedulerSrc = readFileSync('server/recommendation-regen-scheduler.ts', 'utf-8'); // readFile-ok - debounce contract
 
-  it('uses a recsInFlight Set to prevent concurrent regen for the same workspace', () => {
-    expect(followOnsSrc).toContain('const recsInFlight = new Set<string>()');
-    expect(followOnsSrc).toContain('recsInFlight.has(workspaceId)');
-    expect(followOnsSrc).toContain('recsInFlight.add(workspaceId)');
-    expect(followOnsSrc).toContain('recsInFlight.delete(workspaceId)');
+  it('routes follow-ons through the shared delayed regen queue', () => {
+    expect(followOnsSrc).toContain("from './recommendation-regen-scheduler.js'");
+    expect(followOnsSrc).toContain("queueDelayedRecommendationRegen(workspaceId, 'keyword_strategy_follow_on', RECOMMENDATION_REFRESH_DELAY_MS)");
+  });
+
+  it('keeps a shared per-workspace single-flight guard in the scheduler', () => {
+    expect(schedulerSrc).toContain('const inflight = new Map<string, Promise<void>>()');
+    expect(schedulerSrc).toContain('const delayed = new Map<string, ReturnType<typeof setTimeout>>()');
+    expect(schedulerSrc).toContain('const existing = inflight.get(workspaceId)');
   });
 });
 

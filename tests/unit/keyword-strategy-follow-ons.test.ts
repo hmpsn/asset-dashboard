@@ -19,8 +19,9 @@ vi.mock('../../server/rank-tracking-reconciliation.js', () => ({
 vi.mock('../../server/llms-txt-generator.js', () => ({
   queueLlmsTxtRegeneration: vi.fn(),
 }));
-vi.mock('../../server/recommendations.js', () => ({
-  generateRecommendations: vi.fn(async () => undefined),
+vi.mock('../../server/recommendation-regen-scheduler.js', () => ({
+  RECOMMENDATION_REFRESH_DELAY_MS: 30_000,
+  queueDelayedRecommendationRegen: vi.fn(),
 }));
 vi.mock('../../server/workspace-intelligence.js', () => ({
   invalidateIntelligenceCache: vi.fn(),
@@ -37,7 +38,7 @@ import * as activityLog from '../../server/activity-log.js';
 import * as broadcastMod from '../../server/broadcast.js';
 import * as rankTracking from '../../server/rank-tracking-reconciliation.js';
 import * as llmsTxt from '../../server/llms-txt-generator.js';
-import * as recs from '../../server/recommendations.js';
+import * as regenScheduler from '../../server/recommendation-regen-scheduler.js';
 
 // ── Import the module under test ──────────────────────────────────────────────
 import {
@@ -165,10 +166,12 @@ describe('queueKeywordStrategyPostUpdateFollowOns', () => {
     expect(llmsTxt.queueLlmsTxtRegeneration).toHaveBeenCalledWith('ws_foo', 'keyword_strategy_updated');
   });
 
-  it('does not call generateRecommendations synchronously (delayed via setTimeout)', () => {
-    // Use a unique workspaceId to avoid the recsInFlight dedup guard from prior tests
+  it('queues a delayed recommendation regen through the shared scheduler', () => {
     queueKeywordStrategyPostUpdateFollowOns({ workspaceId: 'ws_unique_followon_test_wave25' });
-    // generateRecommendations is behind a 30s setTimeout — NOT called synchronously
-    expect(recs.generateRecommendations).not.toHaveBeenCalled();
+    expect(regenScheduler.queueDelayedRecommendationRegen).toHaveBeenCalledWith(
+      'ws_unique_followon_test_wave25',
+      'keyword_strategy_follow_on',
+      30_000,
+    );
   });
 });

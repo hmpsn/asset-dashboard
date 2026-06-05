@@ -285,8 +285,9 @@
           "source": "/docs/superpowers/audits/2026-06-01-opportunity-value-model-audit.md",
           "est": "2-4h",
           "priority": "P2",
-          "status": "pending",
-          "notes": "PR7 review (non-blocking, dark): triggerOpportunityRegen (debounced generateRecommendations) bypasses the cron's recsInFlight single-flight, so an event regen can run concurrently with a follow-on regen for the same workspace. Debounce mitigates but does not serialize. Harden before enabling opportunity-value-events."
+          "status": "done",
+          "shippedAt": "2026-06-05",
+          "notes": "Closed in PR1 of the OV cleanup sprint. Extracted a shared `server/recommendation-regen-scheduler.ts` authority so delayed keyword-strategy follow-ons and debounced opportunity-event regens now serialize through one per-workspace single-flight path. The event debounce (`opportunity-value-events`, 90s) remains intact, but once it fires it no longer bypasses the follow-on guard. Added dedicated scheduler unit coverage plus updated contract tests around the new shared runtime authority."
         },
         {
           "id": "ov-legacy-scorer-removal-postflip",
@@ -326,7 +327,7 @@
         },
         {
           "id": "ov-seasonality-monthly-volumes",
-          "title": "Seasonal opportunity events + keyword_monthly_volumes (migration 111)",
+          "title": "Seasonal opportunity events + keyword_monthly_volumes (migration 115)",
           "source": "/docs/designs/2026-05-31-opportunity-value-model.md",
           "est": "4-6h",
           "priority": "P3",

@@ -192,7 +192,8 @@ router.post('/api/content-posts/:workspaceId/:postId/publish-to-webflow', requir
     // publish changes the live page inventory so recommendations should reflect
     // it. Guarded in its own try/catch: the response has already been sent, so a
     // throw here must NOT fall through to the outer catch (which would attempt a
-    // second, header-already-sent 500 response). recsInFlight dedupes per-workspace.
+    // second, header-already-sent 500 response). The shared regen scheduler
+    // dedupes per-workspace execution.
     try {
       queueKeywordStrategyPostUpdateFollowOns({ workspaceId });
     } catch (err) {

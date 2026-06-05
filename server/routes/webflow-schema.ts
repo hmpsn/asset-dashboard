@@ -466,8 +466,8 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceSiteAccessFro
           log.warn({ err, pageId }, 'Failed to record outcome action for CMS-field schema deployment');
         }
         // Enqueue debounced rec regen — schema deploy changes page SEO signals so
-        // recommendations should reflect the updated schema state.
-        // recsInFlight deduplicates concurrent regens per workspace.
+        // recommendations should reflect the updated schema state. The shared regen
+        // scheduler deduplicates concurrent per-workspace execution.
         queueKeywordStrategyPostUpdateFollowOns({ workspaceId: cmsWs.id });
         invalidateIntelligenceCache(cmsWs.id);
       }
@@ -563,9 +563,9 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceSiteAccessFro
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-schema: programming error'); /* non-critical — response already sent */ }
 
     // Enqueue debounced rec regen after direct schema publish — schema changes
-    // page SEO signals so recommendations should be refreshed.
-    // recsInFlight in keyword-strategy-follow-ons deduplicates concurrent regens
-    // per workspace, so bulk schema deploys do not trigger N concurrent regen calls.
+    // page SEO signals so recommendations should be refreshed. The shared regen
+    // scheduler deduplicates concurrent per-workspace execution, so bulk schema
+    // deploys do not trigger N overlapping regen calls.
     try {
       if (pubWs) queueKeywordStrategyPostUpdateFollowOns({ workspaceId: pubWs.id });
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-schema: programming error'); /* non-critical — response already sent */ }

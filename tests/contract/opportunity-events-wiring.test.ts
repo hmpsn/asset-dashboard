@@ -55,14 +55,19 @@ describe('apply tail → opportunity regen', () => {
 });
 
 describe('opportunity-regen breaks the recommendations cycle', () => {
-  const src = readFileSync('server/scoring/opportunity-regen.ts', 'utf-8'); // readFile-ok - cycle contract
+  const regenSrc = readFileSync('server/scoring/opportunity-regen.ts', 'utf-8'); // readFile-ok - cycle contract
+  const schedulerSrc = readFileSync('server/recommendation-regen-scheduler.ts', 'utf-8'); // readFile-ok - cycle contract
 
-  it('loads generateRecommendations via a DYNAMIC import (not a static value import)', () => {
-    expect(src).toContain("await import('../recommendations.js')");
-    expect(src).not.toContain("from '../recommendations.js'");
+  it('keeps the dynamic-import cycle break in the shared scheduler', () => {
+    expect(schedulerSrc).toContain("await import('./recommendations.js')");
+    expect(schedulerSrc).not.toContain("from './recommendations.js'");
   });
   it('is built on debounceBridge with the opportunity event source id', () => {
-    expect(src).toContain("debounceBridge('opportunity-value-events'");
+    expect(regenSrc).toContain("debounceBridge('opportunity-value-events'");
+  });
+  it('routes the debounced event path through the shared single-flight scheduler', () => {
+    expect(regenSrc).toContain("from '../recommendation-regen-scheduler.js'");
+    expect(regenSrc).toContain("runRecommendationRegen(workspaceId, 'opportunity_value_event')");
   });
 });
 
