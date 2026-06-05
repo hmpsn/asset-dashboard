@@ -21,6 +21,7 @@ const GUARD_SIGNALS: GuardSignal[] = [
   { entity: 'briefing_draft', file: 'server/briefing-store.ts', transitionToken: 'BRIEFING_DRAFT_TRANSITIONS' },
   { entity: 'background_job', file: 'server/jobs.ts', transitionToken: 'BACKGROUND_JOB_TRANSITIONS' },
   { entity: 'recommendation', file: 'server/recommendations.ts', transitionToken: 'RECOMMENDATION_TRANSITIONS' },
+  { entity: 'keyword', file: 'server/keyword-command-center.ts', transitionToken: 'TRACKED_KEYWORD_TRANSITIONS' },
 ];
 
 function readSource(file: string): string {

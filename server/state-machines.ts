@@ -246,6 +246,41 @@ export const REQUEST_TRANSITIONS: Record<string, readonly string[]> = {
 
 export type RequestTransitionStatus = 'new' | 'in_review' | 'in_progress' | 'on_hold' | 'completed' | 'closed';
 
+// ── Tracked Keyword (rank-tracking lifecycle) ──
+// The four TRACKED_KEYWORD_STATUS values (shared/types/rank-tracking.ts). Until P3
+// (Keyword Hub Wave 4) the tracked-keyword lifecycle was the ONLY status entity whose
+// mutations were not state-machine-guarded: every other status column already routes
+// through validateTransition, but `applyKeywordCommandCenterActionInternal` flipped
+// active↔paused↔deprecated directly. This map closes that gap so the live KCC/Hub
+// action engine refuses illegal moves (defense-in-depth: an illegal transition is
+// "never allowed", orthogonal to protection which is "needs confirmation").
+//
+// The edge set is DERIVED from the real action switch (`applyKeywordCommandCenterActionInternal`)
+// — the minimal map that ADMITS every transition the switch performs and REJECTS the rest:
+//   active → paused      PAUSE_TRACKING
+//   active → deprecated  RETIRE, DECLINE-of-tracked
+//   paused → deprecated  RETIRE / DECLINE while paused (Retire is offered whenever row.tracking exists)
+//   paused → active      RESTORE
+//   deprecated → active  RESTORE (revive clears deprecatedAt/replacedBy — rank-tracking.ts)
+// Plus the reconcile-only lifecycle edge active|paused → replaced (rank-tracking-reconciliation.ts
+// flips an active strategy-owned keyword to REPLACED when a current target supersedes it; that
+// path does NOT route through this validator but the edge is part of the real lifecycle, so the
+// model includes it to stay faithful). `replaced` and the unreachable cross-edges are terminal:
+// deprecated/replaced are NOT freely interconvertible, and `replaced` never revives (the only
+// revive path, RESTORE, targets `active` from paused/deprecated — a replaced keyword has been
+// superseded and is re-tracked as a fresh insert, not a transition).
+//
+// NOT a machine state: `not_tracked`. TRACK/PROMOTE_EVIDENCE/ADD_TO_STRATEGY create a row at
+// ACTIVE — an INSERT, not a transition — so those paths do not route through validateTransition.
+export const TRACKED_KEYWORD_TRANSITIONS: Record<string, readonly string[]> = {
+  active:     ['paused', 'deprecated', 'replaced'],
+  paused:     ['active', 'deprecated', 'replaced'],
+  deprecated: ['active'],   // RESTORE — the only edge out of deprecated
+  replaced:   [],           // terminal — superseded; re-tracking is a fresh insert
+};
+
+export type TrackedKeywordTransitionStatus = 'active' | 'paused' | 'deprecated' | 'replaced';
+
 // ── Generic validator ──
 
 export class InvalidTransitionError extends Error {

@@ -485,6 +485,19 @@ The admin Keywords surface uses a full-width dense table with overlay detail, no
 - `transactional` → `text-accent-warning bg-amber-500/10 border-amber-500/20`
 - `navigational` → `text-accent-cyan bg-cyan-500/10 border-cyan-500/20`
 
+### Keyword Hub action affordances (`KeywordActionMenu.tsx`, flag `keyword-hub`)
+
+The Keyword Hub (Wave 4) introduces a deliberate **action-tone reconciliation** that frees **red exclusively for the one irreversible affordance — permanent Delete.** This is Hub-only (flag-ON); the flag-OFF Keyword Command Center renders byte-identically (the shared server `buildNextActions` still emits `tone:'red'` for retire/decline, which the legacy KCC renderer consumes unchanged — the Hub remaps those locally in `KeywordActionMenu` rather than changing the server).
+
+| Affordance | Tone | Rationale |
+|------------|------|-----------|
+| Track / Add to strategy / Restore | **Teal** | Constructive lifecycle actions (Law 1 — teal for actions) |
+| View rankings (navigation) | **Blue** | Read-only data surface (Law 2) |
+| **Retire / Decline** | **Amber** | Reversible removal (rank history preserved, restorable) — caution, NOT danger. Remapped from the server's flag-OFF red. |
+| **Delete permanently** | **Red** (`IconButton variant="danger"`, `Trash2`) | The ONLY red affordance in the Hub. Visually separated (divider + icon button), gated by `ConfirmDialog variant="destructive"` with explicit copy ("This permanently deletes `<kw>` and its rank history. This cannot be undone."), and rendered ONLY when the client eligibility predicate (`canHardDelete`: MANUAL, unpinned, no gap/client provenance) is true. Ineligible rows hide Delete — retire is their only remove. |
+
+This is the canonical example of the Four Laws' "red = irreversible/destructive only" discipline: soft retire (reversible) is amber; hard delete (irreversible, drops rank history) is red.
+
 ### Stripe Checkout
 
 | Element | Color |

@@ -26,9 +26,10 @@ import { Search } from 'lucide-react';
 import { KeywordTable } from '../shared/RankTable';
 import { ErrorState } from '../ui/ErrorState';
 import { KeywordBulkActionBar } from '../keyword-command-center/KeywordBulkActionBar';
+import { KeywordActionMenu } from '../keyword-command-center/KeywordActionMenu';
 import { HubKeywordRowMeta } from './HubKeywordRowMeta';
 import { Button } from '../ui/Button';
-import type { KeywordCommandCenterRow, KeywordCommandCenterPageInfo, KeywordCommandCenterBulkActionType } from '../../../shared/types/keyword-command-center';
+import type { KeywordCommandCenterRow, KeywordCommandCenterPageInfo, KeywordCommandCenterActionType, KeywordCommandCenterBulkActionType } from '../../../shared/types/keyword-command-center';
 import type { HubSortState, HubSortKey } from '../../hooks/admin/useKeywordHubState';
 
 // ---------------------------------------------------------------------------
@@ -52,6 +53,12 @@ export interface HubKeywordListProps {
   onPageChange: (p: number) => void;
   isBulkPending: boolean;
   onBulkAction: (action: KeywordCommandCenterBulkActionType) => void;
+  /** Per-row lifecycle action (P3-3b) — mounts via KeywordActionMenu in the row actions slot. */
+  onRowAction: (keyword: string, action: KeywordCommandCenterActionType, opts?: { force?: boolean }) => void;
+  /** Separate hard-delete channel (P3-3c) — never a lifecycle action. */
+  onDeleteHard: (keyword: string) => void;
+  /** True while a per-row action or hard delete is in flight — disables the row menu. */
+  isRowActionPending: boolean;
   onClearSelection: () => void;
   /** Resets the active segment/search/advanced-filter (NOT the multi-select). Wired to the empty-state "Clear filters" CTA. */
   onResetFilters: () => void;
@@ -117,6 +124,9 @@ export function HubKeywordList({
   onPageChange,
   isBulkPending,
   onBulkAction,
+  onRowAction,
+  onDeleteHard,
+  isRowActionPending,
   onClearSelection,
   onResetFilters,
   showLocalSeo,
@@ -175,6 +185,14 @@ export function HubKeywordList({
         }}
         keywordText={(r) => r.keyword}
         renderKeywordMeta={(r) => <HubKeywordRowMeta row={r} />}
+        renderActions={(r) => (
+          <KeywordActionMenu
+            row={r}
+            isPending={isRowActionPending}
+            onAction={(action: KeywordCommandCenterActionType, opts) => onRowAction(r.keyword, action, opts)}
+            onDeleteHard={onDeleteHard}
+          />
+        )}
         loading={isLoading && rows.length === 0}
         emptyState={{
           icon: Search,
