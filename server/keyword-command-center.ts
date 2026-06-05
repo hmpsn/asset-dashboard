@@ -30,7 +30,8 @@ import { getWorkspace } from './workspaces.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { buildKeywordStrategyUxPayload } from './keyword-strategy-ux.js';
 import { WS_EVENTS } from './ws-events.js';
-import { findBestParent, keywordComparisonKey } from '../shared/keyword-normalization.js';
+import { findBestParent, isJunkKeywordString, keywordComparisonKey } from '../shared/keyword-normalization.js';
+import { isStrategyPoolEligibleKeyword } from './keyword-intelligence/rules.js';
 import {
   getLostVisibilityKeys,
   getLostVisibilityQueries,
@@ -1182,6 +1183,12 @@ async function populateDraftRows(rows: Map<string, DraftRow>, bundle: CommandCen
   }
 
   for (const candidate of bundle.localCandidates ?? []) {
+    // F2: local candidates are built by buildLocalSeoKeywordCandidates (a separate
+    // source from the gated gaps), so apply Tier-1 here too — a malformed gap
+    // keyword with a local twin must not leak into the local_candidates filter.
+    // Tier-1 only (matches the localVisibility candidate-boundary gate); local
+    // candidates are a curated/local surface and are never relevance-gated.
+    if (isTier1JunkKeyword(candidate.keyword)) continue;
     const row = ensureRow(rows, candidate.keyword);
     if (!row) continue;
     row.localCandidate = candidate;
@@ -1333,8 +1340,12 @@ async function buildKeywordCommandCenterModel(
   // above, and pageMap keeps the Lite/full page_keywords path above — KCC only
   // needs the two gap arrays here.
   const assembled = assembleStoredKeywordStrategy(workspace.id);
-  const contentGaps = assembled?.contentGaps ?? [];
-  const keywordGaps = assembled?.keywordGaps ?? [];
+  // Tier-1 + Tier-2 junk gate applied ONCE at the discovery source so the read
+  // model (incl. the LOCAL_CANDIDATES filter) never surfaces a junk gap keyword.
+  const { contentGaps, keywordGaps } = gateDiscoveryGaps({
+    contentGaps: assembled?.contentGaps ?? [],
+    keywordGaps: assembled?.keywordGaps ?? [],
+  });
   // Wave 3d-i: getTrackedKeywords strips provenance; merge sourceGapKey back from
   // the provenance-bearing table read (KCC is admin-authed) so the tracking row can
   // expose it.
@@ -1480,15 +1491,20 @@ export async function buildKeywordCommandCenterSummary(
 
   // contentGaps + keywordGaps via the single assembler (#2); siteKeywords/
   // siteKeywordMetrics above stay blob-sourced (workspace.keywordStrategy).
+  // F1 fix: gate the discovery gaps through the SAME Tier-1 + Tier-2 junk gate the
+  // rows path uses, so the summary `counts`/`filterCounts` and `/rows?filter=all`
+  // `totalRows` agree on the gated universe (numerator/denominator share a source).
   const summaryAssembled = assembleStoredKeywordStrategy(workspace.id);
-  const contentGaps = summaryAssembled?.contentGaps ?? [];
+  const { contentGaps, keywordGaps } = gateDiscoveryGaps({
+    contentGaps: summaryAssembled?.contentGaps ?? [],
+    keywordGaps: summaryAssembled?.keywordGaps ?? [],
+  });
   for (const gap of contentGaps) {
     addKey(contentKeys, gap.targetKeyword);
     addKey(inStrategyKeys, gap.targetKeyword);
     markVolume(gap.targetKeyword, gap.volume);
   }
 
-  const keywordGaps = summaryAssembled?.keywordGaps ?? [];
   for (const gap of keywordGaps) {
     addKey(rawEvidenceKeys, gap.keyword);
     markVolume(gap.keyword, gap.volume);
@@ -1862,6 +1878,80 @@ function addCandidateKey(
   }
 }
 
+/**
+ * Tier-2 (relevance) evaluation context for the KCC discovery gate.
+ *
+ * DELIBERATELY EMPTY ({}). The strategy-synthesis path builds a rich ctx with
+ * `strictBusinessFit: true` (server/keyword-strategy-ai-synthesis.ts) to
+ * AGGRESSIVELY prune business-mismatched provider suggestions during strategy
+ * GENERATION. The Keyword Command Center has a different goal: surface the
+ * COMPLETE not-yet-ranking opportunity universe. Here we only want to strip the
+ * low-actionability NOISE that `isStrategyPoolEligibleKeyword` suppresses
+ * unconditionally — the `LOW_ACTIONABILITY_PHRASES` blocklist and blank keywords
+ * (server/keyword-intelligence/rules.ts) — WITHOUT dropping a real competitor-gap
+ * keyword just because the workspace has no business-context terms yet.
+ *
+ * With `{}`, `strictBusinessFit` defaults to false, so the `business_mismatch`
+ * hard-suppress escalation never fires; only the source-agnostic noise/blank
+ * suppression remains. This keeps the headline invariant ("invisalign cost",
+ * 1900 vol, 0 clicks → RETAINED) true while still dropping "paper tiger"-class
+ * noise. When unsure, we KEEP the keyword (a false-negative on junk is far
+ * cheaper than dropping a real opportunity).
+ */
+const KCC_DISCOVERY_TIER2_CTX: Parameters<typeof isStrategyPoolEligibleKeyword>[1] = {};
+
+/** Tier-1 malformed-string gate (ALL populations). True ⇒ drop the candidate. */
+function isTier1JunkKeyword(keyword: string | null | undefined): boolean {
+  return isJunkKeywordString(keyword).isJunk;
+}
+
+/**
+ * Tier-2 relevance/low-actionability gate (DISCOVERY populations ONLY:
+ * `contentGaps` + `keywordGaps`). True ⇒ drop the candidate. Never call this for
+ * ranking/curated/strategy/tracked/feedback/GSC/local/lost sources — a
+ * clicked/tracked/client-chosen keyword is never relevance-dropped.
+ */
+function isTier2SuppressedDiscovery(keyword: string, volume: number, difficulty: number): boolean {
+  return isStrategyPoolEligibleKeyword(
+    { keyword, volume, difficulty, sourceKind: 'keyword_gap' },
+    KCC_DISCOVERY_TIER2_CTX,
+  ).suppressed;
+}
+
+/**
+ * SINGLE source-of-truth junk gate for the DISCOVERY populations (contentGaps +
+ * keywordGaps). Applied ONCE, immediately after `assembleStoredKeywordStrategy`,
+ * by every KCC consumer (rows-skinny bundle, read-model, summary, detail) so all
+ * four paths read the SAME gated gaps by construction — the rows table, the
+ * summary badges, the `local_candidates` filter, and `/detail` can no longer
+ * diverge on the discovery universe.
+ *
+ * Both tiers from the candidate boundary apply: Tier-1 (`isTier1JunkKeyword` —
+ * malformed strings) drops every population; Tier-2 (`isTier2SuppressedDiscovery`
+ * — low-actionability noise) is DISCOVERY-only and never touches ranking/curated
+ * sources, so the headline invariant holds (a real not-yet-ranking competitor
+ * gap with volume + 0 clicks survives; a clicked GSC ranking query is never
+ * relevance-gated because ranks are not gaps).
+ *
+ * The candidate loops in `addCandidateKeysFromBundle` keep their own Tier-1/Tier-2
+ * gap checks; with pre-gated bundles those checks are redundant-but-harmless
+ * (they still gate the OTHER populations — strategy/page/rank/tracked/local/lost —
+ * for the rare garbage string, and they keep `__candidateKeysForTest` honest when
+ * fed a raw bundle directly).
+ */
+function gateDiscoveryGaps<T extends { contentGaps: ContentGap[]; keywordGaps: KeywordGapItem[] }>(
+  source: T,
+): { contentGaps: ContentGap[]; keywordGaps: KeywordGapItem[] } {
+  return {
+    contentGaps: source.contentGaps.filter(gap =>
+      !isTier1JunkKeyword(gap.targetKeyword)
+      && !isTier2SuppressedDiscovery(gap.targetKeyword, gap.volume ?? 0, gap.difficulty ?? 0)),
+    keywordGaps: source.keywordGaps.filter(gap =>
+      !isTier1JunkKeyword(gap.keyword)
+      && !isTier2SuppressedDiscovery(gap.keyword, gap.volume ?? 0, gap.difficulty ?? 0)),
+  };
+}
+
 function addCandidateKeysFromBundle(
   candidates: Map<string, RowCandidateKey>,
   bundle: CommandCenterSourceBundle,
@@ -1874,43 +1964,72 @@ function addCandidateKeysFromBundle(
     trackedKeywords: bundle.trackedKeywords,
     feedback: bundle.feedback,
   });
+  // Per-tier dropped COUNTS for observability (no keyword PII beyond counts).
+  let tier1Dropped = 0;
+  let tier2Dropped = 0;
   for (const metric of bundle.strategy?.siteKeywordMetrics ?? []) {
+    if (isTier1JunkKeyword(metric.keyword)) { tier1Dropped++; continue; }
     // siteKeywordMetrics carry provider difficulty (SiteKeywordMetric.difficulty).
     addCandidateKey(candidates, metric.keyword, 0, metric.volume ?? 0, undefined, undefined, undefined, metric.difficulty);
   }
   for (const keyword of bundle.strategy?.siteKeywords ?? []) {
+    if (isTier1JunkKeyword(keyword)) { tier1Dropped++; continue; }
     addCandidateKey(candidates, keyword, 0);
   }
   for (const page of bundle.pageMap) {
     const pageSearchText = `${page.pageTitle ?? ''} ${page.pagePath ?? ''}`.toLowerCase();
-    addCandidateKey(candidates, page.primaryKeyword, 0, page.volume ?? 0, undefined, pageSearchText);
-    for (const secondary of page.secondaryKeywords ?? []) addCandidateKey(candidates, secondary, 1, page.volume ?? 0, undefined, pageSearchText);
+    if (isTier1JunkKeyword(page.primaryKeyword)) tier1Dropped++;
+    else addCandidateKey(candidates, page.primaryKeyword, 0, page.volume ?? 0, undefined, pageSearchText);
+    for (const secondary of page.secondaryKeywords ?? []) {
+      if (isTier1JunkKeyword(secondary)) { tier1Dropped++; continue; }
+      addCandidateKey(candidates, secondary, 1, page.volume ?? 0, undefined, pageSearchText);
+    }
   }
   for (const gap of bundle.contentGaps) {
+    // DISCOVERY (Population C): Tier-1 AND Tier-2.
+    if (isTier1JunkKeyword(gap.targetKeyword)) { tier1Dropped++; continue; }
+    if (isTier2SuppressedDiscovery(gap.targetKeyword, gap.volume ?? 0, gap.difficulty ?? 0)) { tier2Dropped++; continue; }
     // ContentGap.difficulty (0–100) is optional provider enrichment.
     addCandidateKey(candidates, gap.targetKeyword, 1, gap.volume ?? 0, undefined, undefined, undefined, gap.difficulty);
   }
   for (const keyword of bundle.trackedKeywords) {
+    if (isTier1JunkKeyword(keyword.query)) { tier1Dropped++; continue; }
     // TrackedKeyword.difficulty is optional provider enrichment.
     addCandidateKey(candidates, keyword.query, keyword.status === TRACKED_KEYWORD_STATUS.ACTIVE ? 1 : 5, keyword.volume ?? keyword.baselineImpressions ?? 0, undefined, undefined, undefined, keyword.difficulty);
   }
   for (const row of bundle.feedback.values()) {
+    if (isTier1JunkKeyword(row.keyword)) { tier1Dropped++; continue; }
     addCandidateKey(candidates, row.keyword, row.status === 'requested' ? 2 : row.status === 'declined' ? 6 : 1);
   }
   for (const rank of bundle.latestRanks) {
     if (findVariantParentKey(keywordComparisonKey(rank.query), variantParentKeys)) continue;
+    // RANKING (Population A): Tier-1 only — empirical ranking data is never
+    // relevance-gated (a clicked/impression-only query must still appear).
+    if (isTier1JunkKeyword(rank.query)) { tier1Dropped++; continue; }
     // LatestRank carries empirical GSC clicks (28-day) — feeds the clicks sort.
     addCandidateKey(candidates, rank.query, 2, rank.impressions ?? 0, rank.position, undefined, rank.clicks);
   }
   for (const gap of bundle.keywordGaps) {
+    // DISCOVERY (Population C): Tier-1 AND Tier-2.
+    if (isTier1JunkKeyword(gap.keyword)) { tier1Dropped++; continue; }
+    if (isTier2SuppressedDiscovery(gap.keyword, gap.volume ?? 0, gap.difficulty ?? 0)) { tier2Dropped++; continue; }
     // KeywordGapItem.difficulty (competitor-gap KD) is required on the type.
     addCandidateKey(candidates, gap.keyword, 4, gap.volume ?? 0, undefined, undefined, undefined, gap.difficulty);
   }
   for (const visibility of localVisibility.values()) {
+    if (isTier1JunkKeyword(visibility.keyword)) { tier1Dropped++; continue; }
     addCandidateKey(candidates, visibility.keyword, 2);
   }
   for (const lost of bundle.lostVisibilityRows ?? []) {
+    if (isTier1JunkKeyword(lost.query)) { tier1Dropped++; continue; }
     addCandidateKey(candidates, lost.query, 2, lost.totalImpressions, lost.lastPosition ?? undefined);
+  }
+
+  if (tier1Dropped > 0 || tier2Dropped > 0) {
+    log.debug(
+      { workspaceId: bundle.workspaceId, tier1Dropped, tier2Dropped },
+      'keyword-command-center junk gate dropped candidates',
+    );
   }
 
   // DRIFT FIX (Task 1): the loops above seed candidate IDENTITY (sourcePriority /
@@ -2118,6 +2237,21 @@ export interface CandidateRowMetricParity {
   row: Map<string, { demand: number; clicks?: number; rank?: number; difficulty?: number }>;
 }
 
+/**
+ * Test-only: return the set of normalized candidate keys that SURVIVE the
+ * two-tier junk gate in `addCandidateKeysFromBundle`. Exactly the keys that can
+ * become rows on the skinny path. Pure (no DB, no HTTP) — used by the per-source
+ * gating unit spec. Not used by the request path.
+ */
+export function __candidateKeysForTest(
+  bundle: CommandCenterSourceBundle,
+  localVisibility: Map<string, LocalSeoKeywordVisibilitySummary> = new Map(),
+): Set<string> {
+  const candidates = new Map<string, RowCandidateKey>();
+  addCandidateKeysFromBundle(candidates, { ...bundle, includeStrategyUx: false }, localVisibility);
+  return new Set(candidates.keys());
+}
+
 export async function __candidateRowMetricParityForTest(
   bundle: CommandCenterSourceBundle,
   localVisibility: Map<string, LocalSeoKeywordVisibilitySummary> = new Map(),
@@ -2316,8 +2450,13 @@ function buildFilteredBundle(input: {
   // raw blob (with siteKeywordMetrics table-resolved) and pageMap keeps the Lite
   // page_keywords path.
   const filteredAssembled = assembleStoredKeywordStrategy(input.workspace.id);
-  const contentGaps = filteredAssembled?.contentGaps ?? [];
-  const keywordGaps = filteredAssembled?.keywordGaps ?? [];
+  // Gate discovery gaps once at the source (Tier-1 + Tier-2) so the skinny rows
+  // path's candidate gathering, populateDraftRows, and key derivation all read the
+  // same gated gaps — identical to the read-model / summary / detail paths.
+  const { contentGaps, keywordGaps } = gateDiscoveryGaps({
+    contentGaps: filteredAssembled?.contentGaps ?? [],
+    keywordGaps: filteredAssembled?.keywordGaps ?? [],
+  });
   // Wave 3d-i: merge sourceGapKey back from the provenance-bearing table read
   // (getTrackedKeywords strips it; KCC is admin-authed so it may surface it).
   const trackedKeywords = mergeTrackedKeywordProvenance(
@@ -2542,8 +2681,15 @@ export async function buildKeywordCommandCenterDetail(
   // contentGaps + keywordGaps via the single assembler (#2), filtered to the
   // requested keyword; pageMap keeps the Lite page_keywords path above.
   const detailAssembled = assembleStoredKeywordStrategy(workspace.id);
-  const contentGaps = (detailAssembled?.contentGaps ?? []).filter(gap => keywordComparisonKey(gap.targetKeyword) === normalized);
-  const keywordGaps = (detailAssembled?.keywordGaps ?? []).filter(gap => keywordComparisonKey(gap.keyword) === normalized);
+  // F2 fix: gate the discovery gaps (Tier-1 + Tier-2) BEFORE narrowing to the
+  // requested keyword, so /detail on a junk gap keyword finds no base source and
+  // returns null — consistent with the gated rows/summary universe.
+  const gatedDetailGaps = gateDiscoveryGaps({
+    contentGaps: detailAssembled?.contentGaps ?? [],
+    keywordGaps: detailAssembled?.keywordGaps ?? [],
+  });
+  const contentGaps = gatedDetailGaps.contentGaps.filter(gap => keywordComparisonKey(gap.targetKeyword) === normalized);
+  const keywordGaps = gatedDetailGaps.keywordGaps.filter(gap => keywordComparisonKey(gap.keyword) === normalized);
   // Wave 3d-i/3d-ii: merge sourceGapKey + strategyOwned back from the table read
   // (getTrackedKeywords strips them) so the admin detail drawer exposes accurate
   // provenance, ownership, and protected-state UI. Read-time inference retired.
