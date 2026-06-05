@@ -113,9 +113,6 @@ export function OverviewTab({
     const briefReviews = contentRequests.filter(r => r.status === 'client_review').length;
     const postReviews = contentRequests.filter(r => r.status === 'post_review').length;
     const effectiveTier: Tier = (betaMode ? 'premium' : (ws.tier as Tier)) || 'free';
-    // Wrap in ErrorBoundary to match the rest of OverviewTab's section-level
-    // resilience: a hook failure inside InsightsBriefingPage (GA4/GSC/audit)
-    // shouldn't bring down the whole client portal.
     return (
       <ErrorBoundary>
         <InsightsBriefingPage

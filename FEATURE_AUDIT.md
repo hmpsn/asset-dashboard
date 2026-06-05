@@ -4433,7 +4433,7 @@ Current feature count: **329**. Last updated: May 2026.
 
 **Files:** `server/diagnostic-orchestrator.ts`, `server/diagnostic-store.ts`, `server/diagnostic-probe.ts`, `server/routes/diagnostics.ts`, `server/routes/jobs.ts` (deep-diagnostic case), `src/api/diagnostics.ts`, `src/hooks/admin/useDiagnostics.ts`, `src/components/admin/DiagnosticReport/` (4 components), `shared/types/diagnostics.ts`, `server/db/migrations/059-diagnostic-reports.sql`
 
-**Agency value:** Turns anomaly alerts into actionable root cause reports in minutes. Admin sees ranked root causes with evidence, remediation plan with priority/effort/impact labels. Growth+ clients see an enriched narrative instead of the generic 'monitoring' message. Dark-launched behind `deep-diagnostics` feature flag.
+**Agency value:** Turns anomaly alerts into actionable root cause reports in minutes. Admin sees ranked root causes with evidence, remediation plan with priority/effort/impact labels. Growth+ clients see an enriched narrative instead of the generic 'monitoring' message. The diagnostics workflow is now canonical and no longer gated by a rollout flag.
 
 ---
 

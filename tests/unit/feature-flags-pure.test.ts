@@ -17,11 +17,9 @@ import {
 } from '../../server/feature-flags.js';
 import { FEATURE_FLAGS, FEATURE_FLAG_KEYS } from '../../shared/types/feature-flags.js';
 
-// A stable flag key we can safely toggle in tests without risking real behaviour.
-// 'copy-engine' is always false by default and not read on hot paths.
-const TEST_FLAG = 'copy-engine' as const;
-// A second flag for cross-flag isolation tests.
-const TEST_FLAG_2 = 'deep-diagnostics' as const;
+// Stable flag keys we can safely toggle in tests without risking real behaviour.
+const TEST_FLAG = 'keyword-hub' as const;
+const TEST_FLAG_2 = 'smart-placeholders' as const;
 
 afterEach(() => {
   // Remove any DB overrides set during tests so subsequent runs start clean.

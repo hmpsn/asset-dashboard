@@ -67,7 +67,6 @@ import {
   workspaceContextJobErrorResponse,
 } from '../workspace-context-generation-job.js';
 import { createLogger } from '../logger.js';
-import { isFeatureEnabled } from '../feature-flags.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
 import { getInsights } from '../analytics-insights-store.js';
 import { createDiagnosticReport, markDiagnosticFailed } from '../diagnostic-store.js';
@@ -850,8 +849,6 @@ router.post('/api/jobs', async (req, res) => {
         const workspaceId = params.workspaceId as string;
         const insightId = params.insightId as string;
         if (!workspaceId || !insightId) return res.status(400).json({ error: 'workspaceId and insightId required' });
-
-        if (!isFeatureEnabled('deep-diagnostics')) return res.status(403).json({ error: 'Deep diagnostics feature not enabled' });
 
         const ws = getWorkspace(workspaceId);
         if (!ws) return res.status(404).json({ error: 'Workspace not found' });

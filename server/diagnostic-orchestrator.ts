@@ -460,7 +460,7 @@ Rules for remediation:
     maxTokens: 3000,
     temperature: 0.3,
     responseFormat: { type: 'json_object' },
-    feature: 'deep-diagnostics',
+    feature: 'diagnostics',
     workspaceId,
   });
 

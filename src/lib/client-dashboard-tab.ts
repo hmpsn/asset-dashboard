@@ -1,7 +1,7 @@
 /**
  * Pure helper for resolving the active client-portal tab from the URL.
  * Extracted from src/components/ClientDashboard.tsx so the tab fallback logic
- * (legacy aliases + feature flags + unknown-tab fallback) can be unit-tested
+ * (legacy aliases + unknown-tab fallback) can be unit-tested
  * without rendering the full dashboard.
  */
 import type { ClientTab } from '../routes';
@@ -22,11 +22,8 @@ export type ResolvedClientTab = ClientTab;
 
 /**
  * Set of tab ids the client dashboard accepts as-is. A strict subset of the
- * canonical `ClientTab` values — intentionally EXCLUDES `'brand'` (feature-flagged;
- * resolved by an explicit branch in `resolveClientTab()` *before* this list
- * is consulted — adding `'brand'` here would bypass the feature flag because
- * the pass-through check would match the tab id directly) and EXCLUDES
- * `'search'` / `'analytics'` (redirected to `'performance'` by alias guards).
+ * canonical `ClientTab` values — intentionally EXCLUDES `'search'` /
+ * `'analytics'` (redirected to `'performance'` by alias guards).
  */
 export const KNOWN_CLIENT_TABS: readonly ResolvedClientTab[] = [
   'overview',
@@ -40,6 +37,7 @@ export const KNOWN_CLIENT_TABS: readonly ResolvedClientTab[] = [
   'plans',
   'roi',
   'content-plan',
+  'brand',
 ];
 
 /**
@@ -47,18 +45,12 @@ export const KNOWN_CLIENT_TABS: readonly ResolvedClientTab[] = [
  *
  * Rules (mirror ClientDashboard.tsx):
  *  - 'search' and 'analytics' are legacy aliases that redirect to 'performance'.
- *  - 'brand' resolves to 'brand' only when the brand-tab feature flag is on,
- *    otherwise falls back to 'overview'.
  *  - Anything in KNOWN_CLIENT_TABS passes through unchanged.
  *  - Unknown / undefined / empty values fall back to 'overview'.
  */
-export function resolveClientTab(
-  initialTabId: string | undefined | null,
-  brandTabEnabled: boolean,
-): ResolvedClientTab {
+export function resolveClientTab(initialTabId: string | undefined | null): ResolvedClientTab {
   const t = initialTabId;
   if (t === 'search' || t === 'analytics') return 'performance';
-  if (t === 'brand') return brandTabEnabled ? 'brand' : 'overview';
   if (t === 'schema-review') return 'inbox'; // retired — schema plan now lives in Inbox > SEO Changes
   if (t && (KNOWN_CLIENT_TABS as readonly string[]).includes(t)) return t as ResolvedClientTab;
   return 'overview';

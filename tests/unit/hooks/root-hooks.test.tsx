@@ -295,10 +295,10 @@ describe('useFeatureFlag — static defaults (loading state)', () => {
 
   it('returns the static default (false) for a known flag while loading', () => {
     const { result } = renderHook(
-      () => useFeatureFlag('copy-engine' as FeatureFlagKey),
+      () => useFeatureFlag('keyword-hub' as FeatureFlagKey),
       { wrapper: makeWrapper() },
     );
-    expect(result.current).toBe(FEATURE_FLAGS['copy-engine']);
+    expect(result.current).toBe(FEATURE_FLAGS['keyword-hub']);
     expect(result.current).toBe(false);
   });
 
@@ -334,7 +334,7 @@ describe('useFeatureFlag — server response overrides defaults', () => {
 
   it('returns true for a flag the server has enabled', async () => {
     const serverFlags = Object.fromEntries(
-      Object.keys(FEATURE_FLAGS).map(k => [k, k === 'copy-engine']),
+      Object.keys(FEATURE_FLAGS).map(k => [k, k === 'keyword-hub']),
     ) as Record<FeatureFlagKey, boolean>;
     fetchSpy.mockResolvedValue({
       ok: true,
@@ -342,7 +342,7 @@ describe('useFeatureFlag — server response overrides defaults', () => {
     });
 
     const { result } = renderHook(
-      () => useFeatureFlag('copy-engine' as FeatureFlagKey),
+      () => useFeatureFlag('keyword-hub' as FeatureFlagKey),
       { wrapper: makeWrapper() },
     );
 
@@ -373,13 +373,13 @@ describe('useFeatureFlag — server response overrides defaults', () => {
     fetchSpy.mockResolvedValue({ ok: false, status: 500 });
 
     const { result } = renderHook(
-      () => useFeatureFlag('copy-engine' as FeatureFlagKey),
+      () => useFeatureFlag('keyword-hub' as FeatureFlagKey),
       { wrapper: makeWrapper() },
     );
 
     // Error path: no data → falls back to FEATURE_FLAGS default
     await waitFor(() => {
-      expect(result.current).toBe(FEATURE_FLAGS['copy-engine']);
+      expect(result.current).toBe(FEATURE_FLAGS['keyword-hub']);
     });
   });
 });

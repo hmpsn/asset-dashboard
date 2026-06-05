@@ -56,7 +56,7 @@ describe('Sidebar', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-    // Default: copy-engine ON (legacy 'brand' item), keyword-hub OFF.
+    // Default: keyword-hub OFF.
     featureFlagMock.mockImplementation((flag: string) => flag !== 'keyword-hub');
   });
 

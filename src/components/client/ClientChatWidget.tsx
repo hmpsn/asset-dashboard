@@ -29,7 +29,7 @@ export interface ClientChatWidgetProps {
   /**
    * Override the default quick-question buttons shown in the empty chat state.
    * When omitted, the widget falls back to `QUICK_QUESTIONS` from `./types`.
-   * Set by `<InsightsBriefingPage>` (Phase 2 of client-briefing-v2) so the
+   * Set by `<InsightsBriefingPage>` so the
    * briefing-era home page can route its sidebar quick questions through the
    * floating chat widget instead of a separate sidebar.
    */

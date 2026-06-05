@@ -14,6 +14,14 @@ import { createTestContext } from './helpers.js';
 const ctx = createTestContext(13400);
 const { api, authApi } = ctx;
 
+const RETIRED_PRODUCT_UI_FLAGS = [
+  'copy-engine',
+  'copy-engine-voice',
+  'copy-engine-pipeline',
+  'deep-diagnostics',
+  'client-brand-section',
+] as const;
+
 beforeAll(async () => {
   await ctx.startServer();
   ctx.setAuthToken('test-token');
@@ -64,6 +72,19 @@ describe('PUT /api/admin/feature-flags/:key', () => {
     expect(res.status).toBe(400);
     const body = await res.json() as { error: string };
     expect(body.error).toContain('Unknown feature flag');
+  });
+
+  it('returns 400 for retired product/UI flag keys', async () => {
+    for (const key of RETIRED_PRODUCT_UI_FLAGS) {
+      const res = await authApi(`/api/admin/feature-flags/${key}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: true }),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json() as { error: string };
+      expect(body.error).toContain('Unknown feature flag');
+    }
   });
 
   it('returns 400 when enabled field is missing', async () => {

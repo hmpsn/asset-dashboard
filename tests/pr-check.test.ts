@@ -154,7 +154,7 @@ describe('Rule: Retired outcome feature flag key used in flag API', () => {
     const file = write(
       uniqPath('rule-retired-outcome-flags', 'negative.tsx'),
       lines(
-        "const active = isFeatureEnabled('copy-engine');",
+        "const active = isFeatureEnabled('keyword-hub');",
         `const historicalNote = '${retiredKey} was retired';`,
       ),
     );
@@ -325,8 +325,85 @@ describe('Rule: Retired unified inbox feature flag key used in flag API', () => 
     const file = write(
       uniqPath('rule-retired-unified-inbox-flags', 'negative.tsx'),
       lines(
-        "const active = useFeatureFlag('copy-engine');",
+        "const active = useFeatureFlag('keyword-hub');",
         `const note = '${retiredKey} was retired after cutover';`,
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: Retired product/UI feature flag key used in flag API', () => {
+  const RULE = 'Retired product/UI feature flag key used in flag API';
+
+  it('flags retired product keys passed to feature flag helpers', () => {
+    const retiredKey = ['copy', 'engine'].join('-');
+    const file = write(
+      uniqPath('rule-retired-product-ui-flags', 'helper.ts'),
+      lines(
+        'import { isFeatureEnabled } from "./feature-flags";',
+        `const enabled = isFeatureEnabled('${retiredKey}');`,
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags retired product keys passed to FeatureFlag components', () => {
+    const retiredKey = ['client', 'brand', 'section'].join('-');
+    const file = write(
+      uniqPath('rule-retired-product-ui-flags', 'component.tsx'),
+      lines(
+        'import { FeatureFlag } from "./FeatureFlag";',
+        `export const Demo = () => <FeatureFlag flag="${retiredKey}">demo</FeatureFlag>;`,
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags retired product env vars', () => {
+    const retiredEnv = ['FEATURE', 'COPY', 'ENGINE', 'PIPELINE'].join('_');
+    const file = write(
+      uniqPath('rule-retired-product-ui-flags', 'env.ts'),
+      lines(
+        `process.env.${retiredEnv} = 'true';`,
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('flags retired keys re-added to the shared feature flag registry', () => {
+    const retiredKey = ['deep', 'diagnostics'].join('-');
+    const file = write(
+      'shared/types/feature-flags.ts',
+      lines(
+        'export const FEATURE_FLAGS = {',
+        `  '${retiredKey}': false,`,
+        '};',
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('allows active feature flags and historical product strings', () => {
+    const retiredKey = ['copy', 'engine', 'pipeline'].join('-');
+    const file = write(
+      uniqPath('rule-retired-product-ui-flags', 'negative.tsx'),
+      lines(
+        "const active = useFeatureFlag('keyword-hub');",
+        `const note = '${retiredKey} was retired after rollout';`,
       ),
     );
 
@@ -5377,6 +5454,9 @@ describe('Meta: customCheck rule name registry', () => {
     // Feature flag retirement PR3 (2026-06-04) — unified inbox / deliverables
     // cutover removed the rollout keys, so they cannot re-enter flag APIs.
     'Retired unified inbox feature flag key used in flag API',
+    // Feature flag retirement PR4 (2026-06-04) — product/UI rollout keys
+    // became canonical and cannot re-enter runtime/UI/test flag APIs.
+    'Retired product/UI feature flag key used in flag API',
     // keyword-consolidation Wave 1 (2026-06-03) — prevents lost-update race on
     // tracked_keywords JSON blob; enforces withTrackedKeywordsTxn (BEGIN IMMEDIATE).
     'tracked_keywords bare read→write outside withTrackedKeywordsTxn',

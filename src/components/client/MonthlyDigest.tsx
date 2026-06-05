@@ -39,7 +39,7 @@ export function MonthlyDigest({ workspaceId, tier }: Props) {
 /**
  * Presentational subcomponent — renders an already-fetched digest.
  * Extracted so the Free-tier branch of `<InsightsBriefingPage>` (Phase 2 of
- * client-briefing-v2) can render the digest body un-gated as a tease of the
+ * briefing-era overview can render the digest body un-gated as a tease of the
  * editorial voice. The original `<MonthlyDigest>` keeps the TierGate so any
  * non-briefing caller behaves identically to before the split.
  */

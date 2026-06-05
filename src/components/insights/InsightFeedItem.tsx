@@ -5,7 +5,6 @@ import { Icon } from '../ui/Icon.js';
 import { Button } from '../ui';
 import type { FeedInsight } from '../../../shared/types/insights.js';
 import { useDiagnosticForInsight, useRunDiagnostic } from '../../hooks/admin/useDiagnostics.js';
-import { useFeatureFlag } from '../../hooks/useFeatureFlag.js';
 import { adminPath } from '../../routes.js';
 
 const SEVERITY_CONFIG = {
@@ -73,8 +72,7 @@ export function InsightFeedItem({ insight, workspaceId }: { insight: FeedInsight
   const SeverityIcon = config.icon;
   const hasDetails = insight.details && insight.details.length > 0;
   const [expanded, setExpanded] = useState(false);
-  const diagnosticsEnabled = useFeatureFlag('deep-diagnostics');
-  const showDiagnosticCTA = diagnosticsEnabled && workspaceId && insight.type === 'anomaly_digest';
+  const showDiagnosticCTA = !!workspaceId && insight.type === 'anomaly_digest';
 
   return (
     <div className="bg-[var(--surface-2)]/50 border border-[var(--brand-border)] rounded-[var(--radius-md)] overflow-hidden">
