@@ -21,9 +21,10 @@ describe('keyword-hub feature flag (Wave 4 P0)', () => {
     expect(entry.lifecycle.linkedRoadmapItemId).toBe('keyword-hub-wave4');
   });
 
-  it('is registered in exactly one group ("Keyword Hub" → ["keyword-hub"])', () => {
-    const group = FEATURE_FLAG_GROUPS.find(g => g.label === 'Keyword Hub');
-    expect(group?.keys).toEqual(['keyword-hub']);
+  it('is registered in exactly one group (the "Keyword Hub" group)', () => {
+    const groupsWithKey = FEATURE_FLAG_GROUPS.filter(g => g.keys.includes('keyword-hub'));
+    expect(groupsWithKey).toHaveLength(1);
+    expect(groupsWithKey[0].label).toBe('Keyword Hub');
   });
 
   it('importing the module runs assertFeatureFlagGroupingConsistency() without throwing', () => {
