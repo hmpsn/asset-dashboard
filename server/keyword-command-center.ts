@@ -1948,6 +1948,12 @@ export interface RowCandidateKey {
   clicks?: number;
   /** Keyword difficulty (0–100) — populated where the source has it; enables the difficulty sort. */
   difficulty?: number;
+  /** Cost-per-click resolved from trackedKeyword enrichment (Phase 1: precomputed for value scoring). */
+  cpc?: number;
+  /** Raw keyword intent string resolved from the bundle (Phase 1: precomputed for value scoring). */
+  intent?: string;
+  /** Precomputed value-first score (flag ON only); undefined when the signal gate returns no score. */
+  valueScore?: number;
 }
 
 function addCandidateKey(
