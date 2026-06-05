@@ -9,6 +9,16 @@ import {
 // (KCC + Rank Tracker consolidation). It MUST be OFF by default (dark), grouped,
 // and pass the import-time grouping-consistency assertion + verify:feature-flags.
 describe('keyword-hub feature flag (Wave 4 P0)', () => {
+  it('keyword-value-scoring flag exists, defaults OFF, and is in the Keyword Hub group', () => {
+    expect(FEATURE_FLAGS['keyword-value-scoring']).toBe(false);
+    const entry = FEATURE_FLAG_CATALOG['keyword-value-scoring'];
+    expect(entry.group).toBe('Keyword Hub');
+    expect(entry.lifecycle.owner).toBe('analytics-intelligence');
+    expect(entry.lifecycle.linkedRoadmapItemId).toBeTruthy();
+    const hubBucket = FEATURE_FLAG_GROUPS.find(g => g.label === 'Keyword Hub');
+    expect(hubBucket?.keys).toContain('keyword-value-scoring');
+  });
+
   it('exists and is OFF by default (dark launch)', () => {
     expect(FEATURE_FLAGS['keyword-hub']).toBe(false);
   });
