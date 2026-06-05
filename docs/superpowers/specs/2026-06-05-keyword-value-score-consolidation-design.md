@@ -67,7 +67,7 @@ deriveValueIntent(keyword: string, provided?: string | null): ValueIntent   // a
 - `primaryKeyword` can be `''` (coerced from absent at `page-keywords.ts:206`); `classifyLocalKeywordIntent('')` safely returns `'transactional'` (no throw) — assert this empty case in tests.
 - Hardcoded-intent local branches (`recommendations.ts` local service-gap/competitor/not-visible) and no-keyword branches (technical/decay/diagnostic/freshness) are **unchanged** — they classify no keyword.
 
-**Behavior-scope decision (for owner review):** this is the *full-derive* choice — recs now classify intent the **same way the Hub does** (comparison→commercial **and** a regex fallback when `searchIntent` is absent), instead of defaulting absent/`comparison` to 0.5. That's the true "one source of truth," and the blast radius is bounded and correctness-positive: only `ranking_opp` recs whose `searchIntent` is `comparison` or missing change weight, on the next strategy regen. The conservative alternative (coerce-only: fix `comparison→commercial` but keep `null`/0.5 for absent) is available if you'd rather minimize the change — flagged here as the one behavior decision.
+**Behavior-scope — DECIDED: full-derive (owner, 2026-06-05).** Recs classify intent the **same way the Hub does** (`comparison→commercial` **and** a regex fallback from the keyword when `searchIntent` is absent), instead of defaulting absent/`comparison` to 0.5 — the true "one source of truth." Blast radius is bounded and correctness-positive: only `ranking_opp` recs whose `searchIntent` is `comparison` or missing change weight, on the next strategy regen, verified on staging. (The coerce-only alternative — fix `comparison` only, keep 0.5 for absent — was considered and rejected.)
 
 ## 5. The layered contract
 
@@ -102,6 +102,8 @@ Layer 1 today returns `number | undefined` (`keyword-value-score.ts:210`), disca
 - **Non-goal:** the breakdown *render* reconciliation, surface re-ranking, and any deep merge of the two output maths — those are their own roadmap items built on this foundation.
 - **Blast radius is real but bounded + reversible:** the only output change is rec intent weight for `comparison`/absent-`searchIntent` keywords, visible after regen, verified on staging before `staging→main`.
 
-## 10. For owner review
+## 10. Decisions (resolved)
 
-One decision (§4): **full-derive** (recs classify intent exactly like the Hub — recommended, true one-source-of-truth) vs **coerce-only** (just fix `comparison→commercial`, keep the 0.5 default for absent intent — smaller blast radius). Everything else follows from the approved "shared classification core + layered contract, no flag" design.
+- **Intent behavior: full-derive** (owner, 2026-06-05) — recs classify intent exactly like the Hub (see §4). Coerce-only rejected.
+- **Layering:** distinct layers, shared classification core, one contract (approach ①). Deep-merge (②) and pure-contract (③) rejected.
+- **Rollout:** no feature flag; behavior-preserving full-object parity + staging regen verification.
