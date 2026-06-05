@@ -26,6 +26,7 @@ import type {
 } from '../../shared/types/keyword-command-center';
 import { keywordComparisonKey } from '../../shared/keyword-normalization';
 import { TRACKED_KEYWORD_SOURCE, TRACKED_KEYWORD_STATUS, type LatestRank, type TrackedKeyword } from '../../shared/types/rank-tracking';
+import type { LocalSeoKeywordVisibilitySummary } from '../../shared/types/local-seo';
 
 // ---------------------------------------------------------------------------
 // Fixtures — same five keywords, expressed as both candidates and rows, with
@@ -223,8 +224,11 @@ function bundle(overrides: Partial<CommandCenterSourceBundle>): CommandCenterSou
   };
 }
 
-async function assertMetricParity(b: CommandCenterSourceBundle): Promise<void> {
-  const { candidate, row } = await __candidateRowMetricParityForTest(b);
+async function assertMetricParity(
+  b: CommandCenterSourceBundle,
+  localVisibility?: Map<string, LocalSeoKeywordVisibilitySummary>,
+): Promise<void> {
+  const { candidate, row } = await __candidateRowMetricParityForTest(b, localVisibility);
   // Every key the row stage materializes must also be a candidate with EQUAL
   // sort-metrics (and vice versa for keys the candidate stage produces).
   for (const [key, rowMetrics] of row) {
@@ -386,5 +390,75 @@ describe('keyword-command-center — intent symmetry (Task 1.1)', () => {
     expect(candidate.get(key)?.intent).toBe('transactional'); // tracked wins
     expect(row.get(key)?.intent).toBe('transactional');
     await assertMetricParity(b);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 1 Task 1.6 — candidate↔row valueScore parity + key-set equality. The
+// probe now (a) runs with value scoring ON, (b) exposes valueScore on both sides,
+// and (c) calls ensureLocalVisibilityRows on the row side to match the real
+// skinny path — so a localVisibility-only key (present on the candidate side via
+// addCandidateKeysFromBundle) is ALSO materialized on the row side. Without the
+// ensureLocalVisibilityRows fix the key sets diverge and this test fails loudly.
+// ---------------------------------------------------------------------------
+
+function localVisibilitySummary(keyword: string): LocalSeoKeywordVisibilitySummary {
+  // Minimal summary — ensureLocalVisibilityRows only reads keyword/label, but the
+  // type requires the full shape, so cast a representative object.
+  return {
+    keyword,
+    normalizedKeyword: keywordComparisonKey(keyword),
+    marketId: 'mkt-1',
+    marketLabel: 'Test Market',
+    capturedAt: '2026-01-01T00:00:00.000Z',
+    posture: 'visible',
+    label: 'Visible locally',
+    detail: 'Visible in 1 market',
+    localPackPresent: true,
+    businessFound: true,
+    businessMatchConfidence: 'verified',
+    sourceEndpoint: 'local_finder',
+    provider: 'dataforseo',
+    marketCount: 1,
+    markets: [],
+    visibleMarketCount: 1,
+    possibleMatchMarketCount: 0,
+    localPackOnlyMarketCount: 0,
+    notVisibleMarketCount: 0,
+    degradedMarketCount: 0,
+  } as LocalSeoKeywordVisibilitySummary;
+}
+
+describe('keyword-command-center — candidate/row VALUE-SCORE parity + key-set equality (Task 1.6)', () => {
+  it('candidate and row value scores match for every key (no drift); key sets are equal — incl. a localVisibility-only key', async () => {
+    const localVisibility = new Map<string, LocalSeoKeywordVisibilitySummary>([
+      [keywordComparisonKey('teeth cleaning sarasota'), localVisibilitySummary('teeth cleaning sarasota')],
+    ]);
+    const b = bundle({
+      trackedKeywords: [
+        trackedKeyword('emergency dentist near me', { volume: 800, difficulty: 45, cpc: 9, intent: 'transactional' }),
+        trackedKeyword('what causes bad breath', { volume: 22000, difficulty: 40, intent: 'informational' }),
+      ],
+      contentGaps: [
+        { topic: 'Guide', targetKeyword: 'dental implants cost', intent: 'commercial', priority: 'high', rationale: 'x', volume: 1200, difficulty: 55 },
+      ],
+    });
+
+    const { candidate, row } = await __candidateRowMetricParityForTest(b, localVisibility);
+
+    // (a) key-set equality — catches one-sided source additions (the localVisibility
+    //     key must exist on BOTH sides once ensureLocalVisibilityRows is called).
+    expect(new Set(candidate.keys())).toEqual(new Set(row.keys()));
+    expect(candidate.has(keywordComparisonKey('teeth cleaning sarasota'))).toBe(true);
+
+    // (b) per-key valueScore parity — drift-free by construction.
+    for (const [key, cand] of candidate) {
+      expect(row.get(key)?.valueScore, `valueScore drift on key ${key}`).toBe(cand.valueScore);
+    }
+    // and at least one key actually carries a defined score (the probe ran ON).
+    expect([...candidate.values()].some(c => c.valueScore !== undefined)).toBe(true);
+
+    // full projection parity (demand/clicks/rank/difficulty/cpc/intent/valueScore).
+    await assertMetricParity(b, localVisibility);
   });
 });

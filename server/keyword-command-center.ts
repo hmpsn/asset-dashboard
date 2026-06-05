@@ -2496,6 +2496,7 @@ interface CandidateRowMetricProjection {
   difficulty?: number;
   cpc?: number;
   intent?: string;
+  valueScore?: number;
 }
 
 export interface CandidateRowMetricParity {
@@ -2522,17 +2523,45 @@ export async function __candidateRowMetricParityForTest(
   bundle: CommandCenterSourceBundle,
   localVisibility: Map<string, LocalSeoKeywordVisibilitySummary> = new Map(),
 ): Promise<CandidateRowMetricParity> {
+  // Run the probe with value scoring ON so candidate.valueScore and the row
+  // valueScore are populated and can be compared per key. The ScoringContext is a
+  // pure request constant (no DB) — a fixed posture/markets is sufficient for the
+  // drift guard (the SAME ctx feeds both stages, which is all parity requires).
+  const valueScoring: ValueScoringConfig = { on: true, ctx: { posture: 'non_local', markets: [] } };
+
   const candidates = new Map<string, RowCandidateKey>();
-  addCandidateKeysFromBundle(candidates, { ...bundle, includeStrategyUx: false }, localVisibility);
+  addCandidateKeysFromBundle(candidates, { ...bundle, includeStrategyUx: false }, localVisibility, valueScoring);
   const candidate = new Map<string, CandidateRowMetricProjection>();
   for (const c of candidates.values()) {
-    candidate.set(c.key, { demand: c.demand, clicks: c.clicks, rank: c.rank, difficulty: c.difficulty, cpc: c.cpc, intent: c.intent });
+    candidate.set(c.key, { demand: c.demand, clicks: c.clicks, rank: c.rank, difficulty: c.difficulty, cpc: c.cpc, intent: c.intent, valueScore: c.valueScore });
   }
 
   const rows = new Map<string, DraftRow>();
   await populateDraftRows(rows, { ...bundle, includeStrategyUx: false });
+  // CRITICAL: the real skinny path calls ensureLocalVisibilityRows AFTER
+  // populateDraftRows (keyword-command-center.ts:2797-2798). Without this, a
+  // localVisibility-only key exists on the candidate side (addCandidateKeysFromBundle
+  // adds it) but is ABSENT on the row side — a false key-set divergence. Mirror
+  // production exactly so the key sets match for real, not by papering over a bug.
+  ensureLocalVisibilityRows(rows, localVisibility);
   const row = new Map<string, CandidateRowMetricProjection>();
   for (const r of rows.values()) {
+    // The row valueScore is computed in finalizeDraftRow from finalized.metrics,
+    // which is row.metrics verbatim — so computing it here from r.metrics with the
+    // SAME fn + SAME ctx is byte-identical to production's finalize computation.
+    const rowValue = valueScoring.ctx
+      ? computeKeywordValueScore(
+          {
+            keyword: r.keyword,
+            volume: r.metrics.volume,
+            impressions: r.metrics.impressions,
+            difficulty: r.metrics.difficulty,
+            cpc: r.metrics.cpc,
+            intent: r.metrics.intent,
+          },
+          valueScoring.ctx,
+        )
+      : undefined;
     row.set(r.normalizedKeyword, {
       demand: r.metrics.volume ?? r.metrics.impressions ?? 0,
       clicks: r.metrics.clicks,
@@ -2540,6 +2569,7 @@ export async function __candidateRowMetricParityForTest(
       difficulty: r.metrics.difficulty,
       cpc: r.metrics.cpc,
       intent: r.metrics.intent,
+      valueScore: rowValue,
     });
   }
   return { candidate, row };
