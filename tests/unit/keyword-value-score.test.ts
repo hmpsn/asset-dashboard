@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   toValueIntent, deriveValueIntent, valueIntentWeight, isLocalKeyword,
-  localRelevanceMultiplier, computeKeywordValueScore, type ScoringContext,
+  localRelevanceMultiplier, computeKeywordValueScore, computeKeywordValueComponents,
+  type ScoringContext,
 } from '../../server/scoring/keyword-value-score.js';
 
 const NON_LOCAL: ScoringContext = { posture: 'non_local', markets: [] };
@@ -114,5 +115,37 @@ describe('computeKeywordValueScore', () => {
     const s = computeKeywordValueScore({ keyword: 'dentist near me', volume: 999999, difficulty: 0, cpc: 999, intent: 'transactional' }, LOCAL)!;
     expect(s).toBeGreaterThanOrEqual(0);
     expect(s).toBeLessThanOrEqual(100);
+  });
+});
+
+describe('computeKeywordValueComponents (Task 2.1)', () => {
+  it('sibling .score equals the scalar wrapper for the same input', () => {
+    const ctx = { posture: 'non_local' as const, markets: [] };
+    const input = { keyword: 'teeth cleaning sarasota', volume: 480, difficulty: 30, cpc: 6, intent: 'transactional' };
+    const { score, components } = computeKeywordValueComponents(input, ctx);
+    expect(score).toBe(computeKeywordValueScore(input, ctx));
+    expect(components).toMatchObject({
+      commercialValue: expect.any(Number),
+      demand: expect.any(Number),
+      winnability: expect.any(Number),
+      localMultiplier: expect.any(Number),
+      intent: 'transactional',
+    });
+  });
+  it('signal-gated input returns {score: undefined, components: undefined} and wrapper stays undefined', () => {
+    const ctx = { posture: 'non_local' as const, markets: [] };
+    const r = computeKeywordValueComponents({ keyword: 'anything' }, ctx);
+    expect(r.score).toBeUndefined();
+    expect(r.components).toBeUndefined();
+    expect(computeKeywordValueScore({ keyword: 'anything' }, ctx)).toBeUndefined();
+  });
+  it('components carry the correct resolved intent for a comparison keyword', () => {
+    const ctx = { posture: 'non_local' as const, markets: [] };
+    const { components } = computeKeywordValueComponents(
+      { keyword: 'invisalign vs braces', volume: 500, difficulty: 30, intent: 'comparison' },
+      ctx,
+    );
+    // comparison → commercial via toValueIntent
+    expect(components?.intent).toBe('commercial');
   });
 });
