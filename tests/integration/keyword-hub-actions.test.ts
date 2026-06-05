@@ -13,7 +13,7 @@ import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { addTrackedKeyword } from '../../server/rank-tracking.js';
 import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
-import type { KeywordCommandCenterActionResult } from '../../shared/types/keyword-command-center.js';
+import type { KeywordCommandCenterActionResult, KeywordCommandCenterBulkActionResult } from '../../shared/types/keyword-command-center.js';
 
 const ctx = createTestContext(13901); // port-ok: next free after keyword-hub-list (13900)
 const { postJson, del } = ctx;
@@ -70,5 +70,37 @@ describe('hard delete route (3c) over HTTP', () => {
     addTrackedKeyword(workspaceId, 'gap del kw', { source: TRACKED_KEYWORD_SOURCE.MANUAL, sourceGapKey: 'gap:gap del kw' });
     const res = await del(`${base()}/keywords/${encodeURIComponent('gap del kw')}`);
     expect(res.status).toBe(403);
+  });
+});
+
+// Regression (#3): a bulk action over a selection that already contains a
+// keyword in the target state must report a benign skip, NOT a false failure.
+// The single-action route still returns 409 for the same illegal transition
+// (intended/strict); only the bulk path is lenient (idempotent skip).
+describe('bulk idempotent self-transition (#3) over HTTP', () => {
+  it('bulk RETIRE over an already-deprecated keyword → skipped_noop, never failed', async () => {
+    await postJson(`${base()}/actions`, { action: 'track', keyword: 'bulk idem' });
+    await postJson(`${base()}/actions`, { action: 'retire', keyword: 'bulk idem', force: true });
+
+    const res = await postJson(`${base()}/actions/bulk`, { action: 'retire', keywords: ['bulk idem'], force: true });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as KeywordCommandCenterBulkActionResult;
+    expect(body.failed).toBe(0); // regression guard: P3 reported failed: 1 here
+    expect(body.applied).toBe(0);
+    expect(body.skipped).toBe(1);
+    expect(body.items[0]?.status).toBe('skipped_noop');
+  });
+
+  it('bulk RETIRE over a mixed selection applies the active row and skips the already-retired one', async () => {
+    await postJson(`${base()}/actions`, { action: 'track', keyword: 'bulk active' });
+    await postJson(`${base()}/actions`, { action: 'track', keyword: 'bulk done' });
+    await postJson(`${base()}/actions`, { action: 'retire', keyword: 'bulk done', force: true });
+
+    const res = await postJson(`${base()}/actions/bulk`, { action: 'retire', keywords: ['bulk active', 'bulk done'], force: true });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as KeywordCommandCenterBulkActionResult;
+    expect(body.applied).toBe(1);
+    expect(body.skipped).toBe(1);
+    expect(body.failed).toBe(0);
   });
 });

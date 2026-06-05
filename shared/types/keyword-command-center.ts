@@ -346,7 +346,16 @@ export interface KeywordCommandCenterBulkActionRequest {
 
 export interface KeywordCommandCenterBulkActionItem {
   keyword: string;
-  status: 'applied' | 'skipped_protected' | 'skipped_not_tracked' | 'error';
+  /**
+   * - applied: the action mutated the keyword.
+   * - skipped_protected: a protected keyword that needs explicit confirmation.
+   * - skipped_not_tracked: the action requires a tracked row and there was none.
+   * - skipped_noop: the keyword is already in (or cannot leave) the target state —
+   *   an idempotent self-transition (e.g. retire an already-retired keyword in a
+   *   bulk selection). A benign no-op, NOT a failure; counts toward `skipped`.
+   * - error: an unexpected failure.
+   */
+  status: 'applied' | 'skipped_protected' | 'skipped_not_tracked' | 'skipped_noop' | 'error';
   error?: string;
 }
 
