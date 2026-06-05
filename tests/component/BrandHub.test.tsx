@@ -18,6 +18,9 @@ vi.mock('../../src/components/brand/VoiceTab', () => ({
 vi.mock('../../src/components/brand/IdentityTab', () => ({
   IdentityTab: () => <div data-testid="identity-tab" />,
 }));
+vi.mock('../../src/components/brand/BrandOverviewTab', () => ({
+  BrandOverviewTab: () => <div data-testid="brand-overview-tab" />,
+}));
 vi.mock('../../src/components/brand/PageStrategyTab', () => ({
   PageStrategyTab: ({ onSelectBlueprint }: { onSelectBlueprint: (id: string) => void }) => (
     <div data-testid="page-strategy-tab">
@@ -34,6 +37,13 @@ vi.mock('../../src/components/brand/BlueprintDetail', () => ({
 }));
 vi.mock('../../src/components/brand/BlueprintVersionHistory', () => ({
   BlueprintVersionHistory: () => <div data-testid="blueprint-version-history" />,
+}));
+vi.mock('../../src/components/settings/BusinessFootprintTab', () => ({
+  BusinessFootprintTab: ({ legacySection }: { legacySection?: string | null }) => (
+    <div data-testid="business-footprint-tab" data-legacy-section={legacySection ?? 'none'}>
+      BusinessFootprintTabStub
+    </div>
+  ),
 }));
 
 // ── Background tasks mock ─────────────────────────────────────────────────────
@@ -77,7 +87,7 @@ vi.mock('../../src/api', () => ({
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function makeWrapper() {
+function makeWrapper(initialEntries: string[] = ['/']) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -87,7 +97,7 @@ function makeWrapper() {
   return function Wrapper({ children }: { children: React.ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter>{children}</MemoryRouter>
+        <MemoryRouter initialEntries={initialEntries}>{children}</MemoryRouter>
       </QueryClientProvider>
     );
   };
@@ -111,10 +121,13 @@ const mockWorkspace = {
   ],
 };
 
-function renderBrandHub(props?: Partial<React.ComponentProps<typeof BrandHub>>) {
+function renderBrandHub(
+  props?: Partial<React.ComponentProps<typeof BrandHub>>,
+  options?: { initialEntries?: string[] },
+) {
   return render(
     <BrandHub workspaceId="ws-test" {...props} />,
-    { wrapper: makeWrapper() },
+    { wrapper: makeWrapper(options?.initialEntries) },
   );
 }
 
@@ -147,10 +160,14 @@ describe('BrandHub', () => {
     expect(screen.getByRole('tab', { name: /discovery/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /voice/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /identity/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /business footprint/i })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /business profile/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /locations/i })).not.toBeInTheDocument();
   });
 
-  it('defaults to overview tab showing Brand Voice and Knowledge Base sections', async () => {
+  it('defaults to overview tab showing summary cards and current context sections', async () => {
     renderBrandHub();
+    expect(screen.getByTestId('brand-overview-tab')).toBeInTheDocument();
     expect(screen.getByText('Brand Voice & Style')).toBeInTheDocument();
     expect(screen.getByText('Knowledge Base')).toBeInTheDocument();
     expect(screen.getByText('Audience Personas')).toBeInTheDocument();
@@ -163,6 +180,7 @@ describe('BrandHub', () => {
     expect(screen.queryByTestId('discovery-tab')).not.toBeInTheDocument();
     expect(screen.queryByTestId('voice-tab')).not.toBeInTheDocument();
     expect(screen.queryByTestId('identity-tab')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('business-footprint-tab')).not.toBeInTheDocument();
   });
 
   it('switches to Brandscript tab and renders stub', async () => {
@@ -188,6 +206,22 @@ describe('BrandHub', () => {
     renderBrandHub();
     fireEvent.click(screen.getByRole('tab', { name: /identity/i }));
     expect(screen.getByTestId('identity-tab')).toBeInTheDocument();
+  });
+
+  it('switches to Business Footprint tab and renders stub', () => {
+    renderBrandHub();
+    fireEvent.click(screen.getByRole('tab', { name: /business footprint/i }));
+    expect(screen.getByTestId('business-footprint-tab')).toBeInTheDocument();
+  });
+
+  it('maps legacy business-profile deep links to the Business Footprint tab', () => {
+    renderBrandHub(undefined, { initialEntries: ['/ws/ws-test/brand?tab=business-profile'] });
+    expect(screen.getByTestId('business-footprint-tab')).toHaveAttribute('data-legacy-section', 'business-profile');
+  });
+
+  it('maps legacy locations deep links to the Business Footprint tab', () => {
+    renderBrandHub(undefined, { initialEntries: ['/ws/ws-test/brand?tab=locations'] });
+    expect(screen.getByTestId('business-footprint-tab')).toHaveAttribute('data-legacy-section', 'locations');
   });
 
   it('switching back to Overview tab restores overview content', () => {

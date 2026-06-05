@@ -394,162 +394,6 @@
       ]
     },
     {
-      "id": "sprint-duplication-unification-audit-2026-05-27",
-      "name": "🚧 Duplication Unification Audit Follow-through",
-      "hours": "20-36",
-      "rationale": "Execute the 2026-05-27 duplication inventory with one-track-per-finding to reduce drift regressions.",
-      "notes": "Audit references: /docs/superpowers/audits/2026-05-27-duplication-inventory.md and /docs/superpowers/audits/2026-05-27-audit-drift-closure.md",
-      "items": [
-        {
-          "id": "dup-schema-validator-core-unification",
-          "title": "Unify schema validator core primitives",
-          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
-          "est": "6-8h",
-          "priority": "P0",
-          "status": "done",
-          "shippedAt": "2026-05-27",
-          "notes": "Completed on codex/schema-unification-roadmap-capture via shared schema rule core extraction and adoption. File clusters delivered: server/schema-validator.ts, server/schema/rich-results.ts, server/schema/validator.ts, server/schema/schema-validation-core.ts, tests/unit/schema-validation-*. Outcome: publish/eligibility/lean paths now consume shared rule primitives and contradiction coverage is in place. Final closeout follow-up on 2026-05-28 unified generator callers onto the same core evaluation projections and added explicit wrapper-projection contract coverage."
-        },
-        {
-          "id": "dup-schema-eligibility-publish-contradiction-elimination",
-          "title": "Eliminate eligibility vs publish contradictions",
-          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
-          "est": "4-6h",
-          "priority": "P0",
-          "status": "done",
-          "shippedAt": "2026-05-27",
-          "notes": "Completed on codex/schema-unification-roadmap-capture by deriving eligibility from the shared publish-rule evaluator path. File clusters delivered: server/schema/rich-results.ts, server/schema-validator.ts, server/schema/schema-validation-core.ts, tests/unit/schema-validation-matrix.test.ts, and tests/unit/schema-validator-alignment.test.ts. Outcome: contradiction state (eligible while publish errors for same type) is now contract-tested and blocked. Final closeout follow-up on 2026-05-28 extended contradiction lock tests to assert core-projection parity between publish and eligibility wrappers."
-        },
-        {
-          "id": "dup-page-normalizer-authority-collision-cleanup",
-          "title": "Resolve normalizePageUrl authority collision",
-          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
-          "est": "6-8h",
-          "priority": "P0",
-          "status": "done",
-          "notes": "File clusters: shared/page-address-utils.ts, server/helpers.ts, server/analytics-intelligence.ts and high-fanout callers. Risk: same-name different-semantics helpers can corrupt joins/grouping with no compile-time signal. Done when: one canonical page-identity helper contract is enforced and non-canonical variants are renamed or removed. Cross-reference: keep alongside broad page-address work in roadmap item 2601 to avoid duplicate closure ambiguity.\n\nCompleted via the Canonical Page Address consolidation sweep (cross-ref roadmap item `audit-drift-page-path-address-helper-consolidation`) and associated normalizePath sunset/page-address authority guardrails.",
-          "shippedAt": "2026-05-27"
-        },
-        {
-          "id": "dup-pathname-extraction-fanout-migration",
-          "title": "Migrate raw pathname extraction fan-out",
-          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
-          "est": "5-7h",
-          "priority": "P1",
-          "status": "pending",
-          "notes": "File clusters: ~69 new URL(...).pathname callsites across server/src/shared/tests (audit-indexed sweep). Risk: partial migration leaves subtle path-matching regressions. Done when: page-identity joins route through shared page-address helpers and remaining raw pathname usage is intentional/documented.\n\n2026-05-28 phase update: server-first migration completed across high-risk join/matching callsites (`analytics-intelligence`, `content-decay`, `keyword-strategy-ai-synthesis`, `keyword-strategy-enrichment`, `search-console`, `insight-enrichment`, `content-requests`, `webflow-cms-images`). Parent remains pending because client/UI display-path cleanup is deferred to child item `dup-pathname-ui-display-callsite-cleanup` (parent: dup-pathname-extraction-fanout-migration)."
-        },
-        {
-          "id": "dup-pathname-ui-display-callsite-cleanup",
-          "title": "Clean up deferred UI pathname formatting/matching callsites",
-          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
-          "est": "3-5h",
-          "priority": "P2",
-          "status": "done",
-          "notes": "Parent: dup-pathname-extraction-fanout-migration. Deferred from the 2026-05-28 server-first phase to keep blast radius low. Target areas: `src/components/*` and `src/hooks/*` callsites using raw `new URL(...).pathname` for labels/matching, especially Insight cards, RedirectManager, SearchDetail, client snapshot/search surfaces, and admin insight feed helpers. Done when UI callsites route through shared page-address helpers (or explicitly documented exceptions) and page-address contract tests + affected component tests are green. [DONE 2026-06-02 (PR #1035): 8 genuine new URL().pathname display callsites migrated to the shared normalizePageUrl helper (+ a pinning test for output parity / trailing-slash normalization). The remaining new URL() uses in src/ read hostname/protocol or validate URLs — out of scope for this helper, intentionally left.]"
-        },
-        {
-          "id": "dup-route-query-parser-consolidation",
-          "title": "Consolidate duplicated route query parsers",
-          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
-          "est": "3-5h",
-          "priority": "P1",
-          "status": "done",
-          "notes": "File clusters: server/routes/{ai,google,health,public-analytics,webflow-cms,workspace-home}.ts. Risk: parser behavior drift causes inconsistent pagination/default bounds by endpoint. Done when: shared parsePositiveIntQuery helper is adopted and legacy inline copies are removed with route-level tests.\n\nCompleted 2026-05-28 via shared `server/query-param-parsers.ts` adoption in all six target routes, including shared non-negative parser usage for Webflow CMS offsets. Added parser contract coverage at `tests/unit/query-param-parsers.test.ts`; preserved existing integration error contracts in `tests/integration/misc-endpoints.test.ts`.",
-          "shippedAt": "2026-05-28"
-        },
-        {
-          "id": "dup-mutation-feedback-loop-helperization",
-          "title": "Helperize mutation feedback loop wiring",
-          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
-          "est": "5-7h",
-          "priority": "P1",
-          "status": "done",
-          "notes": "File clusters: server routes/services with repeated addActivity + broadcastToWorkspace patterns (53-file fanout from audit). Risk: omitted or mismatched side effects create stale UI and audit gaps. Done when: shared mutation-side-effect helper/guardrails reduce repeated boilerplate and high-churn mutation families are migrated first.\n\nCompleted 2026-05-28 pilot expansion by adopting `runWorkspaceMutation` on blueprint CRUD in `server/routes/page-strategy.ts` and create/update/delete in `server/routes/eeat-assets.ts`, preserving route shapes/events while centralizing mutation guardrails. Extended helper adoption contract at `tests/contract/workspace-mutation-helper-adoption.test.ts`.",
-          "shippedAt": "2026-05-28"
-        },
-        {
-          "id": "dup-schema-text-sanitizer-consolidation",
-          "title": "Consolidate schema text sanitizers",
-          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
-          "est": "3-4h",
-          "priority": "P1",
-          "status": "done",
-          "shippedAt": "2026-05-27",
-          "notes": "Completed on codex/schema-unification-roadmap-capture via canonical sanitizer extraction at server/schema/schema-text-sanitizer.ts and adoption in server/schema/generator.ts, server/schema/templates/service.ts, server/schema/templates/local-business.ts, and server/schema/extractors/page-elements.ts. Fixture lock added at tests/unit/schema/schema-text-sanitizer.test.ts. Outcome: one shared authority now controls whitespace cleanup + opaque identifier filtering semantics."
-        },
-        {
-          "id": "dup-schema-role-type-registry-consolidation",
-          "title": "Consolidate schema role/type registry mappings",
-          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
-          "est": "4-6h",
-          "priority": "P1",
-          "status": "done",
-          "shippedAt": "2026-05-27",
-          "notes": "Completed on codex/schema-unification-roadmap-capture via centralized role/type registry module at server/schema/role-type-registry.ts. File clusters delivered: server/schema/role-type-registry.ts, server/schema-suggester.ts, server/schema/generator.ts. Outcome: PAGE_TYPE_SCHEMA_MAP, PAGE_TYPE_LABELS, SCHEMA_ROLE_TO_PAGE_KIND, and diagnostics-type mapping now share one authority and are re-exported for compatibility."
-        },
-        {
-          "id": "dup-html-analysis-helper-consolidation",
-          "title": "Consolidate residual HTML analysis helper drift",
-          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
-          "est": "2-4h",
-          "priority": "P2",
-          "status": "done",
-          "notes": "File clusters: server/seo-audit-html.ts, server/sales-audit.ts, server/html-analysis-utils.ts. Risk: forked extraction logic yields inconsistent audit outcomes. Done when: wrappers only delegate to canonical html-analysis-utils helpers and no ad hoc extraction logic remains outside approved wrappers.\n\nCompleted in roadmap item `audit-drift-html-extraction-utility-consolidation`: canonicalized HTML extraction in `server/html-analysis-utils.ts`, migrated wrappers/callers, and added pr-check drift guardrails.",
-          "shippedAt": "2026-05-27"
-        },
-        {
-          "id": "dup-ui-number-size-formatter-consolidation",
-          "title": "Consolidate UI numeric and size formatters",
-          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
-          "est": "2-4h",
-          "priority": "P2",
-          "status": "done",
-          "notes": "File clusters: src/components/{AssetBrowser,AssetAudit,PageWeight,assets/AssetCard}.tsx plus fmtNum/fmtMoney adoption gaps. Risk: inconsistent formatting and repeated bugs in display logic. Done when: shared format helpers cover bytes/number use cases and duplicate local helpers are removed.\n\nCompleted via roadmap items `audit-drift-fmt-num-formatbytes-adoption` and `audit-drift-fmt-money-format-date-adoption` (fmtNum/fmtMoney/formatBytes/date formatting adoption + guardrails).",
-          "shippedAt": "2026-05-27"
-        },
-        {
-          "id": "dup-slug-url-helper-consolidation",
-          "title": "Consolidate slug and URL helper variants",
-          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
-          "est": "2-4h",
-          "priority": "P2",
-          "status": "done",
-          "notes": "File clusters: server/intelligence/entity-resolution-slice.ts, server/mcp/tools/keyword-actions.ts, server/sales-audit.ts, server/diagnostic-probe.ts. Risk: diverging normalization semantics break cross-domain linking over time. Done when: shared slug/url helpers exist with explicit domain wrappers where semantics intentionally differ.\n\nCompleted through canonical slug/path/address hardening work (cross-ref `audit-drift-server-slugify-dedupe-consolidation`, `audit-drift-page-path-address-helper-consolidation`, and item `630`).",
-          "shippedAt": "2026-05-27"
-        },
-        {
-          "id": "dup-ws-invalidation-map-guardrails",
-          "title": "Add guardrails for WS invalidation map drift",
-          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
-          "est": "3-5h",
-          "priority": "P2",
-          "status": "done",
-          "notes": "File clusters: src/hooks/useWsInvalidation.ts and workspace-event broadcasters. Risk: repetitive handler map edits can miss new events or invalidate wrong keys. Done when: event coverage guardrails/tests enforce handler completeness for workspace-scoped broadcasts.\n\nCompleted by centralized WS invalidation guardrails and coverage contracts (cross-ref done hardening item `598`, ws invalidation coverage contracts, and event-handler drift checks).",
-          "shippedAt": "2026-05-27"
-        },
-        {
-          "id": "dup-table-mapper-pattern-review",
-          "title": "Review repeated table mapper patterns for safe extraction",
-          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
-          "est": "2-3h",
-          "priority": "P3",
-          "status": "done",
-          "notes": "File clusters: keyword/table modules using rowToModel/modelToParams/migrateFromJsonBlob patterns. Risk: over-abstraction could reduce readability without real bug reduction. Done when: keep-as-is vs extract decision is documented with targeted adoption only where complexity decreases.\n\nCompleted 2026-05-28 via decision record `docs/rules/table-mapper-pattern-review.md`: keep explicit row/model mappers local to domain modules for readability and schema clarity; no generic extraction introduced because current duplication is intentional pattern consistency with low bug risk.",
-          "shippedAt": "2026-05-28"
-        },
-        {
-          "id": "dup-brand-ai-overview-business-footprint-ia-consolidation",
-          "title": "Consolidate Brand & AI overview IA and business footprint surfaces",
-          "source": "Browser annotation review 2026-05-28",
-          "est": "3-5h",
-          "priority": "P2",
-          "status": "pending",
-          "notes": "Brand & AI has become bulky and overlaps adjacent tabs. Consolidate IA without collapsing distinct data authorities. Keep separate models: `workspace.businessProfile` (schema/contact authority), `client_locations` (local-SEO operational authority), and `workspace.intelligenceProfile` (strategic AI context). UX target: Overview shows compact current snapshots + deep links (Current Context, Intelligence Profile, Business Profile, Locations), and the editing flow groups Business Profile + Locations into one business-footprint editing surface to reduce navigation churn. Done when: no duplicate long-form editors remain in Overview, legacy deep links continue to resolve, and Locations + Business Profile remain separately persisted but co-located in admin UX."
-        }
-      ]
-    },
-    {
       "id": "sprint-self-service",
       "name": "Self-Service & Growth",
       "hours": "26-37",
@@ -2171,6 +2015,165 @@
           "notes": "Completed 2026-06-04. Retired the legacy `server/db/json-column.ts` shim and removed its tests; all JSON parsing coverage now targets `server/db/json-validation.ts`. Collapsed server/frontend title-casing onto shared `capitalizeWord` helpers, migrated schema data-source and insight-feed title generation, collapsed keyword-strategy `compact()` siblings onto `compactStrings`, and promoted `sleep(ms)` from `server/local-seo.ts` into `server/helpers.ts`. Follow-up review also removed the clipboard-upload `sips` shellout in favor of existing `sharp` resizing after invalid test image bytes triggered native macOS `sips` crashes. Prior work had already completed `useDebouncedValue`, `daysSince`, and quickWins parity. Verification sweep now leaves no `parseJsonColumn`/`stringifyJsonColumn`, local `compact()`, local `sleep()`, `titleCaseWord`, or `capitalizeSlugSegment` callsites outside roadmap history."
         }
       ]
+    },
+    {
+      "id": "sprint-duplication-unification-audit-2026-05-27",
+      "name": "✅ SHIPPED — 🚧 Duplication Unification Audit Follow-through",
+      "hours": "20-36",
+      "rationale": "Execute the 2026-05-27 duplication inventory with one-track-per-finding to reduce drift regressions.",
+      "notes": "Audit references: /docs/superpowers/audits/2026-05-27-duplication-inventory.md and /docs/superpowers/audits/2026-05-27-audit-drift-closure.md",
+      "items": [
+        {
+          "id": "dup-schema-validator-core-unification",
+          "title": "Unify schema validator core primitives",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "6-8h",
+          "priority": "P0",
+          "status": "done",
+          "shippedAt": "2026-05-27",
+          "notes": "Completed on codex/schema-unification-roadmap-capture via shared schema rule core extraction and adoption. File clusters delivered: server/schema-validator.ts, server/schema/rich-results.ts, server/schema/validator.ts, server/schema/schema-validation-core.ts, tests/unit/schema-validation-*. Outcome: publish/eligibility/lean paths now consume shared rule primitives and contradiction coverage is in place. Final closeout follow-up on 2026-05-28 unified generator callers onto the same core evaluation projections and added explicit wrapper-projection contract coverage."
+        },
+        {
+          "id": "dup-schema-eligibility-publish-contradiction-elimination",
+          "title": "Eliminate eligibility vs publish contradictions",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "4-6h",
+          "priority": "P0",
+          "status": "done",
+          "shippedAt": "2026-05-27",
+          "notes": "Completed on codex/schema-unification-roadmap-capture by deriving eligibility from the shared publish-rule evaluator path. File clusters delivered: server/schema/rich-results.ts, server/schema-validator.ts, server/schema/schema-validation-core.ts, tests/unit/schema-validation-matrix.test.ts, and tests/unit/schema-validator-alignment.test.ts. Outcome: contradiction state (eligible while publish errors for same type) is now contract-tested and blocked. Final closeout follow-up on 2026-05-28 extended contradiction lock tests to assert core-projection parity between publish and eligibility wrappers."
+        },
+        {
+          "id": "dup-page-normalizer-authority-collision-cleanup",
+          "title": "Resolve normalizePageUrl authority collision",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "6-8h",
+          "priority": "P0",
+          "status": "done",
+          "notes": "File clusters: shared/page-address-utils.ts, server/helpers.ts, server/analytics-intelligence.ts and high-fanout callers. Risk: same-name different-semantics helpers can corrupt joins/grouping with no compile-time signal. Done when: one canonical page-identity helper contract is enforced and non-canonical variants are renamed or removed. Cross-reference: keep alongside broad page-address work in roadmap item 2601 to avoid duplicate closure ambiguity.\n\nCompleted via the Canonical Page Address consolidation sweep (cross-ref roadmap item `audit-drift-page-path-address-helper-consolidation`) and associated normalizePath sunset/page-address authority guardrails.",
+          "shippedAt": "2026-05-27"
+        },
+        {
+          "id": "dup-pathname-extraction-fanout-migration",
+          "title": "Migrate raw pathname extraction fan-out",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "5-7h",
+          "priority": "P1",
+          "status": "done",
+          "shippedAt": "2026-06-05",
+          "notes": "File clusters: ~69 new URL(...).pathname callsites across server/src/shared/tests (audit-indexed sweep). Risk: partial migration leaves subtle path-matching regressions. Done when: page-identity joins route through shared page-address helpers and remaining raw pathname usage is intentional/documented.\n\n2026-05-28 phase update: server-first migration completed across high-risk join/matching callsites (`analytics-intelligence`, `content-decay`, `keyword-strategy-ai-synthesis`, `keyword-strategy-enrichment`, `search-console`, `insight-enrichment`, `content-requests`, `webflow-cms-images`). Parent remained pending because client/UI display-path cleanup was deferred to child item `dup-pathname-ui-display-callsite-cleanup`.\n\nCompleted 2026-06-05: the deferred UI/display cleanup landed on 2026-06-02, and the remaining prompt/display stragglers in `server/admin-chat-context.ts`, `server/content-brief.ts`, `server/keyword-strategy-helpers.ts`, and `src/hooks/admin/useInsightFeed.ts` now also route through `normalizePageUrl()`. Remaining raw `.pathname` usage is helper-internal or domain-specific URL parsing outside the page-identity drift scope, so the parent audit item is now complete."
+        },
+        {
+          "id": "dup-pathname-ui-display-callsite-cleanup",
+          "title": "Clean up deferred UI pathname formatting/matching callsites",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "3-5h",
+          "priority": "P2",
+          "status": "done",
+          "notes": "Parent: dup-pathname-extraction-fanout-migration. Deferred from the 2026-05-28 server-first phase to keep blast radius low. Target areas: `src/components/*` and `src/hooks/*` callsites using raw `new URL(...).pathname` for labels/matching, especially Insight cards, RedirectManager, SearchDetail, client snapshot/search surfaces, and admin insight feed helpers. Done when UI callsites route through shared page-address helpers (or explicitly documented exceptions) and page-address contract tests + affected component tests are green. [DONE 2026-06-02 (PR #1035): 8 genuine new URL().pathname display callsites migrated to the shared normalizePageUrl helper (+ a pinning test for output parity / trailing-slash normalization). The remaining new URL() uses in src/ read hostname/protocol or validate URLs — out of scope for this helper, intentionally left.]"
+        },
+        {
+          "id": "dup-route-query-parser-consolidation",
+          "title": "Consolidate duplicated route query parsers",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "3-5h",
+          "priority": "P1",
+          "status": "done",
+          "notes": "File clusters: server/routes/{ai,google,health,public-analytics,webflow-cms,workspace-home}.ts. Risk: parser behavior drift causes inconsistent pagination/default bounds by endpoint. Done when: shared parsePositiveIntQuery helper is adopted and legacy inline copies are removed with route-level tests.\n\nCompleted 2026-05-28 via shared `server/query-param-parsers.ts` adoption in all six target routes, including shared non-negative parser usage for Webflow CMS offsets. Added parser contract coverage at `tests/unit/query-param-parsers.test.ts`; preserved existing integration error contracts in `tests/integration/misc-endpoints.test.ts`.",
+          "shippedAt": "2026-05-28"
+        },
+        {
+          "id": "dup-mutation-feedback-loop-helperization",
+          "title": "Helperize mutation feedback loop wiring",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "5-7h",
+          "priority": "P1",
+          "status": "done",
+          "notes": "File clusters: server routes/services with repeated addActivity + broadcastToWorkspace patterns (53-file fanout from audit). Risk: omitted or mismatched side effects create stale UI and audit gaps. Done when: shared mutation-side-effect helper/guardrails reduce repeated boilerplate and high-churn mutation families are migrated first.\n\nCompleted 2026-05-28 pilot expansion by adopting `runWorkspaceMutation` on blueprint CRUD in `server/routes/page-strategy.ts` and create/update/delete in `server/routes/eeat-assets.ts`, preserving route shapes/events while centralizing mutation guardrails. Extended helper adoption contract at `tests/contract/workspace-mutation-helper-adoption.test.ts`.",
+          "shippedAt": "2026-05-28"
+        },
+        {
+          "id": "dup-schema-text-sanitizer-consolidation",
+          "title": "Consolidate schema text sanitizers",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "3-4h",
+          "priority": "P1",
+          "status": "done",
+          "shippedAt": "2026-05-27",
+          "notes": "Completed on codex/schema-unification-roadmap-capture via canonical sanitizer extraction at server/schema/schema-text-sanitizer.ts and adoption in server/schema/generator.ts, server/schema/templates/service.ts, server/schema/templates/local-business.ts, and server/schema/extractors/page-elements.ts. Fixture lock added at tests/unit/schema/schema-text-sanitizer.test.ts. Outcome: one shared authority now controls whitespace cleanup + opaque identifier filtering semantics."
+        },
+        {
+          "id": "dup-schema-role-type-registry-consolidation",
+          "title": "Consolidate schema role/type registry mappings",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "done",
+          "shippedAt": "2026-05-27",
+          "notes": "Completed on codex/schema-unification-roadmap-capture via centralized role/type registry module at server/schema/role-type-registry.ts. File clusters delivered: server/schema/role-type-registry.ts, server/schema-suggester.ts, server/schema/generator.ts. Outcome: PAGE_TYPE_SCHEMA_MAP, PAGE_TYPE_LABELS, SCHEMA_ROLE_TO_PAGE_KIND, and diagnostics-type mapping now share one authority and are re-exported for compatibility."
+        },
+        {
+          "id": "dup-html-analysis-helper-consolidation",
+          "title": "Consolidate residual HTML analysis helper drift",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "2-4h",
+          "priority": "P2",
+          "status": "done",
+          "notes": "File clusters: server/seo-audit-html.ts, server/sales-audit.ts, server/html-analysis-utils.ts. Risk: forked extraction logic yields inconsistent audit outcomes. Done when: wrappers only delegate to canonical html-analysis-utils helpers and no ad hoc extraction logic remains outside approved wrappers.\n\nCompleted in roadmap item `audit-drift-html-extraction-utility-consolidation`: canonicalized HTML extraction in `server/html-analysis-utils.ts`, migrated wrappers/callers, and added pr-check drift guardrails.",
+          "shippedAt": "2026-05-27"
+        },
+        {
+          "id": "dup-ui-number-size-formatter-consolidation",
+          "title": "Consolidate UI numeric and size formatters",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "2-4h",
+          "priority": "P2",
+          "status": "done",
+          "notes": "File clusters: src/components/{AssetBrowser,AssetAudit,PageWeight,assets/AssetCard}.tsx plus fmtNum/fmtMoney adoption gaps. Risk: inconsistent formatting and repeated bugs in display logic. Done when: shared format helpers cover bytes/number use cases and duplicate local helpers are removed.\n\nCompleted via roadmap items `audit-drift-fmt-num-formatbytes-adoption` and `audit-drift-fmt-money-format-date-adoption` (fmtNum/fmtMoney/formatBytes/date formatting adoption + guardrails).",
+          "shippedAt": "2026-05-27"
+        },
+        {
+          "id": "dup-slug-url-helper-consolidation",
+          "title": "Consolidate slug and URL helper variants",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "2-4h",
+          "priority": "P2",
+          "status": "done",
+          "notes": "File clusters: server/intelligence/entity-resolution-slice.ts, server/mcp/tools/keyword-actions.ts, server/sales-audit.ts, server/diagnostic-probe.ts. Risk: diverging normalization semantics break cross-domain linking over time. Done when: shared slug/url helpers exist with explicit domain wrappers where semantics intentionally differ.\n\nCompleted through canonical slug/path/address hardening work (cross-ref `audit-drift-server-slugify-dedupe-consolidation`, `audit-drift-page-path-address-helper-consolidation`, and item `630`).",
+          "shippedAt": "2026-05-27"
+        },
+        {
+          "id": "dup-ws-invalidation-map-guardrails",
+          "title": "Add guardrails for WS invalidation map drift",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "3-5h",
+          "priority": "P2",
+          "status": "done",
+          "notes": "File clusters: src/hooks/useWsInvalidation.ts and workspace-event broadcasters. Risk: repetitive handler map edits can miss new events or invalidate wrong keys. Done when: event coverage guardrails/tests enforce handler completeness for workspace-scoped broadcasts.\n\nCompleted by centralized WS invalidation guardrails and coverage contracts (cross-ref done hardening item `598`, ws invalidation coverage contracts, and event-handler drift checks).",
+          "shippedAt": "2026-05-27"
+        },
+        {
+          "id": "dup-table-mapper-pattern-review",
+          "title": "Review repeated table mapper patterns for safe extraction",
+          "source": "/docs/superpowers/audits/2026-05-27-duplication-inventory.md",
+          "est": "2-3h",
+          "priority": "P3",
+          "status": "done",
+          "notes": "File clusters: keyword/table modules using rowToModel/modelToParams/migrateFromJsonBlob patterns. Risk: over-abstraction could reduce readability without real bug reduction. Done when: keep-as-is vs extract decision is documented with targeted adoption only where complexity decreases.\n\nCompleted 2026-05-28 via decision record `docs/rules/table-mapper-pattern-review.md`: keep explicit row/model mappers local to domain modules for readability and schema clarity; no generic extraction introduced because current duplication is intentional pattern consistency with low bug risk.",
+          "shippedAt": "2026-05-28"
+        },
+        {
+          "id": "dup-brand-ai-overview-business-footprint-ia-consolidation",
+          "title": "Consolidate Brand & AI overview IA and business footprint surfaces",
+          "source": "Browser annotation review 2026-05-28",
+          "est": "3-5h",
+          "priority": "P2",
+          "status": "done",
+          "notes": "Brand & AI has become bulky and overlaps adjacent tabs. Consolidate IA without collapsing distinct data authorities. Keep separate models: `workspace.businessProfile` (schema/contact authority), `client_locations` (local-SEO operational authority), and `workspace.intelligenceProfile` (strategic AI context). UX target: Overview shows compact current snapshots + deep links (Current Context, Intelligence Profile, Business Profile, Locations), and the editing flow groups Business Profile + Locations into one business-footprint editing surface to reduce navigation churn. Done when: no duplicate long-form editors remain in Overview, legacy deep links continue to resolve, and Locations + Business Profile remain separately persisted but co-located in admin UX.\n\nCompleted 2026-06-05. Brand Hub now uses `business-footprint` as the canonical tab while preserving `business-profile` and `locations` as legacy aliases. Business Profile and Locations are co-located in one admin surface without merging their storage or route contracts, schema/local-SEO senders now point at the canonical tab, and Overview opens with compact summary cards for Current Context, Intelligence Profile, Business Profile, and Locations before the existing richer current-context sections.",
+          "shippedAt": "2026-06-05"
+        }
+      ],
+      "shippedAt": "2026-06-05"
     }
   ]
 }

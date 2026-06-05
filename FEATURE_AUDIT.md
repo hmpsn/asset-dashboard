@@ -441,7 +441,7 @@ The rollout remains intentionally orchestration-light: no server-side AI rewrite
 
 ### 446. Multi-Location Local SEO Business Match
 
-**What it does:** Matches local visibility results against multiple client-owned physical locations and gives admins a dedicated management UI. Workspaces can store `client_locations` with branch names, domains, phone numbers, addresses, status, and future per-location strategy fields. Local visibility snapshots record the matched location ID/name, match evaluation checks every configured location, client-owned branches are scrubbed from `top_competitors`, and a background job recalculates historical snapshots after location changes. Workspace Settings now includes a Locations tab for CRUD, seed-from-business-profile confirmation, review/confirm flows, and delete confirmation. The Local SEO setup drawer links directly to `?tab=locations` and summarizes configured/needs-review locations.
+**What it does:** Matches local visibility results against multiple client-owned physical locations and gives admins a dedicated management UI. Workspaces can store `client_locations` with branch names, domains, phone numbers, addresses, status, and future per-location strategy fields. Local visibility snapshots record the matched location ID/name, match evaluation checks every configured location, client-owned branches are scrubbed from `top_competitors`, and a background job recalculates historical snapshots after location changes. Workspace Settings now includes a Locations tab for CRUD, seed-from-business-profile confirmation, review/confirm flows, and delete confirmation. The Local SEO setup drawer now links directly to the Brand Hub `business-footprint` surface and summarizes configured/needs-review locations.
 
 **Agency value:** Fixes the credibility gap where a client’s own branch listings could appear as competitors. Strategists get cleaner local pack reporting, a backfill path for historical snapshots, and a low-friction settings surface for keeping branch identity data accurate.
 
@@ -1642,6 +1642,17 @@ Reference docs:
 **Client value:** Content that speaks to their actual audience segments from day one. Each persona's pain points and goals are addressed naturally in generated content.
 
 **Mutual:** Transforms audience research from a multi-hour workshop exercise into a one-click starting point. Generated personas can be refined, but the initial set is specific enough to dramatically improve content targeting.
+
+---
+
+### 66a. Brand & AI Business Footprint Consolidation
+**What it does:** Reorganizes Brand Hub IA so Business Profile and Locations are edited together in a single `business-footprint` tab while preserving their separate storage authorities. `workspace.businessProfile` remains the schema/contact source of truth, `client_locations` remains the local-SEO operational source of truth, and `workspace.intelligenceProfile` remains a separate strategic AI context editor. Brand Hub now treats `business-footprint` as the canonical deep-link target, while legacy `?tab=business-profile` and `?tab=locations` URLs still resolve through alias handling. Overview now opens with compact snapshot cards for Current Context, Intelligence Profile, Business Profile, and Locations before the richer current-context editing sections below.
+
+**Agency value:** Reduces navigation churn in Brand & AI by grouping the two admin surfaces that are most often reviewed together without introducing a risky data-model merge. Schema and local-SEO workflows now point to one canonical destination.
+
+**Client value:** Indirect. The agency has a clearer, faster setup flow for business identity and local footprint data, which improves schema quality and local SEO matching reliability.
+
+**Mutual:** The platform now has one stable Brand Hub destination for business-footprint fixes, while still honoring old bookmarks and helper links. This lowers future UX drift and keeps schema/local-SEO guidance aligned.
 
 ---
 

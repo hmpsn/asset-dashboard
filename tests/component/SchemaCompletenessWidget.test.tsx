@@ -92,6 +92,17 @@ describe('SchemaCompletenessWidget', () => {
     expect(loc).toContain('?tab=features&focus=brandLogoUrl');
   });
 
+  it('navigates to Brand Hub business footprint for business address fixes', () => {
+    const { getLocation } = renderWithRouter([
+      { pageId: 'p1', validationFindings: [finding('warning', 'address')] },
+    ]);
+
+    fireEvent.click(screen.getByText('Business address'));
+    const loc = getLocation();
+    expect(loc).toContain('/ws/ws_test/brand');
+    expect(loc).toContain('?tab=business-footprint&focus=address');
+  });
+
   it('errors sort above warnings', () => {
     renderWithRouter([
       { pageId: 'p1', validationFindings: [finding('warning', 'address')] },
