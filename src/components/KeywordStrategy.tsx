@@ -103,7 +103,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const [showNextSteps, setShowNextSteps] = useState(false);
   const [strategyTab, setStrategyTab] = useState<'analysis' | 'guide'>('analysis');
   const [refreshOrderingPromptOpen, setRefreshOrderingPromptOpen] = useState(false);
-  const [reverseStalenessNudgeDismissed, setReverseStalenessNudgeDismissed] = useState(false);
+  const [dismissedRefreshAt, setDismissedRefreshAt] = useState<string | null>(null);
   const activeStrategyJob = findActiveJob({ type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, workspaceId });
   const completedStartedJob = lastStartedJobId ? jobs.find(job => job.id === lastStartedJobId) : undefined;
   const generating = startingStrategyJob || Boolean(activeStrategyJob);
@@ -704,7 +704,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           )}
 
           {/* ── Reverse-Staleness Nudge (strategy older than local SEO data) ── */}
-          {localSync?.applies && localSync?.strategyStaleVsLocal && !reverseStalenessNudgeDismissed && (
+          {localSync?.applies && localSync?.strategyStaleVsLocal && dismissedRefreshAt !== localSync.lastLocalRefreshAt && (
             <div
               data-testid="reverse-staleness-nudge"
               className="bg-amber-500/10 border border-amber-500/30 rounded-[var(--radius-lg)] px-4 py-3 flex items-start gap-2.5"
@@ -727,7 +727,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                 </div>
               </div>
               <IconButton
-                onClick={() => setReverseStalenessNudgeDismissed(true)}
+                onClick={() => setDismissedRefreshAt(localSync?.lastLocalRefreshAt ?? null)}
                 title="Dismiss"
                 label="Dismiss"
                 icon={X}

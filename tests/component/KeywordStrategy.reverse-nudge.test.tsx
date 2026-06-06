@@ -7,12 +7,13 @@
  * Mirrors KeywordStrategy.refresh-ordering.test.tsx for mocking patterns.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { KeywordStrategyPanel } from '../../src/components/KeywordStrategy';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
 import type { BackgroundJob } from '../../src/hooks/useBackgroundTasks';
+import { formatDate } from '../../src/utils/formatDates';
 
 // ─── mutable mock state ───────────────────────────────────────────────────────
 
@@ -236,9 +237,15 @@ describe('KeywordStrategyPanel — reverse-staleness nudge (Task 4.1)', () => {
       expect(screen.getByTestId('reverse-staleness-nudge')).toBeInTheDocument();
     });
 
-    it('nudge contains regenerate copy referencing both dates', () => {
+    it('nudge contains lead framing and both formatted dates', () => {
       renderPanel();
       const nudge = screen.getByTestId('reverse-staleness-nudge');
+      expect(nudge.textContent).toMatch(/newer than this strategy/i);
+      // Both timestamps must appear formatted via formatDate
+      const expectedLocal = formatDate('2025-06-05T00:00:00Z');
+      const expectedGenerated = formatDate('2025-01-01T00:00:00Z');
+      expect(nudge.textContent).toContain(expectedLocal);
+      expect(nudge.textContent).toContain(expectedGenerated);
       expect(nudge.textContent).toMatch(/Regenerate/i);
     });
 
@@ -246,28 +253,111 @@ describe('KeywordStrategyPanel — reverse-staleness nudge (Task 4.1)', () => {
       renderPanel();
       expect(screen.getByTestId('reverse-staleness-nudge')).toBeInTheDocument();
 
-      // Find and click the dismiss button inside the nudge
       const nudge = screen.getByTestId('reverse-staleness-nudge');
-      const dismissBtn = nudge.querySelector('[aria-label*="ismiss"], [title*="ismiss"]');
-      expect(dismissBtn).not.toBeNull();
-      fireEvent.click(dismissBtn!);
+      const dismissBtn = within(nudge).getByRole('button', { name: /dismiss/i });
+      fireEvent.click(dismissBtn);
 
       expect(screen.queryByTestId('reverse-staleness-nudge')).toBeNull();
     });
 
     it('clicking "Generate Strategy" CTA calls startJob directly (localNeedsRefresh=false)', async () => {
       renderPanel();
-      // There may be multiple "Generate Strategy" buttons — find the one inside the nudge
       const nudge = screen.getByTestId('reverse-staleness-nudge');
-      const genBtn = nudge.querySelector('button');
-      expect(genBtn).not.toBeNull();
-      fireEvent.click(genBtn!);
+      const genBtn = within(nudge).getByRole('button', { name: /generate strategy/i });
+      fireEvent.click(genBtn);
 
       await waitFor(() => {
         expect(mocks.startJob).toHaveBeenCalledWith(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, expect.any(Object));
       });
       // Should NOT call refreshMutate — local data is fresh, goes straight to generate
       expect(mocks.refreshMutate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('(d) dismiss-reset: nudge reappears on next stale read with a newer lastLocalRefreshAt', () => {
+    it('dismissing then re-rendering with a newer timestamp re-shows the nudge', () => {
+      mocks.keywordStrategyData = {
+        strategy: makeStrategy(makeLocalSync({
+          applies: true,
+          localNeedsRefresh: false,
+          strategyStaleVsLocal: true,
+          lastLocalRefreshAt: '2025-06-05T00:00:00Z',
+          lastStrategyGeneratedAt: '2025-01-01T00:00:00Z',
+        })),
+        seoDataAvailable: true,
+        providers: [{ name: 'dataforseo', configured: true }],
+        workspaceData: { competitorDomains: [], seoDataProvider: 'dataforseo' },
+      };
+
+      const { rerender } = renderPanel();
+
+      // Nudge is visible initially
+      expect(screen.getByTestId('reverse-staleness-nudge')).toBeInTheDocument();
+
+      // Dismiss it
+      const nudge = screen.getByTestId('reverse-staleness-nudge');
+      fireEvent.click(within(nudge).getByRole('button', { name: /dismiss/i }));
+      expect(screen.queryByTestId('reverse-staleness-nudge')).toBeNull();
+
+      // Simulate a new local refresh — update mock data with a newer lastLocalRefreshAt
+      mocks.keywordStrategyData = {
+        strategy: makeStrategy(makeLocalSync({
+          applies: true,
+          localNeedsRefresh: false,
+          strategyStaleVsLocal: true,
+          lastLocalRefreshAt: '2025-07-01T00:00:00Z',
+          lastStrategyGeneratedAt: '2025-01-01T00:00:00Z',
+        })),
+        seoDataAvailable: true,
+        providers: [{ name: 'dataforseo', configured: true }],
+        workspaceData: { competitorDomains: [], seoDataProvider: 'dataforseo' },
+      };
+
+      const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+      });
+      rerender(
+        <MemoryRouter initialEntries={['/ws/ws-1/strategy']}>
+          <QueryClientProvider client={queryClient}>
+            <KeywordStrategyPanel workspaceId="ws-1" />
+          </QueryClientProvider>
+        </MemoryRouter>
+      );
+
+      // Nudge must reappear because lastLocalRefreshAt changed
+      expect(screen.getByTestId('reverse-staleness-nudge')).toBeInTheDocument();
+    });
+  });
+
+  describe('(e) CTA while localNeedsRefresh=true opens RefreshOrderingPrompt', () => {
+    it('clicking Generate Strategy CTA opens the ordering prompt, not startJob directly', async () => {
+      mocks.keywordStrategyData = {
+        strategy: makeStrategy(makeLocalSync({
+          applies: true,
+          localNeedsRefresh: true,
+          localNeedsRefreshReason: 'stale',
+          strategyStaleVsLocal: true,
+          lastLocalRefreshAt: '2025-06-05T00:00:00Z',
+          lastStrategyGeneratedAt: '2025-01-01T00:00:00Z',
+        })),
+        seoDataAvailable: true,
+        providers: [{ name: 'dataforseo', configured: true }],
+        workspaceData: { competitorDomains: [], seoDataProvider: 'dataforseo' },
+      };
+
+      renderPanel();
+
+      const nudge = screen.getByTestId('reverse-staleness-nudge');
+      const genBtn = within(nudge).getByRole('button', { name: /generate strategy/i });
+      fireEvent.click(genBtn);
+
+      // The RefreshOrderingPrompt modal must open (its title text is rendered)
+      await waitFor(() => {
+        expect(screen.getByText(/Strategy needs fresh local data/i)).toBeInTheDocument();
+      });
+
+      // startJob must NOT have been called — prompt intercepts
+      expect(mocks.startJob).not.toHaveBeenCalled();
     });
   });
 });
