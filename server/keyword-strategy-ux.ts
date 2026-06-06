@@ -439,14 +439,20 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
   const computeValueReasons = (
     keyword: string,
     raw: { volume?: number; difficulty?: number; cpc?: number; intent?: string | null },
+    opts?: { exposeCpc?: boolean },
   ): string[] | undefined => {
     if (!valueScoringCtx) return undefined;
+    // cpc always feeds the SCORE (commercial value); `exposeCpc` controls only
+    // whether the raw "$X CPC" appears in the human-readable reason text. Content
+    // gaps keep cpc admin-only (#1103) — the score stays cpc-aware but the raw cpc
+    // must not reach the public payload via the reason string.
+    const exposeCpc = opts?.exposeCpc ?? true;
     const { components } = computeKeywordValueComponents(
       { keyword, volume: raw.volume, difficulty: raw.difficulty, cpc: raw.cpc, intent: raw.intent },
       valueScoringCtx,
     );
     if (!components) return undefined;
-    return keywordValueReasons(components, { cpc: raw.cpc, volume: raw.volume, difficulty: raw.difficulty });
+    return keywordValueReasons(components, { cpc: exposeCpc ? raw.cpc : undefined, volume: raw.volume, difficulty: raw.difficulty });
   };
 
   const siteMetricByKeyword = new Map((options.strategy?.siteKeywordMetrics ?? []).map(metric => [normalizeKeyword(metric.keyword), metric]));
@@ -522,7 +528,14 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
       feedbackStatus: feedbackByKeyword.get(normalized),
       businessReasons: result.reasons.map(reason => reason.message),
       fitSignals: result.fitSignals,
-      valueReasons: computeValueReasons(keyword, { volume: gap.volume, difficulty: gap.difficulty, cpc: gap.cpc, intent: gap.intent }),
+      // Content-gap cpc is admin/scoring-internal only (#1103): score stays
+      // cpc-aware, but only the admin surface may show the raw "$X CPC" in text —
+      // the client surface feeds the public payload, so suppress it there.
+      valueReasons: computeValueReasons(
+        keyword,
+        { volume: gap.volume, difficulty: gap.difficulty, cpc: gap.cpc, intent: gap.intent },
+        { exposeCpc: surface === 'admin' },
+      ),
     }));
   }
 
