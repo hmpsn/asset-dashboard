@@ -2419,6 +2419,10 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
   const proceed = result.refreshed > 0;
   if (request.thenRegenerateStrategy === true && proceed) {
     try {
+      // No pre-flight active-job guard on purpose: if a strategy gen is already
+      // running, generateKeywordStrategy's own 409 guard rejects this cleanly into
+      // the strategy job's error state (no quota spent). A silently-skipped guard
+      // would be worse UX than a momentary errored row — the admin asked for it.
       const strategyJob = createJob(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, {
         workspaceId,
         message: 'Regenerating keyword strategy after local refresh...',
@@ -2429,6 +2433,8 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
       void (async () => {
         try {
           updateJob(strategyJob.id, { status: 'running', message: 'Generating keyword strategy...' });
+          // mode 'full' (not incremental): fresh local snapshots can shift the whole
+          // keyword universe, not just the pages that changed.
           const generationResult = await generateKeywordStrategy({ workspaceId, mode: 'full' });
           updateJob(strategyJob.id, {
             status: 'done',
