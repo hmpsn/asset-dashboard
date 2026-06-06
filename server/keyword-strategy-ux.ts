@@ -3,12 +3,19 @@ import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
 import { strategyHistoryStrategySchema, strategyHistoryPageMapSchema, type StrategyHistoryStrategy } from './schemas/workspace-schemas.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { createLogger } from './logger.js';
+import { isFeatureEnabled } from './feature-flags.js';
 import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js';
 import { buildStrategyKeywordEvaluationContext } from './keyword-strategy-context.js';
 import { evaluateKeywordCandidate, normalizeKeyword } from './keyword-intelligence/rules.js';
 import { getTrackedKeywords } from './rank-tracking.js';
 import { compactStrings } from './utils/collections.js';
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
+import {
+  computeKeywordValueComponents,
+  keywordValueReasons,
+  type ScoringContext,
+} from './scoring/keyword-value-score.js';
+import { getLocalSeoPosture, listLocalSeoMarkets } from './local-seo.js';
 import {
   TRACKED_KEYWORD_SOURCE,
   TRACKED_KEYWORD_STATUS,
@@ -213,6 +220,7 @@ function buildExplanation(input: {
   businessReasons: string[];
   fitSignals: string[];
   rawEvidenceOnly?: boolean;
+  valueReasons?: string[];
 }): KeywordStrategyExplanation {
   const normalizedKeyword = normalizeKeyword(input.keyword);
   const opportunityScore = input.contentGap?.opportunityScore;
@@ -251,6 +259,7 @@ function buildExplanation(input: {
     opportunityScore,
     rawEvidenceOnly: input.rawEvidenceOnly,
     nextAction: nextActionFor(input.role, input.keyword, input.page, input.tracked),
+    valueReasons: input.valueReasons,
   };
 }
 
@@ -377,6 +386,35 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
     cpc: 0,
   }, evaluationContext);
 
+  // Task 2.3: build value reasons server-side when the flag is ON.
+  // One ScoringContext per payload build (flag-gated), reused across all keywords.
+  const KEYWORD_VALUE_SCORING_FLAG = 'keyword-value-scoring' as const;
+  const valueScoringOn = isFeatureEnabled(KEYWORD_VALUE_SCORING_FLAG, options.workspaceId);
+  let valueScoringCtx: ScoringContext | null = null;
+  if (valueScoringOn) {
+    try {
+      const posture = getLocalSeoPosture(options.workspaceId);
+      const markets = listLocalSeoMarkets(options.workspaceId);
+      valueScoringCtx = { posture: posture ?? 'unknown', markets };
+    } catch (err) {
+      // catch-ok: value reasons are informational; degrade gracefully on posture/market read failure.
+      log.debug({ err, workspaceId: options.workspaceId }, 'Value scoring context unavailable — skipping valueReasons');
+    }
+  }
+
+  const computeValueReasons = (
+    keyword: string,
+    raw: { volume?: number; difficulty?: number; cpc?: number; intent?: string | null },
+  ): string[] | undefined => {
+    if (!valueScoringCtx) return undefined;
+    const { components } = computeKeywordValueComponents(
+      { keyword, volume: raw.volume, difficulty: raw.difficulty, cpc: raw.cpc, intent: raw.intent },
+      valueScoringCtx,
+    );
+    if (!components) return undefined;
+    return keywordValueReasons(components, { cpc: raw.cpc, volume: raw.volume, difficulty: raw.difficulty });
+  };
+
   const siteMetricByKeyword = new Map((options.strategy?.siteKeywordMetrics ?? []).map(metric => [normalizeKeyword(metric.keyword), metric]));
   for (const keyword of options.strategy?.siteKeywords ?? []) {
     const normalized = normalizeKeyword(keyword);
@@ -398,6 +436,7 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
       feedbackStatus: feedbackByKeyword.get(normalized),
       businessReasons: result.reasons.map(reason => reason.message),
       fitSignals: result.fitSignals,
+      valueReasons: computeValueReasons(keyword, { volume: metric?.volume, difficulty: metric?.difficulty }),
     }));
   }
 
@@ -423,6 +462,7 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
       feedbackStatus: feedbackByKeyword.get(normalized),
       businessReasons: result.reasons.map(reason => reason.message),
       fitSignals: result.fitSignals,
+      valueReasons: computeValueReasons(keyword, { volume: page.volume, difficulty: page.difficulty, cpc: page.cpc, intent: page.searchIntent }),
     }));
   }
 
@@ -448,6 +488,7 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
       feedbackStatus: feedbackByKeyword.get(normalized),
       businessReasons: result.reasons.map(reason => reason.message),
       fitSignals: result.fitSignals,
+      valueReasons: computeValueReasons(keyword, { volume: gap.volume, difficulty: gap.difficulty, cpc: gap.cpc, intent: gap.intent }),
     }));
   }
 
@@ -472,6 +513,7 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
         businessReasons: result.reasons.map(reason => reason.message),
         fitSignals: result.fitSignals,
         rawEvidenceOnly: true,
+        valueReasons: computeValueReasons(gap.keyword, { volume: gap.volume, difficulty: gap.difficulty }),
       }));
     }
   }

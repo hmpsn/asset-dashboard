@@ -56,6 +56,14 @@ export interface KeywordStrategyExplanation {
   opportunityScore?: number;
   rawEvidenceOnly?: boolean;
   nextAction: KeywordStrategyNextAction;
+  /**
+   * Plain-language reasons explaining the keyword's value score (Task 2.3).
+   * Populated server-side in buildKeywordStrategyUxPayload when the
+   * keyword-value-scoring flag is ON. Absent when the flag is OFF or the
+   * keyword has no value signal (signal gate fails).
+   * Safe for all tiers (no $ amounts).
+   */
+  valueReasons?: string[];
 }
 
 export interface KeywordStrategyRefreshSummary {

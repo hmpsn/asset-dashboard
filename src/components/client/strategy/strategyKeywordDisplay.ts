@@ -39,6 +39,13 @@ export interface StrategyKeywordTableRow extends PriorityKeywordItem {
   trendDirection?: 'rising' | 'declining' | 'stable';
   enrichmentStatus: 'enriched' | 'partial' | 'unenriched';
   explanation?: KeywordStrategyExplanation;
+  /**
+   * Plain-language reasons explaining why this keyword has value (Task 2.3).
+   * Populated server-side via explanation.valueReasons when the keyword-value-scoring
+   * flag is ON. Absent when the flag is OFF or no value signal exists.
+   * Safe for all tiers (no $ amounts).
+   */
+  valueReasons?: string[];
 }
 
 export const normalizeKeyword = (keyword: string) => keywordComparisonKey(keyword);

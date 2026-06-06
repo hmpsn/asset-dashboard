@@ -622,6 +622,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       trendDirection: contentGap?.trendDirection,
       enrichmentStatus,
       explanation,
+      // Task 2.3: server-computed value reasons from the explanation (flag-gated, never re-derived).
+      valueReasons: explanation?.valueReasons,
     };
   };
 
