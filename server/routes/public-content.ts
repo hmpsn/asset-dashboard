@@ -189,6 +189,9 @@ router.get('/api/public/seo-strategy/:workspaceId', async (req, res, next) => {
         competitorProof: g.competitorProof,
         questionKeywords: g.questionKeywords,
         opportunityScore: g.opportunityScore ?? computeOpportunityScore(g),
+        // kwv-real-cpc: cpc is intentionally score-only (not raw-exposed). The
+        // opportunityScore already reflects real CPC via commercialValue. Raw CPC
+        // is admin/scoring-internal only — do NOT add it to this public list.
         // SEO Generation Quality P2 — surface the honesty flag through the explicit
         // public whitelist so the client renderer can sort/label backfilled gaps.
         backfilled: g.backfilled,
