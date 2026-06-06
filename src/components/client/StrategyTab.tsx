@@ -835,6 +835,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
             drawerRow={drawerRow}
             drawerClosing={drawerClosing}
             drawerRef={drawerRef}
+            effectiveTier={effectiveTier}
             drawerEvidenceOpen={drawerEvidenceOpen}
             setDrawerEvidenceOpen={setDrawerEvidenceOpen}
             removingKeyword={removingKeyword}
