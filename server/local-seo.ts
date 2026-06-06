@@ -397,6 +397,10 @@ const stmts = createStmtCache(() => ({
     SELECT COUNT(*) AS count FROM local_visibility_snapshots
     WHERE workspace_id = ?
   `),
+  maxCapturedAtForWorkspace: db.prepare(`
+    SELECT MAX(captured_at) AS max_captured_at FROM local_visibility_snapshots
+    WHERE workspace_id = ?
+  `),
   latestSnapshots: db.prepare(`
     SELECT * FROM local_visibility_snapshots
     WHERE workspace_id = ?
@@ -2400,6 +2404,16 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
 export function countLocalVisibilitySnapshots(workspaceId: string): number {
   const row = stmts().countSnapshotsForWorkspace.get(workspaceId) as { count: number };
   return row.count;
+}
+
+/**
+ * Returns the ISO timestamp of the most recent local_visibility_snapshots row
+ * for the given workspace, or null when none exist.
+ * Cheap aggregate read — does NOT invoke any full-model or Evaluated builders.
+ */
+export function latestLocalSnapshotAt(workspaceId: string): string | null {
+  const row = stmts().maxCapturedAtForWorkspace.get(workspaceId) as { max_captured_at: string | null };
+  return row.max_captured_at ?? null;
 }
 
 export async function runLocationBackfillJob(jobId: string, workspaceId: string): Promise<void> {
