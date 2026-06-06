@@ -73,6 +73,7 @@ function renderStrategyDrawer(row: StrategyKeywordTableRow) {
       drawerRow={row}
       drawerClosing={false}
       drawerRef={drawerRef as React.RefObject<HTMLDivElement | null>}
+      effectiveTier="growth"
       drawerEvidenceOpen={true}
       setDrawerEvidenceOpen={vi.fn()}
       removingKeyword={null}

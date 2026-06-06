@@ -1171,6 +1171,7 @@ async function populateDraftRows(rows: Map<string, DraftRow>, bundle: CommandCen
     mergeMetrics(row, {
       volume: gap.volume,
       difficulty: gap.difficulty,
+      cpc: gap.cpc, // real content-gap cpc (#1103) → cpc-aware value score, same as enrichment/strategy
       intent: gap.intent,
     });
   }
@@ -1437,10 +1438,17 @@ function finalizeDraftRow(row: DraftRow, context: RowFinalizeContext): KeywordCo
     }
   }
   // Task 3.3: per-keyword realized $ via the single keywordDollarValue helper (one $
-  // definition — currentMonthly == roi.ts trafficValue). Admin-only path; computed
-  // whenever cpc is present (no flag gate — this is the same realized $ class as ROI).
-  // cpc sparsity floors to 0 → omit entirely so the drawer hides the block (no cpc).
-  if (finalized.metrics.cpc != null && finalized.metrics.cpc > 0) {
+  // definition — currentMonthly == roi.ts trafficValue). Admin-only path; no flag
+  // gate — same realized $ class as ROI. cpc sparsity floors to 0 → omit so the
+  // drawer hides the block (no cpc). Also require a realized-traffic signal so a
+  // content-gap-only row (which now carries cpc for scoring but has no GSC data)
+  // does not surface a misleading $0 block — matching the client, which computes $
+  // only for page_keywords (keyword-strategy-ux). Without a signal both figures are
+  // 0 anyway, so this only suppresses empty $ blocks.
+  const hasRealizedSignal = finalized.metrics.clicks != null
+    || finalized.metrics.impressions != null
+    || finalized.metrics.currentPosition != null;
+  if (finalized.metrics.cpc != null && finalized.metrics.cpc > 0 && hasRealizedSignal) {
     const money = keywordDollarValue({
       clicks: finalized.metrics.clicks,
       cpc: finalized.metrics.cpc,
@@ -2366,7 +2374,9 @@ function resolveBundleMetrics(
   for (const gap of bundle.contentGaps) {
     const row = ensure(gap.targetKeyword);
     if (!row) continue;
-    merge(row, { volume: gap.volume, difficulty: gap.difficulty, intent: gap.intent });
+    // cpc threaded here too so the candidate-stage metrics stay in lockstep with
+    // populateDraftRows (the row==candidate invariant) and the value score is cpc-aware.
+    merge(row, { volume: gap.volume, difficulty: gap.difficulty, cpc: gap.cpc, intent: gap.intent });
   }
   for (const gap of bundle.keywordGaps) {
     const row = ensure(gap.keyword);

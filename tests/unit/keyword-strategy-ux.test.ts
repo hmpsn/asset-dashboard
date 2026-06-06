@@ -228,3 +228,49 @@ describe('valueReasons on strategy explanations (Task 2.3)', () => {
     expect(pageExplanation!.valueReasons).toBeUndefined();
   });
 });
+
+describe('content-gap cpc is admin-only in reason text (public-leak fix)', () => {
+  it('client content-gap reasons stay cpc-aware but never print the raw "$X CPC"; page cpc (public) may', async () => {
+    setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, true);
+    try {
+      const payload = await buildKeywordStrategyUxPayload({
+        workspaceId,
+        strategy: strategy(),
+        pageMap: [page({ volume: 2400, difficulty: 40, cpc: 9, searchIntent: 'commercial' })],
+        contentGaps: [contentGap({ targetKeyword: 'porcelain veneers cost', intent: 'commercial', volume: 1000, difficulty: 40, cpc: 14 })],
+        keywordGaps: [],
+        surface: 'client',
+        includeWorkspaceIntelligence: false,
+      });
+      const gapExp = payload.explanations.find(e => e.normalizedKeyword === 'porcelain veneers cost');
+      const pageExp = payload.explanations.find(e => e.normalizedKeyword === 'cosmetic dentistry');
+      expect(gapExp!.valueReasons).toBeDefined();
+      expect(gapExp!.valueReasons!.some(r => /intent/i.test(r))).toBe(true);
+      // The raw content-gap cpc must NOT leak to the public payload via reason text.
+      expect(gapExp!.valueReasons!.some(r => /\$14/.test(r) || /CPC/i.test(r))).toBe(false);
+      // Page cpc IS public (in the public pageMap whitelist) — its reason may show it.
+      expect(pageExp!.valueReasons!.some(r => /\$9/.test(r))).toBe(true);
+    } finally {
+      setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, false);
+    }
+  });
+
+  it('admin content-gap reasons may include the raw "$X CPC"', async () => {
+    setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, true);
+    try {
+      const payload = await buildKeywordStrategyUxPayload({
+        workspaceId,
+        strategy: strategy(),
+        pageMap: [],
+        contentGaps: [contentGap({ targetKeyword: 'porcelain veneers cost', intent: 'commercial', volume: 1000, difficulty: 40, cpc: 14 })],
+        keywordGaps: [],
+        surface: 'admin',
+        includeWorkspaceIntelligence: false,
+      });
+      const gapExp = payload.explanations.find(e => e.normalizedKeyword === 'porcelain veneers cost');
+      expect(gapExp!.valueReasons!.some(r => /\$14/.test(r))).toBe(true);
+    } finally {
+      setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, false);
+    }
+  });
+});

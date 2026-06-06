@@ -6,6 +6,13 @@ export type Tier = 'free' | 'growth' | 'premium';
 
 const TIER_LEVEL: Record<Tier, number> = { free: 0, growth: 1, premium: 2 };
 
+/** True when `tier` meets or exceeds `required` — the same comparison TierGate
+ *  uses internally, exported for inline guards (e.g. gating a sub-section that
+ *  can't wrap in a full <TierGate> upsell card). */
+export function tierAtLeast(tier: Tier, required: Tier): boolean {
+  return TIER_LEVEL[tier] >= TIER_LEVEL[required];
+}
+
 const TIER_LABELS: Record<Tier, string> = {
   free: 'Free',
   growth: 'Growth',

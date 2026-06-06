@@ -68,13 +68,14 @@ function makeStrategyRow(money?: { currentMonthly?: number; upsideMonthly?: numb
   };
 }
 
-function renderStrategyDrawer(row: StrategyKeywordTableRow) {
+function renderStrategyDrawer(row: StrategyKeywordTableRow, effectiveTier: 'free' | 'growth' | 'premium' = 'growth') {
   const drawerRef = { current: null };
   return render(
     <StrategyKeywordDrawer
       drawerRow={row}
       drawerClosing={false}
       drawerRef={drawerRef as React.RefObject<HTMLDivElement | null>}
+      effectiveTier={effectiveTier}
       drawerEvidenceOpen={true}
       setDrawerEvidenceOpen={vi.fn()}
       removingKeyword={null}
@@ -155,6 +156,18 @@ describe('StrategyKeywordDrawer — per-keyword $ (Task 3.3)', () => {
   it('omits the Revenue potential section when there is no cpc / no $', () => {
     renderStrategyDrawer(makeStrategyRow(undefined));
     expect(screen.queryByTestId('revenue-potential-section')).toBeNull();
+  });
+
+  it('hides the Revenue potential block below Growth even when $ is present (explicit tier gate)', () => {
+    // $ data can be on the wire to all tiers; the drawer must gate the block itself
+    // (defense in depth), matching ROIDashboard's Growth+ gate.
+    renderStrategyDrawer(makeStrategyRow({ currentMonthly: 540, upsideMonthly: 120 }), 'free');
+    expect(screen.queryByTestId('revenue-potential-section')).toBeNull();
+  });
+
+  it('shows the Revenue potential block on premium (Growth+)', () => {
+    renderStrategyDrawer(makeStrategyRow({ currentMonthly: 540, upsideMonthly: 120 }), 'premium');
+    expect(screen.getByTestId('revenue-potential-section')).toBeInTheDocument();
   });
 });
 

@@ -18,7 +18,7 @@ export { ErrorState, NetworkError, DataError, PermissionError } from './ErrorSta
 export { NextStepsCard } from './NextStepsCard';
 export { ProgressIndicator } from './ProgressIndicator';
 export { TabBar } from './TabBar';
-export { TierGate, TierBadge, type Tier } from './TierGate';
+export { TierGate, TierBadge, tierAtLeast, type Tier } from './TierGate';
 export { AIContextIndicator } from './AIContextIndicator';
 export { ScannerReveal } from './ScannerReveal';
 export { Skeleton, StatCardSkeleton, SectionCardSkeleton, OverviewSkeleton, AnalyticsSkeleton } from './Skeleton';

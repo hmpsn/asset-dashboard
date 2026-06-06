@@ -1772,3 +1772,42 @@ describe('cpc join from page_keywords (Task 3.2)', () => {
     expect(bridgeRow!.metrics.cpc).toBe(7.5);
   });
 });
+
+describe('content-gap cpc on KCC rows (cross-surface consistency fix)', () => {
+  it('a content-gap-only row is cpc-aware in score/reasons (flag ON) but shows NO realized $ block', async () => {
+    // Real content-gap cpc (#1103) must reach the KCC value score the same way it
+    // reaches enrichment/strategy — otherwise the same keyword scores/sorts
+    // differently in the Hub vs the client. But content gaps have no GSC signal, so
+    // they must NOT surface a realized-$ block (the client computes $ for pages only).
+    replaceAllContentGaps(workspaceId, [{
+      topic: 'Invisalign cost guide',
+      targetKeyword: 'invisalign cost',
+      intent: 'commercial',
+      priority: 'high',
+      rationale: 'Patients compare aligner pricing before booking.',
+      volume: 1800,
+      difficulty: 38,
+      cpc: 12,
+    }]);
+
+    setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, true);
+    try {
+      const payload = await buildKeywordCommandCenterRows(workspaceId, {
+        filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+        pageSize: 100,
+      });
+      const row = payload!.rows.find(r => r.normalizedKeyword === 'invisalign cost');
+      expect(row).toBeDefined();
+      // cpc threaded into the row metrics → cpc-aware value score
+      expect(row!.metrics.cpc).toBe(12);
+      // Hub (admin) reasons are cpc-aware and may show the raw "$X CPC"
+      expect(row!.valueReasons).toBeDefined();
+      expect(row!.valueReasons!.some(r => /\$12/.test(r))).toBe(true);
+      // No realized-$ block: content gaps carry no clicks/impressions/rank
+      expect(row!.currentMonthly).toBeUndefined();
+      expect(row!.upsideMonthly).toBeUndefined();
+    } finally {
+      setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, false);
+    }
+  });
+});

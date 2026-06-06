@@ -1,7 +1,8 @@
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import { ChevronDown, X } from 'lucide-react';
-import { Badge, Button, IconButton } from '../../ui';
+import { Badge, Button, IconButton, tierAtLeast, type Tier } from '../../ui';
 import { positionColor } from '../../ui/constants';
+import { useScrollLock } from '../../../hooks/useScrollLock';
 import { kdFraming } from '../../../lib/kdFraming.js';
 import {
   ROLE_DISPLAY_LABELS,
@@ -21,6 +22,7 @@ interface StrategyKeywordDrawerProps {
   drawerRow: StrategyKeywordTableRow;
   drawerClosing: boolean;
   drawerRef: RefObject<HTMLDivElement | null>;
+  effectiveTier: Tier;
   drawerEvidenceOpen: boolean;
   setDrawerEvidenceOpen: Dispatch<SetStateAction<boolean>>;
   removingKeyword: string | null;
@@ -43,6 +45,7 @@ export function StrategyKeywordDrawer({
   drawerRow,
   drawerClosing,
   drawerRef,
+  effectiveTier,
   drawerEvidenceOpen,
   setDrawerEvidenceOpen,
   removingKeyword,
@@ -60,6 +63,14 @@ export function StrategyKeywordDrawer({
   const explanation = drawerRow.explanation;
   const primaryReason = explanation?.reasons[0] ?? drawerRow.rationale ?? drawerRow.opportunityDetail;
   const nextAction = explanation?.nextAction;
+  // Per-keyword realized $ is Growth+ (same class as ROIDashboard). The drawer's
+  // only trigger lives inside a Growth+ TierGate, but the $ data is on the public
+  // wire for all tiers — so gate the block explicitly here too (defense in depth).
+  const canViewRevenue = tierAtLeast(effectiveTier, 'growth');
+
+  // Lock background scroll while the drawer is mounted (it renders only when open)
+  // so the page can't be scrolled past its bounds behind the fixed backdrop.
+  useScrollLock(true, drawerRef);
 
   return (
     <>
@@ -101,7 +112,7 @@ export function StrategyKeywordDrawer({
           />
         </div>
 
-        <div className="flex-1 overflow-y-auto flex flex-col gap-5 px-4 py-4">
+        <div className="flex-1 overflow-y-auto overscroll-contain flex flex-col gap-5 px-4 py-4">
           {unenriched ? (
             <div className="rounded-[var(--radius-lg)] bg-[var(--surface-3)] px-3 py-3 flex items-start gap-2.5">
               <div className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-[var(--brand-text-muted)] mt-1.5 animate-pulse flex-shrink-0" />
@@ -168,7 +179,7 @@ export function StrategyKeywordDrawer({
               emerald = success/$ law). Absent when no cpc. currentMonthly may be 0
               (ranking but no clicks yet) while upside is positive — render whenever
               either figure is defined. */}
-          {(drawerRow.currentMonthly != null || drawerRow.upsideMonthly != null) && (
+          {canViewRevenue && (drawerRow.currentMonthly != null || drawerRow.upsideMonthly != null) && (
             <div data-testid="revenue-potential-section" className="rounded-[var(--radius-lg)] bg-emerald-500/5 border border-emerald-500/20 px-3 py-3">
               <div className="t-caption-sm font-medium text-emerald-400/90 uppercase tracking-wider mb-2">Revenue potential</div>
               <div className="grid grid-cols-2 gap-3">
