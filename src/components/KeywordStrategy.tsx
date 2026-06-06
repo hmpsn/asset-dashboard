@@ -11,7 +11,8 @@ import {
 import { Badge, StatCard, SectionCard, AIContextIndicator, TabBar, ErrorState, ProgressIndicator, NextStepsCard, LoadingState, Icon, PageHeader, Button, ClickableRow, IconButton, FormInput, FormTextarea, positionColor } from './ui';
 import { kdColor } from './page-intelligence/pageIntelligenceDisplay';
 import { KeywordStrategyGuide } from './strategy/KeywordStrategyGuide';
-import { useKeywordStrategy } from '../hooks/admin';
+import { useKeywordStrategy, useLocalSeoRefresh } from '../hooks/admin';
+import { RefreshOrderingPrompt } from './keyword-strategy/RefreshOrderingPrompt';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BacklinkProfile } from './strategy/BacklinkProfile';
 import { CompetitiveIntel } from './strategy/CompetitiveIntel';
@@ -101,6 +102,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const [settingsOpen, setSettingsOpen] = useState(true);
   const [showNextSteps, setShowNextSteps] = useState(false);
   const [strategyTab, setStrategyTab] = useState<'analysis' | 'guide'>('analysis');
+  const [refreshOrderingPromptOpen, setRefreshOrderingPromptOpen] = useState(false);
   const activeStrategyJob = findActiveJob({ type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, workspaceId });
   const completedStartedJob = lastStartedJobId ? jobs.find(job => job.id === lastStartedJobId) : undefined;
   const generating = startingStrategyJob || Boolean(activeStrategyJob);
@@ -110,6 +112,10 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const selectedSeoDataProvider = savedSeoDataProvider
     ?? defaultSeoDataProvider(providerList)
     ?? 'dataforseo';
+
+  // Local ↔ Strategy sync status — present when workspace posture is local or hybrid.
+  const localSync = keywordData?.strategy?.strategyUx?.localSync;
+  const refresh = useLocalSeoRefresh(workspaceId);
 
   // Tracked keywords via React Query — buttons reflect actual server state with keywordTrackingKey normalization.
   // The `rankTrackingKeywords` cache holds the canonical TrackedKeyword[] array (the shape RankTracker
@@ -184,7 +190,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     }
   }, [completedStartedJob, queryClient, workspaceId]);
 
-  const generateStrategy = async (strategyMode: 'full' | 'incremental' = 'full') => {
+  const runStartJob = async (strategyMode: 'full' | 'incremental' = 'full') => {
     if (generating) return;
     setStartingStrategyJob(true);
     setShowNextSteps(false);
@@ -211,6 +217,16 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     } finally {
       setStartingStrategyJob(false);
     }
+  };
+
+  const generateStrategy = async (strategyMode: 'full' | 'incremental' = 'full') => {
+    // When local data needs a refresh, open the ordering prompt instead of immediately running.
+    // Incremental runs bypass the prompt (user already chose a mode explicitly).
+    if (strategyMode === 'full' && localSync?.localNeedsRefresh) {
+      setRefreshOrderingPromptOpen(true);
+      return;
+    }
+    await runStartJob(strategyMode);
   };
 
   const trackKeyword = useCallback(async (kw: string) => {
@@ -318,6 +334,25 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                 Update changed pages
               </Button>
             )}
+            {/* Full refresh — shown only for local/hybrid workspaces (applies=true).
+                Amber ring signals the recommended state when local data needs refresh. */}
+            {localSync?.applies && (
+              <Button
+                onClick={() => refresh.mutate({ thenRegenerateStrategy: true })}
+                disabled={generating || refresh.isPending}
+                variant="secondary"
+                size="sm"
+                className={[
+                  'rounded-[var(--radius-lg)] t-caption',
+                  localSync.localNeedsRefresh
+                    ? 'ring-1 ring-amber-500/60'
+                    : '',
+                ].filter(Boolean).join(' ')}
+              >
+                <Icon as={RefreshCw} size="sm" />
+                Full refresh
+              </Button>
+            )}
             <Button
               onClick={() => generateStrategy('full')}
               disabled={generating}
@@ -335,6 +370,24 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           </div>
         }
       />
+
+      {/* Refresh ordering prompt — opens when Generate is clicked and local data needs refresh */}
+      {localSync?.applies && localSync.localNeedsRefresh && (
+        <RefreshOrderingPrompt
+          open={refreshOrderingPromptOpen}
+          reason={localSync.localNeedsRefreshReason ?? 'stale'}
+          lastLocalRefreshAt={localSync.lastLocalRefreshAt}
+          onFullRefresh={() => {
+            refresh.mutate({ thenRegenerateStrategy: true });
+            setRefreshOrderingPromptOpen(false);
+          }}
+          onGenerateAnyway={() => {
+            setRefreshOrderingPromptOpen(false);
+            void runStartJob('full');
+          }}
+          onCancel={() => setRefreshOrderingPromptOpen(false)}
+        />
+      )}
 
       {!isRealStrategy && !generating && (
         <AIContextIndicator workspaceId={workspaceId} feature="strategy" />
