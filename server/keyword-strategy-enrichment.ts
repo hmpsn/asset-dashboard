@@ -441,6 +441,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
       if (domainHit) {
         cg.volume = domainHit.volume;
         cg.difficulty = domainHit.difficulty;
+        cg.cpc = domainHit.cpc;
         continue;
       }
       missingCgKws.push(cg.targetKeyword);
@@ -457,6 +458,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
             if (m && !isSuspiciousPlannerGroupedVolume(m.keyword, m.volume)) {
               cg.volume = m.volume;
               cg.difficulty = m.difficulty;
+              cg.cpc = m.cpc;
             }
           }
         }
@@ -596,7 +598,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
       // computeOpportunityScore in that case so a gap is never silently dropped.
       const base: number | undefined = valueScoringOn && scoringCtx != null
         ? (computeKeywordValueScore(
-            { keyword: cg.targetKeyword, volume: cg.volume, difficulty: cg.difficulty, cpc: undefined, intent: cg.intent },
+            { keyword: cg.targetKeyword, volume: cg.volume, difficulty: cg.difficulty, cpc: cg.cpc, intent: cg.intent },
             scoringCtx,
           ) ?? computeOpportunityScore(cg))
         : computeOpportunityScore(cg);

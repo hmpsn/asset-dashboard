@@ -78,6 +78,8 @@ export interface StrategyContentGap {
   serpTargeting?: string[];
   questionKeywords?: string[];
   opportunityScore?: number;
+  /** Cost-per-click from SEO provider — feeds commercialValue in the value scorer. */
+  cpc?: number;
   /** SEO Generation Quality P2 — re-admitted by the deterministic backfill floor. */
   backfilled?: boolean;
   /**
