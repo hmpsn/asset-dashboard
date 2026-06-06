@@ -16,7 +16,7 @@ import {
   listLocalSeoMarkets,
   type LocalSeoKeywordCandidate,
 } from './local-seo.js';
-import { computeKeywordValueScore, type ScoringContext } from './scoring/keyword-value-score.js';
+import { computeKeywordValueScore, computeKeywordValueComponents, keywordValueReasons, type ScoringContext } from './scoring/keyword-value-score.js';
 import { createLogger } from './logger.js';
 import { listPageKeywords, listPageKeywordsLite } from './page-keywords.js';
 import { computeOpportunityScore, isSuspiciousPlannerGroupedVolume } from './keyword-strategy-helpers.js';
@@ -1415,18 +1415,24 @@ function finalizeDraftRow(row: DraftRow, context: RowFinalizeContext): KeywordCo
   // per-request ScoringContext as the candidate merge-back — so candidate and row
   // scores are identical by construction. Stored on the WeakMap (never serialized).
   if (context.valueScoring?.on && context.valueScoring.ctx) {
-    const score = computeKeywordValueScore(
-      {
-        keyword: finalized.keyword,
-        volume: finalized.metrics.volume,
-        impressions: finalized.metrics.impressions,
-        difficulty: finalized.metrics.difficulty,
-        cpc: finalized.metrics.cpc,
-        intent: finalized.metrics.intent,
-      },
-      context.valueScoring.ctx,
-    );
+    const input = {
+      keyword: finalized.keyword,
+      volume: finalized.metrics.volume,
+      impressions: finalized.metrics.impressions,
+      difficulty: finalized.metrics.difficulty,
+      cpc: finalized.metrics.cpc,
+      intent: finalized.metrics.intent,
+    };
+    const { score, components } = computeKeywordValueComponents(input, context.valueScoring.ctx);
     if (score !== undefined) rowValueScore.set(finalized, score);
+    // Task 2.2: populate valueReasons from components (admin-only, flag-gated).
+    if (components !== undefined) {
+      finalized.valueReasons = keywordValueReasons(components, {
+        cpc: finalized.metrics.cpc,
+        volume: finalized.metrics.volume,
+        difficulty: finalized.metrics.difficulty,
+      });
+    }
   }
   return finalized;
 }

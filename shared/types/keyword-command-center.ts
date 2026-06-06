@@ -227,6 +227,13 @@ export interface KeywordCommandCenterRow {
   }>;
   /** True if this keyword has lost GSC visibility for 14+ days (quality-gated). */
   isLostVisibility?: boolean;
+  /**
+   * Plain-language reasons explaining the keyword's value score (admin-only, Task 2.2).
+   * Built in finalizeDraftRow from computeKeywordValueComponents + keywordValueReasons
+   * when the keyword-value-scoring flag is ON. Absent when the flag is OFF or the
+   * keyword has no value signal (signal gate fails).
+   */
+  valueReasons?: string[];
 }
 
 export interface KeywordCommandCenterCounts {

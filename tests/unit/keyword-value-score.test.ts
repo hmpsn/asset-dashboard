@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   toValueIntent, deriveValueIntent, valueIntentWeight, isLocalKeyword,
   localRelevanceMultiplier, computeKeywordValueScore, computeKeywordValueComponents,
+  keywordValueReasons,
   type ScoringContext,
 } from '../../server/scoring/keyword-value-score.js';
 
@@ -147,5 +148,46 @@ describe('computeKeywordValueComponents (Task 2.1)', () => {
     );
     // comparison → commercial via toValueIntent
     expect(components?.intent).toBe('commercial');
+  });
+});
+
+describe('keywordValueReasons (Task 2.1)', () => {
+  it('builds plain-language reasons from components + raw', () => {
+    const reasons = keywordValueReasons(
+      { commercialValue: 0.5, demand: 0.8, winnability: 0.76, localMultiplier: 1.5, intent: 'commercial' },
+      { cpc: 9, volume: 2400, difficulty: 24 },
+    );
+    expect(reasons.some(r => /commercial intent/i.test(r) && r.includes('$9'))).toBe(true);
+    expect(reasons.some(r => /KD 24/.test(r))).toBe(true);
+    expect(reasons.some(r => /2,?400/.test(r))).toBe(true);
+    expect(reasons.some(r => /local/i.test(r) && /1\.5/.test(r))).toBe(true);
+  });
+  it('omits the local reason when localMultiplier <= 1', () => {
+    const reasons = keywordValueReasons({ commercialValue: 0.5, demand: 0.5, winnability: 0.7, localMultiplier: 1.0, intent: 'transactional' }, { difficulty: 30 });
+    expect(reasons.some(r => /local/i.test(r))).toBe(false);
+  });
+  it('falls back to "<Intent> intent" with no cpc', () => {
+    const reasons = keywordValueReasons({ commercialValue: 0.5, demand: 0.5, winnability: 0.7, localMultiplier: 1.0, intent: 'transactional' }, {});
+    expect(reasons.some(r => /transactional intent/i.test(r) && !r.includes('$'))).toBe(true);
+  });
+  // Review fixes:
+  it('does NOT emit a demand reason when volume is 0 (provider-coerced absent, like the score)', () => {
+    const reasons = keywordValueReasons({ commercialValue: 0.5, demand: 0, winnability: 0.7, localMultiplier: 1.0, intent: 'commercial' }, { volume: 0, difficulty: 30 });
+    expect(reasons.some(r => /demand/i.test(r))).toBe(false);
+    expect(reasons.some(r => /0\/mo/.test(r))).toBe(false);
+  });
+  it('bands the winnability label off the computed winnability (Hard for KD 90, Winnable for KD 24)', () => {
+    const hard = keywordValueReasons({ commercialValue: 0.5, demand: 0.5, winnability: 0.10, localMultiplier: 1.0, intent: 'commercial' }, { difficulty: 90 });
+    expect(hard.some(r => /^Hard · KD 90/.test(r))).toBe(true);
+    expect(hard.some(r => /Winnable/.test(r))).toBe(false);
+    const easy = keywordValueReasons({ commercialValue: 0.5, demand: 0.5, winnability: 0.76, localMultiplier: 1.0, intent: 'commercial' }, { difficulty: 24 });
+    expect(easy.some(r => /^Winnable · KD 24/.test(r))).toBe(true);
+  });
+  it('rounds a fractional CPC cleanly ($12.35, not $12.347) and keeps integers whole ($9)', () => {
+    const frac = keywordValueReasons({ commercialValue: 0.5, demand: 0.5, winnability: 0.7, localMultiplier: 1.0, intent: 'commercial' }, { cpc: 12.347 });
+    expect(frac.some(r => r.includes('$12.35 CPC'))).toBe(true);
+    expect(frac.some(r => /12\.347/.test(r))).toBe(false);
+    const whole = keywordValueReasons({ commercialValue: 0.5, demand: 0.5, winnability: 0.7, localMultiplier: 1.0, intent: 'commercial' }, { cpc: 9 });
+    expect(whole.some(r => r.includes('$9 CPC'))).toBe(true);
   });
 });

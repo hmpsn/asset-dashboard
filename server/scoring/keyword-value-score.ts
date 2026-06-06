@@ -231,6 +231,65 @@ export function computeKeywordValueComponents(
   };
 }
 
+// ── Volume demand bands for plain-language reasons ───────────────────────────
+
+const DEMAND_HIGH  = 1000;
+const DEMAND_MODEST = 100;
+
+/**
+ * Returns plain-language reason strings from Layer-1 value components + raw signals.
+ * Ordered by contribution: intent → winnability → demand → local.
+ *
+ * - intent: cpc>0 → "Commercial intent · $9 CPC"; else "<Capitalized-intent> intent"
+ * - winnability: raw.difficulty present → "Winnable · KD 24"; else omitted
+ * - demand: raw.volume present → banded label + formatted volume/mo; else omitted
+ * - local: ONLY when components.localMultiplier > 1 → "Local boost ×1.5"
+ */
+export function keywordValueReasons(
+  components: KeywordValueComponents,
+  raw: { cpc?: number; volume?: number; difficulty?: number },
+): string[] {
+  const reasons: string[] = [];
+
+  // 1. Intent reason
+  const intentLabel = components.intent.charAt(0).toUpperCase() + components.intent.slice(1);
+  if (raw.cpc !== undefined && raw.cpc > 0) {
+    // Clean money formatting: "$9" for 9, "$12.35" for 12.347 (no fractional dust).
+    const cpcStr = Number.isInteger(raw.cpc) ? `${raw.cpc}` : raw.cpc.toFixed(2);
+    reasons.push(`${intentLabel} intent · $${cpcStr} CPC`);
+  } else {
+    reasons.push(`${intentLabel} intent`);
+  }
+
+  // 2. Winnability reason — banded off the COMPUTED winnability so the label can't say
+  //    "Winnable" for a KD-90 keyword. winnability = 1 − difficulty/100.
+  if (raw.difficulty != null) {
+    const winLabel =
+      components.winnability >= 0.6 ? 'Winnable' :
+      components.winnability >= 0.3 ? 'Competitive' :
+      'Hard';
+    reasons.push(`${winLabel} · KD ${raw.difficulty}`);
+  }
+
+  // 3. Demand reason — only when volume is REAL. volume:0 is provider-coerced "absent"
+  //    (the score itself treats 0 as absent, §5 :213); never render "Low demand · 0/mo".
+  if (raw.volume != null && raw.volume > 0) {
+    const demandLabel =
+      raw.volume >= DEMAND_HIGH ? 'Strong demand' :
+      raw.volume >= DEMAND_MODEST ? 'Modest demand' :
+      'Low demand';
+    const formatted = raw.volume.toLocaleString('en-US');
+    reasons.push(`${demandLabel} · ${formatted}/mo`);
+  }
+
+  // 4. Local boost (only when multiplier > 1)
+  if (components.localMultiplier > 1) {
+    reasons.push(`Local boost ×${components.localMultiplier}`);
+  }
+
+  return reasons;
+}
+
 /**
  * Thin wrapper: returns only the score from computeKeywordValueComponents.
  * The 4 existing scalar callers are unaffected — they receive the same number | undefined.
