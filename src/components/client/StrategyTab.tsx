@@ -616,6 +616,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       searchIntent: page?.searchIntent ?? contentGap?.intent,
       impressions,
       clicks: page?.clicks,
+      cpc: page?.cpc, // Task 3.2: realized-$ input joined from page_keywords
       metricsSource,
       contextSources,
       rationale: contentGap?.rationale,

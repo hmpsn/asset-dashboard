@@ -169,6 +169,11 @@ router.get('/api/public/seo-strategy/:workspaceId', async (req, res, next) => {
         clicks: p.clicks,
         volume: p.volume,
         difficulty: p.difficulty,
+        // Task 3.2: cpc is the realized-$ input for the per-keyword "Revenue
+        // potential" block on the (Growth+ gated) strategy drawer. It is the same
+        // clicks×cpc realized value ROIDashboard already shows Growth+ clients —
+        // exposed alongside the other raw pageMap metrics (clicks/impressions/volume).
+        cpc: p.cpc,
         metricsSource: p.metricsSource,
         validated: p.validated,
         gscKeywords: p.gscKeywords || [],

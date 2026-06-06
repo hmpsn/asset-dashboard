@@ -1153,6 +1153,7 @@ async function populateDraftRows(rows: Map<string, DraftRow>, bundle: CommandCen
       mergeMetrics(row, {
         volume: page.volume,
         difficulty: page.difficulty,
+        cpc: page.cpc, // Task 3.2: join cpc from page_keywords (the realized-$ input)
         intent: page.searchIntent, // NOTE field name: pageMap carries intent as `searchIntent`
       });
     }
@@ -2341,7 +2342,9 @@ function resolveBundleMetrics(
     for (const keyword of [page.primaryKeyword, ...(page.secondaryKeywords ?? [])].filter(Boolean)) {
       const row = ensure(keyword);
       if (!row) continue;
-      merge(row, { volume: page.volume, difficulty: page.difficulty, intent: page.searchIntent });
+      // Task 3.2: cpc joined here too so the candidate-stage metrics stay in
+      // lockstep with populateDraftRows (the documented row==candidate invariant).
+      merge(row, { volume: page.volume, difficulty: page.difficulty, cpc: page.cpc, intent: page.searchIntent });
     }
   }
   for (const gap of bundle.contentGaps) {

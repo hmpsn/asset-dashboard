@@ -33,6 +33,8 @@ export interface StrategyKeywordTableRow extends PriorityKeywordItem {
   searchIntent?: string;
   impressions?: number;
   clicks?: number;
+  /** Cost-per-click from page_keywords (Task 3.2). The realized-$ input. Absent when unknown. */
+  cpc?: number;
   metricsSource?: string;
   contextSources: string[];
   rationale?: string;

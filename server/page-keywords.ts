@@ -74,6 +74,7 @@ interface PageKeywordLiteRow {
   clicks: number | null;
   volume: number | null;
   difficulty: number | null;
+  cpc: number | null;
 }
 
 interface PageKeywordScoreHistoryRow {
@@ -256,7 +257,8 @@ const stmts = createStmtCache(() => ({
       impressions,
       clicks,
       volume,
-      difficulty
+      difficulty,
+      cpc
     FROM page_keywords
     WHERE workspace_id = ?
   `),
@@ -471,6 +473,8 @@ function rowToLiteModel(row: PageKeywordLiteRow): PageKeywordMap {
   if (row.clicks != null) model.clicks = row.clicks;
   if (row.volume != null) model.volume = row.volume;
   if (row.difficulty != null) model.difficulty = row.difficulty;
+  // Task 3.2: cpc is the realized-$ input the Keyword Hub + strategy drawer need.
+  if (row.cpc != null) model.cpc = row.cpc;
   return model;
 }
 
