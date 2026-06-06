@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setBroadcast } from '../../server/broadcast.js';
+import { setWorkspaceFlagOverride } from '../../server/feature-flags.js';
 import db from '../../server/db/index.js';
 import {
   applyKeywordCommandCenterAction,
@@ -1684,5 +1685,66 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
     for (const row of payload!.rows) {
       expect(row.localSeoState?.lifecycle).toBe(KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CANDIDATE);
     }
+  });
+});
+
+describe('valueReasons on KCC rows (Task 2.2)', () => {
+  it('a Hub row carries valueReasons (non-empty) for a scored keyword when flag is ON', async () => {
+    // Seed a page keyword with enough signal to trigger value scoring
+    upsertPageKeyword(workspaceId, {
+      pagePath: '/services/dental-implants',
+      pageTitle: 'Dental Implants',
+      primaryKeyword: 'dental implants',
+      secondaryKeywords: [],
+      searchIntent: 'commercial',
+      volume: 2400,
+      difficulty: 40,
+      cpc: 9,
+    });
+
+    // Enable the value scoring flag for this workspace
+    setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, true);
+
+    try {
+      const payload = await buildKeywordCommandCenterRows(workspaceId, {
+        filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+        pageSize: 100,
+      });
+      expect(payload).not.toBeNull();
+      const dentalRow = payload!.rows.find(r => r.normalizedKeyword === 'dental implants');
+      expect(dentalRow).toBeDefined();
+      // valueReasons must be present and non-empty when flag is ON
+      expect(dentalRow!.valueReasons).toBeDefined();
+      expect(dentalRow!.valueReasons!.length).toBeGreaterThan(0);
+      // Must include an intent reason
+      expect(dentalRow!.valueReasons!.some(r => /intent/i.test(r))).toBe(true);
+    } finally {
+      setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, false);
+    }
+  });
+
+  it('valueReasons is absent when the flag is OFF', async () => {
+    upsertPageKeyword(workspaceId, {
+      pagePath: '/services/dental-cleaning',
+      pageTitle: 'Dental Cleaning',
+      primaryKeyword: 'dental cleaning',
+      secondaryKeywords: [],
+      searchIntent: 'commercial',
+      volume: 1200,
+      difficulty: 30,
+      cpc: 5,
+    });
+
+    setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, false);
+
+    const payload = await buildKeywordCommandCenterRows(workspaceId, {
+      filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+      pageSize: 100,
+    });
+    expect(payload).not.toBeNull();
+    const cleaningRow = payload!.rows.find(r => r.normalizedKeyword === 'dental cleaning');
+    expect(cleaningRow).toBeDefined();
+    // valueReasons must be absent when flag is OFF
+    expect(cleaningRow!.valueReasons).toBeUndefined();
   });
 });
