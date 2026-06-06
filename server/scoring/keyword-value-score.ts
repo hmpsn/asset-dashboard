@@ -252,21 +252,28 @@ export function keywordValueReasons(
   const reasons: string[] = [];
 
   // 1. Intent reason
+  const intentLabel = components.intent.charAt(0).toUpperCase() + components.intent.slice(1);
   if (raw.cpc !== undefined && raw.cpc > 0) {
-    const intentLabel = components.intent.charAt(0).toUpperCase() + components.intent.slice(1);
-    reasons.push(`${intentLabel} intent · $${raw.cpc} CPC`);
+    // Clean money formatting: "$9" for 9, "$12.35" for 12.347 (no fractional dust).
+    const cpcStr = Number.isInteger(raw.cpc) ? `${raw.cpc}` : raw.cpc.toFixed(2);
+    reasons.push(`${intentLabel} intent · $${cpcStr} CPC`);
   } else {
-    const intentLabel = components.intent.charAt(0).toUpperCase() + components.intent.slice(1);
     reasons.push(`${intentLabel} intent`);
   }
 
-  // 2. Winnability reason (only when difficulty is present)
-  if (raw.difficulty !== undefined && raw.difficulty !== null) {
-    reasons.push(`Winnable · KD ${raw.difficulty}`);
+  // 2. Winnability reason — banded off the COMPUTED winnability so the label can't say
+  //    "Winnable" for a KD-90 keyword. winnability = 1 − difficulty/100.
+  if (raw.difficulty != null) {
+    const winLabel =
+      components.winnability >= 0.6 ? 'Winnable' :
+      components.winnability >= 0.3 ? 'Competitive' :
+      'Hard';
+    reasons.push(`${winLabel} · KD ${raw.difficulty}`);
   }
 
-  // 3. Demand reason (only when volume is present)
-  if (raw.volume !== undefined && raw.volume !== null) {
+  // 3. Demand reason — only when volume is REAL. volume:0 is provider-coerced "absent"
+  //    (the score itself treats 0 as absent, §5 :213); never render "Low demand · 0/mo".
+  if (raw.volume != null && raw.volume > 0) {
     const demandLabel =
       raw.volume >= DEMAND_HIGH ? 'Strong demand' :
       raw.volume >= DEMAND_MODEST ? 'Modest demand' :

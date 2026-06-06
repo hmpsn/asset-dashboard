@@ -16,6 +16,7 @@ import {
   type ScoringContext,
 } from './scoring/keyword-value-score.js';
 import { getLocalSeoPosture, listLocalSeoMarkets } from './local-seo.js';
+import { getWorkspace } from './workspaces.js';
 import {
   TRACKED_KEYWORD_SOURCE,
   TRACKED_KEYWORD_STATUS,
@@ -395,7 +396,16 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
     try {
       const posture = getLocalSeoPosture(options.workspaceId);
       const markets = listLocalSeoMarkets(options.workspaceId);
-      valueScoringCtx = { posture: posture ?? 'unknown', markets };
+      // Capture business-profile city/state (lowercased) — MUST match buildValueScoringConfig
+      // in keyword-command-center.ts, or isLocalKeyword (hence "Local boost") drifts between
+      // the admin Hub drawer and this client strategy path for the same keyword.
+      const ws = getWorkspace(options.workspaceId);
+      valueScoringCtx = {
+        posture: posture ?? 'unknown',
+        markets,
+        city: ws?.businessProfile?.address?.city?.toLowerCase(),
+        state: ws?.businessProfile?.address?.state?.toLowerCase(),
+      };
     } catch (err) {
       // catch-ok: value reasons are informational; degrade gracefully on posture/market read failure.
       log.debug({ err, workspaceId: options.workspaceId }, 'Value scoring context unavailable — skipping valueReasons');
