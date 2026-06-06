@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **479 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **480 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 480. Legible + dollarized keyword value — plain-language reasons + per-keyword $/mo + portfolio "Revenue at stake" (PR 1–3)
+
+**What it does:** Makes the consolidated keyword value score legible and dollarized on the surfaces clients and the agency already use, with ONE reasons definition and ONE dollar definition. PR 1 (`kwv-real-cpc`) adds a `cpc` column to `content_gaps` (migration + mapper + enrichment populate) so content-gap value scores reflect real CPC instead of the `CPC_UNKNOWN` 0.5 proxy. PR 2 (`kwv-value-breakdown`) adds the `keywordValueReasons` helper (server-computed plain-language reasons from the Layer-1 components — "Commercial intent · $9 CPC", "Winnable · KD 24", "Strong demand · 2,400/mo", "Local boost ×1.5"), serialized as `valueReasons` onto both the admin KCC row and the client strategy explanation, rendered in both keyword drawers (flag-gated on `keyword-value-scoring`, blue = data). PR 3 (`kwv-dollar-value`) adds the single `keywordDollarValue` helper (`server/scoring/keyword-value-money.ts`): `currentMonthly = clicks × cpc` (identical to `roi.ts` `trafficValue` — enforced by a cross-module equivalence test) and `upsideMonthly = impressions × CTR-uplift × cpc` (realized $ only, no intent weight). `cpc` is joined from `page_keywords` onto both keyword builders; a per-keyword "Revenue potential" $ block renders on both drawers (emerald = success/$), and a portfolio "Revenue at stake" (Σ `upsideMonthly`) is a 4th hero `StatCard` on `ROIDashboard`, computed in `computeROI` by reusing the same helper.
+
+**Agency value:** One reasons formula and one dollar formula across every surface — the Hub, the client strategy drawer, and the ROI dashboard can never show a contradictory "why" or a contradictory "$" for the same keyword. The realized-$ equivalence (`currentMonthly == roi.ts trafficValue`) is locked by test, so there is no second dollar engine to drift. Real CPC on content gaps makes the value score honest before it propagates.
+
+**Client value:** Clients see WHY a keyword is worth pursuing in plain language (not a bare 0–100), the realized $/mo a keyword earns today, the upside $/mo of moving it up, and a portfolio headline of the monthly revenue at stake across their below-page-1 keywords — all behind the existing Growth+ tier gate, the same class of realized $ ROIDashboard already shows.
+
+**Mutual:** Pure reuse — no new endpoint, no new client keyword tab, no second dollar engine. Rides the existing `/api/public/roi` query + the keyword-strategy / KCC serialization. The dollar helper floors to 0 when CPC is unknown (drawers hide the block), so CPC sparsity degrades gracefully.
+
+**Files:** `server/db/migrations/*-content-gap-cpc.sql`, `server/content-gaps.ts`, `server/keyword-strategy-enrichment.ts` (PR 1); `server/scoring/keyword-value-score.ts` (`keywordValueReasons`), `server/keyword-command-center.ts`, `server/keyword-strategy-ux.ts`, `src/components/client/strategy/StrategyKeywordDrawer.tsx`, `src/components/keyword-command-center/KeywordDetailDrawer.tsx` (PR 2); `server/scoring/keyword-value-money.ts` (`keywordDollarValue`), `server/roi.ts` + `shared/types/roi.ts` (`revenueAtStake`), `server/page-keywords.ts` (lite-reader cpc), `src/components/client/ROIDashboard.tsx`, both drawers (PR 3). Tests: `tests/unit/keyword-value-money.test.ts` (incl. the equivalence test), `tests/component/keyword-dollar-value-drawer.test.tsx`, `tests/integration/roi-attribution.test.ts` (`revenueAtStake`), `tests/integration/keyword-strategy-assembler-public-read.test.ts` (cpc + serialized $).
 
 ---
 
