@@ -39,6 +39,9 @@ describe('useScrollLock', () => {
     // body restored to its prior value, not blindly cleared
     expect(document.body.style.overflow).toBe('scroll');
     expect(document.documentElement.style.overflow).toBe('');
+    // scrollbar-compensation padding is also unwound (no leftover inline padding)
+    expect(document.body.style.paddingRight).toBe('');
+    expect(main.style.paddingRight).toBe('');
   });
 
   it('does nothing while inactive', () => {

@@ -25,12 +25,25 @@ export function useScrollLock(active: boolean, ref?: RefObject<HTMLElement | nul
     const main = ref?.current?.closest('main');
     if (main instanceof HTMLElement && !targets.includes(main)) targets.push(main);
 
-    const previous = targets.map(el => el.style.overflow);
-    for (const el of targets) el.style.overflow = 'hidden';
+    const previous = targets.map(el => ({ overflow: el.style.overflow, paddingRight: el.style.paddingRight }));
+    for (const el of targets) {
+      // Reserve the removed scrollbar's width as padding so the content behind
+      // the drawer doesn't jump sideways when its scrollbar disappears. Measured
+      // per element (only the actual scroll container shows a scrollbar), and a
+      // no-op where there's none. The custom 6px webkit scrollbar (index.css)
+      // makes this visible even on macOS, not just classic-scrollbar platforms.
+      const scrollbarWidth = el.offsetWidth - el.clientWidth;
+      el.style.overflow = 'hidden';
+      if (scrollbarWidth > 0) {
+        const current = parseFloat(getComputedStyle(el).paddingRight) || 0;
+        el.style.paddingRight = `${current + scrollbarWidth}px`;
+      }
+    }
 
     return () => {
       targets.forEach((el, index) => {
-        el.style.overflow = previous[index];
+        el.style.overflow = previous[index].overflow;
+        el.style.paddingRight = previous[index].paddingRight;
       });
     };
   }, [active, ref]);
