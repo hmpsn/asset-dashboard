@@ -8,6 +8,7 @@ import { get } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
 import { positionColor } from '../ui/constants';
 import { formatDate } from '../../utils/formatDates';
+import { fmtMoney } from '../../utils/formatNumbers';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import type { KeywordCommandCenterNextAction, KeywordCommandCenterRow } from '../../../shared/types/keyword-command-center';
 import { LocalSeoVisibilityBadge } from '../local-seo/LocalSeoVisibilityPanel';
@@ -295,6 +296,28 @@ export function KeywordDetailDrawer({
                   <p className="t-caption font-semibold text-blue-400 tabular-nums">{percent(row.metrics.ctr)}</p>
                 </KeywordDetailPanel>
               </div>
+
+              {/* Task 3.3: per-keyword realized $ (server-computed via the single
+                  keywordDollarValue helper; emerald = success/$ law). Absent when no cpc. */}
+              {(row.currentMonthly != null || row.upsideMonthly != null) && (
+                <div data-testid="revenue-potential-section">
+                  <p className="t-label text-[var(--brand-text-muted)] mb-2">Revenue Potential</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {row.currentMonthly != null && (
+                      <KeywordDetailPanel>
+                        <p className="t-caption-sm text-[var(--brand-text-muted)]">Value today</p>
+                        <p className="t-caption font-semibold text-emerald-400 tabular-nums">{fmtMoney(row.currentMonthly)}/mo</p>
+                      </KeywordDetailPanel>
+                    )}
+                    {row.upsideMonthly != null && row.upsideMonthly > 0 && (
+                      <KeywordDetailPanel>
+                        <p className="t-caption-sm text-[var(--brand-text-muted)]">Upside if it moves up</p>
+                        <p className="t-caption font-semibold text-emerald-400 tabular-nums">+{fmtMoney(row.upsideMonthly)}/mo</p>
+                      </KeywordDetailPanel>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <p className="t-label text-[var(--brand-text-muted)] mb-2">Where It Came From</p>

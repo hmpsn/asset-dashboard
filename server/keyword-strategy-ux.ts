@@ -15,6 +15,7 @@ import {
   keywordValueReasons,
   type ScoringContext,
 } from './scoring/keyword-value-score.js';
+import { keywordDollarValue } from './scoring/keyword-value-money.js';
 import { getLocalSeoPosture, listLocalSeoMarkets } from './local-seo.js';
 import { getWorkspace } from './workspaces.js';
 import {
@@ -234,6 +235,27 @@ function buildExplanation(input: {
         : 'Included in the strategy set that guides tracking and recommendations.';
 
   const reasons = uniq([...input.businessReasons, fallbackReason]).slice(0, 4);
+
+  // Task 3.3: per-keyword realized $ via the single keywordDollarValue helper (the
+  // ONE $ definition — currentMonthly == roi.ts trafficValue). Only the page_keyword
+  // path carries realized clicks/cpc/position/impressions, so $ is computed there.
+  // cpc sparsity floors to 0 → omit the $ entirely so the drawer hides it (no cpc).
+  // ctrCurve is left null (industry fallback via ctrAt) to keep this latency-sensitive
+  // public read off a GSC-history rebuild.
+  let currentMonthly: number | undefined;
+  let upsideMonthly: number | undefined;
+  if (input.page && input.page.cpc != null && input.page.cpc > 0) {
+    const money = keywordDollarValue({
+      clicks: input.page.clicks,
+      cpc: input.page.cpc,
+      currentPosition: input.page.currentPosition,
+      impressions: input.page.impressions,
+      ctrCurve: null,
+    });
+    currentMonthly = money.currentMonthly;
+    upsideMonthly = money.upsideMonthly;
+  }
+
   return {
     keyword: input.keyword,
     normalizedKeyword,
@@ -261,6 +283,8 @@ function buildExplanation(input: {
     rawEvidenceOnly: input.rawEvidenceOnly,
     nextAction: nextActionFor(input.role, input.keyword, input.page, input.tracked),
     valueReasons: input.valueReasons,
+    currentMonthly,
+    upsideMonthly,
   };
 }
 

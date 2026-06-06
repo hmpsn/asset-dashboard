@@ -154,5 +154,15 @@ describe('GET /api/public/seo-strategy/:id — assembler byte-identity gate', ()
 
     // strategyUx is a route-layer derived projection — present but excluded from the byte snapshot.
     expect(body.strategyUx).toBeTruthy();
+
+    // Task 3.3: the page_keyword explanation carries server-computed realized $ from
+    // the single keywordDollarValue helper (currentMonthly == clicks×cpc == roi.ts).
+    const ux = body.strategyUx as { explanations: Array<{ normalizedKeyword: string; currentMonthly?: number; upsideMonthly?: number }> };
+    const pageExp = ux.explanations.find(e => e.normalizedKeyword === 'services keyword');
+    expect(pageExp).toBeTruthy();
+    // clicks 40 × cpc 3.25 = 130 (identical to roi.ts trafficValue for these inputs).
+    expect(pageExp!.currentMonthly).toBe(130);
+    // Ranking at position 8 with impressions → positive upside if moved up.
+    expect(pageExp!.upsideMonthly).toBeGreaterThan(0);
   });
 });

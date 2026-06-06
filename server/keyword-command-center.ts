@@ -17,6 +17,7 @@ import {
   type LocalSeoKeywordCandidate,
 } from './local-seo.js';
 import { computeKeywordValueScore, computeKeywordValueComponents, keywordValueReasons, type ScoringContext } from './scoring/keyword-value-score.js';
+import { keywordDollarValue } from './scoring/keyword-value-money.js';
 import { createLogger } from './logger.js';
 import { listPageKeywords, listPageKeywordsLite } from './page-keywords.js';
 import { computeOpportunityScore, isSuspiciousPlannerGroupedVolume } from './keyword-strategy-helpers.js';
@@ -1434,6 +1435,21 @@ function finalizeDraftRow(row: DraftRow, context: RowFinalizeContext): KeywordCo
         difficulty: finalized.metrics.difficulty,
       });
     }
+  }
+  // Task 3.3: per-keyword realized $ via the single keywordDollarValue helper (one $
+  // definition — currentMonthly == roi.ts trafficValue). Admin-only path; computed
+  // whenever cpc is present (no flag gate — this is the same realized $ class as ROI).
+  // cpc sparsity floors to 0 → omit entirely so the drawer hides the block (no cpc).
+  if (finalized.metrics.cpc != null && finalized.metrics.cpc > 0) {
+    const money = keywordDollarValue({
+      clicks: finalized.metrics.clicks,
+      cpc: finalized.metrics.cpc,
+      currentPosition: finalized.metrics.currentPosition,
+      impressions: finalized.metrics.impressions,
+      ctrCurve: null,
+    });
+    finalized.currentMonthly = money.currentMonthly;
+    finalized.upsideMonthly = money.upsideMonthly;
   }
   return finalized;
 }
