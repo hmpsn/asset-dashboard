@@ -6,7 +6,7 @@ import {
   Loader2, Target, ChevronDown, ChevronRight, RefreshCw,
   Sparkles, Briefcase,
   BarChart3, Users, Search, FileText,
-  Eye, MousePointerClick, Trophy, AlertTriangle, Plus, Check, ArrowUpRight,
+  Eye, MousePointerClick, Trophy, AlertTriangle, Plus, Check, ArrowUpRight, X,
 } from 'lucide-react';
 import { Badge, StatCard, SectionCard, AIContextIndicator, TabBar, ErrorState, ProgressIndicator, NextStepsCard, LoadingState, Icon, PageHeader, Button, ClickableRow, IconButton, FormInput, FormTextarea, positionColor } from './ui';
 import { kdColor } from './page-intelligence/pageIntelligenceDisplay';
@@ -103,6 +103,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const [showNextSteps, setShowNextSteps] = useState(false);
   const [strategyTab, setStrategyTab] = useState<'analysis' | 'guide'>('analysis');
   const [refreshOrderingPromptOpen, setRefreshOrderingPromptOpen] = useState(false);
+  const [reverseStalenessNudgeDismissed, setReverseStalenessNudgeDismissed] = useState(false);
   const activeStrategyJob = findActiveJob({ type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, workspaceId });
   const completedStartedJob = lastStartedJobId ? jobs.find(job => job.id === lastStartedJobId) : undefined;
   const generating = startingStrategyJob || Boolean(activeStrategyJob);
@@ -699,6 +700,41 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                 <strong className="text-accent-warning">This strategy was generated without keyword volume validation.</strong>{' '}
                 Keywords, volume, and difficulty data may not reflect real search demand. Enable DataForSEO for validated keyword recommendations.
               </div>
+            </div>
+          )}
+
+          {/* ── Reverse-Staleness Nudge (strategy older than local SEO data) ── */}
+          {localSync?.applies && localSync?.strategyStaleVsLocal && !reverseStalenessNudgeDismissed && (
+            <div
+              data-testid="reverse-staleness-nudge"
+              className="bg-amber-500/10 border border-amber-500/30 rounded-[var(--radius-lg)] px-4 py-3 flex items-start gap-2.5"
+            >
+              <Icon as={AlertTriangle} size="md" className="text-accent-warning flex-shrink-0 mt-0.5" />
+              <div className="flex-1 t-caption text-accent-warning leading-relaxed">
+                <strong className="text-accent-warning">Your local SEO data is newer than this strategy.</strong>{' '}
+                {localSync.lastLocalRefreshAt && localSync.lastStrategyGeneratedAt && (
+                  <>Local data was refreshed {formatDate(localSync.lastLocalRefreshAt)}, after this strategy was generated ({formatDate(localSync.lastStrategyGeneratedAt)}). </>
+                )}
+                Regenerate to reflect your current local data.
+                <div className="mt-2">
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={() => generateStrategy('full')}
+                  >
+                    Generate Strategy
+                  </Button>
+                </div>
+              </div>
+              <IconButton
+                onClick={() => setReverseStalenessNudgeDismissed(true)}
+                title="Dismiss"
+                label="Dismiss"
+                icon={X}
+                size="sm"
+                variant="ghost"
+                className="text-accent-warning hover:text-[var(--brand-text-muted)] flex-shrink-0"
+              />
             </div>
           )}
 
