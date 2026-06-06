@@ -15,7 +15,7 @@ import {
   type PriorityKeywordItem,
   type StrategyKeywordTableRow,
 } from './strategyKeywordDisplay';
-import { fmtNum } from '../../../utils/formatNumbers';
+import { fmtNum, fmtMoney } from '../../../utils/formatNumbers';
 
 interface StrategyKeywordDrawerProps {
   drawerRow: StrategyKeywordTableRow;
@@ -158,6 +158,30 @@ export function StrategyKeywordDrawer({
                       {drawerRow.impressions >= 1000 ? `${(drawerRow.impressions / 1000).toFixed(1)}k` : drawerRow.impressions}
                     </div>
                     <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">via Google Search</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Task 3.3: per-keyword realized $ (server-computed via keywordDollarValue;
+              emerald = success/$ law). Absent when no cpc. currentMonthly may be 0
+              (ranking but no clicks yet) while upside is positive — render whenever
+              either figure is defined. */}
+          {(drawerRow.currentMonthly != null || drawerRow.upsideMonthly != null) && (
+            <div data-testid="revenue-potential-section" className="rounded-[var(--radius-lg)] bg-emerald-500/5 border border-emerald-500/20 px-3 py-3">
+              <div className="t-caption-sm font-medium text-emerald-400/90 uppercase tracking-wider mb-2">Revenue potential</div>
+              <div className="grid grid-cols-2 gap-3">
+                {drawerRow.currentMonthly != null && (
+                  <div>
+                    <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Value today</div>
+                    <div className="t-page font-semibold text-emerald-400">{fmtMoney(drawerRow.currentMonthly)}<span className="t-caption-sm text-[var(--brand-text-muted)] font-normal">/mo</span></div>
+                  </div>
+                )}
+                {drawerRow.upsideMonthly != null && drawerRow.upsideMonthly > 0 && (
+                  <div>
+                    <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Upside if it moves up</div>
+                    <div className="t-page font-semibold text-emerald-400">+{fmtMoney(drawerRow.upsideMonthly)}<span className="t-caption-sm text-[var(--brand-text-muted)] font-normal">/mo</span></div>
                   </div>
                 )}
               </div>

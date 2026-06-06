@@ -604,3 +604,40 @@ describe('ROI pipeline — cross-workspace isolation', () => {
     expect(bodyA.organicTrafficValue).toBeCloseTo(800, 1); // 200 × 4.00
   });
 });
+
+// ── Task 3.4: Revenue-at-stake rollup ────────────────────────────────────────
+
+/** A page with an explicit rank position (for upside math). */
+function makePositionedPage(
+  pagePath: string,
+  primaryKeyword: string,
+  clicks: number,
+  impressions: number,
+  cpc: number,
+  currentPosition: number,
+): PageKeywordMap {
+  return { ...makePage(pagePath, primaryKeyword, clicks, impressions, cpc), currentPosition };
+}
+
+describe('ROI pipeline — Revenue at stake (Task 3.4)', () => {
+  it('returns a positive revenueAtStake when keywords rank below page 1 (with cpc + impressions)', async () => {
+    const wsId = seedWorkspaceWithStrategy([
+      makePositionedPage('/services', 'below page one keyword', 5, 2000, 4, 11),
+    ]);
+    const res = await api(`/api/public/roi/${wsId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { revenueAtStake?: number };
+    expect(typeof body.revenueAtStake).toBe('number');
+    expect(body.revenueAtStake!).toBeGreaterThan(0);
+  });
+
+  it('returns 0 revenueAtStake when every keyword already ranks #1', async () => {
+    const wsId = seedWorkspaceWithStrategy([
+      makePositionedPage('/services', 'already number one', 50, 2000, 4, 1),
+    ]);
+    const res = await api(`/api/public/roi/${wsId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { revenueAtStake?: number };
+    expect(body.revenueAtStake).toBe(0);
+  });
+});

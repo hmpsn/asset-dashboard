@@ -616,6 +616,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       searchIntent: page?.searchIntent ?? contentGap?.intent,
       impressions,
       clicks: page?.clicks,
+      cpc: page?.cpc, // Task 3.2: realized-$ input joined from page_keywords
       metricsSource,
       contextSources,
       rationale: contentGap?.rationale,
@@ -624,6 +625,9 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       explanation,
       // Task 2.3: server-computed value reasons from the explanation (flag-gated, never re-derived).
       valueReasons: explanation?.valueReasons,
+      // Task 3.3: server-computed realized $ (one keywordDollarValue definition). Never re-derived client-side.
+      currentMonthly: explanation?.currentMonthly,
+      upsideMonthly: explanation?.upsideMonthly,
     };
   };
 

@@ -64,6 +64,18 @@ export interface KeywordStrategyExplanation {
    * Safe for all tiers (no $ amounts).
    */
   valueReasons?: string[];
+  /**
+   * Realized monthly dollar value of the keyword: clicks × cpc (Task 3.3).
+   * Computed server-side via the single keywordDollarValue helper (one $
+   * definition, identical to roi.ts trafficValue). Absent when cpc is unknown.
+   * Growth+ gated like ROIDashboard's realized $.
+   */
+  currentMonthly?: number;
+  /**
+   * Upside monthly dollar value if the keyword moved up (Task 3.3): impressions ×
+   * CTR uplift × cpc, from the same keywordDollarValue helper. Absent when no cpc.
+   */
+  upsideMonthly?: number;
 }
 
 export interface KeywordStrategyRefreshSummary {

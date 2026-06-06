@@ -1748,3 +1748,27 @@ describe('valueReasons on KCC rows (Task 2.2)', () => {
     expect(cleaningRow!.valueReasons).toBeUndefined();
   });
 });
+
+describe('cpc join from page_keywords (Task 3.2)', () => {
+  it('a KCC row carries metrics.cpc populated from the page_keywords cpc', async () => {
+    upsertPageKeyword(workspaceId, {
+      pagePath: '/services/dental-bridges',
+      pageTitle: 'Dental Bridges',
+      primaryKeyword: 'dental bridges',
+      secondaryKeywords: [],
+      searchIntent: 'commercial',
+      volume: 800,
+      difficulty: 35,
+      cpc: 7.5,
+    });
+
+    const payload = await buildKeywordCommandCenterRows(workspaceId, {
+      filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+      pageSize: 100,
+    });
+    expect(payload).not.toBeNull();
+    const bridgeRow = payload!.rows.find(r => r.normalizedKeyword === 'dental bridges');
+    expect(bridgeRow).toBeDefined();
+    expect(bridgeRow!.metrics.cpc).toBe(7.5);
+  });
+});

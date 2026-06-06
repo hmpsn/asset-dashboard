@@ -26,6 +26,13 @@ export interface ROIData {
   organicTrafficValue: number;
   adSpendEquivalent: number;
   growthPercent: number | null;
+  /**
+   * Portfolio "Revenue at stake" (Task 3.4): Σ keywordDollarValue(kw).upsideMonthly
+   * over the tracked page_keywords — the monthly $ unlocked if below-page-1 keywords
+   * moved up. Reuses the single keywordDollarValue helper (no second $ math). 0 when
+   * every keyword already ranks #1; absent only on older payloads.
+   */
+  revenueAtStake?: number;
   pageBreakdown: PageROI[];
   totalClicks: number;
   totalImpressions: number;

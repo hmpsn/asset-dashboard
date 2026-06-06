@@ -33,6 +33,8 @@ export interface StrategyKeywordTableRow extends PriorityKeywordItem {
   searchIntent?: string;
   impressions?: number;
   clicks?: number;
+  /** Cost-per-click from page_keywords (Task 3.2). The realized-$ input. Absent when unknown. */
+  cpc?: number;
   metricsSource?: string;
   contextSources: string[];
   rationale?: string;
@@ -46,6 +48,14 @@ export interface StrategyKeywordTableRow extends PriorityKeywordItem {
    * Safe for all tiers (no $ amounts).
    */
   valueReasons?: string[];
+  /**
+   * Realized monthly dollar value: clicks × cpc (Task 3.3). Server-computed via the
+   * single keywordDollarValue helper and serialized on explanation. Absent when no cpc.
+   * The "Revenue potential" block on the (Growth+ gated) strategy drawer renders this.
+   */
+  currentMonthly?: number;
+  /** Upside monthly $ if the keyword moved up (Task 3.3). Absent when no cpc. */
+  upsideMonthly?: number;
 }
 
 export const normalizeKeyword = (keyword: string) => keywordComparisonKey(keyword);

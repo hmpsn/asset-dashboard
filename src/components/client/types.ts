@@ -131,7 +131,7 @@ export type { ClientTab } from '../../routes';
 export interface ClientKeywordStrategy {
   siteKeywords: string[];
   siteKeywordMetrics?: { keyword: string; volume: number; difficulty: number }[];
-  pageMap: { pagePath: string; pageTitle?: string; primaryKeyword: string; secondaryKeywords?: string[]; searchIntent?: string; currentPosition?: number; impressions?: number; clicks?: number; volume?: number; difficulty?: number; metricsSource?: MetricsSource; validated?: boolean; gscKeywords?: { query: string; clicks: number; impressions: number; position: number }[] }[];
+  pageMap: { pagePath: string; pageTitle?: string; primaryKeyword: string; secondaryKeywords?: string[]; searchIntent?: string; currentPosition?: number; impressions?: number; clicks?: number; volume?: number; difficulty?: number; cpc?: number; metricsSource?: MetricsSource; validated?: boolean; gscKeywords?: { query: string; clicks: number; impressions: number; position: number }[] }[];
   opportunities: string[];
   contentGaps?: { topic: string; targetKeyword: string; intent: string; priority: string; rationale: string; suggestedPageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource'; volume?: number; difficulty?: number; impressions?: number; competitorProof?: string; trendDirection?: 'rising' | 'declining' | 'stable'; serpFeatures?: string[]; questionKeywords?: string[]; opportunityScore?: number; /** SEO Generation Quality P2 — re-admitted by the deterministic backfill floor (sorted after organically-strong gaps). */ backfilled?: boolean }[];
   quickWins?: { pagePath: string; action: string; estimatedImpact: string; rationale: string; roiScore?: number }[];

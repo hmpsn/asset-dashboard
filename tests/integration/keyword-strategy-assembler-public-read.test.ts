@@ -49,7 +49,7 @@ const cannibal: CannibalizationItem = {
 const pageMap: PageKeywordMap[] = [{
   pagePath: '/services', pageTitle: 'Services', primaryKeyword: 'services keyword',
   secondaryKeywords: ['second'], searchIntent: 'commercial', currentPosition: 8, previousPosition: 12,
-  impressions: 900, clicks: 40, volume: 1000, difficulty: 30, metricsSource: 'semrush', validated: true,
+  impressions: 900, clicks: 40, volume: 1000, difficulty: 30, cpc: 3.25, metricsSource: 'semrush', validated: true,
   gscKeywords: [{ query: 'services', clicks: 40, impressions: 900, position: 8 }],
 }];
 
@@ -109,12 +109,16 @@ describe('GET /api/public/seo-strategy/:id — assembler byte-identity gate', ()
     expect(body.businessContext).toBe('A dental clinic in San Antonio.');
     expect(body.generatedAt).toBe('2026-06-01T00:00:00.000Z');
 
+    // Task 3.2: cpc is serialized onto the client pageMap (the realized-$ input the
+    // Growth+ strategy drawer + ROIDashboard already share — consistent with the
+    // other raw pageMap metrics like clicks/impressions/volume).
     expect(body.pageMap).toEqual([{
       pagePath: '/services', pageTitle: 'Services', primaryKeyword: 'services keyword',
       secondaryKeywords: ['second'], searchIntent: 'commercial', currentPosition: 8, previousPosition: 12,
-      impressions: 900, clicks: 40, volume: 1000, difficulty: 30, metricsSource: 'semrush', validated: true,
+      impressions: 900, clicks: 40, volume: 1000, difficulty: 30, cpc: 3.25, metricsSource: 'semrush', validated: true,
       gscKeywords: [{ query: 'services', clicks: 40, impressions: 900, position: 8 }],
     }]);
+    expect((body.pageMap[0] as { cpc?: number }).cpc).toBe(3.25);
 
     expect(body.contentGaps).toEqual([
       {
@@ -150,5 +154,15 @@ describe('GET /api/public/seo-strategy/:id — assembler byte-identity gate', ()
 
     // strategyUx is a route-layer derived projection — present but excluded from the byte snapshot.
     expect(body.strategyUx).toBeTruthy();
+
+    // Task 3.3: the page_keyword explanation carries server-computed realized $ from
+    // the single keywordDollarValue helper (currentMonthly == clicks×cpc == roi.ts).
+    const ux = body.strategyUx as { explanations: Array<{ normalizedKeyword: string; currentMonthly?: number; upsideMonthly?: number }> };
+    const pageExp = ux.explanations.find(e => e.normalizedKeyword === 'services keyword');
+    expect(pageExp).toBeTruthy();
+    // clicks 40 × cpc 3.25 = 130 (identical to roi.ts trafficValue for these inputs).
+    expect(pageExp!.currentMonthly).toBe(130);
+    // Ranking at position 8 with impressions → positive upside if moved up.
+    expect(pageExp!.upsideMonthly).toBeGreaterThan(0);
   });
 });

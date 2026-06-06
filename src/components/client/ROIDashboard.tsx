@@ -106,7 +106,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
   return (
     <div className="space-y-8">
       {/* Hero metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${data.revenueAtStake != null ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-3`}>
         <StatCard
           label="Organic Traffic Value"
           value={fmtMoneyFull(data.organicTrafficValue)}
@@ -141,6 +141,19 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
           }
           className={`bg-gradient-to-br ${data.growthPercent != null ? (data.growthPercent >= 0 ? 'from-teal-500/10 border-teal-500/20' : 'from-amber-500/10 border-amber-500/20') : 'from-teal-500/10 border-teal-500/20'} via-[var(--surface-2)] to-[var(--surface-2)]`}
         />
+
+        {/* Task 3.4: portfolio "Revenue at stake" — Σ upsideMonthly via the single
+            keywordDollarValue helper. Emerald = success/$ law. Absent on older payloads. */}
+        {data.revenueAtStake != null && (
+          <StatCard
+            label="Revenue at Stake"
+            value={fmtMoneyFull(data.revenueAtStake)}
+            icon={TrendingUp}
+            valueColor="text-accent-success"
+            sub="Monthly value you'd unlock by moving below-page-1 keywords up"
+            className="bg-gradient-to-br from-emerald-500/10 via-[var(--surface-2)] to-[var(--surface-2)] border-emerald-500/20"
+          />
+        )}
       </div>
 
       {/* Page breakdown table */}

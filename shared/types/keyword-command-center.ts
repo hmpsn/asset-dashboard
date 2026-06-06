@@ -234,6 +234,17 @@ export interface KeywordCommandCenterRow {
    * keyword has no value signal (signal gate fails).
    */
   valueReasons?: string[];
+  /**
+   * Realized monthly dollar value of the keyword: clicks × cpc (Task 3.3).
+   * Built in finalizeDraftRow via the single keywordDollarValue helper (one $
+   * definition, identical to roi.ts trafficValue). Absent when metrics.cpc is unknown.
+   */
+  currentMonthly?: number;
+  /**
+   * Upside monthly dollar value if the keyword moved up (Task 3.3): impressions ×
+   * CTR uplift × cpc, from the same keywordDollarValue helper. Absent when no cpc.
+   */
+  upsideMonthly?: number;
 }
 
 export interface KeywordCommandCenterCounts {
