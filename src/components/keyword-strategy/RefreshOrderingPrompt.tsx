@@ -1,10 +1,11 @@
 import { Modal } from '../ui/overlay/Modal';
 import { Button } from '../ui/Button';
 import { formatDate } from '../../utils/formatDates';
+import type { LocalNeedsRefreshReason } from '../../../shared/types/local-seo';
 
 export interface RefreshOrderingPromptProps {
   open: boolean;
-  reason: 'missing' | 'stale' | 'markets_changed';
+  reason: LocalNeedsRefreshReason;
   lastLocalRefreshAt: string | null;
   onFullRefresh: () => void;
   onGenerateAnyway: () => void;

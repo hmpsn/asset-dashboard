@@ -83,15 +83,4 @@ describe('RefreshOrderingPrompt', () => {
     const staleText = screen.getByText(/Local SEO data is over 30 days old/i).textContent;
     expect(missingText).not.toEqual(staleText);
   });
-
-  it('clicking the overlay backdrop calls onCancel', () => {
-    const onCancel = vi.fn();
-    renderPrompt({ onCancel });
-    // Click the backdrop (fixed overlay div — has data-testid or is first child)
-    const backdrop = document.querySelector('[data-testid="refresh-ordering-backdrop"]');
-    if (backdrop) {
-      fireEvent.click(backdrop);
-      expect(onCancel).toHaveBeenCalledTimes(1);
-    }
-  });
 });

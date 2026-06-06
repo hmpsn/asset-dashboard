@@ -16,10 +16,6 @@ import type { BackgroundJob } from '../../src/hooks/useBackgroundTasks';
 
 // ─── mutable mock state ───────────────────────────────────────────────────────
 
-const refreshMutate = vi.fn();
-const startJobMock = vi.fn();
-const findActiveJobMock = vi.fn();
-
 const mocks = vi.hoisted(() => ({
   startJob: vi.fn(),
   findActiveJob: vi.fn(),
