@@ -157,19 +157,35 @@ export function localRelevanceMultiplier(
   return 1.0;
 }
 
+// ── Component interface (§6, PR 2) ───────────────────────────────────────────
+
+/**
+ * The internal scoring components exposed by computeKeywordValueComponents.
+ * Provides one value-component vocabulary for the kwv-value-breakdown render layer.
+ */
+export interface KeywordValueComponents {
+  commercialValue: number;
+  demand: number;
+  winnability: number;
+  localMultiplier: number;
+  intent: ValueIntent;
+}
+
 // ── Main scorer (§5) ──────────────────────────────────────────────────────────
 
 /**
- * Computes the value-first keyword opportunity score (0..100) for a single keyword.
+ * Computes the value-first keyword opportunity score and its internal components.
  *
- * Returns undefined when the signal gate fails (no volume>0, no impressions>0,
- * difficulty==null, no cpc>0, AND no *provided* intent — regex-derived intent does
- * NOT rescue a metric-less keyword).
+ * Returns { score: undefined, components: undefined } when the signal gate fails
+ * (no volume>0, no impressions>0, difficulty==null, no cpc>0, AND no *provided*
+ * intent — regex-derived intent does NOT rescue a metric-less keyword).
+ *
+ * The scalar wrapper computeKeywordValueScore delegates entirely to this function.
  */
-export function computeKeywordValueScore(
+export function computeKeywordValueComponents(
   input: KeywordValueInput,
   ctx: ScoringContext,
-): number | undefined {
+): { score: number | undefined; components: KeywordValueComponents | undefined } {
   const { keyword, volume, impressions, difficulty, cpc, intent } = input;
 
   // 1. Signal gate — must have at least one raw signal OR a provided intent.
@@ -181,7 +197,7 @@ export function computeKeywordValueScore(
     (cpc !== undefined && cpc > 0) ||
     toValueIntent(intent) !== null;
 
-  if (!hasSignal) return undefined;
+  if (!hasSignal) return { score: undefined, components: undefined };
 
   // 2. Intent + local
   const resolvedIntent = deriveValueIntent(keyword, intent);
@@ -205,7 +221,25 @@ export function computeKeywordValueScore(
   const tiebreak = W_DEMAND * demand + W_WIN * winnability;
 
   // 6. Final score
-  const multiplier = localRelevanceMultiplier(ctx.posture, local, resolvedIntent);
-  const raw = commercialValue * (FLOOR + (1 - FLOOR) * tiebreak) * multiplier * 100;
-  return Math.round(Math.min(100, raw));
+  const localMultiplier = localRelevanceMultiplier(ctx.posture, local, resolvedIntent);
+  const raw = commercialValue * (FLOOR + (1 - FLOOR) * tiebreak) * localMultiplier * 100;
+  const score = Math.round(Math.min(100, raw));
+
+  return {
+    score,
+    components: { commercialValue, demand, winnability, localMultiplier, intent: resolvedIntent },
+  };
+}
+
+/**
+ * Thin wrapper: returns only the score from computeKeywordValueComponents.
+ * The 4 existing scalar callers are unaffected — they receive the same number | undefined.
+ *
+ * Returns undefined when the signal gate fails.
+ */
+export function computeKeywordValueScore(
+  input: KeywordValueInput,
+  ctx: ScoringContext,
+): number | undefined {
+  return computeKeywordValueComponents(input, ctx).score;
 }
