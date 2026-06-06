@@ -10,6 +10,7 @@ import { positionColor } from '../ui/constants';
 import { formatDate } from '../../utils/formatDates';
 import { fmtMoney } from '../../utils/formatNumbers';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
+import { useScrollLock } from '../../hooks/useScrollLock';
 import type { KeywordCommandCenterNextAction, KeywordCommandCenterRow } from '../../../shared/types/keyword-command-center';
 import { LocalSeoVisibilityBadge } from '../local-seo/LocalSeoVisibilityPanel';
 import { Badge, Button, EmptyState, Icon, IconButton, Skeleton, StatusBadge, TableSkeleton } from '../ui';
@@ -58,6 +59,11 @@ export function KeywordDetailDrawer({
 
   const [showAllMarkets, setShowAllMarkets] = useState(false);
 
+  // Lock background scroll while the drawer is open so the page underneath can't
+  // be scrolled past its bounds behind the fixed backdrop. drawerRef resolves the
+  // scroll container (admin `<main>` / client `<body>`); see useScrollLock.
+  useScrollLock(open, drawerRef);
+
   // Lazy national-rank history for the sparkline. Only fetched when the journey
   // is enabled, the drawer is open, a row exists, and the keyword is tracked.
   const rankHistoryEnabled = hubEnabled
@@ -78,7 +84,7 @@ export function KeywordDetailDrawer({
     if (!open) return;
     previouslyFocusedRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const focusTimer = window.setTimeout(() => {
-      closeButtonRef.current?.focus();
+      closeButtonRef.current?.focus({ preventScroll: true });
     }, 0);
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -236,7 +242,7 @@ export function KeywordDetailDrawer({
           />
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-4">
+        <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4">
           {isLoading ? (
             <TableSkeleton rows={6} columns={1} />
           ) : !row ? (

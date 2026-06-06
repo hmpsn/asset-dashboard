@@ -400,7 +400,10 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
   }
 
   return (
-    <div className="space-y-5 pb-24">
+    // pb-24 only reserves clearance for the floating bulk-action bar, which renders
+    // only when rows are selected. Without it the padding is a dead scrollable tail
+    // below the page, so gate the bottom padding on the bar being present.
+    <div className={`space-y-5 ${selectedBulkRows.length > 0 ? 'pb-24' : ''}`}>
       <PageHeader
         title="Keywords"
         subtitle="The operating layer for strategy terms, evidence, tracking, feedback, retired keywords, and safe handoffs."
