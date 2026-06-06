@@ -77,7 +77,7 @@ export function useKeywordStrategy(workspaceId: string) {
   const strategyReady = strategyQuery.data !== undefined;
   const data: KeywordStrategyData | undefined = workspaceId && strategyReady
     ? {
-      strategy: (strategyQuery.data as KeywordStrategyRead | undefined) ?? null,
+      strategy: strategyQuery.data ?? null,
       seoDataAvailable: auxData.seoDataAvailable,
       providers: auxData.providers,
       workspaceData: auxData.workspaceData,
