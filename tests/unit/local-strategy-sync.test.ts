@@ -184,6 +184,21 @@ describe('getLocalStrategySyncStatus', () => {
     expect(status.strategyStaleVsLocal).toBe(false);
   });
 
+  it('(1b) surfaces the timestamps even when applies=false', () => {
+    // A non-local workspace still gets lastLocalRefreshAt/lastStrategyGeneratedAt
+    // surfaced (read regardless of applies) — only the flags/reason zero out.
+    seedLocalPosture('non_local'); // seeds no market
+    insertSnapshot('snap-nonlocal', '2026-05-20T10:00:00.000Z', 'market-nonlocal');
+    seedStrategy('2026-05-19T10:00:00.000Z');
+    const status = getLocalStrategySyncStatus(workspaceId);
+    expect(status.applies).toBe(false);
+    expect(status.localNeedsRefresh).toBe(false);
+    expect(status.localNeedsRefreshReason).toBeNull();
+    expect(status.strategyStaleVsLocal).toBe(false);
+    expect(status.lastLocalRefreshAt).toBe('2026-05-20T10:00:00.000Z');
+    expect(status.lastStrategyGeneratedAt).toBe('2026-05-19T10:00:00.000Z');
+  });
+
   it('(2) reason=missing for local posture with no snapshots', () => {
     seedLocalPosture('local');
     const status = getLocalStrategySyncStatus(workspaceId);
