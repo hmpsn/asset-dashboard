@@ -3,6 +3,7 @@ import type {
   TrackedKeywordSource,
   TrackedKeywordStatus,
 } from './rank-tracking.js';
+import type { LocalStrategySyncStatus } from './local-seo.js';
 
 export type KeywordStrategyUxSurface = 'admin' | 'client';
 
@@ -96,6 +97,13 @@ export interface KeywordStrategyUxPayload {
   refreshSummary?: KeywordStrategyRefreshSummary;
   explanations: KeywordStrategyExplanation[];
   rawEvidenceNote?: string;
+  /**
+   * Bidirectional sync status between local SEO visibility data and the
+   * keyword strategy. Present on admin GET /api/webflow/keyword-strategy/:id
+   * in both the real branch (strategy blob) and the shell branch
+   * (page_keywords only). Absent on client-facing reads.
+   */
+  localSync?: LocalStrategySyncStatus;
 }
 
 export interface KeywordStrategyKeywordChange {

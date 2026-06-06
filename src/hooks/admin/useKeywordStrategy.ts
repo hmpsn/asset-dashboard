@@ -8,6 +8,7 @@ import { get } from '../../api/client';
 import { keywords } from '../../api/seo';
 import { workspaces } from '../../api/workspaces';
 import type { KeywordStrategy } from '../../../shared/types/workspace';
+import type { KeywordStrategyUxPayload } from '../../../shared/types/keyword-strategy-ux';
 import { queryKeys } from '../../lib/queryKeys';
 
 interface WorkspaceData {
@@ -15,8 +16,15 @@ interface WorkspaceData {
   seoDataProvider?: 'dataforseo';
 }
 
+/**
+ * The raw GET /api/webflow/keyword-strategy/:id response shape.
+ * Extends KeywordStrategy with the strategyUx field that the server
+ * attaches on every admin read (both real and shell branches).
+ */
+export type KeywordStrategyRead = KeywordStrategy & { strategyUx?: KeywordStrategyUxPayload };
+
 interface KeywordStrategyData {
-  strategy: KeywordStrategy | null;
+  strategy: KeywordStrategyRead | null;
   seoDataAvailable: boolean;
   providers: Array<{ name: string; configured: boolean }>;
   workspaceData: WorkspaceData | null;
@@ -31,9 +39,9 @@ interface KeywordStrategyAuxData {
 export function useKeywordStrategy(workspaceId: string) {
   const strategyQuery = useQuery({
     queryKey: queryKeys.admin.keywordStrategy(workspaceId),
-    queryFn: async (): Promise<KeywordStrategy | null> => {
+    queryFn: async (): Promise<KeywordStrategyRead | null> => {
       if (!workspaceId) return null;
-      return get<KeywordStrategy>(`/api/webflow/keyword-strategy/${workspaceId}`).catch(() => null);
+      return get<KeywordStrategyRead>(`/api/webflow/keyword-strategy/${workspaceId}`).catch(() => null);
     },
     staleTime: 10 * 60 * 1000, // 10 minutes
     enabled: !!workspaceId,

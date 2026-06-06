@@ -92,6 +92,10 @@ const refreshSchema = z.object({
   keywords: z.array(z.string().min(1).max(200)).max(LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP).optional(),
   device: z.enum([LOCAL_SEO_DEVICE.DESKTOP, LOCAL_SEO_DEVICE.MOBILE]).optional(),
   languageCode: z.string().min(2).max(8).optional(),
+  // When true, a successful refresh (crawl that produced data) chains a
+  // keyword-strategy regen server-side so it survives a closed tab. Threaded
+  // through to runLocalSeoRefreshJob, which gates on result.refreshed > 0.
+  thenRegenerateStrategy: z.boolean().optional(),
 }).strict();
 
 const locationLookupQuerySchema = z.object({

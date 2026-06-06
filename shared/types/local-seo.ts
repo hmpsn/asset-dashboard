@@ -1,5 +1,23 @@
 export type LocalSeoKeywordIntent = 'transactional' | 'commercial' | 'navigational' | 'informational' | 'comparison';
 
+export const LOCAL_DATA_STALE_DAYS = 30;
+export const LOCAL_NEEDS_REFRESH_REASON = {
+  MISSING: 'missing',
+  STALE: 'stale',
+  MARKETS_CHANGED: 'markets_changed',
+} as const;
+export type LocalNeedsRefreshReason =
+  (typeof LOCAL_NEEDS_REFRESH_REASON)[keyof typeof LOCAL_NEEDS_REFRESH_REASON];
+
+export interface LocalStrategySyncStatus {
+  applies: boolean;                       // posture is local | hybrid
+  localNeedsRefresh: boolean;
+  localNeedsRefreshReason: LocalNeedsRefreshReason | null;
+  strategyStaleVsLocal: boolean;
+  lastLocalRefreshAt: string | null;      // ISO; max(local_visibility_snapshots.captured_at)
+  lastStrategyGeneratedAt: string | null; // ISO; ws.keywordStrategy.generatedAt
+}
+
 export const LOCAL_SEO_POSTURE = {
   LOCAL: 'local',
   NON_LOCAL: 'non_local',
@@ -572,6 +590,7 @@ export interface LocalSeoRefreshRequest {
   keywords?: string[];
   device?: LocalSeoDevice;
   languageCode?: string;
+  thenRegenerateStrategy?: boolean;
 }
 
 export interface LocalSeoRefreshStartResponse {

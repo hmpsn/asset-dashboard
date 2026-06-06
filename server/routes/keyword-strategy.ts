@@ -1,7 +1,7 @@
 /**
  * keyword-strategy routes — extracted from server/index.ts
  *
- * @reads workspaces, page_keywords, strategy_history, keyword_feedback, snapshots, search_console, google_analytics, seo_provider, workspace_intelligence, workspace_pages, analytics_insights
+ * @reads workspaces, page_keywords, strategy_history, keyword_feedback, snapshots, search_console, google_analytics, seo_provider, workspace_intelligence, workspace_pages, analytics_insights, local_seo_workspace_settings, local_seo_markets, local_visibility_snapshots
  * @writes page_keywords, strategy_history, keyword_feedback, tracked_keywords, workspaces, usage_tracking, intelligence_cache
  */
 import { Router } from 'express';
@@ -58,6 +58,7 @@ import {
   buildKeywordStrategyUxPayload,
 } from '../keyword-strategy-ux.js';
 import { queueKeywordStrategyPostUpdateFollowOns } from '../keyword-strategy-follow-ons.js';
+import { getLocalStrategySyncStatus } from '../local-strategy-sync.js';
 export { buildStrategyIntelligenceBlock, computeOpportunityScore, shouldFetchCompetitorData } from '../keyword-strategy-generation.js';
 
 const log = createLogger('keyword-strategy');
@@ -220,6 +221,16 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess(
     if (!assembled) return res.json(null);
     const { pageMap, contentGaps, quickWins, keywordGaps, topicClusters, cannibalization } = assembled;
     if (!strategy) {
+      const shellStrategyUx = await buildKeywordStrategyUxPayload({
+        workspaceId: ws.id,
+        workspaceName: ws.name,
+        strategy: null,
+        pageMap,
+        contentGaps,
+        keywordGaps,
+        surface: 'admin',
+      });
+      shellStrategyUx.localSync = getLocalStrategySyncStatus(ws.id);
       return res.json({
         siteKeywords: [],
         opportunities: [],
@@ -229,15 +240,7 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess(
         keywordGaps,
         topicClusters,
         cannibalization,
-        strategyUx: await buildKeywordStrategyUxPayload({
-          workspaceId: ws.id,
-          workspaceName: ws.name,
-          strategy: null,
-          pageMap,
-          contentGaps,
-          keywordGaps,
-          surface: 'admin',
-        }),
+        strategyUx: shellStrategyUx,
         generatedAt: null,
       });
     }
@@ -250,6 +253,7 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess(
       keywordGaps,
       surface: 'admin',
     });
+    strategyUx.localSync = getLocalStrategySyncStatus(ws.id);
     res.json(serializeKeywordStrategy(strategy, pageMap, contentGaps, quickWins, keywordGaps, topicClusters, cannibalization, strategyUx));
   } catch (err) {
     next(err);

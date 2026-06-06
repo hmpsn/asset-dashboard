@@ -9,7 +9,7 @@ import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { getClientLocations } from './client-locations.js';
 import { listContentGaps } from './content-gaps.js';
-import { updateJob, getJob } from './jobs.js';
+import { createJob, updateJob, getJob } from './jobs.js';
 import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js';
 import { isStrategyPoolEligibleKeyword, isNearDuplicateKeyword } from './keyword-intelligence/rules.js';
 import { listPageKeywords } from './page-keywords.js';
@@ -64,6 +64,7 @@ import {
   type LocalVisibilitySnapshot,
 } from '../shared/types/local-seo.js';
 import { TRACKED_KEYWORD_STATUS } from '../shared/types/rank-tracking.js';
+import { BACKGROUND_JOB_TYPES } from '../shared/types/background-jobs.js';
 import type { Workspace } from '../shared/types/workspace.js';
 
 const log = createLogger('local-seo');
@@ -395,6 +396,10 @@ const stmts = createStmtCache(() => ({
   `),
   countSnapshotsForWorkspace: db.prepare(`
     SELECT COUNT(*) AS count FROM local_visibility_snapshots
+    WHERE workspace_id = ?
+  `),
+  maxCapturedAtForWorkspace: db.prepare(`
+    SELECT MAX(captured_at) AS max_captured_at FROM local_visibility_snapshots
     WHERE workspace_id = ?
   `),
   latestSnapshots: db.prepare(`
@@ -2394,12 +2399,78 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
     }
   }
 
+  // Optional chained keyword-strategy regen. When the admin requested
+  // `thenRegenerateStrategy` AND the crawl actually produced data
+  // (result.refreshed > 0 — the only success signal on the result shape), kick
+  // off a strategy regen server-side so it survives a closed tab. A hard-fail
+  // crawl (refreshed === 0) is NOT a usable refresh, so we abort rather than
+  // regenerate a strategy on stale/empty evidence.
+  //
+  // The regen is its own tracked KEYWORD_STRATEGY job and runs DETACHED (not
+  // awaited) — mirroring the POST /api/jobs dispatcher (server/routes/jobs.ts)
+  // — so the slow, AI-heavy strategy phase never blocks this local-refresh job
+  // from reaching 'done'. A strategy failure (e.g. KeywordStrategyGenerationError,
+  // or a missing tier/OPENAI_API_KEY/webflowSiteId precondition) marks only the
+  // strategy job 'error'; the local refresh job is already successful and stays
+  // 'done'. `generateKeywordStrategy` owns its own STRATEGY_UPDATED broadcast
+  // (Data-flow rule #4 — NO manual broadcast here). Dynamic import breaks the
+  // keyword-strategy-generation.ts ↔ local-seo.ts cycle, exactly like the
+  // recommendations regen above.
+  const proceed = result.refreshed > 0;
+  if (request.thenRegenerateStrategy === true && proceed) {
+    try {
+      // No pre-flight active-job guard on purpose: if a strategy gen is already
+      // running, generateKeywordStrategy's own 409 guard rejects this cleanly into
+      // the strategy job's error state (no quota spent). A silently-skipped guard
+      // would be worse UX than a momentary errored row — the admin asked for it.
+      const strategyJob = createJob(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, {
+        workspaceId,
+        message: 'Regenerating keyword strategy after local refresh...',
+      });
+      const { generateKeywordStrategy } = await import('./keyword-strategy-generation.js'); // dynamic-import-ok - breaks the keyword-strategy-generation.ts ↔ local-seo.ts cycle
+      // Detached: do NOT await — the local-refresh job must not block on the
+      // slow strategy generation. Failures are isolated to the strategy job.
+      void (async () => {
+        try {
+          updateJob(strategyJob.id, { status: 'running', message: 'Generating keyword strategy...' });
+          // mode 'full' (not incremental): fresh local snapshots can shift the whole
+          // keyword universe, not just the pages that changed.
+          const generationResult = await generateKeywordStrategy({ workspaceId, mode: 'full' });
+          updateJob(strategyJob.id, {
+            status: 'done',
+            progress: 100,
+            total: 100,
+            message: generationResult.upToDate ? 'Strategy already up to date' : 'Keyword strategy regenerated after local refresh',
+          });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          log.warn({ err, workspaceId, strategyJobId: strategyJob.id }, 'Keyword-strategy regen after local SEO refresh failed (non-fatal to refresh job)');
+          updateJob(strategyJob.id, { status: 'error', error: message, message: 'Keyword strategy regeneration failed' });
+        }
+      })();
+    } catch (err) {
+      // Guards the synchronous createJob/dynamic-import setup — a failure here
+      // must never fail the already-successful local-refresh job.
+      log.warn({ err, workspaceId }, 'Failed to kick off keyword-strategy regen after local SEO refresh (non-fatal)');
+    }
+  }
+
   updateJob(jobId, { status: 'done', progress: total, total, message: `Local visibility refreshed — ${refreshed}/${total} checks`, result });
 }
 
 export function countLocalVisibilitySnapshots(workspaceId: string): number {
   const row = stmts().countSnapshotsForWorkspace.get(workspaceId) as { count: number };
   return row.count;
+}
+
+/**
+ * Returns the ISO timestamp of the most recent local_visibility_snapshots row
+ * for the given workspace, or null when none exist.
+ * Cheap aggregate read — does NOT invoke any full-model or Evaluated builders.
+ */
+export function latestLocalSnapshotAt(workspaceId: string): string | null {
+  const row = stmts().maxCapturedAtForWorkspace.get(workspaceId) as { max_captured_at: string | null };
+  return row.max_captured_at ?? null;
 }
 
 export async function runLocationBackfillJob(jobId: string, workspaceId: string): Promise<void> {

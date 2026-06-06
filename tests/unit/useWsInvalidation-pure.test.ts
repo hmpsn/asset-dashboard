@@ -281,6 +281,14 @@ function buildHandlers(wsId: string) {
       qc.invalidateQueries({ queryKey: queryKeys.client.rankHistory(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(wsId) });
     },
+    [WS_EVENTS.LOCAL_SEO_UPDATED]: () => {
+      if (!wsId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.localSeo(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.localSeoLocations(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(wsId) });
+    },
     [WS_EVENTS.BRIEFING_GENERATED]: () => {
       if (!wsId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.briefingDrafts(wsId) });
@@ -536,5 +544,21 @@ describe('useWsInvalidation — event routing (pure)', () => {
     expect(invalidated).toContainEqual(queryKeys.admin.diagnostics(WS_ID));
     expect(invalidated).toContainEqual(queryKeys.admin.diagnosticForInsightAll(WS_ID));
     expect(invalidated).not.toContainEqual(queryKeys.admin.insightFeed(WS_ID));
+  });
+
+  it('STRATEGY_UPDATED invalidates keywordStrategy (Task 1.2 — strategy read refreshes on strategy complete)', () => {
+    const { handlers, invalidated } = buildHandlers(WS_ID);
+    handlers[WS_EVENTS.STRATEGY_UPDATED]();
+
+    expect(invalidated).toContainEqual(queryKeys.admin.keywordStrategy(WS_ID));
+  });
+
+  it('LOCAL_SEO_UPDATED invalidates keywordStrategy (Task 1.2 — strategy read refreshes after local refresh)', () => {
+    const { handlers, invalidated } = buildHandlers(WS_ID);
+    handlers[WS_EVENTS.LOCAL_SEO_UPDATED]();
+
+    expect(invalidated).toContainEqual(queryKeys.admin.keywordStrategy(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.admin.localSeo(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.admin.intelligenceAll(WS_ID));
   });
 });
