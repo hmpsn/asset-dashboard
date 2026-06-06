@@ -257,6 +257,15 @@ export function StrategyKeywordDrawer({
                     </span>
                   </div>
                 )}
+                {drawerRow.valueReasons && drawerRow.valueReasons.length > 0 && (
+                  <div data-testid="value-reasons-section" className="flex flex-col gap-1">
+                    {drawerRow.valueReasons.map(reason => (
+                      <span key={reason} className="t-caption-sm text-blue-400">
+                        {reason}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

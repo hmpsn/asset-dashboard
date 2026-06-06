@@ -334,6 +334,19 @@ export function KeywordDetailDrawer({
                 </div>
               )}
 
+              {row.valueReasons && row.valueReasons.length > 0 && (
+                <div data-testid="value-reasons-section">
+                  <p className="t-label text-[var(--brand-text-muted)] mb-2">Why this score</p>
+                  <div className="space-y-2">
+                    {row.valueReasons.map(reason => (
+                      <KeywordDetailPanel key={reason} tone="blue" className="py-2">
+                        <p className="t-caption-sm text-blue-400 break-words">{reason}</p>
+                      </KeywordDetailPanel>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div>
                 <p className="t-label text-[var(--brand-text-muted)] mb-2">Tracking State</p>
                 <KeywordDetailPanel>
