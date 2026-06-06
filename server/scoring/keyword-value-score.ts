@@ -231,6 +231,58 @@ export function computeKeywordValueComponents(
   };
 }
 
+// ── Volume demand bands for plain-language reasons ───────────────────────────
+
+const DEMAND_HIGH  = 1000;
+const DEMAND_MODEST = 100;
+
+/**
+ * Returns plain-language reason strings from Layer-1 value components + raw signals.
+ * Ordered by contribution: intent → winnability → demand → local.
+ *
+ * - intent: cpc>0 → "Commercial intent · $9 CPC"; else "<Capitalized-intent> intent"
+ * - winnability: raw.difficulty present → "Winnable · KD 24"; else omitted
+ * - demand: raw.volume present → banded label + formatted volume/mo; else omitted
+ * - local: ONLY when components.localMultiplier > 1 → "Local boost ×1.5"
+ */
+export function keywordValueReasons(
+  components: KeywordValueComponents,
+  raw: { cpc?: number; volume?: number; difficulty?: number },
+): string[] {
+  const reasons: string[] = [];
+
+  // 1. Intent reason
+  if (raw.cpc !== undefined && raw.cpc > 0) {
+    const intentLabel = components.intent.charAt(0).toUpperCase() + components.intent.slice(1);
+    reasons.push(`${intentLabel} intent · $${raw.cpc} CPC`);
+  } else {
+    const intentLabel = components.intent.charAt(0).toUpperCase() + components.intent.slice(1);
+    reasons.push(`${intentLabel} intent`);
+  }
+
+  // 2. Winnability reason (only when difficulty is present)
+  if (raw.difficulty !== undefined && raw.difficulty !== null) {
+    reasons.push(`Winnable · KD ${raw.difficulty}`);
+  }
+
+  // 3. Demand reason (only when volume is present)
+  if (raw.volume !== undefined && raw.volume !== null) {
+    const demandLabel =
+      raw.volume >= DEMAND_HIGH ? 'Strong demand' :
+      raw.volume >= DEMAND_MODEST ? 'Modest demand' :
+      'Low demand';
+    const formatted = raw.volume.toLocaleString('en-US');
+    reasons.push(`${demandLabel} · ${formatted}/mo`);
+  }
+
+  // 4. Local boost (only when multiplier > 1)
+  if (components.localMultiplier > 1) {
+    reasons.push(`Local boost ×${components.localMultiplier}`);
+  }
+
+  return reasons;
+}
+
 /**
  * Thin wrapper: returns only the score from computeKeywordValueComponents.
  * The 4 existing scalar callers are unaffected — they receive the same number | undefined.
