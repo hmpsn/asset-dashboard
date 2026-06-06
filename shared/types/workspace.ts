@@ -93,6 +93,8 @@ export interface ContentGap {
   questionKeywords?: string[];
   // SERP feature targeting recommendations
   serpTargeting?: string[];
+  // Cost-per-click from SEO provider (feeds commercialValue in the value scorer)
+  cpc?: number;
   // Composite opportunity score (0–100): volume × ease × GSC signal × trend
   opportunityScore?: number;
   /**

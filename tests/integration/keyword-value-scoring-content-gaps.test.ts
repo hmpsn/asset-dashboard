@@ -163,6 +163,37 @@ describe('content-gap opportunityScore — flag-gated value-first spine swap', (
   });
 });
 
+// ── PR kwv-real-cpc: cpc-fed value score ─────────────────────────────────────────────────
+// When the keyword-value-scoring flag is ON and a content gap carries a real CPC, the
+// commercialValue component is higher than the CPC_UNKNOWN (0.5) proxy path.
+// relaxConservatism=true exercises the full OV / EMV path where CPC matters most.
+describe('content-gap cpc — value score uses real CPC (kwv-real-cpc)', () => {
+  function strategyWith(gap: StrategyContentGap): StrategyOutput {
+    return { pageMap: [], contentGaps: [{ ...gap }], quickWins: [], siteKeywords: [] };
+  }
+
+  it('a content gap with a real cpc scores higher than the same gap with no cpc (commercialValue uses real CPC)', async () => {
+    setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, true);
+    const withCpc = await enrichKeywordStrategy(
+      makeEnrichOptions(
+        workspaceId,
+        strategyWith({ targetKeyword: 'commercial widget', intent: 'commercial', priority: 'high', volume: 1000, difficulty: 40, cpc: 15 }),
+        true,
+      ),
+    );
+    const noCpc = await enrichKeywordStrategy(
+      makeEnrichOptions(
+        workspaceId,
+        strategyWith({ targetKeyword: 'commercial widget', intent: 'commercial', priority: 'high', volume: 1000, difficulty: 40 }),
+        true,
+      ),
+    );
+    const a = withCpc.strategy.contentGaps!.find(g => g.targetKeyword === 'commercial widget')!.opportunityScore!;
+    const b = noCpc.strategy.contentGaps!.find(g => g.targetKeyword === 'commercial widget')!.opportunityScore!;
+    expect(a).toBeGreaterThan(b);
+  });
+});
+
 // ── Full-derive intent at enrichment:611 (score-consolidation PR 1 — review fix) ──────────
 // StrategyContentGap.intent is a FREE-FORM AI-synthesized string (NOT the strict 4-bucket
 // ContentGap.intent), so under the consolidated single classifier a 'comparison' intent
