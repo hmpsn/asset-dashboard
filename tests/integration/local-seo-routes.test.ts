@@ -3,12 +3,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { addTrackedKeyword } from '../../server/rank-tracking.js';
+import { cancelJob, createJob } from '../../server/jobs.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
 import db from '../../server/db/index.js';
 
 const ctx = createTestContext(13361); // port-ok: next free after 13360
-const { api, postJson } = ctx;
+const { api, postJson, del } = ctx;
 
 let workspaceId = '';
 let otherWorkspaceId = '';
@@ -238,6 +239,14 @@ describe('Local SEO routes', () => {
   it('POST refresh starts a capped background job from local-intent keywords', async () => {
     const res = await postJson(`/api/local-seo/${workspaceId}/refresh`, {
       marketIds: ['missing-market'],
+      thenRegenerateStrategy: true,
+      strategyGeneration: {
+        businessContext: 'Route-level local strategy chain coverage',
+        seoDataMode: 'full',
+        seoDataProvider: 'dataforseo',
+        competitorDomains: ['competitor.example'],
+        maxPages: 12,
+      },
     });
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -246,6 +255,44 @@ describe('Local SEO routes', () => {
     expect(body.selectedMarketCount).toBe(0);
     expect(body.selectedKeywordCount).toBeGreaterThan(0);
     expect(body.selectedKeywordCount).toBeLessThanOrEqual(50);
+    await del(`/api/jobs/${body.jobId}`);
+  });
+
+  it('POST refresh rejects invalid request bodies before creating a job', async () => {
+    const res = await postJson(`/api/local-seo/${workspaceId}/refresh`, {
+      device: 'tablet',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('POST refresh returns 404 for an unknown workspace', async () => {
+    const res = await postJson('/api/local-seo/does-not-exist-workspace/refresh', {
+      keywords: ['Austin Dentist'],
+    });
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error).toBe('Workspace not found');
+  });
+
+  it('POST refresh returns the active job id when a workspace refresh is already running', async () => {
+    const activeJob = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, {
+      workspaceId,
+      message: 'already refreshing',
+    });
+    try {
+      const res = await postJson(`/api/local-seo/${workspaceId}/refresh`, {
+        keywords: ['Austin Dentist'],
+      });
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body).toEqual(expect.objectContaining({
+        error: 'Local SEO refresh is already running for this workspace',
+        jobId: activeJob.id,
+      }));
+    } finally {
+      cancelJob(activeJob.id);
+      await del(`/api/jobs/${activeJob.id}`);
+    }
   });
 
   it('allows replacing a market while already at the active market cap', async () => {

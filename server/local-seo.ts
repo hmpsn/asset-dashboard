@@ -14,6 +14,7 @@ import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js
 import { isStrategyPoolEligibleKeyword, isNearDuplicateKeyword } from './keyword-intelligence/rules.js';
 import { listPageKeywords } from './page-keywords.js';
 import { getTrackedKeywords } from './rank-tracking.js';
+import { runRecommendationRegen } from './recommendation-regen-scheduler.js';
 import { DEFAULT_SEO_DATA_PROVIDER, getProvider, isCapabilityDisabled, normalizeRuntimeSeoDataProvider, type SeoDataProvider } from './seo-data-provider.js';
 import { getTaxonomyForIndustry } from './service-taxonomy.js';
 import { getWorkspace } from './workspaces.js';
@@ -442,7 +443,7 @@ const stmts = createStmtCache(() => ({
     JOIN (
       SELECT market_id, normalized_keyword, device, language_code, MAX(captured_at) AS captured_at
       FROM local_visibility_snapshots
-      WHERE workspace_id = ?
+      WHERE workspace_id = ? AND status != ?
       GROUP BY market_id, normalized_keyword, device, language_code
     ) latest
       ON latest.market_id = s.market_id
@@ -450,7 +451,7 @@ const stmts = createStmtCache(() => ({
       AND latest.device = s.device
       AND latest.language_code = s.language_code
       AND latest.captured_at = s.captured_at
-    WHERE s.workspace_id = ?
+    WHERE s.workspace_id = ? AND s.status != ?
   `),
 }));
 
@@ -933,7 +934,12 @@ function listLatestLocalVisibilitySnapshotsForKeyword(workspaceId: string, norma
 }
 
 function listLatestLocalVisibilitySnapshotSummaryRows(workspaceId: string): SnapshotSummaryRow[] {
-  return stmts().latestSnapshotSummary.all(workspaceId, workspaceId) as SnapshotSummaryRow[];
+  return stmts().latestSnapshotSummary.all(
+    workspaceId,
+    LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED,
+    workspaceId,
+    LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED,
+  ) as SnapshotSummaryRow[];
 }
 
 interface CompetitorSnapshotRow {
@@ -2376,6 +2382,26 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
     keywords: plan.keywords,
   };
   if (getJob(jobId)?.status === 'cancelled') return;
+
+  if (refreshed === 0 && failed > 0) {
+    const message = `Local visibility refresh failed — 0/${total} checks refreshed`;
+    notifyLocalSeoUpdated(workspaceId, {
+      action: 'refresh_failed',
+      refreshed,
+      failed,
+      updatedAt: new Date().toISOString(),
+    });
+    updateJob(jobId, {
+      status: 'error',
+      progress: processed,
+      total,
+      message,
+      error: 'All local visibility checks failed',
+      result,
+    });
+    return;
+  }
+
   notifyLocalSeoUpdated(workspaceId, { action: 'refresh_completed', refreshed, failed, updatedAt: new Date().toISOString() });
   addActivity(workspaceId, 'local_seo_updated', 'Local SEO visibility refreshed', `${refreshed} local visibility checks refreshed`, { source: 'local_seo', refreshed, failed });
 
@@ -2391,8 +2417,7 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
     || readSettings(workspace).posture === LOCAL_SEO_POSTURE.HYBRID;
   if (useLocalGenQual) {
     try {
-      const { generateRecommendations } = await import('./recommendations.js'); // dynamic-import-ok - breaks the recommendations.ts ↔ local-seo.ts cycle (readers imported statically the other way)
-      await generateRecommendations(workspaceId);
+      await runRecommendationRegen(workspaceId, 'local_seo_refresh');
       log.info({ workspaceId }, 'Auto-regenerated recommendations after local SEO refresh');
     } catch (err) {
       log.warn({ err, workspaceId }, 'Recommendation regen after local SEO refresh failed (non-fatal)');
@@ -2427,12 +2452,12 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
           workspaceId,
           message: 'Regenerating keyword strategy after local refresh...',
         });
-        const { generateKeywordStrategy } = await import('./keyword-strategy-generation.js'); // dynamic-import-ok - breaks the keyword-strategy-generation.ts ↔ local-seo.ts cycle
         // Detached: do NOT await — the local-refresh job must not block on the
         // slow strategy generation. Failures are isolated to the strategy job.
         void (async () => {
           try {
             updateJob(strategyJob.id, { status: 'running', message: 'Generating keyword strategy...' });
+            const { generateKeywordStrategy } = await import('./keyword-strategy-generation.js'); // dynamic-import-ok - breaks the keyword-strategy-generation.ts ↔ local-seo.ts cycle
             // mode 'full' (not incremental): fresh local snapshots can shift the whole
             // keyword universe, not just the pages that changed.
             const strategyGeneration = request.strategyGeneration;

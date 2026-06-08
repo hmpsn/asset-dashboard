@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   __resetRefreshTimingsForTesting,
   __setRefreshTimingsForTesting,
+  buildLocalSeoKeywordVisibilitySummaryByKey,
   runLocalSeoRefreshJob,
   updateLocalSeoConfiguration,
 } from '../../server/local-seo.js';
@@ -9,6 +10,7 @@ import { getLocalStrategySyncStatus } from '../../server/local-strategy-sync.js'
 import * as strategyModule from '../../server/keyword-strategy-generation.js';
 import { setBroadcast } from '../../server/broadcast.js';
 import { clearCompletedJobs, createJob, getJob, updateJob } from '../../server/jobs.js';
+import { setRecommendationRegenRunnerForTests } from '../../server/recommendation-regen-scheduler.js';
 import { FakeSeoProvider } from '../../server/providers/fake-seo-provider.js';
 import { _resetRegistryForTest, registerProvider } from '../../server/seo-data-provider.js';
 import { addTrackedKeyword } from '../../server/rank-tracking.js';
@@ -35,9 +37,9 @@ import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
 //   1. flag OFF                          → generateKeywordStrategy NOT called; job 'done'
 //   2. flag ON + crawl SUCCESS           → spy called exactly once with strategy settings
 //   3. flag ON + DEGRADED (refreshed>0)  → spy called (proceed)
-//   4. flag ON + hard-fail (refreshed=0) → spy NOT called (abort); job still 'done'
+//   4. flag ON + hard-fail (refreshed=0) → spy NOT called (abort); job 'error'
 //   5. flag ON + regen THROWS            → local-refresh job STILL 'done' (isolated)
-//   6. flag ON + PROVIDER_FAILED row     → spy NOT called; local data still needs refresh
+//   6. flag ON + PROVIDER_FAILED row     → downstream regen skipped; local data still needs refresh
 //   7. flag ON + active strategy job     → duplicate strategy job skipped
 
 const cleanupWorkspaceIds = new Set<string>();
@@ -80,6 +82,7 @@ class ConfigurableLocalProvider extends FakeSeoProvider {
 }
 
 let strategySpy: ReturnType<typeof vi.spyOn>;
+let recommendationRegenSpy: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   __setRefreshTimingsForTesting({ itemYieldMs: 0, heapHeadroomThresholdMb: Number.MAX_SAFE_INTEGER });
@@ -87,9 +90,12 @@ beforeEach(() => {
   // without running the real (heavy, AI-backed) generator. The completion hook
   // dynamic-imports this same module record.
   strategySpy = vi.spyOn(strategyModule, 'generateKeywordStrategy').mockResolvedValue({ strategy: null } as never);
+  recommendationRegenSpy = vi.fn().mockResolvedValue(undefined);
+  setRecommendationRegenRunnerForTests(recommendationRegenSpy);
 });
 
 afterEach(() => {
+  setRecommendationRegenRunnerForTests(null);
   __resetRefreshTimingsForTesting();
   vi.restoreAllMocks();
   _resetRegistryForTest();
@@ -136,6 +142,26 @@ function seedRefreshableWorkspace(name: string, mode: LocalVisibilityMode) {
 }
 
 describe('Phase 2 — chain keyword-strategy regen after local refresh', () => {
+  it('(0) no local markets or local-intent keywords → job ends done with explicit zero-work result', async () => {
+    const ws = createWorkspace('Chain zero-work');
+    cleanupWorkspaceIds.add(ws.id);
+    const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, { workspaceId: ws.id, message: 'zero work' });
+    await runLocalSeoRefreshJob(job.id, ws.id, { thenRegenerateStrategy: true });
+    await flushDetached();
+
+    const finalJob = getJob(job.id);
+    expect(finalJob?.status).toBe('done');
+    expect(finalJob?.message).toBe('No local markets or local-intent keywords ready for refresh');
+    expect(finalJob?.result).toEqual(expect.objectContaining({
+      refreshed: 0,
+      failed: 0,
+      markets: [],
+      keywords: [],
+    }));
+    expect(recommendationRegenSpy).not.toHaveBeenCalled();
+    expect(strategySpy).not.toHaveBeenCalled();
+  });
+
   it('(1) flag OFF → generateKeywordStrategy NOT called; local job ends done', async () => {
     const ws = seedRefreshableWorkspace('Chain flag OFF', 'success');
     const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, { workspaceId: ws.id, message: 'flag off' });
@@ -144,6 +170,8 @@ describe('Phase 2 — chain keyword-strategy regen after local refresh', () => {
 
     expect(getJob(job.id)?.status).toBe('done');
     expect(strategySpy).not.toHaveBeenCalled();
+    expect(recommendationRegenSpy).toHaveBeenCalledTimes(1);
+    expect(recommendationRegenSpy).toHaveBeenCalledWith(ws.id);
   });
 
   it('(2) flag ON + crawl SUCCESS (refreshed > 0) → spy called exactly once with strategy settings', async () => {
@@ -163,6 +191,8 @@ describe('Phase 2 — chain keyword-strategy regen after local refresh', () => {
     await flushDetached();
 
     expect(getJob(job.id)?.status).toBe('done');
+    expect(recommendationRegenSpy).toHaveBeenCalledTimes(1);
+    expect(recommendationRegenSpy).toHaveBeenCalledWith(ws.id);
     expect(strategySpy).toHaveBeenCalledTimes(1);
     expect(strategySpy).toHaveBeenCalledWith(expect.objectContaining({
       workspaceId: ws.id,
@@ -183,18 +213,22 @@ describe('Phase 2 — chain keyword-strategy regen after local refresh', () => {
     await flushDetached();
 
     expect(getJob(job.id)?.status).toBe('done');
+    expect(recommendationRegenSpy).toHaveBeenCalledTimes(1);
     expect(strategySpy).toHaveBeenCalledTimes(1);
   });
 
-  it('(4) flag ON + hard-fail (refreshed === 0) → spy NOT called (abort); job still done', async () => {
+  it('(4) flag ON + hard-fail (refreshed === 0) → spy NOT called (abort); job fails closed', async () => {
     const ws = seedRefreshableWorkspace('Chain hard-fail', 'throw');
     const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, { workspaceId: ws.id, message: 'hard fail' });
     await runLocalSeoRefreshJob(job.id, ws.id, { keywords: ['Austin Dentist'], thenRegenerateStrategy: true });
     await flushDetached();
 
     const finalJob = getJob(job.id);
-    expect(finalJob?.status).toBe('done');
-    expect((finalJob?.result as { refreshed: number }).refreshed).toBe(0);
+    expect(finalJob?.status).toBe('error');
+    expect(finalJob?.message).toBe('Local visibility refresh failed — 0/1 checks refreshed');
+    expect((finalJob?.result as { refreshed: number; failed: number }).refreshed).toBe(0);
+    expect((finalJob?.result as { refreshed: number; failed: number }).failed).toBe(1);
+    expect(recommendationRegenSpy).not.toHaveBeenCalled();
     expect(strategySpy).not.toHaveBeenCalled();
   });
 
@@ -206,6 +240,7 @@ describe('Phase 2 — chain keyword-strategy regen after local refresh', () => {
     await flushDetached();
 
     expect(strategySpy).toHaveBeenCalledTimes(1);
+    expect(recommendationRegenSpy).toHaveBeenCalledTimes(1);
     const finalJob = getJob(job.id);
     // The strategy regen threw, but its own try/catch swallows it — the local
     // refresh job is already successful and stays 'done' with no error.
@@ -213,17 +248,20 @@ describe('Phase 2 — chain keyword-strategy regen after local refresh', () => {
     expect(finalJob?.error).toBeUndefined();
   });
 
-  it('(6) flag ON + provider-failed snapshot → spy NOT called and local data still needs refresh', async () => {
+  it('(6) flag ON + provider-failed snapshot → no downstream regen and local data still needs refresh', async () => {
     const ws = seedRefreshableWorkspace('Chain provider failed', 'provider_failed');
     const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, { workspaceId: ws.id, message: 'provider failed' });
     await runLocalSeoRefreshJob(job.id, ws.id, { keywords: ['Austin Dentist'], thenRegenerateStrategy: true });
     await flushDetached();
 
     const finalJob = getJob(job.id);
-    expect(finalJob?.status).toBe('done');
+    expect(finalJob?.status).toBe('error');
+    expect(finalJob?.error).toBe('All local visibility checks failed');
     expect((finalJob?.result as { refreshed: number; failed: number }).refreshed).toBe(0);
     expect((finalJob?.result as { refreshed: number; failed: number }).failed).toBe(1);
+    expect(recommendationRegenSpy).not.toHaveBeenCalled();
     expect(strategySpy).not.toHaveBeenCalled();
+    expect(buildLocalSeoKeywordVisibilitySummaryByKey(ws.id).has('austin dentist')).toBe(false);
 
     const localSync = getLocalStrategySyncStatus(ws.id);
     expect(localSync.localNeedsRefresh).toBe(true);
@@ -239,6 +277,7 @@ describe('Phase 2 — chain keyword-strategy regen after local refresh', () => {
     await flushDetached();
 
     expect(getJob(job.id)?.status).toBe('done');
+    expect(recommendationRegenSpy).toHaveBeenCalledTimes(1);
     expect(strategySpy).not.toHaveBeenCalled();
     expect(getJob(activeStrategyJob.id)?.status).toBe('pending');
     updateJob(activeStrategyJob.id, { status: 'done' });
