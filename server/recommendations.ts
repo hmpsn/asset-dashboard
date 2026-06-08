@@ -59,6 +59,7 @@ import { buildCtrCurve, type GscKeywordObservation } from './scoring/ctr-curve.j
 import { resolveOvAuthorityStrength } from './workspace-authority.js';
 import { getOrCreateWorkspaceWeights } from './opportunity-weights.js';
 import { computeOvCalibration } from './scoring/ov-calibration.js';
+import { applyOutcomeAdjustmentScore, buildOutcomeAdjustment } from './outcome-learning-default-path.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -768,6 +769,11 @@ function deriveCanonicalRecommendationFields(
   };
 }
 
+function extractOpportunityDifficulty(opportunity: OpportunityScore | undefined): number | null {
+  const rawValue = opportunity?.components.find(component => component.dimension === 'winnability')?.rawValue;
+  return typeof rawValue === 'number' && Number.isFinite(rawValue) ? rawValue : null;
+}
+
 export function getTrafficScore(traffic: TrafficMap, slug: string, conversionRate?: number): number {
   const pagePath = normalizePageUrl(slug);
   const t = traffic[pagePath] || traffic[slug];
@@ -1094,7 +1100,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     // We consume it through the shared builder rather than a hand-rolled read so
     // intent stays sourced from the one blessed representation (CLAUDE.md
     // "AI/recommendation generation consumers must use shared intelligence context builders").
-    slices: ['seoContext', 'clientSignals'],
+    slices: ['seoContext', 'clientSignals', 'learnings'],
     verbosity: 'standard',
     tokenBudget: 800,
     enrichWithBacklinks: true,
@@ -1106,6 +1112,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   // Resolved business priorities (client-entered first, admin-set as supplement).
   // Used only as a within-tier ranking tiebreaker below — never to change tiers.
   const effectiveBusinessPriorities = recommendationContext?.intelligence.clientSignals?.effectiveBusinessPriorities ?? [];
+  const outcomeLearnings = recommendationContext?.intelligence.learnings ?? null;
 
   // Fetch domain strength once per rec-gen cycle (cached at provider layer; see resolveDomainStrength).
   // It now feeds recommendation copy/context only (KD notes / authority framing), while
@@ -2345,6 +2352,14 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       const scoring = deriveCanonicalRecommendationFields(r.source, r.opportunity);
       r.impactScore = scoring.impactScore;
       r.priority = scoring.priority;
+    }
+    const outcomeAdjustment = buildOutcomeAdjustment({
+      actionType: recommendationOutcomeActionType(r.type, r.source),
+      learnings: outcomeLearnings,
+      difficulty: extractOpportunityDifficulty(r.opportunity),
+    });
+    if (outcomeAdjustment.multiplier !== 1) {
+      r.impactScore = applyOutcomeAdjustmentScore(r.impactScore, outcomeAdjustment); // rec-impactscore-ok: outcome learnings apply a bounded same-tier ranking adjustment after canonical OV scoring; priority remains unchanged.
     }
     r.estimatedGain = resolveEstimatedGain(r.estimatedGain, r.opportunity, true);
   }

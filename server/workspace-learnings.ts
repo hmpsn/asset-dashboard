@@ -49,6 +49,11 @@ const CONTENT_ACTION_TYPES: ActionType[] = [
 const STRATEGY_ACTION_TYPES: ActionType[] = [
   'strategy_keyword_added',
   'insight_acted_on',
+  'competitor_gap_closed',
+  'cluster_published',
+  'cannibalization_resolved',
+  'local_visibility_won',
+  'local_service_added',
 ];
 
 const TECHNICAL_ACTION_TYPES: ActionType[] = [

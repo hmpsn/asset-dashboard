@@ -28,9 +28,57 @@ import { replaceAllContentGaps } from '../../server/content-gaps.js';
 import { replaceAllQuickWins } from '../../server/quick-wins.js';
 import { upsertPageKeyword } from '../../server/page-keywords.js';
 import { generateRecommendations } from '../../server/recommendations.js';
+import { buildRecommendationGenerationContext } from '../../server/intelligence/generation-context-builders.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
+import type { LearningsSlice } from '../../shared/types/intelligence.js';
 import type { PageKeywordMap, QuickWin } from '../../shared/types/workspace.js';
+
+const mockBuildRecommendationGenerationContext = vi.mocked(buildRecommendationGenerationContext);
+
+function makeRecommendationContext(learnings: LearningsSlice | null = null) {
+  return {
+    intelligence: {
+      learnings,
+      seoContext: { backlinkProfile: null },
+    },
+  };
+}
+
+function makeLearnings(overrides: Partial<LearningsSlice> = {}): LearningsSlice {
+  return {
+    availability: 'ready',
+    summary: {
+      workspaceId: 'ws-rec-learnings',
+      computedAt: new Date().toISOString(),
+      confidence: 'medium',
+      totalScoredActions: 10,
+      content: null,
+      strategy: null,
+      technical: null,
+      overall: {
+        totalWinRate: 0.6,
+        strongWinRate: 0.2,
+        topActionTypes: [],
+        recentTrend: 'stable',
+      },
+    },
+    confidence: 'medium',
+    topActionTypes: [],
+    overallWinRate: 0.6,
+    recentTrend: 'stable',
+    playbooks: [],
+    roiAttribution: [],
+    topWins: [],
+    weCalledIt: [],
+    winRateByActionType: {},
+    ...overrides,
+  };
+}
+
+afterEach(() => {
+  mockBuildRecommendationGenerationContext.mockResolvedValue(makeRecommendationContext());
+});
 
 describe('generateRecommendations keyword normalization', () => {
   let workspaceId = '';
@@ -97,6 +145,52 @@ describe('generateRecommendations keyword normalization', () => {
     expect(strategySources).not.toContain('strategy:quick-win');
     expect(strategySources).not.toContain('strategy:content-gap');
     expect(strategySources).not.toContain('strategy:ranking-opportunity');
+  });
+});
+
+describe('generateRecommendations outcome-learning ranking', () => {
+  let workspaceId = '';
+
+  afterEach(() => {
+    if (workspaceId) {
+      deleteWorkspace(workspaceId);
+      workspaceId = '';
+    }
+  });
+
+  it('requests learnings and adjusts impactScore without changing the priority tier', async () => {
+    workspaceId = createWorkspace('Recommendation Outcome Learning').id;
+    updateWorkspace(workspaceId, {
+      keywordStrategy: {
+        generatedAt: '2026-05-20T00:00:00.000Z',
+        siteKeywords: [],
+        opportunities: [],
+      },
+    });
+    replaceAllQuickWins(workspaceId, [{
+      pagePath: '/services',
+      action: 'Strengthen service page metadata',
+      estimatedImpact: 'high',
+      rationale: 'Metadata is missing a clear service keyword.',
+      roiScore: 72,
+    }]);
+
+    mockBuildRecommendationGenerationContext.mockResolvedValueOnce(makeRecommendationContext());
+    const neutral = await generateRecommendations(workspaceId);
+    const neutralRec = neutral.recommendations.find(r => r.source === 'strategy:quick-win');
+    expect(neutralRec).toBeTruthy();
+    expect(mockBuildRecommendationGenerationContext).toHaveBeenLastCalledWith(workspaceId, expect.objectContaining({
+      slices: expect.arrayContaining(['seoContext', 'clientSignals', 'learnings']),
+    }));
+
+    mockBuildRecommendationGenerationContext.mockResolvedValueOnce(makeRecommendationContext(makeLearnings({
+      winRateByActionType: { insight_acted_on: 0.72 },
+    })));
+    const boosted = await generateRecommendations(workspaceId);
+    const boostedRec = boosted.recommendations.find(r => r.source === 'strategy:quick-win');
+
+    expect(boostedRec?.priority).toBe(neutralRec?.priority);
+    expect(boostedRec?.impactScore).toBeGreaterThan(neutralRec?.impactScore ?? 0);
   });
 });
 

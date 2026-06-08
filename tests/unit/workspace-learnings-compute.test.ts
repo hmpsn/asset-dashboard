@@ -523,7 +523,7 @@ describe('computeContentLearnings', () => {
 // ---------------------------------------------------------------------------
 
 describe('computeStrategyLearnings', () => {
-  // Strategy action types: strategy_keyword_added, insight_acted_on
+  // Strategy action types: strategy_keyword_added, insight_acted_on, keyword/local recommendation outcomes
 
   it('returns null when fewer than 10 strategy-type items', () => {
     const items = makeItems(9, { actionType: 'strategy_keyword_added', score: 'win' });
@@ -543,6 +543,21 @@ describe('computeStrategyLearnings', () => {
     expect(result).toHaveProperty('winRateByCheckpoint');
     expect(result).toHaveProperty('bestIntentTypes');
     expect(result).toHaveProperty('keywordVolumeSweetSpot');
+  });
+
+  it('includes first-class keyword and local recommendation action types', () => {
+    const actionTypes = [
+      'competitor_gap_closed',
+      'cluster_published',
+      'cannibalization_resolved',
+      'local_visibility_won',
+      'local_service_added',
+    ];
+    const items = actionTypes.flatMap(actionType => makeItems(2, { actionType, score: 'win' }));
+    const result = computeStrategyLearnings(items);
+
+    expect(result).not.toBeNull();
+    expect(result!.winRateByCheckpoint['90d']).toBe(1);
   });
 
   it('bins baseline position >= 51 into 0-20 difficulty range', () => {
