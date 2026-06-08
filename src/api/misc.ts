@@ -171,7 +171,7 @@ export const recommendations = {
     getOptional<unknown>(`/api/public/recommendations/${wsId}`),
 
   generate: (wsId: string) =>
-    post<unknown>(`/api/public/recommendations/${wsId}/generate`),
+    post<{ jobId: string; existing?: boolean }>(`/api/public/recommendations/${wsId}/generate`),
 
   update: (wsId: string, recId: string, body: Record<string, unknown>) =>
     patch<unknown>(`/api/public/recommendations/${wsId}/${recId}`, body),

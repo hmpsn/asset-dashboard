@@ -112,8 +112,14 @@ function serializeKeywordStrategy(
   };
 }
 
-// --- Keyword Strategy Generation (SSE progress) ---
+const KEYWORD_STRATEGY_LEGACY_ROUTE_DEPRECATION =
+  'Deprecated: start keyword strategy generation with BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY via /api/jobs.';
+
+// --- Keyword Strategy Generation (legacy SSE compatibility) ---
+// @deprecated Use BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY through /api/jobs. This
+// route remains for external compatibility only; first-party UI is job-based.
 router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+  res.setHeader('X-Deprecated-Route', KEYWORD_STRATEGY_LEGACY_ROUTE_DEPRECATION);
   const wantsStream = req.headers.accept === 'text/event-stream';
   let streamStarted = false;
   const routeKeepalive: { stop: (() => void) | null } = { stop: null };

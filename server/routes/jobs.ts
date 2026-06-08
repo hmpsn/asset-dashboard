@@ -30,6 +30,7 @@ import {
 import { APP_PASSWORD, signAdminToken } from '../middleware.js';
 import { requestUserCanAccessWorkspace, sendWorkspaceAccessDenied, workspaceOwnsWebflowSite } from '../auth.js';
 import { generateRecommendations, loadRecommendations, resolveRecommendationsForPageIds } from '../recommendations.js';
+import { runRecommendationGenerationJob } from '../recommendation-generation-job.js';
 import { getBrief } from '../content-brief.js';
 import {
   createContentPostGenerationJob,
@@ -710,6 +711,24 @@ router.post('/api/jobs', async (req, res) => {
           const response = workspaceContextJobErrorResponse(err);
           res.status(response.status).json(response.body);
         }
+        break;
+      }
+
+      case BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION: {
+        const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
+        if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
+        const activeRecJob = hasActiveJob(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION, wsId);
+        if (activeRecJob) return res.json({ jobId: activeRecJob.id, existing: true });
+        const recWs = getWorkspace(wsId);
+        if (!recWs) return res.status(404).json({ error: 'Workspace not found' });
+        const job = createJob(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION, {
+          workspaceId: wsId,
+          message: 'Generating recommendations...',
+        });
+        res.json({ jobId: job.id });
+        setTimeout(() => {
+          void runRecommendationGenerationJob(job.id, wsId, 'explicit');
+        }, 100);
         break;
       }
 

@@ -7,19 +7,21 @@ import { requireClientPortalAuth } from '../middleware.js';
 import { createLogger } from '../logger.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';
 import {
-  generateRecommendations,
   loadRecommendations,
   computeRecommendationSummary,
   updateRecommendationStatus,
   dismissRecommendation,
   recommendationOutcomeActionType,
 } from '../recommendations.js';
+import { createJob, hasActiveJob } from '../jobs.js';
+import { runRecommendationGenerationJob } from '../recommendation-generation-job.js';
 import { getLatestSnapshot } from '../reports.js';
 import { updatePageState, getPageIdBySlug, getWorkspace } from '../workspaces.js';
 import { normalizePageUrl } from '../helpers.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import type { Recommendation, RecommendationSet } from '../../shared/types/recommendations.js';
 
 const log = createLogger('routes:recommendations');
@@ -74,8 +76,19 @@ function toPublicRecommendationSet(set: RecommendationSet, recs: Recommendation[
 // cookie-only fetch). Matches the sibling PATCH/DELETE routes below.
 router.post('/api/public/recommendations/:workspaceId/generate', requireClientPortalAuth(), async (req, res) => {
   try {
-    const set = await generateRecommendations(req.params.workspaceId);
-    res.json(toPublicRecommendationSet(set, set.recommendations));
+    const { workspaceId } = req.params;
+    if (!getWorkspace(workspaceId)) return res.status(404).json({ error: 'Workspace not found' });
+    const active = hasActiveJob(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION, workspaceId);
+    if (active) return res.json({ jobId: active.id, existing: true });
+
+    const job = createJob(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION, {
+      workspaceId,
+      message: 'Generating recommendations...',
+    });
+    res.json({ jobId: job.id });
+    setTimeout(() => {
+      void runRecommendationGenerationJob(job.id, workspaceId, 'explicit');
+    }, 100);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }

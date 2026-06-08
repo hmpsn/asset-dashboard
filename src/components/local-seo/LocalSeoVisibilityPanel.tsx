@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { AlertTriangle, CheckCircle2, Globe2, MapPin, RefreshCw, Search, Settings2, Swords, XCircle } from 'lucide-react';
 import type { LocalSeoKeywordVisibility, LocalSeoReadResponse, LocalSeoRepeatCompetitor, LocalSeoReportSummary, LocalSeoVisibilityPosture } from '../../../shared/types/local-seo';
 import { LOCAL_SEO_VISIBILITY_POSTURE } from '../../../shared/types/local-seo';
+import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs';
 import { useLocalSeo, useLocalSeoRefresh } from '../../hooks/admin';
+import { useBackgroundTasks } from '../../hooks/useBackgroundTasks';
 import { Badge, Button, Icon, SectionCard, StatCard, cn } from '../ui';
 import { LocalSeoMarketSetupDrawer } from './LocalSeoMarketSetupDrawer';
 
@@ -260,6 +262,12 @@ export function LocalSeoVisibilityPanel({ workspaceId, mode = 'keywords', onOpen
   const [setupOpen, setSetupOpen] = useState(false);
   const { data, isLoading, error } = useLocalSeo(workspaceId);
   const refresh = useLocalSeoRefresh(workspaceId);
+  const { findActiveJob } = useBackgroundTasks();
+  const activeRefreshJob = findActiveJob({
+    type: BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH,
+    workspaceId,
+  });
+  const refreshing = refresh.isPending || Boolean(activeRefreshJob);
   const title = mode === 'strategy'
     ? 'Local SEO Setup'
     : mode === 'page'
@@ -317,13 +325,13 @@ export function LocalSeoVisibilityPanel({ workspaceId, mode = 'keywords', onOpen
           <Button
             variant="secondary"
             size="sm"
-            icon={refresh.isPending ? undefined : RefreshCw}
-            loading={refresh.isPending}
-            disabled={!canRefresh || refresh.isPending}
+            icon={refreshing ? undefined : RefreshCw}
+            loading={refreshing}
+            disabled={!canRefresh || refreshing}
             title={!canRefresh ? report.setupDetail : 'Refresh local-pack visibility through the background job system.'}
             onClick={() => refresh.mutate({})}
           >
-            {refresh.isPending ? 'Starting...' : 'Refresh'}
+            {refreshing ? 'Refreshing...' : 'Refresh'}
           </Button>
         </div>
       }

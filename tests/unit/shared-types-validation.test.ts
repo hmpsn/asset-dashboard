@@ -224,6 +224,7 @@ describe('BACKGROUND_JOB_TYPES constants', () => {
     expect(BACKGROUND_JOB_TYPES.SEO_BULK_ANALYZE).toBe('seo-bulk-analyze');
     expect(BACKGROUND_JOB_TYPES.SEO_BULK_REWRITE).toBe('seo-bulk-rewrite');
     expect(BACKGROUND_JOB_TYPES.SEO_BULK_ACCEPT_FIXES).toBe('seo-bulk-accept-fixes');
+    expect(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION).toBe('recommendations-generation');
   });
 });
 
@@ -265,6 +266,7 @@ describe('getBackgroundJobLabel', () => {
     expect(getBackgroundJobLabel(BACKGROUND_JOB_TYPES.SEO_AUDIT)).toBe('SEO Audit');
     expect(getBackgroundJobLabel(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY)).toBe('Keyword Strategy');
     expect(getBackgroundJobLabel(BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION)).toBe('Content Post Generation');
+    expect(getBackgroundJobLabel(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION)).toBe('Recommendations Generation');
   });
 
   it('falls back to the raw type string for unknown types', () => {
@@ -279,6 +281,7 @@ describe('isBackgroundJobCancellable', () => {
     expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION)).toBe(true);
     expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.SEO_BULK_ANALYZE)).toBe(true);
     expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.SEO_BULK_REWRITE)).toBe(true);
+    expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH)).toBe(true);
   });
 
   it('returns false for non-cancellable jobs', () => {

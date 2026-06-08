@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { localSeo } from '../../api/localSeo';
 import { queryKeys } from '../../lib/queryKeys';
+import { useBackgroundTasks } from '../useBackgroundTasks';
+import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs';
 import type { LocalSeoLocationLookupRequest, LocalSeoMarketUpdateRequest, LocalSeoRefreshRequest } from '../../../shared/types/local-seo';
 
 export function useLocalSeo(workspaceId: string, options: { includeSnapshots?: boolean } = {}) {
@@ -15,9 +17,13 @@ export function useLocalSeo(workspaceId: string, options: { includeSnapshots?: b
 
 export function useLocalSeoRefresh(workspaceId: string) {
   const queryClient = useQueryClient();
+  const { trackJob } = useBackgroundTasks();
   return useMutation({
     mutationFn: (body: LocalSeoRefreshRequest = {}) => localSeo.refresh(workspaceId, body),
-    onSuccess: () => {
+    onSuccess: (result) => {
+      if (result.jobId) {
+        trackJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, result.jobId, { workspaceId });
+      }
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.localSeo(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });

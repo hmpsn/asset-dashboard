@@ -21,6 +21,9 @@ import type { AddressInfo } from 'net';
 const broadcastState = vi.hoisted(() => ({
   calls: [] as Array<{ workspaceId: string; event: string; payload: Record<string, unknown> }>,
 }));
+const recommendationJobState = vi.hoisted(() => ({
+  runs: [] as Array<{ jobId: string; workspaceId: string; reason: string | undefined }>,
+}));
 
 vi.mock('../../server/broadcast.js', () => ({
   setBroadcast: vi.fn(),
@@ -31,13 +34,20 @@ vi.mock('../../server/broadcast.js', () => ({
     },
   ),
 }));
+vi.mock('../../server/recommendation-generation-job.js', () => ({
+  runRecommendationGenerationJob: vi.fn((jobId: string, workspaceId: string, reason?: string) => {
+    recommendationJobState.runs.push({ jobId, workspaceId, reason });
+  }),
+}));
 
 // ─── Imports (after mock registration) ───────────────────────────────────────
 
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { loadRecommendations, saveRecommendations } from '../../server/recommendations.js';
+import { cancelJob, createJob } from '../../server/jobs.js';
 import db from '../../server/db/index.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import type { OpportunityScore, RecommendationSet } from '../../shared/types/recommendations.js';
 
 // ─── Server bootstrap ─────────────────────────────────────────────────────────
@@ -80,6 +90,10 @@ function patchJson(path: string, body: unknown): Promise<Response> {
 
 function del(path: string): Promise<Response> {
   return api(path, { method: 'DELETE' });
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 // ─── Seed helpers ─────────────────────────────────────────────────────────────
@@ -158,6 +172,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   broadcastState.calls = [];
+  recommendationJobState.runs = [];
   if (wsId) db.prepare('DELETE FROM tracked_actions WHERE workspace_id = ?').run(wsId);
   if (otherWsId) db.prepare('DELETE FROM tracked_actions WHERE workspace_id = ?').run(otherWsId);
 });
@@ -216,6 +231,43 @@ describe('GET /api/public/recommendations/:workspaceId — with seeded data', ()
       expect(ids).not.toContain(seededRecId);
     } finally {
       deleteWorkspace(freshWs.id);
+    }
+  });
+});
+
+// ─── POST generate ───────────────────────────────────────────────────────────
+
+describe('POST /api/public/recommendations/:workspaceId/generate — durable job', () => {
+  it('returns a jobId and dispatches the recommendation generation runner', async () => {
+    const res = await api(`/api/public/recommendations/${wsId}/generate`, { method: 'POST' });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { jobId?: string; existing?: boolean };
+    expect(typeof body.jobId).toBe('string');
+    expect(body.existing).toBeUndefined();
+
+    await sleep(150);
+    expect(recommendationJobState.runs).toContainEqual({
+      jobId: body.jobId,
+      workspaceId: wsId,
+      reason: 'explicit',
+    });
+    cancelJob(body.jobId!);
+  });
+
+  it('returns the active recommendation job id instead of starting a duplicate', async () => {
+    const active = createJob(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION, {
+      workspaceId: wsId,
+      message: 'Already generating recommendations...',
+    });
+    try {
+      const res = await api(`/api/public/recommendations/${wsId}/generate`, { method: 'POST' });
+      expect(res.status).toBe(200);
+      const body = await res.json() as { jobId?: string; existing?: boolean };
+      expect(body).toMatchObject({ jobId: active.id, existing: true });
+      await sleep(150);
+      expect(recommendationJobState.runs).toEqual([]);
+    } finally {
+      cancelJob(active.id);
     }
   });
 });

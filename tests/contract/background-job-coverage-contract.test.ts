@@ -121,6 +121,12 @@ const COVERAGE_SIGNALS: Record<BackgroundJobType, CoverageSignal[]> = {
       mustContainOneOf: [BACKGROUND_JOB_TYPES.ACTION_PLAYBOOK_EXECUTE, 'BACKGROUND_JOB_TYPES.ACTION_PLAYBOOK_EXECUTE'],
     },
   ],
+  [BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION]: [
+    {
+      file: 'tests/integration/recommendations-lifecycle.test.ts',
+      mustContainOneOf: [BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION, 'BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION'],
+    },
+  ],
   [BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH]: [
     {
       file: 'tests/integration/local-seo-routes.test.ts',
