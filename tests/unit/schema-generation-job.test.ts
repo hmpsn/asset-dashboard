@@ -87,6 +87,11 @@ describe('runSchemaGenerationJob', () => {
     });
     expect(mocks.saveSchemaSnapshot).toHaveBeenNthCalledWith(1, 'site-1', 'ws-1', partialResult);
     expect(mocks.saveSchemaSnapshot).toHaveBeenNthCalledWith(2, 'site-1', 'ws-1', finalResult);
+    expect(mocks.broadcastToWorkspace).toHaveBeenNthCalledWith(1, 'ws-1', WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED, {
+      siteId: 'site-1',
+      action: 'partial_saved',
+      pageCount: 1,
+    });
     expect(mocks.broadcastToWorkspace).toHaveBeenCalledWith('ws-1', WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED, {
       siteId: 'site-1',
       action: 'generated',

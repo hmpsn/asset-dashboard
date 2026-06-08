@@ -24,10 +24,12 @@ import {
   listJobs,
   cancelJob,
   clearCompletedJobs,
+  getJobCancellationError,
   registerAbort,
   hasActiveJob,
+  type Job,
 } from '../jobs.js';
-import { APP_PASSWORD, signAdminToken } from '../middleware.js';
+import { APP_PASSWORD, requireClientPortalAuth, signAdminToken } from '../middleware.js';
 import { requestUserCanAccessWorkspace, sendWorkspaceAccessDenied, workspaceOwnsWebflowSite } from '../auth.js';
 import { generateRecommendations, loadRecommendations, resolveRecommendationsForPageIds } from '../recommendations.js';
 import { runRecommendationGenerationJob } from '../recommendation-generation-job.js';
@@ -73,7 +75,7 @@ import { getInsights } from '../analytics-insights-store.js';
 import { createDiagnosticReport, markDiagnosticFailed } from '../diagnostic-store.js';
 import { runDiagnostic } from '../diagnostic-orchestrator.js';
 import type { AnalyticsInsight, AnomalyDigestData } from '../../shared/types/analytics.js';
-import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
+import { BACKGROUND_JOB_TYPES, toPublicBackgroundJob } from '../../shared/types/background-jobs.js';
 import {
   buildWorkspaceIntelligence,
   formatKeywordsForPrompt,
@@ -88,6 +90,9 @@ import { WS_EVENTS } from '../ws-events.js';
 
 const log = createLogger('jobs');
 const router = Router();
+const CLIENT_VISIBLE_JOB_TYPES = new Set<string>([
+  BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION,
+]);
 
 const PORT = parseInt(process.env.PORT || '3001', 10);
 
@@ -132,6 +137,10 @@ function keywordStrategyJobResultSummary(
   };
 }
 
+function isClientVisibleJob(job: Job, workspaceId: string): boolean {
+  return job.workspaceId === workspaceId && CLIENT_VISIBLE_JOB_TYPES.has(job.type);
+}
+
 // --- Background Job Endpoints ---
 router.get('/api/jobs', (_req, res) => {
   const wsId = _req.query.workspaceId as string | undefined;
@@ -150,6 +159,23 @@ router.get('/api/jobs/:id', (req, res) => {
   if (!job) return res.status(404).json({ error: 'Job not found' });
   if (job.workspaceId && !requestUserCanAccessWorkspace(req, job.workspaceId)) return sendWorkspaceAccessDenied(res);
   res.json(job);
+});
+
+router.get('/api/public/jobs/:workspaceId', requireClientPortalAuth(), (req, res) => {
+  const workspaceId = req.params.workspaceId;
+  const jobs = listJobs(workspaceId)
+    .filter(job => isClientVisibleJob(job, workspaceId))
+    .map(toPublicBackgroundJob);
+  res.json(jobs);
+});
+
+router.get('/api/public/jobs/:workspaceId/:id', requireClientPortalAuth(), (req, res) => {
+  const workspaceId = req.params.workspaceId;
+  const job = getJob(req.params.id);
+  if (!job || !isClientVisibleJob(job, workspaceId)) {
+    return res.status(404).json({ error: 'Job not found' });
+  }
+  res.json(toPublicBackgroundJob(job));
 });
 
 router.delete('/api/jobs/completed', (_req, res) => {
@@ -173,6 +199,8 @@ router.delete('/api/jobs/:id', (req, res) => {
   const existing = getJob(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Job not found' });
   if (existing.workspaceId && !requestUserCanAccessWorkspace(req, existing.workspaceId)) return sendWorkspaceAccessDenied(res);
+  const cancellationError = getJobCancellationError(existing);
+  if (cancellationError) return res.status(409).json({ error: cancellationError, jobId: existing.id });
   const job = cancelJob(req.params.id);
   if (!job) return res.status(404).json({ error: 'Job not found' });
   res.json(job);

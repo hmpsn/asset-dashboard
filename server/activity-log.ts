@@ -48,6 +48,7 @@ export type ActivityType =
   | 'strategy_generated'
   | 'keyword_added'
   | 'rank_tracking_updated'
+  | 'recommendations_generated'
   | 'rank_snapshot'
   | 'chat_session'
   | 'payment_received'

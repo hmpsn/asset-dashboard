@@ -176,7 +176,9 @@ describe('background-job coverage contract', () => {
   it('mounts client routes inside BackgroundTaskProvider for public job tracking', () => {
     const appSource = readSignalFile('src/App.tsx');
 
-    expect(appSource).toContain('<BackgroundTaskProvider><MobileGuard><Suspense fallback={<ChunkFallback />}><ClientRoutes betaMode /></Suspense></MobileGuard></BackgroundTaskProvider>');
-    expect(appSource).toContain('<BackgroundTaskProvider><MobileGuard><Suspense fallback={<ChunkFallback />}><ClientRoutes /></Suspense></MobileGuard></BackgroundTaskProvider>');
+    expect(appSource).toContain('function ClientRouteShell({ betaMode = false }: { betaMode?: boolean })');
+    expect(appSource).toContain('<BackgroundTaskProvider workspaceId={workspaceId} publicMode>');
+    expect(appSource).toContain('<Route path="/client/beta/:workspaceId/*" element={<ClientRouteShell betaMode />} />');
+    expect(appSource).toContain('<Route path="/client/:workspaceId/*" element={<ClientRouteShell />} />');
   });
 });

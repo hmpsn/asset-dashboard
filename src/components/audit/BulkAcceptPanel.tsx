@@ -68,6 +68,7 @@ export function BulkAcceptPanel({
         }
       }
     },
+    // ws-invalidation-ok -- centralized cache invalidation lives in useWsInvalidation; this handler only reconciles local bulk-accept UI state.
     [WS_EVENTS.BULK_OPERATION_COMPLETE]: (rawData: unknown) => {
       const d = rawData as { jobId: string; operation: string; applied: number; failed: number; total: number; appliedKeys?: string[] };
       if (d.operation === 'bulk-accept-fixes' && d.jobId === bulkAcceptJobId) {

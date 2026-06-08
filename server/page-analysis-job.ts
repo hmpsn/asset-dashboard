@@ -116,6 +116,14 @@ export async function runPageAnalysisJob({
   let skippedFetch = 0;
   let failed = 0;
   let queuedTotal = 0;
+  const invalidatePageAnalysisReads = (payload: Record<string, unknown>) => {
+    broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_UPDATED, payload);
+    debouncedPageAnalysisInvalidate(workspaceId, () => {
+      invalidateIntelligenceCache(workspaceId);
+      invalidateSubCachePrefix(workspaceId, 'slice:seoContext');
+      invalidateSubCachePrefix(workspaceId, 'slice:pageProfile');
+    });
+  };
 
   try {
     updateJob(jobId, { status: 'running', message: 'Discovering pages...' });
@@ -172,6 +180,7 @@ export async function runPageAnalysisJob({
       // but resets analysis results so removed pages don't retain stale scores.
       const cleared = clearAnalysisFields(workspaceId);
       log.info({ cleared }, 'Page analysis: cleared stale analysis fields for re-analyze');
+      invalidatePageAnalysisReads({ cleared, source: 'page-analysis-job', action: 'analysis_cleared' });
     } else {
       toAnalyze = pages.filter(p => {
         const existing = getPageKeyword(workspaceId, p.path);
@@ -205,6 +214,15 @@ export async function runPageAnalysisJob({
         error: 'OPENAI_API_KEY not configured',
         message: 'Page analysis needs an OpenAI API key before it can run.',
         result: { analyzed, skipped: skippedFetch + failed, skippedFetch, failed, total: queuedTotal },
+      });
+      invalidatePageAnalysisReads({
+        analyzed,
+        skipped: skippedFetch + failed,
+        skippedFetch,
+        failed,
+        total: queuedTotal,
+        source: 'page-analysis-job',
+        action: 'analysis_failed',
       });
       return;
     }
@@ -410,6 +428,7 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
         message: `Cancelled — ${analyzed} of ${total} pages analyzed`,
         result: { analyzed, skipped: skippedFetch + failed, skippedFetch, failed, total },
       });
+      addActivity(workspaceId, 'page_analysis', `Bulk page analysis cancelled — ${analyzed} pages`, `${pages.length} total pages, ${total} queued, ${skippedFetch + failed} skipped`);
     } else {
       const skipped = skippedFetch + failed;
       const message = skipped > 0
@@ -422,17 +441,11 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
         message,
         result: { analyzed, skipped, skippedFetch, failed, total },
       });
+      addActivity(workspaceId, 'page_analysis', `Bulk page analysis completed — ${analyzed} pages`, `${pages.length} total pages, ${total} queued, ${skippedFetch + failed} skipped`);
     }
-    addActivity(workspaceId, 'page_analysis', `Bulk page analysis completed — ${analyzed} pages`, `${pages.length} total pages, ${total} queued, ${skippedFetch + failed} skipped`);
     if (analyzed > 0) {
-      broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_UPDATED, { analyzed, source: 'page-analysis-job' });
+      invalidatePageAnalysisReads({ analyzed, source: 'page-analysis-job' });
     }
-    // Bridge #5: bulk page analysis complete — clear caches
-    debouncedPageAnalysisInvalidate(workspaceId, () => {
-      invalidateIntelligenceCache(workspaceId);
-      invalidateSubCachePrefix(workspaceId, 'slice:seoContext');
-      invalidateSubCachePrefix(workspaceId, 'slice:pageProfile');
-    });
   } catch (err) {
     log.error({ err, jobId }, 'Page analysis job failed');
     if (!isJobCancelled(jobId)) {
@@ -441,6 +454,15 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
         error: err instanceof Error ? err.message : String(err),
         message: 'Page analysis failed',
         result: { analyzed, skipped: skippedFetch + failed, skippedFetch, failed, total: queuedTotal },
+      });
+      invalidatePageAnalysisReads({
+        analyzed,
+        skipped: skippedFetch + failed,
+        skippedFetch,
+        failed,
+        total: queuedTotal,
+        source: 'page-analysis-job',
+        action: 'analysis_failed',
       });
     }
   } finally {

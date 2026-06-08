@@ -139,9 +139,9 @@ describe('MCP job tools (integration)', () => {
   });
 
   it('supports get_job_status, list_jobs, and cancel_job tools', async () => {
-    const started = await callMcpTool('start_keyword_strategy_generation', {
+    const started = await callMcpTool('start_local_seo_refresh', {
       workspace_id: ws.workspaceId,
-      options: { mode: 'full' },
+      refresh_body: {},
     });
     expect(started.isError).toBeFalsy();
     const startedPayload = JSON.parse(started.content[0].text) as { job_id: string };

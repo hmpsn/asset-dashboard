@@ -131,6 +131,7 @@ export function useSeoEditorBulkWorkflow({
         setBulkProgress({ done: detail.done, total: detail.total });
       }
     },
+    // ws-invalidation-ok -- centralized cache invalidation lives in useWsInvalidation; this handler only clears local progress/result UI.
     [WS_EVENTS.BULK_OPERATION_COMPLETE]: (data: unknown) => {
       const detail = data as { jobId: string; operation: string; generated?: number; generatedPages?: number; suggestions?: number; failed?: number; total: number; field?: string };
       if (detail.operation === 'bulk-analyze' && detail.jobId === bulkAnalyzeJobId) {
