@@ -62,6 +62,7 @@ function makeWrapper(props: React.ComponentProps<typeof BackgroundTaskProvider>)
 
 describe('BackgroundTaskProvider realtime wiring', () => {
   beforeEach(() => {
+    vi.useRealTimers();
     sockets.length = 0;
     localStorage.clear();
     mockGet.mockReset();
@@ -131,5 +132,55 @@ describe('BackgroundTaskProvider realtime wiring', () => {
       expect.objectContaining({ onMessage: expect.any(Function) }),
     );
     expect(sockets).toHaveLength(0);
+  });
+
+  it('rehydrates active admin workspace jobs if a terminal websocket event is missed', async () => {
+    mockGet.mockImplementation(async (url: string) => {
+      if (url === '/api/jobs?workspaceId=ws-admin') {
+        return [{
+          id: 'job-admin-1',
+          type: BACKGROUND_JOB_TYPES.SCHEMA_PLAN_GENERATION,
+          status: 'running',
+          message: 'Generating schema plan...',
+          createdAt: '2026-06-08T20:00:00.000Z',
+          updatedAt: '2026-06-08T20:00:01.000Z',
+          workspaceId: 'ws-admin',
+        }];
+      }
+      if (url === '/api/jobs/job-admin-1') {
+        return {
+          id: 'job-admin-1',
+          type: BACKGROUND_JOB_TYPES.SCHEMA_PLAN_GENERATION,
+          status: 'done',
+          message: 'Schema plan ready',
+          createdAt: '2026-06-08T20:00:00.000Z',
+          updatedAt: '2026-06-08T20:00:03.000Z',
+          workspaceId: 'ws-admin',
+        };
+      }
+      return [];
+    });
+
+    const wrapper = makeWrapper({ workspaceId: 'ws-admin' });
+    const { result } = renderHook(() => useBackgroundTasks(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.jobs[0]).toMatchObject({
+        id: 'job-admin-1',
+        status: 'running',
+      });
+    });
+
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 2100));
+    });
+
+    await waitFor(() => {
+      expect(mockGet).toHaveBeenCalledWith('/api/jobs/job-admin-1');
+      expect(result.current.jobs[0]).toMatchObject({
+        id: 'job-admin-1',
+        status: 'done',
+      });
+    });
   });
 });

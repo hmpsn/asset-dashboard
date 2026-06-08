@@ -60,6 +60,8 @@ export const queryKeys = {
     auditTraffic: (siteId: string) => ['admin-audit-traffic', siteId] as const,
     auditSuppressions: (wsId: string) => ['admin-audit-suppressions', wsId] as const,
     auditSchedule: (wsId: string) => ['admin-audit-schedule', wsId] as const,
+    schemaPlan: (siteId: string, wsId?: string) =>
+      wsId ? ['admin-schema-plan', siteId, wsId] as const : ['admin-schema-plan', siteId] as const,
     schemaSnapshot: (siteId: string, wsId?: string) =>
       wsId ? ['admin-schema-snapshot', siteId, wsId] as const : ['admin-schema-snapshot', siteId] as const,
     schemaValidations: (siteId: string, wsId?: string) =>

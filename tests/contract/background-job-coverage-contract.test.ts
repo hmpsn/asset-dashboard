@@ -61,6 +61,12 @@ const COVERAGE_SIGNALS: Record<BackgroundJobType, CoverageSignal[]> = {
       mustContainOneOf: [BACKGROUND_JOB_TYPES.SCHEMA_GENERATOR, 'BACKGROUND_JOB_TYPES.SCHEMA_GENERATOR'],
     },
   ],
+  [BACKGROUND_JOB_TYPES.SCHEMA_PLAN_GENERATION]: [
+    {
+      file: 'tests/integration/schema-plan-generation-job-mutation-safety.test.ts',
+      mustContainOneOf: [BACKGROUND_JOB_TYPES.SCHEMA_PLAN_GENERATION, 'BACKGROUND_JOB_TYPES.SCHEMA_PLAN_GENERATION'],
+    },
+  ],
   [BACKGROUND_JOB_TYPES.PAGE_ANALYSIS]: [
     {
       file: 'tests/integration/page-analysis-job-mutation-safety.test.ts',

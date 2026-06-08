@@ -12,6 +12,8 @@ describe('schema snapshot invalidation contract', () => {
   it('defines the schema snapshot websocket event in both server and client registries', () => {
     expect(readProjectFile('server/ws-events.ts')).toContain("SCHEMA_SNAPSHOT_UPDATED: 'schema:snapshot_updated'");
     expect(readProjectFile('src/lib/wsEvents.ts')).toContain("SCHEMA_SNAPSHOT_UPDATED: 'schema:snapshot_updated'");
+    expect(readProjectFile('server/ws-events.ts')).toContain("SCHEMA_PLAN_UPDATED: 'schema:plan_updated'");
+    expect(readProjectFile('src/lib/wsEvents.ts')).toContain("SCHEMA_PLAN_UPDATED: 'schema:plan_updated'");
   });
 
   it('guards against invalid legacy websocket event literals', () => {
@@ -39,9 +41,12 @@ describe('schema snapshot invalidation contract', () => {
     const clientSource = readProjectFile('src/components/ClientDashboard.tsx');
 
     expect(adminSource).toContain('[WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED]');
+    expect(adminSource).toContain('[WS_EVENTS.SCHEMA_PLAN_UPDATED]');
+    expect(adminSource).toContain('queryKeys.admin.schemaPlan(siteId, workspaceId)');
     expect(adminSource).toContain('queryKeys.admin.schemaSnapshot(siteId, workspaceId)');
     expect(adminSource).toContain('queryKeys.admin.schemaGraphValidation(siteId, workspaceId)');
     expect(clientSource).toContain('[WS_EVENTS.SCHEMA_PLAN_SENT]');
+    expect(clientSource).toContain('[WS_EVENTS.SCHEMA_PLAN_UPDATED]');
     expect(clientSource).toContain('queryKeys.client.schemaPlan(workspaceId)');
     expect(clientSource).toContain('[WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED]');
     expect(clientSource).toContain('queryKeys.client.schemaSnapshot(workspaceId)');

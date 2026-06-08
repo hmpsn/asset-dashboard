@@ -464,6 +464,10 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       queryClient.invalidateQueries({ queryKey: queryKeys.client.schemaPlan(workspaceId) });
     },
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.SCHEMA_PLAN_UPDATED]: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.client.schemaPlan(workspaceId) });
+    },
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED]: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.client.schemaPlan(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.client.schemaSnapshot(workspaceId) });

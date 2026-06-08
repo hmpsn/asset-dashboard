@@ -42,6 +42,7 @@ import {
   notifyTeamActionApproved,
   notifyTeamChangesRequested,
 } from '../../email.js';
+import { assertSchemaPlanFeedbackAllowed } from './schema-plan-respond.js';
 import { getClientPortalUrl, getWorkspace } from '../../workspaces.js';
 import { invalidateIntelligenceCache } from '../../workspace-intelligence.js';
 import type { ClientDeliverable, DeliverableType } from '../../../shared/types/client-deliverable.js';
@@ -181,6 +182,9 @@ export async function respondToDeliverable(
   // Guard the client decision against the per-type machine. Throws InvalidTransitionError
   // (which surfaces as a 4xx in the route) on an illegal move (e.g. approving a declined row).
   validateTransition('deliverable', transitions, current.status, input.decision);
+  if (current.type === 'schema_plan') {
+    assertSchemaPlanFeedbackAllowed(workspaceId);
+  }
 
   const nowIso = new Date().toISOString();
   const responded = upsertDeliverable(toUpsert(current, {

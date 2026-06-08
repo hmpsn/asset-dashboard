@@ -48,6 +48,10 @@ import { saveSnapshot, getLatestSnapshotBefore } from '../reports.js';
 import { getEffectiveAudit, getEffectivePreviousScore } from '../audit-snapshot-views.js';
 import { runSalesAudit } from '../sales-audit.js';
 import { runSchemaGenerationJob } from '../schema-generation-job.js';
+import {
+  schemaPlanGenerationErrorResponse,
+  startSchemaPlanGenerationJob,
+} from '../schema-plan-generation-job.js';
 import { runSeoAudit } from '../seo-audit.js';
 import { handleOnDemandSeoAuditResult } from '../webflow-seo-audit-bridges.js';
 import {
@@ -845,6 +849,18 @@ router.post('/api/jobs', async (req, res) => {
           })();
         }, 100);
         res.json({ jobId: job.id });
+        break;
+      }
+      case BACKGROUND_JOB_TYPES.SCHEMA_PLAN_GENERATION: {
+        const siteId = typeof params.siteId === 'string' ? params.siteId : '';
+        const workspaceId = typeof params.workspaceId === 'string' ? params.workspaceId : undefined;
+        try {
+          const started = startSchemaPlanGenerationJob(siteId, workspaceId);
+          res.json(started);
+        } catch (err) {
+          const response = schemaPlanGenerationErrorResponse(err);
+          res.status(response.status).json(response.body);
+        }
         break;
       }
       case 'schema-generator': {

@@ -18,8 +18,13 @@ import { createTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
-import { upsertDeliverable } from '../../server/client-deliverables.js';
+import { createJob } from '../../server/jobs.js';
+import { getDeliverable, upsertDeliverable } from '../../server/client-deliverables.js';
 import { listActivity } from '../../server/activity-log.js';
+import db from '../../server/db/index.js';
+import { saveSchemaPlan, getSchemaPlan, deleteSchemaPlan } from '../../server/schema-store.js';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
+import type { SchemaSitePlan } from '../../shared/types/schema-plan.js';
 
 const ctx = createTestContext(13874); // port-ok: next free after 13873
 
@@ -56,6 +61,9 @@ beforeAll(async () => {
 }, 25_000);
 
 afterAll(async () => {
+  db.prepare('DELETE FROM jobs WHERE workspace_id = ?').run(pwless.workspaceId);
+  db.prepare('DELETE FROM client_deliverable WHERE workspace_id = ?').run(pwless.workspaceId);
+  deleteSchemaPlan(pwless.webflowSiteId);
   if (clientUserId) deleteClientUser(clientUserId, pwless.workspaceId);
   pwless?.cleanup();
   await ctx.stopServer();
@@ -91,6 +99,58 @@ describe('PATCH /api/public/deliverables/:workspaceId/:id/respond auth', () => {
       body: JSON.stringify({ decision: 'banana' }),
     });
     expect(res.status).toBe(400);
+  });
+
+  it('returns 409 when a schema-plan deliverable is answered during active regeneration', async () => {
+    const now = new Date().toISOString();
+    const plan: SchemaSitePlan = {
+      id: `schema-plan-${pwless.webflowSiteId}`,
+      siteId: pwless.webflowSiteId,
+      workspaceId: pwless.workspaceId,
+      siteUrl: 'https://test.example.com',
+      canonicalEntities: [],
+      pageRoles: [{
+        pagePath: '/',
+        pageTitle: 'Home',
+        role: 'homepage',
+        primaryType: 'Organization',
+        entityRefs: [],
+      }],
+      status: 'sent_to_client',
+      generatedAt: now,
+      updatedAt: now,
+    };
+    saveSchemaPlan(plan);
+    const deliverable = upsertDeliverable({
+      workspaceId: pwless.workspaceId,
+      type: 'schema_plan',
+      kind: 'review',
+      status: 'awaiting_client',
+      title: 'Schema Strategy Review',
+      summary: '1 page, 0 entities for review',
+      payload: { siteId: pwless.webflowSiteId, pageRoles: plan.pageRoles, canonicalEntities: [] },
+      externalRef: pwless.webflowSiteId,
+      sentAt: now,
+      generatedAt: now,
+      sourceRef: `schema_plan:${pwless.webflowSiteId}`,
+    });
+    const activeJob = createJob(BACKGROUND_JOB_TYPES.SCHEMA_PLAN_GENERATION, {
+      workspaceId: pwless.workspaceId,
+      message: 'Generating schema plan...',
+    });
+
+    const res = await clientFetch(
+      `/api/public/deliverables/${pwless.workspaceId}/${deliverable.id}/respond`,
+      { method: 'PATCH', body: JSON.stringify({ decision: 'approved' }) },
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: 'Schema plan generation is in progress. Wait for it to finish before responding to this plan.',
+      jobId: activeJob.id,
+    });
+    expect(getSchemaPlan(pwless.webflowSiteId)?.status).toBe('sent_to_client');
+    expect(getDeliverable(deliverable.id)?.status).toBe('awaiting_client');
   });
 });
 

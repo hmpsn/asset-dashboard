@@ -245,6 +245,11 @@ test.describe('Client workflow smoke pack', () => {
 
     const generatePlanRes = await request.post(`/api/webflow/schema-plan/${schemaSiteId}`);
     expect(generatePlanRes.ok()).toBe(true);
+    await expect.poll(async () => {
+      const res = await request.get(`/api/webflow/schema-plan/${schemaSiteId}`);
+      if (!res.ok()) return null;
+      return await res.json();
+    }).not.toBeNull();
 
     const sendPlanRes = await request.post(`/api/webflow/schema-plan/${schemaSiteId}/send-to-client`);
     expect(sendPlanRes.ok()).toBe(true);
