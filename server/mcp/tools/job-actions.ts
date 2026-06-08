@@ -11,7 +11,7 @@ import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs.js';
 import type { LocalSeoRefreshRequest } from '../../../shared/types/local-seo.js';
 import { addActivity } from '../../activity-log.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
-import { cancelJob, createJob, getJob, hasActiveJob, listJobs, updateJob } from '../../jobs.js';
+import { cancelJob, createJob, getJob, getJobCancellationError, hasActiveJob, listJobs, updateJob } from '../../jobs.js';
 import type { Job } from '../../jobs.js';
 import { createLocalSeoRefreshPlan, runLocalSeoRefreshJob } from '../../local-seo.js';
 import { createLogger } from '../../logger.js';
@@ -376,7 +376,10 @@ async function handleCancelJob(
   if ('isError' in workspace) return workspace;
 
   const existing = requireJobWorkspaceMatch(workspaceId, jobId);
-  if ('isError' in existing) return existing;
+  if (!('id' in existing)) return existing;
+  const existingJob = existing as Job;
+  const cancellationError = getJobCancellationError(existingJob);
+  if (cancellationError) return mcpError(cancellationError);
 
   const job = cancelJob(jobId);
   if (!job) return mcpError(`Job not found: ${jobId}`);

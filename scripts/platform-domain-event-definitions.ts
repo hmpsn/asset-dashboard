@@ -158,6 +158,8 @@ const DEFAULTS_BY_CONTEXT: Record<BoundedContextId, RegistryDefaults> = {
 };
 
 const CONTEXT_BY_EVENT_KEY: Record<WsEventKey, BoundedContextId> = {
+  JOB_CREATED: 'platform-foundation',
+  JOB_UPDATED: 'platform-foundation',
   WORKSPACE_UPDATED: 'workspace-command-center',
   PAGE_STATE_UPDATED: 'seo-health',
   CONTENT_SUBSCRIPTION_CREATED: 'billing-monetization',
@@ -225,6 +227,8 @@ const CONTEXT_BY_EVENT_KEY: Record<WsEventKey, BoundedContextId> = {
 };
 
 const PAYLOAD_NOTE_BY_EVENT_KEY: Partial<Record<WsEventKey, string>> = {
+  JOB_CREATED: 'Background job lifecycle payload consumed by the task provider for progress rediscovery and task-surface updates.',
+  JOB_UPDATED: 'Background job progress/terminal payload consumed by the task provider for progress rediscovery and task-surface updates.',
   WORKSPACE_UPDATED: 'Workspace metadata and billing/tier updates propagated to admin/client caches.',
   PAGE_STATE_UPDATED: 'Page edit-state payload with page identity + operation details for SEO/CMS editors.',
   CONTENT_UPDATED: 'Content domain payload with `domain` discriminator and resource identifiers.',
@@ -242,6 +246,8 @@ const PAYLOAD_NOTE_BY_EVENT_KEY: Partial<Record<WsEventKey, string>> = {
 };
 
 const INVALIDATION_OVERRIDES: Partial<Record<WsEventKey, string[]>> = {
+  JOB_CREATED: ['background task provider local state'],
+  JOB_UPDATED: ['background task provider local state'],
   WORKSPACE_UPDATED: ['queryKeys.admin.workspaceHome', 'queryKeys.admin.workspaceDetail', 'queryKeys.admin.workspaceOverview'],
   PAGE_STATE_UPDATED: ['queryKeys.shared.pageEditStates', 'queryKeys.admin.seoEditorAll', 'queryKeys.admin.cmsEditorAll'],
   CONTENT_UPDATED: ['queryKeys.admin.content*', 'queryKeys.client.contentRequests', 'queryKeys.client.contentPlan', 'queryKeys.client.intelligence'],

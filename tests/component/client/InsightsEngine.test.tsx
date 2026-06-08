@@ -1,10 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { InsightsEngine } from '../../../src/components/client/InsightsEngine';
 import type { RecommendationSet } from '../../../shared/types/recommendations';
 
 const useQueryMock = vi.fn();
 const setQueryDataMock = vi.fn();
+const trackJobMock = vi.fn();
+const postMock = vi.fn();
+let activeJobMock: Record<string, unknown> | undefined;
+let latestTerminalJobMock: Record<string, unknown> | undefined;
 
 vi.mock('@tanstack/react-query', async () => {
   const actual = await vi.importActual<typeof import('@tanstack/react-query')>('@tanstack/react-query');
@@ -33,9 +37,17 @@ vi.mock('../../../src/components/client/useCart', () => ({
 
 vi.mock('../../../src/api/client', () => ({
   get: vi.fn(),
-  post: vi.fn(),
+  post: (...args: unknown[]) => postMock(...args),
   patch: vi.fn(),
   del: vi.fn(),
+}));
+
+vi.mock('../../../src/hooks/useBackgroundTasks', () => ({
+  useBackgroundTasks: () => ({
+    findActiveJob: vi.fn(() => activeJobMock),
+    findLatestTerminalJob: vi.fn(() => latestTerminalJobMock),
+    trackJob: trackJobMock,
+  }),
 }));
 
 function makeSet(): RecommendationSet {
@@ -82,6 +94,10 @@ describe('InsightsEngine', () => {
   beforeEach(() => {
     useQueryMock.mockReset();
     setQueryDataMock.mockReset();
+    trackJobMock.mockReset();
+    postMock.mockReset();
+    activeJobMock = undefined;
+    latestTerminalJobMock = undefined;
   });
 
   it('renders loading state', () => {
@@ -111,5 +127,40 @@ describe('InsightsEngine', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /fix/i }));
     expect(onNavigate).toHaveBeenCalledWith('seo-editor', { pageSlug: '', recType: 'metadata' });
+  });
+
+  it('shows recommendation job progress in the empty state', () => {
+    const set = makeSet();
+    set.recommendations = [];
+    useQueryMock.mockReturnValue({ data: set, isLoading: false, isError: false });
+    activeJobMock = {
+      id: 'job-1',
+      type: 'recommendations-generation',
+      status: 'running',
+      message: 'Generating recommendations...',
+      createdAt: '2026-05-16T00:00:00.000Z',
+      updatedAt: '2026-05-16T00:00:00.000Z',
+      workspaceId: 'ws-test',
+    };
+
+    render(<InsightsEngine workspaceId="ws-test" tier="growth" />);
+
+    expect(screen.getByText('Generating recommendations')).toBeInTheDocument();
+    expect(screen.getByText('Generating recommendations...')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /refresh/i })).not.toBeInTheDocument();
+  });
+
+  it('tracks the public recommendation generation job when refresh starts', async () => {
+    const set = makeSet();
+    useQueryMock.mockReturnValue({ data: set, isLoading: false, isError: false });
+    postMock.mockResolvedValue({ jobId: 'job-77' });
+
+    render(<InsightsEngine workspaceId="ws-test" tier="growth" />);
+    fireEvent.click(screen.getByRole('button', { name: /refresh/i }));
+
+    expect(postMock).toHaveBeenCalledWith('/api/public/recommendations/ws-test/generate');
+    await waitFor(() => {
+      expect(trackJobMock).toHaveBeenCalledWith('recommendations-generation', 'job-77', { workspaceId: 'ws-test' });
+    });
   });
 });

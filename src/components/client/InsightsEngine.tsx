@@ -16,6 +16,8 @@ import { queryKeys } from '../../lib/queryKeys';
 import { Button } from '../ui/Button';
 import { fmtMoneyFull, fmtNum } from '../../utils/formatNumbers';
 import { Icon } from '../ui/Icon';
+import { useBackgroundTasks } from '../../hooks/useBackgroundTasks';
+import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs';
 
 // ─── Props ────────────────────────────────────────────────────────
 
@@ -121,7 +123,8 @@ const EFFORT_BADGE: Record<string, { label: string; color: string }> = {
 export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: InsightsEngineProps) {
   const cart = useCart();
   const qc = useQueryClient();
-  const [regenerating, setRegenerating] = useState(false);
+  const { findActiveJob, findLatestTerminalJob, trackJob } = useBackgroundTasks();
+  const [startingRegeneration, setStartingRegeneration] = useState(false);
   const [expandedPriorities, setExpandedPriorities] = useState<Set<RecPriority>>(new Set(['fix_now']));
   const [expandedRecs, setExpandedRecs] = useState<Set<string>>(new Set());
 
@@ -137,14 +140,35 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
     staleTime: 60_000,
   });
 
+  const activeRecommendationJob = findActiveJob({
+    type: BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION,
+    workspaceId,
+  });
+  const latestRecommendationJob = findLatestTerminalJob({
+    type: BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION,
+    workspaceId,
+  });
+  const regenerating = startingRegeneration || Boolean(activeRecommendationJob);
+
   // Re-generate
   const handleRegenerate = async () => {
-    setRegenerating(true);
+    if (regenerating) return;
+    setStartingRegeneration(true);
     try {
-      const set = await post<RecommendationSet>(`/api/public/recommendations/${workspaceId}/generate`);
-      qc.setQueryData(queryKeys.shared.recommendations(workspaceId), set);
-    } catch { /* silently fail — button stops spinning; user can retry */ }
-    setRegenerating(false);
+      const result = await post<{ jobId?: string }>(`/api/public/recommendations/${workspaceId}/generate`);
+      if (result.jobId) {
+        trackJob(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION, result.jobId, { workspaceId });
+      }
+    } catch (err) {
+      if (err instanceof Error && 'status' in err && 'body' in err) {
+        const body = (err as { body?: unknown }).body;
+        if (body && typeof body === 'object' && 'jobId' in body && typeof (body as { jobId?: unknown }).jobId === 'string') {
+          trackJob(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION, (body as { jobId: string }).jobId, { workspaceId });
+        }
+      }
+      /* silently fail — button stops spinning; user can retry */
+    }
+    setStartingRegeneration(false);
   };
 
   // Update status (on success)
@@ -220,12 +244,34 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
   }
 
   if (!data || data.recommendations.length === 0) {
+    const emptyStateTitle = activeRecommendationJob
+      ? 'Generating recommendations'
+      : latestRecommendationJob?.status === 'error'
+        ? 'Recommendation refresh failed'
+        : 'No recommendations yet';
+    const emptyStateBody = activeRecommendationJob?.message
+      ?? latestRecommendationJob?.error
+      ?? latestRecommendationJob?.message
+      ?? 'Run a site audit to generate prioritized recommendations.';
     return (
       // pr-check-disable-next-line -- InsightsEngine empty state is a top-level client container intentionally using brand signature shape
       <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-8 text-center" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-        <Icon as={Shield} size="2xl" className="text-accent-brand mx-auto mb-3" />
-        <p className="t-body font-medium text-[var(--brand-text-bright)]">No recommendations yet</p>
-        <p className="t-caption text-[var(--brand-text-muted)] mt-1">Run a site audit to generate prioritized recommendations.</p>
+        <Icon as={activeRecommendationJob ? Loader2 : latestRecommendationJob?.status === 'error' ? XCircle : Shield} size="2xl" className={`mx-auto mb-3 ${activeRecommendationJob ? 'text-accent-brand animate-spin' : latestRecommendationJob?.status === 'error' ? 'text-accent-danger' : 'text-accent-brand'}`} />
+        <p className="t-body font-medium text-[var(--brand-text-bright)]">{emptyStateTitle}</p>
+        <p className="t-caption text-[var(--brand-text-muted)] mt-1">{emptyStateBody}</p>
+        {!activeRecommendationJob && (
+          <Button
+            onClick={handleRegenerate}
+            loading={startingRegeneration}
+            disabled={regenerating}
+            variant="secondary"
+            size="sm"
+            icon={RefreshCw}
+            className="mt-4 t-caption text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border-0"
+          >
+            Refresh
+          </Button>
+        )}
       </div>
     );
   }
@@ -346,6 +392,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
             <Button
               onClick={handleRegenerate}
               loading={regenerating}
+              disabled={regenerating}
               variant="secondary"
               size="sm"
               icon={RefreshCw}

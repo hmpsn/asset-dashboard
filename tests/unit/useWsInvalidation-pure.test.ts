@@ -254,6 +254,16 @@ function buildHandlers(wsId: string) {
         qc.invalidateQueries({ queryKey: queryKeys.admin.schemaGraphValidation(siteId) });
         qc.invalidateQueries({ queryKey: queryKeys.admin.schemaGraphValidation(siteId, wsId) });
       }
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(wsId) });
+    },
+    [WS_EVENTS.BULK_OPERATION_COMPLETE]: (data: unknown) => {
+      if (!wsId) return;
+      const operation = typeof data === 'object' && data !== null && 'operation' in data
+        ? String((data as { operation: unknown }).operation)
+        : undefined;
+      if (operation === 'bulk-rewrite') {
+        qc.invalidateQueries({ queryKey: queryKeys.admin.seoSuggestions(wsId) });
+      }
     },
     [WS_EVENTS.POST_UPDATED]: (data: unknown) => {
       if (!wsId) return;
@@ -427,6 +437,18 @@ describe('useWsInvalidation — event routing (pure)', () => {
     expect(invalidated).toContainEqual(queryKeys.admin.schemaSnapshot('site-99', WS_ID));
     expect(invalidated).toContainEqual(queryKeys.admin.schemaGraphValidation('site-99'));
     expect(invalidated).toContainEqual(queryKeys.admin.schemaGraphValidation('site-99', WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.admin.intelligenceAll(WS_ID));
+  });
+
+  it('BULK_OPERATION_COMPLETE invalidates seoSuggestions only for bulk rewrites', () => {
+    const { handlers, invalidated } = buildHandlers(WS_ID);
+    handlers[WS_EVENTS.BULK_OPERATION_COMPLETE]({ operation: 'bulk-rewrite' });
+
+    expect(invalidated).toContainEqual(queryKeys.admin.seoSuggestions(WS_ID));
+
+    const other = buildHandlers(WS_ID);
+    other.handlers[WS_EVENTS.BULK_OPERATION_COMPLETE]({ operation: 'bulk-analyze' });
+    expect(other.invalidated).not.toContainEqual(queryKeys.admin.seoSuggestions(WS_ID));
   });
 
   it('POST_UPDATED invalidates per-post key when postId present in payload', () => {

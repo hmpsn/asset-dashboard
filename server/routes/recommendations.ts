@@ -3,6 +3,7 @@
  */
 import { Router } from 'express';
 
+import { addActivity } from '../activity-log.js';
 import { requireClientPortalAuth } from '../middleware.js';
 import { createLogger } from '../logger.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';
@@ -13,6 +14,7 @@ import {
   updateRecommendationStatus,
   dismissRecommendation,
 } from '../recommendations.js';
+import { createJob, hasActiveJob, updateJob } from '../jobs.js';
 import { getLatestSnapshot } from '../reports.js';
 import { updatePageState, getPageIdBySlug, getWorkspace } from '../workspaces.js';
 import { normalizePageUrl } from '../helpers.js';
@@ -20,6 +22,7 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import type { Recommendation, RecommendationSet } from '../../shared/types/recommendations.js';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 
 const log = createLogger('routes:recommendations');
 const router = Router();
@@ -72,12 +75,45 @@ function toPublicRecommendationSet(set: RecommendationSet, recs: Recommendation[
 // session; passwordless/demo portals pass through (the client calls this with a
 // cookie-only fetch). Matches the sibling PATCH/DELETE routes below.
 router.post('/api/public/recommendations/:workspaceId/generate', requireClientPortalAuth(), async (req, res) => {
-  try {
-    const set = await generateRecommendations(req.params.workspaceId);
-    res.json(toPublicRecommendationSet(set, set.recommendations));
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
-  }
+  const { workspaceId } = req.params;
+  const activeJob = hasActiveJob(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION, workspaceId);
+  if (activeJob) return res.status(409).json({ error: 'Recommendation generation is already running', jobId: activeJob.id });
+
+  const job = createJob(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION, {
+    workspaceId,
+    message: 'Generating recommendations...',
+  });
+  res.json({ jobId: job.id });
+
+  setTimeout(() => {
+    void (async () => {
+      try {
+        updateJob(job.id, { status: 'running', message: 'Generating recommendations...' });
+        const set = await generateRecommendations(workspaceId);
+        updateJob(job.id, {
+          status: 'done',
+          message: `Recommendations ready — ${set.recommendations.length} items`,
+          result: {
+            generatedAt: set.generatedAt,
+            count: set.recommendations.length,
+          },
+        });
+        addActivity(
+          workspaceId,
+          'recommendations_generated',
+          'Recommendations refreshed',
+          `${set.recommendations.length} recommendations generated`,
+          { source: 'client_portal', jobId: job.id },
+        );
+      } catch (err) {
+        updateJob(job.id, {
+          status: 'error',
+          message: 'Recommendation generation failed',
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    })();
+  }, 25);
 });
 
 // List current recommendations — returns the last-known/empty set.

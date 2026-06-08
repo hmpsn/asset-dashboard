@@ -17,7 +17,7 @@ import {
   updateClientLocation,
 } from '../client-locations.js';
 import db from '../db/index.js';
-import { createJob, hasActiveJob, updateJob } from '../jobs.js';
+import { createJob, hasActiveJob, registerAbort, updateJob } from '../jobs.js';
 import { createLogger } from '../logger.js';
 import {
   countLocalVisibilitySnapshots,
@@ -231,6 +231,7 @@ router.post('/api/local-seo/:workspaceId/refresh', requireWorkspaceAccess('works
     total: Math.max(1, plan.markets.length * plan.keywords.length),
     message: 'Preparing local SEO visibility refresh...',
   });
+  registerAbort(job.id);
   res.json({ jobId: job.id, selectedKeywordCount: plan.keywords.length, selectedMarketCount: plan.markets.length });
   // Use .catch() instead of void so any unexpected throw (e.g. from addActivity/broadcastToWorkspace
   // after the main loop) becomes a logged error + failed job rather than an unhandled rejection

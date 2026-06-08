@@ -180,6 +180,15 @@ describe('runDiagnostic — missing insight', () => {
     await runDiagnostic({ workspaceId: 'ws-1', insightId: 'missing-id', reportId: 'rpt-1' }, 'job-1');
     expect(mocks.completeDiagnosticReport).not.toHaveBeenCalled();
   });
+
+  it('broadcasts DIAGNOSTIC_FAILED when insight lookup fails', async () => {
+    await runDiagnostic({ workspaceId: 'ws-1', insightId: 'missing-id', reportId: 'rpt-1' }, 'job-1');
+    expect(mocks.broadcastToWorkspace).toHaveBeenCalledWith(
+      'ws-1',
+      'diagnostic:failed',
+      expect.objectContaining({ reportId: 'rpt-1', insightId: 'missing-id' }),
+    );
+  });
 });
 
 describe('runDiagnostic — happy path', () => {

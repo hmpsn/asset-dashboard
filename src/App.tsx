@@ -142,14 +142,27 @@ function ClientRoutes({ betaMode = false }: { betaMode?: boolean }) {
   return <ClientDashboard workspaceId={workspaceId} initialTab={splatTab} betaMode={betaMode} />;
 }
 
+function ClientRouteShell({ betaMode = false }: { betaMode?: boolean }) {
+  const { workspaceId } = useParams<{ workspaceId: string }>();
+  return (
+    <BackgroundTaskProvider workspaceId={workspaceId} publicMode>
+      <MobileGuard>
+        <Suspense fallback={<ChunkFallback />}>
+          <ClientRoutes betaMode={betaMode} />
+        </Suspense>
+      </MobileGuard>
+    </BackgroundTaskProvider>
+  );
+}
+
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/welcome" element={<Suspense fallback={<ChunkFallback />}><LandingPage /></Suspense>} />
         <Route path="/styleguide" element={<StyleguideRedirect />} />
-        <Route path="/client/beta/:workspaceId/*" element={<MobileGuard><Suspense fallback={<ChunkFallback />}><ClientRoutes betaMode /></Suspense></MobileGuard>} />
-        <Route path="/client/:workspaceId/*" element={<MobileGuard><Suspense fallback={<ChunkFallback />}><ClientRoutes /></Suspense></MobileGuard>} />
+        <Route path="/client/beta/:workspaceId/*" element={<ClientRouteShell betaMode />} />
+        <Route path="/client/:workspaceId/*" element={<ClientRouteShell />} />
         <Route path="/*" element={<ToastProvider><BackgroundTaskProvider><AdminApp /></BackgroundTaskProvider></ToastProvider>} />
       </Routes>
     </BrowserRouter>

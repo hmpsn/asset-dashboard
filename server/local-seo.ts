@@ -9,7 +9,7 @@ import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { getClientLocations } from './client-locations.js';
 import { listContentGaps } from './content-gaps.js';
-import { updateJob, getJob } from './jobs.js';
+import { updateJob, getJob, unregisterAbort } from './jobs.js';
 import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js';
 import { isStrategyPoolEligibleKeyword, isNearDuplicateKeyword } from './keyword-intelligence/rules.js';
 import { listPageKeywords } from './page-keywords.js';
@@ -2259,47 +2259,48 @@ export async function resolveLocalSeoProviderLocation(
 }
 
 export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, request: LocalSeoRefreshRequest = {}): Promise<void> {
-  const workspace = getWorkspace(workspaceId);
-  if (!workspace) {
-    updateJob(jobId, { status: 'error', message: 'Workspace not found', error: 'Workspace not found' });
-    return;
-  }
-  const locations = getEffectiveLocations(workspace);
-  const plan = createLocalSeoRefreshPlan(workspaceId, request);
-  if (!plan || plan.markets.length === 0 || plan.keywords.length === 0) {
-    updateJob(jobId, {
-      status: 'done',
-      progress: 100,
-      total: 100,
-      message: 'No local markets or local-intent keywords ready for refresh',
-      result: { workspaceId, refreshed: 0, skipped: 0, failed: 0, markets: [], keywords: [] } satisfies LocalSeoRefreshResult,
-    });
-    return;
-  }
+  try {
+    const workspace = getWorkspace(workspaceId);
+    if (!workspace) {
+      updateJob(jobId, { status: 'error', message: 'Workspace not found', error: 'Workspace not found' });
+      return;
+    }
+    const locations = getEffectiveLocations(workspace);
+    const plan = createLocalSeoRefreshPlan(workspaceId, request);
+    if (!plan || plan.markets.length === 0 || plan.keywords.length === 0) {
+      updateJob(jobId, {
+        status: 'done',
+        progress: 100,
+        total: 100,
+        message: 'No local markets or local-intent keywords ready for refresh',
+        result: { workspaceId, refreshed: 0, skipped: 0, failed: 0, markets: [], keywords: [] } satisfies LocalSeoRefreshResult,
+      });
+      return;
+    }
 
-  const provider = resolveLocalVisibilityProvider(workspace);
-  if (!provider?.getLocalVisibility) {
-    updateJob(jobId, { status: 'error', message: 'No configured local visibility provider', error: 'No configured local visibility provider' });
-    return;
-  }
-  // Capture the narrowed method reference so TypeScript can see it's non-undefined
-  // inside async closures where control-flow narrowing doesn't persist.
-  const getLocalVisibility = provider.getLocalVisibility.bind(provider);
+    const provider = resolveLocalVisibilityProvider(workspace);
+    if (!provider?.getLocalVisibility) {
+      updateJob(jobId, { status: 'error', message: 'No configured local visibility provider', error: 'No configured local visibility provider' });
+      return;
+    }
+    // Capture the narrowed method reference so TypeScript can see it's non-undefined
+    // inside async closures where control-flow narrowing doesn't persist.
+    const getLocalVisibility = provider.getLocalVisibility.bind(provider);
 
-  const total = plan.markets.length * plan.keywords.length;
-  let processed = 0;
-  let refreshed = 0;
-  let failed = 0;
-  let lastProgressBroadcastAt = 0;
-  updateJob(jobId, { status: 'running', total, progress: 0, message: 'Refreshing local visibility...' });
+    const total = plan.markets.length * plan.keywords.length;
+    let processed = 0;
+    let refreshed = 0;
+    let failed = 0;
+    let lastProgressBroadcastAt = 0;
+    updateJob(jobId, { status: 'running', total, progress: 0, message: 'Refreshing local visibility...' });
 
   // Flatten (market × keyword) into a single work-item array, then process
   // with bounded concurrency to cut wall-clock time 3–5× vs. fully sequential.
-  const workItems = plan.markets.flatMap(market =>
-    plan.keywords.map(keyword => ({ market, keyword }))
-  );
+    const workItems = plan.markets.flatMap(market =>
+      plan.keywords.map(keyword => ({ market, keyword }))
+    );
 
-  for (let i = 0; i < workItems.length; i += LOCAL_SEO_REFRESH_CONCURRENCY) {
+    for (let i = 0; i < workItems.length; i += LOCAL_SEO_REFRESH_CONCURRENCY) {
     if (getJob(jobId)?.status === 'cancelled') return;
     // Layer 4: heap-aware backpressure. If heap is above the soft threshold,
     // pause briefly so GC + concurrent KCC reads can drain before we allocate
@@ -2362,17 +2363,17 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
     if (processed < total && refreshTimings.itemYieldMs > 0) await sleep(refreshTimings.itemYieldMs);
   }
 
-  const result: LocalSeoRefreshResult = {
-    workspaceId,
-    refreshed,
-    skipped: total - refreshed - failed,
-    failed,
-    markets: plan.markets.map(market => market.id),
-    keywords: plan.keywords,
-  };
-  if (getJob(jobId)?.status === 'cancelled') return;
-  notifyLocalSeoUpdated(workspaceId, { action: 'refresh_completed', refreshed, failed, updatedAt: new Date().toISOString() });
-  addActivity(workspaceId, 'local_seo_updated', 'Local SEO visibility refreshed', `${refreshed} local visibility checks refreshed`, { source: 'local_seo', refreshed, failed });
+    const result: LocalSeoRefreshResult = {
+      workspaceId,
+      refreshed,
+      skipped: total - refreshed - failed,
+      failed,
+      markets: plan.markets.map(market => market.id),
+      keywords: plan.keywords,
+    };
+    if (getJob(jobId)?.status === 'cancelled') return;
+    notifyLocalSeoUpdated(workspaceId, { action: 'refresh_completed', refreshed, failed, updatedAt: new Date().toISOString() });
+    addActivity(workspaceId, 'local_seo_updated', 'Local SEO visibility refreshed', `${refreshed} local visibility checks refreshed`, { source: 'local_seo', refreshed, failed });
 
   // Fresh local visibility snapshots are the spine of the local recs (B1/B2/B3). After a refresh
   // completes, regenerate recommendations so the new evidence surfaces immediately — mirroring the
@@ -2382,19 +2383,22 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
   // its own try/catch so a regen failure never fails the refresh job. Dynamic import avoids a
   // static recommendations.ts ↔ local-seo.ts import cycle (recommendations.ts imports the local
   // readers statically).
-  const useLocalGenQual = readSettings(workspace).posture === LOCAL_SEO_POSTURE.LOCAL
-    || readSettings(workspace).posture === LOCAL_SEO_POSTURE.HYBRID;
-  if (useLocalGenQual) {
-    try {
-      const { generateRecommendations } = await import('./recommendations.js'); // dynamic-import-ok - breaks the recommendations.ts ↔ local-seo.ts cycle (readers imported statically the other way)
-      await generateRecommendations(workspaceId);
-      log.info({ workspaceId }, 'Auto-regenerated recommendations after local SEO refresh');
-    } catch (err) {
-      log.warn({ err, workspaceId }, 'Recommendation regen after local SEO refresh failed (non-fatal)');
+    const useLocalGenQual = readSettings(workspace).posture === LOCAL_SEO_POSTURE.LOCAL
+      || readSettings(workspace).posture === LOCAL_SEO_POSTURE.HYBRID;
+    if (useLocalGenQual) {
+      try {
+        const { generateRecommendations } = await import('./recommendations.js'); // dynamic-import-ok - breaks the recommendations.ts ↔ local-seo.ts cycle (readers imported statically the other way)
+        await generateRecommendations(workspaceId);
+        log.info({ workspaceId }, 'Auto-regenerated recommendations after local SEO refresh');
+      } catch (err) {
+        log.warn({ err, workspaceId }, 'Recommendation regen after local SEO refresh failed (non-fatal)');
+      }
     }
-  }
 
-  updateJob(jobId, { status: 'done', progress: total, total, message: `Local visibility refreshed — ${refreshed}/${total} checks`, result });
+    updateJob(jobId, { status: 'done', progress: total, total, message: `Local visibility refreshed — ${refreshed}/${total} checks`, result });
+  } finally {
+    unregisterAbort(jobId);
+  }
 }
 
 export function countLocalVisibilitySnapshots(workspaceId: string): number {

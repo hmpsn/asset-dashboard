@@ -50,6 +50,13 @@ const LOCAL_ONLY_EVENTS = new Set<string>([
   'BULK_OPERATION_COMPLETE',
   'BULK_OPERATION_FAILED',
 
+  // Job lifecycle events are consumed by the dedicated background-task
+  // provider, not by the centralized React Query invalidation hook. The
+  // provider updates task state directly for admin/global and public-client
+  // job tracking surfaces.
+  'JOB_CREATED',
+  'JOB_UPDATED',
+
   // SCHEMA_PLAN_SENT refreshes client portal schema-plan React Query caches,
   // but ClientDashboard owns that client-side subscription because the admin
   // useWsInvalidation hook is not mounted on /client routes.
