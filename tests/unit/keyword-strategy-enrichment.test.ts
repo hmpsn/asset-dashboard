@@ -114,20 +114,29 @@ function fillKeywordPool(opts: ReturnType<typeof makeEnrichOptions>, count = 10)
 
 describe('parseTopicClusterOutput', () => {
   it('validates parseable topic cluster JSON with the expected shape', () => {
-    mockParseJsonFallback.mockReturnValue([
-      { topic: 'Dental Services', keywords: ['dental keyword 1', 'dental keyword 2', 'dental keyword 3'] },
-    ]);
+    mockParseJsonFallback.mockReturnValue({
+      clusters: [
+        { topic: 'Dental Services', keywords: ['dental keyword 1', 'dental keyword 2', 'dental keyword 3'] },
+      ],
+    });
 
-    const clusters = parseTopicClusterOutput('[{"topic":"Dental Services","keywords":["dental keyword 1","dental keyword 2","dental keyword 3"]}]');
+    const clusters = parseTopicClusterOutput('{"clusters":[{"topic":"Dental Services","keywords":["dental keyword 1","dental keyword 2","dental keyword 3"]}]}');
 
     expect(clusters).toHaveLength(1);
     expect(clusters[0].topic).toBe('Dental Services');
   });
 
-  it('rejects malformed but parseable topic cluster JSON', () => {
-    mockParseJsonFallback.mockReturnValue([{ topic: 'Broken', keywords: ['one'] }]);
+  it('skips malformed items in parseable topic cluster JSON', () => {
+    mockParseJsonFallback.mockReturnValue({
+      clusters: [
+        { topic: 'Broken', keywords: ['one'] },
+        { topic: 'Dental Services', keywords: ['dental keyword 1', 'dental keyword 2', 'dental keyword 3'] },
+      ],
+    });
 
-    expect(() => parseTopicClusterOutput('[{"topic":"Broken","keywords":["one"]}]')).toThrow('invalid JSON');
+    expect(parseTopicClusterOutput('{"clusters":[]}')).toEqual([
+      { topic: 'Dental Services', keywords: ['dental keyword 1', 'dental keyword 2', 'dental keyword 3'] },
+    ]);
   });
 });
 
@@ -581,9 +590,11 @@ describe('enrichKeywordStrategy', () => {
   it('uses the named topic-cluster operation and stores valid AI clusters', async () => {
     const opts = makeEnrichOptions();
     fillKeywordPool(opts);
-    mockParseJsonFallback.mockReturnValue([
-      { topic: 'Dental Services', keywords: ['dental keyword 0', 'dental keyword 1', 'dental keyword 2'] },
-    ]);
+    mockParseJsonFallback.mockReturnValue({
+      clusters: [
+        { topic: 'Dental Services', keywords: ['dental keyword 0', 'dental keyword 1', 'dental keyword 2'] },
+      ],
+    });
 
     const result = await enrichKeywordStrategy(opts);
 

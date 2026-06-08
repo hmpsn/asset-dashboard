@@ -539,6 +539,10 @@ function rowToRawLocalResults(row: SnapshotRow): LocalVisibilityBusinessResult[]
   });
 }
 
+function isUsableLocalVisibilitySnapshot(snapshot: Pick<LocalVisibilitySnapshot, 'status'>): boolean {
+  return snapshot.status !== LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED;
+}
+
 function derivePosture(workspace: Workspace): Pick<LocalSeoWorkspaceSettings, 'suggestedPosture' | 'suggestionReasons'> {
   const reasons: string[] = [];
   const profile = workspace.businessProfile;
@@ -740,6 +744,7 @@ export function getLocalSeoReadModel(
   const markets = listLocalSeoMarkets(workspace.id);
   const suggestedMarkets = buildSuggestedMarkets(workspace);
   const latestSnapshots = listLatestLocalVisibilitySnapshots(workspace.id);
+  const latestUsableSnapshots = latestSnapshots.filter(isUsableLocalVisibilitySnapshot);
   const responseSnapshots = options.includeSnapshots === false ? [] : latestSnapshots;
   return {
     featureEnabled,
@@ -752,7 +757,7 @@ export function getLocalSeoReadModel(
       settings,
       markets,
       suggestedMarkets,
-      latestSnapshots,
+      latestSnapshots: latestUsableSnapshots,
     }),
     competitorBrands: getLocalSeoCompetitorBrands(workspaceId),
     serviceGaps: featureEnabled ? getLocalSeoServiceGaps(workspaceId) : [],
@@ -1148,6 +1153,7 @@ export function buildLocalSeoKeywordVisibilitySummaryByKey(workspaceId: string):
 export function buildLocalSeoKeywordVisibilityByKey(workspaceId: string): Map<string, LocalSeoKeywordVisibilitySummary> {
   const grouped = new Map<string, LocalSeoKeywordVisibility[]>();
   for (const snapshot of listLatestLocalVisibilitySnapshots(workspaceId)) {
+    if (!isUsableLocalVisibilitySnapshot(snapshot)) continue;
     if (!snapshot.normalizedKeyword) continue;
     const current = grouped.get(snapshot.normalizedKeyword) ?? [];
     current.push(localSeoKeywordVisibilityFromSnapshot(snapshot));
@@ -2399,6 +2405,13 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
       error: 'All local visibility checks failed',
       result,
     });
+    addActivity(
+      workspaceId,
+      'local_seo_updated',
+      'Local SEO visibility refresh failed',
+      `${failed} local visibility checks failed; no usable local evidence was refreshed`,
+      { source: 'local_seo', refreshed, failed },
+    );
     return;
   }
 

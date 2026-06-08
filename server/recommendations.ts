@@ -667,16 +667,18 @@ export function isRecIntentAligned(
 
 /** Canonical recommendation ranking. Sorts `recs` in place:
  *   1. priority tier (fix_now > fix_soon > fix_later > ongoing) — PRIMARY
- *   2. impactScore (highest first) — SECONDARY
+ *   2. rank score override, then impactScore (highest first) — SECONDARY
  *   3. business-intent alignment (aligned first) — within-tier TIEBREAKER only
  *
  * Because intent is the LAST comparator, an intent-aligned rec can only outrank
- * another rec that is otherwise equal (same tier, same impactScore). A higher
- * tier or a higher impactScore always wins regardless of intent.
+ * another rec that is otherwise equal (same tier, same rank score). A higher
+ * tier or a higher rank score always wins regardless of intent. Rank score
+ * overrides are ephemeral; they do not change the persisted/public impactScore.
  * @internal exported for unit testing */
 export function sortRecommendations(
   recs: Recommendation[],
   effectiveBusinessPriorities: string[],
+  options: { rankScores?: Map<string, number> } = {},
 ): void {
   const priorityOrder: Record<RecPriority, number> = { fix_now: 0, fix_soon: 1, fix_later: 2, ongoing: 3 };
   // Memoise alignment so we don't re-tokenise per comparison.
@@ -692,7 +694,9 @@ export function sortRecommendations(
   recs.sort((a, b) => {
     const pDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
     if (pDiff !== 0) return pDiff;
-    const scoreDiff = b.impactScore - a.impactScore;
+    const scoreA = options.rankScores?.get(a.id) ?? a.impactScore;
+    const scoreB = options.rankScores?.get(b.id) ?? b.impactScore;
+    const scoreDiff = scoreB - scoreA;
     if (scoreDiff !== 0) return scoreDiff;
     // Equal tier and impact — let stated business intent break the tie.
     return Number(isAligned(b)) - Number(isAligned(a));
@@ -767,11 +771,6 @@ function deriveCanonicalRecommendationFields(
     impactScore: opportunity.value,
     priority: deriveOvTier({ priority: 'ongoing', source, opportunity }),
   };
-}
-
-function extractOpportunityDifficulty(opportunity: OpportunityScore | undefined): number | null {
-  const rawValue = opportunity?.components.find(component => component.dimension === 'winnability')?.rawValue;
-  return typeof rawValue === 'number' && Number.isFinite(rawValue) ? rawValue : null;
 }
 
 export function getTrafficScore(traffic: TrafficMap, slug: string, conversionRate?: number): number {
@@ -2347,6 +2346,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   // ── Canonical OV scoring + one gain basis chokepoint. ──
   // Keep one post-pass so every producer converges on the same final authority even if a
   // future branch accidentally provides a placeholder priority/score during construction.
+  const outcomeRankScores = new Map<string, number>();
   for (const r of recs) {
     if (r.opportunity) {
       const scoring = deriveCanonicalRecommendationFields(r.source, r.opportunity);
@@ -2356,17 +2356,17 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     const outcomeAdjustment = buildOutcomeAdjustment({
       actionType: recommendationOutcomeActionType(r.type, r.source),
       learnings: outcomeLearnings,
-      difficulty: extractOpportunityDifficulty(r.opportunity),
     });
     if (outcomeAdjustment.multiplier !== 1) {
-      r.impactScore = applyOutcomeAdjustmentScore(r.impactScore, outcomeAdjustment); // rec-impactscore-ok: outcome learnings apply a bounded same-tier ranking adjustment after canonical OV scoring; priority remains unchanged.
+      outcomeRankScores.set(r.id, applyOutcomeAdjustmentScore(r.impactScore, outcomeAdjustment));
     }
     r.estimatedGain = resolveEstimatedGain(r.estimatedGain, r.opportunity, true);
   }
 
-  // ── Sort: tier PRIMARY, impactScore SECONDARY, business-intent alignment as
-  // the final within-tier tiebreaker (see sortRecommendations). ──
-  sortRecommendations(recs, effectiveBusinessPriorities);
+  // ── Sort: tier PRIMARY, learned rank score / impactScore SECONDARY, business-intent
+  // alignment as the final within-tier tiebreaker. Learning scores are rank-only so
+  // the public `impactScore === opportunity.value` contract stays intact.
+  sortRecommendations(recs, effectiveBusinessPriorities, { rankScores: outcomeRankScores });
 
   // ── Build summary (exclude auto-resolved from active counts) ──
   const summary = computeRecommendationSummary(recs);

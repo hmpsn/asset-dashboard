@@ -15,6 +15,7 @@ import {
 } from '../recommendations.js';
 import { createJob, hasActiveJob } from '../jobs.js';
 import { runRecommendationGenerationJob } from '../recommendation-generation-job.js';
+import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { getLatestSnapshot } from '../reports.js';
 import { updatePageState, getPageIdBySlug, getWorkspace } from '../workspaces.js';
 import { normalizePageUrl } from '../helpers.js';
@@ -197,22 +198,26 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', requireClientPor
   // completed without affectedPages but still need outcome-learning calibration.
   if (status === 'completed') {
     try {
-      if (workspaceId && !getActionBySource('recommendation', recId)) recordAction({ // recordAction-ok: workspaceId guarded by if condition
-        workspaceId,
-        actionType: recommendationOutcomeActionType(rec.type, rec.source),
-        sourceType: 'recommendation',
-        sourceId: recId,
-        pageUrl: rec.affectedPages?.[0] ?? null,
-        targetKeyword: null,
-        baselineSnapshot: {
-          captured_at: new Date().toISOString(),
-        },
-        // P4: snapshot the OV predicted EMV (CPC-proxy placeholder) onto the durable
-        // outcome row so the P6 realized-vs-predicted calibration loop has a pairing.
-        // null when this rec carries no opportunity (legacy row / OV not yet attached).
-        predictedEmv: rec.opportunity?.predictedEmv ?? null,
-        attribution: 'platform_executed',
-      });
+      if (workspaceId && !getActionBySource('recommendation', recId)) {
+        const pageUrl = rec.affectedPages?.[0] ?? null;
+        const action = recordAction({ // recordAction-ok: workspaceId guarded by if condition
+          workspaceId,
+          actionType: recommendationOutcomeActionType(rec.type, rec.source),
+          sourceType: 'recommendation',
+          sourceId: recId,
+          pageUrl,
+          targetKeyword: null,
+          baselineSnapshot: {
+            captured_at: new Date().toISOString(),
+          },
+          // P4: snapshot the OV predicted EMV (CPC-proxy placeholder) onto the durable
+          // outcome row so the P6 realized-vs-predicted calibration loop has a pairing.
+          // null when this rec carries no opportunity (legacy row / OV not yet attached).
+          predictedEmv: rec.opportunity?.predictedEmv ?? null,
+          attribution: 'platform_executed',
+        });
+        if (pageUrl) void captureBaselineFromGsc(action.id, workspaceId, pageUrl);
+      }
     } catch (err) {
       log.warn({ err, recId }, 'Failed to record outcome action for recommendation completion');
     }

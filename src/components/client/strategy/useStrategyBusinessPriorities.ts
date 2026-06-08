@@ -2,11 +2,12 @@ import { useCallback, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, businessPriorities as bizPrioritiesApi } from '../../../api';
 import { queryKeys } from '../../../lib/queryKeys';
+import type {
+  BusinessPrioritiesConflictResponse,
+  BusinessPriority,
+} from '../../../../shared/types/business-priorities';
 
-export interface StrategyBusinessPriority {
-  text: string;
-  category: string;
-}
+export type StrategyBusinessPriority = BusinessPriority;
 
 interface UseStrategyBusinessPrioritiesOptions {
   workspaceId?: string;
@@ -43,7 +44,7 @@ export function useStrategyBusinessPriorities({ workspaceId, setToast }: UseStra
     },
     onError: (err) => {
       if (workspaceId && err instanceof ApiError && err.status === 409) {
-        const body = err.body as { priorities?: StrategyBusinessPriority[]; updatedAt?: string | null } | undefined;
+        const body = err.body as Partial<BusinessPrioritiesConflictResponse> | undefined;
         if (body && Array.isArray(body.priorities)) {
           queryClient.setQueryData(queryKeys.client.strategyGuidance(workspaceId), {
             priorities: body.priorities,
@@ -61,7 +62,11 @@ export function useStrategyBusinessPriorities({ workspaceId, setToast }: UseStra
 
   const savePriorities = useCallback(async (newList: StrategyBusinessPriority[]) => {
     if (!workspaceId || query.isError) return;
-    await mutation.mutateAsync(newList);
+    try {
+      await mutation.mutateAsync(newList);
+    } catch {
+      // onError owns user-facing recovery; UI callers intentionally fire-and-forget.
+    }
   }, [workspaceId, query.isError, mutation]);
 
   return {

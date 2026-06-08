@@ -148,8 +148,8 @@ function App() {
       <Routes>
         <Route path="/welcome" element={<Suspense fallback={<ChunkFallback />}><LandingPage /></Suspense>} />
         <Route path="/styleguide" element={<StyleguideRedirect />} />
-        <Route path="/client/beta/:workspaceId/*" element={<MobileGuard><Suspense fallback={<ChunkFallback />}><ClientRoutes betaMode /></Suspense></MobileGuard>} />
-        <Route path="/client/:workspaceId/*" element={<MobileGuard><Suspense fallback={<ChunkFallback />}><ClientRoutes /></Suspense></MobileGuard>} />
+        <Route path="/client/beta/:workspaceId/*" element={<BackgroundTaskProvider><MobileGuard><Suspense fallback={<ChunkFallback />}><ClientRoutes betaMode /></Suspense></MobileGuard></BackgroundTaskProvider>} />
+        <Route path="/client/:workspaceId/*" element={<BackgroundTaskProvider><MobileGuard><Suspense fallback={<ChunkFallback />}><ClientRoutes /></Suspense></MobileGuard></BackgroundTaskProvider>} />
         <Route path="/*" element={<ToastProvider><BackgroundTaskProvider><AdminApp /></BackgroundTaskProvider></ToastProvider>} />
       </Routes>
     </BrowserRouter>

@@ -287,7 +287,7 @@ export const AI_OPERATION_REGISTRY = {
     providerIntent: 'openai',
     modelIntent: 'topical authority cluster grouping from a closed keyword pool',
     outputMode: 'json',
-    parserExpectation: 'parseTopicClusterOutput (zod array validation, skip malformed)',
+    parserExpectation: 'parseTopicClusterOutput ({ clusters: [...] } object validation, skip malformed items)',
     researchMode: 'optional',
     executionMode: 'background-only',
     retryPolicy: 'standard',

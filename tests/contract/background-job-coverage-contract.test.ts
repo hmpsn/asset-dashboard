@@ -172,4 +172,11 @@ describe('background-job coverage contract', () => {
       }
     }
   });
+
+  it('mounts client routes inside BackgroundTaskProvider for public job tracking', () => {
+    const appSource = readSignalFile('src/App.tsx');
+
+    expect(appSource).toContain('<BackgroundTaskProvider><MobileGuard><Suspense fallback={<ChunkFallback />}><ClientRoutes betaMode /></Suspense></MobileGuard></BackgroundTaskProvider>');
+    expect(appSource).toContain('<BackgroundTaskProvider><MobileGuard><Suspense fallback={<ChunkFallback />}><ClientRoutes /></Suspense></MobileGuard></BackgroundTaskProvider>');
+  });
 });

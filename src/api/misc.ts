@@ -1,6 +1,11 @@
 // ── Miscellaneous API endpoints ────────────────────────────────────
 import { get, post, patch, del, getSafe, getOptional, getText, postForm } from './client';
 import type { ContentSubscription, ContentSubscriptionPlanConfig } from '../../shared/types/content';
+import type {
+  BusinessPrioritiesResponse,
+  BusinessPrioritiesSaveRequest,
+  BusinessPrioritiesSaveResponse,
+} from '../../shared/types/business-priorities';
 import type { KeywordFeedbackDeleteResponse, KeywordFeedbackListRow, KeywordFeedbackMutationResponse } from '../../shared/types/keyword-feedback';
 import type { TrackedKeyword } from '../../shared/types/rank-tracking';
 export {
@@ -309,25 +314,11 @@ export const trackedKeywords = {
 };
 
 // ── Public: business priorities ───────────────────────────────
-export interface BusinessPriority {
-  text: string;
-  category: string;
-}
-
-export interface BusinessPrioritiesResponse {
-  priorities: BusinessPriority[];
-  updatedAt: string | null;
-}
-
-export interface BusinessPrioritiesSaveResponse extends BusinessPrioritiesResponse {
-  saved: number;
-}
-
 export const businessPriorities = {
   get: (wsId: string) =>
     get<BusinessPrioritiesResponse>(`/api/public/business-priorities/${wsId}`),
 
-  save: (wsId: string, body: { priorities: BusinessPriority[]; expectedUpdatedAt?: string | null }) =>
+  save: (wsId: string, body: BusinessPrioritiesSaveRequest) =>
     post<BusinessPrioritiesSaveResponse>(`/api/public/business-priorities/${wsId}`, body),
 };
 

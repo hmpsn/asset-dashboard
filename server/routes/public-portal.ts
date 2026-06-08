@@ -56,6 +56,11 @@ import { computeTrialState } from '../billing/trial-state.js';
 import { toPublicWorkspaceView } from '../serializers/client-safe.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 import { getVoiceProfile } from '../voice-calibration.js';
+import type {
+  BusinessPrioritiesConflictResponse,
+  BusinessPrioritiesResponse,
+  BusinessPrioritiesSaveResponse,
+} from '../../shared/types/business-priorities.js';
 
 const log = createLogger('public-portal');
 
@@ -449,7 +454,7 @@ interface ClientBusinessPrioritiesRow {
 function normalizeClientBusinessPrioritiesRow(
   wsId: string,
   row: ClientBusinessPrioritiesRow | undefined,
-): { priorities: Array<{ text: string; category: string }>; updatedAt: string | null } {
+): BusinessPrioritiesResponse {
   if (!row) return { priorities: [], updatedAt: null };
   const priorities = parseJsonSafeArray(
     row.priorities,
@@ -485,11 +490,12 @@ router.post('/api/public/business-priorities/:workspaceId', requireClientStrateg
   const existingRow = db.prepare('SELECT priorities, updated_at FROM client_business_priorities WHERE workspace_id = ?').get(wsId) as ClientBusinessPrioritiesRow | undefined;
   const existing = normalizeClientBusinessPrioritiesRow(wsId, existingRow);
   if (expectedUpdatedAt !== undefined && expectedUpdatedAt !== existing.updatedAt) {
-    return res.status(409).json({
+    const response: BusinessPrioritiesConflictResponse = {
       error: 'Business priorities changed. Please refresh and try again.',
       priorities: existing.priorities,
       updatedAt: existing.updatedAt,
-    });
+    };
+    return res.status(409).json(response);
   }
   const clean = priorities.map(p => ({
     text: p.text,
@@ -533,7 +539,8 @@ router.post('/api/public/business-priorities/:workspaceId', requireClientStrateg
   broadcastToWorkspace(wsId, WS_EVENTS.STRATEGY_UPDATED, { businessPriorities: clean });
   // client-visibility-ok: business-priority edits are internal strategy signals, not client timeline content.
   addActivity(wsId, 'client_priorities_updated', `Client updated business priorities (${clean.length} items)`, 'Via client portal');
-  res.json({ saved: clean.length, priorities: clean, updatedAt });
+  const response: BusinessPrioritiesSaveResponse = { saved: clean.length, priorities: clean, updatedAt };
+  res.json(response);
 });
 
 // ── Business Profile (client-facing PATCH) ─────────────────────

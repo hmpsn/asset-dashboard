@@ -27,18 +27,27 @@ const log = createLogger('keyword-strategy:enrichment');
 const URL_LEVEL_KEYWORD_PAGE_LIMIT = 12;
 const URL_LEVEL_KEYWORD_PER_PAGE_LIMIT = 10;
 const URL_LEVEL_KEYWORD_CONCURRENCY = 3;
-const topicClusterAiOutputSchema = z.array(z.object({
+const topicClusterItemSchema = z.object({
   topic: z.string().trim().min(1),
   keywords: z.array(z.string().trim().min(1)).min(3),
-}));
+});
+const topicClusterCandidateSchema = z.object({}).passthrough();
+const topicClusterAiOutputSchema = z.object({
+  clusters: z.array(topicClusterCandidateSchema).default([]),
+});
 
-export type TopicClusterAiOutput = z.infer<typeof topicClusterAiOutputSchema>;
+export type TopicClusterAiOutput = z.infer<typeof topicClusterItemSchema>[];
 
 export function parseTopicClusterOutput(raw: string): TopicClusterAiOutput {
   const parsed = parseJsonFallback<unknown>(raw, null);
-  const result = topicClusterAiOutputSchema.safeParse(parsed);
-  if (!result.success) throw new Error('AI topic clustering returned invalid JSON');
-  return result.data;
+  const envelope = topicClusterAiOutputSchema.safeParse(parsed);
+  if (!envelope.success) throw new Error('AI topic clustering returned invalid JSON');
+  const clusters: TopicClusterAiOutput = [];
+  for (const cluster of envelope.data.clusters) {
+    const result = topicClusterItemSchema.safeParse(cluster);
+    if (result.success) clusters.push(result.data);
+  }
+  return clusters;
 }
 
 export interface KeywordStrategyTopicCluster {
@@ -770,13 +779,15 @@ ${businessSection}
 KEYWORD POOL (${poolForClustering.length} keywords with search volume):
 ${poolForClustering.join(', ')}
 
-Return JSON array:
-[
-  {
-    "topic": "Short descriptive topic name (2-4 words, specific to THIS business)",
-    "keywords": ["keyword1", "keyword2"]
-  }
-]
+Return a JSON object:
+{
+  "clusters": [
+    {
+      "topic": "Short descriptive topic name (2-4 words, specific to THIS business)",
+      "keywords": ["keyword1", "keyword2", "keyword3"]
+    }
+  ]
+}
 
 Rules:
 - Each cluster must represent a distinct business capability, service area, product category, or content pillar that THIS business actually serves
@@ -785,7 +796,7 @@ Rules:
 - Every keyword should appear in exactly ONE cluster. Skip keywords that don't fit any meaningful business topic
 - Clusters should have 3-15 keywords each
 - Order clusters by strategic importance to the business
-- Return ONLY valid JSON array, no markdown`;
+- Return ONLY a valid JSON object with a "clusters" array, no markdown`;
 
       const clusterRaw = await callNamedStrategyAI(workspaceId, 'keyword-topic-clusters', [
         { role: 'system', content: 'You are a topical authority analyst. Return valid JSON only.' },

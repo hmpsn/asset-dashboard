@@ -27,11 +27,12 @@ import db from '../../server/db/index.js';
 import { replaceAllContentGaps } from '../../server/content-gaps.js';
 import { replaceAllQuickWins } from '../../server/quick-wins.js';
 import { upsertPageKeyword } from '../../server/page-keywords.js';
-import { generateRecommendations } from '../../server/recommendations.js';
+import { generateRecommendations, sortRecommendations } from '../../server/recommendations.js';
 import { buildRecommendationGenerationContext } from '../../server/intelligence/generation-context-builders.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 import type { LearningsSlice } from '../../shared/types/intelligence.js';
+import type { Recommendation } from '../../shared/types/recommendations.js';
 import type { PageKeywordMap, QuickWin } from '../../shared/types/workspace.js';
 
 const mockBuildRecommendationGenerationContext = vi.mocked(buildRecommendationGenerationContext);
@@ -158,7 +159,7 @@ describe('generateRecommendations outcome-learning ranking', () => {
     }
   });
 
-  it('requests learnings and adjusts impactScore without changing the priority tier', async () => {
+  it('requests learnings without mutating canonical impactScore or priority tier', async () => {
     workspaceId = createWorkspace('Recommendation Outcome Learning').id;
     updateWorkspace(workspaceId, {
       keywordStrategy: {
@@ -190,7 +191,38 @@ describe('generateRecommendations outcome-learning ranking', () => {
     const boostedRec = boosted.recommendations.find(r => r.source === 'strategy:quick-win');
 
     expect(boostedRec?.priority).toBe(neutralRec?.priority);
-    expect(boostedRec?.impactScore).toBeGreaterThan(neutralRec?.impactScore ?? 0);
+    expect(boostedRec?.impactScore).toBe(neutralRec?.impactScore);
+    expect(boostedRec?.opportunity?.value).toBe(neutralRec?.opportunity?.value);
+  });
+
+  it('uses outcome-learning rank scores as within-tier ordering input only', () => {
+    const makeRec = (id: string, impactScore: number): Recommendation => ({
+      id,
+      workspaceId: 'ws-rec-sort',
+      priority: 'fix_soon',
+      type: 'strategy',
+      title: id,
+      description: id,
+      insight: id,
+      impact: 'medium',
+      effort: 'low',
+      impactScore,
+      source: 'strategy:quick-win',
+      affectedPages: [],
+      trafficAtRisk: 0,
+      impressionsAtRisk: 0,
+      estimatedGain: 'Test',
+      actionType: 'manual',
+      status: 'pending',
+      createdAt: '2026-06-01T00:00:00.000Z',
+      updatedAt: '2026-06-01T00:00:00.000Z',
+    });
+    const recs = [makeRec('lower-canonical-boosted', 70), makeRec('higher-canonical', 80)];
+
+    sortRecommendations(recs, [], { rankScores: new Map([['lower-canonical-boosted', 90]]) });
+
+    expect(recs.map(rec => rec.id)).toEqual(['lower-canonical-boosted', 'higher-canonical']);
+    expect(recs[0].impactScore).toBe(70);
   });
 });
 

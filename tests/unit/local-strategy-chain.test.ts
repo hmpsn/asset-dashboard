@@ -3,11 +3,13 @@ import {
   __resetRefreshTimingsForTesting,
   __setRefreshTimingsForTesting,
   buildLocalSeoKeywordVisibilitySummaryByKey,
+  getLocalSeoReadModel,
   runLocalSeoRefreshJob,
   updateLocalSeoConfiguration,
 } from '../../server/local-seo.js';
 import { getLocalStrategySyncStatus } from '../../server/local-strategy-sync.js';
 import * as strategyModule from '../../server/keyword-strategy-generation.js';
+import { listActivity } from '../../server/activity-log.js';
 import { setBroadcast } from '../../server/broadcast.js';
 import { clearCompletedJobs, createJob, getJob, updateJob } from '../../server/jobs.js';
 import { setRecommendationRegenRunnerForTests } from '../../server/recommendation-regen-scheduler.js';
@@ -262,6 +264,12 @@ describe('Phase 2 — chain keyword-strategy regen after local refresh', () => {
     expect(recommendationRegenSpy).not.toHaveBeenCalled();
     expect(strategySpy).not.toHaveBeenCalled();
     expect(buildLocalSeoKeywordVisibilitySummaryByKey(ws.id).has('austin dentist')).toBe(false);
+    const readModel = getLocalSeoReadModel(ws.id, true);
+    expect(readModel?.latestSnapshots).toHaveLength(1);
+    expect(readModel?.report.latestSnapshotCount).toBe(0);
+    expect(readModel?.report.checkedKeywordCount).toBe(0);
+    expect(readModel?.report.setupState).toBe('ready_no_data');
+    expect(listActivity(ws.id).some(activity => activity.title === 'Local SEO visibility refresh failed')).toBe(true);
 
     const localSync = getLocalStrategySyncStatus(ws.id);
     expect(localSync.localNeedsRefresh).toBe(true);

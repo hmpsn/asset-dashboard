@@ -1,4 +1,5 @@
 import { z } from '../middleware/validate.js';
+import type { BusinessPrioritiesSaveRequest } from '../../shared/types/business-priorities.js';
 
 export const CLIENT_BUSINESS_PRIORITIES_MARKER = '\n--- CLIENT PRIORITIES ---\n';
 
@@ -29,4 +30,4 @@ export const clientBusinessPrioritiesBodySchema = z.object({
 }).strict();
 
 export type ClientBusinessPriorityInput = z.infer<typeof clientBusinessPrioritySchema>;
-export type ClientBusinessPrioritiesBody = z.infer<typeof clientBusinessPrioritiesBodySchema>;
+export type ClientBusinessPrioritiesBody = BusinessPrioritiesSaveRequest;
