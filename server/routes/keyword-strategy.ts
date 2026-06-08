@@ -215,10 +215,35 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess(
     const ws = getWorkspace(req.params.workspaceId);
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });
     const strategy = ws.keywordStrategy;
+    const localSync = getLocalStrategySyncStatus(ws.id);
     // Single read-path assembler (#2): table-as-truth + table-or-blob fallback,
     // returning null on the existing short-circuit (no blob + all tables empty).
     const assembled = assembleStoredKeywordStrategy(ws.id);
-    if (!assembled) return res.json(null);
+    if (!assembled) {
+      if (!localSync.applies) return res.json(null);
+      const shellStrategyUx = await buildKeywordStrategyUxPayload({
+        workspaceId: ws.id,
+        workspaceName: ws.name,
+        strategy: null,
+        pageMap: [],
+        contentGaps: [],
+        keywordGaps: [],
+        surface: 'admin',
+      });
+      shellStrategyUx.localSync = localSync;
+      return res.json({
+        siteKeywords: [],
+        opportunities: [],
+        pageMap: [],
+        contentGaps: [],
+        quickWins: [],
+        keywordGaps: [],
+        topicClusters: [],
+        cannibalization: [],
+        strategyUx: shellStrategyUx,
+        generatedAt: null,
+      });
+    }
     const { pageMap, contentGaps, quickWins, keywordGaps, topicClusters, cannibalization } = assembled;
     if (!strategy) {
       const shellStrategyUx = await buildKeywordStrategyUxPayload({
@@ -230,7 +255,7 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess(
         keywordGaps,
         surface: 'admin',
       });
-      shellStrategyUx.localSync = getLocalStrategySyncStatus(ws.id);
+      shellStrategyUx.localSync = localSync;
       return res.json({
         siteKeywords: [],
         opportunities: [],
@@ -253,7 +278,7 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess(
       keywordGaps,
       surface: 'admin',
     });
-    strategyUx.localSync = getLocalStrategySyncStatus(ws.id);
+    strategyUx.localSync = localSync;
     res.json(serializeKeywordStrategy(strategy, pageMap, contentGaps, quickWins, keywordGaps, topicClusters, cannibalization, strategyUx));
   } catch (err) {
     next(err);

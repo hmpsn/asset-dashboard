@@ -420,6 +420,9 @@ export function updateRecommendationStatus(
   if (!set) return null;
   const rec = set.recommendations.find(r => r.id === recId);
   if (!rec) return null;
+  if (rec.status !== status) {
+    validateTransition('recommendation', RECOMMENDATION_TRANSITIONS, rec.status, status);
+  }
   rec.status = status;
   rec.updatedAt = new Date().toISOString();
   // Recompute the summary so topRecommendationId stays consistent after a
@@ -2266,8 +2269,13 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       // Preserve status from existing rec if it was in_progress or completed
       const oldRec = existingByKey.get(key);
       if (oldRec) {
-        if (oldRec.status === 'in_progress' || oldRec.status === 'completed') {
+        if (oldRec.status === 'in_progress') {
           newRec.status = oldRec.status;
+          newRec.id = oldRec.id; // keep same ID for frontend continuity
+          newRec.createdAt = oldRec.createdAt;
+        } else if (oldRec.status === 'completed') {
+          validateTransition('recommendation', RECOMMENDATION_TRANSITIONS, oldRec.status, 'pending');
+          newRec.status = 'pending';
           newRec.id = oldRec.id; // keep same ID for frontend continuity
           newRec.createdAt = oldRec.createdAt;
         } else if (oldRec.status === 'dismissed') {

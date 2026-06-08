@@ -12,6 +12,7 @@ import {
   computeRecommendationSummary,
   updateRecommendationStatus,
   dismissRecommendation,
+  recommendationOutcomeActionType,
 } from '../recommendations.js';
 import { getLatestSnapshot } from '../reports.js';
 import { updatePageState, getPageIdBySlug, getWorkspace } from '../workspaces.js';
@@ -133,7 +134,12 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', requireClientPor
   if (!status || !['pending', 'in_progress', 'completed', 'dismissed'].includes(status)) {
     return res.status(400).json({ error: 'Valid status required: pending, in_progress, completed, dismissed' });
   }
-  const rec = updateRecommendationStatus(workspaceId, recId, status);
+  let rec: Recommendation | null;
+  try {
+    rec = updateRecommendationStatus(workspaceId, recId, status);
+  } catch (err) {
+    return res.status(400).json({ error: err instanceof Error ? err.message : 'Invalid status transition' });
+  }
   if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
   const updatedPageStateIds: string[] = [];
   // When recommendation is completed, mark affected pages as live
@@ -172,11 +178,15 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', requireClientPor
       });
       updatedPageStateIds.push(resolvedPageId);
     }
-    // Record for outcome tracking — idempotent
+  }
+  // Record for outcome tracking — idempotent. This is intentionally outside the
+  // page-state block: strategy, keyword-gap, topic-cluster, and local recs can be
+  // completed without affectedPages but still need outcome-learning calibration.
+  if (status === 'completed') {
     try {
       if (workspaceId && !getActionBySource('recommendation', recId)) recordAction({ // recordAction-ok: workspaceId guarded by if condition
         workspaceId,
-        actionType: 'audit_fix_applied',
+        actionType: recommendationOutcomeActionType(rec.type, rec.source),
         sourceType: 'recommendation',
         sourceId: recId,
         pageUrl: rec.affectedPages?.[0] ?? null,
@@ -211,7 +221,12 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', requireClientPor
 // Dismiss a recommendation
 router.delete('/api/public/recommendations/:workspaceId/:recId', requireClientPortalAuth(), (req, res) => {
   const { workspaceId, recId } = req.params;
-  const ok = dismissRecommendation(workspaceId, recId);
+  let ok: boolean;
+  try {
+    ok = dismissRecommendation(workspaceId, recId);
+  } catch (err) {
+    return res.status(400).json({ error: err instanceof Error ? err.message : 'Invalid status transition' });
+  }
   if (!ok) return res.status(404).json({ error: 'Recommendation not found' });
   invalidateIntelligenceCache(workspaceId);
   broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { recId, status: 'dismissed', deleted: true });

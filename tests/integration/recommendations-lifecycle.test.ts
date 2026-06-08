@@ -35,10 +35,10 @@ vi.mock('../../server/broadcast.js', () => ({
 // ─── Imports (after mock registration) ───────────────────────────────────────
 
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
-import { saveRecommendations } from '../../server/recommendations.js';
+import { loadRecommendations, saveRecommendations } from '../../server/recommendations.js';
 import db from '../../server/db/index.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
-import type { RecommendationSet } from '../../shared/types/recommendations.js';
+import type { OpportunityScore, RecommendationSet } from '../../shared/types/recommendations.js';
 
 // ─── Server bootstrap ─────────────────────────────────────────────────────────
 // This file uses the inline server pattern (vi.mock + dynamic import of app)
@@ -83,6 +83,22 @@ function del(path: string): Promise<Response> {
 }
 
 // ─── Seed helpers ─────────────────────────────────────────────────────────────
+
+function makeOpportunity(overrides: Partial<OpportunityScore> = {}): OpportunityScore {
+  return {
+    value: 82,
+    emvPerWeek: 25,
+    predictedEmv: 1234,
+    roiPerEffortDay: 8,
+    confidence: 0.8,
+    calibration: 1,
+    groundedSpine: 'computed',
+    components: [],
+    calibrationVersion: 'test',
+    modelVersion: 'ov-1',
+    ...overrides,
+  };
+}
 
 function makeRecSet(wsId: string, recId: string, overrides: Partial<RecommendationSet['recommendations'][0]> = {}): RecommendationSet {
   return {
@@ -142,6 +158,8 @@ beforeAll(async () => {
 
 beforeEach(() => {
   broadcastState.calls = [];
+  if (wsId) db.prepare('DELETE FROM tracked_actions WHERE workspace_id = ?').run(wsId);
+  if (otherWsId) db.prepare('DELETE FROM tracked_actions WHERE workspace_id = ?').run(otherWsId);
 });
 
 afterAll(async () => {
@@ -257,6 +275,55 @@ describe('PATCH /api/public/recommendations/:workspaceId/:recId — status updat
     expect(res.status).toBe(200);
     const rec = await res.json() as RecommendationSet['recommendations'][0];
     expect(rec.status).toBe('completed');
+  });
+
+  it('records completed page-less keyword recommendations under their canonical outcome action type', async () => {
+    const recId = mkPatchRecId('keyword_outcome');
+    saveRecommendations(makeRecSet(wsId, recId, {
+      type: 'keyword_gap',
+      source: 'keyword_gap:missing local seo',
+      affectedPages: [],
+      opportunity: makeOpportunity({ predictedEmv: 4321 }),
+    }));
+
+    const res = await patchJson(`/api/public/recommendations/${wsId}/${recId}`, {
+      status: 'completed',
+    });
+    expect(res.status).toBe(200);
+
+    const action = db.prepare(`
+      SELECT action_type, source_type, source_id, page_url, predicted_emv
+      FROM tracked_actions
+      WHERE workspace_id = ? AND source_type = 'recommendation' AND source_id = ?
+    `).get(wsId, recId) as {
+      action_type: string;
+      source_type: string;
+      source_id: string;
+      page_url: string | null;
+      predicted_emv: number | null;
+    } | undefined;
+
+    expect(action).toMatchObject({
+      action_type: 'competitor_gap_closed',
+      source_type: 'recommendation',
+      source_id: recId,
+      page_url: null,
+      predicted_emv: 4321,
+    });
+  });
+
+  it('rejects invalid recommendation state-machine transitions', async () => {
+    const recId = mkPatchRecId('bad_transition');
+    saveRecommendations(makeRecSet(wsId, recId, { status: 'completed' }));
+
+    const res = await patchJson(`/api/public/recommendations/${wsId}/${recId}`, {
+      status: 'dismissed',
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json() as { error: string };
+    expect(body.error).toContain('Invalid');
+    expect(loadRecommendations(wsId)?.recommendations.find(rec => rec.id === recId)?.status).toBe('completed');
   });
 
   it('returns 400 for an invalid status value', async () => {

@@ -168,6 +168,19 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     }
   }, [strategy]);
 
+  const buildStrategyGenerationParams = useCallback(() => {
+    const compList = competitors.trim()
+      ? competitors.split(/[,\n]+/).map(s => s.trim()).filter(Boolean)
+      : undefined;
+    return {
+      businessContext: businessContext.trim() || undefined,
+      seoDataMode: seoDataAvailable ? seoDataMode : 'none',
+      seoDataProvider: selectedSeoDataProvider,
+      competitorDomains: compList,
+      maxPages,
+    };
+  }, [businessContext, competitors, maxPages, selectedSeoDataProvider, seoDataAvailable, seoDataMode]);
+
   // effect-layout-ok: active background jobs can predate this component mount.
   useEffect(() => {
     if (activeStrategyJob && !lastStartedJobId) {
@@ -197,15 +210,10 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     setShowNextSteps(false);
     setError(null);
     try {
-      const compList = competitors.trim() ? competitors.split(/[,\n]+/).map(s => s.trim()).filter(Boolean) : undefined;
       const jobId = await startJob(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, {
         mode: strategyMode,
         workspaceId,
-        businessContext: businessContext.trim() || undefined,
-        seoDataMode: seoDataAvailable ? seoDataMode : 'none',
-        seoDataProvider: selectedSeoDataProvider,
-        competitorDomains: compList,
-        maxPages,
+        ...buildStrategyGenerationParams(),
       });
       if (jobId) {
         setLastStartedJobId(jobId);
@@ -339,7 +347,10 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                 Amber ring signals the recommended state when local data needs refresh. */}
             {localSync?.applies && (
               <Button
-                onClick={() => refresh.mutate({ thenRegenerateStrategy: true })}
+                onClick={() => refresh.mutate({
+                  thenRegenerateStrategy: true,
+                  strategyGeneration: buildStrategyGenerationParams(),
+                })}
                 disabled={generating || refresh.isPending}
                 variant="secondary"
                 size="sm"
@@ -379,7 +390,10 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           reason={localSync.localNeedsRefreshReason ?? 'stale'}
           lastLocalRefreshAt={localSync.lastLocalRefreshAt}
           onFullRefresh={() => {
-            refresh.mutate({ thenRegenerateStrategy: true });
+            refresh.mutate({
+              thenRegenerateStrategy: true,
+              strategyGeneration: buildStrategyGenerationParams(),
+            });
             setRefreshOrderingPromptOpen(false);
           }}
           onGenerateAnyway={() => {

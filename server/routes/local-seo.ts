@@ -33,6 +33,7 @@ import { validate, z } from '../middleware/validate.js';
 import { getWorkspace } from '../workspaces.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { KEYWORD_STRATEGY_MAX_PAGE_CAP } from '../keyword-strategy-generation.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import {
   LOCAL_SEO_DEVICE,
@@ -96,6 +97,13 @@ const refreshSchema = z.object({
   // keyword-strategy regen server-side so it survives a closed tab. Threaded
   // through to runLocalSeoRefreshJob, which gates on result.refreshed > 0.
   thenRegenerateStrategy: z.boolean().optional(),
+  strategyGeneration: z.object({
+    businessContext: z.string().max(20_000).optional(),
+    seoDataMode: z.enum(['none', 'quick', 'full']).optional(),
+    seoDataProvider: z.string().min(1).max(80).optional(),
+    competitorDomains: z.array(z.string().min(1).max(255)).max(50).optional(),
+    maxPages: z.number().int().min(0).max(KEYWORD_STRATEGY_MAX_PAGE_CAP).optional(),
+  }).strict().optional(),
 }).strict();
 
 const locationLookupQuerySchema = z.object({

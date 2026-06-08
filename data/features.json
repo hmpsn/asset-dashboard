@@ -53,7 +53,7 @@
     {
       "id": 6,
       "title": "Keyword Strategy Engine",
-      "oneLiner": "AI-driven keyword mapping with SEMRush/DataForSEO data, content gaps, quick wins, lifecycle tracking, local visibility reporting, and a command-center surface for keyword evidence/actions",
+      "oneLiner": "AI-driven keyword mapping with DataForSEO data, content gaps, quick wins, lifecycle tracking, local visibility reporting, plain-language value reasons, per-keyword revenue potential, and a command-center surface for keyword evidence/actions",
       "category": "content",
       "painPoints": ["keyword-strategy", "competitive-intel", "workflow-clarity", "local-seo"],
       "tier": "growth",
@@ -553,7 +553,7 @@
     {
       "id": 56,
       "title": "ROI Dashboard",
-      "oneLiner": "Shows organic traffic value (clicks × CPC), content ROI attribution, and growth vs previous period — puts a dollar figure on SEO results",
+      "oneLiner": "Shows organic traffic value (clicks × CPC), keyword revenue at stake, content ROI attribution, and growth vs previous period — puts a dollar figure on SEO results",
       "category": "analytics",
       "painPoints": ["reporting", "client-transparency"],
       "tier": "growth",

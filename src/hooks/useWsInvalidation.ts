@@ -385,6 +385,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.client.latestRanks(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.rankHistory(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(workspaceId) });
     },
     [WS_EVENTS.RANK_TRACKING_UPDATED]: () => {
       if (!workspaceId) return;

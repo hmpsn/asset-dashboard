@@ -591,6 +591,13 @@ export interface LocalSeoRefreshRequest {
   device?: LocalSeoDevice;
   languageCode?: string;
   thenRegenerateStrategy?: boolean;
+  strategyGeneration?: {
+    businessContext?: string;
+    seoDataMode?: 'none' | 'quick' | 'full';
+    seoDataProvider?: string;
+    competitorDomains?: string[];
+    maxPages?: number;
+  };
 }
 
 export interface LocalSeoRefreshStartResponse {

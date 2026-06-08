@@ -498,13 +498,16 @@ router.post('/api/public/business-priorities/:workspaceId', requireClientStrateg
       : base;
 
     updateWorkspace(wsId, { keywordStrategy: { ...ws.keywordStrategy, businessContext } });
-    // Bridge #3: business priorities updated — immediate flush + debounced defense-in-depth
-    invalidateIntelligenceCache(wsId);
-    debouncedStrategyInvalidate(wsId, () => {
-      invalidateIntelligenceCache(wsId);
-      invalidateSubCachePrefix(wsId, 'slice:seoContext');
-    });
   }
+  // Bridge #3: business priorities updated — immediate flush + debounced
+  // defense-in-depth. Priorities are also read directly by clientSignals, so
+  // this must run even before a workspace has a keywordStrategy blob.
+  invalidateIntelligenceCache(wsId);
+  debouncedStrategyInvalidate(wsId, () => {
+    invalidateIntelligenceCache(wsId);
+    invalidateSubCachePrefix(wsId, 'slice:seoContext');
+    invalidateSubCachePrefix(wsId, 'slice:clientSignals');
+  });
 
   log.info(`Client submitted ${clean.length} business priorities for workspace ${wsId}`);
   broadcastToWorkspace(wsId, WS_EVENTS.STRATEGY_UPDATED, { businessPriorities: clean });

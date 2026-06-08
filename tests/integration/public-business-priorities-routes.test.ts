@@ -12,6 +12,7 @@ import db from '../../server/db/index.js';
 import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
 import { CLIENT_BUSINESS_PRIORITIES_MARKER } from '../../server/schemas/client-business-priorities.js';
 import { getWorkspace, updateWorkspace } from '../../server/workspaces.js';
+import type { ClientSignalsSlice } from '../../shared/types/intelligence.js';
 import type { KeywordStrategy } from '../../shared/types/workspace.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { createTestContext } from './helpers.js';
@@ -177,6 +178,46 @@ describe('Public business priorities mutations', () => {
     expect(getWorkspace(wsId)?.keywordStrategy?.businessContext).toContain(
       `${CLIENT_BUSINESS_PRIORITIES_MARKER}[growth] Grow enterprise pipeline; [brand] Clarify premium positioning`,
     );
+  });
+
+  it('invalidates clientSignals intelligence even before a keyword strategy exists', async () => {
+    const fresh = seedWorkspace({ clientPassword: '' });
+    let freshClientUserId = '';
+    try {
+      const user = await createClientUser(
+        `priorities-nostrategy-${randomUUID().slice(0, 8)}@test.local`,
+        'ClientPass1!',
+        'No Strategy Client',
+        fresh.workspaceId,
+        'client_member',
+      );
+      freshClientUserId = user.id;
+      const token = signClientToken(user);
+
+      const beforeRes = await api(`/api/intelligence/${fresh.workspaceId}?slices=clientSignals`);
+      expect(beforeRes.status).toBe(200);
+      const before = await beforeRes.json() as { clientSignals: ClientSignalsSlice };
+      expect(before.clientSignals.effectiveBusinessPriorities).toEqual([]);
+
+      const res = await clientPostJson(
+        `/api/public/business-priorities/${fresh.workspaceId}`,
+        { priorities: [{ text: 'Win local emergency searches', category: 'growth' }] },
+        fresh.workspaceId,
+        token,
+      );
+      expect(res.status).toBe(200);
+
+      const afterRes = await api(`/api/intelligence/${fresh.workspaceId}?slices=clientSignals`);
+      expect(afterRes.status).toBe(200);
+      const after = await afterRes.json() as { clientSignals: ClientSignalsSlice };
+      expect(after.clientSignals.effectiveBusinessPriorities).toEqual([
+        '[growth] Win local emergency searches',
+      ]);
+    } finally {
+      db.prepare('DELETE FROM client_business_priorities WHERE workspace_id = ?').run(fresh.workspaceId);
+      if (freshClientUserId) deleteClientUser(freshClientUserId, fresh.workspaceId);
+      fresh.cleanup();
+    }
   });
 
   it('clears stale strategy context when the client clears all priorities', async () => {
