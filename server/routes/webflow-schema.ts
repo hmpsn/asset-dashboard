@@ -12,12 +12,10 @@ import { requireClientPortalAuth } from '../middleware.js';
 import { addActivity } from '../activity-log.js';
 import { validate, z } from '../middleware/validate.js';
 import { buildSchemaContext, normalizePageUrl } from '../helpers.js';
-import { getCachedArchitecture } from '../site-architecture.js';
 import { prepareBulkSchemaGenerationContext, prepareSinglePageSchemaGenerationContext } from '../schema-generation-context.js';
 import { buildSchemaIntelligence } from '../schema-intelligence.js';
 import { getSchemaSnapshot, getSiteTemplate, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, updateSchemaPlanStatus, updateSchemaPlanRoles, deleteSchemaPlan, deleteSchemaSnapshot, removePageFromSnapshot, getPageTypes, savePageType, recordSchemaPublish, getSchemaPublishHistory, getSchemaPublishEntry, getPublishDatesForSite, getSchemaCmsFieldMappings, saveSchemaCmsFieldMapping } from '../schema-store.js';
 import { generateSchemaSuggestions, generateSchemaForPage } from '../schema-suggester.js';
-import { generateSchemaPlan } from '../schema-plan.js';
 import { deleteBatch } from '../approvals.js';
 import { SCHEMA_ROLE_LABELS, type SchemaPageRole } from '../../shared/types/schema-plan.ts';
 import { broadcastToWorkspace } from '../broadcast.js';
@@ -47,6 +45,13 @@ import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { listPendingSchemas } from '../schema-queue.js';
 import { createLogger } from '../logger.js';
 import {
+  broadcastSchemaPlanUpdated,
+  getActiveSchemaPlanGenerationJobId,
+  schemaPlanGenerationErrorResponse,
+  startSchemaPlanGenerationJob,
+} from '../schema-plan-generation-job.js';
+import { hasActiveJob } from '../jobs.js';
+import {
   validateForGoogleRichResults,
   upsertValidation,
   getValidation,
@@ -62,6 +67,7 @@ import {
   toClientSchemaSnapshotView,
   toClientSchemaView,
 } from '../serializers/client-safe.js';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 
 const router = Router();
 const log = createLogger('webflow-schema');
@@ -91,6 +97,25 @@ function broadcastSchemaSnapshotUpdated(
     action,
     ...(pageId ? { pageId } : {}),
   });
+}
+
+function broadcastSchemaPlanEvent(
+  siteId: string,
+  workspaceId: string | undefined,
+  action: Parameters<typeof broadcastSchemaPlanUpdated>[1]['action'],
+  status?: Parameters<typeof broadcastSchemaPlanUpdated>[1]['status'],
+): void {
+  if (!workspaceId) return;
+  broadcastSchemaPlanUpdated(workspaceId, { siteId, action, status });
+}
+
+function activeSchemaPlanMutationConflict(workspaceId: string): { error: string; jobId: string } | null {
+  const jobId = getActiveSchemaPlanGenerationJobId(workspaceId);
+  if (!jobId) return null;
+  return {
+    error: 'Schema plan generation is in progress. Wait for it to finish before editing this plan.',
+    jobId,
+  };
 }
 
 export async function publishSchemaToCmsField(opts: {
@@ -636,44 +661,18 @@ router.patch('/api/webflow/schema-template/:siteId', requireWorkspaceSiteAccessF
 router.post('/api/webflow/schema-plan/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const siteId = req.params.siteId;
-    const { ctx } = await buildSchemaContext(siteId);
-    const ws = listWorkspaces().find(w => w.webflowSiteId === siteId);
-    if (!ws) return res.status(404).json({ error: 'No workspace found for this site' });
-    const schemaIntel = await buildSchemaIntelligence({ siteId });
-
-    // Load architecture tree to avoid duplicate Webflow API + sitemap calls
-    let architectureResult;
-    try {
-      architectureResult = await getCachedArchitecture(ws.id);
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-schema: POST /api/webflow/schema-plan/:siteId: programming error'); /* proceed without — plan will fall back to direct API calls */ }
-
-    // Gather current schema types from existing snapshot for competitor gap analysis
-    const existingSnapshot = getSchemaSnapshot(req.params.siteId);
-    const ourSchemaTypes = existingSnapshot
-      ? [...new Set(existingSnapshot.results.flatMap(p =>
-          p.suggestedSchemas?.flatMap(s => s.type?.split(' + ') || []) || []
-        ))]
-      : [];
-
-    const plan = await generateSchemaPlan({
-      siteId,
-      workspaceId: ws.id,
-      siteUrl: schemaIntel?.baseUrl ?? (ctx.liveDomain ? `https://${ctx.liveDomain}` : ''),
-      companyName: ctx.companyName,
-      businessContext: ctx.businessContext,
-      strategy: schemaIntel?.seoContext?.strategy,
-      architectureResult,
-      competitorDomains: ws.competitorDomains,
-      ourSchemaTypes,
-    });
-
-    addActivity(ws.id, 'schema_plan_generated', 'Schema site plan generated', `${plan.pageRoles.length} pages, ${plan.canonicalEntities.length} entities`);
-    invalidateIntelligenceCache(ws.id);
-    res.json(plan);
+    const workspaceId = typeof req.query.workspaceId === 'string' ? req.query.workspaceId : undefined;
+    const started = startSchemaPlanGenerationJob(siteId, workspaceId);
+    res.json({ ...started, deprecated: true });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    log.error({ detail: msg, err }, 'Schema plan generation error');
-    res.status(500).json({ error: `Schema plan generation failed: ${msg}` });
+    try {
+      const response = schemaPlanGenerationErrorResponse(err);
+      res.status(response.status).json(response.body);
+    } catch (unexpected) {
+      const msg = unexpected instanceof Error ? unexpected.message : String(unexpected);
+      log.error({ detail: msg, err: unexpected }, 'Schema plan generation error');
+      res.status(500).json({ error: `Schema plan generation failed: ${msg}` });
+    }
   }
 });
 
@@ -688,9 +687,14 @@ router.get('/api/webflow/schema-plan/:siteId', requireWorkspaceSiteAccessFromQue
 router.put('/api/webflow/schema-plan/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   const { pageRoles, canonicalEntities } = req.body;
   if (!pageRoles) return res.status(400).json({ error: 'pageRoles required' });
+  const existing = getSchemaPlan(req.params.siteId);
+  if (!existing) return res.status(404).json({ error: 'No plan found for this site' });
+  const conflict = activeSchemaPlanMutationConflict(existing.workspaceId);
+  if (conflict) return res.status(409).json(conflict);
   const plan = updateSchemaPlanRoles(req.params.siteId, pageRoles, canonicalEntities);
   if (!plan) return res.status(404).json({ error: 'No plan found for this site' });
   invalidateIntelligenceCache(plan.workspaceId);
+  broadcastSchemaPlanEvent(req.params.siteId, plan.workspaceId, 'updated', plan.status);
   res.json(plan);
 });
 
@@ -699,6 +703,8 @@ router.post('/api/webflow/schema-plan/:siteId/send-to-client', requireWorkspaceS
   try {
     const plan = getSchemaPlan(req.params.siteId);
     if (!plan) return res.status(404).json({ error: 'No plan found. Generate one first.' });
+    const conflict = activeSchemaPlanMutationConflict(plan.workspaceId);
+    if (conflict) return res.status(409).json(conflict);
 
     const ws = getWorkspace(plan.workspaceId);
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -724,6 +730,7 @@ router.post('/api/webflow/schema-plan/:siteId/send-to-client', requireWorkspaceS
       });
     }
 
+    broadcastSchemaPlanEvent(req.params.siteId, ws.id, 'sent_to_client', updated?.status || plan.status);
     broadcastToWorkspace(ws.id, WS_EVENTS.SCHEMA_PLAN_SENT, { siteId: req.params.siteId });
     addActivity(ws.id, 'schema_plan_sent', 'Schema strategy sent to client for review', `${plan.pageRoles.length} pages`);
     invalidateIntelligenceCache(ws.id);
@@ -737,9 +744,14 @@ router.post('/api/webflow/schema-plan/:siteId/send-to-client', requireWorkspaceS
 
 // POST: mark plan as active (approved or admin-confirmed)
 router.post('/api/webflow/schema-plan/:siteId/activate', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
+  const existing = getSchemaPlan(req.params.siteId);
+  if (!existing) return res.status(404).json({ error: 'No plan found' });
+  const conflict = activeSchemaPlanMutationConflict(existing.workspaceId);
+  if (conflict) return res.status(409).json(conflict);
   const plan = updateSchemaPlanStatus(req.params.siteId, 'active');
   if (!plan) return res.status(404).json({ error: 'No plan found' });
   invalidateIntelligenceCache(plan.workspaceId);
+  broadcastSchemaPlanEvent(req.params.siteId, plan.workspaceId, 'activated', plan.status);
   res.json(plan);
 });
 
@@ -748,6 +760,8 @@ router.delete('/api/webflow/schema-plan/:siteId', requireWorkspaceSiteAccessFrom
   // Read plan first to grab the approval batch ID before deleting
   const plan = getSchemaPlan(req.params.siteId);
   if (!plan) return res.status(404).json({ error: 'No plan found for this site' });
+  const conflict = activeSchemaPlanMutationConflict(plan.workspaceId);
+  if (conflict) return res.status(409).json(conflict);
 
   deleteSchemaPlan(req.params.siteId);
 
@@ -770,6 +784,7 @@ router.delete('/api/webflow/schema-plan/:siteId', requireWorkspaceSiteAccessFrom
     // The schema-plan + snapshot deletions also changed intelligence inputs, so
     // invalidate — unless deleteBatch already did it for this same workspace.
     if (!cacheInvalidated) invalidateIntelligenceCache(ws.id);
+    broadcastSchemaPlanEvent(req.params.siteId, ws.id, 'deleted');
   }
   res.json({ success: true });
 });
@@ -885,6 +900,13 @@ router.post('/api/public/schema-plan/:workspaceId/feedback', requireClientPortal
   const existing = getSchemaPlan(ws.webflowSiteId);
   if (!existing) return res.status(404).json({ error: 'No plan found' });
   if (existing.status !== 'sent_to_client') return res.status(409).json({ error: 'Schema plan is not ready for client feedback' });
+  const activeJob = hasActiveJob(BACKGROUND_JOB_TYPES.SCHEMA_PLAN_GENERATION, ws.id);
+  if (activeJob) {
+    return res.status(409).json({
+      error: 'Schema plan generation is in progress. Wait for it to finish before responding to this plan.',
+      jobId: activeJob.id,
+    });
+  }
 
   // Delegate to the shared respondToSchemaPlanFeedback service (R2) so this route and the
   // unified-inbox respond propagation drive the SAME source write (no divergence).

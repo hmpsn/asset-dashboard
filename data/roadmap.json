@@ -2164,6 +2164,25 @@
       ]
     },
     {
+      "id": "sprint-platform-health-wave9-durable-jobs-schema-plan",
+      "name": "✅ SHIPPED — Platform Health Wave 9 — Durable Jobs + Schema Plan Realtime Hardening",
+      "hours": "6-10",
+      "rationale": "Close the last inline schema-plan AI generation path so schema planning follows the platform's durable job, realtime invalidation, and compatibility-wrapper rules.",
+      "items": [
+        {
+          "id": "platform-health-schema-plan-durable-generation",
+          "title": "Move schema-plan generation onto the durable job platform",
+          "source": "Durable Jobs + Realtime Stability Plan — PR 2 (2026-06-08)",
+          "est": "6-10h",
+          "priority": "P1",
+          "status": "done",
+          "shippedAt": "2026-06-08",
+          "notes": "Completed on 2026-06-08. Added `BACKGROUND_JOB_TYPES.SCHEMA_PLAN_GENERATION`, `server/schema-plan-generation-job.ts`, and the shared `SCHEMA_PLAN_UPDATED` realtime event. `/api/jobs` now starts or attaches to schema-plan generation with duplicate-active protection, and the legacy `POST /api/webflow/schema-plan/:siteId` route is reduced to a compatibility wrapper that returns `{ jobId, deprecated: true }` instead of running AI inline. `SchemaPlanPanel` now reads the stored plan through React Query, starts regeneration through `useBackgroundTasks`, and refreshes the persisted plan on job completion. Schema-plan save/send/activate/delete/client-feedback paths now all emit the shared plan-update event so admin/client caches and intelligence consumers stay aligned. Added lifecycle coverage for `/api/jobs`, the legacy wrapper route, duplicate-active attachment, job metadata/contracts, and schema-plan websocket invalidation wiring."
+        }
+      ],
+      "shippedAt": "2026-06-08"
+    },
+    {
       "id": "sprint-duplication-unification-audit-2026-05-27",
       "name": "✅ SHIPPED — 🚧 Duplication Unification Audit Follow-through",
       "hours": "20-36",

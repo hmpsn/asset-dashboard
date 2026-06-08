@@ -2,12 +2,16 @@
  * SchemaPlanPanel — Admin panel for reviewing and managing the site-wide schema plan.
  * Shows page roles, canonical entities, and actions to generate/update/send to client.
  */
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Loader2, Sparkles, Send, CheckCircle, AlertCircle,
   ChevronDown, ChevronRight, Globe, Zap, HelpCircle, Trash2,
 } from 'lucide-react';
 import { schemaPlan } from '../../api/schema';
+import { useBackgroundTasks } from '../../hooks/useBackgroundTasks';
+import { queryKeys } from '../../lib/queryKeys';
+import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs';
 import type { SchemaSitePlan, SchemaPageRole } from '../../../shared/types/schema-plan';
 import { SCHEMA_ROLE_LABELS, SCHEMA_ROLE_INDEX, SCHEMA_ROLE_PRIMARY_TYPE, SCHEMA_ROLES_THAT_REFERENCE_CANONICAL_ENTITIES } from '../../../shared/types/schema-plan';
 import { Badge, FormSelect, Icon, cn, Button, StatusBadge, type BadgeTone } from '../ui';
@@ -81,9 +85,10 @@ const ROLE_TONES: Partial<Record<SchemaPageRole, BadgeTone>> = {
 };
 
 export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
+  const queryClient = useQueryClient();
+  const { jobs, startJob, findActiveJob } = useBackgroundTasks();
   const [plan, setPlan] = useState<SchemaSitePlan | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
+  const [startingGeneration, setStartingGeneration] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const [activating, setActivating] = useState(false);
@@ -95,38 +100,96 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
   const [showGuide, setShowGuide] = useState(false);
   const [retracting, setRetracting] = useState(false);
   const [confirmRetract, setConfirmRetract] = useState(false);
+  const [trackedGenerationJobId, setTrackedGenerationJobId] = useState<string | null>(null);
+  const handledTerminalJobRef = useRef<string | null>(null);
+
+  const schemaPlanQueryKey = queryKeys.admin.schemaPlan(siteId, workspaceId);
+  const { data: storedPlan, isLoading } = useQuery({
+    queryKey: schemaPlanQueryKey,
+    queryFn: () => schemaPlan.get(siteId, workspaceId),
+    enabled: Boolean(siteId),
+  });
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        const result = await schemaPlan.get(siteId, workspaceId);
-        if (!cancelled) setPlan(result ?? null);
-      } catch { /* no plan yet */ }
-      if (!cancelled) setLoading(false);
-    })();
-    return () => { cancelled = true; };
-  }, [siteId, workspaceId]);
+    if (!dirty) {
+      setPlan(storedPlan ?? null);
+    }
+  }, [dirty, storedPlan]);
+
+  const activeGenerationJob = workspaceId
+    ? findActiveJob({ type: BACKGROUND_JOB_TYPES.SCHEMA_PLAN_GENERATION, workspaceId })
+    : undefined;
+  const trackedGenerationJob = useMemo(
+    () => trackedGenerationJobId ? jobs.find(job => job.id === trackedGenerationJobId) : undefined,
+    [jobs, trackedGenerationJobId],
+  );
+  const generating = startingGeneration || Boolean(activeGenerationJob);
+  const planMutationsLocked = generating;
+
+  useEffect(() => {
+    if (!trackedGenerationJobId && activeGenerationJob?.id) {
+      setTrackedGenerationJobId(activeGenerationJob.id);
+    }
+  }, [activeGenerationJob?.id, trackedGenerationJobId]);
+
+  useEffect(() => {
+    if (!trackedGenerationJob) return;
+    const terminalKey = `${trackedGenerationJob.id}:${trackedGenerationJob.status}:${trackedGenerationJob.updatedAt}`;
+    if (trackedGenerationJob.status !== 'done' && trackedGenerationJob.status !== 'error' && trackedGenerationJob.status !== 'cancelled') {
+      return;
+    }
+    if (handledTerminalJobRef.current === terminalKey) return;
+    handledTerminalJobRef.current = terminalKey;
+    setStartingGeneration(false);
+    setTrackedGenerationJobId(null);
+
+    if (trackedGenerationJob.status === 'done') {
+      void queryClient.invalidateQueries({ queryKey: schemaPlanQueryKey });
+      setDirty(false);
+      const result = trackedGenerationJob.result as { pageCount?: unknown; canonicalEntityCount?: unknown } | undefined;
+      const pageCount = typeof result?.pageCount === 'number' ? result.pageCount : undefined;
+      const entityCount = typeof result?.canonicalEntityCount === 'number' ? result.canonicalEntityCount : undefined;
+      setError(null);
+      setSuccess(
+        typeof pageCount === 'number' && typeof entityCount === 'number'
+          ? `Plan generated: ${pageCount} pages, ${entityCount} entities`
+          : 'Schema plan generated',
+      );
+      setTimeout(() => setSuccess(null), 4000);
+      return;
+    }
+
+    if (trackedGenerationJob.status === 'cancelled') {
+      setError('Schema plan generation cancelled');
+      return;
+    }
+
+    setError(trackedGenerationJob.error || trackedGenerationJob.message || 'Failed to generate plan');
+  }, [queryClient, schemaPlanQueryKey, trackedGenerationJob]);
 
   const handleGenerate = async () => {
-    setGenerating(true);
+    if (!workspaceId) {
+      setError('Workspace required to generate schema plan');
+      return;
+    }
+    setStartingGeneration(true);
     setError(null);
     setSuccess(null);
-    try {
-      const result = await schemaPlan.generate(siteId, workspaceId);
-      setPlan(result);
-      setDirty(false);
-      setSuccess(`Plan generated: ${result.pageRoles.length} pages, ${result.canonicalEntities.length} entities`);
-      setTimeout(() => setSuccess(null), 4000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate plan');
+    const jobId = await startJob(BACKGROUND_JOB_TYPES.SCHEMA_PLAN_GENERATION, {
+      siteId,
+      workspaceId,
+    });
+    if (!jobId) {
+      setStartingGeneration(false);
+      setError('Failed to start schema plan generation');
+      return;
     }
-    setGenerating(false);
+    handledTerminalJobRef.current = null;
+    setTrackedGenerationJobId(jobId);
   };
 
   const handleRoleChange = (pagePath: string, newRole: SchemaPageRole) => {
-    if (!plan) return;
+    if (!plan || planMutationsLocked) return;
     const canonicalEntityIds = plan.canonicalEntities.map(entity => entity.id).filter(Boolean);
     const updated = plan.pageRoles.map(pr =>
       pr.pagePath === pagePath ? (() => {
@@ -155,6 +218,7 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
     setError(null);
     try {
       const result = await schemaPlan.update(siteId, plan.pageRoles, plan.canonicalEntities, workspaceId);
+      queryClient.setQueryData(schemaPlanQueryKey, result);
       setPlan(result);
       setDirty(false);
       setSuccess('Plan saved');
@@ -171,6 +235,7 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
     setError(null);
     try {
       const { plan: updatedPlan } = await schemaPlan.sendToClient(siteId, plan.workspaceId || workspaceId);
+      queryClient.setQueryData(schemaPlanQueryKey, updatedPlan);
       setPlan(updatedPlan);
       setSuccess('Schema strategy preview sent to client');
       setTimeout(() => setSuccess(null), 5000);
@@ -186,6 +251,7 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
     setError(null);
     try {
       const result = await schemaPlan.activate(siteId, workspaceId);
+      queryClient.setQueryData(schemaPlanQueryKey, result);
       setPlan(result);
       setSuccess('Plan activated — schema generation will now follow this plan');
       setTimeout(() => setSuccess(null), 5000);
@@ -198,6 +264,8 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
   const statusBadge = (status: SchemaSitePlan['status']) => {
     return <StatusBadge status={status} domain="schema" fallback="neutral" variant="outline" shape="pill" size="sm" />;
   };
+
+  const loading = isLoading && plan === null;
 
   if (loading) {
     return (
@@ -221,6 +289,11 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
         {error && (
           <div className="flex items-center gap-1.5 t-caption text-red-400/80">
             <Icon as={AlertCircle} size="sm" /> {error}
+          </div>
+        )}
+        {success && (
+          <div className="flex items-center gap-1.5 t-caption text-emerald-400/80">
+            <Icon as={CheckCircle} size="sm" /> {success}
           </div>
         )}
         <Button
@@ -279,6 +352,11 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
               <Icon as={CheckCircle} size="sm" className="shrink-0" /> {success}
             </div>
           )}
+          {planMutationsLocked && (
+            <div className="flex items-center gap-1.5 t-caption text-amber-300/90 bg-amber-500/8 border border-amber-500/20 rounded-[var(--radius-md)] px-3 py-2">
+              <Icon as={Loader2} size="sm" className="shrink-0 animate-spin" /> Schema plan regeneration is running. Editing is temporarily locked.
+            </div>
+          )}
 
           {/* Actions bar */}
           <div className="flex items-center gap-2 flex-wrap">
@@ -296,7 +374,7 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
             {dirty && (
               <Button
                 onClick={handleSave}
-                disabled={saving}
+                disabled={saving || planMutationsLocked}
                 loading={saving}
                 icon={CheckCircle}
                 size="sm"
@@ -309,8 +387,8 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
             {plan.status === 'draft' && (
               <Button
                 onClick={handleSendToClient}
-                disabled={sending || dirty}
-                title={dirty ? 'Save changes first' : 'Send strategy preview to client'}
+                disabled={sending || dirty || planMutationsLocked}
+                title={planMutationsLocked ? 'Wait for regeneration to finish' : dirty ? 'Save changes first' : 'Send strategy preview to client'}
                 loading={sending}
                 icon={Send}
                 size="sm"
@@ -323,7 +401,7 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
             {(plan.status === 'draft' || plan.status === 'client_approved') && (
               <Button
                 onClick={handleActivate}
-                disabled={activating || dirty}
+                disabled={activating || dirty || planMutationsLocked}
                 loading={activating}
                 icon={Zap}
                 size="sm"
@@ -342,6 +420,7 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
                     setError(null);
                     try {
                       await schemaPlan.retract(siteId, workspaceId);
+                      queryClient.setQueryData(schemaPlanQueryKey, null);
                       setPlan(null);
                       setSuccess('Schema plan retracted');
                       setTimeout(() => setSuccess(null), 4000);
@@ -351,7 +430,7 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
                     setRetracting(false);
                     setConfirmRetract(false);
                   }}
-                  disabled={retracting}
+                  disabled={retracting || planMutationsLocked}
                   loading={retracting}
                   icon={Trash2}
                   size="sm"
@@ -480,6 +559,7 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
                     <FormSelect
                       value={pr.role}
                       onChange={value => handleRoleChange(pr.pagePath, value as SchemaPageRole)}
+                      disabled={planMutationsLocked}
                       options={ROLE_OPTIONS.map(role => ({
                         value: role,
                         label: SCHEMA_ROLE_LABELS[role],

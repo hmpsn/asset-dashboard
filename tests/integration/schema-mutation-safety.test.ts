@@ -78,6 +78,7 @@ vi.mock('../../server/llms-txt-generator.js', async importOriginal => {
 });
 
 import db from '../../server/db/index.js';
+import { cancelJob, clearCompletedJobs, createJob, listJobs } from '../../server/jobs.js';
 import {
   deleteSchemaPlan,
   deleteSchemaSnapshot,
@@ -90,6 +91,7 @@ import {
 } from '../../server/schema-store.js';
 import { createWorkspace, deleteWorkspace, getPageState, updateWorkspace } from '../../server/workspaces.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import type { SchemaPageSuggestion } from '../../server/schema-suggester.js';
 import type { SchemaSitePlan } from '../../shared/types/schema-plan.js';
 
@@ -238,6 +240,12 @@ function resetSchemaState(): void {
   db.prepare('DELETE FROM page_edit_states WHERE workspace_id IN (?, ?)').run(workspaceId, otherWorkspaceId);
   db.prepare('DELETE FROM tracked_actions WHERE workspace_id IN (?, ?)').run(workspaceId, otherWorkspaceId);
   db.prepare('DELETE FROM seo_changes WHERE workspace_id IN (?, ?)').run(workspaceId, otherWorkspaceId);
+  db.prepare('DELETE FROM jobs WHERE workspace_id IN (?, ?)').run(workspaceId, otherWorkspaceId);
+  for (const job of [...listJobs(workspaceId), ...listJobs(otherWorkspaceId)]) {
+    cancelJob(job.id);
+  }
+  clearCompletedJobs({ workspaceId });
+  clearCompletedJobs({ workspaceId: otherWorkspaceId });
 }
 
 beforeAll(async () => {
@@ -339,6 +347,69 @@ describe('schema mutation safety', () => {
         },
       },
     ]);
+  });
+
+  it('blocks schema-plan mutations while regeneration is active', async () => {
+    const activeJob = createJob(BACKGROUND_JOB_TYPES.SCHEMA_PLAN_GENERATION, {
+      workspaceId,
+      message: 'Generating schema plan...',
+    });
+    saveSchemaPlan(buildPlan('sent_to_client'));
+
+    const updateRes = await api(`/api/webflow/schema-plan/${siteId}${workspaceQuery()}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pageRoles: [{
+          pagePath: '/',
+          pageTitle: 'Updated Home',
+          role: 'homepage',
+          primaryType: 'WebPage',
+          entityRefs: [],
+        }],
+        canonicalEntities: [],
+      }),
+    });
+    expect(updateRes.status).toBe(409);
+    expect(await updateRes.json()).toEqual({
+      error: 'Schema plan generation is in progress. Wait for it to finish before editing this plan.',
+      jobId: activeJob.id,
+    });
+
+    const sendRes = await postJson(`/api/webflow/schema-plan/${siteId}/send-to-client${workspaceQuery()}`, {});
+    expect(sendRes.status).toBe(409);
+    expect(await sendRes.json()).toEqual({
+      error: 'Schema plan generation is in progress. Wait for it to finish before editing this plan.',
+      jobId: activeJob.id,
+    });
+
+    const activateRes = await postJson(`/api/webflow/schema-plan/${siteId}/activate${workspaceQuery()}`, {});
+    expect(activateRes.status).toBe(409);
+    expect(await activateRes.json()).toEqual({
+      error: 'Schema plan generation is in progress. Wait for it to finish before editing this plan.',
+      jobId: activeJob.id,
+    });
+
+    const deleteRes = await del(`/api/webflow/schema-plan/${siteId}${workspaceQuery()}`);
+    expect(deleteRes.status).toBe(409);
+    expect(await deleteRes.json()).toEqual({
+      error: 'Schema plan generation is in progress. Wait for it to finish before editing this plan.',
+      jobId: activeJob.id,
+    });
+
+    const feedbackRes = await postJson(`/api/public/schema-plan/${workspaceId}/feedback`, {
+      action: 'approve',
+    });
+    expect(feedbackRes.status).toBe(409);
+    expect(await feedbackRes.json()).toEqual({
+      error: 'Schema plan generation is in progress. Wait for it to finish before responding to this plan.',
+      jobId: activeJob.id,
+    });
+
+    expect(getSchemaPlan(siteId)?.status).toBe('sent_to_client');
+    expect(countActivities('schema_plan_sent')).toBe(0);
+    expect(countActivities('changes_requested')).toBe(0);
+    expect(broadcastState.calls).toHaveLength(0);
   });
 
   it('rejects invalid or missing schema-plan feedback without side effects', async () => {

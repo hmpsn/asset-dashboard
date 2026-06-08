@@ -220,6 +220,7 @@ describe('BACKGROUND_JOB_TYPES constants', () => {
     expect(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY).toBe('keyword-strategy');
     expect(BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION).toBe('content-post-generation');
     expect(BACKGROUND_JOB_TYPES.SCHEMA_GENERATOR).toBe('schema-generator');
+    expect(BACKGROUND_JOB_TYPES.SCHEMA_PLAN_GENERATION).toBe('schema-plan-generation');
     expect(BACKGROUND_JOB_TYPES.PAGE_ANALYSIS).toBe('page-analysis');
     expect(BACKGROUND_JOB_TYPES.SEO_BULK_ANALYZE).toBe('seo-bulk-analyze');
     expect(BACKGROUND_JOB_TYPES.SEO_BULK_REWRITE).toBe('seo-bulk-rewrite');
@@ -256,6 +257,12 @@ describe('getBackgroundJobMetadata', () => {
     expect(meta?.cancellable).toBe(true);
   });
 
+  it('returns metadata for schema-plan-generation (cancellable: false)', () => {
+    const meta = getBackgroundJobMetadata(BACKGROUND_JOB_TYPES.SCHEMA_PLAN_GENERATION);
+    expect(meta?.cancellable).toBe(false);
+    expect(meta?.resultBehavior).toBe('domain-store');
+  });
+
   it('returns undefined for unknown type', () => {
     expect(getBackgroundJobMetadata('not-a-job')).toBeUndefined();
   });
@@ -266,6 +273,7 @@ describe('getBackgroundJobLabel', () => {
     expect(getBackgroundJobLabel(BACKGROUND_JOB_TYPES.SEO_AUDIT)).toBe('SEO Audit');
     expect(getBackgroundJobLabel(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY)).toBe('Keyword Strategy');
     expect(getBackgroundJobLabel(BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION)).toBe('Content Post Generation');
+    expect(getBackgroundJobLabel(BACKGROUND_JOB_TYPES.SCHEMA_PLAN_GENERATION)).toBe('Schema Plan Generation');
     expect(getBackgroundJobLabel(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION)).toBe('Recommendations Generation');
   });
 
@@ -287,6 +295,7 @@ describe('isBackgroundJobCancellable', () => {
   it('returns false for non-cancellable jobs', () => {
     expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.SEO_AUDIT)).toBe(false);
     expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY)).toBe(false);
+    expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.SCHEMA_PLAN_GENERATION)).toBe(false);
     expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION)).toBe(false);
   });
 

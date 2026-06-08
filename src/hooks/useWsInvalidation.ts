@@ -221,6 +221,20 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       if (!siteId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.schemaCmsFieldMappings(siteId) });
     },
+    [WS_EVENTS.SCHEMA_PLAN_UPDATED]: (data: unknown) => {
+      if (!workspaceId) return;
+      const siteId = typeof data === 'object' && data !== null && 'siteId' in data
+        ? String((data as { siteId: unknown }).siteId)
+        : undefined;
+      if (siteId) {
+        qc.invalidateQueries({ queryKey: queryKeys.admin.schemaPlan(siteId) });
+        qc.invalidateQueries({ queryKey: queryKeys.admin.schemaPlan(siteId, workspaceId) });
+        qc.invalidateQueries({ queryKey: queryKeys.admin.schemaGraphValidation(siteId) });
+        qc.invalidateQueries({ queryKey: queryKeys.admin.schemaGraphValidation(siteId, workspaceId) });
+      }
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.schemaPlan(workspaceId) });
+    },
     [WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED]: (data: unknown) => {
       if (!workspaceId) return;
       const siteId = typeof data === 'object' && data !== null && 'siteId' in data

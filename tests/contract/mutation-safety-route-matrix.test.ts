@@ -36,6 +36,11 @@ const ROUTE_MATRIX: RouteSignal[] = [
     files: ['tests/integration/schema-generator-job-mutation-safety.test.ts'],
   },
   {
+    routeId: 'jobs-schema-plan-generation',
+    routeHints: ['schema-plan-generation', '/api/jobs', '/api/webflow/schema-plan/'],
+    files: ['tests/integration/schema-plan-generation-job-mutation-safety.test.ts'],
+  },
+  {
     routeId: 'jobs-keyword-strategy',
     routeHints: ['keyword-strategy', '/api/jobs'],
     files: ['tests/integration/keyword-strategy-job-mutation-safety.test.ts'],

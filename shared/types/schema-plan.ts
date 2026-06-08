@@ -248,3 +248,9 @@ export interface SchemaSitePlan {
   generatedAt: string;
   updatedAt: string;
 }
+
+export interface SchemaPlanGenerationResponse {
+  jobId: string;
+  existing?: boolean;
+  deprecated?: boolean;
+}

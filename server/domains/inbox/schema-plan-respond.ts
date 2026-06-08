@@ -26,6 +26,8 @@ import { addActivity } from '../../activity-log.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
 import { WS_EVENTS } from '../../ws-events.js';
 import { createLogger } from '../../logger.js';
+import { invalidateIntelligenceCache } from '../../workspace-intelligence.js';
+import { broadcastSchemaPlanUpdated } from '../../schema-plan-generation-job.js';
 import type { SchemaSitePlan } from '../../../shared/types/schema-plan.js';
 
 const log = createLogger('schema-plan-respond');
@@ -70,6 +72,12 @@ export function respondToSchemaPlanFeedback(
 
   const label = action === 'approve' ? 'approved' : 'requested changes on';
   addActivity(workspaceId, 'changes_requested', `Client ${label} schema plan`, note || undefined);
+  invalidateIntelligenceCache(workspaceId);
+  broadcastSchemaPlanUpdated(workspaceId, {
+    siteId,
+    action: 'client_feedback',
+    status: newStatus,
+  });
   broadcastToWorkspace(workspaceId, WS_EVENTS.SCHEMA_PLAN_SENT, {
     siteId,
     action: 'schema_plan_feedback',

@@ -7,6 +7,7 @@ export const BACKGROUND_JOB_TYPES = {
   SALES_REPORT: 'sales-report',
   KEYWORD_STRATEGY: 'keyword-strategy',
   SCHEMA_GENERATOR: 'schema-generator',
+  SCHEMA_PLAN_GENERATION: 'schema-plan-generation',
   PAGE_ANALYSIS: 'page-analysis',
   DEEP_DIAGNOSTIC: 'deep-diagnostic',
   CONTENT_POST_GENERATION: 'content-post-generation',
@@ -107,6 +108,12 @@ export const BACKGROUND_JOB_METADATA: { [K in BackgroundJobType]: BackgroundJobT
     description: 'Generates schema suggestions across a site.',
     cancellable: true,
     resultBehavior: 'domain-store-and-result',
+  },
+  [BACKGROUND_JOB_TYPES.SCHEMA_PLAN_GENERATION]: {
+    label: 'Schema Plan Generation',
+    description: 'Builds the site-wide schema plan for a workspace.',
+    cancellable: false,
+    resultBehavior: 'domain-store',
   },
   [BACKGROUND_JOB_TYPES.PAGE_ANALYSIS]: {
     label: 'Page Analysis',
