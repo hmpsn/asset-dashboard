@@ -495,6 +495,10 @@ describe('queryKeys — client outcome + plan keys', () => {
     expect(queryKeys.client.pageKeywords(WS)).toEqual(['client-page-keywords', WS]);
   });
 
+  it('strategyGuidance key shape', () => {
+    expect(queryKeys.client.strategyGuidance(WS)).toEqual(['client-strategy-guidance', WS]);
+  });
+
   it('rankHistory key shape', () => {
     expect(queryKeys.client.rankHistory(WS)).toEqual(['client-rank-history', WS]);
   });

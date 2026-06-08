@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Lightbulb, Zap, Clock, CalendarClock, RefreshCw,
@@ -10,12 +10,14 @@ import {
 import { useCart } from './useCart';
 import type { ProductType } from '../../../shared/types/payments.ts';
 import type { RecPriority, RecType, RecStatus, Recommendation, RecommendationSet } from '../../../shared/types/recommendations.ts';
+import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs.ts';
 import { STUDIO_NAME } from '../../constants';
 import { get, post, patch, del } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
 import { Button } from '../ui/Button';
 import { fmtMoneyFull, fmtNum } from '../../utils/formatNumbers';
 import { Icon } from '../ui/Icon';
+import { useBackgroundTasks } from '../../hooks/useBackgroundTasks';
 
 // ─── Props ────────────────────────────────────────────────────────
 
@@ -121,9 +123,20 @@ const EFFORT_BADGE: Record<string, { label: string; color: string }> = {
 export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: InsightsEngineProps) {
   const cart = useCart();
   const qc = useQueryClient();
-  const [regenerating, setRegenerating] = useState(false);
+  const { trackJob, findActiveJob, findLatestTerminalJob } = useBackgroundTasks();
+  const [startingRegeneration, setStartingRegeneration] = useState(false);
+  const lastObservedRecommendationJobId = useRef<string | null>(null);
   const [expandedPriorities, setExpandedPriorities] = useState<Set<RecPriority>>(new Set(['fix_now']));
   const [expandedRecs, setExpandedRecs] = useState<Set<string>>(new Set());
+  const activeRecommendationJob = findActiveJob({
+    type: BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION,
+    workspaceId,
+  });
+  const latestRecommendationJob = findLatestTerminalJob({
+    type: BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION,
+    workspaceId,
+  });
+  const regenerating = startingRegeneration || Boolean(activeRecommendationJob);
 
   const isPremium = tier === 'premium';
 
@@ -139,13 +152,24 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
 
   // Re-generate
   const handleRegenerate = async () => {
-    setRegenerating(true);
+    setStartingRegeneration(true);
     try {
-      const set = await post<RecommendationSet>(`/api/public/recommendations/${workspaceId}/generate`);
-      qc.setQueryData(queryKeys.shared.recommendations(workspaceId), set);
+      const result = await post<{ jobId?: string }>(`/api/public/recommendations/${workspaceId}/generate`);
+      if (result.jobId) {
+        trackJob(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION, result.jobId, { workspaceId });
+      }
     } catch { /* silently fail — button stops spinning; user can retry */ }
-    setRegenerating(false);
+    setStartingRegeneration(false);
   };
+
+  useEffect(() => {
+    if (!latestRecommendationJob) return;
+    if (lastObservedRecommendationJobId.current === latestRecommendationJob.id) return;
+    lastObservedRecommendationJobId.current = latestRecommendationJob.id;
+    if (latestRecommendationJob.status === 'done') {
+      qc.invalidateQueries({ queryKey: queryKeys.shared.recommendations(workspaceId) });
+    }
+  }, [latestRecommendationJob, qc, workspaceId]);
 
   // Update status (on success)
   const handleStatusUpdate = async (recId: string, status: RecStatus) => {

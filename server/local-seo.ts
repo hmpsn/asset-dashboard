@@ -9,11 +9,12 @@ import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { getClientLocations } from './client-locations.js';
 import { listContentGaps } from './content-gaps.js';
-import { createJob, updateJob, getJob } from './jobs.js';
+import { createJob, updateJob, getJob, hasActiveJob } from './jobs.js';
 import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js';
 import { isStrategyPoolEligibleKeyword, isNearDuplicateKeyword } from './keyword-intelligence/rules.js';
 import { listPageKeywords } from './page-keywords.js';
 import { getTrackedKeywords } from './rank-tracking.js';
+import { runRecommendationRegen } from './recommendation-regen-scheduler.js';
 import { DEFAULT_SEO_DATA_PROVIDER, getProvider, isCapabilityDisabled, normalizeRuntimeSeoDataProvider, type SeoDataProvider } from './seo-data-provider.js';
 import { getTaxonomyForIndustry } from './service-taxonomy.js';
 import { getWorkspace } from './workspaces.js';
@@ -398,9 +399,9 @@ const stmts = createStmtCache(() => ({
     SELECT COUNT(*) AS count FROM local_visibility_snapshots
     WHERE workspace_id = ?
   `),
-  maxCapturedAtForWorkspace: db.prepare(`
+  maxUsableCapturedAtForWorkspace: db.prepare(`
     SELECT MAX(captured_at) AS max_captured_at FROM local_visibility_snapshots
-    WHERE workspace_id = ?
+    WHERE workspace_id = ? AND status != ?
   `),
   latestSnapshots: db.prepare(`
     SELECT * FROM local_visibility_snapshots
@@ -442,7 +443,7 @@ const stmts = createStmtCache(() => ({
     JOIN (
       SELECT market_id, normalized_keyword, device, language_code, MAX(captured_at) AS captured_at
       FROM local_visibility_snapshots
-      WHERE workspace_id = ?
+      WHERE workspace_id = ? AND status != ?
       GROUP BY market_id, normalized_keyword, device, language_code
     ) latest
       ON latest.market_id = s.market_id
@@ -450,7 +451,7 @@ const stmts = createStmtCache(() => ({
       AND latest.device = s.device
       AND latest.language_code = s.language_code
       AND latest.captured_at = s.captured_at
-    WHERE s.workspace_id = ?
+    WHERE s.workspace_id = ? AND s.status != ?
   `),
 }));
 
@@ -536,6 +537,10 @@ function rowToRawLocalResults(row: SnapshotRow): LocalVisibilityBusinessResult[]
     table: 'local_visibility_snapshots',
     field: row.raw_results ? 'raw_results' : 'top_competitors',
   });
+}
+
+function isUsableLocalVisibilitySnapshot(snapshot: Pick<LocalVisibilitySnapshot, 'status'>): boolean {
+  return snapshot.status !== LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED;
 }
 
 function derivePosture(workspace: Workspace): Pick<LocalSeoWorkspaceSettings, 'suggestedPosture' | 'suggestionReasons'> {
@@ -739,6 +744,7 @@ export function getLocalSeoReadModel(
   const markets = listLocalSeoMarkets(workspace.id);
   const suggestedMarkets = buildSuggestedMarkets(workspace);
   const latestSnapshots = listLatestLocalVisibilitySnapshots(workspace.id);
+  const latestUsableSnapshots = latestSnapshots.filter(isUsableLocalVisibilitySnapshot);
   const responseSnapshots = options.includeSnapshots === false ? [] : latestSnapshots;
   return {
     featureEnabled,
@@ -751,7 +757,7 @@ export function getLocalSeoReadModel(
       settings,
       markets,
       suggestedMarkets,
-      latestSnapshots,
+      latestSnapshots: latestUsableSnapshots,
     }),
     competitorBrands: getLocalSeoCompetitorBrands(workspaceId),
     serviceGaps: featureEnabled ? getLocalSeoServiceGaps(workspaceId) : [],
@@ -933,7 +939,12 @@ function listLatestLocalVisibilitySnapshotsForKeyword(workspaceId: string, norma
 }
 
 function listLatestLocalVisibilitySnapshotSummaryRows(workspaceId: string): SnapshotSummaryRow[] {
-  return stmts().latestSnapshotSummary.all(workspaceId, workspaceId) as SnapshotSummaryRow[];
+  return stmts().latestSnapshotSummary.all(
+    workspaceId,
+    LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED,
+    workspaceId,
+    LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED,
+  ) as SnapshotSummaryRow[];
 }
 
 interface CompetitorSnapshotRow {
@@ -1142,6 +1153,7 @@ export function buildLocalSeoKeywordVisibilitySummaryByKey(workspaceId: string):
 export function buildLocalSeoKeywordVisibilityByKey(workspaceId: string): Map<string, LocalSeoKeywordVisibilitySummary> {
   const grouped = new Map<string, LocalSeoKeywordVisibility[]>();
   for (const snapshot of listLatestLocalVisibilitySnapshots(workspaceId)) {
+    if (!isUsableLocalVisibilitySnapshot(snapshot)) continue;
     if (!snapshot.normalizedKeyword) continue;
     const current = grouped.get(snapshot.normalizedKeyword) ?? [];
     current.push(localSeoKeywordVisibilityFromSnapshot(snapshot));
@@ -2376,6 +2388,33 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
     keywords: plan.keywords,
   };
   if (getJob(jobId)?.status === 'cancelled') return;
+
+  if (refreshed === 0 && failed > 0) {
+    const message = `Local visibility refresh failed — 0/${total} checks refreshed`;
+    notifyLocalSeoUpdated(workspaceId, {
+      action: 'refresh_failed',
+      refreshed,
+      failed,
+      updatedAt: new Date().toISOString(),
+    });
+    updateJob(jobId, {
+      status: 'error',
+      progress: processed,
+      total,
+      message,
+      error: 'All local visibility checks failed',
+      result,
+    });
+    addActivity(
+      workspaceId,
+      'local_seo_updated',
+      'Local SEO visibility refresh failed',
+      `${failed} local visibility checks failed; no usable local evidence was refreshed`,
+      { source: 'local_seo', refreshed, failed },
+    );
+    return;
+  }
+
   notifyLocalSeoUpdated(workspaceId, { action: 'refresh_completed', refreshed, failed, updatedAt: new Date().toISOString() });
   addActivity(workspaceId, 'local_seo_updated', 'Local SEO visibility refreshed', `${refreshed} local visibility checks refreshed`, { source: 'local_seo', refreshed, failed });
 
@@ -2391,8 +2430,7 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
     || readSettings(workspace).posture === LOCAL_SEO_POSTURE.HYBRID;
   if (useLocalGenQual) {
     try {
-      const { generateRecommendations } = await import('./recommendations.js'); // dynamic-import-ok - breaks the recommendations.ts ↔ local-seo.ts cycle (readers imported statically the other way)
-      await generateRecommendations(workspaceId);
+      await runRecommendationRegen(workspaceId, 'local_seo_refresh');
       log.info({ workspaceId }, 'Auto-regenerated recommendations after local SEO refresh');
     } catch (err) {
       log.warn({ err, workspaceId }, 'Recommendation regen after local SEO refresh failed (non-fatal)');
@@ -2419,35 +2457,43 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
   const proceed = result.refreshed > 0;
   if (request.thenRegenerateStrategy === true && proceed) {
     try {
-      // No pre-flight active-job guard on purpose: if a strategy gen is already
-      // running, generateKeywordStrategy's own 409 guard rejects this cleanly into
-      // the strategy job's error state (no quota spent). A silently-skipped guard
-      // would be worse UX than a momentary errored row — the admin asked for it.
-      const strategyJob = createJob(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, {
-        workspaceId,
-        message: 'Regenerating keyword strategy after local refresh...',
-      });
-      const { generateKeywordStrategy } = await import('./keyword-strategy-generation.js'); // dynamic-import-ok - breaks the keyword-strategy-generation.ts ↔ local-seo.ts cycle
-      // Detached: do NOT await — the local-refresh job must not block on the
-      // slow strategy generation. Failures are isolated to the strategy job.
-      void (async () => {
-        try {
-          updateJob(strategyJob.id, { status: 'running', message: 'Generating keyword strategy...' });
-          // mode 'full' (not incremental): fresh local snapshots can shift the whole
-          // keyword universe, not just the pages that changed.
-          const generationResult = await generateKeywordStrategy({ workspaceId, mode: 'full' });
-          updateJob(strategyJob.id, {
-            status: 'done',
-            progress: 100,
-            total: 100,
-            message: generationResult.upToDate ? 'Strategy already up to date' : 'Keyword strategy regenerated after local refresh',
-          });
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          log.warn({ err, workspaceId, strategyJobId: strategyJob.id }, 'Keyword-strategy regen after local SEO refresh failed (non-fatal to refresh job)');
-          updateJob(strategyJob.id, { status: 'error', error: message, message: 'Keyword strategy regeneration failed' });
-        }
-      })();
+      const activeStrategyJob = hasActiveJob(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, workspaceId);
+      if (activeStrategyJob) {
+        log.info({ workspaceId, activeJobId: activeStrategyJob.id }, 'Skipped chained keyword strategy regeneration because a strategy job is already active');
+      } else {
+        const strategyJob = createJob(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, {
+          workspaceId,
+          message: 'Regenerating keyword strategy after local refresh...',
+        });
+        // Detached: do NOT await — the local-refresh job must not block on the
+        // slow strategy generation. Failures are isolated to the strategy job.
+        void (async () => {
+          try {
+            updateJob(strategyJob.id, { status: 'running', message: 'Generating keyword strategy...' });
+            const { generateKeywordStrategy } = await import('./keyword-strategy-generation.js'); // dynamic-import-ok - breaks the keyword-strategy-generation.ts ↔ local-seo.ts cycle
+            // mode 'full' (not incremental): fresh local snapshots can shift the whole
+            // keyword universe, not just the pages that changed.
+            const strategyGeneration = request.strategyGeneration;
+            const competitorDomainsProvided = Array.isArray(strategyGeneration?.competitorDomains);
+            const generationResult = await generateKeywordStrategy({
+              ...strategyGeneration,
+              workspaceId,
+              mode: 'full',
+              competitorDomainsProvided,
+            });
+            updateJob(strategyJob.id, {
+              status: 'done',
+              progress: 100,
+              total: 100,
+              message: generationResult.upToDate ? 'Strategy already up to date' : 'Keyword strategy regenerated after local refresh',
+            });
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            log.warn({ err, workspaceId, strategyJobId: strategyJob.id }, 'Keyword-strategy regen after local SEO refresh failed (non-fatal to refresh job)');
+            updateJob(strategyJob.id, { status: 'error', error: message, message: 'Keyword strategy regeneration failed' });
+          }
+        })();
+      }
     } catch (err) {
       // Guards the synchronous createJob/dynamic-import setup — a failure here
       // must never fail the already-successful local-refresh job.
@@ -2464,12 +2510,13 @@ export function countLocalVisibilitySnapshots(workspaceId: string): number {
 }
 
 /**
- * Returns the ISO timestamp of the most recent local_visibility_snapshots row
- * for the given workspace, or null when none exist.
+ * Returns the ISO timestamp of the most recent usable local_visibility_snapshots
+ * row for the given workspace, or null when none exist. Provider-failed rows are
+ * stored for diagnostics but must not satisfy freshness checks.
  * Cheap aggregate read — does NOT invoke any full-model or Evaluated builders.
  */
 export function latestLocalSnapshotAt(workspaceId: string): string | null {
-  const row = stmts().maxCapturedAtForWorkspace.get(workspaceId) as { max_captured_at: string | null };
+  const row = stmts().maxUsableCapturedAtForWorkspace.get(workspaceId, LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED) as { max_captured_at: string | null };
   return row.max_captured_at ?? null;
 }
 

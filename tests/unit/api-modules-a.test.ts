@@ -1404,10 +1404,20 @@ describe('trackedKeywords.remove', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('businessPriorities.get', () => {
-  it('calls getSafe with correct URL and priorities fallback', async () => {
+  it('calls get with correct URL', async () => {
     await businessPriorities.get('ws-1');
-    const [url, fallback] = mockGetSafe.mock.calls[0];
+    const [url] = mockGet.mock.calls[0];
     expect(url).toContain('/api/public/business-priorities/ws-1');
-    expect(fallback).toEqual({ priorities: [] });
+  });
+
+  it('save posts priorities with the concurrency token', async () => {
+    await businessPriorities.save('ws-1', {
+      priorities: [{ text: 'Grow', category: 'growth' }],
+      expectedUpdatedAt: '2026-01-01T00:00:00.000Z',
+    });
+    expect(mockPost).toHaveBeenCalledWith('/api/public/business-priorities/ws-1', {
+      priorities: [{ text: 'Grow', category: 'growth' }],
+      expectedUpdatedAt: '2026-01-01T00:00:00.000Z',
+    });
   });
 });

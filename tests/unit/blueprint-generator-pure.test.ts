@@ -24,7 +24,13 @@ vi.mock('../../server/logger.js', () => ({
 vi.mock('../../server/ai.js', () => ({ callAI: vi.fn() }));
 vi.mock('../../server/helpers.js', () => ({ stripCodeFences: vi.fn((s: string) => s) }));
 vi.mock('../../server/db/json-validation.js', () => ({
-  parseJsonFallback: vi.fn((_raw: unknown, fallback: unknown) => fallback),
+  parseJsonFallback: vi.fn((raw: unknown, fallback: unknown) => {
+    try {
+      return JSON.parse(String(raw));
+    } catch {
+      return fallback;
+    }
+  }),
 }));
 vi.mock('../../server/brandscript.js', () => ({ getBrandscript: vi.fn(() => null) }));
 vi.mock('../../server/local-seo.js', () => ({ resolveWorkspaceLocationCode: vi.fn(() => null) }));
@@ -44,7 +50,41 @@ vi.mock('../../server/page-strategy.js', () => ({
 }));
 vi.mock('../../server/content-brief.js', () => ({ generateBrief: vi.fn(async () => ({ id: 'brief_1' })) }));
 
-import { getDefaultSectionPlan } from '../../server/blueprint-generator.js';
+import { getDefaultSectionPlan, parseBlueprintGenerationOutput } from '../../server/blueprint-generator.js';
+
+describe('parseBlueprintGenerationOutput', () => {
+  it('accepts valid blueprint JSON before database writes', () => {
+    const entries = parseBlueprintGenerationOutput(JSON.stringify([
+      {
+        name: 'Emergency Plumbing',
+        pageType: 'service',
+        scope: 'included',
+        isCollection: false,
+        primaryKeyword: 'emergency plumber austin',
+        secondaryKeywords: ['24 hour plumber'],
+        rationale: 'Core revenue page.',
+      },
+    ]));
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      name: 'Emergency Plumbing',
+      pageType: 'service',
+      scope: 'included',
+    });
+  });
+
+  it('fails closed for malformed parseable blueprint JSON', () => {
+    expect(() => parseBlueprintGenerationOutput(JSON.stringify([
+      {
+        name: 'Broken Page',
+        pageType: 'not-a-page-type',
+        scope: 'included',
+        isCollection: false,
+      },
+    ]))).toThrow('schema validation');
+  });
+});
 
 // ── getDefaultSectionPlan ─────────────────────────────────────────────────
 

@@ -7,18 +7,22 @@ import { requireClientPortalAuth } from '../middleware.js';
 import { createLogger } from '../logger.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';
 import {
-  generateRecommendations,
   loadRecommendations,
   computeRecommendationSummary,
   updateRecommendationStatus,
   dismissRecommendation,
+  recommendationOutcomeActionType,
 } from '../recommendations.js';
+import { createJob, hasActiveJob } from '../jobs.js';
+import { runRecommendationGenerationJob } from '../recommendation-generation-job.js';
+import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { getLatestSnapshot } from '../reports.js';
 import { updatePageState, getPageIdBySlug, getWorkspace } from '../workspaces.js';
 import { normalizePageUrl } from '../helpers.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import type { Recommendation, RecommendationSet } from '../../shared/types/recommendations.js';
 
 const log = createLogger('routes:recommendations');
@@ -73,8 +77,19 @@ function toPublicRecommendationSet(set: RecommendationSet, recs: Recommendation[
 // cookie-only fetch). Matches the sibling PATCH/DELETE routes below.
 router.post('/api/public/recommendations/:workspaceId/generate', requireClientPortalAuth(), async (req, res) => {
   try {
-    const set = await generateRecommendations(req.params.workspaceId);
-    res.json(toPublicRecommendationSet(set, set.recommendations));
+    const { workspaceId } = req.params;
+    if (!getWorkspace(workspaceId)) return res.status(404).json({ error: 'Workspace not found' });
+    const active = hasActiveJob(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION, workspaceId);
+    if (active) return res.json({ jobId: active.id, existing: true });
+
+    const job = createJob(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION, {
+      workspaceId,
+      message: 'Generating recommendations...',
+    });
+    res.json({ jobId: job.id });
+    setTimeout(() => {
+      void runRecommendationGenerationJob(job.id, workspaceId, 'explicit');
+    }, 100);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -133,7 +148,12 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', requireClientPor
   if (!status || !['pending', 'in_progress', 'completed', 'dismissed'].includes(status)) {
     return res.status(400).json({ error: 'Valid status required: pending, in_progress, completed, dismissed' });
   }
-  const rec = updateRecommendationStatus(workspaceId, recId, status);
+  let rec: Recommendation | null;
+  try {
+    rec = updateRecommendationStatus(workspaceId, recId, status);
+  } catch (err) {
+    return res.status(400).json({ error: err instanceof Error ? err.message : 'Invalid status transition' });
+  }
   if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
   const updatedPageStateIds: string[] = [];
   // When recommendation is completed, mark affected pages as live
@@ -172,24 +192,32 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', requireClientPor
       });
       updatedPageStateIds.push(resolvedPageId);
     }
-    // Record for outcome tracking — idempotent
+  }
+  // Record for outcome tracking — idempotent. This is intentionally outside the
+  // page-state block: strategy, keyword-gap, topic-cluster, and local recs can be
+  // completed without affectedPages but still need outcome-learning calibration.
+  if (status === 'completed') {
     try {
-      if (workspaceId && !getActionBySource('recommendation', recId)) recordAction({ // recordAction-ok: workspaceId guarded by if condition
-        workspaceId,
-        actionType: 'audit_fix_applied',
-        sourceType: 'recommendation',
-        sourceId: recId,
-        pageUrl: rec.affectedPages?.[0] ?? null,
-        targetKeyword: null,
-        baselineSnapshot: {
-          captured_at: new Date().toISOString(),
-        },
-        // P4: snapshot the OV predicted EMV (CPC-proxy placeholder) onto the durable
-        // outcome row so the P6 realized-vs-predicted calibration loop has a pairing.
-        // null when this rec carries no opportunity (legacy row / OV not yet attached).
-        predictedEmv: rec.opportunity?.predictedEmv ?? null,
-        attribution: 'platform_executed',
-      });
+      if (workspaceId && !getActionBySource('recommendation', recId)) {
+        const pageUrl = rec.affectedPages?.[0] ?? null;
+        const action = recordAction({ // recordAction-ok: workspaceId guarded by if condition
+          workspaceId,
+          actionType: recommendationOutcomeActionType(rec.type, rec.source),
+          sourceType: 'recommendation',
+          sourceId: recId,
+          pageUrl,
+          targetKeyword: null,
+          baselineSnapshot: {
+            captured_at: new Date().toISOString(),
+          },
+          // P4: snapshot the OV predicted EMV (CPC-proxy placeholder) onto the durable
+          // outcome row so the P6 realized-vs-predicted calibration loop has a pairing.
+          // null when this rec carries no opportunity (legacy row / OV not yet attached).
+          predictedEmv: rec.opportunity?.predictedEmv ?? null,
+          attribution: 'platform_executed',
+        });
+        if (pageUrl) void captureBaselineFromGsc(action.id, workspaceId, pageUrl);
+      }
     } catch (err) {
       log.warn({ err, recId }, 'Failed to record outcome action for recommendation completion');
     }
@@ -211,7 +239,12 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', requireClientPor
 // Dismiss a recommendation
 router.delete('/api/public/recommendations/:workspaceId/:recId', requireClientPortalAuth(), (req, res) => {
   const { workspaceId, recId } = req.params;
-  const ok = dismissRecommendation(workspaceId, recId);
+  let ok: boolean;
+  try {
+    ok = dismissRecommendation(workspaceId, recId);
+  } catch (err) {
+    return res.status(400).json({ error: err instanceof Error ? err.message : 'Invalid status transition' });
+  }
   if (!ok) return res.status(404).json({ error: 'Recommendation not found' });
   invalidateIntelligenceCache(workspaceId);
   broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { recId, status: 'dismissed', deleted: true });

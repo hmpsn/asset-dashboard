@@ -683,11 +683,21 @@ describe('src/api/misc — trackedKeywords', () => {
 });
 
 describe('src/api/misc — businessPriorities', () => {
-  it('businessPriorities.get uses getSafe with priorities fallback', async () => {
+  it('businessPriorities.get uses get with the public route', async () => {
     await businessPriorities.get('ws-1');
-    const [url, fallback] = mockedGetSafe.mock.calls[0];
+    const [url] = mockedGet.mock.calls[0];
     expect(url).toContain('/api/public/business-priorities/ws-1');
-    expect(fallback).toEqual({ priorities: [] });
+  });
+
+  it('businessPriorities.save posts priorities and expectedUpdatedAt', async () => {
+    await businessPriorities.save('ws-1', {
+      priorities: [{ text: 'Grow', category: 'growth' }],
+      expectedUpdatedAt: null,
+    });
+    expect(mockedPost).toHaveBeenCalledWith('/api/public/business-priorities/ws-1', {
+      priorities: [{ text: 'Grow', category: 'growth' }],
+      expectedUpdatedAt: null,
+    });
   });
 });
 

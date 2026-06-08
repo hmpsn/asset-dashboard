@@ -59,6 +59,7 @@ import { buildCtrCurve, type GscKeywordObservation } from './scoring/ctr-curve.j
 import { resolveOvAuthorityStrength } from './workspace-authority.js';
 import { getOrCreateWorkspaceWeights } from './opportunity-weights.js';
 import { computeOvCalibration } from './scoring/ov-calibration.js';
+import { applyOutcomeAdjustmentScore, buildOutcomeAdjustment } from './outcome-learning-default-path.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -420,6 +421,9 @@ export function updateRecommendationStatus(
   if (!set) return null;
   const rec = set.recommendations.find(r => r.id === recId);
   if (!rec) return null;
+  if (rec.status !== status) {
+    validateTransition('recommendation', RECOMMENDATION_TRANSITIONS, rec.status, status);
+  }
   rec.status = status;
   rec.updatedAt = new Date().toISOString();
   // Recompute the summary so topRecommendationId stays consistent after a
@@ -663,16 +667,18 @@ export function isRecIntentAligned(
 
 /** Canonical recommendation ranking. Sorts `recs` in place:
  *   1. priority tier (fix_now > fix_soon > fix_later > ongoing) — PRIMARY
- *   2. impactScore (highest first) — SECONDARY
+ *   2. rank score override, then impactScore (highest first) — SECONDARY
  *   3. business-intent alignment (aligned first) — within-tier TIEBREAKER only
  *
  * Because intent is the LAST comparator, an intent-aligned rec can only outrank
- * another rec that is otherwise equal (same tier, same impactScore). A higher
- * tier or a higher impactScore always wins regardless of intent.
+ * another rec that is otherwise equal (same tier, same rank score). A higher
+ * tier or a higher rank score always wins regardless of intent. Rank score
+ * overrides are ephemeral; they do not change the persisted/public impactScore.
  * @internal exported for unit testing */
 export function sortRecommendations(
   recs: Recommendation[],
   effectiveBusinessPriorities: string[],
+  options: { rankScores?: Map<string, number> } = {},
 ): void {
   const priorityOrder: Record<RecPriority, number> = { fix_now: 0, fix_soon: 1, fix_later: 2, ongoing: 3 };
   // Memoise alignment so we don't re-tokenise per comparison.
@@ -688,7 +694,9 @@ export function sortRecommendations(
   recs.sort((a, b) => {
     const pDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
     if (pDiff !== 0) return pDiff;
-    const scoreDiff = b.impactScore - a.impactScore;
+    const scoreA = options.rankScores?.get(a.id) ?? a.impactScore;
+    const scoreB = options.rankScores?.get(b.id) ?? b.impactScore;
+    const scoreDiff = scoreB - scoreA;
     if (scoreDiff !== 0) return scoreDiff;
     // Equal tier and impact — let stated business intent break the tie.
     return Number(isAligned(b)) - Number(isAligned(a));
@@ -1091,7 +1099,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     // We consume it through the shared builder rather than a hand-rolled read so
     // intent stays sourced from the one blessed representation (CLAUDE.md
     // "AI/recommendation generation consumers must use shared intelligence context builders").
-    slices: ['seoContext', 'clientSignals'],
+    slices: ['seoContext', 'clientSignals', 'learnings'],
     verbosity: 'standard',
     tokenBudget: 800,
     enrichWithBacklinks: true,
@@ -1103,6 +1111,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   // Resolved business priorities (client-entered first, admin-set as supplement).
   // Used only as a within-tier ranking tiebreaker below — never to change tiers.
   const effectiveBusinessPriorities = recommendationContext?.intelligence.clientSignals?.effectiveBusinessPriorities ?? [];
+  const outcomeLearnings = recommendationContext?.intelligence.learnings ?? null;
 
   // Fetch domain strength once per rec-gen cycle (cached at provider layer; see resolveDomainStrength).
   // It now feeds recommendation copy/context only (KD notes / authority framing), while
@@ -2266,8 +2275,13 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       // Preserve status from existing rec if it was in_progress or completed
       const oldRec = existingByKey.get(key);
       if (oldRec) {
-        if (oldRec.status === 'in_progress' || oldRec.status === 'completed') {
+        if (oldRec.status === 'in_progress') {
           newRec.status = oldRec.status;
+          newRec.id = oldRec.id; // keep same ID for frontend continuity
+          newRec.createdAt = oldRec.createdAt;
+        } else if (oldRec.status === 'completed') {
+          validateTransition('recommendation', RECOMMENDATION_TRANSITIONS, oldRec.status, 'pending');
+          newRec.status = 'pending';
           newRec.id = oldRec.id; // keep same ID for frontend continuity
           newRec.createdAt = oldRec.createdAt;
         } else if (oldRec.status === 'dismissed') {
@@ -2332,18 +2346,27 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   // ── Canonical OV scoring + one gain basis chokepoint. ──
   // Keep one post-pass so every producer converges on the same final authority even if a
   // future branch accidentally provides a placeholder priority/score during construction.
+  const outcomeRankScores = new Map<string, number>();
   for (const r of recs) {
     if (r.opportunity) {
       const scoring = deriveCanonicalRecommendationFields(r.source, r.opportunity);
       r.impactScore = scoring.impactScore;
       r.priority = scoring.priority;
     }
+    const outcomeAdjustment = buildOutcomeAdjustment({
+      actionType: recommendationOutcomeActionType(r.type, r.source),
+      learnings: outcomeLearnings,
+    });
+    if (outcomeAdjustment.multiplier !== 1) {
+      outcomeRankScores.set(r.id, applyOutcomeAdjustmentScore(r.impactScore, outcomeAdjustment));
+    }
     r.estimatedGain = resolveEstimatedGain(r.estimatedGain, r.opportunity, true);
   }
 
-  // ── Sort: tier PRIMARY, impactScore SECONDARY, business-intent alignment as
-  // the final within-tier tiebreaker (see sortRecommendations). ──
-  sortRecommendations(recs, effectiveBusinessPriorities);
+  // ── Sort: tier PRIMARY, learned rank score / impactScore SECONDARY, business-intent
+  // alignment as the final within-tier tiebreaker. Learning scores are rank-only so
+  // the public `impactScore === opportunity.value` contract stays intact.
+  sortRecommendations(recs, effectiveBusinessPriorities, { rankScores: outcomeRankScores });
 
   // ── Build summary (exclude auto-resolved from active counts) ──
   const summary = computeRecommendationSummary(recs);

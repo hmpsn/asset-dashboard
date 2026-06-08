@@ -56,7 +56,7 @@ export function getLocalStrategySyncStatus(workspaceId: string): LocalStrategySy
   let reason: LocalStrategySyncStatus['localNeedsRefreshReason'] = null;
 
   if (lastLocalRefreshAt === null) {
-    // No snapshots at all.
+    // No usable snapshots yet. Provider-failed rows are diagnostics, not freshness.
     reason = LOCAL_NEEDS_REFRESH_REASON.MISSING;
   } else {
     // Check markets_changed: any market.updatedAt > lastLocalRefreshAt.

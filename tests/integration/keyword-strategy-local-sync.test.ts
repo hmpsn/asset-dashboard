@@ -4,6 +4,8 @@
  * Covers Task 1.1 — both branches of the GET handler:
  *   1. Real branch (workspace with a strategy blob) returns strategyUx.localSync
  *   2. Shell branch (page_keywords only, no blob) returns strategyUx.localSync
+ *   3. First-generation local branch (no blob, no page keywords) returns
+ *      strategyUx.localSync so the UI can prompt for local refresh first
  *
  * Also covers:
  *   - applies === true when posture is 'local' + a snapshot exists
@@ -26,6 +28,7 @@ const { api } = ctx;
 let localWsId = ''; // workspace with local posture + snapshot + strategy blob
 let defaultWsId = ''; // workspace with no local posture (default/unknown)
 let shellWsId = ''; // workspace with only page_keywords (no strategy blob)
+let firstGenerationLocalWsId = ''; // workspace with local posture but no strategy/page keyword rows
 
 const createdIds: string[] = [];
 
@@ -113,6 +116,10 @@ beforeAll(async () => {
   });
   // No strategy blob set — this exercises the shell-strategy branch
 
+  // 4. First-generation local workspace: local posture, no snapshots yet, no page_keywords, no strategy blob.
+  firstGenerationLocalWsId = freshWs('LocalSync Test — First Generation Local');
+  seedPosture(firstGenerationLocalWsId, 'local');
+
   await ctx.startServer();
 }, 25_000);
 
@@ -166,5 +173,20 @@ describe('GET /api/webflow/keyword-strategy/:wsId — strategyUx.localSync', () 
     expect(body.strategyUx.localSync.lastLocalRefreshAt).not.toBeNull();
     // No strategy blob → lastStrategyGeneratedAt is null
     expect(body.strategyUx.localSync.lastStrategyGeneratedAt).toBeNull();
+  });
+
+  it('first-generation local workspace returns strategyUx.localSync instead of null', async () => {
+    const res = await api(`/api/webflow/keyword-strategy/${firstGenerationLocalWsId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).not.toBeNull();
+    expect(body.generatedAt).toBeNull();
+    expect(body.pageMap).toEqual([]);
+    expect(body.strategyUx).toBeDefined();
+    expect(body.strategyUx.localSync).toBeDefined();
+    expect(body.strategyUx.localSync.applies).toBe(true);
+    expect(body.strategyUx.localSync.localNeedsRefresh).toBe(true);
+    expect(body.strategyUx.localSync.localNeedsRefreshReason).toBe('missing');
+    expect(body.strategyUx.localSync.lastLocalRefreshAt).toBeNull();
   });
 });

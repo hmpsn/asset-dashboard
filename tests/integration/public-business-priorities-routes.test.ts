@@ -12,6 +12,7 @@ import db from '../../server/db/index.js';
 import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
 import { CLIENT_BUSINESS_PRIORITIES_MARKER } from '../../server/schemas/client-business-priorities.js';
 import { getWorkspace, updateWorkspace } from '../../server/workspaces.js';
+import type { ClientSignalsSlice } from '../../shared/types/intelligence.js';
 import type { KeywordStrategy } from '../../shared/types/workspace.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { createTestContext } from './helpers.js';
@@ -169,7 +170,14 @@ describe('Public business priorities mutations', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ saved: 2 });
+    expect(await res.json()).toEqual(expect.objectContaining({
+      saved: 2,
+      priorities: [
+        { text: 'Grow enterprise pipeline', category: 'growth' },
+        { text: 'Clarify premium positioning', category: 'brand' },
+      ],
+      updatedAt: expect.any(String),
+    }));
     expect(getStoredPriorities(wsId)).toEqual([
       { text: 'Grow enterprise pipeline', category: 'growth' },
       { text: 'Clarify premium positioning', category: 'brand' },
@@ -177,6 +185,46 @@ describe('Public business priorities mutations', () => {
     expect(getWorkspace(wsId)?.keywordStrategy?.businessContext).toContain(
       `${CLIENT_BUSINESS_PRIORITIES_MARKER}[growth] Grow enterprise pipeline; [brand] Clarify premium positioning`,
     );
+  });
+
+  it('invalidates clientSignals intelligence even before a keyword strategy exists', async () => {
+    const fresh = seedWorkspace({ clientPassword: '' });
+    let freshClientUserId = '';
+    try {
+      const user = await createClientUser(
+        `priorities-nostrategy-${randomUUID().slice(0, 8)}@test.local`,
+        'ClientPass1!',
+        'No Strategy Client',
+        fresh.workspaceId,
+        'client_member',
+      );
+      freshClientUserId = user.id;
+      const token = signClientToken(user);
+
+      const beforeRes = await api(`/api/intelligence/${fresh.workspaceId}?slices=clientSignals`);
+      expect(beforeRes.status).toBe(200);
+      const before = await beforeRes.json() as { clientSignals: ClientSignalsSlice };
+      expect(before.clientSignals.effectiveBusinessPriorities).toEqual([]);
+
+      const res = await clientPostJson(
+        `/api/public/business-priorities/${fresh.workspaceId}`,
+        { priorities: [{ text: 'Win local emergency searches', category: 'growth' }] },
+        fresh.workspaceId,
+        token,
+      );
+      expect(res.status).toBe(200);
+
+      const afterRes = await api(`/api/intelligence/${fresh.workspaceId}?slices=clientSignals`);
+      expect(afterRes.status).toBe(200);
+      const after = await afterRes.json() as { clientSignals: ClientSignalsSlice };
+      expect(after.clientSignals.effectiveBusinessPriorities).toEqual([
+        '[growth] Win local emergency searches',
+      ]);
+    } finally {
+      db.prepare('DELETE FROM client_business_priorities WHERE workspace_id = ?').run(fresh.workspaceId);
+      if (freshClientUserId) deleteClientUser(freshClientUserId, fresh.workspaceId);
+      fresh.cleanup();
+    }
   });
 
   it('clears stale strategy context when the client clears all priorities', async () => {
@@ -194,9 +242,44 @@ describe('Public business priorities mutations', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ saved: 0 });
+    expect(await res.json()).toEqual(expect.objectContaining({
+      saved: 0,
+      priorities: [],
+      updatedAt: expect.any(String),
+    }));
     expect(getStoredPriorities(wsId)).toEqual([]);
     expect(getWorkspace(wsId)?.keywordStrategy?.businessContext).toBe('Existing context');
+  });
+
+  it('rejects stale whole-list saves with the current priorities and updatedAt', async () => {
+    const first = await clientPostJson(`/api/public/business-priorities/${wsId}`, {
+      priorities: [{ text: 'Grow enterprise pipeline', category: 'growth' }],
+    });
+    expect(first.status).toBe(200);
+    const firstBody = await first.json() as { updatedAt: string };
+
+    await new Promise(resolve => setTimeout(resolve, 2));
+    const second = await clientPostJson(`/api/public/business-priorities/${wsId}`, {
+      priorities: [{ text: 'Clarify premium positioning', category: 'brand' }],
+      expectedUpdatedAt: firstBody.updatedAt,
+    });
+    expect(second.status).toBe(200);
+
+    const stale = await clientPostJson(`/api/public/business-priorities/${wsId}`, {
+      priorities: [{ text: 'Overwrite from stale tab', category: 'competitive' }],
+      expectedUpdatedAt: firstBody.updatedAt,
+    });
+
+    expect(stale.status).toBe(409);
+    const body = await stale.json();
+    expect(body).toEqual({
+      error: 'Business priorities changed. Please refresh and try again.',
+      priorities: [{ text: 'Clarify premium positioning', category: 'brand' }],
+      updatedAt: expect.any(String),
+    });
+    expect(getStoredPriorities(wsId)).toEqual([
+      { text: 'Clarify premium positioning', category: 'brand' },
+    ]);
   });
 
   it('does not allow a client token from another workspace to mutate priorities', async () => {

@@ -56,6 +56,11 @@ import { computeTrialState } from '../billing/trial-state.js';
 import { toPublicWorkspaceView } from '../serializers/client-safe.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 import { getVoiceProfile } from '../voice-calibration.js';
+import type {
+  BusinessPrioritiesConflictResponse,
+  BusinessPrioritiesResponse,
+  BusinessPrioritiesSaveResponse,
+} from '../../shared/types/business-priorities.js';
 
 const log = createLogger('public-portal');
 
@@ -441,15 +446,16 @@ router.delete('/api/public/keyword-feedback/:workspaceId', (req, res) => {
 // ── Client Business Priorities ──────────────────────────
 // Clients can share their business priorities which get injected into future strategy generations
 
-router.get('/api/public/business-priorities/:workspaceId', (req, res) => {
-  const wsId = req.params.workspaceId;
-  const ws = getWorkspace(wsId);
-  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+interface ClientBusinessPrioritiesRow {
+  priorities: string;
+  updated_at: string;
+}
 
-  // Load from db
-  const row = db.prepare('SELECT priorities, updated_at FROM client_business_priorities WHERE workspace_id = ?').get(wsId) as { priorities: string; updated_at: string } | undefined;
-  if (!row) return res.json({ priorities: [], updatedAt: null });
-
+function normalizeClientBusinessPrioritiesRow(
+  wsId: string,
+  row: ClientBusinessPrioritiesRow | undefined,
+): BusinessPrioritiesResponse {
+  if (!row) return { priorities: [], updatedAt: null };
   const priorities = parseJsonSafeArray(
     row.priorities,
     clientBusinessPrioritySchema,
@@ -463,7 +469,16 @@ router.get('/api/public/business-priorities/:workspaceId', (req, res) => {
       category: priority.category?.trim() || 'other',
     };
   }).filter(priority => priority.text.length > 0);
-  res.json({ priorities, updatedAt: row.updated_at });
+  return { priorities, updatedAt: row.updated_at };
+}
+
+router.get('/api/public/business-priorities/:workspaceId', (req, res) => {
+  const wsId = req.params.workspaceId;
+  const ws = getWorkspace(wsId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const row = db.prepare('SELECT priorities, updated_at FROM client_business_priorities WHERE workspace_id = ?').get(wsId) as ClientBusinessPrioritiesRow | undefined;
+  res.json(normalizeClientBusinessPrioritiesRow(wsId, row));
 });
 
 router.post('/api/public/business-priorities/:workspaceId', requireClientStrategyMutationAuth, validate(clientBusinessPrioritiesBodySchema), (req, res) => {
@@ -471,20 +486,31 @@ router.post('/api/public/business-priorities/:workspaceId', requireClientStrateg
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
-  const { priorities } = req.body as ClientBusinessPrioritiesBody;
+  const { priorities, expectedUpdatedAt } = req.body as ClientBusinessPrioritiesBody;
+  const existingRow = db.prepare('SELECT priorities, updated_at FROM client_business_priorities WHERE workspace_id = ?').get(wsId) as ClientBusinessPrioritiesRow | undefined;
+  const existing = normalizeClientBusinessPrioritiesRow(wsId, existingRow);
+  if (expectedUpdatedAt !== undefined && expectedUpdatedAt !== existing.updatedAt) {
+    const response: BusinessPrioritiesConflictResponse = {
+      error: 'Business priorities changed. Please refresh and try again.',
+      priorities: existing.priorities,
+      updatedAt: existing.updatedAt,
+    };
+    return res.status(409).json(response);
+  }
   const clean = priorities.map(p => ({
     text: p.text,
     category: p.category,
   }));
+  const updatedAt = new Date().toISOString();
 
   // Upsert into db
   db.prepare(`
     INSERT INTO client_business_priorities (workspace_id, priorities, updated_at)
-    VALUES (?, ?, datetime('now'))
+    VALUES (?, ?, ?)
     ON CONFLICT(workspace_id) DO UPDATE SET
       priorities = excluded.priorities,
-      updated_at = datetime('now')
-  `).run(wsId, JSON.stringify(clean));
+      updated_at = excluded.updated_at
+  `).run(wsId, JSON.stringify(clean), updatedAt);
 
   // Also inject a summary into workspace businessContext so it's available for AI prompts
   if (ws.keywordStrategy) {
@@ -498,19 +524,23 @@ router.post('/api/public/business-priorities/:workspaceId', requireClientStrateg
       : base;
 
     updateWorkspace(wsId, { keywordStrategy: { ...ws.keywordStrategy, businessContext } });
-    // Bridge #3: business priorities updated — immediate flush + debounced defense-in-depth
-    invalidateIntelligenceCache(wsId);
-    debouncedStrategyInvalidate(wsId, () => {
-      invalidateIntelligenceCache(wsId);
-      invalidateSubCachePrefix(wsId, 'slice:seoContext');
-    });
   }
+  // Bridge #3: business priorities updated — immediate flush + debounced
+  // defense-in-depth. Priorities are also read directly by clientSignals, so
+  // this must run even before a workspace has a keywordStrategy blob.
+  invalidateIntelligenceCache(wsId);
+  debouncedStrategyInvalidate(wsId, () => {
+    invalidateIntelligenceCache(wsId);
+    invalidateSubCachePrefix(wsId, 'slice:seoContext');
+    invalidateSubCachePrefix(wsId, 'slice:clientSignals');
+  });
 
   log.info(`Client submitted ${clean.length} business priorities for workspace ${wsId}`);
   broadcastToWorkspace(wsId, WS_EVENTS.STRATEGY_UPDATED, { businessPriorities: clean });
   // client-visibility-ok: business-priority edits are internal strategy signals, not client timeline content.
   addActivity(wsId, 'client_priorities_updated', `Client updated business priorities (${clean.length} items)`, 'Via client portal');
-  res.json({ saved: clean.length });
+  const response: BusinessPrioritiesSaveResponse = { saved: clean.length, priorities: clean, updatedAt };
+  res.json(response);
 });
 
 // ── Business Profile (client-facing PATCH) ─────────────────────

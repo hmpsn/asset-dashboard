@@ -121,6 +121,12 @@ const COVERAGE_SIGNALS: Record<BackgroundJobType, CoverageSignal[]> = {
       mustContainOneOf: [BACKGROUND_JOB_TYPES.ACTION_PLAYBOOK_EXECUTE, 'BACKGROUND_JOB_TYPES.ACTION_PLAYBOOK_EXECUTE'],
     },
   ],
+  [BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION]: [
+    {
+      file: 'tests/integration/recommendations-lifecycle.test.ts',
+      mustContainOneOf: [BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION, 'BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION'],
+    },
+  ],
   [BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH]: [
     {
       file: 'tests/integration/local-seo-routes.test.ts',
@@ -165,5 +171,12 @@ describe('background-job coverage contract', () => {
         ).toBe(true);
       }
     }
+  });
+
+  it('mounts client routes inside BackgroundTaskProvider for public job tracking', () => {
+    const appSource = readSignalFile('src/App.tsx');
+
+    expect(appSource).toContain('<BackgroundTaskProvider><MobileGuard><Suspense fallback={<ChunkFallback />}><ClientRoutes betaMode /></Suspense></MobileGuard></BackgroundTaskProvider>');
+    expect(appSource).toContain('<BackgroundTaskProvider><MobileGuard><Suspense fallback={<ChunkFallback />}><ClientRoutes /></Suspense></MobileGuard></BackgroundTaskProvider>');
   });
 });

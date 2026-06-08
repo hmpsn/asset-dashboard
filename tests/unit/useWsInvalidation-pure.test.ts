@@ -275,11 +275,13 @@ function buildHandlers(wsId: string) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingHistory(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.strategy(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.strategyGuidance(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.pageKeywords(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.keywordFeedback(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.latestRanks(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.rankHistory(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(wsId) });
     },
     [WS_EVENTS.LOCAL_SEO_UPDATED]: () => {
       if (!wsId) return;
@@ -456,15 +458,17 @@ describe('useWsInvalidation — event routing (pure)', () => {
     expect(perPostKeys).toHaveLength(0);
   });
 
-  it('STRATEGY_UPDATED fans out to both admin rank-tracking and client strategy/pageKeywords', () => {
+  it('STRATEGY_UPDATED fans out to admin rank-tracking and client strategy/intelligence paths', () => {
     const { handlers, invalidated } = buildHandlers(WS_ID);
     handlers[WS_EVENTS.STRATEGY_UPDATED]();
 
     expect(invalidated).toContainEqual(queryKeys.admin.keywordStrategy(WS_ID));
     expect(invalidated).toContainEqual(queryKeys.admin.rankTrackingKeywords(WS_ID));
     expect(invalidated).toContainEqual(queryKeys.client.strategy(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.client.strategyGuidance(WS_ID));
     expect(invalidated).toContainEqual(queryKeys.client.pageKeywords(WS_ID));
     expect(invalidated).toContainEqual(queryKeys.client.keywordFeedback(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.client.intelligence(WS_ID));
   });
 
   it('BRIEFING_PUBLISHED invalidates both admin drafts and client briefing', () => {

@@ -231,7 +231,14 @@ describe('KeywordStrategyPanel — refresh ordering (Task 3.3)', () => {
       fireEvent.click(screen.getByRole('button', { name: /Full refresh \(local → strategy\)/i }));
 
       expect(mocks.refreshMutate).toHaveBeenCalledWith(
-        expect.objectContaining({ thenRegenerateStrategy: true }),
+        expect.objectContaining({
+          thenRegenerateStrategy: true,
+          strategyGeneration: expect.objectContaining({
+            seoDataMode: 'quick',
+            seoDataProvider: 'dataforseo',
+            maxPages: 500,
+          }),
+        }),
       );
       // startJob NOT called — the chain happens server-side
       expect(mocks.startJob).not.toHaveBeenCalled();
@@ -269,7 +276,14 @@ describe('KeywordStrategyPanel — refresh ordering (Task 3.3)', () => {
       const fullRefreshBtn = screen.getByRole('button', { name: /full refresh/i });
       fireEvent.click(fullRefreshBtn);
       expect(mocks.refreshMutate).toHaveBeenCalledWith(
-        expect.objectContaining({ thenRegenerateStrategy: true }),
+        expect.objectContaining({
+          thenRegenerateStrategy: true,
+          strategyGeneration: expect.objectContaining({
+            seoDataMode: 'quick',
+            seoDataProvider: 'dataforseo',
+            maxPages: 500,
+          }),
+        }),
       );
     });
   });

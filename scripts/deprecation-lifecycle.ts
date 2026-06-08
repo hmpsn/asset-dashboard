@@ -114,6 +114,23 @@ export const DEPRECATION_REGISTRY: DeprecationEntry[] = [
     ],
   },
   {
+    id: 'keyword-strategy-legacy-sse-route',
+    capability: 'Legacy keyword strategy SSE generation route (POST /api/webflow/keyword-strategy/:workspaceId)',
+    state: 'deprecated',
+    owner: 'analytics-intelligence',
+    replacement: 'Start BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY through /api/jobs.',
+    requiresHumanVerification: true,
+    notes: 'The first-party UI uses durable background jobs; the legacy route remains only for external compatibility during retirement.',
+    contracts: [
+      {
+        kind: 'safe-failure',
+        description: 'Legacy route responds with explicit deprecation guidance while preserving compatibility.',
+        evidence: 'server/routes/keyword-strategy.ts (X-Deprecated-Route compatibility header)',
+        testEvidence: 'tests/contract/keyword-strategy-compat-retirement.test.ts',
+      },
+    ],
+  },
+  {
     id: 'keyword-strategy-client-action-read-only',
     capability: 'Deprecated keyword_strategy client action source type (archived rows only)',
     state: 'read-only',

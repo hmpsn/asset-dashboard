@@ -1,6 +1,11 @@
 // ── Miscellaneous API endpoints ────────────────────────────────────
 import { get, post, patch, del, getSafe, getOptional, getText, postForm } from './client';
 import type { ContentSubscription, ContentSubscriptionPlanConfig } from '../../shared/types/content';
+import type {
+  BusinessPrioritiesResponse,
+  BusinessPrioritiesSaveRequest,
+  BusinessPrioritiesSaveResponse,
+} from '../../shared/types/business-priorities';
 import type { KeywordFeedbackDeleteResponse, KeywordFeedbackListRow, KeywordFeedbackMutationResponse } from '../../shared/types/keyword-feedback';
 import type { TrackedKeyword } from '../../shared/types/rank-tracking';
 export {
@@ -171,7 +176,7 @@ export const recommendations = {
     getOptional<unknown>(`/api/public/recommendations/${wsId}`),
 
   generate: (wsId: string) =>
-    post<unknown>(`/api/public/recommendations/${wsId}/generate`),
+    post<{ jobId: string; existing?: boolean }>(`/api/public/recommendations/${wsId}/generate`),
 
   update: (wsId: string, recId: string, body: Record<string, unknown>) =>
     patch<unknown>(`/api/public/recommendations/${wsId}/${recId}`, body),
@@ -311,10 +316,10 @@ export const trackedKeywords = {
 // ── Public: business priorities ───────────────────────────────
 export const businessPriorities = {
   get: (wsId: string) =>
-    getSafe<{ priorities: Array<{ text: string; category: string }> }>(
-      `/api/public/business-priorities/${wsId}`,
-      { priorities: [] },
-    ),
+    get<BusinessPrioritiesResponse>(`/api/public/business-priorities/${wsId}`),
+
+  save: (wsId: string, body: BusinessPrioritiesSaveRequest) =>
+    post<BusinessPrioritiesSaveResponse>(`/api/public/business-priorities/${wsId}`, body),
 };
 
 // ── Content exports (HTML strings for client-side PDF print flow) ──

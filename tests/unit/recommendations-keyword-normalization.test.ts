@@ -27,10 +27,59 @@ import db from '../../server/db/index.js';
 import { replaceAllContentGaps } from '../../server/content-gaps.js';
 import { replaceAllQuickWins } from '../../server/quick-wins.js';
 import { upsertPageKeyword } from '../../server/page-keywords.js';
-import { generateRecommendations } from '../../server/recommendations.js';
+import { generateRecommendations, sortRecommendations } from '../../server/recommendations.js';
+import { buildRecommendationGenerationContext } from '../../server/intelligence/generation-context-builders.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
+import type { LearningsSlice } from '../../shared/types/intelligence.js';
+import type { Recommendation } from '../../shared/types/recommendations.js';
 import type { PageKeywordMap, QuickWin } from '../../shared/types/workspace.js';
+
+const mockBuildRecommendationGenerationContext = vi.mocked(buildRecommendationGenerationContext);
+
+function makeRecommendationContext(learnings: LearningsSlice | null = null) {
+  return {
+    intelligence: {
+      learnings,
+      seoContext: { backlinkProfile: null },
+    },
+  };
+}
+
+function makeLearnings(overrides: Partial<LearningsSlice> = {}): LearningsSlice {
+  return {
+    availability: 'ready',
+    summary: {
+      workspaceId: 'ws-rec-learnings',
+      computedAt: new Date().toISOString(),
+      confidence: 'medium',
+      totalScoredActions: 10,
+      content: null,
+      strategy: null,
+      technical: null,
+      overall: {
+        totalWinRate: 0.6,
+        strongWinRate: 0.2,
+        topActionTypes: [],
+        recentTrend: 'stable',
+      },
+    },
+    confidence: 'medium',
+    topActionTypes: [],
+    overallWinRate: 0.6,
+    recentTrend: 'stable',
+    playbooks: [],
+    roiAttribution: [],
+    topWins: [],
+    weCalledIt: [],
+    winRateByActionType: {},
+    ...overrides,
+  };
+}
+
+afterEach(() => {
+  mockBuildRecommendationGenerationContext.mockResolvedValue(makeRecommendationContext());
+});
 
 describe('generateRecommendations keyword normalization', () => {
   let workspaceId = '';
@@ -97,6 +146,83 @@ describe('generateRecommendations keyword normalization', () => {
     expect(strategySources).not.toContain('strategy:quick-win');
     expect(strategySources).not.toContain('strategy:content-gap');
     expect(strategySources).not.toContain('strategy:ranking-opportunity');
+  });
+});
+
+describe('generateRecommendations outcome-learning ranking', () => {
+  let workspaceId = '';
+
+  afterEach(() => {
+    if (workspaceId) {
+      deleteWorkspace(workspaceId);
+      workspaceId = '';
+    }
+  });
+
+  it('requests learnings without mutating canonical impactScore or priority tier', async () => {
+    workspaceId = createWorkspace('Recommendation Outcome Learning').id;
+    updateWorkspace(workspaceId, {
+      keywordStrategy: {
+        generatedAt: '2026-05-20T00:00:00.000Z',
+        siteKeywords: [],
+        opportunities: [],
+      },
+    });
+    replaceAllQuickWins(workspaceId, [{
+      pagePath: '/services',
+      action: 'Strengthen service page metadata',
+      estimatedImpact: 'high',
+      rationale: 'Metadata is missing a clear service keyword.',
+      roiScore: 72,
+    }]);
+
+    mockBuildRecommendationGenerationContext.mockResolvedValueOnce(makeRecommendationContext());
+    const neutral = await generateRecommendations(workspaceId);
+    const neutralRec = neutral.recommendations.find(r => r.source === 'strategy:quick-win');
+    expect(neutralRec).toBeTruthy();
+    expect(mockBuildRecommendationGenerationContext).toHaveBeenLastCalledWith(workspaceId, expect.objectContaining({
+      slices: expect.arrayContaining(['seoContext', 'clientSignals', 'learnings']),
+    }));
+
+    mockBuildRecommendationGenerationContext.mockResolvedValueOnce(makeRecommendationContext(makeLearnings({
+      winRateByActionType: { insight_acted_on: 0.72 },
+    })));
+    const boosted = await generateRecommendations(workspaceId);
+    const boostedRec = boosted.recommendations.find(r => r.source === 'strategy:quick-win');
+
+    expect(boostedRec?.priority).toBe(neutralRec?.priority);
+    expect(boostedRec?.impactScore).toBe(neutralRec?.impactScore);
+    expect(boostedRec?.opportunity?.value).toBe(neutralRec?.opportunity?.value);
+  });
+
+  it('uses outcome-learning rank scores as within-tier ordering input only', () => {
+    const makeRec = (id: string, impactScore: number): Recommendation => ({
+      id,
+      workspaceId: 'ws-rec-sort',
+      priority: 'fix_soon',
+      type: 'strategy',
+      title: id,
+      description: id,
+      insight: id,
+      impact: 'medium',
+      effort: 'low',
+      impactScore,
+      source: 'strategy:quick-win',
+      affectedPages: [],
+      trafficAtRisk: 0,
+      impressionsAtRisk: 0,
+      estimatedGain: 'Test',
+      actionType: 'manual',
+      status: 'pending',
+      createdAt: '2026-06-01T00:00:00.000Z',
+      updatedAt: '2026-06-01T00:00:00.000Z',
+    });
+    const recs = [makeRec('lower-canonical-boosted', 70), makeRec('higher-canonical', 80)];
+
+    sortRecommendations(recs, [], { rankScores: new Map([['lower-canonical-boosted', 90]]) });
+
+    expect(recs.map(rec => rec.id)).toEqual(['lower-canonical-boosted', 'higher-canonical']);
+    expect(recs[0].impactScore).toBe(70);
   });
 });
 

@@ -17,6 +17,7 @@ export const BACKGROUND_JOB_TYPES = {
   SEO_BULK_REWRITE: 'seo-bulk-rewrite',
   SEO_BULK_ACCEPT_FIXES: 'seo-bulk-accept-fixes',
   ACTION_PLAYBOOK_EXECUTE: 'action-playbook-execute',
+  RECOMMENDATIONS_GENERATION: 'recommendations-generation',
   LOCAL_SEO_REFRESH: 'local-seo-refresh',
   LOCAL_SEO_LOCATION_BACKFILL: 'local-seo-location-backfill',
 } as const;
@@ -144,10 +145,16 @@ export const BACKGROUND_JOB_METADATA: { [K in BackgroundJobType]: BackgroundJobT
     cancellable: false,
     resultBehavior: 'domain-store',
   },
+  [BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION]: {
+    label: 'Recommendations Generation',
+    description: 'Regenerates prioritized client recommendations for a workspace.',
+    cancellable: false,
+    resultBehavior: 'domain-store-and-result',
+  },
   [BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH]: {
     label: 'Local SEO Refresh',
     description: 'Refreshes local pack visibility for selected markets and keywords.',
-    cancellable: false,
+    cancellable: true,
     resultBehavior: 'domain-store-and-result',
   },
   [BACKGROUND_JOB_TYPES.LOCAL_SEO_LOCATION_BACKFILL]: {

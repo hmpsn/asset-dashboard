@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { stripCodeFences } from './helpers.js';
 import { callAI } from './ai.js';
 import { parseJsonFallback } from './db/json-validation.js';
+import { z } from 'zod';
 import { getBrandscript } from './brandscript.js';
 import { resolveWorkspaceLocationCode } from './local-seo.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
@@ -33,6 +34,46 @@ import { generateBrief } from './content-brief.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('blueprint-generator');
+
+const blueprintPageTypeSchema = z.enum([
+  'blog',
+  'landing',
+  'service',
+  'location',
+  'product',
+  'pillar',
+  'resource',
+  'provider-profile',
+  'procedure-guide',
+  'pricing-page',
+  'homepage',
+  'about',
+  'contact',
+  'faq',
+  'testimonials',
+  'custom',
+]);
+
+const generatedBlueprintEntrySchema = z.object({
+  name: z.string().trim().min(1),
+  pageType: blueprintPageTypeSchema,
+  scope: z.enum(['included', 'recommended']),
+  isCollection: z.boolean(),
+  primaryKeyword: z.string().trim().min(1).optional(),
+  secondaryKeywords: z.array(z.string().trim().min(1)).optional(),
+  rationale: z.string().optional(),
+});
+
+type ValidatedGeneratedBlueprintEntry = z.infer<typeof generatedBlueprintEntrySchema>;
+
+export function parseBlueprintGenerationOutput(raw: string): ValidatedGeneratedBlueprintEntry[] {
+  const parsed = parseJsonFallback<unknown>(stripCodeFences(raw).trim(), null);
+  const result = z.array(generatedBlueprintEntrySchema).min(1).safeParse(parsed);
+  if (!result.success) {
+    throw new Error('Failed to generate blueprint — AI response failed schema validation');
+  }
+  return result.data;
+}
 
 // ── Default Section Plans ────────────────────────────────────────────────────
 // Maps page type to an ordered list of section plan items (no `id` — UUIDs
@@ -189,21 +230,20 @@ For each recommended page, provide:
 Return ONLY a JSON array of objects with these fields. No markdown, no explanation outside the JSON.`;
 
   const aiResponse = await callAI({
+    operation: 'blueprint-generation',
     provider: 'anthropic',
-    model: 'claude-sonnet-4-6',
     maxTokens: 4000,
     messages: [{ role: 'user', content: prompt }],
-    feature: 'blueprint-generation',
     workspaceId,
   });
 
   // ── 4. Parse AI response ───────────────────────────────────────────────────
   const text = aiResponse.text;
-  // Strip markdown code fences if present — then use parseJsonFallback (bare JSON.parse fails pr-check)
-  const jsonStr = stripCodeFences(text).trim();
-  const generatedEntries = parseJsonFallback<GeneratedBlueprintEntry[]>(jsonStr, []);
-  if (generatedEntries.length === 0) {
-    log.error({ workspaceId, raw: text.slice(0, 500) }, 'Blueprint AI response parsed to empty array');
+  let generatedEntries: ValidatedGeneratedBlueprintEntry[];
+  try {
+    generatedEntries = parseBlueprintGenerationOutput(text);
+  } catch (err) {
+    log.error({ err, workspaceId, raw: text.slice(0, 500) }, 'Blueprint AI response failed validation');
     throw new Error('Failed to generate blueprint — AI response was not valid JSON or returned empty array');
   }
 

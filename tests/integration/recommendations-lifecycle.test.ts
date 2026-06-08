@@ -21,6 +21,9 @@ import type { AddressInfo } from 'net';
 const broadcastState = vi.hoisted(() => ({
   calls: [] as Array<{ workspaceId: string; event: string; payload: Record<string, unknown> }>,
 }));
+const recommendationJobState = vi.hoisted(() => ({
+  runs: [] as Array<{ jobId: string; workspaceId: string; reason: string | undefined }>,
+}));
 
 vi.mock('../../server/broadcast.js', () => ({
   setBroadcast: vi.fn(),
@@ -31,14 +34,21 @@ vi.mock('../../server/broadcast.js', () => ({
     },
   ),
 }));
+vi.mock('../../server/recommendation-generation-job.js', () => ({
+  runRecommendationGenerationJob: vi.fn((jobId: string, workspaceId: string, reason?: string) => {
+    recommendationJobState.runs.push({ jobId, workspaceId, reason });
+  }),
+}));
 
 // ─── Imports (after mock registration) ───────────────────────────────────────
 
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
-import { saveRecommendations } from '../../server/recommendations.js';
+import { loadRecommendations, saveRecommendations } from '../../server/recommendations.js';
+import { cancelJob, createJob } from '../../server/jobs.js';
 import db from '../../server/db/index.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
-import type { RecommendationSet } from '../../shared/types/recommendations.js';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
+import type { OpportunityScore, RecommendationSet } from '../../shared/types/recommendations.js';
 
 // ─── Server bootstrap ─────────────────────────────────────────────────────────
 // This file uses the inline server pattern (vi.mock + dynamic import of app)
@@ -82,7 +92,27 @@ function del(path: string): Promise<Response> {
   return api(path, { method: 'DELETE' });
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 // ─── Seed helpers ─────────────────────────────────────────────────────────────
+
+function makeOpportunity(overrides: Partial<OpportunityScore> = {}): OpportunityScore {
+  return {
+    value: 82,
+    emvPerWeek: 25,
+    predictedEmv: 1234,
+    roiPerEffortDay: 8,
+    confidence: 0.8,
+    calibration: 1,
+    groundedSpine: 'computed',
+    components: [],
+    calibrationVersion: 'test',
+    modelVersion: 'ov-1',
+    ...overrides,
+  };
+}
 
 function makeRecSet(wsId: string, recId: string, overrides: Partial<RecommendationSet['recommendations'][0]> = {}): RecommendationSet {
   return {
@@ -142,6 +172,9 @@ beforeAll(async () => {
 
 beforeEach(() => {
   broadcastState.calls = [];
+  recommendationJobState.runs = [];
+  if (wsId) db.prepare('DELETE FROM tracked_actions WHERE workspace_id = ?').run(wsId);
+  if (otherWsId) db.prepare('DELETE FROM tracked_actions WHERE workspace_id = ?').run(otherWsId);
 });
 
 afterAll(async () => {
@@ -202,6 +235,43 @@ describe('GET /api/public/recommendations/:workspaceId — with seeded data', ()
   });
 });
 
+// ─── POST generate ───────────────────────────────────────────────────────────
+
+describe('POST /api/public/recommendations/:workspaceId/generate — durable job', () => {
+  it('returns a jobId and dispatches the recommendation generation runner', async () => {
+    const res = await api(`/api/public/recommendations/${wsId}/generate`, { method: 'POST' });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { jobId?: string; existing?: boolean };
+    expect(typeof body.jobId).toBe('string');
+    expect(body.existing).toBeUndefined();
+
+    await sleep(150);
+    expect(recommendationJobState.runs).toContainEqual({
+      jobId: body.jobId,
+      workspaceId: wsId,
+      reason: 'explicit',
+    });
+    cancelJob(body.jobId!);
+  });
+
+  it('returns the active recommendation job id instead of starting a duplicate', async () => {
+    const active = createJob(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION, {
+      workspaceId: wsId,
+      message: 'Already generating recommendations...',
+    });
+    try {
+      const res = await api(`/api/public/recommendations/${wsId}/generate`, { method: 'POST' });
+      expect(res.status).toBe(200);
+      const body = await res.json() as { jobId?: string; existing?: boolean };
+      expect(body).toMatchObject({ jobId: active.id, existing: true });
+      await sleep(150);
+      expect(recommendationJobState.runs).toEqual([]);
+    } finally {
+      cancelJob(active.id);
+    }
+  });
+});
+
 // ─── PATCH status updates ─────────────────────────────────────────────────────
 
 describe('PATCH /api/public/recommendations/:workspaceId/:recId — status updates', () => {
@@ -257,6 +327,55 @@ describe('PATCH /api/public/recommendations/:workspaceId/:recId — status updat
     expect(res.status).toBe(200);
     const rec = await res.json() as RecommendationSet['recommendations'][0];
     expect(rec.status).toBe('completed');
+  });
+
+  it('records completed page-less keyword recommendations under their canonical outcome action type', async () => {
+    const recId = mkPatchRecId('keyword_outcome');
+    saveRecommendations(makeRecSet(wsId, recId, {
+      type: 'keyword_gap',
+      source: 'keyword_gap:missing local seo',
+      affectedPages: [],
+      opportunity: makeOpportunity({ predictedEmv: 4321 }),
+    }));
+
+    const res = await patchJson(`/api/public/recommendations/${wsId}/${recId}`, {
+      status: 'completed',
+    });
+    expect(res.status).toBe(200);
+
+    const action = db.prepare(`
+      SELECT action_type, source_type, source_id, page_url, predicted_emv
+      FROM tracked_actions
+      WHERE workspace_id = ? AND source_type = 'recommendation' AND source_id = ?
+    `).get(wsId, recId) as {
+      action_type: string;
+      source_type: string;
+      source_id: string;
+      page_url: string | null;
+      predicted_emv: number | null;
+    } | undefined;
+
+    expect(action).toMatchObject({
+      action_type: 'competitor_gap_closed',
+      source_type: 'recommendation',
+      source_id: recId,
+      page_url: null,
+      predicted_emv: 4321,
+    });
+  });
+
+  it('rejects invalid recommendation state-machine transitions', async () => {
+    const recId = mkPatchRecId('bad_transition');
+    saveRecommendations(makeRecSet(wsId, recId, { status: 'completed' }));
+
+    const res = await patchJson(`/api/public/recommendations/${wsId}/${recId}`, {
+      status: 'dismissed',
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json() as { error: string };
+    expect(body.error).toContain('Invalid');
+    expect(loadRecommendations(wsId)?.recommendations.find(rec => rec.id === recId)?.status).toBe('completed');
   });
 
   it('returns 400 for an invalid status value', async () => {
