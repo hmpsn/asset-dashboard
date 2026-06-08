@@ -725,10 +725,17 @@ export function gscDateRange(days: number, dateRange?: CustomDateRange) {
       return { startDate: dateRange.startDate, endDate: dateRange.endDate };
     }
   }
-  const endDate = new Date();
-  endDate.setDate(endDate.getDate() - 3);
-  const startDate = new Date(endDate);
-  startDate.setDate(startDate.getDate() - days);
+  const now = new Date();
+  const endDate = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() - 3,
+  ));
+  const startDate = new Date(Date.UTC(
+    endDate.getUTCFullYear(),
+    endDate.getUTCMonth(),
+    endDate.getUTCDate() - days,
+  ));
   const fmt = (d: Date) => d.toISOString().split('T')[0];
   return { startDate: fmt(startDate), endDate: fmt(endDate) };
 }
