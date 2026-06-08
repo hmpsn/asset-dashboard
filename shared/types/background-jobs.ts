@@ -29,6 +29,29 @@ export type BackgroundJobResultBehavior =
   | 'domain-store'
   | 'domain-store-and-result';
 
+export type BackgroundJobStatus =
+  | 'pending'
+  | 'running'
+  | 'done'
+  | 'error'
+  | 'cancelled';
+
+export interface BackgroundJobRecord {
+  id: string;
+  type: BackgroundJobType | string;
+  status: BackgroundJobStatus;
+  progress?: number;
+  total?: number;
+  message?: string;
+  result?: unknown;
+  error?: string;
+  createdAt: string;
+  updatedAt: string;
+  workspaceId?: string;
+}
+
+export type PublicBackgroundJob = Omit<BackgroundJobRecord, 'result'>;
+
 export interface BackgroundJobTypeMetadata {
   label: string;
   description: string;
@@ -179,4 +202,10 @@ export function getBackgroundJobLabel(type: string): string {
 
 export function isBackgroundJobCancellable(type: string): boolean {
   return getBackgroundJobMetadata(type)?.cancellable ?? true;
+}
+
+export function toPublicBackgroundJob(job: BackgroundJobRecord): PublicBackgroundJob {
+  const { result: _result, ...publicJob } = job;
+  void _result;
+  return publicJob;
 }

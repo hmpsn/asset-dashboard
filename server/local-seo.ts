@@ -9,7 +9,7 @@ import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { getClientLocations } from './client-locations.js';
 import { listContentGaps } from './content-gaps.js';
-import { createJob, updateJob, getJob, hasActiveJob } from './jobs.js';
+import { createJob, updateJob, getJob, hasActiveJob, unregisterAbort } from './jobs.js';
 import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js';
 import { isStrategyPoolEligibleKeyword, isNearDuplicateKeyword } from './keyword-intelligence/rules.js';
 import { listPageKeywords } from './page-keywords.js';
@@ -2276,47 +2276,48 @@ export async function resolveLocalSeoProviderLocation(
 }
 
 export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, request: LocalSeoRefreshRequest = {}): Promise<void> {
-  const workspace = getWorkspace(workspaceId);
-  if (!workspace) {
-    updateJob(jobId, { status: 'error', message: 'Workspace not found', error: 'Workspace not found' });
-    return;
-  }
-  const locations = getEffectiveLocations(workspace);
-  const plan = createLocalSeoRefreshPlan(workspaceId, request);
-  if (!plan || plan.markets.length === 0 || plan.keywords.length === 0) {
-    updateJob(jobId, {
-      status: 'done',
-      progress: 100,
-      total: 100,
-      message: 'No local markets or local-intent keywords ready for refresh',
-      result: { workspaceId, refreshed: 0, skipped: 0, failed: 0, markets: [], keywords: [] } satisfies LocalSeoRefreshResult,
-    });
-    return;
-  }
+  try {
+    const workspace = getWorkspace(workspaceId);
+    if (!workspace) {
+      updateJob(jobId, { status: 'error', message: 'Workspace not found', error: 'Workspace not found' });
+      return;
+    }
+    const locations = getEffectiveLocations(workspace);
+    const plan = createLocalSeoRefreshPlan(workspaceId, request);
+    if (!plan || plan.markets.length === 0 || plan.keywords.length === 0) {
+      updateJob(jobId, {
+        status: 'done',
+        progress: 100,
+        total: 100,
+        message: 'No local markets or local-intent keywords ready for refresh',
+        result: { workspaceId, refreshed: 0, skipped: 0, failed: 0, markets: [], keywords: [] } satisfies LocalSeoRefreshResult,
+      });
+      return;
+    }
 
-  const provider = resolveLocalVisibilityProvider(workspace);
-  if (!provider?.getLocalVisibility) {
-    updateJob(jobId, { status: 'error', message: 'No configured local visibility provider', error: 'No configured local visibility provider' });
-    return;
-  }
-  // Capture the narrowed method reference so TypeScript can see it's non-undefined
-  // inside async closures where control-flow narrowing doesn't persist.
-  const getLocalVisibility = provider.getLocalVisibility.bind(provider);
+    const provider = resolveLocalVisibilityProvider(workspace);
+    if (!provider?.getLocalVisibility) {
+      updateJob(jobId, { status: 'error', message: 'No configured local visibility provider', error: 'No configured local visibility provider' });
+      return;
+    }
+    // Capture the narrowed method reference so TypeScript can see it's non-undefined
+    // inside async closures where control-flow narrowing doesn't persist.
+    const getLocalVisibility = provider.getLocalVisibility.bind(provider);
 
-  const total = plan.markets.length * plan.keywords.length;
-  let processed = 0;
-  let refreshed = 0;
-  let failed = 0;
-  let lastProgressBroadcastAt = 0;
-  updateJob(jobId, { status: 'running', total, progress: 0, message: 'Refreshing local visibility...' });
+    const total = plan.markets.length * plan.keywords.length;
+    let processed = 0;
+    let refreshed = 0;
+    let failed = 0;
+    let lastProgressBroadcastAt = 0;
+    updateJob(jobId, { status: 'running', total, progress: 0, message: 'Refreshing local visibility...' });
 
   // Flatten (market × keyword) into a single work-item array, then process
   // with bounded concurrency to cut wall-clock time 3–5× vs. fully sequential.
-  const workItems = plan.markets.flatMap(market =>
-    plan.keywords.map(keyword => ({ market, keyword }))
-  );
+    const workItems = plan.markets.flatMap(market =>
+      plan.keywords.map(keyword => ({ market, keyword }))
+    );
 
-  for (let i = 0; i < workItems.length; i += LOCAL_SEO_REFRESH_CONCURRENCY) {
+    for (let i = 0; i < workItems.length; i += LOCAL_SEO_REFRESH_CONCURRENCY) {
     if (getJob(jobId)?.status === 'cancelled') return;
     // Layer 4: heap-aware backpressure. If heap is above the soft threshold,
     // pause briefly so GC + concurrent KCC reads can drain before we allocate
@@ -2379,44 +2380,44 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
     if (processed < total && refreshTimings.itemYieldMs > 0) await sleep(refreshTimings.itemYieldMs);
   }
 
-  const result: LocalSeoRefreshResult = {
-    workspaceId,
-    refreshed,
-    skipped: total - refreshed - failed,
-    failed,
-    markets: plan.markets.map(market => market.id),
-    keywords: plan.keywords,
-  };
-  if (getJob(jobId)?.status === 'cancelled') return;
-
-  if (refreshed === 0 && failed > 0) {
-    const message = `Local visibility refresh failed — 0/${total} checks refreshed`;
-    notifyLocalSeoUpdated(workspaceId, {
-      action: 'refresh_failed',
-      refreshed,
-      failed,
-      updatedAt: new Date().toISOString(),
-    });
-    updateJob(jobId, {
-      status: 'error',
-      progress: processed,
-      total,
-      message,
-      error: 'All local visibility checks failed',
-      result,
-    });
-    addActivity(
+    const result: LocalSeoRefreshResult = {
       workspaceId,
-      'local_seo_updated',
-      'Local SEO visibility refresh failed',
-      `${failed} local visibility checks failed; no usable local evidence was refreshed`,
-      { source: 'local_seo', refreshed, failed },
-    );
-    return;
-  }
+      refreshed,
+      skipped: total - refreshed - failed,
+      failed,
+      markets: plan.markets.map(market => market.id),
+      keywords: plan.keywords,
+    };
+    if (getJob(jobId)?.status === 'cancelled') return;
 
-  notifyLocalSeoUpdated(workspaceId, { action: 'refresh_completed', refreshed, failed, updatedAt: new Date().toISOString() });
-  addActivity(workspaceId, 'local_seo_updated', 'Local SEO visibility refreshed', `${refreshed} local visibility checks refreshed`, { source: 'local_seo', refreshed, failed });
+    if (refreshed === 0 && failed > 0) {
+      const message = `Local visibility refresh failed — 0/${total} checks refreshed`;
+      notifyLocalSeoUpdated(workspaceId, {
+        action: 'refresh_failed',
+        refreshed,
+        failed,
+        updatedAt: new Date().toISOString(),
+      });
+      updateJob(jobId, {
+        status: 'error',
+        progress: processed,
+        total,
+        message,
+        error: 'All local visibility checks failed',
+        result,
+      });
+      addActivity(
+        workspaceId,
+        'local_seo_updated',
+        'Local SEO visibility refresh failed',
+        `${failed} local visibility checks failed; no usable local evidence was refreshed`,
+        { source: 'local_seo', refreshed, failed },
+      );
+      return;
+    }
+
+    notifyLocalSeoUpdated(workspaceId, { action: 'refresh_completed', refreshed, failed, updatedAt: new Date().toISOString() });
+    addActivity(workspaceId, 'local_seo_updated', 'Local SEO visibility refreshed', `${refreshed} local visibility checks refreshed`, { source: 'local_seo', refreshed, failed });
 
   // Fresh local visibility snapshots are the spine of the local recs (B1/B2/B3). After a refresh
   // completes, regenerate recommendations so the new evidence surfaces immediately — mirroring the
@@ -2426,82 +2427,85 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
   // its own try/catch so a regen failure never fails the refresh job. Dynamic import avoids a
   // static recommendations.ts ↔ local-seo.ts import cycle (recommendations.ts imports the local
   // readers statically).
-  const useLocalGenQual = readSettings(workspace).posture === LOCAL_SEO_POSTURE.LOCAL
-    || readSettings(workspace).posture === LOCAL_SEO_POSTURE.HYBRID;
-  if (useLocalGenQual) {
-    try {
-      await runRecommendationRegen(workspaceId, 'local_seo_refresh');
-      log.info({ workspaceId }, 'Auto-regenerated recommendations after local SEO refresh');
-    } catch (err) {
-      log.warn({ err, workspaceId }, 'Recommendation regen after local SEO refresh failed (non-fatal)');
-    }
-  }
-
-  // Optional chained keyword-strategy regen. When the admin requested
-  // `thenRegenerateStrategy` AND the crawl actually produced data
-  // (result.refreshed > 0 — the only success signal on the result shape), kick
-  // off a strategy regen server-side so it survives a closed tab. A hard-fail
-  // crawl (refreshed === 0) is NOT a usable refresh, so we abort rather than
-  // regenerate a strategy on stale/empty evidence.
-  //
-  // The regen is its own tracked KEYWORD_STRATEGY job and runs DETACHED (not
-  // awaited) — mirroring the POST /api/jobs dispatcher (server/routes/jobs.ts)
-  // — so the slow, AI-heavy strategy phase never blocks this local-refresh job
-  // from reaching 'done'. A strategy failure (e.g. KeywordStrategyGenerationError,
-  // or a missing tier/OPENAI_API_KEY/webflowSiteId precondition) marks only the
-  // strategy job 'error'; the local refresh job is already successful and stays
-  // 'done'. `generateKeywordStrategy` owns its own STRATEGY_UPDATED broadcast
-  // (Data-flow rule #4 — NO manual broadcast here). Dynamic import breaks the
-  // keyword-strategy-generation.ts ↔ local-seo.ts cycle, exactly like the
-  // recommendations regen above.
-  const proceed = result.refreshed > 0;
-  if (request.thenRegenerateStrategy === true && proceed) {
-    try {
-      const activeStrategyJob = hasActiveJob(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, workspaceId);
-      if (activeStrategyJob) {
-        log.info({ workspaceId, activeJobId: activeStrategyJob.id }, 'Skipped chained keyword strategy regeneration because a strategy job is already active');
-      } else {
-        const strategyJob = createJob(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, {
-          workspaceId,
-          message: 'Regenerating keyword strategy after local refresh...',
-        });
-        // Detached: do NOT await — the local-refresh job must not block on the
-        // slow strategy generation. Failures are isolated to the strategy job.
-        void (async () => {
-          try {
-            updateJob(strategyJob.id, { status: 'running', message: 'Generating keyword strategy...' });
-            const { generateKeywordStrategy } = await import('./keyword-strategy-generation.js'); // dynamic-import-ok - breaks the keyword-strategy-generation.ts ↔ local-seo.ts cycle
-            // mode 'full' (not incremental): fresh local snapshots can shift the whole
-            // keyword universe, not just the pages that changed.
-            const strategyGeneration = request.strategyGeneration;
-            const competitorDomainsProvided = Array.isArray(strategyGeneration?.competitorDomains);
-            const generationResult = await generateKeywordStrategy({
-              ...strategyGeneration,
-              workspaceId,
-              mode: 'full',
-              competitorDomainsProvided,
-            });
-            updateJob(strategyJob.id, {
-              status: 'done',
-              progress: 100,
-              total: 100,
-              message: generationResult.upToDate ? 'Strategy already up to date' : 'Keyword strategy regenerated after local refresh',
-            });
-          } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            log.warn({ err, workspaceId, strategyJobId: strategyJob.id }, 'Keyword-strategy regen after local SEO refresh failed (non-fatal to refresh job)');
-            updateJob(strategyJob.id, { status: 'error', error: message, message: 'Keyword strategy regeneration failed' });
-          }
-        })();
+    const useLocalGenQual = readSettings(workspace).posture === LOCAL_SEO_POSTURE.LOCAL
+      || readSettings(workspace).posture === LOCAL_SEO_POSTURE.HYBRID;
+    if (useLocalGenQual) {
+      try {
+        await runRecommendationRegen(workspaceId, 'local_seo_refresh');
+        log.info({ workspaceId }, 'Auto-regenerated recommendations after local SEO refresh');
+      } catch (err) {
+        log.warn({ err, workspaceId }, 'Recommendation regen after local SEO refresh failed (non-fatal)');
       }
-    } catch (err) {
-      // Guards the synchronous createJob/dynamic-import setup — a failure here
-      // must never fail the already-successful local-refresh job.
-      log.warn({ err, workspaceId }, 'Failed to kick off keyword-strategy regen after local SEO refresh (non-fatal)');
     }
-  }
 
-  updateJob(jobId, { status: 'done', progress: total, total, message: `Local visibility refreshed — ${refreshed}/${total} checks`, result });
+    // Optional chained keyword-strategy regen. When the admin requested
+    // `thenRegenerateStrategy` AND the crawl actually produced data
+    // (result.refreshed > 0 — the only success signal on the result shape), kick
+    // off a strategy regen server-side so it survives a closed tab. A hard-fail
+    // crawl (refreshed === 0) is NOT a usable refresh, so we abort rather than
+    // regenerate a strategy on stale/empty evidence.
+    //
+    // The regen is its own tracked KEYWORD_STRATEGY job and runs DETACHED (not
+    // awaited) — mirroring the POST /api/jobs dispatcher (server/routes/jobs.ts)
+    // — so the slow, AI-heavy strategy phase never blocks this local-refresh job
+    // from reaching 'done'. A strategy failure (e.g. KeywordStrategyGenerationError,
+    // or a missing tier/OPENAI_API_KEY/webflowSiteId precondition) marks only the
+    // strategy job 'error'; the local refresh job is already successful and stays
+    // 'done'. `generateKeywordStrategy` owns its own STRATEGY_UPDATED broadcast
+    // (Data-flow rule #4 — NO manual broadcast here). Dynamic import breaks the
+    // keyword-strategy-generation.ts ↔ local-seo.ts cycle, exactly like the
+    // recommendations regen above.
+    const proceed = result.refreshed > 0;
+    if (request.thenRegenerateStrategy === true && proceed) {
+      try {
+        const activeStrategyJob = hasActiveJob(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, workspaceId);
+        if (activeStrategyJob) {
+          log.info({ workspaceId, activeJobId: activeStrategyJob.id }, 'Skipped chained keyword strategy regeneration because a strategy job is already active');
+        } else {
+          const strategyJob = createJob(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, {
+            workspaceId,
+            message: 'Regenerating keyword strategy after local refresh...',
+          });
+          // Detached: do NOT await — the local-refresh job must not block on the
+          // slow strategy generation. Failures are isolated to the strategy job.
+          void (async () => {
+            try {
+              updateJob(strategyJob.id, { status: 'running', message: 'Generating keyword strategy...' });
+              const { generateKeywordStrategy } = await import('./keyword-strategy-generation.js'); // dynamic-import-ok - breaks the keyword-strategy-generation.ts ↔ local-seo.ts cycle
+              // mode 'full' (not incremental): fresh local snapshots can shift the whole
+              // keyword universe, not just the pages that changed.
+              const strategyGeneration = request.strategyGeneration;
+              const competitorDomainsProvided = Array.isArray(strategyGeneration?.competitorDomains);
+              const generationResult = await generateKeywordStrategy({
+                ...strategyGeneration,
+                workspaceId,
+                mode: 'full',
+                competitorDomainsProvided,
+              });
+              updateJob(strategyJob.id, {
+                status: 'done',
+                progress: 100,
+                total: 100,
+                message: generationResult.upToDate ? 'Strategy already up to date' : 'Keyword strategy regenerated after local refresh',
+              });
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err);
+              log.warn({ err, workspaceId, strategyJobId: strategyJob.id }, 'Keyword-strategy regen after local SEO refresh failed (non-fatal to refresh job)');
+              updateJob(strategyJob.id, { status: 'error', error: message, message: 'Keyword strategy regeneration failed' });
+            }
+          })();
+        }
+      } catch (err) {
+        // Guards the synchronous createJob/dynamic-import setup — a failure here
+        // must never fail the already-successful local-refresh job.
+        log.warn({ err, workspaceId }, 'Failed to kick off keyword-strategy regen after local SEO refresh (non-fatal)');
+      }
+    }
+
+    updateJob(jobId, { status: 'done', progress: total, total, message: `Local visibility refreshed — ${refreshed}/${total} checks`, result });
+  } finally {
+    unregisterAbort(jobId);
+  }
 }
 
 export function countLocalVisibilitySnapshots(workspaceId: string): number {

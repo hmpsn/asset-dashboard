@@ -38,7 +38,9 @@ describe('Page Intelligence + SEO Editor correctness contracts', () => {
     const seoBulkAnalyzeSrc = readFileSync('server/webflow-seo-bulk-analyze-job.ts', 'utf-8'); // readFile-ok — source contract for SEO Editor bulk analyze invalidation
 
     expect(singleSrc).toContain("broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_UPDATED, { pagePath: normalized, source: 'page-analysis' })");
-    expect(bulkSrc).toContain("broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_UPDATED, { analyzed, source: 'page-analysis-job' })");
+    expect(bulkSrc).toContain('const invalidatePageAnalysisReads = (payload: Record<string, unknown>) => {');
+    expect(bulkSrc).toContain("broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_UPDATED, payload)");
+    expect(bulkSrc).toContain("invalidatePageAnalysisReads({ analyzed, source: 'page-analysis-job' })");
     expect(seoBulkAnalyzeSrc).toContain('resolvePersistedKeywordMetrics(existing, resolvedPrimaryKeyword, null)');
     expect(seoBulkAnalyzeSrc).toContain('broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_UPDATED');
     expect(seoBulkAnalyzeSrc).toContain("source: 'seo-bulk-analyze'");

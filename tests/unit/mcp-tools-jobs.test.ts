@@ -8,6 +8,7 @@ vi.mock('../../server/jobs.js', () => ({
   cancelJob: vi.fn(),
   createJob: vi.fn(),
   getJob: vi.fn(),
+  getJobCancellationError: vi.fn(() => null),
   hasActiveJob: vi.fn(),
   listJobs: vi.fn(),
   updateJob: vi.fn(),

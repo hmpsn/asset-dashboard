@@ -12,6 +12,10 @@
 // --- Workspace-scoped events (broadcastToWorkspace) ---
 
 export const WS_EVENTS = {
+  // Job lifecycle
+  JOB_CREATED: 'job:created',
+  JOB_UPDATED: 'job:update',
+
   // Workspace settings / tier changes
   WORKSPACE_UPDATED: 'workspace:updated',
   PAGE_STATE_UPDATED: 'page-state:updated',

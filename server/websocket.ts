@@ -9,11 +9,19 @@ import { startWatcher } from './processor.js';
 import { verifyToken, type JwtPayload } from './auth.js';
 import { getUserById } from './users.js';
 import { recoverStuckDiagnosticReports } from './diagnostic-store.js';
+import {
+  BACKGROUND_JOB_TYPES,
+  toPublicBackgroundJob,
+  type BackgroundJobRecord,
+} from '../shared/types/background-jobs.js';
 
 // --- WebSocket state ---
 const clients = new Set<WebSocket>();
 const clientWorkspaces = new Map<WebSocket, Set<string>>();
 const authenticatedClients = new Map<WebSocket, JwtPayload & { workspaceIds?: string[] }>();
+const CLIENT_VISIBLE_JOB_TYPES = new Set<string>([
+  BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION,
+]);
 
 // --- User Presence Tracking ---
 interface PresenceInfo {
@@ -55,6 +63,74 @@ function _broadcast(event: string, data: unknown) {
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(msg);
     }
+  }
+}
+
+interface JobSocketDelivery {
+  data: BackgroundJobRecord | ReturnType<typeof toPublicBackgroundJob>;
+  workspaceId?: string;
+}
+
+interface ResolveJobDeliveryArgs {
+  job: BackgroundJobRecord;
+  auth?: (JwtPayload & { workspaceIds?: string[] }) | null;
+  subscribedWorkspaces?: Set<string>;
+}
+
+export function resolveJobDelivery({
+  job,
+  auth,
+  subscribedWorkspaces,
+}: ResolveJobDeliveryArgs): JobSocketDelivery | null {
+  if (auth) {
+    if (!job.workspaceId) {
+      return auth.role === 'owner'
+        ? { data: job }
+        : null;
+    }
+
+    const canAccessWorkspace = auth.role === 'owner'
+      || Boolean(auth.workspaceIds?.includes(job.workspaceId));
+    return canAccessWorkspace
+      ? { data: job, workspaceId: job.workspaceId }
+      : null;
+  }
+
+  if (!job.workspaceId || !CLIENT_VISIBLE_JOB_TYPES.has(job.type)) {
+    return null;
+  }
+
+  if (!subscribedWorkspaces?.has(job.workspaceId)) {
+    return null;
+  }
+
+  return {
+    data: toPublicBackgroundJob(job),
+    workspaceId: job.workspaceId,
+  };
+}
+
+function resolveJobDeliveryForSocket(
+  ws: WebSocket,
+  job: BackgroundJobRecord,
+): JobSocketDelivery | null {
+  return resolveJobDelivery({
+    job,
+    auth: authenticatedClients.get(ws),
+    subscribedWorkspaces: clientWorkspaces.get(ws),
+  });
+}
+
+function _broadcastJobEvent(event: string, job: BackgroundJobRecord) {
+  for (const ws of clients) {
+    if (ws.readyState !== WebSocket.OPEN) continue;
+    const delivery = resolveJobDeliveryForSocket(ws, job);
+    if (!delivery) continue;
+    ws.send(JSON.stringify({
+      event,
+      data: delivery.data,
+      ...(delivery.workspaceId ? { workspaceId: delivery.workspaceId } : {}),
+    }));
   }
 }
 
@@ -142,7 +218,7 @@ export function initWebSocket(server: Server): WebSocketServer {
   setBroadcast(_broadcast, _broadcastToWorkspace);
 
   // Initialise subsystems that depend on broadcast
-  initJobs(_broadcast);
+  initJobs(_broadcastJobEvent);
   recoverStuckDiagnosticReports();
   initActivityBroadcast(_broadcastToWorkspace);
   initAnomalyBroadcast(_broadcastToWorkspace);

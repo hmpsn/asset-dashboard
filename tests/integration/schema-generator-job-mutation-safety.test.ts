@@ -218,6 +218,15 @@ describe('schema generator job mutation safety', () => {
         event: WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED,
         payload: {
           siteId: workspaceA.webflowSiteId,
+          action: 'partial_saved',
+          pageCount: 1,
+        },
+      },
+      {
+        workspaceId: workspaceA.workspaceId,
+        event: WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED,
+        payload: {
+          siteId: workspaceA.webflowSiteId,
           action: 'generated',
           pageCount: 1,
         },

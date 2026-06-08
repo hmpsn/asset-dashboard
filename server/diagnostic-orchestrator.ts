@@ -105,6 +105,7 @@ export async function runDiagnostic(request: DiagnosticRequest, jobId: string): 
     if (!anomalyInsight) {
       markDiagnosticFailed(reportId, 'Anomaly insight not found');
       updateJob(jobId, { status: 'error', message: 'Anomaly insight not found' });
+      broadcastToWorkspace(workspaceId, WS_EVENTS.DIAGNOSTIC_FAILED, { reportId, insightId });
       return;
     }
 

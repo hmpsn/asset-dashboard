@@ -16,6 +16,7 @@ const h = vi.hoisted(() => {
     createJob: vi.fn(),
     cancelJob: vi.fn(),
     getJob: vi.fn(),
+    getJobCancellationError: vi.fn(() => null),
     hasActiveJob: vi.fn(),
     listJobs: vi.fn(),
     updateJob: vi.fn(),
@@ -46,6 +47,7 @@ vi.mock('../../server/jobs.js', () => ({
   cancelJob: h.cancelJob,
   createJob: h.createJob,
   getJob: h.getJob,
+  getJobCancellationError: h.getJobCancellationError,
   hasActiveJob: h.hasActiveJob,
   listJobs: h.listJobs,
   updateJob: h.updateJob,
@@ -80,6 +82,7 @@ describe('mcp job action tools', () => {
     h.hasActiveJob.mockReturnValue(undefined);
     h.createJob.mockReturnValue({ id: 'job-1' });
     h.getJob.mockReturnValue({ id: 'job-1', status: 'running' });
+    h.getJobCancellationError.mockReturnValue(null);
     h.generateKeywordStrategy.mockResolvedValue({
       strategy: { pageMap: [{ id: 'p1' }, { id: 'p2' }] },
       upToDate: false,
@@ -239,6 +242,17 @@ describe('mcp job action tools', () => {
     await handleJobActionTool('start_local_seo_refresh', { workspace_id: 'ws-1', refresh_body: {} });
     await Promise.resolve();
     expect(h.updateJob).toHaveBeenCalledWith('job-1', expect.objectContaining({ status: 'error', error: 'refresh failed' }));
+  });
+
+  it('rejects cancel_job when the job metadata marks it non-cancellable', async () => {
+    h.getJob.mockReturnValue({ id: 'job-1', status: 'running', workspaceId: 'ws-1', type: 'recommendations-generation' });
+    h.getJobCancellationError.mockReturnValue('Recommendations Generation cannot be cancelled once it has started');
+
+    const res = await handleJobActionTool('cancel_job', { workspace_id: 'ws-1', job_id: 'job-1' });
+
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text).toContain('cannot be cancelled');
+    expect(h.cancelJob).not.toHaveBeenCalled();
   });
 
   it('supports get_job_status, list_jobs, and cancel_job', async () => {

@@ -232,6 +232,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
         qc.invalidateQueries({ queryKey: queryKeys.admin.schemaGraphValidation(siteId) });
         qc.invalidateQueries({ queryKey: queryKeys.admin.schemaGraphValidation(siteId, workspaceId) });
       }
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
     },
     [WS_EVENTS.OUTCOME_ACTION_RECORDED]: () => {
       if (!workspaceId) return;
@@ -358,6 +359,15 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.diagnosticForInsightAll(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.diagnostics(workspaceId) });
+    },
+    [WS_EVENTS.BULK_OPERATION_COMPLETE]: (data: unknown) => {
+      if (!workspaceId) return;
+      const operation = typeof data === 'object' && data !== null && 'operation' in data
+        ? String((data as { operation: unknown }).operation)
+        : undefined;
+      if (operation === 'bulk-rewrite') {
+        qc.invalidateQueries({ queryKey: queryKeys.admin.seoSuggestions(workspaceId) });
+      }
     },
     [WS_EVENTS.RECOMMENDATIONS_UPDATED]: () => {
       if (!workspaceId) return;

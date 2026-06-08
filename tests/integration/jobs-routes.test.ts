@@ -85,6 +85,21 @@ describe('Jobs — list and get', () => {
     const body = await res.json();
     expect(body.error).toBe('Job not found');
   });
+
+  it('DELETE /api/jobs/:id returns 409 for non-cancellable active jobs', async () => {
+    const job = createJob(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION, {
+      workspaceId: testWsId,
+      message: 'Generating recommendations...',
+    });
+    updateJob(job.id, { status: 'running' });
+
+    const res = await del(`/api/jobs/${job.id}`);
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({
+      jobId: job.id,
+      error: expect.stringContaining('cannot be cancelled'),
+    });
+  });
 });
 
 describe('Jobs — scoped JWT workspace guards', () => {

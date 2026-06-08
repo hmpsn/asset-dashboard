@@ -5,7 +5,7 @@ import { createLogger } from './logger.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { prepareBulkSchemaGenerationContext } from './schema-generation-context.js';
 import { saveSchemaSnapshot } from './schema-store.js';
-import { generateSchemaSuggestions } from './schema-suggester.js';
+import { generateSchemaSuggestions, type SchemaPageSuggestion } from './schema-suggester.js';
 import { WS_EVENTS } from './ws-events.js';
 
 const log = createLogger('schema-generation-job');
@@ -26,6 +26,16 @@ export async function runSchemaGenerationJob({
   try {
     updateJob(jobId, { status: 'running', message: 'Scanning pages and generating unified schemas...' });
     const { ctx } = await prepareBulkSchemaGenerationContext(siteId);
+    const persistSnapshot = (schemas: SchemaPageSuggestion[], action: 'partial_saved' | 'generated') => {
+      saveSchemaSnapshot(siteId, workspaceId, schemas);
+      if (workspaceId) {
+        broadcastToWorkspace(workspaceId, WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED, {
+          siteId,
+          action,
+          pageCount: schemas.length,
+        });
+      }
+    };
     // Debounced incremental save — persist partial results every 10s
     let lastSaveTime = 0;
     const SAVE_INTERVAL = 10_000;
@@ -34,19 +44,12 @@ export async function runSchemaGenerationJob({
       const now = Date.now();
       if (partial.length > 0 && now - lastSaveTime >= SAVE_INTERVAL) {
         lastSaveTime = now;
-        saveSchemaSnapshot(siteId, workspaceId, partial);
+        persistSnapshot(partial, 'partial_saved');
       }
     }, () => isJobCancelled(jobId));
     // Final save — always write the complete result
     if (result.length > 0) {
-      saveSchemaSnapshot(siteId, workspaceId, result);
-      if (workspaceId) {
-        broadcastToWorkspace(workspaceId, WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED, {
-          siteId,
-          action: 'generated',
-          pageCount: result.length,
-        });
-      }
+      persistSnapshot(result, 'generated');
     }
     if (isJobCancelled(jobId)) {
       updateJob(jobId, { status: 'cancelled', result, message: `Cancelled — ${result.length} pages completed before stop` });

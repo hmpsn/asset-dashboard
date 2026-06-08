@@ -5,31 +5,25 @@ import { parseJsonFallback } from './db/json-validation.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
 import { recordOperationTrace } from './platform-observability.js';
-import { getBackgroundJobLabel, type BackgroundJobType } from '../shared/types/background-jobs.js';
+import {
+  getBackgroundJobLabel,
+  isBackgroundJobCancellable,
+  type BackgroundJobRecord,
+  type BackgroundJobType,
+} from '../shared/types/background-jobs.js';
 import { BACKGROUND_JOB_TRANSITIONS, validateTransition } from './state-machines.js';
+import { WS_EVENTS } from './ws-events.js';
 
 
 const log = createLogger('jobs');
-export interface Job {
-  id: string;
-  type: BackgroundJobType | string;
-  status: 'pending' | 'running' | 'done' | 'error' | 'cancelled';
-  progress?: number;
-  total?: number;
-  message?: string;
-  result?: unknown;
-  error?: string;
-  createdAt: string;
-  updatedAt: string;
-  workspaceId?: string;
-}
+export interface Job extends BackgroundJobRecord {}
 
-type BroadcastFn = (event: string, data: unknown) => void;
+type JobBroadcastFn = (event: string, job: Job) => void;
 
 // In-memory write-through cache for fast reads (jobs are read frequently via WebSocket broadcasts)
 const jobs = new Map<string, Job>();
 const abortControllers = new Map<string, AbortController>();
-let broadcastFn: BroadcastFn | null = null;
+let broadcastJobFn: JobBroadcastFn | null = null;
 
 const MAX_JOBS = 200;
 const JOB_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
@@ -213,8 +207,12 @@ function pruneOldJobs() {
 
 // ── Public API ──
 
-export function initJobs(broadcast: BroadcastFn) {
-  broadcastFn = broadcast;
+function broadcastJobEvent(event: string, job: Job): void {
+  broadcastJobFn?.(event, job);
+}
+
+export function initJobs(broadcastJob: JobBroadcastFn) {
+  broadcastJobFn = broadcastJob;
   loadJobsFromDb();
 }
 
@@ -235,7 +233,7 @@ export function createJob(type: BackgroundJobType | string, opts?: { message?: s
   // Write to SQLite first, then cache
   stmts().insert.run(jobToParams(job));
   jobs.set(job.id, job);
-  broadcastFn?.('job:created', job);
+  broadcastJobEvent(WS_EVENTS.JOB_CREATED, job);
   recordOperationTrace({
     source: 'job',
     operation: `job:${job.type}`,
@@ -272,7 +270,7 @@ export function updateJob(id: string, update: Partial<Omit<Job, 'id' | 'type' | 
     error: job.error ?? null,
     updatedAt: job.updatedAt,
   });
-  broadcastFn?.('job:update', job);
+  broadcastJobEvent(WS_EVENTS.JOB_UPDATED, job);
 
   if (job.status === 'done' || job.status === 'error' || job.status === 'cancelled') {
     const durationMs = Math.max(0, new Date(job.updatedAt).getTime() - new Date(job.createdAt).getTime());
@@ -319,6 +317,13 @@ export function unregisterAbort(jobId: string): void {
   abortControllers.delete(jobId);
 }
 
+export function getJobCancellationError(job: Job): string | null {
+  const isActive = job.status === 'pending' || job.status === 'running';
+  if (!isActive) return null;
+  if (isBackgroundJobCancellable(job.type)) return null;
+  return `${getBackgroundJobLabel(job.type)} cannot be cancelled once it has started`;
+}
+
 export function cancelJob(id: string): Job | undefined {
   const ac = abortControllers.get(id);
   if (ac) ac.abort();
@@ -335,7 +340,7 @@ export function cancelJob(id: string): Job | undefined {
       error: job.error ?? null,
       updatedAt: job.updatedAt,
     });
-    broadcastFn?.('job:update', job);
+    broadcastJobEvent(WS_EVENTS.JOB_UPDATED, job);
   }
   return job;
 }

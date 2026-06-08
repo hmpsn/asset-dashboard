@@ -314,6 +314,11 @@ const KNOWN_UNHANDLED_BROADCASTS = new Set<string>([
   // (src/components/client/inbox/UnifiedInbox.tsx wires useWorkspaceEvents for both, invalidating
   // the unified-inbox query). They are intentionally NOT listed here anymore. (The admin inbox
   // half lands in PR-2b; a single frontend handler already satisfies this contract.)
+
+  // Background job lifecycle events are handled by BackgroundTaskProvider /
+  // useBackgroundTasks, not by the centralized React Query invalidation layer.
+  'job:created',
+  'job:update',
 ]);
 
 /**
@@ -454,8 +459,11 @@ describe('broadcast ↔ handler pairing audit', () => {
   // ── WS_EVENTS definition coverage ─────────────────────────────────────────
 
   const KNOWN_CONSTANTS_PENDING_ROUTES = new Set<string>([
-    // Intentionally empty: every WS_EVENTS constant is now broadcast
-    // by at least one backend route.
+    // Job lifecycle is emitted through the jobs subsystem dispatcher rather
+    // than a literal broadcastToWorkspace() call, so this static scan cannot
+    // see the producer even though the events are live.
+    'job:created',
+    'job:update',
   ]);
 
   it('every WS_EVENTS constant is actually used in a broadcastToWorkspace() call', () => {
