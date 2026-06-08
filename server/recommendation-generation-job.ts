@@ -1,4 +1,5 @@
 import { broadcastToWorkspace } from './broadcast.js';
+import { addActivity } from './activity-log.js';
 import { isProgrammingError } from './errors.js';
 import { getJob, updateJob } from './jobs.js';
 import { createLogger } from './logger.js';
@@ -28,6 +29,21 @@ export async function runRecommendationGenerationJob(
     if (jobWasCancelled()) return;
 
     invalidateIntelligenceCache(workspaceId);
+    if (reason === 'explicit') {
+      addActivity(
+        workspaceId,
+        'recommendations_generated',
+        'Recommendations refreshed',
+        `${set.recommendations.length} recommendations generated`,
+        {
+          source: 'recommendations_job',
+          reason,
+          jobId,
+          recommendationCount: set.recommendations.length,
+          generatedAt: set.generatedAt,
+        },
+      );
+    }
     broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, {
       action: 'generated',
       reason,

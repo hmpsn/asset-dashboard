@@ -7,6 +7,7 @@ import { initAnomalyBroadcast } from './anomaly-detection.js';
 import { initStripeBroadcast } from './stripe.js';
 import { startWatcher } from './processor.js';
 import { verifyToken, type JwtPayload } from './auth.js';
+import { verifyAdminToken } from './middleware.js';
 import { getUserById } from './users.js';
 import { recoverStuckDiagnosticReports } from './diagnostic-store.js';
 import {
@@ -75,6 +76,26 @@ interface ResolveJobDeliveryArgs {
   job: BackgroundJobRecord;
   auth?: (JwtPayload & { workspaceIds?: string[] }) | null;
   subscribedWorkspaces?: Set<string>;
+}
+
+export function resolveSocketAuth(
+  token: string,
+): (JwtPayload & { workspaceIds?: string[] }) | null {
+  const payload = verifyToken(token);
+  if (payload) {
+    const user = getUserById(payload.userId);
+    return { ...payload, workspaceIds: user?.workspaceIds };
+  }
+
+  if (verifyAdminToken(token)) {
+    return {
+      userId: 'admin-hmac',
+      email: 'admin@local',
+      role: 'owner',
+    };
+  }
+
+  return null;
 }
 
 export function resolveJobDelivery({
@@ -165,11 +186,9 @@ export function initWebSocket(server: Server): WebSocketServer {
       try {
         const msg = JSON.parse(String(raw));
         if (msg.action === 'authenticate' && typeof msg.token === 'string') {
-          const payload = verifyToken(msg.token);
+          const payload = resolveSocketAuth(msg.token);
           if (payload) {
-            const user = getUserById(payload.userId);
-            const wsIds = user?.workspaceIds;
-            authenticatedClients.set(ws, { ...payload, workspaceIds: wsIds });
+            authenticatedClients.set(ws, payload);
             ws.send(JSON.stringify({ action: 'authenticated', ok: true }));
           } else {
             ws.send(JSON.stringify({ action: 'authenticated', ok: false }));

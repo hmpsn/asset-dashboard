@@ -120,7 +120,7 @@ export function BackgroundTaskProvider({
 }: BackgroundTaskProviderProps) {
   const [jobs, setJobs] = useState<BackgroundJob[]>([]);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const globalWsRef = useRef<WebSocket | null>(null);
+  const socketRef = useRef<WebSocket | null>(null);
 
   const handleIncomingJobEvent = useCallback((eventName: string | undefined, data: unknown) => {
     if (eventName !== WS_EVENTS.JOB_CREATED && eventName !== WS_EVENTS.JOB_UPDATED) return;
@@ -133,6 +133,49 @@ export function BackgroundTaskProvider({
     return subscribeWorkspaceEvents(workspaceId, {
       onMessage: (msg) => handleIncomingJobEvent(msg.event, msg.data),
     });
+  }, [handleIncomingJobEvent, publicMode, workspaceId]);
+
+  useEffect(() => {
+    if (!publicMode || !workspaceId) return undefined;
+    let disposed = false;
+
+    function connect() {
+      if (disposed) return;
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+
+      ws.onopen = () => {
+        try {
+          ws.send(JSON.stringify({ action: 'subscribe', workspaceId }));
+        } catch (err) {
+          console.error('useBackgroundTasks operation failed:', err);
+        }
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data) as { event?: string; data?: unknown };
+          handleIncomingJobEvent(msg.event, msg.data);
+        } catch (err) {
+          console.error('useBackgroundTasks operation failed:', err);
+        }
+      };
+
+      ws.onclose = () => {
+        if (!disposed) reconnectTimer.current = setTimeout(connect, 2000);
+      };
+
+      socketRef.current = ws;
+    }
+
+    connect();
+
+    return () => {
+      disposed = true;
+      clearTimeout(reconnectTimer.current);
+      socketRef.current?.close();
+      socketRef.current = null;
+    };
   }, [handleIncomingJobEvent, publicMode, workspaceId]);
 
   useEffect(() => {
@@ -168,7 +211,7 @@ export function BackgroundTaskProvider({
         if (!disposed) reconnectTimer.current = setTimeout(connect, 2000);
       };
 
-      globalWsRef.current = ws;
+      socketRef.current = ws;
     }
 
     connect();
@@ -176,8 +219,8 @@ export function BackgroundTaskProvider({
     return () => {
       disposed = true;
       clearTimeout(reconnectTimer.current);
-      globalWsRef.current?.close();
-      globalWsRef.current = null;
+      socketRef.current?.close();
+      socketRef.current = null;
     };
   }, [handleIncomingJobEvent, publicMode, workspaceId]);
 

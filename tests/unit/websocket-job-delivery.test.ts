@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveJobDelivery } from '../../server/websocket.js';
+import { signAdminToken } from '../../server/middleware.js';
+import { resolveJobDelivery, resolveSocketAuth } from '../../server/websocket.js';
 import {
   BACKGROUND_JOB_TYPES,
   type BackgroundJobRecord,
@@ -114,5 +115,21 @@ describe('resolveJobDelivery', () => {
         workspaceIds: ['ws-2'],
       },
     })).toBeNull();
+  });
+});
+
+describe('resolveSocketAuth', () => {
+  it('accepts admin HMAC tokens as owner-authenticated websocket sessions', () => {
+    const auth = resolveSocketAuth(signAdminToken());
+
+    expect(auth).toEqual({
+      userId: 'admin-hmac',
+      email: 'admin@local',
+      role: 'owner',
+    });
+  });
+
+  it('rejects invalid websocket auth tokens', () => {
+    expect(resolveSocketAuth('definitely-not-valid')).toBeNull();
   });
 });
