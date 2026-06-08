@@ -275,6 +275,7 @@ function buildHandlers(wsId: string) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingHistory(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.strategy(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.strategyGuidance(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.pageKeywords(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.keywordFeedback(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.latestRanks(wsId) });
@@ -464,6 +465,7 @@ describe('useWsInvalidation — event routing (pure)', () => {
     expect(invalidated).toContainEqual(queryKeys.admin.keywordStrategy(WS_ID));
     expect(invalidated).toContainEqual(queryKeys.admin.rankTrackingKeywords(WS_ID));
     expect(invalidated).toContainEqual(queryKeys.client.strategy(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.client.strategyGuidance(WS_ID));
     expect(invalidated).toContainEqual(queryKeys.client.pageKeywords(WS_ID));
     expect(invalidated).toContainEqual(queryKeys.client.keywordFeedback(WS_ID));
     expect(invalidated).toContainEqual(queryKeys.client.intelligence(WS_ID));

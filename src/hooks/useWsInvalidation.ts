@@ -380,6 +380,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.roi(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.strategy(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.strategyGuidance(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.pageKeywords(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.keywordFeedback(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.latestRanks(workspaceId) });
@@ -398,6 +399,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.client.rankHistory(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.strategy(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.strategyGuidance(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.pageKeywords(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.localSeo(workspaceId) });

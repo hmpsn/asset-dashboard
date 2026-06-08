@@ -112,6 +112,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const {
     priorities,
     prioritiesLoaded,
+    prioritiesError,
+    reloadPriorities,
     newPriority,
     setNewPriority,
     newPriorityCategory,
@@ -725,6 +727,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         businessPrioritiesRef={businessPrioritiesRef}
         workspaceId={workspaceId}
         prioritiesLoaded={prioritiesLoaded}
+        prioritiesError={prioritiesError}
+        reloadPriorities={() => { void reloadPriorities(); }}
         priorities={priorities}
         newPriority={newPriority}
         setNewPriority={setNewPriority}

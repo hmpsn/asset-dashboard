@@ -309,12 +309,26 @@ export const trackedKeywords = {
 };
 
 // ── Public: business priorities ───────────────────────────────
+export interface BusinessPriority {
+  text: string;
+  category: string;
+}
+
+export interface BusinessPrioritiesResponse {
+  priorities: BusinessPriority[];
+  updatedAt: string | null;
+}
+
+export interface BusinessPrioritiesSaveResponse extends BusinessPrioritiesResponse {
+  saved: number;
+}
+
 export const businessPriorities = {
   get: (wsId: string) =>
-    getSafe<{ priorities: Array<{ text: string; category: string }> }>(
-      `/api/public/business-priorities/${wsId}`,
-      { priorities: [] },
-    ),
+    get<BusinessPrioritiesResponse>(`/api/public/business-priorities/${wsId}`),
+
+  save: (wsId: string, body: { priorities: BusinessPriority[]; expectedUpdatedAt?: string | null }) =>
+    post<BusinessPrioritiesSaveResponse>(`/api/public/business-priorities/${wsId}`, body),
 };
 
 // ── Content exports (HTML strings for client-side PDF print flow) ──

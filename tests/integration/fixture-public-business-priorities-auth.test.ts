@@ -68,7 +68,14 @@ describe('Public business priorities auth boundaries (fixture-backed)', () => {
     );
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ saved: 2 });
+    expect(await res.json()).toEqual(expect.objectContaining({
+      saved: 2,
+      priorities: [
+        { text: 'Increase qualified leads', category: 'growth' },
+        { text: 'Improve brand visibility', category: 'brand' },
+      ],
+      updatedAt: expect.any(String),
+    }));
 
     const followUp = await ctx.api(`/api/public/business-priorities/${primary!.workspaceId}`);
     expect(followUp.status).toBe(200);

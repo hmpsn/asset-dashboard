@@ -22,6 +22,7 @@ describe('client StrategyTab split', () => {
     expect(trackedKeywordsHook).toContain('trackedKwApi.add');
     expect(trackedKeywordsHook).toContain('trackedKwApi.remove');
     expect(businessPrioritiesHook).toContain('businessPriorities as bizPrioritiesApi');
-    expect(businessPrioritiesHook).toContain('/api/public/business-priorities/');
+    expect(businessPrioritiesHook).toContain('queryKeys.client.strategyGuidance');
+    expect(businessPrioritiesHook).toContain('bizPrioritiesApi.save');
   });
 });

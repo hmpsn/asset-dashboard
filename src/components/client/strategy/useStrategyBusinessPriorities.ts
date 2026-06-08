@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
-import { post, businessPriorities as bizPrioritiesApi } from '../../../api';
+import { useCallback, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ApiError, businessPriorities as bizPrioritiesApi } from '../../../api';
+import { queryKeys } from '../../../lib/queryKeys';
 
 export interface StrategyBusinessPriority {
   text: string;
@@ -12,44 +14,66 @@ interface UseStrategyBusinessPrioritiesOptions {
 }
 
 export function useStrategyBusinessPriorities({ workspaceId, setToast }: UseStrategyBusinessPrioritiesOptions) {
-  const [priorities, setPriorities] = useState<StrategyBusinessPriority[]>([]);
-  const [prioritiesLoaded, setPrioritiesLoaded] = useState(false);
+  const queryClient = useQueryClient();
   const [newPriority, setNewPriority] = useState('');
   const [newPriorityCategory, setNewPriorityCategory] = useState('growth');
-  const [savingPriorities, setSavingPriorities] = useState(false);
 
-  useEffect(() => {
-    if (!workspaceId) return;
-    bizPrioritiesApi.get(workspaceId)
-      .then((data) => {
-        setPriorities(data.priorities || []);
-        setPrioritiesLoaded(true);
-      })
-      .catch(() => setPrioritiesLoaded(true));
-  }, [workspaceId]);
+  const query = useQuery({
+    queryKey: queryKeys.client.strategyGuidance(workspaceId ?? ''),
+    queryFn: () => bizPrioritiesApi.get(workspaceId!),
+    enabled: Boolean(workspaceId),
+  });
+
+  const mutation = useMutation({
+    mutationFn: (newList: StrategyBusinessPriority[]) => {
+      if (!workspaceId) throw new Error('Workspace is required');
+      return bizPrioritiesApi.save(workspaceId, {
+        priorities: newList,
+        expectedUpdatedAt: query.data?.updatedAt ?? null,
+      });
+    },
+    onSuccess: (data) => {
+      if (workspaceId) {
+        queryClient.setQueryData(queryKeys.client.strategyGuidance(workspaceId), {
+          priorities: data.priorities,
+          updatedAt: data.updatedAt,
+        });
+      }
+      setToast?.('Business priorities saved - they will shape your next strategy');
+    },
+    onError: (err) => {
+      if (workspaceId && err instanceof ApiError && err.status === 409) {
+        const body = err.body as { priorities?: StrategyBusinessPriority[]; updatedAt?: string | null } | undefined;
+        if (body && Array.isArray(body.priorities)) {
+          queryClient.setQueryData(queryKeys.client.strategyGuidance(workspaceId), {
+            priorities: body.priorities,
+            updatedAt: body.updatedAt ?? null,
+          });
+        } else {
+          queryClient.invalidateQueries({ queryKey: queryKeys.client.strategyGuidance(workspaceId) });
+        }
+        setToast?.('Business priorities changed elsewhere - latest priorities loaded');
+        return;
+      }
+      setToast?.('Failed to save priorities');
+    },
+  });
 
   const savePriorities = useCallback(async (newList: StrategyBusinessPriority[]) => {
-    if (!workspaceId) return;
-    setSavingPriorities(true);
-    try {
-      await post(`/api/public/business-priorities/${workspaceId}`, { priorities: newList });
-      setPriorities(newList);
-      setToast?.('Business priorities saved - they will shape your next strategy');
-    } catch {
-      setToast?.('Failed to save priorities');
-    } finally {
-      setSavingPriorities(false);
-    }
-  }, [workspaceId, setToast]);
+    if (!workspaceId || query.isError) return;
+    await mutation.mutateAsync(newList);
+  }, [workspaceId, query.isError, mutation]);
 
   return {
-    priorities,
-    prioritiesLoaded,
+    priorities: query.data?.priorities ?? [],
+    prioritiesLoaded: !query.isLoading,
+    prioritiesError: query.isError,
+    reloadPriorities: query.refetch,
     newPriority,
     setNewPriority,
     newPriorityCategory,
     setNewPriorityCategory,
-    savingPriorities,
+    savingPriorities: mutation.isPending,
     savePriorities,
   };
 }

@@ -25,6 +25,7 @@ export const clientBusinessPrioritiesBodySchema = z.object({
     text: z.string().trim().min(1, 'priority text is required').max(500),
     category: clientBusinessPriorityCategorySchema.optional().default('other'),
   }).strict()).max(10),
+  expectedUpdatedAt: z.string().nullable().optional(),
 }).strict();
 
 export type ClientBusinessPriorityInput = z.infer<typeof clientBusinessPrioritySchema>;

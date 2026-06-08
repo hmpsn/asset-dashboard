@@ -441,15 +441,16 @@ router.delete('/api/public/keyword-feedback/:workspaceId', (req, res) => {
 // ── Client Business Priorities ──────────────────────────
 // Clients can share their business priorities which get injected into future strategy generations
 
-router.get('/api/public/business-priorities/:workspaceId', (req, res) => {
-  const wsId = req.params.workspaceId;
-  const ws = getWorkspace(wsId);
-  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+interface ClientBusinessPrioritiesRow {
+  priorities: string;
+  updated_at: string;
+}
 
-  // Load from db
-  const row = db.prepare('SELECT priorities, updated_at FROM client_business_priorities WHERE workspace_id = ?').get(wsId) as { priorities: string; updated_at: string } | undefined;
-  if (!row) return res.json({ priorities: [], updatedAt: null });
-
+function normalizeClientBusinessPrioritiesRow(
+  wsId: string,
+  row: ClientBusinessPrioritiesRow | undefined,
+): { priorities: Array<{ text: string; category: string }>; updatedAt: string | null } {
+  if (!row) return { priorities: [], updatedAt: null };
   const priorities = parseJsonSafeArray(
     row.priorities,
     clientBusinessPrioritySchema,
@@ -463,7 +464,16 @@ router.get('/api/public/business-priorities/:workspaceId', (req, res) => {
       category: priority.category?.trim() || 'other',
     };
   }).filter(priority => priority.text.length > 0);
-  res.json({ priorities, updatedAt: row.updated_at });
+  return { priorities, updatedAt: row.updated_at };
+}
+
+router.get('/api/public/business-priorities/:workspaceId', (req, res) => {
+  const wsId = req.params.workspaceId;
+  const ws = getWorkspace(wsId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const row = db.prepare('SELECT priorities, updated_at FROM client_business_priorities WHERE workspace_id = ?').get(wsId) as ClientBusinessPrioritiesRow | undefined;
+  res.json(normalizeClientBusinessPrioritiesRow(wsId, row));
 });
 
 router.post('/api/public/business-priorities/:workspaceId', requireClientStrategyMutationAuth, validate(clientBusinessPrioritiesBodySchema), (req, res) => {
@@ -471,20 +481,30 @@ router.post('/api/public/business-priorities/:workspaceId', requireClientStrateg
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
-  const { priorities } = req.body as ClientBusinessPrioritiesBody;
+  const { priorities, expectedUpdatedAt } = req.body as ClientBusinessPrioritiesBody;
+  const existingRow = db.prepare('SELECT priorities, updated_at FROM client_business_priorities WHERE workspace_id = ?').get(wsId) as ClientBusinessPrioritiesRow | undefined;
+  const existing = normalizeClientBusinessPrioritiesRow(wsId, existingRow);
+  if (expectedUpdatedAt !== undefined && expectedUpdatedAt !== existing.updatedAt) {
+    return res.status(409).json({
+      error: 'Business priorities changed. Please refresh and try again.',
+      priorities: existing.priorities,
+      updatedAt: existing.updatedAt,
+    });
+  }
   const clean = priorities.map(p => ({
     text: p.text,
     category: p.category,
   }));
+  const updatedAt = new Date().toISOString();
 
   // Upsert into db
   db.prepare(`
     INSERT INTO client_business_priorities (workspace_id, priorities, updated_at)
-    VALUES (?, ?, datetime('now'))
+    VALUES (?, ?, ?)
     ON CONFLICT(workspace_id) DO UPDATE SET
       priorities = excluded.priorities,
-      updated_at = datetime('now')
-  `).run(wsId, JSON.stringify(clean));
+      updated_at = excluded.updated_at
+  `).run(wsId, JSON.stringify(clean), updatedAt);
 
   // Also inject a summary into workspace businessContext so it's available for AI prompts
   if (ws.keywordStrategy) {
@@ -513,7 +533,7 @@ router.post('/api/public/business-priorities/:workspaceId', requireClientStrateg
   broadcastToWorkspace(wsId, WS_EVENTS.STRATEGY_UPDATED, { businessPriorities: clean });
   // client-visibility-ok: business-priority edits are internal strategy signals, not client timeline content.
   addActivity(wsId, 'client_priorities_updated', `Client updated business priorities (${clean.length} items)`, 'Via client portal');
-  res.json({ saved: clean.length });
+  res.json({ saved: clean.length, priorities: clean, updatedAt });
 });
 
 // ── Business Profile (client-facing PATCH) ─────────────────────

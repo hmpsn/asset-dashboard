@@ -170,7 +170,14 @@ describe('Public business priorities mutations', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ saved: 2 });
+    expect(await res.json()).toEqual(expect.objectContaining({
+      saved: 2,
+      priorities: [
+        { text: 'Grow enterprise pipeline', category: 'growth' },
+        { text: 'Clarify premium positioning', category: 'brand' },
+      ],
+      updatedAt: expect.any(String),
+    }));
     expect(getStoredPriorities(wsId)).toEqual([
       { text: 'Grow enterprise pipeline', category: 'growth' },
       { text: 'Clarify premium positioning', category: 'brand' },
@@ -235,9 +242,44 @@ describe('Public business priorities mutations', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ saved: 0 });
+    expect(await res.json()).toEqual(expect.objectContaining({
+      saved: 0,
+      priorities: [],
+      updatedAt: expect.any(String),
+    }));
     expect(getStoredPriorities(wsId)).toEqual([]);
     expect(getWorkspace(wsId)?.keywordStrategy?.businessContext).toBe('Existing context');
+  });
+
+  it('rejects stale whole-list saves with the current priorities and updatedAt', async () => {
+    const first = await clientPostJson(`/api/public/business-priorities/${wsId}`, {
+      priorities: [{ text: 'Grow enterprise pipeline', category: 'growth' }],
+    });
+    expect(first.status).toBe(200);
+    const firstBody = await first.json() as { updatedAt: string };
+
+    await new Promise(resolve => setTimeout(resolve, 2));
+    const second = await clientPostJson(`/api/public/business-priorities/${wsId}`, {
+      priorities: [{ text: 'Clarify premium positioning', category: 'brand' }],
+      expectedUpdatedAt: firstBody.updatedAt,
+    });
+    expect(second.status).toBe(200);
+
+    const stale = await clientPostJson(`/api/public/business-priorities/${wsId}`, {
+      priorities: [{ text: 'Overwrite from stale tab', category: 'competitive' }],
+      expectedUpdatedAt: firstBody.updatedAt,
+    });
+
+    expect(stale.status).toBe(409);
+    const body = await stale.json();
+    expect(body).toEqual({
+      error: 'Business priorities changed. Please refresh and try again.',
+      priorities: [{ text: 'Clarify premium positioning', category: 'brand' }],
+      updatedAt: expect.any(String),
+    });
+    expect(getStoredPriorities(wsId)).toEqual([
+      { text: 'Clarify premium positioning', category: 'brand' },
+    ]);
   });
 
   it('does not allow a client token from another workspace to mutate priorities', async () => {

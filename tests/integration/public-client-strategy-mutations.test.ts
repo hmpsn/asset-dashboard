@@ -204,8 +204,10 @@ describe('POST /api/public/business-priorities/:workspaceId', () => {
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json() as { saved: number };
+    const body = await res.json() as { saved: number; priorities: unknown[]; updatedAt: string };
     expect(body.saved).toBe(2);
+    expect(body.priorities).toHaveLength(2);
+    expect(body.updatedAt).toEqual(expect.any(String));
   });
 
   it('priorities persist and appear in subsequent GET', async () => {
