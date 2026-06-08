@@ -39,7 +39,11 @@ import { queueKeywordStrategyPostUpdateFollowOns } from '../keyword-strategy-fol
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
-import { mirrorSchemaPlanToDeliverable } from '../domains/inbox/schema-plan-dual-write.js';
+import {
+  cancelSchemaPlanDeliverable,
+  mirrorSchemaPlanToDeliverable,
+  syncSchemaPlanDeliverable,
+} from '../domains/inbox/schema-plan-dual-write.js';
 import { respondToSchemaPlanFeedback } from '../domains/inbox/schema-plan-respond.js';
 import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { listPendingSchemas } from '../schema-queue.js';
@@ -694,6 +698,7 @@ router.put('/api/webflow/schema-plan/:siteId', requireWorkspaceSiteAccessFromQue
   const plan = updateSchemaPlanRoles(req.params.siteId, pageRoles, canonicalEntities);
   if (!plan) return res.status(404).json({ error: 'No plan found for this site' });
   invalidateIntelligenceCache(plan.workspaceId);
+  syncSchemaPlanDeliverable(plan);
   broadcastSchemaPlanEvent(req.params.siteId, plan.workspaceId, 'updated', plan.status);
   res.json(plan);
 });
@@ -715,7 +720,13 @@ router.post('/api/webflow/schema-plan/:siteId/send-to-client', requireWorkspaceS
     // Mirror the sent plan into the unified client_deliverable model. Best-effort + swallowed: it
     // can NEVER break the legacy send (the status is already persisted above). The OWNING
     // workspace is read straight off the plan (plan.workspaceId === ws.id) — not guessed.
-    mirrorSchemaPlanToDeliverable(ws.id, updated || plan);
+    const mirrored = mirrorSchemaPlanToDeliverable(ws.id, updated || plan);
+    if (mirrored) {
+      broadcastToWorkspace(ws.id, WS_EVENTS.DELIVERABLE_SENT, {
+        deliverableId: mirrored.id,
+        type: mirrored.type,
+      });
+    }
 
     // Notify client via email, directing to the Schema tab
     if (ws.clientEmail) {
@@ -751,6 +762,7 @@ router.post('/api/webflow/schema-plan/:siteId/activate', requireWorkspaceSiteAcc
   const plan = updateSchemaPlanStatus(req.params.siteId, 'active');
   if (!plan) return res.status(404).json({ error: 'No plan found' });
   invalidateIntelligenceCache(plan.workspaceId);
+  syncSchemaPlanDeliverable(plan);
   broadcastSchemaPlanEvent(req.params.siteId, plan.workspaceId, 'activated', plan.status);
   res.json(plan);
 });
@@ -784,6 +796,7 @@ router.delete('/api/webflow/schema-plan/:siteId', requireWorkspaceSiteAccessFrom
     // The schema-plan + snapshot deletions also changed intelligence inputs, so
     // invalidate — unless deleteBatch already did it for this same workspace.
     if (!cacheInvalidated) invalidateIntelligenceCache(ws.id);
+    cancelSchemaPlanDeliverable(ws.id, req.params.siteId);
     broadcastSchemaPlanEvent(req.params.siteId, ws.id, 'deleted');
   }
   res.json({ success: true });
@@ -912,6 +925,7 @@ router.post('/api/public/schema-plan/:workspaceId/feedback', requireClientPortal
   // unified-inbox respond propagation drive the SAME source write (no divergence).
   const result = respondToSchemaPlanFeedback(ws.id, ws.webflowSiteId, action, note);
   if (!result) return res.status(404).json({ error: 'No plan found' });
+  syncSchemaPlanDeliverable(result.plan);
   res.json(toClientSchemaView(result.plan));
 });
 

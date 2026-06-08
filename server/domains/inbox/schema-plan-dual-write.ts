@@ -24,12 +24,31 @@
  */
 import type { SchemaSitePlan } from '../../../shared/types/schema-plan.js';
 import type { ClientDeliverable } from '../../../shared/types/client-deliverable.js';
-import { upsertDeliverable } from '../../client-deliverables.js';
+import { findBySourceRef, upsertDeliverable } from '../../client-deliverables.js';
 import { getAdapter } from './deliverable-adapters/index.js';
 import type { SchemaPlanInput } from './deliverable-adapters/schema-plan.js';
 import { createLogger } from '../../logger.js';
+import { broadcastToWorkspace } from '../../broadcast.js';
+import { WS_EVENTS } from '../../ws-events.js';
 
 const log = createLogger('schema-plan-dual-write');
+
+function schemaPlanDeliverableStatus(
+  status: SchemaSitePlan['status'],
+): ClientDeliverable['status'] | null {
+  switch (status) {
+    case 'sent_to_client':
+      return 'awaiting_client';
+    case 'client_approved':
+      return 'approved';
+    case 'client_changes_requested':
+      return 'changes_requested';
+    case 'active':
+      return 'applied';
+    default:
+      return null;
+  }
+}
 
 /**
  * Mirror a freshly-sent schema plan into `client_deliverable`. Returns the mirrored deliverable, or
@@ -89,6 +108,92 @@ export function mirrorSchemaPlanToDeliverable(
     // Best-effort: the plan status is already persisted + the client notified. A mirror failure
     // must not surface to the operator or roll back the live send.
     log.error({ err, workspaceId, siteId: plan.siteId }, 'schema-plan mirror failed (swallowed)');
+    return null;
+  }
+}
+
+export function syncSchemaPlanDeliverable(plan: SchemaSitePlan): ClientDeliverable | null {
+  const adapter = getAdapter('schema_plan');
+  const input: SchemaPlanInput = { plan };
+  const sourceRef = adapter.sourceRef(input);
+  const deliverableStatus = schemaPlanDeliverableStatus(plan.status);
+  if (!sourceRef || !deliverableStatus) return null;
+
+  try {
+    const built = adapter.buildPayload(input);
+    const existing = findBySourceRef(plan.workspaceId, 'schema_plan', sourceRef);
+    const nowIso = new Date().toISOString();
+    const deliverable = upsertDeliverable({
+      id: existing?.id,
+      workspaceId: plan.workspaceId,
+      type: 'schema_plan',
+      kind: built.kind,
+      status: deliverableStatus,
+      title: built.title,
+      summary: built.summary ?? null,
+      payload: built.payload,
+      note: existing?.note ?? null,
+      clientResponseNote: existing?.clientResponseNote ?? null,
+      externalRef: built.externalRef ?? null,
+      parentDeliverableId: built.parentDeliverableId ?? null,
+      sentAt: existing?.sentAt ?? nowIso,
+      decidedAt: deliverableStatus === 'approved' || deliverableStatus === 'changes_requested'
+        ? (existing?.decidedAt ?? nowIso)
+        : existing?.decidedAt ?? null,
+      appliedAt: deliverableStatus === 'applied'
+        ? (existing?.appliedAt ?? nowIso)
+        : existing?.appliedAt ?? null,
+      generatedAt: plan.generatedAt,
+      source: existing?.source ?? 'schema-plan-sync',
+      sourceRef,
+    });
+    broadcastToWorkspace(plan.workspaceId, WS_EVENTS.DELIVERABLE_UPDATED, {
+      deliverableId: deliverable.id,
+      type: deliverable.type,
+      status: deliverable.status,
+    });
+    return deliverable;
+  } catch (err) {
+    log.error({ err, workspaceId: plan.workspaceId, siteId: plan.siteId }, 'schema-plan deliverable sync failed');
+    return null;
+  }
+}
+
+export function cancelSchemaPlanDeliverable(workspaceId: string, siteId: string): ClientDeliverable | null {
+  const sourceRef = `schema_plan:${siteId}`;
+  const existing = findBySourceRef(workspaceId, 'schema_plan', sourceRef);
+  if (!existing) return null;
+
+  try {
+    const deliverable = upsertDeliverable({
+      id: existing.id,
+      workspaceId: existing.workspaceId,
+      type: existing.type,
+      kind: existing.kind,
+      status: 'cancelled',
+      title: existing.title,
+      summary: existing.summary,
+      payload: existing.payload,
+      note: existing.note,
+      clientResponseNote: existing.clientResponseNote,
+      externalRef: existing.externalRef,
+      parentDeliverableId: existing.parentDeliverableId,
+      sentAt: existing.sentAt,
+      decidedAt: existing.decidedAt,
+      dueAt: existing.dueAt,
+      appliedAt: existing.appliedAt,
+      generatedAt: existing.generatedAt,
+      source: existing.source,
+      sourceRef: existing.sourceRef,
+    });
+    broadcastToWorkspace(workspaceId, WS_EVENTS.DELIVERABLE_UPDATED, {
+      deliverableId: deliverable.id,
+      type: deliverable.type,
+      status: deliverable.status,
+    });
+    return deliverable;
+  } catch (err) {
+    log.error({ err, workspaceId, siteId }, 'schema-plan deliverable cancel sync failed');
     return null;
   }
 }

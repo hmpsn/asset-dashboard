@@ -253,13 +253,13 @@ export function BackgroundTaskProvider({
   }, [publicMode, workspaceId]);
 
   useEffect(() => {
-    if (!publicMode || !workspaceId) return undefined;
+    const activeJobs = jobs.filter(job => !isTerminalJobStatus(job.status));
+    if (activeJobs.length === 0) return undefined;
     const interval = window.setInterval(() => {
-      const activeJobs = jobs.filter(job => !isTerminalJobStatus(job.status));
       for (const job of activeJobs) hydrateJob(job.id);
     }, 2000);
     return () => window.clearInterval(interval);
-  }, [hydrateJob, jobs, publicMode, workspaceId]);
+  }, [hydrateJob, jobs]);
 
   const trackJob = useCallback((type: BackgroundJobType, jobId: string, params: Record<string, unknown>) => {
     setJobs(prev => upsertBackgroundJob(prev, createOptimisticBackgroundJob(jobId, type, params)));

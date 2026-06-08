@@ -78,6 +78,8 @@ vi.mock('../../server/llms-txt-generator.js', async importOriginal => {
 });
 
 import db from '../../server/db/index.js';
+import { findBySourceRef } from '../../server/client-deliverables.js';
+import { mirrorSchemaPlanToDeliverable } from '../../server/domains/inbox/schema-plan-dual-write.js';
 import { cancelJob, clearCompletedJobs, createJob, listJobs } from '../../server/jobs.js';
 import {
   deleteSchemaPlan,
@@ -286,12 +288,26 @@ describe('schema mutation safety', () => {
     const body = await res.json() as { plan: SchemaSitePlan };
     expect(body.plan.status).toBe('sent_to_client');
     expect(getSchemaPlan(siteId)?.status).toBe('sent_to_client');
+    expect(findBySourceRef(workspaceId, 'schema_plan', `schema_plan:${siteId}`)).toMatchObject({
+      status: 'awaiting_client',
+      externalRef: siteId,
+    });
     expect(countActivities('schema_plan_sent', 'Schema strategy sent to client for review')).toBe(1);
     expect(schemaBroadcasts(WS_EVENTS.SCHEMA_PLAN_SENT)).toEqual([
       {
         workspaceId,
         event: WS_EVENTS.SCHEMA_PLAN_SENT,
         payload: { siteId },
+      },
+    ]);
+    expect(schemaBroadcasts(WS_EVENTS.DELIVERABLE_SENT)).toEqual([
+      {
+        workspaceId,
+        event: WS_EVENTS.DELIVERABLE_SENT,
+        payload: {
+          deliverableId: expect.any(String),
+          type: 'schema_plan',
+        },
       },
     ]);
 
@@ -303,6 +319,7 @@ describe('schema mutation safety', () => {
 
   it('records approve and request-changes feedback with schema-plan broadcasts', async () => {
     saveSchemaPlan(buildPlan('sent_to_client'));
+    mirrorSchemaPlanToDeliverable(workspaceId, getSchemaPlan(siteId)!);
 
     const approveRes = await postJson(`/api/public/schema-plan/${workspaceId}/feedback`, {
       action: 'approve',
@@ -311,6 +328,7 @@ describe('schema mutation safety', () => {
 
     expect(approveRes.status).toBe(200);
     expect(getSchemaPlan(siteId)?.status).toBe('client_approved');
+    expect(findBySourceRef(workspaceId, 'schema_plan', `schema_plan:${siteId}`)?.status).toBe('approved');
     expect(countActivities('changes_requested', 'Client approved schema plan')).toBe(1);
     expect(schemaBroadcasts(WS_EVENTS.SCHEMA_PLAN_SENT)).toEqual([
       {
@@ -327,6 +345,7 @@ describe('schema mutation safety', () => {
     broadcastState.calls = [];
     db.prepare('DELETE FROM activity_log WHERE workspace_id = ?').run(workspaceId);
     saveSchemaPlan(buildPlan('sent_to_client'));
+    mirrorSchemaPlanToDeliverable(workspaceId, getSchemaPlan(siteId)!);
 
     const changesRes = await postJson(`/api/public/schema-plan/${workspaceId}/feedback`, {
       action: 'request_changes',
@@ -335,6 +354,7 @@ describe('schema mutation safety', () => {
 
     expect(changesRes.status).toBe(200);
     expect(getSchemaPlan(siteId)?.status).toBe('client_changes_requested');
+    expect(findBySourceRef(workspaceId, 'schema_plan', `schema_plan:${siteId}`)?.status).toBe('changes_requested');
     expect(countActivities('changes_requested', 'Client requested changes on schema plan')).toBe(1);
     expect(schemaBroadcasts(WS_EVENTS.SCHEMA_PLAN_SENT)).toEqual([
       {
@@ -347,6 +367,44 @@ describe('schema mutation safety', () => {
         },
       },
     ]);
+  });
+
+  it('keeps mirrored schema-plan deliverables in sync for admin edits and activation', async () => {
+    saveSchemaPlan(buildPlan('sent_to_client'));
+    mirrorSchemaPlanToDeliverable(workspaceId, getSchemaPlan(siteId)!);
+
+    const updateRes = await api(`/api/webflow/schema-plan/${siteId}${workspaceQuery()}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pageRoles: [{
+          pagePath: '/',
+          pageTitle: 'Updated Home',
+          role: 'homepage',
+          primaryType: 'Organization',
+          entityRefs: [],
+        }],
+        canonicalEntities: [],
+      }),
+    });
+
+    expect(updateRes.status).toBe(200);
+    const mirroredAfterUpdate = findBySourceRef(workspaceId, 'schema_plan', `schema_plan:${siteId}`);
+    expect(mirroredAfterUpdate).toMatchObject({
+      status: 'awaiting_client',
+      payload: expect.objectContaining({
+        pageRoles: [
+          expect.objectContaining({
+            pageTitle: 'Updated Home',
+          }),
+        ],
+      }),
+    });
+
+    const activateRes = await postJson(`/api/webflow/schema-plan/${siteId}/activate${workspaceQuery()}`, {});
+    expect(activateRes.status).toBe(200);
+    expect(getSchemaPlan(siteId)?.status).toBe('active');
+    expect(findBySourceRef(workspaceId, 'schema_plan', `schema_plan:${siteId}`)?.status).toBe('applied');
   });
 
   it('blocks schema-plan mutations while regeneration is active', async () => {
@@ -566,6 +624,7 @@ describe('schema mutation safety', () => {
 
   it('deletes a schema plan and snapshot with activity and snapshot invalidation', async () => {
     saveSchemaPlan(buildPlan('sent_to_client'));
+    mirrorSchemaPlanToDeliverable(workspaceId, getSchemaPlan(siteId)!);
     seedSnapshot();
 
     const res = await del(`/api/webflow/schema-plan/${siteId}${workspaceQuery()}`);
@@ -573,6 +632,7 @@ describe('schema mutation safety', () => {
     expect(res.status).toBe(200);
     expect(getSchemaPlan(siteId)).toBeNull();
     expect(getSchemaSnapshot(siteId)).toBeNull();
+    expect(findBySourceRef(workspaceId, 'schema_plan', `schema_plan:${siteId}`)?.status).toBe('cancelled');
     expect(countActivities('schema_plan_deleted', 'Schema site plan retracted')).toBe(1);
     expect(schemaBroadcasts(WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED)).toEqual([
       {

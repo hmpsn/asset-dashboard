@@ -30,6 +30,7 @@ import {
   remindDeliverable,
   SendToClientError,
 } from '../domains/inbox/send-to-client.js';
+import { SchemaPlanFeedbackConflictError } from '../domains/inbox/schema-plan-respond.js';
 import { listClientFacingDeliverables } from '../domains/inbox/unified-inbox-read.js';
 import { listAdminDeliverables } from '../domains/inbox/admin-inbox-read.js';
 import { InvalidTransitionError } from '../state-machines.js';
@@ -222,6 +223,9 @@ router.patch(
     } catch (err) {
       if (err instanceof SendToClientError) {
         return res.status(err.status).json({ error: err.message });
+      }
+      if (err instanceof SchemaPlanFeedbackConflictError) {
+        return res.status(err.status).json({ error: err.message, jobId: err.jobId });
       }
       if (err instanceof InvalidTransitionError) {
         return res.status(409).json({ error: err.message });
