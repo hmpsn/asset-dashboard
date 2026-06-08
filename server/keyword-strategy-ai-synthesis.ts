@@ -226,7 +226,7 @@ export async function callKeywordStrategyAI(
  */
 export async function callNamedStrategyAI(
   workspaceId: string,
-  operation: Extract<AIOperationId, 'keyword-page-assignment' | 'keyword-site-synthesis'>,
+  operation: Extract<AIOperationId, 'keyword-page-assignment' | 'keyword-site-synthesis' | 'keyword-topic-clusters'>,
   messages: Array<{ role: string; content: string }>,
   maxTokens: number,
 ): Promise<string> {

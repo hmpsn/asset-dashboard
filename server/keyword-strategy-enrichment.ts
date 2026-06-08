@@ -1,13 +1,14 @@
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { normalizePageUrl } from './helpers.js';
+import { z } from 'zod';
 import { resolveWorkspaceLocationCode, getLocalSeoPosture, listLocalSeoMarkets } from './local-seo.js';
 import { trendDirection, hasSerpOpportunity } from './seo-provider-signals.js';
 import type { SeoDataProvider, DomainKeyword } from './seo-data-provider.js';
 import type { CompetitorKeywordData, QuestionKeywordGroup, KeywordStrategySeoDataMode } from './keyword-strategy-seo-data.js';
 import type { KeywordStrategySearchData } from './keyword-strategy-search-data.js';
 import {
-  callKeywordStrategyAI,
+  callNamedStrategyAI,
   type KeywordStrategyKeywordPool,
   type StrategyPageMapEntry,
   type StrategyContentGap,
@@ -26,6 +27,19 @@ const log = createLogger('keyword-strategy:enrichment');
 const URL_LEVEL_KEYWORD_PAGE_LIMIT = 12;
 const URL_LEVEL_KEYWORD_PER_PAGE_LIMIT = 10;
 const URL_LEVEL_KEYWORD_CONCURRENCY = 3;
+const topicClusterAiOutputSchema = z.array(z.object({
+  topic: z.string().trim().min(1),
+  keywords: z.array(z.string().trim().min(1)).min(3),
+}));
+
+export type TopicClusterAiOutput = z.infer<typeof topicClusterAiOutputSchema>;
+
+export function parseTopicClusterOutput(raw: string): TopicClusterAiOutput {
+  const parsed = parseJsonFallback<unknown>(raw, null);
+  const result = topicClusterAiOutputSchema.safeParse(parsed);
+  if (!result.success) throw new Error('AI topic clustering returned invalid JSON');
+  return result.data;
+}
 
 export interface KeywordStrategyTopicCluster {
   topic: string;
@@ -773,62 +787,57 @@ Rules:
 - Order clusters by strategic importance to the business
 - Return ONLY valid JSON array, no markdown`;
 
-      const clusterRaw = await callKeywordStrategyAI(workspaceId, [
+      const clusterRaw = await callNamedStrategyAI(workspaceId, 'keyword-topic-clusters', [
         { role: 'system', content: 'You are a topical authority analyst. Return valid JSON only.' },
         { role: 'user', content: clusterPrompt },
-      ], 2000, 'topic-clusters');
+      ], 2000);
 
-      const aiClusters = parseJsonFallback<Array<{ topic?: string; keywords?: string[] }> | null>(clusterRaw, null);
-      if (!Array.isArray(aiClusters)) throw new Error('AI topic clustering returned invalid JSON');
-      if (Array.isArray(aiClusters)) {
-        for (const cluster of aiClusters) {
-          if (!cluster.topic || !Array.isArray(cluster.keywords) || cluster.keywords.length < 3) continue;
+      const aiClusters = parseTopicClusterOutput(clusterRaw);
+      for (const cluster of aiClusters) {
+        const normalizedKws = cluster.keywords
+          .map((k: string) => keywordComparisonKey(k))
+          .filter((k: string) => keywordPool.has(k));
+        if (normalizedKws.length < 3) continue;
 
-          const normalizedKws = cluster.keywords
-            .map((k: string) => keywordComparisonKey(k))
-            .filter((k: string) => keywordPool.has(k));
-          if (normalizedKws.length < 3) continue;
+        const owned = normalizedKws.filter((k: string) =>
+          ownedRankingKws.has(k) || isTopicKeywordCoveredByPageMap(k, strategy.pageMap)
+        );
+        const gap = normalizedKws.filter((k: string) => !owned.includes(k));
+        const coverage = Math.round((owned.length / normalizedKws.length) * 100);
 
-          const owned = normalizedKws.filter((k: string) =>
-            ownedRankingKws.has(k) || isTopicKeywordCoveredByPageMap(k, strategy.pageMap)
-          );
-          const gap = normalizedKws.filter((k: string) => !owned.includes(k));
-          const coverage = Math.round((owned.length / normalizedKws.length) * 100);
-
-          let avgPos: number | undefined;
-          if (owned.length > 0) {
-            const positions = owned.map((k: string) => domainKeywords.find(d => keywordComparisonKey(d.keyword) === k)?.position).filter(Boolean) as number[];
-            if (positions.length > 0) avgPos = Math.round(positions.reduce((s, p) => s + p, 0) / positions.length);
-          }
-
-          let topComp: string | undefined;
-          let topCompCov: number | undefined;
-          if (competitorKeywords.length > 0) {
-            const compCoverage = new Map<string, number>();
-            for (const ck of competitorKeywords) {
-              if (normalizedKws.includes(keywordComparisonKey(ck.keyword))) {
-                compCoverage.set(ck.domain, (compCoverage.get(ck.domain) || 0) + 1);
-              }
-            }
-            const best = [...compCoverage.entries()].sort((a, b) => b[1] - a[1])[0];
-            if (best && best[1] > owned.length) {
-              topComp = best[0];
-              topCompCov = Math.round((best[1] / normalizedKws.length) * 100);
-            }
-          }
-
-          topicClusters.push({
-            topic: cluster.topic,
-            keywords: normalizedKws,
-            ownedCount: owned.length,
-            totalCount: normalizedKws.length,
-            coveragePercent: coverage,
-            avgPosition: avgPos,
-            topCompetitor: topComp,
-            topCompetitorCoverage: topCompCov,
-            gap,
-          });
+        let avgPos: number | undefined;
+        if (owned.length > 0) {
+          const positions = owned.map((k: string) => domainKeywords.find(d => keywordComparisonKey(d.keyword) === k)?.position).filter(Boolean) as number[];
+          if (positions.length > 0) avgPos = Math.round(positions.reduce((s, p) => s + p, 0) / positions.length);
         }
+
+        let topComp: string | undefined;
+        let topCompCov: number | undefined;
+        if (competitorKeywords.length > 0) {
+          const compCoverage = new Map<string, number>();
+          for (const ck of competitorKeywords) {
+            if (normalizedKws.includes(keywordComparisonKey(ck.keyword))) {
+              compCoverage.set(ck.domain, (compCoverage.get(ck.domain) || 0) + 1);
+            }
+          }
+          const best = [...compCoverage.entries()].sort((a, b) => b[1] - a[1])[0];
+          if (best && best[1] > owned.length) {
+            topComp = best[0];
+            topCompCov = Math.round((best[1] / normalizedKws.length) * 100);
+          }
+        }
+
+        topicClusters.push({
+          topic: cluster.topic,
+          keywords: normalizedKws,
+          ownedCount: owned.length,
+          totalCount: normalizedKws.length,
+          coveragePercent: coverage,
+          avgPosition: avgPos,
+          topCompetitor: topComp,
+          topCompetitorCoverage: topCompCov,
+          gap,
+        });
       }
       if (topicClusters.length > 0) {
         topicClusters.sort((a, b) => a.coveragePercent - b.coveragePercent);

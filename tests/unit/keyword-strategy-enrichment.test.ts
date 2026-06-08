@@ -16,6 +16,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mocks — must be hoisted before any imports that touch the mocked modules
 // ---------------------------------------------------------------------------
 const mockCallKeywordStrategyAI = vi.hoisted(() => vi.fn(async () => '[]'));
+const mockCallNamedStrategyAI = vi.hoisted(() => vi.fn(async () => '[]'));
 const mockComputeOpportunityScore = vi.hoisted(() => vi.fn((cg: Record<string, unknown>) => (cg.volume as number ?? 0) + 10));
 const mockIsSuspiciousPlannerGroupedVolume = vi.hoisted(() => vi.fn(() => false));
 const mockMatchesQuestionKeyword = vi.hoisted(() => vi.fn(() => false));
@@ -33,6 +34,7 @@ vi.mock('../../server/logger.js', () => ({
 
 vi.mock('../../server/keyword-strategy-ai-synthesis.js', () => ({
   callKeywordStrategyAI: mockCallKeywordStrategyAI,
+  callNamedStrategyAI: mockCallNamedStrategyAI,
 }));
 
 vi.mock('../../server/keyword-strategy-helpers.js', () => ({
@@ -62,6 +64,7 @@ import {
   _resolvePageUrl,
   _chooseUrlLevelKeyword,
   enrichKeywordStrategy,
+  parseTopicClusterOutput,
 } from '../../server/keyword-strategy-enrichment.js';
 import type { StrategyPageMapEntry, StrategyContentGap, StrategyOutput } from '../../server/keyword-strategy-ai-synthesis.js';
 
@@ -102,6 +105,31 @@ function makeEnrichOptions(strategyOverride: Partial<StrategyOutput> = {}) {
     sendProgress: vi.fn(),
   };
 }
+
+function fillKeywordPool(opts: ReturnType<typeof makeEnrichOptions>, count = 10) {
+  for (let i = 0; i < count; i++) {
+    opts.keywordPool.set(`dental keyword ${i}`, { volume: 1000 - i, difficulty: 20, source: 'gap:competitor.com' });
+  }
+}
+
+describe('parseTopicClusterOutput', () => {
+  it('validates parseable topic cluster JSON with the expected shape', () => {
+    mockParseJsonFallback.mockReturnValue([
+      { topic: 'Dental Services', keywords: ['dental keyword 1', 'dental keyword 2', 'dental keyword 3'] },
+    ]);
+
+    const clusters = parseTopicClusterOutput('[{"topic":"Dental Services","keywords":["dental keyword 1","dental keyword 2","dental keyword 3"]}]');
+
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0].topic).toBe('Dental Services');
+  });
+
+  it('rejects malformed but parseable topic cluster JSON', () => {
+    mockParseJsonFallback.mockReturnValue([{ topic: 'Broken', keywords: ['one'] }]);
+
+    expect(() => parseTopicClusterOutput('[{"topic":"Broken","keywords":["one"]}]')).toThrow('invalid JSON');
+  });
+});
 
 // ---------------------------------------------------------------------------
 // _hasMultiWordTopicSignal
@@ -547,7 +575,44 @@ describe('enrichKeywordStrategy', () => {
     }
 
     await enrichKeywordStrategy(opts);
-    expect(mockCallKeywordStrategyAI).not.toHaveBeenCalled();
+    expect(mockCallNamedStrategyAI).not.toHaveBeenCalled();
+  });
+
+  it('uses the named topic-cluster operation and stores valid AI clusters', async () => {
+    const opts = makeEnrichOptions();
+    fillKeywordPool(opts);
+    mockParseJsonFallback.mockReturnValue([
+      { topic: 'Dental Services', keywords: ['dental keyword 0', 'dental keyword 1', 'dental keyword 2'] },
+    ]);
+
+    const result = await enrichKeywordStrategy(opts);
+
+    expect(mockCallNamedStrategyAI).toHaveBeenCalledWith(
+      'ws-test-123',
+      'keyword-topic-clusters',
+      expect.any(Array),
+      2000,
+    );
+    expect(result.topicClusters).toHaveLength(1);
+    expect(result.topicClusters[0]).toMatchObject({
+      topic: 'Dental Services',
+      totalCount: 3,
+      ownedCount: 0,
+    });
+  });
+
+  it('skips malformed topic-cluster AI output while preserving deterministic base results', async () => {
+    const opts = makeEnrichOptions({
+      quickWins: [{ pagePath: '/services', recommendation: 'refresh copy', priority: 'medium', effort: 'low' }],
+    });
+    fillKeywordPool(opts);
+    mockParseJsonFallback.mockReturnValue({ clusters: [{ topic: 'Dental Services', keywords: ['dental keyword 0'] }] });
+
+    const result = await enrichKeywordStrategy(opts);
+
+    expect(mockCallNamedStrategyAI).toHaveBeenCalled();
+    expect(result.topicClusters).toEqual([]);
+    expect(result.strategy.quickWins).toHaveLength(1);
   });
 
   it('attaches FAQ question keywords to a content gap from a grouped questionKeywords input (flag-ON parity)', async () => {
