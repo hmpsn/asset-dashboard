@@ -21,6 +21,8 @@ describe('CI workflow speed contract', () => {
     expect(ciWorkflow).toContain('npm run test:integration -- --reporter=dot --shard=2/3');
     expect(ciWorkflow).toContain('npm run test:integration -- --reporter=dot --shard=3/3');
     expect(ciWorkflow).not.toContain('npm run test -- --reporter=dot --shard=${{ matrix.shard }}/6');
+    expect(ciWorkflow).toMatch(/test:\n(?:\s+- '.*'\n)*\s+- '\.github\/workflows\/\*\*'/);
+    expect(ciWorkflow).toMatch(/coverage:\n(?:\s+- '.*'\n)*\s+- '\.github\/workflows\/\*\*'/);
   });
 
   it('disables Husky installation in every workflow that runs npm ci', () => {

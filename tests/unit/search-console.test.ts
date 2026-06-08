@@ -208,6 +208,94 @@ describe('search-console behavior', () => {
     });
   });
 
+  it('builds UTC-safe previous windows for dropped-page comparisons across DST boundaries', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-12T12:00:00.000Z'));
+
+    mocks.getValidToken.mockResolvedValue('token');
+    const requestBodies: Array<Record<string, unknown>> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async (_url: string, opts?: RequestInit) => {
+        const body = JSON.parse(String(opts?.body ?? '{}')) as Record<string, unknown>;
+        requestBodies.push(body);
+        return {
+          ok: true,
+          json: async () => ({
+            rows: [
+              {
+                keys: ['https://example.com/a'],
+                clicks: 10,
+                impressions: 100,
+                ctr: 0.1,
+                position: 5,
+              },
+            ],
+          }),
+        };
+      }),
+    );
+
+    const { getTopDroppedGscPage } = await import('../../server/search-console.js');
+
+    await getTopDroppedGscPage('site-1', 'sc-domain:example.com', 90);
+
+    expect(requestBodies[0]).toMatchObject({
+      startDate: '2025-12-09',
+      endDate: '2026-03-09',
+      type: 'web',
+    });
+    expect(requestBodies[1]).toMatchObject({
+      startDate: '2025-09-10',
+      endDate: '2025-12-08',
+      type: 'web',
+    });
+  });
+
+  it('builds UTC-safe previous windows for spiked-page comparisons across DST boundaries', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-12T12:00:00.000Z'));
+
+    mocks.getValidToken.mockResolvedValue('token');
+    const requestBodies: Array<Record<string, unknown>> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async (_url: string, opts?: RequestInit) => {
+        const body = JSON.parse(String(opts?.body ?? '{}')) as Record<string, unknown>;
+        requestBodies.push(body);
+        return {
+          ok: true,
+          json: async () => ({
+            rows: [
+              {
+                keys: ['https://example.com/a'],
+                clicks: 10,
+                impressions: 100,
+                ctr: 0.1,
+                position: 5,
+              },
+            ],
+          }),
+        };
+      }),
+    );
+
+    const { getTopSpikedGscPage } = await import('../../server/search-console.js');
+
+    await getTopSpikedGscPage('site-1', 'sc-domain:example.com', 90);
+
+    expect(requestBodies[0]).toMatchObject({
+      startDate: '2025-12-09',
+      endDate: '2026-03-09',
+      type: 'web',
+    });
+    expect(requestBodies[1]).toMatchObject({
+      startDate: '2025-09-10',
+      endDate: '2025-12-08',
+      type: 'web',
+    });
+  });
+
   it('continues search-type breakdown when one type fetch fails', async () => {
     mocks.getValidToken.mockResolvedValue('token');
 
