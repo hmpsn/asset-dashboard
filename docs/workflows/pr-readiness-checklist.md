@@ -75,8 +75,8 @@ npx tsx scripts/pr-check.ts
 Optional but commonly needed:
 
 ```bash
-grep -r "createTestContext(" tests/
-grep -r "violet\\|indigo" src/components/
+rg "createTestContext\\(" tests/
+rg "violet\\|indigo" src/components/
 ```
 
 ## 9. PR closeout prompts

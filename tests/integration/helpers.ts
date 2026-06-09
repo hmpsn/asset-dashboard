@@ -2,8 +2,8 @@
  * Shared test helpers for integration tests.
  *
  * Provides two factories:
- * - `createTestContext(port)` for existing literal port ownership
- * - `createEphemeralTestContext(testId)` for lock-backed automatic port ownership
+ * - `createEphemeralTestContext(import.meta.url)` as the default for single-context files
+ * - `createTestContext(port)` for explicit literal port ownership
  */
 import { spawn, type ChildProcess } from 'child_process';
 import crypto from 'crypto';
