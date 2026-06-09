@@ -9,11 +9,17 @@ vi.mock('../../server/workspace-intelligence.js', async importOriginal => {
   };
 });
 
-import { buildSeoPromptContext } from '../../server/intelligence/generation-context-builders.js';
+import {
+  buildSeoPromptBlocks,
+  buildSeoPromptContext,
+} from '../../server/intelligence/generation-context-builders.js';
 import {
   buildWorkspaceIntelligence,
   formatForPrompt,
+  formatKeywordsForPrompt,
+  formatKnowledgeBaseForPrompt,
   formatPageMapForPrompt,
+  formatPersonasForPrompt,
 } from '../../server/workspace-intelligence.js';
 
 const realisticIntelligence: WorkspaceIntelligence = {
@@ -106,5 +112,35 @@ describe('buildSeoPromptContext parity', () => {
     }) + formatPageMapForPrompt(realisticIntelligence.seoContext);
 
     expect(result.seoPromptContext).toBe(legacy);
+  });
+
+  it('buildSeoPromptBlocks preserves the legacy manual sub-block composition with page keyword overrides', () => {
+    const pageSeo = {
+      ...realisticIntelligence.seoContext!,
+      pageKeywords: {
+        pagePath: '/services/seo',
+        pageTitle: 'SEO Services',
+        primaryKeyword: 'managed seo reporting',
+        secondaryKeywords: ['enterprise seo dashboard'],
+      },
+    };
+
+    const result = buildSeoPromptBlocks(pageSeo);
+
+    expect(result.keywordBlock).toBe(formatKeywordsForPrompt(pageSeo));
+    expect(result.brandVoiceBlock).toBe(pageSeo.effectiveBrandVoiceBlock);
+    expect(result.personasBlock).toBe(formatPersonasForPrompt(pageSeo.personas));
+    expect(result.knowledgeBlock).toBe(formatKnowledgeBaseForPrompt(pageSeo.knowledgeBase));
+    expect(result.pageMapBlock).toBe(formatPageMapForPrompt(pageSeo));
+  });
+
+  it('buildSeoPromptBlocks preserves knowledge/persona formatting when page-map output is disabled', () => {
+    const seo = realisticIntelligence.seoContext!;
+
+    const result = buildSeoPromptBlocks(seo, { includePageMap: false });
+
+    expect(result.personasBlock).toBe(formatPersonasForPrompt(seo.personas));
+    expect(result.knowledgeBlock).toBe(formatKnowledgeBaseForPrompt(seo.knowledgeBase));
+    expect(result.pageMapBlock).toBe('');
   });
 });

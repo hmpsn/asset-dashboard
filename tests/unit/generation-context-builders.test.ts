@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkspaceIntelligence } from '../../shared/types/intelligence.js';
 import {
+  buildSeoPromptBlocks,
   buildContentGenerationContext,
   buildRecommendationGenerationContext,
   buildSeoPromptContext,
@@ -8,14 +9,20 @@ import {
 import {
   buildWorkspaceIntelligence,
   formatForPrompt,
+  formatKeywordsForPrompt,
+  formatKnowledgeBaseForPrompt,
   formatPageMapForPrompt,
+  formatPersonasForPrompt,
 } from '../../server/workspace-intelligence.js';
 import { listLocalSeoMarkets } from '../../server/local-seo.js';
 
 vi.mock('../../server/workspace-intelligence.js', () => ({
   buildWorkspaceIntelligence: vi.fn(),
   formatForPrompt: vi.fn(),
+  formatKeywordsForPrompt: vi.fn(),
+  formatKnowledgeBaseForPrompt: vi.fn(),
   formatPageMapForPrompt: vi.fn(),
+  formatPersonasForPrompt: vi.fn(),
 }));
 
 vi.mock('../../server/local-seo.js', () => ({
@@ -42,8 +49,47 @@ describe('generation context builders', () => {
     vi.clearAllMocks();
     vi.mocked(buildWorkspaceIntelligence).mockResolvedValue(mockIntelligence);
     vi.mocked(formatForPrompt).mockReturnValue('[Workspace Intelligence]');
+    vi.mocked(formatKeywordsForPrompt).mockReturnValue('[Keywords]');
+    vi.mocked(formatKnowledgeBaseForPrompt).mockReturnValue('[Knowledge]');
     vi.mocked(formatPageMapForPrompt).mockReturnValue('[Page Map]');
+    vi.mocked(formatPersonasForPrompt).mockReturnValue('[Personas]');
     vi.mocked(listLocalSeoMarkets).mockReturnValue([]);
+  });
+
+  it('buildSeoPromptBlocks centralizes keyword, voice, persona, knowledge, and page-map formatting', () => {
+    const seoContext = {
+      ...mockIntelligence.seoContext,
+      effectiveBrandVoiceBlock: '[Voice]',
+      knowledgeBase: 'Knowledge base',
+      personas: [{ id: 'persona-1', name: 'Ops Lead', description: 'Runs delivery.' }],
+    };
+
+    const result = buildSeoPromptBlocks(seoContext);
+
+    expect(formatKeywordsForPrompt).toHaveBeenCalledWith(seoContext);
+    expect(formatPersonasForPrompt).toHaveBeenCalledWith(seoContext.personas);
+    expect(formatKnowledgeBaseForPrompt).toHaveBeenCalledWith('Knowledge base');
+    expect(formatPageMapForPrompt).toHaveBeenCalledWith(seoContext);
+    expect(result).toEqual({
+      keywordBlock: '[Keywords]',
+      brandVoiceBlock: '[Voice]',
+      personasBlock: '[Personas]',
+      knowledgeBlock: '[Knowledge]',
+      pageMapBlock: '[Page Map]',
+    });
+  });
+
+  it('buildSeoPromptBlocks supports page-map opt-out without bypassing voice authority', () => {
+    const result = buildSeoPromptBlocks({
+      ...mockIntelligence.seoContext,
+      effectiveBrandVoiceBlock: '',
+    }, {
+      includePageMap: false,
+    });
+
+    expect(formatPageMapForPrompt).not.toHaveBeenCalled();
+    expect(result.brandVoiceBlock).toBe('');
+    expect(result.pageMapBlock).toBe('');
   });
 
   it('buildContentGenerationContext uses the default content slices and content learnings domain', async () => {

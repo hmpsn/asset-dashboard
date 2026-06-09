@@ -63,8 +63,10 @@ vi.mock('../../server/workspace-intelligence.js', () => ({
     },
     pageProfile: null,
   })),
+  formatKeywordsForPrompt: vi.fn(() => ''),
   formatPersonasForPrompt: vi.fn(() => ''),
   formatKnowledgeBaseForPrompt: vi.fn(() => ''),
+  formatPageMapForPrompt: vi.fn(() => ''),
 }));
 
 vi.mock('../../server/webflow.js', () => ({
@@ -92,6 +94,10 @@ vi.mock('../../server/logger.js', () => ({
 
 // ── Imports (after mocks) ───────────────────────────────────────────────────
 
+import {
+  formatKnowledgeBaseForPrompt,
+  formatPersonasForPrompt,
+} from '../../server/workspace-intelligence.js';
 import { analyzeInternalLinks } from '../../server/internal-links.js';
 
 // ── fetch mock: sitemap + page HTML ─────────────────────────────────────────
@@ -204,5 +210,19 @@ describe('analyzeInternalLinks brand voice authority (PR #167 regression)', () =
     const userMessage = calls[0].messages.find(m => m.role === 'user');
     expect(userMessage!.content).toContain('FRESH_VOICE_WINS');
     expect(userMessage!.content).not.toContain('STALE_VOICE_LOSES');
+  });
+
+  it('preserves knowledge-base and persona blocks alongside the shared voice block', async () => {
+    seoFixture.effectiveBrandVoiceBlock = AUTHORITATIVE_BLOCK;
+    vi.mocked(formatKnowledgeBaseForPrompt).mockReturnValueOnce('\n\nKNOWLEDGE BASE:\nUse concrete service proof.');
+    vi.mocked(formatPersonasForPrompt).mockReturnValueOnce('\n\nTARGET AUDIENCE PERSONAS:\n- Ops Lead');
+
+    await analyzeInternalLinks('site-id', 'ws-test');
+
+    const calls = getCapturedOpenAICalls();
+    const userMessage = calls[0].messages.find(m => m.role === 'user');
+    expect(userMessage!.content).toContain('MATCH_ME sentinel');
+    expect(userMessage!.content).toContain('KNOWLEDGE BASE:\nUse concrete service proof.');
+    expect(userMessage!.content).toContain('TARGET AUDIENCE PERSONAS:\n- Ops Lead');
   });
 });

@@ -6,13 +6,10 @@ import type {
   WorkspaceIntelligence,
 } from '../../shared/types/intelligence.js';
 import type { PageKeywordMap } from '../../shared/types/workspace.js';
+import { buildSeoPromptBlocks } from './generation-context-builders.js';
 import {
   buildWorkspaceIntelligence,
   formatForPrompt,
-  formatKeywordsForPrompt,
-  formatKnowledgeBaseForPrompt,
-  formatPageMapForPrompt,
-  formatPersonasForPrompt,
 } from '../workspace-intelligence.js';
 import { normalizePageUrl } from '../helpers.js';
 
@@ -127,7 +124,7 @@ export async function buildPageAssistContext(
   const pageProfileBlock = pagePath
     ? formatForPrompt(intelligence, { verbosity: opts.verbosity ?? 'detailed', sections: PAGE_PROFILE_SECTIONS, tokenBudget: opts.tokenBudget })
     : '';
-  const pageMapBlock = opts.includePageMap === false || !seoContext ? '' : formatPageMapForPrompt(seoContext);
+  const seoBlocks = buildSeoPromptBlocks(seoContext, { includePageMap: opts.includePageMap });
   const playbookPatterns = intelligence.contentPipeline?.rewritePlaybook?.patterns;
 
   const promptSections: readonly IntelligenceSlice[] = seoContext && opts.baseSeoContext ? ['seoContext', ...slices] : slices;
@@ -145,12 +142,12 @@ export async function buildPageAssistContext(
     pagePath,
     seoContext,
     blocks: {
-      keywordBlock: formatKeywordsForPrompt(seoContext),
-      brandVoiceBlock: seoContext?.effectiveBrandVoiceBlock ?? '',
-      personasBlock: formatPersonasForPrompt(seoContext?.personas ?? []),
-      knowledgeBlock: formatKnowledgeBaseForPrompt(seoContext?.knowledgeBase),
+      keywordBlock: seoBlocks.keywordBlock,
+      brandVoiceBlock: seoBlocks.brandVoiceBlock,
+      personasBlock: seoBlocks.personasBlock,
+      knowledgeBlock: seoBlocks.knowledgeBlock,
       pageProfileBlock,
-      pageMapBlock,
+      pageMapBlock: seoBlocks.pageMapBlock,
       pageInsightsBlock: formatPageInsights(intelligence.insights?.forPage),
       playbookBlock: playbookPatterns?.length
         ? `\n\nREWRITING PLAYBOOK (follow these instructions when suggesting rewrites):\n${playbookPatterns.join('\n')}`
