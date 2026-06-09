@@ -140,6 +140,7 @@ describe('Journey: Payment → Tier Upgrade', () => {
       },
       amount_total: 24900,
       payment_intent: 'pi_test_journey_growth',
+      subscription: 'sub_test_journey_growth',
     });
     await handleWebhookEvent(event as never);
 
@@ -152,6 +153,7 @@ describe('Journey: Payment → Tier Upgrade', () => {
     // Step 5: Verify workspace tier upgraded to 'growth'
     const wsAfter = getWorkspace(ws.workspaceId);
     expect(wsAfter?.tier).toBe('growth');
+    expect(wsAfter?.stripeSubscriptionId).toBe('sub_test_journey_growth');
 
     // Step 6: Verify broadcast was called with the tier update
     expect(mockBroadcast).toHaveBeenCalledWith(
@@ -211,6 +213,7 @@ describe('Journey: Payment → Tier Upgrade', () => {
       },
       amount_total: 24900,
       payment_intent: 'pi_test_journey_dup',
+      subscription: 'sub_test_journey_dup',
     });
 
     await handleWebhookEvent(event as never);
@@ -260,12 +263,14 @@ describe('Journey: Payment → Tier Upgrade', () => {
         productType: 'plan_growth',
       },
       amount_total: 24900,
+      subscription: 'sub_test_tier_growth_meta',
     });
     await handleWebhookEvent(event as never);
 
     // Tier must be 'growth'
     const wsAfter = getWorkspace(ws.workspaceId);
     expect(wsAfter?.tier).toBe('growth');
+    expect(wsAfter?.stripeSubscriptionId).toBe('sub_test_tier_growth_meta');
 
     // trialEndsAt should be cleared on upgrade (set to undefined by the handler)
     // The handler calls: updateWorkspace(workspaceId, { tier: newTier, trialEndsAt: undefined })
@@ -295,11 +300,13 @@ describe('Journey: Payment → Tier Upgrade', () => {
         productType: 'plan_premium',
       },
       amount_total: 99900,
+      subscription: 'sub_test_tier_premium',
     });
     await handleWebhookEvent(event as never);
 
     const wsAfter = getWorkspace(ws.workspaceId);
     expect(wsAfter?.tier).toBe('premium');
+    expect(wsAfter?.stripeSubscriptionId).toBe('sub_test_tier_premium');
   });
 
   // ── 6. Checkout API failure → no stale payment record ───────────────────

@@ -7,6 +7,7 @@ import { createLogger } from './logger.js';
 
 
 const log = createLogger('stripe-config');
+const DEFAULT_STRIPE_CONFIG_KEY = 'asset-dashboard-default-key';
 // --- Types ---
 
 export interface StripeProductPrice {
@@ -27,9 +28,25 @@ export interface StripeConfig {
 
 // --- Encryption ---
 
-// Derive a key from APP_PASSWORD or a fallback machine-specific seed
-function deriveKey(): Buffer {
-  const seed = process.env.APP_PASSWORD || process.env.STRIPE_CONFIG_KEY || 'asset-dashboard-default-key';
+function stripeConfigSeed(): string {
+  if (process.env.STRIPE_CONFIG_KEY) return process.env.STRIPE_CONFIG_KEY;
+  if (process.env.APP_PASSWORD) return process.env.APP_PASSWORD;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('STRIPE_CONFIG_KEY is required in production to encrypt Stripe config');
+  }
+  return DEFAULT_STRIPE_CONFIG_KEY;
+}
+
+function legacyStripeConfigSeeds(): string[] {
+  const preferred = stripeConfigSeed();
+  return [
+    process.env.APP_PASSWORD,
+    process.env.NODE_ENV === 'production' ? undefined : DEFAULT_STRIPE_CONFIG_KEY,
+  ].filter((seed): seed is string => !!seed && seed !== preferred);
+}
+
+// Derive a key from STRIPE_CONFIG_KEY, APP_PASSWORD, or a local-development fallback.
+function deriveKey(seed = stripeConfigSeed()): Buffer {
   return crypto.scryptSync(seed, 'stripe-config-salt', 32);
 }
 
@@ -45,16 +62,26 @@ function encrypt(text: string): string {
 
 function decrypt(data: string): string {
   if (!data) return '';
+  const seeds = [stripeConfigSeed(), ...legacyStripeConfigSeeds()];
+  let lastErr: unknown;
+  for (const seed of seeds) {
+    try {
+      const [ivHex, tagHex, encHex] = data.split(':');
+      const key = deriveKey(seed);
+      const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'));
+      decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
+      return decipher.update(Buffer.from(encHex, 'hex')) + decipher.final('utf8');
+    } catch (err) {
+      lastErr = err;
+    }
+  }
   try {
-    const [ivHex, tagHex, encHex] = data.split(':');
-    const key = deriveKey();
-    const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'));
-    decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
-    return decipher.update(Buffer.from(encHex, 'hex')) + decipher.final('utf8');
+    if (isProgrammingError(lastErr)) log.warn({ err: lastErr }, 'stripe-config/decrypt: programming error');
   } catch (err) {
     if (isProgrammingError(err)) log.warn({ err }, 'stripe-config/decrypt: programming error');
     return '';
   }
+  return '';
 }
 
 // --- Storage ---

@@ -26,11 +26,13 @@ import {
   createBillingPortalSession,
   cancelSubscription,
   getProductConfig,
+  isProductType,
   listProducts,
 } from '../stripe.js';
 import { getWorkspace } from '../workspaces.js';
 import { getContentRequest } from '../content-requests.js';
 import { createLogger } from '../logger.js';
+import { validate, z } from '../middleware/validate.js';
 
 const log = createLogger('stripe');
 
@@ -51,6 +53,18 @@ function validateFullPostUpgradePayment(workspaceId: string, productType: string
   }
   return true;
 }
+
+const stripeProductPriceSchema = z.object({
+  productType: z.string().min(1).max(80).refine(isProductType, 'Unknown product type'),
+  stripePriceId: z.string().max(200),
+  displayName: z.string().min(1).max(200),
+  priceUsd: z.number().nonnegative(),
+  enabled: z.boolean(),
+});
+
+const stripeProductsConfigSchema = z.object({
+  products: z.array(stripeProductPriceSchema).max(100),
+});
 
 // NOTE: Stripe webhook is in server/index.ts — it must be registered before
 // express.json() middleware to receive the raw body needed for signature verification.
@@ -74,9 +88,8 @@ router.post('/api/stripe/config/keys', requireAdminAuth, (req, res) => {
 
 // Save product price mappings
 // Admin-only: product/price configuration is system-level. HMAC token only.
-router.post('/api/stripe/config/products', requireAdminAuth, (req, res) => {
+router.post('/api/stripe/config/products', requireAdminAuth, validate(stripeProductsConfigSchema), (req, res) => {
   const { products } = req.body;
-  if (!Array.isArray(products)) return res.status(400).json({ error: 'products must be an array' });
   saveStripeProducts(products as StripeProductPrice[]);
   res.json({ ok: true, products });
 });
