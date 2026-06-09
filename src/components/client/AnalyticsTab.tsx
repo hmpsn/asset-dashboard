@@ -19,6 +19,7 @@ import type {
   GA4Comparison, GA4NewVsReturning, GA4OrganicOverview, GA4LandingPage,
   WorkspaceInfo,
 } from './types';
+import type { AnalyticsDateRange } from '../../../shared/types/analytics-contract.js';
 
 interface AnalyticsTabProps {
   ga4Overview: GA4Overview | null;
@@ -34,12 +35,13 @@ interface AnalyticsTabProps {
   ga4Events: GA4Event[];
   ws: WorkspaceInfo;
   days: number;
+  dateRange?: AnalyticsDateRange;
 }
 
 export function AnalyticsTab({
   ga4Overview, ga4Comparison, ga4Trend, ga4Devices, ga4Pages, ga4Sources,
   ga4Organic, ga4LandingPages, ga4NewVsReturning,
-  ga4Conversions, ga4Events, ws, days,
+  ga4Conversions, ga4Events, ws, days, dateRange,
 }: AnalyticsTabProps) {
   // Analytics-internal state
   const [ga4SelectedEvent, setGa4SelectedEvent] = useState<string | null>(null);
@@ -55,6 +57,11 @@ export function AnalyticsTab({
   const [analyticsActionError, setAnalyticsActionError] = useState<string | null>(null);
 
   // ── Helper functions ──
+  const applyDateRange = (params: URLSearchParams) => {
+    if (!dateRange) return;
+    params.set('startDate', dateRange.startDate);
+    params.set('endDate', dateRange.endDate);
+  };
 
   const eventDisplayName = (eventName: string): string => {
     const cfg = ws?.eventConfig?.find(c => c.eventName === eventName);
@@ -81,6 +88,7 @@ export function AnalyticsTab({
     setAnalyticsActionError(null);
     try {
       const params = new URLSearchParams({ days: String(days), page: pagePath });
+      applyDateRange(params);
       const data = await get<GA4EventPageBreakdown[]>(`/api/public/analytics-event-explorer/${ws.id}?${params}`);
       if (Array.isArray(data)) {
         const byEvent: Record<string, { conversions: number; users: number }> = {};
@@ -113,6 +121,7 @@ export function AnalyticsTab({
     setAnalyticsActionError(null);
     try {
       const params = new URLSearchParams({ days: String(days) });
+      applyDateRange(params);
       if (event) params.set('event', event);
       if (page) params.set('page', page);
       const data = await get<GA4EventPageBreakdown[]>(`/api/public/analytics-event-explorer/${ws.id}?${params}`);
@@ -129,7 +138,9 @@ export function AnalyticsTab({
     setGa4SelectedEvent(eventName);
     setAnalyticsActionError(null);
     try {
-      const data = await get<GA4EventTrend[]>(`/api/public/analytics-event-trend/${ws.id}?days=${days}&event=${encodeURIComponent(eventName)}`);
+      const params = new URLSearchParams({ days: String(days), event: eventName });
+      applyDateRange(params);
+      const data = await get<GA4EventTrend[]>(`/api/public/analytics-event-trend/${ws.id}?${params}`);
       if (Array.isArray(data)) setGa4EventTrend(data);
     } catch {
       setGa4EventTrend([]);

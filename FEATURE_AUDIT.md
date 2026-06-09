@@ -721,6 +721,8 @@ Reference docs:
 
 **Mutual:** A typed contract keeps admin and client analytics interpretation aligned.
 
+**Hardening update (2026-06-08):** GA4/GSC provider and route contracts now normalize GA4 rate metrics to display percentages, use GA4 `keyEvents` for conversion summaries, carry top-page `sessions` through shared types, use inclusive GSC date windows, paginate page-level GSC reads, validate public analytics date ranges strictly, expose admin GA4 reads independent of client-portal visibility, and invalidate GA4/GSC analytics caches after workspace integration updates.
+
 ---
 
 ### 364. Shared URL/Tab Search Param Helper

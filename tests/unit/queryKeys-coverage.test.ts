@@ -36,6 +36,10 @@ describe('queryKeys.admin analytics keys', () => {
     const specific = queryKeys.admin.gsc(SITE, '/', 'impressions', 28);
     expect(specific.slice(0, all.length)).toEqual([...all]);
   });
+
+  it('gscAny returns global admin GSC namespace', () => {
+    expect(queryKeys.admin.gscAny()).toEqual(['admin-gsc']);
+  });
 });
 
 // ── Admin — content ────────────────────────────────────────────────────────────
@@ -89,6 +93,10 @@ describe('queryKeys.admin SEO keys', () => {
 
   it('auditTraffic includes siteId', () => {
     expect(queryKeys.admin.auditTraffic(SITE)).toEqual(['admin-audit-traffic', SITE]);
+  });
+
+  it('auditTrafficAll returns audit traffic namespace', () => {
+    expect(queryKeys.admin.auditTrafficAll()).toEqual(['admin-audit-traffic']);
   });
 
   it('schemaSnapshot without wsId', () => {

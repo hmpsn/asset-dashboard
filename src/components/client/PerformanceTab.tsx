@@ -13,6 +13,7 @@ import type {
   GA4Comparison, GA4NewVsReturning, GA4OrganicOverview, GA4LandingPage,
   WorkspaceInfo,
 } from './types';
+import type { AnalyticsDateRange } from '../../../shared/types/analytics-contract.js';
 
 interface SearchInsights {
   lowHanging: { query: string; position: number; impressions: number; clicks: number; ctr: number }[];
@@ -47,6 +48,7 @@ interface PerformanceTabProps {
   ws: WorkspaceInfo;
   tier: 'free' | 'growth' | 'premium';
   days: number;
+  dateRange?: AnalyticsDateRange;
   // Which sub-tab to start on
   initialSubTab?: 'search' | 'analytics';
 }
@@ -149,6 +151,7 @@ export function PerformanceTab(props: PerformanceTabProps) {
           ga4Events={props.ga4Events}
           ws={props.ws}
           days={props.days}
+          dateRange={props.dateRange}
         />
       )}
     </>

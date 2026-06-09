@@ -47,7 +47,7 @@ beforeEach(() => {
 // src/api/analytics.ts — gsc
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { gsc, ga4, gscAdmin, fetchClientIntelligence } from '../../src/api/analytics';
+import { gsc, ga4, ga4Admin, gscAdmin, fetchClientIntelligence } from '../../src/api/analytics';
 
 describe('gsc.overview', () => {
   it('calls getOptional with correct URL including workspaceId', async () => {
@@ -195,6 +195,13 @@ describe('ga4.eventTrend', () => {
     const [url] = mockGet.mock.calls[0];
     expect(url).toContain('days=14');
   });
+
+  it('appends dateRange params when provided', async () => {
+    await ga4.eventTrend('ws-1', 'purchase', 14, { startDate: '2025-01-01', endDate: '2025-01-14' });
+    const [url] = mockGet.mock.calls[0];
+    expect(url).toContain('startDate=2025-01-01');
+    expect(url).toContain('endDate=2025-01-14');
+  });
 });
 
 describe('ga4.eventPages', () => {
@@ -203,6 +210,13 @@ describe('ga4.eventPages', () => {
     const [url] = mockGet.mock.calls[0];
     expect(url).toContain('/api/public/analytics-event-explorer/ws-1');
     expect(url).toContain('event=form%20submit');
+  });
+
+  it('appends dateRange params when provided', async () => {
+    await ga4.eventPages('ws-1', 'form submit', 7, { startDate: '2025-02-01', endDate: '2025-02-07' });
+    const [url] = mockGet.mock.calls[0];
+    expect(url).toContain('startDate=2025-02-01');
+    expect(url).toContain('endDate=2025-02-07');
   });
 });
 
@@ -254,6 +268,37 @@ describe('ga4.landingPages', () => {
     const [url] = mockGet.mock.calls[0];
     expect(url).not.toContain('organic=');
     expect(url).not.toContain('limit=');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// src/api/analytics.ts — ga4Admin
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('ga4Admin.overview', () => {
+  it('calls admin analytics endpoint with workspaceId and days', async () => {
+    await ga4Admin.overview('ws-1', 28);
+    const [url] = mockGetOptional.mock.calls[0];
+    expect(url).toContain('/api/google/analytics-overview/ws-1');
+    expect(url).toContain('days=28');
+  });
+});
+
+describe('ga4Admin.organic', () => {
+  it('calls admin organic endpoint via getOptional', async () => {
+    await ga4Admin.organic('ws-1', 28);
+    const [url] = mockGetOptional.mock.calls[0];
+    expect(url).toContain('/api/google/analytics-organic/ws-1');
+  });
+});
+
+describe('ga4Admin.landingPages', () => {
+  it('calls admin landing-pages endpoint with organic and limit params', async () => {
+    await ga4Admin.landingPages('ws-1', 28, { organic: true, limit: 20 });
+    const [url] = mockGet.mock.calls[0];
+    expect(url).toContain('/api/google/analytics-landing-pages/ws-1');
+    expect(url).toContain('organic=true');
+    expect(url).toContain('limit=20');
   });
 });
 

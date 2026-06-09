@@ -3,6 +3,7 @@ import type {
   GA4DeviceBreakdown, GA4CountryBreakdown, GA4ConversionSummary,
   GA4Comparison, GA4NewVsReturning, GA4OrganicOverview, GA4LandingPage,
 } from '../../../shared/types/analytics';
+import { ga4Admin } from '../../api/analytics';
 import { useGA4Base } from '../shared/useGA4Base';
 
 export interface AdminGA4Data {
@@ -25,7 +26,7 @@ export function useAdminGA4(workspaceId: string, days: number, enabled: boolean)
   const {
     overviewQ, trendQ, topPagesQ, sourcesQ, devicesQ, countriesQ,
     comparisonQ, nvrQ, organicQ, landingQ, conversionsQ,
-  } = useGA4Base({ wsId: workspaceId, days, enabled, keyPrefix: 'admin-ga4' });
+  } = useGA4Base({ wsId: workspaceId, days, enabled, keyPrefix: 'admin-ga4', api: ga4Admin });
 
   const firstError = overviewQ.error || trendQ.error;
   const errorMsg = firstError

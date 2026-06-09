@@ -46,8 +46,8 @@ describe('audit-traffic service', () => {
       { page: 'malformed-url', clicks: 1, impressions: 10 },
     ]);
     mocks.getGA4TopPages.mockResolvedValue([
-      { path: '/services', pageviews: 200, users: 80 },
-      { path: 'services', pageviews: 30, users: 10 },
+      { path: '/services', pageviews: 200, users: 80, sessions: 80 },
+      { path: 'services', pageviews: 30, users: 10, sessions: 10 },
     ]);
 
     const map = await getAuditTrafficForWorkspace({
@@ -74,6 +74,7 @@ describe('audit-traffic service', () => {
 
     const map = await getAuditTrafficForWorkspace({
       id: 'ws_audit_malformed',
+      webflowSiteId: 'site_malformed',
       gscPropertyUrl: 'sc-domain:example.com',
     });
 
@@ -107,7 +108,7 @@ describe('audit-traffic service', () => {
       { page: 'https://example.com/', clicks: 3, impressions: 30 },
     ]);
     mocks.getGA4TopPages.mockResolvedValue([
-      { path: '/', pageviews: 12, users: 7 },
+      { path: '/', pageviews: 12, users: 7, sessions: 7 },
     ]);
 
     const ws = {
@@ -125,12 +126,12 @@ describe('audit-traffic service', () => {
     expect(mocks.getGA4TopPages).toHaveBeenCalledTimes(1);
   });
 
-  it('does not require webflowSiteId when analytics integrations exist', async () => {
+  it('uses GA4 traffic without webflowSiteId but skips GSC reads', async () => {
     mocks.getAllGscPages.mockResolvedValue([
       { page: 'https://example.com/pricing', clicks: 6, impressions: 60 },
     ]);
     mocks.getGA4TopPages.mockResolvedValue([
-      { path: '/pricing', pageviews: 14, users: 9 },
+      { path: '/pricing', pageviews: 14, users: 9, sessions: 9 },
     ]);
 
     const map = await getAuditTrafficForWorkspace({
@@ -140,10 +141,11 @@ describe('audit-traffic service', () => {
     });
 
     expect(map['/pricing']).toEqual({
-      clicks: 6,
-      impressions: 60,
+      clicks: 0,
+      impressions: 0,
       pageviews: 14,
       sessions: 9,
     });
+    expect(mocks.getAllGscPages).not.toHaveBeenCalled();
   });
 });

@@ -113,9 +113,9 @@ async function gatherMonthlyData(ws: Workspace): Promise<MonthlyData> {
   const traffic: TrafficComparison = {};
   const days = 28;
 
-  if (ws.gscPropertyUrl) {
+  if (ws.gscPropertyUrl && ws.webflowSiteId) {
     try {
-      const cmp = await getSearchPeriodComparison(ws.id, ws.gscPropertyUrl, days);
+      const cmp = await getSearchPeriodComparison(ws.webflowSiteId, ws.gscPropertyUrl, days);
       traffic.clicks = { current: cmp.current.clicks, previous: cmp.previous.clicks, changePct: cmp.changePercent.clicks };
       traffic.impressions = { current: cmp.current.impressions, previous: cmp.previous.impressions, changePct: cmp.changePercent.impressions };
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'monthly-report: programming error'); /* GSC unavailable */ }

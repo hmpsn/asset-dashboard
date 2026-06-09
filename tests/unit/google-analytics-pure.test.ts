@@ -208,9 +208,7 @@ describe('getGA4Overview', () => {
     expect(result.totalSessions).toBe(1500);
     expect(result.totalPageviews).toBe(3000);
     expect(result.avgSessionDuration).toBe(120.5);
-    // "0.35".toFixed(1) → JS float precision: 0.35 is stored as 0.34999...
-    // so parseFloat(0.35).toFixed(1) = "0.3" not "0.4"
-    expect(result.bounceRate).toBe(0.3);
+    expect(result.bounceRate).toBe(35);
     expect(result.newUserPercentage).toBe(60.0); // 600/1000 * 100
   });
 
@@ -336,11 +334,11 @@ describe('getGA4DailyTrend', () => {
 // ─── getGA4TopPages ───────────────────────────────────────────────────────────
 
 describe('getGA4TopPages', () => {
-  it('parses path, pageviews, users correctly', async () => {
+  it('parses path, pageviews, users, sessions correctly', async () => {
     mockFetchOk({
       rows: [
-        makeRow(['/blog/seo-tips'], ['1200', '800', '96000']),
-        makeRow(['/about'], ['300', '200', '10000']),
+        makeRow(['/blog/seo-tips'], ['1200', '800', '900', '96000']),
+        makeRow(['/about'], ['300', '200', '250', '10000']),
       ],
     });
 
@@ -349,26 +347,26 @@ describe('getGA4TopPages', () => {
     expect(result[0].path).toBe('/blog/seo-tips');
     expect(result[0].pageviews).toBe(1200);
     expect(result[0].users).toBe(800);
+    expect(result[0].sessions).toBe(900);
   });
 
-  it('computes avgEngagementTime as total duration / users', async () => {
-    // userEngagementDuration = 9600 seconds total, users = 800
+  it('computes avgEngagementTime as total duration / sessions', async () => {
+    // userEngagementDuration = 9600 seconds total, sessions = 900
     mockFetchOk({
-      rows: [makeRow(['/blog/post'], ['1200', '800', '9600'])],
+      rows: [makeRow(['/blog/post'], ['1200', '800', '900', '9600'])],
     });
 
     const result = await getGA4TopPages('prop123');
-    expect(result[0].avgEngagementTime).toBeCloseTo(9600 / 800, 5);
+    expect(result[0].avgEngagementTime).toBeCloseTo(9600 / 900, 5);
   });
 
-  it('clamps avgEngagementTime to 0 when users is 0', async () => {
+  it('sets avgEngagementTime to 0 when sessions is 0', async () => {
     mockFetchOk({
-      rows: [makeRow(['/page'], ['0', '0', '1000'])],
+      rows: [makeRow(['/page'], ['0', '0', '0', '1000'])],
     });
 
-    // users=0 → Math.max(0,1) = 1 → 1000/1 = 1000 (avoids division by zero)
     const result = await getGA4TopPages('prop123');
-    expect(result[0].avgEngagementTime).toBe(1000);
+    expect(result[0].avgEngagementTime).toBe(0);
   });
 
   it('returns empty array when no rows', async () => {
@@ -534,7 +532,7 @@ describe('getGA4EventTrend', () => {
 // ─── getGA4Conversions ────────────────────────────────────────────────────────
 
 describe('getGA4Conversions', () => {
-  it('filters out GA4 auto-events', async () => {
+  it('queries GA4 key events only', async () => {
     // First call: overview (totalUsers)
     mocks.fetch
       .mockResolvedValueOnce({
@@ -548,30 +546,24 @@ describe('getGA4Conversions', () => {
         ok: true,
         json: async () => ({
           rows: [
-            makeRow(['session_start'], ['5000', '1000']),   // auto-event, filtered
-            makeRow(['first_visit'], ['900', '900']),       // auto-event, filtered
-            makeRow(['page_view'], ['3000', '1000']),       // auto-event, filtered
-            makeRow(['scroll'], ['2000', '800']),           // auto-event, filtered
-            makeRow(['user_engagement'], ['1800', '700']),  // auto-event, filtered
-            makeRow(['click'], ['1500', '600']),            // auto-event, filtered
-            makeRow(['file_download'], ['200', '100']),     // auto-event, filtered
-            makeRow(['purchase'], ['500', '250']),          // kept
-            makeRow(['sign_up'], ['300', '280']),           // kept
+            makeRow(['purchase'], ['500', '250']),
+            makeRow(['sign_up'], ['300', '280']),
           ],
         }),
       });
 
     const result = await getGA4Conversions('prop123');
+    const requestBody = JSON.parse(mocks.fetch.mock.calls[1][1].body);
+    expect(requestBody.metrics[0].name).toBe('keyEvents');
+    expect(requestBody.dimensionFilter.filter.fieldName).toBe('isKeyEvent');
+    expect(requestBody.dimensionFilter.filter.stringFilter).toEqual({
+      matchType: 'EXACT',
+      value: 'true',
+    });
+    expect(requestBody.orderBys[0].metric.metricName).toBe('keyEvents');
+
     const eventNames = result.map(r => r.eventName);
-    expect(eventNames).not.toContain('session_start');
-    expect(eventNames).not.toContain('first_visit');
-    expect(eventNames).not.toContain('page_view');
-    expect(eventNames).not.toContain('scroll');
-    expect(eventNames).not.toContain('user_engagement');
-    expect(eventNames).not.toContain('click');
-    expect(eventNames).not.toContain('file_download');
-    expect(eventNames).toContain('purchase');
-    expect(eventNames).toContain('sign_up');
+    expect(eventNames).toEqual(['purchase', 'sign_up']);
   });
 
   it('computes conversion rate as users/totalUsers * 100', async () => {
@@ -608,8 +600,8 @@ describe('getGA4Conversions', () => {
     expect(result[0].rate).toBe(0);
   });
 
-  it('limits results to 15 items after filtering', async () => {
-    // Generate 20 non-auto events
+  it('limits key event results to 15 items', async () => {
+    // Generate 20 key event rows from GA4.
     const events = Array.from({ length: 20 }, (_, i) =>
       makeRow([`custom_event_${i}`], [`${100 + i}`, `${50 + i}`])
     );
@@ -788,7 +780,7 @@ describe('getGA4LandingPages', () => {
     });
 
     const result = await getGA4LandingPages('prop123');
-    expect(result[0].bounceRate).toBe(0.3); // toFixed(1) = "0.3"
+    expect(result[0].bounceRate).toBe(34.5);
   });
 
   it('sends organic filter when organicOnly=true', async () => {
@@ -842,9 +834,8 @@ describe('getGA4OrganicOverview', () => {
     expect(result.organicUsers).toBe(500);
     expect(result.organicSessions).toBe(600);
     expect(result.organicPageviews).toBe(1200);
-    // 0.35 stored as 0.34999... → toFixed(1) = "0.3"
-    expect(result.organicBounceRate).toBe(0.3);
-    expect(result.engagementRate).toBe(0.7); // 0.65 toFixed(1) = "0.7" (rounds correctly)
+    expect(result.organicBounceRate).toBe(35);
+    expect(result.engagementRate).toBe(65);
   });
 
   it('computes avgEngagementTime as totalDuration / organicSessions', async () => {

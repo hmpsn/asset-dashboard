@@ -262,6 +262,15 @@ export function parseDateRange(query: Record<string, unknown>): CustomDateRange 
   return { startDate: s, endDate: e };
 }
 
+export function parseDateRangeStrict(query: Record<string, unknown>): { dateRange?: CustomDateRange; error?: string } {
+  const startRaw = query.startDate;
+  const endRaw = query.endDate;
+  if (startRaw === undefined && endRaw === undefined) return {};
+  if (typeof startRaw !== 'string' || typeof endRaw !== 'string') return { error: 'Invalid date range' };
+  const parsed = parseDateRange({ startDate: startRaw, endDate: endRaw });
+  return parsed ? { dateRange: parsed } : { error: 'Invalid date range' };
+}
+
 function isCanonicalDateOnly(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const [yearRaw, monthRaw, dayRaw] = value.split('-');

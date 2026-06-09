@@ -337,9 +337,9 @@ async function detectForWorkspace(ws: Workspace): Promise<Anomaly[]> {
   const detected: Anomaly[] = [];
 
   // --- GSC anomalies ---
-  if (ws.gscPropertyUrl) {
+  if (ws.gscPropertyUrl && ws.webflowSiteId) {
     try {
-      const cmp = await getSearchPeriodComparison(ws.id, ws.gscPropertyUrl, COMPARISON_DAYS);
+      const cmp = await getSearchPeriodComparison(ws.webflowSiteId, ws.gscPropertyUrl, COMPARISON_DAYS);
       const { current, previous, changePercent } = cmp;
 
       // Traffic drop (clicks)

@@ -55,11 +55,11 @@ export const ga4 = {
   events: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
     get<GA4Event[]>(`/api/public/analytics-events/${wsId}${qs(days, dateRange)}`),
 
-  eventTrend: (wsId: string, eventName: string, days: number) =>
-    get<GA4EventTrend[]>(`/api/public/analytics-event-trend/${wsId}?event=${encodeURIComponent(eventName)}&days=${days}`),
+  eventTrend: (wsId: string, eventName: string, days: number, dateRange?: AnalyticsDateRange) =>
+    get<GA4EventTrend[]>(`/api/public/analytics-event-trend/${wsId}?event=${encodeURIComponent(eventName)}&days=${days}${dateRange ? `&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}` : ''}`),
 
-  eventPages: (wsId: string, eventName: string, days: number) =>
-    get<GA4EventPageBreakdown[]>(`/api/public/analytics-event-explorer/${wsId}?event=${encodeURIComponent(eventName)}&days=${days}`),
+  eventPages: (wsId: string, eventName: string, days: number, dateRange?: AnalyticsDateRange) =>
+    get<GA4EventPageBreakdown[]>(`/api/public/analytics-event-explorer/${wsId}?event=${encodeURIComponent(eventName)}&days=${days}${dateRange ? `&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}` : ''}`),
 
   conversions: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
     get<GA4ConversionSummary[]>(`/api/public/analytics-conversions/${wsId}${qs(days, dateRange)}`),
@@ -75,6 +75,46 @@ export const ga4 = {
 
   landingPages: (wsId: string, days: number, opts?: { dateRange?: AnalyticsDateRange; organic?: boolean; limit?: number }) => {
     let url = `/api/public/analytics-landing-pages/${wsId}${qs(days, opts?.dateRange)}`;
+    if (opts?.organic) url += '&organic=true';
+    if (opts?.limit) url += `&limit=${opts.limit}`;
+    return get<GA4LandingPage[]>(url);
+  },
+};
+
+// ── Admin GA4 endpoints (admin auth, independent of client portal visibility) ──
+export const ga4Admin = {
+  overview: (wsId: string, days: number) =>
+    getOptional<GA4Overview>(`/api/google/analytics-overview/${wsId}?days=${days}`),
+
+  trend: (wsId: string, days: number) =>
+    get<GA4DailyTrend[]>(`/api/google/analytics-trend/${wsId}?days=${days}`),
+
+  topPages: (wsId: string, days: number) =>
+    get<GA4TopPage[]>(`/api/google/analytics-top-pages/${wsId}?days=${days}`),
+
+  sources: (wsId: string, days: number) =>
+    get<GA4TopSource[]>(`/api/google/analytics-sources/${wsId}?days=${days}`),
+
+  devices: (wsId: string, days: number) =>
+    get<GA4DeviceBreakdown[]>(`/api/google/analytics-devices/${wsId}?days=${days}`),
+
+  countries: (wsId: string, days: number) =>
+    get<GA4CountryBreakdown[]>(`/api/google/analytics-countries/${wsId}?days=${days}`),
+
+  conversions: (wsId: string, days: number) =>
+    get<GA4ConversionSummary[]>(`/api/google/analytics-conversions/${wsId}?days=${days}`),
+
+  comparison: (wsId: string, days: number) =>
+    getOptional<GA4Comparison>(`/api/google/analytics-comparison/${wsId}?days=${days}`),
+
+  newVsReturning: (wsId: string, days: number) =>
+    get<GA4NewVsReturning[]>(`/api/google/analytics-new-vs-returning/${wsId}?days=${days}`),
+
+  organic: (wsId: string, days: number) =>
+    getOptional<GA4OrganicOverview>(`/api/google/analytics-organic/${wsId}?days=${days}`),
+
+  landingPages: (wsId: string, days: number, opts?: { organic?: boolean; limit?: number }) => {
+    let url = `/api/google/analytics-landing-pages/${wsId}?days=${days}`;
     if (opts?.organic) url += '&organic=true';
     if (opts?.limit) url += `&limit=${opts.limit}`;
     return get<GA4LandingPage[]>(url);

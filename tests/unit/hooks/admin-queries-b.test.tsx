@@ -27,8 +27,8 @@ function makeWrapper() {
 // ── Mock API modules ────────────────────────────────────────────────────────
 
 // useAdminGA4 → via useGA4Base → src/api/analytics (ga4 object)
-vi.mock('../../../src/api/analytics', () => ({
-  ga4: {
+vi.mock('../../../src/api/analytics', () => {
+  const ga4Api = {
     overview: vi.fn(),
     trend: vi.fn(),
     topPages: vi.fn(),
@@ -41,16 +41,20 @@ vi.mock('../../../src/api/analytics', () => ({
     landingPages: vi.fn(),
     conversions: vi.fn(),
     events: vi.fn(),
-  },
-  gscAdmin: {
-    overview: vi.fn(),
-    trend: vi.fn(),
-    devices: vi.fn(),
-    countries: vi.fn(),
-    searchTypes: vi.fn(),
-    comparison: vi.fn(),
-  },
-}));
+  };
+  return {
+    ga4: ga4Api,
+    ga4Admin: ga4Api,
+    gscAdmin: {
+      overview: vi.fn(),
+      trend: vi.fn(),
+      devices: vi.fn(),
+      countries: vi.fn(),
+      searchTypes: vi.fn(),
+      comparison: vi.fn(),
+    },
+  };
+});
 
 // useAdminAssets → src/api/client (get, getSafe)
 vi.mock('../../../src/api/client', () => ({
