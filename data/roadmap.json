@@ -274,9 +274,10 @@
           "source": "Parallel simplification explorer audit 2026-06-09 — Test/Guardrail Leverage",
           "est": "medium",
           "priority": "P1",
-          "status": "pending",
-          "notes": "Scope: `tests/integration/broadcast-handler-pairs.test.ts`, `tests/contract/ws-invalidation-coverage.test.ts`, `scripts/pr-check.ts`, and WS event constants. Current complexity: duplicate parsers collect `WS_EVENTS`, broadcasts, frontend handlers, and exemption lists; this overlaps directly with the frontend invalidation registry opportunity. Behavior-preserving path: extract `tests/helpers/ws-contracts.ts` with `parseWsEvents`, `collectBroadcasts`, and `collectHandlers`; let both tests consume the helper. Later extend it with an event-to-query-key expectation table once the frontend registry exists. Tests/guardrails: run broadcast-handler pairs, ws invalidation coverage, and pr-check tests; ensure CSS class/string false positives remain excluded.",
-          "createdAt": "2026-06-09"
+          "status": "done",
+          "notes": "Scope: `tests/integration/broadcast-handler-pairs.test.ts`, `tests/contract/ws-invalidation-coverage.test.ts`, `scripts/pr-check.ts`, and WS event constants. Current complexity: duplicate parsers collect `WS_EVENTS`, broadcasts, frontend handlers, and exemption lists; this overlaps directly with the frontend invalidation registry opportunity. Behavior-preserving path: extract `tests/helpers/ws-contracts.ts` with `parseWsEvents`, `collectBroadcasts`, and `collectHandlers`; let both tests consume the helper. Later extend it with an event-to-query-key expectation table once the frontend registry exists. Tests/guardrails: run broadcast-handler pairs, ws invalidation coverage, and pr-check tests; ensure CSS class/string false positives remain excluded. || DONE 2026-06-09: extracted shared WS contract parser logic into `scripts/ws-contract-parser.ts` so both static tests and `scripts/pr-check.ts` use the same `WS_EVENTS`, centralized handler, broadcast, and frontend subscription parsing. Migrated `broadcast-handler-pairs`, `ws-invalidation-coverage`, and pr-check's WS event loader/centralization rule without changing exemptions or event semantics. Targeted verification: `npx vitest run tests/integration/broadcast-handler-pairs.test.ts tests/contract/ws-invalidation-coverage.test.ts tests/pr-check.test.ts`.",
+          "createdAt": "2026-06-09",
+          "shippedAt": "2026-06-09"
         },
         {
           "id": "simp-tests-ephemeral-integration-ports",
