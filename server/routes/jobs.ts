@@ -10,7 +10,6 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import { addActivity } from '../activity-log.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { callCreativeAI } from '../content-posts-ai.js';
-import { notifyClientRecommendationsReady, notifyClientAuditComplete } from '../email.js';
 import { findPageMapEntryForPage, normalizePageUrl, tryResolvePagePath, stripHtmlToText } from '../helpers.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 import {
@@ -27,7 +26,7 @@ import {
 } from '../jobs.js';
 import { APP_PASSWORD, requireClientPortalAuth, signAdminToken } from '../middleware.js';
 import { requestUserCanAccessWorkspace, sendWorkspaceAccessDenied, workspaceOwnsWebflowSite } from '../auth.js';
-import { generateRecommendations, loadRecommendations, resolveRecommendationsForPageIds } from '../recommendations.js';
+import { resolveRecommendationsForPageIds } from '../recommendations.js';
 import { runRecommendationGenerationJob } from '../recommendation-generation-job.js';
 import { getBrief } from '../content-brief.js';
 import { startContentBriefGenerationJob } from '../content-brief-generation-job.js';
@@ -48,27 +47,22 @@ import {
   KeywordStrategyGenerationError,
   KEYWORD_STRATEGY_MAX_PAGE_CAP,
 } from '../keyword-strategy-generation.js';
-import { saveSnapshot, getLatestSnapshotBefore } from '../reports.js';
-import { getEffectiveAudit, getEffectivePreviousScore } from '../audit-snapshot-views.js';
 import { startSalesReportJob } from '../sales-report-background-job.js';
 import { runSchemaGenerationJob } from '../schema-generation-job.js';
 import {
   schemaPlanGenerationErrorResponse,
   startSchemaPlanGenerationJob,
 } from '../schema-plan-generation-job.js';
-import { runSeoAudit } from '../seo-audit.js';
+import { startSeoAuditBackgroundJob } from '../seo-audit-background-job.js';
 import { startWebflowBulkAltJob } from '../webflow-bulk-alt-background-job.js';
 import { startWebflowBulkCompressJob } from '../webflow-bulk-compress-background-job.js';
 import { startWebflowImageCompressJob } from '../webflow-image-compress-background-job.js';
-import { handleOnDemandSeoAuditResult } from '../webflow-seo-audit-bridges.js';
 import {
   updatePageSeo,
 } from '../webflow.js';
 import {
-  listWorkspaces,
   getWorkspace,
   getTokenForSite,
-  getClientPortalUrl,
   updatePageState,
   getBrandName,
 } from '../workspaces.js';
@@ -243,118 +237,12 @@ router.post('/api/jobs', async (req, res) => {
         if (activeAudit) return res.status(409).json({ error: 'An SEO audit is already running for this workspace', jobId: activeAudit.id });
         const token = getTokenForSite(siteId) || undefined;
         if (!token) return res.status(400).json({ error: 'No Webflow API token configured' });
-        const job = createJob('seo-audit', { message: 'Running SEO audit...', workspaceId: params.workspaceId as string });
-        res.json({ jobId: job.id });
-        // Fire and forget
-        (async () => {
-          try {
-            updateJob(job.id, { status: 'running', message: 'Scanning pages...' });
-            const result = await runSeoAudit(siteId, token, params.workspaceId as string, params.skipLinkCheck === true);
-            // Auto-save snapshot so overview + client dashboard stay in sync
-            const ws = typeof params.workspaceId === 'string'
-              ? getWorkspace(params.workspaceId)
-              : listWorkspaces().find(w => w.webflowSiteId === siteId);
-            const siteName = getBrandName(ws) || siteId;
-            const snapshot = saveSnapshot(siteId, siteName, result);
-            const effectiveResult = getEffectiveAudit(result, ws?.auditSuppressions || []);
-            let effectivePreviousScore = snapshot.previousScore;
-            if (ws) {
-              effectivePreviousScore = getEffectivePreviousScore(snapshot, ws.auditSuppressions || []);
-              addActivity(ws.id, 'audit_completed', `Site audit completed — score ${effectiveResult.siteScore}`,
-                `${effectiveResult.totalPages} pages scanned, ${effectiveResult.errors} errors, ${effectiveResult.warnings} warnings`,
-                { score: effectiveResult.siteScore, previousScore: effectivePreviousScore });
-              handleOnDemandSeoAuditResult(ws, effectiveResult);
-              broadcastToWorkspace(ws.id, WS_EVENTS.AUDIT_COMPLETE, { score: effectiveResult.siteScore, previousScore: effectivePreviousScore });
-            }
-            updateJob(job.id, {
-              status: 'done',
-              result: { ...effectiveResult, previousScore: effectivePreviousScore, snapshotId: snapshot.id },
-              message: `Audit complete — score ${effectiveResult.siteScore}`,
-            });
-            // Auto-regenerate recommendations after audit
-            if (ws) {
-              try {
-                await generateRecommendations(ws.id);
-                log.info(`Auto-regenerated recommendations for ${ws.id}`);
-                // Notify client that recommendations are ready
-                if (ws.clientEmail) {
-                  const dashUrl = getClientPortalUrl(ws);
-                  const recSet = loadRecommendations(ws.id);
-                  const recs = recSet?.recommendations || [];
-                  // SEO Generation Quality P2(f): the "recommendations ready for review"
-                  // headline counts only what the client will actually act on — ACTIVE recs
-                  // (exclude completed/dismissed carry-forwards) minus deterministic-backfill
-                  // recs (tagged at the source via Recommendation.backfilled). Flag-OFF has no
-                  // backfilled recs and no status pollution change, so the count is unchanged.
-                  const honestRecCount = recs.filter(
-                    r => r.status !== 'completed' && r.status !== 'dismissed' && !r.backfilled,
-                  ).length;
-                  if (honestRecCount > 0) {
-                    notifyClientRecommendationsReady({ clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: ws.id, recCount: honestRecCount, dashboardUrl: dashUrl });
-                  }
-                }
-              } catch (recErr) {
-                log.error({ err: recErr }, 'Failed to regenerate recommendations');
-              }
-              // Notify client of audit completion with suppressed data
-              if (ws.clientEmail) {
-                const dashUrl = getClientPortalUrl(ws);
-                // Collect issues from suppressed audit, sorted errors first
-                const allIssues: Array<{ message: string; severity: string }> = [];
-                for (const p of effectiveResult.pages) {
-                  for (const iss of p.issues) {
-                    if (iss.severity === 'error' || iss.severity === 'warning') {
-                      allIssues.push({ message: iss.message, severity: iss.severity });
-                    }
-                  }
-                }
-                // Deduplicate by message, keep highest severity
-                const seen = new Map<string, { message: string; severity: string }>();
-                for (const iss of allIssues) {
-                  const existing = seen.get(iss.message);
-                  if (!existing || (iss.severity === 'error' && existing.severity !== 'error')) {
-                    seen.set(iss.message, iss);
-                  }
-                }
-                const uniqueIssues = [...seen.values()];
-                uniqueIssues.sort((a, b) => (a.severity === 'error' ? 0 : 1) - (b.severity === 'error' ? 0 : 1));
-                const topIssues = uniqueIssues.slice(0, 5);
-
-                // Compare suppressed versions for accurate fixed count
-                let fixedCount = 0;
-                if (effectivePreviousScore != null) {
-                  const prev = getLatestSnapshotBefore(ws.webflowSiteId!, snapshot.id);
-                  if (prev) {
-                    const prevAudit = getEffectiveAudit(prev.audit, ws.auditSuppressions || []);
-                    const prevIssueKeys = new Set<string>();
-                    for (const p of prevAudit.pages) {
-                      for (const iss of p.issues) prevIssueKeys.add(`${p.pageId}:${iss.check}`);
-                    }
-                    const curIssueKeys = new Set<string>();
-                    for (const p of effectiveResult.pages) {
-                      for (const iss of p.issues) curIssueKeys.add(`${p.pageId}:${iss.check}`);
-                    }
-                    for (const k of prevIssueKeys) {
-                      if (!curIssueKeys.has(k)) fixedCount++;
-                    }
-                  }
-                }
-
-                notifyClientAuditComplete({
-                  clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: ws.id,
-                  score: effectiveResult.siteScore, previousScore: effectivePreviousScore,
-                  totalPages: effectiveResult.totalPages, errors: effectiveResult.errors, warnings: effectiveResult.warnings,
-                  topIssues, fixedCount, dashboardUrl: dashUrl,
-                });
-              }
-            }
-          } catch (err) {
-            if (isProgrammingError(err)) log.warn({ err }, 'jobs: audit job failed with programming error'); // url-fetch-ok
-            else log.debug({ err }, 'jobs: audit job failed — degrading gracefully');
-            updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Audit failed' });
-          }
-        })();
-        break;
+        return res.json(startSeoAuditBackgroundJob({
+          workspaceId: params.workspaceId as string | undefined,
+          siteId,
+          token,
+          skipLinkCheck: params.skipLinkCheck === true,
+        }));
       }
 
       case 'compress': {
