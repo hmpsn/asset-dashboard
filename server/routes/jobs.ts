@@ -60,6 +60,7 @@ import {
   startSchemaPlanGenerationJob,
 } from '../schema-plan-generation-job.js';
 import { runSeoAudit } from '../seo-audit.js';
+import { startWebflowBulkCompressJob } from '../webflow-bulk-compress-background-job.js';
 import { startWebflowImageCompressJob } from '../webflow-image-compress-background-job.js';
 import { handleOnDemandSeoAuditResult } from '../webflow-seo-audit-bridges.js';
 import {
@@ -377,46 +378,13 @@ router.post('/api/jobs', async (req, res) => {
         if (!assets?.length || !siteId) return res.status(400).json({ error: 'assets and siteId required' });
         const activeBulkCompress = hasActiveJob('bulk-compress', params.workspaceId as string);
         if (activeBulkCompress) return res.status(409).json({ error: 'A bulk compression is already running', jobId: activeBulkCompress.id });
-        const job = createJob('bulk-compress', { message: `Compressing ${assets.length} assets...`, total: assets.length, workspaceId: params.workspaceId as string });
-        res.json({ jobId: job.id });
-        (async () => {
-          try {
-            updateJob(job.id, { status: 'running', progress: 0 });
-            let totalSaved = 0;
-            const results: unknown[] = [];
-            for (let i = 0; i < assets.length; i++) {
-              const asset = assets[i];
-              try {
-                const compressRes = await fetch(`http://localhost:${PORT}/api/webflow/${params.workspaceId}/compress/${asset.assetId}`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', ...internalAdminHeaders() },
-                  body: JSON.stringify({ imageUrl: asset.imageUrl, siteId, altText: asset.altText, fileName: asset.fileName, cmsUsages: asset.cmsUsages }),
-                });
-                const r = await compressRes.json() as Record<string, unknown>;
-                results.push({ assetId: asset.assetId, ...r });
-                if (typeof r.savings === 'number') totalSaved += r.savings;
-              } catch (err) {
-                log.debug({ err }, 'jobs: bulk-compress individual asset failed — skipping');
-                results.push({ assetId: asset.assetId, error: String(err) });
-              }
-              updateJob(job.id, { progress: i + 1, message: `Compressed ${i + 1}/${assets.length} (${Math.round(totalSaved / 1024)}KB saved)` });
-            }
-            updateJob(job.id, { status: 'done', result: { results, totalSaved }, progress: assets.length, message: `Done — saved ${Math.round(totalSaved / 1024)}KB total` });
-            const compressWsId = params.workspaceId as string;
-            if (compressWsId) {
-              addActivity(compressWsId, 'images_optimized',
-                `Bulk compression: ${assets.length} images processed, ${Math.round(totalSaved / 1024)}KB saved`,
-                undefined,
-                { processed: assets.length, totalSavedBytes: totalSaved }
-              );
-            }
-          } catch (err) {
-            if (isProgrammingError(err)) log.warn({ err }, 'jobs: bulk-compress job failed with programming error'); // url-fetch-ok
-            else log.debug({ err }, 'jobs: bulk-compress job failed — degrading gracefully');
-            updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Bulk compress failed' });
-          }
-        })();
-        break;
+        return res.json(startWebflowBulkCompressJob({
+          workspaceId: params.workspaceId as string | undefined,
+          siteId,
+          assets,
+          baseUrl: `http://localhost:${PORT}`,
+          headers: internalAdminHeaders(),
+        }));
       }
 
       case 'bulk-alt': {
