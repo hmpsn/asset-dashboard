@@ -1,13 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
+import { featureFlags } from '../api/misc';
 import { FEATURE_FLAGS } from '../../shared/types/feature-flags';
 import type { FeatureFlagKey } from '../../shared/types/feature-flags';
 import { queryKeys } from '../lib/queryKeys';
-
-async function fetchFeatureFlags(): Promise<Record<FeatureFlagKey, boolean>> {
-  const res = await fetch('/api/feature-flags');
-  if (!res.ok) throw new Error('Failed to fetch feature flags');
-  return res.json();
-}
 
 /**
  * Returns whether a feature flag is enabled.
@@ -21,7 +16,7 @@ async function fetchFeatureFlags(): Promise<Record<FeatureFlagKey, boolean>> {
 export function useFeatureFlag(flag: FeatureFlagKey): boolean {
   const { data } = useQuery({
     queryKey: queryKeys.shared.featureFlags(),
-    queryFn: fetchFeatureFlags,
+    queryFn: featureFlags.list,
     staleTime: Infinity,
     gcTime: Infinity,
   });

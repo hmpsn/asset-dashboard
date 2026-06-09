@@ -14,6 +14,7 @@ import type { PricingModalState } from './StrategyTab';
 import { STUDIO_NAME } from '../../constants';
 import { useContentRequests } from '../../hooks/useContentRequests';
 import { contentPerformance } from '../../api';
+import { publicContent } from '../../api/content';
 import { PostReviewCard } from './PostReviewCard';
 import { formatDate } from '../../utils/formatDates';
 import { positionColor } from '../ui/constants';
@@ -620,8 +621,7 @@ export function ContentTab({
 
                     {/* Export */}
                     <div className="flex items-center gap-2 pt-1">
-                      {/* // fetch-ok — fetches HTML for new-window preview, API client is JSON-only */}
-                      <Button variant="secondary" size="sm" icon={Download} onClick={() => { const url = `/api/public/content-brief/${workspaceId}/${brief.id}/export`; const w = window.open('', '_blank'); if (!w) return; w.document.write('<p style="font-family:sans-serif;padding:40px">Loading...</p>'); fetch(url).then(r => r.text()).then(html => { w.document.open(); w.document.write(html); w.document.close(); }).catch(() => { w.location.href = url; }); }}>
+                      <Button variant="secondary" size="sm" icon={Download} onClick={() => { const url = `/api/public/content-brief/${workspaceId}/${brief.id}/export`; const w = window.open('', '_blank'); if (!w) return; w.document.write('<p style="font-family:sans-serif;padding:40px">Loading...</p>'); publicContent.exportBrief(workspaceId, brief.id).then(html => { w.document.open(); w.document.write(html); w.document.close(); }).catch(() => { w.location.href = url; }); }}>
                         Download PDF
                       </Button>
                     </div>

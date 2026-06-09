@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { trackedKeywords as trackedKwApi } from '../../../api';
 import { useWorkspaceEvents } from '../../../hooks/useWorkspaceEvents';
+import { queryKeys } from '../../../lib/queryKeys';
 import { WS_EVENTS } from '../../../lib/wsEvents';
 import type { TrackedKeyword } from '../../../../shared/types/rank-tracking';
 
@@ -11,29 +13,27 @@ interface UseStrategyTrackedKeywordsOptions {
 }
 
 export function useStrategyTrackedKeywords({ workspaceId }: UseStrategyTrackedKeywordsOptions) {
-  const [trackedKeywords, setTrackedKeywords] = useState<StrategyTrackedKeyword[]>([]);
+  const queryClient = useQueryClient();
   const [newTrackedKeyword, setNewTrackedKeyword] = useState('');
   const [addingKeyword, setAddingKeyword] = useState(false);
   const [removingKeyword, setRemovingKeyword] = useState<string | null>(null);
-  const [trackedKeywordsLoading, setTrackedKeywordsLoading] = useState(false);
-  const [trackedKeywordsError, setTrackedKeywordsError] = useState(false);
+  const trackedKeywordsQuery = useQuery({
+    queryKey: queryKeys.client.trackedKeywords(workspaceId ?? ''),
+    queryFn: () => trackedKwApi.get(workspaceId!),
+    enabled: !!workspaceId,
+    select: (data) => data.keywords || [],
+  });
 
+  const trackedKeywords = trackedKeywordsQuery.data ?? [];
+  const trackedKeywordsLoading = trackedKeywordsQuery.isLoading;
+  const trackedKeywordsError = trackedKeywordsQuery.isError;
   const loadTrackedKeywords = useCallback(() => {
-    if (!workspaceId) return;
-    setTrackedKeywordsError(false);
-    setTrackedKeywordsLoading(true);
-    trackedKwApi.get(workspaceId)
-      .then((data) => {
-        setTrackedKeywords(data.keywords || []);
-      })
-      .catch(() => { setTrackedKeywordsError(true); })
-      .finally(() => setTrackedKeywordsLoading(false));
-  }, [workspaceId]);
-
-  useEffect(() => { loadTrackedKeywords(); }, [loadTrackedKeywords]);
+    if (!workspaceId) return Promise.resolve();
+    return trackedKeywordsQuery.refetch();
+  }, [trackedKeywordsQuery, workspaceId]);
 
   useWorkspaceEvents(workspaceId, {
-    // ws-invalidation-ok: Strategy tab owns local tracked-keyword state, not React Query state.
+    // ws-invalidation-ok: Strategy tab owns the public tracked-keywords query key, not central invalidation.
     [WS_EVENTS.RANK_TRACKING_UPDATED]: loadTrackedKeywords,
     // ws-invalidation-ok: strategy refresh can reconcile tracked keyword lifecycle/source metadata.
     [WS_EVENTS.STRATEGY_UPDATED]: loadTrackedKeywords,
@@ -43,17 +43,17 @@ export function useStrategyTrackedKeywords({ workspaceId }: UseStrategyTrackedKe
     if (!workspaceId) return trackedKeywords;
     const res = await trackedKwApi.add(workspaceId, keyword);
     const keywords = res.keywords || [];
-    setTrackedKeywords(keywords);
+    queryClient.setQueryData(queryKeys.client.trackedKeywords(workspaceId), { keywords });
     return keywords;
-  }, [workspaceId, trackedKeywords]);
+  }, [queryClient, trackedKeywords, workspaceId]);
 
   const removeTrackedKeyword = useCallback(async (keyword: string): Promise<StrategyTrackedKeyword[]> => {
     if (!workspaceId) return trackedKeywords;
     const data = await trackedKwApi.remove(workspaceId, keyword);
     const keywords = data.keywords || [];
-    setTrackedKeywords(keywords);
+    queryClient.setQueryData(queryKeys.client.trackedKeywords(workspaceId), { keywords });
     return keywords;
-  }, [workspaceId, trackedKeywords]);
+  }, [queryClient, trackedKeywords, workspaceId]);
 
   return {
     trackedKeywords,

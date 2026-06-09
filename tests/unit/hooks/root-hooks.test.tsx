@@ -320,26 +320,11 @@ describe('useFeatureFlag — static defaults (loading state)', () => {
 });
 
 describe('useFeatureFlag — server response overrides defaults', () => {
-  // useFeatureFlag uses raw fetch(), not the api/client wrapper
-  let fetchSpy: ReturnType<typeof vi.fn>;
-
-  beforeEach(() => {
-    fetchSpy = vi.fn();
-    vi.stubGlobal('fetch', fetchSpy);
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   it('returns true for a flag the server has enabled', async () => {
     const serverFlags = Object.fromEntries(
       Object.keys(FEATURE_FLAGS).map(k => [k, k === 'keyword-hub']),
     ) as Record<FeatureFlagKey, boolean>;
-    fetchSpy.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(serverFlags),
-    });
+    mockGet.mockResolvedValue(serverFlags);
 
     const { result } = renderHook(
       () => useFeatureFlag('keyword-hub' as FeatureFlagKey),
@@ -353,10 +338,7 @@ describe('useFeatureFlag — server response overrides defaults', () => {
     const serverFlags = Object.fromEntries(
       Object.keys(FEATURE_FLAGS).map(k => [k, false]),
     ) as Record<FeatureFlagKey, boolean>;
-    fetchSpy.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(serverFlags),
-    });
+    mockGet.mockResolvedValue(serverFlags);
 
     const { result } = renderHook(
       () => useFeatureFlag('white-label' as FeatureFlagKey),
@@ -370,7 +352,7 @@ describe('useFeatureFlag — server response overrides defaults', () => {
   });
 
   it('falls back to static default when fetch fails', async () => {
-    fetchSpy.mockResolvedValue({ ok: false, status: 500 });
+    mockGet.mockRejectedValue(new Error('Failed to fetch feature flags'));
 
     const { result } = renderHook(
       () => useFeatureFlag('keyword-hub' as FeatureFlagKey),

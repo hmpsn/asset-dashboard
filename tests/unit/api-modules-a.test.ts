@@ -779,7 +779,7 @@ import {
   churnSignals, chat, recommendations, settings,
   salesReport, workOrders, redirects,
   contentSubscriptions, stripe, auth,
-  keywordFeedback, trackedKeywords, businessPriorities,
+  keywordFeedback, trackedKeywords, businessPriorities, featureFlags,
 } from '../../src/api/misc';
 
 describe('requests.list', () => {
@@ -1431,5 +1431,16 @@ describe('businessPriorities.get', () => {
       priorities: [{ text: 'Grow', category: 'growth' }],
       expectedUpdatedAt: '2026-01-01T00:00:00.000Z',
     });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// src/api/misc.ts — featureFlags
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('featureFlags.list', () => {
+  it('calls get with the shared feature flags endpoint', async () => {
+    await featureFlags.list();
+    expect(mockGet).toHaveBeenCalledWith('/api/feature-flags');
   });
 });

@@ -1,5 +1,5 @@
 // ── Content API (briefs, posts, content requests) ─────────────────
-import { get, post, patch, put, del, getSafe, getOptional } from './client';
+import { get, post, patch, put, del, getSafe, getOptional, getText } from './client';
 import type {
   ContentBrief,
   GeneratedPost,
@@ -14,6 +14,39 @@ import type {
   BriefTemplateCrossrefMatch,
 } from '../../shared/types/content';
 import type { ClientContentRequest } from '../components/client/types';
+import type { CopySectionStatus, ClientSuggestion } from '../../shared/types/copy-pipeline';
+
+export interface PublicCopyEntryListItem {
+  id: string;
+  name: string;
+  pageType: string;
+  blueprintId: string;
+  blueprintName: string;
+  copyStatus: {
+    entryId: string;
+    totalSections: number;
+    pendingSections: number;
+    draftSections: number;
+    clientReviewSections: number;
+    approvedSections: number;
+    revisionSections: number;
+    overallStatus: CopySectionStatus;
+    approvalPercentage: number;
+  };
+}
+
+export interface PublicClientCopySection {
+  id: string;
+  entryId: string;
+  sectionPlanItemId: string;
+  generatedCopy: string | null;
+  status: CopySectionStatus;
+  aiAnnotation: string | null;
+  clientSuggestions: ClientSuggestion[] | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export const contentBriefs = {
   list: (wsId: string) =>
@@ -148,6 +181,23 @@ export const publicContent = {
 
   briefPreview: (wsId: string, briefId: string) =>
     getOptional<unknown>(`/api/public/content-brief/${wsId}/${briefId}`),
+
+  exportBrief: (wsId: string, briefId: string) =>
+    getText(`/api/public/content-brief/${wsId}/${briefId}/export`),
+};
+
+export const publicCopyReview = {
+  entries: (wsId: string) =>
+    get<{ entries: PublicCopyEntryListItem[] }>(`/api/public/copy/${wsId}/entries`),
+
+  sections: (wsId: string, entryId: string) =>
+    get<{ sections: PublicClientCopySection[] }>(`/api/public/copy/${wsId}/entry/${entryId}/sections`),
+
+  approveSection: (wsId: string, sectionId: string) =>
+    post<{ section: PublicClientCopySection }>(`/api/public/copy/${wsId}/section/${sectionId}/approve`),
+
+  suggestEdit: (wsId: string, sectionId: string, body: { originalText: string; suggestedText: string }) =>
+    post<{ section: PublicClientCopySection }>(`/api/public/copy/${wsId}/section/${sectionId}/suggest`, body),
 };
 
 // ── Public post-review actions (client portal) ────────────────
