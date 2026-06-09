@@ -1,14 +1,19 @@
 /**
  * Shared test helpers for integration tests.
  *
- * Provides a factory function `createTestContext(port)` that returns
- * isolated server + HTTP helpers per test file, allowing parallel execution
- * on different ports.
+ * Provides two factories:
+ * - `createTestContext(port)` for existing literal port ownership
+ * - `createEphemeralTestContext(testId)` for lock-backed automatic port ownership
  */
 import { spawn, type ChildProcess } from 'child_process';
 import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import {
+  isIntegrationTestPortReserved,
+  releaseIntegrationTestPort,
+  reserveIntegrationTestPort,
+} from '../helpers/ports.js';
 import { ensureIsolatedTestDataDir } from '../test-data-dir.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -249,6 +254,37 @@ export function createTestContext(port: number, options?: { env?: Record<string,
     authPostJson,
     authPatchJson,
     authDel,
+  };
+}
+
+/**
+ * Allocate a unique integration-test port from the shared lock-backed range.
+ * Callers should pass a stable file identifier such as `import.meta.url`.
+ */
+export function createEphemeralTestContext(
+  testFileUrl: string,
+  options?: { env?: Record<string, string>; startupTimeoutMs?: number; autoPublicAuth?: boolean },
+): TestContext {
+  if (!testFileUrl.startsWith('file://')) {
+    throw new Error('createEphemeralTestContext() requires import.meta.url as its first argument');
+  }
+  if (isIntegrationTestPortReserved(testFileUrl)) {
+    throw new Error('Only one createEphemeralTestContext(import.meta.url) is allowed per test file');
+  }
+
+  const port = reserveIntegrationTestPort(testFileUrl);
+  const ctx = createTestContext(port, options);
+  const baseStopServer = ctx.stopServer;
+
+  return {
+    ...ctx,
+    stopServer: async () => {
+      try {
+        await baseStopServer();
+      } finally {
+        releaseIntegrationTestPort(testFileUrl);
+      }
+    },
   };
 }
 
