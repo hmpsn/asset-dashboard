@@ -6,6 +6,7 @@
 import { getValidToken } from './google-auth.js';
 import type { CustomDateRange } from './google-analytics.js';
 import { isProgrammingError } from './errors.js';
+import { googleJson, isGoogleProviderError } from './google-provider-client.js';
 import { createLogger } from './logger.js';
 import { GSC_METRIC_WINDOW_DAYS } from '../shared/keyword-window.js';
 import { normalizePageUrl } from '../shared/page-address-utils.js';
@@ -170,22 +171,19 @@ export interface PerformanceTrend {
 }
 
 async function gscFetch(endpoint: string, token: string, body?: unknown): Promise<unknown> {
-  const opts: RequestInit = {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  };
-  if (body) {
-    opts.method = 'POST';
-    opts.body = JSON.stringify(body);
+  try {
+    return await googleJson({
+      endpoint,
+      source: 'gsc',
+      token,
+      body: body as Record<string, unknown> | undefined,
+    });
+  } catch (err) {
+    if (isGoogleProviderError(err)) {
+      throw new Error(`GSC API error (${err.status ?? err.kind}): ${err.body ?? ''}`);
+    }
+    throw err;
   }
-  const res = await fetch(endpoint, opts);
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`GSC API error (${res.status}): ${err}`);
-  }
-  return res.json();
 }
 
 export async function listGscSites(siteId: string): Promise<Array<{ siteUrl: string; permissionLevel: string }>> {
@@ -616,33 +614,7 @@ export async function inspectUrlForRichResults(
   const token = await getValidToken(siteId);
   if (!token) return null;
 
-  const res = await fetch(
-    'https://searchconsole.googleapis.com/v1/urlInspection/index:inspect',
-    {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ inspectionUrl: pageUrl, siteUrl }),
-      signal: AbortSignal.timeout(15_000),
-    },
-  );
-
-  if (!res.ok) {
-    const errText = await res.text().catch(() => '');
-    if (res.status === 429) {
-      log.warn({ siteId }, 'GSC URL Inspection API quota exhausted');
-      return null;
-    }
-    if (res.status === 401 || res.status === 403) {
-      throw new Error(`GSC URL Inspection authentication error (${res.status}): ${errText.slice(0, 200)}`);
-    }
-    if (res.status >= 400 && res.status < 500) {
-      log.warn({ siteId, status: res.status }, 'GSC URL Inspection API client error — treating as no_gsc');
-      return null;
-    }
-    throw new Error(`GSC URL Inspection error (${res.status}): ${errText.slice(0, 200)}`);
-  }
-
-  const data = await res.json() as {
+  let data: {
     inspectionResult?: {
       richResultsResult?: {
         detectedItems?: Array<{
@@ -658,6 +630,32 @@ export async function inspectUrlForRichResults(
       };
     };
   };
+
+  try {
+    data = await googleJson({
+      endpoint: 'https://searchconsole.googleapis.com/v1/urlInspection/index:inspect',
+      source: 'gsc',
+      token,
+      body: { inspectionUrl: pageUrl, siteUrl },
+      timeoutMs: 15_000,
+    });
+  } catch (err) {
+    if (isGoogleProviderError(err) && err.status === 429) {
+      log.warn({ siteId }, 'GSC URL Inspection API quota exhausted');
+      return null;
+    }
+    if (isGoogleProviderError(err) && (err.status === 401 || err.status === 403)) {
+      throw new Error(`GSC URL Inspection authentication error (${err.status}): ${(err.body ?? '').slice(0, 200)}`);
+    }
+    if (isGoogleProviderError(err) && (err.status ?? 0) >= 400 && (err.status ?? 0) < 500) {
+      log.warn({ siteId, status: err.status }, 'GSC URL Inspection API client error — treating as no_gsc');
+      return null;
+    }
+    if (isGoogleProviderError(err)) {
+      throw new Error(`GSC URL Inspection error (${err.status ?? err.kind}): ${(err.body ?? '').slice(0, 200)}`);
+    }
+    throw err;
+  }
 
   const detectedItems = data.inspectionResult?.richResultsResult?.detectedItems ?? [];
   const issues: RichResultsIssue[] = [];

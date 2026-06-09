@@ -210,6 +210,20 @@ describe('google-auth', () => {
     expect(isConnected(SITE_ID)).toBe(false);
   });
 
+  it('returns a provider error when token exchange receives invalid JSON', async () => {
+    const fetchMock = vi.fn(async () => new Response('not-json', {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(exchangeCode('invalid-json', SITE_ID)).resolves.toEqual({
+      success: false,
+      error: `SyntaxError: Unexpected token 'o', "not-json" is not valid JSON`,
+    });
+    expect(isConnected(SITE_ID)).toBe(false);
+  });
+
   it('returns a fresh per-site token without refreshing', async () => {
     saveToken(SITE_ID, { accessToken: 'fresh-access' });
     const fetchMock = vi.fn();
