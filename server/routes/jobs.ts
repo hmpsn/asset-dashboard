@@ -7,11 +7,8 @@
 import { Router } from 'express';
 import { broadcastToWorkspace } from '../broadcast.js';
 
-import fs from 'fs';
-import path from 'path';
 import { addActivity } from '../activity-log.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
-import { generateAltText } from '../alttext.js';
 import { callCreativeAI } from '../content-posts-ai.js';
 import { notifyClientRecommendationsReady, notifyClientAuditComplete } from '../email.js';
 import { findPageMapEntryForPage, normalizePageUrl, tryResolvePagePath, stripHtmlToText } from '../helpers.js';
@@ -60,11 +57,11 @@ import {
   startSchemaPlanGenerationJob,
 } from '../schema-plan-generation-job.js';
 import { runSeoAudit } from '../seo-audit.js';
+import { startWebflowBulkAltJob } from '../webflow-bulk-alt-background-job.js';
 import { startWebflowBulkCompressJob } from '../webflow-bulk-compress-background-job.js';
 import { startWebflowImageCompressJob } from '../webflow-image-compress-background-job.js';
 import { handleOnDemandSeoAuditResult } from '../webflow-seo-audit-bridges.js';
 import {
-  updateAsset,
   updatePageSeo,
 } from '../webflow.js';
 import {
@@ -392,65 +389,11 @@ router.post('/api/jobs', async (req, res) => {
         if (!altAssets?.length) return res.status(400).json({ error: 'assets required' });
         const activeBulkAlt = hasActiveJob('bulk-alt', params.workspaceId as string);
         if (activeBulkAlt) return res.status(409).json({ error: 'Bulk alt text generation is already running', jobId: activeBulkAlt.id });
-        const job = createJob('bulk-alt', { message: `Generating alt text for ${altAssets.length} images...`, total: altAssets.length, workspaceId: params.workspaceId as string });
-        res.json({ jobId: job.id });
-        (async () => {
-          try {
-            updateJob(job.id, { status: 'running', progress: 0 });
-            const token = altSiteId ? (getTokenForSite(altSiteId) || undefined) : undefined;
-            // Resolve workspace + intelligence ONCE per job (not per asset) — the context doesn't change across assets.
-            const jobWsId = params.workspaceId as string | undefined;
-            const jobWs = jobWsId ? getWorkspace(jobWsId) : (altSiteId ? listWorkspaces().find(w => w.webflowSiteId === altSiteId) : undefined);
-            let jobAltContext = '';
-            if (jobWs) {
-              const resolvedJobWsId = jobWsId || jobWs.id;
-              const jobIntel = await buildWorkspaceIntelligence(resolvedJobWsId, { slices: ['seoContext'] });
-              // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
-              const bvBlock = jobIntel.seoContext?.effectiveBrandVoiceBlock ?? '';
-              const parts: string[] = [];
-              if (jobWs.keywordStrategy?.siteKeywords?.length) parts.push(`Site keywords: ${jobWs.keywordStrategy.siteKeywords.slice(0, 5).join(', ')}`);
-              if (parts.length > 0) jobAltContext = parts.join('. ');
-              if (bvBlock) jobAltContext = jobAltContext ? `${jobAltContext}${bvBlock}` : bvBlock;
-            }
-            const results: Array<{ assetId: string; altText?: string; updated: boolean; error?: string }> = [];
-            for (let i = 0; i < altAssets.length; i++) {
-              const asset = altAssets[i];
-              try {
-                const imgRes = await fetch(asset.imageUrl);
-                if (!imgRes.ok) { results.push({ assetId: asset.assetId, updated: false, error: `Download failed: ${imgRes.status}` }); continue; }
-                const buffer = Buffer.from(await imgRes.arrayBuffer());
-                const imgExt = path.extname(asset.imageUrl).split('?')[0] || '.jpg';
-                const tmpPath = `/tmp/bulk_alt_${Date.now()}${imgExt}`;
-                fs.writeFileSync(tmpPath, buffer);
-                const altTextResult = await generateAltText(tmpPath, jobAltContext || undefined);
-                try { fs.unlinkSync(tmpPath); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs: programming error'); /* ignore */ }
-                if (altTextResult) {
-                  await updateAsset(asset.assetId, { altText: altTextResult }, token);
-                  results.push({ assetId: asset.assetId, altText: altTextResult, updated: true });
-                } else {
-                  results.push({ assetId: asset.assetId, updated: false, error: 'Generation returned null' });
-                }
-              } catch (err) {
-                log.debug({ err }, 'jobs: bulk-alt-text individual asset failed — skipping');
-                results.push({ assetId: asset.assetId, updated: false, error: String(err) });
-              }
-              updateJob(job.id, { progress: i + 1, message: `Generated ${i + 1}/${altAssets.length} alt texts` });
-            }
-            updateJob(job.id, { status: 'done', result: results, progress: altAssets.length, message: `Done — ${results.filter(r => r.updated).length}/${altAssets.length} updated` });
-            if (jobWsId) {
-              addActivity(jobWsId, 'images_optimized',
-                `Bulk alt text: ${results.filter(r => r.updated).length} images updated`,
-                undefined,
-                { updated: results.filter(r => r.updated).length, total: altAssets.length }
-              );
-            }
-          } catch (err) {
-            if (isProgrammingError(err)) log.warn({ err }, 'jobs: bulk-alt-text job failed with programming error'); // url-fetch-ok
-            else log.debug({ err }, 'jobs: bulk-alt-text job failed — degrading gracefully');
-            updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Bulk alt text failed' });
-          }
-        })();
-        break;
+        return res.json(startWebflowBulkAltJob({
+          workspaceId: params.workspaceId as string | undefined,
+          siteId: altSiteId,
+          assets: altAssets,
+        }));
       }
 
       case 'bulk-seo-fix': {

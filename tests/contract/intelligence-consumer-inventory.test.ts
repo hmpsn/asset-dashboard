@@ -49,6 +49,7 @@ const INVENTORY: Array<{
   { file: 'server/routes/workspaces.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/seo-audit-ai-recs.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/voice-calibration.ts', classification: 'native', targetPath: 'low-level' },
+  { file: 'server/webflow-bulk-alt-background-job.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/webflow-seo-bulk-analyze-job.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/webflow-seo-bulk-rewrite-job.ts', classification: 'native', targetPath: 'page-assist-builder' },
 ];
