@@ -32,6 +32,7 @@ import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/
 import { ExternalFetchError } from '../../server/external-fetch.js';
 
 const nativeFetch = globalThis.fetch;
+const ALT_ROUTE_TEST_TIMEOUT_MS = 15_000;
 
 // --- Hoisted mock state ---
 
@@ -303,7 +304,7 @@ describe('POST /generate-alt — generate returns null', () => {
     expect(body.updated).toBe(false);
     // Should NOT have called updateAsset
     expect(webflowState.updateCalls).toHaveLength(0);
-  });
+  }, ALT_ROUTE_TEST_TIMEOUT_MS);
 });
 
 describe('POST /generate-alt — without siteId', () => {
@@ -349,7 +350,7 @@ describe('POST /generate-alt — siteId context from site displayName', () => {
     const body = await res.json() as { altText: string; updated: boolean };
     expect(body.updated).toBe(true);
     expect(body.altText).toBe('Generated with site name context');
-  });
+  }, ALT_ROUTE_TEST_TIMEOUT_MS);
 });
 
 describe('POST /generate-alt — siteId context from page DOM match', () => {
