@@ -569,7 +569,7 @@ export function extractBuildWorkspaceIntelligenceCall(chunk: string): string {
 //
 // Used by the 'Assembled-but-never-rendered slice fields' rule to detect fields
 // declared in *Slice interfaces (shared/types/intelligence.ts) but never referenced
-// in their corresponding format*Section function (server/workspace-intelligence.ts
+// in their corresponding format*Section function (server/intelligence/formatters.ts
 // or a focused extracted formatter module).
 // Must live at module scope because the rule lives in the CHECKS array and its
 // customCheck closure looks these up by lexical binding at invocation time.
@@ -2805,7 +2805,15 @@ export const CHECKS: Check[] = [
     // formatter module changes; the customCheck always reads the fixed type
     // file plus formatter sources from disk.
     name: 'Assembled-but-never-rendered slice fields',
-    fileGlobs: ['intelligence.ts', 'workspace-intelligence.ts', 'formatters.ts', 'page-elements-slice.ts'],
+    fileGlobs: [
+      'intelligence.ts',
+      'workspace-intelligence.ts',
+      'formatters.ts',
+      'page-elements-slice.ts',
+      'formatter-content-pipeline.ts',
+      'formatter-site-health.ts',
+      'formatter-operational.ts',
+    ],
     exclude: ['.test.ts'],
     displayScope: 'shared/types/intelligence.ts + server/workspace-intelligence.ts + extracted intelligence formatters',
     message: 'Fields declared in *Slice types but not referenced in their format*Section formatter are silently dropped at prompt time. Add to KNOWN_UNRENDERED_FIELDS in scripts/pr-check.ts if intentionally omitted.',
@@ -2822,6 +2830,9 @@ export const CHECKS: Check[] = [
       const formatterModules = [
         path.join(ROOT, 'server/intelligence/formatters.ts'),
         path.join(ROOT, 'server/intelligence/page-elements-slice.ts'),
+        path.join(ROOT, 'server/intelligence/formatter-content-pipeline.ts'),
+        path.join(ROOT, 'server/intelligence/formatter-site-health.ts'),
+        path.join(ROOT, 'server/intelligence/formatter-operational.ts'),
       ];
       const serverContent = [
         readFileOrEmpty(serverPath),

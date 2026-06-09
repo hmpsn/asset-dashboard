@@ -1845,9 +1845,12 @@ describe('Rule: Assembled-but-never-rendered slice fields', () => {
     expect(hits.some(h => h.text.includes('catalog'))).toBe(false);
   });
 
-  it('diff scope includes the extracted workspace intelligence formatter module', () => {
+  it('diff scope includes the extracted workspace intelligence formatter modules', () => {
     const rule = CHECKS.find(c => c.name === 'Assembled-but-never-rendered slice fields');
     expect(rule?.fileGlobs).toContain('formatters.ts');
+    expect(rule?.fileGlobs).toContain('formatter-content-pipeline.ts');
+    expect(rule?.fileGlobs).toContain('formatter-site-health.ts');
+    expect(rule?.fileGlobs).toContain('formatter-operational.ts');
   });
 
   it('emits a "formatter not found" hit when the format*Section function is missing', () => {

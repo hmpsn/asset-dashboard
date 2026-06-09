@@ -185,6 +185,17 @@ function makeIntelligence(
   };
 }
 
+function formatSingleSection(
+  intelligence: Partial<WorkspaceIntelligence>,
+  section: 'contentPipeline' | 'siteHealth' | 'operational',
+  verbosity: 'compact' | 'standard' | 'detailed' = 'standard',
+): string {
+  return formatForPrompt(makeIntelligence(intelligence), {
+    sections: [section],
+    verbosity,
+  });
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // formatKnowledgeBaseForPrompt
 // ════════════════════════════════════════════════════════════════════════════
@@ -1244,6 +1255,176 @@ describe('formatForPrompt — contentPipeline section', () => {
     expect(result).toContain('20 sections');
     expect(result).toContain('75%');
   });
+
+  it('preserves exact compact output for a representative content pipeline slice', () => {
+    const result = formatSingleSection({
+      contentPipeline: makeContentPipelineSlice({
+        briefs: { total: 4, byStatus: { draft: 2, approved: 2 } },
+        posts: { total: 3, byStatus: { draft: 1, published: 2 } },
+        matrices: { total: 1, cellsPlanned: 6, cellsPublished: 4 },
+        requests: { pending: 2, inProgress: 1, delivered: 0 },
+        workOrders: { active: 2 },
+        coverageGaps: ['service pages', 'comparison content'],
+        seoEdits: { pending: 3, applied: 5, inReview: 1 },
+        copyPipeline: {
+          totalSections: 12,
+          approvedSections: 8,
+          draftSections: 2,
+          clientReviewSections: 2,
+          approvalRate: 67,
+          firstTryApprovalRate: 50,
+          entriesWithCompleteCopy: 4,
+          entriesWithPendingCopy: 2,
+          activePatternsCount: 3,
+          lastBatchJob: { status: 'completed', completionRate: 100 },
+        } as never,
+      }),
+    }, 'contentPipeline', 'compact');
+
+    expect(result).toBe(
+      [
+        '[Workspace Intelligence]',
+        '',
+        '## Content Pipeline',
+        'Briefs: 4, Posts: 3, Matrices: 1',
+        'Copy: 12 sections (8 approved, 2 draft, 2 in review)',
+        'Copy approval rate: 67%, first-try: 50%',
+        'Pages: 4 complete, 2 pending',
+      ].join('\n')
+    );
+  });
+
+  it('preserves exact standard output for a representative content pipeline slice', () => {
+    const result = formatSingleSection({
+      contentPipeline: makeContentPipelineSlice({
+        briefs: { total: 4, byStatus: { draft: 2, approved: 2 } },
+        posts: { total: 3, byStatus: { draft: 1, published: 2 } },
+        matrices: { total: 1, cellsPlanned: 6, cellsPublished: 4 },
+        requests: { pending: 2, inProgress: 1, delivered: 0 },
+        workOrders: { active: 2 },
+        coverageGaps: ['service pages', 'comparison content'],
+        seoEdits: { pending: 3, applied: 5, inReview: 1 },
+        subscriptions: { active: 2, totalPages: 15 },
+        suggestedBriefs: 6,
+        contentPricing: {
+          briefPrice: 249,
+          fullPostPrice: 799,
+          currency: 'USD',
+          briefLabel: 'Brief',
+          fullPostLabel: 'Article',
+        },
+        copyPipeline: {
+          totalSections: 12,
+          approvedSections: 8,
+          draftSections: 2,
+          clientReviewSections: 2,
+          approvalRate: 67,
+          firstTryApprovalRate: 50,
+          entriesWithCompleteCopy: 4,
+          entriesWithPendingCopy: 2,
+          activePatternsCount: 3,
+          lastBatchJob: { status: 'completed', completionRate: 100 },
+        } as never,
+      }),
+    }, 'contentPipeline', 'standard');
+
+    expect(result).toBe(
+      [
+        '[Workspace Intelligence]',
+        '',
+        '## Content Pipeline',
+        'Briefs: 4, Posts: 3, Matrices: 1',
+        'Coverage gaps: service pages, comparison content',
+        'Subscriptions: 2 active, 15 pages',
+        'Content requests: 2 pending, 1 in progress',
+        'Work orders: 2 active',
+        'SEO edits: 3 pending, 5 applied',
+        'Content pricing: Brief USD 249, Article USD 799',
+        'Suggested briefs: 6 pending topics identified',
+        'Copy: 12 sections (8 approved, 2 draft, 2 in review)',
+        'Copy approval rate: 67%, first-try: 50%',
+        'Pages: 4 complete, 2 pending',
+        'Learned copy patterns: 3 active',
+        'Last batch: completed, 100% complete',
+      ].join('\n')
+    );
+  });
+
+  it('preserves exact detailed output for a representative content pipeline slice', () => {
+    const result = formatSingleSection({
+      contentPipeline: makeContentPipelineSlice({
+        briefs: { total: 4, byStatus: { draft: 2, approved: 2 } },
+        posts: { total: 3, byStatus: { draft: 1, published: 2 } },
+        matrices: { total: 1, cellsPlanned: 6, cellsPublished: 4 },
+        requests: { pending: 2, inProgress: 1, delivered: 0 },
+        workOrders: { active: 2 },
+        coverageGaps: ['service pages', 'comparison content'],
+        seoEdits: { pending: 3, applied: 5, inReview: 1 },
+        subscriptions: { active: 2, totalPages: 15 },
+        suggestedBriefs: 6,
+        schemaDeployment: { planned: 3, deployed: 2, types: ['FAQPage', 'HowTo'] },
+        rewritePlaybook: { patterns: ['tighten intros', 'add proof blocks'], lastUsedAt: '2026-06-01T00:00:00Z' },
+        cannibalizationWarnings: [
+          { keyword: 'seo dashboard', severity: 'high', pages: ['/overview', '/platform'] },
+        ],
+        decayAlerts: [
+          { pageUrl: '/blog/decline', clickDrop: 18, detectedAt: '2026-06-02T00:00:00Z', hasRefreshBrief: true, isRepeatDecay: true },
+        ],
+        contentPricing: {
+          briefPrice: 249,
+          fullPostPrice: 799,
+          currency: 'USD',
+          briefLabel: 'Brief',
+          fullPostLabel: 'Article',
+        },
+        copyPipeline: {
+          totalSections: 12,
+          approvedSections: 8,
+          draftSections: 2,
+          clientReviewSections: 2,
+          approvalRate: 67,
+          firstTryApprovalRate: 50,
+          entriesWithCompleteCopy: 4,
+          entriesWithPendingCopy: 2,
+          activePatternsCount: 3,
+          lastBatchJob: { status: 'completed', completionRate: 100 },
+        } as never,
+      }),
+    }, 'contentPipeline', 'detailed');
+
+    expect(result).toBe(
+      [
+        '[Workspace Intelligence]',
+        '',
+        '## Content Pipeline',
+        'Briefs: 4, Posts: 3, Matrices: 1',
+        'Coverage gaps: service pages, comparison content',
+        'Decay alerts: 1 pages declining',
+        'Subscriptions: 2 active, 15 pages',
+        'Content requests: 2 pending, 1 in progress',
+        'Work orders: 2 active',
+        'SEO edits: 3 pending, 5 applied',
+        'Content pricing: Brief USD 249, Article USD 799',
+        'Suggested briefs: 6 pending topics identified',
+        'Brief status: draft: 2, approved: 2',
+        'Post status: draft: 1, published: 2',
+        'Matrix: 4/6 cells published',
+        'Schema: 2/3 deployed',
+        'Rewrite playbook: 2 learned patterns',
+        '  - tighten intros',
+        '  - add proof blocks',
+        'Keyword cannibalization:',
+        '  - "seo dashboard" [high]: /overview, /platform',
+        'Decay alert details:',
+        '  - /blog/decline: -18% clicks (repeat decay)',
+        'Copy: 12 sections (8 approved, 2 draft, 2 in review)',
+        'Copy approval rate: 67%, first-try: 50%',
+        'Pages: 4 complete, 2 pending',
+        'Learned copy patterns: 3 active',
+        'Last batch: completed, 100% complete',
+      ].join('\n')
+    );
+  });
 });
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1315,6 +1496,146 @@ describe('formatForPrompt — siteHealth section', () => {
     expect(result).toContain('Core Web Vitals');
     expect(result).toContain('LCP');
     expect(result).toContain('2.1s');
+  });
+
+  it('preserves exact compact output for a representative site health slice', () => {
+    const result = formatSingleSection({
+      siteHealth: makeSiteHealthSlice({
+        auditScore: 81,
+        auditScoreDelta: 3,
+        anomalyCount: 2,
+      }),
+    }, 'siteHealth', 'compact');
+
+    expect(result).toBe(
+      [
+        '[Workspace Intelligence]',
+        '',
+        '## Site Health',
+        'Audit score: 81 (+3)',
+        'Critical issues: 2 anomalies',
+      ].join('\n')
+    );
+  });
+
+  it('preserves exact standard output for a representative site health slice', () => {
+    const result = formatSingleSection({
+      siteHealth: makeSiteHealthSlice({
+        auditScore: 81,
+        auditScoreDelta: 3,
+        deadLinks: 4,
+        redirectChains: 2,
+        orphanPages: 1,
+        anomalyCount: 2,
+        anomalyTypes: ['missing_title', 'redirect_loop'],
+        performanceSummary: {
+          score: 88,
+          avgLcp: 2100,
+          avgInp: 180,
+          avgCls: 0.07,
+        },
+        aeoReadiness: { pagesChecked: 12, passingRate: 0.75 },
+        weeklyMetricsTrend: {
+          latestWeek: {
+            snapshotDate: '2026-06-01',
+            totalClicks: 420,
+            totalImpressions: 8000,
+            avgPosition: 12.1,
+            auditScore: 81,
+            organicTrafficValue: 983.4,
+          },
+          snapshotCount: 3,
+        },
+      }),
+    }, 'siteHealth', 'standard');
+
+    expect(result).toBe(
+      [
+        '[Workspace Intelligence]',
+        '',
+        '## Site Health',
+        'Audit score: 81 (+3)',
+        'Critical issues: 2 anomalies',
+        'Performance: 88/100',
+        'Links: 4 dead, 2 redirect chains, 1 orphan pages',
+        'Anomaly types: missing_title, redirect_loop',
+        'AEO readiness: 12 pages checked, 75% passing',
+        'Latest week (2026-06-01): 420 clicks, audit 81, $983 traffic value — based on 3 snapshots',
+      ].join('\n')
+    );
+  });
+
+  it('preserves exact detailed output for a representative site health slice', () => {
+    const result = formatSingleSection({
+      siteHealth: makeSiteHealthSlice({
+        auditScore: 81,
+        auditScoreDelta: 3,
+        deadLinks: 4,
+        redirectChains: 2,
+        orphanPages: 1,
+        schemaErrors: 5,
+        anomalyCount: 2,
+        anomalyTypes: ['missing_title', 'redirect_loop'],
+        seoChangeVelocity: 11,
+        cwvPassRate: { mobile: 0.75, desktop: 0.5 },
+        schemaValidation: { valid: 14, warnings: 3, errors: 1 },
+        performanceSummary: {
+          score: 88,
+          avgLcp: 2100,
+          avgInp: 180,
+          avgCls: 0.07,
+        },
+        aeoReadiness: { pagesChecked: 12, passingRate: 0.75 },
+        weeklyMetricsTrend: {
+          latestWeek: {
+            snapshotDate: '2026-06-01',
+            totalClicks: 420,
+            totalImpressions: 8000,
+            avgPosition: 12.1,
+            auditScore: 81,
+            organicTrafficValue: 983.4,
+          },
+          snapshotCount: 3,
+        },
+        recentDiagnostics: [
+          {
+            insightId: 'diag-1',
+            anomalyType: 'redirect_loop',
+            status: 'completed',
+            affectedPages: ['/pricing'],
+            completedAt: '2026-06-02T00:00:00Z',
+            rootCauseTitles: ['Duplicate redirect rule'],
+          },
+        ],
+        redirectDetails: [
+          { url: '/old', target: '/new', chainDepth: 2, status: 301 },
+        ],
+      }),
+    }, 'siteHealth', 'detailed');
+
+    expect(result).toBe(
+      [
+        '[Workspace Intelligence]',
+        '',
+        '## Site Health',
+        'Audit score: 81 (+3)',
+        'Critical issues: 2 anomalies',
+        'Performance: 88/100',
+        'Links: 4 dead, 2 redirect chains, 1 orphan pages',
+        'Anomaly types: missing_title, redirect_loop',
+        'AEO readiness: 12 pages checked, 75% passing',
+        'Latest week (2026-06-01): 420 clicks, audit 81, $983 traffic value — based on 3 snapshots',
+        'Recent diagnostics:',
+        '  redirect_loop [completed] on /pricing → Duplicate redirect rule',
+        'Schema errors: 5',
+        'SEO change velocity: 11 changes (30d)',
+        'CWV pass rate: mobile 75%, desktop 50%',
+        'Schema validation: 14 valid, 3 warnings, 1 errors',
+        'Core Web Vitals: LCP: 2.1s, INP: 180ms, CLS: 0.07',
+        'Redirect chain details:',
+        '  - /old → /new (2 hops, status 301)',
+      ].join('\n')
+    );
   });
 });
 
@@ -1464,6 +1785,120 @@ describe('formatForPrompt — operational section', () => {
     const result = formatForPrompt(intel, { verbosity: 'detailed' });
     expect(result).toContain('Timeline annotations');
     expect(result).toContain('Google algorithm update');
+  });
+
+  it('preserves exact compact output for a representative operational slice', () => {
+    const result = formatSingleSection({
+      operational: makeOperationalSlice({
+        approvalQueue: { pending: 2, oldestAge: 12 },
+        clientActionQueue: { pending: 3, oldestAge: 18 },
+        actionBacklog: { pendingMeasurement: 4, oldestAge: 24 },
+        recommendationQueue: { fixNow: 1, fixSoon: 2, fixLater: 3 },
+      }),
+    }, 'operational', 'compact');
+
+    expect(result).toBe(
+      [
+        '[Workspace Intelligence]',
+        '',
+        '## Operational',
+        'Pending: 2 approvals, 3 client actions, 4 actions awaiting measurement, 6 recommendations',
+      ].join('\n')
+    );
+  });
+
+  it('preserves exact standard output for a representative operational slice', () => {
+    const result = formatSingleSection({
+      operational: makeOperationalSlice({
+        recentActivity: [
+          { type: 'insight_created', description: 'New insight added', timestamp: '2026-05-01T00:00:00Z' },
+          { type: 'brief_published', description: 'Brief published', timestamp: '2026-05-02T00:00:00Z' },
+          { type: 'post_sent', description: 'Post sent to client', timestamp: '2026-05-03T00:00:00Z' },
+        ],
+        pendingJobs: 2,
+        approvalQueue: { pending: 2, oldestAge: 12 },
+        clientActionQueue: { pending: 3, oldestAge: 18 },
+        actionBacklog: { pendingMeasurement: 4, oldestAge: 24 },
+        recommendationQueue: { fixNow: 1, fixSoon: 2, fixLater: 3 },
+        timeSaved: { totalMinutes: 135, byFeature: { briefs: 45 } },
+        workOrders: { active: 5, pending: 1 },
+        effectiveTier: 'growth',
+        usageRemaining: { briefs: 4, posts: 2, ai_tokens: Infinity, seo_edits: 7 },
+        pageEditStateSummary: { total: 6, byStatus: { clean: 2, approved: 3, live: 1 } },
+      }),
+    }, 'operational', 'standard');
+
+    expect(result).toBe(
+      [
+        '[Workspace Intelligence]',
+        '',
+        '## Operational',
+        'Pending: 2 approvals, 3 client actions, 4 actions awaiting measurement, 6 recommendations',
+        'Recommendations: 1 fix now, 2 fix soon, 3 fix later',
+        'Recent: New insight added; Brief published; Post sent to client',
+        'Time saved: 135 minutes',
+        'Background jobs: 2 pending',
+        'Work orders: 5 active, 1 pending',
+        'Client action queue: 3 pending, oldest 18h',
+        'Subscription tier: growth',
+        'Usage remaining: briefs: 4 remaining, posts: 2 remaining, seo edits: 7 remaining',
+        'Page states (6 total): 2 clean, 3 approved, 1 live',
+      ].join('\n')
+    );
+  });
+
+  it('preserves exact detailed output for a representative operational slice', () => {
+    const result = formatSingleSection({
+      operational: makeOperationalSlice({
+        recentActivity: [
+          { type: 'insight_created', description: 'New insight added', timestamp: '2026-05-01T00:00:00Z' },
+          { type: 'brief_published', description: 'Brief published', timestamp: '2026-05-02T00:00:00Z' },
+          { type: 'post_sent', description: 'Post sent to client', timestamp: '2026-05-03T00:00:00Z' },
+        ],
+        annotations: [
+          { date: '2026-06-01', label: 'Homepage refreshed' },
+          { date: '2026-06-02', label: 'Schema rollout' },
+        ],
+        pendingJobs: 2,
+        approvalQueue: { pending: 2, oldestAge: 12 },
+        clientActionQueue: { pending: 3, oldestAge: 18 },
+        actionBacklog: { pendingMeasurement: 4, oldestAge: 24 },
+        recommendationQueue: { fixNow: 1, fixSoon: 2, fixLater: 3 },
+        timeSaved: { totalMinutes: 135, byFeature: { briefs: 45, posts: 90 } },
+        workOrders: { active: 5, pending: 1 },
+        detectedPlaybooks: ['refresh decays', 'expand clusters'],
+        insightAcceptanceRate: { rate: 0.45, confirmed: 9, totalShown: 20 },
+        effectiveTier: 'growth',
+        usageRemaining: { briefs: 4, posts: 2, ai_tokens: Infinity, seo_edits: 7 },
+        pageEditStateSummary: { total: 6, byStatus: { clean: 2, approved: 3, live: 1 } },
+      }),
+    }, 'operational', 'detailed');
+
+    expect(result).toBe(
+      [
+        '[Workspace Intelligence]',
+        '',
+        '## Operational',
+        'Pending: 2 approvals, 3 client actions, 4 actions awaiting measurement, 6 recommendations',
+        'Recommendations: 1 fix now, 2 fix soon, 3 fix later',
+        'Recent: New insight added; Brief published; Post sent to client',
+        'Time saved: 135 minutes',
+        'Background jobs: 2 pending',
+        'Work orders: 5 active, 1 pending',
+        'Client action queue: 3 pending, oldest 18h',
+        'Subscription tier: growth',
+        'Usage remaining: briefs: 4 remaining, posts: 2 remaining, seo edits: 7 remaining',
+        'Page states (6 total): 2 clean, 3 approved, 1 live',
+        'Detected playbooks: refresh decays, expand clusters',
+        'Time saved by feature:',
+        '  briefs: 45 min',
+        '  posts: 90 min',
+        'Timeline annotations:',
+        '  - 2026-06-01: Homepage refreshed',
+        '  - 2026-06-02: Schema rollout',
+        'Insight acceptance rate: 45% (9/20)',
+      ].join('\n')
+    );
   });
 });
 
