@@ -184,6 +184,14 @@ describe('listGA4Properties', () => {
     mockFetchFail(403, 'Forbidden');
     await expect(listGA4Properties()).rejects.toThrow('Failed to list GA4 properties: 403');
   });
+
+  it('surfaces invalid JSON as a provider-classified parity error', async () => {
+    mocks.fetch.mockResolvedValue(new Response('not-json', {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+    await expect(listGA4Properties()).rejects.toThrow('Failed to list GA4 properties: invalid-json');
+  });
 });
 
 // ─── getGA4Overview ───────────────────────────────────────────────────────────

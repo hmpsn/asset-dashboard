@@ -5,6 +5,7 @@
  */
 
 import { getGlobalToken } from './google-auth.js';
+import { googleJson, isGoogleProviderError } from './google-provider-client.js';
 import { createLogger } from './logger.js';
 import type { AnalyticsDateRange } from '../shared/types/analytics-contract.js';
 const log = createLogger('ga4');
@@ -70,17 +71,7 @@ export async function listGA4Properties(): Promise<GA4Property[]> {
   const token = await getGlobalToken();
   if (!token) throw new Error('Google not connected');
 
-  const res = await fetch(`${GA4_ADMIN_API}/accountSummaries`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    log.error({ err: err }, 'Failed to list properties');
-    throw new Error(`Failed to list GA4 properties: ${res.status}`);
-  }
-
-  const data = await res.json() as {
+  let data: {
     accountSummaries?: Array<{
       account: string;
       displayName: string;
@@ -90,6 +81,19 @@ export async function listGA4Properties(): Promise<GA4Property[]> {
       }>;
     }>;
   };
+  try {
+    data = await googleJson({
+      endpoint: `${GA4_ADMIN_API}/accountSummaries`,
+      source: 'ga4',
+      token,
+    });
+  } catch (err) {
+    log.error({ err }, 'Failed to list properties');
+    if (isGoogleProviderError(err)) {
+      throw new Error(`Failed to list GA4 properties: ${err.status ?? err.kind}`);
+    }
+    throw err;
+  }
 
   const properties: GA4Property[] = [];
   for (const account of data.accountSummaries || []) {
@@ -113,19 +117,20 @@ async function runReport(propertyId: string, body: Record<string, unknown>): Pro
   const token = await getGlobalToken();
   if (!token) throw new Error('Google not connected');
 
-  const res = await fetch(`${GA4_API}/properties/${propertyId}:runReport`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    log.error({ err: err }, 'Report failed');
-    throw new Error(`GA4 report failed: ${res.status}`);
+  try {
+    return await googleJson({
+      endpoint: `${GA4_API}/properties/${propertyId}:runReport`,
+      source: 'ga4',
+      token,
+      body,
+    });
+  } catch (err) {
+    log.error({ err }, 'Report failed');
+    if (isGoogleProviderError(err)) {
+      throw new Error(`GA4 report failed: ${err.status ?? err.kind}`);
+    }
+    throw err;
   }
-
-  return res.json();
 }
 
 function dateStr(daysAgo: number): string {
