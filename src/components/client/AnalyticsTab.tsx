@@ -11,7 +11,7 @@ import {
 } from 'recharts';
 import SearchableSelect from '../SearchableSelect';
 import { OrganicInsight } from './DataSnapshots';
-import { getSafe } from '../../api/client';
+import { get } from '../../api/client';
 import type {
   GA4Overview, GA4DailyTrend, GA4TopPage, GA4TopSource,
   GA4DeviceBreakdown, GA4Event, GA4ConversionSummary,
@@ -52,6 +52,7 @@ export function AnalyticsTab({
   const [modulePageFilters, setModulePageFilters] = useState<Record<string, string>>({});
   const [modulePageData, setModulePageData] = useState<Record<string, GA4ConversionSummary[]>>({});
   const [modulePageLoading, setModulePageLoading] = useState<Record<string, boolean>>({});
+  const [analyticsActionError, setAnalyticsActionError] = useState<string | null>(null);
 
   // ── Helper functions ──
 
@@ -77,9 +78,10 @@ export function AnalyticsTab({
       return;
     }
     setModulePageLoading(prev => ({ ...prev, [moduleId]: true }));
+    setAnalyticsActionError(null);
     try {
       const params = new URLSearchParams({ days: String(days), page: pagePath });
-      const data = await getSafe<GA4EventPageBreakdown[]>(`/api/public/analytics-event-explorer/${ws.id}?${params}`, []);
+      const data = await get<GA4EventPageBreakdown[]>(`/api/public/analytics-event-explorer/${ws.id}?${params}`);
       if (Array.isArray(data)) {
         const byEvent: Record<string, { conversions: number; users: number }> = {};
         for (const row of data) {
@@ -98,6 +100,7 @@ export function AnalyticsTab({
       }
     } catch (err) {
       console.error('AnalyticsTab operation failed:', err);
+      setAnalyticsActionError('Unable to load event breakdown. Please try again.');
       setModulePageData(prev => { const n = { ...prev }; delete n[moduleId]; return n; });
     } finally {
       setModulePageLoading(prev => ({ ...prev, [moduleId]: false }));
@@ -107,23 +110,31 @@ export function AnalyticsTab({
   const runExplorer = async (event?: string, page?: string) => {
     if (!ws) return;
     setExplorerLoading(true);
+    setAnalyticsActionError(null);
     try {
       const params = new URLSearchParams({ days: String(days) });
       if (event) params.set('event', event);
       if (page) params.set('page', page);
-      const data = await getSafe<GA4EventPageBreakdown[]>(`/api/public/analytics-event-explorer/${ws.id}?${params}`, []);
+      const data = await get<GA4EventPageBreakdown[]>(`/api/public/analytics-event-explorer/${ws.id}?${params}`);
       if (Array.isArray(data)) setExplorerData(data);
-    } catch { setExplorerData([]); }
+    } catch {
+      setExplorerData([]);
+      setAnalyticsActionError('Unable to load event explorer data. Please try again.');
+    }
     finally { setExplorerLoading(false); }
   };
 
   const loadEventTrend = async (eventName: string) => {
     if (!ws) return;
     setGa4SelectedEvent(eventName);
+    setAnalyticsActionError(null);
     try {
-      const data = await getSafe<GA4EventTrend[]>(`/api/public/analytics-event-trend/${ws.id}?days=${days}&event=${encodeURIComponent(eventName)}`, []);
+      const data = await get<GA4EventTrend[]>(`/api/public/analytics-event-trend/${ws.id}?days=${days}&event=${encodeURIComponent(eventName)}`);
       if (Array.isArray(data)) setGa4EventTrend(data);
-    } catch { setGa4EventTrend([]); }
+    } catch {
+      setGa4EventTrend([]);
+      setAnalyticsActionError('Unable to load event trend. Please try again.');
+    }
   };
 
   // Initialize per-module page filters from group defaults
@@ -157,6 +168,11 @@ export function AnalyticsTab({
     <p className="t-caption-sm text-[var(--brand-text-muted)]">
       {ga4Overview.dateRange ? `${ga4Overview.dateRange.start} — ${ga4Overview.dateRange.end}` : 'Google Analytics overview'}
     </p>
+    {analyticsActionError && (
+      <div className="px-3 py-2 bg-red-500/8 border border-red-500/15 text-accent-danger t-caption-sm" style={{ borderRadius: 'var(--radius-signature)' }}>
+        {analyticsActionError}
+      </div>
+    )}
 
     {/* GA4 Overview Cards */}
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">

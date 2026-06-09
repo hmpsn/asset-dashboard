@@ -33,6 +33,7 @@ import { getWorkspace } from '../workspaces.js';
 import { getContentRequest } from '../content-requests.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
+import { sendSanitizedProviderError } from '../provider-error-sanitizer.js';
 
 const log = createLogger('stripe');
 
@@ -139,7 +140,10 @@ router.post('/api/stripe/create-checkout', checkoutLimiter, async (req, res) => 
     res.json({ sessionId, url });
   } catch (err) {
     log.error({ err: err }, 'Checkout error');
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to create checkout session' });
+    sendSanitizedProviderError(res, {
+      source: 'stripe',
+      fallback: 'Unable to start checkout. Please try again or contact support.',
+    });
   }
 });
 
@@ -170,7 +174,10 @@ router.post('/api/stripe/cart-checkout', checkoutLimiter, async (req, res) => {
     res.json({ sessionId, url });
   } catch (err) {
     log.error({ err: err }, 'Cart checkout error');
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to create cart checkout session' });
+    sendSanitizedProviderError(res, {
+      source: 'stripe',
+      fallback: 'Unable to start cart checkout. Please try again or contact support.',
+    });
   }
 });
 
@@ -203,7 +210,10 @@ router.post('/api/public/upgrade-checkout/:workspaceId', checkoutLimiter, requir
     res.json({ sessionId, url });
   } catch (err) {
     log.error({ err: err }, 'Tier upgrade checkout error');
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to create checkout session' });
+    sendSanitizedProviderError(res, {
+      source: 'stripe',
+      fallback: 'Unable to start plan checkout. Please try again or contact support.',
+    });
   }
 });
 
@@ -256,7 +266,10 @@ router.post('/api/public/billing-portal/:workspaceId', checkoutLimiter, requireA
     res.json({ url });
   } catch (err) {
     log.error({ err: err }, 'Billing portal error');
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to create billing portal session' });
+    sendSanitizedProviderError(res, {
+      source: 'stripe',
+      fallback: 'Unable to open the billing portal. Please try again or contact support.',
+    });
   }
 });
 
@@ -272,7 +285,10 @@ router.post('/api/public/cancel-subscription/:workspaceId', checkoutLimiter, req
     res.json(result);
   } catch (err) {
     log.error({ err: err }, 'Cancel subscription error');
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to cancel subscription' });
+    sendSanitizedProviderError(res, {
+      source: 'stripe',
+      fallback: 'Unable to update the subscription. Please try again or contact support.',
+    });
   }
 });
 

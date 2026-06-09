@@ -56,6 +56,7 @@ import { computeTrialState } from '../billing/trial-state.js';
 import { toPublicWorkspaceView } from '../serializers/client-safe.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 import { getVoiceProfile } from '../voice-calibration.js';
+import { sendSanitizedProviderError } from '../provider-error-sanitizer.js';
 import type {
   BusinessPrioritiesConflictResponse,
   BusinessPrioritiesResponse,
@@ -317,7 +318,10 @@ router.get('/api/public/audit-traffic/:workspaceId', requireAuthenticatedClientP
   } catch (err) {
     if (isProgrammingError(err)) log.warn({ err }, 'public-portal: GET /api/public/audit-traffic/:workspaceId: programming error'); // url-fetch-ok
     else log.debug({ err }, 'public-portal: audit-traffic endpoint failed — degrading gracefully');
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    sendSanitizedProviderError(res, {
+      source: 'provider',
+      fallback: 'Traffic data is temporarily unavailable. Please try again.',
+    });
   }
 });
 

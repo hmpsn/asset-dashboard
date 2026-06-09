@@ -53,6 +53,8 @@ interface IntelResponse {
   domains: DomainData[];
   keywordGaps: KeywordGap[];
   fetchedAt: string;
+  degraded?: boolean;
+  providerFailures?: Array<{ area: string; provider: string; domain?: string }>;
 }
 
 interface Props {
@@ -295,14 +297,16 @@ export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, c
       )}
 
       <div className="flex items-center justify-between">
-        {errorMsg && effectiveGaps.length > 0 && (
+        {(errorMsg && effectiveGaps.length > 0) || data?.degraded ? (
           <p className="t-caption-sm text-amber-500/70">
-            Live fetch failed — showing cached data.{' '}
+            {data?.degraded
+              ? 'Some live provider data is unavailable — showing the metrics that loaded.'
+              : 'Live fetch failed — showing cached data.'}{' '}
             <Button onClick={() => refetch()} variant="ghost" size="sm" className="text-teal-400 hover:underline px-0 py-0 h-auto">
               Retry
             </Button>
           </p>
-        )}
+        ) : null}
         <p className="t-caption-sm text-[var(--brand-text-muted)] text-right ml-auto">
           Data via SEO provider · {usingFallbackGaps
             ? 'Keyword gaps from last strategy run'

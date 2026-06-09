@@ -78,54 +78,41 @@ describe('gsc.overview', () => {
 });
 
 describe('gsc.trend', () => {
-  it('calls getSafe with correct URL', async () => {
+  it('calls get with correct URL', async () => {
     await gsc.trend('ws-1', 30);
-    const [url] = mockGetSafe.mock.calls[0];
+    const [url] = mockGet.mock.calls[0];
     expect(url).toContain('/api/public/performance-trend/ws-1');
     expect(url).toContain('days=30');
   });
 
-  it('uses empty array as fallback', async () => {
-    await gsc.trend('ws-1', 7);
-    const [, fallback] = mockGetSafe.mock.calls[0];
-    expect(fallback).toEqual([]);
-  });
-
-  it('returns data from getSafe', async () => {
+  it('returns data from get', async () => {
     const trend = [{ date: '2025-01-01', clicks: 10 }];
-    mockGetSafe.mockResolvedValueOnce(trend);
+    mockGet.mockResolvedValueOnce(trend);
     const result = await gsc.trend('ws-1', 7);
     expect(result).toEqual(trend);
   });
 });
 
 describe('gsc.comparison', () => {
-  it('calls getSafe with null fallback', async () => {
+  it('calls getOptional for nullable comparison data', async () => {
     await gsc.comparison('ws-1', 28);
-    const [url, fallback] = mockGetSafe.mock.calls[0];
+    const [url] = mockGetOptional.mock.calls[0];
     expect(url).toContain('/api/public/search-comparison/ws-1');
-    expect(fallback).toBeNull();
   });
 
   it('includes days param', async () => {
     await gsc.comparison('ws-1', 90);
-    const [url] = mockGetSafe.mock.calls[0];
+    const [url] = mockGetOptional.mock.calls[0];
     expect(url).toContain('days=90');
   });
 });
 
 describe('gsc.devices', () => {
-  it('calls getSafe with correct URL', async () => {
+  it('calls get with correct URL', async () => {
     await gsc.devices('ws-1', 14);
-    const [url] = mockGetSafe.mock.calls[0];
+    const [url] = mockGet.mock.calls[0];
     expect(url).toContain('/api/public/search-devices/ws-1');
     expect(url).toContain('days=14');
-  });
-
-  it('uses empty array as fallback', async () => {
-    await gsc.devices('ws-1', 14);
-    const [, fallback] = mockGetSafe.mock.calls[0];
-    expect(fallback).toEqual([]);
   });
 });
 
@@ -155,55 +142,43 @@ describe('ga4.overview', () => {
 });
 
 describe('ga4.trend', () => {
-  it('calls getSafe with correct URL', async () => {
+  it('calls get with correct URL', async () => {
     await ga4.trend('ws-1', 30);
-    const [url] = mockGetSafe.mock.calls[0];
+    const [url] = mockGet.mock.calls[0];
     expect(url).toContain('/api/public/analytics-trend/ws-1');
     expect(url).toContain('days=30');
-  });
-
-  it('uses empty array fallback', async () => {
-    await ga4.trend('ws-1', 28);
-    const [, fallback] = mockGetSafe.mock.calls[0];
-    expect(fallback).toEqual([]);
   });
 });
 
 describe('ga4.sources', () => {
-  it('calls getSafe with sources endpoint', async () => {
+  it('calls get with sources endpoint', async () => {
     await ga4.sources('ws-1', 28);
-    const [url] = mockGetSafe.mock.calls[0];
+    const [url] = mockGet.mock.calls[0];
     expect(url).toContain('/api/public/analytics-sources/ws-1');
-  });
-
-  it('uses empty array fallback', async () => {
-    await ga4.sources('ws-1', 28);
-    const [, fallback] = mockGetSafe.mock.calls[0];
-    expect(fallback).toEqual([]);
   });
 });
 
 describe('ga4.devices', () => {
-  it('calls getSafe with devices endpoint', async () => {
+  it('calls get with devices endpoint', async () => {
     await ga4.devices('ws-1', 7);
-    const [url] = mockGetSafe.mock.calls[0];
+    const [url] = mockGet.mock.calls[0];
     expect(url).toContain('/api/public/analytics-devices/ws-1');
     expect(url).toContain('days=7');
   });
 });
 
 describe('ga4.countries', () => {
-  it('calls getSafe with countries endpoint', async () => {
+  it('calls get with countries endpoint', async () => {
     await ga4.countries('ws-1', 28);
-    const [url] = mockGetSafe.mock.calls[0];
+    const [url] = mockGet.mock.calls[0];
     expect(url).toContain('/api/public/analytics-countries/ws-1');
   });
 });
 
 describe('ga4.events', () => {
-  it('calls getSafe with events endpoint', async () => {
+  it('calls get with events endpoint', async () => {
     await ga4.events('ws-1', 28);
-    const [url] = mockGetSafe.mock.calls[0];
+    const [url] = mockGet.mock.calls[0];
     expect(url).toContain('/api/public/analytics-events/ws-1');
   });
 });
@@ -211,13 +186,13 @@ describe('ga4.events', () => {
 describe('ga4.eventTrend', () => {
   it('URL-encodes the event name', async () => {
     await ga4.eventTrend('ws-1', 'click & buy', 30);
-    const [url] = mockGetSafe.mock.calls[0];
+    const [url] = mockGet.mock.calls[0];
     expect(url).toContain('event=click%20%26%20buy');
   });
 
   it('includes days param', async () => {
     await ga4.eventTrend('ws-1', 'purchase', 14);
-    const [url] = mockGetSafe.mock.calls[0];
+    const [url] = mockGet.mock.calls[0];
     expect(url).toContain('days=14');
   });
 });
@@ -225,59 +200,58 @@ describe('ga4.eventTrend', () => {
 describe('ga4.eventPages', () => {
   it('URL-encodes event name in analytics-event-explorer endpoint', async () => {
     await ga4.eventPages('ws-1', 'form submit', 7);
-    const [url] = mockGetSafe.mock.calls[0];
+    const [url] = mockGet.mock.calls[0];
     expect(url).toContain('/api/public/analytics-event-explorer/ws-1');
     expect(url).toContain('event=form%20submit');
   });
 });
 
 describe('ga4.conversions', () => {
-  it('calls getSafe with conversions endpoint', async () => {
+  it('calls get with conversions endpoint', async () => {
     await ga4.conversions('ws-1', 28);
-    const [url] = mockGetSafe.mock.calls[0];
+    const [url] = mockGet.mock.calls[0];
     expect(url).toContain('/api/public/analytics-conversions/ws-1');
   });
 });
 
 describe('ga4.newVsReturning', () => {
-  it('calls getSafe with new-vs-returning endpoint', async () => {
+  it('calls get with new-vs-returning endpoint', async () => {
     await ga4.newVsReturning('ws-1', 28);
-    const [url] = mockGetSafe.mock.calls[0];
+    const [url] = mockGet.mock.calls[0];
     expect(url).toContain('/api/public/analytics-new-vs-returning/ws-1');
   });
 });
 
 describe('ga4.organic', () => {
-  it('calls getSafe with organic endpoint and null fallback', async () => {
+  it('calls getOptional with organic endpoint', async () => {
     await ga4.organic('ws-1', 28);
-    const [url, fallback] = mockGetSafe.mock.calls[0];
+    const [url] = mockGetOptional.mock.calls[0];
     expect(url).toContain('/api/public/analytics-organic/ws-1');
-    expect(fallback).toBeNull();
   });
 });
 
 describe('ga4.landingPages', () => {
-  it('calls getSafe with landing-pages endpoint', async () => {
+  it('calls get with landing-pages endpoint', async () => {
     await ga4.landingPages('ws-1', 28);
-    const [url] = mockGetSafe.mock.calls[0];
+    const [url] = mockGet.mock.calls[0];
     expect(url).toContain('/api/public/analytics-landing-pages/ws-1');
   });
 
   it('appends organic=true when opts.organic is set', async () => {
     await ga4.landingPages('ws-1', 28, { organic: true });
-    const [url] = mockGetSafe.mock.calls[0];
+    const [url] = mockGet.mock.calls[0];
     expect(url).toContain('organic=true');
   });
 
   it('appends limit param when opts.limit is set', async () => {
     await ga4.landingPages('ws-1', 28, { limit: 20 });
-    const [url] = mockGetSafe.mock.calls[0];
+    const [url] = mockGet.mock.calls[0];
     expect(url).toContain('limit=20');
   });
 
   it('omits organic and limit when options not provided', async () => {
     await ga4.landingPages('ws-1', 28);
-    const [url] = mockGetSafe.mock.calls[0];
+    const [url] = mockGet.mock.calls[0];
     expect(url).not.toContain('organic=');
     expect(url).not.toContain('limit=');
   });
@@ -304,49 +278,42 @@ describe('gscAdmin.overview', () => {
 });
 
 describe('gscAdmin.trend', () => {
-  it('calls getSafe with trend endpoint', async () => {
+  it('calls get with trend endpoint', async () => {
     await gscAdmin.trend('ws-1', 'site-1', 'https://example.com/', 28);
-    const [url] = mockGetSafe.mock.calls[0];
+    const [url] = mockGet.mock.calls[0];
     expect(url).toContain('/api/google/performance-trend/site-1');
-  });
-
-  it('uses empty array fallback', async () => {
-    await gscAdmin.trend('ws-1', 'site-1', 'https://example.com/', 28);
-    const [, fallback] = mockGetSafe.mock.calls[0];
-    expect(fallback).toEqual([]);
   });
 });
 
 describe('gscAdmin.devices', () => {
-  it('calls getSafe with devices endpoint', async () => {
+  it('calls get with devices endpoint', async () => {
     await gscAdmin.devices('ws-1', 'site-1', 'https://example.com/', 28);
-    const [url] = mockGetSafe.mock.calls[0];
+    const [url] = mockGet.mock.calls[0];
     expect(url).toContain('/api/google/search-devices/site-1');
   });
 });
 
 describe('gscAdmin.countries', () => {
-  it('calls getSafe with countries endpoint', async () => {
+  it('calls get with countries endpoint', async () => {
     await gscAdmin.countries('ws-1', 'site-1', 'https://example.com/', 28);
-    const [url] = mockGetSafe.mock.calls[0];
+    const [url] = mockGet.mock.calls[0];
     expect(url).toContain('/api/google/search-countries/site-1');
   });
 });
 
 describe('gscAdmin.searchTypes', () => {
-  it('calls getSafe with search-types endpoint', async () => {
+  it('calls get with search-types endpoint', async () => {
     await gscAdmin.searchTypes('ws-1', 'site-1', 'https://example.com/', 28);
-    const [url] = mockGetSafe.mock.calls[0];
+    const [url] = mockGet.mock.calls[0];
     expect(url).toContain('/api/google/search-types/site-1');
   });
 });
 
 describe('gscAdmin.comparison', () => {
-  it('calls getSafe with comparison endpoint and null fallback', async () => {
+  it('calls getOptional with comparison endpoint', async () => {
     await gscAdmin.comparison('ws-1', 'site-1', 'https://example.com/', 28);
-    const [url, fallback] = mockGetSafe.mock.calls[0];
+    const [url] = mockGetOptional.mock.calls[0];
     expect(url).toContain('/api/google/search-comparison/site-1');
-    expect(fallback).toBeNull();
   });
 });
 

@@ -15,7 +15,7 @@
  *   5. Checkout session creation — valid tier vs. invalid tier
  *   6. Workspace tier upgrade lifecycle (broadcast fires on tier change)
  *   7. Subscription status sync via webhook handler
- *   8. Error paths — Stripe SDK throws → 500 with error message
+ *   8. Error paths — Stripe SDK throws → 500 with sanitized error message
  *   9. Config persistence across requests
  */
 
@@ -916,6 +916,8 @@ describe('8. Error paths — Stripe SDK throws', () => {
     expect(res.status).toBe(500);
     const body = await res.json() as { error: string };
     expect(typeof body.error).toBe('string');
+    expect(body.error).not.toContain('Stripe API unavailable');
+    expect(body.error).toContain('Unable to start checkout');
   });
 
   it('POST /api/public/upgrade-checkout/:wsId when Stripe SDK throws returns 500', async () => {
@@ -940,6 +942,8 @@ describe('8. Error paths — Stripe SDK throws', () => {
     expect(res.status).toBe(500);
     const body = await res.json() as { error: string };
     expect(typeof body.error).toBe('string');
+    expect(body.error).not.toContain('Stripe rate limit exceeded');
+    expect(body.error).toContain('Unable to start plan checkout');
   });
 
   it('checkout.session.completed with missing payment record is handled without crash', async () => {
