@@ -54,6 +54,7 @@ import {
   contentPosts,
   contentRequests,
   publicContent,
+  publicCopyReview,
   publicPostReview,
   contentTemplates,
   contentMatrices,
@@ -369,6 +370,51 @@ describe('publicContent.briefPreview', () => {
   it('calls getOptional with public content-brief endpoint', async () => {
     await publicContent.briefPreview('ws-1', 'brief-1');
     expect(mockGetOptional).toHaveBeenCalledWith('/api/public/content-brief/ws-1/brief-1');
+  });
+});
+
+describe('publicContent.exportBrief', () => {
+  it('calls getText with public content-brief export endpoint', async () => {
+    await publicContent.exportBrief('ws-1', 'brief-1');
+    expect(mockGetText).toHaveBeenCalledWith('/api/public/content-brief/ws-1/brief-1/export');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// src/api/content.ts — publicCopyReview
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('publicCopyReview.entries', () => {
+  it('calls GET with public copy entries endpoint', async () => {
+    await publicCopyReview.entries('ws-1');
+    expect(mockGet).toHaveBeenCalledWith('/api/public/copy/ws-1/entries');
+  });
+});
+
+describe('publicCopyReview.sections', () => {
+  it('calls GET with public copy sections endpoint', async () => {
+    await publicCopyReview.sections('ws-1', 'entry-1');
+    expect(mockGet).toHaveBeenCalledWith('/api/public/copy/ws-1/entry/entry-1/sections');
+  });
+});
+
+describe('publicCopyReview.approveSection', () => {
+  it('calls post with approve endpoint', async () => {
+    await publicCopyReview.approveSection('ws-1', 'section-1');
+    expect(mockPost).toHaveBeenCalledWith('/api/public/copy/ws-1/section/section-1/approve');
+  });
+});
+
+describe('publicCopyReview.suggestEdit', () => {
+  it('calls post with original and suggested text', async () => {
+    await publicCopyReview.suggestEdit('ws-1', 'section-1', {
+      originalText: 'Old text',
+      suggestedText: 'New text',
+    });
+    expect(mockPost).toHaveBeenCalledWith(
+      '/api/public/copy/ws-1/section/section-1/suggest',
+      { originalText: 'Old text', suggestedText: 'New text' },
+    );
   });
 });
 

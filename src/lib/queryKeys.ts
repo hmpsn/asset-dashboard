@@ -239,6 +239,7 @@ export const queryKeys = {
     pricing: (wsId: string) => ['client-pricing', wsId] as const,
     contentSubscription: (wsId: string) => ['client-content-subscription', wsId] as const,
     contentPlan: (wsId: string) => ['client-content-plan', wsId] as const,
+    trackedKeywords: (wsId: string) => ['client-tracked-keywords', wsId] as const,
     pageKeywords: (wsId: string) => ['client-page-keywords', wsId] as const,
     insights: (wsId: string) => ['client-insights', wsId] as const,
     clientInsights: (wsId: string) => ['client-narrative-insights', wsId] as const,

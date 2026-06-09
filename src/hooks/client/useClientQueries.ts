@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, get, getSafe, getOptional } from '../../api/client';
+import { publicCopyReview } from '../../api/content';
 import { queryKeys } from '../../lib/queryKeys';
 import type { AnalyticsInsight } from '../../../shared/types/analytics';
 import type { ClientAction } from '../../../shared/types/client-actions';
@@ -265,5 +266,21 @@ export function useClientCopyEntries(wsId: string, enabled: boolean) {
     queryFn: () => getSafe<{ entries: unknown[] }>(`/api/public/copy/${wsId}/entries`, { entries: [] }),
     enabled,
     select: (d) => (Array.isArray(d?.entries) ? d.entries.length : 0),
+  });
+}
+
+export function useClientCopyEntryList(wsId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.client.copyEntries(wsId),
+    queryFn: () => publicCopyReview.entries(wsId),
+    enabled,
+  });
+}
+
+export function useClientCopySections(wsId: string, entryId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.client.copySections(wsId, entryId),
+    queryFn: () => publicCopyReview.sections(wsId, entryId),
+    enabled,
   });
 }

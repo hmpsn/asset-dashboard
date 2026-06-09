@@ -6,6 +6,7 @@ import type {
   BusinessPrioritiesSaveRequest,
   BusinessPrioritiesSaveResponse,
 } from '../../shared/types/business-priorities';
+import type { FeatureFlagKey } from '../../shared/types/feature-flags';
 import type { KeywordFeedbackDeleteResponse, KeywordFeedbackListRow, KeywordFeedbackMutationResponse } from '../../shared/types/keyword-feedback';
 import type { TrackedKeyword } from '../../shared/types/rank-tracking';
 export {
@@ -198,6 +199,12 @@ export const settings = {
 
   updateFeatures: (wsId: string, body: Record<string, unknown>) =>
     patch<unknown>(`/api/settings/${wsId}/features`, body),
+};
+
+// ── Feature flags ────────────────────────────────────────────────
+export const featureFlags = {
+  list: () =>
+    get<Record<FeatureFlagKey, boolean>>('/api/feature-flags'),
 };
 
 // ── Sales report ────────────────────────────────────────────────

@@ -393,6 +393,10 @@ describe('queryKeys.client keys', () => {
     expect(count).not.toEqual(entries);
   });
 
+  it('trackedKeywords key shape', () => {
+    expect(queryKeys.client.trackedKeywords(WS)).toEqual(['client-tracked-keywords', WS]);
+  });
+
   it('copySections includes entryId', () => {
     const key = queryKeys.client.copySections(WS, ID);
     expect(key).toEqual(['client-copy-sections', WS, ID]);
