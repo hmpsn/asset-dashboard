@@ -20,6 +20,10 @@ const fetchState = vi.hoisted(() => ({
   failInternal: false,
 }));
 
+const imageCompressionState = vi.hoisted(() => ({
+  outputBuffer: Buffer.alloc(200),
+}));
+
 vi.mock('../../server/webflow.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../server/webflow.js')>();
   return {
@@ -57,7 +61,7 @@ vi.mock('sharp', () => {
       jpeg: vi.fn().mockReturnThis(),
       png: vi.fn().mockReturnThis(),
       webp: vi.fn().mockReturnThis(),
-      toBuffer: vi.fn(async () => Buffer.alloc(200)),
+      toBuffer: vi.fn(async () => imageCompressionState.outputBuffer),
     })),
   };
 });
@@ -94,6 +98,7 @@ function resetState(): void {
   altState.queue = [];
   fetchState.failExternal = false;
   fetchState.failInternal = false;
+  imageCompressionState.outputBuffer = Buffer.alloc(200);
 }
 
 async function startTestServer(): Promise<void> {
@@ -225,6 +230,39 @@ describe('media background-job mutation safety', () => {
     expect(webflowState.uploadCalls).toHaveLength(1);
     expect(webflowState.deleteCalls).toHaveLength(1);
     expect(countActivities(workspaceAId, 'images_optimized')).toBe(1);
+    expect(countActivities(workspaceBId, 'images_optimized')).toBe(0);
+  });
+
+  it('compress preserves the legacy already-optimized skip contract without downstream writes', async () => {
+    imageCompressionState.outputBuffer = Buffer.alloc(1000);
+
+    const res = await postJson('/api/jobs', {
+      type: BACKGROUND_JOB_TYPES.COMPRESS,
+      params: {
+        workspaceId: workspaceAId,
+        siteId: siteA,
+        assetId: 'asset-skip',
+        imageUrl: 'https://cdn.example.test/asset-skip.jpg',
+        fileName: 'skip.jpg',
+      },
+    });
+    expect(res.status).toBe(200);
+    const started = await res.json() as { jobId: string };
+
+    const job = await waitForJob(started.jobId);
+    expect(job).toMatchObject({
+      workspaceId: workspaceAId,
+      type: BACKGROUND_JOB_TYPES.COMPRESS,
+      status: 'done',
+      message: 'Already optimized',
+      result: {
+        skipped: true,
+        reason: 'Already optimized (only 2% savings)',
+      },
+    });
+    expect(webflowState.uploadCalls).toHaveLength(0);
+    expect(webflowState.deleteCalls).toHaveLength(0);
+    expect(countActivities(workspaceAId, 'images_optimized')).toBe(0);
     expect(countActivities(workspaceBId, 'images_optimized')).toBe(0);
   });
 

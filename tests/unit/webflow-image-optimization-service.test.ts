@@ -123,4 +123,42 @@ describe('compressImageBuffer', () => {
       newSize: original.length,
     });
   });
+
+  it('allows the legacy job threshold override for raster assets', async () => {
+    state.sharpOutputs.jpeg = Buffer.alloc(970);
+    const original = Buffer.alloc(1000);
+    const result = await compressImageBuffer(original, 'photo.jpeg', {
+      rasterThresholdPercent: 3,
+    });
+
+    expect('skipped' in result).toBe(false);
+    if ('skipped' in result) return;
+    expect(result.newFileName).toBe('photo.jpg');
+    expect(result.savingsPercent).toBe(3);
+  });
+
+  it('can throw on svgo failure for legacy job callers', async () => {
+    state.optimizeSvgShouldThrow = true;
+
+    await expect(
+      compressImageBuffer(Buffer.from('<svg>bad</svg>'), 'icon.svg', {
+        svgFailureMode: 'throw',
+      }),
+    ).rejects.toThrow('bad svg');
+  });
+
+  it('supports the legacy job skip labels for svg assets', async () => {
+    state.optimizeSvgResult = '<svg>' + 'x'.repeat(980) + '</svg>';
+    const original = Buffer.from('<svg>' + 'x'.repeat(1000) + '</svg>');
+    const result = await compressImageBuffer(original, 'icon.svg', {
+      svgSkipReasonLabel: 'Already optimized',
+    });
+
+    expect(result).toEqual({
+      skipped: true,
+      reason: expect.stringContaining('Already optimized'),
+      originalSize: original.length,
+      newSize: Buffer.from(state.optimizeSvgResult).length,
+    });
+  });
 });
