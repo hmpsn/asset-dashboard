@@ -5,12 +5,15 @@ import {
   getJob,
 } from '../../server/jobs.js';
 
-const nativeFetch = globalThis.fetch;
-
 const state = vi.hoisted(() => ({
-  responses: [] as Array<Record<string, unknown> | Error>,
+  fetchBytesCalls: [] as string[],
+  compressionCalls: [] as Array<{ sourceName: string; outputBaseName?: string }>,
+  replaceCalls: [] as Array<{ assetId: string; imageUrl: string; siteId: string; altText?: string; token?: string }>,
+  fetchedBytesQueue: [] as Array<Uint8Array | Error>,
+  compressionQueue: [] as Array<Record<string, unknown>>,
+  replaceQueue: [] as Array<Record<string, unknown> | Error>,
+  token: 'wf-token',
   activityCalls: [] as Array<{ workspaceId: string; type: string; message: string; metadata: Record<string, unknown> | undefined }>,
-  fetchCalls: [] as Array<{ url: string; body: Record<string, unknown> }>,
 }));
 
 vi.mock('../../server/activity-log.js', async (importOriginal) => {
@@ -19,6 +22,60 @@ vi.mock('../../server/activity-log.js', async (importOriginal) => {
     ...actual,
     addActivity: vi.fn((workspaceId: string, type: string, message: string, _userId?: string, metadata?: Record<string, unknown>) => {
       state.activityCalls.push({ workspaceId, type, message, metadata });
+    }),
+  };
+});
+
+vi.mock('../../server/workspaces.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../server/workspaces.js')>();
+  return {
+    ...actual,
+    getTokenForSite: vi.fn(() => state.token),
+  };
+});
+
+vi.mock('../../server/external-fetch.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../server/external-fetch.js')>();
+  return {
+    ...actual,
+    fetchExternalBytes: vi.fn(async ({ url }: { url: string }) => {
+      state.fetchBytesCalls.push(url);
+      const next = state.fetchedBytesQueue.shift();
+      if (next instanceof Error) throw next;
+      return next ?? new Uint8Array(Buffer.alloc(1024));
+    }),
+  };
+});
+
+vi.mock('../../server/domains/webflow-assets/image-optimization.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../server/domains/webflow-assets/image-optimization.js')>();
+  return {
+    ...actual,
+    compressImageBuffer: vi.fn(async (_buffer: Buffer, sourceName: string, options?: { outputBaseName?: string }) => {
+      state.compressionCalls.push({ sourceName, outputBaseName: options?.outputBaseName });
+      return state.compressionQueue.shift() ?? {
+        compressed: Buffer.alloc(200),
+        newFileName: 'image.jpg',
+        originalSize: 1024,
+        newSize: 200,
+        savings: 824,
+        savingsPercent: 80,
+      };
+    }),
+    replaceCompressedAsset: vi.fn(async (options: { assetId: string; imageUrl: string; siteId: string; altText?: string; token?: string }) => {
+      state.replaceCalls.push(options);
+      const next = state.replaceQueue.shift();
+      if (next instanceof Error) throw next;
+      return next ?? {
+        success: true,
+        newAssetId: `new-${options.assetId}`,
+        originalSize: 1024,
+        newSize: 200,
+        savings: 8_000,
+        savingsPercent: 80,
+        newFileName: `${options.assetId}.jpg`,
+        oldAssetPreserved: false,
+      };
     }),
   };
 });
@@ -39,54 +96,53 @@ async function waitForTerminalJob(jobId: string): Promise<NonNullable<ReturnType
 describe('startWebflowBulkCompressJob', () => {
   beforeEach(() => {
     clearCompletedJobs();
-    state.responses = [];
+    state.fetchBytesCalls = [];
+    state.compressionCalls = [];
+    state.replaceCalls = [];
+    state.fetchedBytesQueue = [];
+    state.compressionQueue = [];
+    state.replaceQueue = [];
+    state.token = 'wf-token';
     state.activityCalls = [];
-    state.fetchCalls = [];
-
-    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-      const url = typeof input === 'string'
-        ? input
-        : input instanceof URL
-          ? input.toString()
-          : input.url;
-      const next = state.responses.shift();
-      const body = init?.body && typeof init.body === 'string'
-        ? JSON.parse(init.body) as Record<string, unknown>
-        : {};
-      state.fetchCalls.push({ url, body });
-
-      if (next instanceof Error) {
-        throw next;
-      }
-
-      return new Response(JSON.stringify(next ?? {}), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }));
   });
 
   afterAll(() => {
     clearCompletedJobs();
-    if (nativeFetch) {
-      vi.stubGlobal('fetch', nativeFetch);
-    } else {
-      vi.unstubAllGlobals();
-    }
   });
 
   it('preserves result ordering, totalSaved accumulation, and summary activity', async () => {
-    state.responses = [
-      { success: true, savings: 8_000, newAssetId: 'new-1' },
-      { skipped: true, reason: 'Already optimized' },
-      { success: true, savings: 4_000, newAssetId: 'new-3' },
+    state.compressionQueue = [
+      {
+        compressed: Buffer.alloc(200),
+        newFileName: 'asset-1.jpg',
+        originalSize: 1024,
+        newSize: 200,
+        savings: 8_000,
+        savingsPercent: 80,
+      },
+      {
+        skipped: true,
+        reason: 'Already optimized',
+        originalSize: 1024,
+        newSize: 1000,
+      },
+      {
+        compressed: Buffer.alloc(200),
+        newFileName: 'asset-3.jpg',
+        originalSize: 1024,
+        newSize: 200,
+        savings: 4_000,
+        savingsPercent: 40,
+      },
+    ];
+    state.replaceQueue = [
+      { success: true, savings: 8_000, newAssetId: 'new-1', newFileName: 'asset-1.jpg' },
+      { success: true, savings: 4_000, newAssetId: 'new-3', newFileName: 'asset-3.jpg' },
     ];
 
     const started = startWebflowBulkCompressJob({
       workspaceId: 'ws-1',
       siteId: 'site-1',
-      baseUrl: 'http://localhost:3001',
-      headers: { 'x-auth-token': 'token' },
       assets: [
         { assetId: 'asset-1', imageUrl: 'https://cdn.example.test/1.jpg' },
         { assetId: 'asset-2', imageUrl: 'https://cdn.example.test/2.jpg' },
@@ -96,10 +152,26 @@ describe('startWebflowBulkCompressJob', () => {
 
     const job = await waitForTerminalJob(started.jobId);
 
-    expect(state.fetchCalls.map((call) => call.url)).toEqual([
-      'http://localhost:3001/api/webflow/ws-1/compress/asset-1',
-      'http://localhost:3001/api/webflow/ws-1/compress/asset-2',
-      'http://localhost:3001/api/webflow/ws-1/compress/asset-3',
+    expect(state.fetchBytesCalls).toEqual([
+      'https://cdn.example.test/1.jpg',
+      'https://cdn.example.test/2.jpg',
+      'https://cdn.example.test/3.jpg',
+    ]);
+    expect(state.replaceCalls).toEqual([
+      {
+        assetId: 'asset-1',
+        imageUrl: 'https://cdn.example.test/1.jpg',
+        siteId: 'site-1',
+        token: 'wf-token',
+        compression: expect.objectContaining({ newFileName: 'asset-1.jpg', savings: 8_000 }),
+      },
+      {
+        assetId: 'asset-3',
+        imageUrl: 'https://cdn.example.test/3.jpg',
+        siteId: 'site-1',
+        token: 'wf-token',
+        compression: expect.objectContaining({ newFileName: 'asset-3.jpg', savings: 4_000 }),
+      },
     ]);
     expect(job).toMatchObject({
       type: 'bulk-compress',
@@ -127,16 +199,14 @@ describe('startWebflowBulkCompressJob', () => {
   });
 
   it('preserves partial-failure behavior by recording per-asset error results and still completing', async () => {
-    state.responses = [
-      { success: true, savings: 8_000 },
-      new Error('compress route exploded'),
+    state.replaceQueue = [
+      { success: true, savings: 8_000, newAssetId: 'new-1', newFileName: 'asset-1.jpg' },
+      new Error('replace exploded'),
     ];
 
     const started = startWebflowBulkCompressJob({
       workspaceId: 'ws-1',
       siteId: 'site-1',
-      baseUrl: 'http://localhost:3001',
-      headers: {},
       assets: [
         { assetId: 'asset-1', imageUrl: 'https://cdn.example.test/1.jpg' },
         { assetId: 'asset-2', imageUrl: 'https://cdn.example.test/2.jpg' },
@@ -154,7 +224,7 @@ describe('startWebflowBulkCompressJob', () => {
         totalSaved: 8_000,
         results: [
           { assetId: 'asset-1', success: true, savings: 8_000 },
-          { assetId: 'asset-2', error: 'Error: compress route exploded' },
+          { assetId: 'asset-2', error: 'Error: replace exploded' },
         ],
       },
     });

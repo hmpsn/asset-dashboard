@@ -4,6 +4,7 @@ import { startWebflowBulkAltJob } from './webflow-bulk-alt-background-job.js';
 import { startWebflowBulkCompressJob } from './webflow-bulk-compress-background-job.js';
 import { startWebflowBulkSeoFixJob } from './webflow-bulk-seo-fix-background-job.js';
 import { startWebflowImageCompressJob } from './webflow-image-compress-background-job.js';
+import type { CmsImageUsage } from '../shared/types/cms-images.js';
 import {
   hasActiveJob,
 } from './jobs.js';
@@ -79,9 +80,9 @@ const LEGACY_JOB_STARTERS: Record<LegacyJobType, LegacyJobStarter> = {
     }));
   },
 
-  [BACKGROUND_JOB_TYPES.BULK_COMPRESS]: (params, context) => {
+  [BACKGROUND_JOB_TYPES.BULK_COMPRESS]: (params) => {
     const { assets, siteId } = params as {
-      assets: Array<{ assetId: string; imageUrl: string; altText?: string; fileName?: string; cmsUsages?: unknown[] }>;
+      assets: Array<{ assetId: string; imageUrl: string; altText?: string; fileName?: string; cmsUsages?: CmsImageUsage[] }>;
       siteId: string;
     };
     if (!assets?.length || !siteId) return error(400, { error: 'assets and siteId required' });
@@ -93,8 +94,6 @@ const LEGACY_JOB_STARTERS: Record<LegacyJobType, LegacyJobStarter> = {
       workspaceId: params.workspaceId as string | undefined,
       siteId,
       assets,
-      baseUrl: `http://localhost:${context.port}`,
-      headers: context.internalHeaders,
     }));
   },
 

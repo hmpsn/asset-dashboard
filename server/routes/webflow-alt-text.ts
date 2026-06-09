@@ -13,9 +13,7 @@ import { buildIntelPrompt } from '../workspace-intelligence.js';
 import {
   listSites,
   updateAsset,
-  deleteAsset,
   getPageDom,
-  uploadAsset,
 } from '../webflow.js';
 import type { CmsImageUsage } from '../../shared/types/cms-images.ts';
 import {
@@ -25,7 +23,7 @@ import {
 import { getWorkspacePages } from '../workspace-data.js';
 import {
   compressImageBuffer,
-  repairCmsReferences,
+  replaceCompressedAsset,
 } from '../domains/webflow-assets/image-optimization.js';
 import { createLogger } from '../logger.js';
 import { isProgrammingError } from '../errors.js';
@@ -303,53 +301,21 @@ router.post('/api/webflow/:workspaceId/compress/:assetId', requireWorkspaceAcces
       return res.json(compression);
     }
 
-    const tmpPath = `/tmp/compressed_${Date.now()}_${compression.newFileName}`;
-    fs.writeFileSync(tmpPath, compression.compressed);
-
-    const uploadResult = await uploadAsset(siteId, tmpPath, compression.newFileName, altText, compressToken);
-    fs.unlinkSync(tmpPath);
-
-    if (!uploadResult.success) {
-      return res.status(500).json({ error: uploadResult.error });
-    }
-
-    // Repair CMS references BEFORE deleting old asset (so old asset stays as fallback if updates fail)
-    let cmsUpdates: { succeeded: number; failed: number } | undefined;
-    if (cmsUsages?.length && uploadResult.assetId && uploadResult.hostedUrl) {
-      cmsUpdates = await repairCmsReferences(
-        cmsUsages,
-        req.params.assetId,
-        uploadResult.assetId,
-        uploadResult.hostedUrl,
-        imageUrl,
-        compressToken,
-      );
-    }
-
-    // Only delete old asset if CMS repairs either weren't needed or all succeeded.
-    // When repairs fail OR were needed but skipped (e.g. missing hostedUrl),
-    // the old asset must remain so CMS items aren't broken.
-    const cmsRepairsNeeded = !!(cmsUsages?.length);
-    const cmsRepairsSkipped = cmsRepairsNeeded && !cmsUpdates;
-    const hasFailedCmsRepairs = cmsUpdates && cmsUpdates.failed > 0;
-    if (!hasFailedCmsRepairs && !cmsRepairsSkipped) {
-      await deleteAsset(req.params.assetId, compressToken);
-    } else {
-      log.warn({ assetId: req.params.assetId, failed: cmsUpdates?.failed, skipped: cmsRepairsSkipped }, 'Skipping old asset deletion — CMS reference repairs had failures or were skipped');
-    }
-
-    res.json({
-      success: true,
-      newAssetId: uploadResult.assetId,
-      newHostedUrl: uploadResult.hostedUrl,
-      originalSize: compression.originalSize,
-      newSize: compression.newSize,
-      savings: compression.savings,
-      savingsPercent: compression.savingsPercent,
-      newFileName: compression.newFileName,
-      oldAssetPreserved: !!(hasFailedCmsRepairs || cmsRepairsSkipped),
-      ...(cmsUpdates ? { cmsUpdates } : {}),
+    const result = await replaceCompressedAsset({
+      assetId: req.params.assetId,
+      imageUrl,
+      siteId,
+      compression,
+      altText,
+      cmsUsages,
+      token: compressToken,
     });
+
+    if (!result.success) {
+      return res.status(500).json({ error: result.error });
+    }
+
+    res.json(result);
   } catch (e) {
     log.error({ err: e }, 'Compress error');
     res.status(500).json({ error: 'Compression failed' });

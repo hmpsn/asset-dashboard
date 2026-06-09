@@ -33,11 +33,28 @@ const state = vi.hoisted(() => ({
       originalSize: number;
       newSize: number;
     },
-  uploadResult: { success: true, assetId: 'new-hero' } as
-    | { success: true; assetId: string }
+  replaceResult: {
+    success: true,
+    newAssetId: 'new-hero',
+    originalSize: 1024,
+    newSize: 200,
+    savings: 824,
+    savingsPercent: 80,
+    newFileName: 'hero.jpg',
+    oldAssetPreserved: false,
+  } as
+    | {
+      success: true;
+      newAssetId?: string;
+      originalSize?: number;
+      newSize?: number;
+      savings?: number;
+      savingsPercent?: number;
+      newFileName?: string;
+      oldAssetPreserved?: boolean;
+    }
     | { success: false; error: string },
-  uploadCalls: [] as Array<{ siteId: string; fileName: string; altText?: string; token?: string }>,
-  deleteCalls: [] as Array<{ assetId: string; token?: string }>,
+  replaceCalls: [] as Array<{ assetId: string; imageUrl: string; siteId: string; altText?: string; token?: string }>,
   activityCalls: [] as Array<{ workspaceId: string; type: string; message: string; metadata: Record<string, unknown> | undefined }>,
   compressionCalls: [] as Array<{ sourceName: string; outputBaseName?: string }>,
 }));
@@ -47,21 +64,6 @@ vi.mock('../../server/workspaces.js', async (importOriginal) => {
   return {
     ...actual,
     getTokenForSite: vi.fn(() => state.token),
-  };
-});
-
-vi.mock('../../server/webflow.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../server/webflow.js')>();
-  return {
-    ...actual,
-    uploadAsset: vi.fn(async (siteId: string, _tmpPath: string, fileName: string, altText?: string, token?: string) => {
-      state.uploadCalls.push({ siteId, fileName, altText, token });
-      return state.uploadResult;
-    }),
-    deleteAsset: vi.fn(async (assetId: string, token?: string) => {
-      state.deleteCalls.push({ assetId, token });
-      return { success: true };
-    }),
   };
 });
 
@@ -82,6 +84,10 @@ vi.mock('../../server/domains/webflow-assets/image-optimization.js', async (impo
     compressImageBuffer: vi.fn(async (_buffer: Buffer, sourceName: string, options?: { outputBaseName?: string }) => {
       state.compressionCalls.push({ sourceName, outputBaseName: options?.outputBaseName });
       return state.compressionResult;
+    }),
+    replaceCompressedAsset: vi.fn(async (options: { assetId: string; imageUrl: string; siteId: string; altText?: string; token?: string }) => {
+      state.replaceCalls.push(options);
+      return state.replaceResult;
     }),
   };
 });
@@ -113,9 +119,17 @@ describe('startWebflowImageCompressJob', () => {
       savings: 824,
       savingsPercent: 80,
     };
-    state.uploadResult = { success: true, assetId: 'new-hero' };
-    state.uploadCalls = [];
-    state.deleteCalls = [];
+    state.replaceResult = {
+      success: true,
+      newAssetId: 'new-hero',
+      originalSize: 1024,
+      newSize: 200,
+      savings: 824,
+      savingsPercent: 80,
+      newFileName: 'hero.jpg',
+      oldAssetPreserved: false,
+    };
+    state.replaceCalls = [];
     state.activityCalls = [];
     state.compressionCalls = [];
 
@@ -166,11 +180,18 @@ describe('startWebflowImageCompressJob', () => {
         newFileName: 'hero.jpg',
       },
     });
-    expect(state.uploadCalls).toEqual([
-      { siteId: 'site-1', fileName: 'hero.jpg', altText: 'Hero alt', token: 'wf-token' },
-    ]);
-    expect(state.deleteCalls).toEqual([
-      { assetId: 'asset-1', token: 'wf-token' },
+    expect(state.replaceCalls).toEqual([
+      {
+        assetId: 'asset-1',
+        imageUrl: 'https://cdn.example.test/hero.jpg',
+        siteId: 'site-1',
+        altText: 'Hero alt',
+        token: 'wf-token',
+        compression: expect.objectContaining({
+          newFileName: 'hero.jpg',
+          savings: 824,
+        }),
+      },
     ]);
     expect(state.activityCalls).toEqual([
       {
@@ -215,9 +236,30 @@ describe('startWebflowImageCompressJob', () => {
         reason: 'Already optimized (only 2% savings)',
       },
     });
-    expect(state.uploadCalls).toHaveLength(0);
-    expect(state.deleteCalls).toHaveLength(0);
+    expect(state.replaceCalls).toHaveLength(0);
     expect(state.activityCalls).toHaveLength(0);
+  });
+
+  it('keeps the legacy upload error result when replacement fails', async () => {
+    state.replaceResult = { success: false, error: 'Upload exploded' };
+
+    const started = startWebflowImageCompressJob({
+      workspaceId: 'ws-1',
+      assetId: 'asset-3',
+      imageUrl: 'https://cdn.example.test/broken.jpg',
+      siteId: 'site-1',
+      fileName: 'broken.jpg',
+    });
+
+    const job = await waitForTerminalJob(started.jobId);
+
+    expect(job).toMatchObject({
+      type: 'compress',
+      workspaceId: 'ws-1',
+      status: 'error',
+      error: 'Upload exploded',
+      message: 'Upload failed',
+    });
   });
 
   it('keeps the legacy error result when the download fails', async () => {
@@ -240,8 +282,7 @@ describe('startWebflowImageCompressJob', () => {
       message: 'Compression failed',
       error: 'download exploded',
     });
-    expect(state.uploadCalls).toHaveLength(0);
-    expect(state.deleteCalls).toHaveLength(0);
+    expect(state.replaceCalls).toHaveLength(0);
     expect(state.activityCalls).toHaveLength(0);
   });
 });
