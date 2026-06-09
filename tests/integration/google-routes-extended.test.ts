@@ -389,7 +389,10 @@ describe('GET /api/google/gsc-sites — global GSC sites', () => {
     gscState.shouldThrow = true;
     const { status, body } = await getJson(baseUrl, '/api/google/gsc-sites');
     expect(status).toBe(500);
-    expect((body as Record<string, unknown>).error).toBeTruthy();
+    const error = String((body as Record<string, unknown>).error);
+    expect(error).toBeTruthy();
+    expect(error).not.toContain('GSC API error');
+    expect(error).toContain('Unable to load Search Console sites');
   });
 });
 
@@ -451,6 +454,7 @@ describe('GET /api/google/callback — OAuth callback edge cases', () => {
     expect(status).toBe(500);
     expect(typeof body).toBe('string');
     expect((body as string)).toContain('Google auth failed');
+    expect((body as string)).not.toContain('Token exchange failed');
   });
 });
 
@@ -478,7 +482,10 @@ describe('GET /api/google/ga4-properties', () => {
     ga4State.shouldThrow = true;
     const { status, body } = await getJson(baseUrl, '/api/google/ga4-properties');
     expect(status).toBe(500);
-    expect((body as Record<string, unknown>).error).toBeTruthy();
+    const error = String((body as Record<string, unknown>).error);
+    expect(error).toBeTruthy();
+    expect(error).not.toContain('GA4 API error');
+    expect(error).toContain('Unable to load GA4 properties');
   });
 });
 
@@ -543,7 +550,10 @@ describe('GET /api/google/search-overview/:siteId — validation and errors', ()
       `/api/google/search-overview/${ws.webflowSiteId}?workspaceId=${ws.workspaceId}&gscSiteUrl=https://gsc.example.com/`,
     );
     expect(status).toBe(500);
-    expect((body as Record<string, unknown>).error).toBeTruthy();
+    const error = String((body as Record<string, unknown>).error);
+    expect(error).toBeTruthy();
+    expect(error).not.toContain('Search overview API error');
+    expect(error).toContain('Unable to load Search Console overview');
   });
 });
 

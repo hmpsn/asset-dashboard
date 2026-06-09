@@ -146,6 +146,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     if (requestsQ.error) errs.requests = 'Unable to load requests';
     if (contentReqQ.error) errs.content = 'Unable to load content requests';
     if (strategyQ.error) errs.strategy = 'Unable to load SEO strategy';
+    if (search.error) errs.search = 'Unable to load search performance data';
     if (ga4Data.sectionError) errs.analytics = ga4Data.sectionError;
     return errs;
   }, [
@@ -157,6 +158,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     requestsQ.error,
     contentReqQ.error,
     strategyQ.error,
+    search.error,
     ga4Data.sectionError,
   ]);
 

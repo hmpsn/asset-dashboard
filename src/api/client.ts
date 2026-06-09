@@ -101,12 +101,13 @@ export async function postForm<T>(url: string, formData: FormData, signal?: Abor
 
 /**
  * GET that returns `null` on non-ok responses instead of throwing.
- * Useful for optional data where a 404 is expected.
+ * Useful for optional data where a 400/404 means "not configured" or absent.
+ * Provider/server failures still throw so React Query can surface degraded data.
  */
 export async function getOptional<T>(url: string, signal?: AbortSignal): Promise<T | null> {
   const res = await fetch(url, { signal });
-  if (!res.ok) return null;
-  return res.json() as Promise<T>;
+  if (res.status === 400 || res.status === 404) return null;
+  return handleResponse<T>(res);
 }
 
 /**

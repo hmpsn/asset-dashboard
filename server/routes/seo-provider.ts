@@ -18,6 +18,7 @@ import { parseJsonFallback } from '../db/json-validation.js';
 import fs from 'fs';
 import path from 'path';
 import { isProgrammingError } from '../errors.js';
+import { sendSanitizedProviderError } from '../provider-error-sanitizer.js';
 
 const log = createLogger('seo-provider-routes');
 
@@ -27,6 +28,14 @@ function parseCsvQuery(rawValue: unknown): string[] {
     .flatMap(value => typeof value === 'string' ? value.split(',') : [])
     .map(value => value.trim())
     .filter(Boolean);
+}
+
+type CompetitiveIntelFailureArea = 'overview' | 'backlinks' | 'keyword_gap' | 'top_keywords';
+
+interface CompetitiveIntelProviderFailure {
+  area: CompetitiveIntelFailureArea;
+  provider: string;
+  domain?: string;
 }
 
 // --- Competitive Intelligence Hub ---
@@ -70,18 +79,58 @@ router.get('/api/seo/competitive-intel/:workspaceId', requireWorkspaceAccess('wo
       log.warn({ dropped: competitors.filter(c => !cappedCompetitors.includes(c)), workspaceId }, 'competitive-intel: dropped invalid competitor domains');
     }
     const allDomains = [myDomain, ...cappedCompetitors];
+    const providerFailures: CompetitiveIntelProviderFailure[] = [];
+    const readProvider = async <T>(
+      area: CompetitiveIntelFailureArea,
+      sourceProvider: string,
+      operation: () => Promise<T>,
+      fallback: T,
+      domain?: string,
+    ): Promise<T> => {
+      try {
+        return await operation();
+      } catch (err) {
+        providerFailures.push({
+          area,
+          provider: sourceProvider,
+          ...(domain ? { domain } : {}),
+        });
+        log.warn({ err, area, provider: sourceProvider, domain, workspaceId }, 'competitive-intel: provider read failed');
+        return fallback;
+      }
+    };
+
     const [overviews, backlinks, keywordGaps] = await Promise.all([
-      Promise.all(allDomains.map(d => provider.getDomainOverview(d, workspaceId).catch(() => null))),
+      Promise.all(allDomains.map(d => readProvider('overview', provider.name, () => provider.getDomainOverview(d, workspaceId), null, d))),
       blProvider
-        ? Promise.all(allDomains.map(d => blProvider.getBacklinksOverview(d, workspaceId).catch(() => null)))
+        ? Promise.all(allDomains.map(d => readProvider('backlinks', blProvider.name, () => blProvider.getBacklinksOverview(d, workspaceId), null, d)))
         : Promise.resolve(allDomains.map(() => null)),
-      provider.getKeywordGap(myDomain, cappedCompetitors, workspaceId, 30).catch(() => []),
+      readProvider('keyword_gap', provider.name, () => provider.getKeywordGap(myDomain, cappedCompetitors, workspaceId, 30), []),
     ]);
 
     // Get top keywords for each domain (parallel, limit 20 for speed)
     const topKeywords = await Promise.all(
-      allDomains.map(d => provider.getDomainKeywords(d, workspaceId, 20).catch(() => []))
+      allDomains.map(d => readProvider('top_keywords', provider.name, () => provider.getDomainKeywords(d, workspaceId, 20), [], d))
     );
+
+    const hasPrimaryProviderData =
+      overviews.some(Boolean) ||
+      keywordGaps.length > 0 ||
+      topKeywords.some(rows => rows.length > 0);
+    const primaryProviderFailed = providerFailures.some(f => f.provider === provider.name);
+    if (!hasPrimaryProviderData && primaryProviderFailed) {
+      sendSanitizedProviderError(res, {
+        status: 502,
+        source: 'seo',
+        fallback: 'SEO provider data is temporarily unavailable. Please try again.',
+        degraded: true,
+        metadata: {
+          provider: provider.name,
+          failures: providerFailures,
+        },
+      });
+      return;
+    }
 
     const domains = allDomains.map((domain, i) => ({
       domain,
@@ -91,10 +140,19 @@ router.get('/api/seo/competitive-intel/:workspaceId', requireWorkspaceAccess('wo
       topKeywords: topKeywords[i],
     }));
 
-    res.json({ domains, keywordGaps, fetchedAt: new Date().toISOString() });
+    res.json({
+      domains,
+      keywordGaps,
+      fetchedAt: new Date().toISOString(),
+      degraded: providerFailures.length > 0,
+      providerFailures,
+    });
   } catch (err) {
     log.error({ err }, 'Competitive intelligence fetch failed');
-    res.status(500).json({ error: 'Failed to fetch competitive data' });
+    sendSanitizedProviderError(res, {
+      source: 'seo',
+      fallback: 'SEO provider data is temporarily unavailable. Please try again.',
+    });
   }
 });
 

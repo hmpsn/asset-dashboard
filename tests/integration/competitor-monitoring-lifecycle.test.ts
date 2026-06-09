@@ -560,6 +560,46 @@ describe('GET /api/seo/competitive-intel/:workspaceId — comparison data', () =
     );
     expect(status).toBe(400);
   });
+
+  it('returns degraded metadata when some provider reads fail but usable data remains', async () => {
+    mockProviderRef = {
+      ...makeMockProvider(),
+      getDomainOverview: vi.fn(async () => {
+        throw new Error('Provider overview secret failure');
+      }),
+      getDomainKeywords: vi.fn(async () => DEFAULT_DOMAIN_KEYWORDS),
+      getKeywordGap: vi.fn(async () => DEFAULT_KEYWORD_GAP),
+    } as unknown as SeoDataProvider;
+
+    const { status, body } = await getJson(
+      `/api/seo/competitive-intel/${ws.workspaceId}?competitors=competitor.com`,
+    );
+
+    expect(status).toBe(200);
+    const b = body as { degraded?: boolean; providerFailures?: Array<{ area: string }>; domains: unknown[] };
+    expect(b.degraded).toBe(true);
+    expect(b.providerFailures?.some(f => f.area === 'overview')).toBe(true);
+    expect(Array.isArray(b.domains)).toBe(true);
+
+    mockProviderRef = makeMockProvider();
+  });
+
+  it('returns 502 with sanitized error when the primary provider fully fails', async () => {
+    mockProviderRef = makeMockProvider({ shouldThrow: true });
+
+    const { status, body } = await getJson(
+      `/api/seo/competitive-intel/${ws.workspaceId}?competitors=competitor.com`,
+    );
+
+    expect(status).toBe(502);
+    const b = body as { error: string; degraded?: boolean; failures?: Array<{ area: string }> };
+    expect(b.error).toContain('SEO provider data is temporarily unavailable');
+    expect(b.error).not.toContain('Provider unavailable');
+    expect(b.degraded).toBe(true);
+    expect(b.failures?.length).toBeGreaterThan(0);
+
+    mockProviderRef = makeMockProvider();
+  });
 });
 
 // ---------------------------------------------------------------------------
