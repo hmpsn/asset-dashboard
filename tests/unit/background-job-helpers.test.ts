@@ -58,10 +58,13 @@ describe('background-job-helpers', () => {
     const queryClient = {
       invalidateQueries: vi.fn(),
     };
+    const keys = [['admin', 'a'], ['admin', 'b']] as const;
     invalidateQueriesOnJobCompletion(
       queryClient as unknown as { invalidateQueries: (opts: { queryKey: readonly unknown[] }) => void },
-      [['admin', 'a'], ['admin', 'b']],
+      keys,
     );
     expect(queryClient.invalidateQueries).toHaveBeenCalledTimes(2);
+    expect(queryClient.invalidateQueries).toHaveBeenNthCalledWith(1, { queryKey: keys[0] });
+    expect(queryClient.invalidateQueries).toHaveBeenNthCalledWith(2, { queryKey: keys[1] });
   });
 });

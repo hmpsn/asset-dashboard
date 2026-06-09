@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { keywordCommandCenter } from '../../api/keywordCommandCenter';
 import { queryKeys } from '../../lib/queryKeys';
+import { invalidateMany, keywordMutationInvalidationKeys } from '../../lib/queryInvalidation';
 import type {
   KeywordCommandCenterActionRequest,
   KeywordCommandCenterBulkActionRequest,
@@ -43,12 +44,7 @@ export function useKeywordCommandCenterAction(workspaceId: string) {
   return useMutation({
     mutationFn: (body: KeywordCommandCenterActionRequest) => keywordCommandCenter.action(workspaceId, body),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(workspaceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(workspaceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingHistory(workspaceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+      invalidateMany(queryClient, keywordMutationInvalidationKeys(workspaceId));
     },
   });
 }
@@ -58,12 +54,7 @@ export function useKeywordCommandCenterBulkAction(workspaceId: string) {
   return useMutation({
     mutationFn: (body: KeywordCommandCenterBulkActionRequest) => keywordCommandCenter.bulkAction(workspaceId, body),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(workspaceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(workspaceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingHistory(workspaceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+      invalidateMany(queryClient, keywordMutationInvalidationKeys(workspaceId));
     },
   });
 }
@@ -78,12 +69,7 @@ export function useKeywordHardDelete(workspaceId: string) {
     mutationFn: (vars: { keyword: string; force?: boolean }) =>
       keywordCommandCenter.deleteHard(workspaceId, vars.keyword, { force: vars.force }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(workspaceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(workspaceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingHistory(workspaceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+      invalidateMany(queryClient, keywordMutationInvalidationKeys(workspaceId));
     },
   });
 }

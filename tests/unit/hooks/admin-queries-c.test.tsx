@@ -13,7 +13,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 
 // ── Standard wrapper ────────────────────────────────────────────────────────
 
@@ -166,6 +166,7 @@ vi.mock('../../../src/api/keywordCommandCenter', () => ({
     detail: vi.fn(),
     action: vi.fn(),
     bulkAction: vi.fn(),
+    deleteHard: vi.fn(),
   },
 }));
 
@@ -240,6 +241,7 @@ import { keywordCommandCenter } from '../../../src/api/keywordCommandCenter';
 import { localSeo } from '../../../src/api/localSeo';
 import { schemaValidation } from '../../../src/api/schema';
 import { outcomesApi } from '../../../src/api/outcomes';
+import { queryKeys } from '../../../src/lib/queryKeys';
 
 const mockContentBriefsList = vi.mocked(contentBriefs.list);
 const mockContentPostsList = vi.mocked(contentPosts.list);
@@ -254,6 +256,7 @@ const mockWorkspacesGetById = vi.mocked(workspaces.getById);
 const mockKccSummary = vi.mocked(keywordCommandCenter.summary);
 const mockKccRows = vi.mocked(keywordCommandCenter.rows);
 const mockKccDetail = vi.mocked(keywordCommandCenter.detail);
+const mockKccAction = vi.mocked(keywordCommandCenter.action);
 const mockLocalSeoGetSummary = vi.mocked(localSeo.getSummary);
 const mockLocalSeoListLocations = vi.mocked(localSeo.listLocations);
 const mockSchemaValidationGetAll = vi.mocked(schemaValidation.getAll);
@@ -270,6 +273,7 @@ import { useCopySections, useCopyIntelligence } from '../../../src/hooks/admin/u
 import { useBriefingDrafts } from '../../../src/hooks/admin/useBriefingDrafts';
 import { useKeywordStrategy } from '../../../src/hooks/admin/useKeywordStrategy';
 import {
+  useKeywordCommandCenterAction,
   useKeywordCommandCenterSummary,
   useKeywordCommandCenterRows,
   useKeywordCommandCenterDetail,
@@ -623,6 +627,36 @@ describe('useKeywordCommandCenterDetail', () => {
     );
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.data).toEqual(detail);
+  });
+});
+
+describe('useKeywordCommandCenterAction', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('invalidates the shared keyword mutation bundle on success', async () => {
+    mockKccAction.mockResolvedValue(undefined);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(
+      () => useKeywordCommandCenterAction('ws-1'),
+      { wrapper },
+    );
+
+    await act(async () => {
+      await result.current.mutateAsync({ action: 'track', keyword: 'seo agency' });
+    });
+
+    expect(mockKccAction).toHaveBeenCalledWith('ws-1', { action: 'track', keyword: 'seo agency' });
+    expect(invalidateSpy).toHaveBeenNthCalledWith(1, { queryKey: queryKeys.admin.keywordCommandCenter('ws-1') });
+    expect(invalidateSpy).toHaveBeenNthCalledWith(2, { queryKey: queryKeys.admin.keywordStrategy('ws-1') });
+    expect(invalidateSpy).toHaveBeenNthCalledWith(3, { queryKey: queryKeys.admin.rankTrackingKeywords('ws-1') });
+    expect(invalidateSpy).toHaveBeenNthCalledWith(4, { queryKey: queryKeys.admin.rankTrackingLatest('ws-1') });
+    expect(invalidateSpy).toHaveBeenNthCalledWith(5, { queryKey: queryKeys.admin.rankTrackingHistory('ws-1') });
+    expect(invalidateSpy).toHaveBeenNthCalledWith(6, { queryKey: queryKeys.admin.intelligenceAll('ws-1') });
   });
 });
 
