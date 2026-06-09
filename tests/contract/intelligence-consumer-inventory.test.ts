@@ -70,7 +70,7 @@ function listTypeScriptFiles(dir: string): string[] {
 }
 
 function isGenerationConsumer(relPath: string, source: string): boolean {
-  const hasIntelligenceAccess = /buildWorkspaceIntelligence\(|buildIntelPrompt\(|formatForPrompt\(|buildContentGenerationContext\(|buildRecommendationGenerationContext\(|buildAdminChatIntelligenceContext\(|buildDiagnosticIntelligenceContext\(|resolveDiagnosticAnomalyInsight\(|buildPageAssistContext\(|getWorkspaceLearnings\(|formatLearningsForPrompt\(|getInsights\(/.test(source);
+  const hasIntelligenceAccess = /buildWorkspaceIntelligence\(|buildIntelPrompt\(|formatForPrompt\(|buildContentGenerationContext\(|buildRecommendationGenerationContext\(|buildSeoPromptContext\(|buildAdminChatIntelligenceContext\(|buildDiagnosticIntelligenceContext\(|resolveDiagnosticAnomalyInsight\(|buildPageAssistContext\(|getWorkspaceLearnings\(|formatLearningsForPrompt\(|getInsights\(/.test(source);
   const hasAiCall = /callAI\(|callCreativeAI\(|callAnthropic\(|callOpenAI\(|generateAltText\(/.test(source);
   return hasIntelligenceAccess && (hasAiCall || MANUAL_CONSUMERS.has(relPath));
 }
@@ -146,6 +146,18 @@ describe('intelligence consumer inventory', () => {
     const contentBrief = readFileSync(resolve(ROOT_DIR, 'server/content-brief.ts'), 'utf-8'); // readFile-ok — PR5 guard: content briefs use builder promptContext for SEO/voice/knowledge data.
     expect(contentBrief).toContain('buildContentGenerationContext');
     expect(contentBrief).not.toMatch(/formatKeywordsForPrompt|formatKnowledgeBaseForPrompt|formatPersonasForPrompt/);
+
+    for (const file of [
+      'server/content-posts-ai.ts',
+      'server/page-analysis-job.ts',
+      'server/routes/google.ts',
+      'server/routes/public-analytics.ts',
+      'server/webflow-seo-bulk-analyze-job.ts',
+    ]) {
+      const source = readFileSync(resolve(ROOT_DIR, file), 'utf-8'); // readFile-ok — SEO prompt builder guard: these consumers should stay on the shared seoContext/learnings/page-map builder.
+      expect(source).toContain('buildSeoPromptContext');
+      expect(source).not.toMatch(/formatForPrompt\(intel|formatPageMapForPrompt\(intel\.seoContext|buildWorkspaceIntelligence\(.*slices:\s*\['seoContext', 'learnings'/s);
+    }
   });
 
   it('keeps chat and page-assist consumers on dedicated context builders', () => {

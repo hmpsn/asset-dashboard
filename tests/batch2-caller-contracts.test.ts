@@ -5,6 +5,7 @@
  * These tests catch regressions when migrated files are modified:
  *   — correct slices requested for buildWorkspaceIntelligence (via slices-var or buildIntelPrompt)
  *   — correct sections requested for formatForPrompt (via slices-var, sections: slices, or buildIntelPrompt)
+ *   — SEO prompt consumers stay on buildSeoPromptContext() instead of re-inlining prompt + page-map assembly
  *   — learningsDomain threaded correctly
  *   — formatPageMapForPrompt called without pagePath filter where full cross-page map is needed
  *   — hasMeaningfulContext guard present and complete in keyword-recommendations
@@ -86,21 +87,21 @@ function hasSectionsSeoContextLearnings(src: string): boolean {
   );
 }
 
+function usesSeoPromptBuilder(src: string): boolean {
+  return src.includes('buildSeoPromptContext');
+}
+
 // ── buildVoiceContext (content-posts-ai.ts) ───────────────────────────────────
 
 describe('buildVoiceContext migration contracts (content-posts-ai.ts)', () => {
   const src = read('content-posts-ai.ts');
 
-  it('requests seoContext + learnings slices', () => {
-    expect(hasSlicesSeoContextLearnings(src)).toBe(true);
+  it('uses the shared SEO prompt context builder', () => {
+    expect(usesSeoPromptBuilder(src)).toBe(true);
   });
 
   it("uses learningsDomain:'content' for content-specific learnings", () => {
     expect(src).toContain("learningsDomain: 'content'");
-  });
-
-  it('formats with seoContext + learnings sections', () => {
-    expect(hasSectionsSeoContextLearnings(src)).toBe(true);
   });
 });
 
@@ -238,12 +239,8 @@ describe('content-decay.ts migration contracts', () => {
 describe('google.ts search-chat migration contracts', () => {
   const src = readRoute('google.ts');
 
-  it('requests seoContext + learnings slices', () => {
-    expect(hasSlicesSeoContextLearnings(src)).toBe(true);
-  });
-
-  it('formats with seoContext + learnings sections', () => {
-    expect(hasSectionsSeoContextLearnings(src)).toBe(true);
+  it('uses the shared SEO prompt context builder', () => {
+    expect(usesSeoPromptBuilder(src)).toBe(true);
   });
 });
 
@@ -252,12 +249,8 @@ describe('google.ts search-chat migration contracts', () => {
 describe('public-analytics.ts AI review migration contracts', () => {
   const src = readRoute('public-analytics.ts');
 
-  it('requests seoContext + learnings slices', () => {
-    expect(hasSlicesSeoContextLearnings(src)).toBe(true);
-  });
-
-  it('formats with seoContext + learnings sections', () => {
-    expect(hasSectionsSeoContextLearnings(src)).toBe(true);
+  it('uses the shared SEO prompt context builder', () => {
+    expect(usesSeoPromptBuilder(src)).toBe(true);
   });
 });
 
@@ -310,14 +303,16 @@ describe('keyword-recommendations.ts meaningful-context guard', () => {
 describe('page-analysis-job.ts migration contracts', () => {
   const src = read('page-analysis-job.ts');
 
-  it('requests seoContext + learnings slices for PA job AI context', () => {
-    // fullContext fed to per-page AI analysis — previously used buildSeoContext().fullContext
-    // which included learnings. Must include learnings slice.
-    expect(hasSlicesSeoContextLearnings(src)).toBe(true);
+  it('uses the shared SEO prompt context builder for PA job AI context', () => {
+    expect(usesSeoPromptBuilder(src)).toBe(true);
   });
+});
 
-  it('formats with seoContext + learnings sections in PA job', () => {
-    expect(hasSectionsSeoContextLearnings(src)).toBe(true);
+describe('webflow-seo-bulk-analyze-job.ts migration contracts', () => {
+  const src = read('webflow-seo-bulk-analyze-job.ts');
+
+  it('uses the shared SEO prompt context builder', () => {
+    expect(usesSeoPromptBuilder(src)).toBe(true);
   });
 });
 

@@ -25,11 +25,9 @@ import { getWorkspace } from './workspaces.js';
 import { pageAnalysisAiResultSchema } from './schemas/page-analysis.js';
 import { listEeatAssets } from './eeat-assets.js';
 import { EEAT_RECOMMENDATION_SURFACE, evaluatePageTrustSignals } from './eeat-trust-signals.js';
+import { buildSeoPromptContext } from './intelligence/generation-context-builders.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 import {
-  buildWorkspaceIntelligence,
-  formatForPrompt,
-  formatPageMapForPrompt,
   invalidateIntelligenceCache,
 } from './workspace-intelligence.js';
 import { WS_EVENTS } from './ws-events.js';
@@ -227,10 +225,9 @@ export async function runPageAnalysisJob({
       return;
     }
 
-    const slices = ['seoContext', 'learnings'] as const;
-    const intel = await buildWorkspaceIntelligence(workspaceId, { slices });
-    const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: slices });
-    const kwMapCtx = formatPageMapForPrompt(intel.seoContext);
+    const seoPrompt = await buildSeoPromptContext(workspaceId);
+    const fullContext = seoPrompt.promptContext;
+    const kwMapCtx = seoPrompt.pageMapContext;
 
     const FETCH_HEADERS = { 'User-Agent': 'Mozilla/5.0 (compatible; HmpsnStudioBot/1.0)' };
 

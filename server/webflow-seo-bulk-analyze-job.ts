@@ -9,10 +9,8 @@ import { callAI } from './ai.js';
 import { getPageKeyword, upsertPageKeyword } from './page-keywords.js';
 import { resolvePersistedKeywordMetrics } from './provider-keyword-metrics.js';
 import { resolveBaseUrl } from './url-helpers.js';
+import { buildSeoPromptContext } from './intelligence/generation-context-builders.js';
 import {
-  buildWorkspaceIntelligence,
-  formatForPrompt,
-  formatPageMapForPrompt,
   invalidateIntelligenceCache,
 } from './workspace-intelligence.js';
 import { getTokenForSite, type Workspace } from './workspaces.js';
@@ -43,10 +41,9 @@ export async function runSeoBulkAnalyzeJob({
     const siteId = workspace.webflowSiteId || '';
     const token = getTokenForSite(siteId) || undefined;
 
-    const slices = ['seoContext', 'learnings'] as const;
-    const intel = await buildWorkspaceIntelligence(workspaceId, { slices });
-    const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: slices });
-    const kwMapCtx = formatPageMapForPrompt(intel.seoContext);
+    const seoPrompt = await buildSeoPromptContext(workspaceId);
+    const fullContext = seoPrompt.promptContext;
+    const kwMapCtx = seoPrompt.pageMapContext;
 
     const baseUrl = await resolveBaseUrl({ liveDomain: workspace.liveDomain, webflowSiteId: siteId }, token);
 

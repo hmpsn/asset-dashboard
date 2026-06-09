@@ -3,16 +3,19 @@ import type { WorkspaceIntelligence } from '../../shared/types/intelligence.js';
 import {
   buildContentGenerationContext,
   buildRecommendationGenerationContext,
+  buildSeoPromptContext,
 } from '../../server/intelligence/generation-context-builders.js';
 import {
   buildWorkspaceIntelligence,
   formatForPrompt,
+  formatPageMapForPrompt,
 } from '../../server/workspace-intelligence.js';
 import { listLocalSeoMarkets } from '../../server/local-seo.js';
 
 vi.mock('../../server/workspace-intelligence.js', () => ({
   buildWorkspaceIntelligence: vi.fn(),
   formatForPrompt: vi.fn(),
+  formatPageMapForPrompt: vi.fn(),
 }));
 
 vi.mock('../../server/local-seo.js', () => ({
@@ -39,6 +42,7 @@ describe('generation context builders', () => {
     vi.clearAllMocks();
     vi.mocked(buildWorkspaceIntelligence).mockResolvedValue(mockIntelligence);
     vi.mocked(formatForPrompt).mockReturnValue('[Workspace Intelligence]');
+    vi.mocked(formatPageMapForPrompt).mockReturnValue('[Page Map]');
     vi.mocked(listLocalSeoMarkets).mockReturnValue([]);
   });
 
@@ -247,5 +251,44 @@ describe('generation context builders', () => {
       learningsDomain: 'all',
       enrichWithBacklinks: true,
     });
+  });
+
+  it('buildSeoPromptContext preserves the legacy manual prompt + page-map composition', async () => {
+    const result = await buildSeoPromptContext('ws-seo');
+
+    expect(buildWorkspaceIntelligence).toHaveBeenCalledWith('ws-seo', {
+      slices: ['seoContext', 'learnings'],
+      pagePath: undefined,
+      learningsDomain: 'all',
+      enrichWithBacklinks: undefined,
+    });
+    expect(formatForPrompt).toHaveBeenCalledWith(mockIntelligence, {
+      verbosity: 'detailed',
+      sections: vi.mocked(buildWorkspaceIntelligence).mock.calls[0]?.[1]?.slices,
+      tokenBudget: undefined,
+      learningsDomain: 'all',
+    });
+    expect(formatPageMapForPrompt).toHaveBeenCalledWith(mockIntelligence.seoContext);
+    expect(result.promptContext).toBe('[Workspace Intelligence]');
+    expect(result.pageMapContext).toBe('[Page Map]');
+    expect(result.seoPromptContext).toBe('[Workspace Intelligence][Page Map]');
+  });
+
+  it('allows SEO prompt callers to disable page-map output while keeping the assembled intelligence parity', async () => {
+    const result = await buildSeoPromptContext('ws-seo', {
+      includePageMap: false,
+      learningsDomain: 'content',
+    });
+
+    expect(buildWorkspaceIntelligence).toHaveBeenCalledWith('ws-seo', {
+      slices: ['seoContext', 'learnings'],
+      pagePath: undefined,
+      learningsDomain: 'content',
+      enrichWithBacklinks: undefined,
+    });
+    expect(formatPageMapForPrompt).not.toHaveBeenCalled();
+    expect(result.promptContext).toBe('[Workspace Intelligence]');
+    expect(result.pageMapContext).toBe('');
+    expect(result.seoPromptContext).toBe('[Workspace Intelligence]');
   });
 });

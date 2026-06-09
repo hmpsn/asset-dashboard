@@ -45,7 +45,7 @@ import {
   fetchSearchComparison,
 } from '../analytics-data.js';
 import { RICH_BLOCKS_PROMPT } from '../prompt-rich-blocks.js';
-import { buildWorkspaceIntelligence, formatForPrompt, formatPageMapForPrompt } from '../workspace-intelligence.js';
+import { buildSeoPromptContext } from '../intelligence/generation-context-builders.js';
 import { listTemplates } from '../content-templates.js';
 import { listMatrices } from '../content-matrices.js';
 import { incrementUsage } from '../usage-tracking.js';
@@ -374,9 +374,8 @@ router.post('/api/public/search-chat/:workspaceId', validate(chatSchema), async 
     const bookingUrl = getBookingUrl();
 
     // Pre-compute SEO context blocks for the system prompt
-    const slices = ['seoContext', 'learnings'] as const;
-    const intel = await buildWorkspaceIntelligence(ws.id, { slices });
-    const seoContextBlock = formatForPrompt(intel, { verbosity: 'detailed', sections: slices }) + formatPageMapForPrompt(intel.seoContext);
+    const seoPrompt = await buildSeoPromptContext(ws.id);
+    const seoContextBlock = seoPrompt.seoPromptContext;
 
     // Content plan context (templates + matrices) — fetched server-side
     let contentPlanSection = '';
