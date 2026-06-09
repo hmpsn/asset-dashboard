@@ -29,6 +29,11 @@ export interface CompressionSkipResult {
 
 interface CompressImageBufferOptions {
   outputBaseName?: string;
+  rasterThresholdPercent?: number;
+  svgThresholdPercent?: number;
+  rasterSkipReasonLabel?: string;
+  svgSkipReasonLabel?: string;
+  svgFailureMode?: 'skip' | 'throw';
 }
 
 export async function compressImageBuffer(
@@ -41,6 +46,11 @@ export async function compressImageBuffer(
   const originalSize = originalBuffer.length;
   const ext = sourceName.split('.').pop()?.split('?')[0]?.toLowerCase() || 'jpg';
   const baseName = (options.outputBaseName || sourceName).replace(/\.[^.]+$/, '');
+  const rasterThresholdPercent = options.rasterThresholdPercent ?? 5;
+  const svgThresholdPercent = options.svgThresholdPercent ?? 3;
+  const rasterSkipReasonLabel = options.rasterSkipReasonLabel ?? 'Already optimized';
+  const svgSkipReasonLabel = options.svgSkipReasonLabel ?? 'SVG already optimized';
+  const svgFailureMode = options.svgFailureMode ?? 'skip';
 
   let compressed: Buffer;
   let newFileName: string;
@@ -57,6 +67,9 @@ export async function compressImageBuffer(
       newFileName = `${baseName}.svg`;
     } catch (err) {
       log.error({ err }, 'SVGO error');
+      if (svgFailureMode === 'throw') {
+        throw err;
+      }
       return {
         skipped: true,
         reason: `SVGO optimization failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -93,8 +106,8 @@ export async function compressImageBuffer(
   const newSize = compressed.length;
   const savings = originalSize - newSize;
   const savingsPercent = Math.round((savings / originalSize) * 100);
-  const threshold = ext === 'svg' ? 3 : 5;
-  const typeLabel = ext === 'svg' ? 'SVG already optimized' : 'Already optimized';
+  const threshold = ext === 'svg' ? svgThresholdPercent : rasterThresholdPercent;
+  const typeLabel = ext === 'svg' ? svgSkipReasonLabel : rasterSkipReasonLabel;
 
   if (savingsPercent < threshold) {
     return {

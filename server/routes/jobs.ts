@@ -94,10 +94,9 @@ import {
   buildWorkspaceIntelligence,
   invalidateIntelligenceCache,
 } from '../workspace-intelligence.js';
-import type { default as SharpConstructor } from 'sharp';
-import type * as SvgoMod from 'svgo';
 import { isProgrammingError } from '../errors.js';
 import { WS_EVENTS } from '../ws-events.js';
+import { compressImageBuffer } from '../domains/webflow-assets/image-optimization.js';
 
 const log = createLogger('jobs');
 const router = Router();
@@ -371,46 +370,29 @@ router.post('/api/jobs', async (req, res) => {
         (async () => {
           try {
             updateJob(job.id, { status: 'running' });
-            const sharp: typeof SharpConstructor = (await import('sharp')).default; // dynamic-import-ok
             const response = await fetch(imageUrl);
             const originalBuffer = Buffer.from(await response.arrayBuffer());
-            const originalSize = originalBuffer.length;
-            const ext = (fileName || imageUrl).split('.').pop()?.split('?')[0]?.toLowerCase() || 'jpg';
-            let compressed: Buffer;
-            let newFileName: string;
-            const baseName = (fileName || 'image').replace(/\.[^.]+$/, '');
+            const compression = await compressImageBuffer(originalBuffer, fileName || imageUrl, {
+              outputBaseName: fileName || 'image',
+              rasterThresholdPercent: 3,
+              svgThresholdPercent: 3,
+              rasterSkipReasonLabel: 'Already optimized',
+              svgSkipReasonLabel: 'Already optimized',
+              svgFailureMode: 'throw',
+            });
 
-            if (ext === 'svg') {
-              const svgo: typeof SvgoMod = await import('svgo'); // dynamic-import-ok
-              const svgString = originalBuffer.toString('utf-8');
-              const svgResult = svgo.optimize(svgString, { multipass: true, plugins: ['preset-default'] } as Parameters<typeof svgo.optimize>[1]);
-              compressed = Buffer.from(svgResult.data, 'utf-8');
-              newFileName = `${baseName}.svg`;
-            } else if (ext === 'jpg' || ext === 'jpeg') {
-              compressed = await sharp(originalBuffer).jpeg({ quality: 80, mozjpeg: true }).toBuffer();
-              newFileName = `${baseName}.jpg`;
-            } else if (ext === 'png') {
-              const webpBuffer = await sharp(originalBuffer).webp({ quality: 80 }).toBuffer();
-              const pngBuffer = await sharp(originalBuffer).png({ compressionLevel: 9, palette: true }).toBuffer();
-              if (webpBuffer.length < pngBuffer.length) { compressed = webpBuffer; newFileName = `${baseName}.webp`; }
-              else { compressed = pngBuffer; newFileName = `${baseName}.png`; }
-            } else {
-              compressed = await sharp(originalBuffer).webp({ quality: 80 }).toBuffer();
-              newFileName = `${baseName}.webp`;
-            }
-
-            const newSize = compressed.length;
-            const savings = originalSize - newSize;
-            const savingsPercent = Math.round((savings / originalSize) * 100);
-
-            if (savingsPercent < 3) {
-              updateJob(job.id, { status: 'done', result: { skipped: true, reason: `Already optimized (only ${savingsPercent}% savings)` }, message: 'Already optimized' });
+            if ('skipped' in compression) {
+              updateJob(job.id, {
+                status: 'done',
+                result: { skipped: true, reason: compression.reason },
+                message: 'Already optimized',
+              });
               return;
             }
 
-            const tmpPath = `/tmp/compressed_${Date.now()}_${newFileName}`;
-            fs.writeFileSync(tmpPath, compressed);
-            const uploadResult = await uploadAsset(siteId, tmpPath, newFileName, altText, compressToken);
+            const tmpPath = `/tmp/compressed_${Date.now()}_${compression.newFileName}`;
+            fs.writeFileSync(tmpPath, compression.compressed);
+            const uploadResult = await uploadAsset(siteId, tmpPath, compression.newFileName, altText, compressToken);
             try { fs.unlinkSync(tmpPath); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs: programming error'); /* ignore */ }
 
             if (!uploadResult.success) {
@@ -420,15 +402,28 @@ router.post('/api/jobs', async (req, res) => {
             await deleteAsset(assetId, compressToken);
             updateJob(job.id, {
               status: 'done',
-              result: { success: true, newAssetId: uploadResult.assetId, originalSize, newSize, savings, savingsPercent, newFileName },
-              message: `Saved ${Math.round(savings / 1024)}KB (${savingsPercent}%)`,
+              result: {
+                success: true,
+                newAssetId: uploadResult.assetId,
+                originalSize: compression.originalSize,
+                newSize: compression.newSize,
+                savings: compression.savings,
+                savingsPercent: compression.savingsPercent,
+                newFileName: compression.newFileName,
+              },
+              message: `Saved ${Math.round(compression.savings / 1024)}KB (${compression.savingsPercent}%)`,
             });
             const singleCompressWsId = params.workspaceId as string;
             if (singleCompressWsId) {
               addActivity(singleCompressWsId, 'images_optimized',
-                `Image compressed: ${fileName || 'image'} — saved ${Math.round(savings / 1024)}KB (${savingsPercent}%)`,
+                `Image compressed: ${fileName || 'image'} — saved ${Math.round(compression.savings / 1024)}KB (${compression.savingsPercent}%)`,
                 undefined,
-                { originalSize, newSize, savings, savingsPercent }
+                {
+                  originalSize: compression.originalSize,
+                  newSize: compression.newSize,
+                  savings: compression.savings,
+                  savingsPercent: compression.savingsPercent,
+                }
               );
             }
           } catch (err) {
