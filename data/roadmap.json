@@ -1,6 +1,315 @@
 {
   "sprints": [
     {
+      "id": "sprint-platform-simplification-explorers-2026-06-09",
+      "name": "🧭 Platform Simplification — Parallel Explorer Recommendations",
+      "hours": "phased",
+      "rationale": "Six read-only parallel explorers audited the platform for behavior-preserving simplification opportunities: server domain shape, intelligence slices, frontend data flow, stacked feature surfaces, integration adapters, and test/guardrail leverage. This sprint captures those findings as a pick-up-ready backlog. The goal is not to remove functionality or pursue a broad rewrite; it is to make existing platform concepts more canonical by consolidating repeated lifecycle logic, cache invalidation, prompt assembly, provider transport, and guardrail patterns behind the conventions the codebase already uses.",
+      "notes": "Source: 2026-06-09 parallel simplification explorer batch. All items are recommendation-only and pending. Before implementing any item: run the normal brainstorm/spec/pre-plan-audit/plan flow where the scope crosses multiple files; preserve behavior first; use phase-per-PR for high-blast-radius work; add parity tests before rewiring user-visible behavior. Recommended first PR: frontend invalidation helper extraction, starting with keyword mutation invalidation bundles before broader WS registry work.",
+      "items": [
+        {
+          "id": "simp-frontend-keyword-invalidation-bundles",
+          "title": "Frontend cache simplification — extract keyword mutation invalidation bundles",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Frontend Data Flow",
+          "est": "small-medium",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Recommended first PR. Scope: `src/hooks/admin/useKeywordCommandCenter.ts`, `src/hooks/admin/useLocalSeo.ts`, `src/hooks/admin/useOutcomes.ts`, `src/hooks/admin/useCopyPipeline.ts`, `src/hooks/admin/useWorkOrders.ts`, `src/lib/queryKeys.ts`, and existing helper `src/lib/background-job-helpers.ts`. Current complexity: mutations repeat domain cache groups by hand, especially keyword strategy/KCC/rank tracking/intelligence. Behavior-preserving path: add `invalidateMany(queryClient, keys)` plus domain helpers such as `keywordMutationInvalidationKeys(wsId)`, `copyEntryInvalidationKeys(wsId, entryId?)`, `localSeoInvalidationKeys(wsId)`. Start with the KCC/rank-tracking bundle because several mutations share the same invalidation set and recent audit work touched that surface. Do not change event names or query key factories in the first PR. Tests/guardrails: focused QueryClient spy tests proving before/after invalidated keys match; keep `npm run typecheck`, `npx vite build`, and relevant KCC hook/component tests green.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-frontend-ws-invalidation-registry",
+          "title": "Frontend cache simplification — central event-to-query invalidation registry",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Frontend Data Flow",
+          "est": "medium",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Scope: `src/hooks/useWsInvalidation.ts`, `src/components/ClientDashboard.tsx`, `src/components/client/inbox/UnifiedInbox.tsx`, `src/components/client/ClientCopyReview.tsx`, `src/components/admin/ClientDeliverablesPane.tsx`, `src/lib/queryKeys.ts`, `src/lib/wsEvents.ts`. Current complexity: many websocket handlers repeat `queryClient.invalidateQueries(...)`; client-specific handlers duplicate parts of the central admin invalidation hook while also mixing local UI side effects. Behavior-preserving path: after domain invalidation bundles exist, add a shared registry like `getWorkspaceInvalidationKeys(event, workspaceId, payload, scope)` and have handlers call `invalidateMany`. Keep UI-only websocket behavior local (progress bars, modal state, optimistic notifications). Migrate event-by-event, starting with high-volume events such as `CONTENT_UPDATED`, `STRATEGY_UPDATED`, `COPY_SECTION_UPDATED`, `DELIVERABLE_UPDATED`, and rank/keyword events. Tests/guardrails: unit coverage for event-to-key mapping, keep `tests/integration/broadcast-handler-pairs.test.ts` and `tests/contract/ws-invalidation-coverage.test.ts` green, and add a guardrail that new workspace broadcasts either register invalidation keys or document why they are UI-only.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-frontend-shared-gsc-base-hook",
+          "title": "Frontend data hooks — create shared GSC base hook mirroring GA4",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Frontend Data Flow",
+          "est": "small",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Scope: `src/hooks/shared/useGA4Base.ts`, `src/hooks/admin/useAdminSearch.ts`, `src/hooks/client/useClientSearch.ts`, `src/api/analytics.ts`, `src/lib/queryKeys.ts`. Current complexity: GA4 has a shared base hook while GSC admin/client hooks repeat parallel `useQuery` setup, loading/error aggregation, and metric naming. Behavior-preserving path: add `src/hooks/shared/useGSCBase.ts` with configurable API calls, key factories, metric labels, and optional admin-only dimensions; keep `useAdminSearch` and `useClientSearch` as thin adapters so component call sites do not change. Tests/guardrails: typecheck, admin/client Search tab smoke render, and assertions that query keys remain `queryKeys.admin.gsc(...)` and `queryKeys.client.gsc(...)` rather than new literals.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-frontend-component-local-data-access",
+          "title": "Frontend data flow — move remaining component-local data access into hooks/API wrappers",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Frontend Data Flow",
+          "est": "medium",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Scope: `src/components/client/ClientCopyReview.tsx`, `src/components/client/ContentTab.tsx`, `src/components/client/strategy/useStrategyTrackedKeywords.ts`, `src/components/page-intelligence/usePageIntelligenceKeywordTracking.ts`, `src/hooks/useFeatureFlag.ts`, and matching `src/api/*` wrappers. Current complexity: a few components/hooks still define inline API helpers, direct `fetch()`, or manual loading state instead of React Query and typed API wrappers. Behavior-preserving path: add typed wrappers for public copy review, text exports, feature flags, and tracked keyword reads; move client copy review queries/mutations to `src/hooks/client/`; convert tracked keyword loaders to React Query-backed hooks. Split into two PRs: copy/export wrappers first, tracked keyword hooks second. Tests/guardrails: client copy review interaction tests, strategy/page intelligence tracking smoke tests, and a post-PR `rg \"fetch\\(\" src/components src/hooks` review with intentional exceptions documented.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-frontend-query-key-factory-coverage",
+          "title": "Frontend query keys — tighten factory coverage for prefix keys and variants",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Frontend Data Flow",
+          "est": "small",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Scope: `src/lib/queryKeys.ts`, `src/hooks/useWsInvalidation.ts`, `src/components/ClientDashboard.tsx`, `src/hooks/admin/useOutcomes.ts`, `src/hooks/admin/useLocalSeo.ts`. Current complexity: most keys are centralized, but some prefix/variant keys are still assembled ad hoc with array literals/spreads. Behavior-preserving path: add explicit factories such as `admin.blueprintAll(wsId)`, `admin.blueprintVersionsAll(wsId)`, `client.postPreviewAll(wsId)`, `admin.outcomeAction(wsId, actionId)`, `admin.outcomeActionsFiltered(wsId, type, score)`, and `admin.localSeoVariant(wsId, includeSnapshots)`. Migrate one domain at a time. Tests/guardrails: typecheck/build; static grep for `queryKey: [` after migration; consider a pr-check warning that literal query-key arrays require a `querykey-ok` reason unless they are inside `queryKeys.ts`.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-google-provider-client",
+          "title": "Integration adapters — introduce a shared Google provider transport wrapper",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Integration Adapters",
+          "est": "medium",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Scope: `server/google-analytics.ts`, `server/search-console.ts`, `server/google-auth.ts`, routes under `server/routes/google.ts`, and Google-related tests. Current complexity: GA4, GSC, and OAuth helpers use separate raw `fetch()` behavior, different timeout handling, and inconsistent provider error envelopes; DataForSEO has stronger centralized transport patterns by comparison. Behavior-preserving path: add `server/google-provider-client.ts` with `googleJson<T>()`, timeout support, sanitized provider error classification, token refresh integration where appropriate, and an explicit degraded/null policy for quota-sensitive reads. Keep existing exported functions and route response shapes stable in the first PR; migrate GA4 read calls first, then GSC query/inspection calls, then OAuth exchange/refresh if it fits. Tests/guardrails: `tests/unit/google-auth.test.ts`, `tests/unit/google-analytics-pure.test.ts`, `tests/unit/gsc-pagination.test.ts`, `tests/integration/google-routes-extended.test.ts`, plus provider-error fixtures for 401/403/429/5xx.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-webflow-result-pagination-helpers",
+          "title": "Integration adapters — standardize Webflow result envelopes and pagination helpers",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Integration Adapters",
+          "est": "medium-large",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Scope: `server/webflow-client.ts`, `server/webflow-pages.ts`, `server/webflow-cms.ts`, `server/webflow-assets.ts`, Webflow SEO write modules, and Webflow tests. Current complexity: Webflow modules repeat `if (!res.ok) return []|null|{ success:false }`, offset/limit pagination, and stringified status/body errors. Behavior-preserving path: extend `webflow-client.ts` with `webflowJson<T>()`, `webflowMutation()`, `paginateWebflow<T>()`, and a typed `WebflowResult<T>`. Preserve existing product function return shapes as adapters over the helper. Split read-only endpoints first; mutate/write flows second because upload/delete/CMS repair behavior is higher risk. Tests/guardrails: `tests/unit/webflow-client.test.ts`, `tests/unit/webflow-pages-pure.test.ts`, `tests/unit/webflow-assets.test.ts`, `tests/integration/webflow-cms-writes.test.ts`, `tests/integration/webflow-seo-writes.test.ts`; assert current degradation behavior is unchanged.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-dataforseo-operation-runner",
+          "title": "Integration adapters — extract DataForSEO operation runner for cache/credits/telemetry",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Integration Adapters",
+          "est": "medium-large",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Scope: `server/providers/dataforseo-provider.ts`, `server/seo-data-provider.ts`, keyword provider tests, and KCC provider consumers. Current complexity: methods around related keywords, questions, ideas, site keywords, and backlinks repeat cache read/write, credit logging, task-error handling, `areCreditsExhausted()` branches, and empty-result fallback behavior. Behavior-preserving path: introduce `runDataForSeoOperation<T>()` with endpoint, method, cache key/TTL, normalizer, empty fallback, and credit endpoint label. Keep `apiCall`/`apiGet` as thin wrappers or collapse to a method-aware helper after parity tests. Split into request runner first, then cache/credit runner. Tests/guardrails: `tests/unit/dataforseo-provider.test.ts`, `tests/unit/seo-data-provider.test.ts`, `tests/contract/keyword-provider-abstraction.test.ts`, and keyword command center provider coverage for degraded/empty/credit-exhausted responses.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-stripe-checkout-preflight",
+          "title": "Integration adapters — extract Stripe checkout route preflight",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Integration Adapters",
+          "est": "small",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "Scope: `server/routes/stripe.ts`, `server/stripe.ts`, and Stripe integration tests. Current complexity: create checkout, cart checkout, and upgrade checkout repeat configured checks, workspace lookup, external billing guard, base URL construction, success/cancel URL construction, and sanitized provider error response handling. Behavior-preserving path: add route-local `buildCheckoutContext(req, workspaceId, returnTab)` or `withStripeCheckoutPreflight()` returning `{ ws, baseUrl, successUrl, cancelUrl }`; leave Stripe SDK/session creation in `server/stripe.ts`. Tests/guardrails: `tests/integration/stripe-checkout-flow.test.ts`, `tests/integration/stripe-api.test.ts`, `tests/integration/stripe-admin-auth.test.ts`; verify all existing API error shapes remain `{ error: string }`.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-ai-provider-http-retry-helper",
+          "title": "Integration adapters — share AI provider HTTP retry/backoff helper internally",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Integration Adapters",
+          "est": "medium",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Scope: `server/openai-helpers.ts`, `server/anthropic-helpers.ts`, `server/ai.ts`, and AI helper tests. Current complexity: OpenAI and Anthropic helpers duplicate retry-after/backoff/timeout logic; Anthropic tool-use path has a separate retry implementation and less consistent trace/cancellation behavior. Behavior-preserving path: create internal `runAiHttpRequest()` or `withProviderRetry()` used only by provider helpers. Keep `callAI()` as the public boundary and keep provider-specific response normalization separate. Do not expose new direct provider callers. Tests/guardrails: `tests/unit/openai-helpers.test.ts`, `tests/unit/anthropic-helpers.test.ts`, `tests/contract/ai-dispatch-migration.test.ts`, `tests/contract/ai-operation-registry-usage.test.ts`; assert retry timing/error classification parity.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-intelligence-optional-slice-helper",
+          "title": "Intelligence slices — extract optional enrichment/degradation helper",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Intelligence/Slice Complexity",
+          "est": "small-medium",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Scope: `server/intelligence/seo-context-slice.ts`, `server/intelligence/client-signals-slice.ts`, `server/intelligence/operational-slice.ts`, `server/intelligence/content-pipeline-slice.ts`, `server/intelligence/site-health-slice.ts`, plus slice tests. Current complexity: assemblers repeat many `try { dynamic import/read/map } catch { log; fallback }` blocks, making degradation rules verbose and easy to drift. Behavior-preserving path: add a small helper like `readOptionalSlicePart(label, workspaceId, fallback, fn, { warnProgrammingErrors })`; migrate one slice at a time, starting with `operational` or `contentPipeline`. Keep slice-specific mapping logic local. Tests/guardrails: assembler degradation tests where one dependency throws, seeded workspace output snapshots, and logging assertions that expected optional failures remain warnings while programming errors still surface where required.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-intelligence-seo-prompt-context-builder",
+          "title": "Intelligence prompt builders — add lightweight SEO prompt context builder",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Intelligence/Slice Complexity",
+          "est": "small",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Scope: `server/intelligence/generation-context-builders.ts`, `server/content-posts-ai.ts`, `server/page-analysis-job.ts`, `server/routes/public-analytics.ts`, `server/routes/google.ts`, `server/webflow-seo-bulk-analyze-job.ts`. Current complexity: several consumers manually assemble the same `seoContext` + `learnings` + page-map prompt blocks. Behavior-preserving path: add `buildSeoPromptContext()` beside existing generation context builders with options for `includePageMap`, `learningsDomain`, `verbosity`, `tokenBudget`, and optional backlink enrichment. Prove output parity against one current manual composition before migrating call sites. Tests/guardrails: unit test for builder output equality, prompt snapshot for a seeded workspace, and a future pr-check warning for new manual `formatForPrompt(...seoContext/learnings...) + formatPageMapForPrompt` compositions.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-intelligence-seo-sub-block-builder",
+          "title": "Intelligence prompt builders — centralize SEO sub-block composition for assists/jobs",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Intelligence/Slice Complexity",
+          "est": "small-medium",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Scope: `server/intelligence/page-assist-context-builder.ts`, `server/copy-generation.ts`, `server/routes/jobs.ts`, `server/internal-links.ts`, and SEO context tests. Current complexity: consumers manually stitch `formatKeywordsForPrompt`, `effectiveBrandVoiceBlock`, personas, knowledge base, and page-map blocks, sometimes with page-keyword overrides. Behavior-preserving path: export typed `buildSeoPromptBlocks(seoContext, opts)` returning `{ keywordBlock, brandVoiceBlock, personasBlock, knowledgeBlock, pageMapBlock }`; use it in `buildPageAssistContext()` first, then migrate jobs/copy/internal-linking. Tests/guardrails: calibrated voice-profile regression ensuring no raw `brandVoice` bypasses authority resolution; output parity tests for page keyword override and knowledge/persona formatting.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-intelligence-formatter-facade-split",
+          "title": "Intelligence prompt formatting — split slice formatters behind existing facade",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Intelligence/Slice Complexity",
+          "est": "medium",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Scope: `server/intelligence/formatters.ts` and future `server/intelligence/formatters/<slice>.ts` files. Current complexity: one large formatter owns dispatch, cold-start behavior, token budget, and every slice renderer. Behavior-preserving path: keep `formatForPrompt()` as the only public facade and move two or three low-risk section renderers into slice-owned formatter modules first. Introduce a typed formatter registry only after snapshots prove output parity. Tests/guardrails: golden prompt snapshots for compact/standard/detailed verbosity, token-budget tests, cold-start tests, and no prompt text changes unless explicitly approved.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-intelligence-slice-metadata-registry",
+          "title": "Intelligence facade — introduce typed slice metadata registry incrementally",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Intelligence/Slice Complexity",
+          "est": "medium",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "Scope: `server/workspace-intelligence.ts`, `shared/types/intelligence.ts`, `server/intelligence/formatters.ts`, slice assembler imports. Current complexity: slice names, prompt-formattable status, required options, assembly dispatch, and formatting order are spread across arrays and switches. Behavior-preserving path: add a server-side registry with assembler, prompt formatter metadata, `promptFormattable`, `requires.pagePath/siteId`, and timeout. Keep shared consts as the public type source initially; start with assembly dispatch only, then formatter dispatch later. Tests/guardrails: contract test that every `INTELLIGENCE_SLICES` value has a registry entry; TypeScript should fail on missing assembler metadata; no call-site behavior changes in first PR.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-server-approval-batch-lifecycle-service",
+          "title": "Server domain shape — extract approval batch lifecycle services from thick route code",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Server Domain Shape",
+          "est": "medium",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Scope: `server/routes/approvals.ts`, `server/domains/inbox/approval-batch-respond.ts`, approval stores, page-state sync, activity, broadcasts, and Webflow apply behavior. Current complexity: approval create/respond/apply spreads page status derivation, activity, team email, Webflow writes, outcome tracking, recommendation resolution, and deliverable mirror sync across route code and domain modules. Behavior-preserving path: extract `approval-batch-mutations.ts` and `approval-batch-apply.ts`; routes become thin adapters calling `createApprovalBatchForClient`, `respondToApprovalItem`, and `applyApprovedBatchItems`. Split into two PRs: create/respond first, apply/Webflow side effects second. Tests/guardrails: approval create/respond/apply integration tests, partial apply retry tests, unified inbox respond parity, page-state aggregation contract, and broadcast assertions.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-server-schema-plan-lifecycle-service",
+          "title": "Server domain shape — unify schema plan lifecycle mutations",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Server Domain Shape",
+          "est": "medium",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Scope: `server/routes/webflow-schema.ts`, `server/domains/inbox/schema-plan-dual-write.ts`, `server/domains/inbox/schema-plan-respond.ts`, schema plan store/job interactions, broadcasts, deliverables. Current complexity: plan role updates, send-to-client, activation, delete, conflict checks, feedback handling, activity, intelligence invalidation, and deliverable sync are repeated around route handlers. Behavior-preserving path: add `server/domains/schema/schema-plan-lifecycle.ts` with `updatePlanRoles`, `sendSchemaPlanToClient`, `activateSchemaPlan`, `deleteSchemaPlanForSite`, and `respondToSchemaPlan`. Keep existing routes and response shapes. Tests/guardrails: schema plan send/feedback/delete integration tests, active-job conflict contract, deliverable sync event assertions, and state transition validation.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-server-legacy-jobs-runner-registry",
+          "title": "Server jobs — move legacy inline `/api/jobs` bodies into runner modules",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Server Domain Shape",
+          "est": "phased",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Scope: `server/routes/jobs.ts`, newer runner pattern in `server/routes/webflow-seo-jobs.ts`, and job modules for seo-audit, image compression, bulk alt text, bulk SEO fixes, and sales reports. Current complexity: `/api/jobs` mixes validation, job creation, dispatch, long-running execution, result shaping, and cancellation semantics; newer jobs already use dedicated runner modules. Behavior-preserving path: introduce a small job-handler registry and move legacy bodies into `*-job.ts` modules by job family. Keep `/api/jobs` as auth/validation/dispatch adapter. Split into 3-5 small PRs; do not migrate all job types at once. Tests/guardrails: route start tests per job type, active-job conflict tests, cancellation semantics where cancellable, result shape snapshots, `BACKGROUND_JOB_TYPES` lifecycle contract coverage.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-server-webflow-image-optimization-service",
+          "title": "Server Webflow assets — extract shared image optimization service",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Server Domain Shape",
+          "est": "medium",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Scope: `server/routes/webflow-alt-text.ts`, `server/routes/jobs.ts`, Webflow asset/CMS modules, `repairCmsReferences`, image compression/upload/delete flows. Current complexity: SVG/JPEG/PNG/WebP branches, temp-file handling, upload/delete behavior, and CMS reference repair are duplicated between route and job code; bulk-compress currently calls an internal HTTP route instead of the domain function directly. Behavior-preserving path: extract `server/domains/webflow-assets/image-optimization.ts` with `compressImageBuffer`, `replaceCompressedAsset`, and `repairCmsReferences`; route and jobs call the service directly. Tests/guardrails: unit tests for extension handling and skip thresholds; integration-style mocks for upload failure, CMS repair failure, and old asset preservation.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-server-content-plan-review-service",
+          "title": "Server content plan — extract review/send-to-client mutations from route code",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Server Domain Shape",
+          "est": "small-medium",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Scope: `server/routes/content-plan-review.ts`, approval batch construction, deliverable mirrors, matrix cell status changes, broadcasts, and activity logging. Current complexity: content-plan send-to-client behavior hand-builds approval batches and mirrors deliverables inline. Behavior-preserving path: extract `server/domains/content-plan/review-mutations.ts` with `sendTemplateForReview`, `sendSamplesForReview`, `flagMatrixCell`, and `batchApproveMatrixCells`; keep route serializers nearby or in a serializer module. Tests/guardrails: content plan review route tests, approval-batch payload shape tests, cell status transition assertions, and broadcast event contract.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-feature-keyword-hub-kcc-rank-consolidation",
+          "title": "Feature stack — finish one admin keyword operating surface",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Feature Stack Simplification",
+          "est": "phased",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Scope: `src/components/KeywordHub.tsx`, `src/components/KeywordCommandCenter.tsx`, `src/components/RankTracker.tsx`, `src/hooks/admin/useKeywordHubState.ts`, `src/hooks/admin/useKeywordCommandCenter.ts`, `server/keyword-command-center.ts`, `server/routes/keyword-command-center.ts`, `server/routes/rank-tracking.ts`, `server/rank-tracking.ts`. User-facing behavior to preserve: keyword lifecycle actions, rank history, snapshot capture, pinned trends, strategy feedback, View-in-Hub deep links, and local SEO segments. Current complexity: Keyword Hub and legacy KeywordCommandCenter both own filtering/search/deep-link/drawer/bulk action concerns; RankTracker and strategy surfaces also perform direct tracking mutations and cache invalidation. Behavior-preserving path: make `KeywordHub` the sole admin keyword lifecycle shell; keep `RankTracker` measurement-only, embedded or linked from the Hub drawer; extract shared rank tracking mutations/invalidation first; retire `KeywordCommandCenter.tsx` only after flag parity. Tests/guardrails: `KeywordHub.test.tsx`, `KeywordCommandCenterDeepLink.test.tsx`, `RankTracker.test.tsx`, rank/KCC route tests, and a contract that `RANK_TRACKING_UPDATED` invalidates Hub, latest/history ranks, strategy, and client rank reads.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-feature-inbox-deliverable-spine",
+          "title": "Feature stack — complete ClientDeliverable spine and shrink legacy inbox adapters",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Feature Stack Simplification",
+          "est": "phased",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Scope: `src/components/client/InboxTab.tsx`, `src/components/client/inbox/UnifiedInbox.tsx`, `src/lib/decision-adapters.ts`, `src/hooks/client/useUnifiedInbox.ts`, `server/domains/inbox/unified-inbox-read.ts`, `server/domains/inbox/send-to-client.ts`, `server/domains/inbox/deliverable-adapters/*`, `server/routes/deliverables.ts`, legacy approval/client-action/public-content routes. User-facing behavior to preserve: Decisions/Reviews/Conversations routing, note-based conversations, inline single-action approval, bulk modal, per-item edits, apply-to-website, projected copy/content reviews, requests, and work-order track lane. Current complexity: the canonical deliverable path exists, but legacy ApprovalBatch/ClientAction normalizers and source-specific public response/apply paths still leak into client rendering and props. Behavior-preserving path: move section routing and display count logic to a single deliverable projection utility; keep source-specific writes behind deliverable adapters; reduce `InboxTab` props to what `UnifiedInbox` needs; leave legacy routes available for compatibility. Tests/guardrails: unified inbox read route, deliverables route, decision adapters, InboxTab unified component coverage, approval dual-write tests, edited item propagation, and public approval broadcast tests.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-feature-client-insight-view-model",
+          "title": "Feature stack — consolidate client-facing insight projections into a read-only view model",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Feature Stack Simplification",
+          "est": "phased",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Scope: `src/components/client/Briefing/InsightsBriefingPage.tsx`, `src/components/client/InsightsEngine.tsx`, `src/components/client/AnalyticsTab.tsx`, `src/hooks/client/useClientBriefing.ts`, `src/hooks/client/useClientInsights.ts`, `src/hooks/client/useClientIntelligence.ts`, `src/hooks/useRecommendations.ts`, `server/routes/public-analytics.ts`, `server/routes/client-intelligence.ts`, `server/routes/recommendations.ts`, `server/briefing-client-projection.ts`, `server/insight-narrative.ts`, `server/monthly-digest.ts`. User-facing behavior to preserve: briefing magazine, monthly digest, recommendations, narrative insights, raw Analytics tab, Strategy deep links, and tier gating. Current complexity: client insight data is split across public intelligence, insight narrative, digest, briefing, recommendations, and raw GA4/GSC endpoints; components recompose overlapping summaries independently. Behavior-preserving path: introduce a read-only client insight view-model assembler returning named sections such as briefing, pulse, recommendations, narrative, digest, and intelligence summary. Keep existing endpoints during migration; raw Analytics charts stay separate. Tests/guardrails: client intelligence routes, briefing public tests, public analytics tests, hook/component coverage for briefing page, and public serialization tests proving admin-only fields remain scrubbed.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-feature-content-workflow-hooks",
+          "title": "Feature stack — extract content pipeline workflow mutations into focused hooks/services",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Feature Stack Simplification",
+          "est": "medium",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Scope: `src/components/ContentPipeline.tsx`, `src/components/ContentBriefs.tsx`, `src/components/ContentManager.tsx`, `src/hooks/admin/useAdminBriefs.ts`, `src/hooks/admin/useAdminPosts.ts`, `src/api/content.ts`, `server/routes/content-briefs.ts`, `server/routes/content-requests.ts`, `server/routes/content-posts.ts`, `server/domains/content/send-post-to-client.ts`, `server/content-brief.ts`, `server/content-posts.ts`, `server/content-requests.ts`. User-facing behavior to preserve: planner/calendar/briefs/posts/subscriptions tabs, request-to-brief generation, post generation, send to client, client review, Webflow publish, and exports. Current complexity: large components still mix workflow mutation logic, cache writes, raw API calls, local state machines, and rendering. Behavior-preserving path: create focused hooks such as `useAdminBriefWorkflow`, `useAdminContentRequestWorkflow`, and `useAdminPostWorkflow` over `src/api/content.ts`; keep components as render/state shells. Server route growth should stop; reusable transitions move into content-domain services. Tests/guardrails: ContentBriefs component tests, ContentManager send-to-client tests, content brief/post/request route tests, status transition tests, and public post review broadcast tests.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-feature-keyword-opportunity-projection",
+          "title": "Feature stack — centralize keyword opportunity display projection without merging scoring layers",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Feature Stack Simplification",
+          "est": "phased",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Scope: `server/scoring/keyword-value-score.ts`, `server/scoring/opportunity-value.ts`, `server/keyword-command-center.ts`, `server/keyword-strategy-enrichment.ts`, `server/keyword-recommendations.ts`, `server/briefing-client-projection.ts`, `src/components/client/strategy/StrategyKeywordDrawer.tsx`, `src/components/keyword-command-center/KeywordDetailDrawer.tsx`, `src/components/client/strategy/StrategyContentOpportunitiesSection.tsx`. User-facing behavior to preserve: Layer 1 Hub keyword value, Layer 2 recommendation opportunity value, client-safe explanations, content-gap ordering, and brief/request flows. Current complexity: scoring layers are intentionally separate, but display/ranking projections are scattered; surfaces consume `valueScore`, `opportunityScore`, fallback ordering, and 'why this matters' explanations differently. Behavior-preserving path: do not merge scoring algorithms. Add a shared projection helper for keyword-bearing opportunities that returns normalized keyword, display score, reasons, dollar value if allowed, client-safe explanation, and sort key. Use behind existing flags where ordering changes. Tests/guardrails: keyword value score tests, opportunity value tests, content gap scoring tests, keyword recommendation ranking tests, client strategy content gap tests, briefing preview tests, and flag-off parity tests.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-tests-source-contract-helper",
+          "title": "Test guardrails — add shared source-contract helper for string-based wiring tests",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Test/Guardrail Leverage",
+          "est": "small-medium",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Scope: `tests/bridge-wiring.test.ts`, `tests/bridges-simple.test.ts`, `tests/cache-invalidation-cluster.test.ts`, and other source-sniffing tests with `readFile-ok` comments. Current complexity: many tests repeat `readFileSync`, bounded section extraction, and `toContain/not.toContain` assertions, spreading platform intent across noisy implementation details. Behavior-preserving path: add `tests/helpers/source-contracts.ts` with `readProjectFile`, `boundedSection`, `expectContainsAll`, and `expectOmitsAll`; migrate bridge/cache tests first. Tests/guardrails: run the migrated tests plus `npx tsx scripts/pr-check.ts`; keep helper additive so existing source-contract tests can migrate gradually.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-tests-ws-event-contract-parser",
+          "title": "Test guardrails — extract one WS/event contract parser for coverage tests and pr-check",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Test/Guardrail Leverage",
+          "est": "medium",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Scope: `tests/integration/broadcast-handler-pairs.test.ts`, `tests/contract/ws-invalidation-coverage.test.ts`, `scripts/pr-check.ts`, and WS event constants. Current complexity: duplicate parsers collect `WS_EVENTS`, broadcasts, frontend handlers, and exemption lists; this overlaps directly with the frontend invalidation registry opportunity. Behavior-preserving path: extract `tests/helpers/ws-contracts.ts` with `parseWsEvents`, `collectBroadcasts`, and `collectHandlers`; let both tests consume the helper. Later extend it with an event-to-query-key expectation table once the frontend registry exists. Tests/guardrails: run broadcast-handler pairs, ws invalidation coverage, and pr-check tests; ensure CSS class/string false positives remain excluded.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-tests-ephemeral-integration-ports",
+          "title": "Test infrastructure — simplify integration server port ownership",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Test/Guardrail Leverage",
+          "est": "small foundation, large migration",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "Scope: `tests/integration/helpers.ts`, `tests/meta-port-uniqueness.test.ts`, `scripts/pr-check.ts`, and integration tests using `createTestContext(PORT)`. Current complexity: many tests allocate literal ports, requiring meta-test and pr-check enforcement plus `port-ok` comments. Behavior-preserving path: introduce `createEphemeralTestContext()` or `tests/helpers/ports.ts` allocator while keeping literal support during migration. First PR should only add the helper and migrate one representative integration file; broad migration can be opportunistic. Tests/guardrails: `tests/meta-port-uniqueness.test.ts`, a representative integration test, and smoke tests; ensure parallel Vitest behavior remains stable.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-tests-background-job-lifecycle-matrix",
+          "title": "Test guardrails — table-drive background job lifecycle coverage",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Test/Guardrail Leverage",
+          "est": "medium",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "Scope: `tests/contract/background-job-coverage-contract.test.ts`, `shared/types/background-jobs.ts`, and integration tests around job mutation safety/lifecycle. Current complexity: manual `COVERAGE_SIGNALS` and repeated assertions for job type/status/progress/message/result behavior. Behavior-preserving path: add a test-only registry mapping each `BACKGROUND_JOB_TYPES.*` entry to lifecycle expectations and signal files; use table-driven assertions. Tests/guardrails: background job coverage contract, lifecycle integration tests, and feature flag/job type verification; keep `BACKGROUND_JOB_TYPES` as the product authority.",
+          "createdAt": "2026-06-09"
+        },
+        {
+          "id": "simp-tests-pr-check-fixture-dsl",
+          "title": "Test guardrails — add pr-check fixture DSL and generated docs drift test",
+          "source": "Parallel simplification explorer audit 2026-06-09 — Test/Guardrail Leverage",
+          "est": "small-medium",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Scope: `tests/pr-check.test.ts`, `scripts/pr-check.ts`, `scripts/generate-rules-doc.ts`, `docs/rules/automated-rules.md`. Current complexity: pr-check tests are large and noisy, and docs drift is verified manually through `npm run rules:generate`. Behavior-preserving path: add an `expectRuleCases(rule, cases)` fixture DSL for compact positive/negative cases; add a contract test that renders generated rules content and compares to committed `automated-rules.md` without writing. Tests/guardrails: `npx vitest run tests/pr-check.test.ts`, `npm run rules:generate`, and `git diff --exit-code docs/rules/automated-rules.md`.",
+          "createdAt": "2026-06-09"
+        }
+      ]
+    },
+    {
       "id": "sprint-keyword-hub-2026-06-04",
       "name": "🔑 Keyword Hub (Wave 4) — KCC + Rank Tracker Consolidation",
       "hours": "phased",
