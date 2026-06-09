@@ -483,8 +483,8 @@ export function useWsInvalidation(workspaceId: string | undefined) {
     [WS_EVENTS.BLUEPRINT_UPDATED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.blueprints(workspaceId) });
-      qc.invalidateQueries({ queryKey: ['admin-blueprint', workspaceId] }); // querykey-ok: prefix invalidation (per-blueprint caches)
-      qc.invalidateQueries({ queryKey: ['admin-blueprint-versions', workspaceId] }); // querykey-ok: prefix invalidation (version histories)
+      qc.invalidateQueries({ queryKey: queryKeys.admin.blueprintAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.blueprintVersionsAll(workspaceId) });
     },
     [WS_EVENTS.BLUEPRINT_GENERATED]: () => {
       if (!workspaceId) return;

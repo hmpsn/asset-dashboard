@@ -14,6 +14,8 @@
  *  client-search → ['client-search', wsId, metric, days, dr] similarly
  */
 
+import type { AnalyticsDateRange } from '../../shared/types/analytics-contract.js';
+
 export type DateRange = AnalyticsDateRange;
 
 export const queryKeys = {
@@ -91,6 +93,8 @@ export const queryKeys = {
     keywordCommandCenterRows: (wsId: string, query: unknown) => ['admin-keyword-command-center', wsId, 'rows', query] as const,
     keywordCommandCenterDetail: (wsId: string, keyword: string) => ['admin-keyword-command-center', wsId, 'detail', keyword] as const,
     localSeo: (wsId: string) => ['admin-local-seo', wsId] as const,
+    localSeoVariant: (wsId: string, includeSnapshots: boolean) =>
+      ['admin-local-seo', wsId, includeSnapshots ? 'with-snapshots' : 'summary'] as const,
     localSeoLocations: (wsId: string) => ['admin-local-seo-locations', wsId] as const,
     eeatAssets: (wsId: string) => ['admin-eeat-assets', wsId] as const,
     rankTrackingKeywords: (wsId: string) => ['admin-rank-tracking-keywords', wsId] as const,
@@ -126,7 +130,9 @@ export const queryKeys = {
 
     // Brand Engine — Page Strategy
     blueprints: (wsId: string) => ['admin-blueprints', wsId] as const,
+    blueprintAll: (wsId: string) => ['admin-blueprint', wsId] as const,
     blueprint: (wsId: string, blueprintId: string) => ['admin-blueprint', wsId, blueprintId] as const,
+    blueprintVersionsAll: (wsId: string) => ['admin-blueprint-versions', wsId] as const,
     blueprintVersions: (wsId: string, blueprintId: string) => ['admin-blueprint-versions', wsId, blueprintId] as const,
 
     // Copy Pipeline
@@ -169,6 +175,9 @@ export const queryKeys = {
     health: () => ['admin-health'] as const,
     queue: () => ['admin-queue'] as const,
     outcomeActions: (wsId: string) => ['admin-outcome-actions', wsId] as const,
+    outcomeActionsFiltered: (wsId: string, type?: string, score?: string) =>
+      ['admin-outcome-actions', wsId, type ?? '', score ?? ''] as const,
+    outcomeAction: (wsId: string, actionId: string) => ['admin-outcome-actions', wsId, actionId] as const,
     outcomeScorecard: (wsId: string) => ['admin-outcome-scorecard', wsId] as const,
     outcomeTimeline: (wsId: string) => ['admin-outcome-timeline', wsId] as const,
     outcomeLearnings: (wsId: string) => ['admin-outcome-learnings', wsId] as const,
@@ -250,6 +259,7 @@ export const queryKeys = {
     copyEntriesCount: (wsId: string) => ['client-copy-entries-count', wsId] as const,
     copySections: (wsId: string, entryId: string) => ['client-copy-sections', wsId, entryId] as const,
     copySectionsAll: (wsId: string) => ['client-copy-sections', wsId] as const,
+    postPreviewAll: (wsId: string) => ['client', 'post-preview', wsId] as const,
     postPreview: (wsId: string, postId: string | undefined) => ['client', 'post-preview', wsId, postId] as const,
   },
 
@@ -263,4 +273,3 @@ export const queryKeys = {
     featureFlags: () => ['feature-flags'] as const,
   },
 } as const;
-import type { AnalyticsDateRange } from '../../shared/types/analytics-contract.js';

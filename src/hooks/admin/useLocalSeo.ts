@@ -8,7 +8,7 @@ import type { LocalSeoLocationLookupRequest, LocalSeoMarketUpdateRequest, LocalS
 export function useLocalSeo(workspaceId: string, options: { includeSnapshots?: boolean } = {}) {
   const includeSnapshots = options.includeSnapshots === true;
   return useQuery({
-    queryKey: [...queryKeys.admin.localSeo(workspaceId), includeSnapshots ? 'with-snapshots' : 'summary'] as const,
+    queryKey: queryKeys.admin.localSeoVariant(workspaceId, includeSnapshots),
     queryFn: () => includeSnapshots ? localSeo.getWithSnapshots(workspaceId) : localSeo.getSummary(workspaceId),
     enabled: !!workspaceId,
     staleTime: 2 * 60 * 1000,
