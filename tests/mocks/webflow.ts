@@ -52,42 +52,125 @@ function findRule(endpoint: string): MockRule | undefined {
   return undefined;
 }
 
-vi.mock('../../server/webflow-client.js', () => ({
-  getToken: vi.fn(() => 'test-webflow-token'),
+const mockedGetToken = vi.fn(() => 'test-webflow-token');
 
-  webflowFetch: vi.fn(
-    async (endpoint: string, options: RequestInit = {}, tokenOverride?: string) => {
-      // Capture the outbound request for test assertions.
-      const method = (options.method ?? 'GET').toUpperCase();
-      let body: unknown | undefined;
-      if (typeof options.body === 'string') {
-        try {
-          body = JSON.parse(options.body);
-        } catch {
-          body = options.body;
-        }
-      } else if (options.body != null) {
+const mockedWebflowFetch = vi.fn(
+  async (endpoint: string, options: RequestInit = {}, tokenOverride?: string) => {
+    // Capture the outbound request for test assertions.
+    const method = (options.method ?? 'GET').toUpperCase();
+    let body: unknown | undefined;
+    if (typeof options.body === 'string') {
+      try {
+        body = JSON.parse(options.body);
+      } catch {
         body = options.body;
       }
+    } else if (options.body != null) {
+      body = options.body;
+    }
 
-      mockState.captured.push({
-        endpoint,
-        method,
-        body,
-        token: tokenOverride,
-      });
+    mockState.captured.push({
+      endpoint,
+      method,
+      body,
+      token: tokenOverride,
+    });
 
-      // Find a matching rule and return its response.
-      const rule = findRule(endpoint);
-      if (rule) return rule.handler(endpoint);
+    // Find a matching rule and return its response.
+    const rule = findRule(endpoint);
+    if (rule) return rule.handler(endpoint);
 
-      // Default: 404 for unmocked endpoints (fail-loud in tests).
-      return new Response(
-        JSON.stringify({ error: `No mock configured for endpoint: ${endpoint}` }),
-        { status: 404, headers: { 'Content-Type': 'application/json' } },
-      );
-    },
-  ),
+    // Default: 404 for unmocked endpoints (fail-loud in tests).
+    return new Response(
+      JSON.stringify({ error: `No mock configured for endpoint: ${endpoint}` }),
+      { status: 404, headers: { 'Content-Type': 'application/json' } },
+    );
+  },
+);
+
+async function mockedWebflowJson<T>(
+  endpoint: string,
+  options: RequestInit = {},
+  tokenOverride?: string,
+): Promise<{ ok: true; data: T } | { ok: false; status: number; errorText: string }> {
+  const res = await mockedWebflowFetch(endpoint, options, tokenOverride);
+  if (!res.ok) {
+    return {
+      ok: false,
+      status: res.status,
+      errorText: await res.text(),
+    };
+  }
+  return { ok: true, data: await res.json() as T };
+}
+
+async function mockedWebflowMutation<T = undefined>(
+  endpoint: string,
+  options: RequestInit,
+  tokenOverride?: string,
+  parse: 'json' | 'none' = 'none',
+): Promise<{ ok: true; data: T } | { ok: false; status: number; errorText: string }> {
+  const res = await mockedWebflowFetch(endpoint, options, tokenOverride);
+  if (!res.ok) {
+    return {
+      ok: false,
+      status: res.status,
+      errorText: await res.text(),
+    };
+  }
+  if (parse === 'none') {
+    return { ok: true, data: undefined as T };
+  }
+  return { ok: true, data: await res.json() as T };
+}
+
+async function mockedPaginateWebflow<TPage, TItem>({
+  buildEndpoint,
+  extractItems,
+  getTotal,
+  tokenOverride,
+  limit = 100,
+  advanceBy = 'page-size',
+}: {
+  buildEndpoint: (offset: number, limit: number) => string;
+  extractItems: (page: TPage) => TItem[] | undefined;
+  getTotal?: (page: TPage) => number | undefined;
+  tokenOverride?: string;
+  limit?: number;
+  advanceBy?: 'items-length' | 'page-size';
+}): Promise<TItem[]> {
+  const allItems: TItem[] = [];
+  let offset = 0;
+
+  while (true) {
+    const result = await mockedWebflowJson<TPage>(buildEndpoint(offset, limit), {}, tokenOverride);
+    if (!result.ok) break;
+
+    const items = extractItems(result.data) || [];
+    allItems.push(...items);
+
+    if (items.length === 0) break;
+
+    offset += advanceBy === 'items-length' ? items.length : limit;
+
+    const total = getTotal?.(result.data);
+    if (typeof total === 'number') {
+      if (offset >= total) break;
+      continue;
+    }
+
+    if (items.length < limit) break;
+  }
+
+  return allItems;
+}
+
+vi.mock('../../server/webflow-client.js', () => ({
+  getToken: mockedGetToken,
+  webflowFetch: mockedWebflowFetch,
+  webflowJson: mockedWebflowJson,
+  webflowMutation: mockedWebflowMutation,
+  paginateWebflow: mockedPaginateWebflow,
 }));
 
 // ---------------------------------------------------------------------------
