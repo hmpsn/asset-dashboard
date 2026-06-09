@@ -54,6 +54,7 @@ vi.mock('../../server/email.js', () => ({
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createMatrix } from '../../server/content-matrices.js';
 import { createTemplate } from '../../server/content-templates.js';
+import db from '../../server/db/index.js';
 import { withPublicTestAuth } from './public-auth-test-helpers.js';
 
 let baseUrl = '';
@@ -89,6 +90,26 @@ function postJson(path: string, body?: unknown): Promise<Response> {
     headers: { 'Content-Type': 'application/json' },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   }));
+}
+
+function countActivityMatching(workspaceId: string, action: string): number {
+  const row = db.prepare(`
+    SELECT COALESCE(COUNT(*), 0) AS count
+    FROM activity_log
+    WHERE workspace_id = ?
+      AND metadata LIKE ?
+  `).get(workspaceId, `%"action":"${action}"%`) as { count: number };
+  return row.count;
+}
+
+function countDeliverablesByType(workspaceId: string, type: string): number {
+  const row = db.prepare(`
+    SELECT COALESCE(COUNT(*), 0) AS count
+    FROM client_deliverable
+    WHERE workspace_id = ?
+      AND type = ?
+  `).get(workspaceId, type) as { count: number };
+  return row.count;
 }
 
 // ── Test data ─────────────────────────────────────────────────────────────────
@@ -447,6 +468,22 @@ describe('POST /api/content-plan/:workspaceId/:matrixId/send-template-review', (
     expect(body.batch).toBeDefined();
   });
 
+  it('preserves the template approval-batch payload shape', async () => {
+    const res = await postJson(
+      `/api/content-plan/${adminWs}/${matrixId}/send-template-review`,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.batch.items).toHaveLength(1);
+    expect(body.batch.items[0].field).toBe('content_plan_template');
+    expect(body.batch.items[0].pageTitle).toBe('Template: Admin Template');
+    expect(body.batch.items[0].proposedValue).toContain('Page Type: service');
+    expect(body.batch.items[0].proposedValue).toContain('Sections:');
+    expect(body.batch.items[0].proposedValue).toContain('1. Why Choose Us for {service} (500 words)');
+    expect(countActivityMatching(adminWs, 'template_review_sent')).toBeGreaterThanOrEqual(1);
+    expect(countDeliverablesByType(adminWs, 'content_plan_template')).toBeGreaterThanOrEqual(1);
+  });
+
   it('broadcasts APPROVAL_UPDATE and CONTENT_UPDATED after send-template-review', async () => {
     broadcastState.calls = [];
     await postJson(`/api/content-plan/${adminWs}/${matrixId}/send-template-review`);
@@ -536,6 +573,24 @@ describe('POST /api/content-plan/:workspaceId/:matrixId/send-samples', () => {
     expect(body.batchId).toBeDefined();
     expect(body.cellsSent).toBe(1);
     expect(body.batch).toBeDefined();
+  });
+
+  it('preserves the sample approval-batch payload shape', async () => {
+    const res = await postJson(
+      `/api/content-plan/${samplesWs}/${matrixId}/send-samples`,
+      { cellIds: [cells[0].id] },
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.batch.items).toHaveLength(1);
+    expect(body.batch.items[0].field).toBe('content_plan_sample');
+    expect(body.batch.items[0].pageTitle).toBe('HVAC in Atlanta');
+    expect(body.batch.items[0].pageSlug).toBe('/services/atlanta/hvac');
+    expect(body.batch.items[0].proposedValue).toContain('Keyword: HVAC in Atlanta');
+    expect(body.batch.items[0].proposedValue).toContain('Planned URL: /services/atlanta/hvac');
+    expect(body.batch.items[0].proposedValue).toContain('Variables: service=HVAC, city=Atlanta');
+    expect(countActivityMatching(samplesWs, 'sample_review_sent')).toBeGreaterThanOrEqual(1);
+    expect(countDeliverablesByType(samplesWs, 'content_plan_sample')).toBeGreaterThanOrEqual(1);
   });
 
   it('promotes sent cells to "review" status (visible in public GET)', async () => {
