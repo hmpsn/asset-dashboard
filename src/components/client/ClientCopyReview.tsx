@@ -19,6 +19,7 @@ import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import { WS_EVENTS } from '../../lib/wsEvents';
 import { COPY_STATUS_BADGE } from '../../lib/copyStatusConfig';
 import { queryKeys } from '../../lib/queryKeys';
+import { invalidateWorkspaceEventQueries } from '../../lib/wsInvalidation';
 import { get, post } from '../../api/client';
 import type { CopySectionStatus, ClientSuggestion } from '../../../shared/types/copy-pipeline';
 
@@ -150,9 +151,7 @@ function ClientCopyReviewInner({ workspaceId, initialExpandedEntryId, soloEntryI
   const wsHandlers = useMemo(() => ({
     // ws-invalidation-ok — client keys (copyEntries, copySectionsAll) differ from admin keys in central hook
     [WS_EVENTS.COPY_SECTION_UPDATED]: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.client.copyEntries(workspaceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.client.copyEntriesCount(workspaceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.client.copySectionsAll(workspaceId) });
+      invalidateWorkspaceEventQueries(queryClient, WS_EVENTS.COPY_SECTION_UPDATED, workspaceId, undefined, 'client-copy-review');
     },
   }), [queryClient, workspaceId]);
 

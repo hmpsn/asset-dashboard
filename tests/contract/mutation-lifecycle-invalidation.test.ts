@@ -1,90 +1,73 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import { queryKeys } from '../../src/lib/queryKeys';
+import { getWorkspaceInvalidationKeys } from '../../src/lib/wsInvalidation';
+import { WS_EVENTS } from '../../src/lib/wsEvents';
 
 const root = resolve(import.meta.dirname, '../..');
 
 function readProjectFile(path: string): string {
-  return readFileSync(resolve(root, path), 'utf-8'); // readFile-ok — source contract test for mutation event invalidation wiring.
-}
-
-function eventBlock(source: string, eventKey: string): string {
-  const marker = `[WS_EVENTS.${eventKey}]`;
-  const start = source.indexOf(marker);
-  expect(start, `${marker} handler missing`).toBeGreaterThanOrEqual(0);
-  const next = source.indexOf('\n    [WS_EVENTS.', start + marker.length);
-  return source.slice(start, next === -1 ? undefined : next);
+  return readFileSync(resolve(root, path), 'utf-8'); // readFile-ok — source wiring contract for mutation event invalidation.
 }
 
 describe('mutation lifecycle invalidation contracts', () => {
   it('approval updates refresh admin and client approval read models', () => {
+    const keys = getWorkspaceInvalidationKeys(WS_EVENTS.APPROVAL_UPDATE, 'ws-1', undefined, 'admin');
     const source = readProjectFile('src/hooks/useWsInvalidation.ts');
-    const block = eventBlock(source, 'APPROVAL_UPDATE');
 
-    expect(block).toContain('queryKeys.client.approvals(workspaceId)');
-    expect(block).toContain('queryKeys.admin.approvals(workspaceId)');
-    expect(block).toContain('queryKeys.admin.workspaceHome(workspaceId)');
+    expect(source).toContain('[WS_EVENTS.APPROVAL_UPDATE]: () => invalidateRegistry(WS_EVENTS.APPROVAL_UPDATE)');
+    expect(keys).toContainEqual(queryKeys.client.approvals('ws-1'));
+    expect(keys).toContainEqual(queryKeys.admin.approvals('ws-1'));
+    expect(keys).toContainEqual(queryKeys.admin.workspaceHome('ws-1'));
   });
 
   it('work-order updates refresh admin workspace home and client work-order read models', () => {
-    const invalidationSource = readProjectFile('src/hooks/useWsInvalidation.ts');
-    const workOrderBlock = eventBlock(invalidationSource, 'WORK_ORDER_UPDATE');
+    const keys = getWorkspaceInvalidationKeys(WS_EVENTS.WORK_ORDER_UPDATE, 'ws-1', undefined, 'admin');
 
-    expect(workOrderBlock).toContain('queryKeys.admin.workspaceHome(workspaceId)');
-    expect(workOrderBlock).toContain('queryKeys.client.workOrders(workspaceId)');
-
-    const queryKeysSource = readProjectFile('src/lib/queryKeys.ts');
-    expect(queryKeysSource).toContain("workOrders: (wsId: string) => ['client-work-orders', wsId] as const");
-
-    const clientDashboardSource = readProjectFile('src/components/ClientDashboard.tsx');
-    expect(clientDashboardSource).toContain('[WS_EVENTS.WORK_ORDER_UPDATE]');
-    expect(clientDashboardSource).toContain("refetchClient('workOrders'");
-
-    const orderStatusSource = readProjectFile('src/components/client/OrderStatus.tsx');
-    expect(orderStatusSource).toContain('queryKeys.client.workOrders(workspaceId)');
+    expect(keys).toContainEqual(queryKeys.admin.workspaceHome('ws-1'));
+    expect(keys).toContainEqual(queryKeys.client.workOrders('ws-1'));
   });
 
   it('client action updates refresh client/admin action read models and intelligence surfaces', () => {
-    const invalidationSource = readProjectFile('src/hooks/useWsInvalidation.ts');
-    const clientActionBlock = eventBlock(invalidationSource, 'CLIENT_ACTION_UPDATE');
-
-    expect(clientActionBlock).toContain('queryKeys.client.clientActions(workspaceId)');
-    expect(clientActionBlock).toContain('queryKeys.admin.clientActions(workspaceId)');
-    expect(clientActionBlock).toContain('queryKeys.admin.workspaceHome(workspaceId)');
-    expect(clientActionBlock).toContain('queryKeys.admin.intelligence(workspaceId)');
-    expect(clientActionBlock).toContain('queryKeys.admin.intelligenceAll(workspaceId)');
-
+    const adminKeys = getWorkspaceInvalidationKeys(WS_EVENTS.CLIENT_ACTION_UPDATE, 'ws-1', undefined, 'admin');
+    const clientKeys = getWorkspaceInvalidationKeys(WS_EVENTS.CLIENT_ACTION_UPDATE, 'ws-1', undefined, 'client-dashboard');
     const clientDashboardSource = readProjectFile('src/components/ClientDashboard.tsx');
-    expect(clientDashboardSource).toContain("'client-action:update'");
-    expect(clientDashboardSource).toContain("refetchClient('clientActions'");
+
+    expect(adminKeys).toContainEqual(queryKeys.client.clientActions('ws-1'));
+    expect(adminKeys).toContainEqual(queryKeys.admin.clientActions('ws-1'));
+    expect(adminKeys).toContainEqual(queryKeys.admin.workspaceHome('ws-1'));
+    expect(adminKeys).toContainEqual(queryKeys.admin.intelligence('ws-1'));
+    expect(adminKeys).toContainEqual(queryKeys.admin.intelligenceAll('ws-1'));
+    expect(clientDashboardSource).toContain('[WS_EVENTS.CLIENT_ACTION_UPDATE]: () => invalidateClientEvent(WS_EVENTS.CLIENT_ACTION_UPDATE)');
+    expect(clientKeys).toEqual([queryKeys.client.clientActions('ws-1')]);
   });
 
   it('content updates refresh content read paths and client-facing intelligence', () => {
-    const invalidationSource = readProjectFile('src/hooks/useWsInvalidation.ts');
-    const contentBlock = eventBlock(invalidationSource, 'CONTENT_UPDATED');
-
-    expect(contentBlock).toContain('queryKeys.admin.briefs(workspaceId)');
-    expect(contentBlock).toContain('queryKeys.admin.posts(workspaceId)');
-    expect(contentBlock).toContain('queryKeys.admin.contentPipeline(workspaceId)');
-    expect(contentBlock).toContain('queryKeys.admin.workspaceHome(workspaceId)');
-    expect(contentBlock).toContain('queryKeys.admin.intelligenceAll(workspaceId)');
-    expect(contentBlock).toContain('queryKeys.client.contentRequests(workspaceId)');
-    expect(contentBlock).toContain('queryKeys.client.contentPlan(workspaceId)');
-    expect(contentBlock).toContain('queryKeys.client.intelligence(workspaceId)');
-
+    const adminKeys = getWorkspaceInvalidationKeys(WS_EVENTS.CONTENT_UPDATED, 'ws-1', undefined, 'admin');
     const clientDashboardSource = readProjectFile('src/components/ClientDashboard.tsx');
-    expect(clientDashboardSource).toContain('[WS_EVENTS.CONTENT_UPDATED]');
-    expect(clientDashboardSource).toContain("refetchClient('content'");
-    expect(clientDashboardSource).toContain("refetchClient('content-plan'");
-    expect(clientDashboardSource).toContain("refetchClient('intelligence'");
+
+    expect(adminKeys).toContainEqual(queryKeys.admin.briefs('ws-1'));
+    expect(adminKeys).toContainEqual(queryKeys.admin.posts('ws-1'));
+    expect(adminKeys).toContainEqual(queryKeys.admin.contentPipeline('ws-1'));
+    expect(adminKeys).toContainEqual(queryKeys.admin.workspaceHome('ws-1'));
+    expect(adminKeys).toContainEqual(queryKeys.admin.intelligenceAll('ws-1'));
+    expect(adminKeys).toContainEqual(queryKeys.client.contentRequests('ws-1'));
+    expect(adminKeys).toContainEqual(queryKeys.client.contentPlan('ws-1'));
+    expect(adminKeys).toContainEqual(queryKeys.client.intelligence('ws-1'));
+
+    const clientKeys = getWorkspaceInvalidationKeys(WS_EVENTS.CONTENT_UPDATED, 'ws-1', undefined, 'client-dashboard');
+    expect(clientDashboardSource).toContain('[WS_EVENTS.CONTENT_UPDATED]: () => invalidateClientEvent(WS_EVENTS.CONTENT_UPDATED)');
+    expect(clientKeys).toContainEqual(queryKeys.client.contentRequests('ws-1'));
+    expect(clientKeys).toContainEqual(queryKeys.client.contentPlan('ws-1'));
+    expect(clientKeys).toContainEqual(queryKeys.client.intelligence('ws-1'));
   });
 
   it('treats missing WORK_ORDER_UPDATE invalidation wiring as an invalid regression', () => {
-    const invalidationSource = readProjectFile('src/hooks/useWsInvalidation.ts');
-    const workOrderBlock = eventBlock(invalidationSource, 'WORK_ORDER_UPDATE');
+    const keys = getWorkspaceInvalidationKeys(WS_EVENTS.WORK_ORDER_UPDATE, 'ws-1', undefined, 'admin');
 
-    expect(workOrderBlock).toContain('queryKeys.admin.workspaceHome(workspaceId)');
-    expect(workOrderBlock).toContain('queryKeys.client.workOrders(workspaceId)');
-    expect(workOrderBlock).not.toContain('queryKeys.client.contentRequests(workspaceId)');
+    expect(keys).toContainEqual(queryKeys.admin.workspaceHome('ws-1'));
+    expect(keys).toContainEqual(queryKeys.client.workOrders('ws-1'));
+    expect(keys).not.toContainEqual(queryKeys.client.contentRequests('ws-1'));
   });
 });

@@ -1,6 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { queryKeys } from '../../src/lib/queryKeys';
+import { getWorkspaceInvalidationKeys } from '../../src/lib/wsInvalidation';
+import { WS_EVENTS } from '../../src/lib/wsEvents';
 
 const root = resolve(import.meta.dirname, '../..');
 
@@ -61,13 +64,16 @@ describe('workspace intelligence freshness wiring', () => {
   it('recommendation page-state writes broadcast page-state freshness', () => {
     const route = source('server/routes/recommendations.ts');
     const generator = source('server/recommendations.ts');
-    const invalidationHook = source('src/hooks/useWsInvalidation.ts');
+    const adminKeys = getWorkspaceInvalidationKeys(WS_EVENTS.PAGE_STATE_UPDATED, 'ws-fresh', undefined, 'admin');
+    const clientKeys = getWorkspaceInvalidationKeys(WS_EVENTS.PAGE_STATE_UPDATED, 'ws-fresh', undefined, 'client-dashboard');
 
     expect(route).toContain('updatedPageStateIds.push(resolvedPageId)');
     expect(route).toContain('WS_EVENTS.PAGE_STATE_UPDATED');
     expect(generator).toContain('autoResolvedPageStateIds.push(resolvedPageId)');
     expect(generator).toContain('WS_EVENTS.PAGE_STATE_UPDATED');
-    expect(invalidationHook).toContain('queryKeys.shared.pageEditStates(workspaceId, false)');
-    expect(invalidationHook).toContain('queryKeys.shared.pageEditStates(workspaceId, true)');
+    expect(adminKeys).toContainEqual(queryKeys.shared.pageEditStates('ws-fresh', false));
+    expect(adminKeys).toContainEqual(queryKeys.shared.pageEditStates('ws-fresh', true));
+    expect(clientKeys).toContainEqual(queryKeys.shared.pageEditStates('ws-fresh', false));
+    expect(clientKeys).toContainEqual(queryKeys.shared.pageEditStates('ws-fresh', true));
   });
 });

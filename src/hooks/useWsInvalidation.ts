@@ -11,517 +11,80 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useWorkspaceEvents } from './useWorkspaceEvents';
-import { queryKeys } from '../lib/queryKeys';
 import { WS_EVENTS } from '../lib/wsEvents';
+import { invalidateWorkspaceEventQueries } from '../lib/wsInvalidation';
 
 export function useWsInvalidation(workspaceId: string | undefined) {
   const qc = useQueryClient();
+  const invalidateRegistry = (eventName: typeof WS_EVENTS[keyof typeof WS_EVENTS], data?: unknown) => {
+    invalidateWorkspaceEventQueries(qc, eventName, workspaceId, data, 'admin');
+  };
 
   useWorkspaceEvents(workspaceId, {
-    [WS_EVENTS.APPROVAL_UPDATE]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.client.approvals(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.approvals(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.cmsEditorAll() });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
-    },
-    [WS_EVENTS.APPROVAL_APPLIED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.client.approvals(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.approvals(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.seoEditorAll() });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.cmsEditorAll() });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
-    },
-    [WS_EVENTS.REQUEST_CREATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.client.requests(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.requests(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
-    },
-    [WS_EVENTS.REQUEST_UPDATE]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.client.requests(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.requests(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
-    },
-    [WS_EVENTS.CONTENT_REQUEST_CREATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.client.contentRequests(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.requests(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.contentCalendar(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
-    },
-    [WS_EVENTS.CONTENT_REQUEST_UPDATE]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.client.contentRequests(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.requests(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.contentCalendar(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
-    },
-    [WS_EVENTS.BRIEF_UPDATED]: () => {
-      // Fired by MCP save_brief and any future brief-mutation paths. Keeps the
-      // admin briefs list, content pipeline, and activity feed fresh when a
-      // brief is saved from outside the admin UI (e.g. a Claude chat session
-      // via the MCP).
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.briefs(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-    },
-    [WS_EVENTS.CONTENT_UPDATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.briefs(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.posts(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.postsDetailAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.contentTemplates(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.contentMatrices(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.contentCalendar(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.roi(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.contentRequests(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.contentPlan(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(workspaceId) });
-    },
-    [WS_EVENTS.ACTIVITY_NEW]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceOverview() });
-      qc.invalidateQueries({ queryKey: queryKeys.client.activity(workspaceId) });
-    },
-    [WS_EVENTS.AUDIT_COMPLETE]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.shared.auditSummary(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.auditSummary(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.auditDetail(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.auditAll() });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceOverview() });
-    },
-    [WS_EVENTS.ANOMALIES_UPDATE]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.anomalyAlerts(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.anomalies(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
-    },
-    [WS_EVENTS.WORKSPACE_UPDATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceDetail(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceOverview() });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.auditSuppressions(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.ga4All(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.gscAny() });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.auditTrafficAll() });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.insightFeed(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingHistory(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.ga4All(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.gscAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.insights(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.clientInsights(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.rankHistory(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.latestRanks(workspaceId) });
-    },
-    [WS_EVENTS.PAGE_STATE_UPDATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.shared.pageEditStates(workspaceId, false) });
-      qc.invalidateQueries({ queryKey: queryKeys.shared.pageEditStates(workspaceId, true) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.seoEditorAll() });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.cmsEditorAll() });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.seoSuggestions(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.pageJoinPagesAll() });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-    },
-    [WS_EVENTS.CONTENT_PUBLISHED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.posts(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.postsDetailAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.contentCalendar(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.roi(workspaceId) });
-    },
-    [WS_EVENTS.CONTENT_SUBSCRIPTION_CREATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.contentCalendar(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.roi(workspaceId) });
-    },
-    [WS_EVENTS.CONTENT_SUBSCRIPTION_UPDATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.contentCalendar(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.roi(workspaceId) });
-    },
-    [WS_EVENTS.CONTENT_SUBSCRIPTION_RENEWED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.contentCalendar(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.roi(workspaceId) });
-    },
-    [WS_EVENTS.WORK_ORDER_UPDATE]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-      // The key WorkOrderPanel reads — a second admin session's open panel would otherwise
-      // show stale status after another operator marks complete / closes (matches the
-      // WORK_ORDER_COMMENT handler below).
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workOrders(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.workOrders(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
-    },
-    [WS_EVENTS.WORK_ORDER_COMMENT]: (data: unknown) => {
-      if (!workspaceId) return;
-      const orderId = typeof data === 'object' && data !== null && 'id' in data
-        ? String((data as { id: unknown }).id)
-        : undefined;
-      // Refresh the admin conversation thread for the commented order (and the list,
-      // whose updated_at bumped). Prefix-invalidate all order threads when the id is
-      // absent so the admin panel never shows a stale conversation.
-      if (orderId) {
-        qc.invalidateQueries({ queryKey: queryKeys.admin.workOrderComments(workspaceId, orderId) });
-      } else {
-        qc.invalidateQueries({ queryKey: queryKeys.admin.workOrderCommentsAll(workspaceId) });
-      }
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workOrders(workspaceId) });
-    },
-    [WS_EVENTS.INSIGHT_RESOLVED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.actionQueue(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.clientInsights(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(workspaceId) });
-    },
-    [WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceSignals(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.aiSuggestedBriefs(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(workspaceId) });
-    },
-    [WS_EVENTS.SCHEMA_CMS_MAPPING_UPDATED]: (data: unknown) => {
-      const siteId = typeof data === 'object' && data !== null && 'siteId' in data
-        ? String((data as { siteId: unknown }).siteId)
-        : undefined;
-      if (!siteId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.schemaCmsFieldMappings(siteId) });
-    },
-    [WS_EVENTS.SCHEMA_PLAN_UPDATED]: (data: unknown) => {
-      if (!workspaceId) return;
-      const siteId = typeof data === 'object' && data !== null && 'siteId' in data
-        ? String((data as { siteId: unknown }).siteId)
-        : undefined;
-      if (siteId) {
-        qc.invalidateQueries({ queryKey: queryKeys.admin.schemaPlan(siteId) });
-        qc.invalidateQueries({ queryKey: queryKeys.admin.schemaPlan(siteId, workspaceId) });
-        qc.invalidateQueries({ queryKey: queryKeys.admin.schemaGraphValidation(siteId) });
-        qc.invalidateQueries({ queryKey: queryKeys.admin.schemaGraphValidation(siteId, workspaceId) });
-      }
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.schemaPlan(workspaceId) });
-    },
-    [WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED]: (data: unknown) => {
-      if (!workspaceId) return;
-      const siteId = typeof data === 'object' && data !== null && 'siteId' in data
-        ? String((data as { siteId: unknown }).siteId)
-        : undefined;
-      if (siteId) {
-        qc.invalidateQueries({ queryKey: queryKeys.admin.schemaSnapshot(siteId) });
-        qc.invalidateQueries({ queryKey: queryKeys.admin.schemaSnapshot(siteId, workspaceId) });
-        qc.invalidateQueries({ queryKey: queryKeys.admin.schemaGraphValidation(siteId) });
-        qc.invalidateQueries({ queryKey: queryKeys.admin.schemaGraphValidation(siteId, workspaceId) });
-      }
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-    },
-    [WS_EVENTS.OUTCOME_ACTION_RECORDED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeActions(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeScorecard(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeTimeline(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(workspaceId) });
-    },
-    [WS_EVENTS.OUTCOME_SCORED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeActions(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeScorecard(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeTimeline(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeTopWins(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeLearnings(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.outcomeSummary(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.outcomeWins(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(workspaceId) });
-    },
-    [WS_EVENTS.OUTCOME_EXTERNAL_DETECTED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeActions(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.outcomeWins(workspaceId) });
-    },
-    [WS_EVENTS.OUTCOME_LEARNINGS_UPDATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeActions(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeTimeline(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeLearnings(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(workspaceId) });
-    },
-    [WS_EVENTS.OUTCOME_PLAYBOOK_DISCOVERED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomePlaybooks(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-    },
-    [WS_EVENTS.SUGGESTED_BRIEF_UPDATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.aiSuggestedBriefs(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-    },
-    [WS_EVENTS.INSIGHT_BRIDGE_UPDATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.actionQueue(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.clientInsights(workspaceId) });
-    },
-    [WS_EVENTS.ANNOTATION_BRIDGE_CREATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.analyticsAnnotations(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.annotations(workspaceId) });
-    },
-    [WS_EVENTS.INTELLIGENCE_CACHE_UPDATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligence(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(workspaceId) });
-    },
-    [WS_EVENTS.CLIENT_SIGNAL_CREATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.clientSignals(workspaceId) });
-      // Also refresh the notification bell — signals.new count lives in workspace overview
-      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
-    },
-    [WS_EVENTS.CLIENT_SIGNAL_UPDATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.clientSignals(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
-    },
-    [WS_EVENTS.CLIENT_ACTION_UPDATE]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.client.clientActions(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.clientActions(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligence(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
-    },
-    [WS_EVENTS.MEETING_BRIEF_GENERATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.meetingBrief(workspaceId) });
-    },
-    [WS_EVENTS.COPY_SECTION_UPDATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.copySectionsAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.copyStatusAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-    },
-    [WS_EVENTS.COPY_METADATA_UPDATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.copyMetadataAll(workspaceId) });
-    },
-    [WS_EVENTS.COPY_BATCH_PROGRESS]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.copyBatchAll(workspaceId) });
-    },
-    [WS_EVENTS.COPY_BATCH_COMPLETE]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.copyBatchAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.copySectionsAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.copyStatusAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-    },
-    [WS_EVENTS.COPY_INTELLIGENCE_UPDATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.copyIntelligence(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.copyPromotable(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-    },
-    [WS_EVENTS.DIAGNOSTIC_COMPLETE]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.diagnosticForInsightAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.diagnostics(workspaceId) });
-      // BUG FIX: prior code invalidated ['admin-insights', workspaceId] which matches no
-      // registered query. The real insight feed key is queryKeys.admin.insightFeed(),
-      // so diagnostic completion now correctly refreshes the feed.
-      qc.invalidateQueries({ queryKey: queryKeys.admin.insightFeed(workspaceId) });
-    },
-    [WS_EVENTS.DIAGNOSTIC_FAILED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.diagnosticForInsightAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.diagnostics(workspaceId) });
-    },
-    [WS_EVENTS.BULK_OPERATION_COMPLETE]: (data: unknown) => {
-      if (!workspaceId) return;
-      const operation = typeof data === 'object' && data !== null && 'operation' in data
-        ? String((data as { operation: unknown }).operation)
-        : undefined;
-      if (operation === 'bulk-rewrite') {
-        qc.invalidateQueries({ queryKey: queryKeys.admin.seoSuggestions(workspaceId) });
-      }
-    },
-    [WS_EVENTS.RECOMMENDATIONS_UPDATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.shared.recommendations(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.shared.pageEditStates(workspaceId, false) });
-      qc.invalidateQueries({ queryKey: queryKeys.shared.pageEditStates(workspaceId, true) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.actionQueue(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(workspaceId) });
-    },
-    [WS_EVENTS.STRATEGY_UPDATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.keywordFeedback(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingHistory(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.roi(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.strategy(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.strategyGuidance(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.pageKeywords(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.keywordFeedback(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.latestRanks(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.rankHistory(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(workspaceId) });
-    },
-    [WS_EVENTS.RANK_TRACKING_UPDATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingHistory(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.latestRanks(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.rankHistory(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.strategy(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.strategyGuidance(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.pageKeywords(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.localSeo(workspaceId) });
-    },
-    [WS_EVENTS.LOCAL_SEO_UPDATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.localSeo(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.localSeoLocations(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-    },
-    [WS_EVENTS.EEAT_ASSETS_UPDATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.eeatAssets(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-    },
-    [WS_EVENTS.BRANDSCRIPT_UPDATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.brandscripts(workspaceId) });
-    },
-    [WS_EVENTS.DISCOVERY_UPDATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.discoverySources(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.discoveryExtractionsAll(workspaceId) });
-    },
-    [WS_EVENTS.VOICE_PROFILE_UPDATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.voiceProfile(workspaceId) });
-    },
-    [WS_EVENTS.BRAND_IDENTITY_UPDATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.brandIdentity(workspaceId) });
-    },
-    [WS_EVENTS.BLUEPRINT_UPDATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.blueprints(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.blueprintAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.blueprintVersionsAll(workspaceId) });
-    },
-    [WS_EVENTS.BLUEPRINT_GENERATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.blueprints(workspaceId) });
-    },
-    [WS_EVENTS.COPY_EXPORT_COMPLETE]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.copyStatusAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.copySectionsAll(workspaceId) });
-    },
-    [WS_EVENTS.POST_UPDATED]: (data: unknown) => {
-      if (!workspaceId) return;
-      const payload = data as { postId?: string };
-      qc.invalidateQueries({ queryKey: queryKeys.admin.posts(workspaceId) });
-      if (payload?.postId) {
-        qc.invalidateQueries({ queryKey: queryKeys.admin.post(workspaceId, payload.postId) });
-      }
-      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.contentCalendar(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-    },
-    // ── Client Briefing v2 ──────────────────────────────────────────────
-    // Both events refresh the admin review queue. The cron generates +
-    // broadcasts BRIEFING_GENERATED on every successful run; routes/briefing.ts
-    // emits BRIEFING_PUBLISHED on publish (manual or auto) and reuses
-    // BRIEFING_GENERATED for approve/edit/skip with an action discriminator.
-    [WS_EVENTS.BRIEFING_GENERATED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.briefingDrafts(workspaceId) });
-    },
-    [WS_EVENTS.BRIEFING_PUBLISHED]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.briefingDrafts(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.briefing(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(workspaceId) });
-    },
+    [WS_EVENTS.APPROVAL_UPDATE]: () => invalidateRegistry(WS_EVENTS.APPROVAL_UPDATE),
+    [WS_EVENTS.APPROVAL_APPLIED]: () => invalidateRegistry(WS_EVENTS.APPROVAL_APPLIED),
+    [WS_EVENTS.REQUEST_CREATED]: () => invalidateRegistry(WS_EVENTS.REQUEST_CREATED),
+    [WS_EVENTS.REQUEST_UPDATE]: () => invalidateRegistry(WS_EVENTS.REQUEST_UPDATE),
+    [WS_EVENTS.CONTENT_REQUEST_CREATED]: () => invalidateRegistry(WS_EVENTS.CONTENT_REQUEST_CREATED),
+    [WS_EVENTS.CONTENT_REQUEST_UPDATE]: () => invalidateRegistry(WS_EVENTS.CONTENT_REQUEST_UPDATE),
+    [WS_EVENTS.BRIEF_UPDATED]: () => invalidateRegistry(WS_EVENTS.BRIEF_UPDATED),
+    [WS_EVENTS.CONTENT_UPDATED]: () => invalidateRegistry(WS_EVENTS.CONTENT_UPDATED),
+    [WS_EVENTS.ACTIVITY_NEW]: () => invalidateRegistry(WS_EVENTS.ACTIVITY_NEW),
+    [WS_EVENTS.AUDIT_COMPLETE]: () => invalidateRegistry(WS_EVENTS.AUDIT_COMPLETE),
+    [WS_EVENTS.ANOMALIES_UPDATE]: () => invalidateRegistry(WS_EVENTS.ANOMALIES_UPDATE),
+    [WS_EVENTS.WORKSPACE_UPDATED]: () => invalidateRegistry(WS_EVENTS.WORKSPACE_UPDATED),
+    [WS_EVENTS.PAGE_STATE_UPDATED]: () => invalidateRegistry(WS_EVENTS.PAGE_STATE_UPDATED),
+    [WS_EVENTS.CONTENT_PUBLISHED]: () => invalidateRegistry(WS_EVENTS.CONTENT_PUBLISHED),
+    [WS_EVENTS.CONTENT_SUBSCRIPTION_CREATED]: () => invalidateRegistry(WS_EVENTS.CONTENT_SUBSCRIPTION_CREATED),
+    [WS_EVENTS.CONTENT_SUBSCRIPTION_UPDATED]: () => invalidateRegistry(WS_EVENTS.CONTENT_SUBSCRIPTION_UPDATED),
+    [WS_EVENTS.CONTENT_SUBSCRIPTION_RENEWED]: () => invalidateRegistry(WS_EVENTS.CONTENT_SUBSCRIPTION_RENEWED),
+    [WS_EVENTS.DELIVERABLE_SENT]: () => invalidateRegistry(WS_EVENTS.DELIVERABLE_SENT),
+    [WS_EVENTS.DELIVERABLE_UPDATED]: () => invalidateRegistry(WS_EVENTS.DELIVERABLE_UPDATED),
+    [WS_EVENTS.WORK_ORDER_UPDATE]: () => invalidateRegistry(WS_EVENTS.WORK_ORDER_UPDATE),
+    [WS_EVENTS.WORK_ORDER_COMMENT]: (data: unknown) => invalidateRegistry(WS_EVENTS.WORK_ORDER_COMMENT, data),
+    [WS_EVENTS.INSIGHT_RESOLVED]: () => invalidateRegistry(WS_EVENTS.INSIGHT_RESOLVED),
+    [WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED]: () => invalidateRegistry(WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED),
+    [WS_EVENTS.SCHEMA_CMS_MAPPING_UPDATED]: (data: unknown) =>
+      invalidateRegistry(WS_EVENTS.SCHEMA_CMS_MAPPING_UPDATED, data),
+    [WS_EVENTS.SCHEMA_PLAN_UPDATED]: (data: unknown) => invalidateRegistry(WS_EVENTS.SCHEMA_PLAN_UPDATED, data),
+    [WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED]: (data: unknown) =>
+      invalidateRegistry(WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED, data),
+    [WS_EVENTS.OUTCOME_ACTION_RECORDED]: () => invalidateRegistry(WS_EVENTS.OUTCOME_ACTION_RECORDED),
+    [WS_EVENTS.OUTCOME_SCORED]: () => invalidateRegistry(WS_EVENTS.OUTCOME_SCORED),
+    [WS_EVENTS.OUTCOME_EXTERNAL_DETECTED]: () => invalidateRegistry(WS_EVENTS.OUTCOME_EXTERNAL_DETECTED),
+    [WS_EVENTS.OUTCOME_LEARNINGS_UPDATED]: () => invalidateRegistry(WS_EVENTS.OUTCOME_LEARNINGS_UPDATED),
+    [WS_EVENTS.OUTCOME_PLAYBOOK_DISCOVERED]: () => invalidateRegistry(WS_EVENTS.OUTCOME_PLAYBOOK_DISCOVERED),
+    [WS_EVENTS.SUGGESTED_BRIEF_UPDATED]: () => invalidateRegistry(WS_EVENTS.SUGGESTED_BRIEF_UPDATED),
+    [WS_EVENTS.INSIGHT_BRIDGE_UPDATED]: () => invalidateRegistry(WS_EVENTS.INSIGHT_BRIDGE_UPDATED),
+    [WS_EVENTS.ANNOTATION_BRIDGE_CREATED]: () => invalidateRegistry(WS_EVENTS.ANNOTATION_BRIDGE_CREATED),
+    [WS_EVENTS.INTELLIGENCE_CACHE_UPDATED]: () => invalidateRegistry(WS_EVENTS.INTELLIGENCE_CACHE_UPDATED),
+    [WS_EVENTS.CLIENT_SIGNAL_CREATED]: () => invalidateRegistry(WS_EVENTS.CLIENT_SIGNAL_CREATED),
+    [WS_EVENTS.CLIENT_SIGNAL_UPDATED]: () => invalidateRegistry(WS_EVENTS.CLIENT_SIGNAL_UPDATED),
+    [WS_EVENTS.CLIENT_ACTION_UPDATE]: () => invalidateRegistry(WS_EVENTS.CLIENT_ACTION_UPDATE),
+    [WS_EVENTS.MEETING_BRIEF_GENERATED]: () => invalidateRegistry(WS_EVENTS.MEETING_BRIEF_GENERATED),
+    [WS_EVENTS.COPY_SECTION_UPDATED]: () => invalidateRegistry(WS_EVENTS.COPY_SECTION_UPDATED),
+    [WS_EVENTS.COPY_METADATA_UPDATED]: () => invalidateRegistry(WS_EVENTS.COPY_METADATA_UPDATED),
+    [WS_EVENTS.COPY_BATCH_PROGRESS]: () => invalidateRegistry(WS_EVENTS.COPY_BATCH_PROGRESS),
+    [WS_EVENTS.COPY_BATCH_COMPLETE]: () => invalidateRegistry(WS_EVENTS.COPY_BATCH_COMPLETE),
+    [WS_EVENTS.COPY_INTELLIGENCE_UPDATED]: () => invalidateRegistry(WS_EVENTS.COPY_INTELLIGENCE_UPDATED),
+    [WS_EVENTS.DIAGNOSTIC_COMPLETE]: () => invalidateRegistry(WS_EVENTS.DIAGNOSTIC_COMPLETE),
+    [WS_EVENTS.DIAGNOSTIC_FAILED]: () => invalidateRegistry(WS_EVENTS.DIAGNOSTIC_FAILED),
+    [WS_EVENTS.BULK_OPERATION_COMPLETE]: (data: unknown) =>
+      invalidateRegistry(WS_EVENTS.BULK_OPERATION_COMPLETE, data),
+    [WS_EVENTS.RECOMMENDATIONS_UPDATED]: () => invalidateRegistry(WS_EVENTS.RECOMMENDATIONS_UPDATED),
+    [WS_EVENTS.STRATEGY_UPDATED]: () => invalidateRegistry(WS_EVENTS.STRATEGY_UPDATED),
+    [WS_EVENTS.RANK_TRACKING_UPDATED]: () => invalidateRegistry(WS_EVENTS.RANK_TRACKING_UPDATED),
+    [WS_EVENTS.LOCAL_SEO_UPDATED]: () => invalidateRegistry(WS_EVENTS.LOCAL_SEO_UPDATED),
+    [WS_EVENTS.EEAT_ASSETS_UPDATED]: () => invalidateRegistry(WS_EVENTS.EEAT_ASSETS_UPDATED),
+    [WS_EVENTS.BRANDSCRIPT_UPDATED]: () => invalidateRegistry(WS_EVENTS.BRANDSCRIPT_UPDATED),
+    [WS_EVENTS.DISCOVERY_UPDATED]: () => invalidateRegistry(WS_EVENTS.DISCOVERY_UPDATED),
+    [WS_EVENTS.VOICE_PROFILE_UPDATED]: () => invalidateRegistry(WS_EVENTS.VOICE_PROFILE_UPDATED),
+    [WS_EVENTS.BRAND_IDENTITY_UPDATED]: () => invalidateRegistry(WS_EVENTS.BRAND_IDENTITY_UPDATED),
+    [WS_EVENTS.BLUEPRINT_UPDATED]: () => invalidateRegistry(WS_EVENTS.BLUEPRINT_UPDATED),
+    [WS_EVENTS.BLUEPRINT_GENERATED]: () => invalidateRegistry(WS_EVENTS.BLUEPRINT_GENERATED),
+    [WS_EVENTS.COPY_EXPORT_COMPLETE]: () => invalidateRegistry(WS_EVENTS.COPY_EXPORT_COMPLETE),
+    [WS_EVENTS.POST_UPDATED]: (data: unknown) => invalidateRegistry(WS_EVENTS.POST_UPDATED, data),
+    [WS_EVENTS.BRIEFING_GENERATED]: () => invalidateRegistry(WS_EVENTS.BRIEFING_GENERATED),
+    [WS_EVENTS.BRIEFING_PUBLISHED]: () => invalidateRegistry(WS_EVENTS.BRIEFING_PUBLISHED),
   });
 }

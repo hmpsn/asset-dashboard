@@ -18,7 +18,7 @@ import { isClientApplyableDeliverableBatch } from '../../../../shared/applyabili
 import type { InboxFilter } from './inbox-filter';
 import { useWorkspaceEvents } from '../../../hooks/useWorkspaceEvents';
 import { WS_EVENTS } from '../../../lib/wsEvents';
-import { queryKeys } from '../../../lib/queryKeys';
+import { invalidateWorkspaceEventQueries } from '../../../lib/wsInvalidation';
 import type { ContentTabProps } from '../ContentTab';
 import type { ClientRequest } from '../types';
 import type { ClientDeliverable, DeliverableKind, DeliverableType } from '../../../../shared/types/client-deliverable';
@@ -362,39 +362,29 @@ export function UnifiedInbox({
   // elsewhere (tests/integration/broadcast-handler-pairs.test.ts stays green).
   const wsHandlers = useMemo(
     () => {
-      const invalidateInbox = () =>
-        queryClient.invalidateQueries({ queryKey: queryKeys.client.unifiedInbox(workspaceId) });
+      const invalidateInbox = (eventName: typeof WS_EVENTS[keyof typeof WS_EVENTS], data?: unknown) =>
+        invalidateWorkspaceEventQueries(queryClient, eventName, workspaceId, data, 'client-unified-inbox');
       return {
         // ws-invalidation-ok — client unified-inbox key differs from any admin deliverable key
-        [WS_EVENTS.DELIVERABLE_SENT]: invalidateInbox,
+        [WS_EVENTS.DELIVERABLE_SENT]: () => invalidateInbox(WS_EVENTS.DELIVERABLE_SENT),
         // ws-invalidation-ok — client unified-inbox key differs from any admin deliverable key
-        [WS_EVENTS.DELIVERABLE_UPDATED]: invalidateInbox,
+        [WS_EVENTS.DELIVERABLE_UPDATED]: () => invalidateInbox(WS_EVENTS.DELIVERABLE_UPDATED),
         // ws-invalidation-ok — client unified-inbox key differs from any admin copy/content key
-        [WS_EVENTS.COPY_SECTION_UPDATED]: invalidateInbox,
+        [WS_EVENTS.COPY_SECTION_UPDATED]: () => invalidateInbox(WS_EVENTS.COPY_SECTION_UPDATED),
         // ws-invalidation-ok — client unified-inbox key differs from any admin copy/content key
-        [WS_EVENTS.CONTENT_REQUEST_UPDATE]: invalidateInbox,
+        [WS_EVENTS.CONTENT_REQUEST_UPDATE]: () => invalidateInbox(WS_EVENTS.CONTENT_REQUEST_UPDATE),
         // ws-invalidation-ok — client unified-inbox key differs from any admin copy/content key
-        [WS_EVENTS.POST_UPDATED]: invalidateInbox,
+        [WS_EVENTS.POST_UPDATED]: () => invalidateInbox(WS_EVENTS.POST_UPDATED),
         // Work-order status change: on close-out the PATCH→closed broadcasts WORK_ORDER_UPDATE
         // and the mirror flips the deliverable to `cancelled` → it leaves the inbox lane. Without
         // this the client card lingers until another event. The same broadcast also covers
         // mark-complete transitions that change the card's verbs.
         // ws-invalidation-ok — client unified-inbox key differs from any admin work-order key
-        [WS_EVENTS.WORK_ORDER_UPDATE]: invalidateInbox,
+        [WS_EVENTS.WORK_ORDER_UPDATE]: () => invalidateInbox(WS_EVENTS.WORK_ORDER_UPDATE),
         // Work-order conversation: a team reply (or the client's own post echoed) — refresh the
         // commented order's thread so the client sees replies live. The payload carries { id: orderId }.
         // ws-invalidation-ok — client work-order-comment thread key differs from any admin key
-        [WS_EVENTS.WORK_ORDER_COMMENT]: (data: unknown) => {
-          const orderId = typeof data === 'object' && data !== null && 'id' in data
-            ? String((data as { id: unknown }).id)
-            : undefined;
-          if (orderId) {
-            queryClient.invalidateQueries({ queryKey: queryKeys.client.workOrderComments(workspaceId, orderId) });
-          } else {
-            queryClient.invalidateQueries({ queryKey: queryKeys.client.workOrderCommentsAll(workspaceId) });
-          }
-          invalidateInbox();
-        },
+        [WS_EVENTS.WORK_ORDER_COMMENT]: (data: unknown) => invalidateInbox(WS_EVENTS.WORK_ORDER_COMMENT, data),
       };
     },
     [queryClient, workspaceId],
