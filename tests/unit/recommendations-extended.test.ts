@@ -712,8 +712,8 @@ describe('recommendation persistence integrity', () => {
       ongoing: 0,
       totalImpactScore: 0,
       trafficAtRisk: 0,
-      estimatedRecoverableClicks: 0,
-      estimatedRecoverableImpressions: 0,
+      totalOpportunityValue: 0,
+      actionableOpportunityValue: 0,
       topRecommendationId: null,
     });
   });

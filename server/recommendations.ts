@@ -397,7 +397,7 @@ export function loadRecommendations(workspaceId: string): RecommendationSet | nu
     summary: parseJsonSafe(row.summary, recommendationSummarySchema, {
       fixNow: 0, fixSoon: 0, fixLater: 0, ongoing: 0,
       totalImpactScore: 0, trafficAtRisk: 0,
-      estimatedRecoverableClicks: 0, estimatedRecoverableImpressions: 0,
+      totalOpportunityValue: 0, actionableOpportunityValue: 0,
       topRecommendationId: null,
     }, { table: 'recommendation_sets', field: 'summary', workspaceId }) as RecommendationSet['summary'],
   };
@@ -493,10 +493,9 @@ export function resolveRecommendationsForChange(
 
   if (resolved === 0) return 0;
 
-  // Recompute the summary so client-facing headline counts (fixNow/fixSoon/
-  // trafficAtRisk/estimatedRecoverable*) reflect the resolved recs — otherwise
-  // the rendered list drops the item but the numbers stay inflated until the
-  // next full regen.
+  // Recompute the summary so client-facing headline counts and Opportunity
+  // Value totals reflect the resolved recs — otherwise the rendered list drops
+  // the item but the numbers stay inflated until the next full regen.
   set.summary = computeRecommendationSummary(set.recommendations);
   saveRecommendations(set);
   invalidateIntelligenceCache(workspaceId);
@@ -539,28 +538,15 @@ export function resolveRecommendationsForPageIds(
 }
 
 /**
- * Compute the RecommendationSet summary (active counts + weighted recoverable
- * traffic) from a rec list. Shared by the full regen (generateRecommendations)
- * and the in-place resolver (resolveRecommendationsForChange) so client-facing
- * headline numbers never drift from the rendered active list.
+ * Compute the RecommendationSet summary from a rec list. Shared by the full
+ * regen (generateRecommendations) and the in-place resolver
+ * (resolveRecommendationsForChange) so client-facing headline numbers never
+ * drift from the rendered active list.
  */
 export function computeRecommendationSummary(recs: Recommendation[]): RecommendationSet['summary'] {
   const activeRecs = recs.filter(r => r.status !== 'completed' && r.status !== 'dismissed');
   const actionableRecs = activeRecs.filter(r => r.priority === 'fix_now' || r.priority === 'fix_soon');
-
-  // Weighted recovery: each rec contributes traffic × its issue-specific recovery rate.
-  let weightedRecoverableClicks = 0;
-  let weightedRecoverableImpressions = 0;
-  for (const r of actionableRecs) {
-    const checkName = r.source?.startsWith('audit:site-wide:')
-      ? r.source.replace('audit:site-wide:', '')
-      : r.source?.startsWith('audit:')
-        ? r.source.replace('audit:', '')
-        : '';
-    const rate = checkName ? getRecoveryRate(checkName) : DEFAULT_RECOVERY;
-    weightedRecoverableClicks += r.trafficAtRisk * rate.summary;
-    weightedRecoverableImpressions += r.impressionsAtRisk * rate.summary;
-  }
+  const opportunityValue = (rec: Recommendation) => rec.opportunity?.value ?? rec.impactScore;
 
   // recs are already sorted by sortRecommendations (tier → impactScore → intent
   // alignment) before computeRecommendationSummary is called, so activeRecs[0]
@@ -568,16 +554,19 @@ export function computeRecommendationSummary(recs: Recommendation[]): Recommenda
   const topRec = activeRecs.length > 0 ? activeRecs[0] : null;
   const topRecommendationId = topRec?.id ?? null;
   const topOpportunityRationale = topRec ? buildTopOpportunityRationale(topRec) : undefined;
+  const totalOpportunityValue = activeRecs.reduce((s, r) => s + opportunityValue(r), 0);
+  const actionableOpportunityValue = actionableRecs.reduce((s, r) => s + opportunityValue(r), 0);
 
   return {
     fixNow: activeRecs.filter(r => r.priority === 'fix_now').length,
     fixSoon: activeRecs.filter(r => r.priority === 'fix_soon').length,
     fixLater: activeRecs.filter(r => r.priority === 'fix_later').length,
     ongoing: activeRecs.filter(r => r.priority === 'ongoing').length,
-    totalImpactScore: activeRecs.reduce((s, r) => s + r.impactScore, 0),
+    totalImpactScore: totalOpportunityValue,
     trafficAtRisk: activeRecs.reduce((s, r) => s + r.trafficAtRisk, 0),
-    estimatedRecoverableClicks: Math.round(weightedRecoverableClicks),
-    estimatedRecoverableImpressions: Math.round(weightedRecoverableImpressions),
+    totalOpportunityValue,
+    actionableOpportunityValue,
+    ...(topRec ? { topOpportunityValue: opportunityValue(topRec) } : {}),
     topRecommendationId,
     ...(topOpportunityRationale ? { topOpportunityRationale } : {}),
   };

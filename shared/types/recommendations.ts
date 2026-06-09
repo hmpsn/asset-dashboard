@@ -49,8 +49,16 @@ export interface RecommendationSet {
     ongoing: number;
     totalImpactScore: number;
     trafficAtRisk: number;
-    estimatedRecoverableClicks: number;     // conservative 12% recovery of trafficAtRisk
-    estimatedRecoverableImpressions: number;
+    /** Sum of active recommendations' canonical Opportunity Value scores. */
+    totalOpportunityValue?: number;
+    /** Sum of fix-now/fix-soon recommendations' canonical Opportunity Value scores. */
+    actionableOpportunityValue?: number;
+    /** Canonical Opportunity Value score for the top active recommendation. */
+    topOpportunityValue?: number;
+    /** @deprecated Legacy recovery-rate summary fields retained only for historical persisted rows. */
+    estimatedRecoverableClicks?: number;
+    /** @deprecated Legacy recovery-rate summary fields retained only for historical persisted rows. */
+    estimatedRecoverableImpressions?: number;
     /** The id of the highest-ranked active (non-completed, non-dismissed) recommendation,
      *  or null when no active recs exist. Set from the already-sorted recs array so it
      *  always agrees with the Health tab's ordering. */

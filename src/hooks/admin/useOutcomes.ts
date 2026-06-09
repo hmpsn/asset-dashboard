@@ -97,10 +97,14 @@ export function useAddOutcomeNote(wsId: string) {
     mutationFn: ({ actionId, note }: { actionId: string; note: string }) =>
       outcomesApi.addNote(wsId, actionId, note),
     onSuccess: (_data, { actionId }) => {
-      // Invalidate the individual action so the new note is reflected
       void queryClient.invalidateQueries({
         queryKey: [...queryKeys.admin.outcomeActions(wsId), actionId],
       });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.outcomeActions(wsId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.outcomeTimeline(wsId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.outcomeLearnings(wsId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(wsId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.client.intelligence(wsId) });
     },
   });
 }

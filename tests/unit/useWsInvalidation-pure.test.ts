@@ -142,6 +142,7 @@ function buildHandlers(wsId: string) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeScorecard(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeTimeline(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeTopWins(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeLearnings(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.outcomeSummary(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.outcomeWins(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(wsId) });
@@ -151,7 +152,9 @@ function buildHandlers(wsId: string) {
       if (!wsId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeActions(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeScorecard(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeTimeline(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(wsId) });
     },
     [WS_EVENTS.OUTCOME_EXTERNAL_DETECTED]: () => {
       if (!wsId) return;
@@ -160,8 +163,11 @@ function buildHandlers(wsId: string) {
     },
     [WS_EVENTS.OUTCOME_LEARNINGS_UPDATED]: () => {
       if (!wsId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeActions(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeTimeline(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeLearnings(wsId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(wsId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(wsId) });
     },
     [WS_EVENTS.OUTCOME_PLAYBOOK_DISCOVERED]: () => {
       if (!wsId) return;
@@ -380,8 +386,20 @@ describe('useWsInvalidation — event routing (pure)', () => {
     expect(invalidated).toContainEqual(queryKeys.admin.outcomeScorecard(WS_ID));
     expect(invalidated).toContainEqual(queryKeys.admin.outcomeTimeline(WS_ID));
     expect(invalidated).toContainEqual(queryKeys.admin.outcomeTopWins(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.admin.outcomeLearnings(WS_ID));
     expect(invalidated).toContainEqual(queryKeys.client.outcomeSummary(WS_ID));
     expect(invalidated).toContainEqual(queryKeys.client.outcomeWins(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.admin.intelligenceAll(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.client.intelligence(WS_ID));
+  });
+
+  it('OUTCOME_LEARNINGS_UPDATED refreshes learnings and both intelligence roots', () => {
+    const { handlers, invalidated } = buildHandlers(WS_ID);
+    handlers[WS_EVENTS.OUTCOME_LEARNINGS_UPDATED]();
+
+    expect(invalidated).toContainEqual(queryKeys.admin.outcomeActions(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.admin.outcomeTimeline(WS_ID));
+    expect(invalidated).toContainEqual(queryKeys.admin.outcomeLearnings(WS_ID));
     expect(invalidated).toContainEqual(queryKeys.admin.intelligenceAll(WS_ID));
     expect(invalidated).toContainEqual(queryKeys.client.intelligence(WS_ID));
   });

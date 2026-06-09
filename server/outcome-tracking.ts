@@ -32,6 +32,18 @@ import { toInsightPageId } from './helpers.js';
 
 const log = createLogger('outcome-tracking');
 
+function broadcastOutcomeEvent(workspaceId: string, event: string, payload: object): void {
+  try {
+    broadcastToWorkspace(workspaceId, event, payload);
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('broadcastToWorkspace() called before init')) {
+      log.debug({ workspaceId, event }, 'Skipped outcome broadcast before WebSocket init');
+      return;
+    }
+    throw err;
+  }
+}
+
 const stmts = createStmtCache(() => ({
   insert: db.prepare(`
     INSERT INTO tracked_actions (id, workspace_id, action_type, source_type, source_id, page_url, target_keyword, baseline_snapshot, trailing_history, attribution, measurement_window, source_flag, baseline_confidence, context, predicted_emv, created_at, updated_at)
@@ -316,6 +328,12 @@ export function markActionComplete(actionId: string, workspaceId: string): boole
 
 export function updateActionContext(actionId: string, workspaceId: string, context: ActionContext): boolean {
   const result = stmts().updateContext.run(JSON.stringify(context), actionId, workspaceId);
+  if (result.changes > 0) {
+    broadcastOutcomeEvent(workspaceId, WS_EVENTS.OUTCOME_LEARNINGS_UPDATED, {
+      actionId,
+      action: 'context_updated',
+    });
+  }
   return result.changes > 0;
 }
 
@@ -370,6 +388,20 @@ export function recordOutcome(params: {
   const rows = stmts().getOutcomesByAction.all(params.actionId) as ActionOutcomeRow[];
   const outcome = rows.find(r => r.checkpoint_days === params.checkpointDays);
   if (!outcome) throw new Error(`Failed to read back outcome for action ${params.actionId}`);
+  const actionRowForBroadcast = stmts().getById.get(params.actionId) as TrackedActionRow | undefined;
+  if (
+    actionRowForBroadcast &&
+    params.score != null &&
+    params.score !== 'insufficient_data' &&
+    params.score !== 'inconclusive' &&
+    (params.checkpointDays === 30 || params.checkpointDays === 60 || params.checkpointDays === 90)
+  ) {
+    broadcastOutcomeEvent(actionRowForBroadcast.workspace_id, WS_EVENTS.OUTCOME_LEARNINGS_UPDATED, {
+      actionId: params.actionId,
+      checkpointDays: params.checkpointDays,
+      score: params.score,
+    });
+  }
 
   // ── Bridge #1: Outcome → reweight insight scores ──────────────────
   // Only fire for scores that produce a non-zero adjustment (win/strong_win/loss).

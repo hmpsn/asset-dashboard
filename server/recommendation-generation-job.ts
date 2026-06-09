@@ -1,11 +1,9 @@
-import { broadcastToWorkspace } from './broadcast.js';
 import { addActivity } from './activity-log.js';
 import { isProgrammingError } from './errors.js';
 import { getJob, updateJob } from './jobs.js';
 import { createLogger } from './logger.js';
 import { generateRecommendations } from './recommendations.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
-import { WS_EVENTS } from './ws-events.js';
 
 const log = createLogger('recommendation-generation-job');
 
@@ -44,12 +42,6 @@ export async function runRecommendationGenerationJob(
         },
       );
     }
-    broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, {
-      action: 'generated',
-      reason,
-      jobId,
-      count: set.recommendations.length,
-    });
     updateJob(jobId, {
       status: 'done',
       progress: 100,

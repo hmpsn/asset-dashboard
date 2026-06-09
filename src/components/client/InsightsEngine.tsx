@@ -303,9 +303,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
           {data.summary.trafficAtRisk > 0 && (
             <p className="t-caption text-[var(--brand-text)] mt-1">
               <span className="text-accent-warning font-medium">{num(data.summary.trafficAtRisk)} organic clicks/mo</span> are at risk from unresolved issues
-              {data.summary.estimatedRecoverableClicks > 0 && (
-                <span className="ml-1 text-accent-brand">· ~{num(data.summary.estimatedRecoverableClicks)} recoverable</span>
-              )}
+              <span className="ml-1 text-accent-brand">· prioritized by Opportunity Value</span>
             </p>
           )}
         </div>
@@ -420,7 +418,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
           <p className="t-caption text-[var(--brand-text)] mt-1.5 leading-relaxed">
             We've analyzed your audit, traffic, and SEO strategy to create a prioritized action plan.
             {data.summary.trafficAtRisk > 0 && (
-              <> <span className="text-accent-warning font-medium">{num(data.summary.trafficAtRisk)} organic clicks/mo</span> are at risk from unresolved issues{data.summary.estimatedRecoverableClicks > 0 ? ` — addressing fix-now and fix-soon items could recover ~${num(data.summary.estimatedRecoverableClicks)} clicks/mo.` : '.'}</>
+              <> <span className="text-accent-warning font-medium">{num(data.summary.trafficAtRisk)} organic clicks/mo</span> are at risk from unresolved issues. Top items are ranked by Opportunity Value.</>
             )}
           </p>
         )}

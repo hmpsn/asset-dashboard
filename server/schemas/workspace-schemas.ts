@@ -395,8 +395,12 @@ export const recommendationSummarySchema = z.object({
   ongoing: z.number(),
   totalImpactScore: z.number(),
   trafficAtRisk: z.number(),
-  estimatedRecoverableClicks: z.number(),
-  estimatedRecoverableImpressions: z.number(),
+  totalOpportunityValue: z.number().optional(),
+  actionableOpportunityValue: z.number().optional(),
+  topOpportunityValue: z.number().optional(),
+  // Legacy persisted rows may still carry the pre-OV aggregate recovery fields.
+  estimatedRecoverableClicks: z.number().optional(),
+  estimatedRecoverableImpressions: z.number().optional(),
   topRecommendationId: z.string().nullable().optional(),
   // One-line rendered rationale for the #1 (from its opportunity.components, PR6).
   topOpportunityRationale: z.string().optional(),
