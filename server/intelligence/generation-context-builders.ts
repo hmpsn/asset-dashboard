@@ -5,7 +5,11 @@ import type {
   PromptVerbosity,
   WorkspaceIntelligence,
 } from '../../shared/types/intelligence.js';
-import { buildWorkspaceIntelligence, formatForPrompt } from '../workspace-intelligence.js';
+import {
+  buildWorkspaceIntelligence,
+  formatForPrompt,
+  formatPageMapForPrompt,
+} from '../workspace-intelligence.js';
 
 type LearningsDomain = NonNullable<IntelligenceOptions['learningsDomain']>;
 
@@ -31,6 +35,15 @@ export interface GenerationContextResult {
 export interface ContentGenerationContextOptions extends GenerationContextBuilderOptions {}
 
 export interface RecommendationGenerationContextOptions extends GenerationContextBuilderOptions {}
+
+export interface SeoPromptContextOptions extends GenerationContextBuilderOptions {
+  includePageMap?: boolean;
+}
+
+export interface SeoPromptContextResult extends GenerationContextResult {
+  pageMapContext: string;
+  seoPromptContext: string;
+}
 
 async function buildGenerationContext(
   workspaceId: string,
@@ -115,4 +128,24 @@ export async function buildRecommendationGenerationContext(
     verbosity: opts.verbosity ?? 'detailed',
     learningsDomain: opts.learningsDomain ?? 'all',
   });
+}
+
+export async function buildSeoPromptContext(
+  workspaceId: string,
+  opts: SeoPromptContextOptions = {},
+): Promise<SeoPromptContextResult> {
+  const slices = opts.slices ?? ['seoContext', 'learnings'];
+  const result = await buildGenerationContext(workspaceId, slices, {
+    ...opts,
+    verbosity: opts.verbosity ?? 'detailed',
+    learningsDomain: opts.learningsDomain ?? 'all',
+  });
+  const pageMapContext = opts.includePageMap === false
+    ? ''
+    : formatPageMapForPrompt(result.intelligence.seoContext);
+  return {
+    ...result,
+    pageMapContext,
+    seoPromptContext: `${result.promptContext}${pageMapContext}`,
+  };
 }

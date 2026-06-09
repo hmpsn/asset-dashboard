@@ -45,7 +45,7 @@ import {
   listGscSites,
 } from '../search-console.js';
 import { RICH_BLOCKS_PROMPT } from '../prompt-rich-blocks.js';
-import { buildWorkspaceIntelligence, formatForPrompt, formatPageMapForPrompt } from '../workspace-intelligence.js';
+import { buildSeoPromptContext } from '../intelligence/generation-context-builders.js';
 import { getWorkspace, listWorkspaces } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { createAnnotation, getAnnotations, updateAnnotation, deleteAnnotation } from '../analytics-annotations.js';
@@ -200,11 +200,10 @@ router.post('/api/google/search-chat/:siteId', requireWorkspaceSiteAccess({
 
   // Look up workspace for keyword strategy context
   const wsId = workspaceId || listWorkspaces().find(w => w.webflowSiteId === req.params.siteId)?.id;
-  const slices = ['seoContext', 'learnings'] as const;
-  const intel = wsId ? await buildWorkspaceIntelligence(wsId, { slices }) : null;
-  const fullContext = intel ? formatForPrompt(intel, { verbosity: 'detailed', sections: slices }) : '';
-  const kwMapContext = intel ? formatPageMapForPrompt(intel.seoContext) : '';
-  const bizCtx = intel?.seoContext?.businessContext ?? '';
+  const seoPrompt = wsId ? await buildSeoPromptContext(wsId) : null;
+  const fullContext = seoPrompt?.promptContext ?? '';
+  const kwMapContext = seoPrompt?.pageMapContext ?? '';
+  const bizCtx = seoPrompt?.intelligence.seoContext?.businessContext ?? '';
 
   try {
     const strategySection = (fullContext || kwMapContext || bizCtx)

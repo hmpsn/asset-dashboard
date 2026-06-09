@@ -42,6 +42,7 @@ Current builders:
 
 - `buildContentGenerationContext(workspaceId, opts?)`
 - `buildRecommendationGenerationContext(workspaceId, opts?)`
+- `buildSeoPromptContext(workspaceId, opts?)`
 - `buildAdminChatIntelligenceContext(workspaceId, question, categories)`
 - `buildDiagnosticIntelligenceContext(workspaceId, opts?)`
 - `buildPageAssistContext(workspaceId, opts?)`
@@ -57,6 +58,10 @@ Admin chat and diagnostics use the chat/diagnostic builders so conversation
 surfaces do not own their own canonical slice selection. Page-assist SEO tools
 use `buildPageAssistContext()` for keyword, voice, personas, knowledge, page
 profile, page element, local SEO, learnings, and page-insight prompt blocks.
+SEO keyword-analysis/chat helpers that only need the canonical
+`seoContext`/`learnings` prompt block plus the full keyword page map use
+`buildSeoPromptContext()` instead of re-inlining `formatForPrompt(...) +
+formatPageMapForPrompt(...)`.
 Route-owned add-ons such as scraped page content, GSC query excerpts, selected
 text, Webflow write targets, and user rewrite instructions remain outside the
 builder.
