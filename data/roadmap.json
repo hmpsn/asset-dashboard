@@ -263,9 +263,10 @@
           "source": "Parallel simplification explorer audit 2026-06-09 — Test/Guardrail Leverage",
           "est": "small-medium",
           "priority": "P2",
-          "status": "pending",
-          "notes": "Scope: `tests/bridge-wiring.test.ts`, `tests/bridges-simple.test.ts`, `tests/cache-invalidation-cluster.test.ts`, and other source-sniffing tests with `readFile-ok` comments. Current complexity: many tests repeat `readFileSync`, bounded section extraction, and `toContain/not.toContain` assertions, spreading platform intent across noisy implementation details. Behavior-preserving path: add `tests/helpers/source-contracts.ts` with `readProjectFile`, `boundedSection`, `expectContainsAll`, and `expectOmitsAll`; migrate bridge/cache tests first. Tests/guardrails: run the migrated tests plus `npx tsx scripts/pr-check.ts`; keep helper additive so existing source-contract tests can migrate gradually.",
-          "createdAt": "2026-06-09"
+          "status": "done",
+          "notes": "Scope: `tests/bridge-wiring.test.ts`, `tests/bridges-simple.test.ts`, `tests/cache-invalidation-cluster.test.ts`, and other source-sniffing tests with `readFile-ok` comments. Current complexity: many tests repeat `readFileSync`, bounded section extraction, and `toContain/not.toContain` assertions, spreading platform intent across noisy implementation details. Behavior-preserving path: add `tests/helpers/source-contracts.ts` with `readProjectFile`, `boundedSection`, `expectContainsAll`, and `expectOmitsAll`; migrate bridge/cache tests first. Tests/guardrails: run the migrated tests plus `npx tsx scripts/pr-check.ts`; keep helper additive so existing source-contract tests can migrate gradually. || DONE 2026-06-09: added `tests/helpers/source-contracts.ts` with `readProjectFile`, `boundedSection`, `expectContainsAll`, and `expectOmitsAll`; migrated the bridge/cache source-contract cluster (`tests/bridge-wiring.test.ts`, `tests/bridges-simple.test.ts`, `tests/cache-invalidation-cluster.test.ts`) without changing assertions. Remaining source-sniffing tests can migrate opportunistically when adjacent guardrails are touched.",
+          "createdAt": "2026-06-09",
+          "shippedAt": "2026-06-09"
         },
         {
           "id": "simp-tests-ws-event-contract-parser",
