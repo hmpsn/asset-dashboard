@@ -1,5 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query';
 import type { BackgroundJobType } from '../../shared/types/background-jobs';
+import { invalidateMany } from './queryInvalidation';
 
 export interface BackgroundJobLifecycleBridge {
   startJob: (type: BackgroundJobType, params: Record<string, unknown>) => Promise<string | null>;
@@ -39,7 +40,5 @@ export function invalidateQueriesOnJobCompletion(
   queryClient: QueryClient,
   queryKeys: readonly (readonly unknown[])[],
 ): void {
-  for (const queryKey of queryKeys) {
-    queryClient.invalidateQueries({ queryKey });
-  }
+  invalidateMany(queryClient, queryKeys);
 }
