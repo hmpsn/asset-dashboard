@@ -234,8 +234,8 @@ See `docs/workflows/deploy.md` for the full branch model and deploy steps.
 ## Step 5: Testing Patterns
 
 - **Write tests alongside code** — new routes get integration tests, new state transitions get guard tests
-- **Infrastructure:** mock factories in `tests/mocks/`, seed fixtures in `tests/fixtures/`, HTTP helper `createTestContext(port)` in `tests/integration/helpers.ts`
-- **Port uniqueness** — each integration test file needs a unique port. Check existing range: `grep -r 'createTestContext(' tests/`. Current range: 13201–13316.
+- **Infrastructure:** mock factories in `tests/mocks/`, seed fixtures in `tests/fixtures/`, HTTP helpers in `tests/integration/helpers.ts`. Default to `createEphemeralTestContext(import.meta.url)` for standard single-context integration files; use `createTestContext(port)` when a test genuinely needs fixed or multiple ports.
+- **Port uniqueness** — standard single-context integration tests should use `createEphemeralTestContext(import.meta.url)`. When a file needs literal ports, keep each `createTestContext(port)` unique and verify with `rg 'createTestContext\\(' tests/`.
 - **External API error tests** — mock the API to return an error, assert the operation records `failed`/`error` status (FM-2 pattern)
 - **Cleanup** — every `beforeAll` resource creation must have a matching `afterAll` cleanup. Use `seedWorkspace().cleanup()` or `deleteWorkspace(id)`. Never leave orphaned test data.
 - **Collection assertions** — never assert `.every()` or `.some()` on a potentially empty array without first asserting `length > 0`. `[].every(fn)` returns `true` vacuously.
