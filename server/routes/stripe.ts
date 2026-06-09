@@ -1,7 +1,7 @@
 /**
  * stripe routes — extracted from server/index.ts
  */
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 
 const router = Router();
 
@@ -34,10 +34,42 @@ import { getContentRequest } from '../content-requests.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
 import { sendSanitizedProviderError } from '../provider-error-sanitizer.js';
+import type { Workspace } from '../workspaces.js';
 
 const log = createLogger('stripe');
 
-function validateFullPostUpgradePayment(workspaceId: string, productType: string, contentRequestId: string | undefined, res: import('express').Response): boolean {
+type CheckoutReturnTab = 'content' | 'health' | 'plans';
+
+interface CheckoutPreflightContext {
+  ws: Workspace;
+  baseUrl: string;
+  successUrl: string;
+  cancelUrl: string;
+}
+
+export function buildCheckoutRedirectUrls(req: Pick<Request, 'protocol' | 'get'>, workspaceId: string, returnTab: CheckoutReturnTab): { baseUrl: string; successUrl: string; cancelUrl: string } {
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  return {
+    baseUrl,
+    successUrl: `${baseUrl}/client/${workspaceId}/${returnTab}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+    cancelUrl: `${baseUrl}/client/${workspaceId}/${returnTab}?payment=cancelled`,
+  };
+}
+
+function buildCheckoutContext(req: Request, res: Response, workspaceId: string, returnTab: CheckoutReturnTab): CheckoutPreflightContext | null {
+  const ws = getWorkspace(workspaceId);
+  if (!ws) {
+    res.status(404).json({ error: 'Workspace not found' });
+    return null;
+  }
+  if (ws.billingMode === 'external') {
+    res.status(403).json({ error: 'This workspace is billed externally — Stripe payments are disabled' });
+    return null;
+  }
+  return { ws, ...buildCheckoutRedirectUrls(req, workspaceId, returnTab) };
+}
+
+function validateFullPostUpgradePayment(workspaceId: string, productType: string, contentRequestId: string | undefined, res: Response): boolean {
   if (productType !== 'post_polished') return true;
   if (!contentRequestId) {
     res.status(409).json({ error: 'Full-post upgrades require an approved brief request' });
@@ -115,17 +147,11 @@ router.post('/api/stripe/create-checkout', checkoutLimiter, async (req, res) => 
   if (!isStripeConfigured()) return res.status(503).json({ error: 'Stripe is not configured' });
   const { workspaceId, productType, contentRequestId, topic, targetKeyword } = req.body;
   if (!workspaceId || !productType) return res.status(400).json({ error: 'workspaceId and productType are required' });
-  const ws = getWorkspace(workspaceId);
-  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  if (ws.billingMode === 'external') return res.status(403).json({ error: 'This workspace is billed externally — Stripe payments are disabled' });
+  const context = buildCheckoutContext(req, res, workspaceId, 'content');
+  if (!context) return;
   const config = getProductConfig(productType);
   if (!config) return res.status(400).json({ error: `Unknown product type: ${productType}` });
   if (!validateFullPostUpgradePayment(workspaceId, productType, contentRequestId, res)) return;
-
-  // Build redirect URLs
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
-  const successUrl = `${baseUrl}/client/${workspaceId}/content?payment=success&session_id={CHECKOUT_SESSION_ID}`;
-  const cancelUrl = `${baseUrl}/client/${workspaceId}/content?payment=cancelled`;
 
   try {
     const { sessionId, url } = await createCheckoutSession({
@@ -134,8 +160,8 @@ router.post('/api/stripe/create-checkout', checkoutLimiter, async (req, res) => 
       contentRequestId: contentRequestId ? sanitizeString(contentRequestId, 100) : undefined,
       topic: topic ? sanitizeString(topic, 200) : undefined,
       targetKeyword: targetKeyword ? sanitizeString(targetKeyword, 200) : undefined,
-      successUrl,
-      cancelUrl,
+      successUrl: context.successUrl,
+      cancelUrl: context.cancelUrl,
     });
     res.json({ sessionId, url });
   } catch (err) {
@@ -152,13 +178,8 @@ router.post('/api/stripe/cart-checkout', checkoutLimiter, async (req, res) => {
   if (!isStripeConfigured()) return res.status(503).json({ error: 'Stripe is not configured' });
   const { workspaceId, items } = req.body;
   if (!workspaceId || !Array.isArray(items) || !items.length) return res.status(400).json({ error: 'workspaceId and items[] are required' });
-  const ws = getWorkspace(workspaceId);
-  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  if (ws.billingMode === 'external') return res.status(403).json({ error: 'This workspace is billed externally — Stripe payments are disabled' });
-
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
-  const successUrl = `${baseUrl}/client/${workspaceId}/health?payment=success&session_id={CHECKOUT_SESSION_ID}`;
-  const cancelUrl = `${baseUrl}/client/${workspaceId}/health?payment=cancelled`;
+  const context = buildCheckoutContext(req, res, workspaceId, 'health');
+  if (!context) return;
 
   try {
     const { sessionId, url } = await createCartCheckoutSession({
@@ -168,8 +189,8 @@ router.post('/api/stripe/cart-checkout', checkoutLimiter, async (req, res) => {
         quantity: Math.max(1, Math.min(100, Number(i.quantity) || 1)),
         pageIds: Array.isArray(i.pageIds) ? i.pageIds.map((p: string) => sanitizeString(p, 200)) : undefined,
       })),
-      successUrl,
-      cancelUrl,
+      successUrl: context.successUrl,
+      cancelUrl: context.cancelUrl,
     });
     res.json({ sessionId, url });
   } catch (err) {
@@ -185,9 +206,8 @@ router.post('/api/stripe/cart-checkout', checkoutLimiter, async (req, res) => {
 router.post('/api/public/upgrade-checkout/:workspaceId', checkoutLimiter, requireAuthenticatedClientPortalAuth(), async (req, res) => {
   if (!isStripeConfigured()) return res.status(503).json({ error: 'Stripe is not configured' });
   const wsId = req.params.workspaceId;
-  const ws = getWorkspace(wsId);
-  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  if (ws.billingMode === 'external') return res.status(403).json({ error: 'This workspace is billed externally — Stripe payments are disabled' });
+  const context = buildCheckoutContext(req, res, wsId, 'plans');
+  if (!context) return;
 
   const { planId } = req.body;
   const productType = planId === 'growth' ? 'plan_growth' : planId === 'premium' ? 'plan_premium' : null;
@@ -196,16 +216,12 @@ router.post('/api/public/upgrade-checkout/:workspaceId', checkoutLimiter, requir
   const config = getProductConfig(productType);
   if (!config) return res.status(400).json({ error: `Product not configured: ${productType}` });
 
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
-  const successUrl = `${baseUrl}/client/${wsId}/plans?payment=success&session_id={CHECKOUT_SESSION_ID}`;
-  const cancelUrl = `${baseUrl}/client/${wsId}/plans?payment=cancelled`;
-
   try {
     const { sessionId, url } = await createCheckoutSession({
       workspaceId: wsId,
       productType,
-      successUrl,
-      cancelUrl,
+      successUrl: context.successUrl,
+      cancelUrl: context.cancelUrl,
     });
     res.json({ sessionId, url });
   } catch (err) {

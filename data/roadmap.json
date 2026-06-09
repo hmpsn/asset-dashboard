@@ -93,9 +93,10 @@
           "source": "Parallel simplification explorer audit 2026-06-09 — Integration Adapters",
           "est": "small",
           "priority": "P3",
-          "status": "pending",
-          "notes": "Scope: `server/routes/stripe.ts`, `server/stripe.ts`, and Stripe integration tests. Current complexity: create checkout, cart checkout, and upgrade checkout repeat configured checks, workspace lookup, external billing guard, base URL construction, success/cancel URL construction, and sanitized provider error response handling. Behavior-preserving path: add route-local `buildCheckoutContext(req, workspaceId, returnTab)` or `withStripeCheckoutPreflight()` returning `{ ws, baseUrl, successUrl, cancelUrl }`; leave Stripe SDK/session creation in `server/stripe.ts`. Tests/guardrails: `tests/integration/stripe-checkout-flow.test.ts`, `tests/integration/stripe-api.test.ts`, `tests/integration/stripe-admin-auth.test.ts`; verify all existing API error shapes remain `{ error: string }`.",
-          "createdAt": "2026-06-09"
+          "status": "done",
+          "notes": "Scope: `server/routes/stripe.ts`, `server/stripe.ts`, and Stripe integration tests. Current complexity: create checkout, cart checkout, and upgrade checkout repeat configured checks, workspace lookup, external billing guard, base URL construction, success/cancel URL construction, and sanitized provider error response handling. Behavior-preserving path: add route-local `buildCheckoutContext(req, workspaceId, returnTab)` or `withStripeCheckoutPreflight()` returning `{ ws, baseUrl, successUrl, cancelUrl }`; leave Stripe SDK/session creation in `server/stripe.ts`. Tests/guardrails: `tests/integration/stripe-checkout-flow.test.ts`, `tests/integration/stripe-api.test.ts`, `tests/integration/stripe-admin-auth.test.ts`; verify all existing API error shapes remain `{ error: string }`. || DONE 2026-06-09: added route-local `buildCheckoutContext()` and exported pure `buildCheckoutRedirectUrls()` in `server/routes/stripe.ts`; migrated create-checkout, cart-checkout, and public upgrade-checkout to share workspace lookup, external billing guard, and redirect URL construction while leaving Stripe SDK/session/payment creation in `server/stripe.ts`. Added `tests/unit/stripe-checkout-preflight.test.ts` to pin legacy success/cancel URL parity for content, health, and plans return tabs. Targeted verification: `npx vitest run tests/unit/stripe-checkout-preflight.test.ts tests/integration/stripe-checkout-flow.test.ts tests/integration/stripe-api.test.ts tests/integration/stripe-admin-auth.test.ts`.",
+          "createdAt": "2026-06-09",
+          "shippedAt": "2026-06-09"
         },
         {
           "id": "simp-ai-provider-http-retry-helper",
