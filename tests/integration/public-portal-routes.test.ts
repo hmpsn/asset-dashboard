@@ -522,10 +522,10 @@ describe('POST /api/public/keyword-feedback/:workspaceId — validation', () => 
     }
   });
 
-  it('returns 401 for an unknown workspace (auth check before workspace lookup)', async () => {
-    // requireClientStrategyMutationAuth runs before the workspace lookup,
-    // so a nonexistent workspace returns 401 (no valid auth cookie) rather than 404.
-    // clientTokenA is for wsA — workspace in token != nonexistent-ws-99999 → 401
+  it('returns 404 for an unknown workspace before mutation logic', async () => {
+    // requireAuthenticatedClientPortalAuth now validates workspace existence before
+    // route mutation logic, so nonexistent workspaces resolve to the canonical 404.
+    // clientTokenA is for wsA, but the target workspace does not exist.
     const res = await fetch(`${ctx.BASE}/api/public/keyword-feedback/nonexistent-ws-99999`, {
       method: 'POST',
       headers: {
@@ -535,7 +535,7 @@ describe('POST /api/public/keyword-feedback/:workspaceId — validation', () => 
       body: JSON.stringify({ keyword: 'test keyword', status: 'approved' }),
       redirect: 'manual',
     });
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(404);
   });
 });
 

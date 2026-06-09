@@ -725,8 +725,12 @@ describe('8. Error paths — Stripe SDK throws', () => {
     stripeMockStubs.customersRetrieve.mockRejectedValue(new Error('No such customer'));
     stripeMockStubs.checkoutCreate.mockRejectedValue(new Error('Stripe rate limit exceeded'));
 
-    const res = await postJson(`/api/public/upgrade-checkout/${currentWs.workspaceId}`, {
-      planId: 'growth',
+    const res = await api(`/api/public/upgrade-checkout/${currentWs.workspaceId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-auth-token': ADMIN_HMAC_TOKEN },
+      body: JSON.stringify({
+        planId: 'growth',
+      }),
     });
 
     expect(res.status).toBe(500);

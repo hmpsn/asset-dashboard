@@ -16,7 +16,7 @@ import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createContentRequest, getContentRequest } from '../../server/content-requests.js';
 
 // ── Unique port ──────────────────────────────────────────────────────────────
-const ctx = createTestContext(13262);
+const ctx = createTestContext(13262, { autoPublicAuth: true });
 const { postJson } = ctx;
 
 let wsId = '';

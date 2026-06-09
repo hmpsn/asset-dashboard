@@ -12,7 +12,7 @@ import { validate, z } from '../middleware/validate.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { hasClientUsers, verifyClientToken } from '../client-users.js';
-import { requireAuthenticatedClientPortalAuth, requireClientPortalAuth, verifyClientSession } from '../middleware.js';
+import { requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
 
 import { getLatestSnapshotBefore } from '../reports.js';
 import { getEffectiveAudit, getLatestEffectiveSnapshot, listEffectiveSnapshotSummaries } from '../audit-snapshot-views.js';
@@ -64,19 +64,17 @@ import type {
 
 const log = createLogger('public-portal');
 
-const requireClientStrategyMutationAuth: RequestHandler = (req, res, next) => {
+const attachClientEmail: RequestHandler = (req, res, next) => {
   const wsId = req.params.workspaceId;
-  const sessionToken = req.cookies?.[`client_session_${wsId}`];
   const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
-  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
   const clientPayload = clientUserToken ? verifyClientToken(clientUserToken) : null;
-  const hasClientUserAuth = clientPayload?.workspaceId === wsId;
-  if (!hasSession && !hasClientUserAuth) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-  res.locals.clientEmail = clientPayload?.email;
+  if (clientPayload?.workspaceId === wsId) res.locals.clientEmail = clientPayload.email;
   next();
 };
+const requireClientStrategyMutationAuth = [
+  requireAuthenticatedClientPortalAuth('workspaceId'),
+  attachClientEmail,
+];
 
 // --- Public Client Dashboard API (no auth required) ---
 router.get('/api/public/workspace/:id', (req, res) => {
@@ -91,20 +89,10 @@ router.get('/api/public/workspace/:id', (req, res) => {
 });
 
 // Public onboarding questionnaire submission — transforms responses into KB, brand voice, personas
-router.post('/api/public/onboarding/:id', async (req, res) => {
+router.post('/api/public/onboarding/:id', requireAuthenticatedClientPortalAuth('id'), async (req, res) => {
   try {
     const ws = getWorkspace(req.params.id);
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-
-    // Require a valid client session or client user JWT
-    const wsId = req.params.id;
-    const sessionToken = req.cookies?.[`client_session_${wsId}`];
-    const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
-    const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
-    const hasClientUserAuth = clientUserToken && verifyClientToken(clientUserToken)?.workspaceId === wsId;
-    if (!hasSession && !hasClientUserAuth) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
 
     const { business, audience, brand, competitors } = req.body;
 
@@ -202,7 +190,7 @@ router.post('/api/public/onboarding/:id', async (req, res) => {
     updateWorkspace(req.params.id, updates);
 
     // client-visibility-ok: onboarding completion is internal audit history, not client timeline content.
-    addActivity(wsId, 'client_onboarding_submitted', 'Client completed onboarding questionnaire', 'Via client portal');
+    addActivity(ws.id, 'client_onboarding_submitted', 'Client completed onboarding questionnaire', 'Via client portal');
     res.json({ ok: true, message: 'Onboarding responses saved successfully' });
   } catch (err) {
     log.error({ err: err }, 'Error saving responses');
@@ -343,7 +331,7 @@ router.get('/api/public/keyword-feedback/:workspaceId', (req, res) => {
 });
 
 // Client: submit keyword feedback (approve/decline)
-router.post('/api/public/keyword-feedback/:workspaceId', requireClientStrategyMutationAuth, validate(keywordFeedbackSchema), (req, res) => {
+router.post('/api/public/keyword-feedback/:workspaceId', ...requireClientStrategyMutationAuth, validate(keywordFeedbackSchema), (req, res) => {
   const wsId = req.params.workspaceId;
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -379,7 +367,7 @@ router.post('/api/public/keyword-feedback/:workspaceId', requireClientStrategyMu
 });
 
 // Client: bulk feedback
-router.post('/api/public/keyword-feedback/:workspaceId/bulk', requireClientStrategyMutationAuth, validate(bulkKeywordFeedbackSchema), (req, res) => {
+router.post('/api/public/keyword-feedback/:workspaceId/bulk', ...requireClientStrategyMutationAuth, validate(bulkKeywordFeedbackSchema), (req, res) => {
   const wsId = req.params.workspaceId;
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -407,16 +395,8 @@ router.post('/api/public/keyword-feedback/:workspaceId/bulk', requireClientStrat
 
 // Client: remove keyword feedback so a previously removed/restored keyword returns to neutral.
 // broadcast-ok: notifyKeywordFeedbackChanged broadcasts strategy/signal invalidation after real feedback deletes.
-router.delete('/api/public/keyword-feedback/:workspaceId', (req, res) => {
+router.delete('/api/public/keyword-feedback/:workspaceId', ...requireClientStrategyMutationAuth, (req, res) => {
   const wsId = req.params.workspaceId;
-  const sessionToken = req.cookies?.[`client_session_${wsId}`];
-  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
-  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
-  const clientPayload = clientUserToken ? verifyClientToken(clientUserToken) : null;
-  const hasClientUserAuth = clientPayload?.workspaceId === wsId;
-  if (!hasSession && !hasClientUserAuth) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
@@ -481,7 +461,7 @@ router.get('/api/public/business-priorities/:workspaceId', (req, res) => {
   res.json(normalizeClientBusinessPrioritiesRow(wsId, row));
 });
 
-router.post('/api/public/business-priorities/:workspaceId', requireClientStrategyMutationAuth, validate(clientBusinessPrioritiesBodySchema), (req, res) => {
+router.post('/api/public/business-priorities/:workspaceId', ...requireClientStrategyMutationAuth, validate(clientBusinessPrioritiesBodySchema), (req, res) => {
   const wsId = req.params.workspaceId;
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -562,15 +542,8 @@ const clientBusinessProfileSchema = z.object({
   numberOfEmployees: z.string().max(50).optional(),
 });
 
-router.patch('/api/public/workspaces/:id/business-profile', (req, res) => {
+router.patch('/api/public/workspaces/:id/business-profile', requireAuthenticatedClientPortalAuth('id'), (req, res) => {
   const wsId = req.params.id;
-  const sessionToken = req.cookies?.[`client_session_${wsId}`];
-  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
-  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
-  const hasClientUserAuth = clientUserToken && (verifyClientToken(clientUserToken)?.workspaceId === wsId);
-  if (!hasSession && !hasClientUserAuth) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
 
   const parsed = clientBusinessProfileSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -606,7 +579,7 @@ router.patch('/api/public/workspaces/:id/business-profile', (req, res) => {
 // ── Content Gap Voting ──────────────────────────
 // Clients can upvote content gaps to signal priority
 
-router.post('/api/public/content-gap-vote/:workspaceId', requireClientStrategyMutationAuth, validate(contentGapVoteSchema), (req, res) => {
+router.post('/api/public/content-gap-vote/:workspaceId', ...requireClientStrategyMutationAuth, validate(contentGapVoteSchema), (req, res) => {
   const wsId = req.params.workspaceId;
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -677,17 +650,7 @@ const copySuggestionSchema = z.object({
   suggestedText: z.string().trim().min(1, 'suggestedText is required').max(5000),
 }).strict();
 
-const requireClientCopyReviewAuth: RequestHandler = (req, res, next) => {
-  const wsId = req.params.workspaceId;
-  const sessionToken = req.cookies?.[`client_session_${wsId}`];
-  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
-  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
-  const hasClientUserAuth = clientUserToken && verifyClientToken(clientUserToken)?.workspaceId === wsId;
-  if (!hasSession && !hasClientUserAuth) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-  next();
-};
+const requireClientCopyReviewAuth = requireAuthenticatedClientPortalAuth('workspaceId');
 
 // List blueprint entries with their copy status
 router.get('/api/public/copy/:workspaceId/entries', requireClientPortalAuth(), (req, res) => {

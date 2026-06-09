@@ -190,6 +190,9 @@ export function requireClientPortalAuth(wsIdParam = 'workspaceId') {
     const workspaceId = req.params[wsIdParam];
     const ws = getWorkspace(workspaceId);
     if (!ws) return next();
+    if (ws.clientPortalEnabled != null && !ws.clientPortalEnabled) {
+      return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
+    }
     // Admin HMAC token always passes through (admin reads all client portal data).
     const adminToken = (req.headers['x-auth-token'] || req.cookies?.auth_token || '') as string;
     if (adminToken && verifyAdminToken(adminToken)) return next();
@@ -218,6 +221,9 @@ export function requireAuthenticatedClientPortalAuth(wsIdParam = 'workspaceId') 
     const workspaceId = req.params[wsIdParam];
     const ws = getWorkspace(workspaceId);
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+    if (ws.clientPortalEnabled != null && !ws.clientPortalEnabled) {
+      return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
+    }
 
     const adminToken = (req.headers['x-auth-token'] || req.cookies?.auth_token || '') as string;
     if (adminToken && verifyAdminToken(adminToken)) return next();

@@ -22,7 +22,7 @@ import db from '../../server/db/index.js';
 import type { ClientAction } from '../../shared/types/client-actions.js';
 import type { Job } from '../../server/jobs.js';
 
-const ctx = createTestContext(13353); // port-ok: 13201-13352 already allocated in integration suite
+const ctx = createTestContext(13353, { autoPublicAuth: true }); // port-ok: 13201-13352 already allocated in integration suite
 const { api, postJson, patchJson } = ctx;
 
 let wsId = '';

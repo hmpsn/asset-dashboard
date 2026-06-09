@@ -15,6 +15,7 @@ import {
   hasClientUsers,
   getSafeClientUser,
   createResetToken,
+  getResetTokenWorkspaceId,
   resetPasswordWithToken,
 } from '../client-users.js';
 import { sendEmail } from '../email.js';
@@ -39,9 +40,14 @@ const resetPasswordSchema = z.object({
   newPassword: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
+function isClientPortalDisabled(ws: { clientPortalEnabled?: boolean }): boolean {
+  return ws.clientPortalEnabled != null && !ws.clientPortalEnabled;
+}
+
 router.post('/api/public/auth/:id', clientLoginLimiter, async (req, res) => {
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Not found' });
+  if (isClientPortalDisabled(ws)) return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
   if (!ws.clientPassword) return res.json({ ok: true });
   const { password } = req.body;
   // Support both bcrypt hashes (new) and legacy plaintext (migration)
@@ -75,6 +81,7 @@ router.post('/api/public/client-login/:id', clientLoginLimiter, verifyTurnstile,
   try {
     const ws = getWorkspace(req.params.id);
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+    if (isClientPortalDisabled(ws)) return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
     const { email, password } = req.body;
 
     // Credential stuffing protection: check if email is locked out
@@ -117,6 +124,9 @@ router.post('/api/public/client-login/:id', clientLoginLimiter, verifyTurnstile,
 
 // Get current client user from token
 router.get('/api/public/client-me/:id', (req, res) => {
+  const ws = getWorkspace(req.params.id);
+  if (!ws) return res.json({ user: null });
+  if (isClientPortalDisabled(ws)) return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
   const token = req.cookies?.[`client_user_token_${req.params.id}`];
   if (!token) return res.json({ user: null });
   const payload = verifyClientToken(token);
@@ -136,6 +146,7 @@ router.post('/api/public/client-logout/:id', (_req, res) => {
 router.get('/api/public/auth-mode/:id', (req, res) => {
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (isClientPortalDisabled(ws)) return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
   res.json({
     hasSharedPassword: !!ws.clientPassword,
     hasClientUsers: hasClientUsers(req.params.id),
@@ -148,6 +159,7 @@ router.get('/api/public/auth-mode/:id', (req, res) => {
 router.post('/api/public/forgot-password/:id', clientLoginLimiter, verifyTurnstile, async (req, res) => {
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (isClientPortalDisabled(ws)) return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
   const email = sanitizeString(req.body.email, 200)?.toLowerCase().trim();
   if (!email) return res.status(400).json({ error: 'Email is required' });
 
@@ -175,6 +187,13 @@ router.post('/api/public/forgot-password/:id', clientLoginLimiter, verifyTurnsti
 // Complete password reset with token
 router.post('/api/public/reset-password', validate(resetPasswordSchema), async (req, res) => {
   const { token, newPassword } = req.body;
+  const workspaceId = getResetTokenWorkspaceId(token);
+  if (workspaceId) {
+    const ws = getWorkspace(workspaceId);
+    if (ws && isClientPortalDisabled(ws)) {
+      return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
+    }
+  }
   const result = await resetPasswordWithToken(token, newPassword);
   if (!result.success) return res.status(400).json({ error: result.error });
   res.json({ ok: true });
@@ -185,6 +204,7 @@ router.post('/api/public/reset-password', validate(resetPasswordSchema), async (
 router.post('/api/public/capture-email/:id', (req, res) => {
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (isClientPortalDisabled(ws)) return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
 
   const email = sanitizeString(req.body.email, 200)?.toLowerCase().trim();
   const name = sanitizeString(req.body.name, 100)?.trim() || undefined;

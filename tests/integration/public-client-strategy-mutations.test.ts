@@ -561,8 +561,7 @@ describe('PATCH /api/public/workspaces/:id/business-profile', () => {
       body: JSON.stringify({ phone: '+1-555-0999' }),
     });
 
-    // No auth cookie → 401 before workspace lookup
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(404);
   });
 
   it('returns 401 without auth cookie', async () => {

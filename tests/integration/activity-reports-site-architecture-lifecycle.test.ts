@@ -108,17 +108,41 @@ async function postJson(path: string, body: unknown): Promise<Response> {
 // ── Workspace creation (import after mocks) ──────────────────────────────────
 
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
 
 let wsId = '';
 let wsBId = '';
+let clientUserId = '';
+let clientToken = '';
+
+function clientCookieHeader(workspaceId = wsId, token = clientToken): string {
+  return `client_user_token_${workspaceId}=${token}`;
+}
+
+async function getWithClientToken(path: string, workspaceId = wsId, token = clientToken): Promise<Response> {
+  return fetch(`${baseUrl}${path}`, {
+    headers: {
+      Cookie: clientCookieHeader(workspaceId, token),
+    },
+  });
+}
 
 beforeAll(async () => {
   // Workspace creation can only happen after server started (DB ready)
   wsId = createWorkspace('ActivityReports-WsA').id;
   wsBId = createWorkspace('ActivityReports-WsB').id;
+  const clientUser = await createClientUser(
+    'activity-reports-client@test.local',
+    'ClientPass1!',
+    'Activity Reports Client',
+    wsId,
+  );
+  clientUserId = clientUser.id;
+  clientToken = signClientToken(clientUser);
 }, 30_000);
 
 afterAll(async () => {
+  if (clientUserId) deleteClientUser(clientUserId, wsId);
   if (wsId) deleteWorkspace(wsId);
   if (wsBId) deleteWorkspace(wsBId);
 });
@@ -714,7 +738,7 @@ describe('GET /api/public/reports/:workspaceId', () => {
   });
 
   it('returns 200 with array for existing workspace (even with no reports)', async () => {
-    const res = await get(`/api/public/reports/${wsId}`);
+    const res = await getWithClientToken(`/api/public/reports/${wsId}`);
     expect(res.status).toBe(200);
     const body = await res.json() as unknown[];
     expect(Array.isArray(body)).toBe(true);
@@ -722,7 +746,7 @@ describe('GET /api/public/reports/:workspaceId', () => {
 
   it('each report entry has required fields', async () => {
     // wsId has no webflowSiteId and no monthly reports, so array may be empty
-    const res = await get(`/api/public/reports/${wsId}`);
+    const res = await getWithClientToken(`/api/public/reports/${wsId}`);
     expect(res.status).toBe(200);
     const body = await res.json() as Array<Record<string, unknown>>;
     for (const report of body) {
@@ -735,7 +759,7 @@ describe('GET /api/public/reports/:workspaceId', () => {
   });
 
   it('reports are sorted newest first', async () => {
-    const res = await get(`/api/public/reports/${wsId}`);
+    const res = await getWithClientToken(`/api/public/reports/${wsId}`);
     expect(res.status).toBe(200);
     const body = await res.json() as Array<{ createdAt: string }>;
     if (body.length >= 2) {

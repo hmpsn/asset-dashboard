@@ -3,7 +3,7 @@
  */
 import { Router } from 'express';
 
-import { requireClientPortalAuth } from '../middleware.js';
+import { requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
 import { createLogger } from '../logger.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';
 import {
@@ -75,7 +75,7 @@ function toPublicRecommendationSet(set: RecommendationSet, recs: Recommendation[
 // Soft-gated (requireClientPortalAuth): password-set workspaces require a
 // session; passwordless/demo portals pass through (the client calls this with a
 // cookie-only fetch). Matches the sibling PATCH/DELETE routes below.
-router.post('/api/public/recommendations/:workspaceId/generate', requireClientPortalAuth(), async (req, res) => {
+router.post('/api/public/recommendations/:workspaceId/generate', requireAuthenticatedClientPortalAuth(), async (req, res) => {
   try {
     const { workspaceId } = req.params;
     if (!getWorkspace(workspaceId)) return res.status(404).json({ error: 'Workspace not found' });
@@ -142,7 +142,7 @@ router.get('/api/public/recommendations/:workspaceId', requireClientPortalAuth()
 // completed and mirrors the affected pages to live state. There is no separate
 // rec to resolve; resolving here would be circular.
 // rec-refresh-ok
-router.patch('/api/public/recommendations/:workspaceId/:recId', requireClientPortalAuth(), (req, res) => {
+router.patch('/api/public/recommendations/:workspaceId/:recId', requireAuthenticatedClientPortalAuth(), (req, res) => {
   const { workspaceId, recId } = req.params;
   const { status } = req.body;
   if (!status || !['pending', 'in_progress', 'completed', 'dismissed'].includes(status)) {
@@ -237,7 +237,7 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', requireClientPor
 });
 
 // Dismiss a recommendation
-router.delete('/api/public/recommendations/:workspaceId/:recId', requireClientPortalAuth(), (req, res) => {
+router.delete('/api/public/recommendations/:workspaceId/:recId', requireAuthenticatedClientPortalAuth(), (req, res) => {
   const { workspaceId, recId } = req.params;
   let ok: boolean;
   try {

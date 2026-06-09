@@ -172,7 +172,7 @@ describe('R4 projected review respond routes', () => {
 
     const res = await fetch(`${baseUrl}/api/public/content-request/${wsId}/${review.id}/approve`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: clientHeaders(),
       body: JSON.stringify({}),
     });
     expect(res.status).toBe(200);

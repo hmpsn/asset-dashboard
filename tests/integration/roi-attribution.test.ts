@@ -31,7 +31,7 @@ import { createMatrix, updateMatrixCell } from '../../server/content-matrices.js
 import { upsertPageKeywordsBatch } from '../../server/page-keywords.js';
 import type { PageKeywordMap } from '../../shared/types/workspace.js';
 
-const ctx = createTestContext(13310);
+const ctx = createTestContext(13310, { autoPublicAuth: true });
 const { api } = ctx;
 
 // ── Workspace IDs created during tests ──────────────────────────────────────

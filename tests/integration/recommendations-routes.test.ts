@@ -10,7 +10,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13212);
+const ctx = createTestContext(13212, { autoPublicAuth: true });
 const { api, patchJson, del } = ctx;
 
 let testWsId = '';

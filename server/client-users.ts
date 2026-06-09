@@ -332,6 +332,11 @@ export function createResetToken(email: string, workspaceId: string): { token: s
   return { token, user: stripPassword(user) };
 }
 
+export function getResetTokenWorkspaceId(token: string): string | null {
+  const row = stmts().selectToken.get(token) as ResetTokenRow | undefined;
+  return row?.workspace_id ?? null;
+}
+
 export async function resetPasswordWithToken(token: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
   const row = stmts().selectToken.get(token) as ResetTokenRow | undefined;
   if (!row) return { success: false, error: 'Invalid or expired reset link' };

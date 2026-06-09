@@ -17,7 +17,7 @@ import { savePost, getPost, listPostVersions } from '../../server/content-posts-
 import db from '../../server/db/index.js';
 import type { GeneratedPost } from '../../shared/types/content.js';
 
-const ctx = createTestContext(13328); // port-ok: 13201-13327 fully allocated; extending range
+const ctx = createTestContext(13328, { autoPublicAuth: true }); // port-ok: 13201-13327 fully allocated; extending range
 const { api, postJson, patchJson, clearCookies } = ctx;
 
 let testWsId = '';
@@ -161,7 +161,11 @@ describe('POST /api/public/content-request/:wsId/:id/approve-post', () => {
     updateContentRequest(privateWsId, req.id, { status: 'post_review', postId: req.postId });
 
     clearCookies();
-    const unauthenticatedRes = await postJson(`/api/public/content-request/${privateWsId}/${req.id}/approve-post`, {});
+    const unauthenticatedRes = await api(`/api/public/content-request/${privateWsId}/${req.id}/approve-post`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
+      body: JSON.stringify({}),
+    });
     expect(unauthenticatedRes.status).toBe(401);
     expect(getContentRequest(privateWsId, req.id)?.status).toBe('post_review');
     expect(countActivitiesForRequest(privateWsId, req.id, 'post_approved')).toBe(0);

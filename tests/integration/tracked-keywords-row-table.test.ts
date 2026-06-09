@@ -45,7 +45,7 @@ vi.mock('../../server/middleware.js', async (importOriginal) => {
 });
 
 const PORT = 13891;
-const ctx = createTestContext(PORT);
+const ctx = createTestContext(PORT, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 /** DELETE with a JSON body (the public remove route validates req.body.keyword). */
