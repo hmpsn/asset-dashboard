@@ -19,7 +19,7 @@ plans.
 
 ## Findings Summary
 
-- `native`: 32
+- `native`: 33
 - `hybrid`: 0
 - `legacy`: 0
 - `documented-exception`: 0
@@ -64,6 +64,7 @@ Root pattern confirmed:
 | `server/routes/workspaces.ts` | `workspace-command-center` | `native` | seoContext-backed AI helper path | keep low-level | revisit only if it needs multi-slice context |
 | `server/seo-audit-ai-recs.ts` | `seo-health` | `native` | slice-backed workspace + page prompt assembly | recommendation builder optional later | wave 2 |
 | `server/voice-calibration.ts` | `brand-engine` | `native` | `buildIntelPrompt(['seoContext'])` | keep low-level | only revisit if richer slices are added |
+| `server/webflow-bulk-alt-background-job.ts` | `seo-health` | `native` | slice-backed SEO context inside extracted bulk alt background job | keep low-level for job-specific prompts | completed in simplification sprint phase 4 |
 | `server/webflow-seo-bulk-analyze-job.ts` | `seo-health` | `native` | aligned slices + `formatForPrompt()` | keep low-level | wave 4 |
 | `server/webflow-seo-bulk-rewrite-job.ts` | `seo-health` | `native` | page-assist builder supplies per-page keyword/voice/profile context inside the background job | page-assist builder | completed in follow-up builder PR |
 
