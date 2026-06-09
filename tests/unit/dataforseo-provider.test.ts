@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { isCapabilityDisabled, clearCapabilityDisabled, _resetRegistryForTest } from '../../server/seo-data-provider.js';
 
+const loggerMocks = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+}));
+
 // Mock fs so writeCache/readCache don't touch disk
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -30,6 +37,10 @@ vi.mock('../../server/keyword-metrics-cache.js', () => ({
   cacheMetrics: vi.fn(),
 }));
 
+vi.mock('../../server/logger.js', () => ({
+  createLogger: () => loggerMocks,
+}));
+
 // Set env vars before importing the provider
 process.env.DATAFORSEO_LOGIN = 'test-login';
 process.env.DATAFORSEO_PASSWORD = 'test-password';
@@ -37,6 +48,13 @@ process.env.DATAFORSEO_PASSWORD = 'test-password';
 import fs from 'fs';
 import { DataForSeoProvider, flushCreditsToDisk } from '../../server/providers/dataforseo-provider.js';
 import { getCachedMetricsBatch, cacheMetricsBatch } from '../../server/keyword-metrics-cache.js';
+
+beforeEach(() => {
+  loggerMocks.info.mockReset();
+  loggerMocks.warn.mockReset();
+  loggerMocks.error.mockReset();
+  loggerMocks.debug.mockReset();
+});
 
 function mockFetchOnce(json: unknown): void {
   vi.spyOn(global, 'fetch').mockResolvedValueOnce({
@@ -392,6 +410,25 @@ describe('DataForSeoProvider — keyword difficulty endpoint', () => {
 
     const results = await provider.getRelatedKeywords('seo', 'ws-related', 5, 'us');
     expect(results[0].difficulty).toBe(61);
+  });
+
+  it('returns cached related keywords without making a provider call', async () => {
+    const cached: Array<{ keyword: string; volume: number; difficulty: number; cpc: number }> = [
+      { keyword: 'cached related keyword', volume: 400, difficulty: 22, cpc: 1.1 },
+    ];
+    vi.spyOn(fs, 'existsSync').mockImplementation(pathLike => String(pathLike).includes('.dataforseo-cache'));
+    vi.spyOn(fs, 'mkdirSync').mockReturnValue(undefined as never);
+    vi.spyOn(fs, 'readFileSync').mockImplementation(() => JSON.stringify({
+      cachedAt: new Date().toISOString(),
+      data: cached,
+    }));
+    const fetchSpy = vi.spyOn(global, 'fetch');
+    const provider = new DataForSeoProvider();
+
+    const results = await provider.getRelatedKeywords('seo', 'ws-related-cache', 5, 'us');
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(results).toEqual(cached);
   });
 
   // ── P1 / G13: language threading at the pool-path sites ──
@@ -798,6 +835,46 @@ describe('DataForSeoProvider — getReferringDomains date normalization', () => 
     const result = await provider.getReferringDomains('example.test', 'ws-dfs-date', 15, 'us');
     expect(result[0].firstSeen).toMatch(/^2025-05-17T/);
     expect(result[0].lastSeen).toMatch(/^2026-\d{2}-\d{2}T/);
+  });
+
+  it('degrades backlinks overview subscription errors to null', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        tasks: [{ status_code: 40204, status_message: 'subscription required — 40204', cost: 0 }],
+      }),
+    } as Response);
+
+    await expect(provider.getBacklinksOverview('example.test', 'ws-backlinks-subscription', 'us')).resolves.toBeNull();
+  });
+
+  it('does not emit competitor discovery logs for cached competitor results', async () => {
+    const cached = [
+      {
+        domain: 'cached-competitor.test',
+        competitorRelevance: 73,
+        commonKeywords: 11,
+        organicKeywords: 320,
+        organicTraffic: 1400,
+        organicCost: 92,
+      },
+    ];
+    vi.spyOn(fs, 'existsSync').mockImplementation(pathLike => String(pathLike).includes('.dataforseo-cache'));
+    vi.spyOn(fs, 'mkdirSync').mockReturnValue(undefined as never);
+    vi.spyOn(fs, 'readFileSync').mockImplementation(() => JSON.stringify({
+      cachedAt: new Date().toISOString(),
+      data: cached,
+    }));
+    const fetchSpy = vi.spyOn(global, 'fetch');
+    const provider = new DataForSeoProvider();
+
+    const result = await provider.getCompetitors('example.test', 'ws-competitors-cache', 10, 'us');
+
+    expect(result).toEqual(cached);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(loggerMocks.info).not.toHaveBeenCalledWith('Found 1 competitors for "example.test"');
   });
 });
 
