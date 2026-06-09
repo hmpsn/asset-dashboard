@@ -439,9 +439,12 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     [WS_EVENTS.OUTCOME_SCORED]: () => {
       refetchClient('outcome-summary', '');
       refetchClient('outcome-wins', '');
+      refetchClient('intelligence', '');
     },
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.OUTCOME_EXTERNAL_DETECTED]: () => refetchClient('outcome-wins', ''),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.OUTCOME_LEARNINGS_UPDATED]: () => refetchClient('intelligence', ''),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.INSIGHT_BRIDGE_UPDATED]: () => {
       refetchClient('client-insights', '');

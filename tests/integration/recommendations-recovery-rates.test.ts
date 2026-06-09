@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { getRecoveryRate } from '../../server/recommendations.js';
+import { computeRecommendationSummary, getRecoveryRate } from '../../server/recommendations.js';
+import type { Recommendation } from '../../shared/types/recommendations.js';
 
 describe('getRecoveryRate', () => {
   it('returns rate for a known issue type', () => {
@@ -19,47 +20,43 @@ describe('getRecoveryRate', () => {
   });
 });
 
-// Locks the summary-math formula used in `generateRecommendations` at
-// server/recommendations.ts:898-910:
-//   weightedRecoverableClicks += r.trafficAtRisk * getRecoveryRate(checkName).summary
-// `estimatedRecoverableClicks = Math.round(sum over actionableRecs)`.
-// Catches regressions if someone replaces the weighted accumulation with a
-// flat-rate (pre-Tier 3) calculation or a different rounding policy.
-describe('weighted recoverable-clicks summary math', () => {
-  function extractCheckName(source: string): string {
-    return source.startsWith('audit:site-wide:')
-      ? source.replace('audit:site-wide:', '')
-      : source.startsWith('audit:')
-        ? source.replace('audit:', '')
-        : '';
+describe('Opportunity Value summary math', () => {
+  function makeRec(overrides: Partial<Recommendation>): Recommendation {
+    const now = new Date().toISOString();
+    return {
+      id: 'rec',
+      workspaceId: 'ws-rec-summary',
+      priority: 'fix_now',
+      type: 'metadata',
+      title: 'Fix title',
+      description: 'Description',
+      insight: 'Insight',
+      impact: 'high',
+      effort: 'low',
+      impactScore: 50,
+      source: 'audit:title',
+      affectedPages: [],
+      trafficAtRisk: 1000,
+      impressionsAtRisk: 5000,
+      estimatedGain: '10-25%',
+      actionType: 'manual',
+      status: 'pending',
+      createdAt: now,
+      updatedAt: now,
+      ...overrides,
+    };
   }
-  const DEFAULT_SUMMARY = 0.12;
 
-  it('sums trafficAtRisk × per-check rate.summary and rounds', () => {
-    const recs = [
-      { source: 'audit:title',          trafficAtRisk: 1000 }, // summary 0.18 → 180
-      { source: 'audit:og-image',       trafficAtRisk: 500  }, // summary 0.02 → 10
-      { source: 'strategy:content-gap', trafficAtRisk: 200  }, // default 0.12 → 24
-    ];
-    const weighted = recs.reduce((s, r) => {
-      const checkName = extractCheckName(r.source);
-      const rate = checkName ? getRecoveryRate(checkName) : { summary: DEFAULT_SUMMARY, perRec: '' };
-      return s + r.trafficAtRisk * rate.summary;
-    }, 0);
-    expect(Math.round(weighted)).toBe(214);
-  });
+  it('does not emit legacy aggregate recovery-rate fields', () => {
+    const summary = computeRecommendationSummary([
+      makeRec({ id: 'rec-1', impactScore: 90, trafficAtRisk: 1000 }),
+      makeRec({ id: 'rec-2', impactScore: 40, trafficAtRisk: 500, priority: 'fix_later' }),
+    ]);
 
-  it('site-wide audit sources strip the audit:site-wide: prefix', () => {
-    const checkName = extractCheckName('audit:site-wide:ssl');
-    expect(checkName).toBe('ssl');
-    const rate = getRecoveryRate(checkName);
-    expect(rate.summary).toBeGreaterThan(0);
-    const weighted = 100 * rate.summary;
-    expect(Math.round(weighted)).toBe(Math.round(100 * rate.summary));
-  });
-
-  it('non-audit sources (decay, strategy) fall through to DEFAULT_RECOVERY', () => {
-    expect(extractCheckName('decay:click-decline')).toBe('');
-    expect(extractCheckName('strategy:content-gap')).toBe('');
+    expect(summary.totalOpportunityValue).toBe(130);
+    expect(summary.actionableOpportunityValue).toBe(90);
+    expect(summary.topOpportunityValue).toBe(90);
+    expect(summary).not.toHaveProperty('estimatedRecoverableClicks');
+    expect(summary).not.toHaveProperty('estimatedRecoverableImpressions');
   });
 });

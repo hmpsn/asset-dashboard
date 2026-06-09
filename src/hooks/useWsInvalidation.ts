@@ -252,7 +252,9 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeActions(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeScorecard(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeTimeline(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(workspaceId) });
     },
     [WS_EVENTS.OUTCOME_SCORED]: () => {
       if (!workspaceId) return;
@@ -260,6 +262,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeScorecard(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeTimeline(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeTopWins(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeLearnings(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.outcomeSummary(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.outcomeWins(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
@@ -272,8 +275,11 @@ export function useWsInvalidation(workspaceId: string | undefined) {
     },
     [WS_EVENTS.OUTCOME_LEARNINGS_UPDATED]: () => {
       if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeActions(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeTimeline(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeLearnings(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(workspaceId) });
     },
     [WS_EVENTS.OUTCOME_PLAYBOOK_DISCOVERED]: () => {
       if (!workspaceId) return;

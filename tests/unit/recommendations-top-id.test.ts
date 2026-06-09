@@ -52,6 +52,10 @@ describe('computeRecommendationSummary — topRecommendationId', () => {
     // Recs are passed in sorted order (as they would be after sortRecommendations)
     const summary = computeRecommendationSummary([topRec, lowerRec]);
     expect(summary.topRecommendationId).toBe('rec_top');
+    expect(summary.totalOpportunityValue).toBe(130);
+    expect(summary.actionableOpportunityValue).toBe(130);
+    expect(summary.topOpportunityValue).toBe(80);
+    expect(summary).not.toHaveProperty('estimatedRecoverableClicks');
   });
 
   it('skips completed recs — topRecommendationId is the first non-completed rec', () => {

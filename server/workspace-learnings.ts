@@ -393,14 +393,14 @@ export function computeWorkspaceLearnings(workspaceId: string): WorkspaceLearnin
   const actions = getActionsByWorkspace(workspaceId);
   const now = new Date().toISOString();
 
-  // Collect all scored outcomes (measurement_complete = true, score is a real verdict)
+  // Collect the latest usable scored 30/60/90-day outcome for every action.
+  // 30/60-day verdicts can be meaningful before the 90-day completion flag flips.
   const scored: ScoredActionWithOutcome[] = [];
 
   for (const action of actions) {
-    if (!action.measurementComplete) continue;
     const outcomes = getOutcomesForAction(action.id);
-    // outcomes ordered ASC by checkpoint_days — last valid = most recent checkpoint
     const validOutcomes = outcomes.filter(o =>
+      (o.checkpointDays === 30 || o.checkpointDays === 60 || o.checkpointDays === 90) &&
       o.score != null && o.score !== 'insufficient_data' && o.score !== 'inconclusive'
     );
     if (validOutcomes.length > 0) {
