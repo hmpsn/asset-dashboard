@@ -1,6 +1,9 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { describe, expect, it } from 'vitest';
+import { queryKeys } from '../../src/lib/queryKeys';
+import { getWorkspaceInvalidationKeys } from '../../src/lib/wsInvalidation';
+import { WS_EVENTS } from '../../src/lib/wsEvents';
 
 const ROOT = join(__dirname, '../..');
 
@@ -37,19 +40,44 @@ describe('schema snapshot invalidation contract', () => {
   });
 
   it('invalidates admin and client React Query caches for schema snapshot and plan events', () => {
-    const adminSource = readProjectFile('src/hooks/useWsInvalidation.ts');
     const clientSource = readProjectFile('src/components/ClientDashboard.tsx');
+    const adminPlanKeys = getWorkspaceInvalidationKeys(
+      WS_EVENTS.SCHEMA_PLAN_UPDATED,
+      'ws-schema',
+      { siteId: 'site-11' },
+      'admin',
+    );
+    const adminSnapshotKeys = getWorkspaceInvalidationKeys(
+      WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED,
+      'ws-schema',
+      { siteId: 'site-11' },
+      'admin',
+    );
+    const clientPlanKeys = getWorkspaceInvalidationKeys(
+      WS_EVENTS.SCHEMA_PLAN_UPDATED,
+      'ws-schema',
+      undefined,
+      'client-dashboard',
+    );
+    const clientSnapshotKeys = getWorkspaceInvalidationKeys(
+      WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED,
+      'ws-schema',
+      undefined,
+      'client-dashboard',
+    );
 
-    expect(adminSource).toContain('[WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED]');
-    expect(adminSource).toContain('[WS_EVENTS.SCHEMA_PLAN_UPDATED]');
-    expect(adminSource).toContain('queryKeys.admin.schemaPlan(siteId, workspaceId)');
-    expect(adminSource).toContain('queryKeys.admin.schemaSnapshot(siteId, workspaceId)');
-    expect(adminSource).toContain('queryKeys.admin.schemaGraphValidation(siteId, workspaceId)');
+    expect(adminPlanKeys).toContainEqual(queryKeys.admin.schemaPlan('site-11', 'ws-schema'));
+    expect(adminPlanKeys).toContainEqual(queryKeys.admin.schemaGraphValidation('site-11', 'ws-schema'));
+    expect(adminSnapshotKeys).toContainEqual(queryKeys.admin.schemaSnapshot('site-11', 'ws-schema'));
+    expect(adminSnapshotKeys).toContainEqual(queryKeys.admin.schemaGraphValidation('site-11', 'ws-schema'));
     expect(clientSource).toContain('[WS_EVENTS.SCHEMA_PLAN_SENT]');
-    expect(clientSource).toContain('[WS_EVENTS.SCHEMA_PLAN_UPDATED]');
-    expect(clientSource).toContain('queryKeys.client.schemaPlan(workspaceId)');
+    expect(clientSource).toContain('invalidateClientEvent(WS_EVENTS.SCHEMA_PLAN_UPDATED)');
     expect(clientSource).toContain('[WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED]');
-    expect(clientSource).toContain('queryKeys.client.schemaSnapshot(workspaceId)');
+    expect(clientPlanKeys).toEqual([queryKeys.client.schemaPlan('ws-schema')]);
+    expect(clientSnapshotKeys).toEqual([
+      queryKeys.client.schemaPlan('ws-schema'),
+      queryKeys.client.schemaSnapshot('ws-schema'),
+    ]);
   });
 
   it('keeps the client schema review tab on React Query keys instead of local effect-fetch state', () => {

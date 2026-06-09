@@ -34,6 +34,7 @@ describe('useWsInvalidation (runtime)', () => {
     expect(registered).toContain(WS_EVENTS.DIAGNOSTIC_COMPLETE);
     expect(registered).toContain(WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED);
     expect(registered).toContain(WS_EVENTS.POST_UPDATED);
+    expect(registered).toContain(WS_EVENTS.DELIVERABLE_SENT);
   });
 
   it('short-circuits all workspace-scoped handlers when workspaceId is undefined', () => {
@@ -73,6 +74,7 @@ describe('useWsInvalidation (runtime)', () => {
     expect(invalidatedKeys).toContainEqual(queryKeys.admin.insightFeed(workspaceId));
     expect(invalidatedKeys).toContainEqual(queryKeys.admin.schemaCmsFieldMappings('site-42'));
     expect(invalidatedKeys).toContainEqual(queryKeys.admin.post(workspaceId, 'post-99'));
+    expect(invalidatedKeys).toContainEqual(queryKeys.admin.workspaceDeliverables(workspaceId));
     expect(invalidatedKeys).toContainEqual(queryKeys.client.briefing(workspaceId));
     expect(invalidatedKeys).toContainEqual(queryKeys.admin.notifications());
     expect(invalidatedKeys).toContainEqual(queryKeys.admin.keywordStrategy(workspaceId));

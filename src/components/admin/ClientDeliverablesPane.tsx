@@ -23,7 +23,7 @@ import { deliverableTypeBadge } from '../../lib/decision-adapters';
 import { useWorkspaceDeliverables, useRemindDeliverable } from '../../hooks/admin/useWorkspaceDeliverables';
 import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import { WS_EVENTS } from '../../lib/wsEvents';
-import { queryKeys } from '../../lib/queryKeys';
+import { invalidateWorkspaceEventQueries } from '../../lib/wsInvalidation';
 import { STALE_AWAITING_DAYS } from '../../../shared/types/admin-deliverable-view';
 import type {
   AdminDeliverableView,
@@ -120,16 +120,10 @@ export function ClientDeliverablesPane({ workspaceId }: ClientDeliverablesPanePr
   // send/response/remind; invalidate the admin pane query so the operator view reflects it live.
   const wsHandlers = useMemo(
     () => ({
-      // ws-invalidation-ok — admin workspace-deliverables key differs from the client unified-inbox key
       [WS_EVENTS.DELIVERABLE_SENT]: () =>
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.admin.workspaceDeliverables(workspaceId),
-        }),
-      // ws-invalidation-ok — admin workspace-deliverables key differs from the client unified-inbox key
+        invalidateWorkspaceEventQueries(queryClient, WS_EVENTS.DELIVERABLE_SENT, workspaceId, undefined, 'admin-deliverables'),
       [WS_EVENTS.DELIVERABLE_UPDATED]: () =>
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.admin.workspaceDeliverables(workspaceId),
-        }),
+        invalidateWorkspaceEventQueries(queryClient, WS_EVENTS.DELIVERABLE_UPDATED, workspaceId, undefined, 'admin-deliverables'),
     }),
     [queryClient, workspaceId],
   );

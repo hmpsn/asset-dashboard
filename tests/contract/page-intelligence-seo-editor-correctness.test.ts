@@ -1,5 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { queryKeys } from '../../src/lib/queryKeys';
+import { getWorkspaceInvalidationKeys } from '../../src/lib/wsInvalidation';
+import { WS_EVENTS } from '../../src/lib/wsEvents';
 
 describe('Page Intelligence + SEO Editor correctness contracts', () => {
   it('passes workspace and canonical page identity through single-page Page Intelligence analysis', () => {
@@ -50,7 +53,7 @@ describe('Page Intelligence + SEO Editor correctness contracts', () => {
     const hookSrc = readFileSync('src/components/editor/useSeoEditorPageWorkflow.ts', 'utf-8'); // readFile-ok — source contract for direct SEO save wiring
     const bulkHookSrc = readFileSync('src/components/editor/useSeoEditorBulkWorkflow.ts', 'utf-8'); // readFile-ok — source contract for bulk SEO save wiring
     const routeSrc = readFileSync('server/routes/webflow.ts', 'utf-8'); // readFile-ok — source contract for direct SEO save route
-    const invalidationSrc = readFileSync('src/hooks/useWsInvalidation.ts', 'utf-8'); // readFile-ok — source contract for page state broadcast invalidation
+    const invalidationKeys = getWorkspaceInvalidationKeys(WS_EVENTS.PAGE_STATE_UPDATED, 'ws-seo', undefined, 'admin');
 
     expect(hookSrc).toContain('slug: page ? resolvePagePath(page) :');
     expect(hookSrc).toContain("pageTitle: page?.title || ''");
@@ -65,10 +68,9 @@ describe('Page Intelligence + SEO Editor correctness contracts', () => {
     expect(routeSrc).toContain('const pagePath = rawPagePath ? normalizePageUrl(rawPagePath) :');
     expect(routeSrc).toContain("recordSeoChange(seoWs.id, req.params.pageId, pagePath, req.body.pageTitle || title || '', changedFields, 'editor')");
     expect(routeSrc).toContain('broadcastToWorkspace(seoWs.id, WS_EVENTS.PAGE_STATE_UPDATED');
-    expect(invalidationSrc).toContain('[WS_EVENTS.PAGE_STATE_UPDATED]');
-    expect(invalidationSrc).toContain('queryKeys.admin.seoEditorAll()');
-    expect(invalidationSrc).toContain('queryKeys.admin.seoSuggestions(workspaceId)');
-    expect(invalidationSrc).toContain('queryKeys.admin.pageJoinPagesAll()');
+    expect(invalidationKeys).toContainEqual(queryKeys.admin.seoEditorAll());
+    expect(invalidationKeys).toContainEqual(queryKeys.admin.seoSuggestions('ws-seo'));
+    expect(invalidationKeys).toContainEqual(queryKeys.admin.pageJoinPagesAll());
   });
 
   it('rejects invalid workspace-to-site writes before SEO mutation proceeds', () => {

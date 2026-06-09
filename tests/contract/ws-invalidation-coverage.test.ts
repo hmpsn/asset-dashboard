@@ -62,15 +62,6 @@ const LOCAL_ONLY_EVENTS = new Set<string>([
   // but ClientDashboard owns that client-side subscription because the admin
   // useWsInvalidation hook is not mounted on /client routes.
   'SCHEMA_PLAN_SENT',
-
-  // DELIVERABLE_SENT / DELIVERABLE_UPDATED are the unified send-to-client spine's
-  // workspace events. They are DARK in Phase 0 (no client/admin surface consumes
-  // them yet — zero src/ importers; flags default off). The centralized
-  // useWsInvalidation handler for the unified inbox is added in Phase 2 (the
-  // client + admin inbox PRs), at which point these move out of this exemption.
-  // See docs/superpowers/plans/2026-06-01-unified-send-to-client.md (Phase 2).
-  'DELIVERABLE_SENT',
-  'DELIVERABLE_UPDATED',
 ]);
 
 // ---------------------------------------------------------------------------
