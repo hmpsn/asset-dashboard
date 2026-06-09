@@ -60,12 +60,11 @@ import {
   startSchemaPlanGenerationJob,
 } from '../schema-plan-generation-job.js';
 import { runSeoAudit } from '../seo-audit.js';
+import { startWebflowImageCompressJob } from '../webflow-image-compress-background-job.js';
 import { handleOnDemandSeoAuditResult } from '../webflow-seo-audit-bridges.js';
 import {
   updateAsset,
-  deleteAsset,
   updatePageSeo,
-  uploadAsset,
 } from '../webflow.js';
 import {
   listWorkspaces,
@@ -96,7 +95,6 @@ import {
 } from '../workspace-intelligence.js';
 import { isProgrammingError } from '../errors.js';
 import { WS_EVENTS } from '../ws-events.js';
-import { compressImageBuffer } from '../domains/webflow-assets/image-optimization.js';
 
 const log = createLogger('jobs');
 const router = Router();
@@ -364,75 +362,14 @@ router.post('/api/jobs', async (req, res) => {
       case 'compress': {
         const { assetId, imageUrl, siteId, altText, fileName } = params as { assetId: string; imageUrl: string; siteId: string; altText?: string; fileName?: string };
         if (!assetId || !imageUrl || !siteId) return res.status(400).json({ error: 'assetId, imageUrl, siteId required' });
-        const compressToken = getTokenForSite(siteId) || undefined;
-        const job = createJob('compress', { message: `Compressing ${fileName || 'image'}...`, workspaceId: params.workspaceId as string });
-        res.json({ jobId: job.id });
-        (async () => {
-          try {
-            updateJob(job.id, { status: 'running' });
-            const response = await fetch(imageUrl);
-            const originalBuffer = Buffer.from(await response.arrayBuffer());
-            const compression = await compressImageBuffer(originalBuffer, fileName || imageUrl, {
-              outputBaseName: fileName || 'image',
-              rasterThresholdPercent: 3,
-              svgThresholdPercent: 3,
-              rasterSkipReasonLabel: 'Already optimized',
-              svgSkipReasonLabel: 'Already optimized',
-              svgFailureMode: 'throw',
-            });
-
-            if ('skipped' in compression) {
-              updateJob(job.id, {
-                status: 'done',
-                result: { skipped: true, reason: compression.reason },
-                message: 'Already optimized',
-              });
-              return;
-            }
-
-            const tmpPath = `/tmp/compressed_${Date.now()}_${compression.newFileName}`;
-            fs.writeFileSync(tmpPath, compression.compressed);
-            const uploadResult = await uploadAsset(siteId, tmpPath, compression.newFileName, altText, compressToken);
-            try { fs.unlinkSync(tmpPath); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs: programming error'); /* ignore */ }
-
-            if (!uploadResult.success) {
-              updateJob(job.id, { status: 'error', error: uploadResult.error, message: 'Upload failed' });
-              return;
-            }
-            await deleteAsset(assetId, compressToken);
-            updateJob(job.id, {
-              status: 'done',
-              result: {
-                success: true,
-                newAssetId: uploadResult.assetId,
-                originalSize: compression.originalSize,
-                newSize: compression.newSize,
-                savings: compression.savings,
-                savingsPercent: compression.savingsPercent,
-                newFileName: compression.newFileName,
-              },
-              message: `Saved ${Math.round(compression.savings / 1024)}KB (${compression.savingsPercent}%)`,
-            });
-            const singleCompressWsId = params.workspaceId as string;
-            if (singleCompressWsId) {
-              addActivity(singleCompressWsId, 'images_optimized',
-                `Image compressed: ${fileName || 'image'} — saved ${Math.round(compression.savings / 1024)}KB (${compression.savingsPercent}%)`,
-                undefined,
-                {
-                  originalSize: compression.originalSize,
-                  newSize: compression.newSize,
-                  savings: compression.savings,
-                  savingsPercent: compression.savingsPercent,
-                }
-              );
-            }
-          } catch (err) {
-            if (isProgrammingError(err)) log.warn({ err }, 'jobs: compress job failed with programming error'); // url-fetch-ok
-            else log.debug({ err }, 'jobs: compress job failed — degrading gracefully');
-            updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Compression failed' });
-          }
-        })();
-        break;
+        return res.json(startWebflowImageCompressJob({
+          workspaceId: params.workspaceId as string | undefined,
+          assetId,
+          imageUrl,
+          siteId,
+          altText,
+          fileName,
+        }));
       }
 
       case 'bulk-compress': {
