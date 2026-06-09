@@ -42,6 +42,7 @@ import {
   type Check,
   type CustomCheckMatch,
 } from '../scripts/pr-check.js';
+import { renderAutomatedRulesDoc } from '../scripts/generate-rules-doc.js';
 
 let TMPDIR: string;
 
@@ -85,6 +86,26 @@ let counter = 0;
 function uniqPath(ruleId: string, name: string): string {
   counter += 1;
   return `${ruleId}/case-${counter}/${name}`;
+}
+
+interface RuleFixtureCase {
+  name: string;
+  path: string;
+  source: string;
+  expectedLines: number[];
+}
+
+function expectRuleCases(ruleName: string, ruleId: string, cases: RuleFixtureCase[]): void {
+  for (const testCase of cases) {
+    it(testCase.name, () => {
+      const file = write(uniqPath(ruleId, testCase.path), testCase.source);
+      const hits = runRule(ruleName, [file]);
+      expect(hits.map((hit) => hit.line)).toEqual(testCase.expectedLines);
+      for (const hit of hits) {
+        expect(hit.file).toBe(file);
+      }
+    });
+  }
 }
 
 describe('Rule: Retired outcome feature flag key used in flag API', () => {
@@ -508,54 +529,46 @@ describe('Rule: Retired SEO/runtime feature flag key used in flag API', () => {
 describe('Rule: Global keydown missing isContentEditable guard', () => {
   const RULE = 'Global keydown missing isContentEditable guard';
 
-  it('flags a listener whose inline body omits isContentEditable', () => {
-    const file = write(
-      uniqPath('rule-02', 'trigger.tsx'),
-      lines(
+  expectRuleCases(RULE, 'rule-02', [
+    {
+      name: 'flags a listener whose inline body omits isContentEditable',
+      path: 'trigger.tsx',
+      source: lines(
         "export function Foo() {",                                       // 1
         "  window.addEventListener('keydown', (e) => {",                 // 2
         "    if (e.key === 'Escape') doThing();",                        // 3
         "  });",                                                         // 4
         "}",                                                             // 5
-      )
-    );
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-    expect(hits[0].file).toBe(file);
-  });
-
-  it('respects inline // keydown-ok hatch on the listener line', () => {
-    const file = write(
-      uniqPath('rule-02', 'hatch-inline.tsx'),
-      lines(
+      ),
+      expectedLines: [2],
+    },
+    {
+      name: 'respects inline // keydown-ok hatch on the listener line',
+      path: 'hatch-inline.tsx',
+      source: lines(
         "export function Foo() {",
         "  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') doThing(); }); // keydown-ok",
         "}",
-      )
-    );
-    expect(runRule(RULE, [file])).toHaveLength(0);
-  });
-
-  it('respects // keydown-ok hatch on the immediately preceding line', () => {
-    const file = write(
-      uniqPath('rule-02', 'hatch-above.tsx'),
-      lines(
+      ),
+      expectedLines: [],
+    },
+    {
+      name: 'respects // keydown-ok hatch on the immediately preceding line',
+      path: 'hatch-above.tsx',
+      source: lines(
         "export function Foo() {",
         "  // keydown-ok — intentional",
         "  window.addEventListener('keydown', (e) => {",
         "    if (e.key === 'Escape') doThing();",
         "  });",
         "}",
-      )
-    );
-    expect(runRule(RULE, [file])).toHaveLength(0);
-  });
-
-  it('does not flag a listener that checks e.target.isContentEditable', () => {
-    const file = write(
-      uniqPath('rule-02', 'negative.tsx'),
-      lines(
+      ),
+      expectedLines: [],
+    },
+    {
+      name: 'does not flag a listener that checks e.target.isContentEditable',
+      path: 'negative.tsx',
+      source: lines(
         "export function Foo() {",
         "  window.addEventListener('keydown', (e) => {",
         "    const t = e.target as HTMLElement;",
@@ -563,10 +576,10 @@ describe('Rule: Global keydown missing isContentEditable guard', () => {
         "    if (e.key === 'Escape') doThing();",
         "  });",
         "}",
-      )
-    );
-    expect(runRule(RULE, [file])).toHaveLength(0);
-  });
+      ),
+      expectedLines: [],
+    },
+  ]);
 });
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -5605,6 +5618,18 @@ describe('Meta: customCheck rule name registry', () => {
         `a trigger, a negative, an inline hatch, and an above-line hatch test.`,
       );
     }
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Meta-test: generated automated-rules docs stay committed
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Meta: generated automated-rules docs', () => {
+  it('matches the committed docs/rules/automated-rules.md without rewriting it', () => {
+    const committedPath = path.resolve(process.cwd(), 'docs/rules/automated-rules.md');
+    const committed = readFileSync(committedPath, 'utf-8');
+    expect(renderAutomatedRulesDoc()).toBe(committed);
   });
 });
 
