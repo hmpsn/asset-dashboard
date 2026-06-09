@@ -5,7 +5,10 @@ import type {
   CannibalizationWarning,
   DecayAlert,
 } from '../../shared/types/intelligence.js';
-import type { ContentSubscription, ContentMatrix } from '../../shared/types/content.js';
+import type {
+  ContentSubscription,
+  ContentMatrix,
+} from '../../shared/types/content.js';
 import type { SchemaSitePlan } from '../../shared/types/schema-plan.js';
 import type { CannibalizationReport } from '../cannibalization-detection.js';
 import type { DecayAnalysis } from '../content-decay.js';
@@ -15,6 +18,7 @@ import { createStmtCache } from '../db/stmt-cache.js';
 import { parseJsonSafe } from '../db/json-validation.js';
 import { z } from '../middleware/validate.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
+import { readOptionalSlicePart } from './optional-slice-part.js';
 
 const log = createLogger('workspace-intelligence/content-pipeline');
 
@@ -38,7 +42,9 @@ const copyStmts = createStmtCache(() => ({
   ),
 }));
 
-export async function assembleContentPipeline(workspaceId: string): Promise<ContentPipelineSlice> {
+export async function assembleContentPipeline(
+  workspaceId: string,
+): Promise<ContentPipelineSlice> {
   let summary: ContentPipelineSummary = {
     briefs: { total: 0, byStatus: {} },
     posts: { total: 0, byStatus: {} },
@@ -51,138 +57,200 @@ export async function assembleContentPipeline(workspaceId: string): Promise<Cont
     const { getContentPipelineSummary } = await import('../workspace-data.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
     summary = getContentPipelineSummary(workspaceId);
   } catch (err) {
-    log.warn({ err, workspaceId }, 'assembleContentPipeline: getContentPipelineSummary failed, degrading to empty slice');
+    log.warn(
+      { err, workspaceId },
+      'assembleContentPipeline: getContentPipelineSummary failed, degrading to empty slice',
+    );
   }
 
-  // Coverage gaps: strategy keywords without any brief
-  let coverageGaps: string[] = [];
-  try {
-    const { getWorkspace } = await import('../workspaces.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-    const ws = getWorkspace(workspaceId);
-    const strategyKeywords: string[] = ws?.keywordStrategy?.siteKeywords?.map((k: string | { keyword: string }) =>
-      typeof k === 'string' ? k : k.keyword,
-    ) ?? [];
-    const { listBriefs } = await import('../content-brief.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-    const briefs = listBriefs(workspaceId);
-    const briefKeywords = new Set(briefs.map(b => keywordComparisonKey(b.targetKeyword)));
-    coverageGaps = strategyKeywords
-      .filter(kw => !briefKeywords.has(keywordComparisonKey(kw)))
-      .slice(0, 10);
-  } catch (err) {
-    log.debug({ err, workspaceId }, 'assembleContentPipeline: coverage gaps optional, degrading gracefully');
-  }
+  const coverageGaps = await readOptionalSlicePart<string[]>(
+    'assembleContentPipeline: coverage gaps',
+    workspaceId,
+    [],
+    async () => {
+      const { getWorkspace } = await import('../workspaces.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const ws = getWorkspace(workspaceId);
+      const strategyKeywords: string[] =
+        ws?.keywordStrategy?.siteKeywords?.map(
+          (k: string | { keyword: string }) =>
+            typeof k === 'string' ? k : k.keyword,
+        ) ?? [];
+      const { listBriefs } = await import('../content-brief.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const briefs = listBriefs(workspaceId);
+      const briefKeywords = new Set(
+        briefs.map((b) => keywordComparisonKey(b.targetKeyword)),
+      );
+      return strategyKeywords
+        .filter((kw) => !briefKeywords.has(keywordComparisonKey(kw)))
+        .slice(0, 10);
+    },
+    { logger: log },
+  );
 
-  // Subscriptions
-  let subscriptions: ContentPipelineSlice['subscriptions'];
-  try {
-    const { listContentSubscriptions } = await import('../content-subscriptions.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-    const subs: ContentSubscription[] = listContentSubscriptions(workspaceId);
-    const activeSubs = subs.filter(s => s.status === 'active');
-    const totalPages = activeSubs.reduce((sum, s) => sum + (s.postsPerMonth ?? 0), 0);
-    subscriptions = { active: activeSubs.length, totalPages };
-  } catch (err) {
-    log.debug({ err, workspaceId }, 'assembleContentPipeline: subscriptions optional, degrading gracefully');
-  }
+  const subscriptions = await readOptionalSlicePart<
+    ContentPipelineSlice['subscriptions']
+  >(
+    'assembleContentPipeline: subscriptions',
+    workspaceId,
+    undefined,
+    async () => {
+      const { listContentSubscriptions } =
+        await import('../content-subscriptions.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const subs: ContentSubscription[] = listContentSubscriptions(workspaceId);
+      const activeSubs = subs.filter((s) => s.status === 'active');
+      const totalPages = activeSubs.reduce(
+        (sum, s) => sum + (s.postsPerMonth ?? 0),
+        0,
+      );
+      return { active: activeSubs.length, totalPages };
+    },
+    { logger: log },
+  );
 
-  // Schema deployment
-  let schemaDeployment: ContentPipelineSlice['schemaDeployment'];
-  try {
-    const { getWorkspace } = await import('../workspaces.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-    const ws = getWorkspace(workspaceId);
-    if (ws?.webflowSiteId) {
-      const { getSchemaPlan } = await import('../schema-store.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-      const { listPendingSchemas } = await import('../schema-queue.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-      const plan: SchemaSitePlan | null = getSchemaPlan(ws.webflowSiteId);
-      const pending = listPendingSchemas(workspaceId);
-      const planned = plan?.pageRoles?.length ?? 0;
-      const deployed = Math.max(0, planned - pending.length);
-      const types = [...new Set((plan?.pageRoles ?? []).map(p => p.primaryType).filter(Boolean))];
-      schemaDeployment = { planned, deployed, types };
-    }
-  } catch (err) {
-    log.debug({ err, workspaceId }, 'assembleContentPipeline: schema deployment optional, degrading gracefully');
-  }
+  const schemaDeployment = await readOptionalSlicePart<
+    ContentPipelineSlice['schemaDeployment']
+  >(
+    'assembleContentPipeline: schema deployment',
+    workspaceId,
+    undefined,
+    async () => {
+      const { getWorkspace } = await import('../workspaces.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const ws = getWorkspace(workspaceId);
+      if (ws?.webflowSiteId) {
+        const { getSchemaPlan } = await import('../schema-store.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+        const { listPendingSchemas } = await import('../schema-queue.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+        const plan: SchemaSitePlan | null = getSchemaPlan(ws.webflowSiteId);
+        const pending = listPendingSchemas(workspaceId);
+        const planned = plan?.pageRoles?.length ?? 0;
+        const deployed = Math.max(0, planned - pending.length);
+        const types = [
+          ...new Set(
+            (plan?.pageRoles ?? []).map((p) => p.primaryType).filter(Boolean),
+          ),
+        ];
+        return { planned, deployed, types };
+      }
+      return undefined;
+    },
+    { logger: log },
+  );
 
-  // Cannibalization warnings
-  let cannibalizationWarnings: CannibalizationWarning[] = [];
-  try {
-    const { listMatrices } = await import('../content-matrices.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-    const { detectMatrixCannibalization } = await import('../cannibalization-detection.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-    const matrices: ContentMatrix[] = listMatrices(workspaceId);
-    for (const matrix of matrices.slice(0, 5)) {
-      const report: CannibalizationReport = detectMatrixCannibalization(workspaceId, matrix.id);
-      if (report?.conflicts) {
-        for (const conflict of report.conflicts.slice(0, 10)) {
-          cannibalizationWarnings.push({
-            keyword: conflict.keyword ?? '',
-            pages: [conflict.sourceId, conflict.conflictsWith?.identifier].filter((p): p is string => Boolean(p)),
-            severity: conflict.severity ?? 'low',
-          });
+  const cannibalizationWarnings = await readOptionalSlicePart<
+    CannibalizationWarning[]
+  >(
+    'assembleContentPipeline: cannibalization detection',
+    workspaceId,
+    [] as CannibalizationWarning[],
+    async () => {
+      const { listMatrices } = await import('../content-matrices.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const { detectMatrixCannibalization } =
+        await import('../cannibalization-detection.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const matrices: ContentMatrix[] = listMatrices(workspaceId);
+      const warnings: CannibalizationWarning[] = [];
+      for (const matrix of matrices.slice(0, 5)) {
+        const report: CannibalizationReport = detectMatrixCannibalization(
+          workspaceId,
+          matrix.id,
+        );
+        if (report?.conflicts) {
+          for (const conflict of report.conflicts.slice(0, 10)) {
+            warnings.push({
+              keyword: conflict.keyword ?? '',
+              pages: [
+                conflict.sourceId,
+                conflict.conflictsWith?.identifier,
+              ].filter((p): p is string => Boolean(p)),
+              severity: conflict.severity ?? 'low',
+            });
+          }
         }
       }
-    }
-  } catch (err) {
-    log.debug({ err, workspaceId }, 'assembleContentPipeline: cannibalization detection optional, degrading gracefully');
-  }
+      return warnings;
+    },
+    { logger: log },
+  );
 
-  // Decay alerts
-  let decayAlerts: DecayAlert[] = [];
-  try {
-    const { loadDecayAnalysis } = await import('../content-decay.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-    const decay: DecayAnalysis | null = loadDecayAnalysis(workspaceId);
-    if (decay?.decayingPages) {
-      decayAlerts = decay.decayingPages.slice(0, 20).map(p => ({
-        pageUrl: p.page ?? '',
-        clickDrop: p.clickDeclinePct ?? 0,
-        detectedAt: decay.analyzedAt ?? new Date().toISOString(),
-        hasRefreshBrief: !!p.refreshRecommendation,
-        isRepeatDecay: p.isRepeatDecay ?? false,
-      }));
-    }
-  } catch (err) {
-    log.debug({ err, workspaceId }, 'assembleContentPipeline: decay data optional, degrading gracefully');
-  }
+  const decayAlerts = await readOptionalSlicePart<DecayAlert[]>(
+    'assembleContentPipeline: decay data',
+    workspaceId,
+    [] as DecayAlert[],
+    async () => {
+      const { loadDecayAnalysis } = await import('../content-decay.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const decay: DecayAnalysis | null = loadDecayAnalysis(workspaceId);
+      if (decay?.decayingPages) {
+        return decay.decayingPages.slice(0, 20).map((p) => ({
+          pageUrl: p.page ?? '',
+          clickDrop: p.clickDeclinePct ?? 0,
+          detectedAt: decay.analyzedAt ?? new Date().toISOString(),
+          hasRefreshBrief: !!p.refreshRecommendation,
+          isRepeatDecay: p.isRepeatDecay ?? false,
+        }));
+      }
+      return [];
+    },
+    { logger: log },
+  );
 
-  // Suggested briefs count
-  let suggestedBriefs = 0;
-  try {
-    const { listSuggestedBriefs } = await import('../suggested-briefs-store.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-    const briefs = listSuggestedBriefs(workspaceId);
-    suggestedBriefs = briefs.filter(b => b.status === 'pending').length;
-  } catch (err) {
-    log.debug({ err, workspaceId }, 'assembleContentPipeline: suggested briefs optional, degrading gracefully');
-  }
+  const suggestedBriefs = await readOptionalSlicePart(
+    'assembleContentPipeline: suggested briefs',
+    workspaceId,
+    0,
+    async () => {
+      const { listSuggestedBriefs } =
+        await import('../suggested-briefs-store.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const briefs = listSuggestedBriefs(workspaceId);
+      return briefs.filter((b) => b.status === 'pending').length;
+    },
+    { logger: log },
+  );
 
-  // Copy pipeline (copy_sections, copy_intelligence, copy_batch_jobs)
-  let copyPipeline: CopyPipelineSummary | undefined;
-  try {
-    copyPipeline = assembleCopyPipeline(workspaceId);
-  } catch (err) {
-    log.debug({ err, workspaceId }, 'assembleContentPipeline: copy pipeline optional, degrading gracefully');
-  }
+  const copyPipeline = await readOptionalSlicePart<
+    CopyPipelineSummary | undefined
+  >(
+    'assembleContentPipeline: copy pipeline',
+    workspaceId,
+    undefined,
+    () => assembleCopyPipeline(workspaceId),
+    { logger: log },
+  );
 
-  let rewritePlaybook: ContentPipelineSlice['rewritePlaybook'];
-  let contentPricing: ContentPipelineSlice['contentPricing'];
-  try {
-    const { getWorkspace } = await import('../workspaces.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-    const ws = getWorkspace(workspaceId);
-    const rawPlaybook = ws?.rewritePlaybook?.trim();
-    if (rawPlaybook) {
-      const patterns = rawPlaybook.split('\n').map((l: string) => l.trim()).filter(Boolean);
-      rewritePlaybook = { patterns, lastUsedAt: null };
-    }
-    if (ws?.contentPricing) {
-      contentPricing = {
-        briefPrice: ws.contentPricing.briefPrice,
-        fullPostPrice: ws.contentPricing.fullPostPrice,
-        currency: ws.contentPricing.currency,
-        briefLabel: ws.contentPricing.briefLabel,
-        fullPostLabel: ws.contentPricing.fullPostLabel,
-      };
-    }
-  } catch (err) {
-    log.debug({ err, workspaceId }, 'assembleContentPipeline: workspace enrichment optional, degrading gracefully');
-  }
+  const workspaceEnrichment = await readOptionalSlicePart<{
+    rewritePlaybook: ContentPipelineSlice['rewritePlaybook'];
+    contentPricing: ContentPipelineSlice['contentPricing'];
+  }>(
+    'assembleContentPipeline: workspace enrichment',
+    workspaceId,
+    {
+      rewritePlaybook: undefined as ContentPipelineSlice['rewritePlaybook'],
+      contentPricing: undefined as ContentPipelineSlice['contentPricing'],
+    },
+    async () => {
+      const { getWorkspace } = await import('../workspaces.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const ws = getWorkspace(workspaceId);
+      let rewritePlaybook: ContentPipelineSlice['rewritePlaybook'];
+      let contentPricing: ContentPipelineSlice['contentPricing'];
+      const rawPlaybook = ws?.rewritePlaybook?.trim();
+      if (rawPlaybook) {
+        const patterns = rawPlaybook
+          .split('\n')
+          .map((l: string) => l.trim())
+          .filter(Boolean);
+        rewritePlaybook = { patterns, lastUsedAt: null };
+      }
+      if (ws?.contentPricing) {
+        contentPricing = {
+          briefPrice: ws.contentPricing.briefPrice,
+          fullPostPrice: ws.contentPricing.fullPostPrice,
+          currency: ws.contentPricing.currency,
+          briefLabel: ws.contentPricing.briefLabel,
+          fullPostLabel: ws.contentPricing.fullPostLabel,
+        };
+      }
+      return { rewritePlaybook, contentPricing };
+    },
+    { logger: log },
+  );
+  const { rewritePlaybook, contentPricing } = workspaceEnrichment;
 
   return {
     briefs: summary.briefs,
@@ -203,7 +271,9 @@ export async function assembleContentPipeline(workspaceId: string): Promise<Cont
   };
 }
 
-function assembleCopyPipeline(workspaceId: string): CopyPipelineSummary | undefined {
+function assembleCopyPipeline(
+  workspaceId: string,
+): CopyPipelineSummary | undefined {
   // Section status counts + first-version counts
   type StatusRow = { status: string; cnt: number; first_version_cnt: number };
   const statusRows = copyStmts().sectionCounts.all(workspaceId) as StatusRow[];
@@ -241,17 +311,21 @@ function assembleCopyPipeline(workspaceId: string): CopyPipelineSummary | undefi
     }
   }
 
-  const approvalRate = totalSections > 0
-    ? Math.round((approvedSections / totalSections) * 100)
-    : 0;
-  const firstTryApprovalRate = approvedSections > 0
-    ? Math.round((approvedFirstVersion / approvedSections) * 100)
-    : 0;
+  const approvalRate =
+    totalSections > 0
+      ? Math.round((approvedSections / totalSections) * 100)
+      : 0;
+  const firstTryApprovalRate =
+    approvedSections > 0
+      ? Math.round((approvedFirstVersion / approvedSections) * 100)
+      : 0;
 
   // Active intelligence patterns count
   let activePatternsCount = 0;
   try {
-    const countRow = copyStmts().activePatternCount.get(workspaceId) as { cnt: number } | undefined;
+    const countRow = copyStmts().activePatternCount.get(workspaceId) as
+      | { cnt: number }
+      | undefined;
     activePatternsCount = countRow?.cnt ?? 0;
   } catch (err) {
     // copy_intelligence table may not exist in all environments
@@ -260,18 +334,26 @@ function assembleCopyPipeline(workspaceId: string): CopyPipelineSummary | undefi
 
   // Last batch job
   type BatchRow = { status: string; progress_json: string; created_at: string };
-  const batchRow = copyStmts().lastBatchJob.get(workspaceId) as BatchRow | undefined;
+  const batchRow = copyStmts().lastBatchJob.get(workspaceId) as
+    | BatchRow
+    | undefined;
   let lastBatchJob: CopyPipelineSummary['lastBatchJob'] = null;
   if (batchRow) {
-    const progress = parseJsonSafe(batchRow.progress_json, z.object({
-      total: z.number(),
-      generated: z.number(),
-      reviewed: z.number(),
-      approved: z.number(),
-    }), { total: 0, generated: 0, reviewed: 0, approved: 0 }, { workspaceId, field: 'progress_json', table: 'copy_batch_jobs' });
-    const completionRate = progress.total > 0
-      ? Math.round((progress.generated / progress.total) * 100)
-      : 0;
+    const progress = parseJsonSafe(
+      batchRow.progress_json,
+      z.object({
+        total: z.number(),
+        generated: z.number(),
+        reviewed: z.number(),
+        approved: z.number(),
+      }),
+      { total: 0, generated: 0, reviewed: 0, approved: 0 },
+      { workspaceId, field: 'progress_json', table: 'copy_batch_jobs' },
+    );
+    const completionRate =
+      progress.total > 0
+        ? Math.round((progress.generated / progress.total) * 100)
+        : 0;
     lastBatchJob = {
       status: batchRow.status,
       completionRate,

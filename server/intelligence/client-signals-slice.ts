@@ -1,4 +1,9 @@
-import type { ClientSignalsSlice, ChurnSignalSummary, EngagementMetrics, IntelligenceOptions } from '../../shared/types/intelligence.js';
+import type {
+  ClientSignalsSlice,
+  ChurnSignalSummary,
+  EngagementMetrics,
+  IntelligenceOptions,
+} from '../../shared/types/intelligence.js';
 import type { BriefingSummary } from '../../shared/types/briefing.js';
 import type { ApprovalBatch } from '../../shared/types/approvals.js';
 import type { ChurnSignal } from '../churn-signals.js';
@@ -9,9 +14,12 @@ import type { SessionSummary } from '../chat-memory.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
 import { createStmtCache } from '../db/stmt-cache.js';
-import { isProgrammingError } from '../errors.js';
 import { buildKeywordFeedbackSignals } from '../keyword-feedback.js';
-import { buildEffectiveBusinessPriorities, getRawClientBusinessPriorities } from './business-priorities-source.js';
+import {
+  buildEffectiveBusinessPriorities,
+  getRawClientBusinessPriorities,
+} from './business-priorities-source.js';
+import { readOptionalSlicePart } from './optional-slice-part.js';
 
 const log = createLogger('workspace-intelligence/client-signals');
 
@@ -25,22 +33,38 @@ export async function assembleClientSignals(
   workspaceId: string,
   _opts?: IntelligenceOptions,
 ): Promise<ClientSignalsSlice> {
-  // Keyword feedback
-  let keywordFeedback: ClientSignalsSlice['keywordFeedback'] = { approved: [], rejected: [], patterns: { approveRate: 0, topRejectionReasons: [] } };
-  try {
-    keywordFeedback = buildKeywordFeedbackSignals(workspaceId);
-  } catch (err) {
-    log.debug({ workspaceId, err }, 'Keyword feedback table unavailable — skipping');
-  }
+  const keywordFeedback = await readOptionalSlicePart<
+    ClientSignalsSlice['keywordFeedback']
+  >(
+    'assembleClientSignals: keyword feedback',
+    workspaceId,
+    {
+      approved: [],
+      rejected: [],
+      patterns: { approveRate: 0, topRejectionReasons: [] },
+    },
+    () => buildKeywordFeedbackSignals(workspaceId),
+    {
+      logger: log,
+      debugMessage: 'Keyword feedback table unavailable — skipping',
+    },
+  );
 
-  // Content gap votes (DB direct)
-  let contentGapVotes: { topic: string; votes: number }[] = [];
-  try {
-    const rows = stmts().contentGapVotes.all(workspaceId) as { keyword: string; cnt: number }[];
-    contentGapVotes = rows.map(r => ({ topic: r.keyword, votes: r.cnt }));
-  } catch (err) {
-    log.debug({ err, workspaceId }, 'assembleClientSignals: content gap votes table optional, degrading gracefully');
-  }
+  const contentGapVotes = await readOptionalSlicePart<
+    Array<{ topic: string; votes: number }>
+  >(
+    'assembleClientSignals: content gap votes table',
+    workspaceId,
+    [],
+    () => {
+      const rows = stmts().contentGapVotes.all(workspaceId) as {
+        keyword: string;
+        cnt: number;
+      }[];
+      return rows.map((r) => ({ topic: r.keyword, votes: r.cnt }));
+    },
+    { logger: log },
+  );
 
   // Business priorities.
   // `businessPriorities` is the RAW client-only list (read-only legacy field).
@@ -49,211 +73,315 @@ export async function assembleClientSignals(
   // (workspaces.business_priorities, 048) — precedence: client first, admin as supplement.
   // Both reads live in business-priorities-source.ts so there is no external format helper
   // that could bypass the authority chain (CLAUDE.md "Authority-layered fields").
-  let businessPriorities: string[] = [];
-  let effectiveBusinessPriorities: string[] = [];
-  try {
-    businessPriorities = getRawClientBusinessPriorities(workspaceId);
-    effectiveBusinessPriorities = buildEffectiveBusinessPriorities(workspaceId);
-  } catch (err) {
-    log.debug({ err, workspaceId }, 'assembleClientSignals: business priorities optional, degrading gracefully');
-  }
+  const businessPriorityData = await readOptionalSlicePart<{
+    businessPriorities: string[];
+    effectiveBusinessPriorities: string[];
+  }>(
+    'assembleClientSignals: business priorities',
+    workspaceId,
+    { businessPriorities: [], effectiveBusinessPriorities: [] },
+    () => ({
+      businessPriorities: getRawClientBusinessPriorities(workspaceId),
+      effectiveBusinessPriorities:
+        buildEffectiveBusinessPriorities(workspaceId),
+    }),
+    { logger: log },
+  );
+  const { businessPriorities, effectiveBusinessPriorities } =
+    businessPriorityData;
 
   // Churn signals
   let churnSignals: ChurnSignalSummary[] = [];
   let churnRisk: ClientSignalsSlice['churnRisk'] = null;
   let churnFetchSucceeded = false;
-  try {
-    // NOTE: dynamic import required — churn-signals.ts statically imports from this module
-    const { listChurnSignals } = await import('../churn-signals.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-    // listChurnSignals already filters to undismissed signals via SQL (WHERE dismissed_at IS NULL)
-    const signals: ChurnSignal[] = listChurnSignals(workspaceId);
-    churnFetchSucceeded = true;
-    churnSignals = signals.map(s => ({
-      type: s.type,
-      severity: s.severity,
-      detectedAt: s.detectedAt,
-      title: s.title,
-      description: s.description,
-    }));
-    // ChurnSignal.severity is 'critical' | 'warning' | 'positive' — map to churnRisk levels
-    const criticalCount = signals.filter(s => s.severity === 'critical').length;
-    const warningCount = signals.filter(s => s.severity === 'warning').length;
-    const riskSignalCount = criticalCount + warningCount;
-    churnRisk = criticalCount > 0 ? 'high' : warningCount >= 2 ? 'medium' : riskSignalCount > 0 ? 'low' : null;
-  } catch (err) {
-    if (isProgrammingError(err)) {
-      log.warn({ err, workspaceId }, 'assembleClientSignals: programming error in churn-signals — check export names');
-    } else {
-      log.debug({ err, workspaceId }, 'assembleClientSignals: churn signals optional, degrading gracefully');
-    }
-    // churnFetchSucceeded stays false
-  }
+  const churnData = await readOptionalSlicePart<{
+    churnFetchSucceeded: boolean;
+    churnRisk: ClientSignalsSlice['churnRisk'];
+    churnSignals: ChurnSignalSummary[];
+  }>(
+    'assembleClientSignals: churn signals',
+    workspaceId,
+    {
+      churnFetchSucceeded: false,
+      churnRisk: null,
+      churnSignals: [],
+    },
+    async () => {
+      // NOTE: dynamic import required — churn-signals.ts statically imports from this module
+      const { listChurnSignals } = await import('../churn-signals.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      // listChurnSignals already filters to undismissed signals via SQL (WHERE dismissed_at IS NULL)
+      const signals: ChurnSignal[] = listChurnSignals(workspaceId);
+      const criticalCount = signals.filter(
+        (s) => s.severity === 'critical',
+      ).length;
+      const warningCount = signals.filter(
+        (s) => s.severity === 'warning',
+      ).length;
+      const riskSignalCount = criticalCount + warningCount;
+      return {
+        churnFetchSucceeded: true,
+        churnSignals: signals.map((s) => ({
+          type: s.type,
+          severity: s.severity,
+          detectedAt: s.detectedAt,
+          title: s.title,
+          description: s.description,
+        })),
+        churnRisk:
+          criticalCount > 0
+            ? 'high'
+            : warningCount >= 2
+              ? 'medium'
+              : riskSignalCount > 0
+                ? 'low'
+                : null,
+      };
+    },
+    {
+      logger: log,
+      warnProgrammingErrors: true,
+      warnMessage:
+        'assembleClientSignals: programming error in churn-signals — check export names',
+    },
+  );
+  churnSignals = churnData.churnSignals;
+  churnRisk = churnData.churnRisk;
+  churnFetchSucceeded = churnData.churnFetchSucceeded;
 
   // Approval patterns
-  let approvalPatterns = { approvalRate: 0, avgResponseTime: null as number | null };
-  try {
-    const { listBatches } = await import('../approvals.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-    const batches: ApprovalBatch[] = listBatches(workspaceId);
-    let approved = 0, total = 0;
-    for (const batch of batches) {
-      for (const item of batch.items ?? []) {
-        total++;
-        if (item.status === 'approved' || item.status === 'applied') approved++;
-      }
-    }
-
-    // Compute avgResponseTime from batch-level timestamps.
-    // Batch-level approximation: for batches where all items are approved/applied,
-    // use (updatedAt - createdAt) as response time. There is no per-item resolved_at column.
-    let responseTimeSum = 0;
-    let resolvedBatchCount = 0;
-    for (const batch of batches) {
-      const items = batch.items ?? [];
-      const allResolved = items.length > 0 && items.every(
-        i => i.status === 'approved' || i.status === 'applied',
-      );
-      if (allResolved && batch.createdAt && batch.updatedAt) {
-        const created = new Date(batch.createdAt).getTime();
-        const updated = new Date(batch.updatedAt).getTime();
-        if (updated > created) {
-          responseTimeSum += updated - created;
-          resolvedBatchCount++;
+  const approvalPatterns = await readOptionalSlicePart(
+    'assembleClientSignals: approval patterns',
+    workspaceId,
+    { approvalRate: 0, avgResponseTime: null as number | null },
+    async () => {
+      const { listBatches } = await import('../approvals.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const batches: ApprovalBatch[] = listBatches(workspaceId);
+      let approved = 0,
+        total = 0;
+      for (const batch of batches) {
+        for (const item of batch.items ?? []) {
+          total++;
+          if (item.status === 'approved' || item.status === 'applied')
+            approved++;
         }
       }
-    }
 
-    approvalPatterns = {
-      approvalRate: total > 0 ? approved / total : 0,
-      avgResponseTime: resolvedBatchCount > 0 ? Math.round(responseTimeSum / resolvedBatchCount) : null,
-    };
-  } catch (err) {
-    log.debug({ err, workspaceId }, 'assembleClientSignals: approval patterns optional, degrading gracefully');
-  }
+      // Compute avgResponseTime from batch-level timestamps.
+      // Batch-level approximation: for batches where all items are approved/applied,
+      // use (updatedAt - createdAt) as response time. There is no per-item resolved_at column.
+      let responseTimeSum = 0;
+      let resolvedBatchCount = 0;
+      for (const batch of batches) {
+        const items = batch.items ?? [];
+        const allResolved =
+          items.length > 0 &&
+          items.every((i) => i.status === 'approved' || i.status === 'applied');
+        if (allResolved && batch.createdAt && batch.updatedAt) {
+          const created = new Date(batch.createdAt).getTime();
+          const updated = new Date(batch.updatedAt).getTime();
+          if (updated > created) {
+            responseTimeSum += updated - created;
+            resolvedBatchCount++;
+          }
+        }
+      }
+
+      return {
+        approvalRate: total > 0 ? approved / total : 0,
+        avgResponseTime:
+          resolvedBatchCount > 0
+            ? Math.round(responseTimeSum / resolvedBatchCount)
+            : null,
+      };
+    },
+    { logger: log },
+  );
 
   // Engagement metrics
-  let engagement: EngagementMetrics = { lastLoginAt: null, loginFrequency: 'inactive', chatSessionCount: 0, portalUsage: null };
-  try {
-    const { listClientUsers } = await import('../client-users.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-    const users: SafeClientUser[] = listClientUsers(workspaceId);
-    const latestLogin = users
-      .map(u => u.lastLoginAt)
-      .filter((v): v is string => !!v)
-      .sort()
-      .reverse()[0] ?? null;
+  const engagement = await readOptionalSlicePart<EngagementMetrics>(
+    'assembleClientSignals: client users',
+    workspaceId,
+    {
+      lastLoginAt: null,
+      loginFrequency: 'inactive',
+      chatSessionCount: 0,
+      portalUsage: null,
+    },
+    async () => {
+      const { listClientUsers } = await import('../client-users.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const users: SafeClientUser[] = listClientUsers(workspaceId);
+      const latestLogin =
+        users
+          .map((u) => u.lastLoginAt)
+          .filter((v): v is string => !!v)
+          .sort()
+          .reverse()[0] ?? null;
 
-    let loginFrequency: EngagementMetrics['loginFrequency'] = 'inactive';
-    if (latestLogin) {
-      const daysSinceLogin = (Date.now() - new Date(latestLogin).getTime()) / (24 * 60 * 60 * 1000);
-      loginFrequency = daysSinceLogin <= 2 ? 'daily' : daysSinceLogin <= 8 ? 'weekly' : daysSinceLogin <= 35 ? 'monthly' : 'inactive';
-    }
-
-    let chatSessionCount = 0;
-    try {
-      const { getMonthlyConversationCount } = await import('../chat-memory.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-      chatSessionCount = getMonthlyConversationCount(workspaceId, 'client');
-    } catch (err) {
-      log.debug({ err, workspaceId }, 'assembleClientSignals: chat memory optional, degrading gracefully');
-    }
-
-    let portalUsage: EngagementMetrics['portalUsage'] = null;
-    try {
-      const { getClientActivitySummary, countActivityByType } = await import('../activity-log.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-      // Use broad client_% activity to compute distinct active days (recentSessions) and
-      // the most recent activity timestamp across all client portal interactions.
-      const clientSummary = getClientActivitySummary(workspaceId, 30);
-      if (clientSummary) {
-        // Map distinct active days to pageViews for the EngagementMetrics type contract
-        const featuresUsed: string[] = [];
-        if (chatSessionCount > 0) featuresUsed.push('chat');
-        // Detect dashboard engagement from client-initiated feedback actions
-        const feedbackCount = countActivityByType(workspaceId, 'client_keyword_feedback', 30)
-          + countActivityByType(workspaceId, 'client_content_gap_vote', 30);
-        if (feedbackCount > 0) featuresUsed.push('dashboard');
-        if (countActivityByType(workspaceId, 'client_priorities_updated', 30) > 0) featuresUsed.push('priorities');
-        if (countActivityByType(workspaceId, 'client_onboarding_submitted', 30) > 0) featuresUsed.push('onboarding');
-        const clientActionCount = countActivityByType(workspaceId, 'client_action_approved', 30)
-          + countActivityByType(workspaceId, 'client_action_changes_requested', 30);
-        if (clientActionCount > 0) featuresUsed.push('decisions');
-        const contentReviewCount = countActivityByType(workspaceId, 'post_approved', 30)
-          + countActivityByType(workspaceId, 'post_changes_requested', 30)
-          + countActivityByType(workspaceId, 'post_client_edit', 30);
-        if (contentReviewCount > 0) featuresUsed.push('content_review');
-        portalUsage = { pageViews: clientSummary.distinctDays, featuresUsed };
+      let loginFrequency: EngagementMetrics['loginFrequency'] = 'inactive';
+      if (latestLogin) {
+        const daysSinceLogin =
+          (Date.now() - new Date(latestLogin).getTime()) /
+          (24 * 60 * 60 * 1000);
+        loginFrequency =
+          daysSinceLogin <= 2
+            ? 'daily'
+            : daysSinceLogin <= 8
+              ? 'weekly'
+              : daysSinceLogin <= 35
+                ? 'monthly'
+                : 'inactive';
       }
-    } catch (err) {
-      log.debug({ err, workspaceId }, 'assembleClientSignals: portal usage count optional, degrading gracefully');
-    }
 
-    engagement = {
-      lastLoginAt: latestLogin,
-      loginFrequency,
-      chatSessionCount,
-      portalUsage,
-    };
-  } catch (err) {
-    log.debug({ err, workspaceId }, 'assembleClientSignals: client users optional, degrading gracefully');
-  }
+      const chatSessionCount = await readOptionalSlicePart(
+        'assembleClientSignals: chat memory',
+        workspaceId,
+        0,
+        async () => {
+          const { getMonthlyConversationCount } =
+            await import('../chat-memory.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+          return getMonthlyConversationCount(workspaceId, 'client');
+        },
+        { logger: log },
+      );
+
+      const portalUsage = await readOptionalSlicePart<
+        EngagementMetrics['portalUsage']
+      >(
+        'assembleClientSignals: portal usage count',
+        workspaceId,
+        null,
+        async () => {
+          const { getClientActivitySummary, countActivityByType } =
+            await import('../activity-log.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+          // Use broad client_% activity to compute distinct active days (recentSessions) and
+          // the most recent activity timestamp across all client portal interactions.
+          const clientSummary = getClientActivitySummary(workspaceId, 30);
+          if (!clientSummary) return null;
+          const featuresUsed: string[] = [];
+          if (chatSessionCount > 0) featuresUsed.push('chat');
+          const feedbackCount =
+            countActivityByType(workspaceId, 'client_keyword_feedback', 30) +
+            countActivityByType(workspaceId, 'client_content_gap_vote', 30);
+          if (feedbackCount > 0) featuresUsed.push('dashboard');
+          if (
+            countActivityByType(workspaceId, 'client_priorities_updated', 30) >
+            0
+          )
+            featuresUsed.push('priorities');
+          if (
+            countActivityByType(
+              workspaceId,
+              'client_onboarding_submitted',
+              30,
+            ) > 0
+          )
+            featuresUsed.push('onboarding');
+          const clientActionCount =
+            countActivityByType(workspaceId, 'client_action_approved', 30) +
+            countActivityByType(
+              workspaceId,
+              'client_action_changes_requested',
+              30,
+            );
+          if (clientActionCount > 0) featuresUsed.push('decisions');
+          const contentReviewCount =
+            countActivityByType(workspaceId, 'post_approved', 30) +
+            countActivityByType(workspaceId, 'post_changes_requested', 30) +
+            countActivityByType(workspaceId, 'post_client_edit', 30);
+          if (contentReviewCount > 0) featuresUsed.push('content_review');
+          return { pageViews: clientSummary.distinctDays, featuresUsed };
+        },
+        { logger: log },
+      );
+
+      return {
+        lastLoginAt: latestLogin,
+        loginFrequency,
+        chatSessionCount,
+        portalUsage,
+      };
+    },
+    { logger: log },
+  );
 
   // ROI data
-  let roi: ClientSignalsSlice['roi'] = null;
-  try {
-    const { computeROI } = await import('../roi.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-    const roiData: ROIData | null = computeROI(workspaceId);
-    if (roiData) {
-      roi = {
-        organicValue: roiData.organicTrafficValue,
-        growth: roiData.growthPercent ?? 0,
-        period: 'monthly',
-      };
-    }
-  } catch (err) {
-    log.debug({ err, workspaceId }, 'assembleClientSignals: ROI data optional, degrading gracefully');
-  }
+  const roi = await readOptionalSlicePart<ClientSignalsSlice['roi']>(
+    'assembleClientSignals: ROI data',
+    workspaceId,
+    null,
+    async () => {
+      const { computeROI } = await import('../roi.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const roiData: ROIData | null = computeROI(workspaceId);
+      if (roiData) {
+        return {
+          organicValue: roiData.organicTrafficValue,
+          growth: roiData.growthPercent ?? 0,
+          period: 'monthly',
+        };
+      }
+      return null;
+    },
+    { logger: log },
+  );
 
   // Service requests
-  let serviceRequests = { pending: 0, total: 0 };
-  try {
-    const { listRequests } = await import('../requests.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-    const reqs: ClientRequest[] = listRequests(workspaceId);
-    serviceRequests = {
-      pending: reqs.filter(r => r.status === 'new' || r.status === 'in_review').length,
-      total: reqs.length,
-    };
-  } catch (err) {
-    log.debug({ err, workspaceId }, 'assembleClientSignals: service requests optional, degrading gracefully');
-  }
+  const serviceRequests = await readOptionalSlicePart(
+    'assembleClientSignals: service requests',
+    workspaceId,
+    { pending: 0, total: 0 },
+    async () => {
+      const { listRequests } = await import('../requests.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const reqs: ClientRequest[] = listRequests(workspaceId);
+      return {
+        pending: reqs.filter(
+          (r) => r.status === 'new' || r.status === 'in_review',
+        ).length,
+        total: reqs.length,
+      };
+    },
+    { logger: log },
+  );
 
   // Intent signals from client chat
-  let intentSignals: ClientSignalsSlice['intentSignals'];
-  try {
-    const { listClientSignals, countNewSignals, countAllSignals } = await import('../client-signals-store.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-    const signals = listClientSignals(workspaceId);
-    const newCount = countNewSignals(workspaceId);
-    // Use countAllSignals for totalCount — listClientSignals is capped at LIMIT 100
-    const totalCount = countAllSignals(workspaceId);
-    intentSignals = {
-      newCount,
-      totalCount,
-      recentTypes: signals.slice(0, 5).map(s => s.type),
-    };
-  } catch (err) {
-    // client_signals table may not exist on older DBs — degrade gracefully
-    log.debug({ err }, 'client_signals unavailable for intelligence assembly');
-  }
+  const intentSignals = await readOptionalSlicePart<
+    ClientSignalsSlice['intentSignals']
+  >(
+    'assembleClientSignals: intent signals',
+    workspaceId,
+    undefined,
+    async () => {
+      const { listClientSignals, countNewSignals, countAllSignals } =
+        await import('../client-signals-store.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const signals = listClientSignals(workspaceId);
+      const newCount = countNewSignals(workspaceId);
+      const totalCount = countAllSignals(workspaceId);
+      return {
+        newCount,
+        totalCount,
+        recentTypes: signals.slice(0, 5).map((s) => s.type),
+      };
+    },
+    {
+      logger: log,
+      debugMessage: 'client_signals unavailable for intelligence assembly',
+      logContext: (err) => ({ err }),
+    },
+  );
 
-
-  // Recent chat topics
-  let recentChatTopics: string[] = [];
-  try {
-    const { listSessions } = await import('../chat-memory.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-    const sessions = listSessions(workspaceId, 'client');
-    recentChatTopics = sessions
-      .slice(0, 5)
-      .map((s: SessionSummary) => s.title ?? '')
-      .filter(Boolean);
-  } catch (err) {
-    log.debug({ err, workspaceId }, 'assembleClientSignals: recent chat topics optional, degrading gracefully');
-  }
+  const recentChatTopics = await readOptionalSlicePart<string[]>(
+    'assembleClientSignals: recent chat topics',
+    workspaceId,
+    [],
+    async () => {
+      const { listSessions } = await import('../chat-memory.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const sessions = listSessions(workspaceId, 'client');
+      return sessions
+        .slice(0, 5)
+        .map((s: SessionSummary) => s.title ?? '')
+        .filter(Boolean);
+    },
+    { logger: log },
+  );
 
   // Composite health score (40% churn + 30% ROI + 30% engagement)
   // Weights are normalized to available components so missing data doesn't drag the score down.
@@ -265,21 +393,34 @@ export async function assembleClientSignals(
 
     // Churn component (weight 0.4) — only include if churn subsystem loaded successfully
     if (churnFetchSucceeded) {
-      const churnScore = churnRisk === 'high' ? 0 : churnRisk === 'medium' ? 30 : churnRisk === 'low' ? 60 : 100;
+      const churnScore =
+        churnRisk === 'high'
+          ? 0
+          : churnRisk === 'medium'
+            ? 30
+            : churnRisk === 'low'
+              ? 60
+              : 100;
       weightedSum += churnScore * 0.4;
       totalWeight += 0.4;
       components++;
     }
     // ROI component (weight 0.3)
     if (roi) {
-      const roiScore = roi.growth > 10 ? 100 : roi.growth > 0 ? 70 : roi.growth === 0 ? 40 : 0;
+      const roiScore =
+        roi.growth > 10 ? 100 : roi.growth > 0 ? 70 : roi.growth === 0 ? 40 : 0;
       weightedSum += roiScore * 0.3;
       totalWeight += 0.3;
       components++;
     }
     // Engagement component (weight 0.3)
     if (engagement.loginFrequency !== 'inactive') {
-      const engagementScore = engagement.loginFrequency === 'daily' ? 100 : engagement.loginFrequency === 'weekly' ? 70 : 40;
+      const engagementScore =
+        engagement.loginFrequency === 'daily'
+          ? 100
+          : engagement.loginFrequency === 'weekly'
+            ? 70
+            : 40;
       weightedSum += engagementScore * 0.3;
       totalWeight += 0.3;
       components++;
@@ -293,29 +434,39 @@ export async function assembleClientSignals(
   // Latest published briefing summary — null if none published, undefined-tolerant
   // for the chat AI context. Reads from the briefing-store; degrades gracefully
   // if the table is unavailable (e.g., migration not applied).
-  let latestBriefing: BriefingSummary | null = null;
-  try {
-    const { getLatestPublishedBriefing } = await import('../briefing-store.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-    const draft = getLatestPublishedBriefing(workspaceId);
-    if (draft) {
-      latestBriefing = {
-        weekOf: draft.weekOf,
-        publishedAt: draft.publishedAt,
-        storyCount: draft.stories.length,
-        hasHero: draft.stories.some((s) => s.isHeadline),
-      };
-    }
-  } catch (err) {
-    log.debug({ err, workspaceId }, 'assembleClientSignals: latest briefing optional, degrading gracefully');
-  }
+  const latestBriefing = await readOptionalSlicePart<BriefingSummary | null>(
+    'assembleClientSignals: latest briefing',
+    workspaceId,
+    null,
+    async () => {
+      const { getLatestPublishedBriefing } =
+        await import('../briefing-store.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const draft = getLatestPublishedBriefing(workspaceId);
+      if (draft) {
+        return {
+          weekOf: draft.weekOf,
+          publishedAt: draft.publishedAt,
+          storyCount: draft.stories.length,
+          hasHero: draft.stories.some((s) => s.isHeadline),
+        };
+      }
+      return null;
+    },
+    { logger: log },
+  );
 
-  let clientActions: ClientSignalsSlice['clientActions'];
-  try {
-    const { summarizeClientActions } = await import('../client-actions.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-    clientActions = summarizeClientActions(workspaceId);
-  } catch (err) {
-    log.debug({ err, workspaceId }, 'assembleClientSignals: client actions optional, degrading gracefully');
-  }
+  const clientActions = await readOptionalSlicePart<
+    ClientSignalsSlice['clientActions']
+  >(
+    'assembleClientSignals: client actions',
+    workspaceId,
+    undefined,
+    async () => {
+      const { summarizeClientActions } = await import('../client-actions.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      return summarizeClientActions(workspaceId);
+    },
+    { logger: log },
+  );
 
   return {
     keywordFeedback,
