@@ -3678,21 +3678,23 @@ export const CHECKS: Check[] = [
   {
     // P1 expansion rule: port collision in integration tests.
     //
-    // Every integration test file allocates a unique port via
-    // `createTestContext(NNNN)`. If two files share a port, the second test
-    // to bind gets EADDRINUSE and the CI run is flaky. This rule collects
-    // all port allocations across every `*.test.ts` file and flags any
-    // duplicate. It also flags ports outside the documented range
-    // (13201–13899 per CLAUDE.md) as a separate warning.
+    // Literal integration test ports are still allowed via
+    // `createTestContext(NNNN)`, but they must remain unique. The new
+    // lock-backed `createEphemeralTestContext(import.meta.url)` helper is the
+    // preferred migration path when a file no longer wants to own a literal.
+    // This rule only validates the literal path: if two files share a port,
+    // the second test to bind gets EADDRINUSE and the CI run is flaky. It
+    // also flags ports outside the documented range (13201–13899 per
+    // CLAUDE.md) as a separate warning.
     name: 'Port collision in integration tests',
     pattern: '',
     fileGlobs: ['*.test.ts'],
     pathFilter: 'tests/',
     excludeLines: ['// port-ok'],
     message:
-      'Two or more test files use the same port in createTestContext(). ' +
-      'Each integration test must use a unique port to avoid EADDRINUSE in parallel CI runs. ' +
-      'Pick an unused port in the 13201–13899 range (grep existing ports first). ' +
+      'Two or more test files use the same literal port in createTestContext(). ' +
+      'Each literal integration test port must be unique to avoid EADDRINUSE in parallel CI runs. ' +
+      'Pick an unused port in the 13201–13899 range (grep existing ports first), or migrate the file to createEphemeralTestContext(import.meta.url). ' +
       'Suppress with // port-ok if this is intentionally shared.',
     severity: 'error',
     rationale:

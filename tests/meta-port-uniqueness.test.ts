@@ -1,18 +1,20 @@
 /**
- * Meta-test: every integration server port across the test tree must be unique.
+ * Meta-test: every integration server port strategy across the test tree must be valid.
  *
  * Round 2 Task P3.1 of the 2026-04-10 pr-check audit. CLAUDE.md requires
  * each integration test file using `createTestContext()` to allocate a
- * unique port in the 13201+ range. Today the rule is enforced by a
+ * unique port in the 13201+ range. `createEphemeralTestContext(import.meta.url)`
+ * is the behavior-preserving migration path for new or opportunistically
+ * simplified tests. Today the literal-path rule is enforced by a
  * `grep -r 'createTestContext('` convention before every PR. When two
  * authors collide on a port number, the second test to run binds to an
  * already-listening socket and either fails with EADDRINUSE (loud) or,
  * worse, succeeds and produces cross-contaminated state (silent). This
  * meta-test converts the convention into a mechanical gate.
  *
- * The regex deliberately only matches literal integer ports. A future
- * `createTestContext(PORTS.FOO)` indirection would need this test
- * updated to walk the constant table.
+ * The literal-port regex deliberately only matches integer ports. Files using
+ * `createEphemeralTestContext(import.meta.url)` are treated as a separate
+ * valid ownership strategy. Any other call shape is a test bug.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, lstatSync } from 'fs';
@@ -71,10 +73,17 @@ describe('Meta: integration server port uniqueness', () => {
     // Any match — if present but callRe yielded no resolved port, the caller
     // is using an indirection we don't parse.
     const anyRe = /createTestContext\s*\(/g;
+    const ephemeralRe = /createEphemeralTestContext\s*\(/g;
+    const validEphemeralRe = /createEphemeralTestContext\s*\(\s*import\.meta\.url\b/g;
+    const invalidEphemeralCallers: string[] = [];
+    const duplicateEphemeralCallers: string[] = [];
 
     for (const file of files) {
       const src = readFileSync(file, 'utf-8');
       const rel = path.relative(root, file);
+      const isHarness =
+        rel === 'tests/meta-port-uniqueness.test.ts'
+        || rel === 'tests/unit/test-ports.test.ts';
       const numericConsts = new Map<string, number>();
       let resolvedCount = 0;
       let m: RegExpExecArray | null;
@@ -109,8 +118,19 @@ describe('Meta: integration server port uniqueness', () => {
       // parsed, note it. This is informational, not a hard failure.
       anyRe.lastIndex = 0;
       const totalCalls = (src.match(anyRe) ?? []).length;
+      const ephemeralCalls = (src.match(ephemeralRe) ?? []).length;
+      const validEphemeralCalls = (src.match(validEphemeralRe) ?? []).length;
       if (totalCalls > resolvedCount) {
-        nonLiteralCallers.push(rel);
+        const unresolvedLiteralCalls = totalCalls - resolvedCount - ephemeralCalls;
+        if (unresolvedLiteralCalls > 0) {
+          nonLiteralCallers.push(rel);
+        }
+      }
+      if (!isHarness && ephemeralCalls > validEphemeralCalls) {
+        invalidEphemeralCallers.push(rel);
+      }
+      if (!isHarness && validEphemeralCalls > 1) {
+        duplicateEphemeralCallers.push(rel);
       }
     }
 
@@ -135,6 +155,21 @@ describe('Meta: integration server port uniqueness', () => {
     // regex probably drifted from the actual call sites (e.g. someone
     // introduced a factory indirection without updating this test).
     expect(portClaims.size).toBeGreaterThan(0);
+
+    if (invalidEphemeralCallers.length > 0) {
+      throw new Error(
+        `createEphemeralTestContext() must be called as createEphemeralTestContext(import.meta.url):\n  - ${
+          invalidEphemeralCallers.join('\n  - ')
+        }`,
+      );
+    }
+    if (duplicateEphemeralCallers.length > 0) {
+      throw new Error(
+        `Each test file may call createEphemeralTestContext(import.meta.url) at most once:\n  - ${
+          duplicateEphemeralCallers.join('\n  - ')
+        }`,
+      );
+    }
 
     // Optional informational output on non-literal callers. Do not fail —
     // they might be legitimately using a shared constant.
