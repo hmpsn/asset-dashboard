@@ -137,6 +137,23 @@ describe('POST /api/public/content-request/:workspaceId', () => {
     expect(typeof body.status).toBe('string');
   });
 
+  it('strips HTML from public plain-text content request fields before persisting', async () => {
+    const res = await postJson(`/api/public/content-request/${wsId}`, {
+      topic: '<strong>HTML Topic</strong>',
+      targetKeyword: '<em>html keyword</em>',
+      rationale: '<p>Needs cleanup</p>',
+      clientNote: '<a href="https://example.com">Client note</a>',
+      priority: 'medium',
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as { topic: string; targetKeyword: string; rationale: string; clientNote: string };
+    expect(body.topic).toBe('HTML Topic');
+    expect(body.targetKeyword).toBe('html keyword');
+    expect(body.rationale).toBe('Needs cleanup');
+    expect(body.clientNote).toBe('Client note');
+  });
+
   it('accepts optional fields without error', async () => {
     const res = await postJson(`/api/public/content-request/${wsId}`, {
       topic: 'Optional Fields Topic',
@@ -250,6 +267,21 @@ describe('POST /api/public/content-request/:workspaceId/submit', () => {
     expect(typeof body.id).toBe('string');
     expect(body.topic).toBe('Client Submitted Topic');
     expect(body.source).toBe('client');
+  });
+
+  it('strips HTML from client-submitted request notes before persisting', async () => {
+    const res = await postJson(`/api/public/content-request/${wsId}/submit`, {
+      topic: '<strong>Client HTML Topic</strong>',
+      targetKeyword: '<em>client html keyword</em>',
+      notes: '<p>Plain client note</p>',
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as { topic: string; targetKeyword: string; rationale: string; clientNote: string };
+    expect(body.topic).toBe('Client HTML Topic');
+    expect(body.targetKeyword).toBe('client html keyword');
+    expect(body.rationale).toBe('Plain client note');
+    expect(body.clientNote).toBe('Plain client note');
   });
 });
 

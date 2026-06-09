@@ -206,11 +206,10 @@ function mergeSectionUpdates(
   return { sections: merged };
 }
 
-function sanitizeSectionUpdates(sectionUpdates: PostSectionUpdate[]): PostSectionUpdate[] {
+function normalizeTrustedAdminSectionUpdates(sectionUpdates: PostSectionUpdate[]): PostSectionUpdate[] {
   return sectionUpdates.map(section => ({
     ...section,
     heading: sanitizePlainText(section.heading).trim(),
-    content: sanitizeRichText(section.content),
     keywords: section.keywords?.map(k => sanitizePlainText(k).trim()).filter(Boolean),
   }));
 }
@@ -326,11 +325,9 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
   if (typeof updates.metaDescription === 'string') updates.metaDescription = sanitizePlainText(updates.metaDescription).trim();
   if (typeof updates.seoTitle === 'string') updates.seoTitle = sanitizePlainText(updates.seoTitle).trim();
   if (typeof updates.seoMetaDescription === 'string') updates.seoMetaDescription = sanitizePlainText(updates.seoMetaDescription).trim();
-  if (typeof updates.introduction === 'string') updates.introduction = sanitizeRichText(updates.introduction);
-  if (typeof updates.conclusion === 'string') updates.conclusion = sanitizeRichText(updates.conclusion);
   if (typeof updates.voiceFeedback === 'string') updates.voiceFeedback = sanitizePlainText(updates.voiceFeedback).trim();
   if (req.body.sections !== undefined) {
-    const merged = mergeSectionUpdates(previous.sections, sanitizeSectionUpdates(req.body.sections));
+    const merged = mergeSectionUpdates(previous.sections, normalizeTrustedAdminSectionUpdates(req.body.sections));
     if ('error' in merged) return res.status(400).json({ error: merged.error });
     updates.sections = merged.sections;
   }

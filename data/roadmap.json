@@ -2164,6 +2164,26 @@
       ]
     },
     {
+      "id": "sprint-audit-remediation-2026-06-09",
+      "name": "✅ SHIPPED — Audit Remediation — Content Pipeline Safety",
+      "hours": "3-5",
+      "rationale": "Close the Content Pipeline Safety findings from the audit remediation PR sequence without introducing new client-visible capability.",
+      "items": [
+        {
+          "id": "audit-remediation-content-pipeline-safety",
+          "title": "PR 5 — Content Pipeline Safety",
+          "source": "Audit Remediation PR Plan 2026-06-09",
+          "est": "3-5h",
+          "priority": "P1",
+          "status": "done",
+          "shippedAt": "2026-06-09",
+          "owner": "content-pipeline",
+          "notes": "Preserved trusted admin TipTap HTML on content-post PATCH while continuing to sanitize plaintext fields, converted public/client plaintext content writes to the shared sanitizePlainText boundary, added named AI operations plus Zod validation for copy generation/regeneration and Webflow field mapping, and added regression coverage for admin HTML preservation, public sanitization, malformed AI output handling, and coverage-test timeout stability."
+        }
+      ],
+      "shippedAt": "2026-06-09"
+    },
+    {
       "id": "sprint-platform-health-wave9-durable-jobs-schema-plan",
       "name": "✅ SHIPPED — Platform Health Wave 9 — Durable Jobs + Schema Plan Realtime Hardening",
       "hours": "6-10",

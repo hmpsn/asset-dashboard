@@ -8,6 +8,9 @@ const structuredOperationIds = [
   'meeting-brief',
   'voice-feedback-suggest',
   'intelligence-profile-autofill',
+  'copy-generation',
+  'copy-regeneration',
+  'content-publish-field-mapping',
 ] as const;
 
 describe('AI operation registry', () => {
@@ -16,7 +19,9 @@ describe('AI operation registry', () => {
       expect(isAIOperationId(id)).toBe(true);
       const contract = getAIOperationContract(id);
       expect(contract.outputMode).toBe('json');
-      expect(contract.defaultResponseFormat).toEqual({ type: 'json_object' });
+      if (contract.providerIntent === 'openai') {
+        expect(contract.defaultResponseFormat).toEqual({ type: 'json_object' });
+      }
     }
   });
 

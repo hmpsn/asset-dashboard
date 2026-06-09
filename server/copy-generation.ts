@@ -2,7 +2,6 @@
 // 8-layer context assembly and AI copy generation engine for the Copy Pipeline.
 
 import { createLogger } from './logger.js';
-import { stripCodeFences } from './helpers.js';
 import { callAI } from './ai.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { getVoiceProfile, buildVoiceCalibrationContext } from './voice-calibration.js';
@@ -19,7 +18,6 @@ import {
 import { getActivePatterns } from './copy-intelligence.js';
 import { CREATIVE_WRITING_RULES } from './writing-quality.js';
 import { BRAND_CONTEXT_HIERARCHY, getPageTypeCopyContract } from './page-type-copy-contract.js';
-import { parseJsonFallback } from './db/json-validation.js';
 import db from './db/index.js';
 import {
   initializeSections,
@@ -28,7 +26,8 @@ import {
   addSteeringEntry,
   getSectionsForEntry,
 } from './copy-review.js';
-import type { CopySection, CopyMetadata, QualityFlag, GeneratedPageCopy } from '../shared/types/copy-pipeline.js';
+import { parseGeneratedPageCopy, parseRegeneratedSectionCopy } from './schemas/ai-copy-generation.js';
+import type { CopySection, CopyMetadata, QualityFlag } from '../shared/types/copy-pipeline.js';
 import type { SectionPlanItem, SiteBlueprint, BlueprintEntry } from '../shared/types/page-strategy.js';
 import type { IntelligencePatternType } from '../shared/types/copy-pipeline.js';
 import { isProgrammingError } from './errors.js';
@@ -104,6 +103,7 @@ ${context}`;
   const systemPrompt = buildSystemPrompt(wsId, baseInstructions, undefined, { skipProseRules: true });
 
   const response = await callAI({
+    operation: 'copy-generation',
     provider: 'anthropic',
     model: 'claude-sonnet-4-6',
     maxTokens: 8000,
@@ -113,14 +113,13 @@ ${context}`;
     workspaceId: wsId,
   });
 
-  // Parse response — callAnthropic returns { text, ... }
-  const cleaned = stripCodeFences(response.text).trim();
-  const generated = parseJsonFallback<GeneratedPageCopy | null>(cleaned, null);
-  if (!generated || !Array.isArray(generated.sections)) {
-    log.error({ entryId, blueprintId }, 'Failed to parse generation response');
+  let generated;
+  try {
+    generated = parseGeneratedPageCopy(response.text);
+  } catch (err) {
+    log.error({ err, entryId, blueprintId }, 'Failed to parse generation response');
     throw new Error('Copy generation failed: invalid AI response format');
   }
-
   // AI call succeeded — now initialize sections and save in a single transaction.
   // Deferred initialization prevents data loss: if the AI call above fails,
   // previously approved copy is preserved.
@@ -205,6 +204,7 @@ ${context}`;
   const systemPrompt = buildSystemPrompt(wsId, baseInstructions, undefined, { skipProseRules: true });
 
   const response = await callAI({
+    operation: 'copy-regeneration',
     provider: 'anthropic',
     model: 'claude-sonnet-4-6',
     maxTokens: 2000,
@@ -214,13 +214,11 @@ ${context}`;
     workspaceId: wsId,
   });
 
-  const regenCleaned = stripCodeFences(response.text).trim();
-  const result = parseJsonFallback<{ copy: string; annotation: string; reasoning: string } | null>(
-    regenCleaned,
-    null,
-  );
-  if (!result || !result.copy) {
-    log.error({ sectionId }, 'Failed to parse regeneration response');
+  let result;
+  try {
+    result = parseRegeneratedSectionCopy(response.text);
+  } catch (err) {
+    log.error({ err, sectionId }, 'Failed to parse regeneration response');
     return null;
   }
 
