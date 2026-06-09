@@ -2,7 +2,7 @@
  * Integration test for FIX A — the bulk-seo-fix background job resolves the
  * recommendations covering the pages it fixed.
  *
- * The bulk-seo-fix job (server/routes/jobs.ts) applies AI-generated SEO titles/
+ * The bulk-seo-fix job (server/webflow-bulk-seo-fix-background-job.ts) applies AI-generated SEO titles/
  * descriptions, writes live page state, then in its post-loop block calls
  * resolveRecommendationsForPageIds(workspaceId, appliedPageIds) — the shared
  * helper that maps Webflow/page IDs (the page_edit_states key) to their SLUGS via

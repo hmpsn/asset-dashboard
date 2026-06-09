@@ -38,7 +38,6 @@ const INVENTORY: Array<{
   { file: 'server/page-analysis-job.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/routes/content-posts.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/routes/google.ts', classification: 'native', targetPath: 'low-level' },
-  { file: 'server/routes/jobs.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/routes/public-analytics.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/routes/rewrite-chat.ts', classification: 'native', targetPath: 'page-assist-builder' },
   { file: 'server/routes/webflow-keywords.ts', classification: 'native', targetPath: 'page-assist-builder' },
@@ -50,6 +49,7 @@ const INVENTORY: Array<{
   { file: 'server/seo-audit-ai-recs.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/voice-calibration.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/webflow-bulk-alt-background-job.ts', classification: 'native', targetPath: 'low-level' },
+  { file: 'server/webflow-bulk-seo-fix-background-job.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/webflow-seo-bulk-analyze-job.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/webflow-seo-bulk-rewrite-job.ts', classification: 'native', targetPath: 'page-assist-builder' },
 ];

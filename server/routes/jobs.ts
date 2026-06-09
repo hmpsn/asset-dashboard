@@ -5,13 +5,6 @@
  * @writes jobs, snapshots, schema_snapshots, recommendations, webflow_assets, page_keywords, page_edit_states, seo_changes, usage_tracking, activities, content_posts
  */
 import { Router } from 'express';
-import { broadcastToWorkspace } from '../broadcast.js';
-
-import { addActivity } from '../activity-log.js';
-import { recordSeoChange } from '../seo-change-tracker.js';
-import { callCreativeAI } from '../content-posts-ai.js';
-import { findPageMapEntryForPage, normalizePageUrl, tryResolvePagePath, stripHtmlToText } from '../helpers.js';
-import { resolveBaseUrl } from '../url-helpers.js';
 import {
   createJob,
   updateJob,
@@ -26,7 +19,7 @@ import {
 } from '../jobs.js';
 import { APP_PASSWORD, requireClientPortalAuth, signAdminToken } from '../middleware.js';
 import { requestUserCanAccessWorkspace, sendWorkspaceAccessDenied, workspaceOwnsWebflowSite } from '../auth.js';
-import { resolveRecommendationsForPageIds } from '../recommendations.js';
+import { startLegacyJob } from '../legacy-jobs-runner-registry.js';
 import { runRecommendationGenerationJob } from '../recommendation-generation-job.js';
 import { getBrief } from '../content-brief.js';
 import { startContentBriefGenerationJob } from '../content-brief-generation-job.js';
@@ -47,24 +40,14 @@ import {
   KeywordStrategyGenerationError,
   KEYWORD_STRATEGY_MAX_PAGE_CAP,
 } from '../keyword-strategy-generation.js';
-import { startSalesReportJob } from '../sales-report-background-job.js';
 import { runSchemaGenerationJob } from '../schema-generation-job.js';
 import {
   schemaPlanGenerationErrorResponse,
   startSchemaPlanGenerationJob,
 } from '../schema-plan-generation-job.js';
-import { startSeoAuditBackgroundJob } from '../seo-audit-background-job.js';
-import { startWebflowBulkAltJob } from '../webflow-bulk-alt-background-job.js';
-import { startWebflowBulkCompressJob } from '../webflow-bulk-compress-background-job.js';
-import { startWebflowImageCompressJob } from '../webflow-image-compress-background-job.js';
-import {
-  updatePageSeo,
-} from '../webflow.js';
 import {
   getWorkspace,
   getTokenForSite,
-  updatePageState,
-  getBrandName,
 } from '../workspaces.js';
 import { runPageAnalysisJob } from '../page-analysis-job.js';
 import {
@@ -72,7 +55,6 @@ import {
   workspaceContextJobErrorResponse,
 } from '../workspace-context-generation-job.js';
 import { createLogger } from '../logger.js';
-import { buildSystemPrompt } from '../prompt-assembly.js';
 import { getInsights } from '../analytics-insights-store.js';
 import { createDiagnosticReport, markDiagnosticFailed } from '../diagnostic-store.js';
 import { runDiagnostic } from '../diagnostic-orchestrator.js';
@@ -80,13 +62,7 @@ import type { AnalyticsInsight, AnomalyDigestData } from '../../shared/types/ana
 import { BACKGROUND_JOB_TYPES, toPublicBackgroundJob } from '../../shared/types/background-jobs.js';
 import { CONTENT_GENERATION_STYLES } from '../../shared/types/content.js';
 import type { ContentGenerationStyle } from '../../shared/types/content.js';
-import { buildSeoPromptBlocks } from '../intelligence/generation-context-builders.js';
-import {
-  buildWorkspaceIntelligence,
-  invalidateIntelligenceCache,
-} from '../workspace-intelligence.js';
 import { isProgrammingError } from '../errors.js';
-import { WS_EVENTS } from '../ws-events.js';
 
 const log = createLogger('jobs');
 const router = Router();
@@ -229,215 +205,15 @@ router.post('/api/jobs', async (req, res) => {
   }
 
   try {
+    const legacyStart = startLegacyJob(type, params, {
+      port: PORT,
+      internalHeaders: internalAdminHeaders(),
+    });
+    if (legacyStart) {
+      return res.status(legacyStart.status).json(legacyStart.body);
+    }
+
     switch (type) {
-      case 'seo-audit': {
-        const siteId = params.siteId as string;
-        if (!siteId) return res.status(400).json({ error: 'siteId required' });
-        const activeAudit = hasActiveJob('seo-audit', params.workspaceId as string);
-        if (activeAudit) return res.status(409).json({ error: 'An SEO audit is already running for this workspace', jobId: activeAudit.id });
-        const token = getTokenForSite(siteId) || undefined;
-        if (!token) return res.status(400).json({ error: 'No Webflow API token configured' });
-        return res.json(startSeoAuditBackgroundJob({
-          workspaceId: params.workspaceId as string | undefined,
-          siteId,
-          token,
-          skipLinkCheck: params.skipLinkCheck === true,
-        }));
-      }
-
-      case 'compress': {
-        const { assetId, imageUrl, siteId, altText, fileName } = params as { assetId: string; imageUrl: string; siteId: string; altText?: string; fileName?: string };
-        if (!assetId || !imageUrl || !siteId) return res.status(400).json({ error: 'assetId, imageUrl, siteId required' });
-        return res.json(startWebflowImageCompressJob({
-          workspaceId: params.workspaceId as string | undefined,
-          assetId,
-          imageUrl,
-          siteId,
-          altText,
-          fileName,
-        }));
-      }
-
-      case 'bulk-compress': {
-        const { assets, siteId } = params as { assets: Array<{ assetId: string; imageUrl: string; altText?: string; fileName?: string; cmsUsages?: unknown[] }>; siteId: string };
-        if (!assets?.length || !siteId) return res.status(400).json({ error: 'assets and siteId required' });
-        const activeBulkCompress = hasActiveJob('bulk-compress', params.workspaceId as string);
-        if (activeBulkCompress) return res.status(409).json({ error: 'A bulk compression is already running', jobId: activeBulkCompress.id });
-        return res.json(startWebflowBulkCompressJob({
-          workspaceId: params.workspaceId as string | undefined,
-          siteId,
-          assets,
-          baseUrl: `http://localhost:${PORT}`,
-          headers: internalAdminHeaders(),
-        }));
-      }
-
-      case 'bulk-alt': {
-        const { assets: altAssets, siteId: altSiteId } = params as { assets: Array<{ assetId: string; imageUrl: string }>; siteId?: string };
-        if (!altAssets?.length) return res.status(400).json({ error: 'assets required' });
-        const activeBulkAlt = hasActiveJob('bulk-alt', params.workspaceId as string);
-        if (activeBulkAlt) return res.status(409).json({ error: 'Bulk alt text generation is already running', jobId: activeBulkAlt.id });
-        return res.json(startWebflowBulkAltJob({
-          workspaceId: params.workspaceId as string | undefined,
-          siteId: altSiteId,
-          assets: altAssets,
-        }));
-      }
-
-      case 'bulk-seo-fix': {
-        // Callers MUST include `publishedPath` on each page for nested Webflow pages —
-        // without it, tryResolvePagePath falls back to the legacy slug path which is wrong for
-        // nested routes (e.g. `/services/seo` becomes `/seo`). The live bulk-fix route
-        // in routes/webflow-seo-apply.ts accepts publishedPath; any frontend caller of this
-        // job type must mirror that contract.
-        const { siteId: seoSiteId, pages: rawPages, field, workspaceId: bwsId } = params as { siteId: string; pages: Array<{ pageId: string; title: string; slug?: string; publishedPath?: string | null; currentSeoTitle?: string; currentDescription?: string; pageContent?: string }>; field: 'title' | 'description'; workspaceId?: string };
-        const pages = (rawPages || []).filter(p => !p.pageId.startsWith('cms-'));
-        if (!seoSiteId || !pages.length || !field || !bwsId) return res.status(400).json({ error: 'siteId, workspaceId, pages, field required' });
-        const bulkWs = getWorkspace(bwsId);
-        const bulkSeoWorkspaceId = bwsId;
-        if (!bulkWs || bulkWs.webflowSiteId !== seoSiteId) {
-          return res.status(403).json({ error: 'You do not have access to this workspace' });
-        }
-        const activeBulkSeo = hasActiveJob('bulk-seo-fix', bulkSeoWorkspaceId);
-        if (activeBulkSeo) return res.status(409).json({ error: 'A bulk SEO fix is already running', jobId: activeBulkSeo.id });
-        const job = createJob('bulk-seo-fix', { message: `Fixing ${field}s for ${pages.length} pages...`, total: pages.length, workspaceId: bulkSeoWorkspaceId });
-        res.json({ jobId: job.id });
-        (async () => {
-          try {
-            updateJob(job.id, { status: 'running', progress: 0 });
-            const openaiKey = process.env.OPENAI_API_KEY;
-            const token = getTokenForSite(seoSiteId) || undefined;
-            if (!openaiKey) { updateJob(job.id, { status: 'error', error: 'OPENAI_API_KEY not configured', message: 'Missing API key' }); return; }
-
-            // Resolve base URL for page content fetching
-            const bulkBaseUrl = await resolveBaseUrl({ liveDomain: bulkWs?.liveDomain, webflowSiteId: seoSiteId }, token);
-            const bulkBrandName = getBrandName(bulkWs);
-            const bwsIntel = await buildWorkspaceIntelligence(bulkSeoWorkspaceId, { slices: ['seoContext'] });
-            const bwsSeo = bwsIntel.seoContext;
-
-            const results: Array<{ pageId: string; text: string; applied: boolean; error?: string }> = [];
-            for (let i = 0; i < pages.length; i++) {
-              const page = pages[i];
-              try {
-                const bulkJobPagePath = tryResolvePagePath(page);
-                const pageSeo = bwsSeo ? { ...bwsSeo } : undefined;
-                if (pageSeo?.strategy?.pageMap?.length) {
-                  const pageKeywords = findPageMapEntryForPage(pageSeo.strategy.pageMap, page);
-                  if (pageKeywords) pageSeo.pageKeywords = pageKeywords;
-                }
-                const seoBlocks = buildSeoPromptBlocks(pageSeo, { includePageMap: false });
-                const kwb = seoBlocks.keywordBlock;
-                const bvb = seoBlocks.brandVoiceBlock;
-                const personasBlock = seoBlocks.personasBlock;
-                const knowledgeBlock = seoBlocks.knowledgeBlock;
-
-                // Fetch page content for context (best-effort)
-                let contentExcerpt = page.pageContent || '';
-                if (!contentExcerpt && bulkBaseUrl && bulkJobPagePath) {
-                  try {
-                    const htmlRes = await fetch(`${bulkBaseUrl}${bulkJobPagePath}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
-                    if (htmlRes.ok) {
-                      const html = await htmlRes.text();
-                      contentExcerpt = stripHtmlToText(html, { maxLength: 800 });
-                    }
-                  } catch { /* best-effort — fetch on external URL */ } // url-fetch-ok
-                }
-                const contentSection = contentExcerpt ? `\nPage content excerpt: ${contentExcerpt}` : '';
-                const brandNote = bulkBrandName ? `\nBrand name is "${bulkBrandName}" — use this exact name, never an abbreviated version.` : '';
-                const locationRule = `\n- LOCATION RULE: If this page's primary keyword targets a specific city/region, ALWAYS use THAT location.`;
-                const extraContext = [personasBlock, knowledgeBlock].filter(Boolean).join('');
-
-                const prompt = field === 'description'
-                  ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}".${contentSection}${kwb}${bvb}${extraContext}${brandNote}\n\nRules:\n- HARD LIMIT: 160 characters\n- Use specific details from the knowledge base — mention real services, outcomes, or differentiators\n- Write to the target persona's pain points if personas are provided\n- Include primary keyword naturally${locationRule}\nReturn ONLY the text.`
-                  : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${contentSection}${kwb}${bvb}${extraContext}${brandNote}\n\nRules:\n- HARD LIMIT: 60 characters\n- Front-load the primary keyword\n- Use specific language from the knowledge base, not generic filler${locationRule}\nReturn ONLY the text.`;
-                const aiText = await callCreativeAI({
-                  systemPrompt: buildSystemPrompt(bulkSeoWorkspaceId, 'You are an elite SEO copywriter. Return ONLY the requested text — no quotes, no explanation, no markdown.'),
-                  userPrompt: prompt,
-                  maxTokens: 150,
-                  feature: 'job-bulk-seo-fix',
-                  workspaceId: bulkSeoWorkspaceId,
-                });
-                let text = aiText;
-                text = text.replace(/^["']|["']$/g, '');
-                const maxLen = field === 'description' ? 160 : 60;
-                if (text.length > maxLen) { const t = text.slice(0, maxLen); const ls = t.lastIndexOf(' '); text = ls > maxLen * 0.6 ? t.slice(0, ls) : t; }
-                if (text) {
-                  const seoFields = field === 'description' ? { seo: { description: text } } : { seo: { title: text } };
-                  const seoResult = await updatePageSeo(page.pageId, seoFields, token);
-                  if (!seoResult.success) {
-                    results.push({ pageId: page.pageId, text: '', applied: false, error: seoResult.error ?? 'Webflow API error' });
-                  } else {
-                    // Persist the page slug on the page-edit-state so the post-job
-                    // rec-resolve (which maps page IDs → slugs via getPageState) can
-                    // match recommendation.affectedPages (slugs). bulk-fixed pages may
-                    // have no prior audit-bridge row, so without writing the slug here
-                    // the resolve would silently no-op for them.
-                    const seoChangePagePath = bulkJobPagePath || (page.slug ? normalizePageUrl(page.slug) : '');
-                    updatePageState(bulkSeoWorkspaceId, page.pageId, { status: 'live', source: 'bulk-fix', fields: [field], updatedBy: 'system', ...(seoChangePagePath ? { slug: seoChangePagePath } : {}) });
-                    recordSeoChange(bulkSeoWorkspaceId, page.pageId, seoChangePagePath, page.title || '', [field], 'bulk-fix');
-                    results.push({ pageId: page.pageId, text, applied: true });
-                  }
-                } else {
-                  results.push({ pageId: page.pageId, text: '', applied: false, error: 'Empty AI response' });
-                }
-              } catch (err) {
-                log.debug({ err }, 'jobs: bulk-seo-fix individual page failed — skipping');
-                results.push({ pageId: page.pageId, text: '', applied: false, error: String(err) });
-              }
-              updateJob(job.id, { progress: i + 1, message: `Fixed ${i + 1}/${pages.length} ${field}s` });
-            }
-            const appliedResults = results.filter(r => r.applied);
-            updateJob(job.id, { status: 'done', result: { results, field }, progress: pages.length, message: `Done — ${appliedResults.length}/${pages.length} ${field}s updated` });
-            const appliedPageIds = appliedResults.map(r => r.pageId);
-            if (appliedPageIds.length > 0) {
-              broadcastToWorkspace(bulkSeoWorkspaceId, WS_EVENTS.PAGE_STATE_UPDATED, {
-                pageIds: appliedPageIds,
-                fields: [field],
-                source: 'bulk-fix',
-              });
-              // A bulk SEO write changes live page state, so the intelligence cache
-              // must be invalidated and any recommendation covering the fixed pages
-              // resolved (matching the work-order completion pattern). appliedPageIds
-              // are Webflow/page IDs (page_edit_states key) — the shared helper maps
-              // each to its slug before matching against recommendation.affectedPages
-              // (SLUGS). Guarded so a resolver failure can never abort the job's
-              // completion side-effects.
-              invalidateIntelligenceCache(bulkSeoWorkspaceId);
-              try {
-                resolveRecommendationsForPageIds(bulkSeoWorkspaceId, appliedPageIds); // rec-refresh-ok
-              } catch (err) {
-                log.warn({ err, jobId: job.id }, 'Failed to resolve recommendations after bulk-seo-fix');
-              }
-            }
-            addActivity(bulkSeoWorkspaceId, 'seo_updated',
-              `Bulk ${field} optimization: ${appliedResults.length} pages updated`,
-              `AI-generated ${field}s applied to ${appliedResults.length}/${pages.length} pages`,
-              { field, pagesUpdated: appliedResults.length, totalPages: pages.length, pageIds: appliedPageIds }
-            );
-          } catch (err) {
-            if (isProgrammingError(err)) log.warn({ err }, 'jobs: bulk-seo-fix job failed with programming error'); // url-fetch-ok
-            else log.debug({ err }, 'jobs: bulk-seo-fix job failed — degrading gracefully');
-            updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Bulk SEO fix failed' });
-          }
-        })();
-        break;
-      }
-
-      case 'sales-report': {
-        const { url, maxPages } = params as { url: string; maxPages?: number };
-        if (!url) return res.status(400).json({ error: 'url required' });
-        const requestedMaxPages = maxPages == null ? 25 : Number(maxPages);
-        if (!Number.isInteger(requestedMaxPages) || requestedMaxPages <= 0) {
-          return res.status(400).json({ error: 'maxPages must be a positive integer' });
-        }
-        if (requestedMaxPages > 100) {
-          return res.status(400).json({ error: 'maxPages must be between 1 and 100' });
-        }
-        const started = startSalesReportJob(url, requestedMaxPages);
-        res.json({ jobId: started.jobId });
-        break;
-      }
-
       case BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION: {
         const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
         const briefId = typeof params.briefId === 'string' ? params.briefId.trim() : '';
