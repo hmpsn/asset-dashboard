@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   mkdirSync: vi.fn(),
   getDataDir: vi.fn(() => '/fake/ai-usage'),
   createLogger: vi.fn(() => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() })),
+  AIRequestDeduplicator: { createKey: vi.fn(() => 'dedupe-key') },
   aiDeduplicator: { deduplicate: vi.fn((_key: string, fn: () => unknown) => fn()) },
   stripCodeFences: vi.fn((s: string) => s),
   abortableDelay: vi.fn(),
@@ -36,7 +37,10 @@ vi.mock('fs', () => ({
 
 vi.mock('../../server/data-dir.js', () => ({ getDataDir: mocks.getDataDir }));
 vi.mock('../../server/logger.js', () => ({ createLogger: mocks.createLogger }));
-vi.mock('../../server/ai-deduplication.js', () => ({ aiDeduplicator: mocks.aiDeduplicator }));
+vi.mock('../../server/ai-deduplication.js', () => ({
+  AIRequestDeduplicator: mocks.AIRequestDeduplicator,
+  aiDeduplicator: mocks.aiDeduplicator,
+}));
 vi.mock('../../server/helpers.js', () => ({ stripCodeFences: mocks.stripCodeFences }));
 vi.mock('../../server/abort-helpers.js', () => ({
   abortableDelay: mocks.abortableDelay,
@@ -51,6 +55,7 @@ vi.mock('../../server/local-provider-mode.js', () => ({
 }));
 
 import {
+  callOpenAI,
   parseAIJson,
   logTokenUsage,
   flushToDisk,
@@ -333,5 +338,73 @@ describe('getUsageByDay', () => {
     expect(todayEntry?.anthropicTokens).toBe(300);
     expect(todayEntry?.openaiCost).toBeGreaterThan(0);
     expect(todayEntry?.anthropicCost).toBeGreaterThan(0);
+  });
+});
+
+describe('callOpenAI retry behavior', () => {
+  beforeEach(() => {
+    process.env.OPENAI_API_KEY = 'sk-openai-test';
+    mocks.isLocalFakeProviderModeEnabled.mockReturnValue(false);
+    mocks.abortableDelay.mockReset();
+    mocks.composeTimeoutSignal.mockReset();
+    mocks.composeTimeoutSignal.mockReturnValue(undefined);
+    mocks.throwIfSignalAborted.mockReset();
+    mocks.recordOperationTrace.mockReset();
+  });
+
+  afterEach(() => {
+    delete process.env.OPENAI_API_KEY;
+    vi.restoreAllMocks();
+  });
+
+  it('retries 429 responses using retry-after-ms before succeeding', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        text: async () => 'rate limited',
+        headers: { get: (name: string) => name === 'retry-after-ms' ? '2500' : null },
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: 'ok' } }],
+          usage: { prompt_tokens: 9, completion_tokens: 4, total_tokens: 13 },
+        }),
+      } as Response);
+
+    const result = await callOpenAI({
+      messages: [{ role: 'user', content: 'retry me' }],
+      feature: 'openai-retry-test',
+      maxRetries: 1,
+    });
+
+    expect(result.text).toBe('ok');
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(mocks.abortableDelay).toHaveBeenCalledWith(3000, undefined, 'AI request cancelled');
+    expect(mocks.recordOperationTrace).toHaveBeenCalledWith(expect.objectContaining({
+      operation: 'openai-retry-test',
+      status: 'success',
+    }));
+  });
+
+  it('does not record an error trace when the caller cancels the request', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    mocks.throwIfSignalAborted.mockImplementationOnce(() => {
+      throw new Error('AI request cancelled');
+    });
+
+    await expect(callOpenAI({
+      messages: [{ role: 'user', content: 'cancel me' }],
+      feature: 'openai-cancel-test',
+      maxRetries: 1,
+      signal: controller.signal,
+    })).rejects.toThrow('AI request cancelled');
+
+    expect(mocks.recordOperationTrace).not.toHaveBeenCalledWith(expect.objectContaining({
+      operation: 'openai-cancel-test',
+      status: 'error',
+    }));
   });
 });
