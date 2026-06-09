@@ -90,11 +90,9 @@ import type { AnalyticsInsight, AnomalyDigestData } from '../../shared/types/ana
 import { BACKGROUND_JOB_TYPES, toPublicBackgroundJob } from '../../shared/types/background-jobs.js';
 import { CONTENT_GENERATION_STYLES } from '../../shared/types/content.js';
 import type { ContentGenerationStyle } from '../../shared/types/content.js';
+import { buildSeoPromptBlocks } from '../intelligence/generation-context-builders.js';
 import {
   buildWorkspaceIntelligence,
-  formatKeywordsForPrompt,
-  formatKnowledgeBaseForPrompt,
-  formatPersonasForPrompt,
   invalidateIntelligenceCache,
 } from '../workspace-intelligence.js';
 import type { default as SharpConstructor } from 'sharp';
@@ -597,11 +595,11 @@ router.post('/api/jobs', async (req, res) => {
                   const pageKeywords = findPageMapEntryForPage(pageSeo.strategy.pageMap, page);
                   if (pageKeywords) pageSeo.pageKeywords = pageKeywords;
                 }
-                const kwb = formatKeywordsForPrompt(pageSeo);
-                // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
-                const bvb = pageSeo?.effectiveBrandVoiceBlock ?? '';
-                const personasBlock = formatPersonasForPrompt(pageSeo?.personas ?? []);
-                const knowledgeBlock = formatKnowledgeBaseForPrompt(pageSeo?.knowledgeBase);
+                const seoBlocks = buildSeoPromptBlocks(pageSeo, { includePageMap: false });
+                const kwb = seoBlocks.keywordBlock;
+                const bvb = seoBlocks.brandVoiceBlock;
+                const personasBlock = seoBlocks.personasBlock;
+                const knowledgeBlock = seoBlocks.knowledgeBlock;
 
                 // Fetch page content for context (best-effort)
                 let contentExcerpt = page.pageContent || '';

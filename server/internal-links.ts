@@ -11,7 +11,8 @@ import { getWorkspacePages } from './workspace-data.js';
 import { getWorkspace } from './workspaces.js';
 import { listPageKeywords } from './page-keywords.js';
 import { callAI } from './ai.js';
-import { buildWorkspaceIntelligence, formatPersonasForPrompt, formatKnowledgeBaseForPrompt } from './workspace-intelligence.js';
+import { buildSeoPromptBlocks } from './intelligence/generation-context-builders.js';
+import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
 import { normalizePageUrl, resolvePagePath, sanitizeForPromptInjection, stripHtmlToText, stripCodeFences, decodeEntities } from './helpers.js';
 import { createLogger } from './logger.js';
 import { parseJsonSafeArray } from './db/json-validation.js';
@@ -301,7 +302,8 @@ export async function analyzeInternalLinks(
   // legacy `workspace.brandVoice` column is no longer authoritative. Accept the tradeoff
   // (calibrated-empty workspaces get no voice hint in this specific flow) until this
   // flow is migrated onto `buildSystemPrompt`. See PR #167 review for context.
-  const brandCtx = seo?.effectiveBrandVoiceBlock ?? '';
+  const seoBlocks = buildSeoPromptBlocks(seo, { includePageMap: false });
+  const brandCtx = seoBlocks.brandVoiceBlock;
 
   // Build the page summary for AI analysis
   const pageSummaries = pages.map(p => {
@@ -338,8 +340,8 @@ export async function analyzeInternalLinks(
   }
 
   // Add business knowledge + personas for better link priority and anchor text
-  const knowledgeBlock = formatKnowledgeBaseForPrompt(seo?.knowledgeBase);
-  const personasBlock = formatPersonasForPrompt(seo?.personas ?? []);
+  const knowledgeBlock = seoBlocks.knowledgeBlock;
+  const personasBlock = seoBlocks.personasBlock;
 
   const prompt = `You are an expert SEO strategist analyzing internal linking opportunities for a website. 
 

@@ -3,12 +3,16 @@ import type {
   IntelligenceSlice,
   LearningsSlice,
   PromptVerbosity,
+  SeoContextSlice,
   WorkspaceIntelligence,
 } from '../../shared/types/intelligence.js';
 import {
   buildWorkspaceIntelligence,
   formatForPrompt,
+  formatKeywordsForPrompt,
+  formatKnowledgeBaseForPrompt,
   formatPageMapForPrompt,
+  formatPersonasForPrompt,
 } from '../workspace-intelligence.js';
 
 type LearningsDomain = NonNullable<IntelligenceOptions['learningsDomain']>;
@@ -43,6 +47,18 @@ export interface SeoPromptContextOptions extends GenerationContextBuilderOptions
 export interface SeoPromptContextResult extends GenerationContextResult {
   pageMapContext: string;
   seoPromptContext: string;
+}
+
+export interface SeoPromptBlocksOptions {
+  includePageMap?: boolean;
+}
+
+export interface SeoPromptBlocks {
+  keywordBlock: string;
+  brandVoiceBlock: string;
+  personasBlock: string;
+  knowledgeBlock: string;
+  pageMapBlock: string;
 }
 
 async function buildGenerationContext(
@@ -147,5 +163,18 @@ export async function buildSeoPromptContext(
     ...result,
     pageMapContext,
     seoPromptContext: `${result.promptContext}${pageMapContext}`,
+  };
+}
+
+export function buildSeoPromptBlocks(
+  seoContext: SeoContextSlice | null | undefined,
+  opts: SeoPromptBlocksOptions = {},
+): SeoPromptBlocks {
+  return {
+    keywordBlock: formatKeywordsForPrompt(seoContext),
+    brandVoiceBlock: seoContext?.effectiveBrandVoiceBlock ?? '',
+    personasBlock: formatPersonasForPrompt(seoContext?.personas ?? []),
+    knowledgeBlock: formatKnowledgeBaseForPrompt(seoContext?.knowledgeBase),
+    pageMapBlock: opts.includePageMap === false ? '' : formatPageMapForPrompt(seoContext),
   };
 }

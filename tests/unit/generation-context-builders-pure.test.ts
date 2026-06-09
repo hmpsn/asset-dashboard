@@ -16,6 +16,10 @@ import type { IntelligenceSlice } from '../../shared/types/intelligence.js';
 vi.mock('../../server/workspace-intelligence.js', () => ({
   buildWorkspaceIntelligence: vi.fn().mockResolvedValue({}),
   formatForPrompt: vi.fn().mockReturnValue(''),
+  formatKeywordsForPrompt: vi.fn().mockReturnValue(''),
+  formatKnowledgeBaseForPrompt: vi.fn().mockReturnValue(''),
+  formatPageMapForPrompt: vi.fn().mockReturnValue(''),
+  formatPersonasForPrompt: vi.fn().mockReturnValue(''),
 }));
 
 const listLocalSeoMarketsMock = vi.fn(() => []);

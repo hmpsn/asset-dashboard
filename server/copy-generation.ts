@@ -9,11 +9,9 @@ import { listDeliverables } from './brand-identity.js';
 import { listBrandscripts } from './brandscript.js';
 import { generateBrief, getPageTypeConfig } from './content-brief.js';
 import { getBlueprint, getEntry, listBlueprints } from './page-strategy.js';
+import { buildSeoPromptBlocks } from './intelligence/generation-context-builders.js';
 import {
   buildWorkspaceIntelligence,
-  formatKeywordsForPrompt,
-  formatPersonasForPrompt,
-  formatKnowledgeBaseForPrompt,
 } from './workspace-intelligence.js';
 import { getActivePatterns } from './copy-intelligence.js';
 import { CREATIVE_WRITING_RULES } from './writing-quality.js';
@@ -496,14 +494,12 @@ export async function buildCopyGenerationContext(
     const seoSlice = intel.seoContext;
     if (seoSlice) {
       const seoParts: string[] = [];
-      const keywordBlock = formatKeywordsForPrompt(seoSlice);
-      if (keywordBlock.trim()) seoParts.push(keywordBlock);
-      if (seoSlice.effectiveBrandVoiceBlock.trim()) seoParts.push(seoSlice.effectiveBrandVoiceBlock);
+      const seoBlocks = buildSeoPromptBlocks(seoSlice, { includePageMap: false });
+      if (seoBlocks.keywordBlock.trim()) seoParts.push(seoBlocks.keywordBlock);
+      if (seoBlocks.brandVoiceBlock.trim()) seoParts.push(seoBlocks.brandVoiceBlock);
       if (seoSlice.businessContext.trim()) seoParts.push(`Business context: ${seoSlice.businessContext}`);
-      const personasBlock = formatPersonasForPrompt(seoSlice.personas);
-      if (personasBlock.trim()) seoParts.push(personasBlock);
-      const knowledgeBlock = formatKnowledgeBaseForPrompt(seoSlice.knowledgeBase);
-      if (knowledgeBlock.trim()) seoParts.push(knowledgeBlock);
+      if (seoBlocks.personasBlock.trim()) seoParts.push(seoBlocks.personasBlock);
+      if (seoBlocks.knowledgeBlock.trim()) seoParts.push(seoBlocks.knowledgeBlock);
       if (seoParts.length > 0) {
         parts.push(`SEO INTELLIGENCE:\n${seoParts.join('\n\n')}`);
       }

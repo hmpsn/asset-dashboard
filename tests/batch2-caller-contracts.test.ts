@@ -145,8 +145,9 @@ describe('webflow SEO route N+1 prevention contracts', () => {
   it('bulk-fix job preserves the richer SEO copy prompt contract from the retired sync route', () => {
     expect(jobsSrc).toContain('callCreativeAI({');
     expect(jobsSrc).toContain('systemPrompt: buildSystemPrompt(bulkSeoWorkspaceId');
-    expect(jobsSrc).toContain('formatPersonasForPrompt(pageSeo?.personas');
-    expect(jobsSrc).toContain('formatKnowledgeBaseForPrompt(pageSeo?.knowledgeBase)');
+    expect(jobsSrc).toContain('buildSeoPromptBlocks(pageSeo');
+    expect(jobsSrc).toContain('const personasBlock = seoBlocks.personasBlock');
+    expect(jobsSrc).toContain('const knowledgeBlock = seoBlocks.knowledgeBlock');
     expect(jobsSrc).toContain('Use specific language from the knowledge base, not generic filler');
   });
 
