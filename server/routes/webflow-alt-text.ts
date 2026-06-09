@@ -9,8 +9,6 @@ import fs from 'fs';
 import path from 'path';
 import { requireWorkspaceAccess, requireWorkspaceSiteAccess } from '../auth.js';
 import { generateAltText } from '../alttext.js';
-import type { default as SharpConstructor } from 'sharp';
-import type * as SvgoMod from 'svgo';
 import { buildIntelPrompt } from '../workspace-intelligence.js';
 import {
   listSites,
@@ -19,13 +17,16 @@ import {
   getPageDom,
   uploadAsset,
 } from '../webflow.js';
-import { updateCollectionItem, getCollectionItem, publishCollectionItems } from '../webflow-cms.js';
 import type { CmsImageUsage } from '../../shared/types/cms-images.ts';
 import {
   getWorkspace,
   getTokenForSite,
 } from '../workspaces.js';
 import { getWorkspacePages } from '../workspace-data.js';
+import {
+  compressImageBuffer,
+  repairCmsReferences,
+} from '../domains/webflow-assets/image-optimization.js';
 import { createLogger } from '../logger.js';
 import { isProgrammingError } from '../errors.js';
 import { checkUsageLimit, incrementIfAllowed, decrementUsage } from '../usage-tracking.js';
@@ -271,100 +272,6 @@ router.post('/api/webflow/:workspaceId/bulk-generate-alt', requireWorkspaceAcces
   res.end();
 });
 
-// --- CMS Reference Repair Helper ---
-// Called after a new compressed asset is uploaded to update CMS items that
-// referenced the old asset ID. Runs before deleting the old asset so that
-// if updates fail, the old asset still exists as a fallback.
-async function repairCmsReferences(
-  cmsUsages: CmsImageUsage[],
-  oldAssetId: string,
-  newAssetId: string,
-  newHostedUrl: string,
-  oldHostedUrl: string,
-  token?: string,
-): Promise<{ succeeded: number; failed: number }> {
-  let succeeded = 0;
-  let failed = 0;
-
-  // Group usages by collection+item to batch field updates per item
-  const itemMap = new Map<string, { collectionId: string; fields: Array<{ fieldSlug: string; fieldType: string }> }>();
-  for (const usage of cmsUsages) {
-    const key = `${usage.collectionId}:${usage.itemId}`;
-    if (!itemMap.has(key)) itemMap.set(key, { collectionId: usage.collectionId, fields: [] });
-    itemMap.get(key)!.fields.push({ fieldSlug: usage.fieldSlug, fieldType: usage.fieldType });
-  }
-
-  // Track which collections have updated items (for optional publish)
-  const updatedByCollection = new Map<string, string[]>();
-
-  for (const [key, { collectionId, fields }] of itemMap.entries()) {
-    const itemId = key.split(':')[1];
-
-    // Fetch current item to handle MultiImage array updates and RichText replacements
-    let currentItem: Record<string, unknown> | null = null;
-    const multiImageFields = fields.filter(f => f.fieldType === 'MultiImage');
-    const richTextFields = fields.filter(f => f.fieldType === 'RichText');
-    if (multiImageFields.length > 0 || richTextFields.length > 0) {
-      try {
-        currentItem = await getCollectionItem(collectionId, itemId, token);
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-alt-text: programming error'); /* proceed without current item data */ }
-    }
-
-    const fieldData: Record<string, unknown> = {};
-
-    for (const { fieldSlug, fieldType } of fields) {
-      if (fieldType === 'Image') {
-        fieldData[fieldSlug] = { fileId: newAssetId, url: newHostedUrl };
-      } else if (fieldType === 'MultiImage' && currentItem) {
-        const fd = (currentItem.fieldData || currentItem) as Record<string, unknown>;
-        const currentArray = fd[fieldSlug];
-        if (Array.isArray(currentArray)) {
-          fieldData[fieldSlug] = currentArray.map((img: unknown) => {
-            const imgObj = img as Record<string, unknown>;
-            if (imgObj.fileId === oldAssetId) {
-              return { fileId: newAssetId, url: newHostedUrl };
-            }
-            return img;
-          });
-        } else {
-          fieldData[fieldSlug] = [{ fileId: newAssetId, url: newHostedUrl }];
-        }
-      } else if (fieldType === 'RichText' && currentItem && oldHostedUrl) {
-        const fd = (currentItem.fieldData || currentItem) as Record<string, unknown>;
-        const htmlString = fd[fieldSlug];
-        if (typeof htmlString === 'string' && htmlString.includes(oldHostedUrl)) {
-          // Replace all occurrences of the old CDN URL with the new one
-          fieldData[fieldSlug] = htmlString.split(oldHostedUrl).join(newHostedUrl);
-        }
-      }
-    }
-
-    if (Object.keys(fieldData).length === 0) continue;
-
-    // Rate-limit CMS PATCH calls
-    await new Promise(r => setTimeout(r, 200));
-
-    const result = await updateCollectionItem(collectionId, itemId, fieldData, token);
-    if (result.success) {
-      succeeded++;
-      if (!updatedByCollection.has(collectionId)) updatedByCollection.set(collectionId, []);
-      updatedByCollection.get(collectionId)!.push(itemId);
-    } else {
-      failed++;
-      log.warn({ collectionId, itemId, error: result.error }, 'CMS reference repair failed for item');
-    }
-  }
-
-  // Auto-publish updated items so changes go live
-  for (const [collectionId, itemIds] of updatedByCollection.entries()) {
-    try {
-      await publishCollectionItems(collectionId, itemIds, token);
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-alt-text: programming error'); /* publish is best-effort */ }
-  }
-
-  return { succeeded, failed };
-}
-
 // --- Image Compression ---
 router.post('/api/webflow/:workspaceId/compress/:assetId', requireWorkspaceAccess('workspaceId'), requireWorkspaceSiteAccess({
   workspace: { source: 'params', name: 'workspaceId' },
@@ -381,8 +288,6 @@ router.post('/api/webflow/:workspaceId/compress/:assetId', requireWorkspaceAcces
   const compressToken = getTokenForSite(siteId) || undefined;
 
   try {
-    const sharp: typeof SharpConstructor = (await import('sharp')).default; // dynamic-import-ok
-
     const originalBytes = await fetchExternalBytes({
       url: imageUrl,
       timeoutMs: 20_000,
@@ -391,81 +296,17 @@ router.post('/api/webflow/:workspaceId/compress/:assetId', requireWorkspaceAcces
       logContext: { module: 'webflow-alt-text', fetchPath: 'compress-image' },
     });
     const originalBuffer = Buffer.from(originalBytes);
-    const originalSize = originalBuffer.length;
-
-    const ext = (fileName || imageUrl).split('.').pop()?.split('?')[0]?.toLowerCase() || 'jpg';
-    let compressed: Buffer;
-    let newFileName: string;
-    const baseName = (fileName || 'image').replace(/\.[^.]+$/, '');
-
-    if (ext === 'svg') {
-      const svgo: typeof SvgoMod = await import('svgo'); // dynamic-import-ok
-      let compressedSvg: Buffer;
-      try {
-        const svgString = originalBuffer.toString('utf-8');
-        const result = svgo.optimize(svgString, {
-          multipass: true,
-          plugins: ['preset-default'],
-        } as Parameters<typeof svgo.optimize>[1]);
-        compressedSvg = Buffer.from(result.data, 'utf-8');
-      } catch (svgoErr) {
-        log.error({ err: svgoErr }, 'SVGO error');
-        return res.json({ skipped: true, reason: 'SVGO optimization failed: ' + (svgoErr instanceof Error ? svgoErr.message : String(svgoErr)) });
-      }
-
-      const svgNewSize = compressedSvg.length;
-      const svgSavings = originalSize - svgNewSize;
-      const svgSavingsPercent = Math.round((svgSavings / originalSize) * 100);
-
-      if (svgSavingsPercent < 3) {
-        return res.json({ skipped: true, reason: `SVG already optimized (only ${svgSavingsPercent}% savings)`, originalSize, newSize: svgNewSize });
-      }
-
-      compressed = compressedSvg;
-      newFileName = `${baseName}.svg`;
-    } else if (ext === 'jpg' || ext === 'jpeg') {
-      compressed = await sharp(originalBuffer)
-        .jpeg({ quality: 80, mozjpeg: true })
-        .toBuffer();
-      newFileName = `${baseName}.jpg`;
-    } else if (ext === 'png') {
-      const webpBuffer = await sharp(originalBuffer)
-        .webp({ quality: 80 })
-        .toBuffer();
-      const pngBuffer = await sharp(originalBuffer)
-        .png({ compressionLevel: 9, palette: true })
-        .toBuffer();
-      if (webpBuffer.length < pngBuffer.length) {
-        compressed = webpBuffer;
-        newFileName = `${baseName}.webp`;
-      } else {
-        compressed = pngBuffer;
-        newFileName = `${baseName}.png`;
-      }
-    } else {
-      compressed = await sharp(originalBuffer)
-        .webp({ quality: 80 })
-        .toBuffer();
-      newFileName = `${baseName}.webp`;
+    const compression = await compressImageBuffer(originalBuffer, fileName || imageUrl, {
+      outputBaseName: fileName || 'image',
+    });
+    if ('skipped' in compression) {
+      return res.json(compression);
     }
 
-    const newSize = compressed.length;
-    const savings = originalSize - newSize;
-    const savingsPercent = Math.round((savings / originalSize) * 100);
+    const tmpPath = `/tmp/compressed_${Date.now()}_${compression.newFileName}`;
+    fs.writeFileSync(tmpPath, compression.compressed);
 
-    if (ext !== 'svg' && savingsPercent < 5) {
-      return res.json({
-        skipped: true,
-        reason: `Already optimized (only ${savingsPercent}% savings)`,
-        originalSize,
-        newSize,
-      });
-    }
-
-    const tmpPath = `/tmp/compressed_${Date.now()}_${newFileName}`;
-    fs.writeFileSync(tmpPath, compressed);
-
-    const uploadResult = await uploadAsset(siteId, tmpPath, newFileName, altText, compressToken);
+    const uploadResult = await uploadAsset(siteId, tmpPath, compression.newFileName, altText, compressToken);
     fs.unlinkSync(tmpPath);
 
     if (!uploadResult.success) {
@@ -501,11 +342,11 @@ router.post('/api/webflow/:workspaceId/compress/:assetId', requireWorkspaceAcces
       success: true,
       newAssetId: uploadResult.assetId,
       newHostedUrl: uploadResult.hostedUrl,
-      originalSize,
-      newSize,
-      savings,
-      savingsPercent,
-      newFileName,
+      originalSize: compression.originalSize,
+      newSize: compression.newSize,
+      savings: compression.savings,
+      savingsPercent: compression.savingsPercent,
+      newFileName: compression.newFileName,
       oldAssetPreserved: !!(hasFailedCmsRepairs || cmsRepairsSkipped),
       ...(cmsUpdates ? { cmsUpdates } : {}),
     });
