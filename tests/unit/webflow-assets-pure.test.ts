@@ -31,6 +31,86 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../server/webflow-client.js', () => ({
   webflowFetch: mocks.webflowFetch,
   getToken: mocks.getToken,
+  webflowJson: async <T>(endpoint: string, options: RequestInit = {}, tokenOverride?: string) => {
+    const res = await mocks.webflowFetch(endpoint, options, tokenOverride);
+    if (!res.ok) {
+      return {
+        ok: false as const,
+        status: res.status,
+        errorText: await res.text(),
+      };
+    }
+    return { ok: true as const, data: await res.json() as T };
+  },
+  paginateWebflow: async <TPage, TItem>({
+    buildEndpoint,
+    extractItems,
+    getTotal,
+    tokenOverride,
+    limit = 100,
+    advanceBy = 'page-size',
+  }: {
+    buildEndpoint: (offset: number, limit: number) => string;
+    extractItems: (page: TPage) => TItem[] | undefined;
+    getTotal?: (page: TPage) => number | undefined;
+    tokenOverride?: string;
+    limit?: number;
+    advanceBy?: 'items-length' | 'page-size';
+  }) => {
+    const allItems: TItem[] = [];
+    let offset = 0;
+
+    while (true) {
+      const result = await (async () => {
+        const res = await mocks.webflowFetch(buildEndpoint(offset, limit), {}, tokenOverride);
+        if (!res.ok) {
+          return {
+            ok: false as const,
+            status: res.status,
+            errorText: await res.text(),
+          };
+        }
+        return { ok: true as const, data: await res.json() as TPage };
+      })();
+      if (!result.ok) break;
+
+      const items = extractItems(result.data) || [];
+      allItems.push(...items);
+
+      if (items.length === 0) break;
+
+      offset += advanceBy === 'items-length' ? items.length : limit;
+
+      const total = getTotal?.(result.data);
+      if (typeof total === 'number') {
+        if (offset >= total) break;
+        continue;
+      }
+
+      if (items.length < limit) break;
+    }
+
+    return allItems;
+  },
+  webflowMutation: async <T = undefined>(
+    endpoint: string,
+    options: RequestInit,
+    tokenOverride?: string,
+    parse: 'json' | 'none' = 'none',
+  ) => {
+    const res = await mocks.webflowFetch(endpoint, options, tokenOverride);
+    if (!res.ok) {
+      return {
+        ok: false as const,
+        status: res.status,
+        errorText: await res.text(),
+      };
+    }
+    if (parse === 'none') {
+      return { ok: true as const, data: undefined as T };
+    }
+    return { ok: true as const, data: await res.json() as T };
+  },
 }));
 
 vi.mock('../../server/logger.js', () => ({

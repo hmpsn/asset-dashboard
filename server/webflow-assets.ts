@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { createLogger } from './logger.js';
 import { resolvePagePath } from './helpers.js';
-import { webflowFetch, getToken } from './webflow-client.js';
+import { getToken, paginateWebflow, webflowFetch, webflowJson, webflowMutation } from './webflow-client.js';
 import { getWorkspacePages, getWorkspaceAllPages } from './workspace-data.js';
 import { listWorkspaces } from './workspaces.js';
 import type * as WebflowPages from './webflow-pages.js';
@@ -34,21 +34,11 @@ export interface WebflowAsset {
 export async function listAssets(siteId: string, tokenOverride?: string): Promise<WebflowAsset[]> {
   const token = tokenOverride || getToken();
   if (!token) return [];
-
-  const allAssets: WebflowAsset[] = [];
-  let offset = 0;
-  const limit = 100;
-
-  while (true) {
-    const res = await webflowFetch(`/sites/${siteId}/assets?limit=${limit}&offset=${offset}`, {}, token);
-    if (!res.ok) break;
-    const data = await res.json() as { assets?: WebflowAsset[] };
-    const assets = data.assets || [];
-    allAssets.push(...assets);
-    if (assets.length < limit) break;
-    offset += limit;
-  }
-  return allAssets;
+  return paginateWebflow<{ assets?: WebflowAsset[] }, WebflowAsset>({
+    buildEndpoint: (offset, limit) => `/sites/${siteId}/assets?limit=${limit}&offset=${offset}`,
+    extractItems: page => page.assets,
+    tokenOverride: token,
+  });
 }
 
 // --- Get single asset ---
@@ -57,9 +47,8 @@ export async function getAsset(
   tokenOverride?: string
 ): Promise<WebflowAsset | null> {
   try {
-    const res = await webflowFetch(`/assets/${assetId}`, {}, tokenOverride);
-    if (!res.ok) return null;
-    return await res.json() as WebflowAsset;
+    const result = await webflowJson<WebflowAsset>(`/assets/${assetId}`, {}, tokenOverride);
+    return result.ok ? result.data : null;
   } catch (err) {
     log.debug({ err }, 'webflow-assets/get-asset: external API error — degrading gracefully');
     return null;
@@ -83,17 +72,14 @@ export async function updateAsset(
     }
 
     log.info({ detail: body }, `PATCH /assets/${assetId}:`);
-    const res = await webflowFetch(`/assets/${assetId}`, {
+    const result = await webflowMutation(`/assets/${assetId}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
     }, tokenOverride);
-    if (!res.ok) {
-      const err = await res.text();
-      log.error({ err: err }, `Asset PATCH failed (${res.status}):`);
-      return { success: false, error: `${res.status}: ${err}` };
+    if (!result.ok) {
+      log.error({ err: result.errorText }, `Asset PATCH failed (${result.status}):`);
+      return { success: false, error: `${result.status}: ${result.errorText}` };
     }
-    const result = await res.json();
-    log.info({ detail: result }, `Asset PATCH success:`);
     return { success: true };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -115,10 +101,8 @@ export async function listAssetFolders(
   siteId: string,
   tokenOverride?: string,
 ): Promise<AssetFolder[]> {
-  const res = await webflowFetch(`/sites/${siteId}/asset_folders`, {}, tokenOverride);
-  if (!res.ok) return [];
-  const data = await res.json() as { assetFolders?: AssetFolder[] };
-  return data.assetFolders || [];
+  const result = await webflowJson<{ assetFolders?: AssetFolder[] }>(`/sites/${siteId}/asset_folders`, {}, tokenOverride);
+  return result.ok ? result.data.assetFolders || [] : [];
 }
 
 export async function createAssetFolder(
@@ -130,16 +114,12 @@ export async function createAssetFolder(
   try {
     const body: Record<string, string> = { displayName };
     if (parentFolderId) body.parentFolderId = parentFolderId;
-    const res = await webflowFetch(`/sites/${siteId}/asset_folders`, {
+    const result = await webflowMutation<{ id?: string }>(`/sites/${siteId}/asset_folders`, {
       method: 'POST',
       body: JSON.stringify(body),
-    }, tokenOverride);
-    if (!res.ok) {
-      const err = await res.text();
-      return { success: false, error: `${res.status}: ${err}` };
-    }
-    const data = await res.json() as { id?: string };
-    return { success: true, folderId: data.id };
+    }, tokenOverride, 'json');
+    if (!result.ok) return { success: false, error: `${result.status}: ${result.errorText}` };
+    return { success: true, folderId: result.data.id };
   } catch (err: unknown) {
     log.debug({ err }, 'webflow-assets/create-folder: external API error — degrading gracefully');
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -158,14 +138,11 @@ export async function moveAssetToFolder(
   };
   if (current?.altText) body.altText = current.altText;
 
-  const res = await webflowFetch(`/assets/${assetId}`, {
+  const result = await webflowMutation(`/assets/${assetId}`, {
     method: 'PATCH',
     body: JSON.stringify(body),
   }, tokenOverride);
-  if (!res.ok) {
-    const err = await res.text();
-    return { success: false, error: `${res.status}: ${err}` };
-  }
+  if (!result.ok) return { success: false, error: `${result.status}: ${result.errorText}` };
   return { success: true };
 }
 
@@ -174,8 +151,8 @@ export async function deleteAsset(assetId: string, tokenOverride?: string): Prom
   try {
     const res = await webflowFetch(`/assets/${assetId}`, { method: 'DELETE' }, tokenOverride);
     if (!res.ok && res.status !== 204) {
-      const err = await res.text();
-      return { success: false, error: `${res.status}: ${err}` };
+      const result = { status: res.status, errorText: await res.text() };
+      return { success: false, error: `${result.status}: ${result.errorText}` };
     }
     return { success: true };
   } catch (err: unknown) {

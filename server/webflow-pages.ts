@@ -4,7 +4,7 @@
  */
 import { createLogger } from './logger.js';
 import { resolvePagePath } from './helpers.js';
-import { webflowFetch, getToken } from './webflow-client.js';
+import { getToken, paginateWebflow, webflowFetch, webflowJson, webflowMutation } from './webflow-client.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { fetchPublicWebText } from './external-fetch.js';
 import type { SchemaDeliveryDecision, SchemaPublishResponse } from '../shared/types/schema-generation.js';
@@ -26,10 +26,8 @@ export interface WebflowPage {
 }
 
 export async function listPages(siteId: string, tokenOverride?: string): Promise<WebflowPage[]> {
-  const res = await webflowFetch(`/sites/${siteId}/pages?limit=100`, {}, tokenOverride);
-  if (!res.ok) return [];
-  const data = await res.json() as { pages?: WebflowPage[] };
-  return data.pages || [];
+  const result = await webflowJson<{ pages?: WebflowPage[] }>(`/sites/${siteId}/pages?limit=100`, {}, tokenOverride);
+  return result.ok ? result.data.pages || [] : [];
 }
 
 // Filter to only published, non-collection, non-draft pages
@@ -55,19 +53,13 @@ interface DomNode {
 }
 
 export async function getPageDomNodes(pageId: string, tokenOverride?: string): Promise<DomNode[]> {
-  const allNodes: DomNode[] = [];
-  let offset = 0;
-  while (true) {
-    const res = await webflowFetch(`/pages/${pageId}/dom?limit=100&offset=${offset}`, {}, tokenOverride);
-    if (!res.ok) break;
-    const data = await res.json() as { nodes?: DomNode[]; pagination?: { total?: number } };
-    const nodes = data.nodes || [];
-    allNodes.push(...nodes);
-    const total = data.pagination?.total || 0;
-    offset += nodes.length;
-    if (offset >= total || nodes.length === 0) break;
-  }
-  return allNodes;
+  return paginateWebflow<{ nodes?: DomNode[]; pagination?: { total?: number } }, DomNode>({
+    buildEndpoint: (offset, limit) => `/pages/${pageId}/dom?limit=${limit}&offset=${offset}`,
+    extractItems: page => page.nodes,
+    getTotal: page => page.pagination?.total,
+    tokenOverride,
+    advanceBy: 'items-length',
+  });
 }
 
 // Legacy wrapper for alt-text context (returns stringified DOM)
@@ -94,14 +86,11 @@ export async function updatePageSeo(
   if (fields.seo) body.seo = fields.seo;
   if (fields.openGraph) body.openGraph = fields.openGraph;
 
-  const res = await webflowFetch(`/pages/${pageId}`, {
+  const result = await webflowMutation(`/pages/${pageId}`, {
     method: 'PUT',
     body: JSON.stringify(body),
   }, tokenOverride);
-  if (!res.ok) {
-    const text = await res.text();
-    return { success: false, error: `${res.status}: ${text}` };
-  }
+  if (!result.ok) return { success: false, error: `${result.status}: ${result.errorText}` };
   return { success: true };
 }
 
@@ -110,9 +99,8 @@ export async function getPageMeta(
   pageId: string,
   tokenOverride?: string,
 ): Promise<Record<string, unknown> | null> {
-  const res = await webflowFetch(`/pages/${pageId}`, {}, tokenOverride);
-  if (!res.ok) return null;
-  return await res.json() as Record<string, unknown>;
+  const result = await webflowJson<Record<string, unknown>>(`/pages/${pageId}`, {}, tokenOverride);
+  return result.ok ? result.data : null;
 }
 
 // --- Publish site ---
@@ -120,14 +108,11 @@ export async function publishSite(
   siteId: string,
   tokenOverride?: string,
 ): Promise<{ success: boolean; error?: string }> {
-  const res = await webflowFetch(`/sites/${siteId}/publish`, {
+  const result = await webflowMutation(`/sites/${siteId}/publish`, {
     method: 'POST',
     body: JSON.stringify({ publishToWebflowSubdomain: true }),
   }, tokenOverride);
-  if (!res.ok) {
-    const text = await res.text();
-    return { success: false, error: `${res.status}: ${text}` };
-  }
+  if (!result.ok) return { success: false, error: `${result.status}: ${result.errorText}` };
   return { success: true };
 }
 
@@ -136,10 +121,8 @@ export async function getSiteSubdomain(siteId: string, tokenOverride?: string): 
   // Guard: no token available — callers treat null as "no subdomain found"
   if (!tokenOverride && !process.env.WEBFLOW_API_TOKEN) return null;
   try {
-    const res = await webflowFetch(`/sites/${siteId}`, {}, tokenOverride);
-    if (!res.ok) return null;
-    const data = await res.json() as { shortName?: string };
-    return data.shortName || null;
+    const result = await webflowJson<{ shortName?: string }>(`/sites/${siteId}`, {}, tokenOverride);
+    return result.ok ? result.data.shortName || null : null;
   } catch { // catch-ok: network failure or missing token → callers treat null as "no subdomain"
     return null;
   }
@@ -187,7 +170,7 @@ async function registerInlineScript(
   version: string,
   tokenOverride?: string,
 ): Promise<WebflowCustomCodeWriteResult<RegisteredScript>> {
-  const res = await webflowFetch(`/sites/${siteId}/registered_scripts/inline`, {
+  const result = await webflowMutation<RegisteredScript>(`/sites/${siteId}/registered_scripts/inline`, {
     method: 'POST',
     body: JSON.stringify({
       sourceCode,
@@ -195,30 +178,25 @@ async function registerInlineScript(
       version,
       canCopy: false,
     }),
-  }, tokenOverride);
-  if (!res.ok) {
-    const text = await res.text();
-    log.error(`Failed to register inline script: ${res.status} ${text}`);
+  }, tokenOverride, 'json');
+  if (!result.ok) {
+    log.error(`Failed to register inline script: ${result.status} ${result.errorText}`);
     return {
-      customCodeApiUnavailable: isWebflowCustomCodeApiUnavailable(res.status, text),
-      error: `Failed to register schema script with Webflow (${res.status}: ${text})`,
+      customCodeApiUnavailable: isWebflowCustomCodeApiUnavailable(result.status, result.errorText),
+      error: `Failed to register schema script with Webflow (${result.status}: ${result.errorText})`,
     };
   }
-  return { data: await res.json() as RegisteredScript };
+  return { data: result.data };
 }
 
 async function listRegisteredScripts(siteId: string, tokenOverride?: string): Promise<RegisteredScript[]> {
-  const res = await webflowFetch(`/sites/${siteId}/registered_scripts`, {}, tokenOverride);
-  if (!res.ok) return [];
-  const data = await res.json() as { registeredScripts?: RegisteredScript[] };
-  return data.registeredScripts || [];
+  const result = await webflowJson<{ registeredScripts?: RegisteredScript[] }>(`/sites/${siteId}/registered_scripts`, {}, tokenOverride);
+  return result.ok ? result.data.registeredScripts || [] : [];
 }
 
 async function getPageCustomCode(pageId: string, tokenOverride?: string): Promise<PageCustomCodeBlock[]> {
-  const res = await webflowFetch(`/pages/${pageId}/custom_code`, {}, tokenOverride);
-  if (!res.ok) return [];
-  const data = await res.json() as { scripts?: PageCustomCodeBlock[] };
-  return data.scripts || [];
+  const result = await webflowJson<{ scripts?: PageCustomCodeBlock[] }>(`/pages/${pageId}/custom_code`, {}, tokenOverride);
+  return result.ok ? result.data.scripts || [] : [];
 }
 
 async function upsertPageCustomCode(
@@ -226,16 +204,15 @@ async function upsertPageCustomCode(
   scripts: PageCustomCodeBlock[],
   tokenOverride?: string,
 ): Promise<WebflowCustomCodeWriteResult> {
-  const res = await webflowFetch(`/pages/${pageId}/custom_code`, {
+  const result = await webflowMutation(`/pages/${pageId}/custom_code`, {
     method: 'PUT',
     body: JSON.stringify({ scripts }),
   }, tokenOverride);
-  if (!res.ok) {
-    const text = await res.text();
-    log.error(`Failed to upsert page custom code: ${res.status} ${text}`);
+  if (!result.ok) {
+    log.error(`Failed to upsert page custom code: ${result.status} ${result.errorText}`);
     return {
-      customCodeApiUnavailable: isWebflowCustomCodeApiUnavailable(res.status, text),
-      error: `Failed to apply schema to page custom code (${res.status}: ${text})`,
+      customCodeApiUnavailable: isWebflowCustomCodeApiUnavailable(result.status, result.errorText),
+      error: `Failed to apply schema to page custom code (${result.status}: ${result.errorText})`,
     };
   }
   return {};
@@ -490,17 +467,16 @@ export async function listSites(
   const token = tokenOverride || getToken();
   if (!token) return [];
 
-  const res = await webflowFetch('/sites', {}, token);
-  if (!res.ok) return [];
-  const data = await res.json() as {
+  const result = await webflowJson<{
     sites?: Array<{
       id: string;
       displayName?: string;
       shortName: string;
       locales?: { primary?: { tag?: string } };
     }>;
-  };
-  return (data.sites || []).map((s) => ({
+  }>('/sites', {}, token);
+  if (!result.ok) return [];
+  return (result.data.sites || []).map((s) => ({
     id: s.id,
     displayName: s.displayName || s.shortName,
     shortName: s.shortName,
