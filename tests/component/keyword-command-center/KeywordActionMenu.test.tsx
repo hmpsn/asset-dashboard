@@ -104,6 +104,30 @@ describe('KeywordActionMenu', () => {
     expect(screen.queryByRole('button', { name: /delete permanently/i })).not.toBeInTheDocument();
   });
 
+  it('a strategy-owned MANUAL row hides Delete (strategy provenance must be retired)', () => {
+    const row = makeRow({
+      tracking: {
+        status: TRACKED_KEYWORD_STATUS.ACTIVE,
+        source: TRACKED_KEYWORD_SOURCE.MANUAL,
+        pinned: false,
+        strategyOwned: true,
+      },
+      nextActions: TRACKED_ACTIONS,
+    });
+    render(<KeywordActionMenu row={row} onAction={vi.fn()} onDeleteHard={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: /delete permanently/i })).not.toBeInTheDocument();
+  });
+
+  it('an approved-feedback MANUAL row hides Delete (strategy feedback provenance must be retired)', () => {
+    const row = makeRow({
+      tracking: { status: TRACKED_KEYWORD_STATUS.ACTIVE, source: TRACKED_KEYWORD_SOURCE.MANUAL, pinned: false },
+      feedback: { status: 'approved', source: 'command_center' },
+      nextActions: TRACKED_ACTIONS,
+    });
+    render(<KeywordActionMenu row={row} onAction={vi.fn()} onDeleteHard={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: /delete permanently/i })).not.toBeInTheDocument();
+  });
+
   it('clicking a lifecycle action fires onAction with that action type', () => {
     const onAction = vi.fn();
     const row = makeRow({ nextActions: TRACKED_ACTIONS });

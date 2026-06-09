@@ -78,7 +78,7 @@ vi.mock('../../server/middleware.js', async (importOriginal) => {
 // ─── Imports (after vi.mock calls) ────────────────────────────────────────────
 
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
-import { getTrackedKeywords } from '../../server/rank-tracking.js';
+import { getTrackedKeywords, storeRankSnapshot } from '../../server/rank-tracking.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
 import db from '../../server/db/index.js';
 
@@ -161,6 +161,10 @@ beforeEach(() => {
   // Reset admin-tracked keywords between tests for clean state
   db.prepare('DELETE FROM rank_tracking_config WHERE workspace_id = ?').run(wsId);
   db.prepare('DELETE FROM rank_tracking_config WHERE workspace_id = ?').run(wsIdB);
+  db.prepare('DELETE FROM tracked_keywords WHERE workspace_id = ?').run(wsId);
+  db.prepare('DELETE FROM tracked_keywords WHERE workspace_id = ?').run(wsIdB);
+  db.prepare('DELETE FROM rank_snapshots WHERE workspace_id = ?').run(wsId);
+  db.prepare('DELETE FROM rank_snapshots WHERE workspace_id = ?').run(wsIdB);
   db.prepare('DELETE FROM activity_log WHERE workspace_id = ?').run(wsId);
   db.prepare('DELETE FROM activity_log WHERE workspace_id = ?').run(wsIdB);
 });
@@ -168,6 +172,10 @@ beforeEach(() => {
 afterAll(async () => {
   db.prepare('DELETE FROM rank_tracking_config WHERE workspace_id = ?').run(wsId);
   db.prepare('DELETE FROM rank_tracking_config WHERE workspace_id = ?').run(wsIdB);
+  db.prepare('DELETE FROM tracked_keywords WHERE workspace_id = ?').run(wsId);
+  db.prepare('DELETE FROM tracked_keywords WHERE workspace_id = ?').run(wsIdB);
+  db.prepare('DELETE FROM rank_snapshots WHERE workspace_id = ?').run(wsId);
+  db.prepare('DELETE FROM rank_snapshots WHERE workspace_id = ?').run(wsIdB);
   deleteWorkspace(wsId);
   deleteWorkspace(wsIdB);
   await stopTestServer();
@@ -245,6 +253,19 @@ describe('Admin keyword CRUD — full lifecycle', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(Array.isArray(body)).toBe(true);
+  });
+
+  it('KCC hard-delete route handles keywords containing a percent sign', async () => {
+    await postJson(kwUrl(wsId), { query: '100% growth' });
+
+    const res = await del(
+      `/api/webflow/keyword-command-center/${wsId}/keywords/${encodeURIComponent('100% growth')}`,
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as { ok: boolean; keyword: string };
+    expect(body.ok).toBe(true);
+    expect(body.keyword).toBe('100 growth');
   });
 
   it('POST with pinned:true adds keyword already pinned', async () => {
@@ -505,6 +526,31 @@ describe('GET /api/rank-tracking/:workspaceId/history — edge cases', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(Array.isArray(body)).toBe(true);
+  });
+
+  it('repeated ?query= filters preserve keywords containing commas', async () => {
+    storeRankSnapshot(wsId, '2026-06-01', [
+      { query: 'dentist, chicago', position: 3.2, clicks: 12, impressions: 100, ctr: 0.12 },
+      { query: 'orthodontist chicago', position: 8.4, clicks: 5, impressions: 60, ctr: 0.0833 },
+    ]);
+
+    const res = await api(
+      `/api/rank-tracking/${wsId}/history?query=${encodeURIComponent('dentist, chicago')}&query=${encodeURIComponent('orthodontist chicago')}`,
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as Array<{ date: string; positions: Record<string, number> }>;
+    expect(body).toEqual([
+      {
+        date: '2026-06-01',
+        positions: {
+          'dentist, chicago': 3.2,
+          'orthodontist chicago': 8.4,
+        },
+      },
+    ]);
+    expect(body[0].positions).not.toHaveProperty('dentist');
+    expect(body[0].positions).not.toHaveProperty('chicago');
   });
 });
 

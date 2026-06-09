@@ -15,12 +15,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { listActivity } from '../../server/activity-log.js';
 import { setBroadcast } from '../../server/broadcast.js';
+import db from '../../server/db/index.js';
 import {
   applyKeywordCommandCenterAction,
   deleteKeywordHard,
   isHardDeleteEligible,
 } from '../../server/keyword-command-center.js';
-import { addTrackedKeyword, getTrackedKeywords, updateTrackedKeywords } from '../../server/rank-tracking.js';
+import {
+  addTrackedKeyword,
+  getLatestSnapshotRanks,
+  getRankHistory,
+  getTrackedKeywords,
+  storeRankSnapshot,
+  updateTrackedKeywords,
+} from '../../server/rank-tracking.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { KEYWORD_COMMAND_CENTER_ACTIONS } from '../../shared/types/keyword-command-center.js';
 import { TRACKED_KEYWORD_SOURCE, TRACKED_KEYWORD_STATUS } from '../../shared/types/rank-tracking.js';
@@ -46,6 +54,13 @@ describe('isHardDeleteEligible', () => {
   it('a sourceGapKey provenance is NOT eligible', () => {
     expect(isHardDeleteEligible({ query: 'x', pinned: false, addedAt: 'now', source: TRACKED_KEYWORD_SOURCE.MANUAL, sourceGapKey: 'gap:x' })).toBe(false);
   });
+  it('strategy-owned manual provenance is NOT eligible', () => {
+    expect(isHardDeleteEligible({ query: 'x', pinned: false, addedAt: 'now', source: TRACKED_KEYWORD_SOURCE.MANUAL, strategyOwned: true })).toBe(false);
+  });
+  it('approved/requested feedback provenance is NOT eligible', () => {
+    const manual = { query: 'x', pinned: false, addedAt: 'now', source: TRACKED_KEYWORD_SOURCE.MANUAL };
+    expect(isHardDeleteEligible(manual, { hasStrategyFeedbackProvenance: true })).toBe(false);
+  });
   it('undefined existing is NOT eligible', () => {
     expect(isHardDeleteEligible(undefined)).toBe(false);
   });
@@ -68,13 +83,19 @@ describe('deleteKeywordHard', () => {
     const ws = createWorkspace('Delete Manual');
     cleanup.add(ws.id);
     addTrackedKeyword(ws.id, 'manual kw', { source: TRACKED_KEYWORD_SOURCE.MANUAL });
+    storeRankSnapshot(ws.id, '2026-06-01', [
+      { query: 'manual kw', position: 4, clicks: 8, impressions: 80, ctr: 0.1 },
+      { query: 'kept kw', position: 9, clicks: 3, impressions: 30, ctr: 0.1 },
+    ]);
     const before = listActivity(ws.id).length;
     wsBroadcast.mockClear();
+    expect(getLatestSnapshotRanks(ws.id).map(rank => rank.query)).toEqual(expect.arrayContaining(['manual kw', 'kept kw']));
 
     const result = deleteKeywordHard(ws.id, 'manual kw');
 
     expect(result.ok).toBe(true);
     expect(present(ws.id, 'manual kw')).toBe(false);
+    expect(getLatestSnapshotRanks(ws.id).map(rank => rank.query)).toEqual(['kept kw']);
     const deletedBroadcasts = wsBroadcast.mock.calls.filter(
       c => c[1] === WS_EVENTS.RANK_TRACKING_UPDATED && (c[2] as { action?: string })?.action === 'deleted',
     );
@@ -101,6 +122,31 @@ describe('deleteKeywordHard', () => {
 
     expect(() => deleteKeywordHard(ws.id, 'gap kw')).toThrow();
     expect(present(ws.id, 'gap kw')).toBe(true);
+  });
+
+  it('strategyOwned manual provenance → throws without force, row STILL present', () => {
+    const ws = createWorkspace('Delete Strategy Owned');
+    cleanup.add(ws.id);
+    addTrackedKeyword(ws.id, 'strategy owned manual', { source: TRACKED_KEYWORD_SOURCE.MANUAL });
+    updateTrackedKeywords(ws.id, keywords => keywords.map(keyword =>
+      keyword.query === 'strategy owned manual' ? { ...keyword, strategyOwned: true } : keyword,
+    ));
+
+    expect(() => deleteKeywordHard(ws.id, 'strategy owned manual')).toThrow();
+    expect(present(ws.id, 'strategy owned manual')).toBe(true);
+  });
+
+  it('approved KCC feedback provenance → throws without force, row STILL present', () => {
+    const ws = createWorkspace('Delete Feedback Provenance');
+    cleanup.add(ws.id);
+    addTrackedKeyword(ws.id, 'approved manual', { source: TRACKED_KEYWORD_SOURCE.MANUAL });
+    applyKeywordCommandCenterAction(ws.id, {
+      action: KEYWORD_COMMAND_CENTER_ACTIONS.ADD_TO_STRATEGY,
+      keyword: 'approved manual',
+    });
+
+    expect(() => deleteKeywordHard(ws.id, 'approved manual')).toThrow();
+    expect(present(ws.id, 'approved manual')).toBe(true);
   });
 
   it('pinned → throws without force', () => {
@@ -144,5 +190,52 @@ describe('deleteKeywordHard', () => {
       deleteKeywordHard(ws.id, 'lifecycle kw');
       expect(present(ws.id, 'lifecycle kw')).toBe(false);
     });
+  });
+
+  it('hard delete preserves an empty latest snapshot date instead of rolling latest ranks back', () => {
+    const ws = createWorkspace('Delete Snapshot Preserve');
+    cleanup.add(ws.id);
+    addTrackedKeyword(ws.id, 'delete me', { source: TRACKED_KEYWORD_SOURCE.MANUAL });
+    storeRankSnapshot(ws.id, '2026-06-01', [
+      { query: 'keep me', position: 2, clicks: 10, impressions: 100, ctr: 10 },
+    ]);
+    storeRankSnapshot(ws.id, '2026-06-02', [
+      { query: 'delete me', position: 8, clicks: 1, impressions: 20, ctr: 5 },
+    ]);
+
+    deleteKeywordHard(ws.id, 'delete me');
+
+    expect(getLatestSnapshotRanks(ws.id)).toEqual([]);
+  });
+
+  it('snapshot writes collapse canonical duplicate queries so latest and history agree', () => {
+    const ws = createWorkspace('Snapshot Dedupe');
+    cleanup.add(ws.id);
+    addTrackedKeyword(ws.id, 'Emergency Dentist - Near-Me', { source: TRACKED_KEYWORD_SOURCE.MANUAL });
+
+    storeRankSnapshot(ws.id, '2026-06-01', [
+      { query: 'Emergency Dentist - Near-Me', position: 9, clicks: 1, impressions: 20, ctr: 5 },
+      { query: 'emergency dentist near me', position: 4, clicks: 3, impressions: 30, ctr: 10 },
+    ]);
+
+    expect(getLatestSnapshotRanks(ws.id).map(rank => [rank.query, rank.position])).toEqual([
+      ['Emergency Dentist - Near-Me', 4],
+    ]);
+    expect(getRankHistory(ws.id)).toEqual([
+      { date: '2026-06-01', positions: { 'Emergency Dentist - Near-Me': 4 } },
+    ]);
+  });
+
+  it('legacy partial snapshot rows keep positions with missing metrics defaulted to zero', () => {
+    const ws = createWorkspace('Snapshot Partial Legacy');
+    cleanup.add(ws.id);
+    db.prepare(`
+      INSERT INTO rank_snapshots (workspace_id, date, queries)
+      VALUES (?, ?, ?)
+    `).run(ws.id, '2026-06-01', JSON.stringify([{ query: 'legacy kw', position: 6 }]));
+
+    expect(getLatestSnapshotRanks(ws.id)).toEqual([
+      { query: 'legacy kw', position: 6, clicks: 0, impressions: 0, ctr: 0, change: undefined },
+    ]);
   });
 });

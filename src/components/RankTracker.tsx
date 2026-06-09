@@ -11,6 +11,7 @@ import { KeywordTable } from './shared/RankTable';
 import { cn } from '../lib/utils';
 import { chartGridColor, chartAxisColor, CHART_SERIES_COLORS, positionColor } from './ui/constants';
 import { queryKeys } from '../lib/queryKeys';
+import { rankTrackingHistoryPath } from '../lib/keywordTracking';
 import { adminPath } from '../routes';
 import { formatDateShort } from '../utils/formatDates';
 import type { LatestRank } from '../../shared/types/rank-tracking';
@@ -197,7 +198,7 @@ export function RankTracker({ workspaceId, hasGsc, onNavigate }: Props) {
     ),
     queryFn: async () => {
       if (!expandedQuery) return [] as HistoryPoint[];
-      return get<HistoryPoint[]>(`/api/rank-tracking/${workspaceId}/history?queries=${encodeURIComponent(expandedQuery)}`);
+      return get<HistoryPoint[]>(rankTrackingHistoryPath(workspaceId, [expandedQuery]));
     },
     enabled: !!workspaceId && !!expandedQuery,
     staleTime: 60 * 1000,
@@ -205,7 +206,7 @@ export function RankTracker({ workspaceId, hasGsc, onNavigate }: Props) {
 
   const trendsQuery = useQuery({
     queryKey: queryKeys.admin.rankTrackingHistoryQueries(workspaceId, pinnedKeywords),
-    queryFn: () => get<HistoryPoint[]>(`/api/rank-tracking/${workspaceId}/history?queries=${encodeURIComponent(pinnedKeywords.join(','))}`),
+    queryFn: () => get<HistoryPoint[]>(rankTrackingHistoryPath(workspaceId, pinnedKeywords)),
     enabled: !!workspaceId && showTrends && pinnedKeywords.length > 0,
     staleTime: 60 * 1000,
   });

@@ -54,7 +54,8 @@ function hubToneClass(action: KeywordCommandCenterNextAction): string {
 /**
  * Client-side hard-delete eligibility — MIRRORS the server `isHardDeleteEligible`:
  * MANUAL, unpinned, with NO strategy/client provenance (no sourceGapKey, not
- * CLIENT_REQUESTED). Ineligible rows hide Delete entirely (retire is the only remove).
+ * CLIENT_REQUESTED, not strategy-owned, no approved/requested feedback). Ineligible
+ * rows hide Delete entirely (retire is the only remove).
  */
 export function canHardDelete(row: KeywordCommandCenterRow): boolean {
   const t = row.tracking;
@@ -62,6 +63,8 @@ export function canHardDelete(row: KeywordCommandCenterRow): boolean {
   if (t.pinned) return false;
   if (t.source === TRACKED_KEYWORD_SOURCE.CLIENT_REQUESTED) return false;
   if (t.sourceGapKey) return false;
+  if (t.strategyOwned === true) return false;
+  if (row.feedback?.status === 'approved' || row.feedback?.status === 'requested') return false;
   return t.source === TRACKED_KEYWORD_SOURCE.MANUAL;
 }
 

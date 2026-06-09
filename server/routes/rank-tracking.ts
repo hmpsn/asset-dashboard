@@ -40,6 +40,25 @@ function sameKeyword(a: string, b: string): boolean {
   return normalizeKeywordQuery(a) === normalizeKeywordQuery(b);
 }
 
+function collectQueryParamValues(rawValue: unknown): string[] {
+  if (typeof rawValue === 'string') return [rawValue];
+  if (Array.isArray(rawValue)) return rawValue.flatMap(collectQueryParamValues);
+  return [];
+}
+
+function parseHistoryQueryFilters(query: Record<string, unknown>): string[] | undefined {
+  const repeatedQueries = collectQueryParamValues(query.query)
+    .map(value => value.trim())
+    .filter(Boolean);
+  if (repeatedQueries.length > 0) return repeatedQueries;
+
+  const legacyQueries = collectQueryParamValues(query.queries)
+    .flatMap(value => value.split(','))
+    .map(value => value.trim())
+    .filter(Boolean);
+  return legacyQueries.length > 0 ? legacyQueries : undefined;
+}
+
 // --- Rank Tracking ---
 // Get tracked keywords for a workspace
 router.get('/api/rank-tracking/:workspaceId/keywords', requireWorkspaceAccess('workspaceId'), (req, res) => {
@@ -118,7 +137,7 @@ router.post('/api/rank-tracking/:workspaceId/snapshot', requireWorkspaceAccess('
 router.get('/api/rank-tracking/:workspaceId/history', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const limit = parseHistoryLimit(req.query.limit);
   if (limit == null) return res.status(400).json({ error: 'limit must be a positive integer' });
-  const queries = req.query.queries ? (req.query.queries as string).split(',') : undefined;
+  const queries = parseHistoryQueryFilters(req.query);
   res.json(getRankHistory(req.params.workspaceId, queries, limit));
 });
 
@@ -134,7 +153,7 @@ router.get('/api/rank-tracking/:workspaceId/latest', requireWorkspaceAccess('wor
 router.get('/api/public/rank-tracking/:workspaceId/history', requireAuthenticatedClientPortalAuth(), (req, res) => {
   const limit = parseHistoryLimit(req.query.limit);
   if (limit == null) return res.status(400).json({ error: 'limit must be a positive integer' });
-  const queries = req.query.queries ? (req.query.queries as string).split(',') : undefined;
+  const queries = parseHistoryQueryFilters(req.query);
   res.json(getRankHistory(req.params.workspaceId, queries, limit));
 });
 

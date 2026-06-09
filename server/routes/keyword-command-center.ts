@@ -143,7 +143,7 @@ router.post('/api/webflow/keyword-command-center/:workspaceId/actions', requireW
 // without ?force=true → 403; retire is the soft alternative. Drops rank history too.
 router.delete('/api/webflow/keyword-command-center/:workspaceId/keywords/:keyword', requireWorkspaceAccess('workspaceId'), (req, res, next) => {
   try {
-    const keyword = decodeURIComponent(req.params.keyword);
+    const keyword = req.params.keyword;
     const force = req.query.force === 'true';
     const result = deleteKeywordHard(req.params.workspaceId, keyword, { force });
     res.json(result);
