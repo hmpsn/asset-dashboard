@@ -46,6 +46,7 @@ vi.mock('../../server/middleware.js', async (importOriginal) => {
 });
 
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
 import { getTrackedKeywords } from '../../server/rank-tracking.js';
 import db from '../../server/db/index.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
@@ -55,6 +56,10 @@ let baseUrl = '';
 let server: http.Server | undefined;
 let wsId = '';
 let wsIdB = '';
+let clientUserId = '';
+let clientUserIdB = '';
+let clientToken = '';
+let clientTokenB = '';
 
 async function startTestServer(): Promise<void> {
   delete process.env.APP_PASSWORD;
@@ -74,8 +79,23 @@ async function stopTestServer(): Promise<void> {
   server = undefined;
 }
 
-function api(path: string, opts?: RequestInit): Promise<Response> {
-  return fetch(`${baseUrl}${path}`, opts);
+function tokenForPublicTrackedPath(path: string): string | null {
+  const workspaceId = path.match(/^\/api\/public\/tracked-keywords\/([^/?]+)/)?.[1];
+  if (workspaceId === wsId) return clientToken;
+  if (workspaceId === wsIdB) return clientTokenB;
+  return null;
+}
+
+function api(path: string, opts: RequestInit = {}): Promise<Response> {
+  const headers: Record<string, string> = {
+    ...((opts.headers as Record<string, string> | undefined) ?? {}),
+  };
+  const token = tokenForPublicTrackedPath(path);
+  if (token && !headers.Cookie) {
+    const workspaceId = path.match(/^\/api\/public\/tracked-keywords\/([^/?]+)/)?.[1] ?? wsId;
+    headers.Cookie = `client_user_token_${workspaceId}=${token}`;
+  }
+  return fetch(`${baseUrl}${path}`, { ...opts, headers });
 }
 
 function postJson(path: string, body: unknown): Promise<Response> {
@@ -116,6 +136,12 @@ beforeAll(async () => {
   wsId = ws.id;
   const wsB = createWorkspace('TK Lifecycle WS B');
   wsIdB = wsB.id;
+  const clientUser = await createClientUser('tk-lifecycle-a@test.local', 'ClientPass1!', 'TK Lifecycle A', wsId);
+  clientUserId = clientUser.id;
+  clientToken = signClientToken(clientUser);
+  const clientUserB = await createClientUser('tk-lifecycle-b@test.local', 'ClientPass1!', 'TK Lifecycle B', wsIdB);
+  clientUserIdB = clientUserB.id;
+  clientTokenB = signClientToken(clientUserB);
 });
 
 beforeEach(() => {
@@ -128,6 +154,8 @@ beforeEach(() => {
 afterAll(async () => {
   cleanupWorkspaceData(wsId);
   cleanupWorkspaceData(wsIdB);
+  if (clientUserId) deleteClientUser(clientUserId, wsId);
+  if (clientUserIdB) deleteClientUser(clientUserIdB, wsIdB);
   deleteWorkspace(wsId);
   deleteWorkspace(wsIdB);
   await stopTestServer();

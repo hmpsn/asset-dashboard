@@ -55,6 +55,8 @@ import type { OpportunityScore, RecommendationSet } from '../../shared/types/rec
 // rather than createTestContext(), because createTestContext() spawns a subprocess
 // that cannot share the vi.mock state.
 
+import { withPublicTestAuth } from './public-auth-test-helpers.js';
+
 let baseUrl = '';
 let server: http.Server | undefined;
 
@@ -77,7 +79,7 @@ async function stopTestServer(): Promise<void> {
 }
 
 function api(path: string, opts?: RequestInit): Promise<Response> {
-  return fetch(`${baseUrl}${path}`, opts);
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path, opts));
 }
 
 function patchJson(path: string, body: unknown): Promise<Response> {

@@ -15,7 +15,7 @@ import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 import type { ClientAction } from '../../shared/types/client-actions.js';
 
-const ctx = createTestContext(13697);
+const ctx = createTestContext(13697, { autoPublicAuth: true });
 const { api, postJson, patchJson } = ctx;
 
 let wsId = '';

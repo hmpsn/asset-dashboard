@@ -16,7 +16,7 @@ import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { saveRecommendations, loadRecommendations } from '../../server/recommendations.js';
 import type { Recommendation, RecommendationSet } from '../../shared/types/recommendations.js';
 
-const ctx = createTestContext(13568); // port-ok: 13201-13567 already allocated in integration suite
+const ctx = createTestContext(13568, { autoPublicAuth: true }); // port-ok: 13201-13567 already allocated in integration suite
 const { api, patchJson, del } = ctx;
 
 let testWsId = '';

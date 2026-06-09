@@ -5,6 +5,9 @@ let freeTierWorkspaceId = '';
 let approvalBatchId = '';
 let approvalItemId = '';
 let schemaSiteId = '';
+let clientUserId = '';
+let clientUserEmail = '';
+const clientUserPassword = 'ClientWorkflowSmoke1!';
 
 async function gotoClientRouteWithFallback(
   page: import('@playwright/test').Page,
@@ -60,6 +63,19 @@ test.describe('Client workflow smoke pack', () => {
         billingMode: 'platform',
       },
     });
+
+    clientUserEmail = `client-workflow-smoke-${Date.now()}@test.local`;
+    const clientUserRes = await request.post(`/api/workspaces/${workspaceId}/client-users`, {
+      data: {
+        email: clientUserEmail,
+        password: clientUserPassword,
+        name: 'E2E Client Workflow Client',
+        role: 'client_member',
+      },
+    });
+    expect(clientUserRes.ok()).toBe(true);
+    const clientUser = await clientUserRes.json() as { id: string };
+    clientUserId = clientUser.id;
   });
 
   test.afterAll(async ({ request }) => {
@@ -68,6 +84,9 @@ test.describe('Client workflow smoke pack', () => {
     }
     if (schemaSiteId) {
       await request.delete(`/api/webflow/schema-plan/${schemaSiteId}`).catch(() => undefined);
+    }
+    if (workspaceId && clientUserId) {
+      await request.delete(`/api/workspaces/${workspaceId}/client-users/${clientUserId}`).catch(() => undefined);
     }
     if (workspaceId) {
       await request.delete(`/api/workspaces/${workspaceId}`);
@@ -207,6 +226,14 @@ test.describe('Client workflow smoke pack', () => {
   });
 
   test('workflow smoke: schema + content publish visibility stays coherent across public reads', async ({ request }) => {
+    const loginRes = await request.post(`/api/public/client-login/${workspaceId}`, {
+      data: {
+        email: clientUserEmail,
+        password: clientUserPassword,
+      },
+    });
+    expect(loginRes.ok()).toBe(true);
+
     const requestRes = await request.post(`/api/public/content-request/${workspaceId}`, {
       data: {
         topic: `Smoke Publish Topic ${Date.now()}`,

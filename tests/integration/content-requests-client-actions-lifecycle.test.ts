@@ -43,6 +43,8 @@ vi.mock('../../server/playbooks.js', () => ({
   enqueuePlaybook: vi.fn(),
 }));
 
+import { withPublicTestAuth } from './public-auth-test-helpers.js';
+
 let server: http.Server | null = null;
 let baseUrl = '';
 
@@ -57,7 +59,7 @@ async function startTestServer(): Promise<void> {
 }
 
 async function api(path: string, opts?: RequestInit): Promise<Response> {
-  return fetch(`${baseUrl}${path}`, opts);
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path, opts));
 }
 
 async function postJson(path: string, body: unknown): Promise<Response> {
@@ -715,7 +717,9 @@ describe('GET /api/public/client-actions/:workspaceId — public list', () => {
   it('returns 401 for workspace with a clientPassword when no auth provided', async () => {
     const { workspaceId, cleanup } = seedWorkspace({ clientPassword: 'supersecret' });
     try {
-      const res = await api(`/api/public/client-actions/${workspaceId}`);
+      const res = await api(`/api/public/client-actions/${workspaceId}`, {
+        headers: { 'x-no-auto-public-auth': 'true' },
+      });
       expect(res.status).toBe(401);
     } finally {
       cleanup();

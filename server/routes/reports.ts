@@ -4,6 +4,7 @@
 import { Router, type RequestHandler } from 'express';
 
 import { requireWorkspaceAccess, requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery, requestUserCanAccessWorkspace, sendWorkspaceAccessDenied } from '../auth.js';
+import { requireAuthenticatedClientPortalAuth } from '../middleware.js';
 import { validate, z } from '../middleware/validate.js';
 const router = Router();
 
@@ -43,6 +44,10 @@ const log = createLogger('reports');
 
 function getWorkspaceForSite(siteId: string) {
   return listWorkspaces().find(w => w.webflowSiteId === siteId);
+}
+
+function isClientPortalDisabled(ws: { clientPortalEnabled?: boolean } | undefined): boolean {
+  return !!ws && ws.clientPortalEnabled != null && !ws.clientPortalEnabled;
 }
 
 function getEffectiveSnapshotForRead(snapshot: AuditSnapshot): AuditSnapshot {
@@ -321,6 +326,7 @@ router.get('/api/public/report/:id', (req, res) => {
 // Public: Latest audit for a site (client dashboard)
 router.get('/api/public/client/:siteId', (req, res) => {
   const ws = getWorkspaceForSite(req.params.siteId);
+  if (isClientPortalDisabled(ws)) return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
   const latest = getLatestEffectiveSnapshot(req.params.siteId, ws?.auditSuppressions || []);
   if (!latest) return res.status(404).json({ error: 'No audits found for this site' });
   const history = listEffectiveSnapshotSummaries(req.params.siteId, ws?.auditSuppressions || []);
@@ -330,6 +336,7 @@ router.get('/api/public/client/:siteId', (req, res) => {
 // Audit report HTML page (renamed from /client/ to avoid conflict with SPA client dashboard)
 router.get('/report/audit/:siteId', (req, res) => {
   const ws = getWorkspaceForSite(req.params.siteId);
+  if (isClientPortalDisabled(ws)) return res.status(403).send('<h1>Client portal is disabled for this workspace</h1>');
   const latest = getLatestEffectiveSnapshot(req.params.siteId, ws?.auditSuppressions || []);
   if (!latest) return res.status(404).send('<h1>No audits found</h1>');
   res.type('html').send(renderReportHTML(latest));
@@ -357,7 +364,7 @@ router.get('/report/monthly/:id', (req, res) => {
 });
 
 // Public: Unified list of all shareable reports for a workspace (audit snapshots + monthly reports)
-router.get('/api/public/reports/:workspaceId', (req, res) => {
+router.get('/api/public/reports/:workspaceId', requireAuthenticatedClientPortalAuth(), (req, res) => {
   const ws = listWorkspaces().find(w => w.id === req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 

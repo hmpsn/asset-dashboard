@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { requireWorkspaceAccess } from '../auth.js';
 import { validate, z } from '../middleware/validate.js';
-import { requireClientPortalAuth, getClientActor } from '../middleware.js';
+import { requireAuthenticatedClientPortalAuth, requireClientPortalAuth, getClientActor } from '../middleware.js';
 import {
   listClientActions,
 } from '../client-actions.js';
@@ -81,7 +81,7 @@ router.get('/api/public/client-actions/:workspaceId', requireClientPortalAuth(),
   res.json(toClientInboxItems(listClientActions(req.params.workspaceId)));
 });
 
-router.patch('/api/public/client-actions/:workspaceId/:actionId/respond', requireClientPortalAuth(), validate(publicRespondSchema), (req, res) => {
+router.patch('/api/public/client-actions/:workspaceId/:actionId/respond', requireAuthenticatedClientPortalAuth(), validate(publicRespondSchema), (req, res) => {
   const actor = getClientActor(req, req.params.workspaceId);
   try {
     const updated = respondToPublicClientAction(req.params.workspaceId, req.params.actionId, req.body, actor);

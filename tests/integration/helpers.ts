@@ -6,6 +6,7 @@
  * on different ports.
  */
 import { spawn, type ChildProcess } from 'child_process';
+import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { ensureIsolatedTestDataDir } from '../test-data-dir.js';
@@ -35,9 +36,11 @@ export interface TestContext {
  * Create an isolated test context bound to a specific port.
  * Each test file should call this with a unique port number.
  */
-export function createTestContext(port: number, options?: { env?: Record<string, string>; startupTimeoutMs?: number }): TestContext {
+export function createTestContext(port: number, options?: { env?: Record<string, string>; startupTimeoutMs?: number; autoPublicAuth?: boolean }): TestContext {
   const BASE = `http://localhost:${port}`;
   const dataDir = process.env.DATA_DIR ?? ensureIsolatedTestDataDir();
+  const sessionSecret = options?.env?.SESSION_SECRET ?? process.env.SESSION_SECRET ?? 'asset-dashboard-test-session-secret';
+  const testAdminToken = crypto.createHmac('sha256', sessionSecret).update('admin').digest('hex');
   let proc: ChildProcess | null = null;
   const cookieJar: Record<string, string> = {};
   let authToken = '';
@@ -82,6 +85,7 @@ export function createTestContext(port: number, options?: { env?: Record<string,
         // gate ACTIVE (e.g. to assert 401 on unauthenticated admin routes) can pass
         // options.env.APP_PASSWORD to override this default.
         APP_PASSWORD: options?.env?.APP_PASSWORD ?? '',
+        SESSION_SECRET: sessionSecret,
         DATA_DIR: dataDir,
         // startServer watches stdout for the "running on" readiness line. The
         // child stdout is not echoed, so this keeps readiness detection working
@@ -144,6 +148,20 @@ export function createTestContext(port: number, options?: { env?: Record<string,
     const headers: Record<string, string> = {
       ...(opts?.headers as Record<string, string> || {}),
     };
+    const skipAutoPublicAuth = headers['x-no-auto-public-auth'] === 'true';
+    delete headers['x-no-auto-public-auth'];
+    if (
+      options?.autoPublicAuth
+      && !skipAutoPublicAuth
+      && urlPath.startsWith('/api/public/')
+      && !headers['x-auth-token']
+      && !headers['X-Auth-Token']
+      && !headers.Authorization
+      && !headers.authorization
+      && !headers.Cookie
+    ) {
+      headers['x-auth-token'] = testAdminToken;
+    }
     const cookies = cookieHeader();
     if (cookies) {
       headers['Cookie'] = cookies;

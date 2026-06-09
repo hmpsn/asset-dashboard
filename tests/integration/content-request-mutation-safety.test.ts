@@ -57,6 +57,8 @@ import { WS_EVENTS } from '../../server/ws-events.js';
 import { createWorkspace, deleteWorkspace, getPageState } from '../../server/workspaces.js';
 import type { GeneratedPost } from '../../shared/types/content.js';
 
+import { withPublicTestAuth } from './public-auth-test-helpers.js';
+
 let baseUrl = '';
 let server: http.Server | undefined;
 let wsAId = '';
@@ -82,7 +84,7 @@ async function stopTestServer(): Promise<void> {
 }
 
 async function api(path: string, opts?: RequestInit): Promise<Response> {
-  return fetch(`${baseUrl}${path}`, opts);
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path, opts));
 }
 
 async function postJson(path: string, body: unknown): Promise<Response> {

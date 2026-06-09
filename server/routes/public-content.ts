@@ -23,7 +23,7 @@ import { sanitizeRichText, sanitizePlainText } from '../html-sanitize.js';
 import { countHtmlWords } from '../content-posts-ai.js';
 import { getPageKeyword, listPageKeywords } from '../page-keywords.js';
 import { assembleStoredKeywordStrategy } from '../keyword-strategy-assembler.js';
-import { getClientActor, requireClientPortalAuth } from '../middleware.js';
+import { getClientActor, requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
 import { getPageTrend, getQueryPageData } from '../search-console.js';
 import { getWorkspace } from '../workspaces.js';
 import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword } from '../rank-tracking.js';
@@ -59,6 +59,7 @@ const log = createLogger('public-content');
 const router = Router();
 const ACTIVITY_COMMENT_PREVIEW_LENGTH = 200;
 type TrackedKeywordActivityType = 'client_keyword_tracked' | 'client_keyword_removed';
+const requirePublicContentWriteAuth = requireAuthenticatedClientPortalAuth('workspaceId');
 
 router.use('/api/public/:resource/:workspaceId', requireClientPortalAuth('workspaceId'));
 
@@ -265,7 +266,7 @@ router.get('/api/public/page-keywords/:workspaceId', (req, res) => {
 });
 
 // --- Public Content Topic Requests (client picks topics from strategy) ---
-router.post('/api/public/content-request/:workspaceId', validate(createContentRequestSchema), (req, res) => {
+router.post('/api/public/content-request/:workspaceId', requirePublicContentWriteAuth, validate(createContentRequestSchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const topic = sanitizeString(req.body.topic, 200);
@@ -309,7 +310,7 @@ router.get('/api/public/content-requests/:workspaceId', (req, res) => {
 });
 
 // Client submits their own topic request
-router.post('/api/public/content-request/:workspaceId/submit', validate(submitContentRequestSchema), (req, res) => {
+router.post('/api/public/content-request/:workspaceId/submit', requirePublicContentWriteAuth, validate(submitContentRequestSchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const topic = sanitizeString(req.body.topic, 200);
@@ -335,7 +336,7 @@ router.post('/api/public/content-request/:workspaceId/submit', validate(submitCo
 });
 
 // Client declines a recommended topic
-router.post('/api/public/content-request/:workspaceId/:id/decline', validate(declineContentRequestSchema), (req, res, next) => {
+router.post('/api/public/content-request/:workspaceId/:id/decline', requirePublicContentWriteAuth, validate(declineContentRequestSchema), (req, res, next) => {
   const reason = sanitizeString(req.body.reason, 1000);
   let updated;
   try {
@@ -356,7 +357,7 @@ router.post('/api/public/content-request/:workspaceId/:id/decline', validate(dec
 });
 
 // Client approves a brief
-router.post('/api/public/content-request/:workspaceId/:id/approve', validate(approveContentRequestSchema), (req, res, next) => {
+router.post('/api/public/content-request/:workspaceId/:id/approve', requirePublicContentWriteAuth, validate(approveContentRequestSchema), (req, res, next) => {
   if (!assertClientReviewRequest(req.params.workspaceId, req.params.id, res)) return;
   let updated;
   try {
@@ -383,7 +384,7 @@ router.post('/api/public/content-request/:workspaceId/:id/approve', validate(app
 });
 
 // Client requests changes on a brief
-router.post('/api/public/content-request/:workspaceId/:id/request-changes', validate(requestChangesSchema), (req, res, next) => {
+router.post('/api/public/content-request/:workspaceId/:id/request-changes', requirePublicContentWriteAuth, validate(requestChangesSchema), (req, res, next) => {
   if (!assertClientReviewRequest(req.params.workspaceId, req.params.id, res)) return;
   const feedback = sanitizeString(req.body.feedback, 2000);
   let updated;
@@ -413,7 +414,7 @@ router.post('/api/public/content-request/:workspaceId/:id/request-changes', vali
 });
 
 // Client upgrades from brief_only to full_post
-router.post('/api/public/content-request/:workspaceId/:id/upgrade', validate(upgradeContentRequestSchema), (req, res, next) => {
+router.post('/api/public/content-request/:workspaceId/:id/upgrade', requirePublicContentWriteAuth, validate(upgradeContentRequestSchema), (req, res, next) => {
   if (!assertUpgradeableBriefRequest(req.params.workspaceId, req.params.id, res)) return;
   let updated;
   try {
@@ -436,7 +437,7 @@ router.post('/api/public/content-request/:workspaceId/:id/upgrade', validate(upg
 });
 
 // Client or team adds a comment
-router.post('/api/public/content-request/:workspaceId/:id/comment', validate(addCommentSchema), (req, res) => {
+router.post('/api/public/content-request/:workspaceId/:id/comment', requirePublicContentWriteAuth, validate(addCommentSchema), (req, res) => {
   const content = sanitizeString(req.body.content, 2000);
   const author = 'client' as const; // public unauthenticated endpoint — always 'client', never trust req.body
   if (!content) return res.status(400).json({ error: 'content is required' });
@@ -457,7 +458,7 @@ router.get('/api/public/work-order/:workspaceId/:orderId/comments', (req, res) =
 // NEVER trust req.body (mirrors the content-request comment route; unauthenticated-shape
 // public endpoint behind the router-level requireClientPortalAuth gate). Rejected with 409
 // once the order is closed (the conversation is over).
-router.post('/api/public/work-order/:workspaceId/:orderId/comment', validate(workOrderCommentSchema), (req, res) => {
+router.post('/api/public/work-order/:workspaceId/:orderId/comment', requirePublicContentWriteAuth, validate(workOrderCommentSchema), (req, res) => {
   const wsId = req.params.workspaceId;
   const orderId = req.params.orderId;
   const content = sanitizeString(req.body.content, 2000);
@@ -550,7 +551,7 @@ router.get('/api/public/content-performance/:workspaceId/:requestId/trend', asyn
 });
 
 // --- Pre-populate content request from audit issues ---
-router.post('/api/public/content-request/:workspaceId/from-audit', validate(fromAuditSchema), async (req, res) => {
+router.post('/api/public/content-request/:workspaceId/from-audit', requirePublicContentWriteAuth, validate(fromAuditSchema), async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
@@ -622,7 +623,7 @@ router.get('/api/public/tracked-keywords/:workspaceId', (req, res) => {
   res.json({ keywords: getTrackedKeywords(ws.id) });
 });
 
-router.post('/api/public/tracked-keywords/:workspaceId', validate(addTrackedKeywordSchema), async (req, res) => {
+router.post('/api/public/tracked-keywords/:workspaceId', requirePublicContentWriteAuth, validate(addTrackedKeywordSchema), async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const keyword = sanitizeString(req.body?.keyword || '').toLowerCase().trim();
@@ -656,7 +657,7 @@ router.post('/api/public/tracked-keywords/:workspaceId', validate(addTrackedKeyw
   }
 });
 
-router.delete('/api/public/tracked-keywords/:workspaceId', validate(removeTrackedKeywordSchema), (req, res) => {
+router.delete('/api/public/tracked-keywords/:workspaceId', requirePublicContentWriteAuth, validate(removeTrackedKeywordSchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const keyword = sanitizeString(req.body?.keyword || '').toLowerCase().trim();
@@ -690,7 +691,7 @@ router.get('/api/public/content-posts/:workspaceId/:postId', (req, res) => {
 });
 
 // Client approves a post — transitions request to 'delivered'
-router.post('/api/public/content-request/:workspaceId/:id/approve-post', validate(approvePostSchema), (req, res, next) => {
+router.post('/api/public/content-request/:workspaceId/:id/approve-post', requirePublicContentWriteAuth, validate(approvePostSchema), (req, res, next) => {
   // Explicit status guard: the state machine allows in_progress → delivered, so we must
   // enforce post_review here to prevent an unauthenticated caller from bypassing review.
   const existing = getContentRequest(req.params.workspaceId, req.params.id);
@@ -723,7 +724,7 @@ router.post('/api/public/content-request/:workspaceId/:id/approve-post', validat
 });
 
 // Client requests changes on a post
-router.post('/api/public/content-request/:workspaceId/:id/request-post-changes', validate(requestPostChangesSchema), (req, res, next) => {
+router.post('/api/public/content-request/:workspaceId/:id/request-post-changes', requirePublicContentWriteAuth, validate(requestPostChangesSchema), (req, res, next) => {
   // Explicit status guard: client_review → changes_requested is a valid state machine
   // transition (brief review phase), so we must enforce post_review here to prevent
   // post-changes feedback being applied to a brief-review request.
@@ -763,7 +764,7 @@ router.post('/api/public/content-request/:workspaceId/:id/request-post-changes',
 // title/metaDescription are plain text; introduction/conclusion/section.content are
 // rich text (TipTap HTML) — both paths are sanitized via the shared allowlist
 // rather than stripped, so client formatting (bold, italic, headings, links) survives.
-router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', validate(clientPostEditSchema), (req, res, next) => {
+router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', requirePublicContentWriteAuth, validate(clientPostEditSchema), (req, res, next) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 

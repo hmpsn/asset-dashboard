@@ -266,6 +266,9 @@ export function createApp(): express.Express {
     const workspaceId = parts[4];
     if (!workspaceId) return next();
     const ws = getWorkspace(workspaceId);
+    if (ws?.clientPortalEnabled != null && !ws.clientPortalEnabled) {
+      return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
+    }
     if (!ws || !ws.clientPassword) return next();
     const adminToken = (req.headers['x-auth-token'] || req.cookies?.auth_token || '') as string;
     if (adminToken && verifyAdminToken(adminToken)) return next();

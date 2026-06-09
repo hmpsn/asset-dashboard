@@ -19,7 +19,7 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { addActivity } from '../activity-log.js';
 import { validate, z } from '../middleware/validate.js';
-import { requireClientPortalAuth } from '../middleware.js';
+import { requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
 import type { ContentMatrix, MatrixCell } from '../../shared/types/content.ts';
 
 const log = createLogger('routes:content-plan-review');
@@ -126,6 +126,7 @@ router.get('/api/public/content-plan/:workspaceId/:matrixId', (req, res) => {
  */
 router.post(
   '/api/public/content-plan/:workspaceId/:matrixId/cells/:cellId/flag',
+  requireAuthenticatedClientPortalAuth('workspaceId'),
   validate(z.object({ comment: z.string().trim().min(1, 'comment is required').max(2000) })),
   (req, res) => {
   const { comment } = req.body;

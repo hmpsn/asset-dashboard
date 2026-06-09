@@ -13,7 +13,7 @@ import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createContentRequest, getContentRequest, updateContentRequest } from '../../server/content-requests.js';
 
-const ctx = createTestContext(13218);
+const ctx = createTestContext(13218, { autoPublicAuth: true });
 const { api, postJson, patchJson, del } = ctx;
 
 let testWsId = '';

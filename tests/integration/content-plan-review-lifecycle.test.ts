@@ -54,6 +54,7 @@ vi.mock('../../server/email.js', () => ({
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createMatrix } from '../../server/content-matrices.js';
 import { createTemplate } from '../../server/content-templates.js';
+import { withPublicTestAuth } from './public-auth-test-helpers.js';
 
 let baseUrl = '';
 let server: http.Server | undefined;
@@ -83,11 +84,11 @@ function getJson(path: string): Promise<Response> {
 }
 
 function postJson(path: string, body?: unknown): Promise<Response> {
-  return fetch(`${baseUrl}${path}`, {
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  }));
 }
 
 // ── Test data ─────────────────────────────────────────────────────────────────
@@ -793,10 +794,8 @@ describe('POST /api/public/content-plan/:workspaceId/:matrixId/cells/:cellId/fla
   });
 
   it('returns 200 ok:true when flagging a review cell', async () => {
-    const res = await fetch(`${baseUrl}/api/public/content-plan/${flagWs}/${matrixId}/cells/${reviewCellId}/flag`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ comment: 'Please update the keyword to be more specific' }),
+    const res = await postJson(`/api/public/content-plan/${flagWs}/${matrixId}/cells/${reviewCellId}/flag`, {
+      comment: 'Please update the keyword to be more specific',
     });
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -823,10 +822,8 @@ describe('POST /api/public/content-plan/:workspaceId/:matrixId/cells/:cellId/fla
     );
 
     broadcastState.calls = [];
-    await fetch(`${baseUrl}/api/public/content-plan/${flagWs}/${mx.id}/cells/${cellId}/flag`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ comment: 'Needs revision' }),
+    await postJson(`/api/public/content-plan/${flagWs}/${mx.id}/cells/${cellId}/flag`, {
+      comment: 'Needs revision',
     });
 
     const broadcast = broadcastState.calls.find(
@@ -840,10 +837,8 @@ describe('POST /api/public/content-plan/:workspaceId/:matrixId/cells/:cellId/fla
   });
 
   it('returns 409 when trying to flag a cell that is not client-visible (planned)', async () => {
-    const res = await fetch(`${baseUrl}/api/public/content-plan/${flagWs}/${matrixId}/cells/${plannedCellId}/flag`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ comment: 'Should not work' }),
+    const res = await postJson(`/api/public/content-plan/${flagWs}/${matrixId}/cells/${plannedCellId}/flag`, {
+      comment: 'Should not work',
     });
     expect(res.status).toBe(409);
     const body = await res.json();
@@ -851,19 +846,13 @@ describe('POST /api/public/content-plan/:workspaceId/:matrixId/cells/:cellId/fla
   });
 
   it('returns 400 when comment is missing', async () => {
-    const res = await fetch(`${baseUrl}/api/public/content-plan/${flagWs}/${matrixId}/cells/${reviewCellId}/flag`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    });
+    const res = await postJson(`/api/public/content-plan/${flagWs}/${matrixId}/cells/${reviewCellId}/flag`, {});
     expect(res.status).toBe(400);
   });
 
   it('returns 404 for a nonexistent cellId', async () => {
-    const res = await fetch(`${baseUrl}/api/public/content-plan/${flagWs}/${matrixId}/cells/cell_nonexistent_flag_xyz/flag`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ comment: 'Ghost cell comment' }),
+    const res = await postJson(`/api/public/content-plan/${flagWs}/${matrixId}/cells/cell_nonexistent_flag_xyz/flag`, {
+      comment: 'Ghost cell comment',
     });
     expect(res.status).toBe(404);
     const body = await res.json();

@@ -14,7 +14,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13689); // port-ok: assigned range 13688-13695
+const ctx = createTestContext(13689, { autoPublicAuth: true }); // port-ok: assigned range 13688-13695
 const { api } = ctx;
 
 let wsId = '';

@@ -18,7 +18,7 @@ import { listWorkOrderComments } from '../../server/work-order-comments.js';
 import { listActivity } from '../../server/activity-log.js';
 import type { WorkOrder } from '../../shared/types/payments.js';
 
-const ctx = createTestContext(13409);
+const ctx = createTestContext(13409, { autoPublicAuth: true });
 
 // pwless: the URL is the credential, so requireClientPortalAuth() passes and we can hit public routes.
 let pwless: SeededFullWorkspace;
@@ -175,8 +175,12 @@ describe('Client public work-order comment', () => {
 
   it('401s unauthenticated on a password-protected workspace', async () => {
     const order = seedOrder(pw.workspaceId, 'in_progress');
-    const res = await ctx.postJson(`/api/public/work-order/${pw.workspaceId}/${order.id}/comment`, {
-      content: 'hello',
+    const res = await ctx.api(`/api/public/work-order/${pw.workspaceId}/${order.id}/comment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
+      body: JSON.stringify({
+        content: 'hello',
+      }),
     });
     expect(res.status).toBe(401);
     // Nothing persisted.

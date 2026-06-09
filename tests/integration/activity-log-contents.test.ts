@@ -49,6 +49,7 @@ vi.mock('../../server/email.js', () => ({
 import db from '../../server/db/index.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createWorkOrder } from '../../server/work-orders.js';
+import { withPublicTestAuth } from './public-auth-test-helpers.js';
 
 // ── Shared types ──────────────────────────────────────────────────────────────
 
@@ -88,19 +89,19 @@ async function stopTestServer(): Promise<void> {
 }
 
 async function postJson(path: string, body: unknown): Promise<Response> {
-  return fetch(`${baseUrl}${path}`, {
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-  });
+  }));
 }
 
 async function patchJson(path: string, body: unknown): Promise<Response> {
-  return fetch(`${baseUrl}${path}`, {
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-  });
+  }));
 }
 
 // ── DB helpers ────────────────────────────────────────────────────────────────

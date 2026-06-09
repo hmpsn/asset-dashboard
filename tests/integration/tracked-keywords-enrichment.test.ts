@@ -12,7 +12,7 @@ import { createTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 
 const PORT = 13334;
-const ctx = createTestContext(PORT);
+const ctx = createTestContext(PORT, { autoPublicAuth: true });
 
 let workspaceId: string;
 let cleanup: () => void;
@@ -34,7 +34,7 @@ afterAll(async () => {
 describe('POST /api/public/tracked-keywords/:workspaceId — background enrichment', () => {
   it('returns 200 and the updated keywords list immediately (does not block on enrichment)', async () => {
     const start = Date.now();
-    const res = await fetch(`http://localhost:${PORT}/api/public/tracked-keywords/${workspaceId}`, {
+    const res = await ctx.api(`/api/public/tracked-keywords/${workspaceId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ keyword: 'seo strategy' }),
@@ -49,7 +49,7 @@ describe('POST /api/public/tracked-keywords/:workspaceId — background enrichme
   }, 10_000);
 
   it('returns 200 even when no SEO provider is configured', async () => {
-    const res = await fetch(`http://localhost:${PORT}/api/public/tracked-keywords/${workspaceId}`, {
+    const res = await ctx.api(`/api/public/tracked-keywords/${workspaceId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ keyword: 'another keyword' }),

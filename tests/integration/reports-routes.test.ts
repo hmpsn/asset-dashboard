@@ -20,6 +20,7 @@ import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { signToken } from '../../server/auth.js';
 import { createUser, deleteUser } from '../../server/users.js';
+import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
 import { saveSnapshot } from '../../server/reports.js';
 import { listActivity } from '../../server/activity-log.js';
 import type { SeoAuditResult } from '../../server/seo-audit.js';
@@ -31,9 +32,26 @@ let testWsId = '';
 let otherWsId = '';
 let scopedUserId = '';
 let scopedUserToken = '';
+let clientUserId = '';
+let clientToken = '';
 let otherSnapshotId = '';
+let disabledWsId = '';
 const testSiteId = 'test_site_' + Date.now();
 const otherSiteId = 'other_site_' + Date.now();
+const disabledSiteId = 'disabled_site_' + Date.now();
+
+function clientCookieHeader(workspaceId = testWsId, token = clientToken): string {
+  return `client_user_token_${workspaceId}=${token}`;
+}
+
+async function getWithClientToken(urlPath: string, workspaceId = testWsId, token = clientToken): Promise<Response> {
+  ctx.clearCookies();
+  return api(urlPath, {
+    headers: {
+      Cookie: clientCookieHeader(workspaceId, token),
+    },
+  });
+}
 
 beforeAll(async () => {
   await ctx.startServer();
@@ -52,6 +70,14 @@ beforeAll(async () => {
   );
   scopedUserId = scopedUser.id;
   scopedUserToken = signToken({ userId: scopedUser.id, email: scopedUser.email, role: scopedUser.role });
+  const clientUser = await createClientUser(
+    'reports-client@test.local',
+    'ClientPass1!',
+    'Reports Client',
+    testWsId,
+  );
+  clientUserId = clientUser.id;
+  clientToken = signClientToken(clientUser);
   const otherSnapshot = saveSnapshot(otherSiteId, 'Other Test Site', {
     siteScore: 70,
     totalPages: 1,
@@ -62,12 +88,26 @@ beforeAll(async () => {
     siteWideIssues: [],
   } satisfies SeoAuditResult);
   otherSnapshotId = otherSnapshot.id;
+  const disabledWs = createWorkspace('Reports Disabled Portal Test Workspace');
+  disabledWsId = disabledWs.id;
+  updateWorkspace(disabledWsId, { webflowSiteId: disabledSiteId, clientPortalEnabled: false });
+  saveSnapshot(disabledSiteId, 'Disabled Test Site', {
+    siteScore: 80,
+    totalPages: 1,
+    errors: 0,
+    warnings: 0,
+    infos: 0,
+    pages: [],
+    siteWideIssues: [],
+  } satisfies SeoAuditResult);
 }, 25_000);
 
 afterAll(async () => {
+  if (clientUserId) deleteClientUser(clientUserId, testWsId);
   deleteUser(scopedUserId);
   deleteWorkspace(testWsId);
   deleteWorkspace(otherWsId);
+  deleteWorkspace(disabledWsId);
   await ctx.stopServer();
 });
 
@@ -340,7 +380,7 @@ describe('Reports — suppression-adjusted public audit reads', () => {
       expect.objectContaining({ id: currentBody.id, siteScore: 100, errors: 0, warnings: 0 }),
     ]));
 
-    const publicReportsRes = await api(`/api/public/reports/${testWsId}`);
+    const publicReportsRes = await getWithClientToken(`/api/public/reports/${testWsId}`);
     expect(publicReportsRes.status).toBe(200);
     const publicReports: Array<{ id: string; type: string; title: string; score?: number; previousScore?: number }> = await publicReportsRes.json();
     expect(publicReports).toEqual(expect.arrayContaining([
@@ -359,6 +399,17 @@ describe('Reports — suppression-adjusted public audit reads', () => {
       && a.metadata?.snapshotOnly === true
       && a.metadata?.score === 100
     )).toBe(true);
+  });
+
+  it('blocks latest audit routes for disabled client portals', async () => {
+    const publicClientRes = await api(`/api/public/client/${disabledSiteId}`);
+    expect(publicClientRes.status).toBe(403);
+    const publicClientBody = await publicClientRes.json() as { error: string };
+    expect(publicClientBody.error).toMatch(/client portal is disabled/i);
+
+    const auditHtmlRes = await api(`/report/audit/${disabledSiteId}`);
+    expect(auditHtmlRes.status).toBe(403);
+    await expect(auditHtmlRes.text()).resolves.toMatch(/client portal is disabled/i);
   });
 });
 
@@ -566,7 +617,7 @@ describe('Reports — sales reports', () => {
 
 describe('Reports — public workspace reports', () => {
   it('GET /api/public/reports/:workspaceId returns array', async () => {
-    const res = await api(`/api/public/reports/${testWsId}`);
+    const res = await getWithClientToken(`/api/public/reports/${testWsId}`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(Array.isArray(body)).toBe(true);

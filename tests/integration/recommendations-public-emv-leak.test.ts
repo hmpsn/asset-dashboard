@@ -17,7 +17,7 @@ import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { saveRecommendations } from '../../server/recommendations.js';
 import type { Recommendation, RecommendationSet, OpportunityScore } from '../../shared/types/recommendations.js';
 
-const ctx = createTestContext(13873); // port-ok: next free port above 13872
+const ctx = createTestContext(13873, { autoPublicAuth: true }); // port-ok: next free port above 13872
 const { api, patchJson } = ctx;
 
 let testWsId = '';

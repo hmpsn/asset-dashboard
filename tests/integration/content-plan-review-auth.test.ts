@@ -4,7 +4,7 @@ import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/
 import { createMatrix, getMatrix, updateMatrixCell } from '../../server/content-matrices.js';
 import db from '../../server/db/index.js';
 
-const ctx = createTestContext(13351); // port-ok: 13201-13350 already allocated in integration suite
+const ctx = createTestContext(13351, { autoPublicAuth: true }); // port-ok: 13201-13350 already allocated in integration suite
 const { api, postJson, clearCookies } = ctx;
 
 let workspaceId = '';
@@ -76,14 +76,22 @@ afterAll(async () => {
 
 describe('public content-plan review auth', () => {
   it('requires client auth before reading or flagging protected content-plan cells', async () => {
-    const listRes = await api(`/api/public/content-plan/${workspaceId}`);
+    const listRes = await api(`/api/public/content-plan/${workspaceId}`, {
+      headers: { 'x-no-auto-public-auth': 'true' },
+    });
     expect(listRes.status).toBe(401);
 
-    const detailRes = await api(`/api/public/content-plan/${workspaceId}/${matrixId}`);
+    const detailRes = await api(`/api/public/content-plan/${workspaceId}/${matrixId}`, {
+      headers: { 'x-no-auto-public-auth': 'true' },
+    });
     expect(detailRes.status).toBe(401);
 
-    const flagRes = await postJson(`/api/public/content-plan/${workspaceId}/${matrixId}/cells/${cellId}/flag`, {
-      comment: 'This unauthenticated flag should not persist.',
+    const flagRes = await api(`/api/public/content-plan/${workspaceId}/${matrixId}/cells/${cellId}/flag`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
+      body: JSON.stringify({
+        comment: 'This unauthenticated flag should not persist.',
+      }),
     });
     expect(flagRes.status).toBe(401);
 
@@ -141,11 +149,17 @@ describe('public content-plan review auth', () => {
     });
     expect(loginRes.status).toBe(200);
 
-    const listRes = await api(`/api/public/content-plan/${otherProtectedWorkspaceId}`);
+    const listRes = await api(`/api/public/content-plan/${otherProtectedWorkspaceId}`, {
+      headers: { 'x-no-auto-public-auth': 'true' },
+    });
     expect(listRes.status).toBe(401);
 
-    const flagRes = await postJson(`/api/public/content-plan/${otherProtectedWorkspaceId}/${otherProtectedMatrixId}/cells/${otherProtectedCellId}/flag`, {
-      comment: 'This should not cross protected workspace boundaries.',
+    const flagRes = await api(`/api/public/content-plan/${otherProtectedWorkspaceId}/${otherProtectedMatrixId}/cells/${otherProtectedCellId}/flag`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
+      body: JSON.stringify({
+        comment: 'This should not cross protected workspace boundaries.',
+      }),
     });
     expect(flagRes.status).toBe(401);
 

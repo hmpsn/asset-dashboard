@@ -17,6 +17,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, updateWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
 import {
   generateReportHTML,
   listMonthlyReports,
@@ -31,6 +32,23 @@ const { api, postJson } = ctx;
 
 let richWsId = '';    // workspace with full data (requests, approvals, activity)
 let emptyWsId = '';   // brand-new workspace with zero data
+let richClientUserId = '';
+let emptyClientUserId = '';
+let richClientToken = '';
+let emptyClientToken = '';
+
+function clientCookieHeader(workspaceId: string, token: string): string {
+  return `client_user_token_${workspaceId}=${token}`;
+}
+
+async function apiWithClientToken(urlPath: string, workspaceId: string, token: string): Promise<Response> {
+  ctx.clearCookies();
+  return api(urlPath, {
+    headers: {
+      Cookie: clientCookieHeader(workspaceId, token),
+    },
+  });
+}
 
 // Minimal Workspace object used for unit-level tests (generateReportHTML)
 function makeWorkspace(overrides: Partial<Workspace> = {}): Workspace {
@@ -52,9 +70,27 @@ beforeAll(async () => {
 
   const emptyWs = createWorkspace('Monthly Report Empty WS');
   emptyWsId = emptyWs.id;
+  const richClient = await createClientUser(
+    'monthly-rich-client@test.local',
+    'ClientPass1!',
+    'Monthly Rich Client',
+    richWsId,
+  );
+  richClientUserId = richClient.id;
+  richClientToken = signClientToken(richClient);
+  const emptyClient = await createClientUser(
+    'monthly-empty-client@test.local',
+    'ClientPass1!',
+    'Monthly Empty Client',
+    emptyWsId,
+  );
+  emptyClientUserId = emptyClient.id;
+  emptyClientToken = signClientToken(emptyClient);
 }, 30_000);
 
 afterAll(async () => {
+  if (richClientUserId) deleteClientUser(richClientUserId, richWsId);
+  if (emptyClientUserId) deleteClientUser(emptyClientUserId, emptyWsId);
   deleteWorkspace(richWsId);
   deleteWorkspace(emptyWsId);
   await ctx.stopServer();
@@ -530,7 +566,7 @@ describe('Monthly report workspace isolation', () => {
   });
 
   it('GET /api/public/reports/:workspaceId lists monthly reports for that workspace', async () => {
-    const res = await api(`/api/public/reports/${richWsId}`);
+    const res = await apiWithClientToken(`/api/public/reports/${richWsId}`, richWsId, richClientToken);
     expect(res.status).toBe(200);
     const body = await res.json() as Array<{ id: string; type: string; workspaceId?: string }>;
     expect(Array.isArray(body)).toBe(true);
@@ -544,8 +580,8 @@ describe('Monthly report workspace isolation', () => {
     // Trigger a report for empty workspace so the endpoint has something to return
     await postJson(`/api/monthly-report/${emptyWsId}`, {});
 
-    const richRes = await api(`/api/public/reports/${richWsId}`);
-    const emptyRes = await api(`/api/public/reports/${emptyWsId}`);
+    const richRes = await apiWithClientToken(`/api/public/reports/${richWsId}`, richWsId, richClientToken);
+    const emptyRes = await apiWithClientToken(`/api/public/reports/${emptyWsId}`, emptyWsId, emptyClientToken);
 
     expect(richRes.status).toBe(200);
     expect(emptyRes.status).toBe(200);
