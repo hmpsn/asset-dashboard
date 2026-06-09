@@ -494,12 +494,7 @@ export async function getTopDroppedGscPage(
   if (!token) return null;
 
   const { startDate: curStart, endDate: curEnd } = gscDateRange(days);
-
-  const prevEnd = new Date(curStart);
-  prevEnd.setDate(prevEnd.getDate() - 1);
-  const prevStart = new Date(prevEnd);
-  prevStart.setDate(prevStart.getDate() - days + 1);
-  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  const previousWindow = getPreviousGscWindow(curStart, days);
 
   const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
   const [curData, prevData] = await Promise.all([
@@ -507,7 +502,7 @@ export async function getTopDroppedGscPage(
       startDate: curStart, endDate: curEnd, dimensions: ['page'], rowLimit: 100, type: 'web',
     }) as Promise<{ rows?: SearchAnalyticsRow[] }>,
     gscFetch(`${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`, token, {
-      startDate: fmt(prevStart), endDate: fmt(prevEnd), dimensions: ['page'], rowLimit: 100, type: 'web',
+      startDate: previousWindow.startDate, endDate: previousWindow.endDate, dimensions: ['page'], rowLimit: 100, type: 'web',
     }) as Promise<{ rows?: SearchAnalyticsRow[] }>,
   ]);
 
@@ -558,12 +553,7 @@ export async function getTopSpikedGscPage(
   if (!token) return null;
 
   const { startDate: curStart, endDate: curEnd } = gscDateRange(days);
-
-  const prevEnd = new Date(curStart);
-  prevEnd.setDate(prevEnd.getDate() - 1);
-  const prevStart = new Date(prevEnd);
-  prevStart.setDate(prevStart.getDate() - days + 1);
-  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  const previousWindow = getPreviousGscWindow(curStart, days);
 
   const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
   const [curData, prevData] = await Promise.all([
@@ -571,7 +561,7 @@ export async function getTopSpikedGscPage(
       startDate: curStart, endDate: curEnd, dimensions: ['page'], rowLimit: 100, type: 'web',
     }) as Promise<{ rows?: SearchAnalyticsRow[] }>,
     gscFetch(`${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`, token, {
-      startDate: fmt(prevStart), endDate: fmt(prevEnd), dimensions: ['page'], rowLimit: 100, type: 'web',
+      startDate: previousWindow.startDate, endDate: previousWindow.endDate, dimensions: ['page'], rowLimit: 100, type: 'web',
     }) as Promise<{ rows?: SearchAnalyticsRow[] }>,
   ]);
 
@@ -725,12 +715,37 @@ export function gscDateRange(days: number, dateRange?: CustomDateRange) {
       return { startDate: dateRange.startDate, endDate: dateRange.endDate };
     }
   }
-  const endDate = new Date();
-  endDate.setDate(endDate.getDate() - 3);
-  const startDate = new Date(endDate);
-  startDate.setDate(startDate.getDate() - days);
+  const now = new Date();
+  const endDate = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() - 3,
+  ));
+  const startDate = new Date(Date.UTC(
+    endDate.getUTCFullYear(),
+    endDate.getUTCMonth(),
+    endDate.getUTCDate() - days,
+  ));
   const fmt = (d: Date) => d.toISOString().split('T')[0];
   return { startDate: fmt(startDate), endDate: fmt(endDate) };
+}
+
+function shiftIsoDateUtc(isoDate: string, dayDelta: number): string {
+  const date = new Date(`${isoDate}T00:00:00.000Z`);
+  const shifted = new Date(Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate() + dayDelta,
+  ));
+  return shifted.toISOString().split('T')[0];
+}
+
+function getPreviousGscWindow(currentStartDate: string, periodDays: number) {
+  const safePeriodDays = Math.max(1, periodDays);
+  return {
+    startDate: shiftIsoDateUtc(currentStartDate, -safePeriodDays),
+    endDate: shiftIsoDateUtc(currentStartDate, -1),
+  };
 }
 
 export async function getPerformanceTrend(
@@ -965,20 +980,14 @@ export async function getSearchPeriodComparison(
     ? Math.round((curEndDate.getTime() - curStartDate.getTime()) / MS_PER_DAY) + 1
     : days;
   const periodDays = Math.max(1, derivedPeriodDays);
-
-  // Previous period: shift by the actual current window length (custom ranges included).
-  const prevEnd = new Date(`${curStart}T00:00:00.000Z`);
-  prevEnd.setDate(prevEnd.getDate() - 1);
-  const prevStart = new Date(prevEnd);
-  prevStart.setDate(prevStart.getDate() - periodDays + 1);
-  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  const previousWindow = getPreviousGscWindow(curStart, periodDays);
 
   const [curData, prevData] = await Promise.all([
     gscFetch(`${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`, token, {
       startDate: curStart, endDate: curEnd, type: 'web',
     }) as Promise<{ rows?: SearchAnalyticsRow[] }>,
     gscFetch(`${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`, token, {
-      startDate: fmt(prevStart), endDate: fmt(prevEnd), type: 'web',
+      startDate: previousWindow.startDate, endDate: previousWindow.endDate, type: 'web',
     }) as Promise<{ rows?: SearchAnalyticsRow[] }>,
   ]);
 
