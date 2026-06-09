@@ -17,12 +17,15 @@ import {
   flushAll,
   getQueueStats,
   restoreQueue,
+  getDeadLetterEvents,
+  clearDeadLetterEvents,
 } from '../../server/email-queue.js';
 import type { EmailEvent } from '../../server/email-templates.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const BATCH_WINDOW_MS = 5 * 60 * 1000; // must match the constant in email-queue.ts
+const RETRY_DELAY_MS = 60 * 1000; // must match the constant in email-queue.ts
 
 function makeEvent(overrides: Partial<EmailEvent> = {}): EmailEvent {
   return {
@@ -46,6 +49,7 @@ beforeEach(async () => {
 
   // Drain any buckets left over from a prior test
   await flushAll();
+  clearDeadLetterEvents();
 
   // Install a fresh mock send function
   mockSend = vi.fn().mockResolvedValue(true);
@@ -55,6 +59,7 @@ beforeEach(async () => {
 afterEach(async () => {
   // Clean up any timers/buckets the test may have left open
   await flushAll();
+  clearDeadLetterEvents();
   vi.useRealTimers();
 });
 
@@ -185,6 +190,40 @@ describe('email-queue timer-driven flush', () => {
     // Both events should have been batched into a single send
     const [to] = mockSend.mock.calls[0] as [string, string, string];
     expect(to).toBe('test@example.com');
+  });
+});
+
+describe('email-queue retry and dead-letter handling', () => {
+  it('requeues a failed send and retries it after the retry delay', async () => {
+    mockSend.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+
+    queueEmail(makeEvent());
+    await flushAll();
+
+    expect(mockSend).toHaveBeenCalledTimes(1);
+    expect(getQueueStats().totalEvents).toBe(1);
+
+    await vi.advanceTimersByTimeAsync(RETRY_DELAY_MS + 1);
+
+    expect(mockSend).toHaveBeenCalledTimes(2);
+    expect(getQueueStats().totalEvents).toBe(0);
+    expect(getDeadLetterEvents()).toHaveLength(0);
+  });
+
+  it('moves events to dead letter after repeated send failures', async () => {
+    mockSend.mockResolvedValue(false);
+
+    queueEmail(makeEvent());
+    await flushAll();
+    await vi.advanceTimersByTimeAsync(RETRY_DELAY_MS + 1);
+    await vi.advanceTimersByTimeAsync((RETRY_DELAY_MS * 2) + 1);
+
+    expect(mockSend).toHaveBeenCalledTimes(3);
+    expect(getQueueStats().totalEvents).toBe(0);
+    const deadLetters = getDeadLetterEvents();
+    expect(deadLetters).toHaveLength(1);
+    expect(deadLetters[0].recipient).toBe('test@example.com');
+    expect(deadLetters[0].deliveryAttempts).toBe(3);
   });
 });
 

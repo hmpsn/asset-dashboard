@@ -53,6 +53,7 @@ vi.mock('../../server/email.js', () => ({
 // ── Imports (after mock declarations) ─────────────────────────────────────────
 
 import db from '../../server/db/index.js';
+import { cancelJob, listJobs } from '../../server/jobs.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { createBlueprint, addEntry } from '../../server/page-strategy.js';
 import { initializeSections, saveGeneratedCopy, saveMetadata } from '../../server/copy-review.js';
@@ -60,6 +61,18 @@ import { addPattern } from '../../server/copy-intelligence.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
 import type { CopySection, CopyIntelligencePattern, EntryCopyStatus, CopyMetadata } from '../../shared/types/copy-pipeline.js';
 import type { SectionPlanItem } from '../../shared/types/page-strategy.js';
+
+function clearActiveCopyBatchJobs() {
+  for (const job of listJobs().filter(job => job.type === 'copy-batch-generation' && (job.status === 'pending' || job.status === 'running'))) {
+    cancelJob(job.id);
+  }
+  db.prepare(`
+    UPDATE jobs
+    SET status = 'cancelled' -- status-ok: test isolation for copy batch active-job guard
+    WHERE type = 'copy-batch-generation'
+      AND status IN ('pending', 'running')
+  `).run();
+}
 
 // ── Test server ───────────────────────────────────────────────────────────────
 
@@ -468,6 +481,10 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/text', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('POST /api/copy/:workspaceId/:blueprintId/batch', () => {
+  beforeEach(() => {
+    clearActiveCopyBatchJobs();
+  });
+
   it('returns 200 with a batchId when blueprint exists', async () => {
     const { workspaceId, blueprintId, entryId } = seedEntry(ws.workspaceId);
     const res = await postJson(`/api/copy/${workspaceId}/${blueprintId}/batch`, {
@@ -514,6 +531,10 @@ describe('POST /api/copy/:workspaceId/:blueprintId/batch', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('GET /api/copy/:workspaceId/batch/:batchId', () => {
+  beforeEach(() => {
+    clearActiveCopyBatchJobs();
+  });
+
   it('returns 200 with batch job data for a valid batchId', async () => {
     const { workspaceId, blueprintId, entryId } = seedEntry(ws.workspaceId);
     const startRes = await postJson(`/api/copy/${workspaceId}/${blueprintId}/batch`, {

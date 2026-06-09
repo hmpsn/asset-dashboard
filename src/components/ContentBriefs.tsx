@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useDeferredValue } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { get, post, patch, del, getSafe, getText } from '../api/client';
+import { ApiError, get, post, patch, del, getSafe, getText } from '../api/client';
 import {
   Trash2, AlertTriangle, PenLine, Clipboard, Search, X, ArrowUpDown,
 } from 'lucide-react';
@@ -29,7 +29,7 @@ type BriefRoute = typeof BRIEF_ROUTES[number];
 export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, clearFixContext }: { workspaceId: string; onRequestCountChange?: (pending: number) => void; fixContext?: FixContext | null; clearFixContext?: () => void }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { trackJob } = useBackgroundTasks();
+  const { trackJob, jobs } = useBackgroundTasks();
   const [keyword, setKeyword] = useState('');
   const deferredKeyword = useDeferredValue(keyword);
   const briefsQ = useAdminBriefsList(workspaceId);
@@ -58,6 +58,8 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
 
   const [generating, setGenerating] = useState(false);
   const [generatingBriefFor, setGeneratingBriefFor] = useState<string | null>(null);
+  const [pendingStandaloneBriefJobId, setPendingStandaloneBriefJobId] = useState<string | null>(null);
+  const [pendingRequestBriefJob, setPendingRequestBriefJob] = useState<{ jobId: string; requestId: string } | null>(null);
   const [businessCtx, setBusinessCtx] = useState('');
   const [generationStyle, setGenerationStyle] = useState<ContentGenerationStyle>(DEFAULT_CONTENT_GENERATION_STYLE);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -110,6 +112,78 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keyword]);
+
+  function extractGeneratedBriefResult(result: unknown): { brief?: ContentBrief; briefId?: string; requestId?: string } | null {
+    if (!result || typeof result !== 'object') return null;
+    const candidate = result as { brief?: unknown; briefId?: unknown; requestId?: unknown };
+    return {
+      brief: candidate.brief && typeof candidate.brief === 'object' ? candidate.brief as ContentBrief : undefined,
+      briefId: typeof candidate.briefId === 'string' ? candidate.briefId : undefined,
+      requestId: typeof candidate.requestId === 'string' ? candidate.requestId : undefined,
+    };
+  }
+
+  async function startBriefGenerationJob(params: Record<string, unknown>): Promise<string | null> {
+    try {
+      const data = await post<{ jobId?: string }>('/api/jobs', {
+        type: BACKGROUND_JOB_TYPES.CONTENT_BRIEF_GENERATION,
+        params,
+      });
+      if (!data.jobId) return null;
+      trackJob(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_GENERATION, data.jobId, params);
+      return data.jobId;
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        toast('A content brief is already being generated for this workspace.', 'error');
+        return null;
+      }
+      throw err;
+    }
+  }
+
+  // effect-layout-ok — reacts to async background job completion, not first-paint layout derivation.
+  useEffect(() => {
+    if (!pendingStandaloneBriefJobId) return;
+    const job = jobs.find(j => j.id === pendingStandaloneBriefJobId);
+    if (!job) return;
+    if (job.status === 'done') {
+      const result = extractGeneratedBriefResult(job.result);
+      if (result?.brief) {
+        queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), old => [result.brief!, ...(old ?? [])]);
+        setKeyword('');
+        setExpanded(result.brief.id);
+        fixContextRef.current = null;
+      }
+      setPendingStandaloneBriefJobId(null);
+      setGenerating(false);
+    } else if (job.status === 'error' || job.status === 'cancelled') {
+      setError(job.error || 'Failed to generate brief');
+      setPendingStandaloneBriefJobId(null);
+      setGenerating(false);
+    }
+  }, [jobs, pendingStandaloneBriefJobId, queryClient, workspaceId]);
+
+  // effect-layout-ok — reacts to async background job completion, not first-paint layout derivation.
+  useEffect(() => {
+    if (!pendingRequestBriefJob) return;
+    const job = jobs.find(j => j.id === pendingRequestBriefJob.jobId);
+    if (!job) return;
+    if (job.status === 'done') {
+      const result = extractGeneratedBriefResult(job.result);
+      if (result?.brief) {
+        queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), old => [result.brief!, ...(old ?? [])]);
+        queryClient.setQueryData<ContentTopicRequest[]>(queryKeys.admin.requests(workspaceId), old => (old ?? []).map(r => r.id === pendingRequestBriefJob.requestId ? { ...r, status: 'brief_generated' as const, briefId: result.brief!.id } : r));
+        setExpandedRequest(pendingRequestBriefJob.requestId);
+      }
+      setGeneratingBriefFor(null);
+      setPendingRequestBriefJob(null);
+    } else if (job.status === 'error' || job.status === 'cancelled') {
+      toast(job.error || 'Failed to generate brief', 'error');
+      setGeneratingBriefFor(null);
+      setPendingRequestBriefJob(null);
+    }
+  }, [jobs, pendingRequestBriefJob, queryClient, toast, workspaceId]);
+
   const [briefSort, setBriefSort] = useState<'date' | 'keyword' | 'difficulty'>('date');
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'brief' | 'request'; id: string; label: string } | null>(null);
   const [editingBrief, setEditingBrief] = useState<string | null>(null);
@@ -277,14 +351,20 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
   const handleGenerateBriefForRequest = async (req: ContentTopicRequest, selectedGenerationStyle?: ContentGenerationStyle) => {
     setGeneratingBriefFor(req.id);
     try {
-      const brief = await post<ContentBrief>(`/api/content-requests/${workspaceId}/${req.id}/generate-brief`, {
+      const jobId = await startBriefGenerationJob({
+        workspaceId,
+        requestId: req.id,
         generationStyle: selectedGenerationStyle ?? generationStyle,
       });
-      queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), old => [brief, ...(old ?? [])]);
-      queryClient.setQueryData<ContentTopicRequest[]>(queryKeys.admin.requests(workspaceId), old => (old ?? []).map(r => r.id === req.id ? { ...r, status: 'brief_generated' as const, briefId: brief.id } : r));
-      setExpandedRequest(req.id);
-    } catch (err) { console.error('ContentBriefs operation failed:', err); }
-    setGeneratingBriefFor(null);
+      if (jobId) {
+        setPendingRequestBriefJob({ jobId, requestId: req.id });
+      } else {
+        setGeneratingBriefFor(null);
+      }
+    } catch (err) {
+      console.error('ContentBriefs operation failed:', err);
+      setGeneratingBriefFor(null);
+    }
   };
 
   const handleGeneratePost = async (briefId: string, selectedGenerationStyle?: ContentGenerationStyle): Promise<boolean> => {
@@ -322,7 +402,8 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
     setGenerating(true);
     setError('');
     try {
-      const brief = await post<ContentBrief>(`/api/content-briefs/${workspaceId}/generate`, {
+      const jobId = await startBriefGenerationJob({
+        workspaceId,
         targetKeyword: keyword.trim(),
         businessContext: businessCtx.trim() || undefined,
         targetPageId: fixContextRef.current?.pageId,
@@ -340,15 +421,13 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
             }
           : undefined,
       });
-      queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), old => [brief, ...(old ?? [])]);
-      setKeyword('');
-      setExpanded(brief.id);
-      // Clear the navigation context so subsequent manual generations don't inherit
-      // stale page analysis data (pageId, optimizationIssues, etc.) from the first brief.
-      fixContextRef.current = null;
+      if (jobId) {
+        setPendingStandaloneBriefJobId(jobId);
+      } else {
+        setGenerating(false);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate brief');
-    } finally {
       setGenerating(false);
     }
   };

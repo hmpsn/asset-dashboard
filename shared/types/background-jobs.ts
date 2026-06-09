@@ -10,7 +10,9 @@ export const BACKGROUND_JOB_TYPES = {
   SCHEMA_PLAN_GENERATION: 'schema-plan-generation',
   PAGE_ANALYSIS: 'page-analysis',
   DEEP_DIAGNOSTIC: 'deep-diagnostic',
+  CONTENT_BRIEF_GENERATION: 'content-brief-generation',
   CONTENT_POST_GENERATION: 'content-post-generation',
+  COPY_BATCH_GENERATION: 'copy-batch-generation',
   KNOWLEDGE_BASE_GENERATION: 'knowledge-base-generation',
   BRAND_VOICE_GENERATION: 'brand-voice-generation',
   PERSONA_GENERATION: 'persona-generation',
@@ -127,10 +129,22 @@ export const BACKGROUND_JOB_METADATA: { [K in BackgroundJobType]: BackgroundJobT
     cancellable: false,
     resultBehavior: 'domain-store',
   },
+  [BACKGROUND_JOB_TYPES.CONTENT_BRIEF_GENERATION]: {
+    label: 'Content Brief Generation',
+    description: 'Generates and stores a content brief.',
+    cancellable: false,
+    resultBehavior: 'domain-store-and-result',
+  },
   [BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION]: {
     label: 'Content Post Generation',
     description: 'Generates a full post from a saved content brief.',
     cancellable: true,
+    resultBehavior: 'domain-store-and-result',
+  },
+  [BACKGROUND_JOB_TYPES.COPY_BATCH_GENERATION]: {
+    label: 'Copy Batch Generation',
+    description: 'Generates page copy for a blueprint batch.',
+    cancellable: false,
     resultBehavior: 'domain-store-and-result',
   },
   [BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION]: {

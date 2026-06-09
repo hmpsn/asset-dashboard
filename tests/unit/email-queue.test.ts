@@ -193,7 +193,7 @@ describe('email-queue behavior', () => {
     expect(emailQueue.getQueueStats()).toEqual({ buckets: 0, totalEvents: 0 });
   });
 
-  it('drops events when timer flush runs without a registered send function', async () => {
+  it('requeues events when timer flush runs without a registered send function', async () => {
     vi.useFakeTimers();
     const emailQueue = await loadEmailQueueModule();
 
@@ -202,7 +202,7 @@ describe('email-queue behavior', () => {
 
     expect(renderDigestMock).not.toHaveBeenCalled();
     expect(throttleMock.recordSend).not.toHaveBeenCalled();
-    expect(emailQueue.getQueueStats()).toEqual({ buckets: 0, totalEvents: 0 });
+    expect(emailQueue.getQueueStats()).toEqual({ buckets: 1, totalEvents: 1 });
   });
 
   it('drops throttle-blocked events without rendering or sending', async () => {
@@ -249,7 +249,7 @@ describe('email-queue behavior', () => {
 
     expect(send).toHaveBeenCalledTimes(1);
     expect(throttleMock.recordSend).not.toHaveBeenCalled();
-    expect(emailQueue.getQueueStats()).toEqual({ buckets: 0, totalEvents: 0 });
+    expect(emailQueue.getQueueStats()).toEqual({ buckets: 1, totalEvents: 1 });
   });
 
   it('restoreQueue safely ignores invalid persisted JSON', async () => {
