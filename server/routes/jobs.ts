@@ -13,7 +13,6 @@ import { addActivity } from '../activity-log.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { generateAltText } from '../alttext.js';
 import { callCreativeAI } from '../content-posts-ai.js';
-import { getDataDir } from '../data-dir.js';
 import { notifyClientRecommendationsReady, notifyClientAuditComplete } from '../email.js';
 import { findPageMapEntryForPage, normalizePageUrl, tryResolvePagePath, stripHtmlToText } from '../helpers.js';
 import { resolveBaseUrl } from '../url-helpers.js';
@@ -54,7 +53,7 @@ import {
 } from '../keyword-strategy-generation.js';
 import { saveSnapshot, getLatestSnapshotBefore } from '../reports.js';
 import { getEffectiveAudit, getEffectivePreviousScore } from '../audit-snapshot-views.js';
-import { runSalesAudit } from '../sales-audit.js';
+import { startSalesReportJob } from '../sales-report-background-job.js';
 import { runSchemaGenerationJob } from '../schema-generation-job.js';
 import {
   schemaPlanGenerationErrorResponse,
@@ -703,23 +702,8 @@ router.post('/api/jobs', async (req, res) => {
         if (requestedMaxPages > 100) {
           return res.status(400).json({ error: 'maxPages must be between 1 and 100' });
         }
-        const job = createJob('sales-report', { message: `Auditing ${url}...` });
-        res.json({ jobId: job.id });
-        (async () => {
-          try {
-            updateJob(job.id, { status: 'running', message: 'Crawling site...' });
-            const result = await runSalesAudit(url, requestedMaxPages);
-            const reportsDir = getDataDir('sales-reports');
-            const reportId = `sr_${Date.now()}`;
-            const reportFile = path.join(reportsDir, `${reportId}.json`);
-            fs.writeFileSync(reportFile, JSON.stringify({ id: reportId, ...result, createdAt: new Date().toISOString() }));
-            updateJob(job.id, { status: 'done', result: { id: reportId, ...result }, message: `Audit complete — score ${result.siteScore}` });
-          } catch (err) {
-            if (isProgrammingError(err)) log.warn({ err }, 'jobs: sales-report job failed with programming error'); // url-fetch-ok
-            else log.debug({ err }, 'jobs: sales-report job failed — degrading gracefully');
-            updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Sales report failed' });
-          }
-        })();
+        const started = startSalesReportJob(url, requestedMaxPages);
+        res.json({ jobId: started.jobId });
         break;
       }
 
