@@ -24,6 +24,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { describe, it, expect } from 'vitest';
+import { parseCoveredWsEventKeys, parseWsEventKeys } from '../../scripts/ws-contract-parser.js';
 
 // ---------------------------------------------------------------------------
 // Paths
@@ -80,21 +81,8 @@ const LOCAL_ONLY_EVENTS = new Set<string>([
  * Extract the set of WS_EVENTS key names from wsEvents.ts.
  * Matches lines like:   SOME_EVENT_NAME: 'some:event-string',
  */
-function parseWsEventKeys(source: string): Set<string> {
-  const keys = new Set<string>();
-  // Match top-level property names inside the WS_EVENTS object.
-  // Pattern: optional whitespace, then UPPER_SNAKE_CASE key, then colon.
-  // We stop parsing at the closing `} as const` to avoid picking up ADMIN_EVENTS keys.
-  const wsEventsBlockMatch = source.match(/export const WS_EVENTS\s*=\s*\{([\s\S]*?)\}\s*as\s*const/);
-  if (!wsEventsBlockMatch) return keys;
-
-  const block = wsEventsBlockMatch[1];
-  const keyRe = /^\s+([A-Z][A-Z0-9_]+)\s*:/gm;
-  let m: RegExpExecArray | null;
-  while ((m = keyRe.exec(block)) !== null) {
-    keys.add(m[1]);
-  }
-  return keys;
+function extractWsEventKeys(source: string): Set<string> {
+  return parseWsEventKeys(source);
 }
 
 // ---------------------------------------------------------------------------
@@ -105,15 +93,8 @@ function parseWsEventKeys(source: string): Set<string> {
  * Extract the set of WS_EVENTS key names that have handlers in useWsInvalidation.ts.
  * Matches lines like:   [WS_EVENTS.SOME_EVENT_NAME]: () => {
  */
-function parseCoveredEventKeys(source: string): Set<string> {
-  const covered = new Set<string>();
-  // Match computed property keys using WS_EVENTS:  [WS_EVENTS.<NAME>]:
-  const handlerRe = /\[WS_EVENTS\.([A-Z][A-Z0-9_]+)\]/g;
-  let m: RegExpExecArray | null;
-  while ((m = handlerRe.exec(source)) !== null) {
-    covered.add(m[1]);
-  }
-  return covered;
+function extractCoveredEventKeys(source: string): Set<string> {
+  return parseCoveredWsEventKeys(source);
 }
 
 // ---------------------------------------------------------------------------
@@ -123,8 +104,8 @@ function parseCoveredEventKeys(source: string): Set<string> {
 const wsEventsSource = readFileSync(WS_EVENTS_FILE, 'utf8'); // readFile-ok — intentional static analysis of event registry
 const useWsInvalidationSource = readFileSync(USE_WS_INVALIDATION_FILE, 'utf8'); // readFile-ok — intentional static analysis of handler registry
 
-const expectedEvents = parseWsEventKeys(wsEventsSource);
-const coveredEvents = parseCoveredEventKeys(useWsInvalidationSource);
+const expectedEvents = extractWsEventKeys(wsEventsSource);
+const coveredEvents = extractCoveredEventKeys(useWsInvalidationSource);
 
 // ---------------------------------------------------------------------------
 // Tests

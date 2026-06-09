@@ -16,40 +16,17 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import fs from 'fs';
+import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-
-// ---------------------------------------------------------------------------
-// Filesystem helpers
-// ---------------------------------------------------------------------------
+import {
+  collectFrontendHandlers,
+  collectServerBroadcasts,
+  parseWsEvents,
+} from '../../scripts/ws-contract-parser.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '../..');
-
-/** Recursively collect all files matching an extension under a directory. */
-function collectFiles(dir: string, exts: string[]): string[] {
-  const results: string[] = [];
-  if (!fs.existsSync(dir)) return results;
-
-  function walk(current: string) {
-    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
-      const full = path.join(current, entry.name);
-      if (entry.isDirectory()) {
-        walk(full);
-      } else if (exts.some(ext => entry.name.endsWith(ext))) {
-        results.push(full);
-      }
-    }
-  }
-  walk(dir);
-  return results;
-}
-
-/** Read a file and return its content as a string. */
-function readFile(filePath: string): string {
-  return fs.readFileSync(filePath, 'utf-8');
-}
 
 // ---------------------------------------------------------------------------
 // Phase 1: Parse the WS_EVENTS constants file (server — source of truth)
@@ -62,115 +39,7 @@ function readFile(filePath: string): string {
  */
 function parseServerWsEvents(): Map<string, string> {
   const filePath = path.join(ROOT, 'server', 'ws-events.ts');
-  const content = readFile(filePath);
-
-  const events = new Map<string, string>();
-
-  // Match lines like:   KEY: 'value',
-  const lineRe = /^\s{2}([A-Z_]+):\s+'([^']+)'/gm;
-  let match: RegExpExecArray | null;
-  while ((match = lineRe.exec(content)) !== null) {
-    const [, key, value] = match;
-    // Only capture entries inside the WS_EVENTS block (not ADMIN_EVENTS).
-    // The WS_EVENTS block starts before ADMIN_EVENTS in the file, so we stop
-    // when we hit the ADMIN_EVENTS declaration.
-    const keyPosition = match.index;
-    const adminEventsPosition = content.indexOf('export const ADMIN_EVENTS');
-    if (adminEventsPosition !== -1 && keyPosition > adminEventsPosition) continue;
-    events.set(key, value);
-  }
-
-  return events;
-}
-
-// ---------------------------------------------------------------------------
-// Phase 2: Collect all broadcastToWorkspace() event names from server code
-// ---------------------------------------------------------------------------
-
-/**
- * Scan all server .ts files for broadcastToWorkspace() call sites and extract
- * the event name argument (second argument).  Handles both:
- *   - WS_EVENTS.SOME_KEY  (resolved via the constants map)
- *   - 'literal-string'    (used directly)
- */
-function collectServerBroadcasts(wsEventsMap: Map<string, string>): Map<string, string[]> {
-  const serverDir = path.join(ROOT, 'server');
-  const files = collectFiles(serverDir, ['.ts']);
-
-  // event name → list of source files that broadcast it
-  const broadcasts = new Map<string, string[]>();
-
-  const record = (eventName: string, file: string) => {
-    const rel = path.relative(ROOT, file);
-    const existing = broadcasts.get(eventName) ?? [];
-    existing.push(rel);
-    broadcasts.set(eventName, existing);
-  };
-
-  // Regex to match broadcastToWorkspace( ... , <event-arg> , ...
-  // The event arg is the second argument — either WS_EVENTS.KEY or a string literal.
-  // We use a broad pattern then extract the second argument.
-  const callRe = /broadcastToWorkspace\s*\([^,]+,\s*([^,)]+)/g;
-
-  // Also capture workspace-scoped broadcasts made via aliased function references.
-  // These use the same (workspaceId, event, data) signature as broadcastToWorkspace()
-  // but are called through module-local variables:
-  //   _broadcastFn?.(workspaceId, event, data)  — activity-log.ts, stripe.ts
-  //   _broadcast(workspaceId, event, data)       — anomaly-detection.ts (3-arg workspace form)
-  // We distinguish the workspace form from the 2-arg global form (_broadcast(event, data))
-  // by requiring that the first argument is an identifier, not a quoted string literal.
-  const aliasCallRe = /(?:_broadcastFn\?\.\s*\(|_broadcastFn\s*\(|_broadcast\s*\()\s*[a-zA-Z_$][a-zA-Z0-9_$.]*\s*,\s*([^,)]+)/g;
-
-  /**
-   * Process a single regex match and record the extracted event name.
-   * Shared by both the main callRe and the aliasCallRe loops.
-   *
-   * Only records:
-   *   - WS_EVENTS.KEY  references (resolved to their string value)
-   *   - String literals ('event:name', "event:name")
-   *
-   * Bare identifiers (e.g. variable names like `event` or `data` in
-   * forwarding shims) are intentionally ignored to avoid false positives.
-   */
-  function processMatch(raw: string, file: string) {
-    if (raw.startsWith('WS_EVENTS.')) {
-      // Resolve the constant key to its string value
-      const key = raw.slice('WS_EVENTS.'.length);
-      const value = wsEventsMap.get(key);
-      if (value) {
-        record(value, file);
-      } else {
-        // Unknown constant — record it verbatim so the test surfaces the gap
-        record(`UNRESOLVED:${raw}`, file);
-      }
-    } else if (raw.startsWith("'") || raw.startsWith('"') || raw.startsWith('`')) {
-      // Strip surrounding quotes from a string literal
-      const literal = raw.replace(/^['"`]|['"`]$/g, '');
-      if (literal.length > 0) {
-        record(literal, file);
-      }
-    }
-    // Bare identifiers (e.g. `event`, `data`) are skipped — they appear in
-    // forwarding shims and do not represent concrete event names.
-  }
-
-  for (const file of files) {
-    const content = readFile(file);
-    let match: RegExpExecArray | null;
-
-    callRe.lastIndex = 0;
-    while ((match = callRe.exec(content)) !== null) {
-      processMatch(match[1].trim(), file);
-    }
-
-    // Also scan for aliased workspace broadcast calls
-    aliasCallRe.lastIndex = 0;
-    while ((match = aliasCallRe.exec(content)) !== null) {
-      processMatch(match[1].trim(), file);
-    }
-  }
-
-  return broadcasts;
+  return parseWsEvents(readFileSync(filePath, 'utf-8')); // readFile-ok — intentional static analysis of WS event constants.
 }
 
 // ---------------------------------------------------------------------------
@@ -192,112 +61,7 @@ function collectServerBroadcasts(wsEventsMap: Map<string, string>): Map<string, 
  */
 function parseFrontendWsEvents(): Map<string, string> {
   const filePath = path.join(ROOT, 'src', 'lib', 'wsEvents.ts');
-  const content = readFile(filePath);
-
-  const events = new Map<string, string>();
-  const lineRe = /^\s{2}([A-Z_]+):\s+'([^']+)'/gm;
-  let match: RegExpExecArray | null;
-  while ((match = lineRe.exec(content)) !== null) {
-    const [, key, value] = match;
-    // Only capture entries inside the WS_EVENTS block (not ADMIN_EVENTS)
-    const keyPosition = match.index;
-    const adminEventsPosition = content.indexOf('export const ADMIN_EVENTS');
-    if (adminEventsPosition !== -1 && keyPosition > adminEventsPosition) continue;
-    events.set(key, value);
-  }
-  return events;
-}
-
-/**
- * Per-file handler registration tracked with which hook was used.
- * Used by the workspace-hook-correctness test below.
- */
-interface HandlerRegistration {
-  eventName: string;
-  file: string;
-  hook: 'useWorkspaceEvents' | 'useGlobalAdminEvents' | 'useWsInvalidation' | 'unknown';
-}
-
-function collectFrontendHandlers(
-  frontendWsEventsMap: Map<string, string>,
-): { handlers: Map<string, string[]>; registrations: HandlerRegistration[] } {
-  const srcDir = path.join(ROOT, 'src');
-  const files = collectFiles(srcDir, ['.ts', '.tsx']);
-
-  // event name → list of source files that handle it
-  const handlers = new Map<string, string[]>();
-  const registrations: HandlerRegistration[] = [];
-
-  const record = (eventName: string, file: string, hook: HandlerRegistration['hook']) => {
-    const rel = path.relative(ROOT, file);
-    const existing = handlers.get(eventName) ?? [];
-    existing.push(rel);
-    handlers.set(eventName, existing);
-    registrations.push({ eventName, file: rel, hook });
-  };
-
-  // Pattern 1: computed key with WS_EVENTS constant
-  //   [WS_EVENTS.KEY]: handler
-  const computedKeyRe = /\[WS_EVENTS\.([A-Z_]+)\]/g;
-
-  // Pattern 2: string literal used as an object key in a handler map
-  //   'event:name': handler  OR  "event:name": handler
-  // We look for quoted strings that precede a colon (object key syntax).
-  const literalKeyRe = /['"]([a-z][a-z0-9_:-]+)['"]\s*:/g;
-
-  // Files that contain useWorkspaceEvents / useGlobalAdminEvents / useWsInvalidation calls
-  for (const file of files) {
-    const content = readFile(file);
-    const usesWorkspaceEvents = content.includes('useWorkspaceEvents');
-    const usesGlobalAdminEvents = content.includes('useGlobalAdminEvents');
-    const usesWsInvalidation = content.includes('useWsInvalidation');
-    const usesWsHook = usesWorkspaceEvents || usesGlobalAdminEvents || usesWsInvalidation;
-
-    if (!usesWsHook) continue;
-
-    // Determine the hook used. If a file uses multiple, we prefer useWorkspaceEvents
-    // for correctness tracking since that's the "correct" workspace hook. Files that
-    // use only useGlobalAdminEvents are tracked as such so we can enforce the rule.
-    const hook: HandlerRegistration['hook'] = usesWorkspaceEvents
-      ? 'useWorkspaceEvents'
-      : usesGlobalAdminEvents
-        ? 'useGlobalAdminEvents'
-        : usesWsInvalidation
-          ? 'useWsInvalidation'
-          : 'unknown';
-
-    // Collect computed WS_EVENTS key references
-    computedKeyRe.lastIndex = 0;
-    let match: RegExpExecArray | null;
-    while ((match = computedKeyRe.exec(content)) !== null) {
-      const key = match[1];
-      const value = frontendWsEventsMap.get(key);
-      if (value) {
-        record(value, file, hook);
-      } else {
-        record(`UNRESOLVED:WS_EVENTS.${key}`, file, hook);
-      }
-    }
-
-    // Collect string literal keys that look like event names.
-    // Require ':' in the middle of the name (not at the end like protocol strings
-    // 'wss:' or 'ws:') to avoid false positives from:
-    //   - CSS class ternaries: 'text-red-400' : 'text-zinc-500'
-    //   - Tab/route names with hyphens: 'content-post-intro'
-    //   - Feature label maps: 'seo-rewrite', 'anomaly-detection', etc.
-    //   - Protocol strings: 'wss:', 'https:'
-    // All real WS event names in this codebase follow the pattern <domain>:<action>
-    // where the colon is a separator within the name (e.g. 'activity:new').
-    literalKeyRe.lastIndex = 0;
-    while ((match = literalKeyRe.exec(content)) !== null) {
-      const literal = match[1];
-      if (literal.includes(':') && !literal.endsWith(':') && !literal.startsWith('/')) {
-        record(literal, file, hook);
-      }
-    }
-  }
-
-  return { handlers, registrations };
+  return parseWsEvents(readFileSync(filePath, 'utf-8')); // readFile-ok — intentional static analysis of frontend WS event mirror.
 }
 
 // ---------------------------------------------------------------------------
@@ -352,8 +116,8 @@ const KNOWN_UNHANDLED_HANDLERS = new Set<string>([
 
 const serverWsEventsMap = parseServerWsEvents();
 const frontendWsEventsMap = parseFrontendWsEvents();
-const serverBroadcasts = collectServerBroadcasts(serverWsEventsMap);
-const { handlers: frontendHandlers, registrations: frontendRegistrations } = collectFrontendHandlers(frontendWsEventsMap);
+const serverBroadcasts = collectServerBroadcasts(ROOT, serverWsEventsMap);
+const { handlers: frontendHandlers, registrations: frontendRegistrations } = collectFrontendHandlers(ROOT, frontendWsEventsMap);
 
 /**
  * Workspace-scoped events: the subset of WS_EVENTS values that are broadcast

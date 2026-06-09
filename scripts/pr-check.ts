@@ -24,6 +24,7 @@ import { execSync, execFileSync } from 'child_process';
 import { existsSync, readFileSync, realpathSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { parseCoveredWsEventKeys, parseWsEventValues, parseWsEvents } from './ws-contract-parser.js';
 
 const ROOT = path.join(import.meta.dirname, '..');
 const SCAN_ALL = process.argv.includes('--all');
@@ -843,27 +844,7 @@ function loadWsEventValues(): Set<string> {
   const wsEventsPath = path.join(ROOT, 'server', 'ws-events.ts');
   const content = readFileOrEmpty(wsEventsPath);
   if (!content) return new Set();
-  const valueRe = /:\s*['"]([^'"]+)['"]/g;
-
-  // Extract the WS_EVENTS block (ends at `} as const;`)
-  const wsBlock = content.match(/export\s+const\s+WS_EVENTS\s*=\s*\{([\s\S]*?)\}\s*as\s+const/);
-  if (!wsBlock) return new Set();
-  const wsValues = new Set<string>();
-  let m: RegExpExecArray | null;
-  while ((m = valueRe.exec(wsBlock[1])) !== null) {
-    wsValues.add(m[1]);
-  }
-
-  // Extract the ADMIN_EVENTS block and subtract overlapping values.
-  const adminBlock = content.match(/export\s+const\s+ADMIN_EVENTS\s*=\s*\{([\s\S]*?)\}\s*as\s+const/);
-  if (adminBlock) {
-    valueRe.lastIndex = 0;
-    while ((m = valueRe.exec(adminBlock[1])) !== null) {
-      wsValues.delete(m[1]);
-    }
-  }
-
-  return wsValues;
+  return parseWsEventValues(content, { subtractAdminEvents: true });
 }
 
 /** Extracts the set of activity-type string literals from the
@@ -4767,14 +4748,7 @@ export const CHECKS: Check[] = [
         );
       }
 
-      // Extract every [WS_EVENTS.NAME] handler key present in the file.
-      // Pattern: `[WS_EVENTS.SOME_EVENT_NAME]` at computed-property position.
-      const keyRe = /\[WS_EVENTS\.([A-Z_]+)\]/g;
-      const centralizedEvents = new Set<string>();
-      let km: RegExpExecArray | null;
-      while ((km = keyRe.exec(wsInvalidationContent)) !== null) {
-        centralizedEvents.add(km[1]);
-      }
+      const centralizedEvents = parseCoveredWsEventKeys(wsInvalidationContent);
 
       if (centralizedEvents.size === 0) {
         throw new Error(
@@ -4791,13 +4765,7 @@ export const CHECKS: Check[] = [
       // skipped by a computed-key-only scanner.
       const wsEventsPath = path.join(ROOT, 'src', 'lib', 'wsEvents.ts');
       const wsEventsContent = readFileOrEmpty(wsEventsPath);
-      const wsEventsBlock = wsEventsContent.match(/export const WS_EVENTS = \{([\s\S]*?)\n\} as const;/)?.[1] ?? '';
-      const eventValueToName = new Map<string, string>();
-      const eventConstRe = /^\s*([A-Z_]+):\s*['"]([^'"]+)['"]/gm;
-      let em: RegExpExecArray | null;
-      while ((em = eventConstRe.exec(wsEventsBlock)) !== null) {
-        eventValueToName.set(em[2], em[1]);
-      }
+      const eventValueToName = new Map([...parseWsEvents(wsEventsContent)].map(([key, value]) => [value, key]));
       if (eventValueToName.size === 0) {
         throw new Error(
           'useWorkspaceEvents-centralization rule: found zero WS_EVENTS values in ' +
