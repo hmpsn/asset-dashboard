@@ -23,7 +23,7 @@ export function useOutcomeScorecard(wsId: string) {
 
 export function useOutcomeActions(wsId: string, type?: string, score?: string) {
   return useQuery({
-    queryKey: [...queryKeys.admin.outcomeActions(wsId), type ?? '', score ?? ''],
+    queryKey: queryKeys.admin.outcomeActionsFiltered(wsId, type, score),
     queryFn: ({ signal }) => outcomesApi.getActions(wsId, type, score, signal),
     enabled: !!wsId,
   });
@@ -33,7 +33,7 @@ export function useOutcomeActions(wsId: string, type?: string, score?: string) {
 
 export function useOutcomeAction(wsId: string, actionId: string) {
   return useQuery({
-    queryKey: [...queryKeys.admin.outcomeActions(wsId), actionId],
+    queryKey: queryKeys.admin.outcomeAction(wsId, actionId),
     queryFn: ({ signal }) => outcomesApi.getAction(wsId, actionId, signal),
     enabled: !!wsId && !!actionId,
   });
@@ -98,7 +98,7 @@ export function useAddOutcomeNote(wsId: string) {
       outcomesApi.addNote(wsId, actionId, note),
     onSuccess: (_data, { actionId }) => {
       void queryClient.invalidateQueries({
-        queryKey: [...queryKeys.admin.outcomeActions(wsId), actionId],
+        queryKey: queryKeys.admin.outcomeAction(wsId, actionId),
       });
       void queryClient.invalidateQueries({ queryKey: queryKeys.admin.outcomeActions(wsId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.admin.outcomeTimeline(wsId) });

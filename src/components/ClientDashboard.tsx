@@ -231,8 +231,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       intelligence: queryKeys.client.intelligence(workspaceId),
       'outcome-summary': queryKeys.client.outcomeSummary(workspaceId),
       'outcome-wins': queryKeys.client.outcomeWins(workspaceId),
-      // Prefix key: invalidate all client post previews for this workspace.
-      'post-preview': ['client', 'post-preview', workspaceId],
+      'post-preview': queryKeys.client.postPreviewAll(workspaceId),
       // Published briefing refresh for the client briefing overview.
       briefing: queryKeys.client.briefing(workspaceId),
     };
