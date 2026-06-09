@@ -305,9 +305,10 @@
           "source": "Parallel simplification explorer audit 2026-06-09 — Test/Guardrail Leverage",
           "est": "small-medium",
           "priority": "P2",
-          "status": "pending",
-          "notes": "Scope: `tests/pr-check.test.ts`, `scripts/pr-check.ts`, `scripts/generate-rules-doc.ts`, `docs/rules/automated-rules.md`. Current complexity: pr-check tests are large and noisy, and docs drift is verified manually through `npm run rules:generate`. Behavior-preserving path: add an `expectRuleCases(rule, cases)` fixture DSL for compact positive/negative cases; add a contract test that renders generated rules content and compares to committed `automated-rules.md` without writing. Tests/guardrails: `npx vitest run tests/pr-check.test.ts`, `npm run rules:generate`, and `git diff --exit-code docs/rules/automated-rules.md`.",
-          "createdAt": "2026-06-09"
+          "status": "done",
+          "notes": "Scope: `tests/pr-check.test.ts`, `scripts/pr-check.ts`, `scripts/generate-rules-doc.ts`, `docs/rules/automated-rules.md`. Current complexity: pr-check tests are large and noisy, and docs drift is verified manually through `npm run rules:generate`. Behavior-preserving path: add an `expectRuleCases(rule, cases)` fixture DSL for compact positive/negative cases; add a contract test that renders generated rules content and compares to committed `automated-rules.md` without writing. Tests/guardrails: `npx vitest run tests/pr-check.test.ts`, `npm run rules:generate`, and `git diff --exit-code docs/rules/automated-rules.md`. || DONE 2026-06-09: exported `renderAutomatedRulesDoc()` from `scripts/generate-rules-doc.ts` while preserving CLI generation, added a no-write docs drift test against committed `docs/rules/automated-rules.md`, and introduced `expectRuleCases()` in `tests/pr-check.test.ts` with the Global keydown customCheck block migrated as the first representative fixture table. Targeted verification: `npx vitest run tests/pr-check.test.ts`; `npm run rules:generate && git diff --exit-code docs/rules/automated-rules.md`.",
+          "createdAt": "2026-06-09",
+          "shippedAt": "2026-06-09"
         }
       ]
     },

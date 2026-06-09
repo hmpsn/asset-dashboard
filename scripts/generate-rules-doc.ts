@@ -10,7 +10,7 @@
  * audit plan for the rationale.
  */
 
-import { writeFileSync } from 'fs';
+import { realpathSync, writeFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { CHECKS, type Check } from './pr-check.js';
@@ -109,17 +109,17 @@ function renderBySeverity(
   };
 }
 
-function main(): void {
-  const errors = renderBySeverity(CHECKS, 'error');
-  const warnings = renderBySeverity(CHECKS, 'warn');
+export function renderAutomatedRulesDoc(checks: readonly Check[] = CHECKS): string {
+  const errors = renderBySeverity(checks, 'error');
+  const warnings = renderBySeverity(checks, 'warn');
 
-  const content = `# Automated Rules (generated)
+  return `# Automated Rules (generated)
 
 > **DO NOT EDIT.** This file is regenerated from \`scripts/pr-check.ts\` on every PR.
 > Run \`npm run rules:generate\` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **${CHECKS.length}** — ${errors.count} error, ${warnings.count} warn.
+Total rules: **${checks.length}** — ${errors.count} error, ${warnings.count} warn.
 
 Every rule below is enforced automatically by \`npx tsx scripts/pr-check.ts\`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -152,6 +152,23 @@ npm run rules:generate
 CI runs the same command and fails the build if the working tree differs
 from the committed file.
 `;
+}
+
+function isDirectRun(): boolean {
+  const entrypoint = process.argv[1];
+  if (!entrypoint) return false;
+
+  try {
+    return realpathSync(entrypoint) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return path.resolve(entrypoint) === fileURLToPath(import.meta.url);
+  }
+}
+
+function main(): void {
+  const content = renderAutomatedRulesDoc();
+  const errors = renderBySeverity(CHECKS, 'error');
+  const warnings = renderBySeverity(CHECKS, 'warn');
 
   writeFileSync(OUTPUT_PATH, content);
   console.log(
@@ -159,4 +176,6 @@ from the committed file.
   );
 }
 
-main();
+if (isDirectRun()) {
+  main();
+}
