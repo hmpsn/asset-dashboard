@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
+import { expectContainsAll, readProjectFile } from './helpers/source-contracts';
 
 /**
  * Structural verification tests for PR 2B bridges.
@@ -10,72 +10,60 @@ import { readFileSync } from 'fs';
 describe('PR 2B Bridge Wiring Verification', () => {
   describe('Bridge #2: content decay → suggested brief', () => {
     it('content-decay.ts calls fireBridge with bridge-decay-suggested-brief', () => {
-      const src = readFileSync('server/routes/content-decay.ts', 'utf-8'); // readFile-ok — bridge wiring guard: asserts Bridge #2 calls fireBridge with bridge-decay-suggested-brief and createSuggestedBrief in the content-decay route.
-      expect(src).toContain('fireBridge');
-      expect(src).toContain('bridge-decay-suggested-brief');
-      expect(src).toContain('createSuggestedBrief');
+      const src = readProjectFile('server/routes/content-decay.ts');
+      expectContainsAll(src, ['fireBridge', 'bridge-decay-suggested-brief', 'createSuggestedBrief']);
     });
   });
 
   describe('Bridge #3: strategy updated → invalidate intelligence cache', () => {
     it('keyword-strategy.ts calls debouncedStrategyInvalidate', () => {
-      const src = readFileSync('server/routes/keyword-strategy.ts', 'utf-8'); // readFile-ok — bridge wiring guard: asserts Bridge #3 calls debouncedStrategyInvalidate (which calls invalidateIntelligenceCache) in keyword-strategy.ts.
-      expect(src).toContain('debouncedStrategyInvalidate');
-      expect(src).toContain('invalidateIntelligenceCache');
+      const src = readProjectFile('server/routes/keyword-strategy.ts');
+      expectContainsAll(src, ['debouncedStrategyInvalidate', 'invalidateIntelligenceCache']);
     });
 
     it('public-portal.ts calls debouncedStrategyInvalidate', () => {
-      const src = readFileSync('server/routes/public-portal.ts', 'utf-8'); // readFile-ok — bridge wiring guard: asserts Bridge #3 also calls debouncedStrategyInvalidate in the public-portal route (client-facing strategy updates).
+      const src = readProjectFile('server/routes/public-portal.ts');
       expect(src).toContain('debouncedStrategyInvalidate');
     });
   });
 
   describe('Bridge #4: insight resolved → tracked action (pre-existing)', () => {
     it('insights.ts calls recordAction on resolution', () => {
-      const src = readFileSync('server/routes/insights.ts', 'utf-8'); // readFile-ok — bridge wiring guard: asserts Bridge #4 calls recordAction with insight_acted_on and getActionBySource in the insights resolution route.
-      expect(src).toContain('recordAction');
-      expect(src).toContain('getActionBySource');
-      expect(src).toContain('insight_acted_on');
+      const src = readProjectFile('server/routes/insights.ts');
+      expectContainsAll(src, ['recordAction', 'getActionBySource', 'insight_acted_on']);
     });
   });
 
   describe('Bridge #5: page analysis → invalidate intelligence cache', () => {
     it('webflow-keywords.ts calls debouncedPageAnalysisInvalidate', () => {
-      const src = readFileSync('server/routes/webflow-keywords.ts', 'utf-8'); // readFile-ok — bridge wiring guard: asserts Bridge #5 calls debouncedPageAnalysisInvalidate and invalidateIntelligenceCache in webflow-keywords.ts.
-      expect(src).toContain('debouncedPageAnalysisInvalidate');
-      expect(src).toContain('invalidateIntelligenceCache');
+      const src = readProjectFile('server/routes/webflow-keywords.ts');
+      expectContainsAll(src, ['debouncedPageAnalysisInvalidate', 'invalidateIntelligenceCache']);
     });
 
     it('page-analysis-job.ts calls debouncedPageAnalysisInvalidate', () => {
-      const src = readFileSync('server/page-analysis-job.ts', 'utf-8'); // readFile-ok — bridge wiring guard: asserts Bridge #5 also calls debouncedPageAnalysisInvalidate in the background page-analysis worker.
-      expect(src).toContain('debouncedPageAnalysisInvalidate');
-      expect(src).toContain('invalidateIntelligenceCache');
+      const src = readProjectFile('server/page-analysis-job.ts');
+      expectContainsAll(src, ['debouncedPageAnalysisInvalidate', 'invalidateIntelligenceCache']);
     });
   });
 
   describe('Bridge #7: recordAction → auto-resolve insights', () => {
     it('outcome-tracking.ts calls fireBridge with bridge-action-auto-resolve', () => {
-      const src = readFileSync('server/outcome-tracking.ts', 'utf-8'); // readFile-ok — bridge wiring guard: asserts Bridge #7 calls fireBridge with bridge-action-auto-resolve and resolveInsight in outcome-tracking.ts.
-      expect(src).toContain('fireBridge');
-      expect(src).toContain('bridge-action-auto-resolve');
-      expect(src).toContain('resolveInsight');
+      const src = readProjectFile('server/outcome-tracking.ts');
+      expectContainsAll(src, ['fireBridge', 'bridge-action-auto-resolve', 'resolveInsight']);
     });
   });
 
   describe('Bridge #11: workspace settings → cascade invalidation', () => {
     it('workspaces.ts calls debouncedSettingsCascade', () => {
-      const src = readFileSync('server/routes/workspaces.ts', 'utf-8'); // readFile-ok — bridge wiring guard: asserts Bridge #11 calls debouncedSettingsCascade (invalidatePageCache, invalidateSubCachePrefix) in workspaces.ts on settings change.
-      expect(src).toContain('debouncedSettingsCascade');
-      expect(src).toContain('invalidatePageCache');
-      expect(src).toContain('invalidateSubCachePrefix');
+      const src = readProjectFile('server/routes/workspaces.ts');
+      expectContainsAll(src, ['debouncedSettingsCascade', 'invalidatePageCache', 'invalidateSubCachePrefix']);
     });
   });
 
   describe('Bridge #13: recordAction → create annotation', () => {
     it('outcome-tracking.ts calls fireBridge with bridge-action-annotation', () => {
-      const src = readFileSync('server/outcome-tracking.ts', 'utf-8'); // readFile-ok — bridge wiring guard: asserts Bridge #13 calls fireBridge with bridge-action-annotation and createAnnotation in outcome-tracking.ts.
-      expect(src).toContain('bridge-action-annotation');
-      expect(src).toContain('createAnnotation');
+      const src = readProjectFile('server/outcome-tracking.ts');
+      expectContainsAll(src, ['bridge-action-annotation', 'createAnnotation']);
     });
   });
 });
