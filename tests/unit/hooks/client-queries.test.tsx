@@ -17,10 +17,17 @@ import React from 'react';
 // ── Shared wrapper ────────────────────────────────────────────────────────────
 
 function makeWrapper() {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
-  );
+  return makeWrapperWithClient().wrapper;
+}
+
+function makeWrapperWithClient(client?: QueryClient) {
+  const qc = client ?? new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return {
+    client: qc,
+    wrapper: ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    ),
+  };
 }
 
 // ── Mock: src/api/client ──────────────────────────────────────────────────────
@@ -110,6 +117,7 @@ import { useClientPostPreview } from '../../../src/hooks/client/useClientPostPre
 import { useClientSearch } from '../../../src/hooks/client/useClientSearch';
 import { useMonthlyDigest } from '../../../src/hooks/client/useMonthlyDigest';
 import { useClientIntelligence } from '../../../src/hooks/client/useClientIntelligence';
+import { queryKeys } from '../../../src/lib/queryKeys';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // useClientActivity
@@ -419,6 +427,22 @@ describe('useClientSearch', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.overview).toEqual(overview);
     expect(result.current.trend).toEqual(trend);
+  });
+
+  it('keeps client GSC query keys on the shared factory shape', async () => {
+    const dr = { startDate: '2024-01-01', endDate: '2024-01-31' } as const;
+    mockGscOverview.mockResolvedValue(null);
+    mockGscTrend.mockResolvedValue([]);
+    mockGscComparison.mockResolvedValue(null);
+    mockGscDevices.mockResolvedValue([]);
+
+    const { client, wrapper } = makeWrapperWithClient();
+    renderHook(() => useClientSearch('ws-1', 28, dr, true), { wrapper });
+
+    await waitFor(() => expect(client.getQueryState(queryKeys.client.gsc('ws-1', 'overview', 28, dr))?.status).toBe('success'));
+    expect(client.getQueryState(queryKeys.client.gsc('ws-1', 'trend', 28, dr))?.status).toBe('success');
+    expect(client.getQueryState(queryKeys.client.gsc('ws-1', 'comparison', 28, dr))?.status).toBe('success');
+    expect(client.getQueryState(queryKeys.client.gsc('ws-1', 'devices', 28, dr))?.status).toBe('success');
   });
 });
 

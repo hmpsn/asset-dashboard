@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
 import { gscAdmin } from '../../api/analytics';
+import { useGSCBase } from '../shared/useGSCBase';
 import { queryKeys } from '../../lib/queryKeys';
 import type {
   SearchOverview, PerformanceTrend, SearchComparison,
@@ -25,41 +25,25 @@ export function useAdminSearch(
 ): AdminSearchData {
   const enabled = !!workspaceId && !!siteId && !!gscSiteUrl;
   const url = gscSiteUrl ?? '';
-
-  const overviewQ = useQuery({
-    queryKey: queryKeys.admin.gsc(`${workspaceId}:${siteId}`, url, 'overview', days),
-    queryFn: () => gscAdmin.overview(workspaceId, siteId, url, days),
+  const keySiteId = `${workspaceId}:${siteId}`;
+  const {
+    overviewQ,
+    trendQ,
+    comparisonQ,
+    devicesQ,
+    countriesQ,
+    searchTypesQ,
+  } = useGSCBase({
     enabled,
-  });
-
-  const trendQ = useQuery({
-    queryKey: queryKeys.admin.gsc(`${workspaceId}:${siteId}`, url, 'trend', days),
-    queryFn: () => gscAdmin.trend(workspaceId, siteId, url, days),
-    enabled,
-  });
-
-  const devicesQ = useQuery({
-    queryKey: queryKeys.admin.gsc(`${workspaceId}:${siteId}`, url, 'devices', days),
-    queryFn: () => gscAdmin.devices(workspaceId, siteId, url, days),
-    enabled,
-  });
-
-  const countriesQ = useQuery({
-    queryKey: queryKeys.admin.gsc(`${workspaceId}:${siteId}`, url, 'countries', days),
-    queryFn: () => gscAdmin.countries(workspaceId, siteId, url, days),
-    enabled,
-  });
-
-  const typesQ = useQuery({
-    queryKey: queryKeys.admin.gsc(`${workspaceId}:${siteId}`, url, 'types', days),
-    queryFn: () => gscAdmin.searchTypes(workspaceId, siteId, url, days),
-    enabled,
-  });
-
-  const comparisonQ = useQuery({
-    queryKey: queryKeys.admin.gsc(`${workspaceId}:${siteId}`, url, 'comparison', days),
-    queryFn: () => gscAdmin.comparison(workspaceId, siteId, url, days),
-    enabled,
+    makeKey: metric => queryKeys.admin.gsc(keySiteId, url, metric === 'searchTypes' ? 'types' : metric, days),
+    api: {
+      overview: () => gscAdmin.overview(workspaceId, siteId, url, days),
+      trend: () => gscAdmin.trend(workspaceId, siteId, url, days),
+      comparison: () => gscAdmin.comparison(workspaceId, siteId, url, days),
+      devices: () => gscAdmin.devices(workspaceId, siteId, url, days),
+      countries: () => gscAdmin.countries(workspaceId, siteId, url, days),
+      searchTypes: () => gscAdmin.searchTypes(workspaceId, siteId, url, days),
+    },
   });
 
   const firstError = overviewQ.error || trendQ.error;
@@ -72,7 +56,7 @@ export function useAdminSearch(
     trend: trendQ.data ?? [],
     devices: devicesQ.data ?? [],
     countries: countriesQ.data ?? [],
-    searchTypes: typesQ.data ?? [],
+    searchTypes: searchTypesQ.data ?? [],
     comparison: (comparisonQ.data ?? null) as SearchComparison | null,
     isLoading: overviewQ.isLoading,
     error: errorMsg,

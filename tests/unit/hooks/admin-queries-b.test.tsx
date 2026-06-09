@@ -18,10 +18,17 @@ import { renderHook, waitFor } from '@testing-library/react';
 // ── Standard wrapper ────────────────────────────────────────────────────────
 
 function makeWrapper() {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
-  );
+  return makeWrapperWithClient().wrapper;
+}
+
+function makeWrapperWithClient(client?: QueryClient) {
+  const qc = client ?? new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return {
+    client: qc,
+    wrapper: ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    ),
+  };
 }
 
 // ── Mock API modules ────────────────────────────────────────────────────────
@@ -134,6 +141,7 @@ import { useIntegrationHealth } from '../../../src/hooks/admin/useIntegrationHea
 import { useNotifications } from '../../../src/hooks/admin/useNotifications';
 import { useDiagnosticsList, useDiagnosticReport, useDiagnosticForInsight } from '../../../src/hooks/admin/useDiagnostics';
 import { useWorkspaceOverviewData } from '../../../src/hooks/admin/useWorkspaceOverview';
+import { queryKeys } from '../../../src/lib/queryKeys';
 
 // ── useAdminGA4 ─────────────────────────────────────────────────────────────
 
@@ -254,6 +262,26 @@ describe('useAdminSearch', () => {
     expect(result.current.overview).toEqual(overviewData);
     expect(result.current.trend).toEqual([]);
     expect(result.current.error).toBeNull();
+  });
+
+  it('keeps admin GSC query keys on the shared factory shape', async () => {
+    const gscAdmin = (await import('../../../src/api/analytics')).gscAdmin;
+    vi.mocked(gscAdmin.overview).mockResolvedValue(null);
+    vi.mocked(gscAdmin.trend).mockResolvedValue([]);
+    vi.mocked(gscAdmin.devices).mockResolvedValue([]);
+    vi.mocked(gscAdmin.countries).mockResolvedValue([]);
+    vi.mocked(gscAdmin.searchTypes).mockResolvedValue([]);
+    vi.mocked(gscAdmin.comparison).mockResolvedValue(null);
+
+    const { client, wrapper } = makeWrapperWithClient();
+    renderHook(() => useAdminSearch('ws-1', 'site-1', 'https://example.com', 28), { wrapper });
+
+    await waitFor(() => expect(client.getQueryState(queryKeys.admin.gsc('ws-1:site-1', 'https://example.com', 'overview', 28))?.status).toBe('success'));
+    expect(client.getQueryState(queryKeys.admin.gsc('ws-1:site-1', 'https://example.com', 'trend', 28))?.status).toBe('success');
+    expect(client.getQueryState(queryKeys.admin.gsc('ws-1:site-1', 'https://example.com', 'devices', 28))?.status).toBe('success');
+    expect(client.getQueryState(queryKeys.admin.gsc('ws-1:site-1', 'https://example.com', 'countries', 28))?.status).toBe('success');
+    expect(client.getQueryState(queryKeys.admin.gsc('ws-1:site-1', 'https://example.com', 'types', 28))?.status).toBe('success');
+    expect(client.getQueryState(queryKeys.admin.gsc('ws-1:site-1', 'https://example.com', 'comparison', 28))?.status).toBe('success');
   });
 });
 
