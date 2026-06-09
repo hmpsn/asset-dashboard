@@ -390,6 +390,7 @@ describe('Stripe Webhook Idempotency — FM-10', () => {
         productType: 'plan_growth',
       },
       amount_total: 24900,
+      subscription: 'sub_test_idemp_tier',
     });
 
     await handleWebhookEvent(event as never);

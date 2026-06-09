@@ -91,6 +91,12 @@ const PRODUCT_MAP: Record<ProductType, { displayName: string; category: ProductC
   content_scale:    { displayName: 'Scale Content (8 posts/mo)',   category: 'content', priceUsd: 1600, envKey: 'STRIPE_PRICE_CONTENT_SCALE' },
 };
 
+export const PRODUCT_TYPES = Object.freeze(Object.keys(PRODUCT_MAP)) as readonly ProductType[];
+
+export function isProductType(value: string): value is ProductType {
+  return PRODUCT_TYPES.includes(value as ProductType);
+}
+
 export function getProductConfig(type: ProductType): ProductConfig | null {
   const entry = PRODUCT_MAP[type];
   if (!entry) return null;
@@ -148,8 +154,55 @@ function checkoutPaymentIntentId(session: Stripe.Checkout.Session): string | und
   return typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
 }
 
+function checkoutSubscriptionId(session: Stripe.Checkout.Session): string | undefined {
+  return typeof session.subscription === 'string' ? session.subscription : session.subscription?.id;
+}
+
 function isFulfillmentProduct(productType: string): boolean {
   return productType.startsWith('fix_') || productType.startsWith('schema_');
+}
+
+type PlatformPlanTier = 'growth' | 'premium';
+
+function platformPlanTier(productType: string | undefined): PlatformPlanTier | null {
+  if (productType === 'plan_premium') return 'premium';
+  if (productType === 'plan_growth') return 'growth';
+  return null;
+}
+
+function isCurrentPlanSubscription(
+  workspaceId: string,
+  subscriptionId: string,
+  opts: { allowMissingCurrent: boolean; eventType: string; status?: string },
+): boolean {
+  const ws = getWorkspace(workspaceId);
+  if (!ws) {
+    log.warn({ workspaceId, subscriptionId, eventType: opts.eventType }, 'Ignoring platform subscription event for missing workspace');
+    return false;
+  }
+  if (!ws.stripeSubscriptionId) {
+    if (opts.allowMissingCurrent) return true;
+    log.warn({ workspaceId, subscriptionId, eventType: opts.eventType, status: opts.status }, 'Ignoring platform subscription event with no current workspace subscription');
+    return false;
+  }
+  if (ws.stripeSubscriptionId !== subscriptionId) {
+    log.warn({
+      workspaceId,
+      eventSubscriptionId: subscriptionId,
+      currentSubscriptionId: ws.stripeSubscriptionId,
+      eventType: opts.eventType,
+      status: opts.status,
+    }, 'Ignoring stale platform subscription event');
+    return false;
+  }
+  return true;
+}
+
+function downgradePlatformPlan(workspaceId: string, subscriptionId: string, status: string, message: string): void {
+  updateWorkspace(workspaceId, { tier: 'free', stripeSubscriptionId: undefined, trialEndsAt: undefined });
+  _broadcastFn?.(workspaceId, WS_EVENTS.WORKSPACE_UPDATED, { tier: 'free', subscriptionStatus: status });
+  addActivity(workspaceId, 'subscription_cancelled', message, '', { subscriptionId, status });
+  log.info({ workspaceId, subscriptionId, status }, 'Platform subscription downgraded workspace to free');
 }
 
 function paymentQueuesByProduct(payments: PaymentRecord[]): Map<ProductType, PaymentRecord[]> {
@@ -428,9 +481,18 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       // Handle tier upgrade
       if (productType === 'plan_growth' || productType === 'plan_premium') {
         const newTier = productType === 'plan_growth' ? 'growth' : 'premium';
-        updateWorkspace(workspaceId, { tier: newTier, trialEndsAt: undefined });
-        _broadcastFn?.(workspaceId, WS_EVENTS.WORKSPACE_UPDATED, { tier: newTier });
-        log.info(`Tier upgraded: workspace=${workspaceId} → ${newTier}`);
+        const stripeSubId = checkoutSubscriptionId(session);
+        if (!stripeSubId) {
+          log.error({ workspaceId, stripeSessionId: session.id, productType }, 'Platform plan checkout completed without a Stripe subscription id — skipping tier upgrade');
+        } else {
+          updateWorkspace(workspaceId, {
+            tier: newTier,
+            trialEndsAt: undefined,
+            stripeSubscriptionId: stripeSubId,
+          });
+          _broadcastFn?.(workspaceId, WS_EVENTS.WORKSPACE_UPDATED, { tier: newTier });
+          log.info(`Tier upgraded: workspace=${workspaceId} → ${newTier}`);
+        }
       }
 
       // Handle content subscription creation
@@ -654,22 +716,38 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       if (!workspaceId) return;
 
       const productType = subscription.metadata?.productType;
-      const newTier = productType === 'plan_premium' ? 'premium' : productType === 'plan_growth' ? 'growth' : null;
+      const newTier = platformPlanTier(productType);
       if (!newTier) {
         log.info({ workspaceId, subscriptionId: subscription.id, status: subscription.status, productType }, 'Ignoring non-platform subscription event with no local content subscription');
         break;
       }
 
       if (subscription.status === 'active' || subscription.status === 'trialing') {
-        const updates: Record<string, unknown> = { stripeSubscriptionId: subscription.id };
-        updates.tier = newTier;
-        updates.trialEndsAt = undefined;
-        updateWorkspace(workspaceId, updates as Parameters<typeof updateWorkspace>[1]);
+        const allowMissingCurrent = event.type === 'customer.subscription.created';
+        if (!isCurrentPlanSubscription(workspaceId, subscription.id, { allowMissingCurrent, eventType: event.type, status: subscription.status })) break;
+        updateWorkspace(workspaceId, {
+          stripeSubscriptionId: subscription.id,
+          tier: newTier,
+          trialEndsAt: undefined,
+        });
         _broadcastFn?.(workspaceId, WS_EVENTS.WORKSPACE_UPDATED, { tier: newTier, subscriptionStatus: subscription.status });
         log.info(`Subscription ${event.type}: workspace=${workspaceId} status=${subscription.status} tier=${newTier}`);
-      } else if (subscription.status === 'past_due' || subscription.status === 'unpaid') {
+      } else if (subscription.status === 'past_due') {
+        if (!isCurrentPlanSubscription(workspaceId, subscription.id, { allowMissingCurrent: false, eventType: event.type, status: subscription.status })) break;
         log.warn(`Subscription ${subscription.status}: workspace=${workspaceId} sub=${subscription.id}`);
         addActivity(workspaceId, 'subscription_issue', `Subscription payment ${subscription.status} — please update billing`, '', { subscriptionId: subscription.id });
+        _broadcastFn?.(workspaceId, WS_EVENTS.WORKSPACE_UPDATED, { subscriptionStatus: subscription.status });
+      } else if (subscription.status === 'unpaid') {
+        if (!isCurrentPlanSubscription(workspaceId, subscription.id, { allowMissingCurrent: false, eventType: event.type, status: subscription.status })) break;
+        downgradePlatformPlan(workspaceId, subscription.id, subscription.status, 'Subscription unpaid — downgraded to Free tier');
+      } else if (subscription.status === 'incomplete_expired') {
+        if (!isCurrentPlanSubscription(workspaceId, subscription.id, { allowMissingCurrent: false, eventType: event.type, status: subscription.status })) break;
+        downgradePlatformPlan(workspaceId, subscription.id, subscription.status, 'Subscription checkout expired — downgraded to Free tier');
+      } else if (subscription.status === 'canceled') {
+        if (!isCurrentPlanSubscription(workspaceId, subscription.id, { allowMissingCurrent: false, eventType: event.type, status: subscription.status })) break;
+        downgradePlatformPlan(workspaceId, subscription.id, subscription.status, 'Subscription cancelled — downgraded to Free tier');
+      } else {
+        log.warn({ workspaceId, subscriptionId: subscription.id, status: subscription.status }, 'Unhandled platform subscription Stripe status');
       }
       break;
     }
@@ -688,11 +766,10 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
         const workspaceId = subscription.metadata?.workspaceId;
         if (!workspaceId) return;
 
+        if (!isCurrentPlanSubscription(workspaceId, subscription.id, { allowMissingCurrent: false, eventType: event.type, status: subscription.status })) break;
+
         // Downgrade to free tier (platform plan)
-        updateWorkspace(workspaceId, { tier: 'free', stripeSubscriptionId: undefined, trialEndsAt: undefined });
-        _broadcastFn?.(workspaceId, WS_EVENTS.WORKSPACE_UPDATED, { tier: 'free' });
-        addActivity(workspaceId, 'subscription_cancelled', 'Subscription cancelled — downgraded to Free tier', '', { subscriptionId: subscription.id });
-        log.info(`Subscription cancelled: workspace=${workspaceId} sub=${subscription.id} → free tier`);
+        downgradePlatformPlan(workspaceId, subscription.id, 'canceled', 'Subscription cancelled — downgraded to Free tier');
       }
       break;
     }

@@ -197,6 +197,66 @@ describe('getStripePriceId', () => {
 // ── Env var overrides ──
 
 describe('env var overrides', () => {
+  it('STRIPE_CONFIG_KEY takes precedence over APP_PASSWORD for encrypted config', () => {
+    const originalAppPassword = process.env.APP_PASSWORD;
+    const originalConfigKey = process.env.STRIPE_CONFIG_KEY;
+    try {
+      process.env.APP_PASSWORD = 'app-password-seed';
+      process.env.STRIPE_CONFIG_KEY = 'stripe-config-seed';
+
+      saveStripeKeys('sk_config_key_precedence', 'whsec_config_key_precedence');
+      expect(getStripeConfig()?.secretKey).toBe('sk_config_key_precedence');
+
+      delete process.env.STRIPE_CONFIG_KEY;
+      expect(getStripeConfig()?.secretKey).toBe('');
+    } finally {
+      if (originalAppPassword !== undefined) process.env.APP_PASSWORD = originalAppPassword;
+      else delete process.env.APP_PASSWORD;
+      if (originalConfigKey !== undefined) process.env.STRIPE_CONFIG_KEY = originalConfigKey;
+      else delete process.env.STRIPE_CONFIG_KEY;
+    }
+  });
+
+  it('decrypts legacy APP_PASSWORD-encrypted config after STRIPE_CONFIG_KEY is introduced', () => {
+    const originalAppPassword = process.env.APP_PASSWORD;
+    const originalConfigKey = process.env.STRIPE_CONFIG_KEY;
+    try {
+      process.env.APP_PASSWORD = 'legacy-app-password-seed';
+      delete process.env.STRIPE_CONFIG_KEY;
+
+      saveStripeKeys('sk_legacy_app_password', 'whsec_legacy_app_password');
+      expect(getStripeConfig()?.secretKey).toBe('sk_legacy_app_password');
+
+      process.env.STRIPE_CONFIG_KEY = 'new-stripe-config-seed';
+      expect(getStripeConfig()?.secretKey).toBe('sk_legacy_app_password');
+    } finally {
+      if (originalAppPassword !== undefined) process.env.APP_PASSWORD = originalAppPassword;
+      else delete process.env.APP_PASSWORD;
+      if (originalConfigKey !== undefined) process.env.STRIPE_CONFIG_KEY = originalConfigKey;
+      else delete process.env.STRIPE_CONFIG_KEY;
+    }
+  });
+
+  it('rejects default encryption key fallback in production', () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalAppPassword = process.env.APP_PASSWORD;
+    const originalConfigKey = process.env.STRIPE_CONFIG_KEY;
+    try {
+      process.env.NODE_ENV = 'production';
+      delete process.env.APP_PASSWORD;
+      delete process.env.STRIPE_CONFIG_KEY;
+
+      expect(() => saveStripeKeys('sk_prod_without_seed')).toThrow(/STRIPE_CONFIG_KEY is required/);
+    } finally {
+      if (originalNodeEnv !== undefined) process.env.NODE_ENV = originalNodeEnv;
+      else delete process.env.NODE_ENV;
+      if (originalAppPassword !== undefined) process.env.APP_PASSWORD = originalAppPassword;
+      else delete process.env.APP_PASSWORD;
+      if (originalConfigKey !== undefined) process.env.STRIPE_CONFIG_KEY = originalConfigKey;
+      else delete process.env.STRIPE_CONFIG_KEY;
+    }
+  });
+
   it('getStripeSecretKey prefers env var', () => {
     const orig = process.env.STRIPE_SECRET_KEY;
     process.env.STRIPE_SECRET_KEY = 'sk_env_override';
