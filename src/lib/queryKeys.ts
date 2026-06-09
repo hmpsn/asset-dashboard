@@ -28,6 +28,7 @@ export const queryKeys = {
     gsc: (siteId: string, url: string, metric: string, days: number) =>
       ['admin-gsc', siteId, url, metric, days] as const,
     gscAll: (siteId: string) => ['admin-gsc', siteId] as const,
+    gscAny: () => ['admin-gsc'] as const,
 
     // Content
     briefs: (wsId: string) => ['admin-briefs', wsId] as const,
@@ -58,6 +59,7 @@ export const queryKeys = {
     // SEO / Audit
     auditAll: () => ['admin-audit'] as const,
     auditTraffic: (siteId: string) => ['admin-audit-traffic', siteId] as const,
+    auditTrafficAll: () => ['admin-audit-traffic'] as const,
     auditSuppressions: (wsId: string) => ['admin-audit-suppressions', wsId] as const,
     auditSchedule: (wsId: string) => ['admin-audit-schedule', wsId] as const,
     schemaPlan: (siteId: string, wsId?: string) =>

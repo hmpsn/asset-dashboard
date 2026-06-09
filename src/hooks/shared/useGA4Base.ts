@@ -30,6 +30,20 @@ export interface GA4BaseOptions {
   includeEvents?: boolean;
   /** Extra options forwarded to ga4.landingPages (e.g. organic, limit). */
   landingOpts?: { organic?: boolean; limit?: number };
+  api?: {
+    overview: typeof ga4.overview;
+    trend: typeof ga4.trend;
+    topPages: typeof ga4.topPages;
+    sources: typeof ga4.sources;
+    devices: typeof ga4.devices;
+    countries: typeof ga4.countries;
+    comparison: typeof ga4.comparison;
+    newVsReturning: typeof ga4.newVsReturning;
+    organic: typeof ga4.organic;
+    landingPages: typeof ga4.landingPages;
+    conversions: typeof ga4.conversions;
+    events?: typeof ga4.events;
+  };
 }
 
 export function useGA4Base({
@@ -40,6 +54,7 @@ export function useGA4Base({
   keyPrefix,
   includeEvents = false,
   landingOpts,
+  api = ga4,
 }: GA4BaseOptions) {
   // Build a consistent query key: [prefix, wsId, metric, days] or [..., dateRange]
   const mk = (metric: string): unknown[] =>
@@ -47,62 +62,62 @@ export function useGA4Base({
 
   const overviewQ = useQuery({
     queryKey: mk('overview'),
-    queryFn: () => ga4.overview(wsId, days, dr),
+    queryFn: () => api.overview(wsId, days, dr),
     enabled,
   });
 
   const trendQ = useQuery({
     queryKey: mk('trend'),
-    queryFn: () => ga4.trend(wsId, days, dr),
+    queryFn: () => api.trend(wsId, days, dr),
     enabled,
   });
 
   const topPagesQ = useQuery({
     queryKey: mk('pages'),
-    queryFn: () => ga4.topPages(wsId, days, dr),
+    queryFn: () => api.topPages(wsId, days, dr),
     enabled,
   });
 
   const sourcesQ = useQuery({
     queryKey: mk('sources'),
-    queryFn: () => ga4.sources(wsId, days, dr),
+    queryFn: () => api.sources(wsId, days, dr),
     enabled,
   });
 
   const devicesQ = useQuery({
     queryKey: mk('devices'),
-    queryFn: () => ga4.devices(wsId, days, dr),
+    queryFn: () => api.devices(wsId, days, dr),
     enabled,
   });
 
   const countriesQ = useQuery({
     queryKey: mk('countries'),
-    queryFn: () => ga4.countries(wsId, days, dr),
+    queryFn: () => api.countries(wsId, days, dr),
     enabled,
   });
 
   const comparisonQ = useQuery({
     queryKey: mk('comparison'),
-    queryFn: () => ga4.comparison(wsId, days, dr),
+    queryFn: () => api.comparison(wsId, days, dr),
     enabled,
   });
 
   const nvrQ = useQuery({
     queryKey: mk('nvr'),
-    queryFn: () => ga4.newVsReturning(wsId, days, dr),
+    queryFn: () => api.newVsReturning(wsId, days, dr),
     enabled,
   });
 
   const organicQ = useQuery({
     queryKey: mk('organic'),
-    queryFn: () => ga4.organic(wsId, days, dr),
+    queryFn: () => api.organic(wsId, days, dr),
     enabled,
   });
 
   const landingQ = useQuery({
     queryKey: mk('landing'),
     queryFn: () =>
-      ga4.landingPages(wsId, days, {
+      api.landingPages(wsId, days, {
         ...(dr ? { dateRange: dr } : {}),
         ...landingOpts,
       }),
@@ -111,13 +126,13 @@ export function useGA4Base({
 
   const conversionsQ = useQuery({
     queryKey: mk('conversions'),
-    queryFn: () => ga4.conversions(wsId, days, dr),
+    queryFn: () => api.conversions(wsId, days, dr),
     enabled,
   });
 
   const eventsQ = useQuery({
     queryKey: mk('events'),
-    queryFn: () => ga4.events(wsId, days, dr),
+    queryFn: () => api.events ? api.events(wsId, days, dr) : Promise.resolve([]),
     enabled: enabled && includeEvents,
   });
 

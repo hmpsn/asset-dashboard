@@ -203,9 +203,9 @@ router.get('/api/webflow/redirect-scan/:siteId', requireWorkspaceSiteAccessFromQ
 
     // Fetch GSC ghost URLs — pages Google indexes that may no longer exist
     let gscGhostUrls: Array<{ url: string; path: string; clicks: number; impressions: number }> | undefined;
-    if (ws?.gscPropertyUrl) {
+    if (ws?.gscPropertyUrl && ws.webflowSiteId) {
       try {
-        const gscPages = await getAllGscPages(ws.id, ws.gscPropertyUrl, 90);
+        const gscPages = await getAllGscPages(ws.webflowSiteId, ws.gscPropertyUrl, 90);
         if (gscPages.length > 0) {
           gscGhostUrls = gscPages.map(p => {
             try {

@@ -125,6 +125,20 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceDetail(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceOverview() });
       qc.invalidateQueries({ queryKey: queryKeys.admin.auditSuppressions(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.ga4All(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.gscAny() });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.auditTrafficAll() });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.insightFeed(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingHistory(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.ga4All(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.gscAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.insights(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.clientInsights(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.rankHistory(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.latestRanks(workspaceId) });
     },
     [WS_EVENTS.PAGE_STATE_UPDATED]: () => {
       if (!workspaceId) return;

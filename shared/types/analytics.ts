@@ -99,6 +99,7 @@ export interface GA4TopPage {
   path: string;
   pageviews: number;
   users: number;
+  sessions: number;
   avgEngagementTime: number;
 }
 
@@ -256,6 +257,8 @@ export interface PageHealthData extends InsightDataBase {
   pageviews: number;
   bounceRate: number;
   avgEngagementTime: number;
+  /** False when GA4 data was unavailable or the page was absent from the GA4 read. */
+  ga4Available?: boolean;
   /** Audit-derived enrichment — present only when populated by bridge-audit-page-health */
   auditSnapshotId?: string;
   errorCount?: number;

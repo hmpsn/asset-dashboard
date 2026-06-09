@@ -239,6 +239,7 @@ export function computePageHealthScores(
     const pagePath = normalizePagePath(page.page);
 
     const ga4 = ga4Map.get(pagePath);
+    const ga4Available = !!ga4;
     const pageviews = ga4?.pageviews ?? 0;
     const avgEngagement = ga4?.avgEngagementTime ?? 0;
 
@@ -256,9 +257,13 @@ export function computePageHealthScores(
     const ctrScore = Math.min(20, 20 * Math.min(ctrRatio, 2) / 2);
 
     // Engagement component (0–25): engagement time capped at 180s
-    const engagementScore = Math.min(25, 25 * Math.min(avgEngagement, 180) / 180);
+    const engagementScore = ga4Available
+      ? Math.min(25, 25 * Math.min(avgEngagement, 180) / 180)
+      : 0;
 
-    const score = Math.round(posScore + trafficScore + ctrScore + engagementScore);
+    const rawScore = posScore + trafficScore + ctrScore + engagementScore;
+    const availableMaxScore = ga4Available ? 100 : 75;
+    const score = Math.round((rawScore / availableMaxScore) * 100);
 
     let severity: InsightSeverity;
     if (score >= 70) severity = 'positive';
@@ -279,6 +284,7 @@ export function computePageHealthScores(
         pageviews,
         bounceRate: 0, // not available from GA4TopPage, added in Phase 2
         avgEngagementTime: avgEngagement,
+        ga4Available,
       },
       severity,
     };

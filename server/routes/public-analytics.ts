@@ -4,7 +4,7 @@
  * @reads analytics_insights, search_console, google_analytics, chat_memory, workspaces, snapshots, workspace_intelligence, studio_config
  * @writes chat_memory, activities
  */
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 import { verifyToken } from '../auth.js';
 import { verifyAdminToken, APP_PASSWORD, requireClientPortalAuth } from '../middleware.js';
 import { validate, z } from '../middleware/validate.js';
@@ -33,7 +33,7 @@ import {
   getGA4PeriodComparison,
   getGA4NewVsReturning,
 } from '../google-analytics.js';
-import { parseDateRange, applySuppressionsToAudit, getAuditTrafficForWorkspace, normalizePageUrl, stripCodeFences } from '../helpers.js';
+import { parseDateRangeStrict, applySuppressionsToAudit, getAuditTrafficForWorkspace, normalizePageUrl, stripCodeFences } from '../helpers.js';
 import { callAI } from '../ai.js';
 import { getLatestSnapshot } from '../reports.js';
 import {
@@ -69,6 +69,50 @@ const log = createLogger('public-analytics');
 const router = Router();
 
 router.use('/api/public/:resource/:workspaceId', requireClientPortalAuth('workspaceId'));
+
+function parseAnalyticsWindow(req: Request, res: Response): { days: number; dateRange?: import('../google-analytics.js').CustomDateRange } | null {
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) {
+    res.status(400).json({ error: 'days must be a positive integer' });
+    return null;
+  }
+  const parsed = parseDateRangeStrict(req.query);
+  if (parsed.error) {
+    res.status(400).json({ error: parsed.error });
+    return null;
+  }
+  return { days, dateRange: parsed.dateRange };
+}
+
+function parseBoundedQueryString(
+  value: unknown,
+  field: string,
+  maxLen: number,
+  res: Response,
+  options: { required?: boolean } = {},
+): string | undefined | null {
+  if (value === undefined) {
+    if (options.required) {
+      res.status(400).json({ error: `${field} query param required` });
+      return null;
+    }
+    return undefined;
+  }
+  if (typeof value !== 'string') {
+    res.status(400).json({ error: `${field} must be a string` });
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed && options.required) {
+    res.status(400).json({ error: `${field} query param required` });
+    return null;
+  }
+  if (!trimmed || trimmed.length > maxLen) {
+    res.status(400).json({ error: `${field} must be a non-empty string up to ${maxLen} characters` });
+    return null;
+  }
+  return trimmed;
+}
 
 // ── AI intent classification ──────────────────────────────────────────────────
 // Runs in parallel with the main chat call — zero added latency.
@@ -172,11 +216,10 @@ router.get('/api/public/insights/:workspaceId', async (req, res) => {
 router.get('/api/public/search-overview/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.webflowSiteId || !ws.gscPropertyUrl) return res.status(400).json({ error: 'Search Console not configured for this workspace' });
-  const days = parsePositiveIntQuery(req.query.days, 28);
-  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
-  const dr = parseDateRange(req.query);
+  const window = parseAnalyticsWindow(req, res);
+  if (!window) return;
   try {
-    const overview = await fetchSearchOverview(ws.webflowSiteId, ws.gscPropertyUrl, days, dr);
+    const overview = await fetchSearchOverview(ws.webflowSiteId, ws.gscPropertyUrl, window.days, window.dateRange);
     res.json(overview);
   } catch (err) {
     log.error({ err }, 'Failed to fetch search overview');
@@ -187,10 +230,10 @@ router.get('/api/public/search-overview/:workspaceId', async (req, res) => {
 router.get('/api/public/performance-trend/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.webflowSiteId || !ws.gscPropertyUrl) return res.status(400).json({ error: 'Search Console not configured' });
-  const days = parsePositiveIntQuery(req.query.days, 28);
-  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  const window = parseAnalyticsWindow(req, res);
+  if (!window) return;
   try {
-    const trend = await fetchPerformanceTrend(ws.webflowSiteId, ws.gscPropertyUrl, days, parseDateRange(req.query));
+    const trend = await fetchPerformanceTrend(ws.webflowSiteId, ws.gscPropertyUrl, window.days, window.dateRange);
     res.json(trend);
   } catch (err) {
     log.error({ err }, 'Failed to fetch performance trend');
@@ -201,10 +244,10 @@ router.get('/api/public/performance-trend/:workspaceId', async (req, res) => {
 router.get('/api/public/search-devices/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.webflowSiteId || !ws.gscPropertyUrl) return res.status(400).json({ error: 'Search Console not configured' });
-  const days = parsePositiveIntQuery(req.query.days, 28);
-  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  const window = parseAnalyticsWindow(req, res);
+  if (!window) return;
   try {
-    res.json(await fetchSearchDevices(ws.webflowSiteId, ws.gscPropertyUrl, days, parseDateRange(req.query)));
+    res.json(await fetchSearchDevices(ws.webflowSiteId, ws.gscPropertyUrl, window.days, window.dateRange));
   } catch (err) {
     log.error({ err }, 'Failed to fetch search devices');
     res.status(500).json({ error: 'Internal server error' });
@@ -214,12 +257,12 @@ router.get('/api/public/search-devices/:workspaceId', async (req, res) => {
 router.get('/api/public/search-countries/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.webflowSiteId || !ws.gscPropertyUrl) return res.status(400).json({ error: 'Search Console not configured' });
-  const days = parsePositiveIntQuery(req.query.days, 28);
-  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  const window = parseAnalyticsWindow(req, res);
+  if (!window) return;
   const limit = parsePositiveIntQuery(req.query.limit, 20);
   if (limit == null) return res.status(400).json({ error: 'limit must be a positive integer' });
   try {
-    res.json(await fetchSearchCountries(ws.webflowSiteId, ws.gscPropertyUrl, days, limit, parseDateRange(req.query)));
+    res.json(await fetchSearchCountries(ws.webflowSiteId, ws.gscPropertyUrl, window.days, limit, window.dateRange));
   } catch (err) {
     log.error({ err }, 'Failed to fetch search countries');
     res.status(500).json({ error: 'Internal server error' });
@@ -229,10 +272,10 @@ router.get('/api/public/search-countries/:workspaceId', async (req, res) => {
 router.get('/api/public/search-types/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.webflowSiteId || !ws.gscPropertyUrl) return res.status(400).json({ error: 'Search Console not configured' });
-  const days = parsePositiveIntQuery(req.query.days, 28);
-  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  const window = parseAnalyticsWindow(req, res);
+  if (!window) return;
   try {
-    res.json(await fetchSearchTypes(ws.webflowSiteId, ws.gscPropertyUrl, days, parseDateRange(req.query)));
+    res.json(await fetchSearchTypes(ws.webflowSiteId, ws.gscPropertyUrl, window.days, window.dateRange));
   } catch (err) {
     log.error({ err }, 'Failed to fetch search types');
     res.status(500).json({ error: 'Internal server error' });
@@ -242,10 +285,10 @@ router.get('/api/public/search-types/:workspaceId', async (req, res) => {
 router.get('/api/public/search-comparison/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.webflowSiteId || !ws.gscPropertyUrl) return res.status(400).json({ error: 'Search Console not configured' });
-  const days = parsePositiveIntQuery(req.query.days, 28);
-  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  const window = parseAnalyticsWindow(req, res);
+  if (!window) return;
   try {
-    res.json(await fetchSearchComparison(ws.webflowSiteId, ws.gscPropertyUrl, days, parseDateRange(req.query)));
+    res.json(await fetchSearchComparison(ws.webflowSiteId, ws.gscPropertyUrl, window.days, window.dateRange));
   } catch (err) {
     log.error({ err }, 'Failed to fetch search comparison');
     res.status(500).json({ error: 'Internal server error' });
@@ -544,10 +587,10 @@ ${JSON.stringify(context, null, 2)}`;
 router.get('/api/public/analytics-overview/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured for this workspace' });
-  const days = parsePositiveIntQuery(req.query.days, 28);
-  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  const window = parseAnalyticsWindow(req, res);
+  if (!window) return;
   try {
-    const overview = await getGA4Overview(ws.ga4PropertyId, days, parseDateRange(req.query));
+    const overview = await getGA4Overview(ws.ga4PropertyId, window.days, window.dateRange);
     res.json(overview);
   } catch (err) {
     log.error({ err }, 'Failed to fetch GA4 overview');
@@ -558,10 +601,10 @@ router.get('/api/public/analytics-overview/:workspaceId', async (req, res) => {
 router.get('/api/public/analytics-trend/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parsePositiveIntQuery(req.query.days, 28);
-  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  const window = parseAnalyticsWindow(req, res);
+  if (!window) return;
   try {
-    const trend = await getGA4DailyTrend(ws.ga4PropertyId, days, parseDateRange(req.query));
+    const trend = await getGA4DailyTrend(ws.ga4PropertyId, window.days, window.dateRange);
     res.json(trend);
   } catch (err) {
     log.error({ err }, 'Failed to fetch GA4 trend');
@@ -572,10 +615,10 @@ router.get('/api/public/analytics-trend/:workspaceId', async (req, res) => {
 router.get('/api/public/analytics-top-pages/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parsePositiveIntQuery(req.query.days, 28);
-  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  const window = parseAnalyticsWindow(req, res);
+  if (!window) return;
   try {
-    const pages = await getGA4TopPages(ws.ga4PropertyId, days, 200, parseDateRange(req.query));
+    const pages = await getGA4TopPages(ws.ga4PropertyId, window.days, 200, window.dateRange);
     res.json(pages);
   } catch (err) {
     log.error({ err }, 'Failed to fetch GA4 top pages');
@@ -586,10 +629,10 @@ router.get('/api/public/analytics-top-pages/:workspaceId', async (req, res) => {
 router.get('/api/public/analytics-sources/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parsePositiveIntQuery(req.query.days, 28);
-  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  const window = parseAnalyticsWindow(req, res);
+  if (!window) return;
   try {
-    const sources = await getGA4TopSources(ws.ga4PropertyId, days, 10, parseDateRange(req.query));
+    const sources = await getGA4TopSources(ws.ga4PropertyId, window.days, 10, window.dateRange);
     res.json(sources);
   } catch (err) {
     log.error({ err }, 'Failed to fetch GA4 sources');
@@ -600,10 +643,10 @@ router.get('/api/public/analytics-sources/:workspaceId', async (req, res) => {
 router.get('/api/public/analytics-devices/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parsePositiveIntQuery(req.query.days, 28);
-  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  const window = parseAnalyticsWindow(req, res);
+  if (!window) return;
   try {
-    const devices = await getGA4DeviceBreakdown(ws.ga4PropertyId, days, parseDateRange(req.query));
+    const devices = await getGA4DeviceBreakdown(ws.ga4PropertyId, window.days, window.dateRange);
     res.json(devices);
   } catch (err) {
     log.error({ err }, 'Failed to fetch GA4 devices');
@@ -614,10 +657,10 @@ router.get('/api/public/analytics-devices/:workspaceId', async (req, res) => {
 router.get('/api/public/analytics-countries/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parsePositiveIntQuery(req.query.days, 28);
-  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  const window = parseAnalyticsWindow(req, res);
+  if (!window) return;
   try {
-    const countries = await getGA4Countries(ws.ga4PropertyId, days, 10, parseDateRange(req.query));
+    const countries = await getGA4Countries(ws.ga4PropertyId, window.days, 10, window.dateRange);
     res.json(countries);
   } catch (err) {
     log.error({ err }, 'Failed to fetch GA4 countries');
@@ -628,10 +671,10 @@ router.get('/api/public/analytics-countries/:workspaceId', async (req, res) => {
 router.get('/api/public/analytics-comparison/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parsePositiveIntQuery(req.query.days, 28);
-  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  const window = parseAnalyticsWindow(req, res);
+  if (!window) return;
   try {
-    res.json(await getGA4PeriodComparison(ws.ga4PropertyId, days, parseDateRange(req.query)));
+    res.json(await getGA4PeriodComparison(ws.ga4PropertyId, window.days, window.dateRange));
   } catch (err) {
     log.error({ err }, 'Failed to fetch GA4 comparison');
     res.status(500).json({ error: 'Internal server error' });
@@ -641,10 +684,10 @@ router.get('/api/public/analytics-comparison/:workspaceId', async (req, res) => 
 router.get('/api/public/analytics-new-vs-returning/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parsePositiveIntQuery(req.query.days, 28);
-  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  const window = parseAnalyticsWindow(req, res);
+  if (!window) return;
   try {
-    res.json(await getGA4NewVsReturning(ws.ga4PropertyId, days, parseDateRange(req.query)));
+    res.json(await getGA4NewVsReturning(ws.ga4PropertyId, window.days, window.dateRange));
   } catch (err) {
     log.error({ err }, 'Failed to fetch GA4 new vs returning');
     res.status(500).json({ error: 'Internal server error' });
@@ -655,10 +698,10 @@ router.get('/api/public/analytics-new-vs-returning/:workspaceId', async (req, re
 router.get('/api/public/analytics-events/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parsePositiveIntQuery(req.query.days, 28);
-  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  const window = parseAnalyticsWindow(req, res);
+  if (!window) return;
   try {
-    const events = await getGA4KeyEvents(ws.ga4PropertyId, days, 20, parseDateRange(req.query));
+    const events = await getGA4KeyEvents(ws.ga4PropertyId, window.days, 20, window.dateRange);
     res.json(events);
   } catch (err) {
     log.error({ err }, 'Failed to fetch GA4 events');
@@ -669,12 +712,12 @@ router.get('/api/public/analytics-events/:workspaceId', async (req, res) => {
 router.get('/api/public/analytics-event-trend/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parsePositiveIntQuery(req.query.days, 28);
-  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
-  const eventName = req.query.event as string;
-  if (!eventName) return res.status(400).json({ error: 'event query param required' });
+  const window = parseAnalyticsWindow(req, res);
+  if (!window) return;
+  const eventName = parseBoundedQueryString(req.query.event, 'event', 200, res, { required: true });
+  if (eventName == null) return;
   try {
-    const trend = await getGA4EventTrend(ws.ga4PropertyId, eventName, days, parseDateRange(req.query));
+    const trend = await getGA4EventTrend(ws.ga4PropertyId, eventName, window.days, window.dateRange);
     res.json(trend);
   } catch (err) {
     log.error({ err }, 'Failed to fetch GA4 event trend');
@@ -685,10 +728,10 @@ router.get('/api/public/analytics-event-trend/:workspaceId', async (req, res) =>
 router.get('/api/public/analytics-conversions/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parsePositiveIntQuery(req.query.days, 28);
-  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  const window = parseAnalyticsWindow(req, res);
+  if (!window) return;
   try {
-    const conversions = await getGA4Conversions(ws.ga4PropertyId, days, parseDateRange(req.query));
+    const conversions = await getGA4Conversions(ws.ga4PropertyId, window.days, window.dateRange);
     res.json(conversions);
   } catch (err) {
     log.error({ err }, 'Failed to fetch GA4 conversions');
@@ -700,12 +743,14 @@ router.get('/api/public/analytics-conversions/:workspaceId', async (req, res) =>
 router.get('/api/public/analytics-event-explorer/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parsePositiveIntQuery(req.query.days, 28);
-  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
-  const eventName = req.query.event as string | undefined;
-  const pagePath = req.query.page as string | undefined;
+  const window = parseAnalyticsWindow(req, res);
+  if (!window) return;
+  const eventName = parseBoundedQueryString(req.query.event, 'event', 200, res);
+  if (eventName === null) return;
+  const pagePath = parseBoundedQueryString(req.query.page, 'page', 500, res);
+  if (pagePath === null) return;
   try {
-    const data = await getGA4EventsByPage(ws.ga4PropertyId, days, { eventName, pagePath }, parseDateRange(req.query));
+    const data = await getGA4EventsByPage(ws.ga4PropertyId, window.days, { eventName, pagePath }, window.dateRange);
     res.json(data);
   } catch (err) {
     log.error({ err }, 'Failed to fetch GA4 event explorer');
@@ -717,13 +762,13 @@ router.get('/api/public/analytics-event-explorer/:workspaceId', async (req, res)
 router.get('/api/public/analytics-landing-pages/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parsePositiveIntQuery(req.query.days, 28);
-  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  const window = parseAnalyticsWindow(req, res);
+  if (!window) return;
   const organicOnly = req.query.organic === 'true';
   const limit = parsePositiveIntQuery(req.query.limit, 25);
   if (limit == null) return res.status(400).json({ error: 'limit must be a positive integer' });
   try {
-    res.json(await getGA4LandingPages(ws.ga4PropertyId, days, limit, organicOnly, parseDateRange(req.query)));
+    res.json(await getGA4LandingPages(ws.ga4PropertyId, window.days, limit, organicOnly, window.dateRange));
   } catch (err) {
     log.error({ err }, 'Failed to fetch GA4 landing pages');
     res.status(500).json({ error: 'Internal server error' });
@@ -733,10 +778,10 @@ router.get('/api/public/analytics-landing-pages/:workspaceId', async (req, res) 
 router.get('/api/public/analytics-organic/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parsePositiveIntQuery(req.query.days, 28);
-  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  const window = parseAnalyticsWindow(req, res);
+  if (!window) return;
   try {
-    res.json(await getGA4OrganicOverview(ws.ga4PropertyId, days, parseDateRange(req.query)));
+    res.json(await getGA4OrganicOverview(ws.ga4PropertyId, window.days, window.dateRange));
   } catch (err) {
     log.error({ err }, 'Failed to fetch GA4 organic overview');
     res.status(500).json({ error: 'Internal server error' });

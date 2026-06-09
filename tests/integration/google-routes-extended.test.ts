@@ -106,6 +106,7 @@ vi.mock('../../server/search-console.js', async (importOriginal) => {
 
 const ga4State = vi.hoisted(() => ({
   properties: [{ propertyId: '123456789', displayName: 'My Property', createTime: '2021-01-01' }] as Array<{ propertyId: string; displayName: string; createTime: string }>,
+  landingPagesCalls: [] as Array<{ propertyId: string; days: number; limit: number; organicOnly: boolean }>,
   shouldThrow: false,
 }));
 
@@ -116,6 +117,15 @@ vi.mock('../../server/google-analytics.js', async (importOriginal) => {
     listGA4Properties: vi.fn(async () => {
       if (ga4State.shouldThrow) throw new Error('GA4 API error');
       return ga4State.properties;
+    }),
+    getGA4LandingPages: vi.fn(async (
+      propertyId: string,
+      days: number,
+      limit: number,
+      organicOnly: boolean,
+    ) => {
+      ga4State.landingPagesCalls.push({ propertyId, days, limit, organicOnly });
+      return [{ landingPage: '/', sessions: 1, users: 1, bounceRate: 0, avgEngagementTime: 0, conversions: 0 }];
     }),
   };
 });
@@ -486,6 +496,52 @@ describe('GET /api/google/ga4-properties', () => {
     expect(error).toBeTruthy();
     expect(error).not.toContain('GA4 API error');
     expect(error).toContain('Unable to load GA4 properties');
+  });
+});
+
+describe('GET /api/google/analytics-landing-pages/:workspaceId', () => {
+  let ws: SeededFullWorkspace;
+  let baseUrl: string;
+  let stop: () => Promise<void>;
+
+  beforeEach(async () => {
+    ws = seedWorkspace({ ga4PropertyId: 'ga4-prop-123' });
+    ga4State.landingPagesCalls = [];
+    const srv = await startTestServer();
+    baseUrl = srv.baseUrl;
+    stop = srv.stop;
+  });
+
+  afterEach(async () => {
+    ws.cleanup();
+    await stop();
+  });
+
+  it('passes days, limit, and organic flag through to GA4 provider', async () => {
+    const { status, body } = await getJson(
+      baseUrl,
+      `/api/google/analytics-landing-pages/${ws.workspaceId}?days=14&limit=20&organic=true`,
+    );
+
+    expect(status).toBe(200);
+    expect(Array.isArray(body)).toBe(true);
+    expect(ga4State.landingPagesCalls).toEqual([{
+      propertyId: 'ga4-prop-123',
+      days: 14,
+      limit: 20,
+      organicOnly: true,
+    }]);
+  });
+
+  it('rejects invalid limit values', async () => {
+    const { status, body } = await getJson(
+      baseUrl,
+      `/api/google/analytics-landing-pages/${ws.workspaceId}?limit=0`,
+    );
+
+    expect(status).toBe(400);
+    expect((body as Record<string, unknown>).error).toContain('limit');
+    expect(ga4State.landingPagesCalls).toEqual([]);
   });
 });
 

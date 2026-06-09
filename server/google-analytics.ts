@@ -32,6 +32,7 @@ export interface GA4TopPage {
   path: string;
   pageviews: number;
   users: number;
+  sessions: number;
   avgEngagementTime: number;
 }
 
@@ -145,6 +146,33 @@ function parseFloatSafe(value: string | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function roundTo(value: number, digits: number): number {
+  const factor = 10 ** digits;
+  return Math.round((value + Number.EPSILON) * factor) / factor;
+}
+
+function ga4RatePercent(value: string | undefined, digits = 1): number {
+  return roundTo(parseFloatSafe(value) * 100, digits);
+}
+
+function metricValue(
+  row: { metricValues?: Array<{ value?: string }> } | undefined,
+  index: number,
+): string | undefined {
+  return row?.metricValues?.[index]?.value;
+}
+
+function dimensionValue(
+  row: { dimensionValues?: Array<{ value?: string }> } | undefined,
+  index: number,
+): string {
+  return row?.dimensionValues?.[index]?.value ?? '';
+}
+
+function formatGa4Date(value: string): string {
+  return value.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
+}
+
 /**
  * Get overview metrics for a GA4 property.
  */
@@ -175,7 +203,7 @@ export async function getGA4Overview(propertyId: string, days: number = 28, date
     totalSessions: parseIntSafe(row?.[1]?.value),
     totalPageviews: parseIntSafe(row?.[2]?.value),
     avgSessionDuration: parseFloatSafe(row?.[3]?.value),
-    bounceRate: parseFloat(parseFloatSafe(row?.[4]?.value).toFixed(1)),
+    bounceRate: ga4RatePercent(row?.[4]?.value),
     newUserPercentage: totalUsers > 0 ? parseFloat(((newUsers / totalUsers) * 100).toFixed(1)) : 0,
     dateRange: { start: startDate, end: endDate },
   };
@@ -205,10 +233,10 @@ export async function getGA4DailyTrend(propertyId: string, days: number = 28, da
   };
 
   return (data.rows || []).map(r => ({
-    date: r.dimensionValues[0].value.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'),
-    users: parseInt(r.metricValues[0].value),
-    sessions: parseInt(r.metricValues[1].value),
-    pageviews: parseInt(r.metricValues[2].value),
+    date: formatGa4Date(dimensionValue(r, 0)),
+    users: parseIntSafe(metricValue(r, 0)),
+    sessions: parseIntSafe(metricValue(r, 1)),
+    pageviews: parseIntSafe(metricValue(r, 2)),
   }));
 }
 
@@ -225,6 +253,7 @@ export async function getGA4TopPages(propertyId: string, days: number = 28, limi
     metrics: [
       { name: 'screenPageViews' },
       { name: 'totalUsers' },
+      { name: 'sessions' },
       { name: 'userEngagementDuration' },
     ],
     orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
@@ -236,12 +265,16 @@ export async function getGA4TopPages(propertyId: string, days: number = 28, limi
     }>;
   };
 
-  return (data.rows || []).map(r => ({
-    path: r.dimensionValues[0].value,
-    pageviews: parseInt(r.metricValues[0].value),
-    users: parseInt(r.metricValues[1].value),
-    avgEngagementTime: parseFloat(r.metricValues[2].value) / Math.max(parseInt(r.metricValues[1].value), 1),
-  }));
+  return (data.rows || []).map(r => {
+    const sessions = parseIntSafe(metricValue(r, 2));
+    return {
+      path: dimensionValue(r, 0),
+      pageviews: parseIntSafe(metricValue(r, 0)),
+      users: parseIntSafe(metricValue(r, 1)),
+      sessions,
+      avgEngagementTime: sessions > 0 ? parseFloatSafe(metricValue(r, 3)) / sessions : 0,
+    };
+  });
 }
 
 /**
@@ -268,10 +301,10 @@ export async function getGA4TopSources(propertyId: string, days: number = 28, li
   };
 
   return (data.rows || []).map(r => ({
-    source: r.dimensionValues[0].value,
-    medium: r.dimensionValues[1].value,
-    users: parseInt(r.metricValues[0].value),
-    sessions: parseInt(r.metricValues[1].value),
+    source: dimensionValue(r, 0),
+    medium: dimensionValue(r, 1),
+    users: parseIntSafe(metricValue(r, 0)),
+    sessions: parseIntSafe(metricValue(r, 1)),
   }));
 }
 
@@ -298,9 +331,9 @@ export async function getGA4DeviceBreakdown(propertyId: string, days: number = 2
   };
 
   const rows = (data.rows || []).map(r => ({
-    device: r.dimensionValues[0].value,
-    users: parseInt(r.metricValues[0].value),
-    sessions: parseInt(r.metricValues[1].value),
+    device: dimensionValue(r, 0),
+    users: parseIntSafe(metricValue(r, 0)),
+    sessions: parseIntSafe(metricValue(r, 1)),
     percentage: 0,
   }));
   const totalSessions = rows.reduce((s, r) => s + r.sessions, 0);
@@ -355,9 +388,9 @@ export async function getGA4KeyEvents(propertyId: string, days: number = 28, lim
   };
 
   return (data.rows || []).map(r => ({
-    eventName: r.dimensionValues[0].value,
-    eventCount: parseInt(r.metricValues[0].value),
-    users: parseInt(r.metricValues[1].value),
+    eventName: dimensionValue(r, 0),
+    eventCount: parseIntSafe(metricValue(r, 0)),
+    users: parseIntSafe(metricValue(r, 1)),
   }));
 }
 
@@ -387,8 +420,8 @@ export async function getGA4EventTrend(propertyId: string, eventName: string, da
   };
 
   return (data.rows || []).map(r => ({
-    date: r.dimensionValues[0].value.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'),
-    eventCount: parseInt(r.metricValues[0].value),
+    date: formatGa4Date(dimensionValue(r, 0)),
+    eventCount: parseIntSafe(metricValue(r, 0)),
   }));
 }
 
@@ -406,22 +439,22 @@ export async function getGA4Conversions(propertyId: string, days: number = 28, d
     dateRanges: [{ startDate, endDate }],
     metrics: [{ name: 'totalUsers' }],
   }) as { rows?: Array<{ metricValues: Array<{ value: string }> }> };
-  const totalUsers = parseInt(overviewData.rows?.[0]?.metricValues[0]?.value || '0');
-
-  // Get key events — filter out generic GA4 auto-events to focus on meaningful ones
-  const autoEvents = new Set([
-    'session_start', 'first_visit', 'page_view', 'scroll',
-    'user_engagement', 'click', 'file_download',
-  ]);
+  const totalUsers = parseIntSafe(metricValue(overviewData.rows?.[0], 0));
 
   const data = await runReport(propertyId, {
     dateRanges: [{ startDate, endDate }],
     dimensions: [{ name: 'eventName' }],
     metrics: [
-      { name: 'eventCount' },
+      { name: 'keyEvents' },
       { name: 'totalUsers' },
     ],
-    orderBys: [{ metric: { metricName: 'eventCount' }, desc: true }],
+    dimensionFilter: {
+      filter: {
+        fieldName: 'isKeyEvent',
+        stringFilter: { matchType: 'EXACT', value: 'true' },
+      },
+    },
+    orderBys: [{ metric: { metricName: 'keyEvents' }, desc: true }],
     limit: 50,
   }) as {
     rows?: Array<{
@@ -431,12 +464,11 @@ export async function getGA4Conversions(propertyId: string, days: number = 28, d
   };
 
   return (data.rows || [])
-    .filter(r => !autoEvents.has(r.dimensionValues[0].value))
     .map(r => {
-      const users = parseInt(r.metricValues[1].value);
+      const users = parseIntSafe(metricValue(r, 1));
       return {
-        eventName: r.dimensionValues[0].value,
-        conversions: parseInt(r.metricValues[0].value),
+        eventName: dimensionValue(r, 0),
+        conversions: parseIntSafe(metricValue(r, 0)),
         users,
         rate: totalUsers > 0 ? parseFloat(((users / totalUsers) * 100).toFixed(2)) : 0,
       };
@@ -499,10 +531,10 @@ export async function getGA4EventsByPage(
   };
 
   return (data.rows || []).map(r => ({
-    eventName: r.dimensionValues[0].value,
-    pagePath: r.dimensionValues[1].value,
-    eventCount: parseInt(r.metricValues[0].value),
-    users: parseInt(r.metricValues[1].value),
+    eventName: dimensionValue(r, 0),
+    pagePath: dimensionValue(r, 1),
+    eventCount: parseIntSafe(metricValue(r, 0)),
+    users: parseIntSafe(metricValue(r, 1)),
   }));
 }
 
@@ -540,7 +572,7 @@ export async function getGA4LandingPages(
       { name: 'totalUsers' },
       { name: 'bounceRate' },
       { name: 'userEngagementDuration' },
-      { name: 'conversions' },
+      { name: 'keyEvents' },
     ],
     orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
     limit,
@@ -563,16 +595,16 @@ export async function getGA4LandingPages(
   };
 
   return (data.rows || []).map(r => {
-    const sessions = parseInt(r.metricValues[0].value);
+    const sessions = parseIntSafe(metricValue(r, 0));
     return {
-      landingPage: r.dimensionValues[0].value,
+      landingPage: dimensionValue(r, 0),
       sessions,
-      users: parseInt(r.metricValues[1].value),
-      bounceRate: parseFloat(parseFloat(r.metricValues[2].value).toFixed(1)),
+      users: parseIntSafe(metricValue(r, 1)),
+      bounceRate: ga4RatePercent(metricValue(r, 2)),
       avgEngagementTime: sessions > 0
-        ? parseFloat(r.metricValues[3].value) / sessions
+        ? parseFloatSafe(metricValue(r, 3)) / sessions
         : 0,
-      conversions: parseInt(r.metricValues[4].value),
+      conversions: parseIntSafe(metricValue(r, 4)),
     };
   });
 }
@@ -626,7 +658,7 @@ export async function getGA4OrganicOverview(
   }) as { rows?: Array<{ metricValues: Array<{ value: string }> }> };
 
   const row = organicData.rows?.[0]?.metricValues;
-  const totalUsers = parseInt(totalData.rows?.[0]?.metricValues[0]?.value || '0');
+  const totalUsers = parseIntSafe(metricValue(totalData.rows?.[0], 0));
   const organicUsers = parseInt(row?.[0]?.value || '0');
   const organicSessions = parseInt(row?.[1]?.value || '0');
 
@@ -634,8 +666,8 @@ export async function getGA4OrganicOverview(
     organicUsers,
     organicSessions,
     organicPageviews: parseInt(row?.[2]?.value || '0'),
-    organicBounceRate: parseFloat(parseFloat(row?.[3]?.value || '0').toFixed(1)),
-    engagementRate: parseFloat(parseFloat(row?.[4]?.value || '0').toFixed(1)),
+    organicBounceRate: ga4RatePercent(row?.[3]?.value),
+    engagementRate: ga4RatePercent(row?.[4]?.value),
     avgEngagementTime: organicSessions > 0
       ? parseFloat(row?.[5]?.value || '0') / organicSessions
       : 0,
@@ -711,7 +743,7 @@ export async function getGA4PeriodComparison(
       totalSessions: parseInt(row?.[1]?.value || '0'),
       totalPageviews: parseInt(row?.[2]?.value || '0'),
       avgSessionDuration: parseFloat(row?.[3]?.value || '0'),
-      bounceRate: parseFloat(parseFloat(row?.[4]?.value || '0').toFixed(1)),
+      bounceRate: ga4RatePercent(row?.[4]?.value),
       newUserPercentage: totalUsers > 0 ? parseFloat(((newUsers / totalUsers) * 100).toFixed(1)) : 0,
       dateRange: { start: '', end: '' },
     };
@@ -780,14 +812,14 @@ export async function getGA4NewVsReturning(
   };
 
   const rows = (data.rows || []).map(r => {
-    const sessions = parseInt(r.metricValues[1].value);
+    const sessions = parseIntSafe(metricValue(r, 1));
     return {
-      segment: r.dimensionValues[0].value,
-      users: parseInt(r.metricValues[0].value),
+      segment: dimensionValue(r, 0),
+      users: parseIntSafe(metricValue(r, 0)),
       sessions,
-      bounceRate: parseFloat(parseFloat(r.metricValues[2].value).toFixed(1)),
-      engagementRate: parseFloat(parseFloat(r.metricValues[3].value).toFixed(1)),
-      avgEngagementTime: sessions > 0 ? parseFloat(r.metricValues[4].value) / sessions : 0,
+      bounceRate: ga4RatePercent(metricValue(r, 2)),
+      engagementRate: ga4RatePercent(metricValue(r, 3)),
+      avgEngagementTime: sessions > 0 ? parseFloatSafe(metricValue(r, 4)) / sessions : 0,
       percentage: 0,
     };
   });
@@ -817,9 +849,9 @@ export async function getGA4Countries(propertyId: string, days: number = 28, lim
   };
 
   return (data.rows || []).map(r => ({
-    country: r.dimensionValues[0].value,
-    users: parseInt(r.metricValues[0].value),
-    sessions: parseInt(r.metricValues[1].value),
+    country: dimensionValue(r, 0),
+    users: parseIntSafe(metricValue(r, 0)),
+    sessions: parseIntSafe(metricValue(r, 1)),
   }));
 }
 
@@ -839,7 +871,7 @@ export async function getTopDroppedGA4Page(
   const curEnd = dateStr(1);
   const curStart = dateStr(days);
   const curSpanMs = new Date(curEnd).getTime() - new Date(curStart).getTime();
-  const curSpanDays = Math.round(curSpanMs / (1000 * 60 * 60 * 24));
+  const curSpanDays = Math.round(curSpanMs / (1000 * 60 * 60 * 24)) + 1;
   const prevEndDate = new Date(curStart);
   prevEndDate.setDate(prevEndDate.getDate() - 1);
   const prevStartDate = new Date(prevEndDate);
@@ -872,14 +904,14 @@ export async function getTopDroppedGA4Page(
 
   const prevByPage = new Map<string, number>();
   for (const row of prevData.rows) {
-    prevByPage.set(row.dimensionValues[0].value, parseInt(row.metricValues[0].value));
+    prevByPage.set(dimensionValue(row, 0), parseIntSafe(metricValue(row, 0)));
   }
 
   let topPage: string | null = null;
   let maxDrop = 0;
   for (const row of curData.rows) {
-    const page = row.dimensionValues[0].value;
-    const curUsers = parseInt(row.metricValues[0].value);
+    const page = dimensionValue(row, 0);
+    const curUsers = parseIntSafe(metricValue(row, 0));
     const prevUsers = prevByPage.get(page) ?? 0;
     const drop = prevUsers - curUsers;
     if (drop > maxDrop) {
@@ -889,7 +921,7 @@ export async function getTopDroppedGA4Page(
   }
 
   // Also check pages that appeared in prev but not in cur (dropped to zero entirely)
-  const curPages = new Set(curData.rows.map(r => r.dimensionValues[0].value));
+  const curPages = new Set(curData.rows.map(r => dimensionValue(r, 0)));
   for (const [page, prevUsers] of prevByPage) {
     if (!curPages.has(page) && prevUsers > maxDrop) {
       maxDrop = prevUsers;
@@ -924,7 +956,7 @@ export async function getTopSpikedGA4Page(
   const curEnd = dateStr(1);
   const curStart = dateStr(days);
   const curSpanMs = new Date(curEnd).getTime() - new Date(curStart).getTime();
-  const curSpanDays = Math.round(curSpanMs / (1000 * 60 * 60 * 24));
+  const curSpanDays = Math.round(curSpanMs / (1000 * 60 * 60 * 24)) + 1;
   const prevEndDate = new Date(curStart);
   prevEndDate.setDate(prevEndDate.getDate() - 1);
   const prevStartDate = new Date(prevEndDate);
@@ -957,14 +989,14 @@ export async function getTopSpikedGA4Page(
 
   const prevByPage = new Map<string, number>();
   for (const row of (prevData.rows ?? [])) {
-    prevByPage.set(row.dimensionValues[0].value, parseInt(row.metricValues[0].value));
+    prevByPage.set(dimensionValue(row, 0), parseIntSafe(metricValue(row, 0)));
   }
 
   let topPage: string | null = null;
   let maxSpike = 0;
   for (const row of curData.rows) {
-    const page = row.dimensionValues[0].value;
-    const curUsers = parseInt(row.metricValues[0].value);
+    const page = dimensionValue(row, 0);
+    const curUsers = parseIntSafe(metricValue(row, 0));
     const prevUsers = prevByPage.get(page) ?? 0;
     const spike = curUsers - prevUsers; // positive = increased
     if (spike > maxSpike) {

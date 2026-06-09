@@ -410,6 +410,20 @@ describe('Parameter edge cases — non-numeric and negative values', () => {
     expect(body).toMatchObject({ error: 'days must be a positive integer' });
   });
 
+  it('GET /api/public/analytics-overview rejects incomplete dateRange', async () => {
+    const res = await api(`/api/public/analytics-overview/${wsGa4OnlyId}?startDate=2025-01-01`);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toMatchObject({ error: 'Invalid date range' });
+  });
+
+  it('GET /api/public/search-overview rejects reversed dateRange', async () => {
+    const res = await api(`/api/public/search-overview/${wsGscOnlyId}?startDate=2025-02-01&endDate=2025-01-01`);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toMatchObject({ error: 'Invalid date range' });
+  });
+
   it('GET /api/public/search-countries rejects negative limit (-5)', async () => {
     const res = await api(`/api/public/search-countries/${wsGscOnlyId}?limit=-5`);
     expect(res.status).toBe(400);

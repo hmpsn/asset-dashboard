@@ -199,12 +199,12 @@ describe('search-console behavior', () => {
 
     expect(result.current.clicks).toBe(10);
     expect(requestBodies[0]).toMatchObject({
-      startDate: '2026-04-24',
+      startDate: '2026-04-25',
       endDate: '2026-05-22',
     });
     expect(requestBodies[1]).toMatchObject({
-      startDate: '2026-03-26',
-      endDate: '2026-04-23',
+      startDate: '2026-03-28',
+      endDate: '2026-04-24',
     });
   });
 
@@ -241,13 +241,13 @@ describe('search-console behavior', () => {
     await getTopDroppedGscPage('site-1', 'sc-domain:example.com', 90);
 
     expect(requestBodies[0]).toMatchObject({
-      startDate: '2025-12-09',
+      startDate: '2025-12-10',
       endDate: '2026-03-09',
       type: 'web',
     });
     expect(requestBodies[1]).toMatchObject({
-      startDate: '2025-09-10',
-      endDate: '2025-12-08',
+      startDate: '2025-09-11',
+      endDate: '2025-12-09',
       type: 'web',
     });
   });
@@ -285,18 +285,18 @@ describe('search-console behavior', () => {
     await getTopSpikedGscPage('site-1', 'sc-domain:example.com', 90);
 
     expect(requestBodies[0]).toMatchObject({
-      startDate: '2025-12-09',
+      startDate: '2025-12-10',
       endDate: '2026-03-09',
       type: 'web',
     });
     expect(requestBodies[1]).toMatchObject({
-      startDate: '2025-09-10',
-      endDate: '2025-12-08',
+      startDate: '2025-09-11',
+      endDate: '2025-12-09',
       type: 'web',
     });
   });
 
-  it('continues search-type breakdown when one type fetch fails', async () => {
+  it('rethrows transient search-type breakdown failures', async () => {
     mocks.getValidToken.mockResolvedValue('token');
 
     let callIndex = 0;
@@ -330,9 +330,98 @@ describe('search-console behavior', () => {
     );
 
     const { getSearchTypeBreakdown } = await import('../../server/search-console.js');
-    const result = await getSearchTypeBreakdown('site-1', 'sc-domain:example.com', 28);
+    await expect(getSearchTypeBreakdown('site-1', 'sc-domain:example.com', 28)).rejects.toThrow(
+      'GSC API error (500): type failed',
+    );
+  });
 
-    expect(result.map((r) => r.searchType)).toEqual(['web', 'video', 'news', 'discover']);
-    expect(result).toHaveLength(4);
+  it('continues fallback page trend pagination when the first raw page has no normalized match', async () => {
+    mocks.getValidToken.mockResolvedValue('token');
+
+    const fetchSpy = vi.fn().mockImplementation(async (_url: string, opts?: RequestInit) => {
+      const body = JSON.parse(String(opts?.body ?? '{}')) as {
+        dimensions?: string[];
+        startRow?: number;
+      };
+
+      if (body.dimensions?.join(',') === 'date') {
+        return { ok: true, json: async () => ({ rows: [] }) };
+      }
+
+      if (body.startRow === 0) {
+        return {
+          ok: true,
+          json: async () => ({
+            rows: Array.from({ length: 1000 }, (_, i) => ({
+              keys: ['20260501', `https://example.com/non-match-${i}`],
+              clicks: 0,
+              impressions: 1,
+              ctr: 0,
+              position: 50,
+            })),
+          }),
+        };
+      }
+
+      return {
+        ok: true,
+        json: async () => ({
+          rows: [{
+            keys: ['20260502', 'https://example.com/services/'],
+            clicks: 3,
+            impressions: 30,
+            ctr: 0.1,
+            position: 4,
+          }],
+        }),
+      };
+    });
+    vi.stubGlobal('fetch', fetchSpy);
+
+    const { getPageTrend } = await import('../../server/search-console.js');
+    const result = await getPageTrend('site-1', 'sc-domain:example.com', 'https://example.com/services', 28);
+
+    expect(result).toEqual([{ date: '20260502', clicks: 3, impressions: 30, ctr: 10, position: 4 }]);
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it('weights fallback page trend position by impressions when URL variants merge', async () => {
+    mocks.getValidToken.mockResolvedValue('token');
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async (_url: string, opts?: RequestInit) => {
+        const body = JSON.parse(String(opts?.body ?? '{}')) as { dimensions?: string[] };
+        if (body.dimensions?.join(',') === 'date') {
+          return { ok: true, json: async () => ({ rows: [] }) };
+        }
+        return {
+          ok: true,
+          json: async () => ({
+            rows: [
+              {
+                keys: ['20260501', 'https://example.com/services'],
+                clicks: 1,
+                impressions: 10,
+                ctr: 0.1,
+                position: 2,
+              },
+              {
+                keys: ['20260501', 'https://example.com/services/'],
+                clicks: 9,
+                impressions: 90,
+                ctr: 0.1,
+                position: 10,
+              },
+            ],
+          }),
+        };
+      }),
+    );
+
+    const { getPageTrend } = await import('../../server/search-console.js');
+    const result = await getPageTrend('site-1', 'sc-domain:example.com', 'https://example.com/services', 28);
+
+    expect(result).toEqual([{ date: '20260501', clicks: 10, impressions: 100, ctr: 10, position: 9.2 }]);
   });
 });

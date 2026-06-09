@@ -85,23 +85,28 @@ function averageGscRows(
   };
 }
 
-async function fetchCurrentMetrics(action: TrackedAction): Promise<BaselineSnapshot> {
+type CurrentMetricResult = {
+  snapshot: BaselineSnapshot;
+  available: boolean;
+};
+
+async function fetchCurrentMetrics(action: TrackedAction): Promise<CurrentMetricResult> {
   if (!action.pageUrl) {
-    return { ...action.baselineSnapshot, captured_at: new Date().toISOString() };
+    return { snapshot: { captured_at: new Date().toISOString() }, available: false };
   }
   const ws = getWorkspace(action.workspaceId);
   if (!ws?.webflowSiteId || !ws?.gscPropertyUrl) {
-    return { ...action.baselineSnapshot, captured_at: new Date().toISOString() };
+    return { snapshot: { captured_at: new Date().toISOString() }, available: false };
   }
   try {
     // Use the last 14 days to smooth weekly variation and get a current-state reading
     const fullUrl = resolveFullPageUrl(action.pageUrl, ws);
     const rows = await getPageTrend(ws.webflowSiteId, ws.gscPropertyUrl, fullUrl, 14);
-    if (!rows.length) return { ...action.baselineSnapshot, captured_at: new Date().toISOString() };
-    return { ...averageGscRows(rows), captured_at: new Date().toISOString() };
+    if (!rows.length) return { snapshot: { captured_at: new Date().toISOString() }, available: false };
+    return { snapshot: { ...averageGscRows(rows), captured_at: new Date().toISOString() }, available: true };
   } catch (err) {
     if (isProgrammingError(err)) log.warn({ err }, 'outcome-measurement/fetchCurrentMetrics: programming error');
-    return { ...action.baselineSnapshot, captured_at: new Date().toISOString() };
+    return { snapshot: { captured_at: new Date().toISOString() }, available: false };
   }
 }
 
@@ -328,11 +333,31 @@ async function scoreActionAtCheckpoint(
   const configEntry = config[action.actionType];
   const primaryMetric = configEntry.primary_metric;
 
-  const currentSnapshot = await fetchCurrentMetrics(action);
+  const currentMetrics = await fetchCurrentMetrics(action);
+  const currentSnapshot = currentMetrics.snapshot;
 
   // Edge case: insufficient data — only applies to search-impression-based metrics.
   // Non-search metrics (page_health_score, voice_score, content_produced, etc.) skip this check.
   const SEARCH_METRICS = new Set(['position', 'clicks', 'impressions', 'ctr']);
+  if (SEARCH_METRICS.has(primaryMetric) && !currentMetrics.available) {
+    const delta = computeDelta(action.baselineSnapshot, currentSnapshot, primaryMetric);
+    const outcome = recordOutcome({
+      actionId: action.id,
+      checkpointDays,
+      metricsSnapshot: currentSnapshot,
+      score: 'inconclusive',
+      deltaSummary: delta,
+    });
+    log.info({ actionId: action.id, checkpointDays }, 'Current GSC data unavailable — cannot measure delta');
+    broadcastToWorkspace(action.workspaceId, WS_EVENTS.OUTCOME_SCORED, {
+      actionId: action.id,
+      checkpointDays,
+      score: outcome.score,
+      earlySignal: outcome.earlySignal,
+      deltaSummary: outcome.deltaSummary,
+    });
+    return;
+  }
   // Only apply the insufficient_data gate when impressions was explicitly captured
   // (undefined means the baseline was recorded without GSC data — don't block scoring)
   const baselineImpressions = action.baselineSnapshot.impressions;
