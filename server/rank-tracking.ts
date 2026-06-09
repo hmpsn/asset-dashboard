@@ -1,5 +1,7 @@
+import { z } from 'zod';
+
 import db from './db/index.js';
-import { parseJsonFallback } from './db/json-validation.js';
+import { parseJsonSafeArray } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import {
   TRACKED_KEYWORD_SOURCE,
@@ -14,6 +16,7 @@ import { listTrackedKeywordRows, replaceAllTrackedKeywordRows, resolveTrackedKey
 
 export interface RankSnapshot {
   date: string; // YYYY-MM-DD
+  /** ctr is already a percentage from GSC (for example, 6.3 for 6.3%). Do NOT multiply by 100. */
   queries: { query: string; position: number; clicks: number; impressions: number; ctr: number }[];
 }
 
@@ -79,12 +82,38 @@ const stmts = createStmtCache(() => ({
          VALUES (@workspace_id, @date, @queries)
          ON CONFLICT(workspace_id, date) DO UPDATE SET queries = @queries`,
   ),
+  updateSnapshotQueries: db.prepare(
+    `UPDATE rank_snapshots SET queries = @queries WHERE workspace_id = @workspace_id AND date = @date`,
+  ),
   deleteOldSnapshots: db.prepare(
     `DELETE FROM rank_snapshots WHERE workspace_id = ? AND date NOT IN (
            SELECT date FROM rank_snapshots WHERE workspace_id = ? ORDER BY date DESC LIMIT 180
          )`,
   ),
 }));
+
+const rankSnapshotQuerySchema = z.object({
+  query: z.string().trim().min(1),
+  position: z.number().finite(),
+  clicks: z.number().finite().optional().default(0),
+  impressions: z.number().finite().optional().default(0),
+  /** Already a percentage (e.g., 6.3 for 6.3%). Do NOT multiply by 100. */
+  ctr: z.number().finite().optional().default(0),
+});
+
+function readSnapshotQueries(raw: string, workspaceId: string): RankSnapshot['queries'] {
+  return parseJsonSafeArray(raw, rankSnapshotQuerySchema, {
+    workspaceId,
+    table: 'rank_snapshots',
+    field: 'queries',
+  }).map(query => ({
+    query: query.query,
+    position: query.position,
+    clicks: query.clicks ?? 0,
+    impressions: query.impressions ?? 0,
+    ctr: query.ctr ?? 0,
+  }));
+}
 
 function normalizeQuery(query: string): string {
   return keywordComparisonKey(query);
@@ -128,13 +157,19 @@ function writeConfig(workspaceId: string) {
 
 function readSnapshots(workspaceId: string): RankSnapshot[] {
   const rows = stmts().getSnapshots.all(workspaceId) as SnapshotRow[];
-  return rows.map(r => ({ date: r.date, queries: parseJsonFallback<RankSnapshot['queries']>(r.queries, []) }));
+  return rows.map(r => ({
+    date: r.date,
+    queries: readSnapshotQueries(r.queries, workspaceId),
+  }));
 }
 
 function readRecentSnapshots(workspaceId: string, limit: number): RankSnapshot[] {
   const rows = stmts().getRecentSnapshots.all(workspaceId, limit) as SnapshotRow[];
   return rows
-    .map(r => ({ date: r.date, queries: parseJsonFallback<RankSnapshot['queries']>(r.queries, []) }))
+    .map(r => ({
+      date: r.date,
+      queries: readSnapshotQueries(r.queries, workspaceId),
+    }))
     .reverse();
 }
 
@@ -328,13 +363,41 @@ export function storeRankSnapshot(
   date: string,
   queries: { query: string; position: number; clicks: number; impressions: number; ctr: number }[]
 ): void {
+  const queriesByKey = new Map<string, { query: string; position: number; clicks: number; impressions: number; ctr: number }>();
+  for (const query of queries) {
+    const normalizedQuery = normalizeQuery(query.query);
+    if (!normalizedQuery) continue;
+    queriesByKey.set(normalizedQuery, query);
+  }
   stmts().upsertSnapshot.run({
     workspace_id: workspaceId,
     date,
-    queries: JSON.stringify(queries),
+    queries: JSON.stringify([...queriesByKey.values()]),
   });
   // Keep max 180 days of snapshots
   stmts().deleteOldSnapshots.run(workspaceId, workspaceId);
+}
+
+export function deleteKeywordRankHistory(workspaceId: string, query: string): number {
+  const normalizedQuery = normalizeQuery(query);
+  if (!normalizedQuery) return 0;
+
+  const run = db.transaction(() => {
+    let changedSnapshots = 0;
+    const snapshots = readSnapshots(workspaceId);
+    for (const snapshot of snapshots) {
+      const filteredQueries = snapshot.queries.filter(entry => normalizeQuery(entry.query) !== normalizedQuery);
+      if (filteredQueries.length === snapshot.queries.length) continue;
+      changedSnapshots++;
+      stmts().updateSnapshotQueries.run({
+        workspace_id: workspaceId,
+        date: snapshot.date,
+        queries: JSON.stringify(filteredQueries),
+      });
+    }
+    return changedSnapshots;
+  });
+  return run();
 }
 
 export function getRankHistory(

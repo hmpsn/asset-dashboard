@@ -20,6 +20,7 @@
  *  - src/lib/internal-link-client-action.ts (normalizeInternalLinkSuggestion edge cases)
  */
 import { describe, it, expect } from 'vitest';
+import { rankTrackingHistoryPath } from '../../src/lib/keywordTracking';
 
 // ════════════════════════════════════════════════════════════════════════════
 // src/lib/decision-adapters.ts
@@ -435,6 +436,18 @@ describe('queryKeys — admin rank tracking keys', () => {
 
   it('localSeoLocations key shape', () => {
     expect(queryKeys.admin.localSeoLocations(WS)).toEqual(['admin-local-seo-locations', WS]);
+  });
+});
+
+describe('keywordTracking — rankTrackingHistoryPath', () => {
+  it('uses repeated query params and preserves comma-bearing keywords', () => {
+    const path = rankTrackingHistoryPath(WS, [
+      'dentist, chicago',
+      '100% growth',
+      'a&b keyword',
+      '  ',
+    ]);
+    expect(path).toBe('/api/rank-tracking/ws-test/history?query=dentist%2C+chicago&query=100%25+growth&query=a%26b+keyword');
   });
 });
 

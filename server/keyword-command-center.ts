@@ -24,6 +24,7 @@ import { computeOpportunityScore, isSuspiciousPlannerGroupedVolume } from './key
 import {
   getLatestSnapshotRanks,
   getTrackedKeywords,
+  deleteKeywordRankHistory,
   removeTrackedKeyword,
   updateTrackedKeywords,
   type AddTrackedKeywordOptions,
@@ -3389,11 +3390,16 @@ export function applyKeywordCommandCenterAction(
  * CLIENT_REQUESTED / a gap-provenanced row via sourceGapKey) must be RETIRED (soft,
  * restorable), never deleted — `force` overrides for the dedicated route.
  */
-export function isHardDeleteEligible(existing: TrackedKeyword | undefined): boolean {
+export function isHardDeleteEligible(
+  existing: TrackedKeyword | undefined,
+  options: { hasStrategyFeedbackProvenance?: boolean } = {},
+): boolean {
   if (!existing) return false;
   if (existing.pinned) return false;
   if (existing.source === TRACKED_KEYWORD_SOURCE.CLIENT_REQUESTED) return false;
   if (existing.sourceGapKey) return false;
+  if (existing.strategyOwned === true) return false;
+  if (options.hasStrategyFeedbackProvenance === true) return false;
   return existing.source === TRACKED_KEYWORD_SOURCE.MANUAL;
 }
 
@@ -3423,8 +3429,10 @@ export function deleteKeywordHard(
     entry => keywordComparisonKey(entry.query) === normalized,
   );
   if (!existing) throw new Error('Keyword is not tracked');
+  const feedback = readFeedback(workspace.id).get(normalized);
+  const hasStrategyFeedbackProvenance = feedback?.status === 'approved' || feedback?.status === 'requested';
 
-  if (!options.force && !isHardDeleteEligible(existing)) {
+  if (!options.force && !isHardDeleteEligible(existing, { hasStrategyFeedbackProvenance })) {
     throw new Error('Keyword is not eligible for permanent deletion — retire it instead.');
   }
 
@@ -3432,6 +3440,7 @@ export function deleteKeywordHard(
   let trackedKeywords: TrackedKeyword[] = [];
   const run = db.transaction(() => {
     removeTrackedKeyword(workspace.id, normalized);
+    deleteKeywordRankHistory(workspace.id, normalized);
     trackedKeywords = getTrackedKeywords(workspace.id, { includeInactive: true });
   });
   run();

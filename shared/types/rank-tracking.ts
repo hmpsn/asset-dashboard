@@ -92,6 +92,7 @@ export interface LatestRank {
   position: number;
   clicks: number;
   impressions: number;
+  /** Already a percentage (e.g., 6.3 for 6.3%). Do NOT multiply by 100. */
   ctr: number;
   change?: number;
   pinned?: boolean;

@@ -284,7 +284,14 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
     rowAction.mutate({ action, keyword, force: opts?.force });
   };
   const handleDeleteHard = (keyword: string) => {
-    hardDelete.mutate({ keyword });
+    hardDelete.mutate(
+      { keyword },
+      {
+        onSuccess: () => {
+          setSelectedKey(null);
+        },
+      },
+    );
   };
 
   // Drawer action dispatcher (P2 journey drawer). The drawer emits a

@@ -5,6 +5,7 @@ import { ArrowUpRight, CheckCircle2, History, MapPin, Search, X } from 'lucide-r
 
 import { adminPath } from '../../routes';
 import { get } from '../../api/client';
+import { rankTrackingHistoryPath } from '../../lib/keywordTracking';
 import { queryKeys } from '../../lib/queryKeys';
 import { positionColor } from '../ui/constants';
 import { formatDate } from '../../utils/formatDates';
@@ -74,7 +75,7 @@ export function KeywordDetailDrawer({
   const rankHistory = useQuery({
     queryKey: queryKeys.admin.rankTrackingHistoryQueries(workspaceId, [rankHistoryKeyword]),
     queryFn: () => get<HistoryPoint[]>(
-      `/api/rank-tracking/${workspaceId}/history?queries=${encodeURIComponent(rankHistoryKeyword)}`,
+      rankTrackingHistoryPath(workspaceId, [rankHistoryKeyword]),
     ),
     enabled: rankHistoryEnabled,
     staleTime: 60_000,

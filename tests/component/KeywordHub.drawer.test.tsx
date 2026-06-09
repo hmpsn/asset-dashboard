@@ -30,6 +30,7 @@ const summaryHookMock = vi.fn();
 const rowsHookMock = vi.fn();
 const detailHookMock = vi.fn();
 const rowActionMutate = vi.fn();
+const hardDeleteMutate = vi.fn();
 const localRefreshMutate = vi.fn();
 const navigateMock = vi.fn();
 
@@ -39,7 +40,7 @@ vi.mock('../../src/hooks/admin/useKeywordCommandCenter', () => ({
   useKeywordCommandCenterDetail: (...a: unknown[]) => detailHookMock(...a),
   useKeywordCommandCenterBulkAction: () => ({ mutate: vi.fn(), isPending: false, error: null }),
   useKeywordCommandCenterAction: () => ({ mutate: rowActionMutate, isPending: false, error: null, variables: undefined }),
-  useKeywordHardDelete: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+  useKeywordHardDelete: () => ({ mutate: hardDeleteMutate, isPending: false, error: null }),
 }));
 
 vi.mock('../../src/hooks/admin/useLocalSeo', () => ({
@@ -65,7 +66,10 @@ const summaryPayload: KeywordCommandCenterSummaryResponse = {
   summarizedAt: '2026-06-04T12:00:00.000Z',
 };
 
-function makeRow(nextActions: KeywordCommandCenterNextAction[] = []): KeywordCommandCenterRow {
+function makeRow(
+  nextActions: KeywordCommandCenterNextAction[] = [],
+  tracking: KeywordCommandCenterRow['tracking'] = { status: 'active', source: 'strategy_primary', pinned: false },
+): KeywordCommandCenterRow {
   return {
     keyword: DISPLAY,
     normalizedKeyword: NORMALIZED,
@@ -73,15 +77,18 @@ function makeRow(nextActions: KeywordCommandCenterNextAction[] = []): KeywordCom
     statusLabel: 'Tracked',
     sourceLabels: [],
     metrics: { volume: 700, difficulty: 29, currentPosition: 6, clicks: 12 },
-    tracking: { status: 'active', source: 'strategy_primary', pinned: false },
+    tracking,
     nextActions,
     isProtected: false,
   };
 }
 
-function setRows(nextActions: KeywordCommandCenterNextAction[] = []) {
+function setRows(
+  nextActions: KeywordCommandCenterNextAction[] = [],
+  tracking?: KeywordCommandCenterRow['tracking'],
+) {
   const payload: KeywordCommandCenterRowsResponse = {
-    rows: [makeRow(nextActions)],
+    rows: [makeRow(nextActions, tracking)],
     pageInfo: { page: 1, pageSize: 50, totalRows: 1, totalPages: 1, hasNextPage: false, hasPreviousPage: false },
   };
   rowsHookMock.mockReturnValue({ data: payload, isLoading: false, isError: false, error: null });
@@ -100,6 +107,7 @@ function renderHub(initialEntry = '/') {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  hardDeleteMutate.mockImplementation(() => undefined);
   summaryHookMock.mockReturnValue({ data: summaryPayload, isLoading: false, error: null });
   detailHookMock.mockReturnValue({ data: undefined, isFetching: false });
   setRows();
@@ -117,6 +125,26 @@ describe('KeywordHub — journey drawer', () => {
     const dialog = screen.getByRole('dialog');
     expect(dialog).toBeInTheDocument();
     expect(dialog).toHaveAttribute('aria-label', expect.stringContaining(DISPLAY));
+  });
+
+  it('closes the drawer after a successful permanent delete', () => {
+    setRows([], { status: 'active', source: 'manual', pinned: false });
+    hardDeleteMutate.mockImplementation((_vars, options) => {
+      options?.onSuccess?.({ ok: true, keyword: NORMALIZED, trackedKeywords: [] });
+    });
+
+    renderHub();
+    fireEvent.click(screen.getByText(DISPLAY));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: `Delete permanently: ${DISPLAY}` }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete permanently' }));
+
+    expect(hardDeleteMutate).toHaveBeenCalledWith(
+      { keyword: DISPLAY },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 });
 

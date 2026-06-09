@@ -16,6 +16,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
+import { storeRankSnapshot } from '../../server/rank-tracking.js';
 
 const ctx = createTestContext(13610);
 const { api, postJson } = ctx;
@@ -85,6 +86,23 @@ describe('Public Rank Tracking — history', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(Array.isArray(body)).toBe(true);
+  });
+
+  it('GET /api/public/rank-tracking/:workspaceId/history supports repeated query filters with commas', async () => {
+    storeRankSnapshot(wsId, '2026-06-03', [
+      { query: 'dentist, chicago', position: 5, clicks: 2, impressions: 40, ctr: 5 },
+      { query: 'braces chicago', position: 9, clicks: 1, impressions: 20, ctr: 5 },
+    ]);
+
+    const res = await api(
+      `/api/public/rank-tracking/${wsId}/history?query=${encodeURIComponent('dentist, chicago')}`,
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as Array<{ date: string; positions: Record<string, number> }>;
+    expect(body).toEqual([
+      { date: '2026-06-03', positions: { 'dentist, chicago': 5 } },
+    ]);
   });
 
   it('GET /api/public/rank-tracking/:workspaceId/history with invalid limit returns 400', async () => {
