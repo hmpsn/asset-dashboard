@@ -382,6 +382,43 @@ describe('PATCH /api/public/content-posts/:wsId/:postId/client-edit', () => {
     expect(persisted?.totalWordCount).toBe(9);
   });
 
+  it('sanitizes unsafe client rich text while preserving allowlisted formatting', async () => {
+    const briefId = `brief_sanitize_${Date.now()}`;
+    const req = createContentRequest(testWsId, {
+      topic: 'Sanitize Test', targetKeyword: `sanitize-${Date.now()}`,
+      intent: 'informational', priority: 'medium', rationale: '',
+      serviceType: 'full_post',
+    });
+    updateContentRequest(testWsId, req.id, { briefId });
+    const post = makeStubPost(testWsId, briefId);
+    savePost(testWsId, post);
+
+    await patchJson(`/api/content-requests/${testWsId}/${req.id}`, { status: 'in_progress' });
+    await patchJson(`/api/content-requests/${testWsId}/${req.id}`, { status: 'post_review' });
+
+    const editRes = await api(`/api/public/content-posts/${testWsId}/${post.id}/client-edit`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: '<strong>Plain title</strong>',
+        sections: [
+          {
+            index: 0,
+            heading: '<em>Plain heading</em>',
+            content: '<p><strong>Allowed</strong> copy</p><script>alert("x")</script>',
+            wordCount: 2,
+          },
+        ],
+      }),
+    });
+
+    expect(editRes.status).toBe(200);
+    const updated = await editRes.json() as { title: string; sections: { heading: string; content: string }[] };
+    expect(updated.title).toBe('Plain title');
+    expect(updated.sections[0].heading).toBe('Plain heading');
+    expect(updated.sections[0].content).toBe('<p><strong>Allowed</strong> copy</p>');
+  });
+
   it('coalesces rapid client edits into a single snapshot within 60 s', async () => {
     // Set up: create request + post, advance to post_review
     const briefId = `brief_coalesce_${Date.now()}`;

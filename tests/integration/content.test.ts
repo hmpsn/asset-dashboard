@@ -261,6 +261,37 @@ describe('Content Posts API', () => {
     expect(body.status).toBe('review');
   });
 
+  it('PATCH /api/content-posts/:wsId/:postId preserves trusted admin TipTap HTML exactly', async () => {
+    const adminHtmlPostId = 'post_admin_tiptap_html_' + Date.now();
+    const adminHtmlBriefId = 'brief_admin_tiptap_html_' + Date.now();
+    seedBrief(adminHtmlBriefId);
+    seedPost(adminHtmlPostId, adminHtmlBriefId);
+
+    const introduction = '<p data-type="lead"><span style="color: #0f766e">Admin intro</span></p>';
+    const sectionContent = '<div data-node-view-wrapper=""><p><span style="font-weight: 700">Exact section</span></p></div>';
+    const conclusion = '<p><a href="https://example.com" target="_blank" rel="noopener noreferrer">Exact outro</a></p>';
+
+    const res = await patchJson(`/api/content-posts/${testWsId}/${adminHtmlPostId}`, {
+      introduction,
+      sections: [
+        {
+          index: 0,
+          heading: '<strong>Plain Heading</strong>',
+          content: sectionContent,
+          wordCount: 2,
+        },
+      ],
+      conclusion,
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.introduction).toBe(introduction);
+    expect(body.sections[0].content).toBe(sectionContent);
+    expect(body.sections[0].heading).toBe('Plain Heading');
+    expect(body.conclusion).toBe(conclusion);
+  });
+
   it('PATCH /api/content-posts/:wsId/:postId rejects arbitrary statuses without mutating', async () => {
     const beforeRes = await api(`/api/content-posts/${testWsId}/${postId}`);
     const before = await beforeRes.json();

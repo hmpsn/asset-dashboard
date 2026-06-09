@@ -26,6 +26,7 @@ import { queueKeywordStrategyPostUpdateFollowOns } from '../keyword-strategy-fol
 import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
 import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { normalizePageUrl } from '../helpers.js';
+import { parseWebflowFieldMapping, type AiWebflowFieldMapping } from '../schemas/ai-content-publish.js';
 
 const log = createLogger('content-publish');
 const router = Router();
@@ -33,6 +34,31 @@ const router = Router();
 const publishContentPostSchema = z.object({
   generateImage: z.boolean().optional(),
 }).strict().default({});
+
+const FIELD_MAPPING_KEYS = [
+  'title',
+  'slug',
+  'body',
+  'metaTitle',
+  'metaDescription',
+  'summary',
+  'featuredImage',
+  'author',
+  'publishDate',
+  'category',
+] as const satisfies readonly (keyof AiWebflowFieldMapping)[];
+
+function keepKnownFieldSlugs(
+  mapping: AiWebflowFieldMapping,
+  validSlugs: ReadonlySet<string>,
+): AiWebflowFieldMapping {
+  const sanitized: AiWebflowFieldMapping = {};
+  for (const key of FIELD_MAPPING_KEYS) {
+    const value = mapping[key];
+    sanitized[key] = value && validSlugs.has(value) ? value : null;
+  }
+  return sanitized;
+}
 
 // --- Publish a content post to Webflow CMS ---
 router.post('/api/content-posts/:workspaceId/:postId/publish-to-webflow', requireWorkspaceAccess('workspaceId'), validate(publishContentPostSchema), async (req, res) => {
@@ -228,7 +254,7 @@ router.post('/api/webflow/suggest-field-mapping/:siteId', requireWorkspaceSiteAc
     const fieldsDescription = schema.fields.map(f => `- slug: "${f.slug}", displayName: "${f.displayName}", type: "${f.type}"`).join('\n');
 
     const result = await callAI({
-      model: 'gpt-5.4-nano',
+      operation: 'content-publish-field-mapping',
       messages: [{
         role: 'user',
         content: `Given this Webflow CMS collection schema, suggest which field slugs map to each blog post property. Return ONLY valid JSON.
@@ -255,13 +281,13 @@ Return ONLY the JSON object with the mapping.`,
       maxTokens: 500,
       temperature: 0.1,
       responseFormat: { type: 'json_object' },
-      feature: 'suggest-field-mapping',
     });
 
-    let mapping: Record<string, string | null>;
+    let mapping: AiWebflowFieldMapping;
     try {
-      const cleaned = result.text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-      mapping = JSON.parse(cleaned);
+      const parsed = parseWebflowFieldMapping(result.text);
+      const validSlugs = new Set(schema.fields.map(field => field.slug));
+      mapping = keepKnownFieldSlugs(parsed, validSlugs);
     } catch (err) {
       log.debug({ err }, 'content-publish: expected error — degrading gracefully');
       return res.status(500).json({ error: 'Failed to parse AI suggestion' });

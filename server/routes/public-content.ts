@@ -18,7 +18,7 @@ import { getWorkOrder } from '../work-orders.js';
 import { addWorkOrderComment, listWorkOrderComments } from '../work-order-comments.js';
 import { getPost, updatePostField, snapshotPostVersion, getMostRecentPostVersion } from '../content-posts.js';
 import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
-import { normalizePageUrl, sanitizeString, validateEnum } from '../helpers.js';
+import { normalizePageUrl, validateEnum } from '../helpers.js';
 import { sanitizeRichText, sanitizePlainText } from '../html-sanitize.js';
 import { countHtmlWords } from '../content-posts-ai.js';
 import { getPageKeyword, listPageKeywords } from '../page-keywords.js';
@@ -67,6 +67,11 @@ function activityCommentPreview(content: string): string {
   return content.length > ACTIVITY_COMMENT_PREVIEW_LENGTH
     ? `${content.slice(0, ACTIVITY_COMMENT_PREVIEW_LENGTH - 3)}...`
     : content;
+}
+
+function sanitizePublicPlainText(val: unknown, maxLen = 500): string {
+  if (typeof val !== 'string') return '';
+  return sanitizePlainText(val).trim().slice(0, maxLen).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
 }
 
 function recordTrackedKeywordActivity(
@@ -269,17 +274,17 @@ router.get('/api/public/page-keywords/:workspaceId', (req, res) => {
 router.post('/api/public/content-request/:workspaceId', requirePublicContentWriteAuth, validate(createContentRequestSchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const topic = sanitizeString(req.body.topic, 200);
-  const targetKeyword = sanitizeString(req.body.targetKeyword, 200);
-  const intent = sanitizeString(req.body.intent, 50);
+  const topic = sanitizePublicPlainText(req.body.topic, 200);
+  const targetKeyword = sanitizePublicPlainText(req.body.targetKeyword, 200);
+  const intent = sanitizePublicPlainText(req.body.intent, 50);
   const priority = validateEnum(req.body.priority, ['low', 'medium', 'high', 'critical'], 'medium');
-  const rationale = sanitizeString(req.body.rationale, 1000);
-  const clientNote = sanitizeString(req.body.clientNote, 1000);
+  const rationale = sanitizePublicPlainText(req.body.rationale, 1000);
+  const clientNote = sanitizePublicPlainText(req.body.clientNote, 1000);
   const serviceType = validateEnum(req.body.serviceType, ['brief_only', 'full_post'], 'brief_only');
   const pageType = validateEnum(req.body.pageType, ['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource'], 'blog');
   const initialStatus = req.body.initialStatus === 'pending_payment' ? 'pending_payment' as const : undefined;
-  const targetPageId = sanitizeString(req.body.targetPageId, 100);
-  const targetPageSlug = sanitizeString(req.body.targetPageSlug, 200);
+  const targetPageId = sanitizePublicPlainText(req.body.targetPageId, 100);
+  const targetPageSlug = sanitizePublicPlainText(req.body.targetPageSlug, 200);
   if (!topic || !targetKeyword) return res.status(400).json({ error: 'topic and targetKeyword are required' });
   const request = createContentRequest(req.params.workspaceId, { topic, targetKeyword, intent, priority, rationale, clientNote, serviceType, pageType, initialStatus, targetPageId: targetPageId || undefined, targetPageSlug: targetPageSlug || undefined });
   const actor = getClientActor(req, req.params.workspaceId);
@@ -313,14 +318,14 @@ router.get('/api/public/content-requests/:workspaceId', (req, res) => {
 router.post('/api/public/content-request/:workspaceId/submit', requirePublicContentWriteAuth, validate(submitContentRequestSchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const topic = sanitizeString(req.body.topic, 200);
-  const targetKeyword = sanitizeString(req.body.targetKeyword, 200);
-  const notes = sanitizeString(req.body.notes, 1000);
+  const topic = sanitizePublicPlainText(req.body.topic, 200);
+  const targetKeyword = sanitizePublicPlainText(req.body.targetKeyword, 200);
+  const notes = sanitizePublicPlainText(req.body.notes, 1000);
   const serviceType = validateEnum(req.body.serviceType, ['brief_only', 'full_post'], 'brief_only');
   const pageType = validateEnum(req.body.pageType, ['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource'], 'blog');
   const initialStatus = req.body.initialStatus === 'pending_payment' ? 'pending_payment' as const : undefined;
-  const targetPageId = sanitizeString(req.body.targetPageId, 100);
-  const targetPageSlug = sanitizeString(req.body.targetPageSlug, 200);
+  const targetPageId = sanitizePublicPlainText(req.body.targetPageId, 100);
+  const targetPageSlug = sanitizePublicPlainText(req.body.targetPageSlug, 200);
   if (!topic || !targetKeyword) return res.status(400).json({ error: 'topic and targetKeyword are required' });
   const request = createContentRequest(req.params.workspaceId, {
     topic, targetKeyword, intent: 'informational', priority: 'medium',
@@ -337,7 +342,7 @@ router.post('/api/public/content-request/:workspaceId/submit', requirePublicCont
 
 // Client declines a recommended topic
 router.post('/api/public/content-request/:workspaceId/:id/decline', requirePublicContentWriteAuth, validate(declineContentRequestSchema), (req, res, next) => {
-  const reason = sanitizeString(req.body.reason, 1000);
+  const reason = sanitizePublicPlainText(req.body.reason, 1000);
   let updated;
   try {
     updated = updateContentRequest(req.params.workspaceId, req.params.id, {
@@ -386,7 +391,7 @@ router.post('/api/public/content-request/:workspaceId/:id/approve', requirePubli
 // Client requests changes on a brief
 router.post('/api/public/content-request/:workspaceId/:id/request-changes', requirePublicContentWriteAuth, validate(requestChangesSchema), (req, res, next) => {
   if (!assertClientReviewRequest(req.params.workspaceId, req.params.id, res)) return;
-  const feedback = sanitizeString(req.body.feedback, 2000);
+  const feedback = sanitizePublicPlainText(req.body.feedback, 2000);
   let updated;
   try {
     updated = updateContentRequest(req.params.workspaceId, req.params.id, {
@@ -438,7 +443,7 @@ router.post('/api/public/content-request/:workspaceId/:id/upgrade', requirePubli
 
 // Client or team adds a comment
 router.post('/api/public/content-request/:workspaceId/:id/comment', requirePublicContentWriteAuth, validate(addCommentSchema), (req, res) => {
-  const content = sanitizeString(req.body.content, 2000);
+  const content = sanitizePublicPlainText(req.body.content, 2000);
   const author = 'client' as const; // public unauthenticated endpoint — always 'client', never trust req.body
   if (!content) return res.status(400).json({ error: 'content is required' });
   const updated = addComment(req.params.workspaceId, req.params.id, author, content);
@@ -461,7 +466,7 @@ router.get('/api/public/work-order/:workspaceId/:orderId/comments', (req, res) =
 router.post('/api/public/work-order/:workspaceId/:orderId/comment', requirePublicContentWriteAuth, validate(workOrderCommentSchema), (req, res) => {
   const wsId = req.params.workspaceId;
   const orderId = req.params.orderId;
-  const content = sanitizeString(req.body.content, 2000);
+  const content = sanitizePublicPlainText(req.body.content, 2000);
   if (!content) return res.status(400).json({ error: 'content is required' });
 
   const order = getWorkOrder(wsId, orderId);
@@ -555,9 +560,9 @@ router.post('/api/public/content-request/:workspaceId/from-audit', requirePublic
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
-  const pageSlug = sanitizeString(req.body.pageSlug, 200);
-  const pageName = sanitizeString(req.body.pageName, 200);
-  const issues = Array.isArray(req.body.issues) ? req.body.issues.map((i: string) => sanitizeString(i, 300)).filter(Boolean) : [];
+  const pageSlug = sanitizePublicPlainText(req.body.pageSlug, 200);
+  const pageName = sanitizePublicPlainText(req.body.pageName, 200);
+  const issues = Array.isArray(req.body.issues) ? req.body.issues.map((i: string) => sanitizePublicPlainText(i, 300)).filter(Boolean) : [];
   const wordCount = typeof req.body.wordCount === 'number' ? req.body.wordCount : undefined;
 
   if (!pageSlug || !pageName) return res.status(400).json({ error: 'pageSlug and pageName are required' });
@@ -626,7 +631,7 @@ router.get('/api/public/tracked-keywords/:workspaceId', (req, res) => {
 router.post('/api/public/tracked-keywords/:workspaceId', requirePublicContentWriteAuth, validate(addTrackedKeywordSchema), async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const keyword = sanitizeString(req.body?.keyword || '').toLowerCase().trim();
+  const keyword = sanitizePublicPlainText(req.body?.keyword || '').toLowerCase().trim();
   if (!keyword || keyword.length < 2) return res.status(400).json({ error: 'Keyword must be at least 2 characters' });
   if (keyword.length > 120) return res.status(400).json({ error: 'Keyword too long' });
   const actor = getClientActor(req, ws.id);
@@ -660,7 +665,7 @@ router.post('/api/public/tracked-keywords/:workspaceId', requirePublicContentWri
 router.delete('/api/public/tracked-keywords/:workspaceId', requirePublicContentWriteAuth, validate(removeTrackedKeywordSchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const keyword = sanitizeString(req.body?.keyword || '').toLowerCase().trim();
+  const keyword = sanitizePublicPlainText(req.body?.keyword || '').toLowerCase().trim();
   if (!keyword) return res.status(400).json({ error: 'Keyword required' });
   const existingKeywords = getTrackedKeywords(ws.id);
   const wasTracked = existingKeywords.some(k => k.query === keyword);
@@ -733,7 +738,7 @@ router.post('/api/public/content-request/:workspaceId/:id/request-post-changes',
   if (existing.status !== 'post_review') {
     return res.status(400).json({ error: 'Request must be in post_review status to request post changes' });
   }
-  const feedback = sanitizeString(req.body.feedback, 2000);
+  const feedback = sanitizePublicPlainText(req.body.feedback, 2000);
   let updated;
   try {
     updated = updateContentRequest(req.params.workspaceId, req.params.id, {
