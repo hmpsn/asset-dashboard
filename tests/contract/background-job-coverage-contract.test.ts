@@ -85,6 +85,18 @@ const COVERAGE_SIGNALS: Record<BackgroundJobType, CoverageSignal[]> = {
       mustContainOneOf: [BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION, 'BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION'],
     },
   ],
+  [BACKGROUND_JOB_TYPES.CONTENT_BRIEF_GENERATION]: [
+    {
+      file: 'tests/component/ContentBriefs.test.tsx',
+      mustContainOneOf: [BACKGROUND_JOB_TYPES.CONTENT_BRIEF_GENERATION, 'BACKGROUND_JOB_TYPES.CONTENT_BRIEF_GENERATION'],
+    },
+  ],
+  [BACKGROUND_JOB_TYPES.COPY_BATCH_GENERATION]: [
+    {
+      file: 'tests/unit/api-modules-b.test.ts',
+      mustContainOneOf: [BACKGROUND_JOB_TYPES.COPY_BATCH_GENERATION, 'BACKGROUND_JOB_TYPES.COPY_BATCH_GENERATION'],
+    },
+  ],
   [BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION]: [
     {
       file: 'tests/integration/workspace-context-job-mutation-safety.test.ts',

@@ -34,10 +34,18 @@ import { requestUserCanAccessWorkspace, sendWorkspaceAccessDenied, workspaceOwns
 import { generateRecommendations, loadRecommendations, resolveRecommendationsForPageIds } from '../recommendations.js';
 import { runRecommendationGenerationJob } from '../recommendation-generation-job.js';
 import { getBrief } from '../content-brief.js';
+import { startContentBriefGenerationJob } from '../content-brief-generation-job.js';
+import type { StandaloneContentBriefGenerationParams } from '../content-brief-generation-job.js';
+import { getContentRequest } from '../content-requests.js';
+import { getBlueprint } from '../page-strategy.js';
 import {
   createContentPostGenerationJob,
   runContentPostGenerationJob,
 } from '../content-posts.js';
+import {
+  createCopyBatchGenerationJob,
+  runCopyBatchGenerationJob,
+} from '../copy-batch-jobs.js';
 import {
   generateKeywordStrategy,
   hasActiveKeywordStrategyGeneration,
@@ -80,6 +88,8 @@ import { createDiagnosticReport, markDiagnosticFailed } from '../diagnostic-stor
 import { runDiagnostic } from '../diagnostic-orchestrator.js';
 import type { AnalyticsInsight, AnomalyDigestData } from '../../shared/types/analytics.js';
 import { BACKGROUND_JOB_TYPES, toPublicBackgroundJob } from '../../shared/types/background-jobs.js';
+import { CONTENT_GENERATION_STYLES } from '../../shared/types/content.js';
+import type { ContentGenerationStyle } from '../../shared/types/content.js';
 import {
   buildWorkspaceIntelligence,
   formatKeywordsForPrompt,
@@ -143,6 +153,12 @@ function keywordStrategyJobResultSummary(
 
 function isClientVisibleJob(job: Job, workspaceId: string): boolean {
   return job.workspaceId === workspaceId && CLIENT_VISIBLE_JOB_TYPES.has(job.type);
+}
+
+function parseContentGenerationStyle(value: unknown): ContentGenerationStyle | undefined {
+  return typeof value === 'string' && CONTENT_GENERATION_STYLES.includes(value as ContentGenerationStyle)
+    ? value as ContentGenerationStyle
+    : undefined;
 }
 
 // --- Background Job Endpoints ---
@@ -729,6 +745,82 @@ router.post('/api/jobs', async (req, res) => {
           postId: started.postId,
           jobId: started.jobId,
         });
+        break;
+      }
+
+      case BACKGROUND_JOB_TYPES.CONTENT_BRIEF_GENERATION: {
+        const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
+        const requestId = typeof params.requestId === 'string' ? params.requestId.trim() : '';
+        const targetKeyword = typeof params.targetKeyword === 'string' ? params.targetKeyword.trim() : '';
+        const generationStyle = parseContentGenerationStyle(params.generationStyle);
+        if (params.generationStyle !== undefined && !generationStyle) {
+          return res.status(400).json({ error: 'generationStyle must be one of standard, concise, hybrid' });
+        }
+        if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
+        const activeBriefJob = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_GENERATION, wsId);
+        if (activeBriefJob) return res.status(409).json({ error: 'Content brief generation is already running for this workspace', jobId: activeBriefJob.id });
+        const ws = getWorkspace(wsId);
+        if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+        if (requestId) {
+          const request = getContentRequest(wsId, requestId);
+          if (!request) return res.status(404).json({ error: 'Request not found' });
+          const started = startContentBriefGenerationJob({
+            source: 'request',
+            workspaceId: wsId,
+            requestId,
+            generationStyle,
+          });
+          res.json(started);
+          break;
+        }
+
+        if (!targetKeyword) return res.status(400).json({ error: 'targetKeyword required' });
+        const referenceUrls = Array.isArray(params.referenceUrls)
+          ? params.referenceUrls.filter((url): url is string => typeof url === 'string')
+          : undefined;
+        const started = startContentBriefGenerationJob({
+          source: 'standalone',
+          workspaceId: wsId,
+          targetKeyword,
+          businessContext: typeof params.businessContext === 'string' ? params.businessContext : undefined,
+          pageType: typeof params.pageType === 'string' ? params.pageType : undefined,
+          referenceUrls,
+          pageAnalysisContext: params.pageAnalysisContext && typeof params.pageAnalysisContext === 'object'
+            ? params.pageAnalysisContext as StandaloneContentBriefGenerationParams['pageAnalysisContext']
+            : undefined,
+          generationStyle,
+        });
+        res.json(started);
+        break;
+      }
+
+      case BACKGROUND_JOB_TYPES.COPY_BATCH_GENERATION: {
+        const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
+        const blueprintId = typeof params.blueprintId === 'string' ? params.blueprintId : '';
+        const entryIds = Array.isArray(params.entryIds) ? params.entryIds.filter((id): id is string => typeof id === 'string') : [];
+        const mode = typeof params.mode === 'string' ? params.mode : undefined;
+        const batchSize = typeof params.batchSize === 'number' ? params.batchSize : undefined;
+        if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
+        if (!blueprintId) return res.status(400).json({ error: 'blueprintId required' });
+        if (entryIds.length === 0) return res.status(400).json({ error: 'entryIds required' });
+        const blueprint = getBlueprint(wsId, blueprintId);
+        if (!blueprint) return res.status(404).json({ error: 'Blueprint not found' });
+        const activeCopyBatchJob = hasActiveJob(BACKGROUND_JOB_TYPES.COPY_BATCH_GENERATION, wsId);
+        if (activeCopyBatchJob) return res.status(409).json({ error: 'Copy batch generation is already running for this workspace', jobId: activeCopyBatchJob.id });
+        try {
+          const started = createCopyBatchGenerationJob({ workspaceId: wsId, blueprintId, entryIds, mode, batchSize });
+          res.json(started);
+          setTimeout(() => {
+            void runCopyBatchGenerationJob({ workspaceId: wsId, blueprintId, entryIds, mode, batchSize, ...started });
+          }, 100);
+        } catch (err) {
+          if (err instanceof Error && err.message === 'Blueprint not found') {
+            return res.status(404).json({ error: 'Blueprint not found' });
+          }
+          log.error({ err, workspaceId: wsId, blueprintId }, 'Failed to start copy batch job');
+          return res.status(500).json({ error: 'Failed to start copy batch job' });
+        }
         break;
       }
 

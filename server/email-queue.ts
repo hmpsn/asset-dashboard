@@ -26,16 +26,28 @@ const log = createLogger('email-queue');
 // ── Config ──
 
 const BATCH_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+const RETRY_DELAY_MS = 60 * 1000;
+const MAX_DELIVERY_ATTEMPTS = 3;
 const QUEUE_DIR = getDataDir('email-queue');
 const QUEUE_FILE = path.join(QUEUE_DIR, 'pending.json');
+const DEAD_LETTER_FILE = path.join(QUEUE_DIR, 'dead-letter.json');
 
 // ── In-memory state ──
 
 interface QueueBucket {
   key: string;              // recipient:type:workspaceId
-  events: EmailEvent[];
+  events: QueuedEmailEvent[];
   timer: ReturnType<typeof setTimeout> | null;
 }
+
+type QueuedEmailEvent = EmailEvent & {
+  deliveryAttempts?: number;
+  lastDeliveryError?: string;
+};
+
+export type DeadLetteredEmailEvent = QueuedEmailEvent & {
+  deadLetteredAt: string;
+};
 
 const buckets = new Map<string, QueueBucket>();
 
@@ -52,7 +64,7 @@ export function registerSendFn(fn: SendFn) {
 
 function persistQueue() {
   try {
-    const data: EmailEvent[] = [];
+    const data: QueuedEmailEvent[] = [];
     for (const bucket of buckets.values()) {
       data.push(...bucket.events);
     }
@@ -62,14 +74,46 @@ function persistQueue() {
   }
 }
 
-function loadQueue(): EmailEvent[] {
+function loadQueue(): QueuedEmailEvent[] {
   try {
     if (fs.existsSync(QUEUE_FILE)) {
       const raw = fs.readFileSync(QUEUE_FILE, 'utf-8');
-      return JSON.parse(raw) as EmailEvent[];
+      return JSON.parse(raw) as QueuedEmailEvent[];
     }
   } catch { /* fresh start — expected */ }
   return [];
+}
+
+function loadDeadLetters(): DeadLetteredEmailEvent[] {
+  try {
+    if (fs.existsSync(DEAD_LETTER_FILE)) {
+      const raw = fs.readFileSync(DEAD_LETTER_FILE, 'utf-8');
+      return JSON.parse(raw) as DeadLetteredEmailEvent[];
+    }
+  } catch (err) {
+    log.warn({ err }, 'Failed to load email dead letters');
+  }
+  return [];
+}
+
+function persistDeadLetters(events: DeadLetteredEmailEvent[]) {
+  try {
+    fs.writeFileSync(DEAD_LETTER_FILE, JSON.stringify(events, null, 2));
+  } catch (err) {
+    log.error({ err }, 'Failed to persist email dead letters');
+  }
+}
+
+function appendDeadLetters(events: QueuedEmailEvent[], reason: string) {
+  const now = new Date().toISOString();
+  const deadLetters = loadDeadLetters();
+  deadLetters.push(...events.map(event => ({
+    ...event,
+    deliveryAttempts: event.deliveryAttempts ?? MAX_DELIVERY_ATTEMPTS,
+    lastDeliveryError: reason,
+    deadLetteredAt: now,
+  })));
+  persistDeadLetters(deadLetters);
 }
 
 function clearPersistedQueue() {
@@ -82,6 +126,42 @@ function clearPersistedQueue() {
 
 function bucketKey(recipient: string, type: EmailEventType, workspaceId: string): string {
   return `${recipient}:${type}:${workspaceId}`;
+}
+
+function scheduleBucketFlush(bucket: QueueBucket, delay: number) {
+  if (bucket.timer) clearTimeout(bucket.timer);
+  bucket.timer = setTimeout(() => flushBucket(bucket.key), delay);
+}
+
+function requeueFailedEvents(key: string, events: QueuedEmailEvent[], reason: string) {
+  const retriedEvents = events.map(event => ({
+    ...event,
+    deliveryAttempts: (event.deliveryAttempts ?? 0) + 1,
+    lastDeliveryError: reason,
+  }));
+  const exhausted = retriedEvents.filter(event => (event.deliveryAttempts ?? 0) >= MAX_DELIVERY_ATTEMPTS);
+  const retryable = retriedEvents.filter(event => (event.deliveryAttempts ?? 0) < MAX_DELIVERY_ATTEMPTS);
+
+  if (exhausted.length > 0) {
+    appendDeadLetters(exhausted, reason);
+    log.error({ count: exhausted.length, reason }, 'Email events moved to dead letter queue');
+  }
+
+  if (retryable.length === 0) {
+    persistQueue();
+    return;
+  }
+
+  let bucket = buckets.get(key);
+  if (!bucket) {
+    bucket = { key, events: [], timer: null };
+    buckets.set(key, bucket);
+  }
+  bucket.events.unshift(...retryable);
+  const nextDelay = RETRY_DELAY_MS * Math.max(1, retryable[0].deliveryAttempts ?? 1);
+  scheduleBucketFlush(bucket, nextDelay);
+  persistQueue();
+  log.warn({ count: retryable.length, nextDelayMs: nextDelay, reason }, 'Requeued failed email events');
 }
 
 async function flushBucket(key: string) {
@@ -111,7 +191,8 @@ async function flushBucket(key: string) {
   persistQueue();
 
   if (!sendFn) {
-    log.warn({ droppedCount: events.length }, `No send function registered, dropping ${events.length} events`);
+    log.warn({ count: events.length }, 'No send function registered, requeueing email events');
+    requeueFailedEvents(key, events, 'No send function registered');
     return;
   }
 
@@ -119,6 +200,7 @@ async function flushBucket(key: string) {
     const { subject, html } = renderDigest(type, events);
     if (!html) {
       log.warn({ detail: type }, 'Empty template for type');
+      appendDeadLetters(events, `Empty template for ${type}`);
       return;
     }
     const ok = await sendFn(recipient, subject, html);
@@ -128,9 +210,11 @@ async function flushBucket(key: string) {
       log.info(`Sent batched ${type} email to ${recipient} (${events.length} event${events.length !== 1 ? 's' : ''})`);
     } else {
       log.error(`Failed to send ${type} email to ${recipient}`);
+      requeueFailedEvents(key, events, 'Send function returned false');
     }
   } catch (err) {
     log.error({ err: err }, 'Error sending digest');
+    requeueFailedEvents(key, events, err instanceof Error ? err.message : String(err));
   }
 }
 
@@ -151,13 +235,11 @@ export function queueEmail(event: EmailEvent) {
   persistQueue();
 
   // Reset the batch timer on each new event (sliding window)
-  if (bucket.timer) clearTimeout(bucket.timer);
-
   // Status events use a longer window — held until next morning digest
   const category = getThrottleCategory(event.type);
   const delay = category === 'status' ? msUntilMorning() : BATCH_WINDOW_MS;
 
-  bucket.timer = setTimeout(() => flushBucket(key), delay);
+  scheduleBucketFlush(bucket, delay);
 
   const delayLabel = delay > 60 * 60 * 1000
     ? `${Math.round(delay / (60 * 60 * 1000))}h (morning digest)`
@@ -175,7 +257,8 @@ export async function flushAll() {
     if (bucket?.timer) clearTimeout(bucket.timer);
     await flushBucket(key);
   }
-  clearPersistedQueue();
+  if (buckets.size === 0) clearPersistedQueue();
+  else persistQueue();
 }
 
 /**
@@ -217,4 +300,16 @@ export function getQueueStats(): { buckets: number; totalEvents: number } {
     totalEvents += bucket.events.length;
   }
   return { buckets: buckets.size, totalEvents };
+}
+
+export function getDeadLetterEvents(): DeadLetteredEmailEvent[] {
+  return loadDeadLetters();
+}
+
+export function clearDeadLetterEvents() {
+  try {
+    if (fs.existsSync(DEAD_LETTER_FILE)) fs.unlinkSync(DEAD_LETTER_FILE);
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'email-queue/clearDeadLetterEvents: programming error');
+  }
 }

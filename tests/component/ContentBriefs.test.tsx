@@ -14,9 +14,19 @@ const mocks = vi.hoisted(() => ({
   getFn: vi.fn(),
   getTextFn: vi.fn(),
   trackJob: vi.fn(),
+  startJob: vi.fn(),
 }));
 
 vi.mock('../../src/api/client', () => ({
+  ApiError: class ApiError extends Error {
+    status: number;
+    body: unknown;
+    constructor(status: number, message: string, body?: unknown) {
+      super(message);
+      this.status = status;
+      this.body = body;
+    }
+  },
   post: mocks.postFn,
   patch: mocks.patchFn,
   del: mocks.delFn,
@@ -30,7 +40,7 @@ vi.mock('../../src/hooks/useBackgroundTasks', () => ({
     trackJob: mocks.trackJob,
     jobs: [],
     activeJobs: [],
-    startJob: vi.fn(),
+    startJob: mocks.startJob,
     getJobResult: vi.fn(),
     findActiveJob: vi.fn(),
     findLatestTerminalJob: vi.fn(),
@@ -416,8 +426,7 @@ describe('ContentBriefs', () => {
 
   // 11. Brief generate flow
   it('calls post API when brief generation is triggered', async () => {
-    const newBrief = makeBrief({ id: 'brief-new', targetKeyword: 'new keyword' });
-    mocks.postFn.mockResolvedValue(newBrief);
+    mocks.postFn.mockResolvedValue({ jobId: 'job-1' });
     renderComponent();
     const keywordInput = screen.getByTestId('keyword-input');
     await act(async () => { fireEvent.change(keywordInput, { target: { value: 'new keyword' } }); });
@@ -427,8 +436,11 @@ describe('ContentBriefs', () => {
     await act(async () => { fireEvent.click(generateBtn); });
     await waitFor(() => {
       expect(mocks.postFn).toHaveBeenCalledWith(
-        expect.stringContaining('/api/content-briefs/ws-1/generate'),
-        expect.objectContaining({ targetKeyword: 'new keyword', generationStyle: 'concise' })
+        '/api/jobs',
+        expect.objectContaining({
+          type: 'content-brief-generation',
+          params: expect.objectContaining({ workspaceId: 'ws-1', targetKeyword: 'new keyword', generationStyle: 'concise' }),
+        }),
       );
     });
   });
@@ -456,7 +468,7 @@ describe('ContentBriefs', () => {
 
   it('sends selected writing style when generating a brief from a request', async () => {
     const req = makeRequest();
-    mocks.postFn.mockResolvedValue(makeBrief({ id: 'brief-from-request', generationStyle: 'hybrid' }));
+    mocks.postFn.mockResolvedValue({ jobId: 'job-1' });
     setHooks({ requests: [req] });
     renderComponent();
 
@@ -469,8 +481,11 @@ describe('ContentBriefs', () => {
 
     await waitFor(() => {
       expect(mocks.postFn).toHaveBeenCalledWith(
-        expect.stringContaining(`/api/content-requests/ws-1/${req.id}/generate-brief`),
-        expect.objectContaining({ generationStyle: 'hybrid' }),
+        '/api/jobs',
+        expect.objectContaining({
+          type: 'content-brief-generation',
+          params: expect.objectContaining({ workspaceId: 'ws-1', requestId: req.id, generationStyle: 'hybrid' }),
+        }),
       );
     });
   });

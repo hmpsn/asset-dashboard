@@ -17,6 +17,7 @@ import type {
   CopyIntelligencePattern, EntryCopyStatus, BatchJob,
   ExportRequest, ExportResult,
 } from '../../shared/types/copy-pipeline';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
 
 // ═══ BRANDSCRIPT ═══
 
@@ -213,10 +214,10 @@ export const copyReview = {
 
 export const copyBatch = {
   start: (wsId: string, blueprintId: string, body: { entryIds: string[]; mode?: string; batchSize?: number }) =>
-    post<{ batchId: string }>(
-      `/api/copy/${wsId}/${blueprintId}/batch`,
-      body
-    ),
+    post<{ batchId: string; jobId: string }>('/api/jobs', {
+      type: BACKGROUND_JOB_TYPES.COPY_BATCH_GENERATION,
+      params: { workspaceId: wsId, blueprintId, ...body },
+    }),
   getJob: (wsId: string, batchId: string) =>
     get<BatchJob | null>(`/api/copy/${wsId}/batch/${batchId}`),
 };

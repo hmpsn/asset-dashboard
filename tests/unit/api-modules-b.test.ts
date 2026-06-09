@@ -1159,11 +1159,14 @@ describe('copyReview.sendEntryToClientReview', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('copyBatch.start', () => {
-  it('calls post on batch endpoint with entryIds', async () => {
+  it('starts a background copy batch job with entryIds', async () => {
     await copyBatch.start('ws-1', 'bp-1', { entryIds: ['e1', 'e2'], mode: 'full' });
     expect(mockPost).toHaveBeenCalledWith(
-      '/api/copy/ws-1/bp-1/batch',
-      { entryIds: ['e1', 'e2'], mode: 'full' },
+      '/api/jobs',
+      {
+        type: 'copy-batch-generation',
+        params: { workspaceId: 'ws-1', blueprintId: 'bp-1', entryIds: ['e1', 'e2'], mode: 'full' },
+      },
     );
   });
 });

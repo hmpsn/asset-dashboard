@@ -30,6 +30,8 @@ describe('background job metadata', () => {
   it('centralizes labels and cancellation semantics', () => {
     expect(getBackgroundJobLabel(BACKGROUND_JOB_TYPES.SEO_BULK_REWRITE)).toBe('Bulk SEO Rewrite');
     expect(getBackgroundJobLabel(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY)).toBe('Keyword Strategy');
+    expect(getBackgroundJobLabel(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_GENERATION)).toBe('Content Brief Generation');
+    expect(getBackgroundJobLabel(BACKGROUND_JOB_TYPES.COPY_BATCH_GENERATION)).toBe('Copy Batch Generation');
     expect(getBackgroundJobLabel(BACKGROUND_JOB_TYPES.SCHEMA_PLAN_GENERATION)).toBe('Schema Plan Generation');
     expect(getBackgroundJobLabel(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION)).toBe('Recommendations Generation');
     expect(getBackgroundJobLabel('future-job')).toBe('future-job');
@@ -37,6 +39,8 @@ describe('background job metadata', () => {
     expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION)).toBe(true);
     expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH)).toBe(true);
     expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.SCHEMA_PLAN_GENERATION)).toBe(false);
+    expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_GENERATION)).toBe(false);
+    expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.COPY_BATCH_GENERATION)).toBe(false);
     expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION)).toBe(false);
     expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY)).toBe(false);
     expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.SEO_AUDIT)).toBe(false);

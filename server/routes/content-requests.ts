@@ -12,7 +12,6 @@ const router = Router();
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
-import { generateBrief } from '../content-brief.js';
 import { listMatrices } from '../content-matrices.js';
 import {
   listContentRequests,
@@ -24,10 +23,7 @@ import { sendPostToClientForReview, PostNotFoundError } from '../domains/content
 import { listPosts } from '../content-posts.js';
 import { notifyClientBriefReady, notifyClientContentPublished, notifyClientPostReady } from '../email.js';
 import { getGA4LandingPages } from '../google-analytics.js';
-import { getQueryPageData, getAllGscPages, getPageTrend } from '../search-console.js';
-import { getConfiguredProvider, getProviderDisplayName } from '../seo-data-provider.js';
-import type { KeywordMetrics, RelatedKeyword } from '../seo-data-provider.js';
-import type { StrategyCardContext, BriefJourneyStage } from '../../shared/types/content.js';
+import { getAllGscPages, getPageTrend } from '../search-console.js';
 import { CONTENT_GENERATION_STYLES } from '../../shared/types/content.js';
 import {
   getSiteSubdomain,
@@ -35,14 +31,15 @@ import {
 } from '../webflow.js';
 import { getWorkspacePages } from '../workspace-data.js';
 import { getWorkspace, getTokenForSite, updatePageState } from '../workspaces.js';
-import { normalizePageUrl, resolvePagePath, sanitizeQueryForPrompt } from '../helpers.js';
+import { normalizePageUrl, resolvePagePath } from '../helpers.js';
 import { listPageKeywords } from '../page-keywords.js';
 import { queueKeywordStrategyPostUpdateFollowOns } from '../keyword-strategy-follow-ons.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
 import { isProgrammingError } from '../errors.js';
-import { loadDecayAnalysis } from '../content-decay.js';
-import { resolveWorkspaceLocationCode } from '../local-seo.js';
+import { hasActiveJob } from '../jobs.js';
+import { startContentBriefGenerationJob } from '../content-brief-generation-job.js';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 
 const log = createLogger('content-requests');
 
@@ -66,16 +63,6 @@ const generateRequestBriefSchema = z.object({
 const sendPostToClientSchema = z.object({
   note: z.string().max(5000).optional(),
 }).strict();
-
-// --- Helper: Derive journey stage from intent ---
-function deriveJourneyStage(intent?: string): BriefJourneyStage | undefined {
-  if (!intent) return undefined;
-  const lower = intent.toLowerCase();
-  if (lower === 'informational') return 'awareness';
-  if (lower === 'commercial') return 'consideration';
-  if (lower === 'transactional') return 'decision';
-  return undefined;
-}
 
 // --- Internal Content Request Management ---
 router.get('/api/content-requests/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
@@ -308,104 +295,17 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
   const { generationStyle } = req.body;
 
   try {
-    // Gather GSC context if available (fetched once, reused for relatedQueries + decayQueryContext below)
-    let relatedQueries: { query: string; position: number; clicks: number; impressions: number }[] = [];
-    let cachedGscRows: Awaited<ReturnType<typeof getQueryPageData>> | null = null;
-    if (ws.gscPropertyUrl && ws.webflowSiteId) {
-      try {
-        cachedGscRows = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90);
-        relatedQueries = cachedGscRows
-          .filter(r => { const q = r.query.toLowerCase(); return request.targetKeyword.toLowerCase().split(' ').some(w => w.length > 2 && q.includes(w)); })
-          .slice(0, 20)
-          .map(r => ({ query: sanitizeQueryForPrompt(r.query), position: r.position, clicks: r.clicks, impressions: r.impressions }));
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-requests: POST /api/content-requests/:workspaceId/:id/generate-brief: programming error'); /* GSC unavailable */ }
+    {
+      const activeBriefJob = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_GENERATION, req.params.workspaceId);
+      if (activeBriefJob) return res.status(409).json({ error: 'Content brief generation is already running for this workspace', jobId: activeBriefJob.id });
+      const started = startContentBriefGenerationJob({
+        source: 'request',
+        workspaceId: req.params.workspaceId,
+        requestId: req.params.id,
+        generationStyle,
+      });
+      return res.json(started);
     }
-
-    // Gather SEO keyword data if a provider is configured
-    let keywordMetrics: KeywordMetrics | undefined;
-    let relatedKeywords: RelatedKeyword[] | undefined;
-    const seoProvider = getConfiguredProvider(ws?.seoDataProvider);
-    const providerLabel = seoProvider ? getProviderDisplayName(seoProvider.name) : 'DataForSEO';
-    if (seoProvider) {
-      try {
-        const locationCode = resolveWorkspaceLocationCode(req.params.workspaceId) ?? undefined;
-        const [metrics, related] = await Promise.all([
-          seoProvider.getKeywordMetrics([request.targetKeyword], req.params.workspaceId, undefined, locationCode),
-          seoProvider.getRelatedKeywords(request.targetKeyword, req.params.workspaceId, 15),
-        ]);
-        if (metrics.length > 0) keywordMetrics = metrics[0];
-        if (related.length > 0) relatedKeywords = related;
-      } catch (e) { log.error({ err: e }, 'SEO keyword enrichment error'); }
-    }
-
-    // Gather GA4 landing page performance if connected
-    let ga4PagePerformance: { landingPage: string; sessions: number; users: number; bounceRate: number; avgEngagementTime: number; conversions: number }[] | undefined;
-    if (ws.ga4PropertyId) {
-      try {
-        const pages = await getGA4LandingPages(ws.ga4PropertyId, 28, 25);
-        if (pages.length > 0) ga4PagePerformance = pages;
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-requests: programming error'); /* GA4 unavailable */ }
-    }
-
-    // Fetch all published pages (Webflow API + sitemap CMS pages) for internal link suggestions
-    const existingPages = await getAllSitePages(ws);
-
-    // Thread strategy card context from request fields
-    const strategyCardContext: StrategyCardContext = {
-      rationale: request.rationale,
-      intent: request.intent,
-      priority: request.priority,
-      journeyStage: deriveJourneyStage(request.intent),
-    };
-
-    // If this content request targets a page that's decaying, compile a decay-specific query context.
-    let decayQueryContext: string | undefined;
-    if (request.targetPageSlug) {
-      try {
-        const decay = loadDecayAnalysis(req.params.workspaceId);
-        const normalizeTarget = normalizePageUrl(request.targetPageSlug);
-        const decayPage = decay?.decayingPages.find(dp => dp.page === normalizeTarget);
-        if (decayPage && ws.gscPropertyUrl && ws.webflowSiteId) {
-          // Reuse the 90-day GSC dataset fetched above — avoids a duplicate API call.
-          // Fall back to a fresh fetch only if the earlier call failed (cachedGscRows === null).
-          const qpRows = cachedGscRows ?? await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90, { maxRows: 500 });
-          const pageQueries = qpRows
-            .filter(r => normalizePageUrl(r.page) === decayPage.page)
-            .sort((a, b) => b.impressions - a.impressions)
-            .slice(0, 15);
-          if (pageQueries.length > 0) {
-            decayQueryContext = `DECAY CONTEXT: This page has lost ${Math.abs(decayPage.clickDeclinePct)}% of search clicks. Top queries:\n` +
-              pageQueries.map(q => `- "${sanitizeQueryForPrompt(q.query)}": ${q.clicks} clicks, ${q.impressions} impressions, pos ${q.position.toFixed(1)}`).join('\n');
-          }
-        }
-      } catch (err) {
-        log.debug({ err }, 'Decay query context enrichment failed — continuing without it');
-      }
-    }
-
-    const brief = await generateBrief(req.params.workspaceId, request.targetKeyword, {
-      relatedQueries,
-      businessContext: ws.keywordStrategy?.businessContext || '',
-      existingPages,
-      keywordMetrics,
-      relatedKeywords,
-      providerLabel,
-      pageType: request.pageType || 'blog',
-      ga4PagePerformance,
-      strategyCardContext,
-      decayQueryContext,
-      generationStyle,
-    });
-
-    // Link brief to request and update status
-    updateContentRequest(req.params.workspaceId, req.params.id, {
-      status: 'brief_generated',
-      briefId: brief.id,
-    });
-
-    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: request.id, status: 'brief_generated' });
-    addActivity(req.params.workspaceId, 'brief_generated', `Content brief generated for "${request.targetKeyword}"`, `Title: ${brief.suggestedTitle}`, { requestId: request.id, briefId: brief.id });
-    res.json(brief);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     res.status(500).json({ error: msg });

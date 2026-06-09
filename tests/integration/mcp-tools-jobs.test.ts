@@ -1,6 +1,8 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
+import { cancelJob, createJob } from '../../server/jobs.js';
 
 const MCP_TEST_KEY = 'test-mcp-key-jobs';
 const ctx = createTestContext(13705, {
@@ -91,12 +93,16 @@ describe('MCP job tools (integration)', () => {
   });
 
   it('start_keyword_strategy_generation rejects a second active job', async () => {
-    const first = await callMcpTool('start_keyword_strategy_generation', { workspace_id: ws.workspaceId });
-    expect(first.isError).toBeFalsy();
+    const activeJob = createJob(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, {
+      workspaceId: ws.workspaceId,
+      message: 'Generating keyword strategy...',
+      total: 100,
+    });
 
     const second = await callMcpTool('start_keyword_strategy_generation', { workspace_id: ws.workspaceId });
     expect(second.isError).toBe(true);
     expect(second.content[0].text).toMatch(/already running|already being generated/i);
+    cancelJob(activeJob.id);
   });
 
   it('start_seo_audit validates required site_id', async () => {

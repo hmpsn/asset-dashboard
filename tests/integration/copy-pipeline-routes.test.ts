@@ -24,11 +24,12 @@
  * We do test that they are wired (check 400/404, not 500, when workspace doesn't exist).
  */
 import { randomUUID } from 'crypto';
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import db from '../../server/db/index.js';
+import { cancelJob, listJobs } from '../../server/jobs.js';
 
 const ctx = createTestContext(13365); // port-ok: next free after 13364
 const { api, postJson, patchJson, del } = ctx;
@@ -614,32 +615,45 @@ describe('POST /api/copy/:workspaceId/:blueprintId/:entryId/send-to-client', () 
 // ── Batch routes ──────────────────────────────────────────────────────────────
 
 describe('POST /api/copy/:workspaceId/:blueprintId/batch', () => {
-  it('returns 200 with { batchId } immediately (fire-and-forget)', async () => {
+  beforeEach(() => {
+    for (const job of listJobs().filter(job => job.type === 'copy-batch-generation' && (job.status === 'pending' || job.status === 'running'))) {
+      cancelJob(job.id);
+    }
+    db.prepare(`
+      UPDATE jobs
+      SET status = 'cancelled' -- status-ok: test isolation for copy batch active-job guard
+      WHERE type = 'copy-batch-generation'
+        AND status IN ('pending', 'running')
+    `).run();
+  });
+
+  it('returns 200 with { batchId } immediately and persists requested metadata', async () => {
     const res = await postJson(
       `/api/copy/${wsA.workspaceId}/${blueprintAId}/batch`,
-      { entryIds: [entryAId] },
+      { entryIds: [entryAId], mode: 'review_inbox', batchSize: 1 },
     );
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toHaveProperty('batchId');
     expect(typeof body.batchId).toBe('string');
     expect(body.batchId).toMatch(/^bj_/);
-  });
-
-  it('persists a batch job record with requested metadata', async () => {
-    const res = await postJson(
-      `/api/copy/${wsA.workspaceId}/${blueprintAId}/batch`,
-      { entryIds: [entryAId], mode: 'review_inbox', batchSize: 1 },
-    );
-    expect(res.status).toBe(200);
-    const { batchId } = await res.json();
 
     const row = db.prepare('SELECT * FROM copy_batch_jobs WHERE id = ? AND workspace_id = ?')
-      .get(batchId, wsA.workspaceId) as { status: string; mode: string; batch_size: number } | undefined;
+      .get(body.batchId, wsA.workspaceId) as { status: string; mode: string; batch_size: number } | undefined;
     expect(row).toBeTruthy();
     expect(['running', 'complete', 'failed']).toContain(row?.status);
     expect(row?.mode).toBe('review_inbox');
     expect(row?.batch_size).toBe(1);
+  });
+
+  it('returns 409 when a copy batch is already active for the workspace', async () => {
+    const res = await postJson(
+      `/api/copy/${wsA.workspaceId}/${blueprintAId}/batch`,
+      { entryIds: [entryAId], mode: 'review_inbox', batchSize: 1 },
+    );
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toContain('already running');
   });
 
   it('returns 404 when blueprintId does not belong to the workspace', async () => {
