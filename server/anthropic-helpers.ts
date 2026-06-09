@@ -6,7 +6,8 @@
 
 import { logTokenUsage } from './openai-helpers.js';
 import { createLogger } from './logger.js';
-import { abortableDelay, composeTimeoutSignal, throwIfSignalAborted } from './abort-helpers.js';
+import { composeTimeoutSignal, throwIfSignalAborted } from './abort-helpers.js';
+import { buildProviderRetryDelayMs, RetryableProviderError, withProviderRetry } from './ai-provider-retry.js';
 import { isLocalFakeProviderModeEnabled } from './local-provider-mode.js';
 
 const log = createLogger('anthropic');
@@ -86,8 +87,14 @@ export async function callAnthropic(opts: AnthropicChatOptions): Promise<Anthrop
 
   const body = JSON.stringify(bodyObj);
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
+  const result = await withProviderRetry({
+    feature,
+    providerLabel: 'Anthropic',
+    logger: log,
+    maxRetries,
+    signal,
+    cancelMessage: AI_REQUEST_CANCELLED_MESSAGE,
+    run: async (attempt) => {
       throwIfSignalAborted(signal, AI_REQUEST_CANCELLED_MESSAGE);
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -103,14 +110,16 @@ export async function callAnthropic(opts: AnthropicChatOptions): Promise<Anthrop
       if (!res.ok) {
         const errText = await res.text().catch(() => '');
 
-        const isRetryable = res.status === 429 || res.status >= 500;
-        if (isRetryable && attempt < maxRetries) {
-          const retryAfter = res.headers.get('retry-after');
-          let waitMs = Math.min(2000 * Math.pow(2, attempt), 30_000);
-          if (retryAfter) waitMs = Math.max(parseInt(retryAfter, 10) * 1000 + 500, waitMs);
-          log.info(`[${feature}] Anthropic ${res.status}, retrying in ${(waitMs / 1000).toFixed(1)}s (attempt ${attempt + 1}/${maxRetries})`);
-          await abortableDelay(waitMs, signal, AI_REQUEST_CANCELLED_MESSAGE);
-          continue;
+        if (res.status === 429 || res.status >= 500) {
+          const waitMs = buildProviderRetryDelayMs({
+            attempt,
+            retryAfterHeader: res.headers.get('retry-after'),
+            retryAfterUnit: 'seconds',
+          });
+          throw new RetryableProviderError(`Anthropic ${res.status}: ${errText.slice(0, 300)}`, {
+            waitMs,
+            retryLog: `[${feature}] Anthropic ${res.status}, retrying in ${(waitMs / 1000).toFixed(1)}s (attempt ${attempt + 1}/${maxRetries})`,
+          });
         }
         throw new Error(`Anthropic ${res.status}: ${errText.slice(0, 300)}`);
       }
@@ -124,24 +133,20 @@ export async function callAnthropic(opts: AnthropicChatOptions): Promise<Anthrop
       const promptTokens = data.usage?.input_tokens || 0;
       const completionTokens = data.usage?.output_tokens || 0;
       const totalTokens = promptTokens + completionTokens;
-
-      // Track usage (reuse the OpenAI token tracker)
-      logTokenUsage({ promptTokens, completionTokens, totalTokens, model, feature, workspaceId });
-
       return { text, promptTokens, completionTokens, totalTokens };
-    } catch (err) {
-      if (signal?.aborted) throw err;
-      if (err instanceof Error && err.name === 'TimeoutError' && attempt < maxRetries) {
-        log.info(`[${feature}] Anthropic timeout, retrying (attempt ${attempt + 1}/${maxRetries})`);
-        await abortableDelay(2000 * (attempt + 1), signal, AI_REQUEST_CANCELLED_MESSAGE);
-        continue;
-      }
-      if (attempt === maxRetries) throw err;
-      log.info(`[${feature}] Anthropic error: ${err instanceof Error ? err.message : err}, retrying (attempt ${attempt + 1}/${maxRetries})`);
-      await abortableDelay(2000 * Math.pow(2, attempt), signal, AI_REQUEST_CANCELLED_MESSAGE);
-    }
-  }
-  throw new Error(`[${feature}] Anthropic call failed after ${maxRetries} retries`);
+    },
+  });
+
+  logTokenUsage({
+    promptTokens: result.promptTokens,
+    completionTokens: result.completionTokens,
+    totalTokens: result.totalTokens,
+    model,
+    feature,
+    workspaceId,
+  });
+
+  return result;
 }
 
 /**
@@ -184,6 +189,7 @@ export async function callAnthropicWithTools(opts: {
   workspaceId?: string;
   maxRetries?: number;
   timeoutMs?: number;
+  signal?: AbortSignal;
 }): Promise<AnthropicToolUseResult> {
   const {
     model = 'claude-haiku-4-5-20251001',
@@ -196,6 +202,7 @@ export async function callAnthropicWithTools(opts: {
     workspaceId,
     maxRetries = 3,
     timeoutMs = 60_000,
+    signal,
   } = opts;
 
   if (isLocalFakeProviderModeEnabled()) {
@@ -220,8 +227,16 @@ export async function callAnthropicWithTools(opts: {
 
   const body = JSON.stringify(bodyObj);
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
+  const result = await withProviderRetry({
+    feature,
+    providerLabel: 'Anthropic tool_use',
+    logger: log,
+    maxRetries,
+    signal,
+    cancelMessage: AI_REQUEST_CANCELLED_MESSAGE,
+    attemptDenominator: maxRetries + 1,
+    run: async (attempt) => {
+      throwIfSignalAborted(signal, AI_REQUEST_CANCELLED_MESSAGE);
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -230,19 +245,21 @@ export async function callAnthropicWithTools(opts: {
           'Content-Type': 'application/json',
         },
         body,
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: composeTimeoutSignal(timeoutMs, signal),
       });
 
       if (!res.ok) {
         const errText = await res.text().catch(() => '');
-        const isRetryable = res.status === 429 || res.status >= 500;
-        if (isRetryable && attempt < maxRetries) {
-          const retryAfter = res.headers.get('retry-after');
-          let waitMs = Math.min(2000 * Math.pow(2, attempt), 30_000);
-          if (retryAfter) waitMs = Math.max(parseInt(retryAfter, 10) * 1000 + 500, waitMs);
-          log.info(`[${feature}] Anthropic tool_use ${res.status}, retrying in ${waitMs}ms (attempt ${attempt + 1}/${maxRetries + 1})`);
-          await new Promise(r => setTimeout(r, waitMs));
-          continue;
+        if (res.status === 429 || res.status >= 500) {
+          const waitMs = buildProviderRetryDelayMs({
+            attempt,
+            retryAfterHeader: res.headers.get('retry-after'),
+            retryAfterUnit: 'seconds',
+          });
+          throw new RetryableProviderError(`Anthropic tool_use ${res.status}: ${errText.slice(0, 300)}`, {
+            waitMs,
+            retryLog: `[${feature}] Anthropic tool_use ${res.status}, retrying in ${waitMs}ms (attempt ${attempt + 1}/${maxRetries + 1})`,
+          });
         }
         throw new Error(`Anthropic tool_use ${res.status}: ${errText.slice(0, 300)}`);
       }
@@ -253,23 +270,22 @@ export async function callAnthropicWithTools(opts: {
       };
 
       const toolUseBlock = data.content?.find(c => c.type === 'tool_use');
-      if (!toolUseBlock?.input) throw new Error(`Anthropic tool_use: no tool_use block in response`);
+      if (!toolUseBlock?.input) throw new Error('Anthropic tool_use: no tool_use block in response');
 
       const promptTokens = data.usage?.input_tokens ?? 0;
       const completionTokens = data.usage?.output_tokens ?? 0;
-      logTokenUsage({ promptTokens, completionTokens, totalTokens: promptTokens + completionTokens, model, feature, workspaceId });
-
       return { toolInput: toolUseBlock.input, promptTokens, completionTokens };
-    } catch (err) {
-      if (err instanceof Error && err.name === 'TimeoutError' && attempt < maxRetries) {
-        log.info(`[${feature}] Anthropic tool_use timeout, retrying (attempt ${attempt + 1}/${maxRetries + 1})`);
-        await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
-        continue;
-      }
-      if (attempt === maxRetries) throw err;
-      log.info(`[${feature}] Anthropic tool_use error: ${err instanceof Error ? err.message : String(err)}, retrying (attempt ${attempt + 1}/${maxRetries + 1})`);
-      await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempt)));
-    }
-  }
-  throw new Error(`[${feature}] callAnthropicWithTools failed after ${maxRetries} retries`);
+    },
+  });
+
+  logTokenUsage({
+    promptTokens: result.promptTokens,
+    completionTokens: result.completionTokens,
+    totalTokens: result.promptTokens + result.completionTokens,
+    model,
+    feature,
+    workspaceId,
+  });
+
+  return result;
 }

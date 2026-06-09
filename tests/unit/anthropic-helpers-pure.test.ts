@@ -105,6 +105,10 @@ describe('callAnthropic (real fetch path)', () => {
     mocks.isLocalFakeProviderModeEnabled.mockReturnValue(false);
     mocks.logTokenUsage.mockReset();
     mocks.fetch.mockReset();
+    mocks.abortableDelay.mockReset();
+    mocks.composeTimeoutSignal.mockReset();
+    mocks.composeTimeoutSignal.mockReturnValue(undefined);
+    mocks.throwIfSignalAborted.mockReset();
     process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
   });
 
@@ -195,6 +199,33 @@ describe('callAnthropic (real fetch path)', () => {
       })
     ).rejects.toThrow('Anthropic 400');
   });
+
+  it('retries 429 responses using retry-after seconds before succeeding', async () => {
+    mocks.fetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        text: async () => 'rate limited',
+        headers: { get: (name: string) => name === 'retry-after' ? '4' : null },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          content: [{ type: 'text', text: 'Recovered' }],
+          usage: { input_tokens: 16, output_tokens: 7 },
+        }),
+      });
+
+    const result = await callAnthropic({
+      messages: [{ role: 'user', content: 'retry please' }],
+      feature: 'anthropic-retry-test',
+      maxRetries: 1,
+    });
+
+    expect(result.text).toBe('Recovered');
+    expect(mocks.fetch).toHaveBeenCalledTimes(2);
+    expect(mocks.abortableDelay).toHaveBeenCalledWith(4500, undefined, 'AI request cancelled');
+  });
 });
 
 // ── callAnthropicWithTools — local fake provider mode ──────────────────────
@@ -246,6 +277,10 @@ describe('callAnthropicWithTools (real fetch path)', () => {
     mocks.isLocalFakeProviderModeEnabled.mockReturnValue(false);
     mocks.logTokenUsage.mockReset();
     mocks.fetch.mockReset();
+    mocks.abortableDelay.mockReset();
+    mocks.composeTimeoutSignal.mockReset();
+    mocks.composeTimeoutSignal.mockReturnValue(undefined);
+    mocks.throwIfSignalAborted.mockReset();
     process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
   });
 
@@ -307,5 +342,36 @@ describe('callAnthropicWithTools (real fetch path)', () => {
         maxRetries: 0,
       })
     ).rejects.toThrow('no tool_use block');
+  });
+
+  it('uses the shared retry path for tool_use requests, including caller cancellation signals', async () => {
+    const controller = new AbortController();
+    mocks.fetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        text: async () => 'rate limited',
+        headers: { get: (name: string) => name === 'retry-after' ? '3' : null },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          content: [{ type: 'tool_use', input: { label: 'recovered' } }],
+          usage: { input_tokens: 11, output_tokens: 6 },
+        }),
+      });
+
+    const result = await callAnthropicWithTools({
+      userMessage: 'Retry with tools',
+      tools: [sampleTool],
+      feature: 'tool-retry-test',
+      maxRetries: 1,
+      timeoutMs: 42_000,
+      signal: controller.signal,
+    });
+
+    expect(result.toolInput).toEqual({ label: 'recovered' });
+    expect(mocks.composeTimeoutSignal).toHaveBeenCalledWith(42_000, controller.signal);
+    expect(mocks.abortableDelay).toHaveBeenCalledWith(3500, controller.signal, 'AI request cancelled');
   });
 });
