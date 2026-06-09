@@ -6,7 +6,7 @@ const approvalsRoute = readFileSync(join(import.meta.dirname, '../../server/rout
 const schemaRoute = readFileSync(join(import.meta.dirname, '../../server/routes/webflow-schema.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for schema outcome tracking.
 const pageToolsRoute = readFileSync(join(import.meta.dirname, '../../server/routes/webflow-seo-page-tools.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for live page HTML fetches.
 const rewriteRoute = readFileSync(join(import.meta.dirname, '../../server/routes/webflow-seo-rewrite.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for SEO rewrite fetches.
-const jobsRoute = readFileSync(join(import.meta.dirname, '../../server/routes/jobs.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for background SEO writes.
+const bulkSeoJob = readFileSync(join(import.meta.dirname, '../../server/webflow-bulk-seo-fix-background-job.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for background SEO writes.
 const contentPostsRoute = readFileSync(join(import.meta.dirname, '../../server/routes/content-posts.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for content outcome tracking.
 const webflowKeywordsRoute = readFileSync(join(import.meta.dirname, '../../server/routes/webflow-keywords.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for keyword intelligence context.
 const schemaGenerator = readFileSync(join(import.meta.dirname, '../../server/schema/generator.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for lean schema suggestions.
@@ -49,7 +49,7 @@ describe('canonical page-address route wiring', () => {
   });
 
   it('background and AI read paths do not persist or prompt with raw leaf slugs', () => {
-    expect(jobsRoute).toContain("const seoChangePagePath = bulkJobPagePath || (page.slug ? normalizePageUrl(page.slug) : '')");
+    expect(bulkSeoJob).toContain("const seoChangePagePath = pagePath || (page.slug ? normalizePageUrl(page.slug) : '')");
     expect(contentPostsRoute).toContain('const publishedPagePath = slug ? normalizePageUrl(slug) : null');
     expect(contentPostsRoute).not.toContain('pageUrl: slug ? `/${slug}` : null');
     expect(webflowKeywordsRoute).toContain('const pagePath = slug ? normalizePageUrl(slug) : undefined');

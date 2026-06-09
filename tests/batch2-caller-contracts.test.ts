@@ -127,7 +127,7 @@ describe('webflow-keywords.ts migration contracts', () => {
 
 describe('webflow SEO route N+1 prevention contracts', () => {
   const applySrc = readRoute('webflow-seo-apply.ts');
-  const jobsSrc = readRoute('jobs.ts');
+  const jobsSrc = read('webflow-bulk-seo-fix-background-job.ts');
   const rewriteSrc = readRoute('webflow-seo-bulk-rewrite.ts');
   const rewriteJobSrc = read('webflow-seo-bulk-rewrite-job.ts');
 
@@ -144,7 +144,7 @@ describe('webflow SEO route N+1 prevention contracts', () => {
 
   it('bulk-fix job preserves the richer SEO copy prompt contract from the retired sync route', () => {
     expect(jobsSrc).toContain('callCreativeAI({');
-    expect(jobsSrc).toContain('systemPrompt: buildSystemPrompt(bulkSeoWorkspaceId');
+    expect(jobsSrc).toContain('systemPrompt: buildSystemPrompt(workspaceId');
     expect(jobsSrc).toContain('buildSeoPromptBlocks(pageSeo');
     expect(jobsSrc).toContain('const personasBlock = seoBlocks.personasBlock');
     expect(jobsSrc).toContain('const knowledgeBlock = seoBlocks.knowledgeBlock');

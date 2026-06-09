@@ -116,12 +116,12 @@ describe('AI dispatch migration', () => {
   });
 
   it('keeps bulk SEO job creative copy on the unified creative dispatcher', () => {
-    const source = readFileSync('server/routes/jobs.ts', 'utf-8'); // readFile-ok — source contract for bulk SEO job dispatcher migration
-    expect(source).toContain("from '../content-posts-ai.js'");
+    const source = readFileSync('server/webflow-bulk-seo-fix-background-job.ts', 'utf-8'); // readFile-ok — source contract for bulk SEO job dispatcher migration
+    expect(source).toContain("from './content-posts-ai.js'");
     expect(source).toContain('callCreativeAI({');
-    expect(source).toContain('systemPrompt: buildSystemPrompt(bulkSeoWorkspaceId');
-    expect(source).not.toContain("from '../openai-helpers.js'");
-    expect(source).not.toContain("from '../anthropic-helpers.js'");
+    expect(source).toContain('systemPrompt: buildSystemPrompt(workspaceId');
+    expect(source).not.toContain("from './openai-helpers.js'");
+    expect(source).not.toContain("from './anthropic-helpers.js'");
     expect(source).not.toContain('callOpenAI({');
     expect(source).not.toContain('callAnthropic({');
   });
