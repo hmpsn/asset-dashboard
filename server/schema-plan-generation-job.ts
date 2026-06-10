@@ -9,7 +9,7 @@ import { getCachedArchitecture } from './site-architecture.js';
 import { createJob, getJob, hasActiveJob, updateJob } from './jobs.js';
 import { createLogger } from './logger.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
-import { getWorkspace, listWorkspaces } from './workspaces.js';
+import { getWorkspace, getWorkspaceBySiteId } from './workspaces.js';
 import { BACKGROUND_JOB_TYPES } from '../shared/types/background-jobs.js';
 import { WS_EVENTS } from './ws-events.js';
 import type { SchemaPlanGenerationResponse, SchemaSitePlan } from '../shared/types/schema-plan.js';
@@ -45,7 +45,7 @@ function getSchemaPlanWorkspace(siteId: string, workspaceId?: string) {
     return workspace;
   }
 
-  const workspace = listWorkspaces().find(candidate => candidate.webflowSiteId === siteId);
+  const workspace = getWorkspaceBySiteId(siteId);
   if (!workspace) {
     throw new SchemaPlanStartError(404, 'No workspace found for this site');
   }
@@ -142,7 +142,7 @@ export async function runSchemaPlanGenerationJob(
       message: 'Gathering intelligence...',
     });
 
-    const workspace = getWorkspace(workspaceId) ?? listWorkspaces().find(candidate => candidate.webflowSiteId === siteId);
+    const workspace = getWorkspace(workspaceId) ?? getWorkspaceBySiteId(siteId);
     if (!workspace) {
       throw new Error('Workspace not found');
     }

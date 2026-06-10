@@ -8,7 +8,7 @@ import { Router } from 'express';
 const router = Router();
 
 import { getConfiguredProvider, getBacklinksProvider, listProviders, isAnyProviderConfigured } from '../seo-data-provider.js';
-import { listWorkspaces, getWorkspace, updateWorkspace } from '../workspaces.js';
+import { getWorkspace, updateWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { getUploadRoot } from '../data-dir.js';
 import { MAX_COMPETITORS } from '../constants.js';
@@ -55,7 +55,7 @@ router.get('/api/seo/competitive-intel/:workspaceId', requireWorkspaceAccess('wo
     return res.status(400).json({ error: `competitors must include at most ${MAX_COMPETITORS} domains` });
   }
 
-  const ws = listWorkspaces().find(w => w.id === workspaceId);
+  const ws = getWorkspace(workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
   const provider = getConfiguredProvider(ws.seoDataProvider);

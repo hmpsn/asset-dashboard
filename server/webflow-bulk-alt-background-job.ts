@@ -10,11 +10,7 @@ import {
 } from './jobs.js';
 import { createLogger } from './logger.js';
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
-import {
-  getTokenForSite,
-  getWorkspace,
-  listWorkspaces,
-} from './workspaces.js';
+import { getTokenForSite, getWorkspace, getWorkspaceBySiteId } from './workspaces.js';
 import { updateAsset } from './webflow.js';
 import { BACKGROUND_JOB_TYPES } from '../shared/types/background-jobs.js';
 
@@ -46,7 +42,7 @@ async function buildJobAltContext(workspaceId?: string, siteId?: string): Promis
   const workspace = workspaceId
     ? getWorkspace(workspaceId)
     : siteId
-      ? listWorkspaces().find((candidate) => candidate.webflowSiteId === siteId)
+      ? getWorkspaceBySiteId(siteId)
       : undefined;
 
   if (!workspace) return '';

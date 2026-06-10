@@ -1772,6 +1772,58 @@ export const CHECKS: Check[] = [
     severity: 'error',
   },
   {
+    // 2026-06-09 audit (quick-wins): scanning listWorkspaces() to keep one row
+    // materializes EVERY workspace (full JSON-column parse) and runs an
+    // attachPageStates query per workspace (N+1). Catches BOTH the chained
+    // `listWorkspaces().find(` form AND the two-line `const x = listWorkspaces();
+    // x.find(` form (a regex on the chained form alone missed three live routes).
+    name: 'listWorkspaces().find() — use indexed getWorkspaceBySiteId / getWorkspace',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    excludeLines: ['// list-workspaces-find-ok'],
+    message: 'Do not scan-and-find over listWorkspaces(): it parses every workspace row + runs N+1 page-state queries. Use getWorkspaceBySiteId(siteId) for webflowSiteId lookups or getWorkspace(id) for id lookups (server/workspaces.ts). Add // list-workspaces-find-ok on the .find line only for a genuine multi-match / folder / case-insensitive scan with no helper.',
+    severity: 'error',
+    rationale: 'Per-request full-table workspace materialization + N+1 page-state queries on ~47 hot paths.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const chainedRe = /listWorkspaces\(\)\s*\.\s*find\(/;
+      const assignRe = /\b(?:const|let|var)\s+(\w+)\s*=\s*listWorkspaces\(\)\s*;/;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes(`server${path.sep}`) && !file.includes('server/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          // Form 1: chained listWorkspaces().find( on one line.
+          if (chainedRe.test(lines[i])) {
+            if (!hasHatch(lines, i, '// list-workspaces-find-ok')) {
+              hits.push({ file, line: i + 1, text: lines[i].trim() });
+            }
+            continue;
+          }
+          // Form 2: const VAR = listWorkspaces(); then VAR.find( within ~5 lines.
+          const m = assignRe.exec(lines[i]);
+          if (m) {
+            const v = m[1];
+            const findRe = new RegExp(`\\b${v}\\s*\\.\\s*find\\(`);
+            for (let j = i + 1; j <= Math.min(i + 5, lines.length - 1); j++) {
+              if (findRe.test(lines[j])) {
+                if (!hasHatch(lines, j, '// list-workspaces-find-ok')) {
+                  hits.push({ file, line: j + 1, text: lines[j].trim() });
+                }
+                break;
+              }
+            }
+          }
+        }
+      }
+      return hits;
+    },
+  },
+  {
     name: 'Direct buildSeoContext() call',
     pattern: 'buildSeoContext\\s*\\(',
     fileGlobs: ['*.ts'],

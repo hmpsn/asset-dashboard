@@ -1,4 +1,4 @@
-import { listWorkspaces, getUploadRoot, type Workspace } from './workspaces.js';
+import { getUploadRoot, getWorkspace, listWorkspaces, type Workspace } from './workspaces.js';
 import { applySuppressionsToAudit } from './helpers.js';
 import { getLatestSnapshot } from './reports.js';
 import { listActivity } from './activity-log.js';
@@ -275,7 +275,7 @@ export function stopMonthlyReports() {
 
 // Manual trigger: generate + send report for a workspace now
 export async function triggerMonthlyReport(workspaceId: string): Promise<{ sent: boolean; html: string; reportId?: string }> {
-  const ws = listWorkspaces().find(w => w.id === workspaceId);
+  const ws = getWorkspace(workspaceId);
   if (!ws) throw new Error('Workspace not found');
   const data = await gatherMonthlyData(ws);
   const html = generateReportHTML(data);

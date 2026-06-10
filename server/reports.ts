@@ -5,7 +5,7 @@ import db from './db/index.js';
 import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
 import { seoAuditResultSchema, actionItemSchema } from './schemas/workspace-schemas.js';
 import { fireBridge, withWorkspaceLock } from './bridge-infrastructure.js';
-import { listWorkspaces } from './workspaces.js';
+import { getWorkspaceBySiteId } from './workspaces.js';
 import { STUDIO_NAME, STUDIO_URL } from './constants.js';
 import type * as AnalyticsInsightsStore from './analytics-insights-store.js';
 import { isProgrammingError } from './errors.js';
@@ -207,7 +207,7 @@ export function saveSnapshot(siteId: string, siteName: string, audit: SeoAuditRe
   });
 
   // Bridge #12 (audit → page_health) and Bridge #15 (audit → site_health)
-  const ws = listWorkspaces().find(w => w.webflowSiteId === siteId);
+  const ws = getWorkspaceBySiteId(siteId);
   if (ws) {
     const effectiveAudit = getEffectiveAudit(audit, ws.auditSuppressions || []);
     const effectivePreviousScore = getEffectivePreviousScore(snapshot, ws.auditSuppressions || []);

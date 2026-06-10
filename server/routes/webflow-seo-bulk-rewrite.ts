@@ -14,12 +14,7 @@ import {
 } from '../seo-suggestions.js';
 import { buildPageAssistContext } from '../intelligence/page-assist-context-builder.js';
 import { getQueryPageData } from '../search-console.js';
-import {
-  listWorkspaces,
-  getWorkspace,
-  getTokenForSite,
-  getBrandName,
-} from '../workspaces.js';
+import { getBrandName, getTokenForSite, getWorkspace, getWorkspaceBySiteId } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
 import { isProgrammingError } from '../errors.js';
@@ -51,7 +46,7 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceSiteAccess(
   const token = getTokenForSite(siteId) || undefined;
   if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
-  const ws = workspaceId ? getWorkspace(workspaceId) : listWorkspaces().find(w => w.webflowSiteId === siteId);
+  const ws = workspaceId ? getWorkspace(workspaceId) : getWorkspaceBySiteId(siteId);
   const baseUrl = await resolveBaseUrl({ liveDomain: ws?.liveDomain, webflowSiteId: siteId }, token);
 
   const inlineBrandName = getBrandName(ws);

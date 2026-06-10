@@ -2210,6 +2210,75 @@ describe('Rule: Constants in sync (STUDIO_NAME, STUDIO_URL)', () => {
 // Rule: Admin mutation on client_users missing expectedWorkspaceId param
 // ════════════════════════════════════════════════════════════════════════════
 
+describe('Rule: listWorkspaces().find() — use indexed getWorkspaceBySiteId / getWorkspace', () => {
+  const RULE = 'listWorkspaces().find() — use indexed getWorkspaceBySiteId / getWorkspace';
+
+  it('flags the chained listWorkspaces().find( form', () => {
+    const file = write(
+      uniqPath('rule-lw-find', 'server/routes/x.ts'),
+      lines(
+        "const ws = listWorkspaces().find(w => w.webflowSiteId === siteId);",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('flags the two-line `const x = listWorkspaces(); x.find(` form', () => {
+    const file = write(
+      uniqPath('rule-lw-find', 'server/routes/y.ts'),
+      lines(
+        "const allWs = listWorkspaces();",            // 1
+        "const ws = allWs.find(w => w.webflowSiteId === siteId);", // 2
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2); // flags the .find line
+  });
+
+  it('respects the // list-workspaces-find-ok hatch on the chained form', () => {
+    const file = write(
+      uniqPath('rule-lw-find', 'server/z.ts'),
+      lines(
+        "const ws = listWorkspaces().find(w => w.folder === f); // list-workspaces-find-ok: folder has no index",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects the hatch on the two-line form (.find line)', () => {
+    const file = write(
+      uniqPath('rule-lw-find', 'server/z2.ts'),
+      lines(
+        "const all = listWorkspaces();",
+        "const ws = all.find(w => w.folder === f); // list-workspaces-find-ok: case-insensitive folder scan",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag a plain full-list iteration (no .find on the variable)', () => {
+    const file = write(
+      uniqPath('rule-lw-find', 'server/cron.ts'),
+      lines(
+        "const workspaces = listWorkspaces();",
+        "for (const ws of workspaces) { process(ws); }",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not scan files outside server/', () => {
+    const file = write(
+      uniqPath('rule-lw-find', 'src/x.ts'),
+      lines("const ws = listWorkspaces().find(w => w.id === id);")
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
 describe('Rule: Admin route reads request workspaceId without a workspace-access guard', () => {
   const RULE = 'Admin route reads request workspaceId without a workspace-access guard';
 
@@ -5711,6 +5780,9 @@ describe('Meta: customCheck rule name registry', () => {
     // users to a workspace; admin routes deriving workspaceId from query/body
     // must carry a workspace-access guard or they are cross-tenant oracles.
     'Admin route reads request workspaceId without a workspace-access guard',
+    // Platform audit PR7 (2026-06-09 quick-wins) — bans scanning listWorkspaces()
+    // to keep one row (chained + two-line forms); use getWorkspaceBySiteId/getWorkspace.
+    'listWorkspaces().find() — use indexed getWorkspaceBySiteId / getWorkspace',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {

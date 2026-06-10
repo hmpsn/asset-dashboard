@@ -17,12 +17,7 @@ import {
   buildStaticPathSet,
   toCmsPageId,
 } from '../webflow.js';
-import {
-  listWorkspaces,
-  getWorkspace,
-  getTokenForSite,
-  updatePageState,
-} from '../workspaces.js';
+import { getTokenForSite, getWorkspace, getWorkspaceBySiteId, updatePageState } from '../workspaces.js';
 import { resolveRecommendationsForChange } from '../recommendations.js';
 import { getWorkspacePages } from '../workspace-data.js';
 import { createLogger } from '../logger.js';
@@ -135,7 +130,7 @@ router.post('/api/webflow/assets/bulk-delete', requireWorkspaceSiteAccess({
 router.get('/api/webflow/pages/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const { siteId } = req.params;
-    const ws = listWorkspaces().find(w => w.webflowSiteId === siteId);
+    const ws = getWorkspaceBySiteId(siteId);
     const published = ws ? await getWorkspacePages(ws.id, siteId) : [];
     log.info(`Pages: ${published.length} published`);
     res.json(published);
@@ -150,7 +145,7 @@ router.get('/api/webflow/all-pages/:siteId', requireWorkspaceSiteAccessFromQuery
   try {
     const { siteId } = req.params;
     const token = getTokenForSite(siteId) || undefined;
-    const ws = listWorkspaces().find(w => w.webflowSiteId === siteId);
+    const ws = getWorkspaceBySiteId(siteId);
     const published = ws ? await getWorkspacePages(ws.id, siteId) : [];
 
     // Build result from static pages
@@ -213,7 +208,7 @@ router.put('/api/webflow/pages/:pageId/seo', requireWorkspaceSiteAccess({
     const token = siteId ? (getTokenForSite(siteId) || undefined) : undefined;
     const result = await updatePageSeo(req.params.pageId, { seo, openGraph, title }, token);
     if (result.success && siteId) {
-      const seoWs = explicitWs || listWorkspaces().find(w => w.webflowSiteId === siteId);
+      const seoWs = explicitWs || getWorkspaceBySiteId(siteId);
       if (seoWs) {
         const changedFields = [seo?.title && 'title', seo?.description && 'description', openGraph && 'OG'].filter(Boolean) as string[];
         addActivity(seoWs.id, 'seo_updated', `Updated SEO ${changedFields.join(', ')} for a page`, undefined, { pageId: req.params.pageId });

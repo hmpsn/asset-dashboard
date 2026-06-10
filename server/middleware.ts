@@ -268,8 +268,10 @@ export function moveUploadedFiles(
   workspaceId: string,
   isMeta: boolean
 ): string[] {
-  const workspaces = listWorkspaces();
-  const ws = workspaces.find(w => w.id === workspaceId || w.folder === workspaceId);
+  // Common case: an id → indexed lookup. Only fall back to a full scan for the
+  // legacy folder-name form (no index on `folder`).
+  const ws = getWorkspace(workspaceId)
+    ?? listWorkspaces().find(w => w.folder === workspaceId); // list-workspaces-find-ok: folder has no index; id path is indexed above
 
   let dest: string;
   if (ws) {

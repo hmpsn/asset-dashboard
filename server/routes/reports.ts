@@ -35,7 +35,7 @@ import { runSalesAudit } from '../sales-audit.js';
 import { renderSalesReportHTML } from '../sales-report-html.js';
 import { runSeoAudit } from '../seo-audit.js';
 import { handleOnDemandSeoAuditResult } from '../webflow-seo-audit-bridges.js';
-import { listWorkspaces, getTokenForSite } from '../workspaces.js';
+import { getTokenForSite, getWorkspace, getWorkspaceBySiteId } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { isProgrammingError } from '../errors.js';
 import { resolveSalesReportPath } from '../path-safety.js';
@@ -43,7 +43,7 @@ import { resolveSalesReportPath } from '../path-safety.js';
 const log = createLogger('reports');
 
 function getWorkspaceForSite(siteId: string) {
-  return listWorkspaces().find(w => w.webflowSiteId === siteId);
+  return getWorkspaceBySiteId(siteId);
 }
 
 function isClientPortalDisabled(ws: { clientPortalEnabled?: boolean } | undefined): boolean {
@@ -83,7 +83,7 @@ const requireSnapshotWorkspaceAccess: RequestHandler = (req, res, next) => {
     return;
   }
 
-  const workspace = listWorkspaces().find(w => w.webflowSiteId === snapshot.siteId);
+  const workspace = getWorkspaceBySiteId(snapshot.siteId);
   if (!workspace) {
     if (!req.user) {
       next();
@@ -365,7 +365,7 @@ router.get('/report/monthly/:id', (req, res) => {
 
 // Public: Unified list of all shareable reports for a workspace (audit snapshots + monthly reports)
 router.get('/api/public/reports/:workspaceId', requireAuthenticatedClientPortalAuth(), (req, res) => {
-  const ws = listWorkspaces().find(w => w.id === req.params.workspaceId);
+  const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
   const reports: Array<{

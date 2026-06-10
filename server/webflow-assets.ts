@@ -8,7 +8,7 @@ import { createLogger } from './logger.js';
 import { resolvePagePath } from './helpers.js';
 import { getToken, paginateWebflow, webflowFetch, webflowJson, webflowMutation } from './webflow-client.js';
 import { getWorkspacePages, getWorkspaceAllPages } from './workspace-data.js';
-import { listWorkspaces } from './workspaces.js';
+import { getWorkspaceBySiteId } from './workspaces.js';
 import type * as WebflowPages from './webflow-pages.js';
 import type * as WebflowCms from './webflow-cms.js';
 import type { createHash as CreateHashFn } from 'crypto';
@@ -183,7 +183,7 @@ export async function scanAssetUsage(siteId: string, tokenOverride?: string): Pr
   const subdomain = await getSiteSubdomain(siteId, tokenOverride);
   if (subdomain) {
     const baseUrl = `https://${subdomain}.webflow.io`;
-    const wsId = listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
+    const wsId = getWorkspaceBySiteId(siteId)?.id;
     // allPages includes CMS template pages (needed for the collection instance loop below)
     const allPages = wsId ? await getWorkspaceAllPages(wsId, siteId) : [];
     // Published pages for HTML scanning (excludes CMS templates — no fetchable URL)

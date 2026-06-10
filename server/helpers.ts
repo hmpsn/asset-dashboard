@@ -7,7 +7,7 @@ import path from 'path';
 import type { SeoAuditResult } from './seo-audit.js';
 import type { SchemaContext } from './schema-suggester.js';
 import type { CustomDateRange } from './google-analytics.js';
-import { listWorkspaces } from './workspaces.js';
+import { getWorkspaceBySiteId } from './workspaces.js';
 import { getDeclinedKeywords } from './keyword-feedback.js';
 import { listSites } from './webflow-pages.js';
 import type { PageAddress, PageAddressInput, ResolvePageAddressOptions } from '../shared/types/page-address.js';
@@ -394,8 +394,7 @@ export async function buildSchemaContext(
 ): Promise<{
   ctx: SchemaContext;
 }> {
-  const allWs = listWorkspaces();
-  const ws = allWs.find(w => w.webflowSiteId === siteId);
+  const ws = getWorkspaceBySiteId(siteId);
   const ctx: SchemaContext = {};
   let schemaIntel: Awaited<ReturnType<typeof buildSchemaIntelligence>> | null = null;
   if (ws) {
