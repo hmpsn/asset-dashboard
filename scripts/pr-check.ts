@@ -7789,6 +7789,59 @@ export const CHECKS: Check[] = [
     },
   },
 
+  // ── E1: public-portal.ts GET-specific auth guard (2026-06-10) ───────────
+  {
+    // Specifically targets server/routes/public-portal.ts GETs (excluded from
+    // the broader "Public route under /api/public/" rule above, which uses a
+    // different exclude strategy). The three intentionally-public bootstrap
+    // GETs (/workspace/:id, /tier/:id, /pricing/:id) are hatched inline with
+    // `// portal-auth-public-ok` since they serve the login screen and must
+    // be accessible before authentication. All other GET routes in this file
+    // must carry either requireClientPortalAuth() or
+    // requireAuthenticatedClientPortalAuth() as middleware.
+    name: 'public-portal.ts GET missing portal-auth middleware',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    displayScope: 'server/routes/public-portal.ts',
+    excludeLines: ['// portal-auth-public-ok'],
+    message:
+      'Every router.get() in server/routes/public-portal.ts must include ' +
+      'requireClientPortalAuth() or requireAuthenticatedClientPortalAuth() as middleware. ' +
+      'The three intentionally-public bootstrap endpoints (workspace/:id, tier/:id, ' +
+      'pricing/:id) that serve the login screen itself are exempt — add ' +
+      '// portal-auth-public-ok on the same router.get( line to suppress.',
+    severity: 'error',
+    rationale:
+      'Unguarded GETs in public-portal.ts silently expose workspace data without ' +
+      'authentication. Defense-in-depth: route-level guards complement the global app.ts ' +
+      'middleware and are the only layer that survives future refactors.',
+    claudeMdRef: '#auth-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        const rel = path.relative(ROOT, file).split(path.sep).join('/');
+        if (rel !== 'server/routes/public-portal.ts' &&
+            !rel.endsWith('/server/routes/public-portal.ts')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (/^\s*(\/\/|\*)/.test(line)) continue;
+          if (!/\brouter\.get\s*\(/.test(line)) continue;
+          // Hatch on the same line as router.get(
+          if (line.includes('// portal-auth-public-ok')) continue;
+          // Look forward up to 8 lines for auth middleware (covers multi-line signatures)
+          const window = lines.slice(i, Math.min(i + 8, lines.length)).join('\n');
+          if (window.includes('requireClientPortalAuth(')) continue;
+          if (window.includes('requireAuthenticatedClientPortalAuth(')) continue;
+          hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
+  },
+
   // ── Plan A Task 2: trial-state centralization (2026-05-27) ──────────────
   {
     name: 'Inline trial-state computation outside billing module',

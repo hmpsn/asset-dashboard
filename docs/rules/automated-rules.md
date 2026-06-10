@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **175** — 155 error, 20 warn.
+Total rules: **176** — 156 error, 20 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -160,17 +160,18 @@ advisory but tracked.
 | 142 | mcp-action-must-tag-source | error | custom | `server/mcp/tools/` | `mcp-action-must-tag-source-ok` | mcp-chat-tagged activity entries get a "chat" badge in the activity feed so operators can audit chat-driven mutations. |
 | 143 | mcp-action-must-broadcast | error | custom | `server/mcp/tools/` | `mcp-action-must-broadcast-ok` | broadcast pairs every write so React Query caches stay fresh; MCP tools own this since the underlying service functions are unbroadcast. |
 | 144 | Public route under /api/public/ missing client-portal auth middleware | error | custom | `server/routes/` | `// public-no-auth-ok` | Without per-route portal auth, sensitive client data leaks from workspaces that have not yet had a clientPassword set (e.g. freshly-created accounts). |
-| 145 | Inline trial-state computation outside billing module | error | custom | `server/` | `trial-state-ok` | Centralizes trial logic so tier changes (e.g. adding a grace period) are single-edit. |
-| 146 | Bare JSON.parse on AI text response without schema validation | error | custom | `server/` | `ai-json-parse-ok` | Unvalidated AI JSON silently propagates wrong shapes when prompts drift. |
-| 147 | Workspace object spread-and-redact in route handler | error | custom | `server/routes/` | `admin-view-ok` | Spread-and-redact is deny-list based — new secrets leak by default. |
-| 148 | Direct callOpenAI/callAnthropic import outside dispatcher | error | custom | `server/` | `direct-ai-helper-ok` | callAI() is the single entry point for all AI calls (~50 sites as of 2026-05-27). Direct imports bypass provider routing, retry logic, and operation registry. |
-| 149 | no-direct-insert-to-client_deliverable-outside-store | error | custom | `server/` | `deliverable-write-ok` | The client_deliverable store is the only writer of the deliverable tables; a bypassing INSERT skips dedup, JSON validation, and item handling. |
-| 150 | unified-send-to-client-bespoke-route | error | custom | `server/routes/` | `unified-send-route-ok` | The unified send service is the single send path (design §3); a new bespoke send route re-creates the five-pipeline divergence the migration removes. |
-| 151 | opportunity-money-field-must-be-stripped | error | custom | `shared/types/recommendations.ts` | — | stripEmvFromPublicRecs destructure-and-spreads, so a new admin-money OpportunityScore field reaches clients unless explicitly stripped (G0b money-leak). |
-| 152 | new-rec-type-source-needs-category-and-action-type | error | custom | `server/recommendations.ts` | — | A RecSourceCategory present in the union but absent from REC_SOURCE_CATEGORIES makes getRecSourceCategory return null, bypassing the per-category auto-resolve guard (G2 false auto-resolve). |
-| 153 | recommendation impactScore must flow from canonical OV scorer | error | custom | `server/recommendations.ts` | — | Inline recommendation impactScore buckets drift from computeOpportunityValue() and silently fork ranking behavior from the canonical Opportunity Value scorer. |
-| 154 | tracked_keywords bare read→write outside withTrackedKeywordsTxn | error | custom | `server/` | `// tracked-keywords-txn-ok` | Two concurrent tracked_keywords writers both read the same JSON blob, mutate independently, and last-write-wins silently drops the other writer's keywords. BEGIN IMMEDIATE serialises the read+write so each writer sees the previous writer's result. |
-| 155 | positionColor/positionTone redefinition outside authority | error | custom | `src/ (excluding src/components/ui/constants.ts)` | `// position-color-authority-ok` | A locally-defined positionColor/positionTone bypasses the canonical color authority, causing silent palette drift when rank-color thresholds or accent tokens change. |
+| 145 | public-portal.ts GET missing portal-auth middleware | error | custom | `server/routes/public-portal.ts` | `// portal-auth-public-ok` | Unguarded GETs in public-portal.ts silently expose workspace data without authentication. Defense-in-depth: route-level guards complement the global app.ts middleware and are the only layer that survives future refactors. |
+| 146 | Inline trial-state computation outside billing module | error | custom | `server/` | `trial-state-ok` | Centralizes trial logic so tier changes (e.g. adding a grace period) are single-edit. |
+| 147 | Bare JSON.parse on AI text response without schema validation | error | custom | `server/` | `ai-json-parse-ok` | Unvalidated AI JSON silently propagates wrong shapes when prompts drift. |
+| 148 | Workspace object spread-and-redact in route handler | error | custom | `server/routes/` | `admin-view-ok` | Spread-and-redact is deny-list based — new secrets leak by default. |
+| 149 | Direct callOpenAI/callAnthropic import outside dispatcher | error | custom | `server/` | `direct-ai-helper-ok` | callAI() is the single entry point for all AI calls (~50 sites as of 2026-05-27). Direct imports bypass provider routing, retry logic, and operation registry. |
+| 150 | no-direct-insert-to-client_deliverable-outside-store | error | custom | `server/` | `deliverable-write-ok` | The client_deliverable store is the only writer of the deliverable tables; a bypassing INSERT skips dedup, JSON validation, and item handling. |
+| 151 | unified-send-to-client-bespoke-route | error | custom | `server/routes/` | `unified-send-route-ok` | The unified send service is the single send path (design §3); a new bespoke send route re-creates the five-pipeline divergence the migration removes. |
+| 152 | opportunity-money-field-must-be-stripped | error | custom | `shared/types/recommendations.ts` | — | stripEmvFromPublicRecs destructure-and-spreads, so a new admin-money OpportunityScore field reaches clients unless explicitly stripped (G0b money-leak). |
+| 153 | new-rec-type-source-needs-category-and-action-type | error | custom | `server/recommendations.ts` | — | A RecSourceCategory present in the union but absent from REC_SOURCE_CATEGORIES makes getRecSourceCategory return null, bypassing the per-category auto-resolve guard (G2 false auto-resolve). |
+| 154 | recommendation impactScore must flow from canonical OV scorer | error | custom | `server/recommendations.ts` | — | Inline recommendation impactScore buckets drift from computeOpportunityValue() and silently fork ranking behavior from the canonical Opportunity Value scorer. |
+| 155 | tracked_keywords bare read→write outside withTrackedKeywordsTxn | error | custom | `server/` | `// tracked-keywords-txn-ok` | Two concurrent tracked_keywords writers both read the same JSON blob, mutate independently, and last-write-wins silently drops the other writer's keywords. BEGIN IMMEDIATE serialises the read+write so each writer sees the previous writer's result. |
+| 156 | positionColor/positionTone redefinition outside authority | error | custom | `src/ (excluding src/components/ui/constants.ts)` | `// position-color-authority-ok` | A locally-defined positionColor/positionTone bypasses the canonical color authority, causing silent palette drift when rank-color thresholds or accent tokens change. |
 
 ---
 

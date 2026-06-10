@@ -78,7 +78,7 @@ const requireClientStrategyMutationAuth = [
 ];
 
 // --- Public Client Dashboard API (no auth required) ---
-router.get('/api/public/workspace/:id', (req, res) => {
+router.get('/api/public/workspace/:id', (req, res) => { // portal-auth-public-ok — login screen bootstrap endpoint
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (ws.clientPortalEnabled != null && !ws.clientPortalEnabled) return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
@@ -200,7 +200,7 @@ router.post('/api/public/onboarding/:id', requireAuthenticatedClientPortalAuth('
 });
 
 // Public tier endpoint — returns effective tier for a workspace
-router.get('/api/public/tier/:id', (req, res) => {
+router.get('/api/public/tier/:id', (req, res) => { // portal-auth-public-ok — login screen bootstrap endpoint
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
@@ -217,7 +217,7 @@ router.get('/api/public/tier/:id', (req, res) => {
 });
 
 // Public pricing endpoint — returns product prices for a workspace
-router.get('/api/public/pricing/:id', (req, res) => {
+router.get('/api/public/pricing/:id', (req, res) => { // portal-auth-public-ok — login screen bootstrap endpoint
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const products = listProducts();
@@ -243,7 +243,7 @@ router.get('/api/public/pricing/:id', (req, res) => {
   res.json({ products: priceMap, bundles, currency: pricing?.currency || 'USD', stripeEnabled: isStripeConfigured() });
 });
 
-router.get('/api/public/audit-summary/:workspaceId', (req, res) => {
+router.get('/api/public/audit-summary/:workspaceId', requireClientPortalAuth('workspaceId'), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (!ws.webflowSiteId) return res.status(400).json({ error: 'No site linked' });
@@ -328,7 +328,7 @@ router.get('/api/public/audit-traffic/:workspaceId', requireAuthenticatedClientP
 // ── Client Keyword Feedback ──────────────────────────
 
 // Client: list their keyword feedback
-router.get('/api/public/keyword-feedback/:workspaceId', (req, res) => {
+router.get('/api/public/keyword-feedback/:workspaceId', requireClientPortalAuth('workspaceId'), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   res.json(listPublicKeywordFeedback(ws.id));
@@ -456,7 +456,7 @@ function normalizeClientBusinessPrioritiesRow(
   return { priorities, updatedAt: row.updated_at };
 }
 
-router.get('/api/public/business-priorities/:workspaceId', (req, res) => {
+router.get('/api/public/business-priorities/:workspaceId', requireClientPortalAuth('workspaceId'), (req, res) => {
   const wsId = req.params.workspaceId;
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -619,7 +619,7 @@ router.post('/api/public/content-gap-vote/:workspaceId', ...requireClientStrateg
   res.json({ ok: true });
 });
 
-router.get('/api/public/content-gap-votes/:workspaceId', (req, res) => {
+router.get('/api/public/content-gap-votes/:workspaceId', requireClientPortalAuth('workspaceId'), (req, res) => {
   const wsId = req.params.workspaceId;
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
