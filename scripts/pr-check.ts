@@ -3081,6 +3081,68 @@ export const CHECKS: Check[] = [
     // out a user from workspace B by guessing the UUID. PR #168 commit
     // 293485d addressed the existing three functions (`updateClientUser`,
     // `changeClientPassword`, `deleteClientUser`); TypeScript catches
+    // The global admin gate accepts ANY valid internal JWT with no workspace
+    // check, so a member scoped to workspace A can read workspace B via any
+    // admin route that derives workspaceId from the query string or body —
+    // UNLESS the route applies a workspace guard. This rule flags route
+    // registrations whose handler reads req.query.workspaceId / req.body.
+    // workspaceId without requireWorkspaceAccessFromQuery|FromBody (or the
+    // site-scoped variants, which validate workspace access via the site).
+    name: 'Admin route reads request workspaceId without a workspace-access guard',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    excludeLines: ['// workspace-scope-from-request-ok'],
+    message: 'This route handler reads workspaceId from the query string or body but its route registration has no workspace-access guard, so any internal JWT (even one scoped to a different workspace) can reach it. Add requireWorkspaceAccessFromQuery()/requireWorkspaceAccessFromBody() (or a requireWorkspaceSiteAccess* variant) to the route chain, OR an inline requestUserCanAccessWorkspace() check, OR // workspace-scope-from-request-ok with a justification. See CLAUDE.md Auth Conventions.',
+    severity: 'error',
+    rationale: 'The global admin gate does not scope JWT users to a workspace; an unguarded query/body workspaceId route is a cross-tenant read/write oracle for any provisioned member.',
+    claudeMdRef: '#auth-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Reads of a request-derived workspaceId inside a handler body.
+      const readRe = /req\.(query|body)(?:\.workspaceId\b|\[(['"])workspaceId\2\])/;
+      // Any guard that establishes workspace access (chain middleware or inline).
+      const guardRe = /requireWorkspaceAccessFromQuery|requireWorkspaceAccessFromBody|requireWorkspaceAccess\b|requireWorkspaceSiteAccess(?:FromQuery)?|requestUserCanAccessWorkspace|internalJwtCanAccessWorkspace|canAccessRequest/;
+      // A route registration line opens a new handler scope.
+      const routeRe = /\brouter\.(get|post|put|patch|delete)\s*\(/;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes(`server${path.sep}routes${path.sep}`) && !file.includes('server/routes/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        // Walk handlers: a route registration starts a block; collect lines until
+        // the next route registration. A block is a violation if it READS a
+        // request workspaceId but contains NO guard token anywhere in the block
+        // (covers both chain middleware on the registration line and inline
+        // checks in the body). Hatch on the reading line or the line above.
+        let blockStart = -1;
+        let blockText = '';
+        let blockReadLine = -1;
+        const flush = () => {
+          if (blockStart === -1) return;
+          if (blockReadLine !== -1 && !guardRe.test(blockText) && !hasHatch(lines, blockReadLine, '// workspace-scope-from-request-ok')) {
+            hits.push({ file, line: blockReadLine + 1, text: lines[blockReadLine].trim() });
+          }
+          blockStart = -1; blockText = ''; blockReadLine = -1;
+        };
+        for (let i = 0; i < lines.length; i++) {
+          if (routeRe.test(lines[i])) {
+            flush();
+            blockStart = i;
+            blockText = lines[i];
+            continue;
+          }
+          if (blockStart === -1) continue;
+          blockText += '\n' + lines[i];
+          if (blockReadLine === -1 && readRe.test(lines[i])) blockReadLine = i;
+        }
+        flush();
+      }
+      return hits;
+    },
+  },
+  {
     // callers that forget to pass the argument NOW, but cannot catch a
     // NEW mutation function added without the parameter at all.
     //

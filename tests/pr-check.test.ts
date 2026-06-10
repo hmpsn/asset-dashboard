@@ -2210,6 +2210,94 @@ describe('Rule: Constants in sync (STUDIO_NAME, STUDIO_URL)', () => {
 // Rule: Admin mutation on client_users missing expectedWorkspaceId param
 // ════════════════════════════════════════════════════════════════════════════
 
+describe('Rule: Admin route reads request workspaceId without a workspace-access guard', () => {
+  const RULE = 'Admin route reads request workspaceId without a workspace-access guard';
+
+  it('flags a GET reading req.query.workspaceId with no guard in the chain', () => {
+    const file = write(
+      uniqPath('rule-ws-from-req', 'server/routes/activity.ts'),
+      lines(
+        "router.get('/api/activity', (req, res) => {",                    // 1
+        "  const wsId = req.query.workspaceId as string | undefined;",     // 2
+        "  res.json(listActivity(wsId));",                                 // 3
+        "});",                                                             // 4
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags a POST reading req.body.workspaceId with no guard', () => {
+    const file = write(
+      uniqPath('rule-ws-from-req', 'server/routes/ai.ts'),
+      lines(
+        "router.post('/api/admin-chat', aiLimiter, async (req, res) => {", // 1
+        "  const { workspaceId } = req.body;",                             // 2 (no read pattern)
+        "  const ctx = assemble(req.body.workspaceId);",                   // 3 (read pattern)
+        "  res.json(ctx);",                                                // 4
+        "});",                                                             // 5
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  it('passes when requireWorkspaceAccessFromQuery is in the route chain', () => {
+    const file = write(
+      uniqPath('rule-ws-from-req', 'server/routes/activity.ts'),
+      lines(
+        "router.get('/api/activity', requireWorkspaceAccessFromQuery(), (req, res) => {",
+        "  const wsId = req.query.workspaceId as string | undefined;",
+        "  res.json(listActivity(wsId));",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('passes when an inline requestUserCanAccessWorkspace check guards the body', () => {
+    const file = write(
+      uniqPath('rule-ws-from-req', 'server/routes/jobs.ts'),
+      lines(
+        "router.get('/api/jobs', (req, res) => {",
+        "  const wsId = req.query.workspaceId as string | undefined;",
+        "  if (wsId && !requestUserCanAccessWorkspace(req, wsId)) return sendWorkspaceAccessDenied(res);",
+        "  res.json(listJobs(wsId));",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects the // workspace-scope-from-request-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-ws-from-req', 'server/routes/activity.ts'),
+      lines(
+        "router.get('/api/activity', (req, res) => {",
+        "  const wsId = req.query.workspaceId as string | undefined; // workspace-scope-from-request-ok: read-only probe",
+        "  res.json(listActivity(wsId));",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not scan files outside server/routes/', () => {
+    const file = write(
+      uniqPath('rule-ws-from-req', 'server/services/activity-service.ts'),
+      lines(
+        "export function listFor(req) {",
+        "  const wsId = req.query.workspaceId as string | undefined;",
+        "  return wsId;",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
 describe('Rule: Admin mutation on client_users missing expectedWorkspaceId param', () => {
   const RULE = 'Admin mutation on client_users missing expectedWorkspaceId param';
 
@@ -5576,6 +5664,10 @@ describe('Meta: customCheck rule name registry', () => {
     // banning new positionColor/positionTone definitions outside the canonical
     // authority (src/components/ui/constants.ts).
     'positionColor/positionTone redefinition outside authority',
+    // Platform audit PR3 (2026-06-09) — the global admin gate does not scope JWT
+    // users to a workspace; admin routes deriving workspaceId from query/body
+    // must carry a workspace-access guard or they are cross-tenant oracles.
+    'Admin route reads request workspaceId without a workspace-access guard',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
