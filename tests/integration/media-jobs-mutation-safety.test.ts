@@ -55,6 +55,17 @@ vi.mock('../../server/alttext.js', async (importOriginal) => {
   };
 });
 
+vi.mock('../../server/external-fetch.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../server/external-fetch.js')>();
+  return {
+    ...actual,
+    fetchExternalBytes: vi.fn(async () => {
+      if (fetchState.failExternal) throw new Error('External image fetch failed');
+      return new Uint8Array(Buffer.alloc(1024));
+    }),
+  };
+});
+
 vi.mock('sharp', () => {
   return {
     default: vi.fn(() => ({
@@ -343,9 +354,11 @@ describe('media background-job mutation safety', () => {
       type: BACKGROUND_JOB_TYPES.BULK_COMPRESS,
       status: 'done',
       result: expect.objectContaining({
-        totalSaved: 16_000,
+        totalSaved: 1_648,
       }),
     });
+    expect(webflowState.uploadCalls).toHaveLength(2);
+    expect(webflowState.deleteCalls).toHaveLength(2);
     expect(countActivities(workspaceAId, 'images_optimized')).toBe(1);
     expect(countActivities(workspaceBId, 'images_optimized')).toBe(0);
   });

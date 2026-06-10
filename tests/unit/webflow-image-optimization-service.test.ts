@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { CmsImageUsage } from '../../shared/types/cms-images.js';
 
 const state = vi.hoisted(() => ({
   optimizeSvgResult: '<svg>tiny</svg>',
@@ -8,6 +9,11 @@ const state = vi.hoisted(() => ({
     png: Buffer.alloc(250),
     webp: Buffer.alloc(150),
   },
+  uploadResult: { success: true, assetId: 'asset-new', hostedUrl: 'https://cdn.example.test/new.jpg' } as
+    | { success: true; assetId?: string; hostedUrl?: string }
+    | { success: false; error: string },
+  uploadCalls: [] as Array<{ siteId: string; fileName: string; altText?: string; token?: string }>,
+  deleteCalls: [] as Array<{ assetId: string; token?: string }>,
 }));
 
 vi.mock('svgo', () => ({
@@ -41,7 +47,25 @@ vi.mock('sharp', () => ({
   }),
 }));
 
-import { compressImageBuffer } from '../../server/domains/webflow-assets/image-optimization.js';
+vi.mock('../../server/webflow.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../server/webflow.js')>();
+  return {
+    ...actual,
+    uploadAsset: vi.fn(async (siteId: string, _tmpPath: string, fileName: string, altText?: string, token?: string) => {
+      state.uploadCalls.push({ siteId, fileName, altText, token });
+      return state.uploadResult;
+    }),
+    deleteAsset: vi.fn(async (assetId: string, token?: string) => {
+      state.deleteCalls.push({ assetId, token });
+      return { success: true };
+    }),
+  };
+});
+
+import {
+  compressImageBuffer,
+  replaceCompressedAsset,
+} from '../../server/domains/webflow-assets/image-optimization.js';
 
 describe('compressImageBuffer', () => {
   beforeEach(() => {
@@ -50,6 +74,9 @@ describe('compressImageBuffer', () => {
     state.sharpOutputs.jpeg = Buffer.alloc(200);
     state.sharpOutputs.png = Buffer.alloc(250);
     state.sharpOutputs.webp = Buffer.alloc(150);
+    state.uploadResult = { success: true, assetId: 'asset-new', hostedUrl: 'https://cdn.example.test/new.jpg' };
+    state.uploadCalls = [];
+    state.deleteCalls = [];
   });
 
   it('keeps jpg output extension and reports savings', async () => {
@@ -160,5 +187,81 @@ describe('compressImageBuffer', () => {
       originalSize: original.length,
       newSize: Buffer.from(state.optimizeSvgResult).length,
     });
+  });
+});
+
+describe('replaceCompressedAsset', () => {
+  beforeEach(() => {
+    state.uploadResult = { success: true, assetId: 'asset-new', hostedUrl: 'https://cdn.example.test/new.jpg' };
+    state.uploadCalls = [];
+    state.deleteCalls = [];
+  });
+
+  it('uploads the compressed asset and deletes the old asset when no CMS repairs are needed', async () => {
+    const result = await replaceCompressedAsset({
+      assetId: 'asset-old',
+      imageUrl: 'https://cdn.example.test/old.jpg',
+      siteId: 'site-1',
+      compression: {
+        compressed: Buffer.alloc(200),
+        newFileName: 'hero.jpg',
+        originalSize: 1000,
+        newSize: 200,
+        savings: 800,
+        savingsPercent: 80,
+      },
+      altText: 'Hero alt',
+      token: 'wf-token',
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      newAssetId: 'asset-new',
+      newHostedUrl: 'https://cdn.example.test/new.jpg',
+      savings: 800,
+      newFileName: 'hero.jpg',
+      oldAssetPreserved: false,
+    });
+    expect(state.uploadCalls).toEqual([
+      { siteId: 'site-1', fileName: 'hero.jpg', altText: 'Hero alt', token: 'wf-token' },
+    ]);
+    expect(state.deleteCalls).toEqual([
+      { assetId: 'asset-old', token: 'wf-token' },
+    ]);
+  });
+
+  it('preserves the old asset when CMS repairs are needed but cannot run', async () => {
+    state.uploadResult = { success: true, assetId: 'asset-new' };
+    const cmsUsages: CmsImageUsage[] = [
+      {
+        collectionId: 'collection-1',
+        itemId: 'item-1',
+        itemName: 'Item 1',
+        fieldSlug: 'heroImage',
+        fieldType: 'Image',
+      },
+    ];
+
+    const result = await replaceCompressedAsset({
+      assetId: 'asset-old',
+      imageUrl: 'https://cdn.example.test/old.jpg',
+      siteId: 'site-1',
+      compression: {
+        compressed: Buffer.alloc(200),
+        newFileName: 'hero.jpg',
+        originalSize: 1000,
+        newSize: 200,
+        savings: 800,
+        savingsPercent: 80,
+      },
+      cmsUsages,
+      token: 'wf-token',
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      oldAssetPreserved: true,
+    });
+    expect(state.deleteCalls).toHaveLength(0);
   });
 });

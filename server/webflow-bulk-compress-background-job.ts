@@ -1,10 +1,17 @@
 import { addActivity } from './activity-log.js';
 import { isProgrammingError } from './errors.js';
+import { fetchExternalBytes } from './external-fetch.js';
 import {
   createJob,
   updateJob,
 } from './jobs.js';
 import { createLogger } from './logger.js';
+import { getTokenForSite } from './workspaces.js';
+import {
+  compressImageBuffer,
+  replaceCompressedAsset,
+} from './domains/webflow-assets/image-optimization.js';
+import type { CmsImageUsage } from '../shared/types/cms-images.js';
 import { BACKGROUND_JOB_TYPES } from '../shared/types/background-jobs.js';
 
 const log = createLogger('webflow-bulk-compress-background-job');
@@ -14,15 +21,13 @@ export interface BulkCompressAssetInput {
   imageUrl: string;
   altText?: string;
   fileName?: string;
-  cmsUsages?: unknown[];
+  cmsUsages?: CmsImageUsage[];
 }
 
 export interface StartWebflowBulkCompressJobParams {
   workspaceId?: string;
   siteId: string;
   assets: BulkCompressAssetInput[];
-  baseUrl: string;
-  headers: Record<string, string>;
 }
 
 export interface StartedWebflowBulkCompressJob {
@@ -32,7 +37,8 @@ export interface StartedWebflowBulkCompressJob {
 export function startWebflowBulkCompressJob(
   params: StartWebflowBulkCompressJobParams,
 ): StartedWebflowBulkCompressJob {
-  const { workspaceId, siteId, assets, baseUrl, headers } = params;
+  const { workspaceId, siteId, assets } = params;
+  const compressToken = getTokenForSite(siteId) || undefined;
   const job = createJob(BACKGROUND_JOB_TYPES.BULK_COMPRESS, {
     message: `Compressing ${assets.length} assets...`,
     total: assets.length,
@@ -48,20 +54,30 @@ export function startWebflowBulkCompressJob(
       for (let i = 0; i < assets.length; i++) {
         const asset = assets[i];
         try {
-          const compressRes = await fetch(`${baseUrl}/api/webflow/${workspaceId}/compress/${asset.assetId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...headers },
-            body: JSON.stringify({
+          const originalBytes = await fetchExternalBytes({
+            url: asset.imageUrl,
+            timeoutMs: 20_000,
+            redirect: 'follow',
+            urlSafety: 'public-web',
+            logContext: { module: 'webflow-bulk-compress-background-job', fetchPath: 'compress-image' },
+          });
+          const originalBuffer = Buffer.from(originalBytes);
+          const compression = await compressImageBuffer(originalBuffer, asset.fileName || asset.imageUrl, {
+            outputBaseName: asset.fileName || 'image',
+          });
+          const result = 'skipped' in compression
+            ? compression
+            : await replaceCompressedAsset({
+              assetId: asset.assetId,
               imageUrl: asset.imageUrl,
               siteId,
+              compression,
               altText: asset.altText,
-              fileName: asset.fileName,
               cmsUsages: asset.cmsUsages,
-            }),
-          });
-          const result = await compressRes.json() as Record<string, unknown>;
+              token: compressToken,
+            });
           results.push({ assetId: asset.assetId, ...result });
-          if (typeof result.savings === 'number') totalSaved += result.savings;
+          if ('savings' in result && typeof result.savings === 'number') totalSaved += result.savings;
         } catch (err) {
           log.debug({ err }, 'webflow bulk-compress individual asset failed — skipping');
           results.push({ assetId: asset.assetId, error: String(err) });

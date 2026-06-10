@@ -1,8 +1,13 @@
+import fs from 'fs';
 import type { default as SharpConstructor } from 'sharp';
 import type * as SvgoMod from 'svgo';
 import type { CmsImageUsage } from '../../../shared/types/cms-images.js';
 import { isProgrammingError } from '../../errors.js';
 import { createLogger } from '../../logger.js';
+import {
+  deleteAsset,
+  uploadAsset,
+} from '../../webflow.js';
 import {
   getCollectionItem,
   publishCollectionItems,
@@ -27,6 +32,20 @@ export interface CompressionSkipResult {
   newSize: number;
 }
 
+export interface ReplaceCompressedAssetResult {
+  success: boolean;
+  newAssetId?: string;
+  newHostedUrl?: string;
+  originalSize?: number;
+  newSize?: number;
+  savings?: number;
+  savingsPercent?: number;
+  newFileName?: string;
+  oldAssetPreserved?: boolean;
+  cmsUpdates?: { succeeded: number; failed: number };
+  error?: string;
+}
+
 interface CompressImageBufferOptions {
   outputBaseName?: string;
   rasterThresholdPercent?: number;
@@ -34,6 +53,16 @@ interface CompressImageBufferOptions {
   rasterSkipReasonLabel?: string;
   svgSkipReasonLabel?: string;
   svgFailureMode?: 'skip' | 'throw';
+}
+
+interface ReplaceCompressedAssetOptions {
+  assetId: string;
+  imageUrl: string;
+  siteId: string;
+  compression: CompressionResult;
+  altText?: string;
+  cmsUsages?: CmsImageUsage[];
+  token?: string;
 }
 
 export async function compressImageBuffer(
@@ -223,4 +252,78 @@ export async function repairCmsReferences(
   }
 
   return { succeeded, failed };
+}
+
+export async function replaceCompressedAsset(
+  options: ReplaceCompressedAssetOptions,
+): Promise<ReplaceCompressedAssetResult> {
+  const {
+    assetId,
+    imageUrl,
+    siteId,
+    compression,
+    altText,
+    cmsUsages,
+    token,
+  } = options;
+
+  const tmpPath = `/tmp/compressed_${Date.now()}_${compression.newFileName}`;
+  fs.writeFileSync(tmpPath, compression.compressed);
+
+  let uploadResult:
+    | { success: boolean; assetId?: string; hostedUrl?: string; error?: string }
+    | undefined;
+
+  try {
+    uploadResult = await uploadAsset(siteId, tmpPath, compression.newFileName, altText, token);
+  } finally {
+    try {
+      fs.unlinkSync(tmpPath);
+    } catch (err) {
+      if (isProgrammingError(err)) {
+        log.warn({ err }, 'webflow image optimization temp file cleanup failed with programming error');
+      }
+    }
+  }
+
+  if (!uploadResult.success) {
+    return { success: false, error: uploadResult.error };
+  }
+
+  let cmsUpdates: { succeeded: number; failed: number } | undefined;
+  if (cmsUsages?.length && uploadResult.assetId && uploadResult.hostedUrl) {
+    cmsUpdates = await repairCmsReferences(
+      cmsUsages,
+      assetId,
+      uploadResult.assetId,
+      uploadResult.hostedUrl,
+      imageUrl,
+      token,
+    );
+  }
+
+  const cmsRepairsNeeded = !!(cmsUsages?.length);
+  const cmsRepairsSkipped = cmsRepairsNeeded && !cmsUpdates;
+  const hasFailedCmsRepairs = cmsUpdates && cmsUpdates.failed > 0;
+  if (!hasFailedCmsRepairs && !cmsRepairsSkipped) {
+    await deleteAsset(assetId, token);
+  } else {
+    log.warn(
+      { assetId, failed: cmsUpdates?.failed, skipped: cmsRepairsSkipped },
+      'Skipping old asset deletion — CMS reference repairs had failures or were skipped',
+    );
+  }
+
+  return {
+    success: true,
+    newAssetId: uploadResult.assetId,
+    newHostedUrl: uploadResult.hostedUrl,
+    originalSize: compression.originalSize,
+    newSize: compression.newSize,
+    savings: compression.savings,
+    savingsPercent: compression.savingsPercent,
+    newFileName: compression.newFileName,
+    oldAssetPreserved: !!(hasFailedCmsRepairs || cmsRepairsSkipped),
+    ...(cmsUpdates ? { cmsUpdates } : {}),
+  };
 }

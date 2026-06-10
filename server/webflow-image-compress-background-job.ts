@@ -1,5 +1,3 @@
-import fs from 'fs';
-
 import { addActivity } from './activity-log.js';
 import { isProgrammingError } from './errors.js';
 import {
@@ -8,12 +6,13 @@ import {
 } from './jobs.js';
 import { createLogger } from './logger.js';
 import {
-  deleteAsset,
-  uploadAsset,
-} from './webflow.js';
-import { getTokenForSite } from './workspaces.js';
+  getTokenForSite,
+} from './workspaces.js';
 import { BACKGROUND_JOB_TYPES } from '../shared/types/background-jobs.js';
-import { compressImageBuffer } from './domains/webflow-assets/image-optimization.js';
+import {
+  compressImageBuffer,
+  replaceCompressedAsset,
+} from './domains/webflow-assets/image-optimization.js';
 
 const log = createLogger('webflow-image-compress-background-job');
 
@@ -63,51 +62,52 @@ export function startWebflowImageCompressJob(
         return;
       }
 
-      const tmpPath = `/tmp/compressed_${Date.now()}_${compression.newFileName}`;
-      fs.writeFileSync(tmpPath, compression.compressed);
-      const uploadResult = await uploadAsset(siteId, tmpPath, compression.newFileName, altText, compressToken);
-      try {
-        fs.unlinkSync(tmpPath);
-      } catch (err) {
-        if (isProgrammingError(err)) log.warn({ err }, 'webflow image compress job temp file cleanup failed with programming error');
-      }
+      const result = await replaceCompressedAsset({
+        assetId,
+        imageUrl,
+        siteId,
+        compression,
+        altText,
+        token: compressToken,
+      });
 
-      if (!uploadResult.success) {
-        updateJob(job.id, { status: 'error', error: uploadResult.error, message: 'Upload failed' });
+      if (!result.success) {
+        updateJob(job.id, { status: 'error', error: result.error, message: 'Upload failed' });
         return;
       }
 
-      await deleteAsset(assetId, compressToken);
+      const jobResult = {
+        success: true,
+        newAssetId: result.newAssetId,
+        originalSize: result.originalSize,
+        newSize: result.newSize,
+        savings: result.savings,
+        savingsPercent: result.savingsPercent,
+        newFileName: result.newFileName,
+      };
+
       updateJob(job.id, {
         status: 'done',
-        result: {
-          success: true,
-          newAssetId: uploadResult.assetId,
-          originalSize: compression.originalSize,
-          newSize: compression.newSize,
-          savings: compression.savings,
-          savingsPercent: compression.savingsPercent,
-          newFileName: compression.newFileName,
-        },
-        message: `Saved ${Math.round(compression.savings / 1024)}KB (${compression.savingsPercent}%)`,
+        result: jobResult,
+        message: `Saved ${Math.round(result.savings! / 1024)}KB (${result.savingsPercent}%)`,
       });
 
       if (workspaceId) {
         addActivity(
           workspaceId,
           'images_optimized',
-          `Image compressed: ${fileName || 'image'} — saved ${Math.round(compression.savings / 1024)}KB (${compression.savingsPercent}%)`,
+          `Image compressed: ${fileName || 'image'} — saved ${Math.round(result.savings! / 1024)}KB (${result.savingsPercent}%)`,
           undefined,
           {
-            originalSize: compression.originalSize,
-            newSize: compression.newSize,
-            savings: compression.savings,
-            savingsPercent: compression.savingsPercent,
+            originalSize: result.originalSize,
+            newSize: result.newSize,
+            savings: result.savings,
+            savingsPercent: result.savingsPercent,
           },
         );
       }
     } catch (err) {
-      if (isProgrammingError(err)) {
+      if (isProgrammingError(err)) { // url-fetch-ok
         log.warn({ err }, 'webflow image compress background job failed with programming error');
       } else {
         log.debug({ err }, 'webflow image compress background job failed — degrading gracefully');
