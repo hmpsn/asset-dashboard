@@ -310,6 +310,15 @@
           "notes": "Scope: `tests/pr-check.test.ts`, `scripts/pr-check.ts`, `scripts/generate-rules-doc.ts`, `docs/rules/automated-rules.md`. Current complexity: pr-check tests are large and noisy, and docs drift is verified manually through `npm run rules:generate`. Behavior-preserving path: add an `expectRuleCases(rule, cases)` fixture DSL for compact positive/negative cases; add a contract test that renders generated rules content and compares to committed `automated-rules.md` without writing. Tests/guardrails: `npx vitest run tests/pr-check.test.ts`, `npm run rules:generate`, and `git diff --exit-code docs/rules/automated-rules.md`. || DONE 2026-06-09: exported `renderAutomatedRulesDoc()` from `scripts/generate-rules-doc.ts` while preserving CLI generation, added a no-write docs drift test against committed `docs/rules/automated-rules.md`, and introduced `expectRuleCases()` in `tests/pr-check.test.ts` with the Global keydown customCheck block migrated as the first representative fixture table. Targeted verification: `npx vitest run tests/pr-check.test.ts`; `npm run rules:generate && git diff --exit-code docs/rules/automated-rules.md`.",
           "createdAt": "2026-06-09",
           "shippedAt": "2026-06-09"
+        },
+        {
+          "id": "generation-quality-intelligence-wiring",
+          "title": "Wire generation_quality store into an intelligence slice (Data Flow Rule 6 deferral from F1)",
+          "source": "Core-features remediation F1 review (2026-06-10) — migration 129 created the workspace-scoped generation_quality table; getLatestGenerationQuality is not yet surfaced in server/intelligence/, so AdminChat/AI context are blind to generation health",
+          "est": "small",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "Deliberate deferral recorded at migration 129 header. Wire when touching the seoContext or operational slice, or when building the generation-health admin panel."
         }
       ]
     },
