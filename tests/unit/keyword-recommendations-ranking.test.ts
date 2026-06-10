@@ -194,9 +194,16 @@ describe('getKeywordRecommendations ranking behavior', () => {
 
   it('suppresses previously declined keyword recommendations', async () => {
     mockGetDeclinedKeywords.mockReturnValue(['cheap plumber austin']);
+    // The surviving candidate must win on RAW metrics (volume 2000 vs the
+    // seed's 300, matching cpc) so this test pins suppression ONLY. It
+    // previously relied on the outcome-learning difficulty multiplier
+    // (candidate's 35 → '21-40' bin → 0.65 boost AND seed's 42 → '41-60' bin
+    // → 0.35 penalty) to flip the order — A1 disabled that multiplier pending
+    // the position-bin vs KD-bin rebinning; the seam has its own dedicated
+    // tests in outcome-learning-pure.test.ts.
     mockGetRelatedKeywords.mockResolvedValue([
       { keyword: 'cheap plumber austin', volume: 600, difficulty: 20, cpc: 2 },
-      { keyword: 'best emergency plumber austin', volume: 140, difficulty: 35, cpc: 10 },
+      { keyword: 'best emergency plumber austin', volume: 2000, difficulty: 30, cpc: 18 },
     ]);
 
     const { getKeywordRecommendations } = await import('../../server/keyword-recommendations.js');
