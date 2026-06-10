@@ -57,6 +57,7 @@ import { toPublicWorkspaceView } from '../serializers/client-safe.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 import { getVoiceProfile } from '../voice-calibration.js';
 import { sendSanitizedProviderError } from '../provider-error-sanitizer.js';
+import { buildMatricesExportRows, MATRICES_EXPORT_HEADERS, sendExport } from './data-export.js';
 import type {
   BusinessPrioritiesConflictResponse,
   BusinessPrioritiesResponse,
@@ -798,6 +799,16 @@ router.get('/api/public/briefing/:workspaceId', requireClientPortalAuth(), (req,
 
   const briefing = buildBriefingClientView(ws.id);
   res.json({ briefing });
+});
+
+// --- Public Content Matrices Export ---
+// Mirrors /api/export/:workspaceId/matrices but honoring client portal auth so real
+// clients can download their content plan as CSV/JSON without the APP_PASSWORD gate.
+router.get('/api/public/export/:workspaceId/matrices', requireClientPortalAuth('workspaceId'), (req, res) => { // activity-ok — read-only download, no meaningful state change to log
+  const { format = 'csv' } = req.query as { format?: string };
+  const rows = buildMatricesExportRows(req.params.workspaceId);
+  log.info(`PUBLIC EXPORT matrices ${req.params.workspaceId}: ${rows.length} cells as ${format}`);
+  sendExport(res, rows, [...MATRICES_EXPORT_HEADERS], `matrices-${req.params.workspaceId}`, format);
 });
 
 export default router;

@@ -15,7 +15,17 @@ const mocks = vi.hoisted(() => ({
   getTextFn: vi.fn(),
   trackJob: vi.fn(),
   startJob: vi.fn(),
+  toastFn: vi.fn(),
 }));
+
+// Mock the Toast module so we can spy on toast() calls
+vi.mock('../../src/components/Toast', async () => {
+  const actual = await vi.importActual<typeof import('../../src/components/Toast')>('../../src/components/Toast');
+  return {
+    ...actual,
+    useToast: () => ({ toast: mocks.toastFn }),
+  };
+});
 
 vi.mock('../../src/api/client', () => ({
   ApiError: class ApiError extends Error {
@@ -286,6 +296,7 @@ function renderComponent(workspaceId = 'ws-1', props: Record<string, unknown> = 
 describe('ContentBriefs', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.toastFn.mockReset();
     setHooks();
   });
 
@@ -599,5 +610,31 @@ describe('ContentBriefs', () => {
   it('renders Content Briefs page header', () => {
     renderComponent();
     expect(screen.getByText('Content Briefs')).toBeInTheDocument();
+  });
+
+  // ── Fix 5: user-triggered mutation errors show toast ────────────────────
+  // handleRegenerateOutline, handleRegenerateBrief, and handleDeleteRequest are
+  // not surfaced by the BriefList/RequestList stubs used in this component test,
+  // so those three paths cannot be driven here. Removed the three vacuous tests
+  // that only asserted `expect(mocks.toastFn).toBeDefined()` — that assertion is
+  // true regardless of whether the handler actually calls toast. Coverage for
+  // those paths belongs in integration tests that can render the full sub-trees.
+
+  it('handleGenerateBriefForRequest shows error toast on non-409 failure', async () => {
+    const req = makeRequest();
+    setHooks({ requests: [req] });
+    mocks.postFn.mockRejectedValue(new Error('Job start failed'));
+
+    renderComponent();
+    await act(async () => {
+      fireEvent.click(screen.getByTestId(`request-generate-${req.id}`));
+    });
+
+    await waitFor(() => {
+      expect(mocks.toastFn).toHaveBeenCalledWith(
+        expect.stringMatching(/Failed to start brief generation|Job start failed/),
+        'error',
+      );
+    });
   });
 });

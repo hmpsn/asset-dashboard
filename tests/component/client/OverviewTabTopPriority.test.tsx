@@ -2,7 +2,7 @@
  * Component test for the OverviewTab #1-priority card "why this is #1" breakdown (PR6 / SI3).
  *
  * Verifies the client #1 card renders:
- *  - the relative ROI badge from opportunity.value (NOT the dollar emvPerWeek)
+ *  - the opportunity score badge from opportunity.value (NOT the dollar emvPerWeek)
  *  - the component breakdown (dimension + evidence) from opportunity.components
  *  - graceful behaviour when opportunity is absent (legacy recs) — no breakdown
  *
@@ -98,13 +98,13 @@ beforeEach(() => {
 });
 
 describe('OverviewTab #1 priority — opportunity breakdown (SI3)', () => {
-  it('renders the relative ROI badge and component breakdown when opportunity is present', () => {
+  it('renders the opportunity score badge and component breakdown when opportunity is present', () => {
     recHolder.set = makeSet(true);
     render(<OverviewTab {...baseProps} />);
 
     expect(screen.getByText(/Your #1 priority/i)).toBeInTheDocument();
-    // Relative ROI badge from opportunity.value
-    expect(screen.getByText('ROI 82')).toBeInTheDocument();
+    // Opportunity score badge from opportunity.value (relabeled from 'ROI' in E2 — it is a 0-100 score, not an ROI)
+    expect(screen.getByText('Score 82')).toBeInTheDocument();
     // Breakdown heading + component evidence
     expect(screen.getByText(/Why this is your top priority/i)).toBeInTheDocument();
     expect(screen.getByText('2,400 monthly searches')).toBeInTheDocument();
@@ -126,6 +126,6 @@ describe('OverviewTab #1 priority — opportunity breakdown (SI3)', () => {
     expect(screen.getByText('Optimize the services page title')).toBeInTheDocument();
     // No breakdown block for legacy recs
     expect(screen.queryByText(/Why this is your top priority/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/^ROI /)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Score \d/)).not.toBeInTheDocument();
   });
 });

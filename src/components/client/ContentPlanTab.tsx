@@ -59,8 +59,11 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
     }
   }, [workspaceId, selectedMatrixId, setToast, queryClient]);
 
-  const handleDownload = useCallback((format: 'docx' | 'pdf') => {
-    window.open(`/api/export/${workspaceId}/matrices?format=${format === 'docx' ? 'csv' : 'json'}`, '_blank');
+  // Honest format names: 'csv' and 'json' match what the endpoint actually delivers.
+  // Public route: client portal auth (cookie) — the admin /api/export/ path sits behind
+  // the global APP_PASSWORD gate and returns 401 for real client sessions.
+  const handleDownload = useCallback((format: 'csv' | 'json') => {
+    window.open(`/api/public/export/${workspaceId}/matrices?format=${format}`, '_blank');
   }, [workspaceId]);
 
   if (loading) {

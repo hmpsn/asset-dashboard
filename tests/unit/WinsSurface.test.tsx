@@ -73,10 +73,39 @@ describe('WinsSurface', () => {
     expect(skeletons.length).toBeGreaterThan(0);
   });
 
-  it('shows "See full history" link when exactly 10 wins returned', () => {
+  it('does not show "See full history" link even when exactly 10 wins returned', () => {
     const wins = Array.from({ length: 10 }, (_, i) => mockWin({ actionId: `act-${i}` }));
     (useClientOutcomeWins as ReturnType<typeof vi.fn>).mockReturnValue({ data: wins, isLoading: false, isError: false });
     renderWithQuery(<WinsSurface workspaceId="ws-1" effectiveTier="growth" />);
-    expect(screen.getByText('See full history →')).toBeInTheDocument();
+    expect(screen.queryByText('See full history →')).not.toBeInTheDocument();
+  });
+
+  // ── Free-tier teaser month-windowed count ────────────────────────────────
+
+  it('free-tier teaser uses 30-day window: 2 recent wins, 3 old → shows "2 wins"', () => {
+    const now = Date.now();
+    const recentWins = [
+      mockWin({ actionId: 'r1', detectedAt: new Date(now - 5 * 24 * 60 * 60 * 1000).toISOString() }),
+      mockWin({ actionId: 'r2', detectedAt: new Date(now - 10 * 24 * 60 * 60 * 1000).toISOString() }),
+    ];
+    const oldWins = [
+      mockWin({ actionId: 'o1', detectedAt: new Date(now - 60 * 24 * 60 * 60 * 1000).toISOString() }),
+      mockWin({ actionId: 'o2', detectedAt: new Date(now - 45 * 24 * 60 * 60 * 1000).toISOString() }),
+      mockWin({ actionId: 'o3', detectedAt: new Date(now - 35 * 24 * 60 * 60 * 1000).toISOString() }),
+    ];
+    (useClientOutcomeWins as ReturnType<typeof vi.fn>).mockReturnValue({ data: [...recentWins, ...oldWins], isLoading: false, isError: false });
+    renderWithQuery(<WinsSurface workspaceId="ws-1" effectiveTier="free" />);
+    expect(screen.getByText(/2 wins? in the last 30 days/)).toBeInTheDocument();
+  });
+
+  it('free-tier teaser zero count: all wins older than 30 days → fallback string', () => {
+    const now = Date.now();
+    const oldWins = [
+      mockWin({ actionId: 'o1', detectedAt: new Date(now - 60 * 24 * 60 * 60 * 1000).toISOString() }),
+      mockWin({ actionId: 'o2', detectedAt: new Date(now - 90 * 24 * 60 * 60 * 1000).toISOString() }),
+    ];
+    (useClientOutcomeWins as ReturnType<typeof vi.fn>).mockReturnValue({ data: oldWins, isLoading: false, isError: false });
+    renderWithQuery(<WinsSurface workspaceId="ws-1" effectiveTier="free" />);
+    expect(screen.getByText(/Wins are being tracked/)).toBeInTheDocument();
   });
 });
