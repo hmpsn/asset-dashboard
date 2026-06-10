@@ -11,21 +11,22 @@ const router = Router();
 import { addActivity } from '../activity-log.js';
 import { canSend, recordSend } from '../email-throttle.js';
 import {
-  createBatch,
   listBatches,
   getBatch,
   updateItem,
   markBatchApplied,
-  deleteBatch,
 } from '../approvals.js';
 import { broadcastToWorkspace } from '../broadcast.js';
-import { mirrorApprovalBatchToDeliverable } from '../domains/inbox/approval-batch-dual-write.js';
+import {
+  createApprovalBatchForClient,
+  deleteApprovalBatchForClient,
+} from '../domains/inbox/approval-batch-admin-mutations.js';
 import { respondToApprovalBatch } from '../domains/inbox/approval-batch-respond.js';
 import { classifyApprovalBatch } from '../domains/inbox/deliverable-adapters/approval-batch-classifier.js';
 import { markDeliverableApplied } from '../domains/inbox/send-to-client.js';
 import { findBySourceRef } from '../client-deliverables.js';
 import { isClientApplyableFields } from '../../shared/applyability.js';
-import { notifyApprovalReady, notifyTeamActionApproved, notifyTeamChangesRequested } from '../email.js';
+import { notifyTeamActionApproved, notifyTeamChangesRequested } from '../email.js';
 import { getClientActor, requireClientPortalAuth } from '../middleware.js';
 import {
   publishCollectionItems,
@@ -37,7 +38,6 @@ import {
   getTokenForSite,
   getClientPortalUrl,
   updatePageState,
-  clearPageState,
 } from '../workspaces.js';
 import { getPageState } from '../page-edit-states.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
@@ -111,33 +111,13 @@ const updateItemSchema = z.object({
 // --- Approvals (admin, authenticated) ---
 router.post('/api/approvals/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(createBatchSchema), (req, res) => {
   const { siteId, name, note, items } = req.body;
-  const batch = createBatch(req.params.workspaceId, siteId, name || 'SEO Changes', items, note);
-  // Unified deliverables (DARK): mirror the batch into client_deliverable when the
-  // approval-family flag is on. Default off → no-op; never throws (best-effort mirror).
-  // The classifier resolves the sub-type (seo_edit / audit_issue / schema_item).
-  mirrorApprovalBatchToDeliverable(req.params.workspaceId, batch, { note, source: 'approvals-send' });
-  // Track all pages in this batch as in-review
-  for (const item of items) {
-    if (item.pageId) updatePageState(req.params.workspaceId, item.pageId, { status: 'in-review', fields: [item.field], approvalBatchId: batch.id, updatedBy: 'admin' });
-  }
-  // Notify client that items are ready for review
-  const ws = getWorkspace(req.params.workspaceId);
-  if (ws?.clientEmail) {
-    const dashUrl = getClientPortalUrl(ws);
-    notifyApprovalReady({ clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: req.params.workspaceId, batchName: batch.name, itemCount: items.length, dashboardUrl: dashUrl });
-  }
-  addActivity(
-    req.params.workspaceId,
-    'approval_sent',
-    `Sent "${batch.name}" to client for review`,
-    `${items.length} item${items.length !== 1 ? 's' : ''} awaiting client review`,
-    {
-      batchId: batch.id,
-      itemCount: items.length,
-      pageIds: items.map((item: { pageId?: string }) => item.pageId).filter(Boolean),
-    },
-  );
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.APPROVAL_UPDATE, { batchId: batch.id, action: 'created' });
+  const batch = createApprovalBatchForClient({
+    workspaceId: req.params.workspaceId,
+    siteId,
+    name: name || 'SEO Changes',
+    note,
+    items,
+  });
   res.json(batch);
 });
 
@@ -153,34 +133,8 @@ router.get('/api/approvals/:workspaceId/:batchId', requireWorkspaceAccess('works
 
 router.delete('/api/approvals/:workspaceId/:batchId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const { workspaceId, batchId } = req.params;
-  // Fetch batch before deleting so we can reset page edit states
-  const batch = getBatch(workspaceId, batchId);
-  if (!batch) return res.status(404).json({ error: 'Batch not found' });
-  for (const item of batch.items) {
-    if (item.pageId) {
-      // Reset any page still associated with this batch (in-review, approved, or rejected)
-      const state = getPageState(workspaceId, item.pageId);
-      if (
-        (state?.status === 'in-review' || state?.status === 'approved' || state?.status === 'rejected') &&
-        state.approvalBatchId === batchId
-      ) {
-        clearPageState(workspaceId, item.pageId);
-      }
-    }
-  }
-  deleteBatch(workspaceId, batchId);
-  addActivity(
-    workspaceId,
-    'approval_deleted',
-    `Deleted approval batch "${batch.name}"`,
-    `${batch.items.length} item${batch.items.length !== 1 ? 's' : ''} removed from client review`,
-    {
-      batchId,
-      itemCount: batch.items.length,
-      pageIds: batch.items.map(item => item.pageId).filter(Boolean),
-    },
-  );
-  broadcastToWorkspace(workspaceId, WS_EVENTS.APPROVAL_UPDATE, { batchId, action: 'deleted' });
+  const result = deleteApprovalBatchForClient(workspaceId, batchId);
+  if (!result) return res.status(404).json({ error: 'Batch not found' });
   res.json({ ok: true });
 });
 
