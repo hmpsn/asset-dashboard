@@ -8,6 +8,7 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { createLogger } from './logger.js';
 import { getActionsByWorkspace, getOutcomesForAction } from './outcome-tracking.js';
 import { rowToWorkspaceLearnings } from './db/outcome-mappers.js';
+import { parseJsonFallback } from './db/json-validation.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import type { WorkspaceLearningsRow } from './db/outcome-mappers.js';
@@ -66,6 +67,11 @@ function getEnvDisabledWorkspaces(): Set<string> {
  *
  * Exported contract consumed by the learnings slice (makes `disabled` reachable)
  * and downstream A4/A6/E5.
+ *
+ * SCOPE: gates AI/slice consumers only (assembleLearnings short-circuits to
+ * availability:'disabled'). Admin outcome routes in server/routes/outcomes.ts
+ * intentionally BYPASS this switch so quarantined data stays observable to operators —
+ * disabling learnings hides them from the model, not from the admin who is debugging them.
  */
 export function isLearningsDisabled(workspaceId: string): boolean {
   const override = learningsDisabledOverrides.get(workspaceId);
@@ -74,12 +80,53 @@ export function isLearningsDisabled(workspaceId: string): boolean {
 }
 
 /**
- * Set (or clear) the administrative learnings kill-switch for a workspace.
+ * Set the process-local administrative learnings override for a workspace.
+ *
+ * NOTE ON SEMANTICS: this writes an EXPLICIT override that takes precedence over the
+ * env allow-list in BOTH directions:
+ *   - `true`  → force-disabled regardless of env.
+ *   - `false` → force-ENABLED regardless of env. This is NOT a "clear" — it is a
+ *     permanent explicit-false override that will mask an env-listed workspace.
+ * To restore env-list precedence (i.e. genuinely forget the override), call
+ * {@link clearLearningsDisabledOverride} instead.
+ *
  * Process-local; intended for admin routes and tests.
  */
 export function setLearningsDisabled(workspaceId: string, disabled: boolean): void {
   learningsDisabledOverrides.set(workspaceId, disabled);
 }
+
+/**
+ * Clear the process-local override for a workspace so {@link isLearningsDisabled} falls
+ * back to the env allow-list. Use this rather than `setLearningsDisabled(id, false)`
+ * when the intent is "stop overriding" rather than "force-enable". Trivially safe:
+ * deleting an absent key is a no-op.
+ */
+export function clearLearningsDisabledOverride(workspaceId: string): void {
+  learningsDisabledOverrides.delete(workspaceId);
+}
+
+// --- Learnings logic version ---
+
+/**
+ * Version stamp for the learnings COMPUTATION LOGIC, baked into every cached
+ * payload. Bump this whenever a fix changes what a recompute would produce for the
+ * SAME underlying outcome data — e.g. the A1 `not_acted_on` exclusion, the
+ * phantom-metric guard, or the backfill re-attribution. A cached blob whose stamp
+ * does not match the current version was produced by older (corrupt) logic and MUST
+ * be treated as cache-invalid on read: recompute, and if the recompute is honestly
+ * empty (`totalScoredActions === 0`) return the empty aggregate rather than serving
+ * the pre-fix blob forever.
+ *
+ * Why this matters (the resurrection bug it fixes): post-A1, a workspace whose entire
+ * history was `not_acted_on` recomputes to 0 scorable actions. The old code returned
+ * the OLD cached blob in that case AND touched computed_at so it never expired —
+ * serving the PRE-FIX corrupted aggregate indefinitely. The version gate breaks that
+ * loop: an unversioned/old-version blob is never returned.
+ *
+ * v1: A1 — not_acted_on exclusion, phantom-metric guard, backfill re-attribution.
+ */
+export const LEARNINGS_LOGIC_VERSION = 1;
 
 // --- Prepared statements ---
 
@@ -492,13 +539,63 @@ export function computeWorkspaceLearnings(workspaceId: string): WorkspaceLearnin
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
+/** Serialized form of the learnings blob stored in the JSON column. */
+function serializeLearnings(learnings: WorkspaceLearnings): string {
+  return JSON.stringify({
+    logicVersion: LEARNINGS_LOGIC_VERSION,
+    confidence: learnings.confidence,
+    totalScoredActions: learnings.totalScoredActions,
+    content: learnings.content,
+    strategy: learnings.strategy,
+    technical: learnings.technical,
+    overall: learnings.overall,
+  });
+}
+
+/**
+ * The honest empty aggregate for a workspace with no scorable outcomes. Returned
+ * (instead of a stale/old-version cached blob) when a recompute yields zero scored
+ * actions and the only cache on disk was produced by stale logic. This is the
+ * truthful "we have no learnings yet" answer rather than the pre-fix corrupted one.
+ */
+function emptyLearnings(workspaceId: string): WorkspaceLearnings {
+  return {
+    workspaceId,
+    computedAt: new Date().toISOString(),
+    confidence: 'low',
+    totalScoredActions: 0,
+    content: null,
+    strategy: null,
+    technical: null,
+    overall: { totalWinRate: 0, strongWinRate: 0, topActionTypes: [], recentTrend: 'stable' },
+  };
+}
+
+/**
+ * Reads the `logicVersion` stamp from a raw cached row WITHOUT trusting the
+ * structural mapper. A row written by pre-A1 logic has no stamp (or an older one);
+ * either way it is cache-invalid and must be recomputed rather than served.
+ */
+function cachedLogicVersion(row: WorkspaceLearningsRow): number | null {
+  const obj = parseJsonFallback<{ logicVersion?: unknown }>(row.learnings, {});
+  return typeof obj.logicVersion === 'number' ? obj.logicVersion : null;
+}
+
 export function getWorkspaceLearnings(
   workspaceId: string,
   _domain?: string
 ): WorkspaceLearnings | null {
   const row = stmts().getCached.get(workspaceId) as WorkspaceLearningsRow | undefined;
 
-  if (row) {
+  // A cached row is only trustworthy when its computation-logic version matches the
+  // current one. A version mismatch (including a missing stamp from pre-A1 logic)
+  // means the blob was produced by older, corrupt logic — treat it as cache-invalid
+  // and fall through to recompute. This is what stops the stale-cache resurrection
+  // bug: an unversioned blob can never be returned, and on a recompute that comes
+  // back empty we return the honest empty aggregate below, not the old blob.
+  const versionMatches = row ? cachedLogicVersion(row) === LEARNINGS_LOGIC_VERSION : false;
+
+  if (row && versionMatches) {
     const age = Date.now() - new Date(row.computed_at).getTime();
     if (age < CACHE_TTL_MS) {
       const parsed = rowToWorkspaceLearnings(row);
@@ -507,35 +604,46 @@ export function getWorkspaceLearnings(
       // silently returning null for a still-fresh row.
       log.warn({ workspaceId }, 'Cached workspace learnings payload invalid — recomputing');
     }
+  } else if (row) {
+    log.info(
+      { workspaceId, cachedVersion: cachedLogicVersion(row), currentVersion: LEARNINGS_LOGIC_VERSION },
+      'Cached workspace learnings logic-version mismatch — recomputing (stale blob will not be served)',
+    );
   }
 
   // Recompute
   const learnings = computeWorkspaceLearnings(workspaceId);
 
   if (learnings.totalScoredActions === 0) {
-    // No current data — return stale cache rather than nothing, so AI prompts
-    // don't lose historical context due to a transient data gap.
-    // Touch the row's computed_at so we don't recompute on every subsequent call
-    // until the next 24h window.
-    if (row) {
+    // No current scorable data after a recompute.
+    if (row && versionMatches) {
+      // The cached blob was produced by CURRENT logic — a transient data gap, not
+      // corruption. Return the stale (but trustworthy) cache so AI prompts don't lose
+      // historical context, and touch computed_at so we don't recompute every call.
       stmts().upsert.run({ id: row.id, workspace_id: workspaceId, learnings: row.learnings, computed_at: new Date().toISOString() });
       return rowToWorkspaceLearnings(row);
     }
-    return null;
+    // No cache, OR the only cache is from stale/old logic. Returning the old blob
+    // would resurrect the pre-fix corrupted aggregate forever, so persist + serve the
+    // honest empty aggregate stamped with the current version instead.
+    const empty = emptyLearnings(workspaceId);
+    if (row) {
+      stmts().upsert.run({
+        id: row.id,
+        workspace_id: workspaceId,
+        learnings: serializeLearnings(empty),
+        computed_at: empty.computedAt,
+      });
+      log.info({ workspaceId }, 'Replaced stale-version learnings cache with honest empty aggregate');
+    }
+    return row ? empty : null;
   }
 
   const id = crypto.randomUUID();
   stmts().upsert.run({
     id,
     workspace_id: workspaceId,
-    learnings: JSON.stringify({
-      confidence: learnings.confidence,
-      totalScoredActions: learnings.totalScoredActions,
-      content: learnings.content,
-      strategy: learnings.strategy,
-      technical: learnings.technical,
-      overall: learnings.overall,
-    }),
+    learnings: serializeLearnings(learnings),
     computed_at: learnings.computedAt,
   });
 
@@ -696,14 +804,7 @@ export async function recomputeAllWorkspaceLearnings(): Promise<void> {
       stmts().upsert.run({
         id,
         workspace_id: workspaceId,
-        learnings: JSON.stringify({
-          confidence: learnings.confidence,
-          totalScoredActions: learnings.totalScoredActions,
-          content: learnings.content,
-          strategy: learnings.strategy,
-          technical: learnings.technical,
-          overall: learnings.overall,
-        }),
+        learnings: serializeLearnings(learnings),
         computed_at: learnings.computedAt,
       });
 

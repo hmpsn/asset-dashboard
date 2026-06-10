@@ -86,6 +86,14 @@ import { migrateTrackedKeywordsFromConfigBlob } from './tracked-keywords-store.j
 import { inferTrackedKeywordSourcesForWorkspace } from './keyword-command-center.js';
 migrateTrackedKeywordsFromConfigBlob(inferTrackedKeywordSourcesForWorkspace);
 
+// One-time historical outcome-pollution remediation (A1 audit #1): relabel
+// recommendation-sourced actions the pre-A1 backfill hardcoded to audit_fix_applied,
+// and re-mark phantom-metric neutral/loss outcomes as inconclusive. Idempotent by
+// construction — a second run is a natural no-op (relabeled/re-marked rows no longer
+// match). Can be retired once every environment has run it post-A1.
+import { runOutcomeRemediation } from './outcome-remediation.js';
+runOutcomeRemediation();
+
 // Create and configure the Express app (middleware + routes)
 const app = createApp();
 

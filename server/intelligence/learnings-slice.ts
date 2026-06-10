@@ -62,7 +62,11 @@ export async function assembleLearnings(
   let topWins: TopWin[] = [];
   try {
     const { getActionsByWorkspace, getOutcomesForAction, getTopWinsFromActions } = await import('../outcome-tracking.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-    const actions = getActionsByWorkspace(workspaceId);
+    // A1: exclude `not_acted_on` actions before building ANY win surface. These are
+    // suggestions the workspace never executed — their outcomes are not our wins.
+    // getTopWinsFromActions filters internally too, but roiAttribution/weCalledIt loop
+    // over this list directly, so filter once here for all three surfaces.
+    const actions = getActionsByWorkspace(workspaceId).filter(a => a.attribution !== 'not_acted_on');
     // Lazy-caching outcomes accessor: fetches on first access, caches the result.
     // Shared between getTopWinsFromActions, roiAttribution, and the weCalledIt loop so
     // each action's outcomes are queried at most once.

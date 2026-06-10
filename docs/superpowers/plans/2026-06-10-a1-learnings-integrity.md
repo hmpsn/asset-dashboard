@@ -137,8 +137,78 @@ suggestions vanish from the denominator, and phantom-metric actions are
 
 OWNS: `server/outcome-backfill.ts`, `server/outcome-measurement.ts`,
 `server/outcome-scoring-defaults.ts`, `server/workspace-learnings.ts`,
-`server/outcome-learning-default-path.ts`, `shared/types/intelligence.ts`
-(availability semantics only), unit + integration tests, this plan.
-One-line consult edit in `server/intelligence/learnings-slice.ts` (unassigned;
-flagged). READS: `server/recommendations.ts` (mapping fn — import only),
+`server/outcome-learning-default-path.ts`, `server/outcome-remediation.ts` (new,
+review), `shared/types/intelligence.ts`
+(availability semantics only), `server/schemas/outcome-schemas.ts` (logicVersion
+field, review), unit + integration tests, this plan.
+Consult edits in `server/intelligence/learnings-slice.ts` (unassigned; flagged),
+`server/outcome-tracking.ts` (`getTopWinsFromActions` not_acted_on filter, review),
+and `server/index.ts` (wire one-time remediation, review).
+READS: `server/recommendations.ts` (mapping fn — import only),
 `server/intelligence/generation-context-builders.ts`, `server/routes/outcomes.ts`.
+
+## Review amendment (2026-06-10) — verified-review findings
+
+Five findings from a verified code review, fixed in the `(review)` commit:
+
+### C1 (CRITICAL) — stale-cache resurrection
+
+`getWorkspaceLearnings` previously returned the OLD cached blob (and touched
+`computed_at`, defeating the TTL) whenever a recompute yielded
+`totalScoredActions === 0`. Post-A1, a workspace whose history was all
+`not_acted_on` recomputes to 0 — so the PRE-FIX corrupted aggregate was served
+forever. Fix: a new exported `LEARNINGS_LOGIC_VERSION` constant (currently `1`) is
+stamped into every cached payload (`serializeLearnings`). On read, a version
+mismatch — including a missing stamp from pre-A1 logic — is treated as
+cache-invalid: recompute, and on an empty recompute return the **honest empty
+aggregate** (`emptyLearnings`), persisting it stamped with the current version so the
+stale blob is never served again. A current-version blob is still served on a
+transient empty recompute (no false invalidation of real historical context).
+`logicVersion` added as an optional field to `workspaceLearningsDataSchema`.
+**Bump `LEARNINGS_LOGIC_VERSION` on any future change to what a recompute produces
+for the same data.**
+
+### I1 (IMPORTANT) — `not_acted_on` excluded from ALL win surfaces
+
+`getTopWinsFromActions` (the single chokepoint behind the admin overview/top-wins
+routes AND the client-facing `/api/public/outcomes/:id/wins` route) now filters
+`attribution !== 'not_acted_on'` before building wins — one filter covers every wins
+route consumer. `assembleLearnings` filters the same predicate before building
+`topWins` / `roiAttribution` / `weCalledIt`. The public client wins route (:388) is
+covered too — an unexecuted suggestion is not a win anywhere, client-facing
+included. (No admin-route divergence: there was no reason to keep phantom wins
+visible.)
+
+### I2 (IMPORTANT) — historical pollution remediation
+
+New `server/outcome-remediation.ts`, wired as an idempotent startup pass in
+`server/index.ts` (same shape as `migrateSiteKeywordMetricsFromBlob` et al.).
+Two passes, idempotent **by construction** (no marker table needed):
+(a) `remediateMislabeledRecommendationActions` relabels `source_type='recommendation'`
+actions still labeled `audit_fix_applied` by joining `source_id` → the rec's `type`
+in `recommendation_sets` and re-deriving via `recommendationOutcomeActionType`; recs
+that no longer exist are left + logged (no enumeration oracle); audit-family recs
+correctly stay `audit_fix_applied`; (b) `remediatePhantomMetricOutcomes` re-marks
+`neutral`/`loss` outcomes whose `delta_summary.primary_metric` is not a real
+`BaselineSnapshot` key as `inconclusive`. Both passes run inside `db.transaction()`.
+Second run is a natural no-op (relabeled/re-marked rows no longer match the WHERE).
+
+### M1 / M2 (MINOR) — kill-switch doc + scope
+
+`setLearningsDisabled` JSDoc corrected to state that `false` writes a *permanent
+explicit-false override* (force-ENABLED), not a clear; a trivially-safe
+`clearLearningsDisabledOverride(workspaceId)` was added for true env-list fallback.
+A scope comment on `isLearningsDisabled` documents that it gates AI/slice consumers
+only and admin outcome routes intentionally bypass it so quarantined data stays
+observable.
+
+### Review test additions
+
+- `tests/integration/a1-learnings-cache-version.test.ts` (4) — C1: unversioned/old
+  blob not served on empty recompute; disk row replaced with current-version empty;
+  current-version blob preserved on transient empty recompute.
+- `tests/integration/a1-not-acted-on-wins.test.ts` (2) — I1: `not_acted_on` win in
+  none of topWins/weCalledIt/roiAttribution (slice + route).
+- `tests/integration/a1-outcome-remediation.test.ts` (4) — I2: relabel mapped type,
+  leave audit-family, leave orphan-rec, phantom→inconclusive vs real-metric kept,
+  second run no-op.

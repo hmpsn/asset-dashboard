@@ -503,10 +503,18 @@ export function getTopWinsFromActions(
   const fetchOutcomes = getOutcomes ?? getOutcomesForAction;
   const wins: TopWin[] = [];
 
+  // A1: an unexecuted suggestion is not a win anywhere. `not_acted_on` actions are
+  // proposals the workspace never acted on; any outcome attached to them is a measure
+  // of what would have happened, not of work we did. Excluding them here covers every
+  // wins surface in one place — the admin overview/top-wins/client "we called it"
+  // routes (getTopWinsForWorkspace) AND the intelligence slice's topWins — so no
+  // caller can resurrect a phantom win by forgetting the filter.
+  const executedActions = actions.filter(a => a.attribution !== 'not_acted_on');
+
   // Iterate the full capped set before sorting — an early break here would mean sort()
   // only operates on whichever wins appeared first chronologically, not highest-impact.
   // limit is enforced via slice(0, limit) after the sort below.
-  for (const action of actions.slice(0, 50)) { // guard: cap N+1 queries for large workspaces
+  for (const action of executedActions.slice(0, 50)) { // guard: cap N+1 queries for large workspaces
     const outcomes = fetchOutcomes(action.id);
     for (const outcome of outcomes) {
       if (outcome.score && WIN_SCORES.includes(outcome.score)) {
