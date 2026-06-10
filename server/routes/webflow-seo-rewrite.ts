@@ -5,6 +5,7 @@
  * @writes none
  */
 import { Router } from 'express';
+import { requireWorkspaceAccessFromBody } from '../auth.js';
 
 import { callCreativeAI } from '../content-posts-ai.js';
 import { parseJsonFallback } from '../db/json-validation.js';
@@ -33,7 +34,7 @@ const router = Router();
 const log = createLogger('webflow-seo');
 
 // --- AI SEO Rewrite (returns 3 variations) ---
-router.post('/api/webflow/seo-rewrite', async (req, res) => {
+router.post('/api/webflow/seo-rewrite', requireWorkspaceAccessFromBody(), async (req, res) => {
   const { pageTitle, currentSeoTitle, currentDescription, pageContent, siteContext, field, workspaceId, pagePath } = req.body;
   if (!pageTitle) return res.status(400).json({ error: 'pageTitle required' });
   const normalizedPagePath = typeof pagePath === 'string' && pagePath ? normalizePageUrl(pagePath) : undefined;

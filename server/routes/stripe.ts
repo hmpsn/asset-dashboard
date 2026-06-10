@@ -7,7 +7,7 @@ const router = Router();
 
 import { sanitizeString } from '../helpers.js';
 import { checkoutLimiter, requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
-import { requireWorkspaceAccess } from '../auth.js';
+import { requireWorkspaceAccess, requireWorkspaceAccessFromBody } from '../auth.js';
 import { requireAdminAuth } from '../middleware/admin-auth.js';
 import { listPayments, getPayment } from '../payments.js';
 import { computeROI } from '../roi.js';
@@ -143,7 +143,7 @@ router.get('/api/stripe/publishable-key', (_req, res) => {
 // --- Stripe Payments ---
 
 // Create a Stripe Checkout session
-router.post('/api/stripe/create-checkout', checkoutLimiter, async (req, res) => {
+router.post('/api/stripe/create-checkout', checkoutLimiter, requireWorkspaceAccessFromBody(), async (req, res) => {
   if (!isStripeConfigured()) return res.status(503).json({ error: 'Stripe is not configured' });
   const { workspaceId, productType, contentRequestId, topic, targetKeyword } = req.body;
   if (!workspaceId || !productType) return res.status(400).json({ error: 'workspaceId and productType are required' });
@@ -174,7 +174,7 @@ router.post('/api/stripe/create-checkout', checkoutLimiter, async (req, res) => 
 });
 
 // Cart checkout: multiple SEO fix products in one Stripe session
-router.post('/api/stripe/cart-checkout', checkoutLimiter, async (req, res) => {
+router.post('/api/stripe/cart-checkout', checkoutLimiter, requireWorkspaceAccessFromBody(), async (req, res) => {
   if (!isStripeConfigured()) return res.status(503).json({ error: 'Stripe is not configured' });
   const { workspaceId, items } = req.body;
   if (!workspaceId || !Array.isArray(items) || !items.length) return res.status(400).json({ error: 'workspaceId and items[] are required' });

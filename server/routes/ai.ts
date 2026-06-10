@@ -23,6 +23,7 @@ import { getDataForSeoUsage, getDataForSeoByDay } from '../providers/dataforseo-
 import { getWorkspace } from '../workspaces.js';
 import { checkAIContext } from '../ai-context-check.js';
 import { aiLimiter } from '../middleware.js';
+import { requireWorkspaceAccess, requireWorkspaceAccessFromBody, requireWorkspaceAccessFromQuery } from '../auth.js';
 import { assembleAdminContext, buildSystemPrompt } from '../admin-chat-context.js';
 import { parsePositiveIntQuery } from '../query-param-parsers.js';
 
@@ -36,7 +37,7 @@ function parseBoundedPositiveIntBody(rawValue: unknown, fallback: number, max: n
 // ── Admin AI Chat (auth-gated, internal analyst persona) ──
 // Context is now assembled server-side based on the question —
 // the frontend only needs to send { workspaceId, question, sessionId }.
-router.post('/api/admin-chat', aiLimiter, async (req, res) => {
+router.post('/api/admin-chat', aiLimiter, requireWorkspaceAccessFromBody(), async (req, res) => {
   const { workspaceId, question, sessionId, days } = req.body;
   if (!question) return res.status(400).json({ error: 'question required' });
   if (!workspaceId) return res.status(400).json({ error: 'workspaceId required' });
@@ -109,12 +110,12 @@ router.post('/api/admin-chat', aiLimiter, async (req, res) => {
 });
 
 // --- AI Context Completeness ---
-router.get('/api/ai/context/:workspaceId', /* tenant-boundary-audit-ok: admin HMAC gate + workspace is explicit query target */ (req, res) => {
+router.get('/api/ai/context/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   res.json(checkAIContext(req.params.workspaceId));
 });
 
 // --- AI Token Usage Tracking ---
-router.get('/api/ai/usage', (req, res) => {
+router.get('/api/ai/usage', requireWorkspaceAccessFromQuery(), (req, res) => {
   const workspaceId = req.query.workspaceId as string | undefined;
   const since = req.query.since as string | undefined;
   const days = parsePositiveIntQuery(req.query.days, 30);
@@ -128,7 +129,7 @@ router.get('/api/ai/usage', (req, res) => {
 });
 
 // --- Time Saved Metric ---
-router.get('/api/ai/time-saved', (req, res) => {
+router.get('/api/ai/time-saved', requireWorkspaceAccessFromQuery(), (req, res) => {
   const workspaceId = req.query.workspaceId as string | undefined;
   const since = req.query.since as string | undefined;
   res.json(getTimeSaved(workspaceId, since));
