@@ -1,12 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { InsightsEngine } from '../../../src/components/client/InsightsEngine';
+import { ToastProvider } from '../../../src/components/Toast';
 import type { RecommendationSet } from '../../../shared/types/recommendations';
 
 const useQueryMock = vi.fn();
 const setQueryDataMock = vi.fn();
 const trackJobMock = vi.fn();
 const postMock = vi.fn();
+const patchMock = vi.fn();
+const delMock = vi.fn();
 let activeJobMock: Record<string, unknown> | undefined;
 let latestTerminalJobMock: Record<string, unknown> | undefined;
 
@@ -15,7 +18,7 @@ vi.mock('@tanstack/react-query', async () => {
   return {
     ...actual,
     useQuery: (...args: unknown[]) => useQueryMock(...args),
-    useQueryClient: () => ({ setQueryData: setQueryDataMock }),
+    useQueryClient: () => ({ setQueryData: setQueryDataMock, invalidateQueries: vi.fn() }),
   };
 });
 
@@ -38,8 +41,8 @@ vi.mock('../../../src/components/client/useCart', () => ({
 vi.mock('../../../src/api/client', () => ({
   get: vi.fn(),
   post: (...args: unknown[]) => postMock(...args),
-  patch: vi.fn(),
-  del: vi.fn(),
+  patch: (...args: unknown[]) => patchMock(...args),
+  del: (...args: unknown[]) => delMock(...args),
 }));
 
 vi.mock('../../../src/hooks/useBackgroundTasks', () => ({
@@ -90,12 +93,18 @@ function makeSet(): RecommendationSet {
   };
 }
 
+function renderWithToast(ui: React.ReactElement) {
+  return render(<ToastProvider>{ui}</ToastProvider>);
+}
+
 describe('InsightsEngine', () => {
   beforeEach(() => {
     useQueryMock.mockReset();
     setQueryDataMock.mockReset();
     trackJobMock.mockReset();
     postMock.mockReset();
+    patchMock.mockReset();
+    delMock.mockReset();
     activeJobMock = undefined;
     latestTerminalJobMock = undefined;
   });
@@ -161,6 +170,70 @@ describe('InsightsEngine', () => {
     expect(postMock).toHaveBeenCalledWith('/api/public/recommendations/ws-test/generate');
     await waitFor(() => {
       expect(trackJobMock).toHaveBeenCalledWith('recommendations-generation', 'job-77', { workspaceId: 'ws-test' });
+    });
+  });
+
+  // ── Error toast tests (fix 5) ────────────────────────────────────────────
+
+  it('shows error toast when handleRegenerate post() rejects', async () => {
+    const set = makeSet();
+    useQueryMock.mockReturnValue({ data: set, isLoading: false, isError: false });
+    postMock.mockRejectedValue(new Error('Network error'));
+
+    renderWithToast(<InsightsEngine workspaceId="ws-test" tier="growth" />);
+    fireEvent.click(screen.getByRole('button', { name: /refresh/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Network error')).toBeInTheDocument();
+    });
+  });
+
+  it('shows error toast when handleStatusUpdate patch() rejects', async () => {
+    const set = makeSet();
+    // premium tier — renders "Start Working On This" button after rec is expanded
+    useQueryMock.mockReturnValue({ data: set, isLoading: false, isError: false });
+    patchMock.mockRejectedValue(new Error('Status update failed'));
+
+    renderWithToast(<InsightsEngine workspaceId="ws-test" tier="premium" />);
+
+    // The fix_now priority group is expanded by default (see expandedPriorities initial state).
+    // Expand the first rec by clicking the chevron toggle.
+    const chevronBtns = screen.getAllByRole('button');
+    const toggleBtn = chevronBtns.find(b => b.className.includes('rounded-[var(--radius-sm)]') && b.className.includes('bg-[var(--surface-3)]'));
+    expect(toggleBtn).toBeDefined();
+    fireEvent.click(toggleBtn!);
+
+    // "Start Working On This" should now be present (rec expanded, status=pending, tier=premium)
+    const startBtn = await screen.findByRole('button', { name: /start working on this/i });
+    fireEvent.click(startBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('Could not update recommendation')).toBeInTheDocument();
+    });
+  }, 10000);
+
+  it('shows error toast when handleDismiss del() rejects', async () => {
+    const set = makeSet();
+    useQueryMock.mockReturnValue({ data: set, isLoading: false, isError: false });
+    delMock.mockRejectedValue(new Error('Dismiss failed'));
+
+    renderWithToast(<InsightsEngine workspaceId="ws-test" tier="growth" />);
+
+    // Expand the rec to reveal the Dismiss button
+    const chevronBtns = screen.getAllByRole('button');
+    const toggleBtn = chevronBtns.find(b => b.className.includes('rounded-[var(--radius-sm)]') && b.className.includes('bg-[var(--surface-3)]'));
+    expect(toggleBtn).toBeDefined();
+    fireEvent.click(toggleBtn!);
+
+    // Now "Dismiss" button should appear
+    await waitFor(() => {
+      const dismissBtn = screen.queryByRole('button', { name: /^dismiss$/i });
+      expect(dismissBtn).toBeTruthy();
+      fireEvent.click(dismissBtn!);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Could not dismiss recommendation')).toBeInTheDocument();
     });
   });
 });

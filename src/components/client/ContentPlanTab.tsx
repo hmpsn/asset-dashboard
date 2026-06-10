@@ -59,8 +59,9 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
     }
   }, [workspaceId, selectedMatrixId, setToast, queryClient]);
 
-  const handleDownload = useCallback((format: 'docx' | 'pdf') => {
-    window.open(`/api/export/${workspaceId}/matrices?format=${format === 'docx' ? 'csv' : 'json'}`, '_blank');
+  // Honest format names: 'csv' and 'json' match what the endpoint actually delivers.
+  const handleDownload = useCallback((format: 'csv' | 'json') => {
+    window.open(`/api/export/${workspaceId}/matrices?format=${format}`, '_blank');
   }, [workspaceId]);
 
   if (loading) {

@@ -13,7 +13,8 @@ interface MatrixProgressViewProps {
   matrix: ContentMatrix;
   onCellPreview: (cell: MatrixCell) => void;
   onFlagCell: (cellId: string, comment: string) => void;
-  onDownload: (format: 'docx' | 'pdf') => void;
+  // format matches the actual endpoint delivery: 'csv' for spreadsheet, 'json' for raw data.
+  onDownload: (format: 'csv' | 'json') => void;
 }
 
 const STATUS_DISPLAY: Record<MatrixCell['status'], { label: string; icon: typeof CheckCircle2; color: string; badgeColor: 'zinc' | 'blue' | 'amber' | 'teal' | 'orange' | 'emerald' }> = {
@@ -150,22 +151,22 @@ export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownlo
         />
         <div className="flex items-center gap-2">
           <Button
-            onClick={() => onDownload('docx')}
+            onClick={() => onDownload('csv')}
             variant="secondary"
             size="sm"
             icon={FileDown}
             className="px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--brand-border)] t-caption text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)]"
           >
-            Word Doc
+            Spreadsheet (CSV)
           </Button>
           <Button
-            onClick={() => onDownload('pdf')}
+            onClick={() => onDownload('json')}
             variant="secondary"
             size="sm"
             icon={Download}
             className="px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--brand-border)] t-caption text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)]"
           >
-            PDF
+            Raw Data (JSON)
           </Button>
         </div>
       </div>

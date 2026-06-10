@@ -25,9 +25,12 @@ export function buildClientDashboardNav({
   contentPlanSummary,
   strategyData,
 }: BuildClientDashboardNavOptions): ClientNavItem[] {
-  const strategyLocked = effectiveTier === 'free' || !ws.seoClientView;
   const isPaid = effectiveTier !== 'free';
   const isExternalBilling = ws.billingMode === 'external';
+  // seoClientView=false means the admin has hidden SEO strategy from this client entirely —
+  // no lock, no upgrade modal, just absent. Only effectiveTier === 'free' shows the tier lock.
+  const strategyVisible = ws.seoClientView !== false;
+  const strategyLocked = effectiveTier === 'free';
 
   return [
     { id: 'overview', label: 'Insights', icon: Sparkles, locked: false },
@@ -35,7 +38,7 @@ export function buildClientDashboardNav({
       { id: 'performance' as const, label: 'Performance', icon: LineChart, locked: false },
     ] : []),
     { id: 'health', label: 'Site Health', icon: Shield, locked: false },
-    ...(isPaid ? [{ id: 'strategy' as const, label: 'SEO Strategy', icon: Target, locked: strategyLocked }] : []),
+    ...(strategyVisible ? [{ id: 'strategy' as const, label: 'SEO Strategy', icon: Target, locked: strategyLocked }] : []),
     ...(isPaid && contentPlanSummary && contentPlanSummary.totalCells > 0
       ? [{ id: 'content-plan' as const, label: 'Content Plan', icon: Layers, locked: false }]
       : []),

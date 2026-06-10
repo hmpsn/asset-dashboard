@@ -18,6 +18,7 @@ import { Button } from '../ui/Button';
 import { fmtMoneyFull, fmtNum } from '../../utils/formatNumbers';
 import { Icon } from '../ui/Icon';
 import { useBackgroundTasks } from '../../hooks/useBackgroundTasks';
+import { useToast } from '../Toast';
 
 // ─── Props ────────────────────────────────────────────────────────
 
@@ -123,6 +124,7 @@ const EFFORT_BADGE: Record<string, { label: string; color: string }> = {
 export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: InsightsEngineProps) {
   const cart = useCart();
   const qc = useQueryClient();
+  const { toast } = useToast();
   const { trackJob, findActiveJob, findLatestTerminalJob } = useBackgroundTasks();
   const [startingRegeneration, setStartingRegeneration] = useState(false);
   const lastObservedRecommendationJobId = useRef<string | null>(null);
@@ -164,9 +166,12 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
         const body = (err as { body?: unknown }).body;
         if (body && typeof body === 'object' && 'jobId' in body && typeof (body as { jobId?: unknown }).jobId === 'string') {
           trackJob(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION, (body as { jobId: string }).jobId, { workspaceId });
+          setStartingRegeneration(false);
+          return;
         }
       }
-      /* silently fail — button stops spinning; user can retry */
+      const msg = err instanceof Error ? err.message : 'Failed to refresh recommendations';
+      toast(msg, 'error');
     }
     setStartingRegeneration(false);
   };
@@ -188,7 +193,10 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
         if (!prev) return prev;
         return { ...prev, recommendations: prev.recommendations.map(r => r.id === recId ? { ...r, status, updatedAt: new Date().toISOString() } : r) };
       });
-    } catch (err) { console.error('InsightsEngine operation failed:', err); }
+    } catch (err) {
+      console.error('InsightsEngine operation failed:', err);
+      toast('Could not update recommendation', 'error');
+    }
   };
 
   // Dismiss (on success)
@@ -199,7 +207,10 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
         if (!prev) return prev;
         return { ...prev, recommendations: prev.recommendations.map(r => r.id === recId ? { ...r, status: 'dismissed' as RecStatus } : r) };
       });
-    } catch (err) { console.error('InsightsEngine operation failed:', err); }
+    } catch (err) {
+      console.error('InsightsEngine operation failed:', err);
+      toast('Could not dismiss recommendation', 'error');
+    }
   };
 
   const togglePriority = (p: RecPriority) =>

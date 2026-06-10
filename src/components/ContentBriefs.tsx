@@ -211,7 +211,10 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
     try {
       const updated = await post<ContentBrief>(`/api/content-briefs/${workspaceId}/${briefId}/regenerate-outline`, { feedback });
       queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), old => (old ?? []).map(b => b.id === briefId ? updated : b));
-    } catch (err) { console.error('ContentBriefs operation failed:', err); }
+    } catch (err) {
+      console.error('ContentBriefs operation failed:', err);
+      toast(err instanceof Error ? err.message : 'Failed to regenerate outline', 'error');
+    }
     setRegeneratingOutline(null);
   };
 
@@ -224,7 +227,10 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
       if (requestId) {
         await handleUpdateRequestStatus(requestId, undefined, { briefId: newBrief.id });
       }
-    } catch (err) { console.error('ContentBriefs operation failed:', err); }
+    } catch (err) {
+      console.error('ContentBriefs operation failed:', err);
+      toast(err instanceof Error ? err.message : 'Failed to regenerate brief', 'error');
+    }
     setRegeneratingBrief(null);
   };
 
@@ -232,7 +238,10 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
     try {
       const updated = await patch<ContentBrief>(`/api/content-briefs/${workspaceId}/${briefId}`, updates);
       queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), old => (old ?? []).map(b => b.id === briefId ? updated : b));
-    } catch (err) { console.error('ContentBriefs operation failed:', err); }
+    } catch (err) {
+      console.error('ContentBriefs operation failed:', err);
+      // auto-save degradation — field reverts to server value on next refetch; no toast (background, user-unaware)
+    }
   };
 
   const getBriefById = (briefId: string) => briefs.find(b => b.id === briefId);
@@ -283,7 +292,10 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
       await del(`/api/content-requests/${workspaceId}/${reqId}`);
       queryClient.setQueryData<ContentTopicRequest[]>(queryKeys.admin.requests(workspaceId), old => (old ?? []).filter(r => r.id !== reqId));
       if (expandedRequest === reqId) setExpandedRequest(null);
-    } catch (err) { console.error('ContentBriefs operation failed:', err); }
+    } catch (err) {
+      console.error('ContentBriefs operation failed:', err);
+      toast(err instanceof Error ? err.message : 'Failed to delete request', 'error');
+    }
   };
 
   const copyAsMarkdown = (b: ContentBrief) => {
@@ -363,6 +375,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
       }
     } catch (err) {
       console.error('ContentBriefs operation failed:', err);
+      toast(err instanceof Error ? err.message : 'Failed to start brief generation', 'error');
       setGeneratingBriefFor(null);
     }
   };
@@ -382,6 +395,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
       return true;
     } catch (err) {
       console.error('ContentBriefs operation failed:', err);
+      toast(err instanceof Error ? err.message : 'Failed to generate post', 'error');
       return false;
     } finally {
       setGeneratingPostFor(null);
@@ -394,7 +408,10 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
       if (status !== undefined) body.status = status;
       const updated = await patch<ContentTopicRequest>(`/api/content-requests/${workspaceId}/${reqId}`, body);
       queryClient.setQueryData<ContentTopicRequest[]>(queryKeys.admin.requests(workspaceId), old => (old ?? []).map(r => r.id === reqId ? updated : r));
-    } catch (err) { console.error('ContentBriefs operation failed:', err); }
+    } catch (err) {
+      console.error('ContentBriefs operation failed:', err);
+      // status update degradation — optimistic cache update already applied; will reconcile on next refetch
+    }
   };
 
   const handleGenerate = async () => {

@@ -280,10 +280,10 @@ export function OverviewTab({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
               <span className="t-caption-sm font-semibold text-accent-danger uppercase tracking-wider">Your #1 priority</span>
-              {/* Relative ROI badge — opportunity.value (0-100). Blue = data per the Four Laws.
-                  NEVER show emvPerWeek (admin/AI-only; stripped at the public boundary). */}
+              {/* Opportunity score badge — opportunity.value is a 0-100 composite score, not an ROI.
+                  Blue = data per the Four Laws. NEVER show emvPerWeek (admin/AI-only; stripped at the public boundary). */}
               {topRec.opportunity && (
-                <Badge label={`ROI ${Math.round(topRec.opportunity.value)}`} tone="blue" variant="outline" shape="pill" />
+                <Badge label={`Score ${Math.round(topRec.opportunity.value)}`} tone="blue" variant="outline" shape="pill" />
               )}
             </div>
             <div className="t-page font-medium text-[var(--brand-text-bright)] truncate">{topRec.title}</div>

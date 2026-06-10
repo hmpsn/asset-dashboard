@@ -132,16 +132,6 @@ export function WinsSurface({ workspaceId, effectiveTier }: WinsSurfaceProps) {
           <div>
             {wins.map(w => <WinRow key={w.actionId} entry={w} />)}
           </div>
-          {wins.length === 10 && (
-            <a
-              href="#"
-              title="Coming soon"
-              className="block mt-3 t-caption text-accent-brand hover:text-[var(--brand-text-bright)] transition-colors"
-              onClick={e => e.preventDefault()}
-            >
-              See full history →
-            </a>
-          )}
         </>
       )}
     </>
@@ -152,16 +142,24 @@ export function WinsSurface({ workspaceId, effectiveTier }: WinsSurfaceProps) {
       title="What we shipped"
       titleIcon={<Icon as={Sparkles} size="md" className="text-accent-brand" />}
     >
-      {effectiveTier === 'free' ? (
-        <TierGate
-          tier={effectiveTier}
-          required="growth"
-          feature="Wins ledger"
-          teaser={`${wins.length} wins shipped this month — upgrade to see what we built.`}
-        >
-          {body}
-        </TierGate>
-      ) : (
+      {effectiveTier === 'free' ? (() => {
+        const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+        const now = Date.now();
+        const thisMonthCount = wins.filter(w => now - new Date(w.detectedAt).getTime() <= thirtyDaysMs).length;
+        const teaserStr = thisMonthCount > 0
+          ? `${thisMonthCount} win${thisMonthCount === 1 ? '' : 's'} in the last 30 days — upgrade to see what we built.`
+          : 'Wins are being tracked — upgrade to see what we built.';
+        return (
+          <TierGate
+            tier={effectiveTier}
+            required="growth"
+            feature="Wins ledger"
+            teaser={teaserStr}
+          >
+            {body}
+          </TierGate>
+        );
+      })() : (
         body
       )}
     </SectionCard>
