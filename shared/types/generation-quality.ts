@@ -40,3 +40,17 @@ export interface GenerationQuality {
    */
   floorHit: boolean;
 }
+
+/**
+ * A GenerationQuality record AS PERSISTED (F1 #7a) — the run-level write-side input
+ * (`GenerationQuality`) plus the durable row identity. One row per generation run in
+ * the `generation_quality` table. This is the read-side contract returned by
+ * `server/generation-quality-store.ts` readers; the table is internal-only and never
+ * serialized on a public route.
+ */
+export interface StoredGenerationQuality extends GenerationQuality {
+  /** Autoincrement row id. */
+  id: number;
+  /** ISO timestamp of the generation run (when the quality row was written). */
+  createdAt: string;
+}

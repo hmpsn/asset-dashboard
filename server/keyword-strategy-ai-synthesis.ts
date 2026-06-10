@@ -1376,14 +1376,14 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
         { role: 'system', content: 'You are an expert SEO strategist. Return valid JSON only.' },
         { role: 'user', content: groundedMasterPrompt },
       ];
-      let masterRaw = await callNamedStrategyAI(ws.id, 'keyword-site-synthesis', masterMessages, 3000);
+      let masterRaw = await callNamedStrategyAI(ws.id, 'keyword-site-synthesis', masterMessages, 4500);
       let masterResult = siteSynthesisResponseSchema.safeParse(parseJsonFallback<unknown>(masterRaw, null));
       if (!masterResult.success) {
         const issues = masterResult.error.issues.slice(0, 5).map(i => `${i.path.join('.')}: ${i.message}`).join('; ');
         log.warn({ workspaceId: ws.id, issues }, 'Master closed-set OP2 failed validation — retrying once');
         masterMessages.push({ role: 'assistant', content: masterRaw });
         masterMessages.push({ role: 'user', content: `Your previous response failed schema validation: ${issues}. Return ONLY the corrected JSON object with the exact keys siteKeywords, opportunities, contentGaps, quickWins. No markdown.` });
-        masterRaw = await callNamedStrategyAI(ws.id, 'keyword-site-synthesis', masterMessages, 3000);
+        masterRaw = await callNamedStrategyAI(ws.id, 'keyword-site-synthesis', masterMessages, 4500);
         masterResult = siteSynthesisResponseSchema.safeParse(parseJsonFallback<unknown>(masterRaw, null));
       }
       if (masterResult.success) {
