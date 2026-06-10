@@ -380,6 +380,14 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
         });
         clearKeepalive();
         activeGenerations.delete(ws.id);
+        // The sanitizer-only re-persist performed ZERO AI synthesis (upToDate fired
+        // before any AI batch), so it must meter like the pure no-op exit below —
+        // refund the pre-reserved slot rather than billing a cleanup pass.
+        try {
+          decrementUsage(ws.id, 'strategy_generations');
+        } catch (err) {
+          log.warn({ err, workspaceId: ws.id }, 'Failed to refund strategy generation usage after sanitizer-only no-op');
+        }
         responseSent = true;
         queueKeywordStrategyPostUpdateFollowOns({ workspaceId: ws.id });
         return { strategy: responseStrategy as KeywordStrategy & { pageMap: PageKeywordMap[] }, upToDate: false, freshPageCount: synthesis.freshPageCount };
