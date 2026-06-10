@@ -36,6 +36,39 @@ const log = createLogger('outcome-measurement');
 const LOWER_IS_BETTER_METRICS = new Set(['position']);
 
 /**
+ * Generic phantom-metric guard (A1). A scoring config may name a `primary_metric`
+ * that was never captured in a GSC/analytics snapshot — e.g. `click_recovery`
+ * (content_refreshed), `target_improvement` (internal_link_added), or
+ * `content_produced` (brief_created). None of those keys exist on
+ * {@link BaselineSnapshot}, so `computeDelta` reads them as 0, the delta is 0, and
+ * the action fabricates a `neutral`/`loss` verdict for a metric that was never
+ * measured. The fix: when the metric key is absent (undefined OR null) from BOTH
+ * the baseline and the current snapshot, the delta is unmeasurable and the action
+ * MUST score `inconclusive`.
+ *
+ * Generic over any actionType and any metric — the guard inspects the snapshots,
+ * not a per-type allow-list — so a future scoring config that names a not-yet-
+ * captured metric is caught automatically.
+ *
+ * Exported contract consumed by A4/A5/A6/E5: no `neutral`/`loss` outcome exists
+ * for a phantom metric.
+ *
+ * @returns true when the metric IS present in at least one snapshot (scoring may
+ *          proceed); false when it is phantom (caller must record `inconclusive`).
+ */
+export function isMetricPresent(
+  primaryMetric: string,
+  baseline: BaselineSnapshot,
+  current: BaselineSnapshot,
+): boolean {
+  const present = (snap: BaselineSnapshot): boolean => {
+    const v = (snap as unknown as Record<string, unknown>)[primaryMetric];
+    return v !== undefined && v !== null;
+  };
+  return present(baseline) || present(current);
+}
+
+/**
  * Resolve a potentially relative pageUrl (e.g. `/blog-post`) to a full URL
  * (e.g. `https://example.com/blog-post`) using the workspace's liveDomain.
  * GSC Search Analytics API requires full URLs for the `page` dimension filter.
@@ -335,6 +368,35 @@ async function scoreActionAtCheckpoint(
 
   const currentMetrics = await fetchCurrentMetrics(action);
   const currentSnapshot = currentMetrics.snapshot;
+
+  // Phantom-metric guard (A1, generic): if the configured primary_metric was never
+  // captured in either the baseline OR the current snapshot, the delta is
+  // unmeasurable. Scoring it would fabricate a neutral/loss verdict (computeDelta
+  // reads the missing key as 0). Score `inconclusive` instead. This catches any
+  // action type whose scoring config names a metric the snapshot does not carry
+  // (e.g. click_recovery, target_improvement, content_produced).
+  if (!isMetricPresent(primaryMetric, action.baselineSnapshot, currentSnapshot)) {
+    const delta = computeDelta(action.baselineSnapshot, currentSnapshot, primaryMetric);
+    const outcome = recordOutcome({
+      actionId: action.id,
+      checkpointDays,
+      metricsSnapshot: currentSnapshot,
+      score: 'inconclusive',
+      deltaSummary: delta,
+    });
+    log.info(
+      { actionId: action.id, checkpointDays, primaryMetric },
+      'Primary metric absent from snapshot — phantom metric, scoring inconclusive',
+    );
+    broadcastToWorkspace(action.workspaceId, WS_EVENTS.OUTCOME_SCORED, {
+      actionId: action.id,
+      checkpointDays,
+      score: outcome.score,
+      earlySignal: outcome.earlySignal,
+      deltaSummary: outcome.deltaSummary,
+    });
+    return;
+  }
 
   // Edge case: insufficient data — only applies to search-impression-based metrics.
   // Non-search metrics (page_health_score, voice_score, content_produced, etc.) skip this check.

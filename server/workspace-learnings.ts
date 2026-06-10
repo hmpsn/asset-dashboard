@@ -26,6 +26,61 @@ import type {
 
 const log = createLogger('workspace-learnings');
 
+// --- Administrative disable switch (A1) ---
+
+/**
+ * Process-local override registry for the learnings kill-switch. Seeded from the
+ * OUTCOME_LEARNINGS_DISABLED_WORKSPACES env allow-list on first read and mutable
+ * via setLearningsDisabled (admin routes / tests). A future PR can swap the
+ * backing store to a DB column without changing the public signatures below.
+ *
+ * Anchored on globalThis so the static import (admin routes, tests) and the
+ * dynamic import inside the learnings slice share ONE Map. Under the vitest ESM
+ * loader a static and a dynamic import of the same module can evaluate to
+ * separate instances; a per-module `new Map()` would then diverge between the
+ * toggle writer and the slice reader. The global anchor makes the switch
+ * authoritative regardless of how the module was imported.
+ */
+const LEARNINGS_DISABLED_KEY = Symbol.for('hmpsn.outcomeLearnings.disabledOverrides');
+const globalAnchor = globalThis as unknown as { [LEARNINGS_DISABLED_KEY]?: Map<string, boolean> };
+const learningsDisabledOverrides: Map<string, boolean> =
+  globalAnchor[LEARNINGS_DISABLED_KEY] ?? (globalAnchor[LEARNINGS_DISABLED_KEY] = new Map<string, boolean>());
+let envDisabledWorkspaces: Set<string> | null = null;
+
+function getEnvDisabledWorkspaces(): Set<string> {
+  if (envDisabledWorkspaces === null) {
+    const raw = process.env.OUTCOME_LEARNINGS_DISABLED_WORKSPACES ?? '';
+    envDisabledWorkspaces = new Set(
+      raw.split(',').map(s => s.trim()).filter(Boolean),
+    );
+  }
+  return envDisabledWorkspaces;
+}
+
+/**
+ * Administrative kill-switch read (A1). Disabled workspaces report
+ * `availability: 'disabled'` through the learnings slice so consumers degrade to
+ * general best practices (per the LearningsSlice.availability contract). A
+ * process-local override takes precedence over the env allow-list, so an admin
+ * toggle wins over the deploy-time default.
+ *
+ * Exported contract consumed by the learnings slice (makes `disabled` reachable)
+ * and downstream A4/A6/E5.
+ */
+export function isLearningsDisabled(workspaceId: string): boolean {
+  const override = learningsDisabledOverrides.get(workspaceId);
+  if (override !== undefined) return override;
+  return getEnvDisabledWorkspaces().has(workspaceId);
+}
+
+/**
+ * Set (or clear) the administrative learnings kill-switch for a workspace.
+ * Process-local; intended for admin routes and tests.
+ */
+export function setLearningsDisabled(workspaceId: string, disabled: boolean): void {
+  learningsDisabledOverrides.set(workspaceId, disabled);
+}
+
 // --- Prepared statements ---
 
 const stmts = createStmtCache(() => ({
@@ -398,6 +453,11 @@ export function computeWorkspaceLearnings(workspaceId: string): WorkspaceLearnin
   const scored: ScoredActionWithOutcome[] = [];
 
   for (const action of actions) {
+    // A1: `not_acted_on` actions are suggestions the workspace never executed.
+    // Scoring them as if they were executed fabricates wins/losses and corrupts
+    // every win-rate, trend, and playbook downstream. Exclude them from aggregation.
+    if (action.attribution === 'not_acted_on') continue;
+
     const outcomes = getOutcomesForAction(action.id);
     const validOutcomes = outcomes.filter(o =>
       (o.checkpointDays === 30 || o.checkpointDays === 60 || o.checkpointDays === 90) &&

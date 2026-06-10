@@ -8,6 +8,8 @@ import { parseJsonSafeArray } from './db/json-validation.js';
 import { z } from './middleware/validate.js';
 import { createLogger } from './logger.js';
 import { recordAction, getActionBySource } from './outcome-tracking.js';
+import { recommendationOutcomeActionType } from './recommendations.js';
+import type { RecType } from '../shared/types/recommendations.js';
 
 const log = createLogger('outcome-backfill');
 
@@ -41,6 +43,9 @@ interface Recommendation {
   id: string;
   status: string;
   affectedPages?: string[];
+  /** Optional on legacy/regenerated rows: drives the outcome ActionType mapping (A1). */
+  type?: string;
+  source?: string;
 }
 
 // ─── Prepared statement cache ────────────────────────────────────────────────
@@ -163,6 +168,10 @@ export function backfillCompletedRecommendations(workspaceId: string): number {
     id: z.string(),
     status: z.string(),
     affectedPages: z.array(z.string()).optional(),
+    // type/source drive the outcome ActionType mapping (A1). Optional because legacy /
+    // regenerated rows may omit them — those fall back to audit_fix_applied below.
+    type: z.string().optional(),
+    source: z.string().optional(),
   });
   const recommendations = parseJsonSafeArray(
     row.recommendations,
@@ -191,10 +200,18 @@ export function backfillCompletedRecommendations(workspaceId: string): number {
         ? rec.affectedPages.find((page): page is string => typeof page === 'string' && page.trim().length > 0) ?? null
         : null;
 
+      // A1: attribute each completed rec to its mapped ActionType instead of
+      // hardcoding audit_fix_applied. recommendationOutcomeActionType is exhaustive
+      // over RecType and falls through to audit_fix_applied for unknown/legacy values,
+      // so a regenerated row that dropped `type` lands on the historical default.
+      const actionType = typeof rec.type === 'string' && rec.type.length > 0
+        ? recommendationOutcomeActionType(rec.type as RecType, rec.source ?? '')
+        : 'audit_fix_applied';
+
       if (workspaceId) {
         recordAction({ // recordAction-ok: workspaceId guarded by if (workspaceId)
           workspaceId,
-          actionType: 'audit_fix_applied',
+          actionType,
           sourceType: 'recommendation',
           sourceId: recId,
           pageUrl: firstAffectedPage,

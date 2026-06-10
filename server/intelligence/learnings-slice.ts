@@ -12,6 +12,33 @@ export async function assembleLearnings(
   let summary: ReturnType<Awaited<typeof import('../workspace-learnings.js')>['getWorkspaceLearnings']> | undefined;
   let playbooks: ReturnType<Awaited<typeof import('../outcome-playbooks.js')>['getPlaybooks']> = [];
   let availability: LearningsSlice['availability'] = 'no_data';
+
+  // A1: administrative kill-switch. When learnings are disabled for this workspace,
+  // short-circuit to availability:'disabled' so consumers degrade to general best
+  // practices (per the LearningsSlice.availability contract) — skipping all
+  // summary/outcome/playbook reads.
+  try {
+    const { isLearningsDisabled } = await import('../workspace-learnings.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+    if (isLearningsDisabled(workspaceId)) {
+      return {
+        availability: 'disabled',
+        summary: null,
+        confidence: null,
+        topActionTypes: [],
+        overallWinRate: 0,
+        recentTrend: null,
+        playbooks: [],
+        roiAttribution: [],
+        topWins: [],
+        weCalledIt: [],
+        winRateByActionType: {},
+        scoringConfig: undefined,
+      };
+    }
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleLearnings: disable-switch read failed, continuing');
+  }
+
   try {
     const { getWorkspaceLearnings } = await import('../workspace-learnings.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
     summary = getWorkspaceLearnings(workspaceId, opts?.learningsDomain ?? 'all');

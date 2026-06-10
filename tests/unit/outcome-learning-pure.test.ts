@@ -97,16 +97,17 @@ describe('buildOutcomeAdjustment — missing learnings', () => {
 // ── buildOutcomeAdjustment — winRateByActionType lookup ───────────────────────
 
 describe('buildOutcomeAdjustment — winRateByActionType lookup', () => {
-  it('produces neutral multiplier when the action type is absent from winRateByActionType', () => {
+  it('produces neutral multiplier when the action type is absent (difficulty disabled — A1)', () => {
     const result = buildOutcomeAdjustment({
       actionType: 'schema_markup_added',
       learnings: baseLearnings({ winRateByActionType: {} }),
       difficulty: 30,
     });
-    // No action-type signal → only difficulty range contributes
-    // '21-40' rate = 0.55 → difficultyMultiplier(0.55) = 1.05
-    expect(result.multiplier).toBe(1.05);
+    // A1: difficulty multiplier disabled — with no action-type signal the net is 1.0
+    // (previously '21-40' difficulty would have boosted to 1.05).
+    expect(result.multiplier).toBe(1);
     expect(result.reasons.some(r => r.includes('schema_markup_added'))).toBe(false);
+    expect(result.reasons.some(r => r.includes('Difficulty range'))).toBe(false);
   });
 
   it('produces neutral action multiplier when winRateByActionType is undefined', () => {
@@ -118,7 +119,7 @@ describe('buildOutcomeAdjustment — winRateByActionType lookup', () => {
       learnings,
       difficulty: 50,
     });
-    // '41-60' rate = 0.40 → difficultyMultiplier(0.40) = 1 (neutral zone)
+    // No action-type signal and difficulty disabled → 1.0
     expect(result.multiplier).toBe(1);
   });
 
@@ -147,8 +148,13 @@ describe('buildOutcomeAdjustment — winRateByActionType lookup', () => {
 // ── buildOutcomeAdjustment — difficulty range boundary values ─────────────────
 
 describe('buildOutcomeAdjustment — difficulty range boundaries', () => {
-  it('maps difficulty=0 to range 0-20', () => {
-    const learnings = baseLearnings({
+  // A1: the difficulty multiplier is DISABLED until the position-bin (producer,
+  // workspace-learnings.ts) vs KD-bin (consumer, getDifficultyRangeLabel) unit
+  // mismatch is rebinned. While disabled, difficulty contributes NOTHING regardless
+  // of which bin the input maps to — these cases assert that no-op contract. Restore
+  // boundary-mapping assertions when DIFFICULTY_MULTIPLIER_ENABLED flips to true.
+  function strongBinLearnings(): NonNullable<Parameters<typeof baseLearnings>[0]> {
+    return {
       summary: {
         workspaceId: 'ws-test',
         computedAt: '2026-05-01T00:00:00.000Z',
@@ -156,13 +162,7 @@ describe('buildOutcomeAdjustment — difficulty range boundaries', () => {
         totalScoredActions: 10,
         content: null,
         strategy: {
-          winRateByDifficultyRange: {
-            '0-20': 0.90, // Clearly above 0.6 → boost
-            '21-40': 0.3,
-            '41-60': 0.3,
-            '61-80': 0.3,
-            '81-100': 0.3,
-          },
+          winRateByDifficultyRange: { '0-20': 0.90, '21-40': 0.90, '41-60': 0.90, '61-80': 0.90, '81-100': 0.10 },
           winRateByCheckpoint: {},
           bestIntentTypes: [],
           keywordVolumeSweetSpot: null,
@@ -170,96 +170,22 @@ describe('buildOutcomeAdjustment — difficulty range boundaries', () => {
         technical: null,
         overall: { totalWinRate: 0.5, strongWinRate: 0.2, topActionTypes: [], recentTrend: 'stable' },
       },
-    });
-    const result = buildOutcomeAdjustment({ actionType: 'title_update', learnings, difficulty: 0 });
-    expect(result.reasons.some(r => r.includes('0-20'))).toBe(true);
-    expect(result.multiplier).toBeGreaterThan(1);
-  });
+    };
+  }
 
-  it('maps difficulty=20 to range 0-20 (boundary is inclusive)', () => {
-    const learnings = baseLearnings({
-      summary: {
-        workspaceId: 'ws-test',
-        computedAt: '2026-05-01T00:00:00.000Z',
-        confidence: 'medium',
-        totalScoredActions: 10,
-        content: null,
-        strategy: {
-          winRateByDifficultyRange: {
-            '0-20': 0.80,
-            '21-40': 0.3,
-            '41-60': 0.3,
-            '61-80': 0.3,
-            '81-100': 0.3,
-          },
-          winRateByCheckpoint: {},
-          bestIntentTypes: [],
-          keywordVolumeSweetSpot: null,
-        },
-        technical: null,
-        overall: { totalWinRate: 0.5, strongWinRate: 0.2, topActionTypes: [], recentTrend: 'stable' },
-      },
-    });
-    const result = buildOutcomeAdjustment({ actionType: 'title_update', learnings, difficulty: 20 });
-    expect(result.reasons.some(r => r.includes('0-20'))).toBe(true);
-  });
-
-  it('maps difficulty=21 to range 21-40', () => {
-    const learnings = baseLearnings({
-      summary: {
-        workspaceId: 'ws-test',
-        computedAt: '2026-05-01T00:00:00.000Z',
-        confidence: 'medium',
-        totalScoredActions: 10,
-        content: null,
-        strategy: {
-          winRateByDifficultyRange: {
-            '0-20': 0.1,
-            '21-40': 0.80, // Boost range
-            '41-60': 0.3,
-            '61-80': 0.3,
-            '81-100': 0.3,
-          },
-          winRateByCheckpoint: {},
-          bestIntentTypes: [],
-          keywordVolumeSweetSpot: null,
-        },
-        technical: null,
-        overall: { totalWinRate: 0.5, strongWinRate: 0.2, topActionTypes: [], recentTrend: 'stable' },
-      },
-    });
-    const result = buildOutcomeAdjustment({ actionType: 'title_update', learnings, difficulty: 21 });
-    expect(result.reasons.some(r => r.includes('21-40'))).toBe(true);
-  });
-
-  it('maps difficulty=100 to range 81-100', () => {
-    const learnings = baseLearnings({
-      summary: {
-        workspaceId: 'ws-test',
-        computedAt: '2026-05-01T00:00:00.000Z',
-        confidence: 'medium',
-        totalScoredActions: 10,
-        content: null,
-        strategy: {
-          winRateByDifficultyRange: {
-            '0-20': 0.7,
-            '21-40': 0.7,
-            '41-60': 0.7,
-            '61-80': 0.7,
-            '81-100': 0.10, // Down-rank
-          },
-          winRateByCheckpoint: {},
-          bestIntentTypes: [],
-          keywordVolumeSweetSpot: null,
-        },
-        technical: null,
-        overall: { totalWinRate: 0.5, strongWinRate: 0.2, topActionTypes: [], recentTrend: 'stable' },
-      },
-    });
-    const result = buildOutcomeAdjustment({ actionType: 'title_update', learnings, difficulty: 100 });
-    expect(result.reasons.some(r => r.includes('81-100'))).toBe(true);
-    expect(result.multiplier).toBeLessThan(1);
-  });
+  it.each([0, 20, 21, 50, 81, 100])(
+    'does not apply a difficulty adjustment for difficulty=%i (multiplier disabled)',
+    (difficulty) => {
+      const result = buildOutcomeAdjustment({
+        actionType: 'title_update',
+        learnings: baseLearnings({ ...strongBinLearnings(), winRateByActionType: {} }),
+        difficulty,
+      });
+      expect(result.reasons.some(r => r.includes('Difficulty range'))).toBe(false);
+      // No action-type signal + difficulty disabled → exactly 1.0.
+      expect(result.multiplier).toBe(1);
+    },
+  );
 
   it('ignores difficulty when it is null', () => {
     const result = buildOutcomeAdjustment({
@@ -296,9 +222,10 @@ describe('buildOutcomeAdjustment — difficulty range boundaries', () => {
 // ── buildOutcomeAdjustment — multiplier clamping ──────────────────────────────
 
 describe('buildOutcomeAdjustment — multiplier clamping', () => {
-  it('clamps combined multiplier at 1.25 upper bound', () => {
-    // actionTypeMultiplier(0.8) = 1.14, difficultyMultiplier(0.8) = 1.12
-    // Combined: 1.14 * 1.12 = 1.2768 → clamped to 1.25
+  it('clamps multiplier at the 1.25 upper bound', () => {
+    // A1: difficulty multiplier disabled, so only actionTypeMultiplier(0.8)=1.14 applies.
+    // The clamp bound itself still holds; this guards against future re-enabling pushing
+    // a combined multiplier past 1.25.
     const learnings = baseLearnings({
       winRateByActionType: { title_update: 0.8 },
       summary: {
@@ -328,9 +255,10 @@ describe('buildOutcomeAdjustment — multiplier clamping', () => {
     expect(result.availability).toBe('ready');
   });
 
-  it('clamps combined multiplier at 0.75 lower bound', () => {
-    // actionTypeMultiplier(0.1) = 0.86, difficultyMultiplier(0.1) = 0.88
-    // Combined: 0.86 * 0.88 = 0.7568 → clamped to 0.75
+  it('clamps multiplier at the 0.75 lower bound', () => {
+    // A1: difficulty multiplier disabled, so only actionTypeMultiplier(0.1)=0.86 applies.
+    // The clamp bound itself still holds; this guards against future re-enabling pushing
+    // a combined multiplier below 0.75.
     const learnings = baseLearnings({
       winRateByActionType: { content_published: 0.1 },
       summary: {
