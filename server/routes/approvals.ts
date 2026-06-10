@@ -13,7 +13,6 @@ import { canSend, recordSend } from '../email-throttle.js';
 import {
   listBatches,
   getBatch,
-  updateItem,
   markBatchApplied,
 } from '../approvals.js';
 import { broadcastToWorkspace } from '../broadcast.js';
@@ -21,12 +20,12 @@ import {
   createApprovalBatchForClient,
   deleteApprovalBatchForClient,
 } from '../domains/inbox/approval-batch-admin-mutations.js';
+import { respondToApprovalBatchItem } from '../domains/inbox/approval-batch-item-respond.js';
 import { respondToApprovalBatch } from '../domains/inbox/approval-batch-respond.js';
 import { classifyApprovalBatch } from '../domains/inbox/deliverable-adapters/approval-batch-classifier.js';
 import { markDeliverableApplied } from '../domains/inbox/send-to-client.js';
 import { findBySourceRef } from '../client-deliverables.js';
 import { isClientApplyableFields } from '../../shared/applyability.js';
-import { notifyTeamActionApproved, notifyTeamChangesRequested } from '../email.js';
 import { getClientActor, requireClientPortalAuth } from '../middleware.js';
 import {
   publishCollectionItems,
@@ -39,7 +38,6 @@ import {
   getClientPortalUrl,
   updatePageState,
 } from '../workspaces.js';
-import { getPageState } from '../page-edit-states.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { resolveRecommendationsForChange } from '../recommendations.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';
@@ -51,30 +49,6 @@ import { WS_EVENTS } from '../ws-events.js';
 import { toClientInboxApprovalBatch, toClientInboxApprovalBatches } from '../serializers/client-safe.js';
 
 const log = createLogger('approvals');
-
-/** Derive the correct page-level edit state from all items targeting that page in a batch. */
-function derivePageStatus(batch: import('../../shared/types/approvals').ApprovalBatch, pageId: string): 'in-review' | 'approved' | 'rejected' {
-  const pageItems = batch.items.filter(i => i.pageId === pageId);
-  const statuses = pageItems.map(i => i.status);
-  // Guard: .every() on empty returns true vacuously — default to in-review
-  if (statuses.length === 0) return 'in-review';
-  if (statuses.every(s => s === 'approved' || s === 'applied')) return 'approved';
-  if (statuses.every(s => s === 'rejected')) return 'rejected';
-  // Mix of pending/approved/rejected → still in review
-  return 'in-review';
-}
-
-const APPROVAL_FIELD_LABELS: Record<string, string> = {
-  seoTitle: 'SEO title',
-  seo_title: 'SEO title',
-  seoDescription: 'meta description',
-  seo_description: 'meta description',
-  schema: 'schema markup',
-};
-
-function approvalActivityLabel(field: string): string {
-  return APPROVAL_FIELD_LABELS[field] ?? field.replace(/[_-]+/g, ' ');
-}
 
 function normalizeSeoChangeField(field: string): string {
   if (field === 'seoTitle') return 'title';
@@ -232,112 +206,30 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClien
   if (req.body.status !== undefined) update.status = req.body.status;
   if (req.body.clientValue !== undefined) update.clientValue = req.body.clientValue;
   if (req.body.clientNote !== undefined) update.clientNote = req.body.clientNote;
-  const { status, clientNote } = req.body;
-  const beforeBatch = getBatch(req.params.workspaceId, req.params.batchId);
-  const beforeItem = beforeBatch?.items.find(i => i.id === req.params.itemId);
-  let batch;
+
+  let result;
   try {
-    batch = updateItem(req.params.workspaceId, req.params.batchId, req.params.itemId, update);
+    result = respondToApprovalBatchItem({
+      workspaceId: req.params.workspaceId,
+      batchId: req.params.batchId,
+      itemId: req.params.itemId,
+      update,
+      actor: getClientActor(req, req.params.workspaceId),
+    });
   } catch (err: unknown) {
     if (err instanceof Error && err.name === 'InvalidTransitionError') {
       return res.status(400).json({ error: err.message });
     }
     return next(err);
   }
-  if (!batch) return res.status(404).json({ error: 'Item not found' });
-  const statusChanged = status !== undefined && beforeItem?.status !== status;
-  // Sync PageEditState when client approves or rejects
-  if (status === 'approved' || status === 'rejected') {
-    const item = batch.items.find(i => i.id === req.params.itemId);
-    if (item) {
-      // Aggregate across all items for this page to avoid last-write-wins on multi-field pages
-      const pageStatus = derivePageStatus(batch, item.pageId);
-      const pageStateResult = updatePageState(req.params.workspaceId, item.pageId, {
-        status: pageStatus,
-        updatedBy: 'client',
-        ...(status === 'rejected' && clientNote ? { rejectionNote: clientNote } : {}),
-      });
-      if (!pageStateResult) {
-        log.warn({ workspaceId: req.params.workspaceId, pageId: item.pageId, status }, 'updatePageState returned null — workspace may not exist in DB');
-      } else {
-        log.info({ workspaceId: req.params.workspaceId, pageId: item.pageId, status: pageStateResult.status }, 'synced page edit state from approval');
-      }
-      // Activity feed for client actions
-      const actorInfo = getClientActor(req, req.params.workspaceId);
-      const actorName = actorInfo?.name || 'Client';
-      const fieldLabel = approvalActivityLabel(item.field);
-      const pageLabel = item.pageTitle || item.pageSlug || item.pageId;
-      if (status === 'approved' && statusChanged) {
-        addActivity(req.params.workspaceId, 'approval_applied',
-          `${actorName} approved ${fieldLabel} changes for ${pageLabel}`,
-          item.proposedValue ? `New value: ${item.proposedValue.slice(0, 80)}` : undefined,
-          { batchId: req.params.batchId, itemId: item.id, pageId: item.pageId },
-          actorInfo);
-        const wsInfo = getWorkspace(req.params.workspaceId);
-        notifyTeamActionApproved({
-          workspaceId: req.params.workspaceId,
-          workspaceName: wsInfo?.name || req.params.workspaceId,
-          actionTitle: `SEO change approved: ${fieldLabel}`,
-          sourceType: 'seo_approval',
-          actionSummary: pageLabel,
-          clientNote,
-        });
-        // NOTE: recommendation resolution happens on the APPLY path (the
-        // /apply endpoint below), NOT on approve. Approving only changes item
-        // status — the change isn't live on the page yet. Resolving here would
-        // mark the rec 'completed', and the regen merge preserves 'completed'
-        // even when the issue is still detected, so a later failed apply would
-        // permanently hide a still-valid recommendation.
-      } else if (status === 'rejected' && statusChanged) {
-        addActivity(req.params.workspaceId, 'changes_requested',
-          `${actorName} requested changes to ${fieldLabel} for ${pageLabel}`,
-          clientNote || undefined,
-          { batchId: req.params.batchId, itemId: item.id, pageId: item.pageId },
-          actorInfo);
-        const wsInfo = getWorkspace(req.params.workspaceId);
-        notifyTeamChangesRequested({
-          workspaceName: wsInfo?.name || req.params.workspaceId,
-          workspaceId: req.params.workspaceId,
-          topic: `SEO revision requested: ${fieldLabel}`,
-          targetKeyword: pageLabel,
-          feedback: clientNote || '',
-        });
-      }
-    }
-  }
-  // Handle undo — client reverting their approve/reject decision back to pending
-  if (status === 'pending' && statusChanged) {
-    const item = batch.items.find(i => i.id === req.params.itemId);
-    if (item?.pageId) {
-      // Aggregate across all items for this page — don't blindly reset to in-review
-      const pageStatus = derivePageStatus(batch, item.pageId);
-      if (pageStatus === 'in-review') {
-        const currentState = getPageState(req.params.workspaceId, item.pageId);
-        if (currentState?.status === 'approved' || currentState?.status === 'rejected') {
-          // updatePageState blocks approved/rejected → in-review downgrades, so reset
-          // first while preserving row metadata, then write the derived review state.
-          updatePageState(req.params.workspaceId, item.pageId, {
-            status: 'clean',
-            updatedBy: 'client',
-            rejectionNote: '',
-          });
-        }
-      }
-      updatePageState(req.params.workspaceId, item.pageId, {
-        status: pageStatus,
-        updatedBy: 'client',
-        ...(pageStatus === 'in-review' ? { rejectionNote: '' } : {}),
-      });
-      const actorInfo = getClientActor(req, req.params.workspaceId);
-      addActivity(req.params.workspaceId, 'approval_reverted',
-        `${actorInfo?.name || 'Client'} reverted ${approvalActivityLabel(item.field)} decision for ${item.pageTitle || item.pageSlug || item.pageId}`,
-        undefined,
-        { batchId: req.params.batchId, itemId: item.id, pageId: item.pageId },
-        actorInfo);
-    }
-  }
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.APPROVAL_UPDATE, { batchId: req.params.batchId, itemId: req.params.itemId, status });
-  res.json(batch);
+  if (!result) return res.status(404).json({ error: 'Item not found' });
+
+  // NOTE: recommendation resolution happens on the APPLY path (the /apply endpoint below),
+  // NOT on approve. Approving only changes item status — the change isn't live on the page yet.
+  // Resolving here would mark the rec 'completed', and the regen merge preserves 'completed'
+  // even when the issue is still detected, so a later failed apply would permanently hide a
+  // still-valid recommendation.
+  res.json(result.batch);
 });
 
 // Apply approved items to Webflow
