@@ -170,8 +170,10 @@ export function transformToFeedInsight(insight: AnalyticsInsight): FeedInsight {
 
     case 'serp_opportunity': {
       headline = 'eligible for rich results';
-      const schemaType = data.schemaType as string | undefined;
-      if (schemaType) contextParts.push(schemaType);
+      // The producer (analytics-intelligence.ts) writes schemaStatus, not schemaType —
+      // reading schemaType meant this context line silently never rendered (guessed-field bug).
+      const schemaStatus = data.schemaStatus as 'missing' | 'partial' | 'complete' | undefined;
+      if (schemaStatus) contextParts.push(`Schema ${schemaStatus}`);
       break;
     }
 
@@ -256,6 +258,10 @@ export function transformToFeedInsight(insight: AnalyticsInsight): FeedInsight {
     pageUrl: insight.pageId ?? undefined,
     domain,
     impactScore: insight.impactScore ?? 0,
+    // When the insight was computed — SearchDetail pins chart callouts to this date
+    // (falls back to the last chart date when absent). Was never set → callouts always
+    // landed on the final chart date, misrepresenting timing.
+    detectedAt: insight.computedAt,
     details,
   };
 }

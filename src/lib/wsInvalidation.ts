@@ -192,6 +192,8 @@ function adminInvalidationKeys(
         queryKeys.admin.anomalyAlerts(workspaceId),
         queryKeys.client.anomalies(workspaceId),
         queryKeys.admin.notifications(),
+        // Anomaly dismissal reverses boosts → feed ordering/contents change (2026-06-09 audit).
+        queryKeys.admin.insightFeed(workspaceId),
       ] as const;
     case WS_EVENTS.WORKSPACE_UPDATED:
       return [
@@ -253,6 +255,8 @@ function adminInvalidationKeys(
         queryKeys.admin.intelligenceAll(workspaceId),
         queryKeys.client.clientInsights(workspaceId),
         queryKeys.client.intelligence(workspaceId),
+        // The Connected Intelligence feed showed resolved items as open (2026-06-09 audit).
+        queryKeys.admin.insightFeed(workspaceId),
       ] as const;
     case WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED:
       return [
@@ -318,6 +322,8 @@ function adminInvalidationKeys(
         queryKeys.admin.actionQueue(workspaceId),
         queryKeys.admin.intelligenceAll(workspaceId),
         queryKeys.client.clientInsights(workspaceId),
+        // Bridge score adjustments change feed ordering (2026-06-09 audit).
+        queryKeys.admin.insightFeed(workspaceId),
       ] as const;
     case WS_EVENTS.ANNOTATION_BRIDGE_CREATED:
       return [

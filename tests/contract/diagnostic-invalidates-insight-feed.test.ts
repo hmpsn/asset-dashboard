@@ -44,4 +44,16 @@ describe('diagnostic completion invalidates the insight feed', () => {
     expect(source).toContain('[WS_EVENTS.DIAGNOSTIC_COMPLETE]: () => invalidateRegistry(WS_EVENTS.DIAGNOSTIC_COMPLETE)');
     expect(keys).toContainEqual(queryKeys.admin.insightFeed('ws-1'));
   });
+
+  // 2026-06-09 audit: the admin insight feed was invalidated only on WORKSPACE_UPDATED +
+  // DIAGNOSTIC_COMPLETE. Resolving an insight, a bridge score adjustment, or an anomaly
+  // dismissal left the Connected Intelligence feed stale (and resolved items still shown).
+  it.each([
+    WS_EVENTS.INSIGHT_RESOLVED,
+    WS_EVENTS.INSIGHT_BRIDGE_UPDATED,
+    WS_EVENTS.ANOMALIES_UPDATE,
+  ])('%s invalidates the admin insight feed', (event) => {
+    const keys = getWorkspaceInvalidationKeys(event, 'ws-1', undefined, 'admin');
+    expect(keys).toContainEqual(queryKeys.admin.insightFeed('ws-1'));
+  });
 });

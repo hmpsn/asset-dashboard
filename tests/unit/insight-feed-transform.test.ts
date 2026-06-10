@@ -183,11 +183,13 @@ describe('transformToFeedInsight', () => {
       const insight = makeInsight({
         insightType: 'serp_opportunity',
         severity: 'opportunity',
-        data: { schemaType: 'FAQ' },
+        // The producer writes schemaStatus (analytics-intelligence.ts), NOT schemaType —
+        // the old renderer read schemaType so the context line silently never rendered.
+        data: { schemaStatus: 'missing' },
       });
       const result = transformToFeedInsight(insight);
       expect(result.headline).toBe('eligible for rich results');
-      expect(result.context).toContain('FAQ');
+      expect(result.context).toContain('Schema missing');
     });
   });
 

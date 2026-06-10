@@ -9,7 +9,7 @@ import { listWorkspaces } from './workspaces.js';
 import { STUDIO_NAME, STUDIO_URL } from './constants.js';
 import type * as AnalyticsInsightsStore from './analytics-insights-store.js';
 import { isProgrammingError } from './errors.js';
-import { toInsightPageId } from './helpers.js';
+import { toAuditFindingPageId } from './helpers.js';
 import { createLogger } from './logger.js';
 
 
@@ -212,45 +212,50 @@ export function saveSnapshot(siteId: string, siteName: string, audit: SeoAuditRe
     const effectiveAudit = getEffectiveAudit(audit, ws.auditSuppressions || []);
     const effectivePreviousScore = getEffectivePreviousScore(snapshot, ws.auditSuppressions || []);
 
-    // Bridge #12 — per-page health insights
-    // Returns { modified } so executeBridge() auto-broadcasts
-    // INSIGHT_BRIDGE_UPDATED via the bridge-infrastructure auto-dispatch
-    // path. Inline broadcastToWorkspace() removed to prevent double-fire.
+    // Bridge #12 — per-page audit findings.
+    // 2026-06-09 audit (confirmed #5): this previously wrote insightType 'page_health'
+    // with HARDCODED zero metrics, colliding with analytics-intelligence's real-GSC/GA4
+    // page_health on the same (workspace_id, page_id, 'page_health') key — every audit
+    // run zeroed the real traffic data that feeds client InsightCards sorting + AI
+    // prompts. Audit issues now write the dedicated 'audit_finding' type (its own key
+    // space), mirroring scheduled-audits.ts + webflow-seo-audit-bridges.ts, with the
+    // SAME read-before-write base-score carry-forward (preserve cross-bridge
+    // _scoreAdjustments). analytics-intelligence is now the sole page_health writer.
+    // Returns { modified } so executeBridge() auto-broadcasts INSIGHT_BRIDGE_UPDATED.
     fireBridge('bridge-audit-page-health', ws.id, async () => {
       let modified = 0;
       await withWorkspaceLock(ws.id, async () => {
-        const { upsertInsight }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
+        const { upsertInsight, getInsight }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
         for (const page of effectiveAudit.pages.slice(0, 50)) {
           const issues = page.issues ?? [];
-          const errorCount = issues.filter(i => i.severity === 'error').length;
-          const warningCount = issues.filter(i => i.severity === 'warning').length;
-          if (errorCount === 0 && warningCount === 0) continue;
-          const score = Math.max(0, 100 - (errorCount * 15) - (warningCount * 5));
-          const severity = errorCount > 0 ? 'warning' : 'opportunity';
+          const pageIssues = issues.filter(i => i.severity === 'error' || i.severity === 'warning');
+          if (pageIssues.length === 0) continue;
+          const isCritical = pageIssues.some(i => i.severity === 'error');
+          const baseScore = isCritical ? 80 : 50;
+          const findingPageId = toAuditFindingPageId(page);
+          // Base-score setter pattern (NOT applyScoreAdjustment): this bridge owns the
+          // raw audit-derived base score and rebases it each run, carrying forward
+          // _scoreAdjustments written by other bridges. upsertInsight replaces `data` on
+          // conflict, so read-before-write to avoid clobbering cross-bridge adjustments.
+          const existing = getInsight(ws.id, findingPageId, 'audit_finding');
+          const prevAdj = existing?.data._scoreAdjustments as Record<string, number> | undefined;
+          const totalDelta = prevAdj
+            ? Object.values(prevAdj).reduce((s, d) => s + (Number.isFinite(d) ? d : 0), 0)
+            : 0;
           upsertInsight({
             workspaceId: ws.id,
-            pageId: toInsightPageId(page.url || page.page),
-            insightType: 'page_health',
-            data: {
-              score,
-              trend: 'stable',
-              clicks: 0,
-              impressions: 0,
-              position: 0,
-              ctr: 0,
-              pageviews: 0,
-              bounceRate: 0,
-              avgEngagementTime: 0,
-              auditSnapshotId: id,
-              errorCount,
-              warningCount,
-              topIssues: issues.slice(0, 5).map(i => i.message),
-            },
-            severity,
-            impactScore: 100 - score,
-            domain: 'cross',
+            pageId: findingPageId,
+            insightType: 'audit_finding',
             pageTitle: page.page ?? undefined,
-            resolutionSource: 'bridge_12_audit_page_health',
+            severity: isCritical ? 'critical' : 'warning',
+            data: {
+              scope: 'page',
+              issueCount: pageIssues.length,
+              issueMessages: pageIssues.map(i => i.message).join('; '),
+              source: 'bridge_12_audit_page_health',
+              ...(prevAdj ? { _originalBaseScore: baseScore, _scoreAdjustments: prevAdj } : {}),
+            },
+            impactScore: prevAdj ? Math.max(0, Math.min(100, baseScore + totalDelta)) : baseScore,
             bridgeSource: 'bridge-audit-page-health',
           });
           modified++;
