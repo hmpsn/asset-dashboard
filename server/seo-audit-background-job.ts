@@ -18,12 +18,7 @@ import {
 } from './reports.js';
 import { runSeoAudit } from './seo-audit.js';
 import { handleOnDemandSeoAuditResult } from './webflow-seo-audit-bridges.js';
-import {
-  getBrandName,
-  getClientPortalUrl,
-  getWorkspace,
-  listWorkspaces,
-} from './workspaces.js';
+import { getBrandName, getClientPortalUrl, getWorkspace, getWorkspaceBySiteId } from './workspaces.js';
 import { BACKGROUND_JOB_TYPES } from '../shared/types/background-jobs.js';
 import { WS_EVENTS } from './ws-events.js';
 
@@ -56,7 +51,7 @@ export function startSeoAuditBackgroundJob(
 
       const workspace = workspaceId
         ? getWorkspace(workspaceId)
-        : listWorkspaces().find((candidate) => candidate.webflowSiteId === siteId);
+        : getWorkspaceBySiteId(siteId);
       const siteName = getBrandName(workspace) || siteId;
       const snapshot = saveSnapshot(siteId, siteName, result);
       const effectiveResult = getEffectiveAudit(result, workspace?.auditSuppressions || []);

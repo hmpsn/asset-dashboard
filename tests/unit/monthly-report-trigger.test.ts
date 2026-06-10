@@ -24,6 +24,9 @@ vi.mock('../../server/workspaces.js', async (importOriginal) => {
     ...actual,
     listWorkspaces: mocks.listWorkspaces,
     getUploadRoot: mocks.getUploadRoot,
+    // Source now resolves by indexed getWorkspace(id) instead of listWorkspaces().find;
+    // delegate to the same mock data each test sets via listWorkspaces.
+    getWorkspace: vi.fn((id: string) => mocks.listWorkspaces().find((w: { id: string }) => w.id === id)),
   };
 });
 vi.mock('../../server/helpers.js', () => ({

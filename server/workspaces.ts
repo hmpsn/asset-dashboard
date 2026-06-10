@@ -532,6 +532,20 @@ export function getWorkspace(id: string): Workspace | undefined {
   return attachPageStates(rowToWorkspace(row));
 }
 
+/**
+ * Resolve a workspace by its linked Webflow site id via the indexed
+ * `getBySiteId` prepared statement. Replaces the old scan-and-find over
+ * `listWorkspaces()` keyed on `webflowSiteId`, which materialized + JSON-parsed
+ * EVERY workspace (and ran an attachPageStates query per workspace — N+1) just
+ * to keep one. Returns undefined when no workspace is linked to the site.
+ */
+export function getWorkspaceBySiteId(siteId: string): Workspace | undefined {
+  if (!siteId) return undefined;
+  const row = stmts().getBySiteId.get(siteId) as WorkspaceRow | undefined;
+  if (!row) return undefined;
+  return attachPageStates(rowToWorkspace(row));
+}
+
 export function getUploadRoot() { return UPLOAD_ROOT; }
 export function getOptRoot() { return OPT_ROOT; }
 

@@ -1772,6 +1772,20 @@ export const CHECKS: Check[] = [
     severity: 'error',
   },
   {
+    // 2026-06-09 audit (quick-wins): listWorkspaces().find(...) materializes EVERY
+    // workspace (full JSON-column parse) and runs an attachPageStates query per
+    // workspace (N+1) just to keep one. Use the indexed single-row helpers instead.
+    name: 'listWorkspaces().find() — use indexed getWorkspaceBySiteId / getWorkspace',
+    pattern: 'listWorkspaces\\(\\)\\.find\\(',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    excludeLines: ['// list-workspaces-find-ok'],
+    message: 'Do not scan-and-find over listWorkspaces(): it parses every workspace row + runs N+1 page-state queries. Use getWorkspaceBySiteId(siteId) for webflowSiteId lookups or getWorkspace(id) for id lookups (both indexed, server/workspaces.ts). Add // list-workspaces-find-ok only for a genuine multi-match scan.',
+    severity: 'error',
+    rationale: 'Per-request full-table workspace materialization + N+1 page-state queries on ~47 hot paths.',
+    claudeMdRef: '#code-conventions',
+  },
+  {
     name: 'Direct buildSeoContext() call',
     pattern: 'buildSeoContext\\s*\\(',
     fileGlobs: ['*.ts'],

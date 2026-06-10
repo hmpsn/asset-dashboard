@@ -31,7 +31,7 @@ import {
 } from '../webflow.js';
 import { detectSchemaFieldTarget, getRecommendedSchemaFieldSlug } from '../schema/site-inventory.js';
 import type { SchemaCmsDeliveryStatus, SchemaFieldTarget } from '../../shared/types/site-inventory.ts';
-import { listWorkspaces, getTokenForSite, updatePageState, getWorkspace } from '../workspaces.js';
+import { getTokenForSite, getWorkspace, getWorkspaceBySiteId, updatePageState } from '../workspaces.js';
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
 import { queueKeywordStrategyPostUpdateFollowOns } from '../keyword-strategy-follow-ons.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
@@ -355,7 +355,7 @@ router.put('/api/webflow/schema-cms-field-mappings/:siteId', requireWorkspaceSit
     fieldMappings: normalizeFieldMappings(req.body.fieldMappings),
   });
   const workspaceId = typeof req.query.workspaceId === 'string' ? req.query.workspaceId : undefined;
-  const ws = workspaceId ? getWorkspace(workspaceId) : listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+  const ws = workspaceId ? getWorkspace(workspaceId) : getWorkspaceBySiteId(req.params.siteId);
   if (ws) {
     broadcastToWorkspace(ws.id, WS_EVENTS.SCHEMA_CMS_MAPPING_UPDATED, {
       siteId: req.params.siteId,
@@ -412,7 +412,7 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceSiteAccessFro
         });
       }
       const validation = validateForGoogleRichResults(schema);
-      const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+      const ws = getWorkspaceBySiteId(req.params.siteId);
       const workspaceId = ws?.id || req.params.siteId;
       upsertValidation({
         workspaceId,
@@ -442,7 +442,7 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceSiteAccessFro
       if (cmsDelivery.status === 'blocked' || cmsDelivery.status === 'failed') {
         return res.status(422).json({ success: false, cmsDeliveryStatus: cmsDelivery, error: cmsDelivery.message });
       }
-      const cmsWs = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+      const cmsWs = getWorkspaceBySiteId(req.params.siteId);
       const snapshotUpdated = updatePageSchemaInSnapshot(req.params.siteId, pageId, schema);
       if (snapshotUpdated) broadcastSchemaSnapshotUpdated(req.params.siteId, cmsWs?.id, 'published', pageId);
       if (cmsWs) {
@@ -502,7 +502,7 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceSiteAccessFro
     const snapshotUpdated = updatePageSchemaInSnapshot(req.params.siteId, pageId, schema);
 
     // Record version history for rollback support
-    const pubWsForHistory = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+    const pubWsForHistory = getWorkspaceBySiteId(req.params.siteId);
     if (snapshotUpdated) broadcastSchemaSnapshotUpdated(req.params.siteId, pubWsForHistory?.id, 'published', pageId);
     recordSchemaPublish(req.params.siteId, pageId, pubWsForHistory?.id || '', schema);
 
@@ -527,7 +527,7 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceSiteAccessFro
     }
 
     // Log to activity feed + track edit status
-    const pubWs = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+    const pubWs = getWorkspaceBySiteId(req.params.siteId);
     const rawPublishedPath = req.body.publishedPath || req.body.pageSlug || '';
     const publishedPath = rawPublishedPath ? normalizePageUrl(rawPublishedPath) : '';
     if (pubWs) {
@@ -568,7 +568,7 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceSiteAccessFro
 
     // Trigger background llms.txt regeneration after schema publish
     try {
-      const llmsWs = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+      const llmsWs = getWorkspaceBySiteId(req.params.siteId);
       if (llmsWs) queueLlmsTxtRegeneration(llmsWs.id, 'schema_published');
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-schema: programming error'); /* non-critical — response already sent */ }
 
@@ -723,7 +723,7 @@ router.delete('/api/webflow/schema-retract/:siteId/:pageId', requireWorkspaceSit
     const snapshotUpdated = removePageFromSnapshot(siteId, pageId);
 
     // Update page state + activity
-    const ws = listWorkspaces().find(w => w.webflowSiteId === siteId);
+    const ws = getWorkspaceBySiteId(siteId);
     if (snapshotUpdated) broadcastSchemaSnapshotUpdated(siteId, ws?.id, 'retracted', pageId);
     if (ws) {
       addActivity(ws.id, 'schema_published', 'Schema retracted from page', `Page ${pageId.slice(0, 8)}… — ${result.removed} script(s) removed`, { pageId });
@@ -766,7 +766,7 @@ router.post('/api/webflow/schema-rollback/:siteId', requireWorkspaceSiteAccessFr
     const snapshotUpdated = updatePageSchemaInSnapshot(req.params.siteId, pageId, entry.schemaJson);
 
     // Record this rollback as a new publish event
-    const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+    const ws = getWorkspaceBySiteId(req.params.siteId);
     if (snapshotUpdated) broadcastSchemaSnapshotUpdated(req.params.siteId, ws?.id, 'rolled_back', pageId);
     recordSchemaPublish(req.params.siteId, pageId, ws?.id || '', entry.schemaJson);
 
@@ -854,7 +854,7 @@ const schemaValidateBody = z.object({
 router.post('/api/webflow/schema-validate/:siteId', requireWorkspaceSiteAccessFromQuery(), validate(schemaValidateBody), (req, res) => {
   try {
     const { pageId, schema } = req.body as { pageId: string; schema: Record<string, unknown> };
-    const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+    const ws = getWorkspaceBySiteId(req.params.siteId);
     const workspaceId = ws?.id || req.params.siteId;
 
     const result = validateForGoogleRichResults(schema);
@@ -897,7 +897,7 @@ router.get('/api/webflow/schema-validation/:siteId', requireWorkspaceSiteAccessF
     const pageId = req.query.pageId as string;
     if (!pageId) return res.status(400).json({ error: 'pageId query param required' });
 
-    const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+    const ws = getWorkspaceBySiteId(req.params.siteId);
     const workspaceId = ws?.id || req.params.siteId;
 
     const validation = getValidation(workspaceId, pageId);
@@ -911,7 +911,7 @@ router.get('/api/webflow/schema-validation/:siteId', requireWorkspaceSiteAccessF
 // Get all validations for a workspace
 router.get('/api/webflow/schema-validations/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   try {
-    const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+    const ws = getWorkspaceBySiteId(req.params.siteId);
     const workspaceId = ws?.id || req.params.siteId;
 
     const validations = getValidations(workspaceId);
@@ -928,7 +928,7 @@ router.delete('/api/webflow/schema-validation/:siteId', requireWorkspaceSiteAcce
     const pageId = req.query.pageId as string;
     if (!pageId) return res.status(400).json({ error: 'pageId query param required' });
 
-    const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+    const ws = getWorkspaceBySiteId(req.params.siteId);
     const workspaceId = ws?.id || req.params.siteId;
 
     const deleted = deleteValidation(workspaceId, pageId);

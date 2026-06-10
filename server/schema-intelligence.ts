@@ -1,5 +1,5 @@
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
-import { listWorkspaces } from './workspaces.js';
+import { getWorkspaceBySiteId, listWorkspaces } from './workspaces.js';
 import { resolveBaseUrl } from './url-helpers.js';
 import type {
   IntelligenceSlice,
@@ -51,7 +51,7 @@ function pageKeywordsFromSeoContext(
 export async function buildSchemaIntelligence(
   opts: SchemaIntelligenceOptions,
 ): Promise<SchemaIntelligenceResult> {
-  const workspace = listWorkspaces().find(w => w.webflowSiteId === opts.siteId);
+  const workspace = getWorkspaceBySiteId(opts.siteId);
   const token = opts.tokenOverride ?? workspace?.webflowToken ?? undefined;
   const resolvedBaseUrl = opts.siteBaseUrl
     ?? await resolveBaseUrl({ liveDomain: workspace?.liveDomain, webflowSiteId: opts.siteId }, token);

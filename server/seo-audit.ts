@@ -2,7 +2,7 @@ import { discoverCmsUrls, buildStaticPathSet, toCmsPageId } from './webflow.js';
 import { getWorkspacePages } from './workspace-data.js';
 import { checkSiteLinks } from './link-checker.js';
 import type { DeadLink } from './link-checker.js';
-import { listWorkspaces } from './workspaces.js';
+import { getWorkspaceBySiteId } from './workspaces.js';
 import { extractMetaContent } from './seo-audit-html.js';
 import { auditPage, isExcludedPage } from './audit-page.js';
 import { resolvePagePath, fetchPublishedHtml } from './helpers.js';
@@ -141,7 +141,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
     ? (siteInfo.customDomain.startsWith('http') ? siteInfo.customDomain : `https://${siteInfo.customDomain}`)
     : baseUrl;
   log.info(`SEO audit: subdomain=${siteInfo.subdomain}, baseUrl=${baseUrl}, siteWideUrl=${siteWideUrl}`);
-  const wsId = workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
+  const wsId = workspaceId || getWorkspaceBySiteId(siteId)?.id;
   if (!wsId) {
     // No workspace linked to this site — page-level SEO checks will be skipped.
     // All route callers pass a workspaceId or are covered by the listWorkspaces() fallback.

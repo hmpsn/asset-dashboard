@@ -12,6 +12,7 @@ vi.mock('../../server/workspace-intelligence.js', () => ({
 
 vi.mock('../../server/workspaces.js', () => ({
   listWorkspaces: mocks.listWorkspaces,
+  getWorkspaceBySiteId: vi.fn((siteId: string) => mocks.listWorkspaces().find((w: { webflowSiteId?: string }) => w.webflowSiteId === siteId)),
 }));
 
 vi.mock('../../server/url-helpers.js', () => ({

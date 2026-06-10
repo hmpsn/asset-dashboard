@@ -20,7 +20,7 @@ import { scanRedirects } from '../redirect-scanner.js';
 import { saveRedirectSnapshot, getRedirectSnapshot } from '../redirect-store.js';
 import { runSalesAudit } from '../sales-audit.js';
 import { getAllGscPages } from '../search-console.js';
-import { listWorkspaces, getTokenForSite } from '../workspaces.js';
+import { getTokenForSite, getWorkspaceBySiteId, listWorkspaces } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
@@ -178,7 +178,7 @@ router.get('/api/webflow/link-check-domains/:siteId', requireWorkspaceSiteAccess
 router.get('/api/webflow/link-check/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const domain = typeof req.query.domain === 'string' ? req.query.domain : undefined;
-    const linkCheckWs = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+    const linkCheckWs = getWorkspaceBySiteId(req.params.siteId);
     const result = await checkSiteLinks(req.params.siteId, linkCheckWs?.id, domain);
     saveLinkCheck(req.params.siteId, result);
     res.json(result);

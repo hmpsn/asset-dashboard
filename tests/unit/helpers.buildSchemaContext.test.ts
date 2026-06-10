@@ -15,9 +15,18 @@ vi.mock('../../server/keyword-feedback.js', () => ({
   getDeclinedKeywords: vi.fn().mockReturnValue([]),
 }));
 
-vi.mock('../../server/workspaces.js', () => ({
-  listWorkspaces: vi.fn().mockReturnValue([]),
-}));
+// Shared hoisted list so the indexed getWorkspaceBySiteId/getWorkspace mocks
+// delegate to the SAME data each test sets via listWorkspaces.mockReturnValue.
+const _wsMocks = vi.hoisted(() => {
+  const listWorkspaces = vi.fn().mockReturnValue([] as Array<{ id: string; webflowSiteId?: string }>);
+  return {
+    listWorkspaces,
+    getWorkspaceBySiteId: vi.fn((siteId: string) => listWorkspaces().find((w) => w.webflowSiteId === siteId)),
+    getWorkspace: vi.fn((id: string) => listWorkspaces().find((w) => w.id === id)),
+  };
+});
+
+vi.mock('../../server/workspaces.js', () => _wsMocks);
 
 vi.mock('../../server/webflow-pages.js', () => ({
   listSites: vi.fn().mockResolvedValue([]),

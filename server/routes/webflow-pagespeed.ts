@@ -8,7 +8,7 @@ const router = Router();
 
 import { runSiteSpeed, runSinglePageSpeed } from '../pagespeed.js';
 import { savePageSpeed, getPageSpeed, saveSinglePageSpeed } from '../performance-store.js';
-import { listWorkspaces, getTokenForSite, getWorkspace } from '../workspaces.js';
+import { getTokenForSite, getWorkspace, getWorkspaceBySiteId } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { getWorkspacePages } from '../workspace-data.js';
 import { normalizePageUrl, resolvePagePath } from '../helpers.js';
@@ -35,7 +35,7 @@ router.get('/api/webflow/pagespeed/:siteId', requireWorkspaceSiteAccessFromQuery
       return res.status(400).json({ error: `maxPages must be between 1 and ${MAX_PAGESPEED_PAGES}` });
     }
     const maxPages = requestedMaxPages;
-    const psWs = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+    const psWs = getWorkspaceBySiteId(req.params.siteId);
     const result = await runSiteSpeed(req.params.siteId, strategy, maxPages, psWs?.id);
     savePageSpeed(req.params.siteId, strategy, result);
     if (psWs?.id) invalidateIntelligenceCache(psWs.id);
@@ -62,7 +62,7 @@ router.post('/api/webflow/pagespeed-single/:siteId', requireWorkspaceSiteAccess(
     const { pageId, pageSlug, strategy, pageTitle, workspaceId } = req.body;
     const resolvedStrategy = parseStrategy(strategy);
     const resolvedWorkspaceId = typeof workspaceId === 'string' ? workspaceId : undefined;
-    const ws = resolvedWorkspaceId ? getWorkspace(resolvedWorkspaceId) : listWorkspaces().find(w => w.webflowSiteId === siteId);
+    const ws = resolvedWorkspaceId ? getWorkspace(resolvedWorkspaceId) : getWorkspaceBySiteId(siteId);
     const token = getTokenForSite(siteId) || process.env.WEBFLOW_API_TOKEN || '';
 
     const baseUrl = await resolveBaseUrl({ liveDomain: ws?.liveDomain, webflowSiteId: siteId }, token);

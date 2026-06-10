@@ -15,12 +15,7 @@ import { getAuditTrafficForWorkspace } from '../helpers.js';
 import { upload, moveUploadedFiles, requireClientPortalAuth } from '../middleware.js';
 import { triggerOptimize } from '../processor.js';
 import { listSites, getPageDom } from '../webflow.js';
-import {
-  listWorkspaces,
-  getWorkspace,
-  getTokenForSite,
-  getAllPageStates,
-} from '../workspaces.js';
+import { getAllPageStates, getTokenForSite, getWorkspace, getWorkspaceBySiteId, listWorkspaces } from '../workspaces.js';
 import { getWorkspacePages } from '../workspace-data.js';
 import { createLogger } from '../logger.js';
 import { isProgrammingError } from '../errors.js';
@@ -116,7 +111,7 @@ router.post('/api/smart-name', requireWorkspaceSiteAccess({
 
         // Scan pages to find where this asset is used
         if (assetId || imageUrl) {
-          const smartNameWs = listWorkspaces().find(w => w.webflowSiteId === siteId);
+          const smartNameWs = getWorkspaceBySiteId(siteId);
           const pages = smartNameWs ? await getWorkspacePages(smartNameWs.id, siteId) : [];
           const usedOnPages: string[] = [];
           for (const page of pages.slice(0, 15)) {

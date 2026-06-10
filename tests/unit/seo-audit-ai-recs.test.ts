@@ -40,7 +40,8 @@ vi.mock('../../server/db.js', () => ({
 vi.mock('../../server/workspaces.js', () => ({
   listWorkspaces: mockListWorkspaces,
   getBrandName: mockGetBrandName,
-  getWorkspace: vi.fn(() => undefined),
+  getWorkspace: vi.fn((id: string) => mockListWorkspaces().find((w: { id: string }) => w.id === id)),
+  getWorkspaceBySiteId: vi.fn((siteId: string) => mockListWorkspaces().find((w: { webflowSiteId?: string }) => w.webflowSiteId === siteId)),
 }));
 
 vi.mock('../../server/workspace-intelligence.js', () => ({

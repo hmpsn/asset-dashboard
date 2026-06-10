@@ -13,12 +13,7 @@ import {
   getSiteSubdomain,
   discoverSitemapUrls,
 } from '../webflow.js';
-import {
-  getTokenForSite,
-  getWorkspace,
-  updatePageState,
-  listWorkspaces,
-} from '../workspaces.js';
+import { getTokenForSite, getWorkspace, getWorkspaceBySiteId, updatePageState } from '../workspaces.js';
 import { getPageState } from '../page-edit-states.js';
 import { resolveRecommendationsForChange } from '../recommendations.js';
 import { createLogger } from '../logger.js';
@@ -125,7 +120,7 @@ router.get('/api/webflow/cms-seo/:siteId', requireWorkspaceSiteAccessFromQuery()
     let sitemapPaths: Set<string> | null = null;
     try {
       // Try live domain first (CMS pages often only in live sitemap), then webflow.io
-      const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+      const ws = getWorkspaceBySiteId(req.params.siteId);
       const sitemapBases: string[] = [];
       if (ws?.liveDomain) {
         const domain = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;

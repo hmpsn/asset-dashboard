@@ -16,12 +16,7 @@ import { resolveBaseUrl } from '../url-helpers.js';
 import { getSiteSubdomain } from '../webflow.js';
 import { z } from '../middleware/validate.js';
 import { buildPageAssistContext } from '../intelligence/page-assist-context-builder.js';
-import {
-  getBrandName,
-  getTokenForSite,
-  getWorkspace,
-  listWorkspaces,
-} from '../workspaces.js';
+import { getBrandName, getTokenForSite, getWorkspace, getWorkspaceBySiteId } from '../workspaces.js';
 
 const router = Router();
 const log = createLogger('webflow-seo-page-tools');
@@ -64,7 +59,7 @@ router.get('/api/webflow/page-html/:siteId', requireWorkspaceSiteAccessFromQuery
   const token = getTokenForSite(siteId) || undefined;
   try {
     // Try live domain first (CMS collection pages often only accessible there)
-    const ws = listWorkspaces().find(w => w.webflowSiteId === siteId);
+    const ws = getWorkspaceBySiteId(siteId);
     const subdomain = await getSiteSubdomain(siteId, token);
     const urls: string[] = [];
     if (ws?.liveDomain) {
