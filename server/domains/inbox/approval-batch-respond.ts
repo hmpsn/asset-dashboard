@@ -25,6 +25,7 @@
  */
 import db from '../../db/index.js';
 import { getBatch, updateItem } from '../../approvals.js';
+import { syncApprovalBatchDeliverableStatus } from './approval-batch-dual-write.js';
 import { addActivity } from '../../activity-log.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
 import { notifyTeamActionApproved, notifyTeamChangesRequested } from '../../email.js';
@@ -208,6 +209,15 @@ export function respondToApprovalBatch(
   broadcastToWorkspace(workspaceId, WS_EVENTS.APPROVAL_UPDATE, {
     batchId,
     status: decision,
+  });
+
+  // Project the decision onto the client_deliverable mirror (best-effort, never throws).
+  // The unified inbox renders from the mirror, so a response through the LEGACY public
+  // routes must move it too — otherwise the inbox keeps nagging about a decided batch.
+  // Idempotent: when the unified respondToDeliverable path drove this call, the mirror
+  // already has the target status and the sync is a no-op.
+  syncApprovalBatchDeliverableStatus(workspaceId, updatedBatch, {
+    ...(note != null ? { clientResponseNote: note } : {}),
   });
 
   return { batch: updatedBatch, itemsUpdated };

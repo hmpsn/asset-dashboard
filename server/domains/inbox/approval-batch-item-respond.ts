@@ -1,5 +1,6 @@
 import { addActivity } from '../../activity-log.js';
 import { getBatch, updateItem } from '../../approvals.js';
+import { syncApprovalBatchDeliverableStatus } from './approval-batch-dual-write.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
 import { notifyTeamActionApproved, notifyTeamChangesRequested } from '../../email.js';
 import { createLogger } from '../../logger.js';
@@ -151,6 +152,12 @@ export function respondToApprovalBatchItem(
     itemId,
     status: requestedStatus,
   });
+
+  // Project the recalculated batch status onto the client_deliverable mirror (best-effort,
+  // idempotent — see syncApprovalBatchDeliverableStatus). A 'pending' revert intentionally
+  // does NOT move the mirror: the deliverable machine has no partial→awaiting_client edge,
+  // and 'partial' remains client-actionable in the unified inbox.
+  syncApprovalBatchDeliverableStatus(workspaceId, batch);
 
   return { batch };
 }
