@@ -10,7 +10,9 @@
  *
  * Design contract:
  *   - Never throws — degrades gracefully on scraper failure (FM-2 pattern).
- *   - All errors are caught and logged at warn level.
+ *   - All errors are caught; programming errors are logged at warn level
+ *     (operational scrape failures are expected and stay silent per
+ *     server/errors.ts conventions).
  *   - On failure: scrapedRefs/stylePages are empty arrays, serpData is null.
  */
 
@@ -38,6 +40,29 @@ export interface BriefScrapeEnrichment {
   serpData: SerpData | null;
   /** Scraped top-performing pages from GA4 for style examples (empty if none) */
   stylePages: ScrapedPage[];
+}
+
+/**
+ * Derive the top style-example page URLs from GA4 landing-page performance.
+ * Shared by both brief paths so the selection heuristic cannot drift.
+ *
+ * `liveDomain` may be stored with or without a protocol (the auto-resolution
+ * path in routes/workspaces.ts stores it WITH one) — it is stripped before
+ * re-prefixing, otherwise the URL becomes `https://https://…` and the scrape
+ * silently fails the helper's startsWith('http') filter downstream.
+ */
+export function deriveStylePageUrls(
+  pages: Array<{ landingPage: string; sessions: number; avgEngagementTime: number }>,
+  liveDomain: string | null | undefined,
+): string[] {
+  if (!liveDomain) return [];
+  const domain = liveDomain.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  if (!domain) return [];
+  return [...pages]
+    .filter(p => p.sessions > 10 && p.avgEngagementTime > 30)
+    .sort((a, b) => (b.avgEngagementTime * b.sessions) - (a.avgEngagementTime * a.sessions))
+    .slice(0, 2)
+    .map(p => `https://${domain}${p.landingPage}`);
 }
 
 /**

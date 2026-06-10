@@ -432,4 +432,48 @@ describe('C1: parity check — standalone path behavior unchanged', () => {
     });
     expect(standaloneCall).toBeDefined();
   });
+
+  it('FM-2: standalone job completes when reference-URL scraping throws (degrades, no longer fails the job)', async () => {
+    // runStandaloneJob passes referenceUrls, so the scrapeUrls branch is
+    // genuinely exercised — this rejection previously propagated through
+    // Promise.all and failed the whole job; the shared helper degrades it.
+    mockScrapeUrls.mockRejectedValue(new Error('Reference scrape network error'));
+
+    const job = await runStandaloneJob();
+
+    expect(mockScrapeUrls).toHaveBeenCalled();
+    const storedJob = db.prepare('SELECT status, result FROM jobs WHERE id = ?').get(job.id) as { status: string; result: string } | undefined;
+    expect(storedJob?.status).toBe('done');
+    const result = JSON.parse(storedJob?.result ?? '{}');
+    expect(result.brief).toBeDefined();
+    expect(result.brief.scrapedReferences?.length ?? 0).toBe(0);
+  });
+});
+
+describe('C1: deriveStylePageUrls — liveDomain protocol handling (review fix)', () => {
+  const PAGES = [
+    { landingPage: '/great-page', sessions: 100, avgEngagementTime: 60 },
+    { landingPage: '/ok-page', sessions: 50, avgEngagementTime: 45 },
+    { landingPage: '/thin-page', sessions: 5, avgEngagementTime: 10 },
+  ];
+
+  it('strips an existing protocol from liveDomain (no https://https:// double prefix)', async () => {
+    const { deriveStylePageUrls } = await import('../../server/content-brief-scrape-enrichment.js');
+    const urls = deriveStylePageUrls(PAGES, 'https://example.com');
+    expect(urls).toEqual(['https://example.com/great-page', 'https://example.com/ok-page']);
+  });
+
+  it('handles a bare domain and trailing slashes', async () => {
+    const { deriveStylePageUrls } = await import('../../server/content-brief-scrape-enrichment.js');
+    expect(deriveStylePageUrls(PAGES, 'example.com/')).toEqual([
+      'https://example.com/great-page',
+      'https://example.com/ok-page',
+    ]);
+  });
+
+  it('returns [] for missing liveDomain and filters thin pages', async () => {
+    const { deriveStylePageUrls } = await import('../../server/content-brief-scrape-enrichment.js');
+    expect(deriveStylePageUrls(PAGES, undefined)).toEqual([]);
+    expect(deriveStylePageUrls(PAGES, 'example.com').some(u => u.includes('thin-page'))).toBe(false);
+  });
 });

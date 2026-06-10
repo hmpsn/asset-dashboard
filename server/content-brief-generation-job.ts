@@ -1,7 +1,7 @@
 import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { generateBrief } from './content-brief.js';
-import { collectBriefEnrichment } from './content-brief-scrape-enrichment.js';
+import { collectBriefEnrichment, deriveStylePageUrls } from './content-brief-scrape-enrichment.js';
 import { resolveBriefTemplateCrossref, toBriefPageType } from './content-brief-template-crossref.js';
 import { getAllSitePages } from './content-site-pages.js';
 import { getContentRequest, updateContentRequest } from './content-requests.js';
@@ -122,15 +122,7 @@ async function generateStandaloneBrief(params: StandaloneContentBriefGenerationP
     try {
       const pages = await getGA4LandingPages(ws.ga4PropertyId, 28, 25);
       ga4Performance = pages.slice(0, 10);
-      if (ws.liveDomain) {
-        const sortedByQuality = [...pages]
-          .filter(p => p.sessions > 10 && p.avgEngagementTime > 30)
-          .sort((a, b) => (b.avgEngagementTime * b.sessions) - (a.avgEngagementTime * a.sessions));
-        for (const p of sortedByQuality.slice(0, 2)) {
-          const domain = ws.liveDomain.replace(/\/+$/, '');
-          topPageUrls.push(`https://${domain}${p.landingPage}`);
-        }
-      }
+      topPageUrls.push(...deriveStylePageUrls(pages, ws.liveDomain));
     } catch (err) {
       if (isProgrammingError(err)) log.warn({ err }, 'Standalone brief GA4 enrichment failed');
     }
@@ -248,15 +240,7 @@ async function generateBriefForRequest(params: RequestContentBriefGenerationPara
     try {
       const pages = await getGA4LandingPages(ws.ga4PropertyId, 28, 25);
       if (pages.length > 0) ga4PagePerformance = pages;
-      if (ws.liveDomain) {
-        const sortedByQuality = [...pages]
-          .filter(p => p.sessions > 10 && p.avgEngagementTime > 30)
-          .sort((a, b) => (b.avgEngagementTime * b.sessions) - (a.avgEngagementTime * a.sessions));
-        for (const p of sortedByQuality.slice(0, 2)) {
-          const domain = ws.liveDomain.replace(/\/+$/, '');
-          topPageUrls.push(`https://${domain}${p.landingPage}`);
-        }
-      }
+      topPageUrls.push(...deriveStylePageUrls(pages, ws.liveDomain));
     } catch (err) {
       if (isProgrammingError(err)) log.warn({ err }, 'Request brief GA4 enrichment failed');
     }
