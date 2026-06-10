@@ -93,7 +93,6 @@ vi.mock('../../src/hooks/client/useClientQueries', () => ({
   useClientStrategy: () => ({ data: null, isLoading: false, error: null }),
   useClientPricing: () => ({ data: null, isLoading: false, error: null }),
   useClientContentPlan: () => ({ data: null, isLoading: false, error: null }),
-  useClientPageKeywords: () => ({ data: null, isLoading: false, error: null }),
   useClientCopyEntries: () => ({ data: 0, isLoading: false, error: null }),
 }));
 
