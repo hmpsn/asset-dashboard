@@ -3,6 +3,7 @@ import { join } from 'path';
 import { describe, expect, it } from 'vitest';
 
 const approvalsRoute = readFileSync(join(import.meta.dirname, '../../server/routes/approvals.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for approval outcome tracking.
+const approvalApplyService = readFileSync(join(import.meta.dirname, '../../server/domains/inbox/approval-batch-apply.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for extracted approval apply lifecycle.
 const schemaRoute = readFileSync(join(import.meta.dirname, '../../server/routes/webflow-schema.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for schema outcome tracking.
 const pageToolsRoute = readFileSync(join(import.meta.dirname, '../../server/routes/webflow-seo-page-tools.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for live page HTML fetches.
 const rewriteRoute = readFileSync(join(import.meta.dirname, '../../server/routes/webflow-seo-rewrite.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for SEO rewrite fetches.
@@ -17,12 +18,13 @@ const seoDerived = readFileSync(join(import.meta.dirname, '../../src/components/
 describe('canonical page-address route wiring', () => {
   it('approval outcome tracking stores normalized canonical paths', () => {
     expect(approvalsRoute).toContain('publishedPath: z.string().nullable().optional()');
-    expect(approvalsRoute).toContain('const rawAppliedPagePath = appliedItem.publishedPath || appliedItem.pageSlug ||');
-    expect(approvalsRoute).toContain('normalizePageUrl(rawAppliedPagePath)');
-    expect(approvalsRoute).toContain('const rawPagePath = item.publishedPath || item.pageSlug ||');
-    expect(approvalsRoute).toContain('normalizePageUrl(rawPagePath)');
+    expect(approvalApplyService).toContain('const rawAppliedPagePath = appliedItem.publishedPath || appliedItem.pageSlug ||');
+    expect(approvalApplyService).toContain('normalizePageUrl(rawAppliedPagePath)');
+    expect(approvalApplyService).toContain('const rawPagePath = item.publishedPath || item.pageSlug ||');
+    expect(approvalApplyService).toContain('normalizePageUrl(rawPagePath)');
     expect(approvalsRoute).not.toContain('pageUrl: item.pageSlug ? `/${item.pageSlug}` : null');
-    expect(approvalsRoute).not.toContain('captureBaselineFromGsc(action.id, req.params.workspaceId, `/${item.pageSlug}`)');
+    expect(approvalApplyService).not.toContain('pageUrl: item.pageSlug ? `/${item.pageSlug}` : null');
+    expect(approvalApplyService).not.toContain('captureBaselineFromGsc(action.id, req.params.workspaceId, `/${item.pageSlug}`)');
   });
 
   it('schema publish paths receive and use publishedPath before pageSlug fallback', () => {
