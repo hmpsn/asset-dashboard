@@ -551,6 +551,7 @@ export function UnifiedInbox({
           <DecisionCard
             decision={decision}
             uniformVerbs
+            submitting={submittingId === d.id}
             ageLabel={ageLabel(d.sentAt)}
             onReview={projected ? () => setReviewProjected({ type: d.type, externalRef: d.externalRef ?? '' }) : undefined}
             onOpen={projected ? () => {} : () => setDetailId(d.id)}
