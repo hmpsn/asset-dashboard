@@ -3099,8 +3099,13 @@ export const CHECKS: Check[] = [
     claudeMdRef: '#auth-conventions',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
-      // Reads of a request-derived workspaceId inside a handler body.
-      const readRe = /req\.(query|body)(?:\.workspaceId\b|\[(['"])workspaceId\2\])/;
+      // Reads of a request-derived workspaceId inside a handler body — BOTH direct
+      // property access (req.body.workspaceId) AND destructuring
+      // (const { workspaceId } = req.body), which is the more common form and was
+      // the rule's original blind spot (a destructured-only route slipped the sweep).
+      const directReadRe = /req\.(query|body)(?:\.workspaceId\b|\[(['"])workspaceId\2\])/;
+      const destructureReadRe = /(?:const|let|var)\s*\{[^}]*\bworkspaceId\b[^}]*\}\s*=\s*req\.(query|body)\b/;
+      const readRe = { test: (line: string) => directReadRe.test(line) || destructureReadRe.test(line) };
       // Any guard that establishes workspace access (chain middleware or inline).
       const guardRe = /requireWorkspaceAccessFromQuery|requireWorkspaceAccessFromBody|requireWorkspaceAccess\b|requireWorkspaceSiteAccess(?:FromQuery)?|requestUserCanAccessWorkspace|internalJwtCanAccessWorkspace|canAccessRequest/;
       // A route registration line opens a new handler scope.

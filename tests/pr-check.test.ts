@@ -2228,20 +2228,63 @@ describe('Rule: Admin route reads request workspaceId without a workspace-access
     expect(hits[0].line).toBe(2);
   });
 
-  it('flags a POST reading req.body.workspaceId with no guard', () => {
+  it('flags a POST reading req.body.workspaceId via direct access with no guard', () => {
     const file = write(
       uniqPath('rule-ws-from-req', 'server/routes/ai.ts'),
       lines(
         "router.post('/api/admin-chat', aiLimiter, async (req, res) => {", // 1
-        "  const { workspaceId } = req.body;",                             // 2 (no read pattern)
-        "  const ctx = assemble(req.body.workspaceId);",                   // 3 (read pattern)
+        "  const ctx = assemble(req.body.workspaceId);",                   // 2 (read pattern)
+        "  res.json(ctx);",                                                // 3
+        "});",                                                             // 4
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags a DESTRUCTURED workspaceId read from req.body with no guard (the original blind spot)', () => {
+    const file = write(
+      uniqPath('rule-ws-from-req', 'server/routes/webflow-seo-rewrite.ts'),
+      lines(
+        "router.post('/api/webflow/seo-rewrite', async (req, res) => {",    // 1
+        "  const { pageTitle, field, workspaceId, pagePath } = req.body;",  // 2 (destructure read)
+        "  const ctx = buildPageAssistContext(workspaceId);",              // 3
         "  res.json(ctx);",                                                // 4
         "});",                                                             // 5
       )
     );
     const hits = runRule(RULE, [file]);
     expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(3);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags a destructured workspaceId read from req.query with no guard', () => {
+    const file = write(
+      uniqPath('rule-ws-from-req', 'server/routes/reports.ts'),
+      lines(
+        "router.get('/api/reports', (req, res) => {",
+        "  const { workspaceId, since } = req.query;",
+        "  res.json(listReports(workspaceId));",
+        "});",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('passes a destructured read when requireWorkspaceAccessFromBody guards the chain', () => {
+    const file = write(
+      uniqPath('rule-ws-from-req', 'server/routes/webflow-seo-rewrite.ts'),
+      lines(
+        "router.post('/api/webflow/seo-rewrite', requireWorkspaceAccessFromBody(), async (req, res) => {",
+        "  const { field, workspaceId } = req.body;",
+        "  res.json(rewrite(workspaceId));",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
   it('passes when requireWorkspaceAccessFromQuery is in the route chain', () => {

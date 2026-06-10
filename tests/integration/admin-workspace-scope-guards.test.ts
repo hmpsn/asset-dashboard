@@ -67,6 +67,31 @@ describe('query/body workspaceId guards — cross-workspace JWT denial', () => {
     expect(res.status).toBe(403);
   });
 
+  it('GET /api/ai/usage?workspaceId=<own> → not 403 (positive path; guards the right query key)', async () => {
+    const res = await ctx.api(`/api/ai/usage?workspaceId=${scopedAuth!.workspaceId}`, {
+      headers: asScopedUser(),
+    });
+    expect(res.status).not.toBe(403);
+  });
+
+  it('POST /api/webflow/seo-rewrite with body workspaceId=<other> → 403 (destructured read, surfaced in review)', async () => {
+    const res = await ctx.api('/api/webflow/seo-rewrite', {
+      method: 'POST',
+      headers: { ...asScopedUser(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workspaceId: otherWorkspace!.workspaceId, pageTitle: 'x', field: 'seoTitle' }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('POST /api/stripe/create-checkout with body workspaceId=<other> → 403', async () => {
+    const res = await ctx.api('/api/stripe/create-checkout', {
+      method: 'POST',
+      headers: { ...asScopedUser(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workspaceId: otherWorkspace!.workspaceId, productType: 'content' }),
+    });
+    expect(res.status).toBe(403);
+  });
+
   it('POST /api/admin-chat with body workspaceId=<other> → 403 (guard fires before any AI call)', async () => {
     const res = await ctx.api('/api/admin-chat', {
       method: 'POST',

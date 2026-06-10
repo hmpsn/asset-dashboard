@@ -39,7 +39,7 @@ router.get('/deduplication', (_req, res) => {
  */
 router.get('/usage', (req, res) => {
   try {
-    const { workspaceId, since, days = 30 } = req.query;
+    const { workspaceId, since, days = 30 } = req.query; // workspace-scope-from-request-ok: router is mounted behind an HMAC-only gate in app.ts (no JWT member can reach it)
     
     const usage = getTokenUsage(
       workspaceId as string,
@@ -64,7 +64,7 @@ router.get('/usage', (req, res) => {
  */
 router.get('/summary', (req, res) => {
   try {
-    const { workspaceId } = req.query;
+    const { workspaceId } = req.query; // workspace-scope-from-request-ok: router is mounted behind an HMAC-only gate in app.ts (no JWT member can reach it)
     
     // Get deduplication stats
     const dedupeStats = aiDeduplicator.getStats();
