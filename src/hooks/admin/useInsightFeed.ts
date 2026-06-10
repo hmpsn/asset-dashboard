@@ -203,6 +203,17 @@ export function transformToFeedInsight(insight: AnalyticsInsight): FeedInsight {
       break;
     }
 
+    case 'lost_visibility': {
+      const lostCount = data.lostCount as number | undefined;
+      if (lostCount !== undefined && lostCount > 0) {
+        headline = `${lostCount} quer${lostCount === 1 ? 'y' : 'ies'} lost visibility`;
+      } else {
+        headline = 'queries lost visibility';
+      }
+      contextParts.push('GSC drop-off detected');
+      break;
+    }
+
     default: {
       headline = insight.insightType.replace(/_/g, ' ');
       break;
@@ -245,6 +256,14 @@ export function transformToFeedInsight(insight: AnalyticsInsight): FeedInsight {
     if (Array.isArray(queries) && queries.length > 0) {
       details = queries.slice(0, 10);
       if (queries.length > 10) details.push(`+ ${queries.length - 10} more queries`);
+    }
+  } else if (insight.insightType === 'lost_visibility') {
+    const topQueries = data.topQueries as Array<{ query: string; lastPosition: number | null; lastSeen: string }> | undefined;
+    if (Array.isArray(topQueries) && topQueries.length > 0) {
+      details = topQueries.map(q => {
+        const pos = q.lastPosition != null ? ` — last position ${q.lastPosition}` : '';
+        return `"${q.query}"${pos}`;
+      });
     }
   }
 

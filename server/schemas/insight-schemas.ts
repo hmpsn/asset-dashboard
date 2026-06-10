@@ -215,6 +215,19 @@ export const milestoneAttributionDataSchema = z.object({
   trafficValue: z.number().nonnegative(),
 });
 
+/** LostVisibilityData — G1: queries that dropped off GSC (bridge-lost-visibility).
+ *  Cross-referenced against shared/types/analytics.ts:LostVisibilityData */
+export const lostVisibilityDataSchema = z.object({
+  lostCount: z.number(),
+  topQueries: z.array(z.object({
+    query: z.string(),
+    lastPosition: z.number().nullable(),
+    lastSeen: z.string(),
+    totalImpressions: z.number(),
+  })),
+  detectedAt: z.string(),
+});
+
 /**
  * Maps each InsightType to its DB-stored Zod schema.
  * Used by rowToInsight to validate the data JSON column via parseJsonSafe.
@@ -242,4 +255,5 @@ export const INSIGHT_DATA_SCHEMA_MAP: Record<InsightType, ZodTypeAny> = {
   competitor_alert: competitorAlertDataSchema.partial().passthrough(),
   freshness_alert: freshnessAlertDataSchema.partial().passthrough(),
   milestone_attribution: milestoneAttributionDataSchema.partial().passthrough(),
+  lost_visibility: lostVisibilityDataSchema.partial().passthrough(),
 };

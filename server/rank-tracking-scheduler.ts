@@ -17,6 +17,8 @@ import {
   upsertDiscoveredQueries,
   type DiscoveredQueryObservation,
 } from './client-discovered-queries.js';
+import { fireBridge } from './bridge-infrastructure.js';
+import { runLostVisibilityBridge } from './bridge-lost-visibility.js';
 
 const log = createLogger('rank-tracking-scheduler');
 
@@ -75,6 +77,7 @@ export async function runRankTrackingSnapshots(workspaceIds?: string[]): Promise
         upsertDiscoveredQueries(ws.id, dateQueries, snapshotDate);
       }
       detectLostVisibility(ws.id, date);
+      fireBridge('bridge-lost-visibility', ws.id, async () => runLostVisibilityBridge(ws.id));
       log.info({ workspaceId: ws.id, count: queries.length, date }, 'Rank snapshot captured');
     } catch (err) {
       log.warn({ err, workspaceId: ws.id }, 'Failed to capture rank snapshot — skipping workspace');
