@@ -47,7 +47,7 @@ import type { SchemaSitePlan } from '../../../../shared/types/schema-plan.js';
 import type { ClientDeliverable } from '../../../../shared/types/client-deliverable.js';
 import { findBySourceRef } from '../../../client-deliverables.js';
 import { createLogger } from '../../../logger.js';
-import { respondToSchemaPlanFeedback } from '../schema-plan-respond.js';
+import { respondToSchemaPlanFeedback } from '../../schema/schema-plan-feedback.js';
 import {
   registerAdapter,
   type BuiltDeliverablePayload,

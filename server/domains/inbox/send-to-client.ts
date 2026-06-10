@@ -42,7 +42,7 @@ import {
   notifyTeamActionApproved,
   notifyTeamChangesRequested,
 } from '../../email.js';
-import { assertSchemaPlanFeedbackAllowed } from './schema-plan-respond.js';
+import { assertSchemaPlanFeedbackAllowed } from '../schema/schema-plan-feedback.js';
 import { getClientPortalUrl, getWorkspace } from '../../workspaces.js';
 import { invalidateIntelligenceCache } from '../../workspace-intelligence.js';
 import type { ClientDeliverable, DeliverableType } from '../../../shared/types/client-deliverable.js';

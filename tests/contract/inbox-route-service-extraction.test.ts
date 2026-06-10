@@ -30,7 +30,7 @@ describe('inbox route-to-service extraction contract', () => {
   // drive the SAME respondToSchemaPlanFeedback service (no divergence).
   it('keeps the public schema-plan feedback route delegated to respondToSchemaPlanFeedback', () => {
     const route = readSource('server/routes/webflow-schema.ts'); // readFile-ok - contract guard for R2 route-to-service extraction.
-    expect(route).toContain("from '../domains/inbox/schema-plan-respond.js'");
+    expect(route).toContain("from '../domains/schema/schema-plan-lifecycle.js'");
     expect(route).toContain('respondToSchemaPlanFeedback(');
   });
 

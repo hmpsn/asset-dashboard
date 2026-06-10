@@ -43,10 +43,10 @@ import {
 import {
   activateSchemaPlanForAdmin,
   deleteSchemaPlanForAdmin,
+  respondToSchemaPlanFeedback,
   sendSchemaPlanToClientForReview,
   updateSchemaPlanForAdmin,
-} from '../domains/schema/schema-plan-admin-mutations.js';
-import { respondToSchemaPlanFeedback } from '../domains/inbox/schema-plan-respond.js';
+} from '../domains/schema/schema-plan-lifecycle.js';
 import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { listPendingSchemas } from '../schema-queue.js';
 import { createLogger } from '../logger.js';
