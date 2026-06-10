@@ -572,7 +572,20 @@ function clientDashboardInvalidationKeys(
     case WS_EVENTS.INSIGHT_BRIDGE_UPDATED:
     case WS_EVENTS.INTELLIGENCE_CACHE_UPDATED:
     case WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED:
+    // 2026-06-09 audit: the admin scope handled INSIGHT_RESOLVED and even listed client
+    // keys — dead in a client session. The client portal needs its own mapping or the
+    // digest shows resolved insights as open until refocus.
+    case WS_EVENTS.INSIGHT_RESOLVED:
       return clientInsightKeys(workspaceId);
+    case WS_EVENTS.CONTENT_PUBLISHED:
+      // Manual publish (server/routes/content-publish.ts) broadcasts ONLY this event —
+      // without a client mapping the post status, content plan, and ROI stay stale.
+      return [
+        queryKeys.client.contentPlan(workspaceId),
+        queryKeys.client.roi(workspaceId),
+        queryKeys.client.postPreviewAll(workspaceId),
+        queryKeys.client.activity(workspaceId),
+      ] as const;
     case WS_EVENTS.ANNOTATION_BRIDGE_CREATED:
       return [queryKeys.client.annotations(workspaceId)] as const;
     case WS_EVENTS.ANOMALIES_UPDATE:

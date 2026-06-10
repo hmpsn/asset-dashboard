@@ -1,9 +1,11 @@
-import { describe, it, expect, afterEach, afterAll } from 'vitest';
+import { describe, it, expect, afterEach, afterAll, beforeEach } from 'vitest';
 import db from '../../server/db/index.js';
 // The barrel self-registers the four family adapters the mirror resolves.
 import '../../server/domains/inbox/deliverable-adapters/index.js';
 import { mirrorClientActionToDeliverable } from '../../server/domains/inbox/client-action-dual-write.js';
 import { listDeliverables } from '../../server/client-deliverables.js';
+import { setBroadcast } from '../../server/broadcast.js';
+import { WS_EVENTS } from '../../server/ws-events.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import type { ClientAction, ClientActionPayload, ClientActionSourceType } from '../../shared/types/client-actions.js';
 
@@ -84,5 +86,35 @@ describe('client-action dual-write mirror', () => {
     const result = mirrorClientActionToDeliverable(WS, makeAction({ payload: { redirects: [] } as ClientActionPayload }));
     expect(result).toBeNull();
     expect(listDeliverables(WS)).toHaveLength(0);
+  });
+});
+
+// 2026-06-09 audit (data-flow confirmed #4): the send-time mirror must broadcast
+// DELIVERABLE_SENT so an open unified Inbox shows the new Decision live.
+describe('client-action mirror DELIVERABLE_SENT broadcast', () => {
+  let events: Array<{ event: string; data: Record<string, unknown> }> = [];
+
+  beforeEach(() => {
+    events = [];
+    setBroadcast(
+      () => {},
+      (_workspaceId, event, data) => events.push({ event, data: data as Record<string, unknown> }),
+    );
+  });
+
+  it('broadcasts DELIVERABLE_SENT exactly once on successful mirror creation', () => {
+    const mirrored = mirrorClientActionToDeliverable(WS, makeAction());
+    expect(mirrored).not.toBeNull();
+    const sent = events.filter(e => e.event === WS_EVENTS.DELIVERABLE_SENT);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].data.deliverableId).toBe(mirrored!.id);
+  });
+
+  it('does not broadcast when the adapter rejects the action', () => {
+    const rejected = mirrorClientActionToDeliverable(WS, makeAction({
+      payload: { redirects: [] } as never,
+    }));
+    expect(rejected).toBeNull();
+    expect(events).toHaveLength(0);
   });
 });

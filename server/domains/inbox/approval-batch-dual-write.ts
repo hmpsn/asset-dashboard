@@ -6,16 +6,22 @@
  * legacy batch into the unified `client_deliverable` model via the registered adapter +
  * `upsertDeliverable`.
  *
- * Scope (kept tight per the plan): this is the SEND-TIME mirror only. We do NOT mirror on
- * the public approve / apply / per-item paths in this PR — the response-side dual-write is
- * a follow-up. We do NOT change any reads. Apply stays disabled (D-apply): the mirrored
- * row is born `awaiting_client` and its items are `applyable=false`.
+ * Lifecycle coverage (2026-06-09 audit PR 2): the mirror runs UNCONDITIONALLY on every
+ * send (no feature flag), broadcasts DELIVERABLE_SENT so the unified client Inbox updates
+ * live, and this module also owns the response/withdrawal sides of the mirror:
+ *   - syncApprovalBatchDeliverableStatus — called by the legacy respond services
+ *     (approval-batch-respond / approval-batch-item-respond) to project batch decisions
+ *     onto the mirror, idempotently vs the unified respondToDeliverable path;
+ *   - cancelApprovalBatchDeliverable — called by deleteApprovalBatchForClient so an admin
+ *     withdraw never orphans an awaiting_client ghost card.
+ * The apply side lives in approval-batch-apply.ts (markDeliverableApplied). The mirrored
+ * row is born `awaiting_client` and its items are `applyable=false` (D-apply).
  *
- * The mirror is best-effort and MUST NOT break the live legacy send: any failure is logged
- * and swallowed (the legacy batch is already persisted + the client already notified by the
- * route).
+ * Every mirror operation is best-effort and MUST NOT break the live legacy write: failures
+ * are logged and swallowed (the legacy row is already persisted + the client notified).
  *
- * Leaf rule: imports the registry + the store + the flag reader; not imported back by them.
+ * Leaf rule: imports the registry + the store + the broadcast singleton + state machines;
+ * not imported back by them.
  */
 import type { ApprovalBatch } from '../../../shared/types/approvals.js';
 import type { ClientDeliverable, DeliverableStatus, DeliverableType } from '../../../shared/types/client-deliverable.js';

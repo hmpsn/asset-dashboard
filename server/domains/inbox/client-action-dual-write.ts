@@ -22,12 +22,15 @@
  * payload — so this seam resolves it from the workspace and passes it into the adapter input.
  * The adapter itself stays a leaf (types + store only); this non-leaf seam does the lookup.
  *
- * Leaf rule: imports the registry + the store + the flag reader + the workspace getter; not
- * imported back by them.
+ * Leaf rule: imports the registry + the store + the broadcast singleton + the workspace
+ * getter; not imported back by them. (No feature flag gates this mirror — it runs
+ * unconditionally on every send.)
  */
 import type { ClientAction } from '../../../shared/types/client-actions.js';
 import type { ClientDeliverable } from '../../../shared/types/client-deliverable.js';
 import { upsertDeliverable } from '../../client-deliverables.js';
+import { broadcastToWorkspace } from '../../broadcast.js';
+import { WS_EVENTS } from '../../ws-events.js';
 import { getWorkspace } from '../../workspaces.js';
 import { getAdapter } from './deliverable-adapters/index.js';
 import {
@@ -94,6 +97,18 @@ export function mirrorClientActionToDeliverable(
       { workspaceId, actionId: action.id, type, deliverableId: deliverable.id },
       'client action mirrored into client_deliverable (dual-write)',
     );
+    // The unified client Inbox renders from the deliverables query and subscribes to
+    // DELIVERABLE_SENT — required for new Decisions to appear live (Data Flow Rule #2).
+    // Own try/catch: a transport failure must not poison the mirror result.
+    try {
+      broadcastToWorkspace(workspaceId, WS_EVENTS.DELIVERABLE_SENT, {
+        deliverableId: deliverable.id,
+        type: deliverable.type,
+        status: deliverable.status,
+      });
+    } catch (broadcastErr) {
+      log.warn({ err: broadcastErr, workspaceId, deliverableId: deliverable.id }, 'DELIVERABLE_SENT broadcast failed (swallowed)');
+    }
     return deliverable;
   } catch (err) {
     // Best-effort: the legacy action is already persisted + the client notified. A mirror
