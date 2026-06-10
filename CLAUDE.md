@@ -159,7 +159,7 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 
 ### UI Primitives — always check before hand-rolling
 
-`SectionCard`, `StatCard`, `CompactStatBar`, `PageHeader`, `MetricRing`, `MetricRingSvg`, `Badge`, `TabBar`, `DateRangeSelector`, `DataList`, `EmptyState`, `ErrorState`, `LoadingState`, `TierGate`, `TierBadge`, `AIContextIndicator`, `StatusBadge`, `Skeleton`, `ConfirmDialog`, `WorkflowStepper`, `WorkspaceHealthBar`, `OnboardingChecklist`, `FeatureFlag`, `TrendBadge`, `ChartCard`, `ClickableRow`, `ProgressIndicator`, `CharacterCounter`, `NextStepsCard`, `MetricToggleCard`, `ScannerReveal`, `SerpPreview`, `SocialPreview`, `ActionPill` [deprecated], `SegmentedControl` [deprecated] — all from `src/components/ui/`.
+`SectionCard`, `StatCard`, `CompactStatBar`, `PageHeader`, `MetricRing`, `MetricRingSvg`, `Badge`, `TabBar`, `DateRangeSelector`, `DataList`, `EmptyState`, `ErrorState`, `LoadingState`, `TierGate`, `TierBadge`, `AIContextIndicator`, `StatusBadge`, `Skeleton`, `ConfirmDialog`, `WorkflowStepper`, `WorkspaceHealthBar`, `OnboardingChecklist`, `FeatureFlag`, `TrendBadge`, `ChartCard`, `ClickableRow`, `ProgressIndicator`, `CharacterCounter`, `NextStepsCard`, `MetricToggleCard`, `ScannerReveal`, `SerpPreview`, `SocialPreview` — all from `src/components/ui/`.
 
 **Client inbox components** (in `src/components/client/`) — check before hand-rolling inbox UI: `DecisionDetailModal` (full-screen bulk approval modal), `DecisionCard` (entry-point card — inline approve for single-action, modal CTA for batch), `ApprovalBatchCard` (inline approval card for Decisions/Conversations sections), `PriorityStrip` (cross-section priority item strip), `SchemaReviewModal` (schema review mounted as a modal inside Inbox > Reviews).
 

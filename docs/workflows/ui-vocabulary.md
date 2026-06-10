@@ -12,8 +12,7 @@ Use these exact labels when creating buttons, badges, tooltips, status text, and
 
 | Action | Label | Icon | Color | Context |
 |--------|-------|------|-------|---------|
-| Send item to client for review | **"Send to Client"** | `Send` | purple (admin-only AI feature) | Audit issues, schemas, briefs, SEO changes |
-| Send batch for client approval | **"Send for Approval"** | `Send` | teal | SEO Editor, CMS Editor (batch approval flow) |
+| Send item(s) to client | **"Send to client"** | `Send` | teal | Audit issues, schemas, briefs, SEO/CMS editor batches — see §Admin Send Convention (the single canonical send button; purple was retired, send buttons are teal per the Four Laws) |
 | Create internal team work item | **"Add to Tasks"** | `ClipboardList` | zinc | Audit → request manager |
 | Batch create internal tasks | **"Add [X] to Tasks"** | `ClipboardList` | varies | e.g. "Add Errors to Tasks (5)" |
 | Push fix directly to Webflow | **"Accept & Push"** | `CheckCircle` | emerald | AI suggestion → Webflow API |
@@ -26,7 +25,7 @@ Use these exact labels when creating buttons, badges, tooltips, status text, and
 
 | State | Badge Label | Icon | Color |
 |-------|-------------|------|-------|
-| Sent to client | **"Sent"** | `Send` | purple (admin-only) |
+| Sent to client | **"Sent"** | `Send` | teal |
 | Task created | **"Added"** | `CheckCircle` | green |
 | Fix pushed to Webflow | **"Applied"** | `CheckCircle` | green |
 | Approval sent | **"Sent!"** | `CheckCircle` | teal |
@@ -63,7 +62,7 @@ The briefing page action strip chips emit final `InboxFilter` values as `?tab=` 
 
 When actions are behind a `⋮` (MoreVertical) overflow menu:
 
-- **"Send to Client"** — always first, purple text
+- **"Send to client"** — always first, teal text (the canonical send action — see §Admin Send Convention)
 - **"Add to Tasks"** — always second, zinc text
 
 ## Admin Send Convention (PR 1.4)

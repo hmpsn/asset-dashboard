@@ -8520,7 +8520,7 @@ export function checkFile(file: string, check: Check): string[] {
 // Directories that should never be scanned (vendor code, test fixtures, build output)
 const EXCLUDED_DIRS = ['node_modules', 'dist', '.git', '.claude', '.worktrees', 'scripts', 'tests'];
 // Root-level files to skip (--exclude-dir doesn't work on files)
-const EXCLUDED_FILES = ['test-branding.ts'];
+const EXCLUDED_FILES: string[] = [];
 
 // Exported for tests/pr-check.test.ts — see the 'pathFilter vs EXCLUDED_DIRS
 // collision' regression test. Not part of the public API; do not import from
