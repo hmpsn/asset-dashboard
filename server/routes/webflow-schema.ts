@@ -14,13 +14,11 @@ import { validate, z } from '../middleware/validate.js';
 import { buildSchemaContext, normalizePageUrl } from '../helpers.js';
 import { prepareBulkSchemaGenerationContext, prepareSinglePageSchemaGenerationContext } from '../schema-generation-context.js';
 import { buildSchemaIntelligence } from '../schema-intelligence.js';
-import { getSchemaSnapshot, getSiteTemplate, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, updateSchemaPlanStatus, updateSchemaPlanRoles, deleteSchemaPlan, deleteSchemaSnapshot, removePageFromSnapshot, getPageTypes, savePageType, recordSchemaPublish, getSchemaPublishHistory, getSchemaPublishEntry, getPublishDatesForSite, getSchemaCmsFieldMappings, saveSchemaCmsFieldMapping } from '../schema-store.js';
+import { getSchemaSnapshot, getSiteTemplate, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, removePageFromSnapshot, getPageTypes, savePageType, recordSchemaPublish, getSchemaPublishHistory, getSchemaPublishEntry, getPublishDatesForSite, getSchemaCmsFieldMappings, saveSchemaCmsFieldMapping } from '../schema-store.js';
 import { generateSchemaSuggestions, generateSchemaForPage } from '../schema-suggester.js';
-import { deleteBatch } from '../approvals.js';
 import { SCHEMA_ROLE_LABELS, type SchemaPageRole } from '../../shared/types/schema-plan.ts';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
-import { notifyApprovalReady } from '../email.js';
 import {
   listCollections,
   getCollectionSchema,
@@ -33,24 +31,26 @@ import {
 } from '../webflow.js';
 import { detectSchemaFieldTarget, getRecommendedSchemaFieldSlug } from '../schema/site-inventory.js';
 import type { SchemaCmsDeliveryStatus, SchemaFieldTarget } from '../../shared/types/site-inventory.ts';
-import { listWorkspaces, getTokenForSite, updatePageState, getWorkspace, getClientPortalUrl } from '../workspaces.js';
+import { listWorkspaces, getTokenForSite, updatePageState, getWorkspace } from '../workspaces.js';
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
 import { queueKeywordStrategyPostUpdateFollowOns } from '../keyword-strategy-follow-ons.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import {
-  cancelSchemaPlanDeliverable,
-  mirrorSchemaPlanToDeliverable,
   syncSchemaPlanDeliverable,
 } from '../domains/inbox/schema-plan-dual-write.js';
+import {
+  activateSchemaPlanForAdmin,
+  deleteSchemaPlanForAdmin,
+  sendSchemaPlanToClientForReview,
+  updateSchemaPlanForAdmin,
+} from '../domains/schema/schema-plan-admin-mutations.js';
 import { respondToSchemaPlanFeedback } from '../domains/inbox/schema-plan-respond.js';
 import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { listPendingSchemas } from '../schema-queue.js';
 import { createLogger } from '../logger.js';
 import {
-  broadcastSchemaPlanUpdated,
-  getActiveSchemaPlanGenerationJobId,
   schemaPlanGenerationErrorResponse,
   startSchemaPlanGenerationJob,
 } from '../schema-plan-generation-job.js';
@@ -101,25 +101,6 @@ function broadcastSchemaSnapshotUpdated(
     action,
     ...(pageId ? { pageId } : {}),
   });
-}
-
-function broadcastSchemaPlanEvent(
-  siteId: string,
-  workspaceId: string | undefined,
-  action: Parameters<typeof broadcastSchemaPlanUpdated>[1]['action'],
-  status?: Parameters<typeof broadcastSchemaPlanUpdated>[1]['status'],
-): void {
-  if (!workspaceId) return;
-  broadcastSchemaPlanUpdated(workspaceId, { siteId, action, status });
-}
-
-function activeSchemaPlanMutationConflict(workspaceId: string): { error: string; jobId: string } | null {
-  const jobId = getActiveSchemaPlanGenerationJobId(workspaceId);
-  if (!jobId) return null;
-  return {
-    error: 'Schema plan generation is in progress. Wait for it to finish before editing this plan.',
-    jobId,
-  };
 }
 
 export async function publishSchemaToCmsField(opts: {
@@ -691,61 +672,17 @@ router.get('/api/webflow/schema-plan/:siteId', requireWorkspaceSiteAccessFromQue
 router.put('/api/webflow/schema-plan/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   const { pageRoles, canonicalEntities } = req.body;
   if (!pageRoles) return res.status(400).json({ error: 'pageRoles required' });
-  const existing = getSchemaPlan(req.params.siteId);
-  if (!existing) return res.status(404).json({ error: 'No plan found for this site' });
-  const conflict = activeSchemaPlanMutationConflict(existing.workspaceId);
-  if (conflict) return res.status(409).json(conflict);
-  const plan = updateSchemaPlanRoles(req.params.siteId, pageRoles, canonicalEntities);
-  if (!plan) return res.status(404).json({ error: 'No plan found for this site' });
-  invalidateIntelligenceCache(plan.workspaceId);
-  syncSchemaPlanDeliverable(plan);
-  broadcastSchemaPlanEvent(req.params.siteId, plan.workspaceId, 'updated', plan.status);
-  res.json(plan);
+  const result = updateSchemaPlanForAdmin(req.params.siteId, pageRoles, canonicalEntities);
+  if (!result.ok) return res.status(result.status).json('jobId' in result ? { error: result.error, jobId: result.jobId } : { error: result.error });
+  res.json(result.value);
 });
 
 // POST: send plan preview to client for review (in dedicated Schema tab, not Inbox)
 router.post('/api/webflow/schema-plan/:siteId/send-to-client', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   try {
-    const plan = getSchemaPlan(req.params.siteId);
-    if (!plan) return res.status(404).json({ error: 'No plan found. Generate one first.' });
-    const conflict = activeSchemaPlanMutationConflict(plan.workspaceId);
-    if (conflict) return res.status(409).json(conflict);
-
-    const ws = getWorkspace(plan.workspaceId);
-    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-
-    // Update plan status — no approval batch; client reviews in the Schema tab
-    const updated = updateSchemaPlanStatus(req.params.siteId, 'sent_to_client');
-
-    // Mirror the sent plan into the unified client_deliverable model. Best-effort + swallowed: it
-    // can NEVER break the legacy send (the status is already persisted above). The OWNING
-    // workspace is read straight off the plan (plan.workspaceId === ws.id) — not guessed.
-    const mirrored = mirrorSchemaPlanToDeliverable(ws.id, updated || plan);
-    if (mirrored) {
-      broadcastToWorkspace(ws.id, WS_EVENTS.DELIVERABLE_SENT, {
-        deliverableId: mirrored.id,
-        type: mirrored.type,
-      });
-    }
-
-    // Notify client via email, directing to the Schema tab
-    if (ws.clientEmail) {
-      const dashUrl = getClientPortalUrl(ws);
-      notifyApprovalReady({
-        clientEmail: ws.clientEmail,
-        workspaceName: ws.name,
-        workspaceId: ws.id,
-        batchName: 'Schema Strategy Review',
-        itemCount: plan.pageRoles.length,
-        dashboardUrl: dashUrl,
-      });
-    }
-
-    broadcastSchemaPlanEvent(req.params.siteId, ws.id, 'sent_to_client', updated?.status || plan.status);
-    broadcastToWorkspace(ws.id, WS_EVENTS.SCHEMA_PLAN_SENT, { siteId: req.params.siteId });
-    addActivity(ws.id, 'schema_plan_sent', 'Schema strategy sent to client for review', `${plan.pageRoles.length} pages`);
-    invalidateIntelligenceCache(ws.id);
-    res.json({ plan: updated || plan });
+    const result = sendSchemaPlanToClientForReview(req.params.siteId);
+    if (!result.ok) return res.status(result.status).json('jobId' in result ? { error: result.error, jobId: result.jobId } : { error: result.error });
+    res.json(result.value);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     log.error({ detail: msg, err }, 'Send schema plan to client error');
@@ -755,51 +692,16 @@ router.post('/api/webflow/schema-plan/:siteId/send-to-client', requireWorkspaceS
 
 // POST: mark plan as active (approved or admin-confirmed)
 router.post('/api/webflow/schema-plan/:siteId/activate', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
-  const existing = getSchemaPlan(req.params.siteId);
-  if (!existing) return res.status(404).json({ error: 'No plan found' });
-  const conflict = activeSchemaPlanMutationConflict(existing.workspaceId);
-  if (conflict) return res.status(409).json(conflict);
-  const plan = updateSchemaPlanStatus(req.params.siteId, 'active');
-  if (!plan) return res.status(404).json({ error: 'No plan found' });
-  invalidateIntelligenceCache(plan.workspaceId);
-  syncSchemaPlanDeliverable(plan);
-  broadcastSchemaPlanEvent(req.params.siteId, plan.workspaceId, 'activated', plan.status);
-  res.json(plan);
+  const result = activateSchemaPlanForAdmin(req.params.siteId);
+  if (!result.ok) return res.status(result.status).json('jobId' in result ? { error: result.error, jobId: result.jobId } : { error: result.error });
+  res.json(result.value);
 });
 
 // DELETE: retract (delete) the entire schema plan for a site
 router.delete('/api/webflow/schema-plan/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
-  // Read plan first to grab the approval batch ID before deleting
-  const plan = getSchemaPlan(req.params.siteId);
-  if (!plan) return res.status(404).json({ error: 'No plan found for this site' });
-  const conflict = activeSchemaPlanMutationConflict(plan.workspaceId);
-  if (conflict) return res.status(409).json(conflict);
-
-  deleteSchemaPlan(req.params.siteId);
-
-  // Also clear the schema snapshot so the client dashboard doesn't show stale data
-  const snapshotDeleted = deleteSchemaSnapshot(req.params.siteId);
-  if (snapshotDeleted) broadcastSchemaSnapshotUpdated(req.params.siteId, plan.workspaceId, 'deleted');
-
-  // Delete the associated approval batch (sent-to-client preview) if one exists.
-  // deleteBatch() already calls invalidateIntelligenceCache(plan.workspaceId)
-  // internally when it removes a batch, so track whether that happened to avoid a
-  // redundant second invalidation of the same workspace below.
-  let cacheInvalidated = false;
-  if (plan.clientPreviewBatchId) {
-    if (deleteBatch(plan.workspaceId, plan.clientPreviewBatchId)) cacheInvalidated = true;
-  }
-
-  const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
-  if (ws) {
-    addActivity(ws.id, 'schema_plan_deleted', 'Schema site plan retracted', 'Plan deleted by admin');
-    // The schema-plan + snapshot deletions also changed intelligence inputs, so
-    // invalidate — unless deleteBatch already did it for this same workspace.
-    if (!cacheInvalidated) invalidateIntelligenceCache(ws.id);
-    cancelSchemaPlanDeliverable(ws.id, req.params.siteId);
-    broadcastSchemaPlanEvent(req.params.siteId, ws.id, 'deleted');
-  }
-  res.json({ success: true });
+  const result = deleteSchemaPlanForAdmin(req.params.siteId);
+  if (!result.ok) return res.status(result.status).json('jobId' in result ? { error: result.error, jobId: result.jobId } : { error: result.error });
+  res.json(result.value);
 });
 
 // DELETE: retract (remove) published schema from a specific page
