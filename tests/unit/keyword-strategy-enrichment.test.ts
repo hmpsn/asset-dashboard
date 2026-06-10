@@ -697,3 +697,82 @@ describe('enrichKeywordStrategy', () => {
     expect(pm?.clicks).toBe(28);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Cannibalization detection — must work WITHOUT GSC data (2026-06-09 audit)
+// ---------------------------------------------------------------------------
+describe('enrichKeywordStrategy — cannibalization without GSC', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockParseJsonFallback.mockReturnValue(null);
+  });
+
+  it('detects two pageMap entries sharing a primaryKeyword when gscData is empty', async () => {
+    const opts = makeEnrichOptions({
+      pageMap: [
+        makePageMapEntry({ pagePath: '/services/dentistry', primaryKeyword: 'cosmetic dentistry' }),
+        makePageMapEntry({ pagePath: '/cosmetic', primaryKeyword: 'cosmetic dentistry' }),
+      ],
+    });
+    // searchData.gscData is [] from makeEnrichOptions — no GSC connection.
+    const result = await enrichKeywordStrategy(opts);
+
+    expect(result.cannibalization).toHaveLength(1);
+    const issue = result.cannibalization[0];
+    expect(issue.keyword).toBe('cosmetic dentistry');
+    expect(issue.pages.map(p => p.path).sort()).toEqual(['/cosmetic', '/services/dentistry']);
+    expect(issue.pages.map(p => p.source)).toEqual(['keyword_map', 'keyword_map']);
+    // 2 pages, no GSC positions → page-count severity fallback.
+    expect(issue.severity).toBe('medium');
+    // With no GSC connection there is NO traffic evidence — the recommendation must
+    // not claim "no meaningful traffic" (that claim derives from GSC absence, not data).
+    expect(issue.recommendation).not.toMatch(/no meaningful traffic/i);
+    expect(issue.action).toBe('canonical_tag');
+  });
+
+  it('flags 3+ pages sharing a keyword as high severity without GSC', async () => {
+    const opts = makeEnrichOptions({
+      pageMap: [
+        makePageMapEntry({ pagePath: '/a', primaryKeyword: 'dental implants' }),
+        makePageMapEntry({ pagePath: '/b', primaryKeyword: 'dental implants' }),
+        makePageMapEntry({ pagePath: '/c', primaryKeyword: 'dental implants' }),
+      ],
+    });
+    const result = await enrichKeywordStrategy(opts);
+    expect(result.cannibalization).toHaveLength(1);
+    expect(result.cannibalization[0].severity).toBe('high');
+  });
+
+  it('does not flag unique primaryKeywords without GSC', async () => {
+    const opts = makeEnrichOptions({
+      pageMap: [
+        makePageMapEntry({ pagePath: '/a', primaryKeyword: 'dental implants' }),
+        makePageMapEntry({ pagePath: '/b', primaryKeyword: 'teeth whitening' }),
+      ],
+    });
+    const result = await enrichKeywordStrategy(opts);
+    expect(result.cannibalization).toEqual([]);
+  });
+
+  it('keeps the GSC-present path behavior (redirect_301 for zero-traffic secondary)', async () => {
+    const opts = makeEnrichOptions({
+      pageMap: [
+        makePageMapEntry({ pagePath: '/services', primaryKeyword: 'cosmetic dentistry' }),
+        makePageMapEntry({ pagePath: '/old-page', primaryKeyword: 'cosmetic dentistry' }),
+      ],
+    });
+    opts.searchData = {
+      gscData: [
+        { page: 'https://example.com/services', query: 'cosmetic dentistry', impressions: 500, clicks: 40, position: 5 },
+        { page: 'https://example.com/old-page', query: 'cosmetic dentistry', impressions: 10, clicks: 0, position: 45 },
+      ],
+    } as typeof opts.searchData;
+
+    const result = await enrichKeywordStrategy(opts);
+    expect(result.cannibalization).toHaveLength(1);
+    const issue = result.cannibalization[0];
+    // GSC evidence present → traffic-based action heuristics unchanged.
+    expect(issue.canonicalPath).toBe('/services');
+    expect(issue.action).toBe('redirect_301');
+  });
+});

@@ -372,7 +372,9 @@ router.post('/api/jobs', async (req, res) => {
               if (jobWasCancelled()) return;
               updateJob(job.id, { status: 'running', message: 'Fetching pages and analyzing keywords...' });
               const businessContext = (params.businessContext as string) || stratWs.keywordStrategy?.businessContext || '';
-              const seoDataMode = (params.seoDataMode as string) || 'none';
+              // Pass absent through as undefined — generation promotes the absent case
+              // to 'quick' but must honor an explicit 'none' (no-spend contract).
+              const seoDataMode = typeof params.seoDataMode === 'string' ? params.seoDataMode : undefined;
               const seoDataProvider = typeof params.seoDataProvider === 'string' ? params.seoDataProvider : undefined;
               const competitorDomainsProvided = Array.isArray(params.competitorDomains);
               const competitorDomains = competitorDomainsProvided ? params.competitorDomains as string[] : stratWs.competitorDomains || [];

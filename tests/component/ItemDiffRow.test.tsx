@@ -76,7 +76,7 @@ describe('ItemDiffRow onEdit prop (item 2 — edit before approve)', () => {
     render(<ItemDiffRow {...seoTitleProps} onEdit={onEdit} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-    const input = screen.getByLabelText('Edit proposed seoTitle') as HTMLInputElement;
+    const input = screen.getByLabelText('Edit proposed SEO Title') as HTMLInputElement;
     // Seeded with the current proposed value.
     expect(input.value).toBe('Proposed title');
 
@@ -102,7 +102,7 @@ describe('ItemDiffRow onEdit prop (item 2 — edit before approve)', () => {
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-    const editor = screen.getByLabelText('Edit proposed seoDescription');
+    const editor = screen.getByLabelText('Edit proposed Meta Description');
     expect(editor.tagName).toBe('TEXTAREA');
   });
 

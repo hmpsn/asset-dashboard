@@ -665,8 +665,13 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
       kwPages.get(kw)!.push({ path: pm.pagePath, source: 'keyword_map' });
     }
 
+    // GSC enrichment is optional: gscByQuery stays empty without a Search Console
+    // connection, so the detection loop below still runs on keyword-map duplicates
+    // alone (two pages assigned the same primaryKeyword). Previously the loop was
+    // nested inside this guard, making cannibalization dead code for non-GSC
+    // workspaces (2026-06-09 audit, strategy-keywords finding).
+    const gscByQuery = new Map<string, Array<{ page: string; position: number; impressions: number; clicks: number }>>();
     if (gscData.length > 0) {
-      const gscByQuery = new Map<string, Array<{ page: string; position: number; impressions: number; clicks: number }>>();
       for (const r of gscData) {
         const q = keywordComparisonKey(r.query);
         if (!gscByQuery.has(q)) gscByQuery.set(q, []);
@@ -686,7 +691,9 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
           }
         }
       }
+    }
 
+    {
       for (const [kw, pages] of kwPages) {
         if (pages.length < 2) continue;
         const gscQueryData = gscByQuery.get(kw);
@@ -734,7 +741,10 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
         } else if (secondaryHasTraffic) {
           action = 'canonical_tag';
           recommendation = `Add <link rel="canonical" href="${canonicalUrl || canonicalPath}"> to ${otherPages.map(p => p.path).join(', ')}. This tells Google that ${canonicalPath} is the primary page for "${kw}" while preserving the secondary pages for users.`;
-        } else if (otherPages.every(p => !p.clicks && (p.impressions ?? 0) < 50)) {
+        } else if (gscData.length > 0 && otherPages.every(p => !p.clicks && (p.impressions ?? 0) < 50)) {
+          // The "no meaningful traffic" claim requires GSC evidence — without a GSC
+          // connection the absence of clicks is absence of DATA, not of traffic, so
+          // the no-GSC case falls through to the generic canonical recommendation.
           action = 'redirect_301';
           recommendation = `301 redirect ${otherPages.map(p => p.path).join(', ')} → ${canonicalPath}. The secondary page(s) have no meaningful traffic and are diluting ranking authority for "${kw}".`;
         } else {

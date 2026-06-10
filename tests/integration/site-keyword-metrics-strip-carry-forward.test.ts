@@ -110,6 +110,7 @@ vi.mock('../../server/keyword-strategy-follow-ons.js', async importOriginal => {
 
 import db from '../../server/db/index.js';
 import { generateKeywordStrategy } from '../../server/keyword-strategy-generation.js';
+import { getUsageCount } from '../../server/usage-tracking.js';
 import { deleteWorkspace } from '../../server/workspaces.js';
 import { replaceAllSiteKeywordMetrics, listSiteKeywordMetrics } from '../../server/site-keyword-metrics.js';
 import { replaceAllKeywordGaps } from '../../server/keyword-gaps.js';
@@ -186,5 +187,32 @@ describe('Wave 3b-ii — REAL-path incremental carry-forward (generation.ts:314 
     // (The persisted blob never carries siteKeywordMetrics — the strip forces it
     // undefined — so the table is the only place the loss is observable.)
     expect(listSiteKeywordMetrics(workspace.workspaceId)).toEqual(TABLE_METRICS);
+  });
+
+  it('refunds the strategy-generation usage slot on the sanitizer-only no-op re-persist (zero AI synthesis = zero billing)', async () => {
+    // 2026-06-09 audit (strategy-keywords): the noOpChanged exit re-persists after a
+    // deterministic sanitizer cleanup — synthesis.upToDate=true means NO AI batch ran
+    // (the early return in keyword-strategy-ai-synthesis.ts fires before any AI call).
+    // The pure no-op exit refunds the pre-reserved slot; this exit must meter
+    // identically, or tier-limited workspaces burn monthly credits on cleanup passes.
+    const before = getUsageCount(workspace.workspaceId, 'strategy_generations');
+
+    const result = await generateKeywordStrategy({ workspaceId: workspace.workspaceId, mode: 'incremental' });
+
+    // Same routing sanity as the carry-forward case: the re-persist branch ran.
+    expect(result.upToDate).toBe(false);
+    expect(getUsageCount(workspace.workspaceId, 'strategy_generations')).toBe(before);
+  });
+
+  it('refunds the strategy-generation usage slot on the pure no-op exit (pins the existing behavior so the two exits cannot diverge)', async () => {
+    // Remove the prunable gap so the sanitizer changes nothing → noOpChanged=false →
+    // the early up-to-date short-circuit (which already refunds) is taken.
+    db.prepare('DELETE FROM keyword_gaps WHERE workspace_id = ?').run(workspace.workspaceId);
+    const before = getUsageCount(workspace.workspaceId, 'strategy_generations');
+
+    const result = await generateKeywordStrategy({ workspaceId: workspace.workspaceId, mode: 'incremental' });
+
+    expect(result.upToDate).toBe(true);
+    expect(getUsageCount(workspace.workspaceId, 'strategy_generations')).toBe(before);
   });
 });

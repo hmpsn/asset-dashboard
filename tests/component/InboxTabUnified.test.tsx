@@ -822,7 +822,7 @@ describe('InboxTab unified inbox', () => {
     render(<InboxTab {...baseProps} effectiveTier="growth" />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-    const input = screen.getByLabelText('Edit proposed seoTitle');
+    const input = screen.getByLabelText('Edit proposed SEO Title');
     fireEvent.change(input, { target: { value: 'Client-fixed title' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save edit' }));
 

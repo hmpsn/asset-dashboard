@@ -118,9 +118,9 @@ describe('DeliverableDetailModal — approval family (seo_edit, typed items)', (
   it('renders Current/Proposed rows for each item', () => {
     renderModal(seoDecision);
     // Item header labels ("PageTitle — field").
-    expect(screen.getByText('Home — seoTitle')).toBeInTheDocument();
-    expect(screen.getByText('About — seoDescription')).toBeInTheDocument();
-    expect(screen.getByText('Services — seoTitle')).toBeInTheDocument();
+    expect(screen.getByText('Home — SEO Title')).toBeInTheDocument();
+    expect(screen.getByText('About — Meta Description')).toBeInTheDocument();
+    expect(screen.getByText('Services — SEO Title')).toBeInTheDocument();
     // Proposed values.
     expect(screen.getByText('New Home')).toBeInTheDocument();
     expect(screen.getByText('New About')).toBeInTheDocument();

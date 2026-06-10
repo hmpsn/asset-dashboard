@@ -25,6 +25,13 @@ interface DecisionCardProps {
   /** Human send-age label (e.g. "Sent 3 days ago"), shown in uniform mode when provided. */
   ageLabel?: string | null;
   /**
+   * Uniform mode: a respond mutation for THIS card is in flight. Disables the verb
+   * buttons and swaps the approve CTA to the in-flight label (approveCtaLabel), so the
+   * card never shows enabled-looking buttons that silently do nothing while the caller
+   * has nulled the handlers.
+   */
+  submitting?: boolean;
+  /**
    * Uniform mode (PR-2a unified inbox): for PROJECTED deliverables (copy_section /
    * content_request) the write verbs would 404 (they have no physical row and are responded to via
    * bespoke routes). When provided, render a single read-only "Review →" deep-link to the surface
@@ -46,6 +53,7 @@ interface DecisionCardProps {
  */
 export function DecisionCard({
   decision, onOpen, onApprove, onFlagWithNote, onDecline, uniformVerbs = false, ageLabel, onReview,
+  submitting = false,
 }: DecisionCardProps) {
   const [flagging, setFlagging] = useState(false);
   const [declining, setDeclining] = useState(false);
@@ -71,14 +79,16 @@ export function DecisionCard({
         <>
           {/* Item 5 — canonical approve CTA, consistent across the unified inbox (uniform mode only;
               the legacy single-action + bulk paths below are unchanged). */}
-          <Button size="sm" variant="primary" onClick={onApprove}>
-            {approveCtaLabel(decision.itemCount)}
+          <Button size="sm" variant="primary" onClick={onApprove} disabled={submitting}>
+            {approveCtaLabel(decision.itemCount, 0, submitting)}
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => setFlagging(true)}>
+          <Button size="sm" variant="ghost" onClick={() => setFlagging(true)} disabled={submitting}>
             Request changes
           </Button>
-          {onDecline && (
-            <Button size="sm" variant="ghost" onClick={() => setDeclining(true)}>
+          {/* Keep Decline visible (disabled) while submitting even though the caller nulls
+              onDecline in flight — otherwise the button vanishes mid-submit (layout jump). */}
+          {(onDecline || submitting) && (
+            <Button size="sm" variant="ghost" onClick={() => setDeclining(true)} disabled={submitting}>
               Decline
             </Button>
           )}

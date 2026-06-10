@@ -88,8 +88,19 @@ export function hasActiveKeywordStrategyGeneration(workspaceId: string): boolean
   return activeGenerations.has(workspaceId);
 }
 
-function normalizeSeoDataMode(mode: string | undefined): 'quick' | 'full' | 'none' {
-  return mode === 'quick' || mode === 'full' ? mode : 'none';
+/**
+ * Resolve the effective SEO-data mode, preserving the absent-vs-explicit distinction.
+ * Only an ABSENT mode (the MCP/chat path, which passes a provider but no seoDataMode)
+ * is promoted to 'quick'. An explicit 'none' is a user no-spend choice — the admin UI
+ * promises "No DataForSEO credits used" — and must yield zero provider calls.
+ * Unrecognized strings are treated as an explicit 'none' (never auto-spend on garbage).
+ */
+export function resolveEffectiveSeoDataMode(
+  requested: string | undefined,
+  providerConfigured: boolean,
+): 'quick' | 'full' | 'none' {
+  if (requested === undefined) return providerConfigured ? 'quick' : 'none';
+  return requested === 'quick' || requested === 'full' ? requested : 'none';
 }
 
 function normalizeSeoDataProvider(provider: string | undefined): ProviderName | undefined {
@@ -160,13 +171,9 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
 
   const businessContext = options.businessContext || ws.keywordStrategy?.businessContext || '';
   const strategyMode = options.mode === 'incremental' ? 'incremental' : 'full'; // 'full' | 'incremental'
-  const requestedSeoDataMode = normalizeSeoDataMode(options.seoDataMode);
-  // The MCP/chat path may pass a provider but no seoDataMode, which otherwise
-  // collapses to 'none' and starves discovery. Promote that case to 'quick' so
-  // the canonical universe path always has real provider-backed seeds.
-  const seoDataMode = (requestedSeoDataMode === 'none' && provider)
-    ? 'quick'
-    : requestedSeoDataMode;
+  // Promote ONLY the absent case (MCP/chat path) to 'quick'; an explicit 'none' is
+  // honored end-to-end with zero provider calls (see resolveEffectiveSeoDataMode).
+  const seoDataMode = resolveEffectiveSeoDataMode(options.seoDataMode, !!provider);
   const competitorDomains = options.competitorDomains ? [...options.competitorDomains] : [...(ws.competitorDomains || [])];
   const rawMaxPages = options.maxPages != null ? Number(options.maxPages) : 500;
   const maxPagesParam = rawMaxPages > 0 ? Math.min(rawMaxPages, KEYWORD_STRATEGY_MAX_PAGE_CAP) : 0; // 0 = no cap
@@ -373,6 +380,14 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
         });
         clearKeepalive();
         activeGenerations.delete(ws.id);
+        // The sanitizer-only re-persist performed ZERO AI synthesis (upToDate fired
+        // before any AI batch), so it must meter like the pure no-op exit below —
+        // refund the pre-reserved slot rather than billing a cleanup pass.
+        try {
+          decrementUsage(ws.id, 'strategy_generations');
+        } catch (err) {
+          log.warn({ err, workspaceId: ws.id }, 'Failed to refund strategy generation usage after sanitizer-only no-op');
+        }
         responseSent = true;
         queueKeywordStrategyPostUpdateFollowOns({ workspaceId: ws.id });
         return { strategy: responseStrategy as KeywordStrategy & { pageMap: PageKeywordMap[] }, upToDate: false, freshPageCount: synthesis.freshPageCount };
