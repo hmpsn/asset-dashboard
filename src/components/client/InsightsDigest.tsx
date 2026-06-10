@@ -394,6 +394,7 @@ const INSIGHT_TYPE_ICONS: Record<InsightType, LucideIcon> = {
   competitor_alert: AlertCircle,
   freshness_alert: Clock,
   milestone_attribution: Trophy, // Phase 2.5c: brief crossed a traffic threshold
+  lost_visibility: TrendingDown, // G1: queries that dropped off GSC
 };
 
 const SEVERITY_TO_SENTIMENT: Record<string, DigestInsight['sentiment']> = {
@@ -427,6 +428,7 @@ const INSIGHT_TYPE_ACTIONS: Partial<Record<InsightType, { label: string; tab: Cl
   competitor_alert: { label: 'View analytics', tab: 'performance' },
   emerging_keyword: { label: 'View strategy', tab: 'strategy' },
   freshness_alert: { label: 'View strategy', tab: 'strategy' },
+  lost_visibility: { label: 'View search data', tab: 'performance' },
 };
 
 function mapServerInsights(insights: ClientInsight[]): DigestInsight[] {
