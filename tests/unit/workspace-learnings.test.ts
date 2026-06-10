@@ -349,10 +349,12 @@ describe('getWorkspaceLearnings cache integrity', () => {
   it('returns fresh cached learnings without recompute when mapper succeeds', async () => {
     const { mod, mocks } = await loadModuleForCacheTests();
     const nowIso = new Date().toISOString();
+    // C1: a trustworthy cached blob carries the current logicVersion stamp; a missing
+    // stamp would be treated as cache-invalid and force a recompute.
     const cachedRow = {
       id: 'row-1',
       workspace_id: 'ws-1',
-      learnings: '{"confidence":"high"}',
+      learnings: JSON.stringify({ logicVersion: mod.LEARNINGS_LOGIC_VERSION, confidence: 'high' }),
       computed_at: nowIso,
     };
     const mapped = makeLearnings({ workspaceId: 'ws-1', computedAt: nowIso, confidence: 'high' });
@@ -370,10 +372,14 @@ describe('getWorkspaceLearnings cache integrity', () => {
   it('recomputes when fresh cached row fails to map, instead of silent null return (regression)', async () => {
     const { mod, mocks } = await loadModuleForCacheTests();
     const nowIso = new Date().toISOString();
+    // C1: current-version stamp so the row is trusted; the mapper still fails (corrupt
+    // payload), and on an empty recompute the trustworthy row is re-served (stale-cache
+    // for a transient data gap, NOT the resurrection of an unversioned pre-fix blob).
+    const cachedLearningsJson = JSON.stringify({ logicVersion: mod.LEARNINGS_LOGIC_VERSION, broken: true });
     const cachedRow = {
       id: 'row-bad',
       workspace_id: 'ws-2',
-      learnings: '{"broken":true}',
+      learnings: cachedLearningsJson,
       computed_at: nowIso,
     };
     const staleFallback = makeLearnings({
@@ -398,7 +404,7 @@ describe('getWorkspaceLearnings cache integrity', () => {
       expect.objectContaining({
         id: 'row-bad',
         workspace_id: 'ws-2',
-        learnings: '{"broken":true}',
+        learnings: cachedLearningsJson,
       }),
     );
   });
@@ -406,10 +412,15 @@ describe('getWorkspaceLearnings cache integrity', () => {
   it('touches stale cache timestamp and returns stale learnings when recompute has zero scored actions', async () => {
     const { mod, mocks } = await loadModuleForCacheTests();
     const oldIso = '2025-01-01T00:00:00.000Z';
+    // C1: current-version stamp so this is a trustworthy historical blob. A recompute
+    // that finds zero scored actions is a transient data gap, so the row is re-served
+    // (timestamp touched) rather than discarded — only UNVERSIONED/old-version blobs are
+    // treated as corrupt and replaced with the honest empty aggregate.
+    const cachedLearningsJson = JSON.stringify({ logicVersion: mod.LEARNINGS_LOGIC_VERSION, confidence: 'medium', totalScoredActions: 12 });
     const cachedRow = {
       id: 'row-stale',
       workspace_id: 'ws-3',
-      learnings: '{"confidence":"medium","totalScoredActions":12}',
+      learnings: cachedLearningsJson,
       computed_at: oldIso,
     };
     const staleMapped = makeLearnings({
@@ -430,7 +441,7 @@ describe('getWorkspaceLearnings cache integrity', () => {
     expect(mocks.upsertRun.mock.calls[0]?.[0]).toMatchObject({
       id: 'row-stale',
       workspace_id: 'ws-3',
-      learnings: '{"confidence":"medium","totalScoredActions":12}',
+      learnings: cachedLearningsJson,
     });
     expect(typeof mocks.upsertRun.mock.calls[0]?.[0]?.computed_at).toBe('string');
   });

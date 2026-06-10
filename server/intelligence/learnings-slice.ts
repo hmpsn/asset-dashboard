@@ -12,6 +12,33 @@ export async function assembleLearnings(
   let summary: ReturnType<Awaited<typeof import('../workspace-learnings.js')>['getWorkspaceLearnings']> | undefined;
   let playbooks: ReturnType<Awaited<typeof import('../outcome-playbooks.js')>['getPlaybooks']> = [];
   let availability: LearningsSlice['availability'] = 'no_data';
+
+  // A1: administrative kill-switch. When learnings are disabled for this workspace,
+  // short-circuit to availability:'disabled' so consumers degrade to general best
+  // practices (per the LearningsSlice.availability contract) — skipping all
+  // summary/outcome/playbook reads.
+  try {
+    const { isLearningsDisabled } = await import('../workspace-learnings.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+    if (isLearningsDisabled(workspaceId)) {
+      return {
+        availability: 'disabled',
+        summary: null,
+        confidence: null,
+        topActionTypes: [],
+        overallWinRate: 0,
+        recentTrend: null,
+        playbooks: [],
+        roiAttribution: [],
+        topWins: [],
+        weCalledIt: [],
+        winRateByActionType: {},
+        scoringConfig: undefined,
+      };
+    }
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleLearnings: disable-switch read failed, continuing');
+  }
+
   try {
     const { getWorkspaceLearnings } = await import('../workspace-learnings.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
     summary = getWorkspaceLearnings(workspaceId, opts?.learningsDomain ?? 'all');
@@ -35,7 +62,11 @@ export async function assembleLearnings(
   let topWins: TopWin[] = [];
   try {
     const { getActionsByWorkspace, getOutcomesForAction, getTopWinsFromActions } = await import('../outcome-tracking.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-    const actions = getActionsByWorkspace(workspaceId);
+    // A1: exclude `not_acted_on` actions before building ANY win surface. These are
+    // suggestions the workspace never executed — their outcomes are not our wins.
+    // getTopWinsFromActions filters internally too, but roiAttribution/weCalledIt loop
+    // over this list directly, so filter once here for all three surfaces.
+    const actions = getActionsByWorkspace(workspaceId).filter(a => a.attribution !== 'not_acted_on');
     // Lazy-caching outcomes accessor: fetches on first access, caches the result.
     // Shared between getTopWinsFromActions, roiAttribution, and the weCalledIt loop so
     // each action's outcomes are queried at most once.

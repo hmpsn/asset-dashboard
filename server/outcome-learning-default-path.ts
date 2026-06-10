@@ -41,6 +41,23 @@ function difficultyMultiplier(winRate: number): number {
   return 1;
 }
 
+/**
+ * A1 — difficulty-multiplier UNIT MISMATCH seam. DISABLED until rebinned.
+ *
+ * The difficulty multiplier matches `input.difficulty` (provider keyword
+ * difficulty, KD 0–100 where LOW = easy) against `winRateByDifficultyRange` bins.
+ * But those bins are populated by `computeStrategyLearnings` in
+ * `server/workspace-learnings.ts:216-226`, which bins by GSC **position** (a
+ * baseline position >= 51 lands in the '0-20' label). So a KD-15 (easy) keyword is
+ * scored against a cohort that actually holds position->=51 (hard-to-rank)
+ * keywords — the multiplier is applied to the WRONG cohort, distorting scores.
+ *
+ * Until the producer (position bins) and consumer (KD bins) agree on a unit, the
+ * difficulty contribution returns 1.0 (no-op). The action-type multiplier is
+ * unaffected. Flip to `true` only once both sides bin on the same scale.
+ */
+const DIFFICULTY_MULTIPLIER_ENABLED = false;
+
 export function buildOutcomeAdjustment(input: OutcomeAdjustmentInput): OutcomeAdjustmentResult {
   const learnings = input.learnings;
   if (!learnings) return { availability: 'no_data', multiplier: 1, reasons: [] };
@@ -64,7 +81,9 @@ export function buildOutcomeAdjustment(input: OutcomeAdjustmentInput): OutcomeAd
 
   const difficulty = input.difficulty;
   const difficultyRates = learnings.summary?.strategy?.winRateByDifficultyRange;
-  if (typeof difficulty === 'number' && Number.isFinite(difficulty) && difficultyRates) {
+  // A1: difficulty multiplier disabled until the position-bin (producer) vs KD-bin
+  // (consumer) unit mismatch is resolved — see DIFFICULTY_MULTIPLIER_ENABLED above.
+  if (DIFFICULTY_MULTIPLIER_ENABLED && typeof difficulty === 'number' && Number.isFinite(difficulty) && difficultyRates) {
     const label = getDifficultyRangeLabel(difficulty);
     const difficultyRate = difficultyRates[label];
     if (typeof difficultyRate === 'number' && Number.isFinite(difficultyRate) && difficultyRate >= 0) {

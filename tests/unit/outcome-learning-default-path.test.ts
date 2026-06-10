@@ -62,7 +62,7 @@ describe('buildOutcomeAdjustment', () => {
     expect(result.reasons).toEqual([]);
   });
 
-  it('boosts scores when the action type and difficulty range have performed well', () => {
+  it('boosts scores from the action-type signal (difficulty multiplier disabled — A1)', () => {
     const result = buildOutcomeAdjustment({
       actionType: 'content_published',
       learnings: makeLearnings({
@@ -76,7 +76,9 @@ describe('buildOutcomeAdjustment', () => {
     expect(result.availability).toBe('ready');
     expect(result.multiplier).toBeGreaterThan(1);
     expect(result.reasons.join(' ')).toContain('content_published has performed well');
-    expect(result.reasons.join(' ')).toContain('Difficulty range 0-20 has been a strong performer');
+    // A1: difficulty multiplier disabled (position-bin vs KD-bin unit mismatch) —
+    // no difficulty reason is emitted even though difficulty 18 → '0-20' would match.
+    expect(result.reasons.join(' ')).not.toContain('Difficulty range');
   });
 
   it('down-ranks scores when a difficulty range has underperformed', () => {
