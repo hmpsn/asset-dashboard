@@ -43,8 +43,9 @@ vi.mock('../../src/hooks/admin/useKeywordCommandCenter', () => ({
   useKeywordCommandCenterRows: (...args: unknown[]) => rowsHookMock(...args),
   useKeywordCommandCenterBulkAction: () => ({ mutate: bulkMutateMock, isPending: false }),
   useKeywordCommandCenterAction: () => ({ mutate: rowActionMutateMock, isPending: false, variables: undefined }),
-  useKeywordHardDelete: () => ({ mutate: hardDeleteMutateMock, isPending: false }),
+  useKeywordHardDelete: () => ({ mutate: hardDeleteMutateMock, isPending: false, error: null }),
   useKeywordCommandCenterDetail: () => ({ data: undefined, isFetching: false }),
+  useRankTrackingAddKeyword: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false, error: null }),
 }));
 
 vi.mock('../../src/hooks/admin/useLocalSeo', () => ({

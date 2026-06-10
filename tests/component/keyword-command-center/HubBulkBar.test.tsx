@@ -53,6 +53,7 @@ vi.mock('../../../src/hooks/admin/useKeywordCommandCenter', () => ({
   useKeywordCommandCenterAction: () => ({ mutate: vi.fn(), isPending: false, error: null, variables: undefined }),
   useKeywordHardDelete: () => ({ mutate: vi.fn(), isPending: false, error: null }),
   useKeywordCommandCenterDetail: () => ({ data: undefined, isFetching: false }),
+  useRankTrackingAddKeyword: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false, error: null }),
 }));
 
 vi.mock('../../../src/hooks/admin/useLocalSeo', () => ({

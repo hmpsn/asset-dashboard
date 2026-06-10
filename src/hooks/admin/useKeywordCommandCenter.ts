@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { keywordCommandCenter } from '../../api/keywordCommandCenter';
+import { rankTracking } from '../../api/seo';
 import { queryKeys } from '../../lib/queryKeys';
 import { invalidateMany, keywordMutationInvalidationKeys } from '../../lib/queryInvalidation';
 import type {
@@ -68,6 +69,24 @@ export function useKeywordHardDelete(workspaceId: string) {
   return useMutation({
     mutationFn: (vars: { keyword: string; force?: boolean }) =>
       keywordCommandCenter.deleteHard(workspaceId, vars.keyword, { force: vars.force }),
+    onSuccess: () => {
+      invalidateMany(queryClient, keywordMutationInvalidationKeys(workspaceId));
+    },
+  });
+}
+
+/**
+ * Add a keyword to rank tracking via the existing server add path
+ * (POST /api/rank-tracking/:workspaceId/keywords).
+ *
+ * Input: the raw keyword string (caller trims before calling mutateAsync).
+ * Invalidates keywordMutationInvalidationKeys so the Hub, KCC, and RankTracker
+ * caches all refresh.
+ */
+export function useRankTrackingAddKeyword(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (keyword: string) => rankTracking.addKeyword(workspaceId, { query: keyword }),
     onSuccess: () => {
       invalidateMany(queryClient, keywordMutationInvalidationKeys(workspaceId));
     },
