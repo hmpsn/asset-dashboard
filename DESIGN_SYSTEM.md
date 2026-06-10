@@ -690,8 +690,6 @@ Sizes: `sm` / `md` (default) / `lg`. Props: `icon`, `iconPosition`, `loading` (s
 
 Sizes: `sm` (24px) / `md` (32px, default) / `lg` (40px). Requires `label` prop (maps to `aria-label`).
 
-
-
 ---
 
 ## § 19 Layout Primitives (Phase 5 — 2026-04-24)
