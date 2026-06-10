@@ -440,12 +440,22 @@ export async function buildCopyGenerationContext(
     try {
       // Reuse the persisted brief the blueprint auto-brief step already created
       // (entry.briefId → getBrief) instead of regenerating a 7000-token research-mode
-      // brief on every copy generation. Only fall back to generation when the entry
-      // has no brief or the FK is stale.
-      const persisted = entry.briefId ? getBrief(wsId, entry.briefId) : undefined;
-      const brief = persisted ?? await generateBrief(wsId, entry.primaryKeyword, {
-        pageType: entry.pageType,
-      }, { persist: false });
+      // brief on every copy generation. Fall back to generation when the entry has no
+      // brief, the FK is stale, OR the brief was built for a DIFFERENT keyword — the
+      // entry-update route changes primary_keyword and brief_id independently, so a
+      // keyword edit leaves briefId pointing at a brief for the old keyword; reusing it
+      // would feed a mismatched brief into a prompt whose PAGE STRATEGY shows the new
+      // keyword (silently-wrong copy). The old path always regenerated for the current
+      // keyword, so this guard preserves that correctness. NOTE: reuse freezes
+      // enrichment at blueprint-creation time rather than copy time — the intended
+      // optimization tradeoff.
+      const persistedCandidate = entry.briefId ? getBrief(wsId, entry.briefId) : undefined;
+      const sameKeyword = persistedCandidate
+        && persistedCandidate.targetKeyword.trim().toLowerCase() === entry.primaryKeyword.trim().toLowerCase();
+      const brief = (sameKeyword ? persistedCandidate : undefined)
+        ?? await generateBrief(wsId, entry.primaryKeyword, {
+          pageType: entry.pageType,
+        }, { persist: false });
       const briefLines: string[] = [];
       if (brief.suggestedTitle) briefLines.push(`Suggested title: ${brief.suggestedTitle}`);
       if (brief.executiveSummary) briefLines.push(`Executive summary: ${brief.executiveSummary}`);

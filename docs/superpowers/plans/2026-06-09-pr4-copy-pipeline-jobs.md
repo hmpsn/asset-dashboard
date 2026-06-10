@@ -42,7 +42,11 @@ Model: orchestrator-inline; reviewer Opus-tier.
 2. `generateCopyForEntry` (full entry) keeps brief enrichment (via Task 1's reuse path).
 **Test assertions:** regenerateSection path → neither `getBrief` nor `generateBrief` is called; generateCopyForEntry path → brief enrichment present.
 
-## Task 3 — Single-entry generation on the job platform
+## Task 3 — Single-entry generation on the job platform — DEFERRED to PR 4b (recorded)
+
+**Decision @ execution (2026-06-10):** the migration's backend is trivial (batch-of-one), but `BlueprintDetail.tsx:666` drives a per-entry spinner from `generateCopyMutation.isPending && variables === entry.id`. With a job the mutation resolves instantly on `{jobId}` while generation continues — the spinner stops while copy is still being written (sections then appear via `COPY_BATCH_COMPLETE`). Clean migration therefore requires per-entry job-progress wiring (track the active batchId per entry, derive `isGenerating` from job status, clear on complete). That is the SAME frontend pattern blueprint (#7) and the four admin crawls (#9) need, so **all sync→job migrations consolidate into PR 4b** where the per-entry/job-progress UX is designed once and the sync-loop pr-check rule is validated across every migrated route. The execution-mode violation has no data-loss harm (verifier: sections persist; risk is proxy-timeout on slow generation), and PR 4's brief-reuse already removed the dominant per-call cost (a full research-mode brief gen). PR 4 = Tasks 1+2 only.
+
+### (Original Task 3 contract, carried to PR 4b)
 **Files:** `server/routes/copy-pipeline.ts` (`/generate` route), `src/hooks/admin/useCopyPipeline.ts`, `src/api/brand-engine.ts`. Test: extend `tests/integration/copy-pipeline-routes.test.ts`.
 **Contracts:**
 1. First READ `runCopyBatchGenerationJob` and confirm whether it (or `generateCopyForEntry`) broadcasts `COPY_SECTION_UPDATED` per entry. If the batch worker only emits `COPY_BATCH_PROGRESS/COMPLETE`, EITHER add a per-entry `COPY_SECTION_UPDATED` + `COPY_METADATA_UPDATED` broadcast in the worker loop OR have the single-entry frontend also invalidate on `COPY_BATCH_COMPLETE`. Pick the option that keeps the existing single-entry UI refreshing — verify which events `useCopyPipeline` / the pipeline WS handlers consume before choosing. **If neither is clean, STOP and record** — the brief-reuse wins (Tasks 1-2) ship regardless.

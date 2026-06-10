@@ -102,6 +102,31 @@ describe('copy generation brief reuse', () => {
     expect(context).toContain('GENERATED-FALLBACK-STALE');
   });
 
+  it('falls back to generateBrief when the persisted brief is for a DIFFERENT keyword (stale briefId after a keyword edit)', async () => {
+    // The brief was generated for 'old keyword' but the entry's primaryKeyword is now
+    // 'managed it services' (a keyword edit left briefId pointing at the old brief).
+    // Reusing it would feed a mismatched brief into the prompt — must regenerate.
+    const brief = seedBrief(ws.workspaceId, { targetKeyword: 'old keyword', suggestedTitle: 'WRONG-KEYWORD-BRIEF' });
+    const { blueprint, entry } = seedBlueprintWithEntry(ws.workspaceId, brief.id);
+    generateBriefSpy.mockResolvedValue({ suggestedTitle: 'REGENERATED-FOR-CURRENT-KW', secondaryKeywords: [] });
+
+    const context = await buildCopyGenerationContext(ws.workspaceId, blueprint, entry);
+
+    expect(generateBriefSpy).toHaveBeenCalledTimes(1);
+    expect(context).toContain('REGENERATED-FOR-CURRENT-KW');
+    expect(context).not.toContain('WRONG-KEYWORD-BRIEF');
+  });
+
+  it('reuses the persisted brief when targetKeyword matches case-insensitively / with whitespace', async () => {
+    const brief = seedBrief(ws.workspaceId, { targetKeyword: '  Managed IT Services  ', suggestedTitle: 'CASE-NORMALIZED-REUSE' });
+    const { blueprint, entry } = seedBlueprintWithEntry(ws.workspaceId, brief.id); // entry primaryKeyword: 'managed it services'
+
+    const context = await buildCopyGenerationContext(ws.workspaceId, blueprint, entry);
+
+    expect(generateBriefSpy).not.toHaveBeenCalled();
+    expect(context).toContain('CASE-NORMALIZED-REUSE');
+  });
+
   it('skips brief enrichment entirely when skipBriefEnrichment is set (section regenerate path)', async () => {
     const brief = seedBrief(ws.workspaceId, { suggestedTitle: 'SHOULD-NOT-APPEAR-ON-REGEN' });
     const { blueprint, entry } = seedBlueprintWithEntry(ws.workspaceId, brief.id);
