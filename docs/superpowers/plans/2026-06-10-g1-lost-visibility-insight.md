@@ -183,3 +183,23 @@ grep -r "purple-" src/components/client/   # must be clean
 - [ ] pr-check + feature-flags green
 - [ ] No purple in client components
 - [ ] Code review (requesting-code-review)
+
+
+---
+
+## Amendment (2026-06-10, review fixes — spec-amendment-sync)
+
+1. **opportunity_event REMOVED from scope.** The plan specified minting a `rank_drop`
+   event with `boost: 35`. Review found (a) `computeTimingBoosts` discards events
+   without a `pagePath`, so a workspace-level event is inert dead data, and (b) the
+   boost scale is 0.0–1.5 (`EVENT_BOOST_DEFAULTS.rank_drop` = 0.4, `MAX_PAGE_BOOST`
+   = 1.5) — 35 was written without reading the scale. The event is removed; a real
+   page-resolved event requires a keyword→page mapping first (candidate follow-up,
+   pair with A4's keyword-level outcome bridge).
+2. **Recovery lifecycle ADDED.** When `lostCount` returns to 0 the bridge deletes the
+   insight (`suppressInsights`) and returns `{ modified: 1 }` so the broadcast fires —
+   bridge-sourced rows are exempt from `deleteStaleInsightsByType`, so the bridge owns
+   its own cleanup. Without this the feed showed a stale alert forever after recovery.
+3. **Resolution-skip semantics documented.** A resolved insight mutes further updates
+   (deliberate conservative mute) until recovery deletes the row; a NEW loss after
+   recovery re-mints fresh and unresolved. Re-alert-on-escalation deferred until asked for.

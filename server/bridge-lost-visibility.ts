@@ -13,23 +13,27 @@
  *   3. Returns { modified: N }, never calls broadcastToWorkspace() ✓
  *   4. Never calls resolveInsight() ✓ (only checks resolutionStatus to avoid un-resolving)
  *
+ * Lifecycle: mints/updates the insight while lost queries exist; when every lost query
+ * recovers (lostCount returns to 0), the insight is DELETED so the feed never shows a
+ * stale alert for a recovered problem (review fix — bridge-sourced rows are exempt from
+ * deleteStaleInsightsByType, so this bridge owns its own cleanup).
+ *
+ * Note: no opportunity_event is minted. The timing engine's computeTimingBoosts skips
+ * events without a pagePath, and lost-visibility detection is workspace-level — a
+ * page-resolved event needs a keyword→page mapping first (future work, see plan doc).
+ *
  * Called from rank-tracking-scheduler.ts after detectLostVisibility().
  *
  * `runLostVisibilityBridge` is exported for direct unit/integration testing and
  * for the scheduler to call via fireBridge(). Returns { modified: N }.
  */
 import { createLogger } from './logger.js';
-import {
-  getLostVisibilityCount,
-  getLostVisibilityQueries,
-} from './client-discovered-queries.js';
+import { getLostVisibilityQueries } from './client-discovered-queries.js';
 import {
   upsertInsight,
   getInsight,
+  suppressInsights,
 } from './analytics-insights-store.js';
-import {
-  insertOpportunityEvent,
-} from './opportunity-events.js';
 import type { BridgeResult } from './bridge-infrastructure.js';
 import type { InsightSeverity } from '../shared/types/analytics.js';
 
@@ -56,24 +60,34 @@ function computeImpactScore(lostCount: number): number {
 }
 
 /**
- * Core bridge logic — reads from discovered_queries, mints the insight, and writes an
- * opportunity_event. Safe to call directly; the scheduler wraps it in fireBridge().
- *
- * Returns { modified: 0 } when there are no lost-visibility queries.
+ * Core bridge logic — reads detected lost-visibility rows and mints, updates, or
+ * retires the workspace-level insight. Safe to call directly; the scheduler wraps
+ * it in fireBridge().
  */
 export async function runLostVisibilityBridge(workspaceId: string): Promise<BridgeResult> {
-  const lostCount = getLostVisibilityCount(workspaceId);
+  const rawQueries = getLostVisibilityQueries(workspaceId);
+  const lostCount = rawQueries.length;
+  const existing = getInsight(workspaceId, null, 'lost_visibility');
+
   if (lostCount === 0) {
+    // Recovery path (review fix): all previously-lost queries are visible again.
+    // Delete the insight — resolved or not — so the admin feed, client digest, and
+    // briefing candidates stop surfacing a recovered problem. Returning modified: 1
+    // makes the bridge infrastructure broadcast so frontends refresh.
+    if (existing) {
+      suppressInsights(workspaceId, [existing.id]);
+      log.info({ workspaceId, insightId: existing.id }, 'Lost-visibility recovered — insight retired');
+      return { modified: 1 };
+    }
     return { modified: 0 };
   }
 
-  const rawQueries = getLostVisibilityQueries(workspaceId);
-
-  // Check resolution: if the admin has resolved this insight, the upsert will overwrite
-  // the data/severity/impactScore fields (updating counts) but NOT resolution_status
-  // (intentionally omitted in the ON CONFLICT SET list — see analytics-insights-store.ts:59).
-  // This matches the expected semantics: bridge re-mints always; resolution is preserved.
-  const existing = getInsight(workspaceId, null, 'lost_visibility');
+  // Deliberate choice: once an admin resolves the insight, this bridge stops updating
+  // it — even if the lost count later escalates. The ON CONFLICT clause would preserve
+  // resolution_status on its own, so this skip is an EXTRA-conservative mute: a resolved
+  // alert stays muted until the queries recover (which deletes the row above) and a NEW
+  // loss re-mints a fresh, unresolved insight. Tradeoff: no re-alert on escalation while
+  // still resolved; revisit if admins ask for escalation re-alerts.
   if (existing?.resolutionStatus === 'resolved') {
     log.debug({ workspaceId, lostCount }, 'lost_visibility insight is resolved — skipping upsert');
     return { modified: 0 };
@@ -104,23 +118,6 @@ export async function runLostVisibilityBridge(workspaceId: string): Promise<Brid
       detectedAt,
     },
   });
-
-  // Mint an opportunity_event so the timing engine can lift recommendations for pages
-  // that could capture the reclaimed visibility. pagePath=null (workspace-level signal).
-  try {
-    insertOpportunityEvent({
-      workspaceId,
-      type: 'rank_drop',
-      pagePath: null,
-      keyword: null,
-      boost: 35,
-      halfLifeDays: 14,
-      source: 'bridge-lost-visibility',
-      payload: { lostCount },
-    });
-  } catch (evErr) {
-    log.warn({ workspaceId, err: evErr }, 'Lost-visibility opportunity-event write failed (non-fatal)');
-  }
 
   log.info({ workspaceId, lostCount, severity, impactScore }, 'Lost-visibility insight minted');
 

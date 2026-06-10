@@ -5,7 +5,8 @@
  * - Mints a lost_visibility insight from discovered_queries data
  * - Is idempotent (upsert, no duplicate rows)
  * - Respects existing resolution status (does not un-resolve admin work)
- * - Mints an opportunity_event of type 'rank_drop'
+ * - Does NOT mint an opportunity_event (page-less events are inert in computeTimingBoosts)
+ * - Retires the insight when all lost queries recover (recovery lifecycle)
  * - Returns { modified: 0 } when there are zero lost-visibility queries
  *
  * Uses seedWorkspace() + cleanup() pattern (no server required — direct module imports).
@@ -113,14 +114,10 @@ describe('bridge-lost-visibility', () => {
     expect(all.length).toBe(1);
   });
 
-  it('mints an opportunity_event of type rank_drop with source bridge-lost-visibility', async () => {
+  it('does NOT mint an opportunity_event (review fix — page-less events are discarded by computeTimingBoosts)', async () => {
     const events = listActiveOpportunityEvents(ws.workspaceId);
-    const bridgeEvent = events.find(
-      e => e.type === 'rank_drop' && e.source === 'bridge-lost-visibility',
-    );
-    expect(bridgeEvent).toBeDefined();
-    expect(bridgeEvent!.boost).toBeGreaterThan(0);
-    expect(bridgeEvent!.halfLifeDays).toBeGreaterThan(0);
+    const bridgeEvent = events.find(e => e.source === 'bridge-lost-visibility');
+    expect(bridgeEvent).toBeUndefined();
   });
 
   it('respects resolution status — resolved insight is not un-resolved on re-run', async () => {
@@ -148,5 +145,34 @@ describe('bridge-lost-visibility', () => {
       expect(typeof q.query).toBe('string');
       expect(q.query.length).toBeGreaterThan(0);
     }
+  });
+
+  it('recovery path (review fix) — insight is retired when all lost queries recover', async () => {
+    // Re-observe every lost query with a recent snapshot date: the upsert flips
+    // them back to ACTIVE, so lost-visibility count returns to 0.
+    const recoveredObservations: DiscoveredQueryObservation[] = [];
+    for (let i = 0; i < 5; i++) {
+      recoveredObservations.push({
+        query: `test lost query ${i}`,
+        position: 5 + i,
+        clicks: 10,
+        impressions: 200,
+        ctr: 0.05,
+        seenDate: '2026-06-09',
+      });
+    }
+    upsertDiscoveredQueries(ws.workspaceId, recoveredObservations, '2026-06-09');
+    detectLostVisibility(ws.workspaceId, '2026-06-09');
+
+    // The insight exists (resolved in the earlier test) — recovery must delete it
+    // and report modified so the bridge infrastructure broadcasts.
+    expect(getInsight(ws.workspaceId, null, 'lost_visibility')).toBeDefined();
+    const result = await runLostVisibilityBridge(ws.workspaceId);
+    expect(result.modified).toBe(1);
+    expect(getInsight(ws.workspaceId, null, 'lost_visibility')).toBeUndefined();
+
+    // Re-run with still-zero lost queries: nothing to retire, no broadcast.
+    const again = await runLostVisibilityBridge(ws.workspaceId);
+    expect(again).toEqual({ modified: 0 });
   });
 });
