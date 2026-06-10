@@ -21,7 +21,7 @@ import {
 } from '../../server/domains/inbox/approval-batch-dual-write.js';
 import { respondToApprovalBatch } from '../../server/domains/inbox/approval-batch-respond.js';
 import { respondToApprovalBatchItem } from '../../server/domains/inbox/approval-batch-item-respond.js';
-import { findBySourceRef } from '../../server/client-deliverables.js';
+import { findBySourceRef, upsertDeliverable } from '../../server/client-deliverables.js';
 import { setBroadcast } from '../../server/broadcast.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
@@ -121,6 +121,43 @@ describe('legacy respond paths sync the deliverable mirror', () => {
     expect(mirror?.status).toBe('approved');
     expect(mirror?.decidedAt).toBe(decidedAt);
     // No second DELIVERABLE_UPDATED churn from the sync (legacy APPROVAL_UPDATE still fires).
+    expect(events.filter(e => e.event === WS_EVENTS.DELIVERABLE_UPDATED)).toHaveLength(0);
+  });
+
+  it('unified DECLINE echo: a declined mirror is left untouched when the batch recalcs to rejected', () => {
+    // respondToDeliverable moves the mirror to 'declined' (terminal) FIRST, then drives
+    // this same respond service with decision 'rejected' (target changes_requested). The
+    // sync must leave the mirror declined — silently (debug, not warn), no broadcast.
+    const { wsId, batch, mirror } = sendMirroredBatch();
+    syncApprovalBatchDeliverableStatus(wsId, batch); // no-op warm-up (pending)
+    // Simulate the unified path: force the mirror terminal via the store.
+    upsertDeliverable({
+      id: mirror.id, workspaceId: wsId, type: mirror.type, kind: mirror.kind,
+      status: 'declined', title: mirror.title, payload: mirror.payload, sourceRef: mirror.sourceRef,
+    });
+    events = [];
+
+    respondToApprovalBatch(wsId, batch.id, 'rejected', { note: 'no thanks' });
+
+    expect(readMirror(wsId, batch.id)?.status).toBe('declined');
+    expect(events.filter(e => e.event === WS_EVENTS.DELIVERABLE_UPDATED)).toHaveLength(0);
+  });
+
+  it('R3 subset-approve echo: an approved mirror is left untouched when the batch recalcs to partial', () => {
+    const { wsId, batch } = sendMirroredBatch(2);
+    // Unified path approves the deliverable (mirror → approved) with one flagged item,
+    // so the legacy batch recalcs to 'partial' via the per-item decisions.
+    syncApprovalBatchDeliverableStatus(wsId, { ...batch, status: 'approved' });
+    events = [];
+
+    respondToApprovalBatch(wsId, batch.id, 'approved', {
+      itemDecisions: [
+        { legacyItemId: batch.items[0].id, status: 'approved' },
+        { legacyItemId: batch.items[1].id, status: 'rejected', note: 'hold this one' },
+      ],
+    });
+
+    expect(readMirror(wsId, batch.id)?.status).toBe('approved');
     expect(events.filter(e => e.event === WS_EVENTS.DELIVERABLE_UPDATED)).toHaveLength(0);
   });
 

@@ -20,8 +20,11 @@
  * Every mirror operation is best-effort and MUST NOT break the live legacy write: failures
  * are logged and swallowed (the legacy row is already persisted + the client notified).
  *
- * Leaf rule: imports the registry + the store + the broadcast singleton + state machines;
- * not imported back by them.
+ * Import shape: imports the registry + the store + the broadcast singleton + state
+ * machines. NOTE a runtime-benign back-edge exists: the adapter registry transitively
+ * imports the respond services (approval-batch-shared → response-lifecycle), which import
+ * this module — function-only live bindings, nothing evaluated at module init, mirroring
+ * the pre-existing client-action-family cycle. Do not add module-init side effects here.
  */
 import type { ApprovalBatch } from '../../../shared/types/approvals.js';
 import type { ClientDeliverable, DeliverableStatus, DeliverableType } from '../../../shared/types/client-deliverable.js';
@@ -33,7 +36,7 @@ import {
 } from './deliverable-adapters/approval-batch-classifier.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
 import { WS_EVENTS } from '../../ws-events.js';
-import { getDeliverableTransitions, validateTransition } from '../../state-machines.js';
+import { getDeliverableTransitions } from '../../state-machines.js';
 import { createLogger } from '../../logger.js';
 
 const log = createLogger('approval-batch-dual-write');
@@ -203,12 +206,24 @@ export function syncApprovalBatchDeliverableStatus(
     const { existing, type } = found;
     if (existing.status === target) return existing;
 
-    try {
-      validateTransition('client_deliverable', getDeliverableTransitions(type), existing.status, target);
-    } catch (err) {
-      log.warn(
-        { err, workspaceId, batchId: batch.id, from: existing.status, to: target },
-        'mirror status sync skipped: illegal deliverable transition',
+    // Non-throwing legality check. An ILLEGAL move here is almost always the expected
+    // unified-path echo, not a bug: respondToDeliverable moves the mirror FIRST (e.g. to
+    // 'declined', or to 'approved' on an R3 subset-approve whose batch recalcs to
+    // 'partial') and then drives this same respond service. The mirror is authoritative
+    // in those flows — leave it, at debug level. warn is reserved for the impossible
+    // combinations (e.g. a decided batch with a still-draft mirror).
+    const allowed = getDeliverableTransitions(type)[existing.status];
+    if (!allowed?.includes(target)) {
+      const mirrorAlreadyDecided = existing.status === 'declined'
+        || existing.status === 'approved'
+        || existing.status === 'applied'
+        || existing.status === 'cancelled'
+        || existing.status === 'expired';
+      log[mirrorAlreadyDecided ? 'debug' : 'warn'](
+        { workspaceId, batchId: batch.id, from: existing.status, to: target },
+        mirrorAlreadyDecided
+          ? 'mirror status sync skipped: mirror already decided (unified-path echo)'
+          : 'mirror status sync skipped: unexpected illegal deliverable transition',
       );
       return existing;
     }
@@ -240,6 +255,9 @@ export function cancelApprovalBatchDeliverable(
     const found = findBatchMirror(workspaceId, batch);
     if (!found) return null;
     if (found.existing.status === 'cancelled') return found.existing;
+    // Deliberately NOT transition-guarded (matching cancelSchemaPlanDeliverable): an admin
+    // withdrawal is authoritative and must clear the card even from decided/terminal
+    // states — the legacy batch it mirrored no longer exists.
     const deliverable = moveMirrorStatus(found.existing, 'cancelled');
     safeBroadcast(workspaceId, WS_EVENTS.DELIVERABLE_UPDATED, deliverable);
     return deliverable;
