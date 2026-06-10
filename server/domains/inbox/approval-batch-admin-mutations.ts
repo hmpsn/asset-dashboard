@@ -5,7 +5,10 @@ import {
   getBatch,
 } from '../../approvals.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
-import { mirrorApprovalBatchToDeliverable } from './approval-batch-dual-write.js';
+import {
+  cancelApprovalBatchDeliverable,
+  mirrorApprovalBatchToDeliverable,
+} from './approval-batch-dual-write.js';
 import { notifyApprovalReady } from '../../email.js';
 import { getPageState } from '../../page-edit-states.js';
 import {
@@ -99,6 +102,11 @@ export function deleteApprovalBatchForClient(
   }
 
   if (!deleteBatch(workspaceId, batchId)) return null;
+
+  // Cancel the deliverable mirror (read-before-delete: `batch` is the pre-delete row).
+  // Without this the mirror stays awaiting_client in the client Inbox forever (2026-06-09
+  // audit, data-flow confirmed finding). Best-effort inside the helper — never throws.
+  cancelApprovalBatchDeliverable(workspaceId, batch);
 
   for (const pageId of pageIdsToClear) {
     clearPageState(workspaceId, pageId);

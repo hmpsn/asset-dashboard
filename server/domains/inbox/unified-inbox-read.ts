@@ -19,10 +19,11 @@
  * admitted ONLY for `kind:'order'` (see `CLIENT_FACING_ORDER_STATUSES` + `isClientFacingDeliverable`),
  * so no other type leaks `ordered`/`in_progress`/`completed` into the client list.
  *
- * This is a PURE read: it writes nothing. The `client_deliverable` table is empty until the
- * per-type send-path cutover flips (Phase 1), so in production this returns only the projected
- * copy/content_request entries — that's expected and correct (the endpoint is exercised with
- * seeded rows in tests). Leaf-ish: imports the store + source readers + the projected adapters.
+ * This is a PURE read: it writes nothing. The `client_deliverable` table is LIVE in
+ * production: the send-time dual-write mirrors (approval batches, client actions, schema
+ * plans, work orders, briefings) run unconditionally — no feature flag gates them — so this
+ * read returns physical rows alongside the projected copy/content_request entries.
+ * Leaf-ish: imports the store + source readers + the projected adapters.
  *
  * IMPORTANT: this module does NOT depend on any `unified-*` flag. The flag gates whether the
  * CLIENT fetches this endpoint (src/hooks/client/useUnifiedInbox.ts) — the read itself is inert

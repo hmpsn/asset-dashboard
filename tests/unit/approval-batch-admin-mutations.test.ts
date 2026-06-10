@@ -8,6 +8,7 @@ const mockDeleteBatch = vi.fn();
 const mockGetBatch = vi.fn();
 const mockBroadcastToWorkspace = vi.fn();
 const mockMirrorApprovalBatchToDeliverable = vi.fn();
+const mockCancelApprovalBatchDeliverable = vi.fn();
 const mockNotifyApprovalReady = vi.fn();
 const mockGetPageState = vi.fn();
 const mockClearPageState = vi.fn();
@@ -31,6 +32,7 @@ vi.mock('../../server/broadcast.js', () => ({
 
 vi.mock('../../server/domains/inbox/approval-batch-dual-write.js', () => ({
   mirrorApprovalBatchToDeliverable: mockMirrorApprovalBatchToDeliverable,
+  cancelApprovalBatchDeliverable: mockCancelApprovalBatchDeliverable,
 }));
 
 vi.mock('../../server/email.js', () => ({
@@ -242,6 +244,10 @@ describe('approval-batch-admin-mutations', () => {
       batchId: 'ab_1',
       action: 'deleted',
     });
+    // 2026-06-09 audit (data-flow, confirmed): deleting the batch previously orphaned the
+    // deliverable mirror forever (awaiting_client ghost card in the client Inbox). The
+    // delete must cancel the mirror, passing the PRE-delete batch (read-before-delete).
+    expect(mockCancelApprovalBatchDeliverable).toHaveBeenCalledWith('ws_1', batch);
   });
 
   it('deleteApprovalBatchForClient returns null for a missing batch without side effects', async () => {
@@ -255,6 +261,7 @@ describe('approval-batch-admin-mutations', () => {
     expect(mockClearPageState).not.toHaveBeenCalled();
     expect(mockAddActivity).not.toHaveBeenCalled();
     expect(mockBroadcastToWorkspace).not.toHaveBeenCalled();
+    expect(mockCancelApprovalBatchDeliverable).not.toHaveBeenCalled();
   });
 
   it('deleteApprovalBatchForClient suppresses delete-side effects when storage deletion fails', async () => {
@@ -270,5 +277,7 @@ describe('approval-batch-admin-mutations', () => {
     expect(mockClearPageState).not.toHaveBeenCalled();
     expect(mockAddActivity).not.toHaveBeenCalled();
     expect(mockBroadcastToWorkspace).not.toHaveBeenCalled();
+    // Storage delete failed → the batch still exists → the mirror must NOT be cancelled.
+    expect(mockCancelApprovalBatchDeliverable).not.toHaveBeenCalled();
   });
 });
