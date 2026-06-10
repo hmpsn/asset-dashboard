@@ -321,6 +321,33 @@ describe('buildKeywordUniverse — monthly credit ceiling + provider threading',
     __resetMonthlyProviderCallCeiling(workspaceId);
     __resetMonthlyProviderCallCeiling();
   });
+
+  it("makes ZERO provider calls when seoDataMode is an explicit 'none' (no-spend contract)", async () => {
+    // The admin UI promises "No DataForSEO credits used" for mode 'none'
+    // (src/components/KeywordStrategy.tsx). An explicit 'none' must therefore reach
+    // the assembler un-promoted AND the assembler must skip the discovery fetch even
+    // though a provider is configured. Non-provider inputs (GSC, client keywords)
+    // still fold so the AI+GSC-only generation completes.
+    const provider = new FakeSeoProvider();
+    const spies = [
+      vi.spyOn(provider, 'getRelatedKeywords'),
+      vi.spyOn(provider, 'getQuestionKeywords'),
+      vi.spyOn(provider, 'getKeywordMetrics'),
+      vi.spyOn(provider, 'getDomainKeywords'),
+    ];
+    const { pool, questionKeywords } = await buildKeywordUniverse(workspaceId, baseOpts({
+      provider,
+      seoDataMode: 'none',
+      // Inputs that WOULD drive related/question fetches on quick/full depth.
+      domainKeywords: [{ keyword: 'cloud security', position: 2, volume: 1500, difficulty: 30, cpc: 4, url: 'https://example.com/cloud', traffic: 200, trafficPercent: 12 }],
+      gscData: [{ query: 'managed backups', impressions: 300 }],
+    }));
+
+    for (const spy of spies) expect(spy).not.toHaveBeenCalled();
+    expect(questionKeywords).toEqual([]);
+    // The non-provider GSC seed still entered the pool — 'none' degrades, not disables.
+    expect(pool.has(normalizeKeyword('managed backups'))).toBe(true);
+  });
 });
 
 // ── SEO Generation Quality P7.2 — local-intent candidates ──────────────────────
