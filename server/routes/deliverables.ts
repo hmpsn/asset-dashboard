@@ -30,7 +30,7 @@ import {
   remindDeliverable,
   SendToClientError,
 } from '../domains/inbox/send-to-client.js';
-import { SchemaPlanFeedbackConflictError } from '../domains/inbox/schema-plan-respond.js';
+import { SchemaPlanFeedbackConflictError } from '../domains/schema/schema-plan-feedback.js';
 import { listClientFacingDeliverables } from '../domains/inbox/unified-inbox-read.js';
 import { listAdminDeliverables } from '../domains/inbox/admin-inbox-read.js';
 import { InvalidTransitionError } from '../state-machines.js';
