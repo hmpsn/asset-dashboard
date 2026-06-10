@@ -19,5 +19,4 @@ export {
   useClientROI,
   useClientPricing,
   useClientContentPlan,
-  useClientPageKeywords,
 } from './useClientQueries';

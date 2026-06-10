@@ -163,6 +163,7 @@ export default defineConfig(async () => ({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'text-summary', 'lcov', 'json-summary'],
+      reportOnFailure: true,
       reportsDirectory: './coverage',
       include: ['server/**/*.ts', 'src/**/*.{ts,tsx}', 'shared/**/*.ts'],
       exclude: [

@@ -1526,7 +1526,7 @@ Reference docs:
 ---
 
 ### 52. AI Recommendations Engine
-**What it does:** `server/recommendations.ts` generates traffic-weighted, prioritized SEO recommendations per workspace using audit data, GSC traffic, and AI analysis. Status-tracked (active → dismissed → completed). Auto-regenerated after every audit run. Client-facing `FixRecommendations.tsx` surfaces recommendations with severity badges and "Fix →" routing to appropriate tools. `InsightsEngine` on WorkspaceHome shows prioritized recommendations grouped by urgency. Recommendation flags appear in SEO Editor and Schema Generator via `useRecommendations` hook. Site-wide issues (duplicate titles, orphan pages, etc.) now list specific affected pages with traffic data instead of generic "affects all pages" messaging.
+**What it does:** `server/recommendations.ts` generates traffic-weighted, prioritized SEO recommendations per workspace using audit data, GSC traffic, and AI analysis. Status-tracked (active → dismissed → completed). Auto-regenerated after every audit run. (The original client surface `FixRecommendations.tsx` was removed as dead code 2026-06-10 / H1 sweep — client recommendations render via the client dashboard recommendations card.) `InsightsEngine` on WorkspaceHome shows prioritized recommendations grouped by urgency. Recommendation flags appear in SEO Editor and Schema Generator via `useRecommendations` hook. Site-wide issues (duplicate titles, orphan pages, etc.) now list specific affected pages with traffic data instead of generic "affects all pages" messaging.
 
 **Tier 1 recommendation intelligence enhancements (April 2026):**
 - **(Item 2) Conversion-weighted traffic scoring**: `getTrafficScore()` now accepts an optional `conversionRate` parameter. Pages with CVR > 2% receive up to a 1.5x traffic score boost (proportional to CVR, capped at 1.5x), ensuring high-converting pages are prioritized even with moderate traffic. Conversion rates sourced from `conversion_attribution` insights.
@@ -1546,7 +1546,7 @@ Reference docs:
 ---
 
 ### 53. SEO Self-Service Cart & Checkout
-**What it does:** Client-facing `SeoCart.tsx` and `useCart.tsx` enable clients to add recommended fixes to a cart (meta fixes, schema pages, redirect fixes) and checkout via Stripe. Cart items carry `pageIds` through to Stripe metadata, which flows into work order creation on payment. `FixRecommendations.tsx` surfaces purchasable fix actions based on audit findings.
+**What it does:** Client-facing `SeoCart.tsx` and `useCart.tsx` enable clients to add recommended fixes to a cart (meta fixes, schema pages, redirect fixes) and checkout via Stripe. Cart items carry `pageIds` through to Stripe metadata, which flows into work order creation on payment. (`FixRecommendations.tsx`, which surfaced purchasable fix actions, was removed as dead code 2026-06-10 / H1 sweep.)
 
 **Agency value:** Revenue from fix services without manual quoting or invoicing. Clients self-serve the purchase flow.
 
@@ -4363,10 +4363,12 @@ Current feature count: **329**. Last updated: May 2026.
 
 ---
 
-### 287. Voice Feedback Loop
-**What it does:** Classifies steering notes as content feedback (structure/information changes) vs voice feedback (tone/style/personality) using GPT-4.1-mini. When voice feedback is detected, generates voice profile update suggestions (new guardrails or modifier adjustments) using the current voice DNA as context. Suggestions are flagged for review — never auto-applied.
+### 287. Voice Feedback Loop — REMOVED 2026-06-10 (H1 dead-code sweep)
+**Status:** Module deleted — `server/copy-voice-feedback.ts` was never wired into any production path (test-only references). The voice-guardrail learning loop concept remains a candidate in the 2026-06-10 audit's data-leverage findings if revived.
 
-**Files:** `server/copy-voice-feedback.ts`
+**What it did:** Classified steering notes as content feedback (structure/information changes) vs voice feedback (tone/style/personality) using GPT-4.1-mini. When voice feedback was detected, generated voice profile update suggestions (new guardrails or modifier adjustments) using the current voice DNA as context. Suggestions were flagged for review — never auto-applied.
+
+**Files:** `server/copy-voice-feedback.ts` (REMOVED)
 
 **Agency value:** Steering feedback naturally informs voice profile evolution. Voice-related feedback is surfaced as actionable profile updates instead of being lost in steering history.
 
@@ -6300,8 +6302,10 @@ Bug hardening included:
 
 **PR:** #662
 
-### 401. ClientActionDetailModal
-**What it does:** Tier-3 full-screen modal for action cards with complex payloads — `internal_link`, `redirect_proposal`, and `aeo_change` source types. Renders a payload-specific review UI (table for link suggestions, before/after diff for redirects/AEO). Approve or Request Changes (with note field) directly from the modal. `content_decay` actions remain Tier 1 (inline approve/reject on the card — no modal needed).
+### 401. ClientActionDetailModal — REMOVED 2026-06-10 (H1 dead-code sweep)
+**Status:** Component deleted with zero production callers — InboxTab no longer mounted it; complex-payload review flows through `DecisionDetailModal`. Entry retained for history.
+
+**What it did:** Tier-3 full-screen modal for action cards with complex payloads — `internal_link`, `redirect_proposal`, and `aeo_change` source types. Renders a payload-specific review UI (table for link suggestions, before/after diff for redirects/AEO). Approve or Request Changes (with note field) directly from the modal. `content_decay` actions remain Tier 1 (inline approve/reject on the card — no modal needed).
 
 **Agency value:** Complex structured-data action reviews now have a dedicated reading surface instead of cramped inline cards.
 
@@ -7057,7 +7061,7 @@ Admins can set a market as primary from `LocalSeoMarketSetupDrawer`, and Keyword
 
 **Scope D (regen-on-local-refresh, `server/local-seo.ts` `runLocalSeoRefreshJob`):** after `refresh_completed` + `addActivity` and before `updateJob(done)`, recompute `useLocalGenQual` and call `generateRecommendations(workspaceId)` in its own try/catch (dynamic import breaks the `recommendations.ts ↔ local-seo.ts` cycle — readers are imported statically the other way). No manual broadcast (generateRecommendations broadcasts + invalidates internally — Bridge rule #3); a regen failure never fails the refresh job; flag-OFF/non-local → complete no-op.
 
-**Full ripple lockstep (one commit):** compile-enforced — `RecType` union + `recommendationOutcomeActionType` exhaustive `never` switch (+2 cases → new ActionTypes, NOT `audit_fix_applied`) + `ActionType` union + `DEFAULT_SCORING_CONFIG` (`Record<ActionType,…>`) +2 entries + the `OpportunityInput.branch` switch + `DEFAULT_EFFORT_DAYS` + **`recommendationSchema.type` enum** (CRITICAL — without it the new recs are silently Zod-dropped on every reload, P5's lesson) + the 3 frontend label maps (`outcomeConstants.ts`, `OutcomeSummary.tsx`, `WinsSurface.tsx`, all `Record<ActionType,…>`) + `REC_TYPE_TAB`/`TYPE_ICONS` (`InsightsEngine.tsx`, `Record<RecType,…>`). pr-check-enforced (`new-rec-type-source-needs-category-and-action-type`) — `RecSourceCategory` union + `REC_SOURCE_CATEGORIES` array +2 + `RecSource.localVisibility`/`localServiceGap` builders. grep-only — `FixRecommendations.tsx` `typeConfig` +2 explicit entries (no fallback-to-technical).
+**Full ripple lockstep (one commit):** compile-enforced — `RecType` union + `recommendationOutcomeActionType` exhaustive `never` switch (+2 cases → new ActionTypes, NOT `audit_fix_applied`) + `ActionType` union + `DEFAULT_SCORING_CONFIG` (`Record<ActionType,…>`) +2 entries + the `OpportunityInput.branch` switch + `DEFAULT_EFFORT_DAYS` + **`recommendationSchema.type` enum** (CRITICAL — without it the new recs are silently Zod-dropped on every reload, P5's lesson) + the 3 frontend label maps (`outcomeConstants.ts`, `OutcomeSummary.tsx`, `WinsSurface.tsx`, all `Record<ActionType,…>`) + `REC_TYPE_TAB`/`TYPE_ICONS` (`InsightsEngine.tsx`, `Record<RecType,…>`). pr-check-enforced (`new-rec-type-source-needs-category-and-action-type`) — `RecSourceCategory` union + `REC_SOURCE_CATEGORIES` array +2 + `RecSource.localVisibility`/`localServiceGap` builders. grep-only — (historical: `FixRecommendations.tsx` `typeConfig` step — file removed 2026-06-10 / H1 sweep, no longer applies).
 
 **Intelligence slice (Data-Flow #6):** `LocalSeoSlice` (`shared/types/intelligence.ts`) gains `serviceGaps[]` + `competitorBrands[]`; `assembleLocalSeo` (`local-seo-slice.ts`) populates them (best-effort, degrade-to-empty) AND `renderLocalSeoBlock` renders them into `effectiveLocalSeoBlock` (the field `formatLocalSeoSection` emits) so AdminChat sees them.
 

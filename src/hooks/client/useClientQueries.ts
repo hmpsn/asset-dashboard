@@ -8,7 +8,7 @@ import type {
   AuditSummary, AuditDetail,
   ClientContentRequest, ClientKeywordStrategy, ClientRequest, ApprovalBatch,
   ActivityLogItem, RankHistoryEntry, LatestRank,
-  AnnotationItem, AnomalyItem, ContentPlanReviewCell, ApprovalPageKeyword,
+  AnnotationItem, AnomalyItem, ContentPlanReviewCell,
 } from '../../components/client/types';
 import type { PricingData } from '../usePayments';
 import { keywordComparisonKey } from '../../../shared/keyword-normalization';
@@ -144,14 +144,6 @@ export function useClientROI(wsId: string, enabled: boolean) {
     enabled,
     staleTime: 10 * 60 * 1000,
     retry: 2,
-  });
-}
-
-export function useClientPageKeywords(wsId: string, enabled: boolean) {
-  return useQuery({
-    queryKey: queryKeys.client.pageKeywords(wsId),
-    queryFn: () => getOptional<ApprovalPageKeyword[]>(`/api/public/page-keywords/${wsId}`),
-    enabled,
   });
 }
 
