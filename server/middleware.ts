@@ -126,6 +126,18 @@ setInterval(() => {
 
 // ── Session Signing ──
 
+// In production a stable secret is mandatory: a per-process random fallback would
+// silently invalidate every admin + client-portal session on each restart/redeploy
+// (2026-06-09 audit). Mirror jwt-config.ts's hard-fail. Dev/test keep the random
+// fallback so local runs need no env setup.
+if (
+  process.env.NODE_ENV === 'production'
+  && !process.env.SESSION_SECRET
+  && !process.env.APP_PASSWORD
+) {
+  throw new Error('SESSION_SECRET (or APP_PASSWORD) must be set in production');
+}
+
 const SESSION_SECRET = process.env.SESSION_SECRET || process.env.APP_PASSWORD || crypto.randomBytes(32).toString('hex');
 
 export function signClientSession(workspaceId: string): string {
