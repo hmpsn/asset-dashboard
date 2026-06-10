@@ -18,8 +18,7 @@ import {
   deleteApprovalBatchForClient,
 } from '../domains/inbox/approval-batch-admin-mutations.js';
 import { applyApprovedBatchItems } from '../domains/inbox/approval-batch-apply.js';
-import { respondToApprovalBatchItem } from '../domains/inbox/approval-batch-item-respond.js';
-import { respondToApprovalBatch } from '../domains/inbox/approval-batch-respond.js';
+import { respondToApprovalBatch, respondToApprovalBatchItem } from '../domains/inbox/approval-batch-response-lifecycle.js';
 import { createLogger } from '../logger.js';
 import { getClientActor, requireClientPortalAuth } from '../middleware.js';
 import {

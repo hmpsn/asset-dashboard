@@ -41,7 +41,7 @@ import type {
 } from './types.js';
 import type { UpsertDeliverableItemInput } from '../../../client-deliverables.js';
 import type { ClientDeliverable, DeliverableType } from '../../../../shared/types/client-deliverable.js';
-import { respondToApprovalBatch, type ApprovalItemDecision } from '../approval-batch-respond.js';
+import { respondToApprovalBatch, type ApprovalItemDecision } from '../approval-batch-response-lifecycle.js';
 import { createLogger } from '../../../logger.js';
 
 const log = createLogger('approval-batch-shared');
