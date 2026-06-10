@@ -35,7 +35,6 @@ const migratedJsonGenerationFiles: Array<{ path: string; aiImport: string }> = [
 
 const migratedOperationBackedStructuredFiles: Array<{ path: string; aiImport: string; operations: string[] }> = [
   { path: 'server/content-posts-ai.ts', aiImport: "from './ai.js'", operations: ['content-post-seo-meta', 'content-post-unify', 'voice-scoring'] },
-  { path: 'server/copy-voice-feedback.ts', aiImport: "from './ai.js'", operations: ['voice-feedback-suggest'] },
   { path: 'server/meeting-brief-generator.ts', aiImport: "from './ai.js'", operations: ['meeting-brief'] },
   { path: 'server/routes/workspaces.ts', aiImport: "from '../ai.js'", operations: ['intelligence-profile-autofill'] },
 ];

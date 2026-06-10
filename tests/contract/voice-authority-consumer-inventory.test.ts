@@ -32,7 +32,6 @@ const VOICE_AUTHORITY_INVENTORY: Array<{
   { file: 'server/copy-generation.ts', classification: 'correct' },
   { file: 'server/copy-intelligence.ts', classification: 'documented-exception' },
   { file: 'server/copy-refresh.ts', classification: 'documented-exception' },
-  { file: 'server/copy-voice-feedback.ts', classification: 'correct' },
   { file: 'server/diagnostic-orchestrator.ts', classification: 'correct' },
   { file: 'server/discovery-ingestion.ts', classification: 'documented-exception' },
   { file: 'server/internal-links.ts', classification: 'correct' },

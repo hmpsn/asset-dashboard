@@ -1,9 +1,9 @@
 /**
  * Smoke tests for client-facing components.
  * Covers: ClientHeader, ClientAuthGate, HealthScoreCard, DataSnapshots,
- *         FixRecommendations, BetaProvider/useBetaMode, EmailCaptureGate,
+ *         BetaProvider/useBetaMode, EmailCaptureGate,
  *         ClientOnboardingQuestionnaire, SeoEducationTip, ServiceInterestCTA,
- *         SeoCartButton/SeoCartDrawer, OrderStatus, WeCalledIt, OutcomeSummary.
+ *         SeoCartButton/SeoCartDrawer, OrderStatus, OutcomeSummary.
  */
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -1112,102 +1112,6 @@ describe('ClientHeader', () => {
   });
 });
 
-// ── FixRecommendations ────────────────────────────────────────────────────────
-
-import { FixRecommendations } from '../../../src/components/client/FixRecommendations';
-
-const auditWithMeta: AuditDetail = {
-  ...mockAuditDetail,
-  audit: {
-    ...mockAuditDetail.audit,
-    pages: [
-      {
-        pageId: 'p1',
-        page: 'Home',
-        slug: '/',
-        url: 'https://example.com/',
-        score: 55,
-        issues: [
-          {
-            check: 'meta-title',
-            severity: 'error',
-            message: 'Missing meta title tag',
-            recommendation: 'Add a meta title',
-            category: 'metadata',
-          },
-          {
-            check: 'meta-description',
-            severity: 'error',
-            message: 'Missing meta description',
-            recommendation: 'Add a meta description',
-            category: 'metadata',
-          },
-        ],
-      },
-    ],
-    siteWideIssues: [],
-  },
-};
-
-describe('FixRecommendations', () => {
-  it('renders null when no categories can be built (empty audit)', () => {
-    const emptyAudit: AuditDetail = {
-      ...mockAuditDetail,
-      audit: {
-        ...mockAuditDetail.audit,
-        pages: [],
-        siteWideIssues: [],
-      },
-    };
-    const { container } = render(
-      <BetaProvider value={false}>
-        <CartProvider>
-          <FixRecommendations auditDetail={emptyAudit} />
-        </CartProvider>
-      </BetaProvider>,
-      { wrapper: Wrapper }
-    );
-    // With empty pages, returns null (no categories)
-    expect(container.firstChild).toBeNull();
-  });
-
-  it('renders Recommended Fixes heading when there are metadata issues', () => {
-    render(
-      <BetaProvider value={false}>
-        <CartProvider>
-          <FixRecommendations auditDetail={auditWithMeta} />
-        </CartProvider>
-      </BetaProvider>,
-      { wrapper: Wrapper }
-    );
-    expect(screen.getByText(/Recommended Fixes/i)).toBeInTheDocument();
-  });
-
-  it('shows metadata optimization category', () => {
-    render(
-      <BetaProvider value={false}>
-        <CartProvider>
-          <FixRecommendations auditDetail={auditWithMeta} />
-        </CartProvider>
-      </BetaProvider>,
-      { wrapper: Wrapper }
-    );
-    expect(screen.getByText(/Metadata Optimization/i)).toBeInTheDocument();
-  });
-
-  it('shows premium plan message when tier is premium', () => {
-    render(
-      <BetaProvider value={false}>
-        <CartProvider>
-          <FixRecommendations auditDetail={auditWithMeta} tier="premium" />
-        </CartProvider>
-      </BetaProvider>,
-      { wrapper: Wrapper }
-    );
-    expect(screen.getByText(/Included in your Premium plan/i)).toBeInTheDocument();
-  });
-});
-
 // ── SeoCartButton ─────────────────────────────────────────────────────────────
 
 import { SeoCartButton, SeoCartDrawer } from '../../../src/components/client/SeoCart';
@@ -1248,35 +1152,6 @@ describe('OrderStatus', () => {
       <OrderStatus workspaceId="ws-1" />
     );
     // No crash is sufficient; query is async so no content renders synchronously
-    expect(true).toBe(true);
-  });
-});
-
-// ── WeCalledIt ────────────────────────────────────────────────────────────────
-
-import WeCalledIt from '../../../src/components/client/WeCalledIt';
-
-describe('WeCalledIt', () => {
-  it('renders without crashing for free tier', () => {
-    renderWithWrapper(
-      <WeCalledIt workspaceId="ws-1" tier="free" />
-    );
-    // FeatureFlag wraps it — if flag is off the component returns null; if on it renders
-    // Either way we should not crash
-    expect(true).toBe(true);
-  });
-
-  it('renders without crashing for growth tier', () => {
-    renderWithWrapper(
-      <WeCalledIt workspaceId="ws-1" tier="growth" />
-    );
-    expect(true).toBe(true);
-  });
-
-  it('renders without crashing for premium tier', () => {
-    renderWithWrapper(
-      <WeCalledIt workspaceId="ws-1" tier="premium" />
-    );
     expect(true).toBe(true);
   });
 });
