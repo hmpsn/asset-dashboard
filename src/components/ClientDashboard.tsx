@@ -35,7 +35,6 @@ import {
   useClientAnnotations,
   useClientAnomalies,
   useClientApprovals,
-  useClientActions,
   useClientRequests,
   useClientContentRequests,
   useClientAuditSummary,
@@ -43,7 +42,6 @@ import {
   useClientStrategy,
   useClientPricing,
   useClientContentPlan,
-  useClientPageKeywords,
   useClientCopyEntries,
 } from '../hooks/client/useClientQueries';
 import { usePayments } from '../hooks/usePayments';
@@ -61,7 +59,6 @@ import {
   type BusinessProfile,
   type WorkspaceInfo,
   type ClientTab,
-  type ApprovalBatch,
   type ClientContentRequest,
 } from './client/types';
 import type { AnalyticsDateRange } from '../../shared/types/analytics-contract.js';
@@ -120,13 +117,11 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   const annotationsQ = useClientAnnotations(workspaceId, dataEnabled);
   const anomaliesQ = useClientAnomalies(workspaceId, dataEnabled);
   const approvalsQ = useClientApprovals(workspaceId, dataEnabled);
-  const clientActionsQ = useClientActions(workspaceId, dataEnabled);
   const requestsQ = useClientRequests(workspaceId, dataEnabled);
   const contentReqQ = useClientContentRequests(workspaceId, dataEnabled);
   const auditSummaryQ = useClientAuditSummary(workspaceId, dataEnabled);
   const auditDetailQ = useClientAuditDetail(workspaceId, dataEnabled);
   const strategyQ = useClientStrategy(workspaceId, dataEnabled);
-  const pageKeywordsQ = useClientPageKeywords(workspaceId, dataEnabled);
   const pricingQ = useClientPricing(workspaceId, dataEnabled);
   const contentPlanQ = useClientContentPlan(workspaceId, dataEnabled);
   const copyEntriesQ = useClientCopyEntries(workspaceId, dataEnabled);
@@ -143,7 +138,6 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     if (latestRanksQ.error) errs.ranks = 'Unable to load ranking data';
     if (auditSummaryQ.error) errs.audit = 'Unable to load site health data';
     if (approvalsQ.error) errs.approvals = 'Unable to load approvals';
-    if (clientActionsQ.error) errs.clientActions = 'Unable to load client actions';
     if (requestsQ.error) errs.requests = 'Unable to load requests';
     if (contentReqQ.error) errs.content = 'Unable to load content requests';
     if (strategyQ.error) errs.strategy = 'Unable to load SEO strategy';
@@ -155,19 +149,12 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     latestRanksQ.error,
     auditSummaryQ.error,
     approvalsQ.error,
-    clientActionsQ.error,
     requestsQ.error,
     contentReqQ.error,
     strategyQ.error,
     search.error,
     ga4Data.sectionError,
   ]);
-
-  const setApprovalBatches = useCallback((val: ApprovalBatch[] | ((prev: ApprovalBatch[]) => ApprovalBatch[])) => {
-    queryClient.setQueryData(queryKeys.client.approvals(workspaceId), (prev: ApprovalBatch[] | undefined) => {
-      return typeof val === 'function' ? val(prev ?? []) : val;
-    });
-  }, [queryClient, workspaceId]);
 
   const setContentRequests = useCallback((val: ClientContentRequest[] | ((prev: ClientContentRequest[]) => ClientContentRequest[])) => {
     queryClient.setQueryData(queryKeys.client.contentRequests(workspaceId), (prev: ClientContentRequest[] | undefined) => {
@@ -182,10 +169,6 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
   const loadRequests = useCallback((_wsId: string) => {
     queryClient.invalidateQueries({ queryKey: queryKeys.client.requests(workspaceId) });
-  }, [queryClient, workspaceId]);
-
-  const loadApprovals = useCallback((_wsId: string) => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.client.approvals(workspaceId) });
   }, [queryClient, workspaceId]);
 
   const changeDays = useCallback((d: number, _currentWs: WorkspaceInfo | null) => {
@@ -225,9 +208,6 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   const ga4LandingPages = ga4Data.ga4LandingPages;
   const anomalies = anomaliesQ.data ?? [];
   const approvalBatches = approvalsQ.data ?? [];
-  const approvalsLoading = approvalsQ.isLoading;
-  const approvalPageKeywords = pageKeywordsQ.data ?? null;
-  const clientActions = clientActionsQ.data ?? [];
   const activityLog = activityQ.data ?? [];
   const rankHistory = rankHistoryQ.data ?? [];
   const latestRanks = latestRanksQ.data ?? [];
@@ -236,7 +216,6 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   const requestsLoading = requestsQ.isLoading;
   const contentPlanSummary = contentPlanQ.data?.summary ?? null;
   const contentPlanKeywords = contentPlanQ.data?.keywords ?? new Map<string, string>();
-  const contentPlanReviewCells = contentPlanQ.data?.reviewCells ?? [];
   const hasCopyEntries = (copyEntriesQ.data ?? 0) > 0;
 
   // ── UI-only state (declared early — needed by hooks below) ──
@@ -695,7 +674,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
             ),
             inbox: (
               <LazyClientTabPanel>
-                <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} approvalBatches={approvalBatches} clientActions={clientActions} approvalsLoading={approvalsLoading} pendingApprovals={pendingApprovals} setApprovalBatches={setApprovalBatches} loadApprovals={loadApprovals} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} setToast={setToast} contentPlanReviewCells={contentPlanReviewCells} pageMap={approvalPageKeywords ?? strategyData?.pageMap} hasCopyEntries={hasCopyEntries} hidePrices={isExternalBilling} />
+                <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} setToast={setToast} hidePrices={isExternalBilling} />
               </LazyClientTabPanel>
             ),
             'content-plan': (

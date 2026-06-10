@@ -1,14 +1,9 @@
-import type { Dispatch, SetStateAction } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { Tier } from '../ui';
 import type {
-  ApprovalBatch,
-  ApprovalPageKeyword,
   ClientContentRequest,
   ClientRequest,
-  ContentPlanReviewCell,
 } from './types';
-import type { ClientAction } from '../../../shared/types/client-actions';
 import { UnifiedInbox } from './inbox/UnifiedInbox';
 import { useBetaMode } from './BetaContext';
 import { resolveInboxFilter } from './inbox/inbox-filter';
@@ -23,18 +18,12 @@ export type { InboxFilter } from './inbox/inbox-filter';
 interface InboxTabProps {
   workspaceId: string;
   effectiveTier: Tier;
-  approvalBatches: ApprovalBatch[];
-  clientActions?: ClientAction[];
-  approvalsLoading: boolean;
-  pendingApprovals: number;
-  setApprovalBatches: Dispatch<SetStateAction<ApprovalBatch[]>>;
-  loadApprovals: (wsId: string) => void;
   requests: ClientRequest[];
   requestsLoading: boolean;
   clientUser: { id: string; name: string; email: string; role: string } | null;
   loadRequests: (wsId: string) => void;
   contentRequests: ClientContentRequest[];
-  setContentRequests: Dispatch<SetStateAction<ClientContentRequest[]>>;
+  setContentRequests: (val: ClientContentRequest[] | ((prev: ClientContentRequest[]) => ClientContentRequest[])) => void;
   briefPrice: number | null;
   fullPostPrice: number | null;
   fmtPrice: (n: number) => string;
@@ -52,10 +41,7 @@ interface InboxTabProps {
   } | null) => void;
   pricingConfirming: boolean;
   setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
-  contentPlanReviewCells?: ContentPlanReviewCell[];
-  hasCopyEntries?: boolean;
   initialFilter?: import('./inbox/inbox-filter').InboxFilter;
-  pageMap?: ApprovalPageKeyword[];
   hidePrices?: boolean;
 }
 
