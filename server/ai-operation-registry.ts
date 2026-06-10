@@ -284,7 +284,16 @@ export const AI_OPERATION_REGISTRY = {
     // candidate set + business-priorities context + select/justify by id) documented
     // here per the AI-operation-contracts rule; flag-OFF keeps the legacy `keyword-strategy`
     // master prompt + op id verbatim.
-    modelIntent: 'closed-set site-level strategy synthesis with source-grounded selection',
+    //
+    // F1 (#6) — MODEL UPGRADE: this is the single highest-leverage AI call in the
+    // platform (it produces the whole site-level strategy). Upgraded from
+    // `gpt-5.4-mini` to the full `gpt-5.4` tier; the call sites raise maxTokens from
+    // 3000 to 4500 to fit the richer closed-set selection + justification output. The
+    // background-only execution mode and the 90s `long` timeout already accommodate the
+    // bigger model — synthesis only ever runs inside the keyword-strategy generation
+    // job, never on a sync request. The closed-set candidate pool + 3-stage sanitizer
+    // contracts are unchanged; only the model and token allocation move.
+    modelIntent: 'closed-set site-level strategy synthesis with source-grounded selection (highest-leverage call → gpt-5.4)',
     outputMode: 'json',
     parserExpectation: 'parseJsonSafe + zod, retry-once then deterministic backfill',
     researchMode: 'required',
@@ -292,7 +301,7 @@ export const AI_OPERATION_REGISTRY = {
     retryPolicy: 'standard',
     timeoutProfile: 'long',
     defaultProvider: 'openai',
-    defaultModel: 'gpt-5.4-mini',
+    defaultModel: 'gpt-5.4',
     defaultResponseFormat: { type: 'json_object' },
     defaultMaxRetries: 3,
     defaultTimeoutMs: 90_000,

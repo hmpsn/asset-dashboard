@@ -29,6 +29,7 @@ import { listCannibalizationIssues } from './cannibalization-issues.js';
 import { normalizePageUrl } from './helpers.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 import { backfillContentGapsToFloor, STRATEGY_CONTENT_GAP_FLOOR } from './keyword-strategy-helpers.js';
+import { recordGenerationQuality } from './generation-quality-store.js';
 import type { GenerationQuality } from '../shared/types/generation-quality.js';
 
 // Re-exported for backward compatibility with existing callers.
@@ -600,6 +601,14 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       floorHit,
     };
     log.info({ generationQuality }, 'keyword-strategy/generation-quality');
+    // F1 (#7a): persist the quality record (one row per run, workspace-scoped). This is
+    // a durable side-effect after the strategy is already persisted — a store failure
+    // must never break a successful generation, so log + swallow.
+    try {
+      recordGenerationQuality(generationQuality);
+    } catch (persistErr) {
+      log.warn({ workspaceId: ws.id, detail: persistErr instanceof Error ? persistErr.message : String(persistErr) }, 'Failed to persist generation-quality row (non-fatal)');
+    }
 
     queueKeywordStrategyPostUpdateFollowOns({ workspaceId: ws.id });
     activeGenerations.delete(ws.id);

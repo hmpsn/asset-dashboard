@@ -8,6 +8,13 @@
  * re-strip in serializeKeywordStrategy.
  *
  * Port: 13889 (exclusive; 13886 reserved; 13888 used by the public-read gate).
+ *
+ * F1 (#7c) — DIVERGENT siteKeywordMetrics fixtures. The blob carries a STALE/wrong
+ * value while the site_keyword_metrics table carries the REAL value. This pins the
+ * admin route's re-attach: the response must equal the TABLE value (resolved by the
+ * assembler), proving the route does NOT fall back to the blob `...strategy` spread
+ * (the masking bug — identical fixtures could not detect the omission). A parallel
+ * public-route assertion confirms both read paths agree on the table value.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
@@ -38,9 +45,14 @@ const page: PageKeywordMap = { pagePath: '/p', pageTitle: 'P', primaryKeyword: '
 beforeAll(async () => {
   await ctx.startServer();
   fullWs = createWorkspace(`Admin Assembler Full ${PORT}`).id;
+  // DIVERGENT (#7c): the blob carries a STALE siteKeywordMetrics value (volume 1,
+  // difficulty 1) — what an un-stripped legacy blob would hold. The table is the
+  // SOLE store post-strip and carries the REAL value (volume 1000, difficulty 30).
+  // The route must return the TABLE value; if it falls back to the blob spread the
+  // test fails, catching the silent-omission regression that identical fixtures hid.
   updateWorkspace(fullWs, { keywordStrategy: {
     siteKeywords: ['admin site kw'], opportunities: ['opp'],
-    siteKeywordMetrics: [{ keyword: 'admin site kw', volume: 1000, difficulty: 30 }],
+    siteKeywordMetrics: [{ keyword: 'admin site kw', volume: 1, difficulty: 1 }],
     businessContext: 'ctx', generatedAt: '2026-06-01T00:00:00.000Z',
   } as KeywordStrategy });
   upsertAndCleanPageKeywords(fullWs, [page]);
@@ -49,7 +61,7 @@ beforeAll(async () => {
   replaceAllKeywordGaps(fullWs, [kgap]);
   replaceAllTopicClusters(fullWs, [cluster]);
   replaceAllCannibalizationIssues(fullWs, [cannibal]);
-  // siteKeywordMetrics is table-only post-strip — populate the table, not the blob.
+  // The REAL metrics live ONLY in the table (table-as-truth post-strip).
   replaceAllSiteKeywordMetrics(fullWs, [{ keyword: 'admin site kw', volume: 1000, difficulty: 30 }]);
 
   // Shell case: no strategy blob, but table rows exist → synthesized shell (generatedAt null).
@@ -70,6 +82,9 @@ describe('GET /api/webflow/keyword-strategy/:id — admin assembler byte-identit
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.siteKeywords).toEqual(['admin site kw']);
+    // #7c: the response carries the TABLE value (volume 1000), NOT the stale blob
+    // value (volume 1) — proving the admin route re-attaches the assembled metrics
+    // and does not silently drop them in favor of the `...strategy` blob spread.
     expect(body.siteKeywordMetrics).toEqual([{ keyword: 'admin site kw', volume: 1000, difficulty: 30 }]);
     expect(body.opportunities).toEqual(['opp']);
     expect(body.businessContext).toBe('ctx');
@@ -92,6 +107,22 @@ describe('GET /api/webflow/keyword-strategy/:id — admin assembler byte-identit
     expect(body.strategyUx).toBeTruthy();
     // semrushMode never leaks (the re-strip removed it; assembler never carries it).
     expect(body.semrushMode).toBeUndefined();
+  });
+
+  it('#7c: admin and public read paths agree on the TABLE siteKeywordMetrics (neither reads the stale blob)', async () => {
+    const [adminRes, publicRes] = await Promise.all([
+      api(`/api/webflow/keyword-strategy/${fullWs}`),
+      api(`/api/public/seo-strategy/${fullWs}`),
+    ]);
+    expect(adminRes.status).toBe(200);
+    expect(publicRes.status).toBe(200);
+    const adminBody = await adminRes.json();
+    const publicBody = await publicRes.json();
+    const real = [{ keyword: 'admin site kw', volume: 1000, difficulty: 30 }];
+    expect(adminBody.siteKeywordMetrics).toEqual(real);
+    expect(publicBody.siteKeywordMetrics).toEqual(real);
+    // The stale blob value (volume 1) appears in NEITHER response.
+    expect(adminBody.siteKeywordMetrics).toEqual(publicBody.siteKeywordMetrics);
   });
 
   it('returns the synthesized shell (generatedAt null) when no blob but tables have rows', async () => {

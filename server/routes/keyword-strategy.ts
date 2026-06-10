@@ -20,6 +20,7 @@ import { listKeywordGaps, replaceAllKeywordGaps } from '../keyword-gaps.js';
 import { listTopicClusters, replaceAllTopicClusters } from '../topic-clusters.js';
 import { listCannibalizationIssues, replaceAllCannibalizationIssues } from '../cannibalization-issues.js';
 import { assembleStoredKeywordStrategy } from '../keyword-strategy-assembler.js';
+import type { KeywordStrategySiteKeywordMetric } from '../keyword-strategy-enrichment.js';
 import { validate, z } from '../middleware/validate.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
@@ -83,6 +84,7 @@ function serializeKeywordStrategy(
   keywordGaps: KeywordGapItem[],
   topicClusters: TopicCluster[],
   cannibalization: CannibalizationItem[],
+  siteKeywordMetrics: KeywordStrategySiteKeywordMetric[] | undefined,
   strategyUx?: Awaited<ReturnType<typeof buildKeywordStrategyUxPayload>>,
 ) {
   // The five table-backed arrays are supplied by assembleStoredKeywordStrategy and
@@ -91,6 +93,11 @@ function serializeKeywordStrategy(
   // dropped — it has no canonical replacement key and would otherwise leak.
   const rest: Record<string, unknown> = { ...strategy };
   delete rest.semrushMode;
+  // #7b: siteKeywordMetrics is table-only post-strip — the blob's `siteKeywordMetrics`
+  // is always undefined now, so `...strategy` cannot carry it. Drop any stale spread key
+  // and re-attach the assembler's TABLE-sourced value below (mirror of public-content.ts),
+  // otherwise paid metrics silently vanish from the admin UI.
+  delete rest.siteKeywordMetrics;
   const seoDataStatus = strategy.seoDataStatus;
   return {
     ...rest,
@@ -102,6 +109,7 @@ function serializeKeywordStrategy(
       reasons: seoDataStatus.reasons ?? [],
       fallbackProviderAvailable: seoDataStatus.fallbackProviderAvailable ?? false,
     } : undefined,
+    siteKeywordMetrics: siteKeywordMetrics && siteKeywordMetrics.length > 0 ? siteKeywordMetrics : undefined,
     pageMap,
     contentGaps,
     quickWins,
@@ -250,7 +258,7 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess(
         generatedAt: null,
       });
     }
-    const { pageMap, contentGaps, quickWins, keywordGaps, topicClusters, cannibalization } = assembled;
+    const { pageMap, contentGaps, quickWins, keywordGaps, topicClusters, cannibalization, siteKeywordMetrics } = assembled;
     if (!strategy) {
       const shellStrategyUx = await buildKeywordStrategyUxPayload({
         workspaceId: ws.id,
@@ -265,6 +273,9 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess(
       return res.json({
         siteKeywords: [],
         opportunities: [],
+        // #7b: surface table-resolved metrics on the synthesized shell too (the
+        // assembler resolves them even when the strategy blob is absent).
+        siteKeywordMetrics: siteKeywordMetrics && siteKeywordMetrics.length > 0 ? siteKeywordMetrics : undefined,
         pageMap,
         contentGaps,
         quickWins,
@@ -285,7 +296,7 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess(
       surface: 'admin',
     });
     strategyUx.localSync = localSync;
-    res.json(serializeKeywordStrategy(strategy, pageMap, contentGaps, quickWins, keywordGaps, topicClusters, cannibalization, strategyUx));
+    res.json(serializeKeywordStrategy(strategy, pageMap, contentGaps, quickWins, keywordGaps, topicClusters, cannibalization, siteKeywordMetrics, strategyUx));
   } catch (err) {
     next(err);
   }
