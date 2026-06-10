@@ -5783,6 +5783,9 @@ describe('Meta: customCheck rule name registry', () => {
     // Platform audit PR7 (2026-06-09 quick-wins) — bans scanning listWorkspaces()
     // to keep one row (chained + two-line forms); use getWorkspaceBySiteId/getWorkspace.
     'listWorkspaces().find() — use indexed getWorkspaceBySiteId / getWorkspace',
+    // Core-features audit E1 (2026-06-10) — every router.get in public-portal.ts
+    // must carry a portal-auth middleware; bootstrap endpoints hatch inline.
+    'public-portal.ts GET missing portal-auth middleware',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -10930,5 +10933,131 @@ describe('Rule: positionColor/positionTone redefinition outside authority', () =
     );
     const hits = runRule(RULE, [file]);
     expect(hits).toHaveLength(0);
+  });
+});
+
+describe('Rule: public-portal.ts GET missing portal-auth middleware', () => {
+  const RULE = 'public-portal.ts GET missing portal-auth middleware';
+
+  // (a) Trigger: unguarded router.get in public-portal.ts → FLAGGED
+  it('flags an unguarded router.get in public-portal.ts', () => {
+    const file = write(
+      uniqPath('portal-get-auth', 'server/routes/public-portal.ts'),
+      lines(
+        "router.get('/api/public/things/:workspaceId', (req, res) => {",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  // (b) requireClientPortalAuth on the same line → NOT flagged
+  it('does not flag a GET guarded by requireClientPortalAuth', () => {
+    const file = write(
+      uniqPath('portal-get-auth', 'server/routes/public-portal.ts'),
+      lines(
+        "router.get('/api/public/things/:workspaceId', requireClientPortalAuth('workspaceId'), (req, res) => {",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+
+  // (c) requireAuthenticatedClientPortalAuth within the multi-line window → NOT flagged
+  it('does not flag a GET with requireAuthenticatedClientPortalAuth on a following line', () => {
+    const file = write(
+      uniqPath('portal-get-auth', 'server/routes/public-portal.ts'),
+      lines(
+        "router.get(",
+        "  '/api/public/things/:workspaceId',",
+        "  requireAuthenticatedClientPortalAuth('workspaceId'),",
+        "  (req, res) => {",
+        "    res.json({ ok: true });",
+        "  },",
+        ");",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+
+  // (d) Inline escape hatch → NOT flagged
+  it('respects the inline // portal-auth-public-ok escape hatch', () => {
+    const file = write(
+      uniqPath('portal-get-auth', 'server/routes/public-portal.ts'),
+      lines(
+        "router.get('/api/public/bootstrap/:id', (req, res) => { // portal-auth-public-ok — login screen bootstrap",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+
+  // (e) Out-of-scope file → NOT flagged (rule scans only public-portal.ts)
+  it('does not flag unguarded GETs in other route files', () => {
+    const file = write(
+      uniqPath('portal-get-auth', 'server/routes/other-routes.ts'),
+      lines(
+        "router.get('/api/things/:workspaceId', (req, res) => {",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+
+  // (f) Mutations are out of scope — POST/DELETE use requireClientStrategyMutationAuth instead
+  it('does not flag router.post in public-portal.ts (GET-specific rule)', () => {
+    const file = write(
+      uniqPath('portal-get-auth', 'server/routes/public-portal.ts'),
+      lines(
+        "router.post('/api/public/things/:workspaceId', ...requireClientStrategyMutationAuth, (req, res) => {",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+
+  // (g) A comment MENTIONING the middleware must not silence the rule
+  it('flags an unguarded GET whose body has a TODO comment naming requireClientPortalAuth', () => {
+    const file = write(
+      uniqPath('portal-get-auth', 'server/routes/public-portal.ts'),
+      lines(
+        "router.get('/api/public/things/:workspaceId', (req, res) => {",
+        "  // TODO: add requireClientPortalAuth() later",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  // (h) An adjacent guarded route's middleware must not bleed into this route's window
+  it('flags an unguarded short GET even when the next route within 8 lines is guarded', () => {
+    const file = write(
+      uniqPath('portal-get-auth', 'server/routes/public-portal.ts'),
+      lines(
+        "router.get('/api/public/unguarded/:workspaceId', (req, res) => res.json({ ok: true }));",
+        "",
+        "router.get('/api/public/guarded/:workspaceId', requireClientPortalAuth('workspaceId'), (req, res) => {",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0].line).toBe(1);
   });
 });
