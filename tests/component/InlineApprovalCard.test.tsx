@@ -77,8 +77,8 @@ describe('InlineApprovalCard', () => {
     // Both items' Current/Proposed substance is rendered inline (each item shows "New title").
     expect(screen.getAllByText('New title').length).toBe(2);
     // Two ItemDiffRow labels render (combined "Home — field").
-    expect(screen.getByText('Home — seoTitle')).toBeInTheDocument();
-    expect(screen.getByText('Home — seoDescription')).toBeInTheDocument();
+    expect(screen.getByText('Home — SEO Title')).toBeInTheDocument();
+    expect(screen.getByText('Home — Meta Description')).toBeInTheDocument();
     // No "View N →" modal affordance.
     expect(screen.queryByRole('button', { name: /View/ })).not.toBeInTheDocument();
     // Age label surfaced.
@@ -147,15 +147,15 @@ describe('InlineApprovalCard', () => {
     render(<InlineApprovalCard decision={makeDecision(items)} ageLabel={null} submitting={false} {...h} />);
 
     // FIX 4 — the group sub-headers render the page title ("Home" / "About"). The per-item row
-    // labels are de-duplicated to the field ONLY ("seoTitle" / "metaDescription"), so the page name
+    // labels are de-duplicated to the field ONLY ("SEO Title" / "Meta Description"), so the page name
     // is NOT repeated under its own group header. The combined "Page — field" form is absent in
     // multi-page mode.
     expect(screen.getByText('Home')).toBeInTheDocument();
     expect(screen.getByText('About')).toBeInTheDocument();
-    expect(screen.getByText('seoTitle')).toBeInTheDocument();
-    expect(screen.getByText('metaDescription')).toBeInTheDocument();
-    expect(screen.queryByText('Home — seoTitle')).not.toBeInTheDocument();
-    expect(screen.queryByText('About — metaDescription')).not.toBeInTheDocument();
+    expect(screen.getByText('SEO Title')).toBeInTheDocument();
+    expect(screen.getByText('Meta Description')).toBeInTheDocument();
+    expect(screen.queryByText('Home — SEO Title')).not.toBeInTheDocument();
+    expect(screen.queryByText('About — Meta Description')).not.toBeInTheDocument();
   });
 
   it('single-page items suppress the group sub-header (no bare page-label header)', () => {
@@ -168,8 +168,8 @@ describe('InlineApprovalCard', () => {
 
     // Single page → no group sub-header → the bare "Home" header is absent (rows are "Home — field").
     expect(screen.queryByText('Home')).not.toBeInTheDocument();
-    expect(screen.getByText('Home — seoTitle')).toBeInTheDocument();
-    expect(screen.getByText('Home — seoDescription')).toBeInTheDocument();
+    expect(screen.getByText('Home — SEO Title')).toBeInTheDocument();
+    expect(screen.getByText('Home — Meta Description')).toBeInTheDocument();
   });
 
   it("field:'schema' shows the Show full/less toggle; non-schema does not", () => {
@@ -202,7 +202,7 @@ describe('InlineApprovalCard', () => {
     render(<InlineApprovalCard decision={makeDecision(items)} ageLabel={null} submitting={false} editable {...h} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-    const input = screen.getByLabelText('Edit proposed seoTitle');
+    const input = screen.getByLabelText('Edit proposed SEO Title');
     fireEvent.change(input, { target: { value: 'Fixed title' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save edit' }));
 
