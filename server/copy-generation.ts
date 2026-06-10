@@ -7,7 +7,7 @@ import { buildSystemPrompt } from './prompt-assembly.js';
 import { getVoiceProfile, buildVoiceCalibrationContext } from './voice-calibration.js';
 import { listDeliverables } from './brand-identity.js';
 import { listBrandscripts } from './brandscript.js';
-import { generateBrief, getPageTypeConfig } from './content-brief.js';
+import { generateBrief, getBrief, getPageTypeConfig } from './content-brief.js';
 import { getBlueprint, getEntry, listBlueprints } from './page-strategy.js';
 import { buildSeoPromptBlocks } from './intelligence/generation-context-builders.js';
 import {
@@ -182,8 +182,9 @@ export async function regenerateSection(
     resultVersion: targetSection.version,
   });
 
-  // Build targeted regeneration prompt
-  const context = await buildCopyGenerationContext(wsId, blueprint, entry);
+  // Build targeted regeneration prompt — skip brief enrichment (a single-section
+  // steer doesn't need a full brief read/generation; the steering note is the context).
+  const context = await buildCopyGenerationContext(wsId, blueprint, entry, undefined, { skipBriefEnrichment: true });
   const baseInstructions = `You are regenerating a single section of website copy based on steering feedback.
 
 Section type: ${sectionPlanItem.sectionType}
@@ -350,6 +351,7 @@ export async function buildCopyGenerationContext(
   blueprint: SiteBlueprint,
   entry: BlueprintEntry,
   accumulatedSteering?: string[],
+  opts?: { skipBriefEnrichment?: boolean },
 ): Promise<string> {
   const parts: string[] = [];
 
@@ -431,11 +433,29 @@ export async function buildCopyGenerationContext(
   parts.push(`PAGE STRATEGY:\n${strategyParts.join('\n')}`);
 
   // ── Layer 4.5: Brief enrichment ──
-  if (entry.primaryKeyword) {
+  // Section regenerate (a ~150-word tweak steered by a note) skips this entirely —
+  // the steering note + section plan is sufficient context, and a full brief read/gen
+  // here is pure waste (2026-06-09 audit #6).
+  if (entry.primaryKeyword && !opts?.skipBriefEnrichment) {
     try {
-      const brief = await generateBrief(wsId, entry.primaryKeyword, {
-        pageType: entry.pageType,
-      }, { persist: false });
+      // Reuse the persisted brief the blueprint auto-brief step already created
+      // (entry.briefId → getBrief) instead of regenerating a 7000-token research-mode
+      // brief on every copy generation. Fall back to generation when the entry has no
+      // brief, the FK is stale, OR the brief was built for a DIFFERENT keyword — the
+      // entry-update route changes primary_keyword and brief_id independently, so a
+      // keyword edit leaves briefId pointing at a brief for the old keyword; reusing it
+      // would feed a mismatched brief into a prompt whose PAGE STRATEGY shows the new
+      // keyword (silently-wrong copy). The old path always regenerated for the current
+      // keyword, so this guard preserves that correctness. NOTE: reuse freezes
+      // enrichment at blueprint-creation time rather than copy time — the intended
+      // optimization tradeoff.
+      const persistedCandidate = entry.briefId ? getBrief(wsId, entry.briefId) : undefined;
+      const sameKeyword = persistedCandidate
+        && persistedCandidate.targetKeyword.trim().toLowerCase() === entry.primaryKeyword.trim().toLowerCase();
+      const brief = (sameKeyword ? persistedCandidate : undefined)
+        ?? await generateBrief(wsId, entry.primaryKeyword, {
+          pageType: entry.pageType,
+        }, { persist: false });
       const briefLines: string[] = [];
       if (brief.suggestedTitle) briefLines.push(`Suggested title: ${brief.suggestedTitle}`);
       if (brief.executiveSummary) briefLines.push(`Executive summary: ${brief.executiveSummary}`);
