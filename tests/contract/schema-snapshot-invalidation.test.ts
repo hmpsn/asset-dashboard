@@ -28,15 +28,18 @@ describe('schema snapshot invalidation contract', () => {
   });
 
   it('broadcasts snapshot updates from every route path that mutates persisted schema snapshots', () => {
-    const source = readProjectFile('server/routes/webflow-schema.ts');
-    const calls = source.match(/broadcastSchemaSnapshotUpdated\([^;]+;/g) ?? [];
+    const routeSource = readProjectFile('server/routes/webflow-schema.ts');
+    const adminMutationSource = readProjectFile('server/domains/schema/schema-plan-admin-mutations.ts');
+    const routeCalls = routeSource.match(/broadcastSchemaSnapshotUpdated\([^;]+;/g) ?? [];
+    const adminCalls = adminMutationSource.match(/broadcastSchemaSnapshotDeleted\([^;]+;/g) ?? [];
 
-    expect(source).toContain('function broadcastSchemaSnapshotUpdated');
-    expect(calls.some(call => call.includes('cmsWs?.id') && call.includes("'published'"))).toBe(true);
-    expect(calls.some(call => call.includes('pubWsForHistory?.id') && call.includes("'published'"))).toBe(true);
-    expect(calls.some(call => call.includes('plan.workspaceId') && call.includes("'deleted'"))).toBe(true);
-    expect(calls.some(call => call.includes('ws?.id') && call.includes("'retracted'"))).toBe(true);
-    expect(calls.some(call => call.includes('ws?.id') && call.includes("'rolled_back'"))).toBe(true);
+    expect(routeSource).toContain('function broadcastSchemaSnapshotUpdated');
+    expect(adminMutationSource).toContain('function broadcastSchemaSnapshotDeleted');
+    expect(routeCalls.some(call => call.includes('cmsWs?.id') && call.includes("'published'"))).toBe(true);
+    expect(routeCalls.some(call => call.includes('pubWsForHistory?.id') && call.includes("'published'"))).toBe(true);
+    expect(adminCalls.some(call => call.includes('plan.workspaceId'))).toBe(true);
+    expect(routeCalls.some(call => call.includes('ws?.id') && call.includes("'retracted'"))).toBe(true);
+    expect(routeCalls.some(call => call.includes('ws?.id') && call.includes("'rolled_back'"))).toBe(true);
   });
 
   it('invalidates admin and client React Query caches for schema snapshot and plan events', () => {

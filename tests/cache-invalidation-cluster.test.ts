@@ -76,9 +76,9 @@ describe('Task 4.1 — Cache-invalidation cluster (A-9/11/12/13) — bounded sou
     expect(section).toContain('invalidateIntelligenceCache');
   });
 
-  it('server/routes/webflow-schema.ts calls invalidateIntelligenceCache on schema-plan DELETE (bounded)', () => {
-    const src = read('server/routes/webflow-schema.ts');
-    const section = boundedSection(src, "router.delete('/api/webflow/schema-plan/:siteId'", ['\nrouter.']);
+  it('server/domains/schema/schema-plan-admin-mutations.ts calls invalidateIntelligenceCache on schema-plan DELETE (bounded)', () => {
+    const src = read('server/domains/schema/schema-plan-admin-mutations.ts');
+    const section = boundedSection(src, 'export function deleteSchemaPlanForAdmin', ['\nexport function ']);
     expect(section).toContain('invalidateIntelligenceCache');
   });
 
