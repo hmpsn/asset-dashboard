@@ -10,7 +10,7 @@ When creating a new bridge insight, pass the literal bridge flag string. When re
 
 **Never call `resolveInsight('in_progress')` as a cleanup-protection hack.** That state is reserved for admin resolutions; using it here silently overwrites genuine admin decisions.
 
-The pr-check rule `bridgeSource missing on upsertInsight inside bridge` catches the new-insight case. The re-upsert case is a manual review item.
+Both the new-insight and re-upsert cases are **manual review items** — there is no pr-check rule enforcing `bridgeSource` on `upsertInsight` inside a bridge. (Treat this as a checklist item when reviewing any bridge that writes insights.)
 
 ## Rule 2 — Score adjustments
 
@@ -34,22 +34,11 @@ A bridge that upserts data should never mark an insight resolved — that's the 
 
 ## Bridge Registration Reference
 
-### Feature flags
+### Bridge sources
 
-Every bridge is individually gated behind a `FeatureFlagKey` from `shared/types/feature-flags.ts`. As of the current codebase there are **16 bridge flags** in the `BRIDGE_FLAGS` array in `server/bridge-infrastructure.ts`:
+Bridge rollout flags are **retired** — every registered source is always active (`getBridgeFlags()` in `server/bridge-infrastructure.ts` reports all sources as enabled). The canonical list is the **17-entry** `BRIDGE_SOURCES` array in `server/bridge-infrastructure.ts` — read that array directly rather than trusting any copied list. Add any new bridge source there in the same commit that introduces the bridge.
 
-```
-bridge-outcome-reweight        bridge-decay-suggested-brief
-bridge-strategy-invalidate     bridge-insight-to-action
-bridge-page-analysis-invalidate bridge-action-auto-resolve
-bridge-content-to-insight      bridge-schema-to-insight
-bridge-anomaly-boost           bridge-settings-cascade
-bridge-audit-page-health       bridge-action-annotation
-bridge-annotation-to-insight   bridge-audit-site-health
-bridge-audit-auto-resolve      bridge-client-signal
-```
-
-Add any new bridge flag to `BRIDGE_FLAGS` AND to `shared/types/feature-flags.ts` in the same commit.
+> Note: several registered sources (`bridge-insight-to-action`, `bridge-content-to-insight`, `bridge-schema-to-insight`, `bridge-annotation-to-insight`, `bridge-client-signal`) are reserved registry entries with no live `fireBridge`/`executeBridge` callsite yet — `getBridgeFlags()` still reports them active. Do not assume a registered source has an implementation; grep for its `fireBridge(` callsite.
 
 ### Default timeout
 

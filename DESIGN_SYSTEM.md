@@ -524,8 +524,6 @@ src/components/ui/
 ├── Icon.tsx                # Strict-enum wrapper around Lucide components (Phase 5)
 ├── Button.tsx              # Primary/secondary/ghost/danger/link button (Phase 5)
 ├── IconButton.tsx          # Square icon button with required a11y label (Phase 5)
-├── ActionPill.tsx          # Workflow pill: start/approve/decline/send/request-changes (Phase 5)
-├── SegmentedControl.tsx    # Radiogroup with roving tabIndex (Phase 5)
 ├── typography/
 │   ├── Heading.tsx
 │   ├── Stat.tsx
@@ -691,30 +689,6 @@ Sizes: `sm` / `md` (default) / `lg`. Props: `icon`, `iconPosition`, `loading` (s
 | `solid` | `bg-zinc-800 hover:bg-zinc-700 text-zinc-200` | Raised icon button |
 
 Sizes: `sm` (24px) / `md` (32px, default) / `lg` (40px). Requires `label` prop (maps to `aria-label`).
-
-### ActionPill
-
-| Variant | Color family | Semantic use |
-|---------|-------------|-------------|
-| `start` | teal | Initiate a workflow |
-| `approve` | emerald | Accept / approve |
-| `decline` | red | Reject / decline |
-| `send` | blue | Transmit / publish (data-adjacent action) |
-| `request-changes` | amber | Flag for revision |
-
-Fixed size: `px-2.5 py-1 text-[11px]`. All use tinted border + bg pattern (`border-X-500/30 bg-X-500/10`).
-
-### SegmentedControl
-
-WAI-ARIA `radiogroup` with roving tabIndex (selected button = `tabIndex={0}`, others = `tabIndex={-1}`). Arrow-key navigation (Left/Right plus Home/End) moves both selection and DOM focus. Supports `disabled` options (skipped during keyboard nav). When the current `value` does not match any option, the first non-disabled option becomes the fallback tab stop so the widget remains keyboard-reachable.
-
-| State | Classes |
-|-------|---------|
-| Active segment | `bg-zinc-700 text-white` |
-| Inactive segment | `text-zinc-400 hover:text-zinc-200` |
-| Container | `bg-zinc-900 border border-zinc-800 rounded-md p-0.5` |
-
-Sizes: `sm` (`px-2 py-1 text-[11px]`) / `md` (`px-3 py-1.5 text-xs`, default).
 
 ---
 

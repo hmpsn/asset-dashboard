@@ -1435,7 +1435,6 @@ export const CHECKS: Check[] = [
       'server/routes/content-publish.ts', // AI response text parser: parses Claude field-mapping suggestion (not DB columns)
       'server/stripe-config.ts', // disk file: AES-encrypted Stripe config file (not DB columns)
       'server/schema/generator.ts', // HTML JSON-LD script tag parsing (existing page schemas from HTML), not DB columns
-      'server/briefing-cron.ts', // AI response text parser (Anthropic Sonnet briefing JSON), validated by briefingAIResponseSchema, not DB columns
       'server/schema/extractors/page-elements/image-ai-classifier.ts', // AI response text parser (vision API role JSON), not DB columns
       'server/schema/extractors/page-elements/howto-ai-fallback.ts', // AI response text parser (HowTo disambiguation JSON), not DB columns
     ],
@@ -7786,7 +7785,6 @@ export const CHECKS: Check[] = [
     exclude: [
       'server/db/', 'server/schemas/', 'tests/', 'server/ai.ts',
       'server/openai-helpers.ts', 'server/anthropic-helpers.ts',
-      'server/briefing-cron.ts',      // uses briefingAIResponseSchema — already validated
       'server/meeting-brief-generator.ts', // comment-only exclusion, validated elsewhere
       'server/routes/content-publish.ts', // field-mapping suggestion, not critical schema
       'server/schema/extractors/', 'server/content-posts-ai.ts',
@@ -8520,7 +8518,7 @@ export function checkFile(file: string, check: Check): string[] {
 // Directories that should never be scanned (vendor code, test fixtures, build output)
 const EXCLUDED_DIRS = ['node_modules', 'dist', '.git', '.claude', '.worktrees', 'scripts', 'tests'];
 // Root-level files to skip (--exclude-dir doesn't work on files)
-const EXCLUDED_FILES = ['test-branding.ts'];
+const EXCLUDED_FILES: string[] = [];
 
 // Exported for tests/pr-check.test.ts — see the 'pathFilter vs EXCLUDED_DIRS
 // collision' regression test. Not part of the public API; do not import from

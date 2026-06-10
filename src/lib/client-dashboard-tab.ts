@@ -51,7 +51,7 @@ export const KNOWN_CLIENT_TABS: readonly ResolvedClientTab[] = [
 export function resolveClientTab(initialTabId: string | undefined | null): ResolvedClientTab {
   const t = initialTabId;
   if (t === 'search' || t === 'analytics') return 'performance';
-  if (t === 'schema-review') return 'inbox'; // retired — schema plan now lives in Inbox > SEO Changes
+  if (t === 'schema-review') return 'inbox'; // retired — schema plan now lives in Inbox > Reviews
   if (t && (KNOWN_CLIENT_TABS as readonly string[]).includes(t)) return t as ResolvedClientTab;
   return 'overview';
 }

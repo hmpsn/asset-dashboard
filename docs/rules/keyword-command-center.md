@@ -41,9 +41,10 @@ The platform has **two distinct value scorers**, by design. They share the same 
 
 ## Mutation Rules
 
-- No hard deletes from the Command Center. "Remove" means lifecycle retirement or feedback suppression.
+- Default "Remove" means lifecycle retirement or feedback suppression — NOT a row delete.
+- **Hard-delete exception (P3-3c).** A deliberate, narrow hard-delete channel exists: `deleteKeywordHard()` (`server/keyword-command-center.ts`), exposed via `DELETE /api/webflow/keyword-command-center/:workspaceId/keywords/:keyword`. It is eligible ONLY for `source === MANUAL`, unpinned, non-client-requested, non-strategy-owned, non-gap-provenance rows (`isHardDeleteEligible`); ineligible rows throw without `?force=true`. It is a SEPARATE channel — never in `KEYWORD_COMMAND_CENTER_ACTIONS`, never a default/bulk action — and it **intentionally drops rank history**. This is the one sanctioned exception to "no hard deletes"; everything else still retires/suppresses.
 - Manual, pinned, and client-requested keywords are protected from accidental retirement or decline. Actions that target them must require explicit confirmation/force semantics.
-- Mutations must preserve rank history and metadata whenever possible.
+- Mutations must preserve rank history and metadata whenever possible (the P3-3c hard delete is the documented exception).
 - Mutations must broadcast the affected surfaces:
   - `WS_EVENTS.RANK_TRACKING_UPDATED` for tracking lifecycle changes.
   - `WS_EVENTS.STRATEGY_UPDATED` when strategy/feedback consideration changes.
