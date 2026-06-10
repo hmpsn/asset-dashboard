@@ -8,56 +8,28 @@ import type * as EmailTemplates from '../email-templates.js';
 import type * as Email from '../email.js';
 const router = Router();
 
-import { addActivity } from '../activity-log.js';
 import { canSend, recordSend } from '../email-throttle.js';
 import {
   listBatches,
   getBatch,
-  markBatchApplied,
 } from '../approvals.js';
-import { broadcastToWorkspace } from '../broadcast.js';
 import {
   createApprovalBatchForClient,
   deleteApprovalBatchForClient,
 } from '../domains/inbox/approval-batch-admin-mutations.js';
+import { applyApprovedBatchItems } from '../domains/inbox/approval-batch-apply.js';
 import { respondToApprovalBatchItem } from '../domains/inbox/approval-batch-item-respond.js';
 import { respondToApprovalBatch } from '../domains/inbox/approval-batch-respond.js';
-import { classifyApprovalBatch } from '../domains/inbox/deliverable-adapters/approval-batch-classifier.js';
-import { markDeliverableApplied } from '../domains/inbox/send-to-client.js';
-import { findBySourceRef } from '../client-deliverables.js';
-import { isClientApplyableFields } from '../../shared/applyability.js';
+import { createLogger } from '../logger.js';
 import { getClientActor, requireClientPortalAuth } from '../middleware.js';
 import {
-  publishCollectionItems,
-  updateCollectionItem,
-  updatePageSeo,
-} from '../webflow.js';
-import {
   getWorkspace,
-  getTokenForSite,
   getClientPortalUrl,
-  updatePageState,
 } from '../workspaces.js';
-import { recordSeoChange } from '../seo-change-tracker.js';
-import { resolveRecommendationsForChange } from '../recommendations.js';
-import { recordAction, getActionBySource } from '../outcome-tracking.js';
-import { captureBaselineFromGsc } from '../outcome-measurement.js';
-import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
-import { normalizePageUrl } from '../helpers.js';
-import { WS_EVENTS } from '../ws-events.js';
 import { toClientInboxApprovalBatch, toClientInboxApprovalBatches } from '../serializers/client-safe.js';
 
 const log = createLogger('approvals');
-
-function normalizeSeoChangeField(field: string): string {
-  if (field === 'seoTitle') return 'title';
-  if (field === 'seoDescription') return 'description';
-  const normalized = field.trim().toLowerCase();
-  if (normalized.includes('title')) return 'title';
-  if (normalized.includes('description') || normalized.includes('desc')) return 'description';
-  return normalized || field;
-}
 
 const createBatchSchema = z.object({
   siteId: z.string().min(1, 'siteId is required'),
@@ -83,7 +55,7 @@ const updateItemSchema = z.object({
 }).strict();
 
 // --- Approvals (admin, authenticated) ---
-router.post('/api/approvals/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(createBatchSchema), (req, res) => {
+router.post('/api/approvals/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(createBatchSchema), (req, res) => { // no-broadcast-ok: createApprovalBatchForClient owns approval update broadcasts
   const { siteId, name, note, items } = req.body;
   const batch = createApprovalBatchForClient({
     workspaceId: req.params.workspaceId,
@@ -234,162 +206,9 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClien
 
 // Apply approved items to Webflow
 router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPortalAuth(), async (req, res) => {
-  const batch = getBatch(req.params.workspaceId, req.params.batchId);
-  if (!batch) return res.status(404).json({ error: 'Batch not found' });
-  const ws = getWorkspace(req.params.workspaceId);
-  if (!ws?.webflowSiteId) return res.status(400).json({ error: 'No site linked' });
-
-  const token = getTokenForSite(ws.webflowSiteId) || undefined;
-  if (!token) return res.status(400).json({ error: 'No Webflow API token' });
-
-  const approved = batch.items.filter(i => i.status === 'approved');
-  if (!approved.length) return res.status(400).json({ error: 'No approved items to apply' });
-  // Single source of truth: the shared applyability predicate (the legacy field/pageId/collectionId
-  // gate, now in shared/applyability.ts so the R3b client UI uses the SAME rule). The two in-loop
-  // `cms-` guards below stay as defense-in-depth.
-  if (approved.some(i => !isClientApplyableFields({ field: i.field, targetRef: i.pageId, collectionId: i.collectionId ?? null }))) {
-    return res.status(400).json({ error: 'Only static page SEO title/meta approvals and real CMS item approvals can be applied by clients.' });
-  }
-
-  const results: Array<{ itemId: string; pageId: string; success: boolean; error?: string }> = [];
-  const appliedIds: string[] = [];
-
-  for (const item of approved) {
-    try {
-      // Guard: synthetic CMS IDs (format 'cms-*') come from sitemap discovery and are
-      // not real Webflow page or collection-item IDs. Attempting to write them via the
-      // Webflow API produces a silent 404. Fail fast with a clear message so the
-      // approval record correctly reflects 'not applied' rather than a phantom success.
-      if (item.pageId.startsWith('cms-')) {
-        throw new Error('CMS pages discovered via sitemap must be updated directly in Webflow — synthetic page ID cannot be written via the API');
-      }
-      const value = item.clientValue || item.proposedValue;
-      if (item.collectionId) {
-        const cmsResult = await updateCollectionItem(item.collectionId, item.pageId, { [item.field]: value }, token);
-        if (cmsResult.success === false) throw new Error(cmsResult.error || 'CMS item update failed');
-        const publishResult = await publishCollectionItems(item.collectionId, [item.pageId], token);
-        if (publishResult.success === false) {
-          log.warn(
-            {
-              batchId: req.params.batchId,
-              collectionId: item.collectionId,
-              itemId: item.pageId,
-              field: item.field,
-            },
-            'CMS approval apply updated draft but publish failed',
-          );
-          throw new Error(publishResult.error || 'CMS item publish failed');
-        }
-      } else {
-        const fields = item.field === 'seoTitle'
-          ? { seo: { title: value } }
-          : { seo: { description: value } };
-        const seoResult = await updatePageSeo(item.pageId, fields, token);
-        if (!seoResult.success) throw new Error(seoResult.error || 'SEO update failed');
-      }
-      appliedIds.push(item.id);
-      results.push({ itemId: item.id, pageId: item.pageId, success: true });
-    } catch (err) {
-      results.push({ itemId: item.id, pageId: item.pageId, success: false, error: err instanceof Error ? err.message : String(err) });
-    }
-  }
-
-  if (appliedIds.length > 0) {
-    markBatchApplied(req.params.workspaceId, req.params.batchId, appliedIds);
-    // Mark applied pages as live in edit tracking + record SEO changes
-    for (const r of results) {
-      if (r.success) {
-        updatePageState(req.params.workspaceId, r.pageId, { status: 'live', updatedBy: 'admin' });
-        const appliedItem = approved.find(i => i.id === r.itemId);
-        if (appliedItem) {
-          const fieldName = normalizeSeoChangeField(appliedItem.field);
-          const rawAppliedPagePath = appliedItem.publishedPath || appliedItem.pageSlug || '';
-          const pagePath = rawAppliedPagePath ? normalizePageUrl(rawAppliedPagePath) : '';
-          recordSeoChange(req.params.workspaceId, r.pageId, pagePath, appliedItem.pageTitle || '', [fieldName], 'approval');
-        }
-      }
-    }
-    // Log activity
-    const batchData = getBatch(req.params.workspaceId, req.params.batchId);
-    addActivity(req.params.workspaceId, 'approval_applied',
-      `Applied ${appliedIds.length} approved SEO changes`,
-      batchData ? `Batch: ${batchData.name}` : undefined,
-      { batchId: req.params.batchId, appliedCount: appliedIds.length });
-  }
-
-  // R3b mirror-flip: when the unified approval-family mirror exists, move it to `applied` so the
-  // unified inbox reflects the publish. The Webflow write already succeeded above; a mirror miss
-  // must never fail this response, so the whole block is best-effort (log + swallow).
-  //
-  // Flip ONLY on a fully successful apply (`failed === 0 && every approved item applied`). On a
-  // partial/total Webflow failure `markBatchApplied` marks only the succeeded items `applied` and the
-  // legacy batch stays retryable; flipping the WHOLE mirror to `applied` (terminal — filtered out of
-  // the client list) would strand the still-`approved` failed items. Leaving the mirror `approved`
-  // keeps it in "Ready to publish" so re-clicking Apply re-applies only the failed items — matching
-  // the legacy batch's retry semantics.
-  const failed = results.length - appliedIds.length;
-  if (failed === 0 && appliedIds.length === approved.length) {
-    try {
-      const type = classifyApprovalBatch(batch);
-      const mirror = findBySourceRef(req.params.workspaceId, type, `${type}:${req.params.batchId}`);
-      if (mirror) markDeliverableApplied(req.params.workspaceId, mirror.id);
-    } catch (err) {
-      log.warn({ err, batchId: req.params.batchId }, 'unified mirror apply-sync failed (swallowed; webflow already applied)');
-    }
-  }
-
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.APPROVAL_APPLIED, { batchId: req.params.batchId, applied: appliedIds.length });
-  if (appliedIds.length > 0) {
-    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.PAGE_STATE_UPDATED, {
-      pageIds: results.filter(result => result.success).map(result => result.pageId),
-      source: 'approval',
-    });
-  }
-
-  // Record for outcome tracking — only successfully applied meta updates
-  try {
-    for (const item of approved.filter(i => appliedIds.includes(i.id))) {
-      const fieldName = normalizeSeoChangeField(item.field);
-      if (fieldName === 'title' || fieldName === 'description') {
-        if (getActionBySource('approval', item.id)) continue;
-        const rawPagePath = item.publishedPath || item.pageSlug || '';
-        const pagePath = rawPagePath ? normalizePageUrl(rawPagePath) : null;
-        const action = recordAction({ // recordAction-ok — workspaceId is from route param, always valid
-          workspaceId: req.params.workspaceId,
-          actionType: 'meta_updated',
-          sourceType: 'approval',
-          sourceId: item.id,
-          pageUrl: pagePath,
-          targetKeyword: null,
-          baselineSnapshot: {
-            captured_at: new Date().toISOString(),
-          },
-          attribution: 'platform_executed',
-        });
-        if (pagePath) void captureBaselineFromGsc(action.id, req.params.workspaceId, pagePath);
-      }
-    }
-  } catch (err) {
-    log.warn({ err, batchId: req.params.batchId }, 'Failed to record outcome action for approval apply');
-  }
-
-  // Resolve any recommendations whose affected pages were just fixed by this
-  // apply, so the priority list drops them immediately (GSC-lag-free). // rec-refresh-ok
-  if (appliedIds.length > 0) {
-    const appliedPages = approved
-      .filter(i => appliedIds.includes(i.id))
-      .map(i => i.publishedPath || i.pageSlug || '')
-      .filter(Boolean);
-    if (appliedPages.length > 0) {
-      try {
-        resolveRecommendationsForChange(req.params.workspaceId, { affectedPages: appliedPages });
-      } catch (err) {
-        log.warn({ err, batchId: req.params.batchId }, 'Failed to resolve recommendations after approval apply');
-      }
-    }
-  }
-
-  res.json({ results, applied: appliedIds.length, failed });
+  const result = await applyApprovedBatchItems(req.params.workspaceId, req.params.batchId);
+  if (!result.ok) return res.status(result.status).json({ error: result.error });
+  res.json({ results: result.results, applied: result.applied, failed: result.failed });
 });
 
 export default router;
