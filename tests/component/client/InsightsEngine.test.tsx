@@ -1,8 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { InsightsEngine } from '../../../src/components/client/InsightsEngine';
-import { ToastProvider } from '../../../src/components/Toast';
 import type { RecommendationSet } from '../../../shared/types/recommendations';
+
+// NOTE: ToastProvider is NOT imported here. The client-portal mounts InsightsEngine
+// WITHOUT a ToastProvider — the three error-toast tests below assert the threaded
+// onNotify prop is called, which is the real production path for client mounts.
+// Wrapping in ToastProvider (the previous approach) masked the bug where toast()
+// silently no-oped in the client portal because ToastProvider is only on the admin route.
 
 const useQueryMock = vi.fn();
 const setQueryDataMock = vi.fn();
@@ -93,10 +98,6 @@ function makeSet(): RecommendationSet {
   };
 }
 
-function renderWithToast(ui: React.ReactElement) {
-  return render(<ToastProvider>{ui}</ToastProvider>);
-}
-
 describe('InsightsEngine', () => {
   beforeEach(() => {
     useQueryMock.mockReset();
@@ -173,28 +174,33 @@ describe('InsightsEngine', () => {
     });
   });
 
-  // ── Error toast tests (fix 5) ────────────────────────────────────────────
+  // ── Error toast tests — client-portal mount (no ToastProvider) ───────────
+  // These tests use the onNotify prop directly (the client-portal path) rather than
+  // wrapping in ToastProvider (which would mask the dead-code bug: without onNotify
+  // or ToastProvider, toast() silently no-ops in the client portal).
 
-  it('shows error toast when handleRegenerate post() rejects', async () => {
+  it('calls onNotify with error when handleRegenerate post() rejects', async () => {
     const set = makeSet();
     useQueryMock.mockReturnValue({ data: set, isLoading: false, isError: false });
     postMock.mockRejectedValue(new Error('Network error'));
+    const onNotify = vi.fn();
 
-    renderWithToast(<InsightsEngine workspaceId="ws-test" tier="growth" />);
+    render(<InsightsEngine workspaceId="ws-test" tier="growth" onNotify={onNotify} />);
     fireEvent.click(screen.getByRole('button', { name: /refresh/i }));
 
     await waitFor(() => {
-      expect(screen.getByText('Network error')).toBeInTheDocument();
+      expect(onNotify).toHaveBeenCalledWith('Network error', 'error');
     });
   });
 
-  it('shows error toast when handleStatusUpdate patch() rejects', async () => {
+  it('calls onNotify with error when handleStatusUpdate patch() rejects', async () => {
     const set = makeSet();
     // premium tier — renders "Start Working On This" button after rec is expanded
     useQueryMock.mockReturnValue({ data: set, isLoading: false, isError: false });
     patchMock.mockRejectedValue(new Error('Status update failed'));
+    const onNotify = vi.fn();
 
-    renderWithToast(<InsightsEngine workspaceId="ws-test" tier="premium" />);
+    render(<InsightsEngine workspaceId="ws-test" tier="premium" onNotify={onNotify} />);
 
     // The fix_now priority group is expanded by default (see expandedPriorities initial state).
     // Expand the first rec by clicking the chevron toggle.
@@ -208,16 +214,17 @@ describe('InsightsEngine', () => {
     fireEvent.click(startBtn);
 
     await waitFor(() => {
-      expect(screen.getByText('Could not update recommendation')).toBeInTheDocument();
+      expect(onNotify).toHaveBeenCalledWith('Could not update recommendation', 'error');
     });
   }, 10000);
 
-  it('shows error toast when handleDismiss del() rejects', async () => {
+  it('calls onNotify with error when handleDismiss del() rejects', async () => {
     const set = makeSet();
     useQueryMock.mockReturnValue({ data: set, isLoading: false, isError: false });
     delMock.mockRejectedValue(new Error('Dismiss failed'));
+    const onNotify = vi.fn();
 
-    renderWithToast(<InsightsEngine workspaceId="ws-test" tier="growth" />);
+    render(<InsightsEngine workspaceId="ws-test" tier="growth" onNotify={onNotify} />);
 
     // Expand the rec to reveal the Dismiss button
     const chevronBtns = screen.getAllByRole('button');
@@ -233,7 +240,7 @@ describe('InsightsEngine', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Could not dismiss recommendation')).toBeInTheDocument();
+      expect(onNotify).toHaveBeenCalledWith('Could not dismiss recommendation', 'error');
     });
   });
 });

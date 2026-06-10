@@ -29,6 +29,10 @@ export function buildClientDashboardNav({
   const isExternalBilling = ws.billingMode === 'external';
   // seoClientView=false means the admin has hidden SEO strategy from this client entirely —
   // no lock, no upgrade modal, just absent. Only effectiveTier === 'free' shows the tier lock.
+  // NOTE: the client-safe serializer (toPublicWorkspaceView) coerces NULL → false via !!ws.seoClientView,
+  // so ws.seoClientView is always a boolean in real client mounts. The `!== false` check (which
+  // treats undefined as visible) is only reachable in unit tests / admin preview where the
+  // workspace object skips the serializer.
   const strategyVisible = ws.seoClientView !== false;
   const strategyLocked = effectiveTier === 'free';
 

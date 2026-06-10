@@ -613,50 +613,12 @@ describe('ContentBriefs', () => {
   });
 
   // ── Fix 5: user-triggered mutation errors show toast ────────────────────
-
-  it('handleRegenerateOutline shows error toast on failure', async () => {
-    // handleRegenerateOutline is not directly exposed as a button in the stub —
-    // we test the function directly by ensuring the toast mock is called when
-    // the post for regenerate-outline rejects. We expose this by having the
-    // stub call the prop, so we need the component in "expanded" state.
-    // The BriefList stub exposes an "Open" button that sets expanded state,
-    // and the component's handler is passed as a prop. However, the BriefList
-    // stub does not render the regenerate button — so instead we test via the
-    // BriefList stub's "expand" which passes the expanded brief ID, and then
-    // the component renders detail view. Since our BriefList stub doesn't render
-    // the inner detail, we verify the toast is called via mock injection.
-    // Simplest approach: call the exported handler directly via a wrapper test
-    // that confirms the toast module receives the call when post() rejects.
-
-    // The component uses handleRegenerateOutline when a sub-component calls
-    // onRegenerateOutline. Our stub doesn't expose this; we verify the toast
-    // module mock is wired by checking it after the ContentBriefs renders.
-    // The real test is: does the component import useToast and is the mock wired?
-    mocks.postFn.mockRejectedValue(new Error('Outline regeneration failed'));
-    renderComponent();
-    // Verify the mock is wired (useToast is mocked)
-    expect(mocks.toastFn).toBeDefined();
-    // The actual toast-on-failure is covered by integration; stub doesn't surface outline regen UI.
-  });
-
-  it('handleRegenerateBrief shows error toast on post() failure', async () => {
-    // BriefList stub doesn't expose onRegenerateBrief directly; we verify
-    // the wiring by confirming useToast mock is active.
-    mocks.postFn.mockRejectedValue(new Error('Brief regeneration failed'));
-    renderComponent();
-    expect(mocks.toastFn).toBeDefined();
-  });
-
-  it('handleDeleteRequest shows error toast on del() failure', async () => {
-    const req = makeRequest({ id: 'req-del', status: 'requested' });
-    setHooks({ requests: [req] });
-    mocks.delFn.mockRejectedValue(new Error('Delete failed'));
-
-    renderComponent();
-    // The request-list stub exposes a "Generate Request Brief" button but
-    // not a delete button for requests. Verify toast wiring is active.
-    expect(mocks.toastFn).toBeDefined();
-  });
+  // handleRegenerateOutline, handleRegenerateBrief, and handleDeleteRequest are
+  // not surfaced by the BriefList/RequestList stubs used in this component test,
+  // so those three paths cannot be driven here. Removed the three vacuous tests
+  // that only asserted `expect(mocks.toastFn).toBeDefined()` — that assertion is
+  // true regardless of whether the handler actually calls toast. Coverage for
+  // those paths belongs in integration tests that can render the full sub-trees.
 
   it('handleGenerateBriefForRequest shows error toast on non-409 failure', async () => {
     const req = makeRequest();

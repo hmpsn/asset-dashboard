@@ -27,6 +27,11 @@ interface InsightsEngineProps {
   tier?: 'free' | 'growth' | 'premium';
   compact?: boolean; // for embedding in overview tab
   onNavigate?: (tab: string, context?: { pageSlug?: string; recType?: string }) => void;
+  /** Optional notification callback for client-portal mounts where no ToastProvider is
+   *  present. When absent the component falls back to the context-based toast (admin
+   *  mounts have ToastProvider; client mounts thread this from ClientDashboard's
+   *  local setToast). Signature mirrors the context toast so both paths look the same. */
+  onNotify?: (message: string, type: 'error' | 'success' | 'info') => void;
 }
 
 // Map recommendation types to the admin dashboard tab that handles them
@@ -121,10 +126,14 @@ const EFFORT_BADGE: Record<string, { label: string; color: string }> = {
 
 // ─── Component ────────────────────────────────────────────────────
 
-export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: InsightsEngineProps) {
+export function InsightsEngine({ workspaceId, tier, compact, onNavigate, onNotify }: InsightsEngineProps) {
   const cart = useCart();
   const qc = useQueryClient();
-  const { toast } = useToast();
+  const { toast: ctxToast } = useToast();
+  // Prefer the threaded onNotify prop (client-portal mount has no ToastProvider);
+  // fall back to the context toast (admin mount has ToastProvider).
+  const toast = (msg: string, type: 'error' | 'success' | 'info' = 'success') =>
+    onNotify ? onNotify(msg, type) : ctxToast(msg, type);
   const { trackJob, findActiveJob, findLatestTerminalJob } = useBackgroundTasks();
   const [startingRegeneration, setStartingRegeneration] = useState(false);
   const lastObservedRecommendationJobId = useRef<string | null>(null);

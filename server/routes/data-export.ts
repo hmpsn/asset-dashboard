@@ -18,7 +18,7 @@ const router = Router();
 
 // --- Helpers ---
 
-function toCsv(headers: string[], rows: Record<string, unknown>[]): string {
+export function toCsv(headers: string[], rows: Record<string, unknown>[]): string {
   const escape = (v: unknown): string => {
     if (v == null) return '';
     const s = typeof v === 'object' ? JSON.stringify(v) : String(v);
@@ -31,7 +31,7 @@ function toCsv(headers: string[], rows: Record<string, unknown>[]): string {
   return lines.join('\n');
 }
 
-function sendExport(res: import('express').Response, data: unknown[], headers: string[], filename: string, format: string) {
+export function sendExport(res: import('express').Response, data: unknown[], headers: string[], filename: string, format: string) {
   if (format === 'csv') {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}.csv"`);
@@ -41,6 +41,32 @@ function sendExport(res: import('express').Response, data: unknown[], headers: s
     res.setHeader('Content-Disposition', `attachment; filename="${filename}.json"`);
     res.json(data);
   }
+}
+
+// --- Shared export helpers ---
+
+export const MATRICES_EXPORT_HEADERS = ['matrixId', 'matrixName', 'templateId', 'cellId', 'targetKeyword', 'plannedUrl', 'status', 'variableValues', 'volume', 'difficulty', 'cpc', 'briefId', 'postId'] as const;
+
+/** Flatten all matrices for a workspace into export rows. Shared by admin and public-portal routes. */
+export function buildMatricesExportRows(workspaceId: string): Record<string, unknown>[] {
+  const matrices = listMatrices(workspaceId);
+  return matrices.flatMap(m =>
+    m.cells.map(c => ({
+      matrixId: m.id,
+      matrixName: m.name,
+      templateId: m.templateId,
+      cellId: c.id,
+      targetKeyword: c.targetKeyword,
+      plannedUrl: c.plannedUrl,
+      status: c.status,
+      variableValues: c.variableValues ? Object.entries(c.variableValues).map(([k, v]) => `${k}=${v}`).join('; ') : '',
+      volume: c.keywordValidation?.volume ?? '',
+      difficulty: c.keywordValidation?.difficulty ?? '',
+      cpc: c.keywordValidation?.cpc ?? '',
+      briefId: c.briefId || '',
+      postId: c.postId || '',
+    })),
+  );
 }
 
 // --- Content Briefs Export ---
@@ -100,28 +126,9 @@ router.get('/api/export/:workspaceId/payments', requireWorkspaceAccess('workspac
 // --- Content Matrices Export (flattened cells) ---
 router.get('/api/export/:workspaceId/matrices', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const { format = 'json' } = req.query as { format?: string };
-  const matrices = listMatrices(req.params.workspaceId);
-  // Flatten: one row per cell across all matrices
-  const rows = matrices.flatMap(m =>
-    m.cells.map(c => ({
-      matrixId: m.id,
-      matrixName: m.name,
-      templateId: m.templateId,
-      cellId: c.id,
-      targetKeyword: c.targetKeyword,
-      plannedUrl: c.plannedUrl,
-      status: c.status,
-      variableValues: c.variableValues ? Object.entries(c.variableValues).map(([k, v]) => `${k}=${v}`).join('; ') : '',
-      volume: c.keywordValidation?.volume ?? '',
-      difficulty: c.keywordValidation?.difficulty ?? '',
-      cpc: c.keywordValidation?.cpc ?? '',
-      briefId: c.briefId || '',
-      postId: c.postId || '',
-    })),
-  );
+  const rows = buildMatricesExportRows(req.params.workspaceId);
   log.info(`EXPORT matrices ${req.params.workspaceId}: ${rows.length} cells as ${format}`);
-  const headers = ['matrixId', 'matrixName', 'templateId', 'cellId', 'targetKeyword', 'plannedUrl', 'status', 'variableValues', 'volume', 'difficulty', 'cpc', 'briefId', 'postId'];
-  sendExport(res, rows, headers, `matrices-${req.params.workspaceId}`, format);
+  sendExport(res, rows, [...MATRICES_EXPORT_HEADERS], `matrices-${req.params.workspaceId}`, format);
 });
 
 // --- Content Templates Export ---

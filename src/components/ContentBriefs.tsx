@@ -410,7 +410,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
       queryClient.setQueryData<ContentTopicRequest[]>(queryKeys.admin.requests(workspaceId), old => (old ?? []).map(r => r.id === reqId ? updated : r));
     } catch (err) {
       console.error('ContentBriefs operation failed:', err);
-      // status update degradation — optimistic cache update already applied; will reconcile on next refetch
+      toast(err instanceof Error ? err.message : 'Failed to update request status', 'error');
     }
   };
 
