@@ -71,8 +71,7 @@ router.post('/api/upload/:workspaceId/meta', requireWorkspaceAccess('workspaceId
 // --- Audit Traffic Context (cross-reference audit pages with GSC/GA4 traffic) ---
 router.get('/api/audit-traffic/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
-    const allWs = listWorkspaces();
-    const ws = allWs.find(w => w.webflowSiteId === req.params.siteId);
+    const ws = getWorkspaceBySiteId(req.params.siteId);
     if (!ws) return res.json({});
     const trafficMap = await getAuditTrafficForWorkspace(ws);
     return res.json(trafficMap);
@@ -212,8 +211,9 @@ router.post('/api/upload/:workspaceId/clipboard', requireWorkspaceAccess('worksp
   const file = req.file;
   if (!file) return res.status(400).json({ error: 'No file' });
 
-  const workspaces = listWorkspaces();
-  const wsMatch = workspaces.find(w => w.id === req.params.workspaceId || w.folder === req.params.workspaceId);
+  // id → single-row helper; folder fallback has no index helper.
+  const wsMatch = getWorkspace(req.params.workspaceId)
+    ?? listWorkspaces().find(w => w.folder === req.params.workspaceId); // list-workspaces-find-ok: folder has no index; id path is the helper above
   const destFolder = wsMatch ? path.join(getUploadRoot(), wsMatch.folder) : path.join(getUploadRoot(), '_unsorted');
   fs.mkdirSync(destFolder, { recursive: true });
 
