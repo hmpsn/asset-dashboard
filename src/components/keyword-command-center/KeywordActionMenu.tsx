@@ -70,12 +70,25 @@ export function canHardDelete(row: KeywordCommandCenterRow): boolean {
 
 export function KeywordActionMenu({ row, onAction, onDeleteHard, isPending }: KeywordActionMenuProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // Pending protected action waiting for user confirmation before force-dispatching.
+  const [pendingForceAction, setPendingForceAction] = useState<KeywordCommandCenterNextAction | null>(null);
 
   // Only render the lifecycle actions (nextActions already encodes the lifecycle-aware set:
   // Restore-only for retired/declined, Add-to-strategy for needs-review, Track for not-tracked,
   // Pause/Retire/Decline for tracked). Navigation affordances are not part of this menu.
   const lifecycleActions = row.nextActions.filter((a) => isLifecycleAction(a.type));
   const deletable = canHardDelete(row);
+
+  const handleLifecycleClick = (a: KeywordCommandCenterNextAction) => {
+    if (a.disabledReason) {
+      // Protected keyword: gate behind a confirm dialog so the user sees WHY it is
+      // protected before force-bypassing. The old code passed { force: true } silently
+      // in one click — that was the bug this fixes.
+      setPendingForceAction(a);
+    } else {
+      onAction(a.type as KeywordCommandCenterActionType, undefined);
+    }
+  };
 
   return (
     <div className="flex items-center justify-end gap-1.5">
@@ -87,7 +100,7 @@ export function KeywordActionMenu({ row, onAction, onDeleteHard, isPending }: Ke
           disabled={isPending || a.disabled}
           title={a.disabledReason ?? a.detail}
           className={hubToneClass(a)}
-          onClick={() => onAction(a.type as KeywordCommandCenterActionType, a.disabledReason ? { force: true } : undefined)}
+          onClick={() => handleLifecycleClick(a)}
         >
           {a.label}
         </Button>
@@ -119,6 +132,24 @@ export function KeywordActionMenu({ row, onAction, onDeleteHard, isPending }: Ke
         onConfirm={() => {
           setConfirmOpen(false);
           onDeleteHard(row.keyword);
+        }}
+      />
+
+      {/* Protected-keyword force gate: shown when a lifecycle action has a disabledReason.
+          The user sees WHY the keyword is protected before confirming the force bypass. */}
+      <ConfirmDialog
+        open={!!pendingForceAction}
+        variant="default"
+        title="Override keyword protection?"
+        message={pendingForceAction?.disabledReason ?? ''}
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
+        onCancel={() => setPendingForceAction(null)}
+        onConfirm={() => {
+          if (pendingForceAction) {
+            onAction(pendingForceAction.type as KeywordCommandCenterActionType, { force: true });
+          }
+          setPendingForceAction(null);
         }}
       />
     </div>

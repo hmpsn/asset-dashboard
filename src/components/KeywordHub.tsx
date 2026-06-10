@@ -23,7 +23,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 
-import { FormInput, PageHeader, SectionCard } from './ui';
+import { Button, FormInput, PageHeader, SectionCard } from './ui';
 import { KeywordBulkConfirmDialog } from './keyword-command-center/KeywordBulkConfirmDialog';
 import { KeywordDetailDrawer } from './keyword-command-center/KeywordDetailDrawer';
 import { summarizeBulkAction, type KeywordBulkActionSummary } from './keyword-command-center/kccActionHelpers';
@@ -42,6 +42,7 @@ import {
   useKeywordCommandCenterRows,
   useKeywordCommandCenterSummary,
   useKeywordHardDelete,
+  useRankTrackingAddKeyword,
 } from '../hooks/admin/useKeywordCommandCenter';
 import { useKeywordHubState } from '../hooks/admin/useKeywordHubState';
 import type { HubSortKey } from '../hooks/admin/useKeywordHubState';
@@ -190,6 +191,10 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
   const rowAction = useKeywordCommandCenterAction(workspaceId);
   const hardDelete = useKeywordHardDelete(workspaceId);
   const localRefresh = useLocalSeoRefresh(workspaceId);
+  const addKeywordMutation = useRankTrackingAddKeyword(workspaceId);
+
+  // Add-keyword input state (local — not a filter, not hub state).
+  const [addKeywordValue, setAddKeywordValue] = useState('');
 
   // The selected row for the drawer: the freshly-fetched detail row when it
   // arrives, otherwise the list row as an instant preview (mirrors KCC).
@@ -365,10 +370,23 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
   );
   const allSelected = hub.allSelected(visibleKeys);
 
+  // Add-keyword: trim → guard empty → mutateAsync → clear on success.
+  // Errors surface via the shared actionErrorMessage band below.
+  const handleAddKeyword = async () => {
+    const trimmed = addKeywordValue.trim();
+    if (!trimmed) return;
+    try {
+      await addKeywordMutation.mutateAsync(trimmed);
+      setAddKeywordValue('');
+    } catch {
+      // Error surfaced via actionErrorMessage below — no double-reporting needed.
+    }
+  };
+
   // Surface a failed row/drawer/local action (mirrors KCC's actionErrorMessage).
   // Without this a thrown mutation — e.g. a server-rejected lifecycle move — would
   // fail silently in the Hub.
-  const firstError = rowAction.error ?? hardDelete.error ?? localRefresh.error ?? bulkAction.error;
+  const firstError = rowAction.error ?? hardDelete.error ?? localRefresh.error ?? bulkAction.error ?? addKeywordMutation.error;
   const actionErrorMessage = firstError instanceof Error
     ? firstError.message
     : firstError
@@ -381,13 +399,38 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
         title="Keyword Hub"
         subtitle="One surface for every keyword — strategy, tracking, rank, and local visibility."
         actions={
-          <div className="w-[260px]">
-            <FormInput
-              value={hub.searchTerm}
-              onChange={hub.setSearchTerm}
-              placeholder="Search keywords, pages..."
-              aria-label="Search keywords"
-            />
+          <div className="flex items-center gap-2">
+            {/* Add-keyword input (B1): writes through the existing rank-tracking add path. */}
+            <div className="flex items-center gap-1.5">
+              <FormInput
+                value={addKeywordValue}
+                onChange={setAddKeywordValue}
+                placeholder="Add keyword..."
+                aria-label="Add keyword"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    void handleAddKeyword();
+                  }
+                }}
+              />
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={addKeywordMutation.isPending}
+                onClick={() => void handleAddKeyword()}
+              >
+                Add
+              </Button>
+            </div>
+
+            <div className="w-[260px]">
+              <FormInput
+                value={hub.searchTerm}
+                onChange={hub.setSearchTerm}
+                placeholder="Search keywords, pages..."
+                aria-label="Search keywords"
+              />
+            </div>
           </div>
         }
       />
