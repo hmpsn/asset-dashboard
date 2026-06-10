@@ -345,14 +345,20 @@ describe('transformToFeedInsight — cannibalization', () => {
 // ── transformToFeedInsight — serp_opportunity ─────────────────────────────────
 
 describe('transformToFeedInsight — serp_opportunity', () => {
-  it('produces rich results headline with schema type in context', () => {
+  it('produces rich results headline with schema status in context', () => {
     const insight = makeInsight({
       insightType: 'serp_opportunity',
-      data: { schemaType: 'FAQ' },
+      data: { schemaStatus: 'partial' },
     });
     const result = transformToFeedInsight(insight);
     expect(result.headline).toBe('eligible for rich results');
-    expect(result.context).toContain('FAQ');
+    expect(result.context).toContain('Schema partial');
+  });
+
+  it('carries detectedAt from the insight computedAt (for chart callouts)', () => {
+    const insight = makeInsight({ insightType: 'serp_opportunity', data: { schemaStatus: 'missing' } });
+    const result = transformToFeedInsight(insight);
+    expect(result.detectedAt).toBe(insight.computedAt);
   });
 });
 

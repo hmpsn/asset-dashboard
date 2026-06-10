@@ -356,14 +356,14 @@ describe('transformToFeedInsight — audit_finding', () => {
 });
 
 describe('transformToFeedInsight — serp_opportunity', () => {
-  it('uses fixed headline and appends schemaType to context', () => {
+  it('uses fixed headline and appends schema status to context', () => {
     const insight = makeInsight({
       insightType: 'serp_opportunity',
-      data: { schemaType: 'FAQ' },
+      data: { schemaStatus: 'missing' }, // producer writes schemaStatus, not schemaType
     });
     const result = transformToFeedInsight(insight);
     expect(result.headline).toBe('eligible for rich results');
-    expect(result.context).toContain('FAQ');
+    expect(result.context).toContain('Schema missing');
   });
 });
 
