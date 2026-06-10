@@ -23,6 +23,7 @@ import { createTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import db from '../../server/db/index.js';
+import { LEARNINGS_LOGIC_VERSION } from '../../server/workspace-learnings.js';
 import { randomUUID } from 'crypto';
 
 const ctx = createTestContext(13366); // port-ok: next free after 13365
@@ -137,6 +138,10 @@ beforeAll(async () => {
     INSERT OR REPLACE INTO workspace_learnings (id, workspace_id, learnings, computed_at)
     VALUES (?, ?, ?, datetime('now'))
   `).run(learningId, readyLearningsWs.workspaceId, JSON.stringify({
+    // A1: cached learnings blobs carry a logic-version stamp; an unstamped blob
+    // is treated as pre-A1 corrupted cache and recomputed from tracked actions.
+    // This test wants the CACHED aggregate served, so stamp the current version.
+    logicVersion: LEARNINGS_LOGIC_VERSION,
     confidence: 'medium',
     totalScoredActions: 12,
     content: null,
