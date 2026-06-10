@@ -53,7 +53,10 @@ const ENDPOINTS = [
 ] as const;
 
 // Convenience: GET with an explicit Cookie header (bypasses cookieJar).
+// clearCookies first — ctx.api overwrites the Cookie header with jar contents
+// whenever the jar is non-empty, which would make these assertions vacuous.
 async function getWithCookie(path: string, cookieValue: string): Promise<Response> {
+  ctx.clearCookies();
   return ctx.api(path, {
     headers: { Cookie: cookieValue, 'x-no-auto-public-auth': 'true' },
   });
@@ -167,8 +170,21 @@ describe('public-portal GET auth guards — case (d): passwordless workspace + n
 
 describe('public-portal GET auth guards — case (e): client JWT for workspace B against workspace A → 401', () => {
   for (const endpointFn of ENDPOINTS) {
-    it(`GET ${endpointFn('{wsA}')} with workspace-B JWT → 401`, async () => {
-      // The cookie is scoped to workspace B, but the URL targets workspace A.
+    it(`GET ${endpointFn('{wsA}')} with forged workspace-A cookie carrying workspace-B token → 401`, async () => {
+      // Forgery: the cookie NAME claims workspace A (so the middleware reads
+      // it), but the token inside belongs to workspace B's user. This pins the
+      // payload.workspaceId check in verifyClientUserTokenForWorkspace — the
+      // strongest cross-workspace defense, not just the cookie-name scoping.
+      const res = await getWithCookie(
+        endpointFn(wsA.workspaceId),
+        `client_user_token_${wsA.workspaceId}=${clientTokenB}`,
+      );
+      expect(res.status).toBe(401);
+    });
+
+    it(`GET ${endpointFn('{wsA}')} with workspace-B-named cookie → 401`, async () => {
+      // Weaker variant: cookie scoped to workspace B against a workspace-A URL
+      // (middleware never reads this cookie name).
       const res = await getWithCookie(
         endpointFn(wsA.workspaceId),
         `client_user_token_${wsB.workspaceId}=${clientTokenB}`,

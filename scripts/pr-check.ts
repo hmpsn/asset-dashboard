@@ -393,6 +393,12 @@ function loadStyleExceptions(): StyleExceptionEntry[] {
  *
  * See docs/rules/pr-check-rule-authoring.md → "Common mistakes" for the
  * explanation and the funcBoundaryRe / ws-scope-ok / ai-race-ok precedents.
+ *
+ * Intentional exception: the security rule "public-portal.ts GET missing
+ * portal-auth middleware" is inline-only by design (a hatch above a route
+ * definition is too easy to leave behind when routes are reordered, and
+ * `router.get(` lines always have room for an inline comment). Do not
+ * "fix" it to use hasHatch.
  */
 function hasHatch(lines: string[], i: number, hatch: string): boolean {
   if (lines[i]?.includes(hatch)) return true;
@@ -7831,8 +7837,22 @@ export const CHECKS: Check[] = [
           if (!/\brouter\.get\s*\(/.test(line)) continue;
           // Hatch on the same line as router.get(
           if (line.includes('// portal-auth-public-ok')) continue;
-          // Look forward up to 8 lines for auth middleware (covers multi-line signatures)
-          const window = lines.slice(i, Math.min(i + 8, lines.length)).join('\n');
+          // Look forward up to 8 lines for auth middleware (covers multi-line
+          // signatures). Comment text is stripped so a `// TODO: add
+          // requireClientPortalAuth() later` cannot silence the rule, and the
+          // window stops at the handler opener / next route so an adjacent
+          // guarded route's middleware cannot bleed into this route's window.
+          const windowLines: string[] = [];
+          for (let j = i; j < Math.min(i + 8, lines.length); j++) {
+            let wl = lines[j];
+            if (j > i && /\brouter\.\w+\s*\(/.test(wl)) break; // next route definition
+            if (/^\s*(\/\/|\*)/.test(wl)) continue; // full-line comments never count
+            const slash = wl.indexOf('//');
+            if (slash >= 0) wl = wl.slice(0, slash); // strip trailing comments
+            windowLines.push(wl);
+            if (wl.includes('(req, res)') || /=>\s*\{?\s*$/.test(wl)) break; // handler reached
+          }
+          const window = windowLines.join('\n');
           if (window.includes('requireClientPortalAuth(')) continue;
           if (window.includes('requireAuthenticatedClientPortalAuth(')) continue;
           hits.push({ file, line: i + 1, text: line.trim() });

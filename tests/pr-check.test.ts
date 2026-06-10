@@ -11027,4 +11027,37 @@ describe('Rule: public-portal.ts GET missing portal-auth middleware', () => {
     const hits = runRule(RULE, [file]);
     expect(hits).toHaveLength(0);
   });
+
+  // (g) A comment MENTIONING the middleware must not silence the rule
+  it('flags an unguarded GET whose body has a TODO comment naming requireClientPortalAuth', () => {
+    const file = write(
+      uniqPath('portal-get-auth', 'server/routes/public-portal.ts'),
+      lines(
+        "router.get('/api/public/things/:workspaceId', (req, res) => {",
+        "  // TODO: add requireClientPortalAuth() later",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  // (h) An adjacent guarded route's middleware must not bleed into this route's window
+  it('flags an unguarded short GET even when the next route within 8 lines is guarded', () => {
+    const file = write(
+      uniqPath('portal-get-auth', 'server/routes/public-portal.ts'),
+      lines(
+        "router.get('/api/public/unguarded/:workspaceId', (req, res) => res.json({ ok: true }));",
+        "",
+        "router.get('/api/public/guarded/:workspaceId', requireClientPortalAuth('workspaceId'), (req, res) => {",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0].line).toBe(1);
+  });
 });
