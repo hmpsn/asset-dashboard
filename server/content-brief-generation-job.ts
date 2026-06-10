@@ -1,6 +1,7 @@
 import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { generateBrief } from './content-brief.js';
+import { collectBriefEnrichment } from './content-brief-scrape-enrichment.js';
 import { resolveBriefTemplateCrossref, toBriefPageType } from './content-brief-template-crossref.js';
 import { getAllSitePages } from './content-site-pages.js';
 import { getContentRequest, updateContentRequest } from './content-requests.js';
@@ -111,7 +112,6 @@ async function generateStandaloneBrief(params: StandaloneContentBriefGenerationP
     }
   }
 
-  const { scrapeUrls, scrapeSerpData } = await import('./web-scraper.js'); // dynamic-import-ok — lazy-loaded per job
   const refUrlList = Array.isArray(referenceUrls)
     ? referenceUrls.filter((u): u is string => typeof u === 'string' && u.startsWith('http')).slice(0, 5)
     : [];
@@ -136,11 +136,11 @@ async function generateStandaloneBrief(params: StandaloneContentBriefGenerationP
     }
   }
 
-  const [scrapedRefs, serpData, stylePages] = await Promise.all([
-    refUrlList.length > 0 ? scrapeUrls(refUrlList, 3) : Promise.resolve([]),
-    scrapeSerpData(targetKeyword).catch(() => null),
-    topPageUrls.length > 0 ? scrapeUrls(topPageUrls, 2) : Promise.resolve([]),
-  ]);
+  const { scrapedRefs, serpData, stylePages } = await collectBriefEnrichment({
+    targetKeyword,
+    referenceUrls: refUrlList,
+    stylePageUrls: topPageUrls,
+  });
 
   const resolvedPageType = toBriefPageType(pageType) ?? templateCrossref?.pageType ?? undefined;
   const brief = await generateBrief(workspaceId, targetKeyword, {
@@ -243,14 +243,32 @@ async function generateBriefForRequest(params: RequestContentBriefGenerationPara
   }
 
   let ga4PagePerformance: { landingPage: string; sessions: number; users: number; bounceRate: number; avgEngagementTime: number; conversions: number }[] | undefined;
+  const topPageUrls: string[] = [];
   if (ws.ga4PropertyId) {
     try {
       const pages = await getGA4LandingPages(ws.ga4PropertyId, 28, 25);
       if (pages.length > 0) ga4PagePerformance = pages;
+      if (ws.liveDomain) {
+        const sortedByQuality = [...pages]
+          .filter(p => p.sessions > 10 && p.avgEngagementTime > 30)
+          .sort((a, b) => (b.avgEngagementTime * b.sessions) - (a.avgEngagementTime * a.sessions));
+        for (const p of sortedByQuality.slice(0, 2)) {
+          const domain = ws.liveDomain.replace(/\/+$/, '');
+          topPageUrls.push(`https://${domain}${p.landingPage}`);
+        }
+      }
     } catch (err) {
       if (isProgrammingError(err)) log.warn({ err }, 'Request brief GA4 enrichment failed');
     }
   }
+
+  const { scrapedRefs, serpData, stylePages } = await collectBriefEnrichment({
+    targetKeyword: request.targetKeyword,
+    // No client-supplied reference URLs on the request path (content_requests
+    // schema has no reference_urls column). SERP + GA4 style-pages provide the
+    // evidence context. C4 may add reference URL persistence later.
+    stylePageUrls: topPageUrls,
+  });
 
   const existingPages = await getAllSitePages(ws);
   const strategyCardContext: StrategyCardContext = {
@@ -294,12 +312,32 @@ async function generateBriefForRequest(params: RequestContentBriefGenerationPara
     strategyCardContext,
     decayQueryContext,
     generationStyle,
+    scrapedReferences: scrapedRefs.length > 0 ? scrapedRefs : undefined,
+    serpData: serpData ? { peopleAlsoAsk: serpData.peopleAlsoAsk, organicResults: serpData.organicResults } : undefined,
+    styleExamples: stylePages.length > 0 ? stylePages : undefined,
   });
 
   updateContentRequest(workspaceId, requestId, {
     status: 'brief_generated',
     briefId: brief.id,
   });
+
+  try {
+    recordAction({ // recordAction-ok — workspaceId is validated before job creation
+      workspaceId,
+      actionType: 'brief_created',
+      sourceType: 'content_request',
+      sourceId: brief.id,
+      pageUrl: null,
+      targetKeyword: request.targetKeyword,
+      baselineSnapshot: {
+        captured_at: new Date().toISOString(),
+      },
+      attribution: 'platform_executed',
+    });
+  } catch (err) {
+    log.warn({ err, keyword: request.targetKeyword }, 'Failed to record outcome action for request brief creation');
+  }
 
   broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: request.id, status: 'brief_generated' });
   addActivity(workspaceId, 'brief_generated', `Content brief generated for "${request.targetKeyword}"`, `Title: ${brief.suggestedTitle}`, { requestId: request.id, briefId: brief.id });
