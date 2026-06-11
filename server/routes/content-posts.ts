@@ -27,21 +27,14 @@ import {
 import { callCreativeAI, scoreVoiceMatch, countHtmlWords } from '../content-posts-ai.js';
 import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
 import { renderPostHTML } from '../post-export-html.js';
-import { assemblePostHtml, generateSlug } from '../html-to-richtext.js';
-import {
-  createCollectionItem,
-  publishCollectionItems,
-} from '../webflow.js';
 import { getWorkspace, getTokenForSite } from '../workspaces.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { createLogger } from '../logger.js';
-import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
-import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { parseAIJson } from '../openai-helpers.js';
 import { callAI } from '../ai.js';
-import { hasActiveJob } from '../jobs.js';
+import { hasActiveJob, createJob } from '../jobs.js';
+import { runContentPublishJob } from '../content-publish-job.js';
 import { buildIntelPrompt } from '../workspace-intelligence.js';
-import { normalizePageUrl } from '../helpers.js';
 import { validate, z } from '../middleware/validate.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
 import {
@@ -365,76 +358,29 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
     snapshotPostVersion(previous, 'manual_edit', `field:${editedContentFields.join(',')}`);
   }
 
-  // Auto-publish on approval if workspace has publishTarget and post isn't already published
+  // Auto-publish on approval — runs as a background CONTENT_PUBLISH job (C3, audit item #12).
+  //
+  // This used to be a silent fire-and-forget detached promise: failures only log.warn-ed and never
+  // reached the operator, and it wrote a strict SUBSET of the field map (no summary, no featured
+  // image). Now it dispatches a job that calls the SAME shared `publishPostToWebflow()` service the
+  // manual route uses (single field map, single broadcast/activity/outcome/follow-on site), so
+  // failures surface as job `error` + activity and the editor gets progress/failure UX via
+  // useJobProgress + the CONTENT_PUBLISHED broadcast.
+  //
+  // The approve PATCH response is unchanged (`res.json(updated)` below, 200 + post) — publish was
+  // already detached, so the response never carried publish results.
   if (req.body.status === 'approved' && previous.status !== 'approved' && !updated.webflowItemId) {
     const ws = getWorkspace(req.params.workspaceId);
-    if (ws?.publishTarget && ws.webflowSiteId) {
-      const token = getTokenForSite(ws.webflowSiteId) || undefined;
-      if (token) {
-        // Fire-and-forget background publish
-        const { collectionId, fieldMap } = ws.publishTarget;
-        const bodyHtml = assemblePostHtml(updated);
-        const slug = generateSlug(updated.title);
-        const fieldData: Record<string, unknown> = {};
-        if (fieldMap.title) fieldData[fieldMap.title] = updated.title;
-        if (fieldMap.slug) fieldData[fieldMap.slug] = slug;
-        if (fieldMap.body) fieldData[fieldMap.body] = bodyHtml;
-        if (fieldMap.metaTitle) fieldData[fieldMap.metaTitle] = updated.seoTitle || updated.title;
-        if (fieldMap.metaDescription) fieldData[fieldMap.metaDescription] = updated.seoMetaDescription || updated.metaDescription;
-        if (fieldMap.publishDate) fieldData[fieldMap.publishDate] = new Date().toISOString();
-        // background-generation-ok: legacy auto-publish follow-up; Phase 2 keeps this visible through jobs or a domain queue.
-        createCollectionItem(collectionId, fieldData, false, token).then(async (result) => {
-          if (result.success && result.itemId) {
-            const publishResult = await publishCollectionItems(collectionId, [result.itemId], token);
-            if (!publishResult.success) {
-              updatePostField(req.params.workspaceId, req.params.postId, {
-                webflowItemId: result.itemId,
-                webflowCollectionId: collectionId,
-              });
-              log.warn(`Auto-publish failed for ${req.params.postId}: ${publishResult.error}`);
-              return;
-            }
-            updatePostField(req.params.workspaceId, req.params.postId, {
-              webflowItemId: result.itemId,
-              webflowCollectionId: collectionId,
-              publishedAt: new Date().toISOString(),
-              publishedSlug: slug,
-            });
-            addActivity(req.params.workspaceId, 'content_published',
-              `Auto-published "${updated.title}" to Webflow CMS on approval`,
-              `Collection: ${ws.publishTarget!.collectionName} · Slug: ${slug}`,
-              { postId: req.params.postId, itemId: result.itemId, collectionId, slug });
-            // Record for outcome tracking — guard prevents duplicates if .then() fires more than once
-            try {
-              if (!getActionByWorkspaceAndSource(req.params.workspaceId, 'post', req.params.postId)) {
-                const publishedPagePath = slug ? normalizePageUrl(slug) : null;
-                const postAction = recordAction({ // recordAction-ok: workspaceId from validated route param
-                  workspaceId: req.params.workspaceId,
-                  actionType: 'content_published',
-                  sourceType: 'post',
-                  sourceId: req.params.postId,
-                  pageUrl: publishedPagePath,
-                  targetKeyword: updated.targetKeyword ?? null,
-                  baselineSnapshot: {
-                    captured_at: new Date().toISOString(),
-                  },
-                  attribution: 'platform_executed',
-                });
-                if (publishedPagePath) {
-                  void captureBaselineFromGsc(postAction.id, req.params.workspaceId, publishedPagePath);
-                }
-              }
-            } catch (err) {
-              log.warn({ err, postId: req.params.postId }, 'Failed to record outcome action for content publish');
-            }
-            invalidateContentPipelineIntelligence(req.params.workspaceId);
-            broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_PUBLISHED, {
-              postId: req.params.postId, itemId: result.itemId, slug, title: updated.title });
-          } else {
-            log.warn(`Auto-publish failed for ${req.params.postId}: ${result.error}`);
-          }
-        }).catch(err => {
-          log.error({ err }, `Auto-publish error for ${req.params.postId}`);
+    if (ws?.publishTarget && ws.webflowSiteId && getTokenForSite(ws.webflowSiteId)) {
+      const existingJob = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_PUBLISH, req.params.workspaceId);
+      if (!existingJob) {
+        const publishJob = createJob(BACKGROUND_JOB_TYPES.CONTENT_PUBLISH, {
+          workspaceId: req.params.workspaceId,
+          message: 'Publishing to Webflow...',
+        });
+        const { workspaceId, postId } = req.params;
+        setImmediate(() => {
+          void runContentPublishJob({ jobId: publishJob.id, workspaceId, postId });
         });
       }
     }

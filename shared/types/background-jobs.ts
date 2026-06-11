@@ -27,6 +27,7 @@ export const BACKGROUND_JOB_TYPES = {
   BLUEPRINT_GENERATION: 'blueprint-generation',
   LLMS_TXT_GENERATION: 'llms-txt-generation',
   AEO_SITE_REVIEW: 'aeo-site-review',
+  CONTENT_PUBLISH: 'content-publish',
 } as const;
 
 export type BackgroundJobType = typeof BACKGROUND_JOB_TYPES[keyof typeof BACKGROUND_JOB_TYPES];
@@ -234,6 +235,12 @@ export const BACKGROUND_JOB_METADATA: { [K in BackgroundJobType]: BackgroundJobT
     description: 'Runs an AI-powered AEO review across site pages.',
     cancellable: false,
     resultBehavior: 'domain-store-and-result',
+  },
+  [BACKGROUND_JOB_TYPES.CONTENT_PUBLISH]: {
+    label: 'Publishing to Webflow',
+    description: 'Publishes an approved content post to the Webflow CMS on approval.',
+    cancellable: false,
+    resultBehavior: 'domain-store',
   },
 };
 

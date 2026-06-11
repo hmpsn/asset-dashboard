@@ -49,9 +49,12 @@ vi.mock('../../server/keyword-strategy-follow-ons.js', () => ({
 
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { getPost, savePost } from '../../server/content-posts-db.js';
+import { listJobs } from '../../server/jobs.js';
+import { listActivity } from '../../server/activity-log.js';
 import db from '../../server/db/index.js';
 import type { GeneratedPost, PostSection } from '../../shared/types/content.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 
 let baseUrl = '';
 let server: http.Server | undefined;
@@ -172,6 +175,13 @@ async function waitFor(predicate: () => boolean, timeoutMs = 500): Promise<void>
     if (Date.now() - start > timeoutMs) throw new Error('Timed out waiting for condition');
     await new Promise(resolve => setTimeout(resolve, 10));
   }
+}
+
+// Jobs accumulate in-memory across tests — always pick the most recent CONTENT_PUBLISH job for wsId.
+function latestPublishJob() {
+  return listJobs(wsId)
+    .filter(j => j.type === BACKGROUND_JOB_TYPES.CONTENT_PUBLISH)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
 }
 
 beforeAll(async () => {
@@ -316,6 +326,62 @@ describe('PATCH /api/content-posts/:workspaceId/:postId', () => {
     expect(stored?.publishedAt).toBeUndefined();
     expect(stored?.publishedSlug).toBeUndefined();
     expect(broadcastState.calls.some(call => call.event === WS_EVENTS.CONTENT_PUBLISHED)).toBe(false);
+  });
+
+  // C3 (audit item #12): auto-publish-on-approval now runs as a background CONTENT_PUBLISH job
+  // instead of a silent fire-and-forget. Failures surface as job `error`; success stamps the post,
+  // broadcasts CONTENT_PUBLISHED, and logs a content_published activity.
+
+  it('auto-publish runs as a CONTENT_PUBLISH job and surfaces failures as job error (not silent)', async () => {
+    configurePublishTarget();
+    mockWebflowError(/\/collections\/collection_content_posts\/items$/, 500, 'Webflow create failed');
+    const post = seedPost({ status: 'review' });
+
+    const res = await patchJson(`/api/content-posts/${wsId}/${post.id}`, { status: 'approved' });
+    expect(res.status).toBe(200);
+
+    // Wait for the background job to reach a terminal error state.
+    await waitFor(() => latestPublishJob()?.status === 'error');
+
+    const job = latestPublishJob();
+    expect(job?.status).toBe('error');
+    expect(job?.error).toMatch(/create CMS item|Webflow create failed/i);
+
+    // FM-2: no partial stamp on create failure.
+    const stored = getPost(wsId, post.id);
+    expect(stored?.webflowItemId).toBeUndefined();
+    expect(stored?.publishedAt).toBeUndefined();
+    expect(broadcastState.calls.some(call => call.event === WS_EVENTS.CONTENT_PUBLISHED)).toBe(false);
+  });
+
+  it('auto-publish job success stamps the post, broadcasts CONTENT_PUBLISHED, and logs activity', async () => {
+    configurePublishTarget();
+    mockWebflowSuccess(/\/collections\/collection_content_posts\/items$/, { id: 'wf_auto_item' });
+    mockWebflowSuccess(/\/collections\/collection_content_posts\/items\/publish$/, {});
+    const post = seedPost({ status: 'review' });
+
+    const res = await patchJson(`/api/content-posts/${wsId}/${post.id}`, { status: 'approved' });
+    expect(res.status).toBe(200);
+
+    await waitFor(() => {
+      const stored = getPost(wsId, post.id);
+      return stored?.webflowItemId === 'wf_auto_item';
+    });
+
+    const stored = getPost(wsId, post.id);
+    expect(stored?.webflowItemId).toBe('wf_auto_item');
+    expect(stored?.webflowCollectionId).toBe('collection_content_posts');
+    expect(stored?.publishedAt).toBeTruthy();
+    expect(stored?.publishedSlug).toBeTruthy();
+
+    expect(latestPublishJob()?.status).toBe('done');
+
+    expect(broadcastState.calls.some(call =>
+      call.event === WS_EVENTS.CONTENT_PUBLISHED
+      && (call.payload as { itemId?: string }).itemId === 'wf_auto_item',
+    )).toBe(true);
+
+    expect(listActivity(wsId).some(a => a.type === 'content_published')).toBe(true);
   });
 });
 

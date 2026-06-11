@@ -9,6 +9,7 @@ const pageToolsRoute = readFileSync(join(import.meta.dirname, '../../server/rout
 const rewriteRoute = readFileSync(join(import.meta.dirname, '../../server/routes/webflow-seo-rewrite.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for SEO rewrite fetches.
 const bulkSeoJob = readFileSync(join(import.meta.dirname, '../../server/webflow-bulk-seo-fix-background-job.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for background SEO writes.
 const contentPostsRoute = readFileSync(join(import.meta.dirname, '../../server/routes/content-posts.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for content outcome tracking.
+const publishService = readFileSync(join(import.meta.dirname, '../../server/domains/content/publish-post-to-webflow.ts'), 'utf-8'); // readFile-ok — C3: content publish outcome tracking moved into the shared service consumed by both publish paths.
 const webflowKeywordsRoute = readFileSync(join(import.meta.dirname, '../../server/routes/webflow-keywords.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for keyword intelligence context.
 const schemaGenerator = readFileSync(join(import.meta.dirname, '../../server/schema/generator.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for lean schema suggestions.
 const schemaSuggester = readFileSync(join(import.meta.dirname, '../../server/schema-suggester.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for schema suggestion publishing paths.
@@ -52,7 +53,10 @@ describe('canonical page-address route wiring', () => {
 
   it('background and AI read paths do not persist or prompt with raw leaf slugs', () => {
     expect(bulkSeoJob).toContain("const seoChangePagePath = pagePath || (page.slug ? normalizePageUrl(page.slug) : '')");
-    expect(contentPostsRoute).toContain('const publishedPagePath = slug ? normalizePageUrl(slug) : null');
+    // C3 (audit item #12): the publish outcome-tracking page-address logic moved out of the
+    // content-posts route into the shared publishPostToWebflow() service (one site, both paths).
+    expect(publishService).toContain('const publishedPagePath = slug ? normalizePageUrl(slug) : null');
+    expect(publishService).not.toContain('pageUrl: slug ? `/${slug}` : null');
     expect(contentPostsRoute).not.toContain('pageUrl: slug ? `/${slug}` : null');
     expect(webflowKeywordsRoute).toContain('const pagePath = slug ? normalizePageUrl(slug) : undefined');
     expect(webflowKeywordsRoute).not.toContain("slug.startsWith('/') ? slug : `/${slug}`");
