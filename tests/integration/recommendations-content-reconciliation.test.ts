@@ -307,6 +307,26 @@ describe('generateRecommendations — in-flight pipeline suppression', () => {
     const active = set.recommendations.filter(r => r.type === 'content' && r.status !== 'completed');
     expect(active).toHaveLength(0);
   });
+
+  it('a prior pending rec suppressed by an in-flight brief auto-resolves with truthful "in progress" copy, not "no longer detected"', async () => {
+    const wsId = makeWorkspace('D2 Truthful Copy Workspace');
+    seedMinimalStrategy(wsId);
+    // The gap is STILL detected — only the in-flight brief suppresses re-minting.
+    upsertContentGap(wsId, makeGap('sump pump maintenance'));
+    seedRecSet(wsId, [makeContentRec(wsId, 'sump pump maintenance')]);
+    seedBrief(wsId, `brief_d2_truthful_${Date.now()}`, 'Sump Pump Maintenance');
+    invalidateIntelligenceCache(wsId);
+
+    const set = await generateRecommendations(wsId);
+    const resolved = set.recommendations.find(
+      r => r.targetKeyword === 'sump pump maintenance' && r.status === 'completed',
+    );
+    expect(resolved).toBeDefined();
+    // Truthful copy: the gap was suppressed because content is in production — it was
+    // NOT "no longer detected" (the gap row still exists).
+    expect(resolved?.insight).toContain('already in progress');
+    expect(resolved?.insight).not.toContain('no longer detected');
+  });
 });
 
 // ─── 2. Publish-time resolution (C3 domain service hook) ────────────────────

@@ -2392,12 +2392,22 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       const category = getRecSourceCategory(oldRec.source);
       if (category && failedCategories.has(category)) continue;
       if (!newSources.has(buildMergeKey(oldRec))) {
-        // Issue no longer detected — auto-resolve
+        // D2: a content-gap rec suppressed because the pipeline already has an in-flight
+        // brief/post for its keyword is NOT "no longer detected" — the gap still exists,
+        // we're just already working on it. Use truthful copy so the client doesn't read
+        // "done" as "my content is live". (Pre-D2 recs without targetKeyword fall through
+        // to the generic copy — forward-looking only.)
+        const suppressedByPipeline = Boolean(
+          oldRec.targetKeyword
+          && inFlightContentKeywords.has(keywordComparisonKey(oldRec.targetKeyword)),
+        );
         recs.push({
           ...oldRec,
           status: 'completed',
           updatedAt: now,
-          insight: `✓ Auto-resolved — this issue is no longer detected in the latest audit. ${oldRec.insight}`,
+          insight: suppressedByPipeline
+            ? `✓ Content for this is already in progress — it will be marked done when it publishes. ${oldRec.insight}`
+            : `✓ Auto-resolved — this issue is no longer detected in the latest audit. ${oldRec.insight}`,
         });
         autoResolved++;
         autoResolvedRecs.push(oldRec);
