@@ -246,23 +246,32 @@ export interface OutcomeScorecard {
 export interface TopWin {
   actionId: string;
   actionType: ActionType;
+  /** Source system the action originated from (e.g. 'recommendation', 'insight', 'post'). */
+  sourceType: string;
+  /** Id within the source system; used to resolve the real source title for client display. */
+  sourceId: string | null;
   pageUrl: string | null;
   targetKeyword: string | null;
   delta: DeltaSummary;
   score: OutcomeScore;
+  /** Realized dollar value of the win outcome (action_outcomes.attributed_value). NULL when no CPC data was available. */
+  attributedValue: number | null;
   createdAt: string;
   scoredAt: string;
 }
 
-/** Client-facing "we called it" win entry for outcome API routes and WeCalledIt component. */
+/** Client-facing "we called it" win entry for outcome API routes and the WinsSurface component. */
 export interface OutcomeWinEntry {
   actionId: string;
   actionType: ActionType;
   pageUrl: string | null;
   targetKeyword: string | null;
+  /** Real source title (recommendation/post/brief/etc.) when resolvable; otherwise an honest generic action label. */
   recommendation: string;
   delta: DeltaSummary;
   score: OutcomeScore;
+  /** Realized dollar value of the win outcome. NULL when no CPC data was available. */
+  attributedValue: number | null;
   detectedAt: string;
 }
 

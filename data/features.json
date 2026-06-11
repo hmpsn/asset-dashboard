@@ -5,7 +5,11 @@
       "title": "Site Health Audit",
       "oneLiner": "20+ check SEO audit with weighted scoring, traffic intelligence, and one-click Fix→ routing to every tool",
       "category": "seo",
-      "painPoints": ["site-health", "technical-seo", "reporting"],
+      "painPoints": [
+        "site-health",
+        "technical-seo",
+        "reporting"
+      ],
       "tier": "free",
       "impact": "high",
       "clientFacing": true
@@ -15,7 +19,10 @@
       "title": "Scheduled Recurring Audits",
       "oneLiner": "Automated SEO audits on a schedule with email alerts when scores drop below threshold",
       "category": "seo",
-      "painPoints": ["site-health", "reporting"],
+      "painPoints": [
+        "site-health",
+        "reporting"
+      ],
       "tier": "growth",
       "impact": "medium",
       "clientFacing": true
@@ -25,7 +32,10 @@
       "title": "AEO — Answer Engine Optimization",
       "oneLiner": "8 trust audit checks, healthcare schema types, AEO content rules, and recommendation engine for AI search visibility",
       "category": "seo",
-      "painPoints": ["ai-seo", "technical-seo"],
+      "painPoints": [
+        "ai-seo",
+        "technical-seo"
+      ],
       "tier": "growth",
       "impact": "high",
       "clientFacing": true
@@ -35,7 +45,10 @@
       "title": "Schema Generator + Publish to Webflow",
       "oneLiner": "AI-generated JSON-LD schemas with Google validation, cleaner service/persona evidence, collection-aware CMS item schemas, diff view, and Webflow publishing",
       "category": "seo",
-      "painPoints": ["schema", "technical-seo"],
+      "painPoints": [
+        "schema",
+        "technical-seo"
+      ],
       "tier": "growth",
       "impact": "high",
       "clientFacing": true
@@ -45,7 +58,10 @@
       "title": "SEO Editor + Bulk AI Rewrite",
       "oneLiner": "Edit titles/descriptions via Webflow API with AI suggestions, 3-variation bulk rewrites, and per-page client approval",
       "category": "seo",
-      "painPoints": ["technical-seo", "scale"],
+      "painPoints": [
+        "technical-seo",
+        "scale"
+      ],
       "tier": "free",
       "impact": "high",
       "clientFacing": false
@@ -55,7 +71,12 @@
       "title": "Keyword Strategy Engine",
       "oneLiner": "AI-driven keyword mapping with DataForSEO data, content gaps, quick wins, lifecycle tracking, local visibility reporting, plain-language value reasons, per-keyword revenue potential, and a command-center surface for keyword evidence/actions",
       "category": "content",
-      "painPoints": ["keyword-strategy", "competitive-intel", "workflow-clarity", "local-seo"],
+      "painPoints": [
+        "keyword-strategy",
+        "competitive-intel",
+        "workflow-clarity",
+        "local-seo"
+      ],
       "tier": "growth",
       "impact": "high",
       "clientFacing": true
@@ -65,7 +86,10 @@
       "title": "Content Brief Generator",
       "oneLiner": "AI briefs with real SERP data, competitor analysis, audience personas, and 7 page-type templates",
       "category": "content",
-      "painPoints": ["content-production", "keyword-strategy"],
+      "painPoints": [
+        "content-production",
+        "keyword-strategy"
+      ],
       "tier": "growth",
       "impact": "high",
       "clientFacing": true
@@ -75,7 +99,10 @@
       "title": "AI Content Post Generator",
       "oneLiner": "Full blog posts from briefs with Claude prose, GPT unification, brand voice scoring, and auto-publish to Webflow CMS",
       "category": "content",
-      "painPoints": ["content-production", "scale"],
+      "painPoints": [
+        "content-production",
+        "scale"
+      ],
       "tier": "premium",
       "impact": "high",
       "clientFacing": false
@@ -85,7 +112,10 @@
       "title": "Client Portal",
       "oneLiner": "White-labeled dashboard with search data, health scores, strategy, content hub, approvals, and AI chatbot",
       "category": "client",
-      "painPoints": ["client-transparency", "reporting"],
+      "painPoints": [
+        "client-transparency",
+        "reporting"
+      ],
       "tier": "free",
       "impact": "high",
       "clientFacing": true
@@ -95,7 +125,10 @@
       "title": "AI Insights Engine (Client Chatbot)",
       "oneLiner": "GPT-4o advisor using full dashboard data — GSC, GA4, audit, strategy, ranks — with conversation memory and revenue hooks",
       "category": "ai",
-      "painPoints": ["client-transparency", "reporting"],
+      "painPoints": [
+        "client-transparency",
+        "reporting"
+      ],
       "tier": "growth",
       "impact": "high",
       "clientFacing": true
@@ -105,7 +138,10 @@
       "title": "Asset Manager + Image Compression",
       "oneLiner": "One-click image compression with CMS-aware re-upload — patches every Webflow collection item automatically, no broken images",
       "category": "seo",
-      "painPoints": ["site-health", "technical-seo"],
+      "painPoints": [
+        "site-health",
+        "technical-seo"
+      ],
       "tier": "free",
       "impact": "medium",
       "clientFacing": false
@@ -115,7 +151,10 @@
       "title": "Dead Link Checker",
       "oneLiner": "Crawls every page including CMS for 404s and broken links, with inline redirect creation and CSV export for Webflow import",
       "category": "seo",
-      "painPoints": ["site-health", "technical-seo"],
+      "painPoints": [
+        "site-health",
+        "technical-seo"
+      ],
       "tier": "free",
       "impact": "medium",
       "clientFacing": false
@@ -125,7 +164,11 @@
       "title": "PageSpeed / Core Web Vitals",
       "oneLiner": "Google PageSpeed Insights with CrUX field-data pass/fail — the actual ranking signal, not just a lab score",
       "category": "seo",
-      "painPoints": ["site-health", "technical-seo", "reporting"],
+      "painPoints": [
+        "site-health",
+        "technical-seo",
+        "reporting"
+      ],
       "tier": "free",
       "impact": "high",
       "clientFacing": true
@@ -135,7 +178,10 @@
       "title": "Redirect Manager + AI Recommendations",
       "oneLiner": "Scans for redirect chains, 404s, and GSC ghost URLs, then AI-recommends the best redirect target for each broken slug",
       "category": "seo",
-      "painPoints": ["technical-seo", "site-health"],
+      "painPoints": [
+        "technical-seo",
+        "site-health"
+      ],
       "tier": "free",
       "impact": "medium",
       "clientFacing": false
@@ -145,7 +191,10 @@
       "title": "Internal Linking Analyzer",
       "oneLiner": "Maps orphan pages and under-linked content with one-click HTML snippet copy — the highest-leverage SEO tactic automated",
       "category": "seo",
-      "painPoints": ["technical-seo", "site-health"],
+      "painPoints": [
+        "technical-seo",
+        "site-health"
+      ],
       "tier": "growth",
       "impact": "medium",
       "clientFacing": false
@@ -155,7 +204,11 @@
       "title": "Content Decay Engine",
       "oneLiner": "Detects pages losing traffic month-over-month with severity tiers and AI-generated refresh recommendations",
       "category": "analytics",
-      "painPoints": ["site-health", "content-production", "reporting"],
+      "painPoints": [
+        "site-health",
+        "content-production",
+        "reporting"
+      ],
       "tier": "growth",
       "impact": "high",
       "clientFacing": true
@@ -165,7 +218,10 @@
       "title": "Page Intelligence",
       "oneLiner": "Unified per-page SEO hub showing keyword map, optimization score, AI recommendations, and content gaps with a 'Fix These First' priority queue",
       "category": "seo",
-      "painPoints": ["technical-seo", "keyword-strategy"],
+      "painPoints": [
+        "technical-seo",
+        "keyword-strategy"
+      ],
       "tier": "growth",
       "impact": "high",
       "clientFacing": false
@@ -175,7 +231,11 @@
       "title": "Site Architecture Planner",
       "oneLiner": "Combines live pages, planned matrix content, and strategy gaps into a visual URL tree with orphan detection and schema coverage overlay",
       "category": "seo",
-      "painPoints": ["technical-seo", "scale", "keyword-strategy"],
+      "painPoints": [
+        "technical-seo",
+        "scale",
+        "keyword-strategy"
+      ],
       "tier": "growth",
       "impact": "medium",
       "clientFacing": false
@@ -185,7 +245,10 @@
       "title": "LLMs.txt Generator",
       "oneLiner": "Generates llms.txt and llms-full.txt with AI summaries so ChatGPT, Perplexity, and other AI models understand your site accurately",
       "category": "seo",
-      "painPoints": ["ai-seo", "technical-seo"],
+      "painPoints": [
+        "ai-seo",
+        "technical-seo"
+      ],
       "tier": "growth",
       "impact": "high",
       "clientFacing": false
@@ -195,7 +258,10 @@
       "title": "Rank Tracker",
       "oneLiner": "Pin priority keywords and visualize position trends over time with sparklines and multi-keyword trend charts",
       "category": "analytics",
-      "painPoints": ["reporting", "keyword-strategy"],
+      "painPoints": [
+        "reporting",
+        "keyword-strategy"
+      ],
       "tier": "free",
       "impact": "high",
       "clientFacing": true
@@ -205,7 +271,10 @@
       "title": "Analytics Hub — Connected Intelligence Engine",
       "oneLiner": "Insight-first unified analytics merging GSC and GA4 with a priority-ranked feed that connects drops to strategy, pipeline, and audit data",
       "category": "analytics",
-      "painPoints": ["reporting", "site-health"],
+      "painPoints": [
+        "reporting",
+        "site-health"
+      ],
       "tier": "growth",
       "impact": "high",
       "clientFacing": false
@@ -215,7 +284,10 @@
       "title": "Approval Workflow",
       "oneLiner": "Structured agency-to-client review flow for SEO changes and schemas — propose, review, edit, approve, auto-push to Webflow",
       "category": "client",
-      "painPoints": ["client-transparency", "technical-seo"],
+      "painPoints": [
+        "client-transparency",
+        "technical-seo"
+      ],
       "tier": "free",
       "impact": "high",
       "clientFacing": true
@@ -225,7 +297,10 @@
       "title": "Client Request System",
       "oneLiner": "Structured ticket system inside the client portal — clients submit requests with categories and files, agency responds with status updates",
       "category": "client",
-      "painPoints": ["client-transparency", "onboarding"],
+      "painPoints": [
+        "client-transparency",
+        "onboarding"
+      ],
       "tier": "free",
       "impact": "medium",
       "clientFacing": true
@@ -235,7 +310,10 @@
       "title": "Recurring Content Subscriptions",
       "oneLiner": "Monthly content packages ($500–$1,600) with Stripe recurring billing, automated delivery tracking, and strategy-gap-sourced topics",
       "category": "monetization",
-      "painPoints": ["content-production", "payments"],
+      "painPoints": [
+        "content-production",
+        "payments"
+      ],
       "tier": "growth",
       "impact": "high",
       "clientFacing": true
@@ -245,7 +323,11 @@
       "title": "Content Matrices",
       "oneLiner": "Bulk content planning grids — define Service × City dimensions once and generate 50+ planned pages with keywords, URLs, and status tracking",
       "category": "content",
-      "painPoints": ["content-production", "scale", "keyword-strategy"],
+      "painPoints": [
+        "content-production",
+        "scale",
+        "keyword-strategy"
+      ],
       "tier": "premium",
       "impact": "high",
       "clientFacing": true
@@ -255,7 +337,10 @@
       "title": "Content Templates",
       "oneLiner": "Reusable page-structure templates with named variables and AI-enforced outlines — stamp out consistent service/location pages at scale",
       "category": "content",
-      "painPoints": ["content-production", "scale"],
+      "painPoints": [
+        "content-production",
+        "scale"
+      ],
       "tier": "growth",
       "impact": "medium",
       "clientFacing": false
@@ -265,7 +350,10 @@
       "title": "Content Calendar",
       "oneLiner": "Month-view visual pipeline showing briefs, posts, and content requests by date — turns chaos into a trackable production schedule",
       "category": "content",
-      "painPoints": ["content-production", "reporting"],
+      "painPoints": [
+        "content-production",
+        "reporting"
+      ],
       "tier": "growth",
       "impact": "medium",
       "clientFacing": false
@@ -275,7 +363,10 @@
       "title": "Competitive Intelligence Hub",
       "oneLiner": "SEMRush-powered side-by-side domain comparison — traffic value, keyword gaps, backlink counts, and top competitor keywords in one view",
       "category": "analytics",
-      "painPoints": ["competitive-intel", "keyword-strategy"],
+      "painPoints": [
+        "competitive-intel",
+        "keyword-strategy"
+      ],
       "tier": "growth",
       "impact": "high",
       "clientFacing": true
@@ -285,7 +376,10 @@
       "title": "Backlink Profile Overview",
       "oneLiner": "Domain-level backlink dashboard with referring domains, follow/nofollow ratio, and top 15 linking sites from SEMRush",
       "category": "analytics",
-      "painPoints": ["competitive-intel", "reporting"],
+      "painPoints": [
+        "competitive-intel",
+        "reporting"
+      ],
       "tier": "growth",
       "impact": "medium",
       "clientFacing": true
@@ -295,7 +389,10 @@
       "title": "Automated Monthly Reports",
       "oneLiner": "Auto-generated branded email reports with traffic trends, health scores, chat topics, and approval status — no manual work required",
       "category": "client",
-      "painPoints": ["reporting", "client-transparency"],
+      "painPoints": [
+        "reporting",
+        "client-transparency"
+      ],
       "tier": "free",
       "impact": "high",
       "clientFacing": true
@@ -305,7 +402,9 @@
       "title": "Stripe Payments + Subscriptions",
       "oneLiner": "Full Stripe Checkout for content purchases and tier subscriptions — encrypted key storage, webhook lifecycle, and self-service billing portal",
       "category": "monetization",
-      "painPoints": ["payments"],
+      "painPoints": [
+        "payments"
+      ],
       "tier": "free",
       "impact": "high",
       "clientFacing": true
@@ -315,7 +414,10 @@
       "title": "Client Onboarding Welcome Flow",
       "oneLiner": "First-visit modal with tier badge, trial countdown, feature grid, and guided quick-action CTAs so clients know exactly where to start",
       "category": "client",
-      "painPoints": ["onboarding", "client-transparency"],
+      "painPoints": [
+        "onboarding",
+        "client-transparency"
+      ],
       "tier": "free",
       "impact": "medium",
       "clientFacing": true
@@ -325,7 +427,10 @@
       "title": "In-Portal Plans & Pricing Page",
       "oneLiner": "Dedicated Plans tab inside the client portal comparing tiers, showing content pricing, and driving upgrades with ROI-backed CTAs",
       "category": "monetization",
-      "painPoints": ["payments", "onboarding"],
+      "painPoints": [
+        "payments",
+        "onboarding"
+      ],
       "tier": "free",
       "impact": "medium",
       "clientFacing": true
@@ -335,7 +440,10 @@
       "title": "Beta Feedback Widget",
       "oneLiner": "In-dashboard floating feedback widget with auto-captured context, status workflow, and threaded admin replies — no external tool needed",
       "category": "platform",
-      "painPoints": ["onboarding", "client-transparency"],
+      "painPoints": [
+        "onboarding",
+        "client-transparency"
+      ],
       "tier": "free",
       "impact": "medium",
       "clientFacing": true
@@ -345,7 +453,10 @@
       "title": "Client Keyword Feedback System",
       "oneLiner": "Clients approve or decline keywords from the Strategy tab — declined keywords are permanently excluded from future strategy generations",
       "category": "client",
-      "painPoints": ["keyword-strategy", "client-transparency"],
+      "painPoints": [
+        "keyword-strategy",
+        "client-transparency"
+      ],
       "tier": "growth",
       "impact": "medium",
       "clientFacing": true
@@ -355,7 +466,10 @@
       "title": "Client Strategy Participation",
       "oneLiner": "Clients set business priorities and upvote content gaps — their input feeds directly into the AI's next strategy generation",
       "category": "client",
-      "painPoints": ["keyword-strategy", "client-transparency"],
+      "painPoints": [
+        "keyword-strategy",
+        "client-transparency"
+      ],
       "tier": "growth",
       "impact": "medium",
       "clientFacing": true
@@ -365,7 +479,10 @@
       "title": "Sales Report (Prospect Audit)",
       "oneLiner": "Run a full SEO audit on any website during a sales call — branded prospect report with score, quick wins, top risks, and one-click onboard CTA",
       "category": "platform",
-      "painPoints": ["site-health", "onboarding"],
+      "painPoints": [
+        "site-health",
+        "onboarding"
+      ],
       "tier": "admin",
       "impact": "high",
       "clientFacing": false
@@ -375,7 +492,10 @@
       "title": "Admin AI Chat Panel",
       "oneLiner": "Expert analyst chat with 20+ live data sources — Analyst, Page Reviewer, and Content Reviewer modes with resizable docked or floating panel",
       "category": "ai",
-      "painPoints": ["reporting", "content-production"],
+      "painPoints": [
+        "reporting",
+        "content-production"
+      ],
       "tier": "admin",
       "impact": "high",
       "clientFacing": false
@@ -385,7 +505,10 @@
       "title": "Global Knowledge Base",
       "oneLiner": "Per-workspace business context that feeds every AI feature — chatbots, briefs, posts, and strategy all speak the client's language",
       "category": "ai",
-      "painPoints": ["content-production", "ai-seo"],
+      "painPoints": [
+        "content-production",
+        "ai-seo"
+      ],
       "tier": "free",
       "impact": "high",
       "clientFacing": false
@@ -395,7 +518,10 @@
       "title": "Brand Voice Auto-Generation",
       "oneLiner": "One-click website crawl extracts brand voice guidelines from real writing patterns — AI content matches tone from day one",
       "category": "ai",
-      "painPoints": ["content-production", "onboarding"],
+      "painPoints": [
+        "content-production",
+        "onboarding"
+      ],
       "tier": "free",
       "impact": "high",
       "clientFacing": false
@@ -405,7 +531,10 @@
       "title": "AI Recommendations Engine",
       "oneLiner": "Traffic-weighted, prioritized SEO recommendations auto-generated after every audit — each one links directly to the tool that can fix it",
       "category": "ai",
-      "painPoints": ["site-health", "technical-seo"],
+      "painPoints": [
+        "site-health",
+        "technical-seo"
+      ],
       "tier": "growth",
       "impact": "high",
       "clientFacing": true
@@ -415,7 +544,10 @@
       "title": "SEO Change Performance Tracker",
       "oneLiner": "Logs every title and meta change, then fetches 28-day before/after GSC data — concrete proof that SEO work drives clicks",
       "category": "analytics",
-      "painPoints": ["reporting", "technical-seo"],
+      "painPoints": [
+        "reporting",
+        "technical-seo"
+      ],
       "tier": "growth",
       "impact": "high",
       "clientFacing": false
@@ -425,7 +557,10 @@
       "title": "Schema Impact Tracking",
       "oneLiner": "Correlates schema deployment dates with GSC before/after data — shows aggregate click and position deltas across all schema changes",
       "category": "analytics",
-      "painPoints": ["reporting", "schema"],
+      "painPoints": [
+        "reporting",
+        "schema"
+      ],
       "tier": "growth",
       "impact": "medium",
       "clientFacing": false
@@ -435,7 +570,10 @@
       "title": "Data Export (CSV/JSON)",
       "oneLiner": "Export briefs, keyword strategy, content requests, activity log, and matrices as CSV or JSON for client handoffs and reporting",
       "category": "platform",
-      "painPoints": ["reporting", "client-transparency"],
+      "painPoints": [
+        "reporting",
+        "client-transparency"
+      ],
       "tier": "free",
       "impact": "low",
       "clientFacing": false
@@ -445,7 +583,10 @@
       "title": "Shareable Reports with Permalinks",
       "oneLiner": "Monthly reports and audit snapshots get persistent public URLs so clients can forward them to budget-holders without a login",
       "category": "client",
-      "painPoints": ["reporting", "client-transparency"],
+      "painPoints": [
+        "reporting",
+        "client-transparency"
+      ],
       "tier": "free",
       "impact": "medium",
       "clientFacing": true
@@ -455,7 +596,10 @@
       "title": "Email Notification System",
       "oneLiner": "15 branded email event types with intelligent batching, anti-spam throttling, and morning digest delivery — never floods the client inbox",
       "category": "client",
-      "painPoints": ["client-transparency", "reporting"],
+      "painPoints": [
+        "client-transparency",
+        "reporting"
+      ],
       "tier": "free",
       "impact": "medium",
       "clientFacing": true
@@ -465,7 +609,10 @@
       "title": "Client Email Capture",
       "oneLiner": "Lightweight email gate for shared-password portals — unlocks the full email marketing funnel for every free-tier client",
       "category": "monetization",
-      "painPoints": ["onboarding", "payments"],
+      "painPoints": [
+        "onboarding",
+        "payments"
+      ],
       "tier": "free",
       "impact": "medium",
       "clientFacing": true
@@ -475,7 +622,10 @@
       "title": "AEO Page Review",
       "oneLiner": "AI generates specific, implementable content changes per page — actual replacement paragraphs, named citation targets, and exact restructuring instructions",
       "category": "ai",
-      "painPoints": ["ai-seo", "content-production"],
+      "painPoints": [
+        "ai-seo",
+        "content-production"
+      ],
       "tier": "premium",
       "impact": "high",
       "clientFacing": false
@@ -485,7 +635,10 @@
       "title": "AI Page Rewriter",
       "oneLiner": "Two-pane chat interface loads any page URL, then lets you rewrite it with full audit, keyword, and brand voice context in one workspace",
       "category": "ai",
-      "painPoints": ["content-production", "technical-seo"],
+      "painPoints": [
+        "content-production",
+        "technical-seo"
+      ],
       "tier": "growth",
       "impact": "high",
       "clientFacing": false
@@ -495,7 +648,10 @@
       "title": "Content Performance Tracking",
       "oneLiner": "Cross-references every published piece with GSC and GA4 data — proves content ROI with clicks, sessions, and conversion numbers",
       "category": "analytics",
-      "painPoints": ["reporting", "content-production"],
+      "painPoints": [
+        "reporting",
+        "content-production"
+      ],
       "tier": "growth",
       "impact": "high",
       "clientFacing": true
@@ -505,7 +661,10 @@
       "title": "Revenue Analytics Dashboard",
       "oneLiner": "Admin dashboard showing total revenue, per-client breakdown, product type split, and 12-month trend chart from Stripe webhook data",
       "category": "monetization",
-      "painPoints": ["payments", "reporting"],
+      "painPoints": [
+        "payments",
+        "reporting"
+      ],
       "tier": "admin",
       "impact": "high",
       "clientFacing": false
@@ -515,7 +674,10 @@
       "title": "\"Time Saved\" Metric",
       "oneLiner": "Tracks AI operations against human-equivalent time estimates — \"We saved you 47 hours this month\" is more compelling than \"we used AI\"",
       "category": "analytics",
-      "painPoints": ["reporting", "client-transparency"],
+      "painPoints": [
+        "reporting",
+        "client-transparency"
+      ],
       "tier": "free",
       "impact": "medium",
       "clientFacing": false
@@ -525,7 +687,10 @@
       "title": "Topical Authority Clustering",
       "oneLiner": "AI groups keywords into 5–10 business-relevant topic clusters and measures site coverage — surfaces the biggest topical gaps to fill first",
       "category": "content",
-      "painPoints": ["keyword-strategy", "competitive-intel"],
+      "painPoints": [
+        "keyword-strategy",
+        "competitive-intel"
+      ],
       "tier": "growth",
       "impact": "high",
       "clientFacing": true
@@ -535,7 +700,10 @@
       "title": "Keyword Cannibalization Detection",
       "oneLiner": "Cross-references keyword map and GSC to find pages competing against each other, with canonical recommender suggesting the right fix for each case",
       "category": "seo",
-      "painPoints": ["technical-seo", "keyword-strategy"],
+      "painPoints": [
+        "technical-seo",
+        "keyword-strategy"
+      ],
       "tier": "growth",
       "impact": "high",
       "clientFacing": true
@@ -545,7 +713,10 @@
       "title": "Client Content Plan Tab",
       "oneLiner": "Clients see the full content matrix with per-page status, can flag cells for changes, and download their complete content roadmap",
       "category": "client",
-      "painPoints": ["client-transparency", "content-production"],
+      "painPoints": [
+        "client-transparency",
+        "content-production"
+      ],
       "tier": "growth",
       "impact": "high",
       "clientFacing": true
@@ -555,7 +726,10 @@
       "title": "ROI Dashboard",
       "oneLiner": "Shows organic traffic value (clicks × CPC), keyword revenue at stake, content ROI attribution, and growth vs previous period — puts a dollar figure on SEO results",
       "category": "analytics",
-      "painPoints": ["reporting", "client-transparency"],
+      "painPoints": [
+        "reporting",
+        "client-transparency"
+      ],
       "tier": "growth",
       "impact": "high",
       "clientFacing": true
@@ -565,7 +739,10 @@
       "title": "14-Day Growth Trial",
       "oneLiner": "New workspaces auto-provisioned with Growth tier access — trial badges, countdown timers, and upgrade prompts drive conversion passively",
       "category": "monetization",
-      "painPoints": ["onboarding", "payments"],
+      "painPoints": [
+        "onboarding",
+        "payments"
+      ],
       "tier": "free",
       "impact": "high",
       "clientFacing": true
@@ -575,7 +752,10 @@
       "title": "Client User Accounts",
       "oneLiner": "Individual logins per client team member with roles — marketing directors, content managers, and developers each have their own access",
       "category": "auth",
-      "painPoints": ["onboarding", "client-transparency"],
+      "painPoints": [
+        "onboarding",
+        "client-transparency"
+      ],
       "tier": "free",
       "impact": "medium",
       "clientFacing": true
@@ -585,7 +765,10 @@
       "title": "SERP Feature Targeting",
       "oneLiner": "Content gaps show Featured Snippet and People Also Ask opportunities with actionable content structuring advice per feature type",
       "category": "content",
-      "painPoints": ["keyword-strategy", "content-production"],
+      "painPoints": [
+        "keyword-strategy",
+        "content-production"
+      ],
       "tier": "growth",
       "impact": "medium",
       "clientFacing": true
@@ -595,7 +778,10 @@
       "title": "Strategy Diff — What Changed",
       "oneLiner": "Tracks keyword strategy changes across generations — shows new gaps, resolved wins, and reassigned pages with green/red color coding",
       "category": "analytics",
-      "painPoints": ["reporting", "keyword-strategy"],
+      "painPoints": [
+        "reporting",
+        "keyword-strategy"
+      ],
       "tier": "growth",
       "impact": "medium",
       "clientFacing": false
@@ -605,7 +791,11 @@
       "title": "AI Copy Generation Pipeline",
       "oneLiner": "Voice-calibrated AI copy for every page in a site blueprint — section-by-section generation with 8-layer context, review workflow, batch processing, and multi-format export",
       "category": "content",
-      "painPoints": ["content-creation", "brand-voice", "copywriting"],
+      "painPoints": [
+        "content-creation",
+        "brand-voice",
+        "copywriting"
+      ],
       "tier": "premium",
       "impact": "high",
       "clientFacing": true
@@ -615,7 +805,11 @@
       "title": "Client Copy Review Portal",
       "oneLiner": "Self-service copy review where clients approve sections or suggest edits — real-time status updates, structured feedback, no email back-and-forth",
       "category": "content",
-      "painPoints": ["client-collaboration", "approvals", "copywriting"],
+      "painPoints": [
+        "client-collaboration",
+        "approvals",
+        "copywriting"
+      ],
       "tier": "premium",
       "impact": "high",
       "clientFacing": true
@@ -625,7 +819,10 @@
       "title": "Copy Intelligence & Voice Learning",
       "oneLiner": "Extracts patterns from generated copy, promotes recurring patterns to voice guardrails, and feeds approved copy back as voice samples — the system improves with every generation",
       "category": "content",
-      "painPoints": ["brand-voice", "content-quality"],
+      "painPoints": [
+        "brand-voice",
+        "content-quality"
+      ],
       "tier": "premium",
       "impact": "medium",
       "clientFacing": false
@@ -635,7 +832,11 @@
       "title": "Deep Diagnostics",
       "oneLiner": "AI-powered root cause analysis for traffic anomalies — gathers GSC position history, redirect chains, internal links, backlinks, and recent activity, then synthesizes ranked root causes and a prioritized remediation plan",
       "category": "seo",
-      "painPoints": ["traffic-drops", "technical-seo", "reporting"],
+      "painPoints": [
+        "traffic-drops",
+        "technical-seo",
+        "reporting"
+      ],
       "tier": "growth",
       "impact": "high",
       "clientFacing": false
@@ -645,7 +846,11 @@
       "title": "Client Post Review",
       "oneLiner": "Clients review generated blog posts in-platform — inline section editing with auto-save, steering feedback, and one-click approve/request-changes, with full version history and audit trail",
       "category": "content",
-      "painPoints": ["client-collaboration", "approval-workflow", "content-quality"],
+      "painPoints": [
+        "client-collaboration",
+        "approval-workflow",
+        "content-quality"
+      ],
       "tier": "growth",
       "impact": "high",
       "clientFacing": true
@@ -655,7 +860,11 @@
       "title": "Weekly AI Briefing",
       "oneLiner": "Every Monday, an AI-curated 5-minute editorial briefing — wins, risks, opportunities, competitive intel — replaces the data dashboard with a tight magazine-rhythm layout. Admin-reviewed before reaching the client.",
       "category": "intelligence",
-      "painPoints": ["client-engagement", "reporting", "client-retention"],
+      "painPoints": [
+        "client-engagement",
+        "reporting",
+        "client-retention"
+      ],
       "tier": "growth",
       "impact": "high",
       "clientFacing": true
@@ -665,7 +874,11 @@
       "title": "Authority-Aware Keyword Recommendations",
       "oneLiner": "Recommendation flows can now tell whether a keyword is within reach, requires authority building, or lacks enough backlink context to judge confidently",
       "category": "content",
-      "painPoints": ["keyword-strategy", "content-quality", "competitive-intel"],
+      "painPoints": [
+        "keyword-strategy",
+        "content-quality",
+        "competitive-intel"
+      ],
       "tier": "growth",
       "impact": "medium",
       "clientFacing": true
@@ -675,10 +888,28 @@
       "title": "E-E-A-T Asset Library",
       "oneLiner": "Central trust-evidence inventory that powers page-level trust-gap detection, specific brief recommendations, and author/credential schema enrichment",
       "category": "content",
-      "painPoints": ["content-quality", "schema", "ai-seo"],
+      "painPoints": [
+        "content-quality",
+        "schema",
+        "ai-seo"
+      ],
       "tier": "growth",
       "impact": "high",
       "clientFacing": false
+    },
+    {
+      "id": 69,
+      "title": "Client Outcome Scorecard & Wins Ledger",
+      "oneLiner": "Tiered 'Your results' win-rate scorecard plus a wins ledger with real recommendation titles and estimated dollar value, right on the client overview",
+      "category": "reporting",
+      "painPoints": [
+        "proof-of-value",
+        "reporting",
+        "retention"
+      ],
+      "tier": "free",
+      "impact": "high",
+      "clientFacing": true
     }
   ]
 }

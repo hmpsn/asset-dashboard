@@ -59,6 +59,10 @@ export default function OutcomeTopWins({ workspaceId }: Props) {
               </p>
               <p className="t-caption text-accent-info mt-0.5">
                 {win.delta.delta_percent >= 0 ? '+' : ''}{win.delta.delta_percent.toFixed(1)}% {win.delta.primary_metric}
+                {/* Realized dollar attribution (action_outcomes.attributed_value) — blue = data */}
+                {typeof win.attributedValue === 'number' && win.attributedValue > 0 && (
+                  <span> · ≈ ${Math.round(win.attributedValue).toLocaleString()} attributed</span>
+                )}
               </p>
               <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">{formatOutcomeDate(win.createdAt)}</p>
             </div>

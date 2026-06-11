@@ -21,9 +21,10 @@ const mockWin = (overrides: Partial<OutcomeWinEntry> = {}): OutcomeWinEntry => (
   actionType: 'meta_updated',
   pageUrl: 'https://example.com/services',
   targetKeyword: null,
-  recommendation: 'meta_updated action',
+  recommendation: 'Updated page metadata',
   delta: { primary_metric: 'clicks', baseline_value: 10, current_value: 15, delta_absolute: 5, delta_percent: 50, direction: 'improved' },
   score: 'win',
+  attributedValue: null,
   detectedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
   ...overrides,
 });
@@ -40,10 +41,35 @@ describe('WinsSurface', () => {
     expect(screen.getByText('What we shipped')).toBeInTheDocument();
   });
 
-  it('renders human label for meta_updated action type', () => {
-    (useClientOutcomeWins as ReturnType<typeof vi.fn>).mockReturnValue({ data: [mockWin()], isLoading: false, isError: false });
+  it('renders the resolved source title as the row heading (E5 — real titles, not fabricated strings)', () => {
+    const win = mockWin({ recommendation: 'Rewrite the pricing page meta description' });
+    (useClientOutcomeWins as ReturnType<typeof vi.fn>).mockReturnValue({ data: [win], isLoading: false, isError: false });
+    renderWithQuery(<WinsSurface workspaceId="ws-1" effectiveTier="growth" />);
+    expect(screen.getByText('Rewrite the pricing page meta description')).toBeInTheDocument();
+  });
+
+  it('falls back to the human action label when recommendation is empty', () => {
+    const win = mockWin({ recommendation: '' });
+    (useClientOutcomeWins as ReturnType<typeof vi.fn>).mockReturnValue({ data: [win], isLoading: false, isError: false });
     renderWithQuery(<WinsSurface workspaceId="ws-1" effectiveTier="growth" />);
     expect(screen.getByText('Updated meta description')).toBeInTheDocument();
+  });
+
+  it('renders formatted attributed value when present (E5 — dollar attribution)', () => {
+    const win = mockWin({ attributedValue: 318.4 });
+    (useClientOutcomeWins as ReturnType<typeof vi.fn>).mockReturnValue({ data: [win], isLoading: false, isError: false });
+    renderWithQuery(<WinsSurface workspaceId="ws-1" effectiveTier="growth" />);
+    expect(screen.getByText(/\$318/)).toBeInTheDocument();
+  });
+
+  it('shows no dollar line when attributedValue is null or zero', () => {
+    const wins = [
+      mockWin({ actionId: 'a-null', attributedValue: null }),
+      mockWin({ actionId: 'a-zero', attributedValue: 0 }),
+    ];
+    (useClientOutcomeWins as ReturnType<typeof vi.fn>).mockReturnValue({ data: wins, isLoading: false, isError: false });
+    renderWithQuery(<WinsSurface workspaceId="ws-1" effectiveTier="growth" />);
+    expect(screen.queryByText(/\$/)).not.toBeInTheDocument();
   });
 
   it('renders "Win" badge for score=win', () => {

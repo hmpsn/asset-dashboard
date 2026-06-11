@@ -6,6 +6,8 @@ import { MonthlyDigest } from './MonthlyDigest';
 import { IntelligenceSummaryCard } from './IntelligenceSummaryCard';
 import { HealthScoreCard } from './HealthScoreCard';
 import { PredictionShowcaseCard } from './PredictionShowcaseCard';
+import OutcomeSummary from './OutcomeSummary';
+import { WinsSurface } from './Briefing/WinsSurface';
 import { useClientIntelligence } from '../../hooks/client';
 import { useRecommendationSet } from '../../hooks/useRecommendations';
 import type { Tier } from '../ui/TierGate';
@@ -414,6 +416,18 @@ export function OverviewTab({
       <IntelligenceSummaryCard workspaceId={workspaceId} tier={(betaMode ? 'premium' : (ws.tier as Tier)) || 'free'} />
     </ErrorBoundary>
     )}
+
+    {/* Outcome scorecard — measured win rates of the work we shipped (E5, audit #5).
+        Shows its own empty state until the first outcomes are scored. */}
+    <ErrorBoundary label="Your Results">
+      <OutcomeSummary workspaceId={workspaceId} tier={(betaMode ? 'premium' : (ws.tier as Tier)) || 'free'} />
+    </ErrorBoundary>
+
+    {/* Wins ledger — backported from the briefing-v2 layout per owner decision #23.
+        Renders nothing until there are real measured wins. */}
+    <ErrorBoundary label="Wins">
+      <WinsSurface workspaceId={workspaceId} effectiveTier={(betaMode ? 'premium' : (ws.tier as Tier)) || 'free'} />
+    </ErrorBoundary>
 
     {/* Predictions that came true — only render when wins surface is off AND server has populated the field (growth+) */}
           {/* prediction-showcase-ungated-ok: wins surface flag is sunset and promoted by Wave 5. */}

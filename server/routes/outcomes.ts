@@ -28,6 +28,11 @@ import {
 } from '../outcome-tracking.js';
 import { getPlaybooks } from '../outcome-playbooks.js';
 import { getWorkspaceLearnings } from '../workspace-learnings.js';
+import { loadRecommendations } from '../recommendations.js';
+import { getClientAction } from '../client-actions.js';
+import { getBrief } from '../content-brief.js';
+import { getPost } from '../content-posts-db.js';
+import { getContentRequest } from '../content-requests.js';
 import type {
   ActionType,
   ActionPlaybook,
@@ -36,7 +41,9 @@ import type {
   OutcomeWinEntry,
   LearningsTrend,
   TrackedAction,
+  TopWin,
 } from '../../shared/types/outcome-tracking.js';
+import type { RecommendationSet } from '../../shared/types/recommendations.js';
 import { actionTypeEnum, attributionEnum, outcomeScoreEnum } from '../schemas/outcome-schemas.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 
@@ -390,34 +397,103 @@ router.post(
 // GET /api/public/outcomes/:workspaceId/summary — Tiered summary (scorecard)
 router.get('/api/public/outcomes/:workspaceId/summary', requireClientPortalAuth(), (req, res) => {
   try {
+    // Full OutcomeScorecard serialization (E5): the client OutcomeSummary component
+    // renders strongWinRate and pendingMeasurement — omitting them produced NaN%.
+    // Nothing here is admin-sensitive (aggregate win-rate stats only; no $ values).
     const scorecard = computeScorecard(req.params.workspaceId);
-    // Simplified view for clients
-    res.json({
-      overallWinRate: scorecard.overallWinRate,
-      totalTracked: scorecard.totalTracked,
-      totalScored: scorecard.totalScored,
-      trend: scorecard.trend,
-      byCategory: scorecard.byCategory,
-    });
+    res.json(scorecard);
   } catch (err) {
     log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to get client summary');
     res.status(500).json({ error: 'Failed to get outcome summary' });
   }
 });
 
+// Honest generic per-action-type labels for win entries whose source title cannot be
+// resolved (E5, audit #5). Replaces the fabricated `"<action_type> action"` string,
+// which implied a recommendation title that never existed. Record<ActionType, string>
+// keeps this exhaustive — adding an ActionType without a label is a compile error.
+const WIN_FALLBACK_LABELS: Record<ActionType, string> = {
+  insight_acted_on: 'Acted on a site insight',
+  content_published: 'Published new content',
+  brief_created: 'Created a content brief',
+  strategy_keyword_added: 'Added a keyword to the strategy',
+  schema_deployed: 'Deployed structured data',
+  audit_fix_applied: 'Applied a technical fix',
+  content_refreshed: 'Refreshed existing content',
+  internal_link_added: 'Added internal links',
+  meta_updated: 'Updated page metadata',
+  voice_calibrated: 'Calibrated brand voice',
+  competitor_gap_closed: 'Closed a competitor keyword gap',
+  cluster_published: 'Filled a topic cluster',
+  cannibalization_resolved: 'Resolved keyword cannibalization',
+  local_visibility_won: 'Won local pack visibility',
+  local_service_added: 'Started targeting a local service',
+};
+
+/**
+ * Resolve the REAL source title for a win entry via sourceType/sourceId.
+ * Falls back to an honest generic action label when the source has no title
+ * or no longer exists. `recSet` is lazily loaded once per request by the caller
+ * so a 10-win response doesn't re-read the recommendation set 10 times.
+ */
+function resolveWinTitle(workspaceId: string, win: TopWin, getRecSet: () => RecommendationSet | null): string {
+  const fallback = WIN_FALLBACK_LABELS[win.actionType] ?? win.actionType.replace(/_/g, ' ');
+  if (!win.sourceId) return fallback;
+  try {
+    switch (win.sourceType) {
+      case 'recommendation': {
+        const rec = getRecSet()?.recommendations.find(r => r.id === win.sourceId);
+        return rec?.title || fallback;
+      }
+      case 'client_action': {
+        const action = getClientAction(workspaceId, win.sourceId);
+        return action?.title || fallback;
+      }
+      case 'post':
+      case 'content_post': {
+        const post = getPost(workspaceId, win.sourceId);
+        return post?.title || fallback;
+      }
+      case 'brief':
+      case 'content_brief': {
+        const brief = getBrief(workspaceId, win.sourceId);
+        return brief?.suggestedTitle || fallback;
+      }
+      case 'content_request': {
+        const request = getContentRequest(workspaceId, win.sourceId);
+        return request?.topic || fallback;
+      }
+      default:
+        return fallback;
+    }
+  } catch (err) {
+    // Title resolution is best-effort display enrichment — never fail the wins read.
+    log.warn({ err, workspaceId, sourceType: win.sourceType, sourceId: win.sourceId }, 'Failed to resolve win source title');
+    return fallback;
+  }
+}
+
 // GET /api/public/outcomes/:workspaceId/wins — "We Called It" entries
 router.get('/api/public/outcomes/:workspaceId/wins', requireClientPortalAuth(), (req, res) => {
   try {
-    const wins = getTopWinsForWorkspace(req.params.workspaceId, 10);
+    const workspaceId = req.params.workspaceId;
+    const wins = getTopWinsForWorkspace(workspaceId, 10);
+    // Lazy once-per-request recommendation set for title resolution
+    let recSet: RecommendationSet | null | undefined;
+    const getRecSet = () => {
+      if (recSet === undefined) recSet = loadRecommendations(workspaceId);
+      return recSet;
+    };
     // Transform to OutcomeWinEntry shape for client view
     const entries: OutcomeWinEntry[] = wins.map(w => ({
       actionId: w.actionId,
       actionType: w.actionType,
       pageUrl: w.pageUrl,
       targetKeyword: w.targetKeyword,
-      recommendation: `${w.actionType.replace(/_/g, ' ')} action`,
+      recommendation: resolveWinTitle(workspaceId, w, getRecSet),
       delta: w.delta,
       score: w.score,
+      attributedValue: w.attributedValue,
       detectedAt: w.scoredAt,
     }));
     res.json(entries);
