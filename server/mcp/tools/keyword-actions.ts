@@ -12,6 +12,7 @@ import { addActivity } from '../../activity-log.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
 import { createLogger } from '../../logger.js';
 import {
+  addKeywordToPage,
   deletePageKeyword,
   getPageKeyword,
   listPageKeywords,
@@ -166,54 +167,41 @@ async function handleAddKeywordToStrategy(
   }
   if (!resolvedTerm) return mcpError('No keyword term resolved');
 
-  let next: PageKeywordMap;
+  // M3/M4: Route through addKeywordToPage (shared helper): handles merge-as-secondary,
+  // secondaryKeywords cap (MAX_SECONDARY_KEYWORDS), and clean slug-derived title (never raw URL).
+  let resolvedPagePath: string;
   if (target.kind === 'existing_page') {
-    const pagePath = pagePathFromUrl(target.page_url);
-    const existing = getPageKeyword(workspaceId, pagePath);
-    if (existing) {
-      const secondarySet = new Set(existing.secondaryKeywords.map(k => k.toLowerCase()));
-      if (
-        existing.primaryKeyword.toLowerCase() !== resolvedTerm.toLowerCase()
-        && !secondarySet.has(resolvedTerm.toLowerCase())
-      ) {
-        existing.secondaryKeywords = [...existing.secondaryKeywords, resolvedTerm];
-      }
-      next = existing;
-    } else {
-      next = {
-        pagePath,
-        pageTitle: target.page_url,
-        primaryKeyword: resolvedTerm,
-        secondaryKeywords: [],
-      };
-    }
+    resolvedPagePath = pagePathFromUrl(target.page_url);
+    // titleOverride: undefined — helper derives a clean title from the slug.
+    addKeywordToPage(workspaceId, resolvedPagePath, resolvedTerm);
   } else {
-    next = {
-      pagePath: `/planned/${slugify(target.topic) || 'page'}`,
-      pageTitle: target.topic,
-      primaryKeyword: resolvedTerm,
-      secondaryKeywords: [],
-      searchIntent: target.intent,
-    };
+    resolvedPagePath = `/planned/${slugify(target.topic) || 'page'}`;
+    // titleOverride: the user-supplied topic label (already human-readable for planned pages).
+    addKeywordToPage(workspaceId, resolvedPagePath, resolvedTerm, target.topic);
+    // searchIntent is not captured by addKeywordToPage; patch it onto the row if set.
+    if (target.intent) {
+      const row = getPageKeyword(workspaceId, resolvedPagePath);
+      if (row && !row.searchIntent) {
+        upsertPageKeyword(workspaceId, { ...row, searchIntent: target.intent });
+      }
+    }
   }
-
-  upsertPageKeyword(workspaceId, next);
   broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_UPDATED, {
     workspaceId,
     action: 'mcp_keyword_added',
     term: resolvedTerm,
-    pagePath: next.pagePath,
+    pagePath: resolvedPagePath,
   });
   invalidateIntelligenceCache(workspaceId);
   addActivity(
     workspaceId,
     'keyword_added',
     `Added keyword "${resolvedTerm}" to strategy`,
-    `Page: ${next.pagePath}`,
+    `Page: ${resolvedPagePath}`,
     {
       source: 'mcp-chat',
       keyword: resolvedTerm,
-      pagePath: next.pagePath,
+      pagePath: resolvedPagePath,
       action: 'mcp_keyword_added',
     },
   );
@@ -221,7 +209,7 @@ async function handleAddKeywordToStrategy(
   return mcpSuccess({
     ok: true,
     term: resolvedTerm,
-    page_path: next.pagePath,
+    page_path: resolvedPagePath,
     dashboard_url: buildDashboardUrl(workspaceId, 'content-plan'),
   });
 }

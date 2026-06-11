@@ -9,6 +9,7 @@ import { mirrorApprovalBatchToDeliverable } from '../../domains/inbox/approval-b
 import { createLogger } from '../../logger.js';
 import { getWorkspace } from '../../workspaces.js';
 import { WS_EVENTS } from '../../ws-events.js';
+import { InvalidTransitionError, MATRIX_CELL_TRANSITIONS, validateTransition } from '../../state-machines.js';
 
 const log = createLogger('content-plan-review-mutations');
 
@@ -143,6 +144,26 @@ export function sendSamplesForReview(
   const selectedCells = matrix.cells.filter((cell) => cellIds.includes(cell.id));
   if (!selectedCells.length) throw new ContentPlanReviewMutationError(400, 'No matching cells found');
 
+  // I3: validate EVERY selected cell can move to 'review' BEFORE creating the batch or flipping
+  // any status. Previously the batch was created + mirrored first, then statuses were flipped in a
+  // loop — so an ineligible cell (e.g. a terminal 'published' cell) threw mid-loop, leaving some
+  // cells flipped and an orphaned batch already persisted. Cells already in 'review' are no-ops
+  // (the flip loop skips them) and are excluded from the eligibility check.
+  for (const cell of selectedCells) {
+    if (cell.status === 'review') continue;
+    try {
+      validateTransition('matrix_cell', MATRIX_CELL_TRANSITIONS, cell.status, 'review');
+    } catch (err) {
+      if (err instanceof InvalidTransitionError) {
+        throw new ContentPlanReviewMutationError(
+          409,
+          `Cell "${cell.targetKeyword}" cannot be sent for review from status "${cell.status}"`,
+        );
+      }
+      throw err;
+    }
+  }
+
   const batch = createBatch(
     workspaceId,
     workspace.webflowSiteId || '',
@@ -156,6 +177,7 @@ export function sendSamplesForReview(
   });
 
   for (const cell of selectedCells) {
+    if (cell.status === 'review') continue;
     updateMatrixCell(workspaceId, matrixId, cell.id, { status: 'review' });
   }
 

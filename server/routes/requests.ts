@@ -26,6 +26,7 @@ import {
   type RequestStatus,
 } from '../requests.js';
 import { getWorkspace, getClientPortalUrl, updatePageState } from '../workspaces.js';
+import { InvalidTransitionError } from '../state-machines.js';
 
 const router = Router();
 
@@ -194,7 +195,15 @@ router.patch('/api/requests/:id', validate(updateRequestSchema), (req, res) => {
   const prev = getRequest(req.params.id);
   if (!prev) return res.status(404).json({ error: 'Not found' });
   if (!canAccessRequest(req, prev.workspaceId, res)) return;
-  const updated = updateRequest(prev.workspaceId, req.params.id, { status, priority, category });
+  let updated;
+  try {
+    updated = updateRequest(prev.workspaceId, req.params.id, { status, priority, category });
+  } catch (err) {
+    // Illegal status transition (e.g. closed→new) — surface a 409 with the machine's message
+    // instead of a 404, so the caller can tell "not found" apart from "transition not allowed" (M1).
+    if (err instanceof InvalidTransitionError) return res.status(409).json({ error: err.message });
+    throw err;
+  }
   if (!updated) return res.status(404).json({ error: 'Not found' });
   broadcast(ADMIN_EVENTS.REQUEST_UPDATED, updated);
   broadcastToWorkspace(updated.workspaceId, WS_EVENTS.REQUEST_UPDATE, { id: updated.id, status: updated.status });

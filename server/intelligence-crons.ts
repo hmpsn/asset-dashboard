@@ -11,6 +11,7 @@ import {
   detectCompetitorAlerts, saveCompetitorAlerts, snapshotExistsForDate, linkAlertToInsight,
 } from './competitor-snapshot-store.js';
 import { upsertInsight, deleteStaleInsightsByType } from './analytics-insights-store.js';
+import { computeImpactScore } from './insight-enrichment.js';
 import type * as PageKeywords from './page-keywords.js';
 import type * as OpportunityEvents from './opportunity-events.js';
 import type * as OpportunityRegen from './scoring/opportunity-regen.js';
@@ -152,21 +153,24 @@ async function runCompetitorCheck(): Promise<void> {
             for (const alert of alerts) {
               // Use a stable unique pageId so each (domain, keyword) alert gets its own DB row
               const alertPageId = `competitor_alert::${alert.competitorDomain}::${alert.keyword ?? 'domain'}`;
+              const alertData = {
+                competitorDomain: alert.competitorDomain,
+                alertType: alert.alertType,
+                keyword: alert.keyword,
+                previousPosition: alert.previousPosition,
+                currentPosition: alert.currentPosition,
+                positionChange: alert.positionChange,
+                volume: alert.volume,
+                snapshotDate: alert.snapshotDate,
+              };
               const insight = upsertInsight({
                 workspaceId: ws.id,
                 pageId: alertPageId,
                 insightType: 'competitor_alert',
-                data: {
-                  competitorDomain: alert.competitorDomain,
-                  alertType: alert.alertType,
-                  keyword: alert.keyword,
-                  previousPosition: alert.previousPosition,
-                  currentPosition: alert.currentPosition,
-                  positionChange: alert.positionChange,
-                  volume: alert.volume,
-                  snapshotDate: alert.snapshotDate,
-                },
+                data: alertData,
                 severity: alert.severity,
+                domain: 'search',
+                impactScore: computeImpactScore(alert.severity, alertData as Record<string, unknown>),
               });
               // Link the alert row back to its insight for traceability
               linkAlertToInsight(alert.id, insight.id, ws.id);

@@ -13,7 +13,7 @@ import { kdColor } from './page-intelligence/pageIntelligenceDisplay';
 import { KeywordStrategyGuide } from './strategy/KeywordStrategyGuide';
 import { useKeywordStrategy, useLocalSeoRefresh } from '../hooks/admin';
 import { RefreshOrderingPrompt } from './keyword-strategy/RefreshOrderingPrompt';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BacklinkProfile } from './strategy/BacklinkProfile';
 import { CompetitiveIntel } from './strategy/CompetitiveIntel';
 import { ContentGaps } from './strategy/ContentGaps';
@@ -26,6 +26,8 @@ import { StrategyDiff } from './strategy/StrategyDiff';
 import { IntelligenceSignals } from './strategy/IntelligenceSignals';
 import { LocalSeoVisibilityPanel } from './local-seo/LocalSeoVisibilityPanel';
 import { keywords, rankTracking } from '../api/seo';
+import { keywordCommandCenter } from '../api/keywordCommandCenter';
+import { KEYWORD_COMMAND_CENTER_ACTIONS } from '../../shared/types/keyword-command-center';
 import { queryKeys } from '../lib/queryKeys';
 import { keywordTrackingKey } from '../lib/keywordTracking';
 import { buildHubDeepLinkQuery } from '../lib/keywordHubDeepLink';
@@ -137,6 +139,25 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     queryFn: () => keywords.feedback(workspaceId),
     enabled: !!workspaceId,
     staleTime: 60 * 1000,
+  });
+
+  // One-click "Add to Strategy" for client-requested keywords (admin side).
+  // Calls the shared KCC add_to_strategy action which — post B2 fix — writes both
+  // the feedback/tracking rows AND the page_keywords strategy artifact.
+  const addRequestedKeywordMutation = useMutation({
+    mutationFn: (keyword: string) =>
+      keywordCommandCenter.action(workspaceId, {
+        action: KEYWORD_COMMAND_CENTER_ACTIONS.ADD_TO_STRATEGY,
+        keyword,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordFeedback(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
+    },
+    // M5: surface failures to the admin rather than silently swallowing them.
+    onError: () => {
+      setError('Failed to add keyword to strategy. Please try again.');
+    },
   });
 
   // Initialize SEO provider availability from React Query hook
@@ -299,6 +320,17 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const requestedFeedback = keywordFeedbackRows.filter(row => row.status === 'requested');
   const approvedFeedback = keywordFeedbackRows.filter(row => row.status === 'approved');
 
+  // Nudge: surface when client feedback is newer than the last strategy generation.
+  // M2: Limit to requested/declined rows only — approved rows (from ADD_TO_STRATEGY)
+  // must not trigger the nudge because they've already been acted on by the admin.
+  const feedbackNewerThanStrategy = isRealStrategy && strategy?.generatedAt != null
+    ? keywordFeedbackRows.some(row => {
+        if (row.status !== 'requested' && row.status !== 'declined') return false;
+        const ts = row.updated_at ?? row.created_at;
+        return ts != null && new Date(ts) > new Date(strategy.generatedAt!);
+      })
+    : false;
+
   if (loading) {
     return <LoadingState message="Loading keyword strategy..." />;
   }
@@ -414,6 +446,21 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         onOpenKeywords={() => navigate(adminPath(workspaceId, 'seo-keywords'))}
       />
 
+      {feedbackNewerThanStrategy && (
+        <div className="rounded-[var(--radius-lg)] border border-amber-500/30 bg-amber-500/5 px-4 py-3 flex items-start gap-3">
+          <Icon as={AlertTriangle} size="md" className="text-accent-warning mt-0.5 shrink-0" />
+          <div>
+            <p className="t-caption font-semibold text-[var(--brand-text-bright)]">New client feedback since last strategy generation</p>
+            <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
+              {requestedFeedback.length > 0 && `${requestedFeedback.length} requested keyword${requestedFeedback.length === 1 ? '' : 's'}`}
+              {requestedFeedback.length > 0 && declinedFeedback.length > 0 && ' and '}
+              {declinedFeedback.length > 0 && `${declinedFeedback.length} declined keyword${declinedFeedback.length === 1 ? '' : 's'}`}
+              {' '}arrived after the last generation. Regenerate the strategy to apply this feedback.
+            </p>
+          </div>
+        </div>
+      )}
+
       <SectionCard
         title="Client Keyword Feedback"
         titleIcon={<Icon as={Users} size="md" className="text-accent-brand" />}
@@ -428,37 +475,73 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             No client feedback submitted yet. Declined keywords and reasons will appear here.
           </p>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-4">
+            {requestedFeedback.length > 0 && (
+              <div className="space-y-2">
+                <p className="t-caption-sm font-semibold text-[var(--brand-text)] uppercase tracking-wider">Requested by client</p>
+                {requestedFeedback.map((item) => (
+                  <div
+                    key={`requested-${item.keyword}`}
+                    className="rounded-[var(--radius-md)] border border-teal-500/20 bg-teal-500/5 px-3 py-2 flex items-center justify-between gap-2"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Badge label="Requested" tone="teal" size="sm" />
+                      <span className="t-caption-sm font-medium text-[var(--brand-text-bright)] truncate">{item.keyword}</span>
+                      {item.updated_at && (
+                        <span className="t-caption-sm text-[var(--brand-text-muted)] shrink-0">
+                          {formatDate(item.updated_at)}
+                        </span>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      icon={Plus}
+                      disabled={addRequestedKeywordMutation.isPending}
+                      onClick={() => addRequestedKeywordMutation.mutate(item.keyword)}
+                      className="shrink-0"
+                    >
+                      Add to Strategy
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
             {declinedFeedback.length > 0 ? (
-              declinedFeedback.slice(0, 12).map((item) => (
-                <div
-                  key={`declined-${item.keyword}`}
-                  className="rounded-[var(--radius-md)] border border-red-500/20 bg-red-500/5 px-3 py-2"
-                >
-                  <div className="flex items-center gap-2">
-                    <Badge label="Declined" tone="red" size="sm" />
-                    <span className="t-caption-sm font-medium text-[var(--brand-text-bright)]">{item.keyword}</span>
-                    {item.updated_at && (
-                      <span className="t-caption-sm text-[var(--brand-text-muted)]">
-                        {formatDate(item.updated_at)}
-                      </span>
+              <div className="space-y-2">
+                {requestedFeedback.length > 0 && (
+                  <p className="t-caption-sm font-semibold text-[var(--brand-text)] uppercase tracking-wider">Declined by client</p>
+                )}
+                {declinedFeedback.slice(0, 12).map((item) => (
+                  <div
+                    key={`declined-${item.keyword}`}
+                    className="rounded-[var(--radius-md)] border border-red-500/20 bg-red-500/5 px-3 py-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Badge label="Declined" tone="red" size="sm" />
+                      <span className="t-caption-sm font-medium text-[var(--brand-text-bright)]">{item.keyword}</span>
+                      {item.updated_at && (
+                        <span className="t-caption-sm text-[var(--brand-text-muted)]">
+                          {formatDate(item.updated_at)}
+                        </span>
+                      )}
+                    </div>
+                    {item.reason && (
+                      <p className="mt-1 t-caption-sm text-[var(--brand-text)]">
+                        {item.reason}
+                      </p>
                     )}
                   </div>
-                  {item.reason && (
-                    <p className="mt-1 t-caption-sm text-[var(--brand-text)]">
-                      {item.reason}
-                    </p>
-                  )}
-                </div>
-              ))
-            ) : (
+                ))}
+                {declinedFeedback.length > 12 && (
+                  <p className="t-caption-sm text-[var(--brand-text-muted)]">
+                    Showing latest 12 declines ({declinedFeedback.length} total).
+                  </p>
+                )}
+              </div>
+            ) : requestedFeedback.length === 0 ? null : (
               <p className="t-caption-sm text-[var(--brand-text-muted)]">
                 No declined keywords right now.
-              </p>
-            )}
-            {declinedFeedback.length > 12 && (
-              <p className="t-caption-sm text-[var(--brand-text-muted)]">
-                Showing latest 12 declines ({declinedFeedback.length} total).
               </p>
             )}
           </div>

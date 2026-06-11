@@ -139,7 +139,11 @@ export type ActivityType =
   | 'post_approved'
   | 'post_changes_requested'
   | 'post_client_edit'
-  | 'llms_txt_generated';
+  | 'llms_txt_generated'
+  // rec_status_updated / rec_dismissed are deliberately NOT in CLIENT_VISIBLE_TYPES:
+  // recommendation triage is an internal admin-facing audit trail, not a client deliverable.
+  | 'rec_status_updated'   // client triage: pending/in_progress/completed
+  | 'rec_dismissed';       // client dismissed a recommendation
 
 export interface ActivityEntry {
   id: string;

@@ -252,6 +252,7 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
     }
   }, [location.state, location.pathname, location.search, navigate]);
 
+  const [searchParams] = useSearchParams();
   const [clipboardStatus, setClipboardStatus] = useState<string | null>(null);
   const [pendingContentRequests, setPendingContentRequests] = useState(0);
   const [requestsSubTab, setRequestsSubTab] = useState<'signals' | 'requests' | 'actions' | 'deliverables'>('deliverables');
@@ -259,8 +260,16 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
   // instead of the legacy Keyword Command Center. Dark (OFF) until P5 cutover.
   const keywordHubEnabled = useFeatureFlag('keyword-hub');
 
-  // Reset requests sub-tab when workspace changes so stale state doesn't persist
-  useEffect(() => { setRequestsSubTab('deliverables'); }, [urlWorkspaceId]); // effect-layout-ok — state reset on workspace switch, not layout derivation
+  // Reset requests sub-tab when workspace changes so stale state doesn't persist.
+  // On workspace change, honour ?tab= if it matches a valid sub-tab; otherwise default to 'deliverables'.
+  // On subsequent navigations within the same workspace the ?tab= param will have been cleared by
+  // the TabBar onChange, so this effect only fires on workspace switch or deep-link entry.
+  const REQUESTS_SUB_TABS = ['signals', 'requests', 'actions', 'deliverables'] as const;
+  useEffect(() => {
+    const deepTab = searchParams.get('tab') as 'signals' | 'requests' | 'actions' | 'deliverables' | null;
+    setRequestsSubTab(deepTab && REQUESTS_SUB_TABS.includes(deepTab) ? deepTab : 'deliverables');
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: only fire on workspace switch or initial mount with ?tab=
+  }, [urlWorkspaceId]); // effect-layout-ok — state reset on workspace switch, not layout derivation
 
   // Derive selected workspace from URL + React Query data
   const selected = useMemo(() => {

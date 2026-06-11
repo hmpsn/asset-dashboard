@@ -16,6 +16,7 @@ import { getWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
 import { requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
+import { InvalidTransitionError } from '../state-machines.js';
 import type { ContentMatrix, MatrixCell } from '../../shared/types/content.ts';
 import {
   batchApproveMatrixCells,
@@ -135,6 +136,12 @@ router.post(
   } catch (err) {
     if (err instanceof ContentPlanReviewMutationError) {
       return res.status(err.status).json({ error: err.message });
+    }
+    // Defense-in-depth: flagMatrixCell already 409s on non-client-visible cells, but if the
+    // state machine ever rejects the flag edge (e.g. a status added without a flag transition),
+    // surface a clean 409 instead of a 500 so the client sees an actionable error.
+    if (err instanceof InvalidTransitionError) {
+      return res.status(409).json({ error: 'Cell is not available for client review' });
     }
     log.error({ err }, 'Failed to flag cell');
     res.status(500).json({ error: 'Failed to flag cell' });

@@ -12,8 +12,7 @@ import { themeColor } from './ui/constants';
 import { WorkspaceHealthBadge } from './admin/WorkspaceHealthBadge';
 import { BriefingReviewQueue } from './admin/BriefingReviewQueue';
 import { WorkOrderPanel } from './admin/WorkOrderPanel';
-import { InsightsEngine } from './client/InsightsEngine';
-import { CartProvider } from './client/useCart';
+import { AdminRecommendationQueue } from './admin/AdminRecommendationQueue';
 import { ErrorBoundary } from './ErrorBoundary';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useAuditSummary } from '../hooks/useAuditSummary';
@@ -621,12 +620,10 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
         <SeoChangeImpact workspaceId={workspaceId} hasGsc={!!gscPropertyUrl} />
       )}
 
-      {/* ── Action Plan (InsightsEngine) ── */}
+      {/* ── Recommendations queue (admin surface — full queue, dismissed view, OV breakdown) ── */}
       {workspaceId && (
-        <ErrorBoundary label="Action Plan">
-          <CartProvider>
-            <InsightsEngine workspaceId={workspaceId} tier="premium" compact onNavigate={(tab) => navigate(adminPath(workspaceId, tab as Page))} />
-          </CartProvider>
+        <ErrorBoundary label="Recommendations">
+          <AdminRecommendationQueue workspaceId={workspaceId} />
         </ErrorBoundary>
       )}
 
