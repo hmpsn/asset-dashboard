@@ -147,6 +147,7 @@ function adminInvalidationKeys(
       return [
         queryKeys.client.contentRequests(workspaceId),
         queryKeys.admin.requests(workspaceId),
+        queryKeys.admin.workspaceBadges(workspaceId),
         ...contentPipelineKeys(workspaceId),
         queryKeys.admin.notifications(),
       ] as const;

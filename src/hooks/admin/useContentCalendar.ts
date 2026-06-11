@@ -53,10 +53,10 @@ export function useContentCalendar(workspaceId: string) {
     queryKey: queryKeys.admin.contentCalendar(workspaceId),
     queryFn: async (): Promise<CalendarItem[]> => {
       const [briefsData, postsData, requestsData, matricesData] = await Promise.all([
-        contentBriefs.list(workspaceId).catch(() => []),
-        contentPosts.list(workspaceId).catch(() => []),
-        contentRequests.list(workspaceId).catch(() => []),
-        contentMatrices.list(workspaceId).catch(() => []),
+        contentBriefs.list(workspaceId),
+        contentPosts.list(workspaceId),
+        contentRequests.list(workspaceId),
+        contentMatrices.list(workspaceId),
       ]);
 
       const allItems: CalendarItem[] = [];

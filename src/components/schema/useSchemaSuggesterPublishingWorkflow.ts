@@ -42,6 +42,9 @@ export function useSchemaSuggesterPublishingWorkflow({
   const [schemaParseError, setSchemaParseError] = useState<Record<string, string>>({});
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [templateSaved, setTemplateSaved] = useState(false);
+  const [templateSaveError, setTemplateSaveError] = useState<string | null>(null);
+  const [sendToClientError, setSendToClientError] = useState<string | null>(null);
+  const [sendPageErrors, setSendPageErrors] = useState<Record<string, string>>({});
 
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
 
@@ -55,6 +58,7 @@ export function useSchemaSuggesterPublishingWorkflow({
   const sendSchemasToClient = useCallback(async (note?: string) => {
     if (!data || !workspaceId) return;
     setSendingToClient(true);
+    setSendToClientError(null);
     try {
       const items = data.map(page => ({
         pageId: page.pageId,
@@ -70,7 +74,7 @@ export function useSchemaSuggesterPublishingWorkflow({
       refreshStates();
       setApprovalRefreshKey(k => k + 1);
     } catch (err) {
-      console.error('SchemaSuggester operation failed:', err);
+      setSendToClientError(err instanceof Error ? err.message : 'Failed to send schemas to client. Please try again.');
     } finally {
       setSendingToClient(false);
     }
@@ -162,6 +166,7 @@ export function useSchemaSuggesterPublishingWorkflow({
   const sendSingleSchemaToClient = useCallback(async (page: SchemaPageSuggestion, note?: string) => {
     if (!workspaceId) return;
     setSendingPage(prev => new Set(prev).add(page.pageId));
+    setSendPageErrors(prev => { const n = { ...prev }; delete n[page.pageId]; return n; });
     try {
       const items = [{
         pageId: page.pageId,
@@ -176,7 +181,7 @@ export function useSchemaSuggesterPublishingWorkflow({
       setSentPages(prev => new Set(prev).add(page.pageId));
       setApprovalRefreshKey(k => k + 1);
     } catch (err) {
-      console.error('SchemaSuggester operation failed:', err);
+      setSendPageErrors(prev => ({ ...prev, [page.pageId]: err instanceof Error ? err.message : 'Failed to send to client. Please try again.' }));
     } finally {
       setSendingPage(prev => {
         const next = new Set(prev);
@@ -197,12 +202,13 @@ export function useSchemaSuggesterPublishingWorkflow({
     if (!orgNode) return;
     const websiteNode = wsNode || { '@type': 'WebSite', '@id': `${orgNode['url']}/#website`, 'url': orgNode['url'], 'name': orgNode['name'], 'publisher': { '@id': `${orgNode['url']}/#organization` } };
     setSavingTemplate(true);
+    setTemplateSaveError(null);
     try {
       await put(`/api/webflow/schema-template/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`, { organizationNode: orgNode, websiteNode });
       setTemplateSaved(true);
       setTimeout(() => setTemplateSaved(false), 3000);
     } catch (err) {
-      console.error('SchemaSuggester operation failed:', err);
+      setTemplateSaveError(err instanceof Error ? err.message : 'Failed to save template. Please try again.');
     } finally {
       setSavingTemplate(false);
     }
@@ -286,10 +292,13 @@ export function useSchemaSuggesterPublishingWorkflow({
     setConfirmPublish,
     sendingToClient,
     sentToClient,
+    sendToClientError,
+    setSendToClientError,
     approvalRefreshKey,
     setApprovalRefreshKey,
     sendingPage,
     sentPages,
+    sendPageErrors,
     retractingPages,
     retractedPages,
     bulkPublishing,
@@ -300,6 +309,7 @@ export function useSchemaSuggesterPublishingWorkflow({
     schemaParseError,
     savingTemplate,
     templateSaved,
+    templateSaveError,
     getState,
     summary,
     unpublishedCount,

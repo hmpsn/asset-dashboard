@@ -5,7 +5,7 @@ import { LOCAL_SEO_VISIBILITY_POSTURE } from '../../../shared/types/local-seo';
 import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs';
 import { useLocalSeo, useLocalSeoRefresh } from '../../hooks/admin';
 import { useBackgroundTasks } from '../../hooks/useBackgroundTasks';
-import { Badge, Button, Icon, SectionCard, StatCard, cn } from '../ui';
+import { Badge, Button, ErrorState, Icon, SectionCard, StatCard, cn } from '../ui';
 import { LocalSeoMarketSetupDrawer } from './LocalSeoMarketSetupDrawer';
 
 type LocalSeoVisibilityPanelMode = 'strategy' | 'keywords' | 'page';
@@ -260,7 +260,7 @@ function LocalSeoPageAnnotationPanel({
 
 export function LocalSeoVisibilityPanel({ workspaceId, mode = 'keywords', onOpenKeywords }: LocalSeoVisibilityPanelProps) {
   const [setupOpen, setSetupOpen] = useState(false);
-  const { data, isLoading, error } = useLocalSeo(workspaceId);
+  const { data, isLoading, isError, error, refetch } = useLocalSeo(workspaceId);
   const refresh = useLocalSeoRefresh(workspaceId);
   const { findActiveJob } = useBackgroundTasks();
   const activeRefreshJob = findActiveJob({
@@ -281,6 +281,23 @@ export function LocalSeoVisibilityPanel({ workspaceId, mode = 'keywords', onOpen
           <Icon as={RefreshCw} size="sm" className="animate-spin text-blue-400" />
           Loading local visibility posture...
         </div>
+      </SectionCard>
+    );
+  }
+
+  // First-load fetch failure: data is undefined and isError is true.
+  // Must render an error state before the featureEnabled check so the panel
+  // never silently vanishes on all three mount surfaces (Strategy, KCC, Page Intelligence).
+  if (isError && !data) {
+    return (
+      <SectionCard title={title} variant="subtle">
+        <ErrorState
+          title="Local visibility unavailable"
+          message="Local SEO data could not load. Keyword and ranking data were not changed."
+          action={{ label: 'Try Again', onClick: () => { void refetch(); } }}
+          type="network"
+          className="py-4"
+        />
       </SectionCard>
     );
   }

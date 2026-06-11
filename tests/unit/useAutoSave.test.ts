@@ -68,6 +68,34 @@ describe('useAutoSave', () => {
     expect(onError).toHaveBeenCalledWith(expect.any(Error));
   });
 
+  it('transitions saveStatus to "error" (not "saved") when saveFn rejects', async () => {
+    const saveFn = vi.fn().mockRejectedValue(new Error('500 Internal Server Error'));
+    const { result } = renderHook(() => useAutoSave(saveFn, 500));
+
+    act(() => { result.current.scheduleAutoSave('<p>content</p>'); });
+    await act(async () => { vi.advanceTimersByTime(500); });
+
+    expect(result.current.saveStatus).toBe('error');
+  });
+
+  it('saveStatus never transitions to "saved" after a failed save', async () => {
+    const saveFn = vi.fn().mockRejectedValue(new Error('network failure'));
+    const { result } = renderHook(() => useAutoSave(saveFn, 500));
+
+    const statusHistory: string[] = [];
+    // Track status by polling after the timer fires
+    act(() => { result.current.scheduleAutoSave('<p>v1</p>'); });
+    await act(async () => { vi.advanceTimersByTime(500); });
+
+    statusHistory.push(result.current.saveStatus);
+    // Advance the 1500ms "saved→idle" window — it must NOT transition through 'saved'
+    await act(async () => { vi.advanceTimersByTime(1500); });
+    statusHistory.push(result.current.saveStatus);
+
+    expect(statusHistory).not.toContain('saved');
+    expect(statusHistory[0]).toBe('error');
+  });
+
   it('new content typed during in-flight save is not lost on flush', async () => {
     let resolveFirstSave!: () => void;
     const firstSavePromise = new Promise<void>(r => { resolveFirstSave = r; });
@@ -113,6 +141,61 @@ describe('useAutoSave', () => {
     expect(saveFn).toHaveBeenCalledTimes(1);
   });
 
+  it('flush returns { ok: true } when save succeeds', async () => {
+    const saveFn = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAutoSave(saveFn, 500));
+
+    act(() => { result.current.scheduleAutoSave('<p>hello</p>'); });
+    const flushResult = await act(async () => result.current.flush());
+
+    expect(flushResult).toEqual({ ok: true });
+  });
+
+  it('flush returns { ok: false } when save fails', async () => {
+    const saveFn = vi.fn().mockRejectedValue(new Error('network error'));
+    const { result } = renderHook(() => useAutoSave(saveFn, 500));
+
+    act(() => { result.current.scheduleAutoSave('<p>hello</p>'); });
+    const flushResult = await act(async () => result.current.flush());
+
+    expect(flushResult).toEqual({ ok: false });
+  });
+
+  it('calls onSuccess when saveFn resolves', async () => {
+    const saveFn = vi.fn().mockResolvedValue(undefined);
+    const onSuccess = vi.fn();
+    const { result } = renderHook(() => useAutoSave(saveFn, 500, undefined, onSuccess));
+
+    act(() => { result.current.scheduleAutoSave('<p>content</p>'); });
+    await act(async () => { vi.advanceTimersByTime(500); });
+
+    expect(saveFn).toHaveBeenCalled();
+    expect(onSuccess).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not call onSuccess when saveFn rejects', async () => {
+    const saveFn = vi.fn().mockRejectedValue(new Error('failure'));
+    const onSuccess = vi.fn();
+    const { result } = renderHook(() => useAutoSave(saveFn, 500, undefined, onSuccess));
+
+    act(() => { result.current.scheduleAutoSave('<p>content</p>'); });
+    await act(async () => { vi.advanceTimersByTime(500); });
+
+    expect(saveFn).toHaveBeenCalled();
+    expect(onSuccess).not.toHaveBeenCalled();
+  });
+
+  it('flush returns { ok: true } when nothing is pending', async () => {
+    const saveFn = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAutoSave(saveFn, 500));
+
+    const flushResult = await act(async () => result.current.flush());
+
+    expect(saveFn).not.toHaveBeenCalled();
+    // lastSaveOkRef starts true, so flush with nothing pending returns ok: true
+    expect(flushResult).toEqual({ ok: true });
+  });
+
   it('does not crash or warn when component unmounts mid-save', async () => {
     let resolveSave!: () => void;
     const savePromise = new Promise<void>(r => { resolveSave = r; });
@@ -130,5 +213,47 @@ describe('useAutoSave', () => {
     await act(async () => { resolveSave(); await savePromise; });
     // Advance time past the 1500ms saved→idle timer to confirm no leak
     await act(async () => { vi.advanceTimersByTime(2000); });
+  });
+
+  // ── resetSaveOk: out-of-band-retry recovery ──────────────────────────────────
+  // Regression for the PostEditor section-retry bug: a manual retry that saves
+  // OUTSIDE the hook leaves lastSaveOkRef=false, so the next flush() (with nothing
+  // pending) returns { ok: false } and edit-mode exit is silently blocked forever.
+  // resetSaveOk() is how the caller restores the hook's ok-state after such a save.
+  it('after a failed save, flush returns { ok: false } until resetSaveOk is called', async () => {
+    const saveFn = vi.fn().mockRejectedValue(new Error('network error'));
+    const { result } = renderHook(() => useAutoSave(saveFn, 500));
+
+    // Trigger a failure so lastSaveOkRef flips to false.
+    act(() => { result.current.scheduleAutoSave('<p>boom</p>'); });
+    await act(async () => { vi.advanceTimersByTime(500); });
+    expect(result.current.saveStatus).toBe('error');
+
+    // With pendingHtml cleared after the failed attempt drains, flush re-fires the
+    // failed payload (still pending) — it fails again, ok stays false.
+    let flushed = await act(async () => result.current.flush());
+    expect(flushed).toEqual({ ok: false });
+
+    // Simulate the out-of-band retry succeeding: caller resets the ok-state.
+    act(() => { result.current.resetSaveOk(); });
+    expect(result.current.saveStatus).toBe('idle');
+
+    // Now a flush with nothing pending reports ok again, so Done can exit edit mode.
+    flushed = await act(async () => result.current.flush());
+    expect(flushed).toEqual({ ok: true });
+  });
+
+  it('resetSaveOk clears pending content so a stale failed payload does not re-fire', async () => {
+    const saveFn = vi.fn().mockRejectedValue(new Error('network error'));
+    const { result } = renderHook(() => useAutoSave(saveFn, 500));
+
+    act(() => { result.current.scheduleAutoSave('<p>stale</p>'); });
+    await act(async () => { vi.advanceTimersByTime(500); });
+    expect(saveFn).toHaveBeenCalledTimes(1);
+
+    // resetSaveOk drops the pending payload; a subsequent flush must not re-save it.
+    act(() => { result.current.resetSaveOk(); });
+    await act(async () => { await result.current.flush(); });
+    expect(saveFn).toHaveBeenCalledTimes(1);
   });
 });

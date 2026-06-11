@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useContentCalendar } from '../hooks/admin';
-import { Button, EmptyState, Icon, IconButton } from './ui';
+import { Button, EmptyState, ErrorState, Icon, IconButton } from './ui';
 import { adminPath } from '../routes';
 import { timeAgo } from '../lib/timeAgo';
 
@@ -80,7 +80,8 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   // React Query hook replaces manual useEffect fetching
-  const { data: items = [], isLoading } = useContentCalendar(workspaceId);
+  const { data: rawItems, isLoading, isError, refetch } = useContentCalendar(workspaceId);
+  const items = rawItems ?? [];
   const [typeFilter, setTypeFilter] = useState<ItemType | 'all'>('all');
 
   // ── Calendar grid ──
@@ -165,6 +166,22 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
       <div className="flex items-center justify-center py-24">
         <div className="w-6 h-6 border-2 rounded-[var(--radius-pill)] animate-spin border-[var(--surface-3)] border-t-teal-400" />
       </div>
+    );
+  }
+
+  // Only surface the full-screen error when there is no cached data to fall back on.
+  // A background refetch failure with stale data present should keep the calendar visible.
+  if (isError && !rawItems) {
+    return (
+      <ErrorState
+        title="Couldn't load calendar data"
+        message="Content calendar data failed to load. Try reloading."
+        actions={[
+          { label: 'Retry', onClick: () => { void refetch(); } },
+          { label: 'Refresh page', onClick: () => window.location.reload(), variant: 'secondary' },
+        ]}
+        type="data"
+      />
     );
   }
 

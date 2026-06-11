@@ -859,7 +859,7 @@ async function importDashboard() {
 
       if (tab === 'home') return <WorkspaceHome workspaceId={selected.id} workspaceName={selected.webflowSiteName || selected.name} webflowSiteId={selected.webflowSiteId} webflowSiteName={selected.webflowSiteName} gscPropertyUrl={selected.gscPropertyUrl} ga4PropertyId={selected.ga4PropertyId} />;
       if (tab === 'seo-audit') return <SeoAudit siteId={selected.webflowSiteId!} workspaceId={selected.id} siteName={selected.webflowSiteName || selected.name} />;
-      if (tab === 'content-pipeline') return <ContentPipeline workspaceId={selected.id} onRequestCountChange={() => {}} fixContext={null} clearFixContext={() => {}} />;
+      if (tab === 'content-pipeline') return <ContentPipeline workspaceId={selected.id} fixContext={null} clearFixContext={() => {}} />;
       return null;
     };
 

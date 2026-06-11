@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { auditSchedules, anomalies } from '../api';
+import { anomalies } from '../api';
 import {
   Search, Globe, BarChart3, Shield, Gauge, Pencil, Link2,
   Target, Code2, Clipboard, Image, TrendingUp, Sparkles, FileText,
@@ -10,6 +10,8 @@ import {
 import { type Workspace } from './WorkspaceSelector';
 import { type Page, adminPath, GLOBAL_TABS } from '../routes';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
+import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
+import { useToast } from './Toast';
 import { ClickableRow, FormInput, Icon } from './ui';
 
 interface PaletteItem {
@@ -92,6 +94,8 @@ function fuzzyMatch(text: string, query: string): boolean {
 
 export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspace }: CommandPaletteProps) {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const { startJob } = useBackgroundTasks();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -172,11 +176,29 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
     if (selectedWorkspace) {
       result.push({
         id: 'action:run-audit',
+        // Run Audit: starts a background seo-audit job (same path as SeoAudit.tsx runAudit).
+        // Requires a linked Webflow site (webflowSiteId). When no site is linked, navigates
+        // to the audit tab where the "link a site" message is shown.
         label: 'Run Audit',
-        sub: 'Start SEO site audit',
+        sub: selectedWorkspace.webflowSiteId ? 'Start SEO site audit' : 'Link a site to run audits',
         icon: Shield,
         type: 'action',
-        action: () => { auditSchedules.enable(selectedWorkspace!.id); addRecent('action:run-audit'); },
+        action: () => {
+          addRecent('action:run-audit');
+          if (!selectedWorkspace.webflowSiteId) {
+            navigate(adminPath(selectedWorkspace.id, 'seo-audit'));
+            return;
+          }
+          startJob('seo-audit', { siteId: selectedWorkspace.webflowSiteId, workspaceId: selectedWorkspace.id })
+            .then(jobId => {
+              if (jobId) {
+                toast('Audit started — check the notification bell for progress', 'success');
+              } else {
+                toast('Could not start audit. Try again from the Site Audit tab.', 'error');
+              }
+            })
+            .catch(() => { toast('Could not start audit. Try again from the Site Audit tab.', 'error'); });
+        },
       });
       result.push({
         id: 'action:generate-schema',
@@ -196,11 +218,19 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
       });
       result.push({
         id: 'action:scan-anomalies',
-        label: 'Scan for Anomalies',
-        sub: 'Run anomaly detection now',
+        // Anomaly scan is global (all workspaces) — the server has no workspace-scoped
+        // variant. Label is honest about scope; a workspace-scoped endpoint is a server gap
+        // flagged in the W1.6 report.
+        label: 'Scan All Workspaces for Anomalies',
+        sub: 'Run anomaly detection across all workspaces',
         icon: Zap,
         type: 'action',
-        action: () => { anomalies.scan(); addRecent('action:scan-anomalies'); },
+        action: () => {
+          addRecent('action:scan-anomalies');
+          anomalies.scan()
+            .then(() => { toast('Anomaly scan started', 'success'); })
+            .catch(() => { toast('Anomaly scan failed. Try again later.', 'error'); });
+        },
       });
       result.push({
         id: 'action:create-template',
@@ -232,7 +262,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
     }
 
     return result;
-  }, [workspaces, selectedWorkspace, onSelectWorkspace, navigate, keywordHubEnabled]);
+  }, [workspaces, selectedWorkspace, onSelectWorkspace, navigate, keywordHubEnabled, startJob, toast]);
 
   // Filter items by query
   const filtered = useMemo(() => {

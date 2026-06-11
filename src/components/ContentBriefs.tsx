@@ -26,7 +26,7 @@ import { useToast } from './Toast';
 const BRIEF_ROUTES = ['seo-briefs', 'content-pipeline'] as const;
 type BriefRoute = typeof BRIEF_ROUTES[number];
 
-export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, clearFixContext }: { workspaceId: string; onRequestCountChange?: (pending: number) => void; fixContext?: FixContext | null; clearFixContext?: () => void }) {
+export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { workspaceId: string; fixContext?: FixContext | null; clearFixContext?: () => void }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { trackJob, jobs } = useBackgroundTasks();
@@ -49,12 +49,6 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
     briefs.length === 0 &&
     clientRequests.length === 0 &&
     posts.length === 0;
-
-  // Notify parent of pending request count whenever requests data changes
-  useEffect(() => {
-    onRequestCountChange?.(clientRequests.filter(r => r.status === 'requested').length);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientRequests]);
 
   const [generating, setGenerating] = useState(false);
   const [generatingBriefFor, setGeneratingBriefFor] = useState<string | null>(null);
